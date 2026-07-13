@@ -38,10 +38,10 @@ var machineGVK = schema.GroupVersionKind{
 	Kind:    "Machine",
 }
 
-var httpRouteGVK = schema.GroupVersionKind{
+var gatewayGVK = schema.GroupVersionKind{
 	Group:   "gateway.networking.k8s.io",
 	Version: "v1",
-	Kind:    "HTTPRoute",
+	Kind:    "Gateway",
 }
 
 const externalDNSTargetAnnotation = "external-dns.alpha.kubernetes.io/target"
@@ -52,17 +52,23 @@ const externalDNSTargetAnnotation = "external-dns.alpha.kubernetes.io/target"
 // re-applies `wg set` when it changes, so there is nothing for this
 // controller to coordinate beyond a plain patch.
 //
-// Optionally (when httpRouteNamespace/httpRouteName are set) it also
-// stamps the same IP onto an HTTPRoute's external-dns target annotation.
-// This exists because a Gateway whose data plane is pinned to one node
-// via hostPorts (rather than a cloud LoadBalancer) has no dependable
+// Optionally (when gatewayNamespace/gatewayName are set) it also stamps
+// the same IP onto a Gateway's external-dns target annotation. This
+// exists because a Gateway whose data plane is pinned to one node via
+// hostPorts (rather than a cloud LoadBalancer) has no dependable
 // Gateway.status.addresses for external-dns to read -- the annotation
 // bypasses that entirely, and this controller already has the one piece
 // of information (the node's real external IP) that annotation needs.
+//
+// This must be the Gateway, not the HTTPRoute: confirmed by reading
+// external-dns's gateway.go (gatewayRouteResolver.resolve) --
+// annotations.TargetsFromTargetAnnotation is called on gw.gateway, the
+// parent Gateway object, never on the route. A target annotation on the
+// HTTPRoute itself is silently ignored.
 type reconciler struct {
 	client.Client
 	// reader is the manager's uncached API reader. The Secret and
-	// HTTPRoute are read once per reconcile, never watched -- routing
+	// Gateway are read once per reconcile, never watched -- routing
 	// those Gets through the normal cached client would make
 	// controller-runtime start a cluster-wide list+watch informer for
 	// the whole type, which needs list/watch RBAC this identity
@@ -70,13 +76,13 @@ type reconciler struct {
 	// named object). The cached Client is still used for the Machine
 	// watch (which is the actual thing meant to be watched) and for
 	// Patch, which doesn't go through the cache either way.
-	reader             client.Reader
-	secretNamespace    string
-	secretName         string
-	secretKey          string
-	port               string
-	httpRouteNamespace string
-	httpRouteName      string
+	reader           client.Reader
+	secretNamespace  string
+	secretName       string
+	secretKey        string
+	port             string
+	gatewayNamespace string
+	gatewayName      string
 }
 
 func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -141,25 +147,25 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 	log.Info("updated dialer peer endpoint", "endpoint", endpoint, "machine", req.NamespacedName)
 
-	if r.httpRouteName != "" {
-		route := &unstructured.Unstructured{}
-		route.SetGroupVersionKind(httpRouteGVK)
-		routeKey := types.NamespacedName{Namespace: r.httpRouteNamespace, Name: r.httpRouteName}
-		if err := r.reader.Get(ctx, routeKey, route); err != nil {
-			return ctrl.Result{}, fmt.Errorf("getting HTTPRoute %s: %w", routeKey, err)
+	if r.gatewayName != "" {
+		gw := &unstructured.Unstructured{}
+		gw.SetGroupVersionKind(gatewayGVK)
+		gwKey := types.NamespacedName{Namespace: r.gatewayNamespace, Name: r.gatewayName}
+		if err := r.reader.Get(ctx, gwKey, gw); err != nil {
+			return ctrl.Result{}, fmt.Errorf("getting Gateway %s: %w", gwKey, err)
 		}
-		if route.GetAnnotations()[externalDNSTargetAnnotation] != externalIP {
-			routePatch := client.MergeFrom(route.DeepCopy())
-			annotations := route.GetAnnotations()
+		if gw.GetAnnotations()[externalDNSTargetAnnotation] != externalIP {
+			gwPatch := client.MergeFrom(gw.DeepCopy())
+			annotations := gw.GetAnnotations()
 			if annotations == nil {
 				annotations = map[string]string{}
 			}
 			annotations[externalDNSTargetAnnotation] = externalIP
-			route.SetAnnotations(annotations)
-			if err := r.Patch(ctx, route, routePatch); err != nil {
-				return ctrl.Result{}, fmt.Errorf("patching HTTPRoute %s: %w", routeKey, err)
+			gw.SetAnnotations(annotations)
+			if err := r.Patch(ctx, gw, gwPatch); err != nil {
+				return ctrl.Result{}, fmt.Errorf("patching Gateway %s: %w", gwKey, err)
 			}
-			log.Info("updated HTTPRoute external-dns target", "ip", externalIP, "httproute", routeKey)
+			log.Info("updated Gateway external-dns target", "ip", externalIP, "gateway", gwKey)
 		}
 	}
 	return ctrl.Result{}, nil
@@ -167,14 +173,14 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 func main() {
 	var (
-		machineSelector    string
-		secretNamespace    string
-		secretName         string
-		secretKey          string
-		port               string
-		metricsAddr        string
-		httpRouteNamespace string
-		httpRouteName      string
+		machineSelector  string
+		secretNamespace  string
+		secretName       string
+		secretKey        string
+		port             string
+		metricsAddr      string
+		gatewayNamespace string
+		gatewayName      string
 	)
 	flag.StringVar(&machineSelector, "machine-selector", "cloud-provisioning.appmana.com/role=cloud-worker",
 		"label selector identifying the Machine(s) whose external address drives the dialer's endpoint")
@@ -183,8 +189,8 @@ func main() {
 	flag.StringVar(&secretKey, "secret-key", "peer-endpoint", "key within the Secret to write the endpoint into")
 	flag.StringVar(&port, "port", "51820", "WireGuard listen port on the joining node")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "metrics endpoint address (0 disables it)")
-	flag.StringVar(&httpRouteNamespace, "httproute-namespace", "", "optional: namespace of an HTTPRoute to annotate with the node's external IP for external-dns (blank disables this)")
-	flag.StringVar(&httpRouteName, "httproute-name", "", "optional: name of an HTTPRoute to annotate with the node's external IP for external-dns")
+	flag.StringVar(&gatewayNamespace, "gateway-namespace", "", "optional: namespace of a Gateway to annotate with the node's external IP for external-dns (blank disables this)")
+	flag.StringVar(&gatewayName, "gateway-name", "", "optional: name of a Gateway to annotate with the node's external IP for external-dns")
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -214,14 +220,14 @@ func main() {
 			return selector.Matches(labels.Set(obj.GetLabels()))
 		}))).
 		Complete(&reconciler{
-			Client:             mgr.GetClient(),
-			reader:             mgr.GetAPIReader(),
-			secretNamespace:    secretNamespace,
-			secretName:         secretName,
-			secretKey:          secretKey,
-			port:               port,
-			httpRouteNamespace: httpRouteNamespace,
-			httpRouteName:      httpRouteName,
+			Client:           mgr.GetClient(),
+			reader:           mgr.GetAPIReader(),
+			secretNamespace:  secretNamespace,
+			secretName:       secretName,
+			secretKey:        secretKey,
+			port:             port,
+			gatewayNamespace: gatewayNamespace,
+			gatewayName:      gatewayName,
 		})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create controller: %v\n", err)

@@ -88,7 +88,8 @@ POLICY_DOC=$(cat <<EOF
         "ec2:DescribeKeyPairs",
         "ec2:DescribeAvailabilityZones",
         "ec2:DescribeTags",
-        "ec2:DescribeDhcpOptions"
+        "ec2:DescribeDhcpOptions",
+        "ec2:DescribeNetworkInterfaces"
       ],
       "Resource": "*"
     },

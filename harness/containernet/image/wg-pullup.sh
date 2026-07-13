@@ -22,7 +22,11 @@ source "/etc/wireguard/${peer}.env"
 ip link add wg0 type wireguard 2>/dev/null || true
 ip link set wg0 mtu 1420
 
-keyfile=$(mktemp)
+# Ubuntu's AppArmor profile for /usr/bin/wg confines it to `/etc/wireguard/**`
+# (see /etc/apparmor.d/usr.bin.wg) -- a keyfile under the default mktemp
+# location (/tmp) fails with a bare "fopen: Permission denied" from wg
+# itself, not from the filesystem. The key must live under /etc/wireguard/.
+keyfile=$(mktemp /etc/wireguard/.wg-pullup-key.XXXXXX)
 trap 'rm -f "$keyfile"' EXIT
 chmod 600 "$keyfile"
 printf '%s' "$PRIVATE_KEY" > "$keyfile"

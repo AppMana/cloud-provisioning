@@ -46,12 +46,18 @@ harness/                reproducible two-netns test of the tunnel + BGP + self-h
 harness/containernet/   the same tunnel scripts under a Docker-based network
                          simulation, with a flappable link standing in for
                          the internet — see harness/containernet/README.md
+harness/aws-bringup/    the same scripts against one real, billed EC2
+                         instance and a real on-prem host, over the real
+                         internet — see harness/aws-bringup/README.md
 manifests/              CAPA + k0smotron worker templates; the cluster-side WG dialer
+scripts/aws/            one-time IAM bootstrap for the least-privilege identity
+                         harness/aws-bringup/ runs under
 ```
 
 ## Status
 
-The design is validated twice, at two levels of fidelity:
+The design is validated at three levels of fidelity, each closer to the
+real thing than the last:
 
 - `harness/wg-wan-worker.sh` — two raw `ip netns`, a WireGuard tunnel, and
   bird BGP, run as root on the bare host.
@@ -60,12 +66,27 @@ The design is validated twice, at two levels of fidelity:
   `harness/containernet/image/` run for real) driven inside two Docker
   containers linked by containernet, with real latency and a link that can
   be flapped on command.
+- `harness/aws-bringup/` — the same `wg-pullup.sh`, unmodified, driving a
+  real `t4g.micro` in EC2 and a real on-prem host (jarvis), dialing over
+  the actual internet. This is the level that caught two bugs the
+  simulations couldn't: Ubuntu's AppArmor profile for `/usr/bin/wg`
+  confines it to `/etc/wireguard/**`, so a keyfile under the default
+  `mktemp` (`/tmp`) location fails with a bare `fopen: Permission denied`
+  — fixed in `wg-pullup.sh` itself, so every environment gets the fix.
+  The other was in the test harness, not the design: `ping -I <device>`
+  binds the socket to that device (forcing egress out a dummy interface
+  with no real link), where `ping -I <address>` binds only the source
+  address and lets normal routing pick `wg0` — the harness now does the
+  latter.
 
-Both independently confirm: ordering (no API access before the tunnel is
-up), a successful WireGuard handshake by dialing out, pod-to-pod
-connectivity riding the tunnel, MTU enforcement under WireGuard overhead
-(1420), and self-heal after a link flap using only WireGuard's
-`PersistentKeepalive` kernel timer — no controller, nothing re-executed.
+All three independently confirm: ordering (no API access before the
+tunnel is up), a successful WireGuard handshake by dialing out,
+pod-to-pod connectivity riding the tunnel, MTU enforcement under
+WireGuard overhead (1420), and self-heal after a link flap using only
+WireGuard's `PersistentKeepalive` kernel timer — no controller, nothing
+re-executed.
 
 The provisioning manifests are templates; the cluster-side dialer's
-endpoint discovery from `AWSMachine.status` is the remaining glue.
+endpoint discovery from `AWSMachine.status` (or, better, the
+provider-agnostic `Machine.status.addresses` CAPI copies it to) is the
+remaining glue — a small controller-runtime reconciler, not yet written.

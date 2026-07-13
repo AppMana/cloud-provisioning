@@ -77,8 +77,17 @@ spec:
   # Standalone/externally-managed: this cluster's control plane is NOT
   # CAPI-managed, so the security group + subnet are supplied directly
   # rather than derived from an AWSCluster.
-  securityGroupOverrides:
-    node: <sg-id-allowing-22-80-443-udp51820>
+  #
+  # additionalSecurityGroups, NOT securityGroupOverrides -- confirmed
+  # by reading CAPA's GetCoreSecurityGroups
+  # (pkg/cloud/services/ec2/instances.go): when the Machine is
+  # externally managed, that function ignores securityGroupOverrides
+  # entirely and only reads additionalSecurityGroups. Using the wrong
+  # field leaves the instance on the VPC's default security group with
+  # none of the rules below applied, and CAPA tight-loops trying to
+  # reconcile the ENI down to zero groups (which AWS rejects).
+  additionalSecurityGroups:
+    - id: <sg-id-allowing-22-80-443-udp51820>
   subnet:
     id: <subnet-id>
   publicIP: true

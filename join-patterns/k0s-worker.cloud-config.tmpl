@@ -34,5 +34,20 @@ runcmd:
   - wg-quick up wg0
   - until ping -c1 -W2 {{ .apiVIP }} >/dev/null 2>&1; do sleep 2; done
   - curl -sSLf https://get.k0s.sh | K0S_VERSION={{ .k0sVersion }} sh
-  - k0s install worker --token-file /etc/k0s/join-token --kubelet-extra-args="{{ .kubeletExtraArgs }}"
+  # k0s resolves node IPs by looking up the instance's own hostname, not
+  # by inspecting interfaces -- on AWS that hostname only maps to the
+  # private IPv4 in /etc/hosts, so a dual-stack cluster's kubelet fails
+  # to start ("IP address lookup didn't return addresses for both
+  # families") even when the interface genuinely has a real IPv6 GUA.
+  # --node-ip bypasses that lookup with addresses fetched directly from
+  # instance metadata instead. (IMDSv2, AWS-specific: a different
+  # infrastructure provider's variant of this pattern would fetch its
+  # own metadata service here instead.)
+  - |
+    IMDS_TOKEN=$(curl -sSf -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+    NODE_IPV4=$(curl -sSf -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+    NODE_IPV6=$(curl -sSf -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/ipv6 || true)
+    NODE_IP_ARG="--node-ip=$NODE_IPV4"
+    [ -n "$NODE_IPV6" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4,$NODE_IPV6"
+    k0s install worker --token-file /etc/k0s/join-token --kubelet-extra-args="{{ .kubeletExtraArgs }} $NODE_IP_ARG"
   - k0s start

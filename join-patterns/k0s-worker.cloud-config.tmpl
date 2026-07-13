@@ -16,6 +16,12 @@ write_files:
       Address = {{ .wireguard.address }}
       ListenPort = {{ .wireguard.listenPort }}
       PrivateKey = {{ .wireguard.privateKey }}
+      # wg-quick otherwise inherits the instance's own ENI MTU (9001 on
+      # AWS, jumbo frames), producing an MTU wg0 can only actually use if
+      # every hop on the real path also carries jumbo frames -- which a
+      # home/office internet uplink never does. 1420 matches what the
+      # rest of this design validates against (harness/, aws-bringup/).
+      MTU = 1420
       [Peer]
       PublicKey = {{ .wireguard.peerPublicKey }}
       AllowedIPs = {{ .wireguard.allowedIPs }}

@@ -1,0 +1,85 @@
+# Template: one cloud VM joined to an existing k0s cluster as a worker.
+#
+# Composes two existing controllers (both run in the target cluster):
+#   - Cluster API core (Machine)
+#   - CAPA / cluster-api-provider-aws (AWSMachine) — the infrastructure
+#
+# No bootstrap provider (no k0smotron): its worker bootstrap controller
+# unconditionally requires Cluster.spec.controlPlaneRef to resolve to a
+# real object (confirmed by reading worker_bootstrap_controller.go's
+# setClientScope -- its own comment claims a graceful fallback to the
+# management cluster client when no ref is given, but the code errors
+# out instead with "object reference not set"). That makes it
+# fundamentally incompatible with a target cluster that isn't
+# CAPI-managed, which is exactly this case. Machine.spec.bootstrap.dataSecretName
+# exists precisely so a bootstrap provider isn't required.
+#
+# Render the actual cloud-init content from ../../join-patterns/k0s-worker.cloud-config.tmpl
+# via ../../controller/cmd/render-join-data (never hand-type it — a
+# different join pattern is a new template, not new code):
+#   go run ./controller/cmd/render-join-data \
+#     --pattern join-patterns/k0s-worker.cloud-config.tmpl \
+#     --values <site-values.yaml> > user-data.yaml
+#   kubectl create secret generic cloud-worker-0-bootstrap -n default \
+#     --type=cluster.x-k8s.io/secret \
+#     --from-file=value=user-data.yaml --from-literal=format=cloud-config
+#
+# Placeholders in <angle brackets> are cluster/site specific. The AWS
+# fields are the only provider-coupled part; swapping to another CAPI
+# infrastructure provider replaces only the AWSMachine.
+#
+# This also requires a Cluster + AWSCluster pair named <cluster-name>
+# to already exist -- clusterName below refers to it, and CAPI won't
+# reconcile a Machine whose Cluster doesn't exist. Since the underlying
+# k0s cluster isn't CAPI-managed, that Cluster/AWSCluster pair must
+# carry the cluster.x-k8s.io/managed-by annotation so CAPA never touches
+# real AWS infrastructure for it. See
+# https://cluster-api-aws.sigs.k8s.io/topics/bring-your-own-aws-infrastructure#using-externally-managed-aws-clusters
+#
+# CAPI's own clustercache also needs live API access to the target
+# cluster (normally supplied by a CAPI-managed control plane) --
+# create a <cluster-name>-kubeconfig Secret once, out of band, from a
+# real kubeconfig pointed at the cluster's own internal API address
+# (not a tailnet/admin-only address -- it must be reachable from
+# inside the target cluster's own pod network):
+#   kubectl create secret generic <cluster-name>-kubeconfig -n default \
+#     --from-file=value=<kubeconfig-with-server-set-to-the-internal-API-address>
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Machine
+metadata:
+  name: cloud-worker-0
+  namespace: default
+  labels:
+    cluster.x-k8s.io/cluster-name: <cluster-name>
+    # Matches ../wg-dialer/controller.yaml's default --machine-selector --
+    # this is what lets the endpoint controller find this Machine without
+    # knowing anything about AWSMachine.
+    cloud-provisioning.appmana.com/role: cloud-worker
+spec:
+  clusterName: <cluster-name>
+  bootstrap:
+    dataSecretName: cloud-worker-0-bootstrap
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AWSMachine
+    name: cloud-worker-0
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSMachine
+metadata:
+  name: cloud-worker-0
+  namespace: default
+spec:
+  instanceType: t4g.small
+  # arm64 image; region/zone per site (Hong Kong: ap-east-1).
+  ami:
+    id: <arm64-ubuntu-ami-id>
+  # Standalone/externally-managed: this cluster's control plane is NOT
+  # CAPI-managed, so the security group + subnet are supplied directly
+  # rather than derived from an AWSCluster.
+  securityGroupOverrides:
+    node: <sg-id-allowing-22-80-443-udp51820>
+  subnet:
+    id: <subnet-id>
+  publicIP: true
+  sshKeyName: <keypair-name>

@@ -22,10 +22,17 @@ not know a WAN is involved.
    cluster as an externally-managed/standalone machine) creates the VM.
    The AWS specifics stay behind the CAPA seam; other infrastructure
    providers slot in the same way.
-2. **Bootstrap** — k0smotron's bootstrap provider (`K0sWorkerConfig`)
-   mints the k0s join token and generates cloud-init. That cloud-init
-   also brings up a WireGuard listener and gates the `k0s install worker`
-   join behind "wait until the API VIP is reachable."
+2. **Bootstrap** — a real k0s join token (`k0s token create --role=worker`
+   on an existing node) plus a WireGuard listener config are rendered into
+   cloud-init from a versioned template (`join-patterns/k0s-worker.cloud-config.tmpl`,
+   via `controller/cmd/render-join-data`) and set directly as
+   `Machine.spec.bootstrap.dataSecretName` — no bootstrap provider. k0smotron's
+   own worker bootstrap controller was tried first and doesn't work here: it
+   unconditionally requires `Cluster.spec.controlPlaneRef` to resolve to a real
+   object, which no externally-managed cluster has (confirmed by reading its
+   source, not guessed). That cloud-init brings up the WireGuard listener and
+   gates the `k0s install worker` join behind "wait until the API VIP is
+   reachable."
 3. **Tunnel** — the cluster dials *out* to the VM's public IP (the VM has
    no inbound requirement on the cluster side). WireGuard needs only one
    reachable endpoint, and the VM's public IP is it.
@@ -49,7 +56,12 @@ harness/containernet/   the same tunnel scripts under a Docker-based network
 harness/aws-bringup/    the same scripts against one real, billed EC2
                          instance and a real on-prem host, over the real
                          internet — see harness/aws-bringup/README.md
-manifests/              CAPA + k0smotron worker templates; the cluster-side WG dialer
+manifests/              CAPA worker templates (Machine + AWSMachine, no bootstrap
+                         provider); the cluster-side WG dialer + endpoint controller
+join-patterns/          versioned cloud-init templates, one per join mechanism --
+                         rendered by controller/cmd/render-join-data, never hand-typed
+controller/              Go module: the endpoint-watcher controller, the Go dialer
+                         (netlink/wgctrl, no shelling out), and render-join-data
 scripts/aws/            one-time IAM bootstrap for the least-privilege identity
                          harness/aws-bringup/ runs under
 ```
@@ -86,7 +98,16 @@ WireGuard overhead (1420), and self-heal after a link flap using only
 WireGuard's `PersistentKeepalive` kernel timer — no controller, nothing
 re-executed.
 
-The provisioning manifests are templates; the cluster-side dialer's
-endpoint discovery from `AWSMachine.status` (or, better, the
-provider-agnostic `Machine.status.addresses` CAPI copies it to) is the
-remaining glue — a small controller-runtime reconciler, not yet written.
+The remaining glue -- the cluster-side dialer's endpoint discovery -- is
+now `controller/cmd/endpoint-controller`: it watches the provider-agnostic
+`Machine.status.addresses` (never `AWSMachine` directly) and keeps the
+dialer's peer Secret current, plus (optionally) an HTTPRoute's
+`external-dns.alpha.kubernetes.io/target` annotation for a Gateway pinned
+to the node via hostPorts. `controller/cmd/dialer` replaced the original
+shell-script DaemonSet with direct netlink/wgctrl calls, avoiding both
+shelling out and the AppArmor confinement `wg` runs under.
+
+This design is now being deployed for real, end to end, against the
+production `hilton` k0s cluster (a t4g.nano in ap-east-1) -- see
+`join-patterns/` and `manifests/capi-direct-bootstrap/` for what that
+deployment actually runs.

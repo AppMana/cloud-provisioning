@@ -1,0 +1,32 @@
+#cloud-config
+# k0s-worker join pattern: bring up the WireGuard tunnel, gate on the
+# cluster's API VIP becoming reachable through it, then join as a plain
+# k0s worker using a pre-minted join token. This is CAPA's own
+# Machine.spec.bootstrap.dataSecretName content -- no bootstrap
+# provider involved. That's deliberate, not a shortcut: a bootstrap
+# provider's whole value is generating this content FOR you from a
+# CAPI-managed control plane, and there isn't one here (see
+# ../README.md's "Why no k0smotron" section). Every value below comes
+# from the render tool's input, not from any control-plane object.
+write_files:
+  - path: /etc/wireguard/wg0.conf
+    permissions: '0600'
+    content: |
+      [Interface]
+      Address = {{ .wireguard.address }}
+      ListenPort = {{ .wireguard.listenPort }}
+      PrivateKey = {{ .wireguard.privateKey }}
+      [Peer]
+      PublicKey = {{ .wireguard.peerPublicKey }}
+      AllowedIPs = {{ .wireguard.allowedIPs }}
+  - path: /etc/k0s/join-token
+    permissions: '0600'
+    content: |
+      {{ .joinToken }}
+runcmd:
+  - apt-get update && apt-get install -y wireguard-tools
+  - wg-quick up wg0
+  - until ping -c1 -W2 {{ .apiVIP }} >/dev/null 2>&1; do sleep 2; done
+  - curl -sSLf https://get.k0s.sh | K0S_VERSION={{ .k0sVersion }} sh
+  - k0s install worker --token-file /etc/k0s/join-token --kubelet-extra-args="{{ .kubeletExtraArgs }}"
+  - k0s start

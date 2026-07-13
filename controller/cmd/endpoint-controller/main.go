@@ -38,17 +38,35 @@ var machineGVK = schema.GroupVersionKind{
 	Kind:    "Machine",
 }
 
+var httpRouteGVK = schema.GroupVersionKind{
+	Group:   "gateway.networking.k8s.io",
+	Version: "v1",
+	Kind:    "HTTPRoute",
+}
+
+const externalDNSTargetAnnotation = "external-dns.alpha.kubernetes.io/target"
+
 // reconciler mirrors one Machine's external address into a Secret key.
 // It never watches or reads the Secret it writes -- the dialer DaemonSet
 // (manifests/wg-dialer/dialer.yaml) polls the mounted file itself and
 // re-applies `wg set` when it changes, so there is nothing for this
 // controller to coordinate beyond a plain patch.
+//
+// Optionally (when httpRouteNamespace/httpRouteName are set) it also
+// stamps the same IP onto an HTTPRoute's external-dns target annotation.
+// This exists because a Gateway whose data plane is pinned to one node
+// via hostPorts (rather than a cloud LoadBalancer) has no dependable
+// Gateway.status.addresses for external-dns to read -- the annotation
+// bypasses that entirely, and this controller already has the one piece
+// of information (the node's real external IP) that annotation needs.
 type reconciler struct {
 	client.Client
-	secretNamespace string
-	secretName      string
-	secretKey       string
-	port            string
+	secretNamespace    string
+	secretName         string
+	secretKey          string
+	port               string
+	httpRouteNamespace string
+	httpRouteName      string
 }
 
 func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -112,17 +130,41 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("patching secret %s: %w", secretKey, err)
 	}
 	log.Info("updated dialer peer endpoint", "endpoint", endpoint, "machine", req.NamespacedName)
+
+	if r.httpRouteName != "" {
+		route := &unstructured.Unstructured{}
+		route.SetGroupVersionKind(httpRouteGVK)
+		routeKey := types.NamespacedName{Namespace: r.httpRouteNamespace, Name: r.httpRouteName}
+		if err := r.Get(ctx, routeKey, route); err != nil {
+			return ctrl.Result{}, fmt.Errorf("getting HTTPRoute %s: %w", routeKey, err)
+		}
+		if route.GetAnnotations()[externalDNSTargetAnnotation] != externalIP {
+			routePatch := client.MergeFrom(route.DeepCopy())
+			annotations := route.GetAnnotations()
+			if annotations == nil {
+				annotations = map[string]string{}
+			}
+			annotations[externalDNSTargetAnnotation] = externalIP
+			route.SetAnnotations(annotations)
+			if err := r.Patch(ctx, route, routePatch); err != nil {
+				return ctrl.Result{}, fmt.Errorf("patching HTTPRoute %s: %w", routeKey, err)
+			}
+			log.Info("updated HTTPRoute external-dns target", "ip", externalIP, "httproute", routeKey)
+		}
+	}
 	return ctrl.Result{}, nil
 }
 
 func main() {
 	var (
-		machineSelector string
-		secretNamespace string
-		secretName      string
-		secretKey       string
-		port            string
-		metricsAddr     string
+		machineSelector    string
+		secretNamespace    string
+		secretName         string
+		secretKey          string
+		port               string
+		metricsAddr        string
+		httpRouteNamespace string
+		httpRouteName      string
 	)
 	flag.StringVar(&machineSelector, "machine-selector", "cloud-provisioning.appmana.com/role=cloud-worker",
 		"label selector identifying the Machine(s) whose external address drives the dialer's endpoint")
@@ -131,6 +173,8 @@ func main() {
 	flag.StringVar(&secretKey, "secret-key", "peer-endpoint", "key within the Secret to write the endpoint into")
 	flag.StringVar(&port, "port", "51820", "WireGuard listen port on the joining node")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "metrics endpoint address (0 disables it)")
+	flag.StringVar(&httpRouteNamespace, "httproute-namespace", "", "optional: namespace of an HTTPRoute to annotate with the node's external IP for external-dns (blank disables this)")
+	flag.StringVar(&httpRouteName, "httproute-name", "", "optional: name of an HTTPRoute to annotate with the node's external IP for external-dns")
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -160,11 +204,13 @@ func main() {
 			return selector.Matches(labels.Set(obj.GetLabels()))
 		}))).
 		Complete(&reconciler{
-			Client:          mgr.GetClient(),
-			secretNamespace: secretNamespace,
-			secretName:      secretName,
-			secretKey:       secretKey,
-			port:            port,
+			Client:             mgr.GetClient(),
+			secretNamespace:    secretNamespace,
+			secretName:         secretName,
+			secretKey:          secretKey,
+			port:               port,
+			httpRouteNamespace: httpRouteNamespace,
+			httpRouteName:      httpRouteName,
 		})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create controller: %v\n", err)

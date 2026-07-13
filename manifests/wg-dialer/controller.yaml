@@ -60,6 +60,36 @@ subjects:
     name: wg-dialer-endpoint-controller
     namespace: wg-dialer
 ---
+# Only needed if --httproute-name is set (a Gateway pinned to one node
+# via hostPorts has no dependable Gateway.status.addresses for
+# external-dns to read; this annotation bypasses that). Grant this in
+# whatever namespace/name the actual HTTPRoute lives in -- omit
+# entirely if the flag is unused.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wg-dialer-endpoint-controller-patch-httproute
+  namespace: <httproute-namespace>
+rules:
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes"]
+    resourceNames: ["<httproute-name>"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wg-dialer-endpoint-controller-patch-httproute
+  namespace: <httproute-namespace>
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wg-dialer-endpoint-controller-patch-httproute
+subjects:
+  - kind: ServiceAccount
+    name: wg-dialer-endpoint-controller
+    namespace: wg-dialer
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:

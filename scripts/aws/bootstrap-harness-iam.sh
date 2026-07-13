@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
-# One-time bootstrap: mint a least-privilege IAM user scoped to exactly what
-# harness/aws-bringup/ needs (launch/terminate one tagged instance, manage
-# its security group and key pair) so the harness never has to run under
-# whatever admin credential did this bootstrap.
+# One-time bootstrap: mint a least-privilege IAM user for a
+# cloud-provisioning identity, scoped to exactly the EC2 actions needed
+# to bring up/tear down a tagged node -- plus, optionally, Route53
+# access scoped to one hosted zone, for cert-manager/external-dns
+# running against that node. One script serves two shapes of caller:
+#
+#   - the ephemeral harness/aws-bringup/ test (default USER_NAME,
+#     no ROUTE53_ZONE_ID)
+#   - a persistent in-cluster identity for a real deployment, e.g.
+#     USER_NAME=hilton-cloud-worker REGION=ap-east-1
+#     ROUTE53_ZONE_ID=Z0730122KCZINH3W18MZ
 #
 # Requires admin-level credentials already exported in the environment
 # (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_DEFAULT_REGION) with
@@ -12,6 +19,8 @@ set -euo pipefail
 
 USER_NAME="${USER_NAME:-cloud-provisioning-harness}"
 POLICY_NAME="${POLICY_NAME:-CloudProvisioningHarness}"
+REGION="${REGION:-*}"
+ROUTE53_ZONE_ID="${ROUTE53_ZONE_ID:-}"
 
 # Least privilege here means: describe calls are unscoped (read-only,
 # harmless), but every mutation that touches an EXISTING resource
@@ -35,7 +44,33 @@ POLICY_NAME="${POLICY_NAME:-CloudProvisioningHarness}"
 # Allow scoped to only the newly-created resource types, tag-conditioned.
 TAG_KEY="Project"
 TAG_VALUE="$USER_NAME"
-PARTITION_ARN="arn:aws:ec2:*:*"
+PARTITION_ARN="arn:aws:ec2:${REGION}:*"
+
+# Only appended when ROUTE53_ZONE_ID is set. ChangeResourceRecordSets and
+# ListResourceRecordSets are scoped to that one zone; GetChange and
+# ListHostedZones(ByName) aren't zone resources in IAM's model (a change
+# ID isn't a hosted zone, and zone discovery-by-name has to run before
+# you have a zone ARN to scope to), so those stay unscoped -- read-only
+# and harmless regardless.
+ROUTE53_STATEMENTS=""
+if [ -n "$ROUTE53_ZONE_ID" ]; then
+  ROUTE53_STATEMENTS=$(cat <<EOF
+    ,
+    {
+      "Sid": "Route53ZoneScoped",
+      "Effect": "Allow",
+      "Action": ["route53:ChangeResourceRecordSets", "route53:ListResourceRecordSets"],
+      "Resource": "arn:aws:route53:::hostedzone/${ROUTE53_ZONE_ID}"
+    },
+    {
+      "Sid": "Route53Unscoped",
+      "Effect": "Allow",
+      "Action": ["route53:GetChange", "route53:ListHostedZones", "route53:ListHostedZonesByName"],
+      "Resource": "*"
+    }
+EOF
+  )
+fi
 
 POLICY_DOC=$(cat <<EOF
 {
@@ -115,7 +150,7 @@ POLICY_DOC=$(cat <<EOF
       "Condition": {
         "StringEquals": { "ec2:ResourceTag/${TAG_KEY}": "${TAG_VALUE}" }
       }
-    }
+    }${ROUTE53_STATEMENTS}
   ]
 }
 EOF

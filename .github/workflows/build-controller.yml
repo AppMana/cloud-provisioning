@@ -17,7 +17,6 @@ jobs:
         target: [endpoint-controller, dialer]
     steps:
       - uses: actions/checkout@v5
-      - run: pwd && ls -la
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3

@@ -87,7 +87,8 @@ POLICY_DOC=$(cat <<EOF
         "ec2:DescribeSecurityGroups",
         "ec2:DescribeKeyPairs",
         "ec2:DescribeAvailabilityZones",
-        "ec2:DescribeTags"
+        "ec2:DescribeTags",
+        "ec2:DescribeDhcpOptions"
       ],
       "Resource": "*"
     },
@@ -144,7 +145,8 @@ POLICY_DOC=$(cat <<EOF
         "ec2:DeleteSecurityGroup",
         "ec2:AuthorizeSecurityGroupIngress",
         "ec2:RevokeSecurityGroupIngress",
-        "ec2:DeleteKeyPair"
+        "ec2:DeleteKeyPair",
+        "ec2:CreateTags"
       ],
       "Resource": "*",
       "Condition": {

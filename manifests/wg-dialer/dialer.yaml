@@ -10,10 +10,13 @@
 # whole point — the tunnel is the node's only path to the API, so it must
 # not depend on the API to stay up.
 #
-# The one piece of glue still to write: populate `peer-endpoint` from the
-# provisioned node's public IP, which CAPA publishes in
-# AWSMachine.status.addresses. Options: a tiny reconciler that writes this
-# Secret, or (for a single node) set it by hand.
+# `peer-endpoint` is kept current by ../../controller/ (deployed via
+# controller.yaml in this directory), which watches core CAPI Machine
+# objects -- not AWSMachine, so it doesn't care which infrastructure
+# provider is underneath -- and patches this key from
+# Machine.status.addresses whenever it changes. peer-public-key and
+# dialer-private-key are set once, out of band, and never touched by the
+# controller.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -21,8 +24,39 @@ metadata:
   namespace: wg-dialer
 stringData:
   peer-public-key: "<node-public-key>"
-  peer-endpoint: "<node-public-ip>:51820"   # from AWSMachine.status.addresses
+  peer-endpoint: "<node-public-ip>:51820"   # kept live by the controller after bootstrap
   dialer-private-key: "<cluster-dialer-private-key>"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wg-dialer
+  namespace: wg-dialer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wg-dialer-read-secret
+  namespace: wg-dialer
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["wg-dialer-peer"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wg-dialer-read-secret
+  namespace: wg-dialer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wg-dialer-read-secret
+subjects:
+  - kind: ServiceAccount
+    name: wg-dialer
+    namespace: wg-dialer
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -39,34 +73,21 @@ spec:
         app: wg-dialer
     spec:
       hostNetwork: true
+      serviceAccountName: wg-dialer
       nodeSelector:
         kubernetes.io/os: linux
       containers:
         - name: dialer
-          image: <wireguard-tools-image>
+          image: <wg-dialer-image>   # controller/Dockerfile --target dialer
           securityContext:
             capabilities:
               add: ["NET_ADMIN"]
-          command:
-            - /bin/sh
-            - -ceu
-            - |
-              # Assemble wg0 from the Secret; dial the node's public IP;
-              # keepalive drives the handshake and self-heals on flap.
-              ip link add wg0 type wireguard 2>/dev/null || true
-              wg set wg0 private-key /secret/dialer-private-key \
-                peer "$(cat /secret/peer-public-key)" \
-                endpoint "$(cat /secret/peer-endpoint)" \
-                persistent-keepalive 15 \
-                allowed-ips 10.100.0.0/24,10.101.130.0/24
-              ip addr add 10.100.0.1/24 dev wg0 2>/dev/null || true
-              ip link set wg0 mtu 1420 up
-              sleep infinity
-          volumeMounts:
-            - name: peer
-              mountPath: /secret
-              readOnly: true
-      volumes:
-        - name: peer
-          secret:
-            secretName: wg-dialer-peer
+          args:
+            - --secret-namespace=wg-dialer
+            - --secret-name=wg-dialer-peer
+            - --iface=wg0
+            - --local-address=10.100.0.1/24
+            - --allowed-ips=10.100.0.0/24,10.101.130.0/24
+            - --keepalive-seconds=15
+            - --mtu=1420
+            - --poll-interval=30s

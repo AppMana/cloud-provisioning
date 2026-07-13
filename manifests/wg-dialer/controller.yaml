@@ -1,0 +1,93 @@
+# Watches core Cluster API Machine objects (cluster.x-k8s.io, not any
+# infrastructure-provider-specific type) and keeps wg-dialer-peer's
+# peer-endpoint key current from Machine.status.addresses. Source:
+# ../../controller/.
+#
+# RBAC is split deliberately: cluster-wide read-only access to Machines
+# (they can live in any namespace CAPI is configured for), but write
+# access to Secrets is a Role scoped to the wg-dialer namespace alone --
+# this identity cannot touch a Secret anywhere else in the cluster.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wg-dialer-endpoint-controller
+  namespace: wg-dialer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wg-dialer-endpoint-controller-read-machines
+rules:
+  - apiGroups: ["cluster.x-k8s.io"]
+    resources: ["machines"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: wg-dialer-endpoint-controller-read-machines
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: wg-dialer-endpoint-controller-read-machines
+subjects:
+  - kind: ServiceAccount
+    name: wg-dialer-endpoint-controller
+    namespace: wg-dialer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wg-dialer-endpoint-controller-patch-secret
+  namespace: wg-dialer
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["wg-dialer-peer"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wg-dialer-endpoint-controller-patch-secret
+  namespace: wg-dialer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wg-dialer-endpoint-controller-patch-secret
+subjects:
+  - kind: ServiceAccount
+    name: wg-dialer-endpoint-controller
+    namespace: wg-dialer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wg-dialer-endpoint-controller
+  namespace: wg-dialer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wg-dialer-endpoint-controller
+  template:
+    metadata:
+      labels:
+        app: wg-dialer-endpoint-controller
+    spec:
+      serviceAccountName: wg-dialer-endpoint-controller
+      containers:
+        - name: controller
+          image: <wg-dialer-endpoint-controller-image>
+          args:
+            - --machine-selector=cloud-provisioning.appmana.com/role=cloud-worker
+            - --secret-namespace=wg-dialer
+            - --secret-name=wg-dialer-peer
+            - --secret-key=peer-endpoint
+            - --port=51820
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi

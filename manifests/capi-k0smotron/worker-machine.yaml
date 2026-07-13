@@ -15,6 +15,10 @@ metadata:
   namespace: default
   labels:
     cluster.x-k8s.io/cluster-name: <cluster-name>
+    # Matches ../wg-dialer/controller.yaml's default --machine-selector --
+    # this is what lets the endpoint controller find this Machine without
+    # knowing anything about AWSMachine.
+    cloud-provisioning.appmana.com/role: cloud-worker
 spec:
   clusterName: <cluster-name>
   bootstrap:

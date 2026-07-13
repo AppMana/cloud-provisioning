@@ -61,6 +61,16 @@ const externalDNSTargetAnnotation = "external-dns.alpha.kubernetes.io/target"
 // of information (the node's real external IP) that annotation needs.
 type reconciler struct {
 	client.Client
+	// reader is the manager's uncached API reader. The Secret and
+	// HTTPRoute are read once per reconcile, never watched -- routing
+	// those Gets through the normal cached client would make
+	// controller-runtime start a cluster-wide list+watch informer for
+	// the whole type, which needs list/watch RBAC this identity
+	// deliberately doesn't have (it only has get, scoped to the one
+	// named object). The cached Client is still used for the Machine
+	// watch (which is the actual thing meant to be watched) and for
+	// Patch, which doesn't go through the cache either way.
+	reader             client.Reader
 	secretNamespace    string
 	secretName         string
 	secretKey          string
@@ -113,7 +123,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	secret := &corev1.Secret{}
 	secretKey := types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}
-	if err := r.Get(ctx, secretKey, secret); err != nil {
+	if err := r.reader.Get(ctx, secretKey, secret); err != nil {
 		return ctrl.Result{}, fmt.Errorf("getting secret %s: %w", secretKey, err)
 	}
 
@@ -135,7 +145,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		route := &unstructured.Unstructured{}
 		route.SetGroupVersionKind(httpRouteGVK)
 		routeKey := types.NamespacedName{Namespace: r.httpRouteNamespace, Name: r.httpRouteName}
-		if err := r.Get(ctx, routeKey, route); err != nil {
+		if err := r.reader.Get(ctx, routeKey, route); err != nil {
 			return ctrl.Result{}, fmt.Errorf("getting HTTPRoute %s: %w", routeKey, err)
 		}
 		if route.GetAnnotations()[externalDNSTargetAnnotation] != externalIP {
@@ -205,6 +215,7 @@ func main() {
 		}))).
 		Complete(&reconciler{
 			Client:             mgr.GetClient(),
+			reader:             mgr.GetAPIReader(),
 			secretNamespace:    secretNamespace,
 			secretName:         secretName,
 			secretKey:          secretKey,

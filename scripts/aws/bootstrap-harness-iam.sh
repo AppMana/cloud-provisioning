@@ -139,6 +139,18 @@ POLICY_DOC=$(cat <<EOF
       }
     },
     {
+      "Sid": "ModifyOwnInstanceNetworkInterfaces",
+      "Effect": "Allow",
+      "Action": ["ec2:ModifyNetworkInterfaceAttribute"],
+      "Resource": [
+        "${PARTITION_ARN}:network-interface/*",
+        "${PARTITION_ARN}:security-group/*"
+      ],
+      "Condition": {
+        "StringEquals": { "ec2:ResourceTag/${TAG_KEY}": "${TAG_VALUE}" }
+      }
+    },
+    {
       "Sid": "MutateOnlyOwnTaggedResources",
       "Effect": "Allow",
       "Action": [
@@ -159,7 +171,8 @@ POLICY_DOC=$(cat <<EOF
 EOF
 )
 
-echo "account: $(aws sts get-caller-identity --query Account --output text)" >&2
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+echo "account: $ACCOUNT_ID" >&2
 
 if aws iam get-user --user-name "$USER_NAME" >/dev/null 2>&1; then
   echo "user $USER_NAME already exists, skipping create" >&2
@@ -167,11 +180,40 @@ else
   aws iam create-user --user-name "$USER_NAME" >/dev/null
 fi
 
-aws iam put-user-policy \
-  --user-name "$USER_NAME" \
-  --policy-name "$POLICY_NAME" \
-  --policy-document "$POLICY_DOC"
-
+# A customer-managed policy, not inline: inline user policies cap out at
+# 2048 bytes, which this policy outgrew as more narrowly-scoped
+# statements were added. Managed policies allow 6144.
+POLICY_ARN="arn:aws:iam::${ACCOUNT_ID}:policy/${POLICY_NAME}"
+if aws iam get-policy --policy-arn "$POLICY_ARN" >/dev/null 2>&1; then
+  # A policy can keep at most 5 versions; drop the oldest non-default
+  # one first if already at the cap, then push the new version as default.
+  OLD_VERSIONS=$(aws iam list-policy-versions --policy-arn "$POLICY_ARN" \
+    --query 'Versions[?!IsDefaultVersion].VersionId' --output text)
+  VERSION_COUNT=$(aws iam list-policy-versions --policy-arn "$POLICY_ARN" --query 'length(Versions)' --output text)
+  if [ "$VERSION_COUNT" -ge 5 ]; then
+    OLDEST=$(echo "$OLD_VERSIONS" | tr '\t' '\n' | sort -t v -k2 -n | head -1)
+    aws iam delete-policy-version --policy-arn "$POLICY_ARN" --version-id "$OLDEST" >/dev/null
+  fi
+  aws iam create-policy-version --policy-arn "$POLICY_ARN" --policy-document "$POLICY_DOC" --set-as-default >/dev/null
+  echo "policy $POLICY_NAME updated (new default version)" >&2
+else
+  aws iam create-policy --policy-name "$POLICY_NAME" --policy-document "$POLICY_DOC" >/dev/null
+  echo "policy $POLICY_NAME created" >&2
+fi
+aws iam attach-user-policy --user-name "$USER_NAME" --policy-arn "$POLICY_ARN"
 echo "policy $POLICY_NAME attached to $USER_NAME" >&2
-echo "creating access key (existing keys are left alone — delete manually if rotating)" >&2
-aws iam create-access-key --user-name "$USER_NAME"
+
+# Clean up an old inline policy of the same name from before this script
+# switched to a managed policy, if one exists.
+if aws iam get-user-policy --user-name "$USER_NAME" --policy-name "$POLICY_NAME" >/dev/null 2>&1; then
+  aws iam delete-user-policy --user-name "$USER_NAME" --policy-name "$POLICY_NAME"
+  echo "removed stale inline policy $POLICY_NAME" >&2
+fi
+
+EXISTING_KEYS=$(aws iam list-access-keys --user-name "$USER_NAME" --query 'length(AccessKeyMetadata)' --output text)
+if [ "$EXISTING_KEYS" -ge 2 ]; then
+  echo "user already has $EXISTING_KEYS access keys (AWS max is 2) -- not creating another; reuse an existing one or delete one first" >&2
+else
+  echo "creating access key (existing keys are left alone — delete manually if rotating)" >&2
+  aws iam create-access-key --user-name "$USER_NAME"
+fi

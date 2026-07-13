@@ -1,13 +1,21 @@
 # Two images from one module, selected with --target:
 #   docker build --target endpoint-controller -t <tag> .
 #   docker build --target dialer -t <tag> .
-FROM golang:1.26 AS build
+#
+# --platform=$BUILDPLATFORM pins the build stage to the runner's own
+# architecture regardless of the requested target --platform, so a
+# multi-arch build cross-compiles natively (Go itself needs no QEMU to
+# target a different GOARCH) instead of running the entire Go toolchain
+# under emulation for arm64, which is what happens without this.
+FROM --platform=$BUILDPLATFORM golang:1.26 AS build
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd
-RUN CGO_ENABLED=0 go build -o /out/endpoint-controller ./cmd/endpoint-controller
-RUN CGO_ENABLED=0 go build -o /out/dialer ./cmd/dialer
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/endpoint-controller ./cmd/endpoint-controller
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/dialer ./cmd/dialer
 
 FROM gcr.io/distroless/static-debian12:nonroot AS endpoint-controller
 COPY --from=build /out/endpoint-controller /endpoint-controller

@@ -1,0 +1,13 @@
+[Unit]
+Description=First-boot provisioning (cloud-init/user_data analogue)
+After=network-pre.target
+Before=wg-pullup@node.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/firstboot
+ExecStartPost=/bin/systemctl start wg-pullup@node.service
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,72 @@
+# Cluster-side WireGuard dialer. Runs as a DaemonSet (hostNetwork,
+# NET_ADMIN) so every node brings up a wg0 to the cloud worker — a flat
+# tunnel mesh, which keeps Calico's node-to-node BGP mesh working with
+# nothing to configure (each node advertises its own IPAM block,
+# next-hop = its own now-reachable node IP).
+#
+# The dialer is deliberately NOT a smart controller: it holds a static
+# WireGuard config with PersistentKeepalive and re-handshakes on its own,
+# independent of Kubernetes control-loop health. That independence is the
+# whole point — the tunnel is the node's only path to the API, so it must
+# not depend on the API to stay up.
+#
+# The one piece of glue still to write: populate `peer-endpoint` from the
+# provisioned node's public IP, which CAPA publishes in
+# AWSMachine.status.addresses. Options: a tiny reconciler that writes this
+# Secret, or (for a single node) set it by hand.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wg-dialer-peer
+  namespace: wg-dialer
+stringData:
+  peer-public-key: "<node-public-key>"
+  peer-endpoint: "<node-public-ip>:51820"   # from AWSMachine.status.addresses
+  dialer-private-key: "<cluster-dialer-private-key>"
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: wg-dialer
+  namespace: wg-dialer
+spec:
+  selector:
+    matchLabels:
+      app: wg-dialer
+  template:
+    metadata:
+      labels:
+        app: wg-dialer
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+        - name: dialer
+          image: <wireguard-tools-image>
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+          command:
+            - /bin/sh
+            - -ceu
+            - |
+              # Assemble wg0 from the Secret; dial the node's public IP;
+              # keepalive drives the handshake and self-heals on flap.
+              ip link add wg0 type wireguard 2>/dev/null || true
+              wg set wg0 private-key /secret/dialer-private-key \
+                peer "$(cat /secret/peer-public-key)" \
+                endpoint "$(cat /secret/peer-endpoint)" \
+                persistent-keepalive 15 \
+                allowed-ips 10.100.0.0/24,10.101.130.0/24
+              ip addr add 10.100.0.1/24 dev wg0 2>/dev/null || true
+              ip link set wg0 mtu 1420 up
+              sleep infinity
+          volumeMounts:
+            - name: peer
+              mountPath: /secret
+              readOnly: true
+      volumes:
+        - name: peer
+          secret:
+            secretName: wg-dialer-peer

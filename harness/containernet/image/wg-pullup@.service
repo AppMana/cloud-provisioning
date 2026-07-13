@@ -1,0 +1,14 @@
+[Unit]
+Description=WireGuard pull-up for peer %i
+After=network-pre.target
+Wants=network-pre.target
+Before=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/wg-pullup %i
+ExecStop=/usr/bin/env sh -c 'ip link del wg0 2>/dev/null || true'
+
+[Install]
+WantedBy=multi-user.target

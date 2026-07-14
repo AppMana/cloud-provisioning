@@ -10,6 +10,7 @@ import (
 
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -518,5 +519,97 @@ func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
 	}
 	if otherProvider.infraValueCalls != 0 {
 		t.Errorf("expected the OtherMachine-kind provider to NEVER be consulted for a Machine whose infrastructureRef.kind is AWSMachine, got %d calls", otherProvider.infraValueCalls)
+	}
+}
+
+func TestReconcile_InfraProviderValidateErrorBlocksBootstrapSecretCreation(t *testing.T) {
+	// Full Reconcile-level proof of the aws.Validator wiring, using the
+	// real aws.Provider (not a stub): reproduces the exact live bug
+	// caught against the hilton cluster (AWSClusterStaticIdentity's
+	// secretRef Secret in the wrong namespace) and confirms Reconcile
+	// surfaces it as an immediate error instead of proceeding to create
+	// a bootstrap secret that CAPA could never actually use.
+	clusterGVK := schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Cluster"}
+	awsClusterGVK := schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSCluster"}
+	awsClusterStaticIdentityGVK := schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSClusterStaticIdentity"}
+
+	machine := machineWithInfraRef("hilton-cloud-worker-jarvistam-0", "default", "hilton-cloud-worker-jarvistam-0")
+	machine.SetLabels(map[string]string{"cluster.x-k8s.io/cluster-name": "hilton-jarvistam"})
+	awsMachine := fakeAWSMachine("hilton-cloud-worker-jarvistam-0", "default", false)
+	awsMachine.SetLabels(map[string]string{"cluster.x-k8s.io/cluster-name": "hilton-jarvistam"})
+
+	cluster := &unstructured.Unstructured{}
+	cluster.SetGroupVersionKind(clusterGVK)
+	cluster.SetName("hilton-jarvistam")
+	cluster.SetNamespace("default")
+	_ = unstructured.SetNestedField(cluster.Object, "AWSCluster", "spec", "infrastructureRef", "kind")
+	_ = unstructured.SetNestedField(cluster.Object, "hilton-jarvistam", "spec", "infrastructureRef", "name")
+
+	awsCluster := &unstructured.Unstructured{}
+	awsCluster.SetGroupVersionKind(awsClusterGVK)
+	awsCluster.SetName("hilton-jarvistam")
+	awsCluster.SetNamespace("default")
+	_ = unstructured.SetNestedField(awsCluster.Object, "AWSClusterStaticIdentity", "spec", "identityRef", "kind")
+	_ = unstructured.SetNestedField(awsCluster.Object, "jarvistam-cloud-worker", "spec", "identityRef", "name")
+
+	identity := &unstructured.Unstructured{}
+	identity.SetGroupVersionKind(awsClusterStaticIdentityGVK)
+	identity.SetName("jarvistam-cloud-worker")
+	_ = unstructured.SetNestedField(identity.Object, "jarvistam-cloud-worker-credentials", "spec", "secretRef")
+
+	// The bug, reproduced: credentials Secret only in "default", never
+	// in "capa-system" (CAPA's actual manager namespace).
+	wrongNamespaceSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "jarvistam-cloud-worker-credentials", Namespace: "default"},
+	}
+
+	dialerSecret := dialerPeerSecretFixture()
+	join := &stubJoinProvider{values: map[string]any{"joinToken": "fake-token", "k0sVersion": "v1.36.2+k0s"}}
+
+	scheme := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		t.Fatalf("adding clientgoscheme: %v", err)
+	}
+	scheme.AddKnownTypeWithName(machineGVK, &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(machineListGVK(), &unstructured.UnstructuredList{})
+	scheme.AddKnownTypeWithName(joinaws.Provider{}.GVK(), &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(clusterGVK, &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(awsClusterGVK, &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(awsClusterStaticIdentityGVK, &unstructured.Unstructured{})
+	c := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(machine, awsMachine, dialerSecret, cluster, awsCluster, identity, wrongNamespaceSecret).
+		Build()
+
+	tmplPath := filepath.Join(t.TempDir(), "test.tmpl")
+	if err := os.WriteFile(tmplPath, []byte("ok"), 0o644); err != nil {
+		t.Fatalf("writing test template: %v", err)
+	}
+
+	r := &Reconciler{
+		Client:                    c,
+		Reader:                    c,
+		Join:                      join,
+		InfraProviders:            []InfraProvider{joinaws.Provider{}},
+		TemplatePath:              tmplPath,
+		NodeVIP4Prefix:            "10.101.0.",
+		NodeVIP6Prefix:            "fd8f:cf26:522a::",
+		NodeVIPStart:              4,
+		DialerPeerSecretNamespace: "wg-dialer",
+		DialerPeerSecretName:      "wg-dialer-peer",
+		BootstrapSecretNameFormat: "%s-bootstrap",
+	}
+
+	_, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)})
+	if err == nil {
+		t.Fatal("expected Reconcile to surface the misplaced-identity-secret error, got nil")
+	}
+	if !strings.Contains(err.Error(), "capa-system") {
+		t.Errorf("error %q doesn't mention the correct namespace -- not actionable", err.Error())
+	}
+	if join.calls != 0 {
+		t.Errorf("JoinValues must not be called when infra validation fails, got %d calls", join.calls)
+	}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "hilton-cloud-worker-jarvistam-0-bootstrap"}, &corev1.Secret{}); !apierrors.IsNotFound(err) {
+		t.Errorf("expected no bootstrap secret to be created when infra validation fails, Get returned: %v", err)
 	}
 }

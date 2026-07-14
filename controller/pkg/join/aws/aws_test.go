@@ -2,9 +2,16 @@ package aws
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 // Provider never calls the AWS API itself -- it only reads
@@ -82,6 +89,113 @@ func TestInfraValues_ReturnsEmptyNonNilMap(t *testing.T) {
 	}
 	if len(values) != 0 {
 		t.Errorf("InfraValues = %v, want empty (AWS contributes nothing today)", values)
+	}
+}
+
+// validateFixtures builds the full Cluster -> AWSCluster ->
+// AWSClusterStaticIdentity chain Validate traces, mirroring the real
+// live objects (hilton-jarvistam / jarvistam-cloud-worker) this check
+// was written against. secretNamespace lets a test place the
+// credentials Secret in the wrong place, matching the actual live bug
+// caught: the Secret existed only in "default", not "capa-system"
+// (CAPA's own manager namespace), and CAPA retried forever with an
+// opaque "Secret ... not found".
+func validateFixtures(t *testing.T, secretNamespace string) (client.Client, *unstructured.Unstructured) {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		t.Fatalf("adding clientgoscheme: %v", err)
+	}
+	scheme.AddKnownTypeWithName(clusterGVK, &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(awsClusterGVK, &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(awsClusterStaticIdentityGVK, &unstructured.Unstructured{})
+
+	awsMachine := &unstructured.Unstructured{}
+	awsMachine.SetGroupVersionKind(gvk)
+	awsMachine.SetName("hilton-cloud-worker-jarvistam-0")
+	awsMachine.SetNamespace("default")
+	awsMachine.SetLabels(map[string]string{clusterNameLabel: "hilton-jarvistam"})
+
+	cluster := &unstructured.Unstructured{}
+	cluster.SetGroupVersionKind(clusterGVK)
+	cluster.SetName("hilton-jarvistam")
+	cluster.SetNamespace("default")
+	_ = unstructured.SetNestedField(cluster.Object, "AWSCluster", "spec", "infrastructureRef", "kind")
+	_ = unstructured.SetNestedField(cluster.Object, "hilton-jarvistam", "spec", "infrastructureRef", "name")
+
+	awsCluster := &unstructured.Unstructured{}
+	awsCluster.SetGroupVersionKind(awsClusterGVK)
+	awsCluster.SetName("hilton-jarvistam")
+	awsCluster.SetNamespace("default")
+	_ = unstructured.SetNestedField(awsCluster.Object, "AWSClusterStaticIdentity", "spec", "identityRef", "kind")
+	_ = unstructured.SetNestedField(awsCluster.Object, "jarvistam-cloud-worker", "spec", "identityRef", "name")
+
+	identity := &unstructured.Unstructured{}
+	identity.SetGroupVersionKind(awsClusterStaticIdentityGVK)
+	identity.SetName("jarvistam-cloud-worker")
+	_ = unstructured.SetNestedField(identity.Object, "jarvistam-cloud-worker-credentials", "spec", "secretRef")
+
+	objs := []client.Object{cluster, awsCluster, identity}
+	if secretNamespace != "" {
+		objs = append(objs, &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "jarvistam-cloud-worker-credentials", Namespace: secretNamespace},
+		})
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
+	return c, awsMachine
+}
+
+func TestValidate_SecretInWrongNamespace_ReturnsActionableError(t *testing.T) {
+	// The exact live bug: the credentials Secret existed only in
+	// "default" (the AWSCluster's own namespace), never in
+	// "capa-system" (CAPA's manager namespace) -- CAPA's own error
+	// ("Secret ... not found") gave no hint about WHERE it actually
+	// needed to be.
+	c, awsMachine := validateFixtures(t, "default")
+
+	err := (Provider{}).Validate(context.Background(), c, awsMachine)
+	if err == nil {
+		t.Fatal("expected an error when the identity secret is in the wrong namespace, got nil")
+	}
+	for _, want := range []string{"jarvistam-cloud-worker-credentials", "capa-system", "default"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error message %q missing %q -- must name the secret and both namespaces so it's actually actionable", err.Error(), want)
+		}
+	}
+}
+
+func TestValidate_SecretInManagerNamespace_ReturnsNil(t *testing.T) {
+	c, awsMachine := validateFixtures(t, managerNamespace)
+
+	if err := (Provider{}).Validate(context.Background(), c, awsMachine); err != nil {
+		t.Errorf("Validate: %v, want nil when the secret is correctly placed in %s", err, managerNamespace)
+	}
+}
+
+func TestValidate_SecretMissingEntirely_ReturnsError(t *testing.T) {
+	c, awsMachine := validateFixtures(t, "")
+
+	if err := (Provider{}).Validate(context.Background(), c, awsMachine); err == nil {
+		t.Fatal("expected an error when the identity secret doesn't exist anywhere, got nil")
+	}
+}
+
+func TestValidate_NoClusterNameLabel_ReturnsNil(t *testing.T) {
+	// A brand new AWSMachine CAPI hasn't labeled yet -- nothing to
+	// trace, not an error.
+	awsMachine := &unstructured.Unstructured{}
+	awsMachine.SetGroupVersionKind(gvk)
+	awsMachine.SetName("some-machine")
+	awsMachine.SetNamespace("default")
+
+	scheme := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		t.Fatalf("adding clientgoscheme: %v", err)
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	if err := (Provider{}).Validate(context.Background(), c, awsMachine); err != nil {
+		t.Errorf("Validate: %v, want nil when there's no cluster-name label yet", err)
 	}
 }
 

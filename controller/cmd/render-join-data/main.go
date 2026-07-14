@@ -8,14 +8,19 @@
 // tunnel) means adding a new .tmpl file, never touching this program.
 // Values are loaded as arbitrary YAML into the template's data, so a
 // new pattern's fields just need to exist in its own values file.
+//
+// Rendering logic itself lives in pkg/render, shared with the
+// bootstrap-provisioning reconciler (cmd/endpoint-controller) so a
+// human rendering by hand and the reconciler rendering programmatically
+// go through the exact same code path.
 package main
 
 import (
 	"flag"
 	"fmt"
 	"os"
-	"text/template"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/render"
 	"sigs.k8s.io/yaml"
 )
 
@@ -30,30 +35,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	tmplBytes, err := os.ReadFile(patternPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "reading %s: %v\n", patternPath, err)
-		os.Exit(1)
-	}
 	valuesBytes, err := os.ReadFile(valuesPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "reading %s: %v\n", valuesPath, err)
 		os.Exit(1)
 	}
-
-	var values map[string]interface{}
+	var values map[string]any
 	if err := yaml.Unmarshal(valuesBytes, &values); err != nil {
 		fmt.Fprintf(os.Stderr, "parsing %s: %v\n", valuesPath, err)
 		os.Exit(1)
 	}
 
-	tmpl, err := template.New("pattern").Option("missingkey=error").Parse(string(tmplBytes))
+	out, err := render.Pattern(patternPath, values)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "parsing template %s: %v\n", patternPath, err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := tmpl.Execute(os.Stdout, values); err != nil {
-		fmt.Fprintf(os.Stderr, "rendering: %v\n", err)
-		os.Exit(1)
-	}
+	fmt.Print(out)
 }

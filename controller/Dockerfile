@@ -11,14 +11,19 @@ FROM --platform=$BUILDPLATFORM golang:1.26 AS build
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
-COPY go.mod go.sum ./
+COPY controller/go.mod controller/go.sum ./
 RUN go mod download
-COPY cmd ./cmd
+COPY controller/cmd ./cmd
+COPY controller/pkg ./pkg
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/endpoint-controller ./cmd/endpoint-controller
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/dialer ./cmd/dialer
 
 FROM gcr.io/distroless/static-debian12:nonroot AS endpoint-controller
 COPY --from=build /out/endpoint-controller /endpoint-controller
+# join.Reconciler's default --join-template-path; the join-pattern
+# templates are versioned alongside this Dockerfile's own repo, not a
+# separate distribution mechanism.
+COPY join-patterns /join-patterns
 USER nonroot:nonroot
 ENTRYPOINT ["/endpoint-controller"]
 

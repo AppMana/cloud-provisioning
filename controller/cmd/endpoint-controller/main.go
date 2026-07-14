@@ -16,13 +16,19 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
+	"time"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/join"
+	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
+	joink0s "github.com/appmana/cloud-provisioning/controller/pkg/join/k0s"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -179,6 +185,23 @@ func main() {
 		metricsAddr      string
 		gatewayNamespace string
 		gatewayName      string
+
+		// join.Reconciler: automated bootstrap-secret provisioning,
+		// replacing what used to be a manual per-node join process.
+		joinEnabled               bool
+		joinTemplatePath          string
+		joinAPIAddress            string
+		joinAPIVIP                string
+		joinKubeletExtraArgs      string
+		joinSSHAuthorizedKeys     string
+		joinTokenTTL              time.Duration
+		wireGuardAddress          string
+		wireGuardListenPort       string
+		nodeVIP4Prefix            string
+		nodeVIP6Prefix            string
+		nodeVIPStart              int
+		dialerListenPort          string
+		bootstrapSecretNameFormat string
 	)
 	flag.StringVar(&machineSelector, "machine-selector", "cloud-provisioning.appmana.com/role=cloud-worker",
 		"label selector identifying the Machine(s) whose external address drives the dialer's endpoint")
@@ -189,6 +212,22 @@ func main() {
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "metrics endpoint address (0 disables it)")
 	flag.StringVar(&gatewayNamespace, "gateway-namespace", "", "optional: namespace of a Gateway to annotate with the node's external IP for external-dns (blank disables this)")
 	flag.StringVar(&gatewayName, "gateway-name", "", "optional: name of a Gateway to annotate with the node's external IP for external-dns")
+
+	flag.BoolVar(&joinEnabled, "join-enabled", false, "enable the bootstrap-secret provisioning reconciler (join.Reconciler)")
+	flag.StringVar(&joinTemplatePath, "join-template-path", "/join-patterns/k0s-worker.cloud-config.tmpl", "path to the join-pattern template to render")
+	flag.StringVar(&joinAPIAddress, "join-api-address", "https://10.101.0.1:6443", "cluster API server address used to mint k0s join tokens (bracket IPv6 literals, e.g. https://[fd8f:cf26:522a::1]:6443)")
+	flag.StringVar(&joinAPIVIP, "join-api-vip", "10.101.0.1", "cluster API VIP the new node must reach through the tunnel before joining")
+	flag.StringVar(&joinKubeletExtraArgs, "join-kubelet-extra-args", "--node-labels=cloud-provisioning.appmana.com/role=cloud-worker --register-with-taints=cloud-provisioning.appmana.com/role=cloud-worker:NoSchedule", "extra kubelet args applied to every joining cloud-worker node, matching the existing taint/label convention")
+	flag.StringVar(&joinSSHAuthorizedKeys, "join-ssh-authorized-keys", "", "comma-separated SSH public keys to authorize on every new node")
+	flag.DurationVar(&joinTokenTTL, "join-token-ttl", 2*time.Hour, "validity window for a minted k0s bootstrap token")
+	flag.StringVar(&wireGuardAddress, "join-wireguard-address", "10.100.0.2/24", "WireGuard tunnel address assigned to the cloud side")
+	flag.StringVar(&wireGuardListenPort, "join-wireguard-listen-port", "51820", "WireGuard listen port on the cloud side")
+	flag.StringVar(&nodeVIP4Prefix, "join-node-vip4-prefix", "10.101.0.", "IPv4 prefix for allocated Calico vip0 addresses")
+	flag.StringVar(&nodeVIP6Prefix, "join-node-vip6-prefix", "fd8f:cf26:522a::", "IPv6 prefix for allocated Calico vip0 addresses")
+	flag.IntVar(&nodeVIPStart, "join-node-vip-start", 4, "first node-VIP index to allocate (avoids the on-prem nodes' own fixed .1/.2/.3 addresses)")
+	flag.StringVar(&dialerListenPort, "join-dialer-listen-port", "51820", "WireGuard listen port the on-prem dialer expects the cloud peer to use")
+	flag.StringVar(&bootstrapSecretNameFormat, "join-bootstrap-secret-name-format", "%s-bootstrap", "printf format (with the Machine's name) for the bootstrap Secret's name")
+
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -230,6 +269,59 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create controller: %v\n", err)
 		os.Exit(1)
+	}
+
+	if joinEnabled {
+		clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to create clientset for join reconciler: %v\n", err)
+			os.Exit(1)
+		}
+		var sshKeys []string
+		if joinSSHAuthorizedKeys != "" {
+			for _, k := range strings.Split(joinSSHAuthorizedKeys, ",") {
+				if k = strings.TrimSpace(k); k != "" {
+					sshKeys = append(sshKeys, k)
+				}
+			}
+		}
+		joinReconciler := &join.Reconciler{
+			Client: mgr.GetClient(),
+			Reader: mgr.GetAPIReader(),
+			Join:   &joink0s.Provider{Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL},
+			Infra:  joinaws.Provider{},
+
+			TemplatePath:      joinTemplatePath,
+			APIVIP:            joinAPIVIP,
+			KubeletExtraArgs:  joinKubeletExtraArgs,
+			SSHAuthorizedKeys: sshKeys,
+
+			WireGuardAddress:    wireGuardAddress,
+			WireGuardListenPort: wireGuardListenPort,
+
+			NodeVIP4Prefix: nodeVIP4Prefix,
+			NodeVIP6Prefix: nodeVIP6Prefix,
+			NodeVIPStart:   nodeVIPStart,
+
+			DialerPeerSecretNamespace: secretNamespace,
+			DialerPeerSecretName:      secretName,
+			DialerListenPort:          dialerListenPort,
+
+			BootstrapSecretNameFormat: bootstrapSecretNameFormat,
+		}
+
+		joinMachine := &unstructured.Unstructured{}
+		joinMachine.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"})
+		err = ctrl.NewControllerManagedBy(mgr).
+			Named("join").
+			For(joinMachine, builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+				return selector.Matches(labels.Set(obj.GetLabels()))
+			}))).
+			Complete(joinReconciler)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to create join controller: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - "controller/**"
+      - "join-patterns/**"
       - ".github/workflows/build-controller.yml"
 env:
   REGISTRY: ghcr.io
@@ -35,7 +36,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: controller
+          context: .
+          file: controller/Dockerfile
           target: ${{ matrix.target }}
           platforms: linux/amd64,linux/arm64
           push: true

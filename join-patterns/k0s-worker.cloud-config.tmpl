@@ -26,9 +26,11 @@ write_files:
       # home/office internet uplink never does. 1420 matches what the
       # rest of this design validates against (harness/, aws-bringup/).
       MTU = 1420
+      {{- range .wireguard.peers }}
       [Peer]
-      PublicKey = {{ .wireguard.peerPublicKey }}
-      AllowedIPs = {{ .wireguard.allowedIPs }}
+      PublicKey = {{ .publicKey }}
+      AllowedIPs = {{ .allowedIPs }}
+      {{- end }}
   - path: /etc/k0s/join-token
     permissions: '0600'
     content: |

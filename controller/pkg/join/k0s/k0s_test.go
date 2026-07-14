@@ -5,7 +5,10 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"testing"
 	"time"
@@ -15,6 +18,31 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/clientcmd"
 )
+
+// fakeGitHubReleasesServer stands in for api.github.com/repos/k0sproject/k0s/releases,
+// serving real releases as fixtures. Returns the server's base URL (its
+// cleanup is registered via t.Cleanup) -- tests never touch the real
+// network, avoiding both flakiness and GitHub's unauthenticated rate
+// limit.
+func fakeGitHubReleasesServer(t *testing.T, tags ...string) string {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		page := r.URL.Query().Get("page")
+		if page != "" && page != "1" {
+			_ = json.NewEncoder(w).Encode([]githubRelease{})
+			return
+		}
+		releases := make([]githubRelease, len(tags))
+		for i, tag := range tags {
+			releases[i] = githubRelease{TagName: tag}
+		}
+		_ = json.NewEncoder(w).Encode(releases)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return srv.URL
+}
 
 func TestRandomToken(t *testing.T) {
 	valid := regexp.MustCompile(`^[a-z0-9]+$`)
@@ -101,15 +129,21 @@ func TestJoinValues_EndToEnd(t *testing.T) {
 			Status:     corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{KubeletVersion: "v1.36.2+k0s"}},
 		},
 	)
-	p := &Provider{Client: client, APIAddress: "https://10.101.0.1:6443", TTL: 2 * time.Hour}
+	releasesAPI := fakeGitHubReleasesServer(t, "v1.36.2+k0s.0")
+	p := &Provider{Client: client, APIAddress: "https://10.101.0.1:6443", TTL: 2 * time.Hour, GitHubReleasesAPI: releasesAPI}
 
 	values, err := p.JoinValues(context.Background())
 	if err != nil {
 		t.Fatalf("JoinValues: %v", err)
 	}
 
-	if values["k0sVersion"] != "v1.36.2+k0s" {
-		t.Errorf("k0sVersion = %v, want it introspected from an existing Node, not hardcoded", values["k0sVersion"])
+	// A real, caught-live bug: Node.status.nodeInfo.KubeletVersion
+	// ("v1.36.2+k0s") is only a PREFIX of the actual downloadable k0s
+	// release tag ("v1.36.2+k0s.0") -- get.k0s.sh's installer 404s if
+	// given the bare kubelet version verbatim as K0S_VERSION. This must
+	// be the resolved, real tag, not the raw kubelet string.
+	if values["k0sVersion"] != "v1.36.2+k0s.0" {
+		t.Errorf("k0sVersion = %v, want the resolved release tag \"v1.36.2+k0s.0\", not the bare kubelet version", values["k0sVersion"])
 	}
 	joinToken, _ := values["joinToken"].(string)
 	if joinToken == "" {
@@ -148,5 +182,42 @@ func TestJoinValues_EndToEnd(t *testing.T) {
 	}
 	if secret.StringData["usage-bootstrap-authentication"] != "true" {
 		t.Errorf("usage-bootstrap-authentication = %q, want \"true\" -- without it the API server won't accept this as an authentication token", secret.StringData["usage-bootstrap-authentication"])
+	}
+}
+
+func TestResolveK0sReleaseTag_CommonCase_SingleRelease(t *testing.T) {
+	// The overwhelmingly common case, confirmed against k0sproject/k0s's
+	// real releases: exactly one release per k8s version, tagged
+	// "<kubeletVersion>.0".
+	api := fakeGitHubReleasesServer(t, "v1.36.2+k0s.0")
+	tag, err := resolveK0sReleaseTag(context.Background(), api, "v1.36.2+k0s")
+	if err != nil {
+		t.Fatalf("resolveK0sReleaseTag: %v", err)
+	}
+	if tag != "v1.36.2+k0s.0" {
+		t.Errorf("tag = %q, want v1.36.2+k0s.0", tag)
+	}
+}
+
+func TestResolveK0sReleaseTag_MultipleReleasesForSameVersion_PicksHighestCounter(t *testing.T) {
+	// A real, confirmed exception: k0sproject/k0s has published both
+	// v1.35.1+k0s.0 AND v1.35.1+k0s.1 for the same k8s version (a
+	// re-release, both non-draft/non-prerelease) -- the bare kubelet
+	// version can't distinguish them, so the higher counter (the more
+	// recent one) must win, not whichever happens to be listed first.
+	api := fakeGitHubReleasesServer(t, "v1.35.1+k0s.0", "v1.35.1+k0s.1")
+	tag, err := resolveK0sReleaseTag(context.Background(), api, "v1.35.1+k0s")
+	if err != nil {
+		t.Fatalf("resolveK0sReleaseTag: %v", err)
+	}
+	if tag != "v1.35.1+k0s.1" {
+		t.Errorf("tag = %q, want the higher-numbered v1.35.1+k0s.1", tag)
+	}
+}
+
+func TestResolveK0sReleaseTag_NoMatchingRelease_ReturnsError(t *testing.T) {
+	api := fakeGitHubReleasesServer(t, "v1.36.2+k0s.0")
+	if _, err := resolveK0sReleaseTag(context.Background(), api, "v9.9.9+k0s"); err == nil {
+		t.Fatal("expected an error when no release matches the kubelet version, got nil")
 	}
 }

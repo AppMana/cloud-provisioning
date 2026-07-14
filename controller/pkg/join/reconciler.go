@@ -159,6 +159,17 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("no InfraProvider registered for infrastructureRef kind %q", infraRefKind)
 	}
 
+	// Deliberately not gated on the infrastructure resource being
+	// "ready" (e.g. AWSMachine's instance actually running): cloud-init/
+	// user-data must exist BEFORE the underlying compute launches, for
+	// every infrastructure provider (AWS's UserData, GCP's instance
+	// metadata, ...) -- it's the boot mechanism, not a post-boot
+	// artifact. Waiting for "ready" first would deadlock, since the
+	// infra provider is commonly the one blocked on this very Secret
+	// existing (confirmed live: CAPA's AWSMachine controller refuses to
+	// call RunInstances until this bootstrap Secret is already there).
+	// All that's needed here is that the infrastructureRef target
+	// object itself exists -- proven by the successful Get below.
 	infraMachine := &unstructured.Unstructured{}
 	infraMachine.SetGroupVersionKind(infra.GVK())
 	if err := r.Reader.Get(ctx, types.NamespacedName{Namespace: machine.GetNamespace(), Name: infraRefName}, infraMachine); err != nil {
@@ -170,15 +181,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{RequeueAfter: crdRecheckInterval}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("getting infrastructure resource %s: %w", infraRefName, err)
-	}
-
-	ready, err := infra.Ready(ctx, infraMachine)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("checking infra readiness: %w", err)
-	}
-	if !ready {
-		log.V(1).Info("infrastructure not ready yet, waiting")
-		return ctrl.Result{}, nil
 	}
 
 	log.Info("provisioning bootstrap secret", "machine", req.NamespacedName)

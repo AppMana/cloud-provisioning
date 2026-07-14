@@ -133,19 +133,17 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("getting secret %s: %w", secretKey, err)
 	}
 
-	if string(secret.Data[r.secretKey]) == endpoint {
-		return ctrl.Result{}, nil
+	if string(secret.Data[r.secretKey]) != endpoint {
+		patch := client.MergeFrom(secret.DeepCopy())
+		if secret.Data == nil {
+			secret.Data = map[string][]byte{}
+		}
+		secret.Data[r.secretKey] = []byte(endpoint)
+		if err := r.Patch(ctx, secret, patch); err != nil {
+			return ctrl.Result{}, fmt.Errorf("patching secret %s: %w", secretKey, err)
+		}
+		log.Info("updated dialer peer endpoint", "endpoint", endpoint, "machine", req.NamespacedName)
 	}
-
-	patch := client.MergeFrom(secret.DeepCopy())
-	if secret.Data == nil {
-		secret.Data = map[string][]byte{}
-	}
-	secret.Data[r.secretKey] = []byte(endpoint)
-	if err := r.Patch(ctx, secret, patch); err != nil {
-		return ctrl.Result{}, fmt.Errorf("patching secret %s: %w", secretKey, err)
-	}
-	log.Info("updated dialer peer endpoint", "endpoint", endpoint, "machine", req.NamespacedName)
 
 	if r.gatewayName != "" {
 		gw := &unstructured.Unstructured{}

@@ -33,22 +33,36 @@ import (
 )
 
 type config struct {
-	secretNamespace string
-	secretName      string
-	iface           string
-	localAddress    string
-	allowedIPs      string
-	keepaliveSecs   int
-	mtu             int
-	pollInterval    time.Duration
+	secretNamespace     string
+	secretName          string
+	privateKeySecretKey string
+	localAddressKey     string
+	iface               string
+	localAddress        string
+	allowedIPs          string
+	keepaliveSecs       int
+	mtu                 int
+	pollInterval        time.Duration
 }
 
 func main() {
 	cfg := config{}
 	flag.StringVar(&cfg.secretNamespace, "secret-namespace", "wg-dialer", "namespace of the dialer peer Secret")
 	flag.StringVar(&cfg.secretName, "secret-name", "wg-dialer-peer", "name of the dialer peer Secret")
+	// One DaemonSet, one shared Secret, every node dials the same remote
+	// peer -- but each node needs its own identity (private key) and its
+	// own tunnel address, not the remote peer's. Rather than one Secret
+	// per node (N nearly-identical manifests for N nodes), the Secret
+	// holds every node's private key/address under a distinct key name,
+	// and the pod spec picks its own via Kubernetes' own $(NODE_NAME)
+	// substitution in --private-key-secret-key/-local-address-secret-key
+	// (e.g. "dialer-private-key-$(NODE_NAME)" resolves before this binary
+	// ever starts). peer-public-key/peer-endpoint stay single, shared keys
+	// -- every node dials the same remote endpoint.
+	flag.StringVar(&cfg.privateKeySecretKey, "private-key-secret-key", "dialer-private-key", "Secret data key holding this node's WireGuard private key")
+	flag.StringVar(&cfg.localAddressKey, "local-address-secret-key", "", "Secret data key holding this node's tunnel address (CIDR); if unset, --local-address is used as a literal instead")
 	flag.StringVar(&cfg.iface, "iface", "wg0", "WireGuard interface name to create/manage")
-	flag.StringVar(&cfg.localAddress, "local-address", "10.100.0.1/24", "address to assign to the interface")
+	flag.StringVar(&cfg.localAddress, "local-address", "10.100.0.1/24", "address to assign to the interface (ignored if --local-address-secret-key is set)")
 	flag.StringVar(&cfg.allowedIPs, "allowed-ips", "10.100.0.0/24,10.101.130.0/24", "comma-separated CIDRs to accept from the peer")
 	flag.IntVar(&cfg.keepaliveSecs, "keepalive-seconds", 15, "PersistentKeepalive interval")
 	flag.IntVar(&cfg.mtu, "mtu", 1420, "interface MTU (WireGuard overhead under the cluster's normal MTU)")
@@ -72,11 +86,6 @@ func main() {
 	}
 	defer wg.Close()
 
-	if err := ensureLink(cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "unable to create/configure %s: %v\n", cfg.iface, err)
-		os.Exit(1)
-	}
-
 	ctx := context.Background()
 	ticker := time.NewTicker(cfg.pollInterval)
 	defer ticker.Stop()
@@ -89,9 +98,13 @@ func main() {
 }
 
 // ensureLink creates the WireGuard link if it doesn't exist, assigns its
-// address, and brings it up -- the one-time part of what `ip link add` /
-// `ip addr add` / `ip link set up` did in the shell version.
-func ensureLink(cfg config) error {
+// address, and brings it up -- the one-time-per-boot part of what
+// `ip link add` / `ip addr add` / `ip link set up` did in the shell
+// version. Called every reconcile pass (idempotent, and self-healing if
+// the address is ever removed from under it) rather than once at
+// startup, since the address itself can now come from the Secret and
+// isn't known until the first successful read.
+func ensureLink(cfg config, localAddress string) error {
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
 		if !isLinkNotFound(err) {
@@ -110,12 +123,12 @@ func ensureLink(cfg config) error {
 		}
 	}
 
-	addr, err := netlink.ParseAddr(cfg.localAddress)
+	addr, err := netlink.ParseAddr(localAddress)
 	if err != nil {
-		return fmt.Errorf("parsing --local-address %q: %w", cfg.localAddress, err)
+		return fmt.Errorf("parsing local address %q: %w", localAddress, err)
 	}
 	if err := netlink.AddrAdd(link, addr); err != nil && !isAddrExists(err) {
-		return fmt.Errorf("assigning %s to %s: %w", cfg.localAddress, cfg.iface, err)
+		return fmt.Errorf("assigning %s to %s: %w", localAddress, cfg.iface, err)
 	}
 
 	if err := netlink.LinkSetMTU(link, cfg.mtu); err != nil {
@@ -136,7 +149,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		return fmt.Errorf("getting secret %s/%s: %w", cfg.secretNamespace, cfg.secretName, err)
 	}
 
-	privateKeyStr, err := requiredKey(secret, "dialer-private-key")
+	privateKeyStr, err := requiredKey(secret, cfg.privateKeySecretKey)
 	if err != nil {
 		return err
 	}
@@ -149,9 +162,17 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		return err
 	}
 
+	localAddress := cfg.localAddress
+	if cfg.localAddressKey != "" {
+		localAddress, err = requiredKey(secret, cfg.localAddressKey)
+		if err != nil {
+			return err
+		}
+	}
+
 	privateKey, err := wgtypes.ParseKey(privateKeyStr)
 	if err != nil {
-		return fmt.Errorf("parsing dialer-private-key: %w", err)
+		return fmt.Errorf("parsing %s: %w", cfg.privateKeySecretKey, err)
 	}
 	peerPublicKey, err := wgtypes.ParseKey(peerPublicKeyStr)
 	if err != nil {
@@ -169,6 +190,10 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			return fmt.Errorf("parsing --allowed-ips entry %q: %w", cidr, err)
 		}
 		allowedIPs = append(allowedIPs, *ipNet)
+	}
+
+	if err := ensureLink(cfg, localAddress); err != nil {
+		return fmt.Errorf("ensuring %s: %w", cfg.iface, err)
 	}
 
 	keepalive := time.Duration(cfg.keepaliveSecs) * time.Second

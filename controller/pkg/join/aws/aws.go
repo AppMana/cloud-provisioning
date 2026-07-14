@@ -6,13 +6,24 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // Provider implements join.InfraProvider for AWSMachine. Reads status
 // fields directly off the unstructured Machine's infrastructureRef
 // target rather than importing CAPA's own types, matching how
 // endpoint-controller already avoids depending on AWSMachine's schema.
+//
+// AWSMachine's own creation is entirely CAPA's job (a separate
+// operator this reconciler has only a soft/graceful dependency on,
+// see isMissingCRD in pkg/join/reconciler.go) -- this Provider only
+// ever reads it, never creates or drives it.
 type Provider struct{}
+
+var gvk = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSMachine"}
+
+// GVK implements join.InfraProvider.
+func (Provider) GVK() schema.GroupVersionKind { return gvk }
 
 // Ready reports whether the underlying AWSMachine is far enough along
 // to bootstrap: status.ready is true. A future GCPProvider would check

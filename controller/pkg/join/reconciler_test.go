@@ -232,6 +232,35 @@ func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs 
 	}
 }
 
+func TestReconcile_CreatesBootstrapSecretEvenWhenInfraNotReady(t *testing.T) {
+	// Regression test for a genuine deadlock caught live against the
+	// real hilton cluster: CAPA's AWSMachine controller refuses to call
+	// RunInstances until this bootstrap Secret already exists (the
+	// Secret IS the cloud-init user-data the instance boots from), so
+	// gating its creation on the AWSMachine being "ready" (instance
+	// already running) can never succeed -- ready never becomes true
+	// without the Secret, and the Secret never gets created while
+	// waiting for ready. Bootstrap-secret creation must proceed as soon
+	// as the infrastructureRef target object merely exists.
+	machine := machineWithInfraRef("hilton-cloud-worker-jarvistam-0", "default", "hilton-cloud-worker-jarvistam-0")
+	awsMachine := fakeAWSMachine("hilton-cloud-worker-jarvistam-0", "default", false)
+	dialerSecret := dialerPeerSecretFixture()
+	join := &stubJoinProvider{values: map[string]any{"joinToken": "fake-token", "k0sVersion": "v1.36.2+k0s"}}
+
+	r := newFakeJoinReconciler(t, join, machine, awsMachine, dialerSecret)
+
+	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)}); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if join.calls != 1 {
+		t.Errorf("expected JoinValues to be called despite the AWSMachine not being ready yet, got %d calls", join.calls)
+	}
+	secret := &corev1.Secret{}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "hilton-cloud-worker-jarvistam-0-bootstrap"}, secret); err != nil {
+		t.Fatalf("expected a bootstrap secret even though the AWSMachine isn't ready: %v", err)
+	}
+}
+
 func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	machine := machineWithInfraRef("hilton-cloud-worker-jarvistam-0", "default", "hilton-cloud-worker-jarvistam-0")
 	awsMachine := fakeAWSMachine("hilton-cloud-worker-jarvistam-0", "default", true)
@@ -409,18 +438,18 @@ func TestReconcile_MissingInfrastructureCRD_StringFallback_RequeuesGracefully(t 
 // only ever exercising the one AWS provider that happens to be
 // registered.
 type stubInfraProvider struct {
-	gvk         schema.GroupVersionKind
-	ready       bool
-	infraValues map[string]any
-	readyCalls  int
+	gvk             schema.GroupVersionKind
+	ready           bool
+	infraValues     map[string]any
+	infraValueCalls int
 }
 
 func (s *stubInfraProvider) GVK() schema.GroupVersionKind { return s.gvk }
 func (s *stubInfraProvider) Ready(ctx context.Context, machine *unstructured.Unstructured) (bool, error) {
-	s.readyCalls++
 	return s.ready, nil
 }
 func (s *stubInfraProvider) InfraValues(ctx context.Context, machine *unstructured.Unstructured) (map[string]any, error) {
+	s.infraValueCalls++
 	return s.infraValues, nil
 }
 
@@ -430,8 +459,8 @@ func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
 	// Machine may be consulted. This is the actual behavior "the
 	// operator should infer which concrete implementation it uses"
 	// depends on, not just a claim in a comment.
-	awsProvider := &stubInfraProvider{gvk: schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSMachine"}, ready: true}
-	otherProvider := &stubInfraProvider{gvk: schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "OtherMachine"}, ready: true}
+	awsProvider := &stubInfraProvider{gvk: schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSMachine"}, ready: true, infraValues: map[string]any{}}
+	otherProvider := &stubInfraProvider{gvk: schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "OtherMachine"}, ready: true, infraValues: map[string]any{}}
 
 	awsMachine := &unstructured.Unstructured{}
 	awsMachine.SetGroupVersionKind(awsProvider.GVK())
@@ -480,10 +509,14 @@ func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
 	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machineA)}); err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}
-	if awsProvider.readyCalls != 1 {
-		t.Errorf("expected the AWSMachine-kind provider to be consulted exactly once, got %d calls", awsProvider.readyCalls)
+	// Reconcile doesn't gate bootstrap-secret creation on Ready() (see
+	// reconciler.go: waiting for "instance running" before creating the
+	// boot data it needs to run would deadlock), so InfraValues is the
+	// observable proof of which provider got consulted instead.
+	if awsProvider.infraValueCalls != 1 {
+		t.Errorf("expected the AWSMachine-kind provider to be consulted exactly once, got %d calls", awsProvider.infraValueCalls)
 	}
-	if otherProvider.readyCalls != 0 {
-		t.Errorf("expected the OtherMachine-kind provider to NEVER be consulted for a Machine whose infrastructureRef.kind is AWSMachine, got %d calls", otherProvider.readyCalls)
+	if otherProvider.infraValueCalls != 0 {
+		t.Errorf("expected the OtherMachine-kind provider to NEVER be consulted for a Machine whose infrastructureRef.kind is AWSMachine, got %d calls", otherProvider.infraValueCalls)
 	}
 }

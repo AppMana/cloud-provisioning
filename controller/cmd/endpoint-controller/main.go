@@ -78,16 +78,23 @@ const (
 	cloudWorkerRoleValue = "cloud-worker"
 )
 
-// dialerAllowedIPs is deliberately maximally permissive (route/accept
-// everything through the tunnel), not narrowed to the peer's known
-// addresses or its dynamically Calico-assigned pod CIDR: WireGuard's
-// real security boundary is the handshake (only a peer holding the
-// correct private key can ever establish the tunnel at all), and this
-// is a single-peer-per-node tunnel, so there's no ambiguity about
-// which peer traffic should route through. Trying to narrow this to
-// an exact CIDR set added real complexity (dynamically discovering a
-// CNI's pod-CIDR allocation) for no actual security benefit.
-const dialerAllowedIPs = "0.0.0.0/0,::/0"
+// defaultDialerAllowedIPs is only the flag default -- the actual value
+// is --dialer-allowed-ips, configuration, not a Go constant. This
+// matters concretely, not just as a principle: fixing a wrong value
+// here means editing gitops YAML and letting it roll out, not a
+// rebuild/push/redeploy cycle -- exactly what's needed to recover
+// quickly from a bad value like this one.
+//
+// MUST NOT be a default route (0.0.0.0/0 or ::/0): this dialer's own
+// reconcile loop installs a literal kernel route for every AllowedIPs
+// entry (see cmd/dialer/main.go), and a default route via wg0 on an
+// on-prem node hijacks ALL of that node's outbound traffic --
+// including its own WireGuard keepalive/handshake packets to the
+// peer's real public IP (which must go out via the node's REAL
+// gateway, not through the tunnel itself -- that would be circular).
+// Caught live: this took down jarvis's own Tailscale/WAN reachability
+// entirely, not just cluster traffic.
+const defaultDialerAllowedIPs = "10.100.0.2/32"
 
 // reconciler mirrors one Machine's external address into a Secret key.
 // It never watches or reads the Secret it writes -- the dialer DaemonSet
@@ -138,6 +145,7 @@ type reconciler struct {
 	dialerServiceAccount  string
 	dialerImage           string
 	dialerImagePullSecret string
+	dialerAllowedIPs      string
 }
 
 func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -270,8 +278,9 @@ func (r *reconciler) ensureDialerDaemonSet(ctx context.Context) error {
 					ImagePullSecrets: []corev1.LocalObjectReference{{Name: r.dialerImagePullSecret}},
 					Containers: []corev1.Container{
 						{
-							Name:  "dialer",
-							Image: r.dialerImage,
+							Name:            "dialer",
+							Image:           r.dialerImage,
+							ImagePullPolicy: corev1.PullAlways,
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"NET_ADMIN"}},
 							},
@@ -284,7 +293,7 @@ func (r *reconciler) ensureDialerDaemonSet(ctx context.Context) error {
 								"--iface=wg0",
 								"--private-key-secret-key=dialer-private-key-$(NODE_NAME)",
 								"--local-address-secret-key=local-address-$(NODE_NAME)",
-								fmt.Sprintf("--allowed-ips=%s", dialerAllowedIPs),
+								fmt.Sprintf("--allowed-ips=%s", r.dialerAllowedIPs),
 								"--keepalive-seconds=15",
 								"--mtu=1420",
 								"--poll-interval=30s",
@@ -339,6 +348,7 @@ func main() {
 		dialerServiceAccount      string
 		dialerImage               string
 		dialerImagePullSecret     string
+		dialerAllowedIPs          string
 	)
 	flag.StringVar(&machineSelector, "machine-selector", fmt.Sprintf("%s=%s", cloudWorkerRoleLabel, cloudWorkerRoleValue),
 		"label selector identifying the Machine(s) whose external address drives the dialer's endpoint")
@@ -353,6 +363,7 @@ func main() {
 	flag.StringVar(&dialerServiceAccount, "dialer-service-account", "wg-dialer", "ServiceAccount the dialer DaemonSet's pods run as")
 	flag.StringVar(&dialerImage, "dialer-image", "ghcr.io/appmana/cloud-provisioning-dialer:e1f8655", "image for the dialer DaemonSet's container")
 	flag.StringVar(&dialerImagePullSecret, "dialer-image-pull-secret", "ghcr-pull", "imagePullSecret for the dialer DaemonSet")
+	flag.StringVar(&dialerAllowedIPs, "dialer-allowed-ips", defaultDialerAllowedIPs, "comma-separated CIDRs the on-prem dialer accepts/routes to the cloud peer -- MUST NOT be a default route (0.0.0.0/0 or ::/0), since this dialer installs a literal kernel route for every entry (see cmd/dialer/main.go), which would hijack the node's own general routing")
 
 	flag.BoolVar(&joinEnabled, "join-enabled", false, "enable the bootstrap-secret provisioning reconciler (join.Reconciler)")
 	flag.StringVar(&joinTemplatePath, "join-template-path", "/join-patterns/k0s-worker.cloud-config.tmpl", "path to the join-pattern template to render")
@@ -412,6 +423,7 @@ func main() {
 			dialerServiceAccount:  dialerServiceAccount,
 			dialerImage:           dialerImage,
 			dialerImagePullSecret: dialerImagePullSecret,
+			dialerAllowedIPs:      dialerAllowedIPs,
 		})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create controller: %v\n", err)

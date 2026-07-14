@@ -17,7 +17,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -45,7 +49,20 @@ type Provider struct {
 	// few minutes between instance launch and first join, not
 	// indefinite credential validity.
 	TTL time.Duration
+
+	// GitHubReleasesAPI is the base URL for k0s's GitHub releases API,
+	// overridable for tests (an httptest.Server) -- defaults to the
+	// real API when empty. See resolveK0sReleaseTag: this exists
+	// because Node.status.nodeInfo.KubeletVersion (e.g. "v1.36.2+k0s")
+	// is NOT the actual release tag/asset name k0s publishes
+	// ("v1.36.2+k0s.0") -- confirmed live: using the bare kubelet
+	// version as get.k0s.sh's K0S_VERSION 404s, since neither the
+	// release tag nor the release asset filename ever omit the
+	// trailing build-counter suffix.
+	GitHubReleasesAPI string
 }
+
+const defaultGitHubReleasesAPI = "https://api.github.com/repos/k0sproject/k0s/releases"
 
 // JoinValues implements join.ClusterJoinProvider.
 func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
@@ -120,7 +137,10 @@ func (p *Provider) clusterCACert(ctx context.Context) ([]byte, error) {
 
 // introspectK0sVersion reads the running k0s version off any existing
 // Node's own status, rather than hardcoding it -- so this stays
-// correct across upgrades without a code change.
+// correct across upgrades without a code change. The Node's
+// KubeletVersion (e.g. "v1.36.2+k0s") is only a prefix of the actual
+// release tag/asset name k0s publishes (e.g. "v1.36.2+k0s.0");
+// resolveK0sReleaseTag turns it into the real, download-able tag.
 func (p *Provider) introspectK0sVersion(ctx context.Context) (string, error) {
 	nodes, err := p.Client.CoreV1().Nodes().List(ctx, metav1.ListOptions{Limit: 1})
 	if err != nil {
@@ -129,10 +149,82 @@ func (p *Provider) introspectK0sVersion(ctx context.Context) (string, error) {
 	if len(nodes.Items) == 0 {
 		return "", fmt.Errorf("no nodes found to introspect k0s version from")
 	}
-	// e.g. "v1.36.2+k0s" -> "v1.36.2+k0s.0" is the release-asset naming;
-	// k0s's own kubeletVersion already carries the "+k0s" suffix the
-	// get.k0s.sh installer's K0S_VERSION expects.
-	return nodes.Items[0].Status.NodeInfo.KubeletVersion, nil
+	kubeletVersion := nodes.Items[0].Status.NodeInfo.KubeletVersion
+	return resolveK0sReleaseTag(ctx, p.githubReleasesAPI(), kubeletVersion)
+}
+
+func (p *Provider) githubReleasesAPI() string {
+	if p.GitHubReleasesAPI != "" {
+		return p.GitHubReleasesAPI
+	}
+	return defaultGitHubReleasesAPI
+}
+
+type githubRelease struct {
+	TagName string `json:"tag_name"`
+}
+
+// resolveK0sReleaseTag turns a bare kubelet version (e.g.
+// "v1.36.2+k0s", what Node.status.nodeInfo.KubeletVersion actually
+// reports) into the real k0s release tag (e.g. "v1.36.2+k0s.0") that
+// exists as a downloadable GitHub release/asset -- confirmed live
+// against k0sproject/k0s's actual releases: every real tag carries a
+// trailing numeric build counter the bare kubelet version never
+// includes, and get.k0s.sh's installer does no fuzzy matching of its
+// own (a bare "v1.36.2+k0s" 404s outright).
+//
+// Deliberately does not stop at the first match (e.g. a direct
+// "<version>.0" lookup): k0sproject/k0s has genuinely published more
+// than one release for the same k8s version (confirmed live:
+// v1.35.1+k0s.0 AND v1.35.1+k0s.1 both exist, non-draft, non-prerelease)
+// -- a later counter is a re-release of the same k8s version, so it's
+// the one that should be used. Since the bare kubelet version can't
+// distinguish these, every release is listed and the highest counter
+// matching this exact version prefix wins.
+func resolveK0sReleaseTag(ctx context.Context, releasesAPI, kubeletVersion string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, releasesAPI+"?per_page=100", nil)
+	if err != nil {
+		return "", err
+	}
+	best := ""
+	bestN := -1
+	for page := 1; ; page++ {
+		req.URL.RawQuery = fmt.Sprintf("per_page=100&page=%d", page)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("listing k0s releases: %w", err)
+		}
+		var releases []githubRelease
+		decodeErr := json.NewDecoder(resp.Body).Decode(&releases)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("listing k0s releases: unexpected status %d", resp.StatusCode)
+		}
+		if decodeErr != nil {
+			return "", fmt.Errorf("decoding k0s releases: %w", decodeErr)
+		}
+		if len(releases) == 0 {
+			break
+		}
+		for _, r := range releases {
+			suffix, ok := strings.CutPrefix(r.TagName, kubeletVersion+".")
+			if !ok {
+				continue
+			}
+			n, err := strconv.Atoi(suffix)
+			if err != nil {
+				continue
+			}
+			if n > bestN {
+				bestN = n
+				best = r.TagName
+			}
+		}
+	}
+	if best == "" {
+		return "", fmt.Errorf("no k0s release found matching kubelet version %q (checked every release tag with that prefix)", kubeletVersion)
+	}
+	return best, nil
 }
 
 func buildKubeconfig(server string, caCert []byte, token string) ([]byte, error) {

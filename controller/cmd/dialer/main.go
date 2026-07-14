@@ -172,7 +172,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	}
 
 	keepalive := time.Duration(cfg.keepaliveSecs) * time.Second
-	return wg.ConfigureDevice(cfg.iface, wgtypes.Config{
+	if err := wg.ConfigureDevice(cfg.iface, wgtypes.Config{
 		PrivateKey: &privateKey,
 		Peers: []wgtypes.PeerConfig{
 			{
@@ -184,7 +184,31 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			},
 		},
 		ReplacePeers: true,
-	})
+	}); err != nil {
+		return err
+	}
+
+	// AllowedIPs above only governs WireGuard's own crypto-routing (which
+	// packets it will decrypt/encrypt for this peer) -- it is not a
+	// kernel route. wg-quick adds one route per AllowedIPs entry itself;
+	// wgctrl.ConfigureDevice, being a thinner wrapper around the same
+	// netlink API wg-quick itself uses, does not. Without this, only the
+	// interface's own connected subnet (from ensureLink's AddrAdd) is
+	// reachable through wg0 -- anything else in AllowedIPs (e.g. the rest
+	// of the cluster's node/pod CIDR, needed for Calico BGP to the peer)
+	// has no path to the interface at all.
+	link, err := netlink.LinkByName(cfg.iface)
+	if err != nil {
+		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
+	}
+	for _, ipNet := range allowedIPs {
+		dst := ipNet
+		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK}
+		if err := netlink.RouteReplace(route); err != nil {
+			return fmt.Errorf("adding route %s dev %s: %w", dst.String(), cfg.iface, err)
+		}
+	}
+	return nil
 }
 
 func requiredKey(secret *corev1.Secret, key string) (string, error) {

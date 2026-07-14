@@ -59,10 +59,7 @@ func isMissingCRD(err error) bool {
 // promptly once it does.
 const crdRecheckInterval = 30 * time.Second
 
-var (
-	machineGVK    = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"}
-	awsMachineGVK = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSMachine"}
-)
+var machineGVK = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"}
 
 // NodeVIPAnnotation records the vip0 address allocated to a cloud
 // worker Machine, so a later reconcile (or a future Machine) can find
@@ -74,8 +71,15 @@ type Reconciler struct {
 	client.Client
 	Reader client.Reader
 
-	Join  ClusterJoinProvider
-	Infra InfraProvider
+	Join ClusterJoinProvider
+
+	// InfraProviders is every registered infrastructure provider (AWS,
+	// a containernet-backed test double, ...). Which one applies to a
+	// given Machine is inferred from its spec.infrastructureRef.kind,
+	// matched against each provider's own GVK() -- never hardcoded
+	// here, so adding a new cloud/test provider means registering it,
+	// not branching this reconciler.
+	InfraProviders []InfraProvider
 
 	// TemplatePath is the join-pattern template to render (e.g.
 	// join-patterns/k0s-worker.cloud-config.tmpl).
@@ -145,20 +149,30 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		log.V(1).Info("machine has no infrastructureRef yet, waiting")
 		return ctrl.Result{}, nil
 	}
-	awsMachine := &unstructured.Unstructured{}
-	awsMachine.SetGroupVersionKind(awsMachineGVK)
-	if err := r.Reader.Get(ctx, types.NamespacedName{Namespace: machine.GetNamespace(), Name: infraRefName}, awsMachine); err != nil {
+	infraRefKind, found, err := unstructured.NestedString(machine.Object, "spec", "infrastructureRef", "kind")
+	if err != nil || !found {
+		log.V(1).Info("machine's infrastructureRef has no kind yet, waiting")
+		return ctrl.Result{}, nil
+	}
+	infra := r.infraProviderFor(infraRefKind)
+	if infra == nil {
+		return ctrl.Result{}, fmt.Errorf("no InfraProvider registered for infrastructureRef kind %q", infraRefKind)
+	}
+
+	infraMachine := &unstructured.Unstructured{}
+	infraMachine.SetGroupVersionKind(infra.GVK())
+	if err := r.Reader.Get(ctx, types.NamespacedName{Namespace: machine.GetNamespace(), Name: infraRefName}, infraMachine); err != nil {
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
 		if isMissingCRD(err) {
-			log.Info("infrastructure provider's CRD isn't installed yet, waiting", "gvk", awsMachineGVK)
+			log.Info("infrastructure provider's CRD isn't installed yet, waiting", "gvk", infra.GVK())
 			return ctrl.Result{RequeueAfter: crdRecheckInterval}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("getting infrastructure resource %s: %w", infraRefName, err)
 	}
 
-	ready, err := r.Infra.Ready(ctx, awsMachine)
+	ready, err := infra.Ready(ctx, infraMachine)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("checking infra readiness: %w", err)
 	}
@@ -195,7 +209,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("getting cluster join values: %w", err)
 	}
-	infraValues, err := r.Infra.InfraValues(ctx, awsMachine)
+	infraValues, err := infra.InfraValues(ctx, infraMachine)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("getting infra values: %w", err)
 	}
@@ -266,6 +280,22 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	log.Info("bootstrap secret provisioned", "machine", req.NamespacedName, "nodeVIP4", nodeVIP4)
 	return ctrl.Result{}, nil
+}
+
+// infraProviderFor finds the registered InfraProvider whose GVK.Kind
+// matches a Machine's spec.infrastructureRef.kind (e.g. "AWSMachine",
+// "ContainernetMachine"), or nil if none is registered for it. This
+// is the whole of the reconciler's provider-selection logic -- it is
+// deliberately never anything more specific than a Kind comparison,
+// so registering a new InfraProvider is the only thing needed to
+// support a new infrastructure.
+func (r *Reconciler) infraProviderFor(kind string) InfraProvider {
+	for _, p := range r.InfraProviders {
+		if p.GVK().Kind == kind {
+			return p
+		}
+	}
+	return nil
 }
 
 // onPremPeers derives the cloud side's wg0.conf peer list from

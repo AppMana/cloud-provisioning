@@ -2,14 +2,21 @@ package join
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -139,5 +146,344 @@ func TestAllocateNodeVIPIndex_NoExisting(t *testing.T) {
 	}
 	if idx != 4 {
 		t.Errorf("expected first allocation to start at NodeVIPStart=4, got %d", idx)
+	}
+}
+
+// stubJoinProvider is a mock ClusterJoinProvider -- these Reconcile-level
+// tests care about what the reconciler DOES with a JoinProvider's
+// output (render it, create the Secret), not about any real cluster
+// technology's token-minting logic (that's k0s_test.go's job).
+type stubJoinProvider struct {
+	values map[string]any
+	err    error
+	calls  int
+}
+
+func (s *stubJoinProvider) JoinValues(ctx context.Context) (map[string]any, error) {
+	s.calls++
+	return s.values, s.err
+}
+
+func fakeAWSMachine(name, namespace string, ready bool) *unstructured.Unstructured {
+	m := &unstructured.Unstructured{}
+	m.SetGroupVersionKind(joinaws.Provider{}.GVK())
+	m.SetName(name)
+	m.SetNamespace(namespace)
+	_ = unstructured.SetNestedField(m.Object, ready, "status", "ready")
+	return m
+}
+
+// machineWithInfraRef builds a Machine whose infrastructureRef.kind is
+// "AWSMachine" -- this is the real, live signal (see fixed
+// infrastructureRef: {"apiGroup":"...","kind":"AWSMachine","name":"..."}
+// confirmed via kubectl against the actual jarvistam cloud-worker
+// Machine) the reconciler uses to infer which registered InfraProvider
+// applies, never a hardcoded assumption.
+func machineWithInfraRef(name, namespace, infraRefName string) *unstructured.Unstructured {
+	m := fakeMachine(name, "")
+	m.SetNamespace(namespace)
+	_ = unstructured.SetNestedField(m.Object, infraRefName, "spec", "infrastructureRef", "name")
+	_ = unstructured.SetNestedField(m.Object, joinaws.Provider{}.GVK().Kind, "spec", "infrastructureRef", "kind")
+	return m
+}
+
+// newFakeJoinReconciler builds a Reconciler wired for a full
+// Reconcile() call: unlike newFakeReconciler (onPremPeers/
+// allocateNodeVIPIndex tests only), this registers AWSMachine too and
+// fills in every field Reconcile actually reads.
+func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs ...client.Object) *Reconciler {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		t.Fatalf("adding clientgoscheme: %v", err)
+	}
+	scheme.AddKnownTypeWithName(machineGVK, &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(machineListGVK(), &unstructured.UnstructuredList{})
+	scheme.AddKnownTypeWithName(joinaws.Provider{}.GVK(), &unstructured.Unstructured{})
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
+
+	tmplPath := filepath.Join(t.TempDir(), "test.tmpl")
+	tmpl := "joinToken={{.joinToken}} k0sVersion={{.k0sVersion}} apiVIP={{.apiVIP}} nodeVIP4={{.nodeVIP4}} nodeVIP6={{.nodeVIP6}} kubeletExtraArgs={{.kubeletExtraArgs}} wgAddress={{.wireguard.address}} wgPrivateKey={{.wireguard.privateKey}}{{range .wireguard.peers}} peer={{.publicKey}}={{.allowedIPs}}{{end}}"
+	if err := os.WriteFile(tmplPath, []byte(tmpl), 0o644); err != nil {
+		t.Fatalf("writing test template: %v", err)
+	}
+
+	return &Reconciler{
+		Client:         c,
+		Reader:         c,
+		Join:           joinProvider,
+		InfraProviders: []InfraProvider{joinaws.Provider{}},
+
+		TemplatePath:     tmplPath,
+		APIVIP:           "10.101.0.1",
+		KubeletExtraArgs: "--node-labels=cloud-provisioning.appmana.com/role=cloud-worker",
+
+		WireGuardAddress:    "10.100.0.2/24",
+		WireGuardListenPort: "51820",
+
+		NodeVIP4Prefix: "10.101.0.",
+		NodeVIP6Prefix: "fd8f:cf26:522a::",
+		NodeVIPStart:   4,
+
+		DialerPeerSecretNamespace: "wg-dialer",
+		DialerPeerSecretName:      "wg-dialer-peer",
+
+		BootstrapSecretNameFormat: "%s-bootstrap",
+	}
+}
+
+func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
+	machine := machineWithInfraRef("hilton-cloud-worker-jarvistam-0", "default", "hilton-cloud-worker-jarvistam-0")
+	awsMachine := fakeAWSMachine("hilton-cloud-worker-jarvistam-0", "default", true)
+	dialerSecret := dialerPeerSecretFixture()
+	join := &stubJoinProvider{values: map[string]any{"joinToken": "fake-token", "k0sVersion": "v1.36.2+k0s"}}
+
+	r := newFakeJoinReconciler(t, join, machine, awsMachine, dialerSecret)
+
+	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)})
+	if err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if res.RequeueAfter != 0 {
+		t.Errorf("expected no requeue on success, got RequeueAfter=%v", res.RequeueAfter)
+	}
+	if join.calls != 1 {
+		t.Errorf("expected JoinValues to be called exactly once, got %d calls", join.calls)
+	}
+
+	bootstrapSecret := &corev1.Secret{}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "hilton-cloud-worker-jarvistam-0-bootstrap"}, bootstrapSecret); err != nil {
+		t.Fatalf("expected a bootstrap secret to be created: %v", err)
+	}
+	if bootstrapSecret.Type != "cluster.x-k8s.io/secret" {
+		t.Errorf("bootstrap secret type = %q, want cluster.x-k8s.io/secret", bootstrapSecret.Type)
+	}
+	if bootstrapSecret.StringData["format"] != "cloud-config" {
+		t.Errorf("bootstrap secret format = %q, want cloud-config", bootstrapSecret.StringData["format"])
+	}
+	rendered := bootstrapSecret.StringData["value"]
+	for _, want := range []string{"joinToken=fake-token", "k0sVersion=v1.36.2+k0s", "apiVIP=10.101.0.1", "nodeVIP4=10.101.0.4", "nodeVIP6=fd8f:cf26:522a::4"} {
+		if !strings.Contains(rendered, want) {
+			t.Errorf("rendered bootstrap content missing %q; got: %s", want, rendered)
+		}
+	}
+
+	updatedDialerSecret := &corev1.Secret{}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "wg-dialer", Name: "wg-dialer-peer"}, updatedDialerSecret); err != nil {
+		t.Fatalf("getting updated dialer secret: %v", err)
+	}
+	if string(updatedDialerSecret.Data["peer-endpoint"]) != "pending" {
+		t.Errorf("peer-endpoint = %q, want \"pending\" until the endpoint-controller learns the real external IP", updatedDialerSecret.Data["peer-endpoint"])
+	}
+	if len(updatedDialerSecret.Data["peer-public-key"]) == 0 {
+		t.Error("peer-public-key wasn't populated with the newly generated cloud-side public key")
+	}
+
+	updatedMachine := &unstructured.Unstructured{}
+	updatedMachine.SetGroupVersionKind(machineGVK)
+	if err := r.Get(context.Background(), client.ObjectKeyFromObject(machine), updatedMachine); err != nil {
+		t.Fatalf("getting updated machine: %v", err)
+	}
+	if updatedMachine.GetAnnotations()[NodeVIPAnnotation] != "4" {
+		t.Errorf("machine's %s annotation = %q, want \"4\" (NodeVIPStart, first allocation)", NodeVIPAnnotation, updatedMachine.GetAnnotations()[NodeVIPAnnotation])
+	}
+}
+
+func TestReconcile_SkipsIfBootstrapSecretAlreadyExists(t *testing.T) {
+	machine := machineWithInfraRef("hilton-cloud-worker-jarvistam-0", "default", "hilton-cloud-worker-jarvistam-0")
+	awsMachine := fakeAWSMachine("hilton-cloud-worker-jarvistam-0", "default", true)
+	existingBootstrap := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "hilton-cloud-worker-jarvistam-0-bootstrap", Namespace: "default"},
+		Data:       map[string][]byte{"value": []byte("already provisioned")},
+	}
+	join := &stubJoinProvider{values: map[string]any{"joinToken": "fake-token", "k0sVersion": "v1.36.2+k0s"}}
+
+	r := newFakeJoinReconciler(t, join, machine, awsMachine, existingBootstrap)
+
+	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)}); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if join.calls != 0 {
+		t.Errorf("JoinValues must not be called when a bootstrap secret already exists (idempotency), got %d calls", join.calls)
+	}
+
+	secret := &corev1.Secret{}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "hilton-cloud-worker-jarvistam-0-bootstrap"}, secret); err != nil {
+		t.Fatalf("getting bootstrap secret: %v", err)
+	}
+	if string(secret.Data["value"]) != "already provisioned" {
+		t.Error("existing bootstrap secret was overwritten -- Reconcile must never touch an already-provisioned secret")
+	}
+}
+
+// erroringReader wraps a real client.Reader but returns a fixed error
+// for Get calls matching one GVK -- used to inject the *exact* error
+// shape a real API server's RESTMapper produces when a CRD isn't
+// installed (meta.NoKindMatchError, or its string-only equivalent).
+// The fake controller-runtime client does NOT reproduce this: an
+// unstructured Get for a GVK it doesn't know about comes back as a
+// plain NotFound (confirmed empirically), which would make a naive
+// "just don't register the scheme type" test pass for the wrong
+// reason -- it would never actually reach isMissingCRD's branch at
+// all. This makes the test honest about which branch it exercises.
+type erroringReader struct {
+	client.Reader
+	failGVK schema.GroupVersionKind
+	err     error
+}
+
+func (r *erroringReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if u, ok := obj.(*unstructured.Unstructured); ok && u.GroupVersionKind() == r.failGVK {
+		return r.err
+	}
+	return r.Reader.Get(ctx, key, obj, opts...)
+}
+
+func testMissingCRDReconciler(t *testing.T, injectedErr error) (*Reconciler, *unstructured.Unstructured, *stubJoinProvider) {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		t.Fatalf("adding clientgoscheme: %v", err)
+	}
+	scheme.AddKnownTypeWithName(machineGVK, &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(machineListGVK(), &unstructured.UnstructuredList{})
+	scheme.AddKnownTypeWithName(joinaws.Provider{}.GVK(), &unstructured.Unstructured{})
+
+	machine := machineWithInfraRef("hilton-cloud-worker-jarvistam-0", "default", "hilton-cloud-worker-jarvistam-0")
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(machine).Build()
+	join := &stubJoinProvider{values: map[string]any{}}
+	r := &Reconciler{
+		Client:                    c,
+		Reader:                    &erroringReader{Reader: c, failGVK: joinaws.Provider{}.GVK(), err: injectedErr},
+		Join:                      join,
+		InfraProviders:            []InfraProvider{joinaws.Provider{}},
+		BootstrapSecretNameFormat: "%s-bootstrap",
+	}
+	return r, machine, join
+}
+
+func TestReconcile_MissingInfrastructureCRD_RequeuesGracefully(t *testing.T) {
+	// The typed error path: meta.IsNoMatchError recognizes this
+	// directly, matching a RESTMapper genuinely failing to resolve a
+	// Kind whose CRD isn't installed.
+	r, machine, join := testMissingCRDReconciler(t, &meta.NoKindMatchError{
+		GroupKind:        schema.GroupKind{Group: "infrastructure.cluster.x-k8s.io", Kind: "AWSMachine"},
+		SearchedVersions: []string{"v1beta2"},
+	})
+
+	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)})
+	if err != nil {
+		t.Fatalf("Reconcile must not return a hard error when the infra CRD is missing, got: %v", err)
+	}
+	if res.RequeueAfter != crdRecheckInterval {
+		t.Errorf("RequeueAfter = %v, want the CRD recheck interval %v", res.RequeueAfter, crdRecheckInterval)
+	}
+	if join.calls != 0 {
+		t.Errorf("JoinValues must not be called before infra is confirmed ready, got %d calls", join.calls)
+	}
+}
+
+func TestReconcile_MissingInfrastructureCRD_StringFallback_RequeuesGracefully(t *testing.T) {
+	// The string-matching fallback path: some server versions surface a
+	// missing CRD as a plain error message rather than a typed
+	// meta.NoKindMatchError (see isMissingCRD's comment) -- this proves
+	// that fallback is actually reachable through the full Reconcile
+	// path, not just a pure-function unit test of isMissingCRD itself.
+	r, machine, join := testMissingCRDReconciler(t, fmt.Errorf(`the server could not find the requested resource`))
+
+	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)})
+	if err != nil {
+		t.Fatalf("Reconcile must not return a hard error when the infra CRD is missing, got: %v", err)
+	}
+	if res.RequeueAfter != crdRecheckInterval {
+		t.Errorf("RequeueAfter = %v, want the CRD recheck interval %v", res.RequeueAfter, crdRecheckInterval)
+	}
+	if join.calls != 0 {
+		t.Errorf("JoinValues must not be called before infra is confirmed ready, got %d calls", join.calls)
+	}
+}
+
+// stubInfraProvider is a mock InfraProvider registered under a
+// distinct GVK, used to prove the reconciler's provider selection is
+// genuinely inferred from spec.infrastructureRef.kind rather than
+// only ever exercising the one AWS provider that happens to be
+// registered.
+type stubInfraProvider struct {
+	gvk         schema.GroupVersionKind
+	ready       bool
+	infraValues map[string]any
+	readyCalls  int
+}
+
+func (s *stubInfraProvider) GVK() schema.GroupVersionKind { return s.gvk }
+func (s *stubInfraProvider) Ready(ctx context.Context, machine *unstructured.Unstructured) (bool, error) {
+	s.readyCalls++
+	return s.ready, nil
+}
+func (s *stubInfraProvider) InfraValues(ctx context.Context, machine *unstructured.Unstructured) (map[string]any, error) {
+	return s.infraValues, nil
+}
+
+func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
+	// Two Machines referencing two different infrastructureRef kinds,
+	// two registered providers -- only the matching provider for each
+	// Machine may be consulted. This is the actual behavior "the
+	// operator should infer which concrete implementation it uses"
+	// depends on, not just a claim in a comment.
+	awsProvider := &stubInfraProvider{gvk: schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSMachine"}, ready: true}
+	otherProvider := &stubInfraProvider{gvk: schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "OtherMachine"}, ready: true}
+
+	awsMachine := &unstructured.Unstructured{}
+	awsMachine.SetGroupVersionKind(awsProvider.GVK())
+	awsMachine.SetName("aws-infra")
+	awsMachine.SetNamespace("default")
+
+	otherMachine := &unstructured.Unstructured{}
+	otherMachine.SetGroupVersionKind(otherProvider.GVK())
+	otherMachine.SetName("other-infra")
+	otherMachine.SetNamespace("default")
+
+	machineA := fakeMachine("machine-a", "")
+	machineA.SetNamespace("default")
+	_ = unstructured.SetNestedField(machineA.Object, "aws-infra", "spec", "infrastructureRef", "name")
+	_ = unstructured.SetNestedField(machineA.Object, "AWSMachine", "spec", "infrastructureRef", "kind")
+
+	scheme := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		t.Fatalf("adding clientgoscheme: %v", err)
+	}
+	scheme.AddKnownTypeWithName(machineGVK, &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(machineListGVK(), &unstructured.UnstructuredList{})
+	scheme.AddKnownTypeWithName(awsProvider.GVK(), &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(otherProvider.GVK(), &unstructured.Unstructured{})
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(machineA, awsMachine, otherMachine, dialerPeerSecretFixture()).Build()
+
+	tmplPath := filepath.Join(t.TempDir(), "test.tmpl")
+	if err := os.WriteFile(tmplPath, []byte("ok"), 0o644); err != nil {
+		t.Fatalf("writing test template: %v", err)
+	}
+
+	r := &Reconciler{
+		Client:                    c,
+		Reader:                    c,
+		Join:                      &stubJoinProvider{values: map[string]any{}},
+		InfraProviders:            []InfraProvider{awsProvider, otherProvider},
+		TemplatePath:              tmplPath,
+		NodeVIP4Prefix:            "10.101.0.",
+		NodeVIP6Prefix:            "fd8f:cf26:522a::",
+		NodeVIPStart:              4,
+		DialerPeerSecretNamespace: "wg-dialer",
+		DialerPeerSecretName:      "wg-dialer-peer",
+		BootstrapSecretNameFormat: "%s-bootstrap",
+	}
+
+	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machineA)}); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if awsProvider.readyCalls != 1 {
+		t.Errorf("expected the AWSMachine-kind provider to be consulted exactly once, got %d calls", awsProvider.readyCalls)
+	}
+	if otherProvider.readyCalls != 0 {
+		t.Errorf("expected the OtherMachine-kind provider to NEVER be consulted for a Machine whose infrastructureRef.kind is AWSMachine, got %d calls", otherProvider.readyCalls)
 	}
 }

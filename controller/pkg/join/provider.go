@@ -10,6 +10,7 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // ClusterJoinProvider is however a specific cluster technology (k0s,
@@ -28,12 +29,28 @@ type ClusterJoinProvider interface {
 }
 
 // InfraProvider is however a specific infrastructure provider (AWS,
-// GCP, ...) knows whether one Machine's underlying resource is ready
-// to be bootstrapped yet, and contributes whatever placement/identity
-// facts about it the join-pattern template needs. Readiness is
-// genuinely provider-specific: each infrastructure CRD (AWSMachine,
-// a hypothetical GCPMachine, ...) has its own status shape.
+// a containernet-backed test double, GCP, ...) knows whether one
+// Machine's underlying resource is ready to be bootstrapped yet, and
+// contributes whatever placement/identity facts about it the
+// join-pattern template needs. Readiness is genuinely
+// provider-specific: each infrastructure CRD (AWSMachine, a
+// ContainernetMachine test double, a hypothetical GCPMachine, ...)
+// has its own status shape.
+//
+// The reconciler never hardcodes which provider applies to a given
+// Machine -- it infers that from the Machine's own
+// spec.infrastructureRef.kind (a real, already-present field, not
+// invented for this), matching it against each registered provider's
+// GVK(). Adding a new infrastructure provider means registering it,
+// never adding a branch to the reconciler.
 type InfraProvider interface {
+	// GVK identifies the infrastructure resource kind this provider
+	// handles (e.g. AWSMachine at infrastructure.cluster.x-k8s.io/v1beta2).
+	// The reconciler matches this against a Machine's
+	// spec.infrastructureRef.kind to pick the right provider, and uses
+	// it to know which object to fetch.
+	GVK() schema.GroupVersionKind
+
 	// Ready reports whether the Machine's underlying infrastructure
 	// resource is far enough along to bootstrap (e.g. AWS: the
 	// instance is running). False, nil means "not yet, requeue" --

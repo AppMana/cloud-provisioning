@@ -286,10 +286,10 @@ func main() {
 			}
 		}
 		joinReconciler := &join.Reconciler{
-			Client: mgr.GetClient(),
-			Reader: mgr.GetAPIReader(),
-			Join:   &joink0s.Provider{Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL},
-			Infra:  joinaws.Provider{},
+			Client:         mgr.GetClient(),
+			Reader:         mgr.GetAPIReader(),
+			Join:           &joink0s.Provider{Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL},
+			InfraProviders: []join.InfraProvider{joinaws.Provider{}},
 
 			TemplatePath:      joinTemplatePath,
 			APIVIP:            joinAPIVIP,

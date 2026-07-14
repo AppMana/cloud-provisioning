@@ -1,4 +1,8 @@
 #cloud-config
+ssh_authorized_keys:
+{{- range .sshAuthorizedKeys }}
+  - {{ . }}
+{{- end }}
 # k0s-worker join pattern: bring up the WireGuard tunnel, gate on the
 # cluster's API VIP becoming reachable through it, then join as a plain
 # k0s worker using a pre-minted join token. This is CAPA's own
@@ -33,6 +37,18 @@ runcmd:
   - apt-get update && apt-get install -y wireguard-tools
   - wg-quick up wg0
   - until ping -c1 -W2 {{ .apiVIP }} >/dev/null 2>&1; do sleep 2; done
+  # Calico's IP_AUTODETECTION_METHOD/IP6_AUTODETECTION_METHOD on this
+  # cluster are cidr= matches (see the cluster's calico-node DaemonSet
+  # env), the same convention every on-prem node satisfies with a dummy
+  # vip0 interface (confirmed via `ip -br addr show vip0` on jarvis:
+  # 10.101.0.1/32 + fd8f:cf26:522a::1/128). Without an address in those
+  # CIDRs on some interface, calico-node fails to start at all
+  # ("failed to autodetect an IPv4 address") -- this isn't optional,
+  # it's the same mechanism every other node already relies on.
+  - ip link add vip0 type dummy
+  - ip addr add {{ .nodeVIP4 }}/32 dev vip0
+  - ip addr add {{ .nodeVIP6 }}/128 dev vip0
+  - ip link set vip0 up
   - curl -sSLf https://get.k0s.sh | K0S_VERSION={{ .k0sVersion }} sh
   # k0s resolves node IPs by looking up the instance's own hostname, not
   # by inspecting interfaces -- on AWS that hostname only maps to the

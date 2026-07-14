@@ -183,6 +183,19 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("getting infrastructure resource %s: %w", infraRefName, err)
 	}
 
+	// Optional preflight: providers whose underlying operator (CAPA,
+	// ...) can silently retry forever on a misconfiguration get a
+	// chance to surface that clearly here instead. Real, caught-live
+	// example: an AWSClusterStaticIdentity's secretRef in the wrong
+	// namespace -- CAPA's own error just says "Secret ... not found"
+	// on an infinite loop with no hint about where it actually needs
+	// to be.
+	if v, ok := infra.(Validator); ok {
+		if err := v.Validate(ctx, r.Client, infraMachine); err != nil {
+			return ctrl.Result{}, fmt.Errorf("validating infrastructure configuration: %w", err)
+		}
+	}
+
 	log.Info("provisioning bootstrap secret", "machine", req.NamespacedName)
 
 	cloudPriv, err := wgtypes.GeneratePrivateKey()

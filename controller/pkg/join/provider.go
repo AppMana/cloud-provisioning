@@ -11,6 +11,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ClusterJoinProvider is however a specific cluster technology (k0s,
@@ -61,4 +62,23 @@ type InfraProvider interface {
 	// for one Machine (e.g. AWS might contribute nothing today, but a
 	// future provider could contribute its own placement facts).
 	InfraValues(ctx context.Context, machine *unstructured.Unstructured) (map[string]any, error)
+}
+
+// Validator is an optional capability an InfraProvider may implement:
+// a Reconcile-time preflight check that surfaces a misconfiguration in
+// whatever *separate* operator actually owns provisioning (CAPA, ...)
+// as an immediate, clear error from THIS reconciler, instead of an
+// opaque, indefinite retry loop in that other operator's own logs.
+// Caught live: CAPA silently retried forever with "Secret ... not
+// found" because an AWSClusterStaticIdentity's secretRef was in the
+// wrong namespace -- a real, non-obvious configuration mistake this
+// reconciler is well-placed to catch early, since it already resolves
+// the infrastructure object anyway.
+//
+// Deliberately not part of InfraProvider itself: it's genuinely
+// optional and provider-specific (containernet, for instance, has
+// nothing analogous to validate), so callers type-assert for it
+// rather than every provider being forced to implement a no-op.
+type Validator interface {
+	Validate(ctx context.Context, c client.Client, infraMachine *unstructured.Unstructured) error
 }

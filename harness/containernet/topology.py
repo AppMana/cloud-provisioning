@@ -193,6 +193,79 @@ def main():
     t = wait_for(lambda: rc_of(onprem, "ping -c1 -W1 -I 10.101.128.1 10.101.130.1") == 0, timeout=30)
     print(f"  pod-to-pod recovered after ~{t}s — kernel keepalive only, nothing re-executed" if t is not None else "  did NOT recover")
 
+    info("*** 6. extended outage (60s, well past a single ping/BGP-hold window)\n")
+    # Scenario 5 proves self-heal after a brief flap; this proves nothing
+    # about it was only accidentally working for something short enough
+    # to still be inside some other retry/backoff window. Same mechanism
+    # (kernel PersistentKeepalive, no controller), just a duration long
+    # enough that anything relying on a short timeout would have already
+    # given up and needed a manual kick.
+    outage_secs = 60
+    onprem.cmd(f"ip link set {link.intf1} down")
+    down_since = time.time()
+    time.sleep(outage_secs)
+    rc = rc_of(ec2, "ping -c1 -W1 10.101.0.1")
+    print(f"  still down after {outage_secs}s (expected)" if rc else "  API unexpectedly reachable")
+    onprem.cmd(f"ip link set {link.intf1} up")
+    t = wait_for(lambda: rc_of(onprem, "ping -c1 -W1 -I 10.101.128.1 10.101.130.1") == 0, timeout=30)
+    total = round(time.time() - down_since, 1)
+    print(f"  recovered ~{t}s after the link came back ({total}s total outage) — no process re-executed"
+          if t is not None else f"  did NOT recover within 30s of the link returning ({total}s total outage)")
+
+    info("*** 7. slow provisioning: onprem dials out for a while before ec2 ever boots\n")
+    # Models a real CAPA/EC2 launch: the on-prem dialer is already
+    # running and trying to reach a peer that doesn't exist yet. Its
+    # only job during this window is to not wedge or error out --
+    # ENDPOINT/peer state was configured back in step 2's config write,
+    # so this restarts wg-pullup on a *fresh* interface to prove the
+    # dialing side tolerates a peer that simply isn't there yet, then
+    # brings the "slow" ec2 side up only after a real delay.
+    provision_delay_secs = 20
+    onprem.cmd("ip link del wg0 2>/dev/null || true")
+    ec2.cmd("ip link del wg0 2>/dev/null || true")
+    onprem.cmd("nohup /usr/local/sbin/wg-pullup node >/tmp/onprem-slow.log 2>&1 &")
+    print(f"  onprem dialing a peer that doesn't exist yet for {provision_delay_secs}s...")
+    time.sleep(provision_delay_secs)
+    rc = rc_of(onprem, "ip link show wg0")
+    print("  onprem's wg0 still up while waiting (no crash/wedge)" if rc == 0 else "  onprem's wg0 is GONE (dialer crashed while peer absent)")
+    ec2.cmd("nohup /usr/local/sbin/wg-pullup node >/tmp/ec2-slow.log 2>&1 &")
+    time.sleep(1)  # give wg-pullup time to create wg0 before routing to it (see step 2's identical wait)
+    onprem.cmd("ip route replace 10.101.130.0/24 dev wg0")
+    ec2.cmd("ip route replace 10.101.0.0/16 dev wg0")
+    t = wait_for(handshake_done, timeout=20, interval=2)
+    print(f"  handshake completed ~{t}s after the late peer finally appeared" if t is not None else "  FAILED to handshake even after the peer appeared")
+
+    info("*** 8. control plane transiently down (API gone, tunnel itself untouched)\n")
+    # Different failure from 5/6: the LINK stays fully up the whole
+    # time (no flap) -- only the thing standing in for the API/control
+    # plane (vip0) disappears, e.g. jarvis's own k0s controller process
+    # restarting while the host and network are fine. The tunnel should
+    # never notice: no re-handshake should be needed once the VIP comes
+    # back, because nothing about the WireGuard session itself broke.
+    hs_before = clean(ec2.cmd("wg show wg0 latest-handshakes")).split()
+    # ip addr del, not `ip link set vip0 down`: a down dummy link's
+    # address can still answer ICMP under Linux's weak-host model (no
+    # second interface needed to trigger it -- confirmed empirically,
+    # this is not the intuitive "down means gone" behavior). Deleting
+    # the address outright is what actually models "the process/address
+    # is gone" -- e.g. k0s's API server unbinding during a restart.
+    onprem.cmd("ip addr del 10.101.0.1/32 dev vip0")
+    rc = rc_of(ec2, "ping -c1 -W1 10.101.0.1")
+    print("  API unreachable while its VIP is gone (expected)" if rc else "  API still answering (unexpected)")
+    rc_tunnel = rc_of(ec2, "ping -c1 -W1 10.101.128.1")  # onprem's *pod*, reached only via the still-healthy tunnel
+    print("  tunnel itself still passes traffic during the outage" if rc_tunnel == 0 else "  tunnel appears down too (unexpected -- this should be API-only)")
+    onprem.cmd("ip addr add 10.101.0.1/32 dev vip0")
+    t = wait_for(lambda: rc_of(ec2, "ping -c1 -W1 10.101.0.1") == 0, timeout=10)
+    hs_after = clean(ec2.cmd("wg show wg0 latest-handshakes")).split()
+    # Same timestamp before/after means no new handshake was forced by
+    # the VIP outage itself -- WireGuard's own periodic rekey (every ~2
+    # minutes) is far outside this test's window, so an unchanged
+    # timestamp here is a real signal, not a coincidence.
+    no_rehandshake = len(hs_before) >= 2 and len(hs_after) >= 2 and hs_before[-1] == hs_after[-1]
+    print(f"  API reachable again ~{t}s after its VIP returned" if t is not None else "  API did NOT come back")
+    print("  no re-handshake occurred -- confirms this was a control-plane outage, not a tunnel one"
+          if no_rehandshake else "  a new handshake occurred (unexpected for a VIP-only outage)")
+
     net.stop()
 
 

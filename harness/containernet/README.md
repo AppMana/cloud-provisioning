@@ -10,7 +10,16 @@ packaged artifact against a more realistic (if messier) environment.
 ## Setup
 
 Requires containernet (a Mininet fork) and its `mnexec` helper, neither
-of which are packaged for pip:
+of which are packaged for pip. `./setup.sh` automates this end to end
+(idempotent, safe to re-run) -- clones containernet into `./containernet`
+(gitignored: a large upstream checkout, not vendored), builds its venv,
+`mnexec`, and the `wg-node:test` image:
+
+```bash
+./setup.sh
+```
+
+Or by hand, if you'd rather see each step:
 
 ```bash
 git clone --depth 1 https://github.com/containernet/containernet.git
@@ -19,25 +28,35 @@ python3 -m venv venv && source venv/bin/activate
 pip install -e . python-iptables
 make mnexec && sudo cp mnexec /usr/local/bin/
 sudo apt-get install -y openvswitch-switch   # mininet's default switch backend
-```
-
-Build the node image once:
-
-```bash
-./build-image.sh
+cd .. && ./build-image.sh
 ```
 
 Run (root; mininet manipulates network namespaces and iptables):
 
 ```bash
-source /path/to/containernet/venv/bin/activate
+source containernet/venv/bin/activate
 sudo -E env PATH=$PATH python3 -u topology.py
 ```
 
-Expect six passing checks: ordering (no API access before the tunnel),
-the real boot script establishing the tunnel, pod-to-pod over the
-tunnel, MTU enforcement, and self-heal after a link flap with the
-tunnel's kernel-level `PersistentKeepalive` — no controller involved.
+Expect these checks, in order:
+
+1. **ordering** — ec2 cannot reach the API VIP before the tunnel exists
+2. **the real boot script** establishing the tunnel (not a reimplementation)
+3. **pod-to-pod** over the tunnel
+4. **MTU enforcement** under WireGuard overhead
+5. **self-heal after a brief link flap** — kernel `PersistentKeepalive`, no controller involved
+6. **self-heal after an extended (60s) outage** — proves 5 wasn't only working because the flap was short enough to be inside some other retry window
+7. **slow provisioning** — the on-prem side dials a peer that doesn't exist yet for 20s (standing in for a real CAPA/EC2 launch delay) and must neither crash nor wedge, then handshake normally once the peer finally appears
+8. **control plane transiently down** — the API's own address disappears (e.g. a k0s controller restart) while the tunnel and network path stay fully up; the tunnel must not notice or need to re-handshake, since this is a different failure than 5/6 (that's a network path failure; this is a control-plane one, orthogonal to the tunnel's own health)
+
+Scoping note: containernet drives the real `wg-pullup`/`firstboot`
+scripts and real Linux network namespaces, so it can faithfully model
+network- and timing-layer failures (5-8 above). It cannot model
+failures in the CAPA/CAPI reconciliation loop itself (IAM permission
+gaps, AWSMachine spec immutability, AWS quota errors, a Machine stuck
+in `Provisioning`) -- that's a different layer entirely, validated
+instead by exercising the real control loop against a real or `kind`
+cluster.
 
 ## What this tool actually gives you (read before extending this test)
 

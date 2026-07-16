@@ -32,6 +32,46 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+// wgDialerRouteTable is a dedicated routing table for this dialer's
+// AllowedIPs-derived routes -- never the main table (254). See the
+// comment at its one call site (reconcile) for why: it's a structural
+// guard against a misconfigured AllowedIPs ever being able to replace
+// the host's own default route again, not just a tidiness choice.
+const wgDialerRouteTable = 52820
+
+// wgDialerRulePriority is deliberately a HIGHER number (lower
+// priority) than the main table's own rule (priority 32766, standard
+// on every Linux system). Linux evaluates FIB rules in ascending
+// priority order and stops at the first rule whose table has a
+// matching route -- placing this rule after "main" means
+// wgDialerRouteTable is only ever consulted when the main table has
+// no route for a given destination at all, so it can never override
+// the main table's own default route or any other route a normal
+// admin/network setup already relies on.
+const wgDialerRulePriority = 32800
+
+// ensurePolicyRoutingRule adds the "look up wgDialerRouteTable, but
+// only after the main table" rule if it isn't already present.
+// Idempotent: safe to call every reconcile pass.
+func ensurePolicyRoutingRule() error {
+	existing, err := netlink.RuleList(netlink.FAMILY_ALL)
+	if err != nil {
+		return fmt.Errorf("listing existing rules: %w", err)
+	}
+	for _, r := range existing {
+		if r.Table == wgDialerRouteTable {
+			return nil
+		}
+	}
+	rule := netlink.NewRule()
+	rule.Table = wgDialerRouteTable
+	rule.Priority = wgDialerRulePriority
+	if err := netlink.RuleAdd(rule); err != nil {
+		return fmt.Errorf("adding rule for table %d at priority %d: %w", wgDialerRouteTable, wgDialerRulePriority, err)
+	}
+	return nil
+}
+
 type config struct {
 	secretNamespace     string
 	secretName          string
@@ -222,15 +262,34 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	// reachable through wg0 -- anything else in AllowedIPs (e.g. the rest
 	// of the cluster's node/pod CIDR, needed for Calico BGP to the peer)
 	// has no path to the interface at all.
+	//
+	// These routes go into a DEDICATED table (wgDialerRouteTable), not
+	// the main table, via a policy rule with a lower priority (higher
+	// number) than the main table's own (32766). Linux FIB rule lookup
+	// stops at the first rule whose table has a matching route, so this
+	// table is only ever consulted as a fallback for destinations the
+	// main table can't already answer -- for a 0.0.0.0/0 (or ::/0)
+	// AllowedIPs entry, the main table's own real default route is
+	// *always* a match, so the fallback table is never reached at all,
+	// regardless of what --allowed-ips is set to. This is a structural
+	// guard against exactly the incident this project hit live: a
+	// misconfigured AllowedIPs=0.0.0.0/0 replaced the node's own
+	// default route and cut off its unrelated admin/WAN access
+	// entirely. With routes confined to this fallback table, the same
+	// misconfiguration can only ever fail to add a redundant, unused
+	// route -- it can no longer touch the host's real routing at all.
+	if err := ensurePolicyRoutingRule(); err != nil {
+		return fmt.Errorf("ensuring policy routing rule: %w", err)
+	}
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
 	}
 	for _, ipNet := range allowedIPs {
 		dst := ipNet
-		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK}
+		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK, Table: wgDialerRouteTable}
 		if err := netlink.RouteReplace(route); err != nil {
-			return fmt.Errorf("adding route %s dev %s: %w", dst.String(), cfg.iface, err)
+			return fmt.Errorf("adding route %s dev %s table %d: %w", dst.String(), cfg.iface, wgDialerRouteTable, err)
 		}
 	}
 	return nil

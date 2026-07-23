@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wg-dialer
+---
+# The wg-dialer-peer Secret itself is NOT here: it needs a freshly generated
+# real WireGuard keypair per run (so unrelated runs don't share key
+# material) and the `cloud` node's real, reachable mgmt IP as its
+# Endpoint, both only known once that node is up -- created imperatively
+# by scripts/run-scenario.sh via `kubectl create secret generic ...
+# --dry-run=client -o yaml | kubectl apply -f -`. The dialer installs its
+# route regardless of whether the peer has completed a handshake yet
+# (see controller/cmd/dialer/main.go's reconcile()), so route-hijack
+# behavior is observable even in the brief window before the two nodes'
+# first real handshake completes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wg-dialer-read-secret
+  namespace: wg-dialer
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["wg-dialer-peer"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wg-dialer-read-secret
+  namespace: wg-dialer
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: wg-dialer
+roleRef:
+  kind: Role
+  name: wg-dialer-read-secret
+  apiGroup: rbac.authorization.k8s.io

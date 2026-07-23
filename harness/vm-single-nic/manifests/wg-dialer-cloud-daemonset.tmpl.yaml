@@ -1,0 +1,65 @@
+# Mirrors endpoint-controller/main.go's ensureCloudDialerDaemonSet: the
+# SAME dialer binary, scheduled onto ONLY the cloud-worker node (via
+# nodeSelector + a toleration for the cloud-worker taint -- the exact
+# opposite of wg-dialer-daemonset.tmpl.yaml's scheduling), reading its
+# peer config from the same /etc/wg-dialer/peers.json file cloud-init
+# already wrote (hostPath-mounted read-only) rather than any in-cluster
+# Secret.
+#
+# This deliberately runs ALONGSIDE the wg-dialer.service systemd unit
+# already running on `cloud`, not instead of it -- see
+# ensureCloudDialerDaemonSet's own doc comment for why both running
+# forever, redundantly, is the actual safety property this harness is
+# meant to prove (the bootstrap unit must never depend on this
+# DaemonSet successfully taking over from it).
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dialer-cloud-repro
+  namespace: wg-dialer
+spec:
+  selector:
+    matchLabels:
+      app: dialer-cloud-repro
+  template:
+    metadata:
+      labels:
+        app: dialer-cloud-repro
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        cloud-provisioning.appmana.com/role: cloud-worker
+      tolerations:
+        - key: cloud-provisioning.appmana.com/internet-facing
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: dialer
+          image: busybox
+          command: ["/host-bin/$DIALER_BINARY"]
+          args:
+            - --iface=wg0
+            - --peers-file=/etc/wg-dialer/peers.json
+            - --listen-port=51820
+            - --pod-cidrs=$POD_CIDRS
+            - --service-cidrs=$SERVICE_CIDRS
+            - --keepalive-seconds=15
+            - --mtu=1420
+            - --poll-interval=30s
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+          volumeMounts:
+            - name: hostbin
+              mountPath: /host-bin
+            - name: wg-dialer-config
+              mountPath: /etc/wg-dialer
+              readOnly: true
+      volumes:
+        - name: hostbin
+          hostPath:
+            path: /opt/dialer-bin
+        - name: wg-dialer-config
+          hostPath:
+            path: /etc/wg-dialer
+            type: Directory

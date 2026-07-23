@@ -1,0 +1,49 @@
+# RED-only: the OLD vulnerable dialer binary (pre-fb01961~1) has its own,
+# now-historical CLI/Secret schema -- a single flat peer-public-key/
+# peer-endpoint pair and a free-form --allowed-ips flag that this exact
+# binary's own code mirrors into a literal kernel route. This template
+# deliberately preserves that old schema unchanged, since RED's whole
+# point is reproducing the actual historical bug, not the redesigned
+# interface -- see manifests/wg-dialer-daemonset.tmpl.yaml for the
+# GREEN/current-binary template.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dialer-repro
+  namespace: wg-dialer
+spec:
+  selector:
+    matchLabels:
+      app: dialer-repro
+  template:
+    metadata:
+      labels:
+        app: dialer-repro
+    spec:
+      hostNetwork: true
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: dialer
+          image: busybox
+          command: ["/host-bin/$DIALER_BINARY"]
+          args:
+            - --secret-namespace=wg-dialer
+            - --secret-name=wg-dialer-peer
+            - --iface=wg0
+            - --private-key-secret-key=dialer-private-key
+            - --local-address-secret-key=local-address
+            - --allowed-ips=$ALLOWED_IPS
+            - --keepalive-seconds=15
+            - --mtu=1420
+            - --poll-interval=10s
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+          volumeMounts:
+            - name: hostbin
+              mountPath: /host-bin
+      volumes:
+        - name: hostbin
+          hostPath:
+            path: /opt/dialer-bin

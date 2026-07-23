@@ -1,0 +1,25 @@
+#!/bin/bash
+# First-boot setup for the "cloud" node -- the wg-quick replacement
+# side of the harness. Unlike onprem, this node never runs k0s at all
+# (it isn't a Kubernetes node in the real topology either -- see
+# join-patterns/k0s-worker.cloud-config.tmpl): its whole role is the
+# dialer binary running as a bare systemd unit in listener mode, fed by
+# a static peers.json (no in-cluster Secret access, same as the real
+# cloud/EC2 side). scripts/run-scenario.sh uploads the actual dialer
+# binary and peers.json post-boot, same upload flow as onprem; this
+# script only needs the SSH key and curl (harness plumbing), same
+# pattern as cfg/onprem-setup.sh.tmpl.
+set -euo pipefail
+
+apt-get update -qy
+DEBIAN_FRONTEND=noninteractive apt-get install -y curl
+
+mkdir -p /home/sysadmin/.ssh
+echo 'HARNESS_PUBLIC_KEY' >> /home/sysadmin/.ssh/authorized_keys
+chmod 700 /home/sysadmin/.ssh
+chmod 600 /home/sysadmin/.ssh/authorized_keys
+chown -R sysadmin:sysadmin /home/sysadmin/.ssh
+
+mkdir -p /etc/wg-dialer
+
+echo ready > /run/wgdialer-harness-ready

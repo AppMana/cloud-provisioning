@@ -1,0 +1,58 @@
+# Templated DaemonSet for the RED/GREEN scenarios -- the driver script
+# substitutes $DIALER_BINARY (the node-local path to whichever built binary
+# is under test), $POD_CIDRS, and $SERVICE_CIDRS via envsubst before
+# applying. Matches the real endpoint-controller's own DaemonSet shape
+# (hostNetwork, NET_ADMIN, hostPath binary mount) closely enough to
+# exercise the same kernel-level route behavior -- this test
+# intentionally runs the dialer binary directly rather than through the full
+# endpoint-controller reconcile loop, since what's under test is the dialer's
+# own route-table behavior, not the controller's reconcile logic.
+#
+# No --allowed-ips anywhere: the peer(s) this dialer accepts come
+# entirely from peer-public-key-<machine>/peer-allowed-ips-<machine>/
+# peer-route-host-<machine> keys in the Secret (auto-discovered, no
+# flag needed -- see cmd/dialer/main.go's loadPeersFromSecret). This
+# node's OWN identity is still --private-key-secret-key=dialer-private-key
+# / --local-address-secret-key=local-address, unchanged.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dialer-repro
+  namespace: wg-dialer
+spec:
+  selector:
+    matchLabels:
+      app: dialer-repro
+  template:
+    metadata:
+      labels:
+        app: dialer-repro
+    spec:
+      hostNetwork: true
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: dialer
+          image: busybox
+          command: ["/host-bin/$DIALER_BINARY"]
+          args:
+            - --secret-namespace=wg-dialer
+            - --secret-name=wg-dialer-peer
+            - --iface=wg0
+            - --private-key-secret-key=dialer-private-key
+            - --local-address-secret-key=local-address
+            - --pod-cidrs=$POD_CIDRS
+            - --service-cidrs=$SERVICE_CIDRS
+            - --keepalive-seconds=15
+            - --mtu=1420
+            - --poll-interval=10s
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+          volumeMounts:
+            - name: hostbin
+              mountPath: /host-bin
+      volumes:
+        - name: hostbin
+          hostPath:
+            path: /opt/dialer-bin

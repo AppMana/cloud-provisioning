@@ -22,6 +22,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+// secretValue reads key from a Secret's Data (real API server
+// behavior: StringData is write-only, converted to Data on write) or
+// falls back to StringData (this fake client's behavior: preserves
+// StringData across Get, never populates Data) -- correct regardless
+// of which backend a test happens to run against.
+func secretValue(s *corev1.Secret, key string) string {
+	if v, ok := s.Data[key]; ok {
+		return string(v)
+	}
+	return s.StringData[key]
+}
+
 func dialerPeerSecretFixture() *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "wg-dialer-peer", Namespace: "wg-dialer"},
@@ -51,16 +63,32 @@ func TestOnPremPeers(t *testing.T) {
 	const jarvisPub = "WpxHfxQmbN8EZZVHeFVhV5uhLWhw2vbY0Rgb0Wnn5Sg="
 	found := false
 	for _, p := range peers {
-		if p["publicKey"] == jarvisPub {
+		if p.PublicKey == jarvisPub {
 			found = true
-			if p["allowedIPs"] != "10.100.0.1/32, 10.101.0.1/32" {
-				t.Errorf("jarvis allowedIPs = %q, want both tunnel address AND cluster VIP", p["allowedIPs"])
+			want := []string{"10.100.0.1/32", "10.101.0.1/32"}
+			if !equalStrings(p.WGAllowedIPs, want) {
+				t.Errorf("jarvis WGAllowedIPs = %v, want both tunnel address AND cluster VIP: %v", p.WGAllowedIPs, want)
+			}
+			if p.RouteHost != "10.100.0.1" {
+				t.Errorf("jarvis RouteHost = %q, want just the tunnel address, no cluster VIPs", p.RouteHost)
 			}
 		}
 	}
 	if !found {
 		t.Errorf("jarvis's derived public key %s not found in peer list", jarvisPub)
 	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestOnPremPeers_DualStackClusterVIPsGetCorrectPrefixLengths(t *testing.T) {
@@ -80,12 +108,12 @@ func TestOnPremPeers_DualStackClusterVIPsGetCorrectPrefixLengths(t *testing.T) {
 	}
 	const jarvisPub = "WpxHfxQmbN8EZZVHeFVhV5uhLWhw2vbY0Rgb0Wnn5Sg="
 	for _, p := range peers {
-		if p["publicKey"] != jarvisPub {
+		if p.PublicKey != jarvisPub {
 			continue
 		}
-		want := "10.100.0.1/32, 10.101.0.1/32, fd8f:cf26:522a::1/128"
-		if p["allowedIPs"] != want {
-			t.Errorf("jarvis allowedIPs = %q, want %q", p["allowedIPs"], want)
+		want := []string{"10.100.0.1/32", "10.101.0.1/32", "fd8f:cf26:522a::1/128"}
+		if !equalStrings(p.WGAllowedIPs, want) {
+			t.Errorf("jarvis WGAllowedIPs = %v, want %v", p.WGAllowedIPs, want)
 		}
 		return
 	}
@@ -204,7 +232,7 @@ func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs 
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	tmplPath := filepath.Join(t.TempDir(), "test.tmpl")
-	tmpl := "joinToken={{.joinToken}} k0sVersion={{.k0sVersion}} apiVIP={{.apiVIP}} nodeVIP4={{.nodeVIP4}} nodeVIP6={{.nodeVIP6}} kubeletExtraArgs={{.kubeletExtraArgs}} wgAddress={{.wireguard.address}} wgPrivateKey={{.wireguard.privateKey}}{{range .wireguard.peers}} peer={{.publicKey}}={{.allowedIPs}}{{end}}"
+	tmpl := "joinToken={{.joinToken}} k0sVersion={{.k0sVersion}} apiVIP={{.apiVIP}} nodeVIP4={{.nodeVIP4}} nodeVIP6={{.nodeVIP6}} kubeletExtraArgs={{.kubeletExtraArgs}} wgAddress={{.wireguardAddress}} podCIDRs={{.podCIDRs}} serviceCIDRs={{.serviceCIDRs}} peersFileJSON={{.peersFileJSON}}"
 	if err := os.WriteFile(tmplPath, []byte(tmpl), 0o644); err != nil {
 		t.Fatalf("writing test template: %v", err)
 	}
@@ -288,10 +316,18 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	if bootstrapSecret.Type != "cluster.x-k8s.io/secret" {
 		t.Errorf("bootstrap secret type = %q, want cluster.x-k8s.io/secret", bootstrapSecret.Type)
 	}
-	if bootstrapSecret.StringData["format"] != "cloud-config" {
-		t.Errorf("bootstrap secret format = %q, want cloud-config", bootstrapSecret.StringData["format"])
+	// A real API server converts StringData to Data on write and never
+	// returns StringData on a subsequent Get (it's write-only) --
+	// confirmed against a real kind cluster while building this test
+	// further. This fake client does the opposite: it preserves
+	// StringData across Get and never populates Data at all. Neither
+	// behavior alone is safe to assert on, so secretValue reads
+	// whichever is actually populated -- correct against the fake here
+	// AND against anything real.
+	if secretValue(bootstrapSecret, "format") != "cloud-config" {
+		t.Errorf("bootstrap secret format = %q, want cloud-config", secretValue(bootstrapSecret, "format"))
 	}
-	rendered := bootstrapSecret.StringData["value"]
+	rendered := secretValue(bootstrapSecret, "value")
 	for _, want := range []string{"joinToken=fake-token", "k0sVersion=v1.36.2+k0s", "apiVIP=10.101.0.1", "nodeVIP4=10.101.0.4", "nodeVIP6=fd8f:cf26:522a::4"} {
 		if !strings.Contains(rendered, want) {
 			t.Errorf("rendered bootstrap content missing %q; got: %s", want, rendered)
@@ -302,11 +338,14 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "wg-dialer", Name: "wg-dialer-peer"}, updatedDialerSecret); err != nil {
 		t.Fatalf("getting updated dialer secret: %v", err)
 	}
-	if string(updatedDialerSecret.Data["peer-endpoint"]) != "pending" {
-		t.Errorf("peer-endpoint = %q, want \"pending\" until the endpoint-controller learns the real external IP", updatedDialerSecret.Data["peer-endpoint"])
+	// Per-Machine keys, not flat singletons -- a second cloud Machine
+	// reconciling must never clobber this one's entry.
+	const machineName = "hilton-cloud-worker-jarvistam-0"
+	if string(updatedDialerSecret.Data["peer-endpoint-"+machineName]) != "pending" {
+		t.Errorf("peer-endpoint-%s = %q, want \"pending\" until the endpoint-controller learns the real external IP", machineName, updatedDialerSecret.Data["peer-endpoint-"+machineName])
 	}
-	if len(updatedDialerSecret.Data["peer-public-key"]) == 0 {
-		t.Error("peer-public-key wasn't populated with the newly generated cloud-side public key")
+	if len(updatedDialerSecret.Data["peer-public-key-"+machineName]) == 0 {
+		t.Error("peer-public-key-<machine> wasn't populated with the newly generated cloud-side public key")
 	}
 
 	updatedMachine := &unstructured.Unstructured{}
@@ -316,6 +355,90 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	}
 	if updatedMachine.GetAnnotations()[NodeVIPAnnotation] != "4" {
 		t.Errorf("machine's %s annotation = %q, want \"4\" (NodeVIPStart, first allocation)", NodeVIPAnnotation, updatedMachine.GetAnnotations()[NodeVIPAnnotation])
+	}
+}
+
+// TestReconcile_TwoCloudMachinesDoNotClobberEachOther is the direct
+// regression test for the actual architectural gap this redesign
+// closes: before per-Machine keys, the dialer Secret's flat
+// peer-public-key/peer-endpoint keys meant a second cloud Machine
+// reconciling would silently overwrite the first's entry -- the
+// on-prem dialer would then only ever know about whichever Machine
+// reconciled last. Two Machines reconciling in sequence must each get
+// their own independent, surviving entry.
+func TestReconcile_TwoCloudMachinesDoNotClobberEachOther(t *testing.T) {
+	machineA := machineWithInfraRef("cloud-worker-a", "default", "cloud-worker-a")
+	awsMachineA := fakeAWSMachine("cloud-worker-a", "default", true)
+	machineB := machineWithInfraRef("cloud-worker-b", "default", "cloud-worker-b")
+	awsMachineB := fakeAWSMachine("cloud-worker-b", "default", true)
+	dialerSecret := dialerPeerSecretFixture()
+	join := &stubJoinProvider{values: map[string]any{"joinToken": "fake-token", "k0sVersion": "v1.36.2+k0s"}}
+
+	r := newFakeJoinReconciler(t, join, machineA, awsMachineA, machineB, awsMachineB, dialerSecret)
+
+	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machineA)}); err != nil {
+		t.Fatalf("Reconcile(machineA): %v", err)
+	}
+	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machineB)}); err != nil {
+		t.Fatalf("Reconcile(machineB): %v", err)
+	}
+
+	updatedDialerSecret := &corev1.Secret{}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "wg-dialer", Name: "wg-dialer-peer"}, updatedDialerSecret); err != nil {
+		t.Fatalf("getting updated dialer secret: %v", err)
+	}
+
+	pubA := updatedDialerSecret.Data["peer-public-key-cloud-worker-a"]
+	pubB := updatedDialerSecret.Data["peer-public-key-cloud-worker-b"]
+	if len(pubA) == 0 {
+		t.Fatal("cloud-worker-a's peer-public-key entry is missing -- clobbered by cloud-worker-b's reconcile")
+	}
+	if len(pubB) == 0 {
+		t.Fatal("cloud-worker-b's peer-public-key entry is missing")
+	}
+	if string(pubA) == string(pubB) {
+		t.Error("cloud-worker-a and cloud-worker-b ended up with the same public key -- one clobbered the other")
+	}
+
+	// The actual regression case for the WireGuardAddrAnnotation fix:
+	// each Machine's own tunnel address (both its own RouteHost/
+	// AllowedIPs entry in the dialer Secret, and its own peer-route-host)
+	// must be distinct -- before that fix, every cloud Machine got the
+	// SAME literal r.WireGuardAddress, which is invalid for WireGuard
+	// cryptokey routing (two peers can't share an AllowedIPs
+	// destination) and ambiguous for the kernel route it produces.
+	routeHostA := string(updatedDialerSecret.Data["peer-route-host-cloud-worker-a"])
+	routeHostB := string(updatedDialerSecret.Data["peer-route-host-cloud-worker-b"])
+	if routeHostA == "" || routeHostB == "" {
+		t.Fatalf("expected both peer-route-host entries to be set, got %q and %q", routeHostA, routeHostB)
+	}
+	if routeHostA == routeHostB {
+		t.Errorf("cloud-worker-a and cloud-worker-b got the same tunnel address %q -- WireGuard address allocation collided", routeHostA)
+	}
+
+	if string(updatedDialerSecret.Data["peer-endpoint-cloud-worker-a"]) != "pending" {
+		t.Errorf("cloud-worker-a's peer-endpoint = %q, want \"pending\"", updatedDialerSecret.Data["peer-endpoint-cloud-worker-a"])
+	}
+	if string(updatedDialerSecret.Data["peer-endpoint-cloud-worker-b"]) != "pending" {
+		t.Errorf("cloud-worker-b's peer-endpoint = %q, want \"pending\"", updatedDialerSecret.Data["peer-endpoint-cloud-worker-b"])
+	}
+
+	// Both Machines must also get their own, non-colliding node-VIP
+	// allocation -- allocateNodeVIPIndex already scans all Machines, but
+	// confirm it actually holds end to end through two real Reconcile
+	// calls, not just in isolation.
+	updatedA := &unstructured.Unstructured{}
+	updatedA.SetGroupVersionKind(machineGVK)
+	if err := r.Get(context.Background(), client.ObjectKeyFromObject(machineA), updatedA); err != nil {
+		t.Fatalf("getting updated machineA: %v", err)
+	}
+	updatedB := &unstructured.Unstructured{}
+	updatedB.SetGroupVersionKind(machineGVK)
+	if err := r.Get(context.Background(), client.ObjectKeyFromObject(machineB), updatedB); err != nil {
+		t.Fatalf("getting updated machineB: %v", err)
+	}
+	if updatedA.GetAnnotations()[NodeVIPAnnotation] == updatedB.GetAnnotations()[NodeVIPAnnotation] {
+		t.Errorf("machineA and machineB got the same node-VIP index %q -- allocation collided", updatedA.GetAnnotations()[NodeVIPAnnotation])
 	}
 }
 
@@ -502,6 +625,7 @@ func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
 		NodeVIP4Prefix:            "10.101.0.",
 		NodeVIP6Prefix:            "fd8f:cf26:522a::",
 		NodeVIPStart:              4,
+		WireGuardAddress:          "10.100.0.2/24",
 		DialerPeerSecretNamespace: "wg-dialer",
 		DialerPeerSecretName:      "wg-dialer-peer",
 		BootstrapSecretNameFormat: "%s-bootstrap",

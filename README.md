@@ -53,6 +53,10 @@ harness/                reproducible two-netns test of the tunnel + BGP + self-h
 harness/containernet/   the same tunnel scripts under a Docker-based network
                          simulation, with a flappable link standing in for
                          the internet — see harness/containernet/README.md
+harness/vm-single-nic/  real single-NIC VM (containerlab + vrnetlab), real k0s,
+                         real wg-dialer route-hijack RED/GREEN regression,
+                         optional real Tailscale assertion — see
+                         harness/vm-single-nic/README.md
 harness/aws-bringup/    the same scripts against one real, billed EC2
                          instance and a real on-prem host, over the real
                          internet — see harness/aws-bringup/README.md
@@ -68,8 +72,15 @@ scripts/aws/            one-time IAM bootstrap for the least-privilege identity
 
 ## Status
 
-The design is validated at three levels of fidelity, each closer to the
+The design is validated at four levels of fidelity, each closer to the
 real thing than the last:
+
+| Level | Location | Tool | Realism | Speed | Use for |
+|---|---|---|---|---|---|
+| 1 | `harness/wg-wan-worker.sh` | raw `ip netns` | Real WireGuard/BGP, no real boot | Fast | Mechanism-level checks |
+| 2 | `harness/containernet/` | Docker + Mininet | Real boot scripts, no real systemd/PID1 | Fast | Ordering/self-heal/flap scenarios |
+| 3 | `harness/vm-single-nic/` | containerlab + vrnetlab | Real systemd/PID1/kubelet/k0s boot race, real Tailscale (env-gated) | Slow (real VM boot + multi-minute observation windows) | Boot-time route hijacks, Tailscale staleness — the jarvis incident class |
+| 4 | `harness/aws-bringup/` | real EC2 + real on-prem | Real billed cloud + real on-prem host, real internet | Slowest, costs money | Final pre-prod confidence |
 
 - `harness/wg-wan-worker.sh` — two raw `ip netns`, a WireGuard tunnel, and
   bird BGP, run as root on the bare host.
@@ -78,6 +89,15 @@ real thing than the last:
   `harness/containernet/image/` run for real) driven inside two Docker
   containers linked by containernet, with real latency and a link that can
   be flapped on command.
+- `harness/vm-single-nic/` — a real, single-NIC Ubuntu VM (containerlab
+  managing the already-built `vrnetlab/canonical_ubuntu:jammy` image, a real
+  QEMU/KVM boot, not a Docker-exec sandbox) running real k0s via `k0sctl`.
+  This is the level that exists specifically because containernet's `Docker`
+  node class cannot do a genuine systemd/PID1 boot, and the jarvis wg-dialer
+  incident's actual mechanism — kubelet resurrecting a stale DaemonSet pod
+  faster than any reconcile-based fix can intervene — needs a real init
+  system and a real kubelet to reproduce at all. See its own README for the
+  RED/GREEN scenarios and the env-gated real-Tailscale assertion.
 - `harness/aws-bringup/` — the same `wg-pullup.sh`, unmodified, driving a
   real `t4g.micro` in EC2 and a real on-prem host (jarvis), dialing over
   the actual internet. This is the level that caught two bugs the
@@ -91,12 +111,13 @@ real thing than the last:
   address and lets normal routing pick `wg0` — the harness now does the
   latter.
 
-All three independently confirm: ordering (no API access before the
+All four independently confirm: ordering (no API access before the
 tunnel is up), a successful WireGuard handshake by dialing out,
 pod-to-pod connectivity riding the tunnel, MTU enforcement under
 WireGuard overhead (1420), and self-heal after a link flap using only
 WireGuard's `PersistentKeepalive` kernel timer — no controller, nothing
-re-executed.
+re-executed. Level 3 additionally validates the wg-dialer route-table
+isolation fix (`395d2fa`) against real boot-time conditions.
 
 The remaining glue -- the cluster-side dialer's endpoint discovery -- is
 now `controller/cmd/endpoint-controller`: it watches the provider-agnostic

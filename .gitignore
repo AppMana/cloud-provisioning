@@ -2,3 +2,9 @@
 *.key
 controller/controller
 harness/containernet/containernet/
+harness/vm-single-nic/bin/
+harness/vm-single-nic/logs/
+harness/vm-single-nic/clab-wgdialer-vm-single-nic/
+harness/vm-single-nic/cfg/ssh/
+harness/vm-single-nic/cfg/onprem-setup.sh
+harness/vm-single-nic/cfg/cloud-setup.sh

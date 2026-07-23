@@ -1,0 +1,60 @@
+name: wgdialer-vm-single-nic
+mgmt:
+  network: wgdialer-vm-mgmt
+  ipv4-subnet: 172.31.41.0/24
+
+topology:
+  nodes:
+    # onprem: the real k0s + DaemonSet-managed dialer, exactly like
+    # jarvis. Reboot-based RED/GREEN scenarios run against this node.
+    onprem:
+      kind: linux
+      image: vrnetlab/canonical_ubuntu:jammy
+      binds:
+        - cfg/onprem-setup.sh:/extra-setup.sh:ro
+      env:
+        # launch.py hardcodes ram=512 (fine for a bare network-device VM,
+        # not for a real k0s controller+worker -- etcd + kube-apiserver +
+        # kubelet all in one process need real headroom).
+        QEMU_MEMORY: "4096"
+        QEMU_SMP: "2"
+        # CLAB_MGMT_PASSTHROUGH was tried and reverted: this Ubuntu image's
+        # launch.py always writes a hardcoded static 10.0.0.15/24 guest
+        # network config regardless of passthrough mode, so passthrough's
+        # "guest uses the container's own IP" assumption doesn't actually
+        # hold here -- SSH broke entirely. Staying on the default
+        # host-forwarded (qemu usermode NAT) mode instead, with 6443/UDP
+        # 51820 added to the forwarded port list directly in the shared
+        # vrnetlab fork (~/Documents/vrnetlab/ubuntu/docker/launch.py).
+      # No `links:` entries for this node on purpose: the mgmt NIC
+      # (Docker-bridge-NATed, real internet egress) is its ONLY interface,
+      # matching jarvis's single real uplink. wg0 is created inside the
+      # guest by the dialer itself and dials out over this same NIC -- there
+      # is no second interface for it to "not conflict with", which is the
+      # whole point: the hijack this harness reproduces is a route on the
+      # SAME link the real default route already uses, not a second link.
+
+    # cloud: the wg-quick replacement -- the dialer binary as a bare
+    # systemd unit, listener role, no k0s at all (it isn't a Kubernetes
+    # node in the real topology either -- see
+    # join-patterns/k0s-worker.cloud-config.tmpl). Same single-NIC
+    # invariant as onprem: no `links:` entry, mgmt NIC only.
+    cloud:
+      kind: linux
+      image: vrnetlab/canonical_ubuntu:jammy
+      binds:
+        - cfg/cloud-setup.sh:/extra-setup.sh:ro
+      env:
+        QEMU_MEMORY: "2048"
+        QEMU_SMP: "1"
+
+  # Deliberately no explicit link between onprem and cloud: both sit on
+  # the one shared containerlab mgmt bridge (172.31.41.0/24), which is
+  # the internet-path stand-in here -- two independently-NATed
+  # endpoints (each behind its own qemu slirp NAT) reaching each other
+  # over some path, not a LAN shortcut. This is a deliberate, documented
+  # simplification: only the ports actually forwarded into each guest
+  # (22/tcp, 6443/tcp, 51820/udp -- see the shared vrnetlab fork) are
+  # reachable at all, which is the real invariant that matters (only
+  # WireGuard's own port need be reachable between the two real nodes),
+  # not the specific shape of the path between them.

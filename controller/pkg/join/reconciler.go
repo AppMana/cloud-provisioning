@@ -11,6 +11,7 @@ package join
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"sort"
@@ -66,6 +67,21 @@ var machineGVK = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1
 // the next free one without needing separate state storage.
 const NodeVIPAnnotation = "cloud-provisioning.appmana.com/node-vip4"
 
+// WireGuardAddrAnnotation records the WireGuard tunnel address
+// allocated to a cloud worker Machine, mirroring NodeVIPAnnotation.
+//
+// This exists because of a real bug this fix caught: WireGuardAddress
+// used to be handed to every Machine as the SAME static literal (e.g.
+// every cloud Machine got "10.100.0.2/24" as its own tunnel address).
+// A second cloud Machine would then get a byte-for-byte identical
+// WireGuard AllowedIPs entry AND kernel RouteHost as the first --
+// invalid/undefined for WireGuard cryptokey routing (two peers can't
+// both claim the same AllowedIPs destination) and ambiguous for the
+// on-prem dialer's own kernel route (two peers, one destination,
+// last-RouteReplace-wins). Each cloud Machine now gets its own,
+// distinct address, allocated the same way node-VIPs already are.
+const WireGuardAddrAnnotation = "cloud-provisioning.appmana.com/wireguard-addr4"
+
 // Reconciler provisions bootstrap Secrets for cloud-worker Machines.
 type Reconciler struct {
 	client.Client
@@ -93,7 +109,22 @@ type Reconciler struct {
 	KubeletExtraArgs  string
 	SSHAuthorizedKeys []string
 
+	// PodCIDRs/ServiceCIDRs are the cluster's own declared, cluster-wide
+	// ranges (sourced at gitops-render time from cluster/k0sctl.yaml's
+	// own podCIDR/serviceCIDR -- never per-node dynamic discovery, see
+	// cmd/dialer/main.go's package doc for why). Comma-separated, fed
+	// straight into the cloud-side dialer's --pod-cidrs/--service-cidrs
+	// flags so its WireGuard peer config accepts real Calico-routed
+	// traffic without ever becoming a kernel route.
+	PodCIDRs     string
+	ServiceCIDRs string
+
 	// WireGuard tunnel config for the cloud side's own interface.
+	// WireGuardAddress is the BASE address (e.g. "10.100.0.2/24") --
+	// the first cloud Machine gets exactly this; each subsequent one
+	// gets the next free address in the same /prefix, allocated the
+	// same way node-VIPs are (see WireGuardAddrAnnotation). Never used
+	// directly as a literal for more than one Machine.
 	WireGuardAddress    string // e.g. "10.100.0.2/24"
 	WireGuardListenPort string // e.g. "51820"
 
@@ -213,6 +244,38 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("deriving on-prem peer list: %w", err)
 	}
 
+	// The cloud node isn't part of the on-prem cluster, so it can't read
+	// a Kubernetes Secret the way the on-prem dialer does -- its whole
+	// peer list (this node's own private key plus every on-prem peer)
+	// is baked into cloud-init once, at Machine-provisioning time, as a
+	// plain JSON file the same dialer binary reads via --peers-file. On
+	// the cloud side every on-prem peer's Endpoint is deliberately left
+	// empty: the cloud node only ever listens, it never dials out (the
+	// on-prem side is the one behind NAT with no inbound path).
+	cloudWGAddress, err := r.allocateWireGuardAddress(ctx)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("allocating wireguard address: %w", err)
+	}
+
+	// LocalAddress travels in this same file, not a flag: a cloud-worker
+	// DaemonSet's pod spec (endpoint-controller's
+	// ensureCloudDialerDaemonSet) is one shared template across every
+	// node it schedules onto, so this node's own tunnel address has to
+	// be per-node DATA, exactly like its own private key already is --
+	// see cmd/dialer/main.go's peersFileDoc doc comment.
+	peersFileJSON, err := json.Marshal(struct {
+		PrivateKey   string          `json:"privateKey"`
+		LocalAddress string          `json:"localAddress"`
+		Peers        []onPremPeerDoc `json:"peers"`
+	}{
+		PrivateKey:   cloudPriv.String(),
+		LocalAddress: cloudWGAddress,
+		Peers:        peers,
+	})
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("marshaling cloud-side peers file: %w", err)
+	}
+
 	nodeVIPIndex, err := r.allocateNodeVIPIndex(ctx, machine.GetLabels())
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("allocating node VIP: %w", err)
@@ -230,17 +293,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	values := map[string]any{
-		"sshAuthorizedKeys": r.SSHAuthorizedKeys,
-		"apiVIP":            r.APIVIP,
-		"nodeVIP4":          nodeVIP4,
-		"nodeVIP6":          nodeVIP6,
-		"kubeletExtraArgs":  r.KubeletExtraArgs,
-		"wireguard": map[string]any{
-			"address":    r.WireGuardAddress,
-			"listenPort": r.WireGuardListenPort,
-			"privateKey": cloudPriv.String(),
-			"peers":      peers,
-		},
+		"sshAuthorizedKeys":   r.SSHAuthorizedKeys,
+		"apiVIP":              r.APIVIP,
+		"nodeVIP4":            nodeVIP4,
+		"nodeVIP6":            nodeVIP6,
+		"kubeletExtraArgs":    r.KubeletExtraArgs,
+		"wireguardAddress":    cloudWGAddress,
+		"wireguardListenPort": r.WireGuardListenPort,
+		"podCIDRs":            r.PodCIDRs,
+		"serviceCIDRs":        r.ServiceCIDRs,
+		"peersFileJSON":       string(peersFileJSON),
 	}
 	for k, v := range joinValues {
 		values[k] = v
@@ -271,13 +333,27 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// Record the new node's public key so on-prem dialers accept it,
 	// and stamp the allocated VIP onto the Machine so future
-	// allocations don't reuse it.
+	// allocations don't reuse it. Per-Machine-keyed (peer-*-<machine>),
+	// not flat singleton keys -- the whole point being that a second
+	// cloud Machine reconciling must never clobber the first's peer
+	// entry, the way a single shared "peer-public-key" key would.
 	patch := client.MergeFrom(dialerSecret.DeepCopy())
 	if dialerSecret.Data == nil {
 		dialerSecret.Data = map[string][]byte{}
 	}
-	dialerSecret.Data["peer-public-key"] = []byte(cloudPub.String())
-	dialerSecret.Data["peer-endpoint"] = []byte("pending")
+	machineName := machine.GetName()
+	dialerSecret.Data["peer-public-key-"+machineName] = []byte(cloudPub.String())
+	dialerSecret.Data["peer-endpoint-"+machineName] = []byte("pending")
+	// This Machine's own WireGuard AllowedIPs (the real cryptokey-routing
+	// accept list, never a kernel route -- see cmd/dialer/main.go's
+	// package doc): just its own tunnel address, since the on-prem
+	// dialer already adds the shared cluster pod-CIDR/service-CIDR
+	// ranges itself (--pod-cidrs/--service-cidrs, identical for every
+	// peer). RouteHost is the same single tunnel address -- the one
+	// thing the on-prem dialer needs a kernel route for.
+	cloudTunnelAddr := strings.SplitN(strings.TrimSpace(cloudWGAddress), "/", 2)[0]
+	dialerSecret.Data["peer-allowed-ips-"+machineName] = []byte(hostCIDR(cloudTunnelAddr))
+	dialerSecret.Data["peer-route-host-"+machineName] = []byte(cloudTunnelAddr)
 	if err := r.Patch(ctx, dialerSecret, patch); err != nil {
 		return ctrl.Result{}, fmt.Errorf("updating dialer peer secret: %w", err)
 	}
@@ -288,6 +364,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		annotations = map[string]string{}
 	}
 	annotations[NodeVIPAnnotation] = strconv.Itoa(nodeVIPIndex)
+	annotations[WireGuardAddrAnnotation] = cloudWGAddress
 	machine.SetAnnotations(annotations)
 	if err := r.Patch(ctx, machine, machinePatch); err != nil {
 		return ctrl.Result{}, fmt.Errorf("annotating machine with allocated VIP: %w", err)
@@ -313,23 +390,38 @@ func (r *Reconciler) infraProviderFor(kind string) InfraProvider {
 	return nil
 }
 
-// onPremPeers derives the cloud side's wg0.conf peer list from
-// wg-dialer-peer's per-node private keys (public keys are derived, not
-// stored separately -- the Secret only ever needed to hold what each
-// dialer needs for itself), local tunnel addresses, and each node's
-// real cluster VIP(s) (a "cluster-vip-<node>" key, comma-separated,
-// e.g. "10.101.0.1,fd8f:cf26:522a::1" for jarvis -- every node here is
+// onPremPeerDoc is one on-prem node's entry in the cloud-side dialer's
+// --peers-file JSON document -- field names/JSON tags deliberately
+// mirror cmd/dialer/main.go's own peerSpec (a different package, no
+// shared Go type across the module boundary, but the same wire shape).
+// Endpoint is always empty: the cloud node only ever listens, it never
+// dials an on-prem peer (the on-prem side is the one behind NAT with
+// no inbound path).
+type onPremPeerDoc struct {
+	PublicKey    string   `json:"publicKey"`
+	WGAllowedIPs []string `json:"allowedIPs"`
+	RouteHost    string   `json:"routeHost"`
+}
+
+// onPremPeers derives the cloud side's peer list from wg-dialer-peer's
+// per-node private keys (public keys are derived, not stored separately
+// -- the Secret only ever needed to hold what each dialer needs for
+// itself), local tunnel addresses, and each node's real cluster VIP(s)
+// (a "cluster-vip-<node>" key, comma-separated, e.g.
+// "10.101.0.1,fd8f:cf26:522a::1" for jarvis -- every node here is
 // genuinely dual-stack, confirmed against the live cluster's own
 // Node.status.addresses, so this is not a hypothetical). All of the
-// tunnel address plus every cluster VIP must be in AllowedIPs, not
-// just the tunnel address, confirmed necessary in practice: BGP
-// traffic uses the real cluster VIP(s), not the tunnel address, and
-// WireGuard only decrypts/routes traffic matching a peer's
-// AllowedIPs -- an on-prem node's IPv6 cluster traffic would be
-// silently undeliverable through the tunnel if only its IPv4 VIP were
-// listed.
-func onPremPeers(secret *corev1.Secret) ([]map[string]string, error) {
-	var peers []map[string]string
+// tunnel address plus every cluster VIP go into WGAllowedIPs (WireGuard's
+// own cryptokey-routing accept list, never a kernel route -- see
+// cmd/dialer/main.go's package doc): BGP traffic uses the real cluster
+// VIP(s), not the tunnel address, and WireGuard only decrypts/routes
+// traffic matching a peer's AllowedIPs -- an on-prem node's IPv6
+// cluster traffic would be silently undeliverable through the tunnel
+// if only its IPv4 VIP were listed. RouteHost stays just the tunnel
+// address -- the one thing the cloud-side dialer needs an actual
+// kernel route for.
+func onPremPeers(secret *corev1.Secret) ([]onPremPeerDoc, error) {
+	var peers []onPremPeerDoc
 	for key, val := range secret.Data {
 		const prefix = "dialer-private-key-"
 		if !strings.HasPrefix(key, prefix) {
@@ -358,12 +450,13 @@ func onPremPeers(secret *corev1.Secret) ([]map[string]string, error) {
 			allowedIPs = append(allowedIPs, hostCIDR(vip))
 		}
 		pub := priv.PublicKey()
-		peers = append(peers, map[string]string{
-			"publicKey":  pub.String(),
-			"allowedIPs": strings.Join(allowedIPs, ", "),
+		peers = append(peers, onPremPeerDoc{
+			PublicKey:    pub.String(),
+			WGAllowedIPs: allowedIPs,
+			RouteHost:    tunnelAddr,
 		})
 	}
-	sort.Slice(peers, func(i, j int) bool { return peers[i]["publicKey"] < peers[j]["publicKey"] })
+	sort.Slice(peers, func(i, j int) bool { return peers[i].PublicKey < peers[j].PublicKey })
 	return peers, nil
 }
 
@@ -406,4 +499,51 @@ func (r *Reconciler) allocateNodeVIPIndex(ctx context.Context, labels map[string
 		}
 	}
 	return maxIndex + 1, nil
+}
+
+// allocateWireGuardAddress finds the next free cloud tunnel address by
+// scanning existing cloud-worker Machines' WireGuardAddrAnnotation,
+// starting from r.WireGuardAddress (the base address, e.g.
+// "10.100.0.2/24" -> next free is "10.100.0.3/24", then ".4", ...).
+// Mirrors allocateNodeVIPIndex exactly, for the same reason: each cloud
+// Machine needs its own distinct value, never a single literal reused
+// across all of them (see WireGuardAddrAnnotation's doc comment for the
+// bug this fixes).
+func (r *Reconciler) allocateWireGuardAddress(ctx context.Context) (string, error) {
+	ip, ipNet, err := net.ParseCIDR(r.WireGuardAddress)
+	if err != nil {
+		return "", fmt.Errorf("parsing base WireGuardAddress %q: %w", r.WireGuardAddress, err)
+	}
+	prefixLen, _ := ipNet.Mask.Size()
+	baseIP4 := ip.To4()
+	if baseIP4 == nil {
+		return "", fmt.Errorf("WireGuardAddress %q must be IPv4", r.WireGuardAddress)
+	}
+	prefix := fmt.Sprintf("%d.%d.%d.", baseIP4[0], baseIP4[1], baseIP4[2])
+	startIndex := int(baseIP4[3])
+
+	list := &unstructured.UnstructuredList{}
+	list.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "MachineList"})
+	if err := r.List(ctx, list); err != nil {
+		return "", err
+	}
+	maxIndex := startIndex - 1
+	for _, m := range list.Items {
+		v, ok := m.GetAnnotations()[WireGuardAddrAnnotation]
+		if !ok {
+			continue
+		}
+		allocIP, _, err := net.ParseCIDR(v)
+		if err != nil {
+			continue
+		}
+		allocIP4 := allocIP.To4()
+		if allocIP4 == nil || fmt.Sprintf("%d.%d.%d.", allocIP4[0], allocIP4[1], allocIP4[2]) != prefix {
+			continue
+		}
+		if n := int(allocIP4[3]); n > maxIndex {
+			maxIndex = n
+		}
+	}
+	return fmt.Sprintf("%s%d/%d", prefix, maxIndex+1, prefixLen), nil
 }

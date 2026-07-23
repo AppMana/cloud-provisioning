@@ -78,23 +78,16 @@ const (
 	cloudWorkerRoleValue = "cloud-worker"
 )
 
-// defaultDialerAllowedIPs is only the flag default -- the actual value
-// is --dialer-allowed-ips, configuration, not a Go constant. This
-// matters concretely, not just as a principle: fixing a wrong value
-// here means editing gitops YAML and letting it roll out, not a
-// rebuild/push/redeploy cycle -- exactly what's needed to recover
-// quickly from a bad value like this one.
-//
-// MUST NOT be a default route (0.0.0.0/0 or ::/0): this dialer's own
-// reconcile loop installs a literal kernel route for every AllowedIPs
-// entry (see cmd/dialer/main.go), and a default route via wg0 on an
-// on-prem node hijacks ALL of that node's outbound traffic --
-// including its own WireGuard keepalive/handshake packets to the
-// peer's real public IP (which must go out via the node's REAL
-// gateway, not through the tunnel itself -- that would be circular).
-// Caught live: this took down jarvis's own Tailscale/WAN reachability
-// entirely, not just cluster traffic.
-const defaultDialerAllowedIPs = "10.100.0.2/32"
+// Historical note: this used to be defaultDialerAllowedIPs, a single
+// flag value fed into BOTH WireGuard's own peer config AND a literal
+// kernel-route-installation loop in cmd/dialer/main.go -- a real
+// incident (jarvis, AllowedIPs=0.0.0.0/0) hijacked the node's entire
+// routing table this way. The dialer no longer takes a single conflated
+// --allowed-ips value at all: WireGuard's own accept-list (real cluster
+// pod-CIDR/service-CIDR ranges, --pod-cidrs/--service-cidrs below) and
+// the kernel route it installs (always a single narrow host address per
+// peer, derived automatically, never configurable) are now genuinely
+// separate mechanisms -- see cmd/dialer/main.go's package doc.
 
 // reconciler mirrors one Machine's external address into a Secret key.
 // It never watches or reads the Secret it writes -- the dialer DaemonSet
@@ -145,7 +138,17 @@ type reconciler struct {
 	dialerServiceAccount  string
 	dialerImage           string
 	dialerImagePullSecret string
-	dialerAllowedIPs      string
+	dialerPodCIDRs        string
+	dialerServiceCIDRs    string
+
+	// Cloud-worker dialer DaemonSet: the SAME dialer binary, running
+	// containerized (hostNetwork, NET_ADMIN) on the cloud-worker node
+	// itself once it has joined as a real k8s Node -- see
+	// ensureCloudDialerDaemonSet's doc comment for why this coexists
+	// with, rather than replaces, the wg-dialer.service systemd unit
+	// cloud-init already installed at bootstrap.
+	dialerCloudDaemonSetName string
+	dialerCloudListenPort    string
 }
 
 func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -158,6 +161,9 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// itself tolerates "peer-endpoint: pending" already).
 	if err := r.ensureDialerDaemonSet(ctx); err != nil {
 		return ctrl.Result{}, fmt.Errorf("ensuring dialer daemonset: %w", err)
+	}
+	if err := r.ensureCloudDialerDaemonSet(ctx); err != nil {
+		return ctrl.Result{}, fmt.Errorf("ensuring cloud dialer daemonset: %w", err)
 	}
 
 	machine := &unstructured.Unstructured{}
@@ -205,12 +211,16 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("getting secret %s: %w", secretKey, err)
 	}
 
-	if string(secret.Data[r.secretKey]) != endpoint {
+	// Per-Machine key (r.secretKey is a PREFIX, e.g. "peer-endpoint-"),
+	// not a flat singleton -- a second cloud Machine matching the
+	// selector must never clobber the first's endpoint entry.
+	machineKey := r.secretKey + machine.GetName()
+	if string(secret.Data[machineKey]) != endpoint {
 		patch := client.MergeFrom(secret.DeepCopy())
 		if secret.Data == nil {
 			secret.Data = map[string][]byte{}
 		}
-		secret.Data[r.secretKey] = []byte(endpoint)
+		secret.Data[machineKey] = []byte(endpoint)
 		if err := r.Patch(ctx, secret, patch); err != nil {
 			return ctrl.Result{}, fmt.Errorf("patching secret %s: %w", secretKey, err)
 		}
@@ -293,7 +303,8 @@ func (r *reconciler) ensureDialerDaemonSet(ctx context.Context) error {
 								"--iface=wg0",
 								"--private-key-secret-key=dialer-private-key-$(NODE_NAME)",
 								"--local-address-secret-key=local-address-$(NODE_NAME)",
-								fmt.Sprintf("--allowed-ips=%s", r.dialerAllowedIPs),
+								fmt.Sprintf("--pod-cidrs=%s", r.dialerPodCIDRs),
+								fmt.Sprintf("--service-cidrs=%s", r.dialerServiceCIDRs),
 								"--keepalive-seconds=15",
 								"--mtu=1420",
 								"--poll-interval=30s",
@@ -312,6 +323,115 @@ func (r *reconciler) ensureDialerDaemonSet(ctx context.Context) error {
 	}
 	if err != nil {
 		return fmt.Errorf("getting existing daemonset %s/%s: %w", desired.Namespace, desired.Name, err)
+	}
+	existing.Spec = desired.Spec
+	return r.Update(ctx, existing)
+}
+
+// ensureCloudDialerDaemonSet creates or updates a SECOND dialer
+// DaemonSet -- the same binary as ensureDialerDaemonSet's, but
+// scheduled onto ONLY the cloud-worker node(s) (nodeSelector +
+// toleration for cloudWorkerTaintKey, the exact opposite of the
+// on-prem DaemonSet's scheduling, which structurally excludes this
+// node instead). It reads its peer config from the same
+// /etc/wg-dialer/peers.json file cloud-init already wrote at
+// Machine-provisioning time (hostPath-mounted read-only), via
+// --peers-file -- there is no in-cluster Secret this DaemonSet reads or
+// needs RBAC for.
+//
+// This deliberately does NOT replace or disable the wg-dialer.service
+// systemd unit cloud-init installed: both reconcile to the identical
+// desired state (same peers.json, same pod/service CIDRs) against the
+// same kernel WireGuard device, so running both is harmless
+// redundancy, not a conflict -- ConfigureDevice is idempotent, and wg0
+// itself is a kernel-resident device that outlives any single
+// process's lifetime (confirmed: nothing in cmd/dialer ever calls
+// LinkDel on shutdown). This was a deliberate design choice, not an
+// oversight: the alternative -- having this DaemonSet somehow signal
+// the systemd unit to stop once it takes over -- creates exactly the
+// failure mode this must never have: if the DaemonSet's own pod can
+// never schedule (a kubelet/CNI problem, the DaemonSet controller
+// being down, anything), a bootstrap tunnel that had already been
+// disabled would leave the node with no path back to the API server at
+// all, undoing the one guarantee that must always hold. Leaving the
+// systemd unit alone forever means it can never be the thing that
+// broke. What this DaemonSet buys instead is a normal, Kubernetes-native
+// upgrade path going forward: bumping --dialer-image and letting a
+// rolling DaemonSet update happen is how the binary gets updated on an
+// already-provisioned cloud-worker node -- no host-level binary-swap or
+// systemctl-restart machinery needed, because Kubernetes' own pod
+// lifecycle already does the equivalent (image pull, container
+// restart, readiness-gated rollout) for a plain containerized process.
+func (r *reconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
+	hostPathDirectory := corev1.HostPathDirectory
+	desired := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.dialerCloudDaemonSetName,
+			Namespace: r.secretNamespace,
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": r.dialerCloudDaemonSetName}},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": r.dialerCloudDaemonSetName}},
+				Spec: corev1.PodSpec{
+					HostNetwork: true,
+					// Opposite of ensureDialerDaemonSet's scheduling:
+					// this pod must run ONLY on the cloud-worker
+					// node(s), never on-prem. nodeSelector matches the
+					// same role label the join-pattern's kubelet args
+					// already register the node with; the toleration
+					// is for the one taint that same node registers
+					// itself with, which is exactly what excludes the
+					// ON-PREM DaemonSet from ever landing here (see
+					// ensureDialerDaemonSet's own comment).
+					NodeSelector: map[string]string{cloudWorkerRoleLabel: cloudWorkerRoleValue},
+					Tolerations: []corev1.Toleration{
+						{Key: cloudWorkerTaintKey, Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule},
+					},
+					ImagePullSecrets: []corev1.LocalObjectReference{{Name: r.dialerImagePullSecret}},
+					Containers: []corev1.Container{
+						{
+							Name:            "dialer",
+							Image:           r.dialerImage,
+							ImagePullPolicy: corev1.PullAlways,
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"NET_ADMIN"}},
+							},
+							Args: []string{
+								"--iface=wg0",
+								"--peers-file=/etc/wg-dialer/peers.json",
+								fmt.Sprintf("--listen-port=%s", r.dialerCloudListenPort),
+								fmt.Sprintf("--pod-cidrs=%s", r.dialerPodCIDRs),
+								fmt.Sprintf("--service-cidrs=%s", r.dialerServiceCIDRs),
+								"--keepalive-seconds=15",
+								"--mtu=1420",
+								"--poll-interval=30s",
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{Name: "wg-dialer-config", MountPath: "/etc/wg-dialer", ReadOnly: true},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "wg-dialer-config",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/etc/wg-dialer", Type: &hostPathDirectory},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	existing := &appsv1.DaemonSet{}
+	err := r.reader.Get(ctx, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, existing)
+	if apierrors.IsNotFound(err) {
+		return r.Create(ctx, desired)
+	}
+	if err != nil {
+		return fmt.Errorf("getting existing cloud daemonset %s/%s: %w", desired.Namespace, desired.Name, err)
 	}
 	existing.Spec = desired.Spec
 	return r.Update(ctx, existing)
@@ -348,13 +468,15 @@ func main() {
 		dialerServiceAccount      string
 		dialerImage               string
 		dialerImagePullSecret     string
-		dialerAllowedIPs          string
+		dialerPodCIDRs            string
+		dialerServiceCIDRs        string
+		dialerCloudDaemonSetName  string
 	)
 	flag.StringVar(&machineSelector, "machine-selector", fmt.Sprintf("%s=%s", cloudWorkerRoleLabel, cloudWorkerRoleValue),
 		"label selector identifying the Machine(s) whose external address drives the dialer's endpoint")
 	flag.StringVar(&secretNamespace, "secret-namespace", "wg-dialer", "namespace of the dialer peer Secret")
 	flag.StringVar(&secretName, "secret-name", "wg-dialer-peer", "name of the dialer peer Secret")
-	flag.StringVar(&secretKey, "secret-key", "peer-endpoint", "key within the Secret to write the endpoint into")
+	flag.StringVar(&secretKey, "secret-key-prefix", "peer-endpoint-", "prefix (Machine name is appended) for the Secret key this Machine's endpoint is written into -- per-Machine, not a flat singleton, so multiple cloud Machines never clobber each other's entry")
 	flag.StringVar(&port, "port", "51820", "WireGuard listen port on the joining node")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "metrics endpoint address (0 disables it)")
 	flag.StringVar(&gatewayNamespace, "gateway-namespace", "", "optional: namespace of a Gateway to annotate with the node's external IP for external-dns (blank disables this)")
@@ -363,7 +485,9 @@ func main() {
 	flag.StringVar(&dialerServiceAccount, "dialer-service-account", "wg-dialer", "ServiceAccount the dialer DaemonSet's pods run as")
 	flag.StringVar(&dialerImage, "dialer-image", "ghcr.io/appmana/cloud-provisioning-dialer:e1f8655", "image for the dialer DaemonSet's container")
 	flag.StringVar(&dialerImagePullSecret, "dialer-image-pull-secret", "ghcr-pull", "imagePullSecret for the dialer DaemonSet")
-	flag.StringVar(&dialerAllowedIPs, "dialer-allowed-ips", defaultDialerAllowedIPs, "comma-separated CIDRs the on-prem dialer accepts/routes to the cloud peer -- MUST NOT be a default route (0.0.0.0/0 or ::/0), since this dialer installs a literal kernel route for every entry (see cmd/dialer/main.go), which would hijack the node's own general routing")
+	flag.StringVar(&dialerPodCIDRs, "dialer-pod-cidrs", "", "comma-separated cluster pod-CIDR ranges (v4/v6), sourced from cluster/k0sctl.yaml's own declared podCIDR at gitops-render time -- fed to the on-prem dialer's WireGuard peer config (cryptokey-routing accept-list only, never a kernel route -- see cmd/dialer/main.go's package doc)")
+	flag.StringVar(&dialerServiceCIDRs, "dialer-service-cidrs", "", "comma-separated cluster service-CIDR ranges (v4/v6), same treatment as --dialer-pod-cidrs, sourced from k0sctl.yaml's serviceCIDR")
+	flag.StringVar(&dialerCloudDaemonSetName, "dialer-cloud-daemonset-name", "wg-dialer-cloud", "name of the cloud-worker dialer DaemonSet this operator provisions directly -- coexists with, does not replace, the wg-dialer.service systemd unit cloud-init installs at bootstrap (see ensureCloudDialerDaemonSet's doc comment)")
 
 	flag.BoolVar(&joinEnabled, "join-enabled", false, "enable the bootstrap-secret provisioning reconciler (join.Reconciler)")
 	flag.StringVar(&joinTemplatePath, "join-template-path", "/join-patterns/k0s-worker.cloud-config.tmpl", "path to the join-pattern template to render")
@@ -423,7 +547,11 @@ func main() {
 			dialerServiceAccount:  dialerServiceAccount,
 			dialerImage:           dialerImage,
 			dialerImagePullSecret: dialerImagePullSecret,
-			dialerAllowedIPs:      dialerAllowedIPs,
+			dialerPodCIDRs:        dialerPodCIDRs,
+			dialerServiceCIDRs:    dialerServiceCIDRs,
+
+			dialerCloudDaemonSetName: dialerCloudDaemonSetName,
+			dialerCloudListenPort:    dialerListenPort,
 		})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create controller: %v\n", err)
@@ -454,6 +582,9 @@ func main() {
 			APIVIP:            joinAPIVIP,
 			KubeletExtraArgs:  joinKubeletExtraArgs,
 			SSHAuthorizedKeys: sshKeys,
+
+			PodCIDRs:     dialerPodCIDRs,
+			ServiceCIDRs: dialerServiceCIDRs,
 
 			WireGuardAddress:    wireGuardAddress,
 			WireGuardListenPort: wireGuardListenPort,

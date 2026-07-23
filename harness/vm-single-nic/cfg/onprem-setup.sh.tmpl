@@ -1,0 +1,24 @@
+#!/bin/bash
+# First-boot setup for the wg-dialer single-NIC VM harness. Bind-mounted at
+# /extra-setup.sh (see ../../../../vrnetlab/ubuntu/docker/launch.py's
+# EXTRA_SETUP_PATH) and run once via cloud-init runcmd. k0s itself is
+# installed remotely by k0sctl (it uploads the binary over SSH) -- this
+# script only needs to guarantee the prerequisites k0sctl and the test
+# driver depend on.
+#
+# This is a template: scripts/render-setup-script.sh substitutes
+# HARNESS_PUBLIC_KEY with the contents of cfg/ssh/harness_key.pub (generated
+# fresh per checkout, never committed) and writes the result to
+# cfg/onprem-setup.sh, which is what topo.clab.yml actually binds in.
+set -euo pipefail
+
+apt-get update -qy
+DEBIAN_FRONTEND=noninteractive apt-get install -y curl
+
+mkdir -p /home/sysadmin/.ssh
+echo 'HARNESS_PUBLIC_KEY' >> /home/sysadmin/.ssh/authorized_keys
+chmod 700 /home/sysadmin/.ssh
+chmod 600 /home/sysadmin/.ssh/authorized_keys
+chown -R sysadmin:sysadmin /home/sysadmin/.ssh
+
+echo ready > /run/wgdialer-harness-ready

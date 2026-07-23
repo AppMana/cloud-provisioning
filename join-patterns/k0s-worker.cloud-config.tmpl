@@ -13,31 +13,67 @@ ssh_authorized_keys:
 # ../README.md's "Why no k0smotron" section). Every value below comes
 # from the render tool's input, not from any control-plane object.
 write_files:
-  - path: /etc/wireguard/wg0.conf
+  # Not wg0.conf/wg-quick: wg-quick auto-installs a kernel route for
+  # every AllowedIPs entry with no isolation at all -- the exact
+  # unmitigated version of the incident that hit the on-prem side
+  # (jarvis) before its own dialer got a route-table-isolation fix. The
+  # same hardened Go dialer binary runs here instead (as a systemd
+  # unit, listener role -- see wg-dialer.service below), inheriting
+  # that isolation directly rather than reimplementing it. This file
+  # never needs new PEERS added later: once this node has even one live
+  # WireGuard relationship to any on-prem node, Calico's own BGP mesh
+  # propagates routes to the rest of the on-prem cluster through that
+  # one peer as a transit path, so a new on-prem node joining later
+  # doesn't require this file to change. localAddress (this node's own
+  # tunnel address) travels in this file too, not a flag -- see
+  # cmd/dialer/main.go's peersFileDoc doc comment for why.
+  #
+  # This file is also read by a second, later-arriving consumer:
+  # once this node joins as a real k8s worker, endpoint-controller's
+  # ensureCloudDialerDaemonSet schedules a containerized copy of the
+  # same dialer binary onto it (hostPath-mounting this same file
+  # read-only) -- see that function's doc comment for why both this
+  # systemd unit and that DaemonSet run forever, redundantly, rather
+  # than one handing off to the other.
+  - path: /etc/wg-dialer/peers.json
     permissions: '0600'
     content: |
-      [Interface]
-      Address = {{ .wireguard.address }}
-      ListenPort = {{ .wireguard.listenPort }}
-      PrivateKey = {{ .wireguard.privateKey }}
-      # wg-quick otherwise inherits the instance's own ENI MTU (9001 on
-      # AWS, jumbo frames), producing an MTU wg0 can only actually use if
-      # every hop on the real path also carries jumbo frames -- which a
-      # home/office internet uplink never does. 1420 matches what the
-      # rest of this design validates against (harness/, aws-bringup/).
-      MTU = 1420
-      {{- range .wireguard.peers }}
-      [Peer]
-      PublicKey = {{ .publicKey }}
-      AllowedIPs = {{ .allowedIPs }}
-      {{- end }}
+      {{ .peersFileJSON }}
+  - path: /etc/systemd/system/wg-dialer.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=wg-dialer (listener role)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      ExecStart=/usr/local/bin/wg-dialer \
+        --iface=wg0 \
+        --peers-file=/etc/wg-dialer/peers.json \
+        --listen-port={{ .wireguardListenPort }} \
+        --pod-cidrs={{ .podCIDRs }} \
+        --service-cidrs={{ .serviceCIDRs }} \
+        --keepalive-seconds=15 \
+        --mtu=1420 \
+        --poll-interval=30s
+      Restart=always
+      AmbientCapabilities=CAP_NET_ADMIN
+
+      [Install]
+      WantedBy=multi-user.target
   - path: /etc/k0s/join-token
     permissions: '0600'
     content: |
       {{ .joinToken }}
 runcmd:
-  - apt-get update && apt-get install -y wireguard-tools
-  - wg-quick up wg0
+  # /usr/local/bin/wg-dialer is expected to already be present in the
+  # image this cloud-init runs against (baked in at image-build time,
+  # the same binary the on-prem DaemonSet's hostPath mount uses) -- no
+  # apt install of wireguard-tools needed anymore; this binary talks
+  # to the kernel's WireGuard interface directly via netlink/wgctrl,
+  # same as the on-prem side always has.
+  - systemctl enable --now wg-dialer.service
   - until ping -c1 -W2 {{ .apiVIP }} >/dev/null 2>&1; do sleep 2; done
   # Calico's IP_AUTODETECTION_METHOD/IP6_AUTODETECTION_METHOD on this
   # cluster are cidr= matches (see the cluster's calico-node DaemonSet

@@ -1,0 +1,41 @@
+apiVersion: k0sctl.k0sproject.io/v1beta1
+kind: Cluster
+metadata:
+  name: wgdialer-vm-single-nic
+spec:
+  hosts:
+    - ssh:
+        address: 172.31.41.2
+        user: sysadmin
+        port: 22
+        keyPath: cfg/ssh/harness_key
+      role: controller+worker
+      noTaints: true
+      installFlags:
+        - --disable-components=konnectivity-server,metrics-server
+    # cloud: mirrors the real EC2/cloud-worker join -- a plain k0s
+    # worker, registered with the SAME node-label/taint pair the real
+    # join-pattern's kubelet args apply
+    # (cloud-provisioning.appmana.com/role=cloud-worker,
+    # cloud-provisioning.appmana.com/internet-facing:NoSchedule -- see
+    # controller/cmd/endpoint-controller/main.go's
+    # cloudWorkerRoleLabel/Value and cloudWorkerTaintKey constants).
+    # This is what makes the on-prem wg-dialer DaemonSet structurally
+    # unable to schedule here, and what lets the cloud-worker DaemonSet
+    # (manifests/wg-dialer-cloud-daemonset.tmpl.yaml) schedule ONLY
+    # here. k0sctl's own join-token distribution replaces the real
+    # join.Reconciler's token-minting for this harness -- that flow is
+    # already covered separately (see the kind-cluster integration test
+    # done earlier this session), what's under test here is the
+    # DaemonSet-scheduling/coexistence behavior, not token minting.
+    - ssh:
+        address: 172.31.41.3
+        user: sysadmin
+        port: 22
+        keyPath: cfg/ssh/harness_key
+      role: worker
+      installFlags:
+        - --kubelet-extra-args=--node-labels=cloud-provisioning.appmana.com/role=cloud-worker --register-with-taints=cloud-provisioning.appmana.com/internet-facing:NoSchedule
+  k0s:
+    version: 1.36.2+k0s.0
+    dynamicConfig: false

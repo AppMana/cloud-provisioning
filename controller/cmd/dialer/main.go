@@ -350,10 +350,10 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		return fmt.Errorf("no peers configured")
 	}
 
-	if err := ensureLink(cfg, localAddress); err != nil {
-		return fmt.Errorf("ensuring %s: %w", cfg.iface, err)
-	}
-
+	// Parse and validate the ENTIRE peer set before touching the
+	// kernel: a refused route-host (or any malformed entry) must leave
+	// the node byte-for-byte untouched -- no link, no address, no
+	// route, no WireGuard config.
 	keepalive := time.Duration(cfg.keepaliveSecs) * time.Second
 	sharedCIDRs := tunnel.SplitList(cfg.podCIDRs, cfg.serviceCIDRs)
 
@@ -387,7 +387,9 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			Endpoint:                    endpoint,
 			PersistentKeepaliveInterval: &keepalive,
 			AllowedIPs:                  allowedIPs,
-			ReplaceAllowedIPs:           true,
+			// Per-peer AllowedIPs replacement is a trie update -- it
+			// does NOT reset the peer's established session.
+			ReplaceAllowedIPs: true,
 		})
 
 		for _, h := range p.AllRouteHosts() {
@@ -399,10 +401,32 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 	}
 
+	if err := ensureLink(cfg, localAddress); err != nil {
+		return fmt.Errorf("ensuring %s: %w", cfg.iface, err)
+	}
+
+	// NEVER ReplacePeers: replacement removes and re-adds every peer,
+	// and removal destroys the peer's established session -- so an
+	// unchanged config re-applied every poll interval would tear the
+	// tunnel down as often as it reconciles it (caught live by the
+	// netns e2e: a ping racing the peer's poll loop). Removed peers are
+	// deleted explicitly; existing peers are updated in place (endpoint,
+	// keepalive, AllowedIPs trie), none of which resets a session.
+	desired := map[wgtypes.Key]bool{}
+	for _, p := range peerConfigs {
+		desired[p.PublicKey] = true
+	}
+	if device, err := wg.Device(cfg.iface); err == nil {
+		for _, existing := range device.Peers {
+			if !desired[existing.PublicKey] {
+				peerConfigs = append(peerConfigs, wgtypes.PeerConfig{PublicKey: existing.PublicKey, Remove: true})
+			}
+		}
+	}
+
 	deviceCfg := wgtypes.Config{
-		PrivateKey:   &privateKey,
-		Peers:        peerConfigs,
-		ReplacePeers: true,
+		PrivateKey: &privateKey,
+		Peers:      peerConfigs,
 	}
 	if cfg.listenPort != 0 {
 		deviceCfg.ListenPort = &cfg.listenPort

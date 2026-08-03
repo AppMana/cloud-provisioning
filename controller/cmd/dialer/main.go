@@ -350,6 +350,23 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		return fmt.Errorf("no peers configured")
 	}
 
+	// Peer viability for ROUTING: a host route toward a peer that has
+	// no endpoint AND has never completed a handshake is a pure
+	// blackhole -- WireGuard cannot send to a peer it has no address
+	// for, so the route only ever eats traffic to that host (including,
+	// on a remote node, the API VIP the join gate is pinging). Such a
+	// peer still gets its WireGuard CONFIG (so the other side can dial
+	// in and roaming can learn its address); its routes follow on the
+	// poll after the first handshake.
+	handshaked := map[wgtypes.Key]bool{}
+	if device, err := wg.Device(cfg.iface); err == nil {
+		for _, p := range device.Peers {
+			if !p.LastHandshakeTime.IsZero() {
+				handshaked[p.PublicKey] = true
+			}
+		}
+	}
+
 	// Parse and validate the ENTIRE peer set before touching the
 	// kernel: a refused route-host (or any malformed entry) must leave
 	// the node byte-for-byte untouched -- no link, no address, no
@@ -396,6 +413,11 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			ipNet, err := parseHostRoute(h)
 			if err != nil {
 				return err
+			}
+			if p.Endpoint == "" && !handshaked[pub] {
+				// Validated but deliberately not installed yet -- see the
+				// peer-viability comment above.
+				continue
 			}
 			routeHosts = append(routeHosts, ipNet)
 		}

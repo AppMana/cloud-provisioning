@@ -1,8 +1,4 @@
 #cloud-config
-ssh_authorized_keys:
-{{- range .sshAuthorizedKeys }}
-  - {{ . }}
-{{- end }}
 # kubeadm-worker join pattern: download the pinned dialer binary, bring
 # up the WireGuard tunnel, gate on the cluster's API VIP becoming
 # reachable through it, then join as a plain kubeadm worker using a
@@ -10,6 +6,15 @@ ssh_authorized_keys:
 # Machine.spec.bootstrap.dataSecretName content -- no bootstrap
 # provider. kubeadm is one join specialization (kind's control plane is
 # kubeadm); k0s-worker.cloud-config.tmpl is another, same contract.
+#
+# ONLY write_files and runcmd here: CAPD (this pattern's first
+# consumer) interprets cloud-config with its own parser, and any OTHER
+# top-level module lands in its "unknown" handler, which parses the
+# block as JSON and hard-fails on plain YAML -- confirmed by reading
+# cluster-api/test/infrastructure/docker/internal/provisioning/
+# cloudinit/{adapter,unknown}.go. SSH keys, if a kubeadm-over-WAN
+# deployment ever needs them, belong in a write_files/runcmd step of a
+# dedicated pattern variant, not an ssh_authorized_keys module.
 write_files:
   # Same hardened dialer, same separation of concerns as the k0s
   # pattern: pod/service CIDRs only ever enter WireGuard's cryptokey

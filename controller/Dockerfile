@@ -13,6 +13,7 @@ ARG TARGETARCH
 WORKDIR /src
 COPY controller/go.mod controller/go.sum ./
 RUN go mod download
+COPY controller/api ./api
 COPY controller/cmd ./cmd
 COPY controller/pkg ./pkg
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/endpoint-controller ./cmd/endpoint-controller

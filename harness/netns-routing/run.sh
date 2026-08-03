@@ -127,12 +127,25 @@ done
 echo "  onprem -> cloud tunnel ping OK"
 
 echo "--- assert 2: only /32 host routes via $IFACE, main table ---"
-ONPREM_ROUTES=$(ip -n "$NS_ONPREM" route show dev "$IFACE" | grep -v "proto kernel" | sed 's/[[:space:]]*$//' | sort)
+routes_via_iface() { # ns -- host routes via the tunnel iface, normalized
+  ip -n "$1" route show dev "$IFACE" | { grep -v "proto kernel" || true; } | sed 's/[[:space:]]*$//' | sort
+}
+ONPREM_ROUTES=$(routes_via_iface "$NS_ONPREM")
 WANT_ONPREM=$(printf '%s\n' "$CLOUD_TUN scope link" "$CLOUD_VIP scope link" | sort)
 [ "$ONPREM_ROUTES" == "$WANT_ONPREM" ] || fail "onprem routes via $IFACE: got [$ONPREM_ROUTES], want exactly the two peer /32s"
-CLOUD_ROUTES=$(ip -n "$NS_CLOUD" route show dev "$IFACE" | grep -v "proto kernel" | sed 's/[[:space:]]*$//' | sort)
+# The LISTENER's routes follow the first handshake by design (the
+# dialing, NAT'd side carries the endpoints; the listener learns the
+# dialer's address by roaming and only then has a viable peer to route
+# to -- before that a host route would only blackhole). Allow one poll
+# interval for them to converge.
 WANT_CLOUD=$(printf '%s\n' "$ONPREM_TUN scope link" "$ONPREM_VIP scope link" | sort)
-[ "$CLOUD_ROUTES" == "$WANT_CLOUD" ] || fail "cloud routes via $IFACE: got [$CLOUD_ROUTES], want exactly the two peer /32s"
+CLOUD_ROUTES=""
+for _ in $(seq 1 10); do
+  CLOUD_ROUTES=$(routes_via_iface "$NS_CLOUD")
+  [ "$CLOUD_ROUTES" == "$WANT_CLOUD" ] && break
+  sleep 1
+done
+[ "$CLOUD_ROUTES" == "$WANT_CLOUD" ] || fail "cloud routes via $IFACE: got [$CLOUD_ROUTES], want exactly the two peer /32s (post-handshake)"
 for ns in "$NS_ONPREM" "$NS_CLOUD"; do
   [ -z "$(ip netns exec "$ns" ip rule list | grep -v '^0:\|^32766:\|^32767:')" ] || fail "$ns: unexpected FIB rules (no route-table games allowed)"
 done

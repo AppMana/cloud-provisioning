@@ -198,22 +198,37 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	var externalIP string
+	// The dialing endpoint: ExternalIP when the provider reports one (a
+	// real cloud's public address), otherwise InternalIP -- some
+	// providers (CAPD containers, private-addressed infra) only ever
+	// report internal addresses, and for them that IS the reachable
+	// endpoint. Never invented here: absent both, keep waiting.
+	var externalIP, internalIP string
 	for _, entry := range addresses {
 		address, ok := entry.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		if address["type"] != "ExternalIP" {
+		ip, ok := address["address"].(string)
+		if !ok || ip == "" {
 			continue
 		}
-		if ip, ok := address["address"].(string); ok && ip != "" {
-			externalIP = ip
-			break
+		switch address["type"] {
+		case "ExternalIP":
+			if externalIP == "" {
+				externalIP = ip
+			}
+		case "InternalIP":
+			if internalIP == "" {
+				internalIP = ip
+			}
 		}
 	}
 	if externalIP == "" {
-		log.V(1).Info("no ExternalIP in status.addresses yet, waiting")
+		externalIP = internalIP
+	}
+	if externalIP == "" {
+		log.V(1).Info("no ExternalIP/InternalIP in status.addresses yet, waiting")
 		return ctrl.Result{}, nil
 	}
 
@@ -490,7 +505,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 						{
 							Name:            "dialer",
 							Image:           r.dialerImage,
-							ImagePullPolicy: corev1.PullAlways,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"NET_ADMIN"}},
 							},
@@ -606,7 +621,7 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 						{
 							Name:            "dialer",
 							Image:           r.dialerImage,
-							ImagePullPolicy: corev1.PullAlways,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"NET_ADMIN"}},
 							},

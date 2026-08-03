@@ -1,19 +1,19 @@
-# Templated DaemonSet for the RED/GREEN scenarios -- the driver script
-# substitutes $DIALER_BINARY (the node-local path to whichever built binary
-# is under test), $POD_CIDRS, and $SERVICE_CIDRS via envsubst before
-# applying. Matches the real endpoint-controller's own DaemonSet shape
-# (hostNetwork, NET_ADMIN, hostPath binary mount) closely enough to
-# exercise the same kernel-level route behavior -- this test
-# intentionally runs the dialer binary directly rather than through the full
-# endpoint-controller reconcile loop, since what's under test is the dialer's
-# own route-table behavior, not the controller's reconcile logic.
+# Templated on-prem DaemonSet for the GREEN scenarios -- the driver
+# script substitutes $DIALER_BINARY, $IFACE, $POD_CIDRS and
+# $SERVICE_CIDRS via envsubst before applying. Matches the real
+# endpoint-controller's ensureDialerDaemonSet shape (hostNetwork,
+# NET_ADMIN, Secret mode, self-generated node-local key) closely enough
+# to exercise the same kernel-level behavior -- this harness runs the
+# dialer binary directly rather than through the controller's reconcile
+# loop, since what's under test is the dialer's kernel behavior on a
+# REAL booted system, not the controller's reconcile logic (that's the
+# kind e2e's job).
 #
-# No --allowed-ips anywhere: the peer(s) this dialer accepts come
-# entirely from peer-public-key-<machine>/peer-allowed-ips-<machine>/
-# peer-route-host-<machine> keys in the Secret (auto-discovered, no
-# flag needed -- see cmd/dialer/main.go's loadPeersFromSecret). This
-# node's OWN identity is still --private-key-secret-key=dialer-private-key
-# / --local-address-secret-key=local-address, unchanged.
+# The dialer generates its own WireGuard key under /var/lib/
+# cloud-provisioning on first start and publishes ONLY the public key
+# into the wg-dialer-peer Secret -- the driver script then renders the
+# cloud side's peers.json from that published key, proving the
+# no-manual-key-material flow end to end on a real kubelet.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -29,18 +29,33 @@ spec:
         app: dialer-repro
     spec:
       hostNetwork: true
-      tolerations:
-        - operator: Exists
+      # No control-plane exclusion HERE: this harness's single onprem
+      # node is controller+worker and is the explicitly-selected tunnel
+      # endpoint (the selector-override case). The production default
+      # posture -- control planes excluded unless named -- is rendered
+      # by the endpoint-controller and asserted by harness/kind-e2e.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/os
+                    operator: In
+                    values: ["linux"]
       containers:
         - name: dialer
           image: busybox
           command: ["/host-bin/$DIALER_BINARY"]
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           args:
             - --secret-namespace=wg-dialer
             - --secret-name=wg-dialer-peer
-            - --iface=wg0
-            - --private-key-secret-key=dialer-private-key
-            - --local-address-secret-key=local-address
+            - --iface=$IFACE
+            - --private-key-file=/host-key/private.key
             - --pod-cidrs=$POD_CIDRS
             - --service-cidrs=$SERVICE_CIDRS
             - --keepalive-seconds=15
@@ -52,7 +67,13 @@ spec:
           volumeMounts:
             - name: hostbin
               mountPath: /host-bin
+            - name: dialer-key
+              mountPath: /host-key
       volumes:
         - name: hostbin
           hostPath:
             path: /opt/dialer-bin
+        - name: dialer-key
+          hostPath:
+            path: /var/lib/cloud-provisioning
+            type: DirectoryOrCreate

@@ -146,6 +146,9 @@ retry 5 15 ${ONPREM_SSH} "test -f /run/wgdialer-harness-ready"
 retry 5 15 ${CLOUD_SSH} "test -f /run/wgdialer-harness-ready"
 
 echo "--- install real k0s via k0sctl (onprem: controller+worker; cloud: worker, registered with the real cloud-worker label/taint) ---"
+# Both guests carry slirp's identical 10.0.0.15; k0sctl needs unique,
+# GUEST-LOCAL privateAddresses (see k0sctl.yaml) -- give cloud its own.
+retry 5 15 ${CLOUD_SSH} "sudo ip addr add 10.0.0.16/32 dev lo 2>/dev/null || true"
 ( cd "${HARNESS_DIR}" && k0sctl apply --config k0sctl.yaml --no-wait ) >"${LOG_DIR}/k0sctl-apply.log" 2>&1
 ( cd "${HARNESS_DIR}" && k0sctl kubeconfig --config k0sctl.yaml ) >"${LOG_DIR}/kubeconfig.yaml" 2>"${LOG_DIR}/k0sctl-kubeconfig.log"
 export KUBECONFIG="${LOG_DIR}/kubeconfig.yaml"

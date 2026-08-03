@@ -1,50 +1,193 @@
-// Package aws implements join.InfraProvider for CAPA (cluster-api-provider-aws).
+// Package aws implements join.InfraProvider and join.MachineProvisioner
+// for CAPA (cluster-api-provider-aws).
 package aws
 
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Provider implements join.InfraProvider for AWSMachine. Reads status
-// fields directly off the unstructured Machine's infrastructureRef
-// target rather than importing CAPA's own types, matching how
-// endpoint-controller already avoids depending on AWSMachine's schema.
+// Provider reads/renders unstructured CAPA objects rather than
+// importing CAPA's own types, matching how the rest of this module
+// avoids depending on AWSMachine's schema. AWSMachine's actual
+// reconciliation (RunInstances etc.) is entirely CAPA's job -- this
+// Provider renders specs and reads status, never drives AWS itself.
 //
-// AWSMachine's own creation is entirely CAPA's job (a separate
-// operator this reconciler has only a soft/graceful dependency on,
-// see isMissingCRD in pkg/join/reconciler.go) -- this Provider only
-// ever reads it, never creates or drives it.
-type Provider struct{}
+// ConfigNamespace/ConfigName point at a plain Secret carrying this
+// provider's cluster-level configuration -- the place AWS specifics
+// live so that ProvisionedNodeClaims never have to (see
+// join.MachineProvisioner). Keys:
+//
+//	ami-arm64, ami-amd64        -- per-arch AMI IDs (at least the arch
+//	                               in use is required)
+//	ssh-key-name                -- optional EC2 keypair name
+//	security-group-ids          -- optional comma-separated sg-...
+//	subnet-id                   -- optional (CAPA picks from the
+//	                               AWSCluster otherwise)
+//	iam-instance-profile        -- optional
+//	public-ip                   -- "true"/"false" (default true: the
+//	                               whole point of these nodes)
+//	insecure-skip-secrets-manager -- "true"/"false" (default true:
+//	                               userdata already carries only a
+//	                               short-TTL join token; SSM adds an
+//	                               IAM dependency for no secret kept)
+type Provider struct {
+	ConfigNamespace string
+	ConfigName      string
+}
 
-var gvk = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSMachine"}
+var (
+	gvk        = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSMachine"}
+	clusterGVK = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Cluster"}
+
+	awsClusterGVK               = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSCluster"}
+	awsClusterStaticIdentityGVK = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSClusterStaticIdentity"}
+)
 
 // GVK implements join.InfraProvider.
 func (Provider) GVK() schema.GroupVersionKind { return gvk }
 
-// Ready reports whether the underlying AWSMachine is far enough along
-// to bootstrap: status.ready is true. A future GCPProvider would check
-// whatever its own infrastructure CRD's status shape happens to be.
-func (Provider) Ready(ctx context.Context, awsMachine *unstructured.Unstructured) (bool, error) {
-	ready, found, err := unstructured.NestedBool(awsMachine.Object, "status", "ready")
-	if err != nil {
-		return false, fmt.Errorf("reading status.ready: %w", err)
-	}
-	return found && ready, nil
+// ClusterGVK implements join.MachineProvisioner.
+func (Provider) ClusterGVK() schema.GroupVersionKind { return awsClusterGVK }
+
+// arm64Families are the EC2 instance families this catalog knows to be
+// Graviton (arm64). Everything else is treated as amd64.
+var arm64Families = map[string]bool{
+	"t4g": true, "m6g": true, "m7g": true, "m8g": true,
+	"c6g": true, "c7g": true, "c8g": true,
+	"r6g": true, "r7g": true, "r8g": true,
+	"a1": true, "im4gn": true, "g5g": true,
 }
 
-// InfraValues contributes nothing today -- the join-pattern template
-// doesn't need any AWS-specific fact beyond "is it ready yet" (that's
-// what gates whether the reconciler runs at all). Kept as a real
-// method (not omitted) so the interface stays honest about what a
-// future infra provider could contribute.
+func archForInstanceType(instanceType string) string {
+	family := strings.SplitN(instanceType, ".", 2)[0]
+	if arm64Families[family] {
+		return "arm64"
+	}
+	return "amd64"
+}
+
+// InfraValues contributes "arch", derived from the AWSMachine's
+// instance type -- it selects which dialer binary the rendered
+// userdata downloads.
 func (Provider) InfraValues(ctx context.Context, awsMachine *unstructured.Unstructured) (map[string]any, error) {
-	return map[string]any{}, nil
+	instanceType, _, _ := unstructured.NestedString(awsMachine.Object, "spec", "instanceType")
+	if instanceType == "" {
+		return map[string]any{}, nil
+	}
+	return map[string]any{"arch": archForInstanceType(instanceType)}, nil
+}
+
+// catalogEntry is one instance type this provider will resolve a
+// NodeRequest onto. The catalog is deliberately tiny and static --
+// burstable general-purpose types, the only shape a tunnel/ingress
+// node needs. It is NOT a general EC2 catalog and never will be;
+// anything fancier belongs to a real autoscaler, which this project
+// deliberately is not.
+type catalogEntry struct {
+	name        string
+	arch        string
+	cpuMillis   int64
+	memoryBytes int64
+}
+
+const gib = int64(1) << 30
+
+var catalog = []catalogEntry{
+	{"t4g.nano", "arm64", 2000, gib / 2},
+	{"t4g.micro", "arm64", 2000, 1 * gib},
+	{"t4g.small", "arm64", 2000, 2 * gib},
+	{"t4g.medium", "arm64", 2000, 4 * gib},
+	{"t4g.large", "arm64", 2000, 8 * gib},
+	{"t4g.xlarge", "arm64", 4000, 16 * gib},
+	{"t4g.2xlarge", "arm64", 8000, 32 * gib},
+	{"t3.micro", "amd64", 2000, 1 * gib},
+	{"t3.small", "amd64", 2000, 2 * gib},
+	{"t3.medium", "amd64", 2000, 4 * gib},
+	{"t3.large", "amd64", 2000, 8 * gib},
+	{"t3.xlarge", "amd64", 4000, 16 * gib},
+	{"t3.2xlarge", "amd64", 8000, 32 * gib},
+}
+
+// ResolveInstanceType implements join.MachineProvisioner: smallest
+// catalog entry (by memory, then CPU) satisfying the request.
+func (Provider) ResolveInstanceType(req join.NodeRequest) (string, error) {
+	arch := req.Arch
+	if arch == "" {
+		arch = "arm64"
+	}
+	candidates := make([]catalogEntry, 0, len(catalog))
+	for _, e := range catalog {
+		if e.arch == arch && e.cpuMillis >= req.CPUMillis && e.memoryBytes >= req.MemoryBytes {
+			candidates = append(candidates, e)
+		}
+	}
+	if len(candidates) == 0 {
+		return "", fmt.Errorf("no %s instance type in the catalog satisfies cpu=%dm memory=%dMi", arch, req.CPUMillis, req.MemoryBytes/(1<<20))
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].memoryBytes != candidates[j].memoryBytes {
+			return candidates[i].memoryBytes < candidates[j].memoryBytes
+		}
+		return candidates[i].cpuMillis < candidates[j].cpuMillis
+	})
+	return candidates[0].name, nil
+}
+
+// InfraMachine implements join.MachineProvisioner: renders the
+// AWSMachine spec for one claim from the provider-config Secret.
+func (p Provider) InfraMachine(ctx context.Context, c client.Reader, namespace, instanceType string, req join.NodeRequest) (*unstructured.Unstructured, error) {
+	cfg := &corev1.Secret{}
+	if err := c.Get(ctx, client.ObjectKey{Namespace: p.ConfigNamespace, Name: p.ConfigName}, cfg); err != nil {
+		return nil, fmt.Errorf("reading AWS provider config %s/%s: %w", p.ConfigNamespace, p.ConfigName, err)
+	}
+	get := func(key string) string { return strings.TrimSpace(string(cfg.Data[key])) }
+
+	arch := archForInstanceType(instanceType)
+	ami := get("ami-" + arch)
+	if ami == "" {
+		return nil, fmt.Errorf("AWS provider config %s/%s has no ami-%s", p.ConfigNamespace, p.ConfigName, arch)
+	}
+
+	spec := map[string]any{
+		"instanceType": instanceType,
+		"ami":          map[string]any{"id": ami},
+		"publicIP":     get("public-ip") != "false",
+		"cloudInit": map[string]any{
+			"insecureSkipSecretsManager": get("insecure-skip-secrets-manager") != "false",
+		},
+	}
+	if v := get("ssh-key-name"); v != "" {
+		spec["sshKeyName"] = v
+	}
+	if v := get("iam-instance-profile"); v != "" {
+		spec["iamInstanceProfile"] = v
+	}
+	if v := get("subnet-id"); v != "" {
+		spec["subnet"] = map[string]any{"id": v}
+	}
+	if v := get("security-group-ids"); v != "" {
+		var groups []any
+		for _, id := range strings.Split(v, ",") {
+			if id = strings.TrimSpace(id); id != "" {
+				groups = append(groups, map[string]any{"id": id})
+			}
+		}
+		spec["additionalSecurityGroups"] = groups
+	}
+
+	obj := &unstructured.Unstructured{Object: map[string]any{"spec": spec}}
+	obj.SetGroupVersionKind(gvk)
+	obj.SetNamespace(namespace)
+	return obj, nil
 }
 
 // managerNamespace is where CAPA ALWAYS resolves an
@@ -54,17 +197,10 @@ func (Provider) InfraValues(ctx context.Context, awsMachine *unstructured.Unstru
 // pkg/cloud/scope/session.go's buildAWSClusterStaticIdentity calling
 // system.GetManagerNamespace(), which reads the CAPA pod's own
 // in-cluster namespace file/POD_NAMESPACE, defaulting to
-// "capa-system"). Hardcoded to match this specific installation
-// (infrastructure/base/cluster-api-providers/providers.yaml), not
-// discovered dynamically -- there's exactly one CAPA install in this
-// cluster, in a namespace fixed by that manifest.
+// "capa-system"). Hardcoded to match this specific installation, not
+// discovered dynamically -- there's exactly one CAPA install per
+// cluster, in a namespace fixed by its manifest.
 const managerNamespace = "capa-system"
-
-var (
-	clusterGVK                  = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Cluster"}
-	awsClusterGVK               = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSCluster"}
-	awsClusterStaticIdentityGVK = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSClusterStaticIdentity"}
-)
 
 const clusterNameLabel = "cluster.x-k8s.io/cluster-name"
 
@@ -80,11 +216,9 @@ const clusterNameLabel = "cluster.x-k8s.io/cluster-name"
 // not an error): a missing Cluster/AWSCluster, an unset or
 // non-static-identity identityRef, or an unresolvable
 // AWSClusterStaticIdentity are all either "nothing to validate yet" or
-// genuinely out of this check's scope -- CAPA's own error handling
-// (including this reconciler's isMissingCRD graceful requeue) already
-// covers those. Only the one specific, confirmed-real misconfiguration
-// this check exists for is surfaced as an error.
-func (Provider) Validate(ctx context.Context, c client.Client, awsMachine *unstructured.Unstructured) error {
+// genuinely out of this check's scope. Only the one specific,
+// confirmed-real misconfiguration this check exists for is surfaced.
+func (Provider) Validate(ctx context.Context, c client.Reader, awsMachine *unstructured.Unstructured) error {
 	clusterName := awsMachine.GetLabels()[clusterNameLabel]
 	if clusterName == "" {
 		return nil

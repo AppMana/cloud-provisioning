@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -22,6 +21,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+// awsMachineGVK mirrors the real CAPA AWSMachine GVK. Deliberately a
+// local copy rather than an import of pkg/join/aws: aws imports this
+// package (for NodeRequest/MachineProvisioner), so importing it back
+// from an in-package test file is an import cycle. The tests that need
+// the REAL aws.Provider live in reconciler_aws_test.go (package
+// join_test), where no cycle exists.
+var awsMachineGVK = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSMachine"}
+
 // secretValue reads key from a Secret's Data (real API server
 // behavior: StringData is write-only, converted to Data on write) or
 // falls back to StringData (this fake client's behavior: preserves
@@ -34,105 +41,22 @@ func secretValue(s *corev1.Secret, key string) string {
 	return s.StringData[key]
 }
 
+// dialerPeerSecretFixture models the peer Secret AFTER the mesh side
+// exists: two worker nodes' dialers have published their public keys
+// (node-public-key-*, self-generated -- NO private key is ever in this
+// Secret) and the endpoint-controller has allocated their tunnel
+// addresses and recorded their cluster addresses.
 func dialerPeerSecretFixture() *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "wg-dialer-peer", Namespace: "wg-dialer"},
 		Data: map[string][]byte{
-			"dialer-private-key-jarvis":     []byte("8ALeO136hzNidiHffMf40dM/SKi7iJHBvfy+mplpKVY="),
-			"local-address-jarvis":          []byte("10.100.0.1/24"),
-			"cluster-vip-jarvis":            []byte("10.101.0.1"),
-			"dialer-private-key-spark-2ab3": []byte("6Opkhqk2sKOCnwLzGkjvk+4SxB8fuDH0XreH3RefOUo="),
-			"local-address-spark-2ab3":      []byte("10.100.0.3/24"),
-			"cluster-vip-spark-2ab3":        []byte("10.101.0.2"),
-			"peer-public-key":               []byte("unrelated"), // must NOT be treated as a node peer
-			"peer-endpoint":                 []byte("unrelated"),
+			"node-public-key-spark-2ab3":     []byte("c3BhcmsyYWIzLXB1YmxpYy1rZXktdGVzdC1vbmx5PT0="),
+			"node-tunnel-address-spark-2ab3": []byte("10.100.0.1/24"),
+			"node-cluster-vips-spark-2ab3":   []byte("10.101.0.2"),
+			"node-public-key-spark-5867":     []byte("c3Bhcms1ODY3LXB1YmxpYy1rZXktdGVzdC1vbmx5PT0="),
+			"node-tunnel-address-spark-5867": []byte("10.100.0.3/24"),
+			"node-cluster-vips-spark-5867":   []byte("10.101.0.3"),
 		},
-	}
-}
-
-func TestOnPremPeers(t *testing.T) {
-	peers, err := onPremPeers(dialerPeerSecretFixture())
-	if err != nil {
-		t.Fatalf("onPremPeers: %v", err)
-	}
-	if len(peers) != 2 {
-		t.Fatalf("expected exactly 2 peers (not the peer-public-key/peer-endpoint keys treated as nodes), got %d: %+v", len(peers), peers)
-	}
-	// jarvis's derived public key, confirmed against the real value
-	// used this session (private key above is the real jarvis dialer key).
-	const jarvisPub = "WpxHfxQmbN8EZZVHeFVhV5uhLWhw2vbY0Rgb0Wnn5Sg="
-	found := false
-	for _, p := range peers {
-		if p.PublicKey == jarvisPub {
-			found = true
-			want := []string{"10.100.0.1/32", "10.101.0.1/32"}
-			if !equalStrings(p.WGAllowedIPs, want) {
-				t.Errorf("jarvis WGAllowedIPs = %v, want both tunnel address AND cluster VIP: %v", p.WGAllowedIPs, want)
-			}
-			if p.RouteHost != "10.100.0.1" {
-				t.Errorf("jarvis RouteHost = %q, want just the tunnel address, no cluster VIPs", p.RouteHost)
-			}
-		}
-	}
-	if !found {
-		t.Errorf("jarvis's derived public key %s not found in peer list", jarvisPub)
-	}
-}
-
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func TestOnPremPeers_DualStackClusterVIPsGetCorrectPrefixLengths(t *testing.T) {
-	// Every real node in this cluster is genuinely dual-stack (confirmed
-	// against live Node.status.addresses: each has both a 10.101.0.x and
-	// an fd8f:cf26:522a::x InternalIP), so cluster-vip-<node> must be
-	// able to carry both, and each must get the correct single-host
-	// prefix length for its family -- /32 for IPv4, /128 for IPv6.
-	// Hardcoding /32 across the board either fails to parse against an
-	// IPv6 literal or silently matches the wrong host count.
-	secret := dialerPeerSecretFixture()
-	secret.Data["cluster-vip-jarvis"] = []byte("10.101.0.1,fd8f:cf26:522a::1")
-
-	peers, err := onPremPeers(secret)
-	if err != nil {
-		t.Fatalf("onPremPeers: %v", err)
-	}
-	const jarvisPub = "WpxHfxQmbN8EZZVHeFVhV5uhLWhw2vbY0Rgb0Wnn5Sg="
-	for _, p := range peers {
-		if p.PublicKey != jarvisPub {
-			continue
-		}
-		want := []string{"10.100.0.1/32", "10.101.0.1/32", "fd8f:cf26:522a::1/128"}
-		if !equalStrings(p.WGAllowedIPs, want) {
-			t.Errorf("jarvis WGAllowedIPs = %v, want %v", p.WGAllowedIPs, want)
-		}
-		return
-	}
-	t.Fatal("jarvis not found in peer list")
-}
-
-func TestOnPremPeers_MissingClusterVIP(t *testing.T) {
-	secret := dialerPeerSecretFixture()
-	delete(secret.Data, "cluster-vip-jarvis")
-	if _, err := onPremPeers(secret); err == nil {
-		t.Fatal("expected an error when cluster-vip-<node> is missing, got nil -- this must fail loudly, not silently omit the BGP-required VIP")
-	}
-}
-
-func TestOnPremPeers_MissingLocalAddress(t *testing.T) {
-	secret := dialerPeerSecretFixture()
-	delete(secret.Data, "local-address-jarvis")
-	if _, err := onPremPeers(secret); err == nil {
-		t.Fatal("expected an error when local-address-<node> is missing, got nil")
 	}
 }
 
@@ -142,7 +66,7 @@ func machineListGVK() schema.GroupVersionKind {
 
 func fakeMachine(name string, nodeVIPAnnotation string) *unstructured.Unstructured {
 	m := &unstructured.Unstructured{}
-	m.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"})
+	m.SetGroupVersionKind(machineGVK)
 	m.SetName(name)
 	m.SetNamespace("default")
 	if nodeVIPAnnotation != "" {
@@ -169,12 +93,33 @@ func newFakeReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 
 func TestAllocateNodeVIPIndex_NoExisting(t *testing.T) {
 	r := newFakeReconciler(t)
-	idx, err := r.allocateNodeVIPIndex(context.Background(), nil)
+	idx, err := r.allocateNodeVIPIndex(context.Background())
 	if err != nil {
 		t.Fatalf("allocateNodeVIPIndex: %v", err)
 	}
 	if idx != 4 {
 		t.Errorf("expected first allocation to start at NodeVIPStart=4, got %d", idx)
+	}
+}
+
+func TestDialerBinaryFor_UnpinnedDigestIsAlwaysFatal(t *testing.T) {
+	// Rendering userdata that downloads an unverifiable binary is a
+	// supply-chain hole, never a fallback.
+	r := &Reconciler{DialerBinaryURLARM64: "https://example.com/dialer-arm64"}
+	if _, _, err := r.dialerBinaryFor(map[string]any{}); err == nil {
+		t.Fatal("expected an error when the arm64 sha256 is unset, got nil")
+	}
+	r = &Reconciler{DialerBinarySHA256ARM64: "abc123"}
+	if _, _, err := r.dialerBinaryFor(map[string]any{}); err == nil {
+		t.Fatal("expected an error when the arm64 URL is unset, got nil")
+	}
+	r = &Reconciler{DialerBinaryURLARM64: "u", DialerBinarySHA256ARM64: "s"}
+	if _, _, err := r.dialerBinaryFor(map[string]any{"arch": "amd64"}); err == nil {
+		t.Fatal("expected an error for an amd64 machine when only arm64 is configured, got nil")
+	}
+	url, sha, err := r.dialerBinaryFor(map[string]any{"arch": "arm64"})
+	if err != nil || url != "u" || sha != "s" {
+		t.Fatalf("dialerBinaryFor(arm64) = (%q, %q, %v), want (u, s, nil)", url, sha, err)
 	}
 }
 
@@ -195,11 +140,31 @@ func (s *stubJoinProvider) JoinValues(ctx context.Context) (map[string]any, erro
 
 func fakeAWSMachine(name, namespace string, ready bool) *unstructured.Unstructured {
 	m := &unstructured.Unstructured{}
-	m.SetGroupVersionKind(joinaws.Provider{}.GVK())
+	m.SetGroupVersionKind(awsMachineGVK)
 	m.SetName(name)
 	m.SetNamespace(namespace)
 	_ = unstructured.SetNestedField(m.Object, ready, "status", "ready")
 	return m
+}
+
+// stubInfraProvider is a mock InfraProvider registered under a given
+// GVK -- used both as the stand-in for AWS (the real aws.Provider can't
+// be imported here, see awsMachineGVK's comment) and to prove provider
+// selection is genuinely inferred from spec.infrastructureRef.kind.
+type stubInfraProvider struct {
+	gvk             schema.GroupVersionKind
+	infraValues     map[string]any
+	infraValueCalls int
+}
+
+func (s *stubInfraProvider) GVK() schema.GroupVersionKind { return s.gvk }
+func (s *stubInfraProvider) InfraValues(ctx context.Context, machine *unstructured.Unstructured) (map[string]any, error) {
+	s.infraValueCalls++
+	return s.infraValues, nil
+}
+
+func awsShapedStub() *stubInfraProvider {
+	return &stubInfraProvider{gvk: awsMachineGVK, infraValues: map[string]any{"arch": "arm64"}}
 }
 
 // machineWithInfraRef builds a Machine whose infrastructureRef.kind is
@@ -212,14 +177,14 @@ func machineWithInfraRef(name, namespace, infraRefName string) *unstructured.Uns
 	m := fakeMachine(name, "")
 	m.SetNamespace(namespace)
 	_ = unstructured.SetNestedField(m.Object, infraRefName, "spec", "infrastructureRef", "name")
-	_ = unstructured.SetNestedField(m.Object, joinaws.Provider{}.GVK().Kind, "spec", "infrastructureRef", "kind")
+	_ = unstructured.SetNestedField(m.Object, awsMachineGVK.Kind, "spec", "infrastructureRef", "kind")
 	return m
 }
 
 // newFakeJoinReconciler builds a Reconciler wired for a full
-// Reconcile() call: unlike newFakeReconciler (onPremPeers/
-// allocateNodeVIPIndex tests only), this registers AWSMachine too and
-// fills in every field Reconcile actually reads.
+// Reconcile() call: unlike newFakeReconciler (allocateNodeVIPIndex
+// tests only), this registers AWSMachine too and fills in every field
+// Reconcile actually reads.
 func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs ...client.Object) *Reconciler {
 	t.Helper()
 	scheme := runtime.NewScheme()
@@ -228,11 +193,11 @@ func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs 
 	}
 	scheme.AddKnownTypeWithName(machineGVK, &unstructured.Unstructured{})
 	scheme.AddKnownTypeWithName(machineListGVK(), &unstructured.UnstructuredList{})
-	scheme.AddKnownTypeWithName(joinaws.Provider{}.GVK(), &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(awsMachineGVK, &unstructured.Unstructured{})
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	tmplPath := filepath.Join(t.TempDir(), "test.tmpl")
-	tmpl := "joinToken={{.joinToken}} k0sVersion={{.k0sVersion}} apiVIP={{.apiVIP}} nodeVIP4={{.nodeVIP4}} nodeVIP6={{.nodeVIP6}} kubeletExtraArgs={{.kubeletExtraArgs}} wgAddress={{.wireguardAddress}} podCIDRs={{.podCIDRs}} serviceCIDRs={{.serviceCIDRs}} peersFileJSON={{.peersFileJSON}}"
+	tmpl := "joinToken={{.joinToken}} k0sVersion={{.k0sVersion}} apiVIP={{.apiVIP}} nodeVIP4={{.nodeVIP4}} nodeVIP6={{.nodeVIP6}} kubeletExtraArgs={{.kubeletExtraArgs}} wgAddress={{.wireguardAddress}} podCIDRs={{.podCIDRs}} serviceCIDRs={{.serviceCIDRs}} iface={{.interfaceName}} binURL={{.dialerBinaryURL}} binSHA={{.dialerBinarySHA256}} machine={{.machineName}} peersFileJSON={{.peersFileJSON}}"
 	if err := os.WriteFile(tmplPath, []byte(tmpl), 0o644); err != nil {
 		t.Fatalf("writing test template: %v", err)
 	}
@@ -241,13 +206,13 @@ func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs 
 		Client:         c,
 		Reader:         c,
 		Join:           joinProvider,
-		InfraProviders: []InfraProvider{joinaws.Provider{}},
+		InfraProviders: []InfraProvider{awsShapedStub()},
 
 		TemplatePath:     tmplPath,
 		APIVIP:           "10.101.0.1",
 		KubeletExtraArgs: "--node-labels=cloud-provisioning.appmana.com/role=cloud-worker",
 
-		WireGuardAddress:    "10.100.0.2/24",
+		WireGuardAddress:    "10.100.0.128/24",
 		WireGuardListenPort: "51820",
 
 		NodeVIP4Prefix: "10.101.0.",
@@ -256,6 +221,11 @@ func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs 
 
 		DialerPeerSecretNamespace: "wg-dialer",
 		DialerPeerSecretName:      "wg-dialer-peer",
+
+		InterfaceName: "cldt0a1b2c3d",
+
+		DialerBinaryURLARM64:    "https://example.com/wg-dialer-linux-arm64",
+		DialerBinarySHA256ARM64: "deadbeef" + strings.Repeat("0", 56),
 
 		BootstrapSecretNameFormat: "%s-bootstrap",
 	}
@@ -290,6 +260,36 @@ func TestReconcile_CreatesBootstrapSecretEvenWhenInfraNotReady(t *testing.T) {
 	}
 }
 
+func TestReconcile_NoPublishedTunnelEndpoints_WaitsInsteadOfBakingEmptyPeerList(t *testing.T) {
+	// Userdata is immutable once the instance launches. If no local
+	// dialer has published a key yet (fresh install ordering), rendering
+	// now would bake an empty peer list into the bootstrap -- a node
+	// that could never reach anything. The reconciler must wait, not
+	// render.
+	machine := machineWithInfraRef("cloud-worker-0", "default", "cloud-worker-0")
+	awsMachine := fakeAWSMachine("cloud-worker-0", "default", false)
+	emptyPeerSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "wg-dialer-peer", Namespace: "wg-dialer"},
+	}
+	join := &stubJoinProvider{values: map[string]any{}}
+
+	r := newFakeJoinReconciler(t, join, machine, awsMachine, emptyPeerSecret)
+
+	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)})
+	if err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if res.RequeueAfter == 0 {
+		t.Error("expected a requeue while waiting for tunnel endpoints to publish, got none")
+	}
+	if join.calls != 0 {
+		t.Errorf("JoinValues must not be called (and a join token not minted/burned) before the peer list can be non-empty, got %d calls", join.calls)
+	}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "cloud-worker-0-bootstrap"}, &corev1.Secret{}); !apierrors.IsNotFound(err) {
+		t.Errorf("expected no bootstrap secret while waiting, Get returned: %v", err)
+	}
+}
+
 func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	machine := machineWithInfraRef("hilton-cloud-worker-jarvistam-0", "default", "hilton-cloud-worker-jarvistam-0")
 	awsMachine := fakeAWSMachine("hilton-cloud-worker-jarvistam-0", "default", true)
@@ -316,6 +316,12 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	if bootstrapSecret.Type != "cluster.x-k8s.io/secret" {
 		t.Errorf("bootstrap secret type = %q, want cluster.x-k8s.io/secret", bootstrapSecret.Type)
 	}
+	// Owned by the Machine: join tokens expire, so a deleted-and-
+	// recreated Machine must get a FRESH render, which only happens if
+	// this Secret is garbage-collected with its Machine.
+	if len(bootstrapSecret.OwnerReferences) != 1 || bootstrapSecret.OwnerReferences[0].Kind != "Machine" || bootstrapSecret.OwnerReferences[0].Name != machine.GetName() {
+		t.Errorf("bootstrap secret ownerReferences = %+v, want exactly one reference to Machine %s", bootstrapSecret.OwnerReferences, machine.GetName())
+	}
 	// A real API server converts StringData to Data on write and never
 	// returns StringData on a subsequent Get (it's write-only) --
 	// confirmed against a real kind cluster while building this test
@@ -328,10 +334,37 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 		t.Errorf("bootstrap secret format = %q, want cloud-config", secretValue(bootstrapSecret, "format"))
 	}
 	rendered := secretValue(bootstrapSecret, "value")
-	for _, want := range []string{"joinToken=fake-token", "k0sVersion=v1.36.2+k0s", "apiVIP=10.101.0.1", "nodeVIP4=10.101.0.4", "nodeVIP6=fd8f:cf26:522a::4"} {
+	for _, want := range []string{
+		"joinToken=fake-token",
+		"k0sVersion=v1.36.2+k0s",
+		"apiVIP=10.101.0.1",
+		"nodeVIP4=10.101.0.4",
+		"nodeVIP6=fd8f:cf26:522a::4",
+		"wgAddress=10.100.0.128/24",
+		"iface=cldt0a1b2c3d",
+		"binURL=https://example.com/wg-dialer-linux-arm64",
+		"binSHA=deadbeef",
+		"machine=hilton-cloud-worker-jarvistam-0",
+	} {
 		if !strings.Contains(rendered, want) {
 			t.Errorf("rendered bootstrap content missing %q; got: %s", want, rendered)
 		}
+	}
+	// The baked peers.json must carry both published locals, and the
+	// API VIP must ride exactly the designated transit local (lowest
+	// tunnel address, 10.100.0.1 = spark-2ab3): control planes carry no
+	// tunnel, so the API is reached through that one worker.
+	for _, want := range []string{
+		"c3BhcmsyYWIzLXB1YmxpYy1rZXktdGVzdC1vbmx5PT0=",
+		"c3Bhcms1ODY3LXB1YmxpYy1rZXktdGVzdC1vbmx5PT0=",
+		"10.101.0.1/32",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Errorf("baked peers.json missing %q; rendered: %s", want, rendered)
+		}
+	}
+	if strings.Count(rendered, "10.101.0.1/32") != 1 {
+		t.Errorf("API VIP must appear in exactly ONE local peer's AllowedIPs (the designated transit), got %d occurrences", strings.Count(rendered, "10.101.0.1/32"))
 	}
 
 	updatedDialerSecret := &corev1.Secret{}
@@ -347,6 +380,19 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	if len(updatedDialerSecret.Data["peer-public-key-"+machineName]) == 0 {
 		t.Error("peer-public-key-<machine> wasn't populated with the newly generated cloud-side public key")
 	}
+	// AllowedIPs carry tunnel address AND both node VIPs (BGP sessions
+	// and kubelet traffic ride the VIPs); RouteHosts carry the same
+	// three as bare hosts (each becomes exactly one /32 or /128 kernel
+	// route on the on-prem side, nothing wider -- pod routing is
+	// Calico's job).
+	wantAllowed := "10.100.0.128/32,10.101.0.4/32,fd8f:cf26:522a::4/128"
+	if got := string(updatedDialerSecret.Data["peer-allowed-ips-"+machineName]); got != wantAllowed {
+		t.Errorf("peer-allowed-ips-%s = %q, want %q", machineName, got, wantAllowed)
+	}
+	wantRouteHosts := "10.100.0.128,10.101.0.4,fd8f:cf26:522a::4"
+	if got := string(updatedDialerSecret.Data["peer-route-hosts-"+machineName]); got != wantRouteHosts {
+		t.Errorf("peer-route-hosts-%s = %q, want %q", machineName, got, wantRouteHosts)
+	}
 
 	updatedMachine := &unstructured.Unstructured{}
 	updatedMachine.SetGroupVersionKind(machineGVK)
@@ -355,6 +401,9 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	}
 	if updatedMachine.GetAnnotations()[NodeVIPAnnotation] != "4" {
 		t.Errorf("machine's %s annotation = %q, want \"4\" (NodeVIPStart, first allocation)", NodeVIPAnnotation, updatedMachine.GetAnnotations()[NodeVIPAnnotation])
+	}
+	if updatedMachine.GetAnnotations()[WireGuardAddrAnnotation] != "10.100.0.128/24" {
+		t.Errorf("machine's %s annotation = %q, want the base address for the first allocation", WireGuardAddrAnnotation, updatedMachine.GetAnnotations()[WireGuardAddrAnnotation])
 	}
 }
 
@@ -401,19 +450,23 @@ func TestReconcile_TwoCloudMachinesDoNotClobberEachOther(t *testing.T) {
 	}
 
 	// The actual regression case for the WireGuardAddrAnnotation fix:
-	// each Machine's own tunnel address (both its own RouteHost/
-	// AllowedIPs entry in the dialer Secret, and its own peer-route-host)
-	// must be distinct -- before that fix, every cloud Machine got the
-	// SAME literal r.WireGuardAddress, which is invalid for WireGuard
-	// cryptokey routing (two peers can't share an AllowedIPs
-	// destination) and ambiguous for the kernel route it produces.
-	routeHostA := string(updatedDialerSecret.Data["peer-route-host-cloud-worker-a"])
-	routeHostB := string(updatedDialerSecret.Data["peer-route-host-cloud-worker-b"])
-	if routeHostA == "" || routeHostB == "" {
-		t.Fatalf("expected both peer-route-host entries to be set, got %q and %q", routeHostA, routeHostB)
+	// each Machine's own tunnel address (both its own RouteHosts/
+	// AllowedIPs entries in the dialer Secret, and its own kernel host
+	// route on the on-prem side) must be distinct -- before that fix,
+	// every cloud Machine got the SAME literal r.WireGuardAddress, which
+	// is invalid for WireGuard cryptokey routing (two peers can't share
+	// an AllowedIPs destination) and ambiguous for the kernel route it
+	// produces.
+	routeHostsA := string(updatedDialerSecret.Data["peer-route-hosts-cloud-worker-a"])
+	routeHostsB := string(updatedDialerSecret.Data["peer-route-hosts-cloud-worker-b"])
+	if routeHostsA == "" || routeHostsB == "" {
+		t.Fatalf("expected both peer-route-hosts entries to be set, got %q and %q", routeHostsA, routeHostsB)
 	}
-	if routeHostA == routeHostB {
-		t.Errorf("cloud-worker-a and cloud-worker-b got the same tunnel address %q -- WireGuard address allocation collided", routeHostA)
+	if routeHostsA == routeHostsB {
+		t.Errorf("cloud-worker-a and cloud-worker-b got identical route-hosts %q -- WireGuard address/VIP allocation collided", routeHostsA)
+	}
+	if !strings.HasPrefix(routeHostsA, "10.100.0.128,") || !strings.HasPrefix(routeHostsB, "10.100.0.129,") {
+		t.Errorf("expected sequential tunnel addresses .128 then .129, got %q and %q", routeHostsA, routeHostsB)
 	}
 
 	if string(updatedDialerSecret.Data["peer-endpoint-cloud-worker-a"]) != "pending" {
@@ -439,6 +492,22 @@ func TestReconcile_TwoCloudMachinesDoNotClobberEachOther(t *testing.T) {
 	}
 	if updatedA.GetAnnotations()[NodeVIPAnnotation] == updatedB.GetAnnotations()[NodeVIPAnnotation] {
 		t.Errorf("machineA and machineB got the same node-VIP index %q -- allocation collided", updatedA.GetAnnotations()[NodeVIPAnnotation])
+	}
+
+	// Machine B's baked peers.json must include machine A as a
+	// remote-to-remote peer (isolated remotes share no LAN -- without
+	// this edge they could never reach each other), and must NOT
+	// include machine B itself.
+	bootstrapB := &corev1.Secret{}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "cloud-worker-b-bootstrap"}, bootstrapB); err != nil {
+		t.Fatalf("getting machine B's bootstrap secret: %v", err)
+	}
+	renderedB := secretValue(bootstrapB, "value")
+	if !strings.Contains(renderedB, string(pubA)) {
+		t.Error("machine B's baked peers.json is missing machine A's public key -- remote-to-remote mesh edge absent")
+	}
+	if strings.Contains(renderedB, "10.100.0.129/32") {
+		t.Error("machine B's baked peers.json contains its own address as a peer -- self-exclusion failed")
 	}
 }
 
@@ -500,16 +569,16 @@ func testMissingCRDReconciler(t *testing.T, injectedErr error) (*Reconciler, *un
 	}
 	scheme.AddKnownTypeWithName(machineGVK, &unstructured.Unstructured{})
 	scheme.AddKnownTypeWithName(machineListGVK(), &unstructured.UnstructuredList{})
-	scheme.AddKnownTypeWithName(joinaws.Provider{}.GVK(), &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(awsMachineGVK, &unstructured.Unstructured{})
 
 	machine := machineWithInfraRef("hilton-cloud-worker-jarvistam-0", "default", "hilton-cloud-worker-jarvistam-0")
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(machine).Build()
 	join := &stubJoinProvider{values: map[string]any{}}
 	r := &Reconciler{
 		Client:                    c,
-		Reader:                    &erroringReader{Reader: c, failGVK: joinaws.Provider{}.GVK(), err: injectedErr},
+		Reader:                    &erroringReader{Reader: c, failGVK: awsMachineGVK, err: injectedErr},
 		Join:                      join,
-		InfraProviders:            []InfraProvider{joinaws.Provider{}},
+		InfraProviders:            []InfraProvider{awsShapedStub()},
 		BootstrapSecretNameFormat: "%s-bootstrap",
 	}
 	return r, machine, join
@@ -556,35 +625,14 @@ func TestReconcile_MissingInfrastructureCRD_StringFallback_RequeuesGracefully(t 
 	}
 }
 
-// stubInfraProvider is a mock InfraProvider registered under a
-// distinct GVK, used to prove the reconciler's provider selection is
-// genuinely inferred from spec.infrastructureRef.kind rather than
-// only ever exercising the one AWS provider that happens to be
-// registered.
-type stubInfraProvider struct {
-	gvk             schema.GroupVersionKind
-	ready           bool
-	infraValues     map[string]any
-	infraValueCalls int
-}
-
-func (s *stubInfraProvider) GVK() schema.GroupVersionKind { return s.gvk }
-func (s *stubInfraProvider) Ready(ctx context.Context, machine *unstructured.Unstructured) (bool, error) {
-	return s.ready, nil
-}
-func (s *stubInfraProvider) InfraValues(ctx context.Context, machine *unstructured.Unstructured) (map[string]any, error) {
-	s.infraValueCalls++
-	return s.infraValues, nil
-}
-
 func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
 	// Two Machines referencing two different infrastructureRef kinds,
 	// two registered providers -- only the matching provider for each
 	// Machine may be consulted. This is the actual behavior "the
 	// operator should infer which concrete implementation it uses"
 	// depends on, not just a claim in a comment.
-	awsProvider := &stubInfraProvider{gvk: schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSMachine"}, ready: true, infraValues: map[string]any{}}
-	otherProvider := &stubInfraProvider{gvk: schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "OtherMachine"}, ready: true, infraValues: map[string]any{}}
+	awsProvider := awsShapedStub()
+	otherProvider := &stubInfraProvider{gvk: schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "OtherMachine"}, infraValues: map[string]any{}}
 
 	awsMachine := &unstructured.Unstructured{}
 	awsMachine.SetGroupVersionKind(awsProvider.GVK())
@@ -625,115 +673,26 @@ func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
 		NodeVIP4Prefix:            "10.101.0.",
 		NodeVIP6Prefix:            "fd8f:cf26:522a::",
 		NodeVIPStart:              4,
-		WireGuardAddress:          "10.100.0.2/24",
+		WireGuardAddress:          "10.100.0.128/24",
 		DialerPeerSecretNamespace: "wg-dialer",
 		DialerPeerSecretName:      "wg-dialer-peer",
+		DialerBinaryURLARM64:      "https://example.com/wg-dialer-linux-arm64",
+		DialerBinarySHA256ARM64:   "deadbeef",
 		BootstrapSecretNameFormat: "%s-bootstrap",
 	}
 
 	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machineA)}); err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}
-	// Reconcile doesn't gate bootstrap-secret creation on Ready() (see
-	// reconciler.go: waiting for "instance running" before creating the
-	// boot data it needs to run would deadlock), so InfraValues is the
-	// observable proof of which provider got consulted instead.
+	// Reconcile doesn't gate bootstrap-secret creation on infra
+	// readiness (see reconciler.go: waiting for "instance running"
+	// before creating the boot data it needs to run would deadlock), so
+	// InfraValues is the observable proof of which provider got
+	// consulted instead.
 	if awsProvider.infraValueCalls != 1 {
 		t.Errorf("expected the AWSMachine-kind provider to be consulted exactly once, got %d calls", awsProvider.infraValueCalls)
 	}
 	if otherProvider.infraValueCalls != 0 {
 		t.Errorf("expected the OtherMachine-kind provider to NEVER be consulted for a Machine whose infrastructureRef.kind is AWSMachine, got %d calls", otherProvider.infraValueCalls)
-	}
-}
-
-func TestReconcile_InfraProviderValidateErrorBlocksBootstrapSecretCreation(t *testing.T) {
-	// Full Reconcile-level proof of the aws.Validator wiring, using the
-	// real aws.Provider (not a stub): reproduces the exact live bug
-	// caught against the hilton cluster (AWSClusterStaticIdentity's
-	// secretRef Secret in the wrong namespace) and confirms Reconcile
-	// surfaces it as an immediate error instead of proceeding to create
-	// a bootstrap secret that CAPA could never actually use.
-	clusterGVK := schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Cluster"}
-	awsClusterGVK := schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSCluster"}
-	awsClusterStaticIdentityGVK := schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSClusterStaticIdentity"}
-
-	machine := machineWithInfraRef("hilton-cloud-worker-jarvistam-0", "default", "hilton-cloud-worker-jarvistam-0")
-	machine.SetLabels(map[string]string{"cluster.x-k8s.io/cluster-name": "hilton-jarvistam"})
-	awsMachine := fakeAWSMachine("hilton-cloud-worker-jarvistam-0", "default", false)
-	awsMachine.SetLabels(map[string]string{"cluster.x-k8s.io/cluster-name": "hilton-jarvistam"})
-
-	cluster := &unstructured.Unstructured{}
-	cluster.SetGroupVersionKind(clusterGVK)
-	cluster.SetName("hilton-jarvistam")
-	cluster.SetNamespace("default")
-	_ = unstructured.SetNestedField(cluster.Object, "AWSCluster", "spec", "infrastructureRef", "kind")
-	_ = unstructured.SetNestedField(cluster.Object, "hilton-jarvistam", "spec", "infrastructureRef", "name")
-
-	awsCluster := &unstructured.Unstructured{}
-	awsCluster.SetGroupVersionKind(awsClusterGVK)
-	awsCluster.SetName("hilton-jarvistam")
-	awsCluster.SetNamespace("default")
-	_ = unstructured.SetNestedField(awsCluster.Object, "AWSClusterStaticIdentity", "spec", "identityRef", "kind")
-	_ = unstructured.SetNestedField(awsCluster.Object, "jarvistam-cloud-worker", "spec", "identityRef", "name")
-
-	identity := &unstructured.Unstructured{}
-	identity.SetGroupVersionKind(awsClusterStaticIdentityGVK)
-	identity.SetName("jarvistam-cloud-worker")
-	_ = unstructured.SetNestedField(identity.Object, "jarvistam-cloud-worker-credentials", "spec", "secretRef")
-
-	// The bug, reproduced: credentials Secret only in "default", never
-	// in "capa-system" (CAPA's actual manager namespace).
-	wrongNamespaceSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "jarvistam-cloud-worker-credentials", Namespace: "default"},
-	}
-
-	dialerSecret := dialerPeerSecretFixture()
-	join := &stubJoinProvider{values: map[string]any{"joinToken": "fake-token", "k0sVersion": "v1.36.2+k0s"}}
-
-	scheme := runtime.NewScheme()
-	if err := clientgoscheme.AddToScheme(scheme); err != nil {
-		t.Fatalf("adding clientgoscheme: %v", err)
-	}
-	scheme.AddKnownTypeWithName(machineGVK, &unstructured.Unstructured{})
-	scheme.AddKnownTypeWithName(machineListGVK(), &unstructured.UnstructuredList{})
-	scheme.AddKnownTypeWithName(joinaws.Provider{}.GVK(), &unstructured.Unstructured{})
-	scheme.AddKnownTypeWithName(clusterGVK, &unstructured.Unstructured{})
-	scheme.AddKnownTypeWithName(awsClusterGVK, &unstructured.Unstructured{})
-	scheme.AddKnownTypeWithName(awsClusterStaticIdentityGVK, &unstructured.Unstructured{})
-	c := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(machine, awsMachine, dialerSecret, cluster, awsCluster, identity, wrongNamespaceSecret).
-		Build()
-
-	tmplPath := filepath.Join(t.TempDir(), "test.tmpl")
-	if err := os.WriteFile(tmplPath, []byte("ok"), 0o644); err != nil {
-		t.Fatalf("writing test template: %v", err)
-	}
-
-	r := &Reconciler{
-		Client:                    c,
-		Reader:                    c,
-		Join:                      join,
-		InfraProviders:            []InfraProvider{joinaws.Provider{}},
-		TemplatePath:              tmplPath,
-		NodeVIP4Prefix:            "10.101.0.",
-		NodeVIP6Prefix:            "fd8f:cf26:522a::",
-		NodeVIPStart:              4,
-		DialerPeerSecretNamespace: "wg-dialer",
-		DialerPeerSecretName:      "wg-dialer-peer",
-		BootstrapSecretNameFormat: "%s-bootstrap",
-	}
-
-	_, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)})
-	if err == nil {
-		t.Fatal("expected Reconcile to surface the misplaced-identity-secret error, got nil")
-	}
-	if !strings.Contains(err.Error(), "capa-system") {
-		t.Errorf("error %q doesn't mention the correct namespace -- not actionable", err.Error())
-	}
-	if join.calls != 0 {
-		t.Errorf("JoinValues must not be called when infra validation fails, got %d calls", join.calls)
-	}
-	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "hilton-cloud-worker-jarvistam-0-bootstrap"}, &corev1.Secret{}); !apierrors.IsNotFound(err) {
-		t.Errorf("expected no bootstrap secret to be created when infra validation fails, Get returned: %v", err)
 	}
 }

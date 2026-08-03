@@ -1,0 +1,97 @@
+# ProvisionedNodeClaim: the ONE resource a user commits to get a cloud
+# node joined to the cluster over a WireGuard tunnel. The spec is
+# request-shaped and names no cloud -- which cloud fulfills it is the
+# registered provider abstraction's decision, routed through the CAPI
+# Cluster's infrastructureRef. Source of truth for the schema:
+# ../../controller/api/v1alpha1/types.go.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: provisionednodeclaims.cloud-provisioning.appmana.com
+spec:
+  group: cloud-provisioning.appmana.com
+  names:
+    kind: ProvisionedNodeClaim
+    listKind: ProvisionedNodeClaimList
+    plural: provisionednodeclaims
+    singular: provisionednodeclaim
+    shortNames:
+      - pnc
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Provider
+          type: string
+          jsonPath: .status.provider
+        - name: Instance-Type
+          type: string
+          jsonPath: .status.instanceType
+        - name: External-IP
+          type: string
+          jsonPath: .status.externalIP
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required: [requests]
+              properties:
+                requests:
+                  description: >-
+                    Pod-style resource requests (cpu, memory) the
+                    provisioned node must satisfy. The fulfilling
+                    provider resolves them to its smallest satisfying
+                    instance type.
+                  type: object
+                  additionalProperties:
+                    anyOf: [{type: integer}, {type: string}]
+                    x-kubernetes-int-or-string: true
+                arch:
+                  description: Node architecture. arm64 (default) or amd64.
+                  type: string
+                  enum: [arm64, amd64]
+                internetFacing:
+                  description: >-
+                    Internet-facing nodes register with the
+                    internet-facing taint and a public address; the
+                    public ingress data plane tolerates that taint.
+                    Defaults to true.
+                  type: boolean
+                tunnelEndpoints:
+                  description: >-
+                    Selects which topologically-local nodes terminate
+                    tunnels to this node. Empty selects every Linux
+                    worker; control-plane nodes are excluded unless
+                    explicitly selected.
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                clusterName:
+                  description: >-
+                    The CAPI Cluster this node joins. Optional when
+                    exactly one Cluster exists in the claim's
+                    namespace.
+                  type: string
+            status:
+              type: object
+              properties:
+                phase: {type: string}
+                provider: {type: string}
+                instanceType: {type: string}
+                machineName: {type: string}
+                externalIP: {type: string}
+                wireGuardAddress: {type: string}
+                tunnelInterface: {type: string}
+                message: {type: string}

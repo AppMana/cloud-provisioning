@@ -1,63 +1,209 @@
-# Watches core Cluster API Machine objects (cluster.x-k8s.io, not any
-# infrastructure-provider-specific type) and keeps wg-dialer-peer's
-# peer-endpoint key current from Machine.status.addresses. Source:
+# The cloud-provisioning operator (endpoint-controller binary): expands
+# ProvisionedNodeClaims into CAPI Machine pairs, renders each Machine's
+# tunnel-bootstrapping userdata, allocates tunnel addresses for
+# selected local nodes, provisions BOTH dialer DaemonSets itself, and
+# mirrors Machine external addresses into the peer Secret. Source:
 # ../../controller/.
 #
-# RBAC is split deliberately: cluster-wide read-only access to Machines
-# (they can live in any namespace CAPI is configured for), but write
-# access to Secrets is a Role scoped to the wg-dialer namespace alone --
-# this identity cannot touch a Secret anywhere else in the cluster.
+# The wg-dialer-peer Secret is CONTROLLER-MANAGED STATE, not user
+# input: dialer pods self-publish their public keys into it and the
+# controller allocates addresses. There is no key-prep step; do not
+# create or edit it by hand. The only user-supplied Secrets are the
+# AWS provider config (aws-provider-config), the image pull secret,
+# and CAPA's own credentials in capa-system.
+#
+# RBAC below is derived from the code's actual API calls, split
+# deliberately: cluster-wide access only for the types that genuinely
+# live cluster-wide (Machines, Clusters, provider machines, Nodes, the
+# claim CRD); Secret access is namespace-scoped Roles -- this identity
+# cannot touch Secrets outside wg-dialer except the two specific
+# kube-system objects the k0s join flow needs and read-only CAPA
+# preflight objects.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wg-dialer
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: wg-dialer-endpoint-controller
   namespace: wg-dialer
 ---
+# The dialer DaemonSets' identity (both on-prem and cloud pods): reads
+# the peer Secret, publishes the node's own public key into it, and
+# (cloud side) reads its machine's adoption Secret.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wg-dialer
+  namespace: wg-dialer
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: wg-dialer-endpoint-controller-read-machines
+  name: wg-dialer-endpoint-controller
 rules:
+  # Watch/annotate Machines (join + mesh reconcilers); the claim
+  # reconciler also creates them.
   - apiGroups: ["cluster.x-k8s.io"]
     resources: ["machines"]
+    verbs: ["get", "list", "watch", "create", "patch"]
+  # resolveCluster (claim reconciler).
+  - apiGroups: ["cluster.x-k8s.io"]
+    resources: ["clusters"]
+    verbs: ["get", "list"]
+  # Provider machine objects: read (join reconciler waits on
+  # existence), create (claim reconciler). CAPA cluster/identity
+  # objects: read-only preflight (aws.Provider.Validate).
+  - apiGroups: ["infrastructure.cluster.x-k8s.io"]
+    resources: ["awsmachines"]
+    verbs: ["get", "create"]
+  - apiGroups: ["infrastructure.cluster.x-k8s.io"]
+    resources: ["awsclusters", "awsclusterstaticidentities"]
+    verbs: ["get"]
+  # The claim CRD itself.
+  - apiGroups: ["cloud-provisioning.appmana.com"]
+    resources: ["provisionednodeclaims"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["cloud-provisioning.appmana.com"]
+    resources: ["provisionednodeclaims/status"]
+    verbs: ["update"]
+  # Tunnel-endpoint allocation watches Nodes (a new/relabeled node
+  # changes the mesh membership).
+  - apiGroups: [""]
+    resources: ["nodes"]
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: wg-dialer-endpoint-controller-read-machines
+  name: wg-dialer-endpoint-controller
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: wg-dialer-endpoint-controller-read-machines
+  name: wg-dialer-endpoint-controller
 subjects:
   - kind: ServiceAccount
     name: wg-dialer-endpoint-controller
     namespace: wg-dialer
 ---
+# Everything the controller does with Secrets and DaemonSets happens in
+# its own namespace: the peer Secret (get/patch), per-machine adoption
+# Secrets (get/create/patch), the AWS provider-config Secret (get), and
+# both dialer DaemonSets (get/create/update).
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: wg-dialer-endpoint-controller-patch-secret
+  name: wg-dialer-endpoint-controller
   namespace: wg-dialer
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
-    resourceNames: ["wg-dialer-peer"]
+    verbs: ["get", "create", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wg-dialer-endpoint-controller
+  namespace: wg-dialer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wg-dialer-endpoint-controller
+subjects:
+  - kind: ServiceAccount
+    name: wg-dialer-endpoint-controller
+    namespace: wg-dialer
+---
+# Bootstrap Secrets are created in whatever namespace the Machines live
+# in (they're owned by the Machines). Bind this in that namespace --
+# shown here for "default"; duplicate per Machine namespace if you use
+# another.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wg-dialer-endpoint-controller-bootstrap-secrets
+  namespace: default
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wg-dialer-endpoint-controller-bootstrap-secrets
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wg-dialer-endpoint-controller-bootstrap-secrets
+subjects:
+  - kind: ServiceAccount
+    name: wg-dialer-endpoint-controller
+    namespace: wg-dialer
+---
+# The k0s join flow (pkg/join/k0s): mints a bootstrap-token Secret in
+# kube-system, reads kube-root-ca.crt, and lists one Node to discover
+# the k0s version.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wg-dialer-endpoint-controller-join
+  namespace: kube-system
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["kube-root-ca.crt"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wg-dialer-endpoint-controller-join
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wg-dialer-endpoint-controller-join
+subjects:
+  - kind: ServiceAccount
+    name: wg-dialer-endpoint-controller
+    namespace: wg-dialer
+---
+# The dialer pods' own access: the peer Secret (read the mesh state,
+# merge-patch their self-published public key) and, on the cloud node,
+# the per-machine adoption Secret (read-only; its name is derived from
+# /etc/wg-dialer/machine-name, so this cannot be resourceName-scoped).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wg-dialer
+  namespace: wg-dialer
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
     verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: wg-dialer-endpoint-controller-patch-secret
+  name: wg-dialer
   namespace: wg-dialer
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: wg-dialer-endpoint-controller-patch-secret
+  name: wg-dialer
 subjects:
   - kind: ServiceAccount
-    name: wg-dialer-endpoint-controller
+    name: wg-dialer
     namespace: wg-dialer
 ---
 # Only needed if --gateway-name is set (a Gateway pinned to one node via
@@ -67,31 +213,19 @@ subjects:
 # the target-annotation override is read from the parent Gateway object,
 # never from the route. Grant this in whatever namespace/name the
 # actual Gateway lives in -- omit entirely if the flag is unused.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: wg-dialer-endpoint-controller-patch-gateway
-  namespace: <gateway-namespace>
-rules:
-  - apiGroups: ["gateway.networking.k8s.io"]
-    resources: ["gateways"]
-    resourceNames: ["<gateway-name>"]
-    verbs: ["get", "patch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: wg-dialer-endpoint-controller-patch-gateway
-  namespace: <gateway-namespace>
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: wg-dialer-endpoint-controller-patch-gateway
-subjects:
-  - kind: ServiceAccount
-    name: wg-dialer-endpoint-controller
-    namespace: wg-dialer
----
+#
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: Role
+# metadata:
+#   name: wg-dialer-endpoint-controller-patch-gateway
+#   namespace: <gateway-namespace>
+# rules:
+#   - apiGroups: ["gateway.networking.k8s.io"]
+#     resources: ["gateways"]
+#     resourceNames: ["<gateway-name>"]
+#     verbs: ["get", "patch"]
+# ---
+# (plus a RoleBinding to wg-dialer-endpoint-controller)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -108,20 +242,37 @@ spec:
         app: wg-dialer-endpoint-controller
     spec:
       serviceAccountName: wg-dialer-endpoint-controller
+      imagePullSecrets:
+        - name: ghcr-pull
       containers:
         - name: controller
-          image: <wg-dialer-endpoint-controller-image>
+          # Pin by digest. There is no default image anywhere in the
+          # binary -- a stale built-in default once pointed at a
+          # pre-hardening build.
+          image: <wg-dialer-endpoint-controller-image>@<digest>
           args:
-            - --machine-selector=cloud-provisioning.appmana.com/role=cloud-worker
-            - --secret-namespace=wg-dialer
-            - --secret-name=wg-dialer-peer
-            - --secret-key=peer-endpoint
-            - --port=51820
+            # Required -- the binary exits immediately if any is unset.
+            - --dialer-image=<wg-dialer-dialer-image>@<digest>
+            - --dialer-pod-cidrs=<pod-cidr-v4>,<pod-cidr-v6>
+            - --dialer-service-cidrs=<service-cidr-v4>,<service-cidr-v6>
+            - --join-api-address=https://<api-address>:6443
+            - --join-api-vip=<api-vip>
+            - --join-node-vip4-prefix=<e.g. 10.101.0.>
+            - --join-dialer-binary-url-arm64=<release binary URL>
+            - --join-dialer-binary-sha256-arm64=<sha256>
+            # Placement: which local nodes terminate tunnels. Empty =
+            # every Linux worker; control planes are excluded unless
+            # this selector names node-role.kubernetes.io/control-plane
+            # explicitly. A single-node rehearsal is just
+            # kubernetes.io/hostname=<node>.
+            # - --tunnel-endpoints=kubernetes.io/hostname=<node>
+            # - --join-node-vip6-prefix=<e.g. fd8f:cf26:522a::>
+            # - --join-node-vip-start=200
             # - --gateway-namespace=<gateway-namespace>
             # - --gateway-name=<gateway-name>
           resources:
             requests:
               cpu: 10m
-              memory: 32Mi
-            limits:
               memory: 64Mi
+            limits:
+              memory: 128Mi

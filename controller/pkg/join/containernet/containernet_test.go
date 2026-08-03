@@ -28,31 +28,31 @@ func fakeContainernetMachine(name string) *unstructured.Unstructured {
 	return m
 }
 
-func TestReady_NonexistentContainer_ReturnsFalseNotError(t *testing.T) {
+func TestRunning_NonexistentContainer_ReturnsFalseNotError(t *testing.T) {
 	requireDocker(t)
 	machine := fakeContainernetMachine("join-test-definitely-does-not-exist-abc123")
 
-	ready, err := Provider{}.Ready(context.Background(), machine)
+	ready, err := Provider{}.Running(context.Background(), machine)
 	if err != nil {
-		t.Fatalf("Ready on a nonexistent container must report \"not ready\", not an error: %v", err)
+		t.Fatalf("Running on a nonexistent container must report \"not ready\", not an error: %v", err)
 	}
 	if ready {
-		t.Error("Ready = true for a container that was never created")
+		t.Error("Running = true for a container that was never created")
 	}
 }
 
-func TestCreateMachine_ThenReady_ReflectsRealContainerState(t *testing.T) {
+func TestCreateMachine_ThenRunning_ReflectsRealContainerState(t *testing.T) {
 	requireDocker(t)
 	ctx := context.Background()
 	const name = "join-test-containernet-machine"
 	const image = "alpine:3.20"
 
-	// Red: before creation, Ready must be false -- proves the green
+	// Red: before creation, Running must be false -- proves the green
 	// result below reflects CreateMachine's real effect, not a stub
 	// that always returns true.
 	machine := fakeContainernetMachine(name)
-	if ready, err := (Provider{}).Ready(ctx, machine); err != nil || ready {
-		t.Fatalf("precondition failed: Ready() = (%v, %v) before CreateMachine, want (false, nil)", ready, err)
+	if ready, err := (Provider{}).Running(ctx, machine); err != nil || ready {
+		t.Fatalf("precondition failed: Running() = (%v, %v) before CreateMachine, want (false, nil)", ready, err)
 	}
 
 	if err := CreateMachine(ctx, name, image); err != nil {
@@ -65,12 +65,12 @@ func TestCreateMachine_ThenReady_ReflectsRealContainerState(t *testing.T) {
 	})
 
 	// Green: a real container is now actually running.
-	ready, err := Provider{}.Ready(ctx, machine)
+	ready, err := Provider{}.Running(ctx, machine)
 	if err != nil {
-		t.Fatalf("Ready: %v", err)
+		t.Fatalf("Running: %v", err)
 	}
 	if !ready {
-		t.Error("Ready = false after CreateMachine succeeded -- container should be running")
+		t.Error("Running = false after CreateMachine succeeded -- container should be running")
 	}
 
 	values, err := Provider{}.InfraValues(ctx, machine)
@@ -82,7 +82,7 @@ func TestCreateMachine_ThenReady_ReflectsRealContainerState(t *testing.T) {
 	}
 }
 
-func TestReady_UsesContainerNameAnnotationWhenPresent(t *testing.T) {
+func TestRunning_UsesContainerNameAnnotationWhenPresent(t *testing.T) {
 	requireDocker(t)
 	ctx := context.Background()
 	const containerName = "join-test-annotated-container-name"
@@ -100,16 +100,16 @@ func TestReady_UsesContainerNameAnnotationWhenPresent(t *testing.T) {
 		}
 	})
 
-	ready, err := Provider{}.Ready(ctx, machine)
+	ready, err := Provider{}.Running(ctx, machine)
 	if err != nil {
-		t.Fatalf("Ready: %v", err)
+		t.Fatalf("Running: %v", err)
 	}
 	if !ready {
-		t.Error("Ready = false despite the annotated container genuinely running -- container-name annotation isn't being honored")
+		t.Error("Running = false despite the annotated container genuinely running -- container-name annotation isn't being honored")
 	}
 }
 
-func TestDestroyMachine_ThenReady_ReturnsFalseAgain(t *testing.T) {
+func TestDestroyMachine_ThenRunning_ReturnsFalseAgain(t *testing.T) {
 	requireDocker(t)
 	ctx := context.Background()
 	const name = "join-test-destroy-then-ready"
@@ -119,19 +119,19 @@ func TestDestroyMachine_ThenReady_ReturnsFalseAgain(t *testing.T) {
 		t.Fatalf("CreateMachine: %v", err)
 	}
 	machine := fakeContainernetMachine(name)
-	if ready, err := (Provider{}).Ready(ctx, machine); err != nil || !ready {
-		t.Fatalf("precondition failed: Ready() = (%v, %v) right after CreateMachine, want (true, nil)", ready, err)
+	if ready, err := (Provider{}).Running(ctx, machine); err != nil || !ready {
+		t.Fatalf("precondition failed: Running() = (%v, %v) right after CreateMachine, want (true, nil)", ready, err)
 	}
 
 	if err := DestroyMachine(ctx, name); err != nil {
 		t.Fatalf("DestroyMachine: %v", err)
 	}
 
-	ready, err := Provider{}.Ready(ctx, machine)
+	ready, err := Provider{}.Running(ctx, machine)
 	if err != nil {
-		t.Fatalf("Ready: %v", err)
+		t.Fatalf("Running: %v", err)
 	}
 	if ready {
-		t.Error("Ready = true after DestroyMachine -- the container should be gone")
+		t.Error("Running = true after DestroyMachine -- the container should be gone")
 	}
 }

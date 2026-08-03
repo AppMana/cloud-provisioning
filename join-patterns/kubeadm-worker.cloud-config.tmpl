@@ -1,0 +1,74 @@
+#cloud-config
+ssh_authorized_keys:
+{{- range .sshAuthorizedKeys }}
+  - {{ . }}
+{{- end }}
+# kubeadm-worker join pattern: download the pinned dialer binary, bring
+# up the WireGuard tunnel, gate on the cluster's API VIP becoming
+# reachable through it, then join as a plain kubeadm worker using a
+# pre-minted bootstrap token + CA-hash pin. Set directly as
+# Machine.spec.bootstrap.dataSecretName content -- no bootstrap
+# provider. kubeadm is one join specialization (kind's control plane is
+# kubeadm); k0s-worker.cloud-config.tmpl is another, same contract.
+write_files:
+  # Same hardened dialer, same separation of concerns as the k0s
+  # pattern: pod/service CIDRs only ever enter WireGuard's cryptokey
+  # accept-list; kernel routes are /32-/128 host routes to peer nodes,
+  # enforced at parse time. This file is the BOOTSTRAP snapshot; the
+  # wg-dialer-cloud DaemonSet supplies the live peer list post-join
+  # (--machine-name-file resolves this machine's adoption Secret).
+  - path: /etc/wg-dialer/peers.json
+    permissions: '0600'
+    content: |
+      {{ .peersFileJSON }}
+  - path: /etc/wg-dialer/machine-name
+    permissions: '0644'
+    content: |
+      {{ .machineName }}
+  - path: /etc/systemd/system/wg-dialer.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=wg-dialer (listener role)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      ExecStart=/usr/local/bin/wg-dialer \
+        --iface={{ .interfaceName }} \
+        --peers-file=/etc/wg-dialer/peers.json \
+        --listen-port={{ .wireguardListenPort }} \
+        --pod-cidrs={{ .podCIDRs }} \
+        --service-cidrs={{ .serviceCIDRs }} \
+        --keepalive-seconds=15 \
+        --mtu=1420 \
+        --poll-interval=30s
+      Restart=always
+      AmbientCapabilities=CAP_NET_ADMIN
+
+      [Install]
+      WantedBy=multi-user.target
+  # kubelet extra args (role label + internet-facing taint) via the
+  # standard systemd drop-in environment file kubeadm's kubelet unit
+  # already sources -- keeps the generic kubeletExtraArgs contract
+  # without translating it into JoinConfiguration structure.
+  - path: /etc/default/kubelet
+    permissions: '0644'
+    content: |
+      KUBELET_EXTRA_ARGS={{ .kubeletExtraArgs }}
+runcmd:
+  # Pinned-digest binary delivery, identical to the k0s pattern: a
+  # mismatch halts the join rather than running unverified code.
+  - |
+    set -e
+    curl -fsSL -o /usr/local/bin/wg-dialer '{{ .dialerBinaryURL }}'
+    echo '{{ .dialerBinarySHA256 }}  /usr/local/bin/wg-dialer' | sha256sum -c -
+    chmod 0755 /usr/local/bin/wg-dialer
+  - systemctl daemon-reload
+  - systemctl enable --now wg-dialer.service
+  - until ping -c1 -W2 {{ .apiVIP }} >/dev/null 2>&1; do sleep 2; done
+  - |
+    kubeadm join {{ .joinEndpoint }} \
+      --token {{ .joinToken }} \
+      --discovery-token-ca-cert-hash {{ .caCertHash }} \
+      --node-name "$(hostname)"

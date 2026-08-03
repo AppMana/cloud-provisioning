@@ -60,6 +60,16 @@ type Provider struct {
 	// release tag nor the release asset filename ever omit the
 	// trailing build-counter suffix.
 	GitHubReleasesAPI string
+
+	// ConfigNamespace/ConfigName point at this specialization's OWN
+	// optional cluster-level config Secret -- the same pattern every
+	// provider uses for its own knobs (aws.Provider's
+	// aws-provider-config), so k0s-specific configuration never leaks
+	// into the operator's generic surface. Recognized keys:
+	//
+	//	releases-api -- overrides GitHubReleasesAPI (hermetic e2e)
+	ConfigNamespace string
+	ConfigName      string
 }
 
 const defaultGitHubReleasesAPI = "https://api.github.com/repos/k0sproject/k0s/releases"
@@ -150,12 +160,19 @@ func (p *Provider) introspectK0sVersion(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("no nodes found to introspect k0s version from")
 	}
 	kubeletVersion := nodes.Items[0].Status.NodeInfo.KubeletVersion
-	return resolveK0sReleaseTag(ctx, p.githubReleasesAPI(), kubeletVersion)
+	return resolveK0sReleaseTag(ctx, p.githubReleasesAPI(ctx), kubeletVersion)
 }
 
-func (p *Provider) githubReleasesAPI() string {
+func (p *Provider) githubReleasesAPI(ctx context.Context) string {
 	if p.GitHubReleasesAPI != "" {
 		return p.GitHubReleasesAPI
+	}
+	if p.ConfigName != "" {
+		if cfg, err := p.Client.CoreV1().Secrets(p.ConfigNamespace).Get(ctx, p.ConfigName, metav1.GetOptions{}); err == nil {
+			if v := strings.TrimSpace(string(cfg.Data["releases-api"])); v != "" {
+				return v
+			}
+		}
 	}
 	return defaultGitHubReleasesAPI
 }

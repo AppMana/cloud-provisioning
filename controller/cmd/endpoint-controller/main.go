@@ -677,7 +677,6 @@ func main() {
 		joinKubeletExtraArgs      string
 		joinSSHAuthorizedKeys     string
 		joinTokenTTL              time.Duration
-		k0sReleasesAPI            string
 		wireGuardAddress          string
 		wireGuardListenPort       string
 		localAddressBase          string
@@ -728,7 +727,6 @@ func main() {
 		"extra kubelet args applied to every joining cloud-worker node -- defaults derived from the same constants the DaemonSet toleration and --machine-selector default use, so they can't drift")
 	flag.StringVar(&joinSSHAuthorizedKeys, "join-ssh-authorized-keys", "", "comma-separated SSH public keys to authorize on every new node")
 	flag.DurationVar(&joinTokenTTL, "join-token-ttl", 2*time.Hour, "validity window for a minted join token")
-	flag.StringVar(&k0sReleasesAPI, "join-k0s-releases-api", "", "override for k0s's GitHub releases API base URL (default: the real api.github.com endpoint) -- lets a hermetic e2e resolve release tags without internet access")
 	flag.StringVar(&wireGuardAddress, "join-wireguard-address", "10.100.0.128/24", "base WireGuard tunnel address for REMOTE (cloud) nodes; each gets the next free address in this subnet")
 	flag.StringVar(&localAddressBase, "tunnel-local-address-base", "10.100.0.1/24", "base WireGuard tunnel address for LOCAL tunnel-endpoint nodes; each selected node gets the next free address in this subnet")
 	flag.StringVar(&wireGuardListenPort, "join-wireguard-listen-port", "51820", "WireGuard listen port on the remote side")
@@ -861,9 +859,17 @@ func main() {
 		awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName}
 
 		joinReconciler := &join.Reconciler{
-			Client:         mgr.GetClient(),
-			Reader:         mgr.GetAPIReader(),
-			Join:           &joink0s.Provider{Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL, GitHubReleasesAPI: k0sReleasesAPI},
+			Client: mgr.GetClient(),
+			Reader: mgr.GetAPIReader(),
+			// k0s is one SPECIALIZATION of join.ClusterJoinProvider --
+			// another cluster technology is another implementation
+			// wired here, nothing else changes. Its own knobs live in
+			// its own provider-config Secret (same pattern as the AWS
+			// infra provider), never in this binary's generic flags.
+			Join: &joink0s.Provider{
+				Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL,
+				ConfigNamespace: secretNamespace, ConfigName: "k0s-provider-config",
+			},
 			InfraProviders: []join.InfraProvider{awsProvider},
 
 			TemplatePath:      joinTemplatePath,

@@ -102,6 +102,10 @@ echo "--- fake k0s releases API (kind's kubelet has no +k0s suffix a real lookup
 KUBELET_VERSION=$(kubectl get node "$WORKER" -o jsonpath='{.status.nodeInfo.kubeletVersion}')
 KUBELET_VERSION="$KUBELET_VERSION" python3 ./fake-k0s-releases.py "$RELEASES_PORT" &
 RELEASES_PID=$!
+# The k0s SPECIALIZATION's own knob, in its own provider-config Secret
+# (the same pattern as aws-provider-config) -- never an operator flag.
+kubectl -n wg-dialer create secret generic k0s-provider-config \
+  --from-literal=releases-api="http://127.0.0.1:$RELEASES_PORT" >/dev/null
 
 echo "--- run the controller (out of cluster, against kind) ---"
 DIALER_IMAGE="ghcr.io/appmana/cloud-provisioning-dialer:test@sha256:0000000000000000000000000000000000000000000000000000000000000000"
@@ -119,7 +123,6 @@ BIN_SHA="1111111111111111111111111111111111111111111111111111111111111111"
   --join-node-vip-start=200 \
   --join-dialer-binary-url-arm64="$BIN_URL" \
   --join-dialer-binary-sha256-arm64="$BIN_SHA" \
-  --join-k0s-releases-api="http://127.0.0.1:$RELEASES_PORT" \
   >"$LOG_DIR/controller.log" 2>&1 &
 CONTROLLER_PID=$!
 

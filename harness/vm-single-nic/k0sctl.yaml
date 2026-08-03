@@ -10,6 +10,14 @@ spec:
         port: 22
         keyPath: cfg/ssh/harness_key
       role: controller+worker
+      # Every guest boots as "ubuntu" with the same slirp-NAT address
+      # (10.0.0.15) -- k0sctl >= 0.32 validates hostname/privateAddress
+      # uniqueness, so both are set explicitly. The mgmt IPs are pinned
+      # in topo.clab.yml. (Only 22/6443/51820 are forwarded into the
+      # guests, so apiserver->kubelet connections are dead -- the same
+      # documented limitation the real topology accepts.)
+      hostname: onprem
+      privateAddress: 172.31.41.2
       noTaints: true
       installFlags:
         - --disable-components=konnectivity-server,metrics-server
@@ -34,6 +42,8 @@ spec:
         port: 22
         keyPath: cfg/ssh/harness_key
       role: worker
+      hostname: cloud
+      privateAddress: 172.31.41.3
       installFlags:
         - --kubelet-extra-args=--node-labels=cloud-provisioning.appmana.com/role=cloud-worker --register-with-taints=cloud-provisioning.appmana.com/internet-facing:NoSchedule
   k0s:

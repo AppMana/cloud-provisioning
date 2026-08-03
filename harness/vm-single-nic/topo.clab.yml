@@ -10,6 +10,10 @@ topology:
     onprem:
       kind: linux
       image: vrnetlab/canonical_ubuntu:jammy
+      # Pinned: containerlab otherwise assigns mgmt IPs by deploy
+      # order, which is not stable across runs -- and k0sctl.yaml plus
+      # the driver script address nodes by these exact IPs.
+      mgmt-ipv4: 172.31.41.2
       binds:
         - cfg/onprem-setup.sh:/extra-setup.sh:ro
       env:
@@ -42,6 +46,7 @@ topology:
     cloud:
       kind: linux
       image: vrnetlab/canonical_ubuntu:jammy
+      mgmt-ipv4: 172.31.41.3
       binds:
         - cfg/cloud-setup.sh:/extra-setup.sh:ro
       env:

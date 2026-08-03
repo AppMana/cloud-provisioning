@@ -281,7 +281,16 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 	secret := &corev1.Secret{}
 	secretKey := types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}
 	if err := r.reader.Get(ctx, secretKey, secret); err != nil {
-		return fmt.Errorf("getting secret %s: %w", secretKey, err)
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("getting secret %s: %w", secretKey, err)
+		}
+		// The peer Secret is controller-managed state -- nothing else
+		// should have to create it (no manual steps, no gitops-authored
+		// Secret for a controller-owned object).
+		secret = &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: r.secretNamespace, Name: r.secretName}}
+		if err := r.Create(ctx, secret); err != nil {
+			return fmt.Errorf("creating peer secret %s: %w", secretKey, err)
+		}
 	}
 	patch := client.MergeFrom(secret.DeepCopy())
 	if secret.Data == nil {
@@ -668,6 +677,7 @@ func main() {
 		joinKubeletExtraArgs      string
 		joinSSHAuthorizedKeys     string
 		joinTokenTTL              time.Duration
+		k0sReleasesAPI            string
 		wireGuardAddress          string
 		wireGuardListenPort       string
 		localAddressBase          string
@@ -718,6 +728,7 @@ func main() {
 		"extra kubelet args applied to every joining cloud-worker node -- defaults derived from the same constants the DaemonSet toleration and --machine-selector default use, so they can't drift")
 	flag.StringVar(&joinSSHAuthorizedKeys, "join-ssh-authorized-keys", "", "comma-separated SSH public keys to authorize on every new node")
 	flag.DurationVar(&joinTokenTTL, "join-token-ttl", 2*time.Hour, "validity window for a minted join token")
+	flag.StringVar(&k0sReleasesAPI, "join-k0s-releases-api", "", "override for k0s's GitHub releases API base URL (default: the real api.github.com endpoint) -- lets a hermetic e2e resolve release tags without internet access")
 	flag.StringVar(&wireGuardAddress, "join-wireguard-address", "10.100.0.128/24", "base WireGuard tunnel address for REMOTE (cloud) nodes; each gets the next free address in this subnet")
 	flag.StringVar(&localAddressBase, "tunnel-local-address-base", "10.100.0.1/24", "base WireGuard tunnel address for LOCAL tunnel-endpoint nodes; each selected node gets the next free address in this subnet")
 	flag.StringVar(&wireGuardListenPort, "join-wireguard-listen-port", "51820", "WireGuard listen port on the remote side")
@@ -852,7 +863,7 @@ func main() {
 		joinReconciler := &join.Reconciler{
 			Client:         mgr.GetClient(),
 			Reader:         mgr.GetAPIReader(),
-			Join:           &joink0s.Provider{Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL},
+			Join:           &joink0s.Provider{Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL, GitHubReleasesAPI: k0sReleasesAPI},
 			InfraProviders: []join.InfraProvider{awsProvider},
 
 			TemplatePath:      joinTemplatePath,

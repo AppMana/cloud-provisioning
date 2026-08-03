@@ -1,8 +1,8 @@
-// Package render is the shared join-pattern templating logic, used by
-// both the render-join-data CLI (a human rendering a values file by
-// hand) and the bootstrap-provisioning reconciler (rendering
-// programmatically-assembled values) -- one implementation, not two
-// copies that could drift.
+// Package render is the join-pattern templating logic used by the
+// bootstrap-provisioning reconciler. (The render-join-data CLI that
+// once shared it -- a human rendering a values file by hand -- was an
+// ad-hoc provisioning path and is gone: every render now flows through
+// the reconciler.)
 package render
 
 import (

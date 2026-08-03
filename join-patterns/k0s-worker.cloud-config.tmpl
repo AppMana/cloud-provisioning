@@ -3,42 +3,45 @@ ssh_authorized_keys:
 {{- range .sshAuthorizedKeys }}
   - {{ . }}
 {{- end }}
-# k0s-worker join pattern: bring up the WireGuard tunnel, gate on the
-# cluster's API VIP becoming reachable through it, then join as a plain
-# k0s worker using a pre-minted join token. This is CAPA's own
+# k0s-worker join pattern: download the pinned dialer binary, bring up
+# the WireGuard tunnel, gate on the cluster's API VIP becoming
+# reachable through it, then join as a plain k0s worker using a
+# pre-minted join token. This is CAPA's own
 # Machine.spec.bootstrap.dataSecretName content -- no bootstrap
 # provider involved. That's deliberate, not a shortcut: a bootstrap
 # provider's whole value is generating this content FOR you from a
 # CAPI-managed control plane, and there isn't one here (see
-# ../README.md's "Why no k0smotron" section). Every value below comes
-# from the render tool's input, not from any control-plane object.
+# ../README.md). Every value below comes from the join reconciler's
+# render, not from any control-plane object.
 write_files:
   # Not wg0.conf/wg-quick: wg-quick auto-installs a kernel route for
-  # every AllowedIPs entry with no isolation at all -- the exact
-  # unmitigated version of the incident that hit the on-prem side
-  # (the on-prem host) before its own dialer got a route-table-isolation fix. The
-  # same hardened Go dialer binary runs here instead (as a systemd
-  # unit, listener role -- see wg-dialer.service below), inheriting
-  # that isolation directly rather than reimplementing it. This file
-  # never needs new PEERS added later: once this node has even one live
-  # WireGuard relationship to any on-prem node, Calico's own BGP mesh
-  # propagates routes to the rest of the on-prem cluster through that
-  # one peer as a transit path, so a new on-prem node joining later
-  # doesn't require this file to change. localAddress (this node's own
-  # tunnel address) travels in this file too, not a flag -- see
-  # cmd/dialer/main.go's peersFileDoc doc comment for why.
+  # every AllowedIPs entry -- the exact mechanism of the 2026-07-22
+  # route-hijack incident. The same hardened Go dialer binary that runs
+  # on-prem runs here instead (listener role, systemd unit below): pod/
+  # service CIDRs go only into WireGuard's cryptokey accept-list, and
+  # the only kernel routes it will ever install are /32 and /128 host
+  # routes to peer node addresses, enforced at parse time.
   #
-  # This file is also read by a second, later-arriving consumer:
-  # once this node joins as a real k8s worker, endpoint-controller's
-  # ensureCloudDialerDaemonSet schedules a containerized copy of the
-  # same dialer binary onto it (hostPath-mounting this same file
-  # read-only) -- see that function's doc comment for why both this
-  # systemd unit and that DaemonSet run forever, redundantly, rather
-  # than one handing off to the other.
+  # This file is the BOOTSTRAP snapshot: identity (this node's private
+  # key + tunnel address, which never travel through the API) plus the
+  # peer list as of render time. Post-join, the wg-dialer-cloud
+  # DaemonSet feeds the same dialer a live peer list from an in-cluster
+  # Secret (--machine-name-file below resolves which one) -- that
+  # adoption path, not this frozen file, is how peer/CIDR corrections
+  # reach a node whose userdata is immutable. The systemd unit is never
+  # disabled: if the DaemonSet can't schedule, this file remains the
+  # floor that keeps the node reachable.
   - path: /etc/wg-dialer/peers.json
     permissions: '0600'
     content: |
       {{ .peersFileJSON }}
+  # The CAPI Machine name, for the adoption path: the DaemonSet's one
+  # shared pod spec derives this machine's own adoption Secret name
+  # from this node-local file.
+  - path: /etc/wg-dialer/machine-name
+    permissions: '0644'
+    content: |
+      {{ .machineName }}
   - path: /etc/systemd/system/wg-dialer.service
     permissions: '0644'
     content: |
@@ -49,7 +52,7 @@ write_files:
 
       [Service]
       ExecStart=/usr/local/bin/wg-dialer \
-        --iface=wg0 \
+        --iface={{ .interfaceName }} \
         --peers-file=/etc/wg-dialer/peers.json \
         --listen-port={{ .wireguardListenPort }} \
         --pod-cidrs={{ .podCIDRs }} \
@@ -67,22 +70,25 @@ write_files:
     content: |
       {{ .joinToken }}
 runcmd:
-  # /usr/local/bin/wg-dialer is expected to already be present in the
-  # image this cloud-init runs against (baked in at image-build time,
-  # the same binary the on-prem DaemonSet's hostPath mount uses) -- no
-  # apt install of wireguard-tools needed anymore; this binary talks
-  # to the kernel's WireGuard interface directly via netlink/wgctrl,
-  # same as the on-prem side always has.
+  # A stock cloud image has no wg-dialer: download the per-arch release
+  # binary and verify its digest BEFORE anything depends on it. The
+  # sha256 is pinned into this (immutable) userdata at render time, so
+  # a compromised download host cannot swap the binary -- a mismatch
+  # halts the join rather than running unverified code.
+  - |
+    set -e
+    curl -fsSL -o /usr/local/bin/wg-dialer '{{ .dialerBinaryURL }}'
+    echo '{{ .dialerBinarySHA256 }}  /usr/local/bin/wg-dialer' | sha256sum -c -
+    chmod 0755 /usr/local/bin/wg-dialer
   - systemctl enable --now wg-dialer.service
   - until ping -c1 -W2 {{ .apiVIP }} >/dev/null 2>&1; do sleep 2; done
   # Calico's IP_AUTODETECTION_METHOD/IP6_AUTODETECTION_METHOD on this
   # cluster are cidr= matches (see the cluster's calico-node DaemonSet
   # env), the same convention every on-prem node satisfies with a dummy
-  # vip0 interface (confirmed via `ip -br addr show vip0` on the on-prem host:
-  # 10.101.0.1/32 + fd8f:cf26:522a::1/128). Without an address in those
-  # CIDRs on some interface, calico-node fails to start at all
-  # ("failed to autodetect an IPv4 address") -- this isn't optional,
-  # it's the same mechanism every other node already relies on.
+  # vip0 interface. Without an address in those CIDRs on some
+  # interface, calico-node fails to start at all ("failed to
+  # autodetect an IPv4 address") -- this isn't optional, it's the same
+  # mechanism every other node already relies on.
   - ip link add vip0 type dummy
   - ip addr add {{ .nodeVIP4 }}/32 dev vip0
   - ip addr add {{ .nodeVIP6 }}/128 dev vip0

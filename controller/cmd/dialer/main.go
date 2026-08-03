@@ -1,195 +1,167 @@
-// Command wg-dialer runs on every cluster node (DaemonSet, hostNetwork,
-// NET_ADMIN) and keeps wg0 dialed out to one or more remote peers. It
-// replaces what was previously a shell script wrapping `ip`/`wg` CLI
-// invocations with direct netlink/wgctrl calls -- one binary, no
-// shelling out, and no dependence on whatever AppArmor profile the
-// node ships for /usr/bin/wg (see harness/aws-bringup/README.md for
-// why that mattered).
+// Command wg-dialer runs on tunnel-endpoint nodes (DaemonSet,
+// hostNetwork, NET_ADMIN, or a systemd unit on a freshly-booted cloud
+// node) and keeps one WireGuard interface configured against the
+// current peer set. It talks netlink/wgctrl directly -- no shelling
+// out, no wg-quick, no dependence on the node's AppArmor profile for
+// /usr/bin/wg.
 //
-// It re-applies configuration on a plain poll loop rather than watching
-// the Secret: the peer list changes at most a few times in a node's
-// lifetime, so an informer/watch would be pure ceremony for no
-// responsiveness that matters. `wg set`-equivalent application is
-// idempotent, so polling costs nothing when nothing changed.
+// Separation of concerns (the invariant the 2026-07-22 the on-prem host incident
+// bought): this binary provides NODE-to-NODE reachability only.
 //
-// Two genuinely separate mechanisms, not one flag:
+//   - WireGuard's cryptokey-routing accept list
+//     (wgtypes.PeerConfig.AllowedIPs) decides which peer's key
+//     encrypts/decrypts a packet, matched against the packet's inner
+//     destination (wg_allowedips_lookup_dst, allowedips.c, reads
+//     ip_hdr(skb)->daddr and ignores kernel routing entirely). It must
+//     include the cluster's pod/service CIDRs (--pod-cidrs/
+//     --service-cidrs) or WireGuard silently drops Calico-routed
+//     traffic. It is a packet FILTER, never a route source.
+//   - Kernel routes: one host route (/32 or /128, enforced at parse
+//     time -- anything broader is a hard error, not a warning) per
+//     peer route-host, installed in the MAIN table. Longest-prefix
+//     match is the whole mechanism: a /32 to a peer's tunnel address
+//     or node VIP wins over a LAN /24 or a VPC default route for
+//     exactly that one host and nothing else. Routing to PODS is
+//     Calico's concern -- bird learns pod blocks over BGP sessions
+//     that ride these node routes; this binary never installs a
+//     pod/service-CIDR route.
 //
-//   - WireGuard's own cryptokey-routing "allow" list (a real WireGuard
-//     concept, wgtypes.PeerConfig.AllowedIPs) decides which peer's key
-//     encrypts/decrypts a packet, matched against the packet's actual
-//     destination address -- confirmed by reading the Linux WireGuard
-//     kernel module source (wg_allowedips_lookup_dst, allowedips.c):
-//     it looks at ip_hdr(skb)->daddr directly and discards the kernel
-//     routing dst/gateway entirely. This must include the cluster's
-//     real pod-CIDR/service-CIDR ranges (via --pod-cidrs/--service-cidrs)
-//     or WireGuard silently drops legitimate Calico-routed traffic --
-//     it has nothing to do with kernel routing.
-//   - An actual kernel route (netlink.RouteReplace) is needed for
-//     exactly one thing: making a peer's own tunnel address reachable
-//     via wg0, since Calico/BIRD assumes ordinary L3 reachability to
-//     its BGP next-hop already exists and cannot itself dial through a
-//     NAT the way this binary does. This is always a single narrow
-//     host route per peer, installed into an isolated routing table
-//     (wgDialerRouteTable) never the main table -- a structural guard,
-//     not a configuration convention, against a misconfigured peer
-//     list ever being able to replace the host's own default route
-//     the way a single conflated `--allowed-ips=0.0.0.0/0` once did
-//     (real incident, the on-prem host, see the isolation-table comment below).
+// There is deliberately no policy-routing table here anymore. The
+// previous design put peer routes in a dedicated table behind an
+// after-main FIB rule -- which made them structurally unreachable on
+// any host with a default route (main matches everything first), i.e.
+// the "isolation" was actually "dead code". Safety does not come from
+// table placement; it comes from the host-prefix-only rule above.
 package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	"github.com/google/nftables"
+	"github.com/google/nftables/expr"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
-// wgDialerRouteTable is a dedicated routing table for this dialer's
-// own peer-host routes -- never the main table (254). See the comment
-// at its call site (installRoutes) for why: it's a structural guard
-// against a misconfigured peer list ever being able to replace the
-// host's own default route again, not just a tidiness choice.
-const wgDialerRouteTable = 52820
-
-// wgDialerRulePriority is deliberately a HIGHER number (lower
-// priority) than the main table's own rule (priority 32766, standard
-// on every Linux system). Linux evaluates FIB rules in ascending
-// priority order and stops at the first rule whose table has a
-// matching route -- placing this rule after "main" means
-// wgDialerRouteTable is only ever consulted when the main table has
-// no route for a given destination at all, so it can never override
-// the main table's own default route or any other route a normal
-// admin/network setup already relies on.
-const wgDialerRulePriority = 32800
-
-// ensurePolicyRoutingRule adds the "look up wgDialerRouteTable, but
-// only after the main table" rule if it isn't already present.
-// Idempotent: safe to call every reconcile pass.
-func ensurePolicyRoutingRule() error {
-	existing, err := netlink.RuleList(netlink.FAMILY_ALL)
-	if err != nil {
-		return fmt.Errorf("listing existing rules: %w", err)
-	}
-	for _, r := range existing {
-		if r.Table == wgDialerRouteTable {
-			return nil
-		}
-	}
-	rule := netlink.NewRule()
-	rule.Table = wgDialerRouteTable
-	rule.Priority = wgDialerRulePriority
-	if err := netlink.RuleAdd(rule); err != nil {
-		return fmt.Errorf("adding rule for table %d at priority %d: %w", wgDialerRouteTable, wgDialerRulePriority, err)
-	}
-	return nil
-}
-
-// peerSpec is one WireGuard peer this dialer maintains. WGAllowedIPs
-// and RouteHost are deliberately separate fields, never derived from
-// each other -- see the package doc comment for why conflating them
-// was the actual root cause of the incident this binary now guards
-// against structurally.
-type peerSpec struct {
-	PublicKey string `json:"publicKey"`
-	// Endpoint is optional: if empty, this peer is never dialed --
-	// WireGuard passively waits for an incoming handshake instead. This
-	// is what lets the identical binary run in a listener role (e.g. on
-	// a cloud/EC2 node that only ever gets dialed, never dials out)
-	// with no code branch, just a different peer list.
-	Endpoint string `json:"endpoint,omitempty"`
-	// WGAllowedIPs is WireGuard's own cryptokey-routing accept list for
-	// this peer -- real CIDRs (cluster pod/service ranges plus this
-	// peer's own tunnel/VIP addresses), never derived from RouteHost.
-	WGAllowedIPs []string `json:"allowedIPs"`
-	// RouteHost is this peer's own tunnel address, always a single
-	// host (/32 or /128). The only thing ever installed as a kernel
-	// route (see installRoutes).
-	RouteHost string `json:"routeHost"`
-}
-
 type config struct {
-	// Peer source: exactly one of these two is set.
-	secretNamespace string
-	secretName      string
-	peersFile       string
+	// Peer sources. Exactly one of secretName / peersFile carries this
+	// node's peer list at startup; when BOTH peersFile and
+	// peersSecretName are set (the cloud node's adoption mode), the
+	// file contributes identity (private key + local address, written
+	// once by cloud-init) and the Secret -- once it exists and is
+	// non-empty -- overrides the peer LIST, which is how post-join
+	// config corrections reach a node whose userdata is immutable.
+	secretNamespace      string
+	secretName           string
+	peersFile            string
+	peersSecretNamespace string
+	peersSecretName      string
+	machineNameFile      string
 
-	privateKeySecretKey string
-	localAddressKey     string
-	iface               string
-	localAddress        string
-	listenPort          int
-	podCIDRs            string
-	serviceCIDRs        string
-	keepaliveSecs       int
-	mtu                 int
-	pollInterval        time.Duration
+	nodeName       string
+	privateKeyFile string
+	iface          string
+	listenPort     int
+	podCIDRs       string
+	serviceCIDRs   string
+	keepaliveSecs  int
+	mtu            int
+	pollInterval   time.Duration
+
+	// transitMasqueradeSource, when set (a CIDR, the tunnel subnet),
+	// makes this node a transit for tunnel peers reaching cluster
+	// addresses that have no tunnel of their own (e.g. a control-plane
+	// node's API VIP): enables IPv4 forwarding and installs one
+	// source-NAT rule for tunnel-sourced traffic leaving via non-tunnel
+	// interfaces. Scoped to exactly that subnet; never touches other
+	// traffic.
+	transitMasqueradeSource string
 }
 
 func main() {
 	cfg := config{}
 	flag.StringVar(&cfg.secretNamespace, "secret-namespace", "", "namespace of the peer Secret (in-cluster peer source; mutually exclusive with --peers-file)")
 	flag.StringVar(&cfg.secretName, "secret-name", "", "name of the peer Secret (in-cluster peer source; mutually exclusive with --peers-file)")
-	flag.StringVar(&cfg.peersFile, "peers-file", "", "path to a local JSON file holding the peer list (used where there is no in-cluster Secret to read, e.g. a cloud/EC2 node that isn't part of the on-prem cluster; mutually exclusive with --secret-namespace/--secret-name)")
-	// One DaemonSet, one shared Secret, every on-prem node dials the
-	// same remote peer(s) -- but each node needs its own identity
-	// (private key) and its own tunnel address, not any peer's. Rather
-	// than one Secret per node (N nearly-identical manifests for N
-	// nodes), the Secret holds every node's private key/address under a
-	// distinct key name, and the pod spec picks its own via Kubernetes'
-	// own $(NODE_NAME) substitution in --private-key-secret-key/
-	// -local-address-secret-key (e.g. "dialer-private-key-$(NODE_NAME)"
-	// resolves before this binary ever starts).
-	flag.StringVar(&cfg.privateKeySecretKey, "private-key-secret-key", "dialer-private-key", "Secret data key holding this node's WireGuard private key")
-	flag.StringVar(&cfg.localAddressKey, "local-address-secret-key", "", "Secret data key holding this node's tunnel address (CIDR); if unset, --local-address is used as a literal instead (in --peers-file mode, the file's own localAddress field always wins over this flag -- see peersFileDoc)")
-	flag.StringVar(&cfg.iface, "iface", "wg0", "WireGuard interface name to create/manage")
-	flag.StringVar(&cfg.localAddress, "local-address", "10.100.0.1/24", "address to assign to the interface (ignored if --local-address-secret-key is set, or in --peers-file mode)")
-	flag.IntVar(&cfg.listenPort, "listen-port", 0, "fixed WireGuard listen port (0 = ephemeral/random, fine for a node that only ever dials out; a listener role that expects to be dialed -- e.g. a cloud node -- needs this set to a known, fixed port)")
-	flag.StringVar(&cfg.podCIDRs, "pod-cidrs", "", "comma-separated cluster pod-CIDR ranges (v4/v6), added to every peer's WireGuard AllowedIPs so Calico-routed pod traffic isn't silently dropped by WireGuard's own cryptokey routing -- never installed as a kernel route")
+	flag.StringVar(&cfg.peersFile, "peers-file", "", "path to a local JSON file holding this node's identity and bootstrap peer list (cloud node; mutually exclusive with --secret-namespace/--secret-name)")
+	flag.StringVar(&cfg.peersSecretNamespace, "peers-secret-namespace", "", "optional (with --peers-file): namespace of a Secret whose peers.json key overrides the file's peer list once readable -- the adoption/reconciliation path")
+	flag.StringVar(&cfg.peersSecretName, "peers-secret-name", "", "optional (with --peers-file): name of the peer-list override Secret")
+	flag.StringVar(&cfg.machineNameFile, "machine-name-file", "", "optional (with --peers-file): file holding this machine's CAPI Machine name (written by cloud-init); the peer-list override Secret's name is derived from it -- an alternative to --peers-secret-name that lets one shared DaemonSet spec serve per-machine Secrets")
+	flag.StringVar(&cfg.nodeName, "node-name", os.Getenv("NODE_NAME"), "this node's Kubernetes node name (defaults to $NODE_NAME)")
+	flag.StringVar(&cfg.privateKeyFile, "private-key-file", "", "node-local file holding this node's WireGuard private key; generated (0600) on first start if absent. Required in Secret mode -- the private key never travels through the API; only the public key is published")
+	flag.StringVar(&cfg.iface, "iface", "", "WireGuard interface name to create/manage (required; unique per mesh, e.g. cldt1a2b3c4d -- never wg0, which collides with whatever the node already runs)")
+	flag.IntVar(&cfg.listenPort, "listen-port", 0, "fixed WireGuard listen port (0 = ephemeral, fine for a node that only dials out; a listener must set this)")
+	flag.StringVar(&cfg.podCIDRs, "pod-cidrs", "", "comma-separated cluster pod-CIDR ranges (v4/v6), added to every peer's WireGuard AllowedIPs -- never installed as a kernel route")
 	flag.StringVar(&cfg.serviceCIDRs, "service-cidrs", "", "comma-separated cluster service-CIDR ranges (v4/v6), same treatment as --pod-cidrs")
 	flag.IntVar(&cfg.keepaliveSecs, "keepalive-seconds", 15, "PersistentKeepalive interval")
 	flag.IntVar(&cfg.mtu, "mtu", 1420, "interface MTU (WireGuard overhead under the cluster's normal MTU)")
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 30*time.Second, "how often to re-read the peer source and re-apply")
+	flag.StringVar(&cfg.transitMasqueradeSource, "transit-masquerade-source", "", "optional tunnel-subnet CIDR: enable forwarding + masquerade for tunnel-sourced traffic leaving this node toward cluster addresses that have no tunnel (transit role)")
 	flag.Parse()
 
 	usingSecret := cfg.secretNamespace != "" || cfg.secretName != ""
 	usingFile := cfg.peersFile != ""
 	if usingSecret == usingFile {
-		fmt.Fprintln(os.Stderr, "exactly one of --secret-namespace/--secret-name or --peers-file must be set")
-		os.Exit(1)
+		fatal("exactly one of --secret-namespace/--secret-name or --peers-file must be set")
+	}
+	if cfg.iface == "" {
+		fatal("--iface is required (a unique per-mesh name, e.g. cldt1a2b3c4d)")
+	}
+	if usingSecret {
+		if cfg.nodeName == "" {
+			fatal("--node-name (or $NODE_NAME) is required in Secret mode")
+		}
+		if cfg.privateKeyFile == "" {
+			fatal("--private-key-file is required in Secret mode (the private key is node-local; only the public key is published)")
+		}
+	}
+	if cfg.peersSecretNamespace != "" {
+		if (cfg.peersSecretName != "") == (cfg.machineNameFile != "") {
+			fatal("--peers-secret-namespace requires exactly one of --peers-secret-name or --machine-name-file")
+		}
+	} else if cfg.peersSecretName != "" || cfg.machineNameFile != "" {
+		fatal("--peers-secret-name/--machine-name-file require --peers-secret-namespace")
 	}
 
 	var clientset *kubernetes.Clientset
-	if usingSecret {
+	if usingSecret || cfg.peersSecretNamespace != "" {
 		restCfg, err := rest.InClusterConfig()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "unable to load in-cluster config: %v\n", err)
-			os.Exit(1)
-		}
-		clientset, err = kubernetes.NewForConfig(restCfg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "unable to build clientset: %v\n", err)
-			os.Exit(1)
+			// The cloud node's systemd unit runs this binary with
+			// --peers-file (and possibly --peers-secret-*): at boot
+			// there is no in-cluster environment. Degrade to file-only
+			// rather than dying -- the DaemonSet copy that arrives
+			// after join has the in-cluster env and takes over the
+			// reconciliation duty.
+			if usingSecret {
+				fatal("unable to load in-cluster config: %v", err)
+			}
+			fmt.Fprintf(os.Stderr, "no in-cluster config (%v); running from --peers-file only\n", err)
+		} else if clientset, err = kubernetes.NewForConfig(restCfg); err != nil {
+			fatal("unable to build clientset: %v", err)
 		}
 	}
 
 	wg, err := wgctrl.New()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to open wgctrl: %v\n", err)
-		os.Exit(1)
+		fatal("unable to open wgctrl: %v", err)
 	}
 	defer wg.Close()
 
@@ -204,13 +176,58 @@ func main() {
 	}
 }
 
-// ensureLink creates the WireGuard link if it doesn't exist, assigns its
-// address, and brings it up -- the one-time-per-boot part of what
-// `ip link add` / `ip addr add` / `ip link set up` did in the shell
-// version. Called every reconcile pass (idempotent, and self-healing if
-// the address is ever removed from under it) rather than once at
-// startup, since the address itself can now come from the Secret and
-// isn't known until the first successful read.
+func fatal(format string, args ...any) {
+	fmt.Fprintf(os.Stderr, format+"\n", args...)
+	os.Exit(1)
+}
+
+// loadOrGeneratePrivateKey returns the node's WireGuard private key,
+// generating and persisting it (0600) on first use. The key never
+// leaves this file; peers only ever see the derived public key.
+func loadOrGeneratePrivateKey(path string) (wgtypes.Key, error) {
+	data, err := os.ReadFile(path)
+	if err == nil {
+		return wgtypes.ParseKey(strings.TrimSpace(string(data)))
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return wgtypes.Key{}, fmt.Errorf("reading %s: %w", path, err)
+	}
+	key, err := wgtypes.GeneratePrivateKey()
+	if err != nil {
+		return wgtypes.Key{}, fmt.Errorf("generating private key: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return wgtypes.Key{}, fmt.Errorf("creating %s: %w", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(key.String()+"\n"), 0o600); err != nil {
+		return wgtypes.Key{}, fmt.Errorf("writing %s: %w", path, err)
+	}
+	return key, nil
+}
+
+// publishNodeInfo records this node's public key in the shared Secret
+// so the controller can assemble the peer graph without any manual
+// `wg genkey` step ever happening anywhere.
+func publishNodeInfo(ctx context.Context, clientset *kubernetes.Clientset, cfg config, pub wgtypes.Key, current *corev1.Secret) error {
+	key := tunnel.NodePublicKeyPrefix + cfg.nodeName
+	if strings.TrimSpace(string(current.Data[key])) == pub.String() {
+		return nil
+	}
+	patch, err := json.Marshal(map[string]any{
+		"data": map[string]string{key: base64.StdEncoding.EncodeToString([]byte(pub.String()))},
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := clientset.CoreV1().Secrets(cfg.secretNamespace).Patch(ctx, cfg.secretName, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+		return fmt.Errorf("publishing %s: %w", key, err)
+	}
+	return nil
+}
+
+// ensureLink creates the WireGuard link if it doesn't exist, assigns
+// its address, and brings it up. Called every reconcile pass
+// (idempotent, self-healing if the address is removed from under it).
 func ensureLink(cfg config, localAddress string) error {
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
@@ -247,45 +264,43 @@ func ensureLink(cfg config, localAddress string) error {
 	return nil
 }
 
-// reconcile reads the current peer list and applies it to the
-// WireGuard device -- the repeated, idempotent part of what `wg set`
-// did each time the shell loop ran.
+// reconcile reads the current peer set and applies it: WireGuard
+// device config, host routes, and (transit role only) the masquerade
+// rule.
 func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.Client, cfg config) error {
-	var secret *corev1.Secret
-	if cfg.secretNamespace != "" {
-		s, err := clientset.CoreV1().Secrets(cfg.secretNamespace).Get(ctx, cfg.secretName, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("getting secret %s/%s: %w", cfg.secretNamespace, cfg.secretName, err)
-		}
-		secret = s
-	}
-
 	var (
-		localAddress          = cfg.localAddress
-		thisNodePrivateKeyStr string
-		peers                 []peerSpec
+		localAddress string
+		privateKey   wgtypes.Key
+		peers        []tunnel.PeerSpec
+		usingSecret  = cfg.secretName != ""
 	)
-	if secret != nil {
-		if cfg.localAddressKey != "" {
-			v, err := requiredKey(secret, cfg.localAddressKey)
-			if err != nil {
-				return err
-			}
-			localAddress = v
-		}
-		v, err := requiredKey(secret, cfg.privateKeySecretKey)
+
+	if usingSecret {
+		key, err := loadOrGeneratePrivateKey(cfg.privateKeyFile)
 		if err != nil {
 			return err
 		}
-		thisNodePrivateKeyStr = v
+		privateKey = key
+
+		secret, err := clientset.CoreV1().Secrets(cfg.secretNamespace).Get(ctx, cfg.secretName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("getting secret %s/%s: %w", cfg.secretNamespace, cfg.secretName, err)
+		}
+		if err := publishNodeInfo(ctx, clientset, cfg, key.PublicKey(), secret); err != nil {
+			return err
+		}
+		localAddress = strings.TrimSpace(string(secret.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName]))
+		if localAddress == "" {
+			// Not allocated yet -- the controller writes the tunnel
+			// address for every node matching a claim's tunnelEndpoints
+			// selector. Nothing to do until then.
+			return fmt.Errorf("no %s%s in %s/%s yet (node not allocated a tunnel address)", tunnel.NodeTunnelAddressPrefix, cfg.nodeName, cfg.secretNamespace, cfg.secretName)
+		}
 		peers, err = loadPeersFromSecret(secret)
 		if err != nil {
 			return fmt.Errorf("loading peer list: %w", err)
 		}
 	} else {
-		// --peers-file mode: this node's own private key and tunnel
-		// address travel in the same file, not a Secret/flag -- see
-		// peersFileDoc's doc comment.
 		doc, err := readPeersFileDoc(cfg.peersFile)
 		if err != nil {
 			return fmt.Errorf("loading peer list: %w", err)
@@ -296,17 +311,43 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		if doc.LocalAddress == "" {
 			return fmt.Errorf("%s has no localAddress", cfg.peersFile)
 		}
-		thisNodePrivateKeyStr = doc.PrivateKey
+		privateKey, err = wgtypes.ParseKey(doc.PrivateKey)
+		if err != nil {
+			return fmt.Errorf("parsing private key from %s: %w", cfg.peersFile, err)
+		}
 		localAddress = doc.LocalAddress
 		peers = doc.Peers
+
+		// Adoption: once the override Secret is readable and carries a
+		// peer list, it supersedes the file's (bootstrap-era) peers.
+		// The file remains the identity source and the fallback floor.
+		if cfg.peersSecretNamespace != "" && clientset != nil {
+			overrideName := cfg.peersSecretName
+			if overrideName == "" {
+				raw, err := os.ReadFile(cfg.machineNameFile)
+				if err != nil {
+					return fmt.Errorf("reading --machine-name-file %s: %w", cfg.machineNameFile, err)
+				}
+				overrideName = tunnel.AdoptionSecretName(strings.TrimSpace(string(raw)))
+			}
+			secret, err := clientset.CoreV1().Secrets(cfg.peersSecretNamespace).Get(ctx, overrideName, metav1.GetOptions{})
+			if err == nil {
+				if raw, ok := secret.Data[tunnel.CloudPeersKey]; ok && len(raw) > 0 {
+					var overlay tunnel.PeerListDoc
+					if err := json.Unmarshal(raw, &overlay); err != nil {
+						return fmt.Errorf("parsing %s from %s/%s: %w", tunnel.CloudPeersKey, cfg.peersSecretNamespace, cfg.peersSecretName, err)
+					}
+					if len(overlay.Peers) > 0 {
+						peers = overlay.Peers
+					}
+				}
+			} else {
+				fmt.Fprintf(os.Stderr, "peer override secret not readable yet (%v); using %s\n", err, cfg.peersFile)
+			}
+		}
 	}
 	if len(peers) == 0 {
 		return fmt.Errorf("no peers configured")
-	}
-
-	privateKey, err := wgtypes.ParseKey(thisNodePrivateKeyStr)
-	if err != nil {
-		return fmt.Errorf("parsing this node's private key: %w", err)
 	}
 
 	if err := ensureLink(cfg, localAddress); err != nil {
@@ -314,7 +355,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	}
 
 	keepalive := time.Duration(cfg.keepaliveSecs) * time.Second
-	sharedCIDRs := splitCIDRs(cfg.podCIDRs, cfg.serviceCIDRs)
+	sharedCIDRs := tunnel.SplitList(cfg.podCIDRs, cfg.serviceCIDRs)
 
 	var peerConfigs []wgtypes.PeerConfig
 	var routeHosts []net.IPNet
@@ -349,11 +390,13 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			ReplaceAllowedIPs:           true,
 		})
 
-		_, routeHost, err := net.ParseCIDR(hostCIDR(p.RouteHost))
-		if err != nil {
-			return fmt.Errorf("parsing peer route-host %q: %w", p.RouteHost, err)
+		for _, h := range p.AllRouteHosts() {
+			ipNet, err := parseHostRoute(h)
+			if err != nil {
+				return err
+			}
+			routeHosts = append(routeHosts, ipNet)
 		}
-		routeHosts = append(routeHosts, *routeHost)
 	}
 
 	deviceCfg := wgtypes.Config{
@@ -371,146 +414,162 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	if err := installRoutes(cfg, routeHosts); err != nil {
 		return err
 	}
+
+	if cfg.transitMasqueradeSource != "" {
+		if err := ensureTransit(cfg); err != nil {
+			return fmt.Errorf("ensuring transit masquerade: %w", err)
+		}
+	}
 	return nil
 }
 
-// installRoutes installs a single narrow host route per peer -- the
-// one thing Calico/BIRD structurally cannot do itself for a NAT'd
-// peer (it assumes ordinary L3 reachability to its own BGP next-hop
-// already exists). Never derived from WireGuard's own AllowedIPs list
-// (see the package doc comment) -- routeHosts is always exactly one
-// host entry per peer, regardless of how broad that peer's WGAllowedIPs
-// is.
-//
-// These routes go into a DEDICATED table (wgDialerRouteTable), not the
-// main table, via a policy rule with a lower priority (higher number)
-// than the main table's own (32766). Linux FIB rule lookup stops at the
-// first rule whose table has a matching route, so this table is only
-// ever consulted as a fallback for destinations the main table can't
-// already answer. This is a structural guard against exactly the
-// incident this project hit live: a misconfigured, conflated
-// AllowedIPs=0.0.0.0/0 replaced the node's own default route and cut
-// off its unrelated admin/WAN access entirely. With routes confined to
-// this fallback table -- and, since this redesign, routeHosts never
-// containing anything but single host addresses in the first place --
-// that class of mistake can no longer happen at all, not just be
-// contained if it does.
-func installRoutes(cfg config, routeHosts []net.IPNet) error {
-	if err := ensurePolicyRoutingRule(); err != nil {
-		return fmt.Errorf("ensuring policy routing rule: %w", err)
+// parseHostRoute parses one route-host entry and enforces the single
+// invariant that keeps this binary structurally unable to hijack a
+// node: only exact host prefixes (/32, /128) ever become kernel
+// routes. Anything broader is a configuration error, rejected before
+// any route is touched.
+func parseHostRoute(h string) (net.IPNet, error) {
+	_, ipNet, err := net.ParseCIDR(tunnel.HostCIDR(strings.TrimSpace(h)))
+	if err != nil {
+		return net.IPNet{}, fmt.Errorf("parsing peer route-host %q: %w", h, err)
 	}
+	ones, bits := ipNet.Mask.Size()
+	if ones != bits {
+		return net.IPNet{}, fmt.Errorf("refusing route-host %q: kernel routes must be single hosts (/32 or /128), got /%d", h, ones)
+	}
+	return *ipNet, nil
+}
+
+// installRoutes installs one host route per peer route-host into the
+// MAIN table. Longest-prefix match makes each /32 (/128) win over any
+// broader route (a LAN /24, a VPC default) for exactly that host --
+// which is the entire point: the peer's node addresses become
+// reachable via the tunnel, and nothing else changes. Never derived
+// from AllowedIPs; parseHostRoute has already rejected anything that
+// isn't a single host.
+func installRoutes(cfg config, routeHosts []net.IPNet) error {
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
 	}
 	for _, host := range routeHosts {
 		dst := host
-		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK, Table: wgDialerRouteTable}
+		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK}
 		if err := netlink.RouteReplace(route); err != nil {
-			return fmt.Errorf("adding route %s dev %s table %d: %w", dst.String(), cfg.iface, wgDialerRouteTable, err)
+			return fmt.Errorf("adding route %s dev %s: %w", dst.String(), cfg.iface, err)
 		}
 	}
 	return nil
 }
 
-// splitCIDRs merges any number of comma-separated CIDR-list flags into
-// one flat, trimmed slice, skipping blanks.
-func splitCIDRs(lists ...string) []string {
-	var out []string
-	for _, list := range lists {
-		for _, cidr := range strings.Split(list, ",") {
-			if cidr = strings.TrimSpace(cidr); cidr != "" {
-				out = append(out, cidr)
-			}
-		}
+// ensureTransit makes this node forward tunnel-sourced traffic to
+// cluster addresses that have no tunnel of their own (e.g. the API
+// VIP on a control-plane node that deliberately carries no WireGuard
+// interface): enables IPv4 forwarding and installs one nftables
+// masquerade rule, scoped to the tunnel subnet and to destinations
+// outside it. nftables via netlink (google/nftables) because the
+// dialer image is distroless -- there is no iptables binary to shell
+// out to.
+func ensureTransit(cfg config) error {
+	ip, subnet, err := net.ParseCIDR(cfg.transitMasqueradeSource)
+	if err != nil {
+		return fmt.Errorf("parsing --transit-masquerade-source %q: %w", cfg.transitMasqueradeSource, err)
 	}
-	return out
+	if ip.To4() == nil {
+		return fmt.Errorf("--transit-masquerade-source must be IPv4 (got %q)", cfg.transitMasqueradeSource)
+	}
+	if err := os.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1"), 0o644); err != nil {
+		return fmt.Errorf("enabling ip_forward: %w", err)
+	}
+
+	c, err := nftables.New()
+	if err != nil {
+		return fmt.Errorf("opening nftables: %w", err)
+	}
+	defer c.CloseLasting()
+
+	// Deterministic table name per interface so re-running is
+	// idempotent: flush and rebuild our own table only.
+	tableName := "cldt-nat-" + cfg.iface
+	table := c.AddTable(&nftables.Table{Family: nftables.TableFamilyIPv4, Name: tableName})
+	c.FlushTable(table)
+	prio := *nftables.ChainPriorityNATSource
+	chain := c.AddChain(&nftables.Chain{
+		Name:     "postrouting",
+		Table:    table,
+		Type:     nftables.ChainTypeNAT,
+		Hooknum:  nftables.ChainHookPostrouting,
+		Priority: &prio,
+	})
+
+	mask := []byte(subnet.Mask)
+	base := subnet.IP.To4()
+	c.AddRule(&nftables.Rule{
+		Table: table,
+		Chain: chain,
+		Exprs: []expr.Any{
+			// ip saddr <subnet>
+			&expr.Payload{DestRegister: 1, Base: expr.PayloadBaseNetworkHeader, Offset: 12, Len: 4},
+			&expr.Bitwise{SourceRegister: 1, DestRegister: 1, Len: 4, Mask: mask, Xor: []byte{0, 0, 0, 0}},
+			&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: base},
+			// ip daddr != <subnet>
+			&expr.Payload{DestRegister: 1, Base: expr.PayloadBaseNetworkHeader, Offset: 16, Len: 4},
+			&expr.Bitwise{SourceRegister: 1, DestRegister: 1, Len: 4, Mask: mask, Xor: []byte{0, 0, 0, 0}},
+			&expr.Cmp{Op: expr.CmpOpNeq, Register: 1, Data: base},
+			&expr.Masq{},
+		},
+	})
+	if err := c.Flush(); err != nil {
+		return fmt.Errorf("applying nftables masquerade for %s: %w", cfg.transitMasqueradeSource, err)
+	}
+	return nil
 }
 
-// loadPeersFromSecret reads every peer this node should dial from the
-// shared Secret's per-Machine keys: peer-public-key-<machine>,
-// peer-endpoint-<machine>, peer-allowed-ips-<machine> (comma-separated
-// CIDRs, that peer's own tunnel/VIP addresses), peer-route-host-<machine>.
-func loadPeersFromSecret(secret *corev1.Secret) ([]peerSpec, error) {
-	const pubPrefix = "peer-public-key-"
-	var peers []peerSpec
+// loadPeersFromSecret reads every remote peer from the shared Secret's
+// per-Machine keys (see pkg/tunnel's key constants).
+func loadPeersFromSecret(secret *corev1.Secret) ([]tunnel.PeerSpec, error) {
+	var peers []tunnel.PeerSpec
 	for key, val := range secret.Data {
-		if !strings.HasPrefix(key, pubPrefix) {
+		if !strings.HasPrefix(key, tunnel.PeerPublicKeyPrefix) {
 			continue
 		}
-		machine := strings.TrimPrefix(key, pubPrefix)
-		endpoint := strings.TrimSpace(string(secret.Data["peer-endpoint-"+machine]))
-		if endpoint == "pending" {
+		machine := strings.TrimPrefix(key, tunnel.PeerPublicKeyPrefix)
+		endpoint := strings.TrimSpace(string(secret.Data[tunnel.PeerEndpointPrefix+machine]))
+		if endpoint == tunnel.PeerEndpointPending {
 			endpoint = ""
 		}
-		allowedIPsRaw, ok := secret.Data["peer-allowed-ips-"+machine]
+		allowedIPsRaw, ok := secret.Data[tunnel.PeerAllowedIPsPrefix+machine]
 		if !ok {
-			return nil, fmt.Errorf("secret has %s but no matching peer-allowed-ips-%s", key, machine)
+			return nil, fmt.Errorf("secret has %s but no matching %s%s", key, tunnel.PeerAllowedIPsPrefix, machine)
 		}
-		routeHost, ok := secret.Data["peer-route-host-"+machine]
-		if !ok {
-			return nil, fmt.Errorf("secret has %s but no matching peer-route-host-%s", key, machine)
+		var routeHosts []string
+		if raw, ok := secret.Data[tunnel.PeerRouteHostsPrefix+machine]; ok {
+			routeHosts = tunnel.SplitList(string(raw))
+		} else if raw, ok := secret.Data[tunnel.PeerRouteHostPrefix+machine]; ok {
+			routeHosts = []string{strings.TrimSpace(string(raw))}
+		} else {
+			return nil, fmt.Errorf("secret has %s but no matching %s%s", key, tunnel.PeerRouteHostsPrefix, machine)
 		}
-		peers = append(peers, peerSpec{
+		peers = append(peers, tunnel.PeerSpec{
 			PublicKey:    strings.TrimSpace(string(val)),
 			Endpoint:     endpoint,
-			WGAllowedIPs: splitCIDRs(string(allowedIPsRaw)),
-			RouteHost:    strings.TrimSpace(string(routeHost)),
+			WGAllowedIPs: tunnel.SplitList(string(allowedIPsRaw)),
+			RouteHosts:   routeHosts,
 		})
 	}
 	return peers, nil
 }
 
-// peersFileDoc is the on-disk shape of --peers-file: this node's own
-// identity plus its peer list, rendered once into cloud-init (no
-// in-cluster Secret access on a node that isn't part of the on-prem
-// cluster -- see join-patterns/k0s-worker.cloud-config.tmpl).
-//
-// LocalAddress travels in the file, not as a flag, for the same reason
-// PrivateKey does: a cloud-worker DaemonSet's pod spec is one shared
-// template across every node it schedules onto (see
-// endpoint-controller's ensureCloudDialerDaemonSet), so anything that
-// varies per node -- this node's own tunnel address, same as its own
-// key pair -- has to be per-node DATA (this file, rendered once at
-// Machine-provisioning time by join.Reconciler), never a per-node flag
-// value baked into a shared pod spec.
-type peersFileDoc struct {
-	PrivateKey   string     `json:"privateKey"`
-	LocalAddress string     `json:"localAddress"`
-	Peers        []peerSpec `json:"peers"`
-}
-
-func readPeersFileDoc(path string) (peersFileDoc, error) {
+func readPeersFileDoc(path string) (tunnel.PeersFileDoc, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return peersFileDoc{}, fmt.Errorf("reading %s: %w", path, err)
+		return tunnel.PeersFileDoc{}, fmt.Errorf("reading %s: %w", path, err)
 	}
-	var doc peersFileDoc
+	var doc tunnel.PeersFileDoc
 	if err := json.Unmarshal(data, &doc); err != nil {
-		return peersFileDoc{}, fmt.Errorf("parsing %s: %w", path, err)
+		return tunnel.PeersFileDoc{}, fmt.Errorf("parsing %s: %w", path, err)
 	}
 	return doc, nil
-}
-
-// hostCIDR appends the correct single-host prefix length for addr's
-// family -- /32 for IPv4, /128 for IPv6 -- if addr doesn't already
-// carry a prefix.
-func hostCIDR(addr string) string {
-	if strings.Contains(addr, "/") {
-		return addr
-	}
-	if ip := net.ParseIP(addr); ip != nil && ip.To4() == nil {
-		return addr + "/128"
-	}
-	return addr + "/32"
-}
-
-func requiredKey(secret *corev1.Secret, key string) (string, error) {
-	v, ok := secret.Data[key]
-	if !ok || len(v) == 0 {
-		return "", fmt.Errorf("secret %s/%s missing required key %q", secret.Namespace, secret.Name, key)
-	}
-	return strings.TrimSpace(string(v)), nil
 }
 
 func isLinkNotFound(err error) bool {

@@ -1,12 +1,18 @@
 // Reconciler watches Machine objects and, for any whose bootstrap
-// Secret doesn't exist yet, provisions it: generates a WireGuard
-// keypair, asks a ClusterJoinProvider for join credentials, asks an
-// InfraProvider whether the underlying infrastructure is ready,
-// renders the join-pattern template, creates the bootstrap Secret, and
-// updates wg-dialer-peer so the new node is accepted into the
-// full-mesh tunnel. Adding a new cluster technology or infrastructure
-// provider means a new ClusterJoinProvider/InfraProvider
-// implementation, never touching this reconciler.
+// Secret doesn't exist yet, provisions it: generates the cloud node's
+// WireGuard keypair, asks a ClusterJoinProvider for join credentials,
+// renders the join-pattern template, creates the bootstrap Secret
+// (owned by the Machine, so deletion cascades), and updates the peer
+// Secret so the new node is accepted into the mesh. Adding a new
+// cluster technology or infrastructure provider means a new
+// ClusterJoinProvider/InfraProvider implementation, never touching
+// this reconciler.
+//
+// The mesh this reconciler emits is fully connected between the
+// topologically local side and every topologically isolated remote:
+// each remote peers with every selected local tunnel-endpoint node AND
+// with every other remote (isolated remotes share no LAN -- without
+// remote-to-remote peers they could not reach each other at all).
 package join
 
 import (
@@ -14,12 +20,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/render"
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -77,8 +83,7 @@ const NodeVIPAnnotation = "cloud-provisioning.appmana.com/node-vip4"
 // WireGuard AllowedIPs entry AND kernel RouteHost as the first --
 // invalid/undefined for WireGuard cryptokey routing (two peers can't
 // both claim the same AllowedIPs destination) and ambiguous for the
-// on-prem dialer's own kernel route (two peers, one destination,
-// last-RouteReplace-wins). Each cloud Machine now gets its own,
+// on-prem dialer's own kernel route. Each cloud Machine gets its own,
 // distinct address, allocated the same way node-VIPs already are.
 const WireGuardAddrAnnotation = "cloud-provisioning.appmana.com/wireguard-addr4"
 
@@ -90,11 +95,11 @@ type Reconciler struct {
 	Join ClusterJoinProvider
 
 	// InfraProviders is every registered infrastructure provider (AWS,
-	// a containernet-backed test double, ...). Which one applies to a
-	// given Machine is inferred from its spec.infrastructureRef.kind,
-	// matched against each provider's own GVK() -- never hardcoded
-	// here, so adding a new cloud/test provider means registering it,
-	// not branching this reconciler.
+	// a Docker-backed test double, ...). Which one applies to a given
+	// Machine is inferred from its spec.infrastructureRef.kind, matched
+	// against each provider's own GVK() -- never hardcoded here, so
+	// adding a new cloud/test provider means registering it, not
+	// branching this reconciler.
 	InfraProviders []InfraProvider
 
 	// TemplatePath is the join-pattern template to render (e.g.
@@ -109,42 +114,53 @@ type Reconciler struct {
 	KubeletExtraArgs  string
 	SSHAuthorizedKeys []string
 
-	// PodCIDRs/ServiceCIDRs are the cluster's own declared, cluster-wide
-	// ranges (sourced at gitops-render time from cluster/k0sctl.yaml's
-	// own podCIDR/serviceCIDR -- never per-node dynamic discovery, see
-	// cmd/dialer/main.go's package doc for why). Comma-separated, fed
-	// straight into the cloud-side dialer's --pod-cidrs/--service-cidrs
-	// flags so its WireGuard peer config accepts real Calico-routed
-	// traffic without ever becoming a kernel route.
+	// PodCIDRs/ServiceCIDRs are the cluster's own declared ranges
+	// (from the cluster's k0sctl/site config at gitops-render time).
+	// Comma-separated; fed to the cloud dialer's --pod-cidrs/
+	// --service-cidrs (WireGuard cryptokey accept-list only -- never a
+	// kernel route; see cmd/dialer/main.go's package doc).
 	PodCIDRs     string
 	ServiceCIDRs string
 
-	// WireGuard tunnel config for the cloud side's own interface.
-	// WireGuardAddress is the BASE address (e.g. "10.100.0.2/24") --
-	// the first cloud Machine gets exactly this; each subsequent one
-	// gets the next free address in the same /prefix, allocated the
-	// same way node-VIPs are (see WireGuardAddrAnnotation). Never used
-	// directly as a literal for more than one Machine.
-	WireGuardAddress    string // e.g. "10.100.0.2/24"
-	WireGuardListenPort string // e.g. "51820"
+	// WireGuardAddress is the BASE tunnel address (e.g.
+	// "10.100.0.2/24") -- the first cloud Machine gets exactly this;
+	// each subsequent one gets the next free address in the same
+	// prefix (see WireGuardAddrAnnotation).
+	WireGuardAddress    string
+	WireGuardListenPort string
 
 	// Node VIP range for Calico autodetection (vip0): allocated as
-	// <NodeVIP4Base + n>, avoiding the on-prem nodes' own fixed
-	// addresses (.1/.2/.3 in this cluster).
-	NodeVIP4Prefix string // e.g. "10.101.0."
-	NodeVIP6Prefix string // e.g. "fd8f:cf26:522a::"
-	NodeVIPStart   int    // e.g. 4
+	// <prefix><n>, starting at NodeVIPStart, avoiding the on-prem
+	// nodes' own fixed addresses.
+	NodeVIP4Prefix string
+	NodeVIP6Prefix string
+	NodeVIPStart   int
 
-	// wg-dialer-peer Secret (namespace/name) holding every on-prem
-	// node's dialer identity -- this is where the peer list for the
-	// cloud side's own wg0.conf comes from, and where the new node's
-	// public key gets recorded so on-prem dialers accept it.
+	// Peer Secret (namespace/name): where tunnel-endpoint nodes have
+	// published their public keys and the controller has allocated
+	// their tunnel addresses (node-* keys), and where this reconciler
+	// records the new machine's peer-* entries.
 	DialerPeerSecretNamespace string
 	DialerPeerSecretName      string
 	DialerListenPort          string
 
-	// BootstrapSecretName is templated with the Machine's name, e.g.
-	// "%s-bootstrap".
+	// InterfaceName is the mesh's unique tunnel interface name
+	// (tunnel.InterfaceName over the peer Secret identity), rendered
+	// into the cloud node's systemd unit.
+	InterfaceName string
+
+	// Dialer binary delivery: the cloud node's stock image has no
+	// wg-dialer; cloud-init downloads it from this per-arch URL and
+	// verifies the pinned digest before enabling the unit. sha256 is
+	// pinned at render time -- a compromised download host cannot swap
+	// the binary.
+	DialerBinaryURLARM64    string
+	DialerBinarySHA256ARM64 string
+	DialerBinaryURLAMD64    string
+	DialerBinarySHA256AMD64 string
+
+	// BootstrapSecretNameFormat is templated with the Machine's name,
+	// e.g. "%s-bootstrap".
 	BootstrapSecretNameFormat string
 }
 
@@ -193,14 +209,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// Deliberately not gated on the infrastructure resource being
 	// "ready" (e.g. AWSMachine's instance actually running): cloud-init/
 	// user-data must exist BEFORE the underlying compute launches, for
-	// every infrastructure provider (AWS's UserData, GCP's instance
-	// metadata, ...) -- it's the boot mechanism, not a post-boot
-	// artifact. Waiting for "ready" first would deadlock, since the
-	// infra provider is commonly the one blocked on this very Secret
-	// existing (confirmed live: CAPA's AWSMachine controller refuses to
-	// call RunInstances until this bootstrap Secret is already there).
-	// All that's needed here is that the infrastructureRef target
-	// object itself exists -- proven by the successful Get below.
+	// every infrastructure provider -- it's the boot mechanism, not a
+	// post-boot artifact. Waiting for "ready" first would deadlock,
+	// since the infra provider is commonly the one blocked on this very
+	// Secret existing (confirmed live: CAPA's AWSMachine controller
+	// refuses to call RunInstances until this bootstrap Secret is
+	// already there). All that's needed here is that the
+	// infrastructureRef target object itself exists.
 	infraMachine := &unstructured.Unstructured{}
 	infraMachine.SetGroupVersionKind(infra.GVK())
 	if err := r.Reader.Get(ctx, types.NamespacedName{Namespace: machine.GetNamespace(), Name: infraRefName}, infraMachine); err != nil {
@@ -216,13 +231,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// Optional preflight: providers whose underlying operator (CAPA,
 	// ...) can silently retry forever on a misconfiguration get a
-	// chance to surface that clearly here instead. Real, caught-live
-	// example: an AWSClusterStaticIdentity's secretRef in the wrong
-	// namespace -- CAPA's own error just says "Secret ... not found"
-	// on an infinite loop with no hint about where it actually needs
-	// to be.
+	// chance to surface that clearly here instead.
 	if v, ok := infra.(Validator); ok {
-		if err := v.Validate(ctx, r.Client, infraMachine); err != nil {
+		if err := v.Validate(ctx, r.Reader, infraMachine); err != nil {
 			return ctrl.Result{}, fmt.Errorf("validating infrastructure configuration: %w", err)
 		}
 	}
@@ -239,35 +250,43 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err := r.Reader.Get(ctx, types.NamespacedName{Namespace: r.DialerPeerSecretNamespace, Name: r.DialerPeerSecretName}, dialerSecret); err != nil {
 		return ctrl.Result{}, fmt.Errorf("getting dialer peer secret: %w", err)
 	}
-	peers, err := onPremPeers(dialerSecret)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("deriving on-prem peer list: %w", err)
-	}
 
-	// The cloud node isn't part of the on-prem cluster, so it can't read
-	// a Kubernetes Secret the way the on-prem dialer does -- its whole
-	// peer list (this node's own private key plus every on-prem peer)
-	// is baked into cloud-init once, at Machine-provisioning time, as a
-	// plain JSON file the same dialer binary reads via --peers-file. On
-	// the cloud side every on-prem peer's Endpoint is deliberately left
-	// empty: the cloud node only ever listens, it never dials out (the
-	// on-prem side is the one behind NAT with no inbound path).
 	cloudWGAddress, err := r.allocateWireGuardAddress(ctx)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("allocating wireguard address: %w", err)
 	}
+	nodeVIPIndex, err := r.allocateNodeVIPIndex(ctx)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("allocating node VIP: %w", err)
+	}
+	nodeVIP4 := fmt.Sprintf("%s%d", r.NodeVIP4Prefix, nodeVIPIndex)
+	nodeVIP6 := fmt.Sprintf("%s%d", r.NodeVIP6Prefix, nodeVIPIndex)
 
-	// LocalAddress travels in this same file, not a flag: a cloud-worker
-	// DaemonSet's pod spec (endpoint-controller's
-	// ensureCloudDialerDaemonSet) is one shared template across every
-	// node it schedules onto, so this node's own tunnel address has to
-	// be per-node DATA, exactly like its own private key already is --
-	// see cmd/dialer/main.go's peersFileDoc doc comment.
-	peersFileJSON, err := json.Marshal(struct {
-		PrivateKey   string          `json:"privateKey"`
-		LocalAddress string          `json:"localAddress"`
-		Peers        []onPremPeerDoc `json:"peers"`
-	}{
+	// The cloud node can't read a cluster Secret before it joins -- its
+	// whole bootstrap peer list travels in cloud-init as a plain JSON
+	// file the same dialer binary reads via --peers-file. Peers:
+	// every selected local tunnel-endpoint node (from the node-* keys
+	// the local dialers published and the controller allocated), plus
+	// every OTHER cloud machine already in the mesh (remote-to-remote:
+	// isolated remotes share no LAN). On the cloud side a local peer's
+	// Endpoint is deliberately empty -- the cloud node only listens for
+	// the on-prem side, which is behind NAT with no inbound path -- but
+	// a remote peer's Endpoint is its public address: two remotes have
+	// no NAT between them and must dial each other directly.
+	cloudTunnelAddrEarly := strings.SplitN(strings.TrimSpace(cloudWGAddress), "/", 2)[0]
+	peers, err := tunnel.RemotePeers(dialerSecret.Data, cloudTunnelAddrEarly, r.APIVIP)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("deriving mesh peer list: %w", err)
+	}
+	if len(peers) == 0 {
+		// No local tunnel endpoint has published yet: rendering now
+		// would bake an empty, useless peer list into immutable
+		// userdata. Wait for the mesh side to exist first.
+		log.Info("no published tunnel-endpoint nodes in the peer secret yet, waiting")
+		return ctrl.Result{RequeueAfter: crdRecheckInterval}, nil
+	}
+
+	peersFileJSON, err := json.Marshal(tunnel.PeersFileDoc{
 		PrivateKey:   cloudPriv.String(),
 		LocalAddress: cloudWGAddress,
 		Peers:        peers,
@@ -276,13 +295,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("marshaling cloud-side peers file: %w", err)
 	}
 
-	nodeVIPIndex, err := r.allocateNodeVIPIndex(ctx, machine.GetLabels())
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("allocating node VIP: %w", err)
-	}
-	nodeVIP4 := fmt.Sprintf("%s%d", r.NodeVIP4Prefix, nodeVIPIndex)
-	nodeVIP6 := fmt.Sprintf("%s%d", r.NodeVIP6Prefix, nodeVIPIndex)
-
 	joinValues, err := r.Join.JoinValues(ctx)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("getting cluster join values: %w", err)
@@ -290,6 +302,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	infraValues, err := infra.InfraValues(ctx, infraMachine)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("getting infra values: %w", err)
+	}
+
+	binaryURL, binarySHA, err := r.dialerBinaryFor(infraValues)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	values := map[string]any{
@@ -303,6 +320,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		"podCIDRs":            r.PodCIDRs,
 		"serviceCIDRs":        r.ServiceCIDRs,
 		"peersFileJSON":       string(peersFileJSON),
+		"interfaceName":       r.InterfaceName,
+		"dialerBinaryURL":     binaryURL,
+		"dialerBinarySHA256":  binarySHA,
+		"machineName":         machine.GetName(),
 	}
 	for k, v := range joinValues {
 		values[k] = v
@@ -316,10 +337,21 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("rendering join pattern: %w", err)
 	}
 
+	// Owned by the Machine: `kubectl delete machine` (or a claim
+	// cascade) garbage-collects this Secret, so a re-created Machine
+	// gets a FRESH render -- join tokens expire (TTL ~2h); silently
+	// reusing a stale Secret was a confirmed way to strand a re-created
+	// node at the join step with no error anywhere.
 	bootstrapSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      bootstrapSecretName,
 			Namespace: machine.GetNamespace(),
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: machineGVK.GroupVersion().String(),
+				Kind:       machineGVK.Kind,
+				Name:       machine.GetName(),
+				UID:        machine.GetUID(),
+			}},
 		},
 		Type: "cluster.x-k8s.io/secret",
 		StringData: map[string]string{
@@ -331,29 +363,30 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("creating bootstrap secret: %w", err)
 	}
 
-	// Record the new node's public key so on-prem dialers accept it,
-	// and stamp the allocated VIP onto the Machine so future
-	// allocations don't reuse it. Per-Machine-keyed (peer-*-<machine>),
-	// not flat singleton keys -- the whole point being that a second
-	// cloud Machine reconciling must never clobber the first's peer
-	// entry, the way a single shared "peer-public-key" key would.
+	// Record the new node's peer entry so local dialers accept and
+	// route to it. Per-Machine-keyed (peer-*-<machine>) -- a second
+	// cloud Machine must never clobber the first's entry.
+	//
+	// AllowedIPs vs RouteHosts (see cmd/dialer/main.go's package doc):
+	// both carry the machine's tunnel address AND its node VIPs --
+	// AllowedIPs because WireGuard's cryptokey filter matches inner
+	// destinations (BGP sessions and kubelet traffic ride the VIPs,
+	// not the tunnel address), RouteHosts because node-to-node
+	// reachability is exactly this tunnel layer's one routing job.
+	// Everything wider (pod blocks) is Calico's concern, learned over
+	// the BGP sessions these host routes make possible.
 	patch := client.MergeFrom(dialerSecret.DeepCopy())
 	if dialerSecret.Data == nil {
 		dialerSecret.Data = map[string][]byte{}
 	}
 	machineName := machine.GetName()
-	dialerSecret.Data["peer-public-key-"+machineName] = []byte(cloudPub.String())
-	dialerSecret.Data["peer-endpoint-"+machineName] = []byte("pending")
-	// This Machine's own WireGuard AllowedIPs (the real cryptokey-routing
-	// accept list, never a kernel route -- see cmd/dialer/main.go's
-	// package doc): just its own tunnel address, since the on-prem
-	// dialer already adds the shared cluster pod-CIDR/service-CIDR
-	// ranges itself (--pod-cidrs/--service-cidrs, identical for every
-	// peer). RouteHost is the same single tunnel address -- the one
-	// thing the on-prem dialer needs a kernel route for.
 	cloudTunnelAddr := strings.SplitN(strings.TrimSpace(cloudWGAddress), "/", 2)[0]
-	dialerSecret.Data["peer-allowed-ips-"+machineName] = []byte(hostCIDR(cloudTunnelAddr))
-	dialerSecret.Data["peer-route-host-"+machineName] = []byte(cloudTunnelAddr)
+	allowed := []string{tunnel.HostCIDR(cloudTunnelAddr), tunnel.HostCIDR(nodeVIP4), tunnel.HostCIDR(nodeVIP6)}
+	routeHosts := []string{cloudTunnelAddr, nodeVIP4, nodeVIP6}
+	dialerSecret.Data[tunnel.PeerPublicKeyPrefix+machineName] = []byte(cloudPub.String())
+	dialerSecret.Data[tunnel.PeerEndpointPrefix+machineName] = []byte(tunnel.PeerEndpointPending)
+	dialerSecret.Data[tunnel.PeerAllowedIPsPrefix+machineName] = []byte(strings.Join(allowed, ","))
+	dialerSecret.Data[tunnel.PeerRouteHostsPrefix+machineName] = []byte(strings.Join(routeHosts, ","))
 	if err := r.Patch(ctx, dialerSecret, patch); err != nil {
 		return ctrl.Result{}, fmt.Errorf("updating dialer peer secret: %w", err)
 	}
@@ -375,12 +408,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 }
 
 // infraProviderFor finds the registered InfraProvider whose GVK.Kind
-// matches a Machine's spec.infrastructureRef.kind (e.g. "AWSMachine",
-// "ContainernetMachine"), or nil if none is registered for it. This
-// is the whole of the reconciler's provider-selection logic -- it is
-// deliberately never anything more specific than a Kind comparison,
-// so registering a new InfraProvider is the only thing needed to
-// support a new infrastructure.
+// matches a Machine's spec.infrastructureRef.kind, or nil if none is
+// registered for it. Deliberately never anything more specific than a
+// Kind comparison, so registering a new InfraProvider is the only
+// thing needed to support a new infrastructure.
 func (r *Reconciler) infraProviderFor(kind string) InfraProvider {
 	for _, p := range r.InfraProviders {
 		if p.GVK().Kind == kind {
@@ -390,95 +421,37 @@ func (r *Reconciler) infraProviderFor(kind string) InfraProvider {
 	return nil
 }
 
-// onPremPeerDoc is one on-prem node's entry in the cloud-side dialer's
-// --peers-file JSON document -- field names/JSON tags deliberately
-// mirror cmd/dialer/main.go's own peerSpec (a different package, no
-// shared Go type across the module boundary, but the same wire shape).
-// Endpoint is always empty: the cloud node only ever listens, it never
-// dials an on-prem peer (the on-prem side is the one behind NAT with
-// no inbound path).
-type onPremPeerDoc struct {
-	PublicKey    string   `json:"publicKey"`
-	WGAllowedIPs []string `json:"allowedIPs"`
-	RouteHost    string   `json:"routeHost"`
-}
-
-// onPremPeers derives the cloud side's peer list from wg-dialer-peer's
-// per-node private keys (public keys are derived, not stored separately
-// -- the Secret only ever needed to hold what each dialer needs for
-// itself), local tunnel addresses, and each node's real cluster VIP(s)
-// (a "cluster-vip-<node>" key, comma-separated, e.g.
-// "10.101.0.1,fd8f:cf26:522a::1" for the on-prem host -- every node here is
-// genuinely dual-stack, confirmed against the live cluster's own
-// Node.status.addresses, so this is not a hypothetical). All of the
-// tunnel address plus every cluster VIP go into WGAllowedIPs (WireGuard's
-// own cryptokey-routing accept list, never a kernel route -- see
-// cmd/dialer/main.go's package doc): BGP traffic uses the real cluster
-// VIP(s), not the tunnel address, and WireGuard only decrypts/routes
-// traffic matching a peer's AllowedIPs -- an on-prem node's IPv6
-// cluster traffic would be silently undeliverable through the tunnel
-// if only its IPv4 VIP were listed. RouteHost stays just the tunnel
-// address -- the one thing the cloud-side dialer needs an actual
-// kernel route for.
-func onPremPeers(secret *corev1.Secret) ([]onPremPeerDoc, error) {
-	var peers []onPremPeerDoc
-	for key, val := range secret.Data {
-		const prefix = "dialer-private-key-"
-		if !strings.HasPrefix(key, prefix) {
-			continue
-		}
-		nodeName := strings.TrimPrefix(key, prefix)
-		priv, err := wgtypes.ParseKey(strings.TrimSpace(string(val)))
-		if err != nil {
-			return nil, fmt.Errorf("parsing %s: %w", key, err)
-		}
-		localAddr, ok := secret.Data["local-address-"+nodeName]
-		if !ok {
-			return nil, fmt.Errorf("secret has %s but no matching local-address-%s", key, nodeName)
-		}
-		clusterVIPs, ok := secret.Data["cluster-vip-"+nodeName]
-		if !ok {
-			return nil, fmt.Errorf("secret has %s but no matching cluster-vip-%s", key, nodeName)
-		}
-		tunnelAddr := strings.SplitN(strings.TrimSpace(string(localAddr)), "/", 2)[0]
-		allowedIPs := []string{hostCIDR(tunnelAddr)}
-		for _, vip := range strings.Split(string(clusterVIPs), ",") {
-			vip = strings.TrimSpace(vip)
-			if vip == "" {
-				continue
-			}
-			allowedIPs = append(allowedIPs, hostCIDR(vip))
-		}
-		pub := priv.PublicKey()
-		peers = append(peers, onPremPeerDoc{
-			PublicKey:    pub.String(),
-			WGAllowedIPs: allowedIPs,
-			RouteHost:    tunnelAddr,
-		})
+// dialerBinaryFor picks the per-arch download URL + pinned sha256 for
+// the joining machine. Arch comes from the infra provider's values
+// ("arch": e.g. AWS derives it from the instance type); a provider
+// that contributes none gets arm64 -- the only arch this project has
+// ever provisioned -- but an unpinned digest is always fatal: silently
+// rendering userdata that downloads an unverifiable binary is not a
+// fallback, it's a supply-chain hole.
+func (r *Reconciler) dialerBinaryFor(infraValues map[string]any) (string, string, error) {
+	arch := "arm64"
+	if v, ok := infraValues["arch"].(string); ok && v != "" {
+		arch = v
 	}
-	sort.Slice(peers, func(i, j int) bool { return peers[i].PublicKey < peers[j].PublicKey })
-	return peers, nil
-}
-
-// hostCIDR appends the correct single-host prefix length for addr's
-// family -- /32 for IPv4, /128 for IPv6. The cluster is dual-stack
-// (Calico vip0 carries both an IPv4 and an IPv6 cluster VIP per node),
-// so any address flowing through here, tunnel or cluster VIP alike,
-// may genuinely be IPv6, not just IPv4 with a differently-shaped
-// string. Hardcoding /32 against an IPv6 literal produces an address
-// that either fails to parse as WireGuard AllowedIPs or, worse,
-// silently matches the wrong host count.
-func hostCIDR(addr string) string {
-	if ip := net.ParseIP(addr); ip != nil && ip.To4() == nil {
-		return addr + "/128"
+	var url, sha string
+	switch arch {
+	case "arm64":
+		url, sha = r.DialerBinaryURLARM64, r.DialerBinarySHA256ARM64
+	case "amd64":
+		url, sha = r.DialerBinaryURLAMD64, r.DialerBinarySHA256AMD64
+	default:
+		return "", "", fmt.Errorf("no dialer binary configured for arch %q", arch)
 	}
-	return addr + "/32"
+	if url == "" || sha == "" {
+		return "", "", fmt.Errorf("dialer binary URL/sha256 for arch %q not configured (--join-dialer-binary-url-%s/--join-dialer-binary-sha256-%s)", arch, arch, arch)
+	}
+	return url, sha, nil
 }
 
 // allocateNodeVIPIndex finds the next free node-VIP index by scanning
 // existing cloud-worker Machines' NodeVIPAnnotation, starting from
 // NodeVIPStart. No separate allocator state needed.
-func (r *Reconciler) allocateNodeVIPIndex(ctx context.Context, labels map[string]string) (int, error) {
+func (r *Reconciler) allocateNodeVIPIndex(ctx context.Context) (int, error) {
 	list := &unstructured.UnstructuredList{}
 	list.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "MachineList"})
 	if err := r.List(ctx, list); err != nil {
@@ -503,12 +476,9 @@ func (r *Reconciler) allocateNodeVIPIndex(ctx context.Context, labels map[string
 
 // allocateWireGuardAddress finds the next free cloud tunnel address by
 // scanning existing cloud-worker Machines' WireGuardAddrAnnotation,
-// starting from r.WireGuardAddress (the base address, e.g.
-// "10.100.0.2/24" -> next free is "10.100.0.3/24", then ".4", ...).
-// Mirrors allocateNodeVIPIndex exactly, for the same reason: each cloud
-// Machine needs its own distinct value, never a single literal reused
-// across all of them (see WireGuardAddrAnnotation's doc comment for the
-// bug this fixes).
+// starting from r.WireGuardAddress (the base address). Mirrors
+// allocateNodeVIPIndex exactly (see WireGuardAddrAnnotation's doc
+// comment for the bug this fixes).
 func (r *Reconciler) allocateWireGuardAddress(ctx context.Context) (string, error) {
 	ip, ipNet, err := net.ParseCIDR(r.WireGuardAddress)
 	if err != nil {

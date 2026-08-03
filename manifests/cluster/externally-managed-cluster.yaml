@@ -1,0 +1,74 @@
+# Template: the externally-managed CAPI Cluster + AWSCluster pair a
+# ProvisionedNodeClaim resolves against. Created once per target
+# cluster; the claim controller derives everything per-node.
+#
+# No bootstrap provider (no k0smotron): its worker bootstrap controller
+# unconditionally requires Cluster.spec.controlPlaneRef to resolve to a
+# real object (confirmed by reading worker_bootstrap_controller.go's
+# setClientScope -- its own comment claims a graceful fallback to the
+# management cluster client when no ref is given, but the code errors
+# out instead with "object reference not set"). That makes it
+# fundamentally incompatible with a target cluster that isn't
+# CAPI-managed, which is exactly this case.
+# Machine.spec.bootstrap.dataSecretName exists precisely so a bootstrap
+# provider isn't required -- the claim controller presets it and the
+# join reconciler renders the Secret.
+#
+# Since the underlying k0s cluster isn't CAPI-managed, this pair must
+# carry the cluster.x-k8s.io/managed-by annotation so CAPA never
+# touches real AWS infrastructure for the CLUSTER (it still provisions
+# AWSMachines). See
+# https://cluster-api-aws.sigs.k8s.io/topics/bring-your-own-aws-infrastructure#using-externally-managed-aws-clusters
+#
+# CAPI's own clustercache also needs live API access to the target
+# cluster (normally supplied by a CAPI-managed control plane) --
+# create a <cluster-name>-kubeconfig Secret once, out of band, from a
+# real kubeconfig pointed at the cluster's own internal API address
+# (not a tailnet/admin-only address -- it must be reachable from
+# inside the target cluster's own pod network):
+#   kubectl create secret generic <cluster-name>-kubeconfig -n default \
+#     --from-file=value=<kubeconfig-with-server-set-to-the-internal-API-address>
+#
+# One manual step remains after apply (documented deviation): CAPA
+# waits for the externally-managed AWSCluster to be marked ready.
+#   kubectl patch awscluster <cluster-name> --subresource=status \
+#     --type=merge -p '{"status":{"ready":true}}'
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: <cluster-name>
+  namespace: default
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AWSCluster
+    name: <cluster-name>
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSCluster
+metadata:
+  name: <cluster-name>
+  namespace: default
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+spec:
+  region: <region>
+  identityRef:
+    kind: AWSClusterStaticIdentity
+    name: <identity-name>
+---
+# CAPA ALWAYS resolves this secretRef against its own manager
+# namespace (capa-system), never the AWSCluster's -- a Secret placed
+# anywhere else produces an indefinite, opaque "Secret not found"
+# retry loop inside CAPA. The controller's preflight (aws.Provider
+# Validate) turns that into an immediate, actionable error, but put it
+# in capa-system in the first place.
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSClusterStaticIdentity
+metadata:
+  name: <identity-name>
+spec:
+  secretRef: <credentials-secret-name-in-capa-system>
+  allowedNamespaces: {}

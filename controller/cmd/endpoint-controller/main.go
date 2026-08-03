@@ -1,27 +1,39 @@
-// Command wg-dialer-endpoint-controller watches core Cluster API Machine
-// objects and mirrors their external address into the wg-dialer DaemonSet's
-// peer Secret, so the cluster-side dialer always has an up to date endpoint
-// for the node it's dialing -- without anything having to know AWSMachine's
-// schema exists.
+// Command endpoint-controller is the cloud-provisioning operator. It
+// runs three reconcilers over one manager:
+//
+//   - claim: expands a ProvisionedNodeClaim (the ONE resource a user
+//     commits) into the CAPI Machine + provider machine pair.
+//   - join: renders the tunnel-bootstrapping userdata into each
+//     Machine's own bootstrap Secret.
+//   - mesh (this file): owns the tunnel mesh -- allocates each selected
+//     tunnel-endpoint node's address, mirrors Machine external
+//     addresses into the peer Secret, renders each remote's adoption
+//     config, and creates both dialer DaemonSets directly (no CRD, no
+//     hand-authored pod spec).
 //
 // Cluster API's own Machine controller copies the address up from
 // whatever infrastructure provider sits underneath (AWSMachine today,
-// anything else later) into Machine.status.addresses automatically. That
-// is the one thing this controller depends on; it never reads AWSMachine
-// (or any other provider-specific type) directly.
+// anything else later) into Machine.status.addresses. That is the one
+// thing the mesh reconciler depends on; it never reads AWSMachine (or
+// any other provider-specific type) directly.
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	"time"
 
+	v1alpha1 "github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	"github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	joink0s "github.com/appmana/cloud-provisioning/controller/pkg/join/k0s"
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,16 +47,17 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var machineGVK = schema.GroupVersionKind{
-	Group:   "cluster.x-k8s.io",
-	Version: "v1beta1",
-	Kind:    "Machine",
-}
+// machineGVK is v1beta2 throughout this module: v1beta1 is gone from
+// current Cluster API, and a stale version here silently produced a
+// watch that never fired (so no DaemonSet was ever created).
+var machineGVK = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"}
 
 var gatewayGVK = schema.GroupVersionKind{
 	Group:   "gateway.networking.k8s.io",
@@ -57,68 +70,42 @@ const externalDNSTargetAnnotation = "external-dns.alpha.kubernetes.io/target"
 // cloudWorkerTaintKey is the ONE taint every cloud-worker node
 // registers itself with (via kubelet's own --register-with-taints,
 // baked into the join-pattern template) and the ONE toleration the
-// on-prem wg-dialer DaemonSet must NOT have (so it never schedules
-// onto the cloud-worker node itself -- that node dials no one, it's
-// dialed) while the public Gateway's own DaemonSet (created entirely
-// separately, outside this operator) DOES tolerate it.
+// public Gateway's own data-plane DaemonSet must have. The on-prem
+// dialer DaemonSet deliberately does not tolerate it.
 //
-// This is a single Go constant, not two independently-configured
-// flag defaults, precisely because letting the taint key drift
-// between where it's applied and where it's tolerated was a real bug
-// caught live: a node ended up with a taint nothing tolerated, so its
-// own Gateway data-plane pod could never schedule.
+// A single Go constant, not independently-configured flag defaults,
+// precisely because letting the taint key drift between where it's
+// applied and where it's tolerated was a real bug caught live: a node
+// ended up with a taint nothing tolerated, so its own Gateway
+// data-plane pod could never schedule.
 const cloudWorkerTaintKey = "cloud-provisioning.appmana.com/internet-facing"
 
 // cloudWorkerRoleLabel/Value select which Machine this operator
-// treats as the cloud-worker peer -- also the default
-// --machine-selector value, so the label a node registers with and
-// the selector used to find its Machine can't drift either.
+// treats as a remote peer -- also the default --machine-selector
+// value, so the label a node registers with and the selector used to
+// find its Machine can't drift either.
 const (
 	cloudWorkerRoleLabel = "cloud-provisioning.appmana.com/role"
 	cloudWorkerRoleValue = "cloud-worker"
 )
 
-// Historical note: this used to be defaultDialerAllowedIPs, a single
-// flag value fed into BOTH WireGuard's own peer config AND a literal
-// kernel-route-installation loop in cmd/dialer/main.go -- a real
-// incident (the on-prem host, AllowedIPs=0.0.0.0/0) hijacked the node's entire
-// routing table this way. The dialer no longer takes a single conflated
-// --allowed-ips value at all: WireGuard's own accept-list (real cluster
-// pod-CIDR/service-CIDR ranges, --pod-cidrs/--service-cidrs below) and
-// the kernel route it installs (always a single narrow host address per
-// peer, derived automatically, never configurable) are now genuinely
-// separate mechanisms -- see cmd/dialer/main.go's package doc.
+// controlPlaneLabel marks control-plane nodes. The on-prem dialer
+// DaemonSet excludes them by nodeAffinity, not merely by lacking a
+// toleration: the other side of a cloud tunnel must never land on a
+// controller. Control planes therefore carry no WireGuard interface
+// and no tunnel routes at all -- the the on-prem host incident class is excluded
+// by scheduling, not only by code. Remotes reach the API through a
+// designated worker that masquerades tunnel-sourced traffic.
+const controlPlaneLabel = "node-role.kubernetes.io/control-plane"
 
-// reconciler mirrors one Machine's external address into a Secret key.
-// It never watches or reads the Secret it writes -- the dialer DaemonSet
-// (manifests/wg-dialer/dialer.yaml) polls the mounted file itself and
-// re-applies `wg set` when it changes, so there is nothing for this
-// controller to coordinate beyond a plain patch.
-//
-// Optionally (when gatewayNamespace/gatewayName are set) it also stamps
-// the same IP onto a Gateway's external-dns target annotation. This
-// exists because a Gateway whose data plane is pinned to one node via
-// hostPorts (rather than a cloud LoadBalancer) has no dependable
-// Gateway.status.addresses for external-dns to read -- the annotation
-// bypasses that entirely, and this controller already has the one piece
-// of information (the node's real external IP) that annotation needs.
-//
-// This must be the Gateway, not the HTTPRoute: confirmed by reading
-// external-dns's gateway.go (gatewayRouteResolver.resolve) --
-// annotations.TargetsFromTargetAnnotation is called on gw.gateway, the
-// parent Gateway object, never on the route. A target annotation on the
-// HTTPRoute itself is silently ignored.
-type reconciler struct {
+// meshReconciler owns the tunnel mesh.
+type meshReconciler struct {
 	client.Client
-	// reader is the manager's uncached API reader. The Secret and
-	// Gateway are read once per reconcile, never watched -- routing
-	// those Gets through the normal cached client would make
-	// controller-runtime start a cluster-wide list+watch informer for
-	// the whole type, which needs list/watch RBAC this identity
-	// deliberately doesn't have (it only has get, scoped to the one
-	// named object). The cached Client is still used for the Machine
-	// watch (which is the actual thing meant to be watched) and for
-	// Patch, which doesn't go through the cache either way.
+	// reader is the manager's uncached API reader. The Secret, Gateway
+	// and DaemonSets are read once per reconcile, never watched --
+	// routing those Gets through the cached client would make
+	// controller-runtime start cluster-wide informers for those types,
+	// needing list/watch RBAC this identity deliberately doesn't have.
 	reader           client.Reader
 	secretNamespace  string
 	secretName       string
@@ -127,43 +114,57 @@ type reconciler struct {
 	gatewayNamespace string
 	gatewayName      string
 
-	// Dialer DaemonSet provisioning: this operator owns the on-prem
-	// dialer DaemonSet's full spec directly -- there is no separate
-	// CRD, and it is never hand-authored in gitops. It's provisioned
-	// unconditionally alongside every reconcile of a matching Machine
-	// (not gated on anything Machine-specific): dialing out to the
-	// cloud worker is simply always wanted, whenever this operator is
-	// running at all.
+	// Tunnel-endpoint placement: which local nodes terminate tunnels.
+	// Empty selector = every Linux worker. Control-plane nodes are
+	// excluded unless explicitly selected.
+	tunnelEndpointSelector labels.Selector
+	tunnelEndpointsRaw     string
+	tunnelSubnet           string
+	localAddressBase       string
+
+	// Dialer DaemonSets: this operator owns both specs directly --
+	// there is no CRD and they are never hand-authored in gitops.
 	dialerDaemonSetName   string
 	dialerServiceAccount  string
 	dialerImage           string
 	dialerImagePullSecret string
 	dialerPodCIDRs        string
 	dialerServiceCIDRs    string
+	dialerPrivateKeyDir   string
+	ifaceName             string
+	apiVIP                string
 
-	// Cloud-worker dialer DaemonSet: the SAME dialer binary, running
-	// containerized (hostNetwork, NET_ADMIN) on the cloud-worker node
-	// itself once it has joined as a real k8s Node -- see
-	// ensureCloudDialerDaemonSet's doc comment for why this coexists
-	// with, rather than replaces, the wg-dialer.service systemd unit
-	// cloud-init already installed at bootstrap.
 	dialerCloudDaemonSetName string
 	dialerCloudListenPort    string
 }
 
-func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	// Provisioning the on-prem dialer DaemonSet is unconditional: we
-	// always want the tunnel, it isn't gated on this specific Machine
-	// reaching any particular state. Doing it first means it exists
-	// even before the peer's ExternalIP/endpoint is known (the dialer
-	// itself tolerates "peer-endpoint: pending" already).
+	// Allocate tunnel addresses and cluster VIPs for every selected
+	// endpoint node first: the peer graph the dialers and the join
+	// reconciler read is derived from these, and a node that hasn't
+	// been allocated one is not a mesh member.
+	if err := r.reconcileTunnelEndpoints(ctx); err != nil {
+		return ctrl.Result{}, fmt.Errorf("reconciling tunnel endpoints: %w", err)
+	}
+
+	// The DaemonSets are unconditional: the tunnel is always wanted
+	// whenever this operator runs at all, and the dialer tolerates a
+	// peer whose endpoint is still "pending".
 	if err := r.ensureDialerDaemonSet(ctx); err != nil {
 		return ctrl.Result{}, fmt.Errorf("ensuring dialer daemonset: %w", err)
 	}
 	if err := r.ensureCloudDialerDaemonSet(ctx); err != nil {
 		return ctrl.Result{}, fmt.Errorf("ensuring cloud dialer daemonset: %w", err)
+	}
+
+	// Node events enqueue a nameless request (they change the endpoint
+	// SET, not any one Machine): mesh-wide maintenance above is all
+	// they ask for. An empty-name Get would be a non-NotFound error --
+	// an infinite error requeue, not a no-op.
+	if req.Name == "" {
+		return ctrl.Result{}, nil
 	}
 
 	machine := &unstructured.Unstructured{}
@@ -173,6 +174,17 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
+	}
+
+	// Adoption config: a public-data-only peer list for this machine,
+	// re-rendered from live cluster state every reconcile. The cloud
+	// dialer prefers it over the bootstrap peers.json baked into
+	// immutable userdata -- which is how post-join corrections (pod/
+	// service CIDRs, added or removed peers, changed endpoints) ever
+	// reach the node at all. Never contains a private key: this
+	// document lands on an internet-facing machine.
+	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
+		return ctrl.Result{}, fmt.Errorf("ensuring adoption config: %w", err)
 	}
 
 	addresses, found, err := unstructured.NestedSlice(machine.Object, "status", "addresses")
@@ -212,8 +224,8 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	// Per-Machine key (r.secretKey is a PREFIX, e.g. "peer-endpoint-"),
-	// not a flat singleton -- a second cloud Machine matching the
-	// selector must never clobber the first's endpoint entry.
+	// not a flat singleton -- a second cloud Machine must never clobber
+	// the first's endpoint entry.
 	machineKey := r.secretKey + machine.GetName()
 	if string(secret.Data[machineKey]) != endpoint {
 		patch := client.MergeFrom(secret.DeepCopy())
@@ -251,15 +263,198 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	return ctrl.Result{}, nil
 }
 
-// ensureDialerDaemonSet creates or updates the on-prem wg-dialer
+// reconcileTunnelEndpoints allocates a tunnel address and records the
+// cluster addresses of every node selected to terminate tunnels. The
+// selection is a plain node selector (the claim's tunnelEndpoints,
+// passed to this operator), which is what makes a fully connected
+// mesh, a single sacrificial test node, or workers-only-by-default all
+// the same mechanism with different selectors.
+//
+// A node's own dialer publishes its public key; this loop never sees
+// or wants a private key.
+func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
+	nodes := &corev1.NodeList{}
+	if err := r.List(ctx, nodes); err != nil {
+		return fmt.Errorf("listing nodes: %w", err)
+	}
+
+	secret := &corev1.Secret{}
+	secretKey := types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}
+	if err := r.reader.Get(ctx, secretKey, secret); err != nil {
+		return fmt.Errorf("getting secret %s: %w", secretKey, err)
+	}
+	patch := client.MergeFrom(secret.DeepCopy())
+	if secret.Data == nil {
+		secret.Data = map[string][]byte{}
+	}
+
+	// Existing allocations stay put; new nodes take the next free host
+	// in the tunnel subnet.
+	used := map[string]bool{}
+	for key, val := range secret.Data {
+		if strings.HasPrefix(key, tunnel.NodeTunnelAddressPrefix) {
+			used[strings.SplitN(strings.TrimSpace(string(val)), "/", 2)[0]] = true
+		}
+	}
+
+	changed := false
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+		if !r.isTunnelEndpoint(node) {
+			continue
+		}
+		addrKey := tunnel.NodeTunnelAddressPrefix + node.Name
+		if len(secret.Data[addrKey]) == 0 {
+			addr, err := nextFreeAddress(r.localAddressBase, used)
+			if err != nil {
+				return err
+			}
+			used[strings.SplitN(addr, "/", 2)[0]] = true
+			secret.Data[addrKey] = []byte(addr)
+			changed = true
+		}
+		// Cluster VIPs: the node's real addresses, which is what BGP
+		// sessions and kubelet traffic actually use -- the tunnel
+		// address alone is not enough for either.
+		var vips []string
+		for _, a := range node.Status.Addresses {
+			if a.Type == corev1.NodeInternalIP && a.Address != "" {
+				vips = append(vips, a.Address)
+			}
+		}
+		vipKey := tunnel.NodeClusterVIPsPrefix + node.Name
+		joined := strings.Join(vips, ",")
+		if joined != "" && string(secret.Data[vipKey]) != joined {
+			secret.Data[vipKey] = []byte(joined)
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return r.Patch(ctx, secret, patch)
+}
+
+// isTunnelEndpoint reports whether a node should terminate tunnels:
+// Linux, and matching the tunnelEndpoints selector. Control-plane
+// nodes are excluded unless the selector names them explicitly --
+// "the other side of the tunnel does not land on a controller" is the
+// default, overridable only by asking for it.
+func (r *meshReconciler) isTunnelEndpoint(node *corev1.Node) bool {
+	if node.Labels["kubernetes.io/os"] == "windows" {
+		return false
+	}
+	if _, isCP := node.Labels[controlPlaneLabel]; isCP && !selectorNamesControlPlane(r.tunnelEndpointsRaw) {
+		return false
+	}
+	if r.tunnelEndpointSelector == nil || r.tunnelEndpointSelector.Empty() {
+		return true
+	}
+	return r.tunnelEndpointSelector.Matches(labels.Set(node.Labels))
+}
+
+// selectorNamesControlPlane reports whether the operator was asked,
+// explicitly, to place tunnels on control-plane nodes.
+func selectorNamesControlPlane(raw string) bool {
+	return strings.Contains(raw, controlPlaneLabel)
+}
+
+// nextFreeAddress returns the next unused host address in base's
+// subnet (base is e.g. "10.100.0.1/24": the first endpoint gets
+// exactly that, subsequent ones the next free host).
+func nextFreeAddress(base string, used map[string]bool) (string, error) {
+	ip, ipNet, err := net.ParseCIDR(base)
+	if err != nil {
+		return "", fmt.Errorf("parsing tunnel address base %q: %w", base, err)
+	}
+	prefixLen, _ := ipNet.Mask.Size()
+	v4 := ip.To4()
+	if v4 == nil {
+		return "", fmt.Errorf("tunnel address base %q must be IPv4", base)
+	}
+	for last := int(v4[3]); last < 255; last++ {
+		candidate := fmt.Sprintf("%d.%d.%d.%d", v4[0], v4[1], v4[2], last)
+		if !used[candidate] {
+			return fmt.Sprintf("%s/%d", candidate, prefixLen), nil
+		}
+	}
+	return "", fmt.Errorf("tunnel subnet %s is exhausted", base)
+}
+
+// ensureAdoptionConfig renders the live, public-data-only peer list
+// for one remote machine into its own Secret. This is the mechanism
+// that makes "adoption" mean something: the bootstrap peers.json in
+// userdata is a frozen snapshot from provisioning time, while this
+// Secret is re-derived from cluster state on every reconcile, and the
+// cloud dialer prefers it once readable.
+func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unstructured.Unstructured) error {
+	peerSecret := &corev1.Secret{}
+	if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, peerSecret); err != nil {
+		return fmt.Errorf("getting peer secret: %w", err)
+	}
+	selfTunnelAddr := strings.SplitN(strings.TrimSpace(machine.GetAnnotations()["cloud-provisioning.appmana.com/wireguard-addr4"]), "/", 2)[0]
+	peers, err := tunnel.RemotePeers(peerSecret.Data, selfTunnelAddr, r.apiVIP)
+	if err != nil {
+		return err
+	}
+	if len(peers) == 0 {
+		return nil
+	}
+	doc, err := json.Marshal(tunnel.PeerListDoc{Peers: peers})
+	if err != nil {
+		return err
+	}
+
+	name := tunnel.AdoptionSecretName(machine.GetName())
+	desired := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: r.secretNamespace},
+		Data:       map[string][]byte{tunnel.CloudPeersKey: doc},
+	}
+	existing := &corev1.Secret{}
+	err = r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: name}, existing)
+	if apierrors.IsNotFound(err) {
+		return r.Create(ctx, desired)
+	}
+	if err != nil {
+		return fmt.Errorf("getting adoption secret %s/%s: %w", r.secretNamespace, name, err)
+	}
+	if string(existing.Data[tunnel.CloudPeersKey]) == string(doc) {
+		return nil
+	}
+	patch := client.MergeFrom(existing.DeepCopy())
+	if existing.Data == nil {
+		existing.Data = map[string][]byte{}
+	}
+	existing.Data[tunnel.CloudPeersKey] = doc
+	return r.Patch(ctx, existing, patch)
+}
+
+// ensureDialerDaemonSet creates or updates the on-prem dialer
 // DaemonSet directly -- no CRD, no gitops YAML for its pod spec. Its
-// desired state is entirely computed from this operator's own fixed
-// Go constants/flags (image, AllowedIPs, the shared taint) plus the
-// Secret it already manages, so it can never drift out of sync with
-// what this operator itself expects (the actual root cause of a real
-// bug caught live: a hand-authored DaemonSet's AllowedIPs and taint
-// values were wrong and had no way to be kept honest against reality).
-func (r *reconciler) ensureDialerDaemonSet(ctx context.Context) error {
+// desired state is entirely computed from this operator's own
+// constants/flags plus the Secret it manages, so it can never drift
+// out of sync with what this operator expects (the actual root cause
+// of a real bug caught live: a hand-authored DaemonSet's AllowedIPs
+// and taint values were wrong with no way to be kept honest).
+//
+// Scheduling: Linux nodes matching the tunnelEndpoints selector,
+// with control-plane nodes excluded by nodeAffinity (see
+// controlPlaneLabel) and no toleration for the cloud-worker taint (so
+// it never lands on the remote node it dials).
+func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
+	nodeSelectorTerms := []corev1.NodeSelectorRequirement{
+		{Key: "kubernetes.io/os", Operator: corev1.NodeSelectorOpIn, Values: []string{"linux"}},
+	}
+	if !selectorNamesControlPlane(r.tunnelEndpointsRaw) {
+		nodeSelectorTerms = append(nodeSelectorTerms, corev1.NodeSelectorRequirement{
+			Key: controlPlaneLabel, Operator: corev1.NodeSelectorOpDoesNotExist,
+		})
+	}
+	for _, req := range parseSelectorRequirements(r.tunnelEndpointsRaw) {
+		nodeSelectorTerms = append(nodeSelectorTerms, req)
+	}
+
+	hostPathDirectoryOrCreate := corev1.HostPathDirectoryOrCreate
 	desired := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.dialerDaemonSetName,
@@ -272,18 +467,12 @@ func (r *reconciler) ensureDialerDaemonSet(ctx context.Context) error {
 				Spec: corev1.PodSpec{
 					HostNetwork:        true,
 					ServiceAccountName: r.dialerServiceAccount,
-					// Control-plane toleration only: this DaemonSet
-					// must run on every ON-PREM node (including
-					// the on-prem host, a control-plane node), but must NEVER
-					// run on the cloud-worker node itself -- it dials
-					// out to that node, it doesn't run there. Since
-					// it has no toleration for cloudWorkerTaintKey,
-					// the scheduler excludes it from that node
-					// automatically; the Gateway's own DaemonSet
-					// (created entirely separately) is the one thing
-					// that does tolerate it.
-					Tolerations: []corev1.Toleration{
-						{Key: "node-role.kubernetes.io/control-plane", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule},
+					Affinity: &corev1.Affinity{
+						NodeAffinity: &corev1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+								NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: nodeSelectorTerms}},
+							},
+						},
 					},
 					ImagePullSecrets: []corev1.LocalObjectReference{{Name: r.dialerImagePullSecret}},
 					Containers: []corev1.Container{
@@ -300,14 +489,25 @@ func (r *reconciler) ensureDialerDaemonSet(ctx context.Context) error {
 							Args: []string{
 								fmt.Sprintf("--secret-namespace=%s", r.secretNamespace),
 								fmt.Sprintf("--secret-name=%s", r.secretName),
-								"--iface=wg0",
-								"--private-key-secret-key=dialer-private-key-$(NODE_NAME)",
-								"--local-address-secret-key=local-address-$(NODE_NAME)",
+								fmt.Sprintf("--iface=%s", r.ifaceName),
+								fmt.Sprintf("--private-key-file=%s/private.key", r.dialerPrivateKeyDir),
 								fmt.Sprintf("--pod-cidrs=%s", r.dialerPodCIDRs),
 								fmt.Sprintf("--service-cidrs=%s", r.dialerServiceCIDRs),
+								fmt.Sprintf("--transit-masquerade-source=%s", r.tunnelSubnet),
 								"--keepalive-seconds=15",
 								"--mtu=1420",
 								"--poll-interval=30s",
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{Name: "dialer-key", MountPath: r.dialerPrivateKeyDir},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "dialer-key",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: r.dialerPrivateKeyDir, Type: &hostPathDirectoryOrCreate},
 							},
 						},
 					},
@@ -328,41 +528,48 @@ func (r *reconciler) ensureDialerDaemonSet(ctx context.Context) error {
 	return r.Update(ctx, existing)
 }
 
-// ensureCloudDialerDaemonSet creates or updates a SECOND dialer
-// DaemonSet -- the same binary as ensureDialerDaemonSet's, but
-// scheduled onto ONLY the cloud-worker node(s) (nodeSelector +
-// toleration for cloudWorkerTaintKey, the exact opposite of the
-// on-prem DaemonSet's scheduling, which structurally excludes this
-// node instead). It reads its peer config from the same
-// /etc/wg-dialer/peers.json file cloud-init already wrote at
-// Machine-provisioning time (hostPath-mounted read-only), via
-// --peers-file -- there is no in-cluster Secret this DaemonSet reads or
-// needs RBAC for.
+// parseSelectorRequirements turns a plain "k=v,k2=v2" selector string
+// into node-affinity requirements. Only equality terms are supported
+// (that is all a node placement selector needs here); anything else
+// is ignored rather than silently mis-scheduling.
+func parseSelectorRequirements(raw string) []corev1.NodeSelectorRequirement {
+	var out []corev1.NodeSelectorRequirement
+	for _, term := range strings.Split(raw, ",") {
+		term = strings.TrimSpace(term)
+		if term == "" || !strings.Contains(term, "=") || strings.Contains(term, "!=") {
+			continue
+		}
+		parts := strings.SplitN(term, "=", 2)
+		key, value := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+		if key == "" || value == "" {
+			continue
+		}
+		out = append(out, corev1.NodeSelectorRequirement{
+			Key: key, Operator: corev1.NodeSelectorOpIn, Values: []string{value},
+		})
+	}
+	return out
+}
+
+// ensureCloudDialerDaemonSet creates or updates the remote-side dialer
+// DaemonSet -- the same binary, scheduled onto ONLY the cloud-worker
+// node(s) (nodeSelector + toleration for the cloud-worker taint, the
+// exact opposite of the on-prem DaemonSet's scheduling). It keeps its
+// IDENTITY from the /etc/wg-dialer/peers.json cloud-init wrote
+// (hostPath, read-only: the private key must never travel through the
+// API) but takes its PEER LIST from the per-machine adoption Secret
+// this operator re-renders every reconcile -- so post-join
+// corrections reach a node whose userdata is immutable.
 //
-// This deliberately does NOT replace or disable the wg-dialer.service
-// systemd unit cloud-init installed: both reconcile to the identical
-// desired state (same peers.json, same pod/service CIDRs) against the
-// same kernel WireGuard device, so running both is harmless
-// redundancy, not a conflict -- ConfigureDevice is idempotent, and wg0
-// itself is a kernel-resident device that outlives any single
-// process's lifetime (confirmed: nothing in cmd/dialer ever calls
-// LinkDel on shutdown). This was a deliberate design choice, not an
-// oversight: the alternative -- having this DaemonSet somehow signal
-// the systemd unit to stop once it takes over -- creates exactly the
-// failure mode this must never have: if the DaemonSet's own pod can
-// never schedule (a kubelet/CNI problem, the DaemonSet controller
-// being down, anything), a bootstrap tunnel that had already been
-// disabled would leave the node with no path back to the API server at
-// all, undoing the one guarantee that must always hold. Leaving the
-// systemd unit alone forever means it can never be the thing that
-// broke. What this DaemonSet buys instead is a normal, Kubernetes-native
-// upgrade path going forward: bumping --dialer-image and letting a
-// rolling DaemonSet update happen is how the binary gets updated on an
-// already-provisioned cloud-worker node -- no host-level binary-swap or
-// systemctl-restart machinery needed, because Kubernetes' own pod
-// lifecycle already does the equivalent (image pull, container
-// restart, readiness-gated rollout) for a plain containerized process.
-func (r *reconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
+// This deliberately does NOT disable the wg-dialer.service systemd
+// unit cloud-init installed: both converge on the same kernel
+// interface (ConfigureDevice is idempotent; nothing ever calls
+// LinkDel), and if this pod could never schedule, a disabled
+// bootstrap tunnel would leave the node with no path back to the API
+// at all -- undoing the one guarantee that must always hold. What the
+// DaemonSet buys is a Kubernetes-native upgrade path (bump
+// --dialer-image, rolling update) instead of host binary swaps.
+func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 	hostPathDirectory := corev1.HostPathDirectory
 	desired := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -374,17 +581,12 @@ func (r *reconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": r.dialerCloudDaemonSetName}},
 				Spec: corev1.PodSpec{
-					HostNetwork: true,
-					// Opposite of ensureDialerDaemonSet's scheduling:
-					// this pod must run ONLY on the cloud-worker
-					// node(s), never on-prem. nodeSelector matches the
-					// same role label the join-pattern's kubelet args
-					// already register the node with; the toleration
-					// is for the one taint that same node registers
-					// itself with, which is exactly what excludes the
-					// ON-PREM DaemonSet from ever landing here (see
-					// ensureDialerDaemonSet's own comment).
-					NodeSelector: map[string]string{cloudWorkerRoleLabel: cloudWorkerRoleValue},
+					HostNetwork:        true,
+					ServiceAccountName: r.dialerServiceAccount,
+					NodeSelector: map[string]string{
+						cloudWorkerRoleLabel: cloudWorkerRoleValue,
+						"kubernetes.io/os":   "linux",
+					},
 					Tolerations: []corev1.Toleration{
 						{Key: cloudWorkerTaintKey, Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule},
 					},
@@ -397,9 +599,18 @@ func (r *reconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"NET_ADMIN"}},
 							},
+							Env: []corev1.EnvVar{
+								{Name: "NODE_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"}}},
+							},
 							Args: []string{
-								"--iface=wg0",
+								fmt.Sprintf("--iface=%s", r.ifaceName),
 								"--peers-file=/etc/wg-dialer/peers.json",
+								fmt.Sprintf("--peers-secret-namespace=%s", r.secretNamespace),
+								// One shared pod spec, per-machine Secrets: the
+								// machine's own name is node-local DATA
+								// (cloud-init wrote it), never a per-node flag
+								// baked into this template.
+								"--machine-name-file=/etc/wg-dialer/machine-name",
 								fmt.Sprintf("--listen-port=%s", r.dialerCloudListenPort),
 								fmt.Sprintf("--pod-cidrs=%s", r.dialerPodCIDRs),
 								fmt.Sprintf("--service-cidrs=%s", r.dialerServiceCIDRs),
@@ -424,7 +635,6 @@ func (r *reconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 			},
 		},
 	}
-
 	existing := &appsv1.DaemonSet{}
 	err := r.reader.Get(ctx, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, existing)
 	if apierrors.IsNotFound(err) {
@@ -448,8 +658,9 @@ func main() {
 		gatewayNamespace string
 		gatewayName      string
 
-		// join.Reconciler: automated bootstrap-secret provisioning,
-		// replacing what used to be a manual per-node join process.
+		tunnelEndpoints     string
+		dialerPrivateKeyDir string
+
 		joinEnabled               bool
 		joinTemplatePath          string
 		joinAPIAddress            string
@@ -459,6 +670,7 @@ func main() {
 		joinTokenTTL              time.Duration
 		wireGuardAddress          string
 		wireGuardListenPort       string
+		localAddressBase          string
 		nodeVIP4Prefix            string
 		nodeVIP6Prefix            string
 		nodeVIPStart              int
@@ -471,40 +683,55 @@ func main() {
 		dialerPodCIDRs            string
 		dialerServiceCIDRs        string
 		dialerCloudDaemonSetName  string
+		dialerBinaryURLARM64      string
+		dialerBinarySHA256ARM64   string
+		dialerBinaryURLAMD64      string
+		dialerBinarySHA256AMD64   string
+		awsConfigNamespace        string
+		awsConfigName             string
 	)
 	flag.StringVar(&machineSelector, "machine-selector", fmt.Sprintf("%s=%s", cloudWorkerRoleLabel, cloudWorkerRoleValue),
 		"label selector identifying the Machine(s) whose external address drives the dialer's endpoint")
 	flag.StringVar(&secretNamespace, "secret-namespace", "wg-dialer", "namespace of the dialer peer Secret")
 	flag.StringVar(&secretName, "secret-name", "wg-dialer-peer", "name of the dialer peer Secret")
-	flag.StringVar(&secretKey, "secret-key-prefix", "peer-endpoint-", "prefix (Machine name is appended) for the Secret key this Machine's endpoint is written into -- per-Machine, not a flat singleton, so multiple cloud Machines never clobber each other's entry")
+	flag.StringVar(&secretKey, "secret-key-prefix", tunnel.PeerEndpointPrefix, "prefix (Machine name is appended) for the Secret key this Machine's endpoint is written into -- per-Machine, not a flat singleton")
 	flag.StringVar(&port, "port", "51820", "WireGuard listen port on the joining node")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "metrics endpoint address (0 disables it)")
 	flag.StringVar(&gatewayNamespace, "gateway-namespace", "", "optional: namespace of a Gateway to annotate with the node's external IP for external-dns (blank disables this)")
 	flag.StringVar(&gatewayName, "gateway-name", "", "optional: name of a Gateway to annotate with the node's external IP for external-dns")
+	flag.StringVar(&tunnelEndpoints, "tunnel-endpoints", "", "node selector (k=v,k2=v2) choosing which local nodes terminate tunnels; empty = every Linux worker. Control-plane nodes are excluded unless this selector names node-role.kubernetes.io/control-plane explicitly")
+	flag.StringVar(&dialerPrivateKeyDir, "dialer-private-key-dir", "/var/lib/cloud-provisioning", "host directory where each node's dialer keeps its own WireGuard private key (generated on first start; never leaves the node)")
 	flag.StringVar(&dialerDaemonSetName, "dialer-daemonset-name", "wg-dialer", "name of the on-prem dialer DaemonSet this operator provisions directly")
 	flag.StringVar(&dialerServiceAccount, "dialer-service-account", "wg-dialer", "ServiceAccount the dialer DaemonSet's pods run as")
-	flag.StringVar(&dialerImage, "dialer-image", "ghcr.io/appmana/cloud-provisioning-dialer:e1f8655", "image for the dialer DaemonSet's container")
-	flag.StringVar(&dialerImagePullSecret, "dialer-image-pull-secret", "ghcr-pull", "imagePullSecret for the dialer DaemonSet")
-	flag.StringVar(&dialerPodCIDRs, "dialer-pod-cidrs", "", "comma-separated cluster pod-CIDR ranges (v4/v6), sourced from cluster/k0sctl.yaml's own declared podCIDR at gitops-render time -- fed to the on-prem dialer's WireGuard peer config (cryptokey-routing accept-list only, never a kernel route -- see cmd/dialer/main.go's package doc)")
-	flag.StringVar(&dialerServiceCIDRs, "dialer-service-cidrs", "", "comma-separated cluster service-CIDR ranges (v4/v6), same treatment as --dialer-pod-cidrs, sourced from k0sctl.yaml's serviceCIDR")
-	flag.StringVar(&dialerCloudDaemonSetName, "dialer-cloud-daemonset-name", "wg-dialer-cloud", "name of the cloud-worker dialer DaemonSet this operator provisions directly -- coexists with, does not replace, the wg-dialer.service systemd unit cloud-init installs at bootstrap (see ensureCloudDialerDaemonSet's doc comment)")
+	flag.StringVar(&dialerImage, "dialer-image", "", "REQUIRED image for the dialer DaemonSets, pinned by digest (tag@sha256:...). Deliberately has no default: a stale built-in default once pointed at a pre-hardening build")
+	flag.StringVar(&dialerImagePullSecret, "dialer-image-pull-secret", "ghcr-pull", "imagePullSecret for the dialer DaemonSets")
+	flag.StringVar(&dialerPodCIDRs, "dialer-pod-cidrs", "", "REQUIRED comma-separated cluster pod-CIDR ranges (v4/v6) -- WireGuard cryptokey accept-list only, never a kernel route. Empty silently drops all Calico traffic, so it is fatal instead")
+	flag.StringVar(&dialerServiceCIDRs, "dialer-service-cidrs", "", "REQUIRED comma-separated cluster service-CIDR ranges (v4/v6), same treatment as --dialer-pod-cidrs")
+	flag.StringVar(&dialerCloudDaemonSetName, "dialer-cloud-daemonset-name", "wg-dialer-cloud", "name of the remote-side dialer DaemonSet this operator provisions directly")
 
-	flag.BoolVar(&joinEnabled, "join-enabled", false, "enable the bootstrap-secret provisioning reconciler (join.Reconciler)")
+	flag.BoolVar(&joinEnabled, "join-enabled", true, "enable bootstrap-secret provisioning (join.Reconciler) and claim expansion -- the whole point of this operator; disable only for an endpoint-mirror-only deployment")
 	flag.StringVar(&joinTemplatePath, "join-template-path", "/join-patterns/k0s-worker.cloud-config.tmpl", "path to the join-pattern template to render")
-	flag.StringVar(&joinAPIAddress, "join-api-address", "https://10.101.0.1:6443", "cluster API server address used to mint k0s join tokens (bracket IPv6 literals, e.g. https://[fd8f:cf26:522a::1]:6443)")
-	flag.StringVar(&joinAPIVIP, "join-api-vip", "10.101.0.1", "cluster API VIP the new node must reach through the tunnel before joining")
+	flag.StringVar(&joinAPIAddress, "join-api-address", "", "REQUIRED cluster API server address used to mint join tokens (bracket IPv6 literals, e.g. https://[fd8f:cf26:522a::1]:6443)")
+	flag.StringVar(&joinAPIVIP, "join-api-vip", "", "REQUIRED cluster API VIP the new node must reach through the tunnel before joining")
 	flag.StringVar(&joinKubeletExtraArgs, "join-kubelet-extra-args",
 		fmt.Sprintf("--node-labels=%s=%s --register-with-taints=%s:NoSchedule", cloudWorkerRoleLabel, cloudWorkerRoleValue, cloudWorkerTaintKey),
-		"extra kubelet args applied to every joining cloud-worker node -- defaults derived from the same cloudWorkerTaintKey/RoleLabel constants the dialer DaemonSet's toleration and this operator's own --machine-selector default use, so they can't drift out of sync")
+		"extra kubelet args applied to every joining cloud-worker node -- defaults derived from the same constants the DaemonSet toleration and --machine-selector default use, so they can't drift")
 	flag.StringVar(&joinSSHAuthorizedKeys, "join-ssh-authorized-keys", "", "comma-separated SSH public keys to authorize on every new node")
-	flag.DurationVar(&joinTokenTTL, "join-token-ttl", 2*time.Hour, "validity window for a minted k0s bootstrap token")
-	flag.StringVar(&wireGuardAddress, "join-wireguard-address", "10.100.0.2/24", "WireGuard tunnel address assigned to the cloud side")
-	flag.StringVar(&wireGuardListenPort, "join-wireguard-listen-port", "51820", "WireGuard listen port on the cloud side")
-	flag.StringVar(&nodeVIP4Prefix, "join-node-vip4-prefix", "10.101.0.", "IPv4 prefix for allocated Calico vip0 addresses")
-	flag.StringVar(&nodeVIP6Prefix, "join-node-vip6-prefix", "fd8f:cf26:522a::", "IPv6 prefix for allocated Calico vip0 addresses")
-	flag.IntVar(&nodeVIPStart, "join-node-vip-start", 4, "first node-VIP index to allocate (avoids the on-prem nodes' own fixed .1/.2/.3 addresses)")
-	flag.StringVar(&dialerListenPort, "join-dialer-listen-port", "51820", "WireGuard listen port the on-prem dialer expects the cloud peer to use")
+	flag.DurationVar(&joinTokenTTL, "join-token-ttl", 2*time.Hour, "validity window for a minted join token")
+	flag.StringVar(&wireGuardAddress, "join-wireguard-address", "10.100.0.128/24", "base WireGuard tunnel address for REMOTE (cloud) nodes; each gets the next free address in this subnet")
+	flag.StringVar(&localAddressBase, "tunnel-local-address-base", "10.100.0.1/24", "base WireGuard tunnel address for LOCAL tunnel-endpoint nodes; each selected node gets the next free address in this subnet")
+	flag.StringVar(&wireGuardListenPort, "join-wireguard-listen-port", "51820", "WireGuard listen port on the remote side")
+	flag.StringVar(&nodeVIP4Prefix, "join-node-vip4-prefix", "", "REQUIRED IPv4 prefix for allocated Calico vip0 addresses (e.g. 10.101.0.)")
+	flag.StringVar(&nodeVIP6Prefix, "join-node-vip6-prefix", "", "IPv6 prefix for allocated Calico vip0 addresses (e.g. fd8f:cf26:522a::)")
+	flag.IntVar(&nodeVIPStart, "join-node-vip-start", 200, "first node-VIP index to allocate (must not collide with existing node addresses)")
+	flag.StringVar(&dialerListenPort, "join-dialer-listen-port", "51820", "WireGuard listen port the local dialers expect the remote peer to use")
 	flag.StringVar(&bootstrapSecretNameFormat, "join-bootstrap-secret-name-format", "%s-bootstrap", "printf format (with the Machine's name) for the bootstrap Secret's name")
+	flag.StringVar(&dialerBinaryURLARM64, "join-dialer-binary-url-arm64", "", "REQUIRED (arm64 nodes) URL cloud-init downloads the dialer binary from; nothing installs it on a stock image")
+	flag.StringVar(&dialerBinarySHA256ARM64, "join-dialer-binary-sha256-arm64", "", "REQUIRED (arm64 nodes) sha256 of that binary, verified by cloud-init before the tunnel unit starts")
+	flag.StringVar(&dialerBinaryURLAMD64, "join-dialer-binary-url-amd64", "", "URL cloud-init downloads the amd64 dialer binary from")
+	flag.StringVar(&dialerBinarySHA256AMD64, "join-dialer-binary-sha256-amd64", "", "sha256 of the amd64 binary")
+	flag.StringVar(&awsConfigNamespace, "aws-config-namespace", "wg-dialer", "namespace of the AWS provider-config Secret (AMIs, subnet, security groups, keypair)")
+	flag.StringVar(&awsConfigName, "aws-config-name", "aws-provider-config", "name of the AWS provider-config Secret")
 
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
@@ -512,9 +739,38 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	// Fatal-on-empty for every value whose absence is silent breakage
+	// rather than a visible error: an empty dialer image once meant a
+	// stale pre-hardening build, and empty pod/service CIDRs mean
+	// WireGuard drops all Calico traffic with no log anywhere.
+	required := map[string]string{
+		"--dialer-image":          dialerImage,
+		"--dialer-pod-cidrs":      dialerPodCIDRs,
+		"--dialer-service-cidrs":  dialerServiceCIDRs,
+		"--join-api-address":      joinAPIAddress,
+		"--join-api-vip":          joinAPIVIP,
+		"--join-node-vip4-prefix": nodeVIP4Prefix,
+	}
+	for name, value := range required {
+		if strings.TrimSpace(value) == "" {
+			fmt.Fprintf(os.Stderr, "%s is required\n", name)
+			os.Exit(1)
+		}
+	}
+
 	selector, err := labels.Parse(machineSelector)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "invalid --machine-selector: %v\n", err)
+		os.Exit(1)
+	}
+	endpointSelector, err := labels.Parse(tunnelEndpoints)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid --tunnel-endpoints: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := v1alpha1.AddToScheme(scheme.Scheme); err != nil {
+		fmt.Fprintf(os.Stderr, "unable to register claim types: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -527,34 +783,55 @@ func main() {
 		os.Exit(1)
 	}
 
+	// The mesh's interface name is derived from the peer Secret's
+	// identity: deterministic on every member, unique per mesh, and
+	// never colliding with a node's existing wg0/tailscale devices.
+	ifaceName := tunnel.InterfaceName(secretNamespace + "/" + secretName)
+	tunnelSubnet := subnetOf(localAddressBase)
+
 	machine := &unstructured.Unstructured{}
 	machine.SetGroupVersionKind(machineGVK)
 
 	err = ctrl.NewControllerManagedBy(mgr).
+		Named("mesh").
 		For(machine, builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
 			return selector.Matches(labels.Set(obj.GetLabels()))
 		}))).
-		Complete(&reconciler{
-			Client:                mgr.GetClient(),
-			reader:                mgr.GetAPIReader(),
-			secretNamespace:       secretNamespace,
-			secretName:            secretName,
-			secretKey:             secretKey,
-			port:                  port,
-			gatewayNamespace:      gatewayNamespace,
-			gatewayName:           gatewayName,
-			dialerDaemonSetName:   dialerDaemonSetName,
-			dialerServiceAccount:  dialerServiceAccount,
-			dialerImage:           dialerImage,
-			dialerImagePullSecret: dialerImagePullSecret,
-			dialerPodCIDRs:        dialerPodCIDRs,
-			dialerServiceCIDRs:    dialerServiceCIDRs,
+		// Node changes (a new worker joining, a label added) change the
+		// tunnel-endpoint set, so they must trigger allocation --
+		// otherwise a newly-selected node waits for an unrelated
+		// Machine event before it ever gets a tunnel address.
+		Watches(&corev1.Node{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
+			return []reconcile.Request{{}}
+		})).
+		Complete(&meshReconciler{
+			Client:                 mgr.GetClient(),
+			reader:                 mgr.GetAPIReader(),
+			secretNamespace:        secretNamespace,
+			secretName:             secretName,
+			secretKey:              secretKey,
+			port:                   port,
+			gatewayNamespace:       gatewayNamespace,
+			gatewayName:            gatewayName,
+			tunnelEndpointSelector: endpointSelector,
+			tunnelEndpointsRaw:     tunnelEndpoints,
+			tunnelSubnet:           tunnelSubnet,
+			localAddressBase:       localAddressBase,
+			dialerDaemonSetName:    dialerDaemonSetName,
+			dialerServiceAccount:   dialerServiceAccount,
+			dialerImage:            dialerImage,
+			dialerImagePullSecret:  dialerImagePullSecret,
+			dialerPodCIDRs:         dialerPodCIDRs,
+			dialerServiceCIDRs:     dialerServiceCIDRs,
+			dialerPrivateKeyDir:    dialerPrivateKeyDir,
+			ifaceName:              ifaceName,
+			apiVIP:                 joinAPIVIP,
 
 			dialerCloudDaemonSetName: dialerCloudDaemonSetName,
 			dialerCloudListenPort:    dialerListenPort,
 		})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to create controller: %v\n", err)
+		fmt.Fprintf(os.Stderr, "unable to create mesh controller: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -565,18 +842,18 @@ func main() {
 			os.Exit(1)
 		}
 		var sshKeys []string
-		if joinSSHAuthorizedKeys != "" {
-			for _, k := range strings.Split(joinSSHAuthorizedKeys, ",") {
-				if k = strings.TrimSpace(k); k != "" {
-					sshKeys = append(sshKeys, k)
-				}
+		for _, k := range strings.Split(joinSSHAuthorizedKeys, ",") {
+			if k = strings.TrimSpace(k); k != "" {
+				sshKeys = append(sshKeys, k)
 			}
 		}
+		awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName}
+
 		joinReconciler := &join.Reconciler{
 			Client:         mgr.GetClient(),
 			Reader:         mgr.GetAPIReader(),
 			Join:           &joink0s.Provider{Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL},
-			InfraProviders: []join.InfraProvider{joinaws.Provider{}},
+			InfraProviders: []join.InfraProvider{awsProvider},
 
 			TemplatePath:      joinTemplatePath,
 			APIVIP:            joinAPIVIP,
@@ -597,11 +874,18 @@ func main() {
 			DialerPeerSecretName:      secretName,
 			DialerListenPort:          dialerListenPort,
 
+			InterfaceName: ifaceName,
+
+			DialerBinaryURLARM64:    dialerBinaryURLARM64,
+			DialerBinarySHA256ARM64: dialerBinarySHA256ARM64,
+			DialerBinaryURLAMD64:    dialerBinaryURLAMD64,
+			DialerBinarySHA256AMD64: dialerBinarySHA256AMD64,
+
 			BootstrapSecretNameFormat: bootstrapSecretNameFormat,
 		}
 
 		joinMachine := &unstructured.Unstructured{}
-		joinMachine.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"})
+		joinMachine.SetGroupVersionKind(machineGVK)
 		err = ctrl.NewControllerManagedBy(mgr).
 			Named("join").
 			For(joinMachine, builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
@@ -612,10 +896,37 @@ func main() {
 			fmt.Fprintf(os.Stderr, "unable to create join controller: %v\n", err)
 			os.Exit(1)
 		}
+
+		err = ctrl.NewControllerManagedBy(mgr).
+			Named("claim").
+			For(&v1alpha1.ProvisionedNodeClaim{}).
+			Complete(&claim.Reconciler{
+				Client:                    mgr.GetClient(),
+				Reader:                    mgr.GetAPIReader(),
+				Provisioners:              []join.MachineProvisioner{awsProvider},
+				RoleLabel:                 cloudWorkerRoleLabel,
+				RoleValue:                 cloudWorkerRoleValue,
+				BootstrapSecretNameFormat: bootstrapSecretNameFormat,
+				TunnelInterface:           ifaceName,
+			})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to create claim controller: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		fmt.Fprintf(os.Stderr, "problem running manager: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// subnetOf turns "10.100.0.1/24" into "10.100.0.0/24" -- the tunnel
+// subnet the transit masquerade rule is scoped to.
+func subnetOf(base string) string {
+	_, ipNet, err := net.ParseCIDR(base)
+	if err != nil {
+		return ""
+	}
+	return ipNet.String()
 }

@@ -39,16 +39,16 @@ type Provider struct{}
 // GVK implements join.InfraProvider.
 func (Provider) GVK() schema.GroupVersionKind { return gvk }
 
-// Ready implements join.InfraProvider: true only if a real Docker
-// container by this machine's name is actually running, checked via a
-// genuine `docker inspect`, not an in-memory flag.
-func (Provider) Ready(ctx context.Context, machine *unstructured.Unstructured) (bool, error) {
+// Running reports whether a real Docker container by this machine's
+// name is actually running, checked via a genuine `docker inspect`,
+// not an in-memory flag. Test helper -- the reconciler deliberately
+// never gates on infrastructure readiness (userdata must exist BEFORE
+// the compute launches; see pkg/join/reconciler.go).
+func (Provider) Running(ctx context.Context, machine *unstructured.Unstructured) (bool, error) {
 	name := containerName(machine)
 	out, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{.State.Running}}", name).CombinedOutput()
 	if err != nil {
 		if strings.Contains(strings.ToLower(string(out)), "no such object") {
-			// Not created yet (or already removed) -- "not ready", not
-			// an error, mirroring aws.Provider's not-yet-ready contract.
 			return false, nil
 		}
 		return false, fmt.Errorf("docker inspect %s: %w: %s", name, err, strings.TrimSpace(string(out)))

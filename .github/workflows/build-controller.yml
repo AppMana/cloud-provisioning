@@ -43,3 +43,42 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  # Per-arch raw dialer binaries: a fresh cloud instance has no
+  # container runtime when cloud-init runs -- its userdata downloads
+  # exactly one of these and verifies the sha256 the join reconciler
+  # pinned at render time (--join-dialer-binary-url-*/-sha256-*).
+  # Published as a GitHub release per commit SHA so the URL is stable,
+  # public, and content-addressed by the workflow that produced it.
+  dialer-binaries:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: controller/go.mod
+      - name: Build static per-arch dialer binaries
+        working-directory: controller
+        run: |
+          set -euo pipefail
+          mkdir -p ../dist
+          for arch in arm64 amd64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" \
+              go build -trimpath -ldflags='-s -w' \
+              -o "../dist/wg-dialer-linux-$arch" ./cmd/dialer
+          done
+          (cd ../dist && sha256sum wg-dialer-linux-arm64 wg-dialer-linux-amd64 | tee SHA256SUMS)
+      - name: Publish release dialer-${{ github.sha }}
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="dialer-${GITHUB_SHA::7}"
+          gh release create "$tag" \
+            --target "$GITHUB_SHA" \
+            --title "$tag" \
+            --notes "wg-dialer static binaries for $GITHUB_SHA. Pin the matching SHA256SUMS entries into --join-dialer-binary-sha256-*." \
+            dist/wg-dialer-linux-arm64 dist/wg-dialer-linux-amd64 dist/SHA256SUMS

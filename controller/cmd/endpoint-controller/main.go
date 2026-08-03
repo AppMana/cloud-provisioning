@@ -32,7 +32,9 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
+	joindocker "github.com/appmana/cloud-provisioning/controller/pkg/join/docker"
 	joink0s "github.com/appmana/cloud-provisioning/controller/pkg/join/k0s"
+	joinkubeadm "github.com/appmana/cloud-provisioning/controller/pkg/join/kubeadm"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -677,6 +679,7 @@ func main() {
 		joinKubeletExtraArgs      string
 		joinSSHAuthorizedKeys     string
 		joinTokenTTL              time.Duration
+		joinProviderName          string
 		wireGuardAddress          string
 		wireGuardListenPort       string
 		localAddressBase          string
@@ -719,6 +722,7 @@ func main() {
 	flag.StringVar(&dialerCloudDaemonSetName, "dialer-cloud-daemonset-name", "wg-dialer-cloud", "name of the remote-side dialer DaemonSet this operator provisions directly")
 
 	flag.BoolVar(&joinEnabled, "join-enabled", true, "enable bootstrap-secret provisioning (join.Reconciler) and claim expansion -- the whole point of this operator; disable only for an endpoint-mirror-only deployment")
+	flag.StringVar(&joinProviderName, "join-provider", "k0s", "which cluster technology's join specialization mints join credentials (k0s, kubeadm); pair with the matching --join-template-path")
 	flag.StringVar(&joinTemplatePath, "join-template-path", "/join-patterns/k0s-worker.cloud-config.tmpl", "path to the join-pattern template to render")
 	flag.StringVar(&joinAPIAddress, "join-api-address", "", "REQUIRED cluster API server address used to mint join tokens (bracket IPv6 literals, e.g. https://[fd8f:cf26:522a::1]:6443)")
 	flag.StringVar(&joinAPIVIP, "join-api-vip", "", "REQUIRED cluster API VIP the new node must reach through the tunnel before joining")
@@ -857,20 +861,32 @@ func main() {
 			}
 		}
 		awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName}
+		dockerProvider := joindocker.Provider{ConfigNamespace: secretNamespace, ConfigName: "docker-provider-config"}
 
-		joinReconciler := &join.Reconciler{
-			Client: mgr.GetClient(),
-			Reader: mgr.GetAPIReader(),
-			// k0s is one SPECIALIZATION of join.ClusterJoinProvider --
-			// another cluster technology is another implementation
-			// wired here, nothing else changes. Its own knobs live in
-			// its own provider-config Secret (same pattern as the AWS
-			// infra provider), never in this binary's generic flags.
-			Join: &joink0s.Provider{
+		// Each cluster technology is one SPECIALIZATION of
+		// join.ClusterJoinProvider behind the same seam -- selection is
+		// by name, each implementation's own knobs live in its own
+		// provider-config Secret (the aws-provider-config pattern),
+		// never in this binary's generic flags.
+		var joinProvider join.ClusterJoinProvider
+		switch joinProviderName {
+		case "k0s":
+			joinProvider = &joink0s.Provider{
 				Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL,
 				ConfigNamespace: secretNamespace, ConfigName: "k0s-provider-config",
-			},
-			InfraProviders: []join.InfraProvider{awsProvider},
+			}
+		case "kubeadm":
+			joinProvider = &joinkubeadm.Provider{Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL}
+		default:
+			fmt.Fprintf(os.Stderr, "unknown --join-provider %q (registered specializations: k0s, kubeadm)\n", joinProviderName)
+			os.Exit(1)
+		}
+
+		joinReconciler := &join.Reconciler{
+			Client:         mgr.GetClient(),
+			Reader:         mgr.GetAPIReader(),
+			Join:           joinProvider,
+			InfraProviders: []join.InfraProvider{awsProvider, dockerProvider},
 
 			TemplatePath:      joinTemplatePath,
 			APIVIP:            joinAPIVIP,
@@ -920,7 +936,7 @@ func main() {
 			Complete(&claim.Reconciler{
 				Client:                    mgr.GetClient(),
 				Reader:                    mgr.GetAPIReader(),
-				Provisioners:              []join.MachineProvisioner{awsProvider},
+				Provisioners:              []join.MachineProvisioner{awsProvider, dockerProvider},
 				RoleLabel:                 cloudWorkerRoleLabel,
 				RoleValue:                 cloudWorkerRoleValue,
 				BootstrapSecretNameFormat: bootstrapSecretNameFormat,

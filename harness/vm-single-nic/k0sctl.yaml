@@ -12,12 +12,17 @@ spec:
       role: controller+worker
       # Every guest boots as "ubuntu" with the same slirp-NAT address
       # (10.0.0.15) -- k0sctl >= 0.32 validates hostname/privateAddress
-      # uniqueness, so both are set explicitly. The mgmt IPs are pinned
-      # in topo.clab.yml. (Only 22/6443/51820 are forwarded into the
-      # guests, so apiserver->kubelet connections are dead -- the same
-      # documented limitation the real topology accepts.)
+      # uniqueness, so both are set explicitly. privateAddress MUST be
+      # guest-local: k0sctl writes it into etcd's peer listener
+      # unconditionally (ignoring spec.storage config), and etcd dies
+      # on a bind of any address the guest doesn't carry -- so the
+      # container-side mgmt IPs are unusable here. Cloud gets a unique
+      # lo-attached 10.0.0.16 (added by the driver script). Only
+      # 22/6443/51820 are forwarded into the guests, so
+      # apiserver->kubelet connections are dead -- the same documented
+      # limitation the real topology accepts.
       hostname: onprem
-      privateAddress: 172.31.41.2
+      privateAddress: 10.0.0.15
       noTaints: true
       installFlags:
         - --disable-components=konnectivity-server,metrics-server
@@ -43,9 +48,17 @@ spec:
         keyPath: cfg/ssh/harness_key
       role: worker
       hostname: cloud
-      privateAddress: 172.31.41.3
+      privateAddress: 10.0.0.16
       installFlags:
         - --kubelet-extra-args=--node-labels=cloud-provisioning.appmana.com/role=cloud-worker --register-with-taints=cloud-provisioning.appmana.com/internet-facing:NoSchedule
   k0s:
     version: 1.36.2+k0s.0
     dynamicConfig: false
+    # externalAddress is what join tokens and kubeconfigs carry: the
+    # forwarded 6443 on onprem's container IP, the one path the cloud
+    # guest (and the driver workstation) can actually reach.
+    config:
+      spec:
+        api:
+          externalAddress: 172.31.41.2
+          sans: [172.31.41.2, 10.0.0.15]

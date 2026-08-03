@@ -64,6 +64,16 @@ func awsConfigSecret() *corev1.Secret {
 	}
 }
 
+// fakeNode provides the version-introspection source every expansion
+// needs (Machine.spec.version comes from the live cluster). The +k0s
+// build suffix must be stripped: Machine versions are plain semver.
+func fakeNode() *corev1.Node {
+	return &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "onprem-0"},
+		Status:     corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{KubeletVersion: "v1.36.2+k0s"}},
+	}
+}
+
 func fakeClaim(name string) *v1alpha1.ProvisionedNodeClaim {
 	return &v1alpha1.ProvisionedNodeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
@@ -103,7 +113,7 @@ func reconcileClaim(t *testing.T, r *Reconciler, claim *v1alpha1.ProvisionedNode
 
 func TestReconcile_ExpandsClaimIntoMachinePair(t *testing.T) {
 	claim := fakeClaim("public-worker")
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret())
+	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret(), fakeNode())
 
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("Reconcile: %v", err)
@@ -153,6 +163,10 @@ func TestReconcile_ExpandsClaimIntoMachinePair(t *testing.T) {
 	if clusterName != "appmana" {
 		t.Errorf("Machine clusterName = %q, want appmana", clusterName)
 	}
+	version, _, _ := unstructured.NestedString(machine.Object, "spec", "version")
+	if version != "v1.36.2" {
+		t.Errorf("Machine version = %q, want the live node's version with the +k0s build suffix stripped", version)
+	}
 	if machine.GetLabels()["cloud-provisioning.appmana.com/role"] != "cloud-worker" {
 		t.Errorf("Machine role label = %q, want cloud-worker (the join/mesh controllers' watch selector)", machine.GetLabels()["cloud-provisioning.appmana.com/role"])
 	}
@@ -177,7 +191,7 @@ func TestReconcile_ExpandsClaimIntoMachinePair(t *testing.T) {
 
 func TestReconcile_SecondPassIsIdempotent(t *testing.T) {
 	claim := fakeClaim("public-worker")
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret())
+	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret(), fakeNode())
 
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("first Reconcile: %v", err)
@@ -199,7 +213,7 @@ func TestReconcile_SecondPassIsIdempotent(t *testing.T) {
 func TestReconcile_UnsatisfiableRequests_RecordsFailedStatus(t *testing.T) {
 	claim := fakeClaim("public-worker")
 	claim.Spec.Requests[corev1.ResourceMemory] = resource.MustParse("1Ti")
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret())
+	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret(), fakeNode())
 
 	if err := reconcileClaim(t, r, claim); err == nil {
 		t.Fatal("expected an error for an unsatisfiable request, got nil")
@@ -218,7 +232,7 @@ func TestReconcile_UnsatisfiableRequests_RecordsFailedStatus(t *testing.T) {
 
 func TestReconcile_NoClusterInNamespace_Fails(t *testing.T) {
 	claim := fakeClaim("public-worker")
-	r := newClaimReconciler(t, claim, awsConfigSecret())
+	r := newClaimReconciler(t, claim, awsConfigSecret(), fakeNode())
 
 	if err := reconcileClaim(t, r, claim); err == nil {
 		t.Fatal("expected an error when no CAPI Cluster exists, got nil")
@@ -234,7 +248,7 @@ func TestReconcile_NoClusterInNamespace_Fails(t *testing.T) {
 
 func TestReconcile_TwoClustersWithoutClusterName_IsAnErrorNotAGuess(t *testing.T) {
 	claim := fakeClaim("public-worker")
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), fakeCluster("other"), awsConfigSecret())
+	r := newClaimReconciler(t, claim, fakeCluster("appmana"), fakeCluster("other"), awsConfigSecret(), fakeNode())
 
 	err := reconcileClaim(t, r, claim)
 	if err == nil {
@@ -248,7 +262,7 @@ func TestReconcile_TwoClustersWithoutClusterName_IsAnErrorNotAGuess(t *testing.T
 func TestReconcile_ExplicitClusterNameSelectsAmongMany(t *testing.T) {
 	claim := fakeClaim("public-worker")
 	claim.Spec.ClusterName = "other"
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), fakeCluster("other"), awsConfigSecret())
+	r := newClaimReconciler(t, claim, fakeCluster("appmana"), fakeCluster("other"), awsConfigSecret(), fakeNode())
 
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("Reconcile: %v", err)
@@ -268,7 +282,7 @@ func TestReconcile_NoProvisionerForClusterKind_Fails(t *testing.T) {
 	claim := fakeClaim("public-worker")
 	cluster := fakeCluster("appmana")
 	_ = unstructured.SetNestedField(cluster.Object, "GCPCluster", "spec", "infrastructureRef", "kind")
-	r := newClaimReconciler(t, claim, cluster, awsConfigSecret())
+	r := newClaimReconciler(t, claim, cluster, awsConfigSecret(), fakeNode())
 
 	err := reconcileClaim(t, r, claim)
 	if err == nil {

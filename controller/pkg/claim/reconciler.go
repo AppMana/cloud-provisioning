@@ -17,6 +17,7 @@ package claim
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	v1alpha1 "github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
@@ -135,9 +136,18 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	machine.SetGroupVersionKind(machineGVK)
 	err = r.Reader.Get(ctx, types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name}, machine)
 	if apierrors.IsNotFound(err) {
+		// spec.version from the live cluster: the joining worker must
+		// match the control plane's version (kubeadm skew policy), and
+		// some infra providers (CAPD) refuse a versionless Machine
+		// outright.
+		version, err := r.clusterKubernetesVersion(ctx)
+		if err != nil {
+			return r.fail(ctx, claim, err)
+		}
 		machine = &unstructured.Unstructured{Object: map[string]any{
 			"spec": map[string]any{
 				"clusterName": cluster.GetName(),
+				"version":     version,
 				"bootstrap": map[string]any{
 					"dataSecretName": fmt.Sprintf(r.BootstrapSecretNameFormat, claim.Name),
 				},
@@ -228,6 +238,26 @@ func (r *Reconciler) resolveCluster(ctx context.Context, claim *v1alpha1.Provisi
 	default:
 		return nil, fmt.Errorf("%d CAPI Clusters in namespace %s -- set spec.clusterName", len(list.Items), claim.Namespace)
 	}
+}
+
+// clusterKubernetesVersion reads the running version off any existing
+// Node -- correct across upgrades without configuration, the same
+// introspection the join providers already do.
+func (r *Reconciler) clusterKubernetesVersion(ctx context.Context) (string, error) {
+	nodes := &corev1.NodeList{}
+	if err := r.List(ctx, nodes, client.Limit(1)); err != nil {
+		return "", fmt.Errorf("listing nodes for version introspection: %w", err)
+	}
+	if len(nodes.Items) == 0 {
+		return "", fmt.Errorf("no nodes found to introspect the kubernetes version from")
+	}
+	// Strip technology build suffixes ("v1.36.2+k0s") -- Machine.spec
+	// .version is plain semver for every CAPI consumer.
+	version := nodes.Items[0].Status.NodeInfo.KubeletVersion
+	if i := strings.IndexByte(version, '+'); i > 0 {
+		version = version[:i]
+	}
+	return version, nil
 }
 
 func (r *Reconciler) provisionerForClusterKind(kind string) join.MachineProvisioner {

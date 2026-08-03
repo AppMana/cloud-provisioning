@@ -112,8 +112,15 @@ ssh-keygen -R "${CLOUD_IP}" >/dev/null 2>&1 || true
 ACTUAL_IPS="$(cd "${HARNESS_DIR}" && sudo containerlab inspect -t topo.clab.yml -f json 2>/dev/null | python3 -c "
 import json,sys
 d = json.load(sys.stdin)
-for n in d.get('containers', d) if isinstance(d, list) else d.get('containers', []):
-    print(n.get('name',''), n.get('ipv4_address','').split('/')[0])
+# containerlab's json shape varies by version: a top-level
+# {'<lab>': [containers]} map (v0.75), {'containers': [...]}, or a
+# bare list.
+if isinstance(d, dict):
+    containers = d.get('containers') or next((v for v in d.values() if isinstance(v, list)), [])
+else:
+    containers = d
+for n in containers:
+    print(n.get('name','').removeprefix('clab-wgdialer-vm-single-nic-'), n.get('ipv4_address','').split('/')[0])
 " 2>/dev/null || true)"
 echo "containerlab-assigned IPs: ${ACTUAL_IPS}" | tee "${LOG_DIR}/assigned-ips.log"
 if ! echo "${ACTUAL_IPS}" | grep -q "onprem ${ONPREM_IP}"; then

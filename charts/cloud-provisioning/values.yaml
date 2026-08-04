@@ -1,0 +1,92 @@
+# Default values for cloud-provisioning.
+
+nameOverride: wg-dialer
+
+image:
+  repository: ghcr.io/appmana/cloud-provisioning-endpoint-controller
+  tag: ""            # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+# Image the operator renders into BOTH dialer DaemonSets. Pin by digest
+# in production; a tag is fine when the image is preloaded on the node.
+dialerImage:
+  repository: ghcr.io/appmana/cloud-provisioning-dialer
+  tag: ""            # defaults to .Chart.AppVersion
+
+imagePullSecrets: []
+
+# EVERY workload this chart owns is Linux-only. Not cosmetic: a mixed
+# cluster will otherwise schedule a linux-only controller onto a
+# Windows node and it fails with "no match for platform in manifest"
+# (observed on this fleet -- CAPI's own clusterctl manifests omit this
+# and landed on a Windows node). The same default is pushed into the
+# Cluster API subchart below.
+nodeSelector:
+  kubernetes.io/os: linux
+tolerations: []
+# Optional: pin the controller to a specific node (e.g. when the
+# images are preloaded there rather than pullable from a registry).
+nodeName: ""
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+
+cluster:
+  # Cluster addresses a joining node must reach. apiAddress is what the
+  # join token's kubeconfig points at; apiVIP is what the bootstrap
+  # gates on before joining.
+  apiAddress: ""     # e.g. https://10.2.0.22:6443
+  apiVIP: ""         # e.g. 10.2.0.22
+  # Cryptokey accept-list only -- NEVER kernel routes.
+  podCIDRs: ""       # e.g. 10.3.0.0/16,2001:5a8:4298:3b01::/64
+  serviceCIDRs: ""   # e.g. 10.152.184.0/24
+  # Calico autodetection VIPs allocated to remote nodes.
+  nodeVIP4Prefix: "" # e.g. 10.2.0.
+  nodeVIP6Prefix: ""
+  nodeVIPStart: 200
+
+tunnel:
+  # Node selector (k=v,k2=v2) choosing which LOCAL nodes terminate
+  # tunnels. Empty selects every Linux worker; control planes are
+  # excluded unless named explicitly. This is the blast radius control:
+  # only these nodes ever get a cldt* interface.
+  endpoints: ""
+
+# Which cluster technology mints join credentials (k0s | kubeadm).
+joinProvider: k0s
+
+# First-boot binary delivery. A remote node has no image puller before
+# it joins, so cloud-init fetches this sha-pinned binary; afterwards
+# the DaemonSet image is the upgrade channel.
+dialerBinary:
+  arm64:
+    url: ""
+    sha256: ""
+  amd64:
+    url: ""
+    sha256: ""
+
+# Cluster API, shipped as a subchart so one release installs the whole
+# stack. Disable if the cluster already manages CAPI itself.
+cluster-api-operator:
+  enabled: true
+  # Same Linux-only reasoning as above.
+  nodeSelector:
+    kubernetes.io/os: linux
+  cert-manager:
+    enabled: false   # most clusters already run cert-manager
+  # Providers the operator installs, as objects keyed by provider name
+  # (the subchart's schema requires objects, not strings). Set an
+  # infrastructure provider per environment, e.g.:
+  #   infrastructure:
+  #     aws:
+  #       namespace: capa-system
+  #       version: v2.13.0
+  # AWS additionally needs a credentials Secret the operator references.
+  core:
+    cluster-api:
+      namespace: capi-system
+  infrastructure: {}

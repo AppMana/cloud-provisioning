@@ -188,12 +188,28 @@ route_via_nat() {
 # starts, so the node never goes Ready, so nothing that waits on the
 # node ever succeeds. The images are already on this host, so the pull
 # is avoidable entirely.
+# Make sure an image is on this host, without depending on one
+# registry being willing. Docker Hub rate limits by address and a few
+# clusters in a row is enough to be refused; the same images are
+# published to quay.io, so a name that implies Docker Hub is retried
+# there and retagged under the name the manifest asks for.
+ensure_image() {
+  local image="$1"
+  docker image inspect "$image" >/dev/null 2>&1 && return 0
+  docker pull -q "$image" >/dev/null 2>&1 && return 0
+  case "$image" in
+    */*.*/*) return 1 ;;   # already names a registry, nothing to fall back to
+  esac
+  docker pull -q "quay.io/$image" >/dev/null 2>&1 || return 1
+  docker tag "quay.io/$image" "$image"
+}
+
 preload_into_node() {
   local container="$1"; shift
   local image
   for image in "$@"; do
     [ -n "$image" ] || continue
-    docker image inspect "$image" >/dev/null 2>&1 || docker pull "$image" >/dev/null 2>&1 || continue
+    ensure_image "$image" || { echo "  could not obtain $image for $container" >&2; continue; }
     docker save "$image" | docker exec -i "$container" ctr -n k8s.io images import - >/dev/null 2>&1 || true
   done
 }
@@ -313,7 +329,7 @@ else
   CNI_IMAGES=$(cni_images)
   [ -n "$CNI_IMAGES" ] || fail "could not read the images the network runs"
   for image in $CNI_IMAGES; do
-    docker image inspect "$image" >/dev/null 2>&1 || docker pull "$image" >/dev/null 2>&1 || true
+    ensure_image "$image" || fail "could not obtain $image from any registry"
   done
   kind load docker-image $CNI_IMAGES --name "$CLUSTER" >/dev/null 2>&1 || true
   echo "  network images preloaded: $(echo $CNI_IMAGES | tr '\n' ' ')"

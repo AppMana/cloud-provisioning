@@ -67,6 +67,19 @@ tunnel:
   # only these nodes ever get a cldt* interface.
   endpoints: ""
 
+# The infrastructure provider's cluster-level configuration, rendered
+# into the Secret its provider reads. Plain configuration, not
+# credentials -- those stay out of git in the provider's own namespace.
+# AWS keys: ami-arm64, ami-amd64, subnet-id, security-group-ids,
+# ssh-key-name, iam-instance-profile, public-ip.
+providerConfig: {}
+#   name: aws-provider-config
+#   data:
+#     ami-amd64: ami-...
+#     subnet-id: subnet-...
+#     security-group-ids: sg-...
+#     public-ip: "true"
+
 # Which cluster technology mints join credentials (k0s | kubeadm).
 joinProvider: k0s
 

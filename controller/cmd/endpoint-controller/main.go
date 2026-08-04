@@ -136,6 +136,13 @@ type meshReconciler struct {
 	ifaceName             string
 	apiVIP                string
 
+	// ownerRef ties everything this controller creates at runtime
+	// (both DaemonSets, the peer Secret, per-machine adoption Secrets)
+	// to an object the installer owns -- its own Deployment. Without
+	// it, uninstalling the release leaves the DaemonSets running: a
+	// tunnel interface on every endpoint node with nothing managing it.
+	ownerRef *metav1.OwnerReference
+
 	dialerCloudDaemonSetName string
 	dialerCloudListenPort    string
 	// dialerCloudImage, when set, is a PUBLIC base image the remote's
@@ -147,6 +154,15 @@ type meshReconciler struct {
 	// bootstrap peer list, so config changes never reach it.
 	dialerCloudImage      string
 	dialerCloudHostBinary string
+}
+
+// owners returns the ownerReference list to stamp on everything this
+// controller creates, so an uninstall garbage-collects it.
+func (r *meshReconciler) owners() []metav1.OwnerReference {
+	if r.ownerRef == nil {
+		return nil
+	}
+	return []metav1.OwnerReference{*r.ownerRef}
 }
 
 func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -313,7 +329,7 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 		// The peer Secret is controller-managed state -- nothing else
 		// should have to create it (no manual steps, no gitops-authored
 		// Secret for a controller-owned object).
-		secret = &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: r.secretNamespace, Name: r.secretName}}
+		secret = &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: r.secretNamespace, Name: r.secretName, OwnerReferences: r.owners()}}
 		if err := r.Create(ctx, secret); err != nil {
 			return fmt.Errorf("creating peer secret %s: %w", secretKey, err)
 		}
@@ -463,7 +479,7 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 
 	name := tunnel.AdoptionSecretName(machine.GetName())
 	desired := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: r.secretNamespace},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: r.secretNamespace, OwnerReferences: r.owners()},
 		Data:       map[string][]byte{tunnel.CloudPeersKey: doc},
 	}
 	existing := &corev1.Secret{}
@@ -513,8 +529,9 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 	hostPathDirectoryOrCreate := corev1.HostPathDirectoryOrCreate
 	desired := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.dialerDaemonSetName,
-			Namespace: r.secretNamespace,
+			Name:            r.dialerDaemonSetName,
+			Namespace:       r.secretNamespace,
+			OwnerReferences: r.owners(),
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": r.dialerDaemonSetName}},
@@ -639,8 +656,9 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 	}
 	desired := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.dialerCloudDaemonSetName,
-			Namespace: r.secretNamespace,
+			Name:            r.dialerCloudDaemonSetName,
+			Namespace:       r.secretNamespace,
+			OwnerReferences: r.owners(),
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": r.dialerCloudDaemonSetName}},
@@ -773,6 +791,7 @@ func main() {
 		dialerServiceCIDRs        string
 		dialerCloudDaemonSetName  string
 		dialerCloudImage          string
+		ownerDeployment           string
 		dialerCloudHostBinary     string
 		dialerBinaryURLARM64      string
 		dialerBinarySHA256ARM64   string
@@ -802,6 +821,7 @@ func main() {
 	flag.StringVar(&dialerImagePullSecret, "dialer-image-pull-secret", "ghcr-pull", "imagePullSecret for the dialer DaemonSets")
 	flag.StringVar(&dialerPodCIDRs, "dialer-pod-cidrs", "", "REQUIRED comma-separated cluster pod-CIDR ranges (v4/v6) -- WireGuard cryptokey accept-list only, never a kernel route. Empty silently drops all Calico traffic, so it is fatal instead")
 	flag.StringVar(&dialerServiceCIDRs, "dialer-service-cidrs", "", "REQUIRED comma-separated cluster service-CIDR ranges (v4/v6), same treatment as --dialer-pod-cidrs")
+	flag.StringVar(&ownerDeployment, "owner-deployment", "", "this controller's own Deployment name; everything it creates at runtime (both DaemonSets, the peer and adoption Secrets) is owned by it, so an uninstall garbage-collects them instead of orphaning a tunnel interface on every endpoint node")
 	flag.StringVar(&dialerCloudImage, "dialer-cloud-image", "", "optional PUBLIC base image for the REMOTE node's DaemonSet, which then executes --dialer-cloud-host-binary instead of carrying its own. Use when the project image is not pullable on a remote node (no preload, no registry credential): without it the adoption DaemonSet ImagePullBackOffs and the node stays on its frozen bootstrap peer list forever")
 	flag.StringVar(&dialerCloudHostBinary, "dialer-cloud-host-binary", "/host-bin/wg-dialer", "path (inside the pod) of the host binary --dialer-cloud-image executes; the bootstrap already installed and sha-verified it")
 	flag.StringVar(&dialerCloudDaemonSetName, "dialer-cloud-daemonset-name", "wg-dialer-cloud", "name of the remote-side dialer DaemonSet this operator provisions directly")
@@ -885,6 +905,28 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Resolve our own Deployment to own everything created at runtime.
+	// Uninstalling the release then garbage-collects the DaemonSets and
+	// the Secrets, instead of leaving a tunnel interface on every
+	// endpoint node with no controller behind it.
+	var runtimeOwner *metav1.OwnerReference
+	if ownerDeployment != "" {
+		clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to create clientset to resolve owner: %v\n", err)
+			os.Exit(1)
+		}
+		dep, err := clientset.AppsV1().Deployments(secretNamespace).Get(context.Background(), ownerDeployment, metav1.GetOptions{})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to resolve owner Deployment %s/%s: %v\n", secretNamespace, ownerDeployment, err)
+			os.Exit(1)
+		}
+		runtimeOwner = &metav1.OwnerReference{
+			APIVersion: "apps/v1", Kind: "Deployment",
+			Name: dep.Name, UID: dep.UID,
+		}
+	}
+
 	// The mesh's interface name is derived from the peer Secret's
 	// identity: deterministic on every member, unique per mesh, and
 	// never colliding with a node's existing wg0/tailscale devices.
@@ -929,6 +971,7 @@ func main() {
 			ifaceName:              ifaceName,
 			apiVIP:                 joinAPIVIP,
 
+			ownerRef:                 runtimeOwner,
 			dialerCloudDaemonSetName: dialerCloudDaemonSetName,
 			dialerCloudListenPort:    dialerListenPort,
 			dialerCloudImage:         dialerCloudImage,

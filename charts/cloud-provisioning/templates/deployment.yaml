@@ -53,6 +53,7 @@ spec:
           image: {{ include "cloud-provisioning.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
+            - "--owner-deployment={{ include "cloud-provisioning.controllerName" . }}"
             - "--dialer-image={{ include "cloud-provisioning.dialerImage" . }}"
             - "--dialer-pod-cidrs={{ .Values.cluster.podCIDRs }}"
             - "--dialer-service-cidrs={{ .Values.cluster.serviceCIDRs }}"

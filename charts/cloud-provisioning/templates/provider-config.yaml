@@ -1,0 +1,19 @@
+{{- /* The infrastructure provider's cluster-level configuration. Not
+credentials -- AMI ids, subnet, security groups: plain configuration
+that belongs in values with everything else, rather than an
+out-of-band `kubectl create secret` the next operator has to know
+about. Credentials stay out of git, in the provider's own namespace. */}}
+{{- with .Values.providerConfig }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .name | default "aws-provider-config" }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "cloud-provisioning.labels" $ | nindent 4 }}
+type: Opaque
+stringData:
+  {{- range $k, $v := .data }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+{{- end }}

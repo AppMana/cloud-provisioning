@@ -408,6 +408,15 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
 		if !r.isTunnelEndpoint(node) {
+			// A node this operator provisioned is on the far side of a
+			// tunnel, not at this site. Its addresses and blocks reach
+			// the mesh as a peer entry, and naming it here as well
+			// would give the same prefixes a second owner, which the
+			// accept list resolves by keeping whichever was written
+			// last.
+			if node.Labels[cloudWorkerRoleLabel] == cloudWorkerRoleValue {
+				continue
+			}
 			// A site node with no tunnel of its own. It is not a peer,
 			// but a remote still has to be permitted to reach it, so
 			// its addresses and blocks are published for whichever

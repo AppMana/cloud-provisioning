@@ -664,12 +664,17 @@ if [ "$WANT_ENCAP" = "native" ]; then
     [ -n "$node" ] || fail "$machine has no node"
     until_ok 180 sh -c "kubectl -n '$NS' get secret '$PEER_SECRET' -o jsonpath='{.data.peer-allowed-ips-$machine}' | base64 -d | grep -q /26" \
       || fail "$machine's peer entry never carried its node's blocks"
-    BLOCK=$(kubectl -n "$NS" get secret "$PEER_SECRET" -o jsonpath="{.data.node-pod-cidrs-$node}" | base64 -d)
+    # The block Calico actually gave that node, which is the thing the
+    # peer entry has to permit. Reading it back out of the same Secret
+    # the entry is written into would only prove the controller agrees
+    # with itself, and the key it was read from is never written for a
+    # remote, so the comparison silently had nothing on one side.
+    BLOCK=$(kubectl get blockaffinities.crd.projectcalico.org -o jsonpath="{range .items[?(@.spec.node=='$node')]}{.spec.cidr}{'\n'}{end}" 2>/dev/null | grep -v '^$' | head -1)
     PERMITTED=$(kubectl -n "$NS" get secret "$PEER_SECRET" -o jsonpath="{.data.peer-allowed-ips-$machine}" | base64 -d)
     # An empty BLOCK makes the pattern below match anything at all,
     # including an empty accept list, so the positive half of this
     # check would silently become a no-op.
-    [ -n "$BLOCK" ] || fail "no pod block recorded for $node, so there is nothing to require"
+    [ -n "$BLOCK" ] || fail "the network gave $node no pod block, so there is nothing to require"
     [ -n "$PERMITTED" ] || fail "$machine permits nothing at all"
     case "$PERMITTED" in
       *"$BLOCK"*) ;;

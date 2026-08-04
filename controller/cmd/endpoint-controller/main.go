@@ -45,8 +45,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -448,16 +448,30 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 		// records and recomputed every pass. A block allocated later
 		// reaches the peers from here, which is why nothing about pod
 		// addressing is configuration.
+		// One node's blocks being unreadable must not discard the
+		// whole pass. The Secret is patched once, after this loop, so
+		// returning here would throw away every node's tunnel address
+		// allocation too, and a dialer with no allocated address
+		// configures nothing at all. The condition is permanent for a
+		// network this does not recognise, so the mesh would never
+		// form rather than forming without one node's pod blocks.
+		// publishSiteNode already treats this as "leave what is
+		// published"; this is the same judgement.
+		publishPods := true
 		prefixes, err := r.network.PrefixesFor(ctx, r.reader, node.Name)
 		if err != nil {
-			return fmt.Errorf("reading the pod prefixes for node %s: %w", node.Name, err)
+			ctrl.LoggerFrom(ctx).Error(err, "leaving this node's published pod blocks alone", "node", node.Name)
+			publishPods = false
 		}
 		texts := make([]string, 0, len(prefixes))
 		for _, prefix := range prefixes {
 			texts = append(texts, prefix.String())
 		}
+		// Side effects on the network's own objects. A failure here
+		// costs transit or address pinning for this node; it is not a
+		// reason to abandon every other node's allocation.
 		if err := r.ensureTransitPeering(ctx, node.Name, firstAddress(addresses)); err != nil {
-			return err
+			ctrl.LoggerFrom(ctx).Error(err, "no transit peering for this node", "node", node.Name)
 		}
 
 		// Keep this node's own address the one its site reaches it by.
@@ -470,12 +484,12 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 		// directions, while the tunnel itself looks healthy. Bringing
 		// up a tunnel must never cost a node something it had.
 		if err := r.ensureCNINodeAddress(ctx, node.Name, firstAddress(addresses), ""); err != nil {
-			return err
+			ctrl.LoggerFrom(ctx).Error(err, "could not pin this node's address for the network", "node", node.Name)
 		}
 
 		podKey := tunnel.NodePodCIDRsPrefix + node.Name
 		joinedPods := strings.Join(texts, ",")
-		if string(secret.Data[podKey]) != joinedPods {
+		if publishPods && string(secret.Data[podKey]) != joinedPods {
 			if joinedPods == "" {
 				delete(secret.Data, podKey)
 			} else {

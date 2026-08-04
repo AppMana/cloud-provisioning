@@ -434,7 +434,8 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 		for _, host := range p.AllRouteHosts() {
 			route, err := hostRoute(host, med)
 			if err != nil {
-				return err
+				fmt.Fprintf(os.Stderr, "not advertising %q: %v\n", host, err)
+				continue
 			}
 			routes = append(routes, route)
 			notSite[host] = true
@@ -448,7 +449,8 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 			}
 			route, err := blockRoute(allowed, med)
 			if err != nil {
-				return err
+				fmt.Fprintf(os.Stderr, "not advertising %q: %v\n", allowed, err)
+				continue
 			}
 			routes = append(routes, route)
 		}
@@ -878,7 +880,12 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		for _, h := range p.AllRouteHosts() {
 			ipNet, err := parseHostRoute(h)
 			if err != nil {
-				return err
+				// Skipping installs strictly fewer routes, so the
+				// invariant this guard protects (never a route broader
+				// than a host) is preserved by dropping the entry. The
+				// two guards below already reason this way.
+				fmt.Fprintf(os.Stderr, "not routing one entry for peer %s: %v\n", pub, err)
+				continue
 			}
 			if p.Endpoint == "" && !handshaked[pub] {
 				// Validated but not installed yet; see the
@@ -1058,7 +1065,11 @@ func ensureTransit(cfg config) error {
 	// and kube-proxy require it, so this is usually a read that finds
 	// the right answer. See setSysctl.
 	if err := setSysctl("ipv4/ip_forward", "1"); err != nil {
-		return fmt.Errorf("enabling ip_forward: %w", err)
+		// A Kubernetes node has forwarding on already, so this is
+		// almost always a read that agreed. Not being able to write it
+		// is no reason to skip the rule below, which is what actually
+		// lets a remote reach an address with no tunnel of its own.
+		fmt.Fprintf(os.Stderr, "could not set ip_forward (continuing; if forwarding is off on this node, transit will not work): %v\n", err)
 	}
 
 	c, err := nftables.New()

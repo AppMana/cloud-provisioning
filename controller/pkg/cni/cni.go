@@ -250,6 +250,68 @@ func (n Network) PrefixesFor(ctx context.Context, c client.Reader, node string) 
 	return nodeBlocksFor(ctx, c, node)
 }
 
+// CheckMasquerade reports whether pod traffic to the given prefixes
+// would have its source address rewritten on the way.
+//
+// Calico masquerades traffic leaving a pool whose natOutgoing is set,
+// and decides what "leaving" means by whether the destination falls in
+// any pool. A remote node's blocks come from the cluster's own pools,
+// so ordinarily they do not, and this holds without anyone arranging
+// it. It stops holding the moment a remote is allocated from somewhere
+// else, and the failure is not a clean one: the traffic still arrives,
+// with the endpoint's address as its source, so the reply goes to the
+// node rather than the pod and the connection hangs instead of being
+// refused. That is worth naming rather than leaving to be rediscovered.
+func (n Network) CheckMasquerade(ctx context.Context, c client.Reader, prefixes []netip.Prefix) error {
+	if n.Name != Calico || len(prefixes) == 0 {
+		return nil
+	}
+	pools := &unstructured.UnstructuredList{}
+	pools.SetGroupVersionKind(calicoIPPoolList)
+	if err := c.List(ctx, pools); err != nil {
+		if meaningfulError(err) {
+			return fmt.Errorf("listing Calico IP pools: %w", err)
+		}
+		return nil
+	}
+	var masquerading []netip.Prefix
+	for _, pool := range pools.Items {
+		if nat, _, _ := unstructured.NestedBool(pool.Object, "spec", "natOutgoing"); !nat {
+			continue
+		}
+		cidr, _, _ := unstructured.NestedString(pool.Object, "spec", "cidr")
+		if prefix, err := netip.ParsePrefix(cidr); err == nil {
+			masquerading = append(masquerading, prefix)
+		}
+	}
+	if len(masquerading) == 0 {
+		return nil
+	}
+	var covered []netip.Prefix
+	for _, pool := range pools.Items {
+		cidr, _, _ := unstructured.NestedString(pool.Object, "spec", "cidr")
+		if prefix, err := netip.ParsePrefix(cidr); err == nil {
+			covered = append(covered, prefix)
+		}
+	}
+	for _, prefix := range prefixes {
+		if containedByAny(prefix, covered) {
+			continue
+		}
+		return fmt.Errorf("%s is outside every Calico IP pool while a pool masquerades outgoing traffic, so pod traffic to it would leave with a node's address and the replies would not come back to the pod; allocate the remote from a pool the cluster already has, or clear natOutgoing", prefix)
+	}
+	return nil
+}
+
+func containedByAny(prefix netip.Prefix, pools []netip.Prefix) bool {
+	for _, pool := range pools {
+		if pool.Overlaps(prefix) && pool.Bits() <= prefix.Bits() && pool.Contains(prefix.Addr()) {
+			return true
+		}
+	}
+	return false
+}
+
 // calicoBlocksFor reads the block affinities Calico maintains, which are
 // how it routes to that node itself. Only confirmed, undeleted blocks
 // count: a pending one is not yet in use and a deleted one is not any

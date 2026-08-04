@@ -295,3 +295,45 @@ func TestPrefixesFor_NeverReturnsAClusterWideRange(t *testing.T) {
 		}
 	}
 }
+
+func natPool(name, cidr string, nat bool) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "crd.projectcalico.org/v1",
+		"kind":       "IPPool",
+		"metadata":   map[string]any{"name": name},
+		"spec":       map[string]any{"cidr": cidr, "ipipMode": "Never", "vxlanMode": "Never", "natOutgoing": nat},
+	}}
+}
+
+// A remote's blocks come from the cluster's own pools, so the outgoing
+// NAT does not apply to them and reachability holds without anyone
+// arranging it. The case worth catching is the one where that stops
+// being true, because it fails by hanging rather than by refusing:
+// traffic arrives carrying a node's address and the reply never
+// reaches the pod that sent it.
+func TestCheckMasquerade(t *testing.T) {
+	network := Network{Name: Calico, Encapsulation: Native}
+	inside := netip.MustParsePrefix("10.244.123.128/26")
+	outside := netip.MustParsePrefix("192.168.7.0/26")
+
+	c := newClient(natPool("default", "10.244.0.0/16", true))
+	if err := network.CheckMasquerade(context.Background(), c, []netip.Prefix{inside}); err != nil {
+		t.Errorf("a block inside the pool is not masqueraded toward: %v", err)
+	}
+	if err := network.CheckMasquerade(context.Background(), c, []netip.Prefix{outside}); err == nil {
+		t.Error("a block outside every pool would have its source rewritten, and that went unreported")
+	}
+
+	// With nothing masquerading, where the block sits does not matter.
+	quiet := newClient(natPool("default", "10.244.0.0/16", false))
+	if err := network.CheckMasquerade(context.Background(), quiet, []netip.Prefix{outside}); err != nil {
+		t.Errorf("no pool masquerades, so nothing is at risk: %v", err)
+	}
+
+	// A second pool covering the remote is enough, which is how a
+	// separate range for remote nodes is meant to be declared.
+	declared := newClient(natPool("default", "10.244.0.0/16", true), natPool("remote", "192.168.7.0/24", false))
+	if err := network.CheckMasquerade(context.Background(), declared, []netip.Prefix{outside}); err != nil {
+		t.Errorf("a pool covering the remote makes it an inside destination: %v", err)
+	}
+}

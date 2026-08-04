@@ -709,6 +709,13 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machineName,
 		// pending and nothing to publish.
 		return r.network.Encapsulation == cni.Encapsulated, nil
 	}
+	// A block the network would masquerade toward is still published:
+	// it is the operator's to resolve, and refusing here would leave
+	// the node with no reachability at all rather than reachability
+	// that fails in one direction. Saying so is what was missing.
+	if err := r.network.CheckMasquerade(ctx, r.reader, prefixes); err != nil {
+		ctrl.LoggerFrom(ctx).Error(err, "the remote's pod block will not survive the network's outgoing NAT", "node", nodeName)
+	}
 	secret := &corev1.Secret{}
 	if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, secret); err != nil {
 		return false, fmt.Errorf("getting peer secret: %w", err)

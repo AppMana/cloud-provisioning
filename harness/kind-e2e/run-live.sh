@@ -484,6 +484,26 @@ echo "  remote nodes: $CLOUD_NODE and $CLOUD_NODE_2"
 assert_wan "both remote nodes joined" "${CLUSTER}-control-plane"
 
 echo "--- reachability across every pair of nodes ---"
+# Pod reachability across the tunnel cannot be proven in this topology,
+# and the reason is worth stating rather than working around.
+#
+# Every node here shares one docker bridge, so a local node's tunnel
+# endpoint address and its node address are the same address. The dialer
+# refuses to route a peer's endpoint through that peer's own tunnel,
+# because the encrypted packet's outer destination would match the route
+# and encapsulate itself indefinitely. So the remote reaches the local
+# nodes over the bridge instead, its sessions source from the tunnel
+# address but leave by the bridge, and the replies come back through the
+# tunnel: an asymmetric path no session survives.
+#
+# A real deployment has the local nodes behind NAT, where the endpoint
+# is a public address and the node address is private, so node addresses
+# are routed through the tunnel and the endpoint is not. Proving pod
+# reachability therefore needs a topology where the remote is genuinely
+# off the local network: harness/vm-single-nic, or real instances.
+if [ "${SKIP_REACHABILITY:-0}" = "1" ]; then
+  echo "  skipped: this topology cannot exercise an off-network remote"
+else
 # One pod per node, then every source against every destination, by pod
 # address and by service address. Two local and two remote, so the pairs
 # cross the tunnel in both directions and between the two remotes.
@@ -492,6 +512,7 @@ echo "--- reachability across every pair of nodes ---"
 grep -q "failed: 0" "$LOG_DIR/health-check.log" \
   || fail "reachability checks failed (see $LOG_DIR/health-check.log)"
 echo "  every pair reachable, by pod and by service"
+fi
 
 echo "--- what each peer is permitted, and what it is not ---"
 # The accept list is a trie with one owner per prefix, so a prefix on

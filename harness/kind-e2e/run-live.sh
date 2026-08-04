@@ -43,6 +43,9 @@ HEALTH_CHECK_ARGS="${HEALTH_CHECK_ARGS:-}"
 # The port the endpoints advertise on, so a node terminating no tunnel
 # still learns which remote nodes are reachable through one that does.
 TRANSIT_BGP_PORT="${TRANSIT_BGP_PORT:-1790}"
+# Filled in once the network is installed, and pushed into every node
+# that joins afterwards.
+CNI_IMAGES=""
 case "$CNI" in
   calico)       WANT_ENCAP=native ;;
   calico-vxlan) WANT_ENCAP=encapsulated ;;
@@ -177,6 +180,32 @@ route_via_nat() {
   echo "  $routed node(s) routed to $target through $NAT_ROUTER"
 }
 
+# Put an image inside a node's own container runtime.
+#
+# A CAPD node pulls what it needs from a registry, and the registry
+# rate limits. Six clusters in a row is enough to start getting 429s,
+# and the failure surfaces far from its cause: the network's pod never
+# starts, so the node never goes Ready, so nothing that waits on the
+# node ever succeeds. The images are already on this host, so the pull
+# is avoidable entirely.
+preload_into_node() {
+  local container="$1"; shift
+  local image
+  for image in "$@"; do
+    [ -n "$image" ] || continue
+    docker image inspect "$image" >/dev/null 2>&1 || docker pull "$image" >/dev/null 2>&1 || continue
+    docker save "$image" | docker exec -i "$container" ctr -n k8s.io images import - >/dev/null 2>&1 || true
+  done
+}
+
+# The images the installed network runs, read from what it actually
+# deployed rather than from a list here that would drift from it.
+cni_images() {
+  { kubectl -n kube-system get daemonset calico-node -o jsonpath='{range .spec.template.spec..}{.image}{"\n"}{end}' 2>/dev/null
+    kubectl -n kube-system get deployment calico-kube-controllers -o jsonpath='{range .spec.template.spec..}{.image}{"\n"}{end}' 2>/dev/null
+  } | tr ' ' '\n' | grep -E '^[a-z0-9]' | sort -u
+}
+
 node_netns() {
   local container="$1"; shift
   local pid
@@ -278,6 +307,16 @@ else
   # model then has to read back.
   until_ok 240 sh -c "kubectl get ippools.crd.projectcalico.org default-ipv4-ippool" \
     || fail "Calico never created its default IP pool"
+  # Every node that joins later needs these, and the registry starts
+  # refusing after a few clusters. Taking them from the host once is
+  # both faster and not dependent on anything outside this machine.
+  CNI_IMAGES=$(cni_images)
+  [ -n "$CNI_IMAGES" ] || fail "could not read the images the network runs"
+  for image in $CNI_IMAGES; do
+    docker image inspect "$image" >/dev/null 2>&1 || docker pull "$image" >/dev/null 2>&1 || true
+  done
+  kind load docker-image $CNI_IMAGES --name "$CLUSTER" >/dev/null 2>&1 || true
+  echo "  network images preloaded: $(echo $CNI_IMAGES | tr '\n' ' ')"
   if [ "$CNI" = "calico-vxlan" ]; then
     POOL_PATCH='{"spec":{"vxlanMode":"Always","ipipMode":"Never"}}'
   else
@@ -493,6 +532,9 @@ until_ok 60 kubectl get secret public-worker-bootstrap || fail "bootstrap Secret
 until_ok 240 sh -c "docker ps --format '{{.Names}}' | grep -q 'public-worker'" \
   || fail "CAPD never launched the node container"
 NODE_CONTAINER=$(docker ps --format '{{.Names}}' | grep public-worker | head -1)
+# Before the network's pod lands on it, so it never reaches for a
+# registry that will refuse.
+preload_into_node "$NODE_CONTAINER" $CNI_IMAGES
 REMOTE_IP=$(docker inspect "$NODE_CONTAINER" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
 route_via_nat "$REMOTE_IP"
 echo "  tunnel traffic to $REMOTE_IP masqueraded, so its peers are not this site's nodes"
@@ -588,6 +630,7 @@ EOF
 until_ok 240 sh -c "docker ps --format '{{.Names}}' | grep -q public-worker-2" \
   || fail "CAPD never launched the second node container"
 NODE_CONTAINER_2=$(docker ps --format '{{.Names}}' | grep public-worker-2 | head -1)
+preload_into_node "$NODE_CONTAINER_2" $CNI_IMAGES
 REMOTE_IP_2=$(docker inspect "$NODE_CONTAINER_2" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
 route_via_nat "$REMOTE_IP_2"
 until_ok 420 sh -c '[ "$(kubectl get node -l cloud-provisioning.appmana.com/role=cloud-worker --no-headers | awk "\$2 == \"Ready\"" | wc -l)" -eq 2 ]' \

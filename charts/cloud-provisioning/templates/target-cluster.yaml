@@ -28,6 +28,12 @@ kind: AWSCluster
 metadata:
   name: {{ .name }}
   namespace: {{ $ns }}
+  annotations:
+    # Also on the INFRA cluster, not just the Cluster: without it the
+    # provider treats this as a control plane it manages and fails
+    # every machine on a control-plane load balancer that does not
+    # exist ("APIServer ELB not available").
+    cluster.x-k8s.io/managed-by: external
   labels:
     {{- include "cloud-provisioning.labels" $ | nindent 4 }}
 spec:
@@ -38,8 +44,6 @@ spec:
   controlPlaneEndpoint:
     host: {{ include "cloud-provisioning.apiHost" $ | quote }}
     port: {{ include "cloud-provisioning.apiPort" $ }}
-  bastion:
-    enabled: false
   network:
     subnets:
       - id: {{ required "provider.aws.subnetID is required" $aws.subnetID }}
@@ -51,6 +55,8 @@ kind: {{ $kind }}
 metadata:
   name: {{ .name }}
   namespace: {{ $ns }}
+  annotations:
+    cluster.x-k8s.io/managed-by: external
   labels:
     {{- include "cloud-provisioning.labels" $ | nindent 4 }}
 spec:

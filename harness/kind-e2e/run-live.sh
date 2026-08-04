@@ -506,6 +506,24 @@ for container in "${CLUSTER}-worker" "${CLUSTER}-worker2"; do
   DUPES=$(node_netns "$container" wg show "$IFACE" allowed-ips 2>/dev/null | awk '{for(i=2;i<=NF;i++) print $i}' | sort | uniq -d)
   [ -z "$DUPES" ] || fail "$container permits the same prefix on more than one peer: $DUPES"
 done
+# Absence of the wrong entries is not presence of the right ones. Under
+# a native network every remote's own block has to be permitted, or the
+# pods on it are unreachable from here.
+if [ "$WANT_ENCAP" = "native" ]; then
+  for machine in public-worker public-worker-2; do
+    node=$(kubectl -n "$NS" get machine "$machine" -o jsonpath='{.status.nodeRef.name}')
+    [ -n "$node" ] || fail "$machine has no node"
+    until_ok 180 sh -c "kubectl -n '$NS' get secret '$PEER_SECRET' -o jsonpath='{.data.peer-allowed-ips-$machine}' | base64 -d | grep -q /26" \
+      || fail "$machine's peer entry never carried its node's blocks"
+    BLOCK=$(kubectl -n "$NS" get secret "$PEER_SECRET" -o jsonpath="{.data.node-pod-cidrs-$node}" | base64 -d)
+    PERMITTED=$(kubectl -n "$NS" get secret "$PEER_SECRET" -o jsonpath="{.data.peer-allowed-ips-$machine}" | base64 -d)
+    case "$PERMITTED" in
+      *"$BLOCK"*) ;;
+      *) fail "$machine permits $PERMITTED, missing its node's block $BLOCK" ;;
+    esac
+  done
+  echo "  each remote's own blocks are permitted, so its pods are reachable"
+fi
 echo "  every peer carries only its own prefixes, none of them cluster wide"
 
 echo "--- reachability across every pair of nodes ---"

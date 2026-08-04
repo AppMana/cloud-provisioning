@@ -223,10 +223,18 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// so the nodes at home can reach the pods running on it. Its blocks
 	// are allocated after it joins, so this is recomputed here rather
 	// than written once when the machine was created.
+	//
+	// A node has no blocks until something is scheduled on it, which is
+	// after it joins, so this comes back until it does. Nothing else
+	// would bring it back: the reconciler is driven by Machine events,
+	// and the machine stops changing once it is running.
+	remoteBlocksPending := false
 	if nodeName, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name"); nodeName != "" {
-		if err := r.publishRemotePodCIDRs(ctx, machine.GetName(), nodeName); err != nil {
+		published, err := r.publishRemotePodCIDRs(ctx, machine.GetName(), nodeName)
+		if err != nil {
 			return ctrl.Result{}, err
 		}
+		remoteBlocksPending = !published
 	}
 
 	// Tell the CNI which address to peer on, once the node exists.
@@ -332,6 +340,10 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}
 			log.Info("updated Gateway external-dns target", "ip", externalIP, "gateway", gwKey)
 		}
+	}
+	if remoteBlocksPending {
+		// Come back for the blocks this node has not been given yet.
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 	return ctrl.Result{}, nil
 }
@@ -577,16 +589,20 @@ func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tun
 
 // publishRemotePodCIDRs keeps a remote machine's peer entry carrying
 // its own node's blocks, alongside its tunnel address.
-func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machineName, nodeName string) error {
+func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machineName, nodeName string) (bool, error) {
 	prefixes, err := r.network.PrefixesFor(ctx, r.reader, nodeName)
 	if err != nil {
-		// The node may not have been allocated a block yet, which is
-		// not a failure: the next pass will find one.
-		return nil
+		// No block yet, which is not a failure: the caller comes back.
+		return false, nil
+	}
+	if len(prefixes) == 0 {
+		// An encapsulated network needs none, so there is nothing
+		// pending and nothing to publish.
+		return r.network.Encapsulation == cni.Encapsulated, nil
 	}
 	secret := &corev1.Secret{}
 	if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, secret); err != nil {
-		return fmt.Errorf("getting peer secret: %w", err)
+		return false, fmt.Errorf("getting peer secret: %w", err)
 	}
 	key := tunnel.PeerAllowedIPsPrefix + machineName
 	entries := tunnel.SplitList(string(secret.Data[key]))
@@ -601,7 +617,7 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machineName,
 	}
 	want := strings.Join(hosts, ",")
 	if want == string(secret.Data[key]) {
-		return nil
+		return true, nil
 	}
 	patch := client.MergeFrom(secret.DeepCopy())
 	if secret.Data == nil {
@@ -609,9 +625,9 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machineName,
 	}
 	secret.Data[key] = []byte(want)
 	if err := r.Patch(ctx, secret, patch); err != nil {
-		return fmt.Errorf("publishing the remote node's pod blocks: %w", err)
+		return false, fmt.Errorf("publishing the remote node's pod blocks: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
 func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unstructured.Unstructured) error {

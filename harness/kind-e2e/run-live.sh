@@ -160,10 +160,21 @@ route_via_nat() {
   # applies. Masquerading the control plane's path would also break what
   # the remote opened directly, since the reply would come back from the
   # router's address rather than the one it asked.
-  for container in $(docker ps --format '{{.Names}}' | grep "^${CLUSTER}-" | grep -v -- "-nat$" | grep -v public-worker | grep -v -- "-control-plane$"); do
+  local routed=0 container
+  local containers
+  containers=$(docker ps --format '{{.Names}}' | grep "^${CLUSTER}-" | grep -v -- "-nat$" | grep -v public-worker | grep -v -- "-control-plane$")
+  # An empty list here is the whole premise of the run quietly removed:
+  # with no node routed through the router, the remote reaches the site
+  # over the flat bridge and every check downstream passes without the
+  # tunnel carrying a packet. Silence is the dangerous outcome, so it
+  # is the one that fails.
+  [ -n "$containers" ] || fail "no node to route through the NAT router: the remote would not be off-network, and every reachability check would pass without the tunnel"
+  for container in $containers; do
     node_netns "$container" ip route replace "$target/32" via "$NAT_IP" \
       || fail "could not route $target through the NAT router on $container"
+    routed=$((routed + 1))
   done
+  echo "  $routed node(s) routed to $target through $NAT_ROUTER"
 }
 
 node_netns() {
@@ -183,14 +194,21 @@ node_netns() {
 WAN_TARGET="${WAN_TARGET:-1.1.1.1}"
 assert_wan() {
   local phase="$1"; shift
-  local container
+  local container probed=0
   for container in "$@"; do
-    docker inspect "$container" >/dev/null 2>&1 || continue
+    [ -n "$container" ] || continue
+    # A named container that cannot be inspected is a failure, not a
+    # skip: skipping every argument would print "wan ok" having probed
+    # nothing, and this runs at ten phases.
+    docker inspect "$container" >/dev/null 2>&1 \
+      || fail "cannot inspect $container to check its path off-box at phase: $phase"
+    probed=$((probed + 1))
     if ! node_netns "$container" ping -c1 -W3 "$WAN_TARGET" >/dev/null 2>&1; then
       node_netns "$container" ip route show >&2 || true
       fail "WAN UNREACHABLE from $container at phase: $phase (default route above)"
     fi
   done
+  [ "$probed" -gt 0 ] || fail "no container probed for WAN at phase: $phase"
   echo "  wan ok [$phase]: $*"
 }
 
@@ -377,7 +395,9 @@ for node in $ENDPOINTS; do
   until_ok 180 sh -c "kubectl -n '$NS' get secret '$PEER_SECRET' -o jsonpath='{.data.node-public-key-$node}' | grep -q ." \
     || fail "$node was selected but never published a key"
 done
-for node in $(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
+ALL_NODE_NAMES=$(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -v '^$')
+[ -n "$ALL_NODE_NAMES" ] || fail "the node list query returned nothing, so the negative half of this precondition would not run"
+for node in $ALL_NODE_NAMES; do
   echo "$ENDPOINTS" | grep -qx "$node" && continue
   kubectl -n "$NS" get secret "$PEER_SECRET" -o jsonpath="{.data.node-public-key-$node}" | grep -q . \
     && fail "$node was not selected but published a key"
@@ -508,6 +528,10 @@ until_ok 60 node_netns "$NODE_CONTAINER" ping -c2 -W3 "$(kubectl -n "$NS" get se
 # is a single host, which `ip` prints bare (a /32), except the
 # connected subnet the address itself creates (proto kernel). Anything
 # else, of any width, is a route hijack.
+RAW_ROUTES=$(node_netns "$ENDPOINT_A" ip route show dev "$IFACE")
+# A live interface always has its own connected route, so no output at
+# all means the probe did not run, not that the table is clean.
+[ -n "$RAW_ROUTES" ] || fail "no routes at all via $IFACE on $ENDPOINT_A: the probe did not work"
 BAD_ROUTES=$(node_netns "$ENDPOINT_A" ip route show dev "$IFACE" \
   | grep -v "proto kernel" | awk '$1 ~ "/" && $1 !~ "/(32|128)$" {print}')
 [ -z "$BAD_ROUTES" ] || fail "non-host route via $IFACE on the control plane: $BAD_ROUTES"
@@ -566,7 +590,7 @@ until_ok 240 sh -c "docker ps --format '{{.Names}}' | grep -q public-worker-2" \
 NODE_CONTAINER_2=$(docker ps --format '{{.Names}}' | grep public-worker-2 | head -1)
 REMOTE_IP_2=$(docker inspect "$NODE_CONTAINER_2" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
 route_via_nat "$REMOTE_IP_2"
-until_ok 420 sh -c "kubectl get node -l cloud-provisioning.appmana.com/role=cloud-worker --no-headers | grep -c Ready | grep -q 2" \
+until_ok 420 sh -c '[ "$(kubectl get node -l cloud-provisioning.appmana.com/role=cloud-worker --no-headers | awk "\$2 == \"Ready\"" | wc -l)" -eq 2 ]' \
   || fail "the second remote node never joined"
 CLOUD_NODE_2=$(kubectl get node -l cloud-provisioning.appmana.com/role=cloud-worker -o jsonpath='{.items[1].metadata.name}')
 echo "  remote nodes: $CLOUD_NODE and $CLOUD_NODE_2"
@@ -588,6 +612,11 @@ ALL_NODES=$(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n
 # shellcheck disable=SC2086
 "$REPO_DIR/harness/health-check.sh" --exec node $HEALTH_CHECK_ARGS $ALL_NODES 2>&1 \
   | tee "$LOG_DIR/health-check.log"
+# Even when reporting rather than failing, a run that performed no
+# checks is not a run that passed.
+CHECKS_RUN=$(sed -n 's/^checks: \([0-9]*\).*/\1/p' "$LOG_DIR/health-check.log" | tail -1)
+[ -n "$CHECKS_RUN" ] && [ "$CHECKS_RUN" -gt 0 ] \
+  || fail "the health check reported no checks at all"
 case "$HEALTH_CHECK_ARGS" in
   *--report-only*) ;;
   *) grep -q "failed: 0" "$LOG_DIR/health-check.log" \
@@ -637,6 +666,11 @@ if [ "$WANT_ENCAP" = "native" ]; then
       || fail "$machine's peer entry never carried its node's blocks"
     BLOCK=$(kubectl -n "$NS" get secret "$PEER_SECRET" -o jsonpath="{.data.node-pod-cidrs-$node}" | base64 -d)
     PERMITTED=$(kubectl -n "$NS" get secret "$PEER_SECRET" -o jsonpath="{.data.peer-allowed-ips-$machine}" | base64 -d)
+    # An empty BLOCK makes the pattern below match anything at all,
+    # including an empty accept list, so the positive half of this
+    # check would silently become a no-op.
+    [ -n "$BLOCK" ] || fail "no pod block recorded for $node, so there is nothing to require"
+    [ -n "$PERMITTED" ] || fail "$machine permits nothing at all"
     case "$PERMITTED" in
       *"$BLOCK"*) ;;
       *) fail "$machine permits $PERMITTED, missing its node's block $BLOCK" ;;

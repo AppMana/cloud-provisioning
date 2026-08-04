@@ -17,6 +17,7 @@ cd "$(dirname "$0")"
 
 OUT="${OUT:-/tmp/cldt-matrix}"
 SCENARIOS="${SCENARIOS:-scenarios.tsv}"
+[ -r "$SCENARIOS" ] || { echo "cannot read $SCENARIOS" >&2; exit 2; }
 ONLY="${ONLY:-}"          # run just these rows, space separated
 mkdir -p "$OUT"
 : > "$OUT/summary.txt"
@@ -93,4 +94,7 @@ echo
 echo "================ summary ================"
 cat "$OUT/summary.txt"
 echo "rows: $rows  failed: $failed_rows"
-[[ "$failed_rows" -eq 0 ]]
+# Zero rows is not success. A mistyped ONLY, an unreadable table or a
+# filter that matches nothing would otherwise report a green matrix
+# having provisioned nothing at all.
+[[ "$rows" -gt 0 && "$failed_rows" -eq 0 ]]

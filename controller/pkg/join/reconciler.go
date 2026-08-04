@@ -283,7 +283,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// a remote peer's Endpoint is its public address: two remotes have
 	// no NAT between them and must dial each other directly.
 	cloudTunnelAddrEarly := strings.SplitN(strings.TrimSpace(cloudWGAddress), "/", 2)[0]
-	peers, err := tunnel.RemotePeers(dialerSecret.Data, cloudTunnelAddrEarly, r.APIVIP)
+	peers, err := tunnel.RemotePeers(dialerSecret.Data, cloudTunnelAddrEarly, r.apiServers(dialerSecret))
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("deriving mesh peer list: %w", err)
 	}
@@ -418,6 +418,23 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	log.Info("bootstrap secret provisioned", "machine", req.NamespacedName, "nodeVIP4", nodeVIP4)
 	return ctrl.Result{}, nil
+}
+
+// apiServers is every control-plane address a remote must reach: the
+// list the mesh reconciler discovered (all control planes), falling
+// back to the single configured VIP. k0s workers load-balance across
+// all of them via nllb, so publishing only one leaves the remote
+// dependent on that single control plane staying up.
+func (r *Reconciler) apiServers(dialerSecret *corev1.Secret) []string {
+	if raw, ok := dialerSecret.Data[tunnel.APIServersKey]; ok {
+		if servers := tunnel.SplitList(string(raw)); len(servers) > 0 {
+			return servers
+		}
+	}
+	if r.APIVIP == "" {
+		return nil
+	}
+	return []string{r.APIVIP}
 }
 
 // infraProviderFor finds the registered InfraProvider whose GVK.Kind

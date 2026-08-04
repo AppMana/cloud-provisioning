@@ -69,10 +69,15 @@ dialerBinary:
     url: ""
     sha256: ""
 
-# Cluster API, shipped as a subchart so one release installs the whole
-# stack. Disable if the cluster already manages CAPI itself.
+# Cluster API, available as an OPTIONAL subchart for a one-release
+# install. DISABLED by default, and the recommended production layout
+# is a SEPARATE HelmRelease for cluster-api-operator: coupling the two
+# lifecycles means a failed upgrade of this chart can delete the
+# provider namespaces (and with them the provider controllers and the
+# credentials Secrets that must live there). See the gitops example in
+# the README.
 cluster-api-operator:
-  enabled: true
+  enabled: false
   # Same Linux-only reasoning as above.
   nodeSelector:
     kubernetes.io/os: linux

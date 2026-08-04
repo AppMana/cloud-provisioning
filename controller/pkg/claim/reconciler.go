@@ -111,9 +111,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err != nil {
 		return r.fail(ctx, claim, err)
 	}
-	instanceType, err := provisioner.ResolveInstanceType(nodeReq)
-	if err != nil {
-		return r.fail(ctx, claim, err)
+	// An explicit instance type wins over the requests: sometimes you
+	// want exactly t3.micro (free tier) or a specific family, not
+	// "whatever satisfies 2 cpu". Requests remain the portable default.
+	instanceType := claim.Spec.InstanceType
+	if instanceType == "" {
+		resolved, err := provisioner.ResolveInstanceType(nodeReq)
+		if err != nil {
+			return r.fail(ctx, claim, err)
+		}
+		instanceType = resolved
 	}
 
 	ownerRef := metav1.OwnerReference{
@@ -228,7 +235,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, fmt.Errorf("updating claim status: %w", err)
 		}
 	}
-	return ctrl.Result{}, nil
+	// Keep converging until the Machine reaches a terminal phase.
+	// Without this the claim reports whatever was true at the instant it
+	// was created ("Resolving") forever, because nothing re-triggers
+	// this reconciler when the Machine progresses underneath it.
+	switch phase {
+	case "Running", "Failed", "Deleting":
+		return ctrl.Result{}, nil
+	default:
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+	}
 }
 
 // claimFinalizer keeps the claim alive until the compute it created is
@@ -403,8 +419,8 @@ func nodeRequest(claim *v1alpha1.ProvisionedNodeClaim) (join.NodeRequest, error)
 	if mem, ok := claim.Spec.Requests[corev1.ResourceMemory]; ok {
 		req.MemoryBytes = mem.Value()
 	}
-	if req.CPUMillis == 0 && req.MemoryBytes == 0 {
-		return req, fmt.Errorf("spec.requests must set cpu and/or memory")
+	if req.CPUMillis == 0 && req.MemoryBytes == 0 && claim.Spec.InstanceType == "" {
+		return req, fmt.Errorf("set spec.requests (cpu and/or memory) or spec.instanceType")
 	}
 	return req, nil
 }

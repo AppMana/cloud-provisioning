@@ -109,21 +109,30 @@ runcmd:
   # interface, calico-node fails to start at all ("failed to
   # autodetect an IPv4 address") -- this isn't optional, it's the same
   # mechanism every other node already relies on.
-  # The cluster's CNI configuration may CHAIN standard plugins
-  # (bandwidth, portmap, tuning). Existing nodes got those from
-  # whatever provisioned them; a stock cloud image has none, and
-  # calico-node only installs its own -- so every pod sandbox on this
-  # node would fail with 'failed to find plugin "bandwidth" in path
-  # [/opt/cni/bin]'. Install them here, sha-pinned, so a provisioned
-  # node is a complete cluster member without any per-node action.
+  # The cluster's CNI configuration CHAINS standard plugins. Confirmed
+  # on this fleet: 10-calico.conflist is calico -> calico-ipam -> k8s
+  # -> portmap -> bandwidth. Calico's install-cni ships calico,
+  # calico-ipam, flannel, host-local, loopback, portmap and tuning --
+  # but NOT bandwidth, and k0s bundles only containerd/kubelet/iptables/
+  # runc. On existing nodes bandwidth was placed there by whatever
+  # provisioned them; a freshly provisioned node has no way to get it,
+  # and every pod sandbox then fails with 'failed to find plugin
+  # "bandwidth" in path [/opt/cni/bin]'.
+  #
+  # Fills GAPS only: a plugin Calico already installed is left alone,
+  # so this never downgrades calico-ipam or portmap to the upstream
+  # build underneath a running CNI.
   {{- if .cniPluginsURL }}
   - |
     set -e
-    mkdir -p /opt/cni/bin
+    mkdir -p /opt/cni/bin /tmp/cni-plugins
     curl -fsSL -o /tmp/cni-plugins.tgz '{{ .cniPluginsURL }}'
     echo '{{ .cniPluginsSHA256 }}  /tmp/cni-plugins.tgz' | sha256sum -c -
-    tar -C /opt/cni/bin -xzf /tmp/cni-plugins.tgz
-    rm -f /tmp/cni-plugins.tgz
+    tar -C /tmp/cni-plugins -xzf /tmp/cni-plugins.tgz
+    for f in /tmp/cni-plugins/*; do
+      [ -e "/opt/cni/bin/$(basename "$f")" ] || cp -a "$f" /opt/cni/bin/
+    done
+    rm -rf /tmp/cni-plugins /tmp/cni-plugins.tgz
   {{- end }}
   - ip link add vip0 type dummy
   - ip addr add {{ .nodeVIP4 }}/32 dev vip0

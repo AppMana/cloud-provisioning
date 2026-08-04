@@ -49,9 +49,14 @@ rules:
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
     resources: ["awsmachines", "dockermachines"]
     verbs: ["get", "create", "delete"]
+  # Read across the whole infrastructure group. A claim names its
+  # machine template by apiGroup and kind, and the machine created is
+  # that kind without the Template suffix, so which resources exist is
+  # the provider's choice rather than something this chart can list.
+  # Reads only: the writes above stay limited to the machine kinds.
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
-    resources: ["awsclusters", "awsclusterstaticidentities", "dockerclusters"]
-    verbs: ["get"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
   # Same reason as clusters/status above.
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
     resources: ["awsclusters/status", "dockerclusters/status"]

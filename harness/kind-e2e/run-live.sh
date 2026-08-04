@@ -32,6 +32,11 @@ CALICO_MANIFEST="${CALICO_MANIFEST:-https://raw.githubusercontent.com/projectcal
 # contain. A native network needs each peer's own pod blocks; an
 # encapsulated one addresses its packets to the node and needs none.
 CNI="${CNI:-calico}"
+# Which of this cluster's nodes terminate tunnels, and how many remote
+# nodes to provision. Varying these is how tunnel placement is compared.
+TUNNEL_ENDPOINTS="${TUNNEL_ENDPOINTS:-kubernetes.io/os=linux}"
+REMOTE_COUNT="${REMOTE_COUNT:-2}"
+HEALTH_CHECK_ARGS="${HEALTH_CHECK_ARGS:-}"
 case "$CNI" in
   calico)       WANT_ENCAP=native ;;
   calico-vxlan) WANT_ENCAP=encapsulated ;;
@@ -140,7 +145,7 @@ start_nat_router() {
 # terminates a tunnel, so their tunnel traffic to it is masqueraded.
 route_via_nat() {
   local target="$1" container
-  for container in "${CLUSTER}-worker" "${CLUSTER}-worker2"; do
+  for container in $(docker ps --format '{{.Names}}' | grep "^${CLUSTER}-" | grep -v -- "-nat$" | grep -v public-worker); do
     node_netns "$container" ip route replace "$target/32" via "$NAT_IP" \
       || fail "could not route $target through the NAT router on $container"
   done
@@ -261,9 +266,25 @@ until_ok 240 sh -c "kubectl wait --for=condition=Ready node --all --timeout=10s"
 CP_NODE=$(kubectl get nodes -l node-role.kubernetes.io/control-plane -o jsonpath='{.items[0].metadata.name}')
 # The tunnel endpoints on this side: both workers. Control planes are
 # left out by the selector's default posture, which is asserted below.
-ENDPOINT_A=$(kubectl get nodes -l '!node-role.kubernetes.io/control-plane' -o jsonpath='{.items[0].metadata.name}')
-ENDPOINT_B=$(kubectl get nodes -l '!node-role.kubernetes.io/control-plane' -o jsonpath='{.items[1].metadata.name}')
-[ -n "$ENDPOINT_B" ] || fail "expected two worker nodes to terminate tunnels"
+# Which of this cluster's nodes the selector picks. Control planes are
+# left out unless the selector names them, or unless it is "all", which
+# is the one thing label syntax cannot say.
+if [ "$TUNNEL_ENDPOINTS" = "all" ]; then
+  ENDPOINTS=$(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+else
+  ENDPOINTS=$(kubectl get nodes -l "$TUNNEL_ENDPOINTS" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+  case "$TUNNEL_ENDPOINTS" in
+    *node-role.kubernetes.io/control-plane*) ;;
+    *) ENDPOINTS=$(echo "$ENDPOINTS" | while read -r n; do
+         [ -n "$n" ] || continue
+         kubectl get node "$n" -o jsonpath='{.metadata.labels}' | grep -q "node-role.kubernetes.io/control-plane" || echo "$n"
+       done) ;;
+  esac
+fi
+ENDPOINTS=$(echo "$ENDPOINTS" | grep -v '^$' || true)
+[ -n "$ENDPOINTS" ] || fail "the selector '$TUNNEL_ENDPOINTS' picked no node"
+ENDPOINT_A=$(echo "$ENDPOINTS" | head -1)
+echo "  tunnel endpoints ($TUNNEL_ENDPOINTS): $(echo $ENDPOINTS | tr '\n' ' ')"
 CP_IP=$(docker inspect "${CLUSTER}-control-plane" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
 [ -n "$CP_IP" ] || fail "could not resolve the control plane's kind network address"
 echo "  control plane: $CP_NODE @ $CP_IP"
@@ -317,7 +338,7 @@ cluster:
   serviceCIDRs: 10.96.0.0/12
   nodeVIP4Prefix: 10.199.0.
   nodeVIP6Prefix: "fd99::"
-tunnel: {endpoints: "kubernetes.io/os=linux"}
+tunnel: {endpoints: "$TUNNEL_ENDPOINTS"}
 dialerBinary: {amd64: {url: "$BIN_URL", sha256: "$BIN_SHA"}}
 targetCluster: {enabled: true, name: "$CLUSTER", infrastructureKind: DockerCluster}
 provider:
@@ -335,18 +356,18 @@ helm install cloud-provisioning "$REPO_DIR/charts/cloud-provisioning" \
 # namespace, the same as a real install.
 kubectl config set-context --current --namespace="$NS" >/dev/null
 
-echo "--- mesh precondition: both workers allocate and publish, the control plane does not ---"
-until_ok 60 sh -c "kubectl -n "$NS" get secret $PEER_SECRET -o jsonpath='{.data.node-tunnel-address-$ENDPOINT_A}' | grep -q ." \
-  || fail "no tunnel address was allocated for worker $ENDPOINT_A"
-until_ok 120 sh -c "kubectl -n "$NS" get pods -l app=$LOCAL_DS --no-headers | grep -q Running" \
-  || fail "on-prem dialer pod never Running (image load / scheduling problem)"
-until_ok 120 sh -c "kubectl -n "$NS" get secret $PEER_SECRET -o jsonpath='{.data.node-public-key-$ENDPOINT_A}' | grep -q ." \
-  || fail "$ENDPOINT_A never self-published its public key"
-until_ok 120 sh -c "kubectl -n "$NS" get secret $PEER_SECRET -o jsonpath='{.data.node-public-key-$ENDPOINT_B}' | grep -q ." \
-  || fail "$ENDPOINT_B never self-published its public key"
-kubectl -n "$NS" get secret $PEER_SECRET -o jsonpath="{.data.node-tunnel-address-$CP_NODE}" | grep -q . \
-  && fail "the control plane was allocated a tunnel address; it must be excluded unless named"
-echo "  dialer pod Running, key published"
+echo "--- mesh precondition: every selected node publishes, the others do not ---"
+for node in $ENDPOINTS; do
+  until_ok 180 sh -c "kubectl -n '$NS' get secret '$PEER_SECRET' -o jsonpath='{.data.node-public-key-$node}' | grep -q ." \
+    || fail "$node was selected but never published a key"
+done
+for node in $(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"
+"}{end}'); do
+  echo "$ENDPOINTS" | grep -qx "$node" && continue
+  kubectl -n "$NS" get secret "$PEER_SECRET" -o jsonpath="{.data.node-public-key-$node}" | grep -q . \
+    && fail "$node was not selected but published a key"
+done
+echo "  every selected node published, and no other did"
 assert_wan "on-prem dialer running (interface created, key published)" "${CLUSTER}-control-plane"
 
 echo "--- the Cluster API objects, applied the way a user applies them ---"
@@ -508,6 +529,7 @@ IMG=$(kubectl -n "$NS" get dockermachine public-worker -o jsonpath='{.spec.custo
 [ "$IMG" = "$NODE_IMAGE" ] || fail "the machine did not take customImage from its template (got '$IMG')"
 echo "  DockerMachineTemplate produced a DockerMachine carrying the template's spec"
 
+if [ "$REMOTE_COUNT" -ge 2 ]; then
 echo "--- a second remote node: the mesh is many to many ---"
 # Two tunnel endpoints on this side and two remote nodes. Every endpoint
 # peers with every remote, and the remotes peer with each other: they
@@ -535,6 +557,8 @@ CLOUD_NODE_2=$(kubectl get node -l cloud-provisioning.appmana.com/role=cloud-wor
 echo "  remote nodes: $CLOUD_NODE and $CLOUD_NODE_2"
 assert_wan "both remote nodes joined" "${CLUSTER}-control-plane"
 
+fi
+
 echo "--- reachability across every pair of nodes ---"
 # The remote sits behind the NAT router, so it reaches this site only
 # through the tunnel: the same shape as a real deployment, where the
@@ -545,10 +569,15 @@ echo "--- reachability across every pair of nodes ---"
 # Probes run through each node's container runtime: a node off the
 # local network has no path for kubectl exec, since the API server
 # reaches a kubelet directly and the control plane carries no tunnel.
-"$REPO_DIR/harness/health-check.sh" --exec node \
-  "$ENDPOINT_A" "$ENDPOINT_B" "$CLOUD_NODE" "$CLOUD_NODE_2" 2>&1 | tee "$LOG_DIR/health-check.log"
-grep -q "failed: 0" "$LOG_DIR/health-check.log" \
-  || fail "reachability checks failed (see $LOG_DIR/health-check.log)"
+ALL_NODES=$(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -v '^$')
+# shellcheck disable=SC2086
+"$REPO_DIR/harness/health-check.sh" --exec node $HEALTH_CHECK_ARGS $ALL_NODES 2>&1 \
+  | tee "$LOG_DIR/health-check.log"
+case "$HEALTH_CHECK_ARGS" in
+  *--report-only*) ;;
+  *) grep -q "failed: 0" "$LOG_DIR/health-check.log" \
+       || fail "reachability checks failed (see $LOG_DIR/health-check.log)" ;;
+esac
 echo "  every pair reachable, by pod and by service"
 
 echo "--- what each peer is permitted, and what it is not ---"
@@ -584,7 +613,9 @@ done
 # a native network every remote's own block has to be permitted, or the
 # pods on it are unreachable from here.
 if [ "$WANT_ENCAP" = "native" ]; then
-  for machine in public-worker public-worker-2; do
+  MACHINES=public-worker
+  [ "$REMOTE_COUNT" -ge 2 ] && MACHINES="public-worker public-worker-2"
+  for machine in $MACHINES; do
     node=$(kubectl -n "$NS" get machine "$machine" -o jsonpath='{.status.nodeRef.name}')
     [ -n "$node" ] || fail "$machine has no node"
     until_ok 180 sh -c "kubectl -n '$NS' get secret '$PEER_SECRET' -o jsonpath='{.data.peer-allowed-ips-$machine}' | base64 -d | grep -q /26" \

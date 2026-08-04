@@ -484,6 +484,9 @@ func (r *meshReconciler) isTunnelEndpoint(node *corev1.Node) bool {
 	if _, isCP := node.Labels[controlPlaneLabel]; isCP && !selectorNamesControlPlane(r.tunnelEndpointsRaw) {
 		return false
 	}
+	if isAllNodes(r.tunnelEndpointsRaw) {
+		return true
+	}
 	if r.tunnelEndpointSelector == nil || r.tunnelEndpointSelector.Empty() {
 		return true
 	}
@@ -493,7 +496,19 @@ func (r *meshReconciler) isTunnelEndpoint(node *corev1.Node) bool {
 // selectorNamesControlPlane reports whether the operator was asked,
 // explicitly, to place tunnels on control-plane nodes.
 func selectorNamesControlPlane(raw string) bool {
-	return strings.Contains(raw, controlPlaneLabel)
+	return strings.Contains(raw, controlPlaneLabel) || isAllNodes(raw)
+}
+
+// isAllNodes is the one selector a label selector cannot express: every
+// node, control planes included. A control plane is left out unless it
+// is named, and naming it in a selector that also matches workers is
+// not something label syntax allows.
+func isAllNodes(raw string) bool {
+	switch strings.TrimSpace(raw) {
+	case "all", "*":
+		return true
+	}
+	return false
 }
 
 // nextFreeAddress returns the next unused host address in base's
@@ -1026,6 +1041,9 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "invalid --machine-selector: %v\n", err)
 		os.Exit(1)
+	}
+	if isAllNodes(tunnelEndpoints) {
+		tunnelEndpoints = ""
 	}
 	endpointSelector, err := labels.Parse(tunnelEndpoints)
 	if err != nil {

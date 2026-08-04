@@ -34,6 +34,10 @@ NODES=()
 # instead. The traffic under test is unchanged; only the way the probe
 # is started differs.
 EXEC_VIA="${HEALTH_CHECK_EXEC:-kubectl}"   # kubectl | node
+# Report the matrix and exit 0 rather than failing on the first
+# unreachable pair. Which pairs reach each other is the measurement
+# when comparing tunnel placements, not a pass or fail.
+REPORT_ONLY="${HEALTH_CHECK_REPORT_ONLY:-0}"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -41,6 +45,7 @@ while [[ $# -gt 0 ]]; do
     --service-port) SERVICE_PORT="$2"; shift 2 ;;
     --image) IMAGE="$2"; shift 2 ;;
     --exec) EXEC_VIA="$2"; shift 2 ;;
+    --report-only) REPORT_ONLY=1; shift ;;
     *) NODES+=("$1"); shift ;;
   esac
 done
@@ -150,7 +155,7 @@ FAIL=0
 # when the first pod lands on it, and the block reaches the peers on the
 # next pass. So each check is retried to a deadline rather than taken as
 # final on its first attempt.
-RETRY_SECONDS="${HEALTH_CHECK_RETRY_SECONDS:-90}"
+RETRY_SECONDS="${HEALTH_CHECK_RETRY_SECONDS:-60}"
 check() {
   local label="$1"; shift
   local deadline=$((SECONDS + RETRY_SECONDS))
@@ -215,4 +220,5 @@ done
 
 echo
 echo "checks: $((PASS+FAIL))  passed: $PASS  failed: $FAIL"
+[[ "$REPORT_ONLY" == "1" ]] && exit 0
 [[ $FAIL -eq 0 ]] || exit 1

@@ -451,6 +451,19 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 			return err
 		}
 
+		// Keep this node's own address the one its site reaches it by.
+		//
+		// A CNI that picks a node's address by looking at its
+		// interfaces can pick the tunnel, which no other node at the
+		// site can reach. Its neighbours then try to peer with it
+		// there, the sessions never establish, and a node that was
+		// working loses the pod network it already had, in both
+		// directions, while the tunnel itself looks healthy. Bringing
+		// up a tunnel must never cost a node something it had.
+		if err := r.ensureCNINodeAddress(ctx, node.Name, firstAddress(addresses), ""); err != nil {
+			return err
+		}
+
 		podKey := tunnel.NodePodCIDRsPrefix + node.Name
 		joinedPods := strings.Join(texts, ",")
 		if string(secret.Data[podKey]) != joinedPods {

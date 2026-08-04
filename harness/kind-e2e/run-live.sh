@@ -335,7 +335,7 @@ kubectl get crd provisionednodeclaims.cloud-provisioning.appmana.com >/dev/null 
 until_ok 60 sh -c "! sudo nsenter -t \$(docker inspect -f '{{.State.Pid}}' ${CLUSTER}-control-plane) -n ip link show $IFACE" \
   || fail "$IFACE survived the uninstall on the control-plane node"
 assert_wan "after uninstall" "${CLUSTER}-control-plane"
-echo "  release removed: no DaemonSets, no peer Secret, no CRD, no tunnel interface"
+echo "  release removed: no DaemonSets, no peer Secret, no tunnel interface (CRD kept, by design)"
 
 echo "--- reinstall: a second install must work with no manual steps ---"
 helm install cloud-provisioning "$REPO_DIR/charts/cloud-provisioning" \

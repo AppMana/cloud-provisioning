@@ -145,7 +145,16 @@ start_nat_router() {
 # terminates a tunnel, so their tunnel traffic to it is masqueraded.
 route_via_nat() {
   local target="$1" container
-  for container in $(docker ps --format '{{.Names}}' | grep "^${CLUSTER}-" | grep -v -- "-nat$" | grep -v public-worker); do
+  # Never the control plane. The remote reaches the API server directly
+  # while it boots, because this provider runs the bootstrap as part of
+  # provisioning and only publishes an address once it succeeds: the
+  # site cannot dial a remote whose address it does not yet know. A
+  # cloud provider publishes the address first and boots afterwards, so
+  # the tunnel is up before the bootstrap needs it and none of this
+  # applies. Masquerading the control plane's path would also break what
+  # the remote opened directly, since the reply would come back from the
+  # router's address rather than the one it asked.
+  for container in $(docker ps --format '{{.Names}}' | grep "^${CLUSTER}-" | grep -v -- "-nat$" | grep -v public-worker | grep -v -- "-control-plane$"); do
     node_netns "$container" ip route replace "$target/32" via "$NAT_IP" \
       || fail "could not route $target through the NAT router on $container"
   done

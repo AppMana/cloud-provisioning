@@ -67,6 +67,27 @@ rules:
     verbs: ["update"]
   # Tunnel-endpoint allocation watches Nodes (a new/relabeled node
   # changes the mesh membership).
+  # Reading the cluster's own addresses and ranges, so none of them
+  # have to be restated as configuration.
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["servicecidrs"]
+    verbs: ["get", "list"]
+  # The service range on a cluster too old for ServiceCIDR objects is
+  # read from the allocator's rejection of an out-of-range address. The
+  # request is a dry run, so nothing is created.
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["create"]
+  # Pod ranges from whichever CNI is installed.
+  - apiGroups: ["crd.projectcalico.org"]
+    resources: ["ippools"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get"]
   - apiGroups: [""]
     resources: ["nodes"]
     # patch: a provisioned node is told which address the CNI should

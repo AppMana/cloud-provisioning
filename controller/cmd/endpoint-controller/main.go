@@ -710,6 +710,17 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 	for _, req := range parseSelectorRequirements(r.tunnelEndpointsRaw) {
 		nodeSelectorTerms = append(nodeSelectorTerms, req)
 	}
+	// A control plane carries a NoSchedule taint, so allowing it by
+	// affinity is not enough: without a toleration a selected control
+	// plane simply never gets a pod, and the mesh silently omits it.
+	var tolerations []corev1.Toleration
+	if selectorNamesControlPlane(r.tunnelEndpointsRaw) {
+		for _, key := range []string{controlPlaneLabel, "node-role.kubernetes.io/master"} {
+			tolerations = append(tolerations, corev1.Toleration{
+				Key: key, Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule,
+			})
+		}
+	}
 
 	hostPathDirectoryOrCreate := corev1.HostPathDirectoryOrCreate
 	desired := &appsv1.DaemonSet{
@@ -725,6 +736,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 				Spec: corev1.PodSpec{
 					HostNetwork:        true,
 					ServiceAccountName: r.dialerServiceAccount,
+					Tolerations:        tolerations,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -1042,7 +1054,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "invalid --machine-selector: %v\n", err)
 		os.Exit(1)
 	}
+	rawTunnelEndpoints := tunnelEndpoints
 	if isAllNodes(tunnelEndpoints) {
+		// Not a label selector, so it must not be parsed as one; the
+		// reconciler still sees the original, which is what tells it
+		// control planes are wanted.
 		tunnelEndpoints = ""
 	}
 	endpointSelector, err := labels.Parse(tunnelEndpoints)
@@ -1156,7 +1172,7 @@ func main() {
 			gatewayNamespace:       gatewayNamespace,
 			gatewayName:            gatewayName,
 			tunnelEndpointSelector: endpointSelector,
-			tunnelEndpointsRaw:     tunnelEndpoints,
+			tunnelEndpointsRaw:     rawTunnelEndpoints,
 			tunnelSubnet:           tunnelSubnet,
 			localAddressBase:       localAddressBase,
 			dialerDaemonSetName:    dialerDaemonSetName,

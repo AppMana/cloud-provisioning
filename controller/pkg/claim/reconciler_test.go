@@ -9,6 +9,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -290,5 +291,92 @@ func TestReconcile_NoProvisionerForClusterKind_Fails(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "GCPCluster") {
 		t.Errorf("error %q must name the unfulfillable kind", err.Error())
+	}
+}
+
+func TestReconcile_MachineDeletionTimeoutsAreBounded(t *testing.T) {
+	// CAPI's defaults wait forever on drain/detach/node-deletion. The
+	// node a claim creates is reachable ONLY through the tunnel being
+	// torn down, so it is exactly the node that can become undrainable
+	// mid-deletion -- unbounded, `kubectl delete provisionednodeclaim`
+	// would hang forever with a billed instance still running.
+	claim := fakeClaim("public-worker")
+	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret(), fakeNode())
+
+	if err := reconcileClaim(t, r, claim); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	machine := &unstructured.Unstructured{}
+	machine.SetGroupVersionKind(machineGVK)
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "public-worker"}, machine); err != nil {
+		t.Fatalf("getting Machine: %v", err)
+	}
+	for _, field := range []string{"nodeDrainTimeoutSeconds", "nodeVolumeDetachTimeoutSeconds", "nodeDeletionTimeoutSeconds"} {
+		v, found, err := unstructured.NestedInt64(machine.Object, "spec", "deletion", field)
+		if err != nil || !found {
+			t.Errorf("spec.deletion.%s not set -- deletion would block indefinitely", field)
+			continue
+		}
+		if v <= 0 {
+			t.Errorf("spec.deletion.%s = %d, want a positive bound", field, v)
+		}
+	}
+}
+
+func TestReconcileDelete_RemovesComputeAndOnlyThenReleasesTheClaim(t *testing.T) {
+	// OwnerRef GC is NOT the teardown mechanism: CAPI's own Machine
+	// controller reconciles ownerReferences and replaces the claim's
+	// with the Cluster, so a deleted claim left the Machine Running
+	// with a billed instance (confirmed live). The claim holds a
+	// finalizer and deletes the compute itself.
+	claim := fakeClaim("public-worker")
+	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret(), fakeNode())
+	if err := reconcileClaim(t, r, claim); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+
+	created := &v1alpha1.ProvisionedNodeClaim{}
+	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), created); err != nil {
+		t.Fatalf("getting claim: %v", err)
+	}
+	if !containsString(created.Finalizers, claimFinalizer) {
+		t.Fatalf("claim finalizers = %v, want %s -- without it deletion orphans the compute", created.Finalizers, claimFinalizer)
+	}
+
+	// Reproduce what CAPI does: strip the claim's ownerRef from the
+	// Machine, so this test can only pass via explicit deletion.
+	machine := &unstructured.Unstructured{}
+	machine.SetGroupVersionKind(machineGVK)
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "public-worker"}, machine); err != nil {
+		t.Fatalf("getting Machine: %v", err)
+	}
+	machine.SetOwnerReferences(nil)
+	if err := r.Update(context.Background(), machine); err != nil {
+		t.Fatalf("stripping ownerRefs: %v", err)
+	}
+
+	if err := r.Delete(context.Background(), created); err != nil {
+		t.Fatalf("deleting claim: %v", err)
+	}
+	// The fake client honors finalizers, so the claim still exists.
+	if err := reconcileClaim(t, r, created); err != nil {
+		t.Fatalf("Reconcile(deleting): %v", err)
+	}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "public-worker"}, machine); !apierrors.IsNotFound(err) {
+		t.Errorf("Machine still present after teardown reconcile: %v", err)
+	}
+	awsMachine := &unstructured.Unstructured{}
+	awsMachine.SetGroupVersionKind(joinaws.Provider{}.GVK())
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "public-worker"}, awsMachine); !apierrors.IsNotFound(err) {
+		t.Errorf("provider machine still present after teardown reconcile: %v", err)
+	}
+
+	// Compute gone -> the finalizer is released and the claim goes away.
+	if err := reconcileClaim(t, r, created); err != nil {
+		t.Fatalf("Reconcile(final): %v", err)
+	}
+	remaining := &v1alpha1.ProvisionedNodeClaim{}
+	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), remaining); !apierrors.IsNotFound(err) {
+		t.Errorf("claim survived teardown (finalizer never released): %v, finalizers=%v", err, remaining.Finalizers)
 	}
 }

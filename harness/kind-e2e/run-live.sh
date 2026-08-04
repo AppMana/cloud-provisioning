@@ -196,15 +196,18 @@ if [ "$CNI" = "cilium" ]; then
 else
   kubectl apply -f "$CALICO_MANIFEST" >"$LOG_DIR/cni-install.log" 2>&1 \
     || fail "installing Calico failed (see $LOG_DIR/cni-install.log)"
+  # The stock manifest ships ipipMode Always, so Calico encapsulates
+  # out of the box. Set the mode this run is for, which is what the
+  # model then has to read back.
+  until_ok 240 sh -c "kubectl get ippools.crd.projectcalico.org default-ipv4-ippool" \
+    || fail "Calico never created its default IP pool"
   if [ "$CNI" = "calico-vxlan" ]; then
-    # Wait for the pool to exist, then turn encapsulation on, which is
-    # what the model must read back.
-    until_ok 240 sh -c "kubectl get ippools.crd.projectcalico.org default-ipv4-ippool" \
-      || fail "Calico never created its default IP pool"
-    kubectl patch ippools.crd.projectcalico.org default-ipv4-ippool --type=merge \
-      -p '{"spec":{"vxlanMode":"Always","ipipMode":"Never"}}' >/dev/null \
-      || fail "could not switch the pool to VXLAN"
+    POOL_PATCH='{"spec":{"vxlanMode":"Always","ipipMode":"Never"}}'
+  else
+    POOL_PATCH='{"spec":{"vxlanMode":"Never","ipipMode":"Never"}}'
   fi
+  kubectl patch ippools.crd.projectcalico.org default-ipv4-ippool --type=merge \
+    -p "$POOL_PATCH" >/dev/null || fail "could not set the pool's encapsulation"
 fi
 # Calico's own IP pool is what the controller reads its pod ranges
 # from, so it has to exist before the controller starts.

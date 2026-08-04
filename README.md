@@ -36,6 +36,26 @@ pods is Calico's concern: bird learns pod blocks over BGP sessions that
 ride the tunnel's host routes. See `controller/cmd/dialer/main.go`'s
 package doc.
 
+Three further rules the dialer enforces, each found by a live failure:
+
+- **Never route a peer's own endpoint through the tunnel.** The
+  encrypted packet's outer destination is that address, so it matches
+  the same route and re-encapsulates forever (observed at line rate).
+  Endpoints are read from the live device as well as config, because a
+  listener's peers have no configured endpoint — it learns theirs by
+  roaming.
+- **Prune routes, don't just add them.** A route that becomes wrong (a
+  removed peer, an address later revealed as an endpoint) must be
+  removed, or it keeps looping or blackholing.
+- **Validate the whole peer set before touching the kernel**, and
+  install a peer's routes only once that peer is viable (it has an
+  endpoint, or a handshake proves the path). A route to a peer
+  WireGuard cannot send to is a blackhole.
+
+The asymmetry matters: internal nodes (behind NAT, not WAN-reachable)
+always DIAL; the remote only LISTENS and learns their addresses by
+roaming.
+
 ## How a claim becomes a node
 
 1. **Claim** — `ProvisionedNodeClaim` is committed (gitops). The claim
@@ -74,26 +94,48 @@ package doc.
 controller/             Go module: endpoint-controller (claim + join +
                         mesh reconcilers) and the dialer
                         (netlink/wgctrl, no shelling out)
+controller/pkg/join/    the two seams, one package per specialization:
+                        k0s + kubeadm (ClusterJoinProvider), aws + docker
+                        (InfraProvider/MachineProvisioner). Each keeps
+                        its own knobs in its own provider-config Secret
 controller/pkg/tunnel/  the shared wire contract: Secret key schema,
                         peers-file shape, cldt* interface naming
 join-patterns/          versioned cloud-init templates, one per join
                         mechanism — rendered by the join reconciler,
                         never hand-typed
-manifests/wg-dialer/    reference deploy: namespace, RBAC (derived from
-                        code), CRD, controller Deployment, claim example
+manifests/wg-dialer/    reference deploy: CRD, RBAC (derived from code),
+                        controller Deployment, claim example
 manifests/cluster/      the externally-managed Cluster/AWSCluster pair a
                         claim resolves against
+harness/netns-routing/  single-NIC routing e2e for the real dialer in
+                        network namespaces (fast; the safety invariants)
+harness/kind-e2e/       run-live.sh: ONE claim becomes a real second node
+                        on a kind cluster via CAPD + kubeadm, over a real
+                        tunnel, and one delete removes it. run.sh: the
+                        same declarative fan-out against shim CRDs
 harness/vm-single-nic/  real single-NIC VM (containerlab + vrnetlab),
-                        real k0s, route-hijack regression — see its README
+                        real k0s, real boot/reboot — see its README
 scripts/aws/            one-time IAM bootstrap for the least-privilege
                         harness identity
 ```
 
 ## Verification
 
-- `controller/`: `go test ./...` — includes the routing invariant
-  (parse-time refusal of any non-host kernel route), mesh derivation,
-  claim expansion, and join rendering against fakes.
+- `controller/`: `go test ./...` — includes the routing invariants
+  (parse-time refusal of any non-host kernel route, endpoints never
+  routed through their own tunnel), mesh derivation, claim expansion
+  and teardown, and join rendering against fakes.
+- `harness/kind-e2e/run-live.sh`: the whole contract on a real API
+  server, through the product's own abstractions — one claim becomes a
+  real kubeadm-joined node over a real WireGuard tunnel, and one delete
+  removes it. **WAN reachability is asserted at every phase on every
+  node**: the failure this project exists to prevent is a tunnel
+  costing a node its default route, and checking only at the end cannot
+  tell "never broke" from "broke and recovered". Requires kind,
+  clusterctl and docker; the assertions run inside each node's netns
+  with host tools, since the node image ships neither `wg` nor `ping`
+  (an assertion that shells into the node for those silently passes on
+  empty output — it did, once).
 - `controller/pkg/join/aws`: real-AWS integration tests (skipped without
   EC2-capable credentials): the instance-type catalog is verified
   against `DescribeInstanceTypes`, and the rendered AWSMachine spec is

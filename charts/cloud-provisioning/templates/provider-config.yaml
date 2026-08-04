@@ -36,3 +36,24 @@ stringData:
   {{- end }}
 {{- end }}
 {{- end }}
+{{- with .Values.provider.docker }}
+{{- if .nodeImage }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: docker-provider-config
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "cloud-provisioning.labels" $ | nindent 4 }}
+type: Opaque
+stringData:
+  node-image: {{ .nodeImage | quote }}
+  {{- with .extraMounts }}
+  extra-mounts: {{ . | quote }}
+  {{- end }}
+  {{- with .preloadImages }}
+  preload-images: {{ . | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

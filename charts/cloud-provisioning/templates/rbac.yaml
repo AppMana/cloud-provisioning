@@ -202,7 +202,13 @@ subjects:
     name: {{ include "cloud-provisioning.name" . }}
     namespace: {{ .Release.Namespace }}
 ---
-{{- /* The AWS provider's preflight check (aws.Provider.Validate)
+{{- if .Values.provider.aws.credentialsSecret }}
+{{- /* Only when the AWS provider is configured: this Role lives in
+CAPA's manager namespace, which does not exist in a cluster that
+installs a different infrastructure provider -- rendering it
+unconditionally made the whole chart uninstallable there.
+
+The AWS provider's preflight check (aws.Provider.Validate)
 resolves an AWSClusterStaticIdentity's secretRef against CAPA's own
 manager namespace -- that is where CAPA always looks, regardless of
 where the AWSCluster lives. Without read access there the check cannot
@@ -231,3 +237,4 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "cloud-provisioning.controllerName" . }}
     namespace: {{ .Release.Namespace }}
+{{- end }}

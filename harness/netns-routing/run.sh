@@ -177,6 +177,21 @@ ip netns exec "$NS_ONPREM" ping -c1 -W2 "$CLOUD_TUN" >/dev/null || fail "tunnel 
 ip netns exec "$NS_ONPREM" ping -c1 -W2 198.51.100.20 >/dev/null || fail "UNDERLAY HIJACKED: plain wan traffic no longer flows with 0.0.0.0/0 in AllowedIPs"
 echo "  route table byte-identical; 0.0.0.0/0 in AllowedIPs only; underlay + tunnel both alive"
 
+echo "--- assert 5: SIGTERM does NOT take the cloud node's tunnel down ---"
+# The cloud node reaches the cluster ONLY through this interface, so
+# whatever manages the dialer there must be able to stop, restart or be
+# uninstalled without stranding the node. (The opposite holds on a node
+# that has its own LAN path -- there the dialer removes the interface on
+# shutdown, so an uninstall cannot leave an orphaned tunnel. That side
+# needs a cluster and is asserted in the kind harness.)
+kill -TERM $CLOUD_PID 2>/dev/null || true
+wait $CLOUD_PID 2>/dev/null || true
+ip -n "$NS_CLOUD" link show "$IFACE" >/dev/null 2>&1 \
+  || fail "the cloud node's $IFACE was removed on SIGTERM -- that strands a node whose only path back is this tunnel"
+ip netns exec "$NS_ONPREM" ping -c1 -W2 "$CLOUD_TUN" >/dev/null \
+  || fail "tunnel stopped carrying traffic after the cloud dialer exited"
+echo "  interface and traffic survive the cloud dialer exiting"
+
 echo "--- assert 6: default routes byte-identical ---"
 [ "$(ip -n "$NS_ONPREM" route show default)" == "$DEFAULT_BEFORE_ONPREM" ] || fail "onprem default route changed"
 [ "$(ip -n "$NS_CLOUD" route show default)" == "$DEFAULT_BEFORE_CLOUD" ] || fail "cloud default route changed"

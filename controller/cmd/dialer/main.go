@@ -46,6 +46,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -190,14 +191,43 @@ func main() {
 	}
 	defer wg.Close()
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 	ticker := time.NewTicker(cfg.pollInterval)
 	defer ticker.Stop()
 	for {
 		if err := reconcile(ctx, clientset, wg, cfg); err != nil {
 			fmt.Fprintf(os.Stderr, "reconcile: %v\n", err)
 		}
-		<-ticker.C
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			// Asked to stop. On a node that reaches the cluster over
+			// its LAN (Secret mode), take the interface down: the
+			// operator removing this DaemonSet means the tunnel is
+			// meant to be gone, and leaving the device behind leaves
+			// routes with nothing reconciling them. On the cloud node
+			// (peers-file mode) NEVER do this -- the tunnel is that
+			// node's only path back to the cluster, so it is the floor
+			// that outlives anything managing it.
+			if cfg.secretName != "" {
+				removeDevice(cfg.iface)
+			}
+			return
+		}
+	}
+}
+
+// removeDevice deletes the tunnel interface, taking its addresses and
+// every route through it with it. Best effort: a failure here must not
+// turn a shutdown into a crash loop.
+func removeDevice(iface string) {
+	link, err := netlink.LinkByName(iface)
+	if err != nil {
+		return
+	}
+	if err := netlink.LinkDel(link); err != nil {
+		fmt.Fprintf(os.Stderr, "removing %s on shutdown: %v\n", iface, err)
 	}
 }
 

@@ -1,0 +1,63 @@
+{{- /* The CAPI Cluster pair standing in for the cluster this release
+runs in. It is annotated managed-by: external -- Cluster API does not
+own this control plane, it only needs a Cluster object to hang
+Machines off. Rendering it here is what makes an install reproducible
+from the chart alone; created by hand, it is a step the next operator
+has to rediscover. Its status is reported by the controller, not
+patched by hand. */}}
+{{- with .Values.targetCluster }}
+{{- if .enabled }}
+{{- $infra := $.Values.provider.aws }}
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSClusterStaticIdentity
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "cloud-provisioning.labels" $ | nindent 4 }}
+spec:
+  # Credentials are referenced, never carried: this chart's values go
+  # into git, so the Secret is created out of band and named here.
+  secretRef: {{ required "provider.aws.credentialsSecret is required: name of an existing Secret holding AccessKeyID/SecretAccessKey" $infra.credentialsSecret }}
+  allowedNamespaces: {}
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSCluster
+metadata:
+  name: {{ .name }}
+  namespace: {{ .namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "cloud-provisioning.labels" $ | nindent 4 }}
+spec:
+  region: {{ required "provider.aws.region is required" $infra.region }}
+  identityRef:
+    kind: AWSClusterStaticIdentity
+    name: {{ .name }}
+  controlPlaneEndpoint:
+    host: {{ include "cloud-provisioning.apiHost" $ | quote }}
+    port: {{ include "cloud-provisioning.apiPort" $ }}
+  bastion:
+    enabled: false
+  network:
+    subnets:
+      - id: {{ required "provider.aws.subnetID is required" $infra.subnetID }}
+        isPublic: true
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: {{ .name }}
+  namespace: {{ .namespace | default $.Release.Namespace }}
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+  labels:
+    {{- include "cloud-provisioning.labels" $ | nindent 4 }}
+spec:
+  controlPlaneEndpoint:
+    host: {{ include "cloud-provisioning.apiHost" $ | quote }}
+    port: {{ include "cloud-provisioning.apiPort" $ }}
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AWSCluster
+    name: {{ .name }}
+{{- end }}
+{{- end }}

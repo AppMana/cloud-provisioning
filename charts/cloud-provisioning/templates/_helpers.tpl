@@ -23,3 +23,17 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | 
 {{- define "cloud-provisioning.dialerImage" -}}
 {{ .Values.dialerImage.repository }}:{{ .Values.dialerImage.tag | default .Chart.AppVersion }}
 {{- end -}}
+
+{{/* Host and port of the cluster API, split out of cluster.apiAddress
+(https://host:port) so a CAPI controlPlaneEndpoint can be rendered
+from the same single value the rest of the chart already takes. */}}
+{{- define "cloud-provisioning.apiHost" -}}
+{{- $hp := trimPrefix "https://" (trimPrefix "http://" (required "cluster.apiAddress is required" .Values.cluster.apiAddress)) -}}
+{{- if contains "]" $hp }}{{ trimSuffix "]" (trimPrefix "[" (first (splitList "]" $hp))) }}{{ else }}{{ first (splitList ":" $hp) }}{{ end -}}
+{{- end -}}
+
+{{- define "cloud-provisioning.apiPort" -}}
+{{- $hp := trimPrefix "https://" (trimPrefix "http://" .Values.cluster.apiAddress) -}}
+{{- $tail := last (splitList ":" $hp) -}}
+{{- if eq $tail $hp }}6443{{ else }}{{ $tail }}{{ end -}}
+{{- end -}}

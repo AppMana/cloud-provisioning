@@ -68,17 +68,35 @@ tunnel:
   endpoints: ""
 
 # The infrastructure provider's cluster-level configuration, rendered
-# into the Secret its provider reads. Plain configuration, not
-# credentials -- those stay out of git in the provider's own namespace.
-# AWS keys: ami-arm64, ami-amd64, subnet-id, security-group-ids,
-# ssh-key-name, iam-instance-profile, public-ip.
-providerConfig: {}
-#   name: aws-provider-config
-#   data:
-#     ami-amd64: ami-...
-#     subnet-id: subnet-...
-#     security-group-ids: sg-...
-#     public-ip: "true"
+# into the Secret its provider reads. This is plain configuration --
+# AMI ids, subnet, security groups -- and belongs in values with
+# everything else; having it be an out-of-band `kubectl create secret`
+# meant no install was reproducible from the chart alone.
+#
+# Secrets are never carried here, only REFERENCED by name: the
+# credentials Secret is created out of band (it is the one thing that
+# cannot go into git) and named below.
+provider:
+  aws:
+    credentialsSecret: ""   # existing Secret: AccessKeyID, SecretAccessKey
+    region: ""
+    subnetID: ""
+    securityGroupIDs: ""    # comma-separated sg-...
+    ami:
+      amd64: ""
+      arm64: ""
+    sshKeyName: ""
+    iamInstanceProfile: ""
+    publicIP: true
+
+# The CAPI Cluster pair this release's Machines hang off. Cluster API
+# does not manage this control plane (the objects are annotated
+# managed-by: external); it only needs them to exist. Disable when the
+# cluster already has a Cluster object to join.
+targetCluster:
+  enabled: false
+  name: ""
+  namespace: ""             # defaults to the release namespace
 
 # Which cluster technology mints join credentials (k0s | kubeadm).
 joinProvider: k0s

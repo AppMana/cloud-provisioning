@@ -3,6 +3,7 @@ package join
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -694,5 +695,36 @@ func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
 	}
 	if otherProvider.infraValueCalls != 0 {
 		t.Errorf("expected the OtherMachine-kind provider to NEVER be consulted for a Machine whose infrastructureRef.kind is AWSMachine, got %d calls", otherProvider.infraValueCalls)
+	}
+}
+
+func TestReconcile_SingleStackCluster_EmitsNoBareIndexAsAnAddress(t *testing.T) {
+	// A single-stack cluster leaves NodeVIP6Prefix empty. Concatenating
+	// the allocation index onto "" produced a bare "200", which every
+	// consumer then treated as an address: "200/32" in the peer
+	// AllowedIPs (which the dialer refuses to parse, so no tunnel is
+	// ever built) and `ip addr add 200/128` in the node's bootstrap.
+	// Caught live on appmana.
+	machine := machineWithInfraRef("cloud-worker-0", "default", "cloud-worker-0")
+	awsMachine := fakeAWSMachine("cloud-worker-0", "default", true)
+	join := &stubJoinProvider{values: map[string]any{"joinToken": "t", "k0sVersion": "v"}}
+	r := newFakeJoinReconciler(t, join, machine, awsMachine, dialerPeerSecretFixture())
+	r.NodeVIP6Prefix = "" // single stack
+
+	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)}); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	secret := &corev1.Secret{}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "wg-dialer", Name: "wg-dialer-peer"}, secret); err != nil {
+		t.Fatalf("getting peer secret: %v", err)
+	}
+	for _, key := range []string{"peer-allowed-ips-cloud-worker-0", "peer-route-hosts-cloud-worker-0"} {
+		val := string(secret.Data[key])
+		for _, entry := range strings.Split(val, ",") {
+			host := strings.SplitN(strings.TrimSpace(entry), "/", 2)[0]
+			if net.ParseIP(host) == nil {
+				t.Errorf("%s contains %q, which is not an IP address (whole value: %q)", key, entry, val)
+			}
+		}
 	}
 }

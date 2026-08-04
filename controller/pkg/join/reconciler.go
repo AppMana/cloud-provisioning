@@ -260,7 +260,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("allocating node VIP: %w", err)
 	}
 	nodeVIP4 := fmt.Sprintf("%s%d", r.NodeVIP4Prefix, nodeVIPIndex)
-	nodeVIP6 := fmt.Sprintf("%s%d", r.NodeVIP6Prefix, nodeVIPIndex)
+	// Only when a v6 prefix is configured. A single-stack cluster leaves
+	// it empty, and concatenating the index onto "" produced a bare
+	// index ("200") that every consumer then treated as an address:
+	// "200/32" in the peer AllowedIPs (which the dialer refuses to
+	// parse, so no tunnel is ever built) and `ip addr add 200/128` in
+	// the node's own bootstrap.
+	nodeVIP6 := ""
+	if r.NodeVIP6Prefix != "" {
+		nodeVIP6 = fmt.Sprintf("%s%d", r.NodeVIP6Prefix, nodeVIPIndex)
+	}
 
 	// The cloud node can't read a cluster Secret before it joins -- its
 	// whole bootstrap peer list travels in cloud-init as a plain JSON
@@ -381,8 +390,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 	machineName := machine.GetName()
 	cloudTunnelAddr := strings.SplitN(strings.TrimSpace(cloudWGAddress), "/", 2)[0]
-	allowed := []string{tunnel.HostCIDR(cloudTunnelAddr), tunnel.HostCIDR(nodeVIP4), tunnel.HostCIDR(nodeVIP6)}
-	routeHosts := []string{cloudTunnelAddr, nodeVIP4, nodeVIP6}
+	allowed := []string{tunnel.HostCIDR(cloudTunnelAddr), tunnel.HostCIDR(nodeVIP4)}
+	routeHosts := []string{cloudTunnelAddr, nodeVIP4}
+	if nodeVIP6 != "" {
+		allowed = append(allowed, tunnel.HostCIDR(nodeVIP6))
+		routeHosts = append(routeHosts, nodeVIP6)
+	}
 	dialerSecret.Data[tunnel.PeerPublicKeyPrefix+machineName] = []byte(cloudPub.String())
 	dialerSecret.Data[tunnel.PeerEndpointPrefix+machineName] = []byte(tunnel.PeerEndpointPending)
 	dialerSecret.Data[tunnel.PeerAllowedIPsPrefix+machineName] = []byte(strings.Join(allowed, ","))

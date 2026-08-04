@@ -48,7 +48,10 @@ rules:
   # reconciler also creates them.
   - apiGroups: ["cluster.x-k8s.io"]
     resources: ["machines"]
-    verbs: ["get", "list", "watch", "create", "patch"]
+    # delete: the claim tears down its own compute -- ownerRef GC does
+    # not suffice, because CAPI's Machine controller replaces the
+    # claim's ownerReference with the Cluster.
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
   # resolveCluster (claim reconciler).
   - apiGroups: ["cluster.x-k8s.io"]
     resources: ["clusters"]
@@ -57,15 +60,17 @@ rules:
   # existence), create (claim reconciler). CAPA cluster/identity
   # objects: read-only preflight (aws.Provider.Validate).
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
-    resources: ["awsmachines"]
-    verbs: ["get", "create"]
+    resources: ["awsmachines", "dockermachines"]
+    verbs: ["get", "create", "delete"]
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
     resources: ["awsclusters", "awsclusterstaticidentities"]
     verbs: ["get"]
   # The claim CRD itself.
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodeclaims"]
-    verbs: ["get", "list", "watch"]
+    # update: the reconciler adds/removes its own finalizer so a claim
+    # cannot be deleted while the compute it created still exists.
+    verbs: ["get", "list", "watch", "update"]
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodeclaims/status"]
     verbs: ["update"]

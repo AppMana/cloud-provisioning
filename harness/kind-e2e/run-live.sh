@@ -46,9 +46,27 @@ fail() {
     kubectl -n wg-dialer logs daemonset/wg-dialer-cloud --tail=30
     kubectl get machines,dockermachines -A -o wide
     kubectl get cluster "$CLUSTER" -o yaml
+    kubectl get machine public-worker -o yaml
     kubectl get dockermachine public-worker -o yaml
+    kubectl get provisionednodeclaim -A -o yaml
+    kubectl get events -A --sort-by=.lastTimestamp | tail -25
     kubectl -n capd-system logs deployment/capd-controller-manager --tail=30
     kubectl -n capi-system logs deployment/capi-controller-manager --tail=30
+    # The actual tunnel state on both sides. Without this a ping
+    # failure is undiagnosable after teardown -- which cost a full
+    # re-run once already. Uses host tools in each netns (the node
+    # image has no wg).
+    for c in "${CLUSTER}-control-plane" "${NODE_CONTAINER:-}"; do
+      [ -n "$c" ] || continue
+      echo "===== netns state: $c ====="
+      node_netns "$c" wg show all 2>&1
+      node_netns "$c" ip -br addr 2>&1
+      node_netns "$c" ip route show 2>&1
+      node_netns "$c" ip -6 route show 2>&1
+    done
+    echo "===== peer secret ====="
+    kubectl -n wg-dialer get secret wg-dialer-peer -o json |
+      python3 -c 'import base64,json,sys; d=json.load(sys.stdin).get("data",{}); [print(k,"=",base64.b64decode(v).decode(errors="replace")) for k,v in sorted(d.items()) if "private" not in k]'
   } >"$LOG_DIR/postmortem.log" 2>&1 || true
   tail -60 "$LOG_DIR/postmortem.log" >&2 || true
   [ -f "$LOG_DIR/controller.log" ] && tail -40 "$LOG_DIR/controller.log" >&2
@@ -76,6 +94,28 @@ node_netns() {
   local pid
   pid=$(docker inspect -f '{{.State.Pid}}' "$container") || return 1
   sudo nsenter -t "$pid" -n "$@"
+}
+
+# WAN reachability, asserted at EVERY phase on EVERY node. This is the
+# invariant the whole design exists to protect: bringing up a tunnel
+# must never cost a node its ordinary path off-box. Checking it once at
+# the end would not distinguish "never broke" from "broke and
+# recovered", so it is checked before and after every step that touches
+# networking. Uses the host's ping inside the node's netns (the node
+# image has none) and a DNS-independent target, so a resolver blip
+# can't masquerade as a routing failure.
+WAN_TARGET="${WAN_TARGET:-1.1.1.1}"
+assert_wan() {
+  local phase="$1"; shift
+  local container
+  for container in "$@"; do
+    docker inspect "$container" >/dev/null 2>&1 || continue
+    if ! node_netns "$container" ping -c1 -W3 "$WAN_TARGET" >/dev/null 2>&1; then
+      node_netns "$container" ip route show >&2 || true
+      fail "WAN UNREACHABLE from $container at phase: $phase (default route above)"
+    fi
+  done
+  echo "  wan ok [$phase]: $*"
 }
 
 handshake_established() {
@@ -109,6 +149,7 @@ CP_NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
 CP_IP=$(docker inspect "${CLUSTER}-control-plane" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
 [ -n "$CP_IP" ] || fail "could not resolve the control plane's kind network address"
 echo "  control plane: $CP_NODE @ $CP_IP"
+assert_wan "baseline, before anything touches networking" "${CLUSTER}-control-plane"
 
 # Binary delivery: NO download server. The docker provider mounts
 # $LOG_DIR/binaries read-only into the node container (extra-mounts in
@@ -206,6 +247,7 @@ until_ok 120 sh -c "kubectl -n wg-dialer get pods -l app=wg-dialer --no-headers 
 until_ok 60 sh -c "kubectl -n wg-dialer get secret wg-dialer-peer -o jsonpath='{.data.node-public-key-$CP_NODE}' | grep -q ." \
   || fail "the dialer pod never self-published its public key"
 echo "  dialer pod Running, key published"
+assert_wan "on-prem dialer running (interface created, key published)" "${CLUSTER}-control-plane"
 
 echo "--- ONE claim ---"
 kubectl apply -f - <<'EOF' >/dev/null
@@ -224,6 +266,7 @@ until_ok 240 sh -c "docker ps --format '{{.Names}}' | grep -q 'public-worker'" \
   || fail "CAPD never launched the node container"
 NODE_CONTAINER=$(docker ps --format '{{.Names}}' | grep public-worker | head -1)
 echo "  node container: $NODE_CONTAINER"
+assert_wan "remote node container up, bootstrap running" "$NODE_CONTAINER" "${CLUSTER}-control-plane"
 
 until_ok 300 sh -c "kubectl get node -l cloud-provisioning.appmana.com/role=cloud-worker --no-headers | grep -q ." \
   || { docker logs "$NODE_CONTAINER" 2>&1 | tail -20 >&2; docker exec "$NODE_CONTAINER" journalctl -u wg-dialer --no-pager 2>/dev/null | tail -10 >&2 || true; fail "the node never joined with the cloud-worker role label"; }
@@ -231,12 +274,14 @@ CLOUD_NODE=$(kubectl get node -l cloud-provisioning.appmana.com/role=cloud-worke
 kubectl get node "$CLOUD_NODE" -o jsonpath='{.spec.taints}' | grep -q "internet-facing" \
   || fail "joined node is missing the internet-facing taint"
 echo "  node $CLOUD_NODE joined with role label + taint"
+assert_wan "remote joined the cluster (its bootstrap tunnel is up)" "$NODE_CONTAINER" "${CLUSTER}-control-plane"
 
 echo "--- endpoint mirrored from CAPD's InternalIP; cloud DaemonSet lands; tunnel up ---"
 until_ok 120 sh -c "kubectl -n wg-dialer get secret wg-dialer-peer -o jsonpath='{.data.peer-endpoint-public-worker}' | base64 -d | grep -q ':51820'" \
   || fail "peer endpoint never mirrored (CAPD reports InternalIP only -- the fallback must handle it)"
 until_ok 180 sh -c "kubectl -n wg-dialer get pods -l app=wg-dialer-cloud -o wide --no-headers | grep '$CLOUD_NODE' | grep -q Running" \
   || fail "cloud DaemonSet pod never Running on the joined node"
+assert_wan "adoption DaemonSet running on the remote" "$NODE_CONTAINER" "${CLUSTER}-control-plane"
 IFACE=$(kubectl -n wg-dialer get daemonset wg-dialer -o jsonpath='{.spec.template.spec.containers[0].args}' | tr ',' '\n' | grep -o 'cldt[0-9a-f]*' | head -1)
 until_ok 180 handshake_established || fail "no WireGuard handshake on $IFACE"
 CLOUD_TUN=$(kubectl -n wg-dialer get secret wg-dialer-peer -o jsonpath='{.data.peer-route-hosts-public-worker}' | base64 -d | cut -d, -f1)
@@ -259,12 +304,21 @@ for v6 in $(node_netns "${CLUSTER}-control-plane" ip -6 route show dev "$IFACE" 
   fail "non-host IPv6 route via $IFACE: $v6"
 done
 echo "  bidirectional tunnel traffic on $IFACE; only host routes installed"
+assert_wan "tunnel fully established, both directions carrying traffic" "$NODE_CONTAINER" "${CLUSTER}-control-plane"
 
 echo "--- cascade: delete the claim, the node container must terminate ---"
 kubectl delete provisionednodeclaim public-worker --wait=true >/dev/null
-until_ok 180 sh -c "! docker ps --format '{{.Names}}' | grep -q public-worker" \
+# Budgeted generously on purpose: CAPI deletion drains the node, waits
+# for volume detach, then deletes the Node object, and the Machine's
+# own bounded timeouts (set by the claim reconciler) have to be able to
+# elapse before this gives up -- otherwise a slow-but-correct teardown
+# reads as a failure.
+until_ok 420 sh -c "! docker ps --format '{{.Names}}' | grep -q public-worker" \
   || fail "node container survived claim deletion"
 until_ok 60 sh -c "! kubectl get machine public-worker" || fail "Machine survived claim deletion"
+# The teardown must leave the surviving node exactly as it found it:
+# a removed peer must not strand routes behind.
+assert_wan "after the claim cascade removed the remote" "${CLUSTER}-control-plane"
 
 echo
 echo "ALL ASSERTIONS PASSED: one claim became a real second kind node over a real tunnel, and one delete removed it (logs: $LOG_DIR)"

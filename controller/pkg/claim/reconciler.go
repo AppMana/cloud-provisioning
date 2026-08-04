@@ -18,13 +18,16 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	v1alpha1 "github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -75,10 +78,23 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 	if !claim.DeletionTimestamp.IsZero() {
-		// Deletion is entirely ownerRef cascade: claim -> Machine +
-		// provider machine -> (CAPA terminates the instance) and
-		// Machine -> bootstrap Secret. Nothing to finalize here.
-		return ctrl.Result{}, nil
+		return r.reconcileDelete(ctx, claim)
+	}
+	// Own the teardown explicitly with a finalizer. OwnerRef garbage
+	// collection is NOT sufficient: Cluster API's own Machine
+	// controller reconciles ownerReferences and replaces them with the
+	// Cluster, so the claim's reference is gone within seconds of
+	// creation (confirmed live -- ownerReferences held only the
+	// Cluster, and deleting the claim left the Machine Running with no
+	// deletionTimestamp and a billed instance still up). The claim owns
+	// this lifecycle, so it must do the deleting itself.
+	if !containsString(claim.Finalizers, claimFinalizer) {
+		updated := claim.DeepCopy()
+		updated.Finalizers = append(updated.Finalizers, claimFinalizer)
+		if err := r.Update(ctx, updated); err != nil {
+			return ctrl.Result{}, fmt.Errorf("adding finalizer: %w", err)
+		}
+		claim = updated
 	}
 
 	cluster, err := r.resolveCluster(ctx, claim)
@@ -148,6 +164,20 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			"spec": map[string]any{
 				"clusterName": cluster.GetName(),
 				"version":     version,
+				// Deletion must always converge. CAPI's defaults are
+				// "wait forever": drain, volume detach and node deletion
+				// each block indefinitely. The node these claims create
+				// is reached ONLY through the tunnel being torn down, so
+				// it is precisely the node that can become undrainable
+				// mid-deletion -- and then `kubectl delete
+				// provisionednodeclaim` would hang forever with a
+				// billed instance still running. Bounded here so a
+				// claim deletion is a reliable teardown.
+				"deletion": map[string]any{
+					"nodeDrainTimeoutSeconds":        int64(120),
+					"nodeVolumeDetachTimeoutSeconds": int64(120),
+					"nodeDeletionTimeoutSeconds":     int64(60),
+				},
 				"bootstrap": map[string]any{
 					"dataSecretName": fmt.Sprintf(r.BootstrapSecretNameFormat, claim.Name),
 				},
@@ -199,6 +229,96 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 	return ctrl.Result{}, nil
+}
+
+// claimFinalizer keeps the claim alive until the compute it created is
+// actually gone -- so `kubectl delete provisionednodeclaim` is a
+// reliable teardown rather than an orphaning operation.
+const claimFinalizer = "cloud-provisioning.appmana.com/claim"
+
+// reconcileDelete removes what this claim created, in dependency
+// order, and only then releases the claim. Deleting the CAPI Machine
+// is what makes the infrastructure provider terminate the instance;
+// the provider machine is deleted too in case it was created before
+// the Machine (the window where nothing else would ever collect it).
+func (r *Reconciler) reconcileDelete(ctx context.Context, claim *v1alpha1.ProvisionedNodeClaim) (ctrl.Result, error) {
+	log := ctrl.LoggerFrom(ctx)
+	key := types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name}
+
+	remaining := 0
+	machine := &unstructured.Unstructured{}
+	machine.SetGroupVersionKind(machineGVK)
+	switch err := r.Reader.Get(ctx, key, machine); {
+	case err == nil:
+		remaining++
+		if machine.GetDeletionTimestamp().IsZero() {
+			if err := r.Delete(ctx, machine); err != nil && !apierrors.IsNotFound(err) {
+				return ctrl.Result{}, fmt.Errorf("deleting Machine %s: %w", key, err)
+			}
+			log.Info("deleting Machine for claim teardown", "machine", key)
+		}
+	case !apierrors.IsNotFound(err):
+		return ctrl.Result{}, fmt.Errorf("checking Machine during teardown: %w", err)
+	}
+
+	for _, p := range r.Provisioners {
+		infraMachine := &unstructured.Unstructured{}
+		infraMachine.SetGroupVersionKind(p.GVK())
+		switch err := r.Reader.Get(ctx, key, infraMachine); {
+		case err == nil:
+			remaining++
+			if infraMachine.GetDeletionTimestamp().IsZero() {
+				if err := r.Delete(ctx, infraMachine); err != nil && !apierrors.IsNotFound(err) {
+					return ctrl.Result{}, fmt.Errorf("deleting %s %s: %w", p.GVK().Kind, key, err)
+				}
+			}
+		case !apierrors.IsNotFound(err) && !isMissingKind(err):
+			return ctrl.Result{}, fmt.Errorf("checking %s during teardown: %w", p.GVK().Kind, err)
+		}
+	}
+
+	if remaining > 0 {
+		// Still terminating (the Machine drains its node first, with
+		// the bounded timeouts set at creation). Hold the finalizer so
+		// the claim visibly represents live infrastructure.
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	if containsString(claim.Finalizers, claimFinalizer) {
+		updated := claim.DeepCopy()
+		updated.Finalizers = removeString(updated.Finalizers, claimFinalizer)
+		if err := r.Update(ctx, updated); err != nil && !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("removing finalizer: %w", err)
+		}
+	}
+	log.Info("claim teardown complete", "claim", key)
+	return ctrl.Result{}, nil
+}
+
+// isMissingKind reports whether the error means the Kind isn't served
+// at all (a provider whose CRDs aren't installed) -- nothing of that
+// kind can exist, so teardown has nothing to wait for.
+func isMissingKind(err error) bool {
+	return meta.IsNoMatchError(err) || runtime.IsNotRegisteredError(err)
+}
+
+func containsString(list []string, s string) bool {
+	for _, item := range list {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+func removeString(list []string, s string) []string {
+	out := list[:0]
+	for _, item := range list {
+		if item != s {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 func (r *Reconciler) fail(ctx context.Context, claim *v1alpha1.ProvisionedNodeClaim, cause error) (ctrl.Result, error) {

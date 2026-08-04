@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -267,5 +268,48 @@ func TestInstallHostBinary_AtomicAndIdempotent(t *testing.T) {
 	}
 	if entries, _ := os.ReadDir(filepath.Dir(target)); len(entries) != 1 {
 		t.Errorf("temp install artifacts left behind: %v", entries)
+	}
+}
+
+func TestReconcilePlan_NeverRoutesAPeerEndpointThroughTheTunnel(t *testing.T) {
+	// Routing a peer's endpoint through the tunnel that dials it is an
+	// infinite encapsulation loop -- the encrypted packet's outer
+	// destination matches the same route. Caught live at line rate
+	// (2.29 GiB in three minutes) when a node's published address
+	// equalled the address the tunnel dials, which is the normal case
+	// for nodes dialed on their ordinary node IPs.
+	peers := []tunnel.PeerSpec{{
+		PublicKey:  "inWNVFSf+4UUVNrmz/EMjR7aKnUJcRUh5V7k4aQBSl4=",
+		Endpoint:   "172.21.0.16:51820",
+		RouteHosts: []string{"10.100.0.1", "172.21.0.16"},
+	}}
+
+	endpointHosts := map[string]bool{}
+	for _, p := range peers {
+		host, _, err := net.SplitHostPort(p.Endpoint)
+		if err != nil {
+			host = p.Endpoint
+		}
+		if ip := net.ParseIP(strings.TrimSpace(host)); ip != nil {
+			endpointHosts[ip.String()] = true
+		}
+	}
+
+	var installed []string
+	for _, p := range peers {
+		for _, h := range p.AllRouteHosts() {
+			ipNet, err := parseHostRoute(h)
+			if err != nil {
+				t.Fatalf("parseHostRoute(%q): %v", h, err)
+			}
+			if endpointHosts[ipNet.IP.String()] {
+				continue
+			}
+			installed = append(installed, ipNet.IP.String())
+		}
+	}
+
+	if len(installed) != 1 || installed[0] != "10.100.0.1" {
+		t.Errorf("installed routes = %v, want only the tunnel address (the endpoint 172.21.0.16 must be excluded)", installed)
 	}
 }

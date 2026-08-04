@@ -55,6 +55,7 @@ import (
 	"github.com/google/nftables"
 	"github.com/google/nftables/expr"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
@@ -447,11 +448,22 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	// peer still gets its WireGuard CONFIG (so the other side can dial
 	// in and roaming can learn its address); its routes follow on the
 	// poll after the first handshake.
+	// Live device state feeds two invariants below: which peers have
+	// ever completed a handshake, and which addresses are ACTUALLY
+	// serving as peer endpoints right now. The latter must come from
+	// the device, not just the config: a listener's peers carry no
+	// configured endpoint (they dial in; it never dials out), so
+	// WireGuard learns their address by roaming and the config alone
+	// would show nothing to protect.
 	handshaked := map[wgtypes.Key]bool{}
+	endpointHosts := map[string]bool{}
 	if device, err := wg.Device(cfg.iface); err == nil {
 		for _, p := range device.Peers {
 			if !p.LastHandshakeTime.IsZero() {
 				handshaked[p.PublicKey] = true
+			}
+			if p.Endpoint != nil && p.Endpoint.IP != nil {
+				endpointHosts[p.Endpoint.IP.String()] = true
 			}
 		}
 	}
@@ -462,6 +474,28 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	// route, no WireGuard config.
 	keepalive := time.Duration(cfg.keepaliveSecs) * time.Second
 	sharedCIDRs := tunnel.SplitList(cfg.podCIDRs, cfg.serviceCIDRs)
+
+	// Configured endpoints join the live ones collected above. Routing
+	// a peer's own endpoint through the tunnel is an infinite
+	// encapsulation loop: the encrypted packet's OUTER destination is
+	// that same address, so it matches the same tunnel route and is
+	// re-encapsulated forever. Observed at line rate (2.57 GiB in three
+	// minutes, with 180 bytes arriving at the far end) the first time a
+	// peer's published node address happened to equal the address the
+	// tunnel dials -- which is the NORMAL case for any cluster whose
+	// nodes are dialed on their ordinary node IPs.
+	for _, p := range peers {
+		if p.Endpoint == "" {
+			continue
+		}
+		host, _, err := net.SplitHostPort(p.Endpoint)
+		if err != nil {
+			host = p.Endpoint
+		}
+		if ip := net.ParseIP(strings.TrimSpace(host)); ip != nil {
+			endpointHosts[ip.String()] = true
+		}
+	}
 
 	var peerConfigs []wgtypes.PeerConfig
 	var routeHosts []net.IPNet
@@ -506,6 +540,14 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			if p.Endpoint == "" && !handshaked[pub] {
 				// Validated but deliberately not installed yet -- see the
 				// peer-viability comment above.
+				continue
+			}
+			if endpointHosts[ipNet.IP.String()] {
+				// Never route a tunnel endpoint through the tunnel (see
+				// endpointHosts). The address stays reachable by its
+				// ordinary route, which is exactly how the tunnel
+				// reaches it in the first place.
+				fmt.Fprintf(os.Stderr, "not routing %s via %s: it is a peer endpoint, and routing an endpoint through its own tunnel loops\n", ipNet.IP, cfg.iface)
 				continue
 			}
 			routeHosts = append(routeHosts, ipNet)
@@ -587,11 +629,41 @@ func installRoutes(cfg config, routeHosts []net.IPNet) error {
 	if err != nil {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
 	}
+	desired := map[string]bool{}
 	for _, host := range routeHosts {
 		dst := host
+		desired[dst.String()] = true
 		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK}
 		if err := netlink.RouteReplace(route); err != nil {
 			return fmt.Errorf("adding route %s dev %s: %w", dst.String(), cfg.iface, err)
+		}
+	}
+
+	// Prune host routes on OUR interface that are no longer desired.
+	// Adding without ever removing meant a route that became wrong --
+	// a peer removed from the mesh, or an address that turned out to be
+	// a peer endpoint once the endpoint was learned by roaming --
+	// persisted forever, still blackholing or looping traffic. Scoped
+	// strictly to this interface and to host prefixes, so the kernel's
+	// own connected route for the tunnel subnet is left alone.
+	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
+		existing, err := netlink.RouteList(link, family)
+		if err != nil {
+			return fmt.Errorf("listing routes on %s: %w", cfg.iface, err)
+		}
+		for i := range existing {
+			route := existing[i]
+			if route.Dst == nil || route.Protocol == unix.RTPROT_KERNEL {
+				continue
+			}
+			ones, bits := route.Dst.Mask.Size()
+			if ones != bits || desired[route.Dst.String()] {
+				continue
+			}
+			if err := netlink.RouteDel(&route); err != nil {
+				return fmt.Errorf("removing stale route %s dev %s: %w", route.Dst, cfg.iface, err)
+			}
+			fmt.Fprintf(os.Stderr, "removed stale route %s via %s\n", route.Dst, cfg.iface)
 		}
 	}
 	return nil
@@ -613,8 +685,21 @@ func ensureTransit(cfg config) error {
 	if ip.To4() == nil {
 		return fmt.Errorf("--transit-masquerade-source must be IPv4 (got %q)", cfg.transitMasqueradeSource)
 	}
-	if err := os.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1"), 0o644); err != nil {
-		return fmt.Errorf("enabling ip_forward: %w", err)
+	// Read before write. /proc/sys is mounted read-only in a container
+	// that isn't privileged -- and NET_ADMIN does not change that --
+	// while every Kubernetes node already has forwarding enabled
+	// because the CNI and kube-proxy require it. Demanding write access
+	// for a setting that is already correct turned every reconcile into
+	// an error on an otherwise healthy node.
+	const ipForward = "/proc/sys/net/ipv4/ip_forward"
+	current, err := os.ReadFile(ipForward)
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", ipForward, err)
+	}
+	if strings.TrimSpace(string(current)) != "1" {
+		if err := os.WriteFile(ipForward, []byte("1"), 0o644); err != nil {
+			return fmt.Errorf("enabling ip_forward (currently %q; a non-privileged container cannot write /proc/sys, so enable it on the node or run this container privileged): %w", strings.TrimSpace(string(current)), err)
+		}
 	}
 
 	c, err := nftables.New()

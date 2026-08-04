@@ -8,7 +8,7 @@ description: |
   `clusterctl init` that gitops cannot reproduce.
 type: application
 version: 0.1.0
-appVersion: "ef5a96e"
+appVersion: "d46770f"
 dependencies:
   # Cluster API's own operator is the supported declarative install
   # path (clusterctl is imperative by design and cannot be reconciled).

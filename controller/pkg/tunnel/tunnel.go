@@ -51,6 +51,11 @@ const (
 	// never a private key), consumed by the cloud dialer's
 	// --peers-secret-* override.
 	CloudPeersKey = "peers.json"
+
+	// APIServersKey lists every control-plane address a remote must be
+	// able to reach (comma-separated). k0s workers load-balance across
+	// all of them via nllb, so one address is not enough.
+	APIServersKey = "api-servers"
 )
 
 // AdoptionSecretName is the per-machine adoption Secret's name --
@@ -168,7 +173,7 @@ func SplitList(lists ...string) []string {
 // rendered once into userdata) and the dialer's adoption mode (live:
 // re-derived from the Secret every poll) -- one derivation, two
 // freshness tiers, no drift.
-func RemotePeers(data map[string][]byte, selfTunnelAddr, apiVIP string) ([]PeerSpec, error) {
+func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []string) ([]PeerSpec, error) {
 	type localNode struct {
 		name       string
 		tunnelAddr string
@@ -202,9 +207,14 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr, apiVIP string) ([]PeerS
 			allowed = append(allowed, HostCIDR(vip))
 			routeHosts = append(routeHosts, vip)
 		}
-		if i == 0 && apiVIP != "" {
-			allowed = append(allowed, HostCIDR(apiVIP))
-			routeHosts = append(routeHosts, apiVIP)
+		if i == 0 {
+			for _, api := range apiServers {
+				if api = strings.TrimSpace(api); api == "" || containsHost(routeHosts, api) {
+					continue
+				}
+				allowed = append(allowed, HostCIDR(api))
+				routeHosts = append(routeHosts, api)
+			}
 		}
 		peers = append(peers, PeerSpec{
 			PublicKey:    pub,

@@ -47,7 +47,6 @@ spec:
           properties:
             spec:
               type: object
-              required: [requests]
               properties:
                 requests:
                   description: >-
@@ -59,6 +58,13 @@ spec:
                   additionalProperties:
                     anyOf: [{type: integer}, {type: string}]
                     x-kubernetes-int-or-string: true
+                instanceType:
+                  description: >-
+                    Provider-specific instance type (e.g. t3.micro),
+                    bypassing requests-to-catalog resolution. Use when
+                    the exact shape matters -- a free-tier size, a GPU
+                    family, or a type the catalog does not list.
+                  type: string
                 arch:
                   description: Node architecture. arm64 (default) or amd64.
                   type: string

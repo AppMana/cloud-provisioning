@@ -28,6 +28,13 @@ type ProvisionedNodeClaimSpec struct {
 	// them to its smallest satisfying instance type.
 	Requests corev1.ResourceList `json:"requests"`
 
+	// InstanceType names a provider-specific instance type directly
+	// (e.g. "t3.micro"), bypassing the requests-to-catalog resolution.
+	// Use it when the exact shape matters -- a free-tier size, a GPU
+	// family, a type this project's small catalog doesn't list.
+	// +optional
+	InstanceType string `json:"instanceType,omitempty"`
+
 	// Arch is the node architecture: arm64 (default) or amd64.
 	// +optional
 	Arch string `json:"arch,omitempty"`

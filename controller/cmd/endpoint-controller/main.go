@@ -355,6 +355,27 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 			changed = true
 		}
 	}
+	// Every control plane's address, for the remote's node-local load
+	// balancer: a k0s worker fans its API traffic across ALL control
+	// planes, so publishing only the one the join token points at would
+	// leave the remote dependent on that single node staying up.
+	var apiServers []string
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+		if _, isCP := node.Labels[controlPlaneLabel]; !isCP {
+			continue
+		}
+		for _, a := range node.Status.Addresses {
+			if a.Type == corev1.NodeInternalIP && a.Address != "" {
+				apiServers = append(apiServers, a.Address)
+			}
+		}
+	}
+	if joined := strings.Join(apiServers, ","); joined != "" && string(secret.Data[tunnel.APIServersKey]) != joined {
+		secret.Data[tunnel.APIServersKey] = []byte(joined)
+		changed = true
+	}
+
 	if !changed {
 		return nil
 	}
@@ -419,7 +440,7 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 		return fmt.Errorf("getting peer secret: %w", err)
 	}
 	selfTunnelAddr := strings.SplitN(strings.TrimSpace(machine.GetAnnotations()["cloud-provisioning.appmana.com/wireguard-addr4"]), "/", 2)[0]
-	peers, err := tunnel.RemotePeers(peerSecret.Data, selfTunnelAddr, r.apiVIP)
+	peers, err := tunnel.RemotePeers(peerSecret.Data, selfTunnelAddr, tunnel.SplitList(string(peerSecret.Data[tunnel.APIServersKey]), r.apiVIP))
 	if err != nil {
 		return err
 	}

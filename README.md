@@ -14,20 +14,21 @@ apiVersion: cloud-provisioning.appmana.com/v1alpha1
 kind: ProvisionedNodeClaim
 metadata:
   name: public-worker
-  namespace: default
+  namespace: wg-dialer
 spec:
   requests:            # resolved to the smallest satisfying instance type
     cpu: "2"
     memory: 2Gi
   # instanceType: t3.micro   # ...or name one exactly, instead of requests
   arch: amd64
-  clusterName: appmana
+  clusterName: my-cluster
 ```
 
 The controller creates the CAPI `Machine` + provider machine, renders
 the node's cloud-init (WireGuard identity, sha-pinned dialer binary,
 join token), and manages both dialer DaemonSets. `kubectl delete
-provisionednodeclaim public-worker` destroys the instance.
+provisionednodeclaim public-worker` destroys the instance. The claim
+goes in whichever namespace holds the CAPI `Cluster`.
 
 The node joins as a normal worker, labelled
 `cloud-provisioning.appmana.com/role=cloud-worker` and tainted
@@ -38,6 +39,9 @@ over the tunnel — no VXLAN.
 ## Install
 
 ```bash
+kubectl -n wg-dialer create secret generic aws-credentials \
+  --from-literal=AccessKeyID=... --from-literal=SecretAccessKey=...
+
 helm install cloud-provisioning oci://ghcr.io/appmana/charts/cloud-provisioning --version 0.1.0 \
   --namespace wg-dialer --create-namespace \
   --set cluster.apiAddress=https://10.2.0.22:6443 \
@@ -45,8 +49,19 @@ helm install cloud-provisioning oci://ghcr.io/appmana/charts/cloud-provisioning 
   --set cluster.podCIDRs=10.3.0.0/16 \
   --set cluster.serviceCIDRs=10.152.184.0/24 \
   --set cluster.nodeVIP4Prefix=10.2.0. \
-  --set tunnel.endpoints=kubernetes.io/hostname=worker-1
+  --set tunnel.endpoints=kubernetes.io/hostname=worker-1 \
+  --set targetCluster.enabled=true --set targetCluster.name=my-cluster \
+  --set provider.aws.credentialsSecret=aws-credentials \
+  --set provider.aws.region=us-west-2 \
+  --set provider.aws.subnetID=subnet-... \
+  --set provider.aws.securityGroupIDs=sg-... \
+  --set provider.aws.ami.amd64=ami-...
 ```
+
+The credentials Secret is the only thing created outside the chart --
+it is the one input that cannot go into git. Everything else,
+including the CAPI `Cluster` pair the Machines hang off, is rendered
+from values, and `helm uninstall` removes all of it.
 
 Or from a checkout: `helm install cloud-provisioning ./charts/cloud-provisioning -f values.yaml`
 (run `helm dependency update ./charts/cloud-provisioning` first if you
@@ -72,12 +87,8 @@ selector.
 
 ## Prerequisites
 
-- A CAPI `Cluster` + provider cluster pair for the target cluster,
-  annotated `cluster.x-k8s.io/managed-by: external`, with
-  `status.initialization.controlPlaneInitialized` patched true.
-- A provider config Secret (`aws-provider-config`: `ami-<arch>`,
-  `subnet-id`, `security-group-ids`, `public-ip`), and provider
-  credentials in the provider's own manager namespace.
+- Cluster API installed (core + an infrastructure provider), and
+  cert-manager, which it requires.
 - The security group must allow inbound UDP 51820 from the cluster's
   egress address.
 
@@ -129,12 +140,3 @@ harness/netns-routing/ single-NIC routing e2e for the dialer
 harness/kind-e2e/      one claim -> a real joined node over a real tunnel
 harness/vm-single-nic/ real VM, real boot/reboot
 ```
-
-## Verification
-
-`go test ./...` covers the routing invariants, mesh derivation, claim
-expansion and teardown. `harness/kind-e2e/run-live.sh` proves the whole
-contract on a real API server: one claim becomes a kubeadm-joined node
-over a real tunnel, and one delete removes it — with WAN reachability
-asserted at every phase on every node, because the failure this project
-exists to prevent is a tunnel costing a node its default route.

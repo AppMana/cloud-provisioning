@@ -124,9 +124,9 @@ handshake_established() {
   [ -n "$hs" ] && [ "$hs" -gt 0 ] 2>/dev/null
 }
 
-echo "--- build: controller binary, dialer image, dialer release binary ---"
-( cd "$REPO_DIR/controller" && go build -o "$LOG_DIR/endpoint-controller" ./cmd/endpoint-controller )
+echo "--- build: controller image, dialer image, dialer release binary ---"
 docker build -q --target dialer -t cldt-dialer:e2e -f "$REPO_DIR/controller/Dockerfile" "$REPO_DIR" >/dev/null
+docker build -q --target endpoint-controller -t cldt-controller:e2e -f "$REPO_DIR/controller/Dockerfile" "$REPO_DIR" >/dev/null
 mkdir -p "$LOG_DIR/binaries"
 ( cd "$REPO_DIR/controller" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$LOG_DIR/binaries/wg-dialer-linux-amd64" ./cmd/dialer )
 BIN_SHA=$(sha256sum "$LOG_DIR/binaries/wg-dialer-linux-amd64" | awk '{print $1}')
@@ -144,7 +144,7 @@ nodes:
 EOF
 export KUBECONFIG="$LOG_DIR/kubeconfig"
 kind export kubeconfig --name "$CLUSTER" --kubeconfig "$KUBECONFIG"
-kind load docker-image cldt-dialer:e2e --name "$CLUSTER" >/dev/null
+kind load docker-image cldt-dialer:e2e cldt-controller:e2e --name "$CLUSTER" >/dev/null
 CP_NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
 CP_IP=$(docker inspect "${CLUSTER}-control-plane" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
 [ -n "$CP_IP" ] || fail "could not resolve the control plane's kind network address"
@@ -165,79 +165,55 @@ SERVED=$(kubectl get crd dockermachines.infrastructure.cluster.x-k8s.io -o jsonp
 echo "  DockerMachine served versions: $SERVED"
 echo "$SERVED" | grep -qw v1beta2 || fail "installed CAPD does not serve infrastructure v1beta2 -- adjust pkg/join/docker's GVK to: $SERVED"
 
-echo "--- the externally-managed Cluster/DockerCluster pair + kubeconfig Secret ---"
-# --wait-providers returns before the webhook endpoints actually
-# serve; give them time by retrying the apply itself.
-cat > "$LOG_DIR/cluster-pair.yaml" <<EOF
-apiVersion: cluster.x-k8s.io/v1beta2
-kind: Cluster
-metadata:
-  name: $CLUSTER
-  namespace: default
-  annotations: {cluster.x-k8s.io/managed-by: external}
-spec:
-  controlPlaneEndpoint: {host: "$CP_IP", port: 6443}
-  infrastructureRef: {apiGroup: infrastructure.cluster.x-k8s.io, kind: DockerCluster, name: $CLUSTER}
----
-apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
-kind: DockerCluster
-metadata:
-  name: $CLUSTER
-  namespace: default
-  annotations: {cluster.x-k8s.io/managed-by: external}
-spec:
-  controlPlaneEndpoint: {host: "$CP_IP", port: 6443}
-EOF
-until_ok 120 kubectl apply -f "$LOG_DIR/cluster-pair.yaml" \
-  || fail "could not create the Cluster/DockerCluster pair (webhooks never came up)"
-# Documented deviations for a BYO/externally-managed cluster, the same
-# class as the AWSCluster status.ready patch: mark the infra cluster
-# provisioned, and mark the Cluster's initialization fields -- they are
-# one-way ("initialized" is sticky by CAPI's own contract), and without
-# controlPlaneInitialized no infra provider will create worker machines
-# for a cluster that has no CAPI-managed control-plane Machine to
-# derive it from.
-kubectl patch dockercluster "$CLUSTER" --subresource=status --type=merge \
-  -p '{"status":{"initialization":{"provisioned":true},"ready":true}}' >/dev/null 2>&1 \
-  || kubectl patch dockercluster "$CLUSTER" --subresource=status --type=merge \
-    -p '{"status":{"ready":true}}' >/dev/null
-kubectl patch cluster "$CLUSTER" --subresource=status --type=merge \
-  -p '{"status":{"initialization":{"controlPlaneInitialized":true,"infrastructureProvisioned":true}}}' >/dev/null
-# CAPI's clustercache needs API access at an address reachable from
-# inside the cluster's pods -- and it caches kubeconfig Secrets
-# FILTERED by the cluster-name label: an unlabeled Secret is invisible
-# to it ("not found" despite existing).
+# CAPD (not this project) needs the target cluster's kubeconfig, at an
+# address reachable from inside the cluster's pods, in a Secret its
+# clustercache can see -- it filters by the cluster-name label, so an
+# unlabelled Secret is invisible to it ("not found" despite existing).
 sed "s#server: https://127.0.0.1:[0-9]*#server: https://$CP_IP:6443#" "$KUBECONFIG" > "$LOG_DIR/incluster-kubeconfig"
-kubectl create secret generic "$CLUSTER-kubeconfig" -n default \
-  --type=cluster.x-k8s.io/secret \
-  --from-file=value="$LOG_DIR/incluster-kubeconfig" >/dev/null
-kubectl label secret "$CLUSTER-kubeconfig" -n default "cluster.x-k8s.io/cluster-name=$CLUSTER" >/dev/null
+kubectl create secret generic "$CLUSTER-kubeconfig" -n wg-dialer --type=cluster.x-k8s.io/secret \
+  --from-file=value="$LOG_DIR/incluster-kubeconfig" --dry-run=client -o yaml > "$LOG_DIR/kubeconfig-secret.yaml"
 
-echo "--- operator inputs: claim CRD, reference RBAC (namespace + the dialer pods' ServiceAccount), provider config ---"
-kubectl apply -f "$REPO_DIR/manifests/wg-dialer/crd.yaml" >/dev/null
-kubectl apply -f "$REPO_DIR/manifests/wg-dialer/rbac.yaml" >/dev/null
-kubectl -n wg-dialer create secret generic docker-provider-config \
-  --from-literal=node-image="$NODE_IMAGE" \
-  --from-literal=extra-mounts="$LOG_DIR/binaries:/opt/dialer-dist" \
-  --from-literal=preload-images="cldt-dialer:e2e" >/dev/null
+echo "--- INSTALL THE CHART -- and nothing else ---"
+# Everything the product owns comes from `helm install`: the claim CRD,
+# RBAC, the controller, the provider config, and the externally-managed
+# Cluster pair. Nothing here creates those by hand.
+#
+# This is the point of this harness. When the setup assembled them with
+# kubectl, the tests passed green against an install path that did not
+# exist -- the chart was missing the Cluster pair and the provider
+# config, and no test could see it. Anything the chart fails to render
+# must fail here.
+kubectl create namespace wg-dialer >/dev/null
+kubectl apply -n wg-dialer -f "$LOG_DIR/kubeconfig-secret.yaml" >/dev/null
+kubectl label secret "$CLUSTER-kubeconfig" -n wg-dialer "cluster.x-k8s.io/cluster-name=$CLUSTER" >/dev/null
+cat > "$LOG_DIR/values.yaml" <<EOF
+image: {repository: cldt-controller, tag: e2e, pullPolicy: Never}
+dialerImage: {repository: cldt-dialer, tag: e2e}
+joinProvider: kubeadm
+cluster:
+  apiAddress: "https://$CP_IP:6443"
+  apiVIP: "$CP_IP"
+  podCIDRs: 10.244.0.0/16
+  serviceCIDRs: 10.96.0.0/12
+  nodeVIP4Prefix: 10.199.0.
+  nodeVIP6Prefix: "fd99::"
+tunnel: {endpoints: "node-role.kubernetes.io/control-plane="}
+dialerBinary: {amd64: {url: "$BIN_URL", sha256: "$BIN_SHA"}}
+targetCluster: {enabled: true, name: "$CLUSTER", infrastructureKind: DockerCluster}
+provider:
+  docker:
+    nodeImage: "$NODE_IMAGE"
+    extraMounts: "$LOG_DIR/binaries:/opt/dialer-dist"
+    preloadImages: cldt-dialer:e2e
+EOF
+helm install cloud-provisioning "$REPO_DIR/charts/cloud-provisioning" \
+  --namespace wg-dialer -f "$LOG_DIR/values.yaml" \
+  --wait --timeout 5m >"$LOG_DIR/helm-install.log" 2>&1 \
+  || fail "helm install failed (see $LOG_DIR/helm-install.log)"
 
-echo "--- run the controller (kubeadm join specialization, docker fulfillment) ---"
-"$LOG_DIR/endpoint-controller" \
-  --dialer-image=cldt-dialer:e2e \
-  --dialer-pod-cidrs=10.244.0.0/16 \
-  --dialer-service-cidrs=10.96.0.0/12 \
-  --join-provider=kubeadm \
-  --join-template-path="$REPO_DIR/join-patterns/kubeadm-worker.cloud-config.tmpl" \
-  --join-api-address="https://$CP_IP:6443" \
-  --join-api-vip="$CP_IP" \
-  --join-node-vip4-prefix=10.199.0. \
-  --join-node-vip6-prefix=fd99:: \
-  --join-node-vip-start=200 \
-  --join-dialer-binary-url-amd64="$BIN_URL" \
-  --join-dialer-binary-sha256-amd64="$BIN_SHA" \
-  --tunnel-endpoints=node-role.kubernetes.io/control-plane= \
-  >"$LOG_DIR/controller.log" 2>&1 &
-CONTROLLER_PID=$!
+# Everything this harness touches from here lives in the release
+# namespace, the same as a real install.
+kubectl config set-context --current --namespace=wg-dialer >/dev/null
 
 echo "--- mesh precondition: the single (control-plane, explicitly selected) node allocates + publishes ---"
 until_ok 60 sh -c "kubectl -n wg-dialer get secret wg-dialer-peer -o jsonpath='{.data.node-tunnel-address-$CP_NODE}' | grep -q ." \
@@ -253,11 +229,19 @@ echo "--- ONE claim ---"
 kubectl apply -f - <<'EOF' >/dev/null
 apiVersion: cloud-provisioning.appmana.com/v1alpha1
 kind: ProvisionedNodeClaim
-metadata: {name: public-worker, namespace: default}
+metadata: {name: public-worker, namespace: wg-dialer}
 spec:
   requests: {cpu: "1", memory: 1Gi}
   arch: amd64
 EOF
+
+echo "--- the chart's Cluster pair is reported provisioned BY THE CONTROLLER ---"
+# Externally-managed means Cluster API's own controllers stand down, so
+# nothing upstream ever sets this status and Machines block on it
+# forever. It used to be a `kubectl patch` here, which is exactly the
+# kind of step a real install would never know to run.
+until_ok 90 sh -c "kubectl -n wg-dialer get cluster $CLUSTER -o jsonpath='{.status.initialization.controlPlaneInitialized}' | grep -q true" \
+  || fail "the controller never reported the externally-managed Cluster provisioned"
 
 echo "--- CAPD launches the node container and the bootstrap joins it ---"
 until_ok 90 kubectl get dockermachine public-worker || fail "DockerMachine never created"
@@ -321,4 +305,46 @@ until_ok 60 sh -c "! kubectl get machine public-worker" || fail "Machine survive
 assert_wan "after the claim cascade removed the remote" "${CLUSTER}-control-plane"
 
 echo
-echo "ALL ASSERTIONS PASSED: one claim became a real second kind node over a real tunnel, and one delete removed it (logs: $LOG_DIR)"
+echo "  one claim became a real second kind node over a real tunnel, and one delete removed it"
+
+echo "--- uninstall: the release must take everything with it ---"
+# The controller creates the DaemonSets, the peer Secret and the
+# per-machine adoption Secrets at RUNTIME, so Helm never templated
+# them and an uninstall used to leave them behind: a tunnel interface
+# on every endpoint node with nothing reconciling it. They carry an
+# ownerReference to the controller's own Deployment now, so removing
+# the release collects them.
+helm uninstall cloud-provisioning --namespace wg-dialer --wait >/dev/null 2>&1 \
+  || fail "helm uninstall failed"
+for res in daemonset/wg-dialer daemonset/wg-dialer-cloud secret/wg-dialer-peer; do
+  until_ok 90 sh -c "! kubectl -n wg-dialer get $res" \
+    || fail "$res survived the uninstall (nothing owns it -- an orphaned tunnel is the failure this project exists to prevent)"
+done
+# The CRD deliberately SURVIVES: Helm never removes crds/, and it
+# should not. Removing it would delete every claim still in the
+# cluster, and with the controller already gone nothing would run their
+# finalizers -- the provisioned instances would be orphaned and still
+# billed while the objects hung in Terminating forever.
+kubectl get crd provisionednodeclaims.cloud-provisioning.appmana.com >/dev/null 2>&1 \
+  || fail "the claim CRD was removed by the uninstall -- that orphans running instances"
+# The tunnel interface itself must be gone from the node: on a node
+# that reaches the cluster over its LAN, removing the DaemonSet means
+# the tunnel is meant to be gone. (The CLOUD node is the opposite case
+# and deliberately keeps its interface -- it is that node's only path
+# back, so it outlives whatever manages it.)
+until_ok 60 sh -c "! sudo nsenter -t \$(docker inspect -f '{{.State.Pid}}' ${CLUSTER}-control-plane) -n ip link show $IFACE" \
+  || fail "$IFACE survived the uninstall on the control-plane node"
+assert_wan "after uninstall" "${CLUSTER}-control-plane"
+echo "  release removed: no DaemonSets, no peer Secret, no CRD, no tunnel interface"
+
+echo "--- reinstall: a second install must work with no manual steps ---"
+helm install cloud-provisioning "$REPO_DIR/charts/cloud-provisioning" \
+  --namespace wg-dialer -f "$LOG_DIR/values.yaml" --wait --timeout 5m \
+  >"$LOG_DIR/helm-reinstall.log" 2>&1 || fail "reinstall failed (see $LOG_DIR/helm-reinstall.log)"
+until_ok 120 sh -c "kubectl -n wg-dialer get secret wg-dialer-peer -o jsonpath='{.data.node-public-key-$CP_NODE}' | grep -q ." \
+  || fail "the reinstalled release never came back up"
+assert_wan "after reinstall" "${CLUSTER}-control-plane"
+echo "  reinstall clean"
+
+echo "ALL ASSERTIONS PASSED (logs: $LOG_DIR)"
+

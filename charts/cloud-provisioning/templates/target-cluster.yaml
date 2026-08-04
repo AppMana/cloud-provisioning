@@ -1,13 +1,16 @@
-{{- /* The CAPI Cluster pair standing in for the cluster this release
-runs in. It is annotated managed-by: external -- Cluster API does not
-own this control plane, it only needs a Cluster object to hang
-Machines off. Rendering it here is what makes an install reproducible
-from the chart alone; created by hand, it is a step the next operator
-has to rediscover. Its status is reported by the controller, not
-patched by hand. */}}
+{{- /* The CAPI Cluster pair this release's Machines hang off. Cluster
+API does not manage this control plane -- the objects are annotated
+managed-by: external and exist only as an anchor -- but Machines block
+forever without them. Rendering them here is what makes an install
+reproducible from the chart alone; created by hand, they are a step
+the next operator has to rediscover. Their status is reported by the
+controller, not patched by hand. */}}
 {{- with .Values.targetCluster }}
 {{- if .enabled }}
-{{- $infra := $.Values.provider.aws }}
+{{- $ns := .namespace | default $.Release.Namespace }}
+{{- $kind := .infrastructureKind }}
+{{- if eq $kind "AWSCluster" }}
+{{- $aws := $.Values.provider.aws }}
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSClusterStaticIdentity
 metadata:
@@ -15,20 +18,20 @@ metadata:
   labels:
     {{- include "cloud-provisioning.labels" $ | nindent 4 }}
 spec:
-  # Credentials are referenced, never carried: this chart's values go
-  # into git, so the Secret is created out of band and named here.
-  secretRef: {{ required "provider.aws.credentialsSecret is required: name of an existing Secret holding AccessKeyID/SecretAccessKey" $infra.credentialsSecret }}
+  # Credentials are referenced, never carried: these values go into
+  # git, so the Secret is created out of band and only named here.
+  secretRef: {{ required "provider.aws.credentialsSecret is required" $aws.credentialsSecret }}
   allowedNamespaces: {}
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSCluster
 metadata:
   name: {{ .name }}
-  namespace: {{ .namespace | default $.Release.Namespace }}
+  namespace: {{ $ns }}
   labels:
     {{- include "cloud-provisioning.labels" $ | nindent 4 }}
 spec:
-  region: {{ required "provider.aws.region is required" $infra.region }}
+  region: {{ required "provider.aws.region is required" $aws.region }}
   identityRef:
     kind: AWSClusterStaticIdentity
     name: {{ .name }}
@@ -39,14 +42,28 @@ spec:
     enabled: false
   network:
     subnets:
-      - id: {{ required "provider.aws.subnetID is required" $infra.subnetID }}
+      - id: {{ required "provider.aws.subnetID is required" $aws.subnetID }}
         isPublic: true
 ---
+{{- else }}
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: {{ $kind }}
+metadata:
+  name: {{ .name }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "cloud-provisioning.labels" $ | nindent 4 }}
+spec:
+  controlPlaneEndpoint:
+    host: {{ include "cloud-provisioning.apiHost" $ | quote }}
+    port: {{ include "cloud-provisioning.apiPort" $ }}
+---
+{{- end }}
 apiVersion: cluster.x-k8s.io/v1beta2
 kind: Cluster
 metadata:
   name: {{ .name }}
-  namespace: {{ .namespace | default $.Release.Namespace }}
+  namespace: {{ $ns }}
   annotations:
     cluster.x-k8s.io/managed-by: external
   labels:
@@ -57,7 +74,7 @@ spec:
     port: {{ include "cloud-provisioning.apiPort" $ }}
   infrastructureRef:
     apiGroup: infrastructure.cluster.x-k8s.io
-    kind: AWSCluster
+    kind: {{ $kind }}
     name: {{ .name }}
 {{- end }}
 {{- end }}

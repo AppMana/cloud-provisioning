@@ -99,3 +99,12 @@ cluster-api-operator:
         nodeSelector:
           kubernetes.io/os: linux
   infrastructure: {}
+  # This project renders its OWN bootstrap data (the join-pattern
+  # cloud-config becomes the Machine's dataSecretName directly), and
+  # the target cluster's control plane is externally managed -- so
+  # neither the kubeadm bootstrap provider nor the kubeadm
+  # control-plane provider is needed. Left empty deliberately; if an
+  # environment does want them, give each a
+  # deployment.nodeSelector too, for the same Windows-node reason.
+  bootstrap: {}
+  controlPlane: {}

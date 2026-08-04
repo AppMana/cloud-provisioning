@@ -189,3 +189,33 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "cloud-provisioning.name" . }}
     namespace: {{ .Release.Namespace }}
+---
+{{- /* The AWS provider's preflight check (aws.Provider.Validate)
+resolves an AWSClusterStaticIdentity's secretRef against CAPA's own
+manager namespace -- that is where CAPA always looks, regardless of
+where the AWSCluster lives. Without read access there the check cannot
+verify the credential and errors out instead of passing, which blocks
+every bootstrap render. Read-only, one namespace. */}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}-read-provider-credentials
+  namespace: {{ .Values.providerManagerNamespace | default "capa-system" }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}-read-provider-credentials
+  namespace: {{ .Values.providerManagerNamespace | default "capa-system" }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "cloud-provisioning.controllerName" . }}-read-provider-credentials
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cloud-provisioning.controllerName" . }}
+    namespace: {{ .Release.Namespace }}

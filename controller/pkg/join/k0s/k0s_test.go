@@ -221,3 +221,19 @@ func TestResolveK0sReleaseTag_NoMatchingRelease_ReturnsError(t *testing.T) {
 		t.Fatal("expected an error when no release matches the kubelet version, got nil")
 	}
 }
+
+func TestHostPort_DefaultsPort(t *testing.T) {
+	// apiEndpoint gates the join on the API's TCP port -- ICMP is
+	// absent on minimal images and commonly firewalled.
+	got, err := hostPort("https://10.101.0.1")
+	if err != nil || got != "10.101.0.1:6443" {
+		t.Errorf("hostPort = (%q, %v), want 10.101.0.1:6443", got, err)
+	}
+	got, err = hostPort("https://10.101.0.1:7443")
+	if err != nil || got != "10.101.0.1:7443" {
+		t.Errorf("hostPort = (%q, %v), want the explicit port preserved", got, err)
+	}
+	if _, err := hostPort("not a url"); err == nil {
+		t.Error("expected an error for a non-URL APIAddress")
+	}
+}

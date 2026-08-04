@@ -98,8 +98,12 @@ func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
 	}
 
 	return map[string]any{
-		"joinToken":         tokenID + "." + tokenSecret,
-		"joinEndpoint":      endpoint,
+		"joinToken":    tokenID + "." + tokenSecret,
+		"joinEndpoint": endpoint,
+		// apiEndpoint is the common contract every join pattern gates
+		// on before joining: the host:port a new node must actually
+		// reach. Same value as joinEndpoint here; k0s derives its own.
+		"apiEndpoint":       endpoint,
 		"caCertHash":        caHash,
 		"kubernetesVersion": version,
 	}, nil

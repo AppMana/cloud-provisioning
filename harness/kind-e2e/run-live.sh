@@ -20,17 +20,14 @@ REPO_DIR="$(cd ../.. && pwd)"
 CLUSTER=cldt-live
 NODE_IMAGE=kindest/node:v1.34.0
 LOG_DIR="${LOG_DIR:-$(mktemp -d /tmp/cldt-live-e2e.XXXXXX)}"
-BIN_PORT=18733
 
 CONTROLLER_PID=""
-HTTP_PID=""
 cleanup() {
   if [ "${KEEP:-0}" = "1" ]; then
     echo "KEEP=1: leaving the cluster and controller running for inspection (kubeconfig: $KUBECONFIG)"
     return
   fi
   [ -n "$CONTROLLER_PID" ] && kill "$CONTROLLER_PID" 2>/dev/null || true
-  [ -n "$HTTP_PID" ] && kill "$HTTP_PID" 2>/dev/null || true
   # CAPD node containers are owned by the claim cascade; the final
   # assertion already deleted them on a green run. This catches red
   # runs so nothing leaks.
@@ -67,6 +64,26 @@ until_ok() {
   done
 }
 
+# Run a command inside a node container's NETWORK namespace using the
+# HOST's tools. The node image ships neither wg nor ping (confirmed:
+# both MISSING in kindest/node), so `docker exec ... wg show` doesn't
+# just fail -- piped into awk it makes the assertion VACUOUS, because
+# the pipeline's status is awk's and awk succeeds on empty input. Every
+# tunnel assertion below therefore enters the namespace instead, where
+# the host's own wg/ping/ip apply to the container's interfaces.
+node_netns() {
+  local container="$1"; shift
+  local pid
+  pid=$(docker inspect -f '{{.State.Pid}}' "$container") || return 1
+  sudo nsenter -t "$pid" -n "$@"
+}
+
+handshake_established() {
+  local hs
+  hs=$(node_netns "${CLUSTER}-control-plane" wg show "$IFACE" latest-handshakes 2>/dev/null | awk 'NR==1{print $2}')
+  [ -n "$hs" ] && [ "$hs" -gt 0 ] 2>/dev/null
+}
+
 echo "--- build: controller binary, dialer image, dialer release binary ---"
 ( cd "$REPO_DIR/controller" && go build -o "$LOG_DIR/endpoint-controller" ./cmd/endpoint-controller )
 docker build -q --target dialer -t cldt-dialer:e2e -f "$REPO_DIR/controller/Dockerfile" "$REPO_DIR" >/dev/null
@@ -90,16 +107,15 @@ kind export kubeconfig --name "$CLUSTER" --kubeconfig "$KUBECONFIG"
 kind load docker-image cldt-dialer:e2e --name "$CLUSTER" >/dev/null
 CP_NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
 CP_IP=$(docker inspect "${CLUSTER}-control-plane" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
-# The kind network is dual-stack on some hosts; the binary URL needs
-# the IPv4 gateway specifically (an IPv6 literal would need bracketing
-# everywhere it's spliced).
-KIND_GW=$(docker network inspect kind --format '{{range .IPAM.Config}}{{.Gateway}}{{"\n"}}{{end}}' | grep '\.' | head -1)
-[ -n "$CP_IP" ] && [ -n "$KIND_GW" ] || fail "could not resolve kind network addresses"
-echo "  control plane: $CP_NODE @ $CP_IP; host on kind network: $KIND_GW"
+[ -n "$CP_IP" ] || fail "could not resolve the control plane's kind network address"
+echo "  control plane: $CP_NODE @ $CP_IP"
 
-echo "--- serve the dialer binary (pinned sha $BIN_SHA) ---"
-( cd "$LOG_DIR/binaries" && python3 -m http.server "$BIN_PORT" --bind 0.0.0.0 >/dev/null 2>&1 ) &
-HTTP_PID=$!
+# Binary delivery: NO download server. The docker provider mounts
+# $LOG_DIR/binaries read-only into the node container (extra-mounts in
+# its provider config) and the userdata curls a file:// URL -- fully
+# deterministic, nothing to start, nothing to leak, nothing to go
+# stale; the pinned-sha verification is unchanged.
+BIN_URL="file:///opt/dialer-dist/wg-dialer-linux-amd64"
 
 echo "--- install CAPI core + CAPD (clusterctl) ---"
 clusterctl init --infrastructure docker --wait-providers >"$LOG_DIR/clusterctl-init.log" 2>&1 \
@@ -160,7 +176,9 @@ echo "--- operator inputs: claim CRD, reference RBAC (namespace + the dialer pod
 kubectl apply -f "$REPO_DIR/manifests/wg-dialer/crd.yaml" >/dev/null
 kubectl apply -f "$REPO_DIR/manifests/wg-dialer/rbac.yaml" >/dev/null
 kubectl -n wg-dialer create secret generic docker-provider-config \
-  --from-literal=node-image="$NODE_IMAGE" >/dev/null
+  --from-literal=node-image="$NODE_IMAGE" \
+  --from-literal=extra-mounts="$LOG_DIR/binaries:/opt/dialer-dist" \
+  --from-literal=preload-images="cldt-dialer:e2e" >/dev/null
 
 echo "--- run the controller (kubeadm join specialization, docker fulfillment) ---"
 "$LOG_DIR/endpoint-controller" \
@@ -174,10 +192,8 @@ echo "--- run the controller (kubeadm join specialization, docker fulfillment) -
   --join-node-vip4-prefix=10.199.0. \
   --join-node-vip6-prefix=fd99:: \
   --join-node-vip-start=200 \
-  --join-dialer-binary-url-amd64="http://$KIND_GW:$BIN_PORT/wg-dialer-linux-amd64" \
+  --join-dialer-binary-url-amd64="$BIN_URL" \
   --join-dialer-binary-sha256-amd64="$BIN_SHA" \
-  --join-dialer-binary-url-arm64="http://$KIND_GW:$BIN_PORT/wg-dialer-linux-arm64" \
-  --join-dialer-binary-sha256-arm64="unused-on-this-host" \
   --tunnel-endpoints=node-role.kubernetes.io/control-plane= \
   >"$LOG_DIR/controller.log" 2>&1 &
 CONTROLLER_PID=$!
@@ -222,14 +238,27 @@ until_ok 120 sh -c "kubectl -n wg-dialer get secret wg-dialer-peer -o jsonpath='
 until_ok 180 sh -c "kubectl -n wg-dialer get pods -l app=wg-dialer-cloud -o wide --no-headers | grep '$CLOUD_NODE' | grep -q Running" \
   || fail "cloud DaemonSet pod never Running on the joined node"
 IFACE=$(kubectl -n wg-dialer get daemonset wg-dialer -o jsonpath='{.spec.template.spec.containers[0].args}' | tr ',' '\n' | grep -o 'cldt[0-9a-f]*' | head -1)
-until_ok 120 sh -c "docker exec ${CLUSTER}-control-plane wg show $IFACE latest-handshakes | awk '{exit (\$2>0)?0:1}'" \
-  || fail "no WireGuard handshake on $IFACE"
+until_ok 180 handshake_established || fail "no WireGuard handshake on $IFACE"
 CLOUD_TUN=$(kubectl -n wg-dialer get secret wg-dialer-peer -o jsonpath='{.data.peer-route-hosts-public-worker}' | base64 -d | cut -d, -f1)
-docker exec "${CLUSTER}-control-plane" ping -c2 -W3 "$CLOUD_TUN" >/dev/null \
+until_ok 60 node_netns "${CLUSTER}-control-plane" ping -c2 -W3 "$CLOUD_TUN" \
   || fail "tunnel ping $CLOUD_TUN failed"
-docker exec "${CLUSTER}-control-plane" ip route show | grep "dev $IFACE" | grep -v "^10.100.0." \
-  && fail "non-tunnel-subnet route via $IFACE on the control plane" || true
-echo "  handshake + tunnel ping OK on $IFACE; only tunnel-subnet routes installed"
+# Both directions: the remote's own dialer must equally have a live
+# tunnel back, not just accept ours.
+until_ok 60 node_netns "$NODE_CONTAINER" ping -c2 -W3 "$(kubectl -n wg-dialer get secret wg-dialer-peer -o jsonpath="{.data.node-tunnel-address-$CP_NODE}" | base64 -d | cut -d/ -f1)" \
+  || fail "reverse tunnel ping from the remote failed"
+# The contract is HOST-PREFIX-ONLY, not tunnel-subnet-only: peer node
+# VIPs are legitimately routed via the tunnel (that IS node-to-node
+# reachability), pod/service CIDRs never are. So every route via the
+# interface must be a single host -- `ip` prints those bare (a /32) --
+# except the connected subnet the address itself creates (proto
+# kernel). Anything else, of any width, is the hijack class.
+BAD_ROUTES=$(node_netns "${CLUSTER}-control-plane" ip route show dev "$IFACE" \
+  | grep -v "proto kernel" | awk '$1 ~ "/" && $1 !~ "/(32|128)$" {print}')
+[ -z "$BAD_ROUTES" ] || fail "non-host route via $IFACE on the control plane: $BAD_ROUTES"
+for v6 in $(node_netns "${CLUSTER}-control-plane" ip -6 route show dev "$IFACE" | grep -v "proto kernel" | awk '$1 ~ "/" && $1 !~ "/128$" {print $1}'); do
+  fail "non-host IPv6 route via $IFACE: $v6"
+done
+echo "  bidirectional tunnel traffic on $IFACE; only host routes installed"
 
 echo "--- cascade: delete the claim, the node container must terminate ---"
 kubectl delete provisionednodeclaim public-worker --wait=true >/dev/null

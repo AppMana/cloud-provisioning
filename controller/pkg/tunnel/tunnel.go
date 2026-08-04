@@ -41,7 +41,19 @@ const (
 	// peer is permitted exactly the pods behind it and no others. Empty
 	// when the network encapsulates: those packets are addressed to the
 	// node itself.
-	NodePodCIDRsPrefix   = "node-pod-cidrs-"
+	NodePodCIDRsPrefix = "node-pod-cidrs-"
+
+	// SiteAddressesPrefix and SitePodCIDRsPrefix carry a site node that
+	// terminates no tunnel: its addresses and the pod blocks it owns.
+	//
+	// A remote reaches these through an endpoint rather than directly,
+	// so they are not peers and never get a tunnel address or a key.
+	// They still have to be named. WireGuard's accept list is checked
+	// on the way out as well as in, so a block that is routed into the
+	// tunnel and permitted by nothing is dropped by the sender, and the
+	// route being correct changes nothing.
+	SiteAddressesPrefix  = "site-addresses-"
+	SitePodCIDRsPrefix   = "site-pod-cidrs-"
 	PeerPublicKeyPrefix  = "peer-public-key-"
 	PeerEndpointPrefix   = "peer-endpoint-"
 	PeerAllowedIPsPrefix = "peer-allowed-ips-"
@@ -228,6 +240,25 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 				allowed = append(allowed, HostCIDR(api))
 				routeHosts = append(routeHosts, api)
 			}
+			// The rest of the site: nodes with no tunnel, reached by
+			// relaying through this one. They go on a single peer
+			// because the accept list has one owner per prefix, and on
+			// this one because it is the same peer already designated
+			// to relay, so a remote has one path to the site rather
+			// than a different one per destination.
+			for _, name := range siteNodeNames(data) {
+				for _, addr := range SplitList(string(data[SiteAddressesPrefix+name])) {
+					if containsHost(routeHosts, addr) {
+						continue
+					}
+					allowed = append(allowed, HostCIDR(addr))
+					routeHosts = append(routeHosts, addr)
+				}
+				// Permitted, never routed: the route for a pod block
+				// comes from the network, over the session these host
+				// routes make possible.
+				allowed = append(allowed, SplitList(string(data[SitePodCIDRsPrefix+name]))...)
+			}
 		}
 		peers = append(peers, PeerSpec{
 			PublicKey:    pub,
@@ -277,6 +308,19 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 // the DaemonSet that creates the mount and the dialer that looks for
 // it name it here.
 const HostSysctlNet = "/host/proc/sys/net"
+
+// siteNodeNames lists the site nodes that terminate no tunnel, in a
+// stable order so the accept list does not change shape between passes.
+func siteNodeNames(data map[string][]byte) []string {
+	var names []string
+	for key := range data {
+		if strings.HasPrefix(key, SiteAddressesPrefix) {
+			names = append(names, strings.TrimPrefix(key, SiteAddressesPrefix))
+		}
+	}
+	sort.Strings(names)
+	return names
+}
 
 func containsHost(hosts []string, addr string) bool {
 	for _, h := range hosts {

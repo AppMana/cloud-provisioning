@@ -1,0 +1,27 @@
+> Where the tunnels land, and how many nodes are on the far side.
+>
+> One row per configuration. Columns, tab separated:
+>
+>   name       what to call the row, and the cluster it runs on
+>   endpoints  which nodes terminate a tunnel, by role: control-plane,
+>              worker, worker2, a comma separated list of those, or all
+>   remotes    how many provisioned nodes to join over the tunnel
+>   cni        the network to install
+>
+> Roles rather than node names, so a row says nothing about the cluster
+> it runs on and every row can run on its own.
+>
+> Every row expects total reachability: each pod reaching every other
+> pod and every service, in both directions, whether or not the nodes
+> involved terminate a tunnel. A node with no tunnel reaches a remote
+> by transiting one that has one, so tunnel placement is meant to be
+> invisible from the pod network. Any row that fails is that claim
+> being wrong.
+>
+name	endpoints	remotes	cni
+control-plane	control-plane	1	calico
+one-worker	worker	1	calico
+all-nodes	all	1	calico
+one-worker-2-remotes	worker	2	calico
+all-nodes-2-remotes	all	2	calico
+two-endpoints-2-remotes	worker,worker2	2	calico

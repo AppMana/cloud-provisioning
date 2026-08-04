@@ -1,59 +1,96 @@
 #!/usr/bin/env bash
-# Reachability against tunnel placement.
+# Every tunnel placement in scenarios.tsv, each on its own cluster.
 #
-# Runs the end to end harness once per configuration, on a fresh cluster
-# each time, and records which pairs of nodes could reach each other.
-# The question it answers is what tunnel placement costs: a node that
-# terminates no tunnel has no route to a remote node's address, so the
-# route its CNI installed for that node's pods has an unresolvable next
-# hop. That is true of Flannel and Cilium as much as Calico, since none
-# of them can route to an address the underlay does not carry.
+# The rows are the specification; this file only knows how to run one.
+# A row names roles rather than nodes, so the selector it turns into
+# depends on the cluster the row is running on, and two rows never
+# share a cluster: they have collided before, one run's teardown
+# deleting another run's cluster mid flight.
 #
-# The health check reports rather than fails here, because a pair being
-# unreachable is the measurement, not an error.
+# Each row asserts total reachability. The health check reports rather
+# than exits on the first failure, so the whole matrix is visible, and
+# this reads its count and fails the row if anything did not pass. A
+# report nobody asserts on is how a broken configuration stayed green
+# before.
 set -uo pipefail
 cd "$(dirname "$0")"
+
 OUT="${OUT:-/tmp/cldt-matrix}"
+SCENARIOS="${SCENARIOS:-scenarios.tsv}"
+ONLY="${ONLY:-}"          # run just these rows, space separated
 mkdir -p "$OUT"
+: > "$OUT/summary.txt"
 
-# Each row: name, endpoint selector, number of remote nodes.
-CONFIGS=(
-  "control-plane|node-role.kubernetes.io/control-plane=|1"
-  "one-worker|kubernetes.io/hostname=cldt-live-worker|1"
-  "all-nodes|all|1"
-  "all-nodes-2-remotes|all|2"
-  "one-worker-2-remotes|kubernetes.io/hostname=cldt-live-worker|2"
-)
+# selector_for CLUSTER ROLES -> a label selector, or the word "all"
+selector_for() {
+  local cluster="$1" roles="$2"
+  case "$roles" in
+    all) echo "all"; return ;;
+    control-plane) echo "node-role.kubernetes.io/control-plane="; return ;;
+  esac
+  # One or more workers, named by the role's position in the cluster.
+  local out="" role
+  for role in ${roles//,/ }; do
+    out+="${out:+,}${cluster}-${role}"
+  done
+  # kubernetes.io/hostname takes one value, so several nodes need a set.
+  if [[ "$out" == *,* ]]; then
+    echo "kubernetes.io/hostname in (${out//,/,})"
+  else
+    echo "kubernetes.io/hostname=$out"
+  fi
+}
 
-for row in "${CONFIGS[@]}"; do
-  IFS='|' read -r name selector remotes <<< "$row"
+rows=0
+failed_rows=0
+while IFS=$'\t' read -r name endpoints remotes cni; do
+  # Comments start with > so the file stays a table anything can read.
+  [[ "$name" == \>* || -z "$name" || "$name" == "name" ]] && continue
+  [[ -n "$ONLY" && " $ONLY " != *" $name "* ]] && continue
+
+  cluster="cldt-$name"
+  selector=$(selector_for "$cluster" "$endpoints")
+  rows=$((rows + 1))
+
   echo
-  echo "================ $name: endpoints=$selector remotes=$remotes ================"
+  echo "================ $name: endpoints=$endpoints remotes=$remotes cni=$cni ================"
+  echo "  cluster $cluster, selector $selector"
 
-  # One at a time: every run uses the same cluster name, so an overlap
-  # would have one run's teardown delete the other's cluster.
-  while pgrep -f "^bash run-live.sh" >/dev/null; do sleep 10; done
-  docker ps -aq --filter "name=cldt-live" | xargs -r docker rm -f >/dev/null 2>&1 || true
-  kind delete cluster --name cldt-live >/dev/null 2>&1 || true
+  # Nothing shares a cluster name, so this only ever removes leftovers
+  # from a previous run of this same row.
+  docker ps -aq --filter "name=$cluster" | xargs -r docker rm -f >/dev/null 2>&1 || true
+  kind delete cluster --name "$cluster" >/dev/null 2>&1 || true
 
+  CLUSTER="$cluster" \
   TUNNEL_ENDPOINTS="$selector" \
   REMOTE_COUNT="$remotes" \
+  CNI="$cni" \
   HEALTH_CHECK_ARGS="--report-only" \
-  CNI="${CNI:-calico}" \
   LOG_DIR="$OUT/$name" \
     bash run-live.sh > "$OUT/$name.log" 2>&1
   status=$?
 
+  counts=$(grep -E "^checks:" "$OUT/$name.log" | tail -1)
+  n_failed=$(sed -n 's/.*failed: \([0-9]*\).*/\1/p' <<< "$counts")
+  verdict="FAIL"
+  if [[ "$status" -eq 0 && -n "$n_failed" && "$n_failed" -eq 0 ]]; then
+    verdict="PASS"
+  else
+    failed_rows=$((failed_rows + 1))
+  fi
+
   {
-    echo "### $name (endpoints=$selector, remotes=$remotes) exit=$status"
-    grep -E "^  (PASS|FAIL)  " "$OUT/$name.log" 2>/dev/null || echo "  (no checks ran)"
-    grep -E "^checks:" "$OUT/$name.log" 2>/dev/null || true
-    grep -E "^FAIL: " "$OUT/$name.log" 2>/dev/null | tail -1 || true
+    echo "### $verdict $name (endpoints=$endpoints, remotes=$remotes, cni=$cni) exit=$status"
+    echo "    ${counts:-no checks ran}"
+    grep -E "^  FAIL  " "$OUT/$name.log" 2>/dev/null | sed 's/^/    /'
+    grep -E "^FAIL: " "$OUT/$name.log" 2>/dev/null | tail -1 | sed 's/^/    /'
     echo
   } >> "$OUT/summary.txt"
-  echo "recorded $name (exit $status)"
-done
+  echo "  $verdict ${counts:-no checks ran}"
+done < "$SCENARIOS"
 
 echo
 echo "================ summary ================"
 cat "$OUT/summary.txt"
+echo "rows: $rows  failed: $failed_rows"
+[[ "$failed_rows" -eq 0 ]]

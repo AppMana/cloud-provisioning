@@ -45,6 +45,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -407,6 +408,14 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
 		if !r.isTunnelEndpoint(node) {
+			// A site node with no tunnel of its own. It is not a peer,
+			// but a remote still has to be permitted to reach it, so
+			// its addresses and blocks are published for whichever
+			// endpoint relays to it. Without this the remote learns
+			// the route and drops the traffic on the way out.
+			if r.publishSiteNode(ctx, secret, node) {
+				changed = true
+			}
 			continue
 		}
 		addrKey := tunnel.NodeTunnelAddressPrefix + node.Name
@@ -696,6 +705,51 @@ func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tun
 	return nil
 }
 
+// publishSiteNode records a node that terminates no tunnel: what it is
+// reachable at, and which pods it holds. Reports whether anything
+// changed.
+//
+// This is the half of the mesh that faces the other way. A site node
+// learns about a remote from the endpoint's advertisement; a remote
+// learns about a site node from here, because it has no session with
+// it to learn from and could not open one.
+func (r *meshReconciler) publishSiteNode(ctx context.Context, secret *corev1.Secret, node *corev1.Node) bool {
+	var addresses []string
+	for _, a := range node.Status.Addresses {
+		if a.Type == corev1.NodeInternalIP && a.Address != "" {
+			addresses = append(addresses, a.Address)
+		}
+	}
+	changed := false
+	set := func(key, value string) {
+		if value == "" {
+			if _, ok := secret.Data[key]; ok {
+				delete(secret.Data, key)
+				changed = true
+			}
+			return
+		}
+		if string(secret.Data[key]) != value {
+			secret.Data[key] = []byte(value)
+			changed = true
+		}
+	}
+	set(tunnel.SiteAddressesPrefix+node.Name, strings.Join(addresses, ","))
+
+	prefixes, err := r.network.PrefixesFor(ctx, r.reader, node.Name)
+	if err != nil {
+		// No blocks yet. Leave what is already published rather than
+		// withdrawing it: the remote is using it.
+		return changed
+	}
+	texts := make([]string, 0, len(prefixes))
+	for _, prefix := range prefixes {
+		texts = append(texts, prefix.String())
+	}
+	set(tunnel.SitePodCIDRsPrefix+node.Name, strings.Join(texts, ","))
+	return changed
+}
+
 // publishRemotePodCIDRs keeps a remote machine's peer entry carrying
 // its own node's blocks, alongside its tunnel address.
 func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machineName, nodeName string) (bool, error) {
@@ -924,20 +978,39 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 // (that is all a node placement selector needs here); anything else
 // is ignored rather than silently mis-scheduling.
 func parseSelectorRequirements(raw string) []corev1.NodeSelectorRequirement {
+	// The same parser Kubernetes uses for a label selector, rather than
+	// splitting on commas: a set based term ("k in (a,b)") contains
+	// commas of its own, so splitting turns one requirement into two
+	// fragments that match nothing. Silently, which put a dialer on
+	// every node instead of the two the selector named.
+	selector, err := labels.Parse(raw)
+	if err != nil {
+		return nil
+	}
+	requirements, _ := selector.Requirements()
 	var out []corev1.NodeSelectorRequirement
-	for _, term := range strings.Split(raw, ",") {
-		term = strings.TrimSpace(term)
-		if term == "" || !strings.Contains(term, "=") || strings.Contains(term, "!=") {
+	for _, req := range requirements {
+		var op corev1.NodeSelectorOperator
+		switch req.Operator() {
+		case selection.Equals, selection.DoubleEquals, selection.In:
+			op = corev1.NodeSelectorOpIn
+		case selection.NotEquals, selection.NotIn:
+			op = corev1.NodeSelectorOpNotIn
+		case selection.Exists:
+			op = corev1.NodeSelectorOpExists
+		case selection.DoesNotExist:
+			op = corev1.NodeSelectorOpDoesNotExist
+		default:
 			continue
 		}
-		parts := strings.SplitN(term, "=", 2)
-		key, value := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
-		if key == "" || value == "" {
+		values := req.Values().List()
+		// A node affinity term with a value and no operator to use it
+		// would match everything, so an empty set is only valid for the
+		// operators that take none.
+		if len(values) == 0 && op != corev1.NodeSelectorOpExists && op != corev1.NodeSelectorOpDoesNotExist {
 			continue
 		}
-		out = append(out, corev1.NodeSelectorRequirement{
-			Key: key, Operator: corev1.NodeSelectorOpIn, Values: []string{value},
-		})
+		out = append(out, corev1.NodeSelectorRequirement{Key: req.Key(), Operator: op, Values: values})
 	}
 	return out
 }

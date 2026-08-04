@@ -234,3 +234,58 @@ func TestRemotePeers_RemotesReachEachOther(t *testing.T) {
 		t.Errorf("no route to the other remote: %v", other.AllRouteHosts())
 	}
 }
+
+// A remote reaches a site node that has no tunnel by relaying through
+// one that does. The route for that node's pods comes from the network,
+// but WireGuard checks its accept list on the way out as well as in, so
+// a block that is routed into the tunnel and permitted by nothing is
+// dropped by the sender. Measured: the remote held
+// "10.244.168.64/26 via ... dev cldt..." and an accept list without it,
+// and every pair involving a node with no tunnel failed in both
+// directions.
+func TestRemotePeers_PermitsTheSiteNodesWithNoTunnel(t *testing.T) {
+	data := peerSecret(
+		map[string][2]string{
+			"endpoint-1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
+			"endpoint-2": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
+		},
+		map[string]string{"endpoint-1": "10.244.63.192/26", "endpoint-2": "10.244.1.0/26"},
+	)
+	// Two nodes at the site with no tunnel of their own.
+	data[SiteAddressesPrefix+"control-plane"] = []byte("172.21.0.18")
+	data[SitePodCIDRsPrefix+"control-plane"] = []byte("10.244.168.64/26")
+	data[SiteAddressesPrefix+"worker-2"] = []byte("172.21.0.17")
+	data[SitePodCIDRsPrefix+"worker-2"] = []byte("10.244.231.192/26")
+
+	peers, err := RemotePeers(data, "10.100.0.128", nil)
+	if err != nil {
+		t.Fatalf("RemotePeers: %v", err)
+	}
+
+	// Every site prefix, on exactly one peer: the accept list has one
+	// owner per prefix, so the same block on two peers belongs to
+	// whichever was written last.
+	for _, want := range []string{"172.21.0.18/32", "10.244.168.64/26", "172.21.0.17/32", "10.244.231.192/26"} {
+		owners := 0
+		for _, p := range peers {
+			for _, cidr := range p.WGAllowedIPs {
+				if cidr == want {
+					owners++
+				}
+			}
+		}
+		if owners != 1 {
+			t.Errorf("%s is permitted on %d peers, want exactly 1", want, owners)
+		}
+	}
+
+	// A pod block is permitted but never routed: the route comes from
+	// the network over the session the host routes make possible.
+	for _, p := range peers {
+		for _, host := range p.AllRouteHosts() {
+			if strings.Contains(host, "/") {
+				t.Errorf("route host %q is a prefix, not a host", host)
+			}
+		}
+	}
+}

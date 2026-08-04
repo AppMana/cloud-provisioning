@@ -821,6 +821,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 
 	var peerConfigs []wgtypes.PeerConfig
 	var routeHosts []net.IPNet
+	var blocks []net.IPNet
 	for _, p := range peers {
 		pub, err := wgtypes.ParseKey(p.PublicKey)
 		if err != nil {
@@ -858,6 +859,11 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 				continue
 			}
 			allowedIPs = append(allowedIPs, ipNet)
+			// Anything wider than a host is the pod space behind this
+			// peer, which this node may have to forward to.
+			if ones, bits := ipNet.Mask.Size(); ones != bits {
+				blocks = append(blocks, ipNet)
+			}
 		}
 		if len(allowedIPs) == 0 {
 			// Nothing left to carry. Configuring the peer anyway would
@@ -937,7 +943,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		return err
 	}
 
-	if err := installRoutes(cfg, routeHosts); err != nil {
+	if err := installRoutes(cfg, routeHosts, blocks); err != nil {
 		return err
 	}
 
@@ -1001,7 +1007,7 @@ func parseHostRoute(h string) (net.IPNet, error) {
 // nothing else changes. Route hosts are not derived from AllowedIPs;
 // parseHostRoute has already rejected anything that isn't a single
 // host.
-func installRoutes(cfg config, routeHosts []net.IPNet) error {
+func installRoutes(cfg config, routeHosts, blocks []net.IPNet) error {
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
@@ -1013,6 +1019,31 @@ func installRoutes(cfg config, routeHosts []net.IPNet) error {
 		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK}
 		if err := netlink.RouteReplace(route); err != nil {
 			return fmt.Errorf("adding route %s dev %s: %w", dst.String(), cfg.iface, err)
+		}
+	}
+
+	// A fallback route for the pod space behind each peer.
+	//
+	// This node tells the rest of its site that the remote's blocks are
+	// reachable through it, so their traffic arrives here. Whether it
+	// can then forward that traffic depended entirely on this node
+	// having its own session with the remote, and if that session is
+	// down the node attracts traffic it cannot deliver. Measured: the
+	// site had "remote block via the endpoint" and the endpoint had no
+	// route to the block at all.
+	//
+	// It can always forward it: the tunnel is up and the block is
+	// permitted, which is what makes this safe to state as a route. A
+	// high metric keeps it a fallback, so any route the network
+	// distributes wins while it is there, and this one carries the
+	// traffic when it is not.
+	const fallbackMetric = 1024
+	for _, block := range blocks {
+		dst := block
+		desired[dst.String()] = true
+		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK, Priority: fallbackMetric}
+		if err := netlink.RouteReplace(route); err != nil {
+			fmt.Fprintf(os.Stderr, "no fallback route for %s via %s: %v\n", dst.String(), cfg.iface, err)
 		}
 	}
 
@@ -1034,7 +1065,14 @@ func installRoutes(cfg config, routeHosts []net.IPNet) error {
 				continue
 			}
 			ones, bits := route.Dst.Mask.Size()
-			if ones != bits || desired[route.Dst.String()] {
+			if desired[route.Dst.String()] {
+				continue
+			}
+			// Prune only host routes. A wider prefix on this interface
+			// is either a fallback this pass no longer wants, which
+			// desired already covers, or something else's, which is
+			// not this function's to remove.
+			if ones != bits {
 				continue
 			}
 			if err := netlink.RouteDel(&route); err != nil {

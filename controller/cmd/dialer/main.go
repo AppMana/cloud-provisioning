@@ -254,10 +254,16 @@ func main() {
 func ensureForwardingPath(iface string, mtu int) error {
 	// Loose rather than off: a packet whose source this node cannot
 	// reach at all is still not one it should be forwarding.
+	//
+	// Read before write, and carry on either way. /proc/sys is mounted
+	// read-only in a container that is not privileged, and NET_ADMIN
+	// does not change that, so on many nodes this is a setting to be
+	// made by whoever builds the node rather than here. Strict
+	// filtering costs the asymmetric case; it does not cost the tunnel.
 	rp := fmt.Sprintf("/proc/sys/net/ipv4/conf/%s/rp_filter", iface)
 	if current, err := os.ReadFile(rp); err == nil && strings.TrimSpace(string(current)) == "1" {
 		if err := os.WriteFile(rp, []byte("2"), 0o644); err != nil {
-			return fmt.Errorf("relaxing reverse path filtering on %s: %w", iface, err)
+			fmt.Fprintf(os.Stderr, "leaving reverse path filtering strict on %s (a return path through a second endpoint will be dropped; set net.ipv4.conf.%s.rp_filter=2 on the node): %v\n", iface, iface, err)
 		}
 	}
 
@@ -614,8 +620,13 @@ func ensureLink(cfg config, localAddress string) error {
 		return fmt.Errorf("assigning %s to %s: %w", localAddress, cfg.iface, err)
 	}
 
+	// Best effort, and deliberately not fatal. Every one of these makes
+	// forwarding work better on a node that already has a tunnel; none
+	// of them is what brings the tunnel up. Returning an error here
+	// would stop the interface being brought up at all, trading a
+	// degraded path for no path, which is the wrong way round.
 	if err := ensureForwardingPath(cfg.iface, mtu); err != nil {
-		return err
+		fmt.Fprintf(os.Stderr, "forwarding path on %s (the tunnel still comes up; large packets and asymmetric returns may not): %v\n", cfg.iface, err)
 	}
 
 	if err := netlink.LinkSetMTU(link, mtu); err != nil {

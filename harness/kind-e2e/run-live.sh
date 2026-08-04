@@ -374,8 +374,7 @@ for node in $ENDPOINTS; do
   until_ok 180 sh -c "kubectl -n '$NS' get secret '$PEER_SECRET' -o jsonpath='{.data.node-public-key-$node}' | grep -q ." \
     || fail "$node was selected but never published a key"
 done
-for node in $(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"
-"}{end}'); do
+for node in $(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
   echo "$ENDPOINTS" | grep -qx "$node" && continue
   kubectl -n "$NS" get secret "$PEER_SECRET" -o jsonpath="{.data.node-public-key-$node}" | grep -q . \
     && fail "$node was not selected but published a key"

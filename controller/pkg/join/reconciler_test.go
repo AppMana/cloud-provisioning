@@ -53,10 +53,10 @@ func dialerPeerSecretFixture() *corev1.Secret {
 		Data: map[string][]byte{
 			"node-public-key-worker-1":     []byte("c3BhcmsyYWIzLXB1YmxpYy1rZXktdGVzdC1vbmx5PT0="),
 			"node-tunnel-address-worker-1": []byte("10.100.0.1/24"),
-			"node-cluster-vips-worker-1":   []byte("10.101.0.2"),
+			"node-addresses-worker-1":      []byte("10.101.0.2"),
 			"node-public-key-worker-2":     []byte("c3Bhcms1ODY3LXB1YmxpYy1rZXktdGVzdC1vbmx5PT0="),
 			"node-tunnel-address-worker-2": []byte("10.100.0.3/24"),
-			"node-cluster-vips-worker-2":   []byte("10.101.0.3"),
+			"node-addresses-worker-2":      []byte("10.101.0.3"),
 		},
 	}
 }

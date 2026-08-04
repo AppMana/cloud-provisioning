@@ -385,16 +385,16 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 		// Cluster VIPs: the node's real addresses, which is what BGP
 		// sessions and kubelet traffic use. The tunnel address alone is
 		// not enough for either.
-		var vips []string
+		var addresses []string
 		for _, a := range node.Status.Addresses {
 			if a.Type == corev1.NodeInternalIP && a.Address != "" {
-				vips = append(vips, a.Address)
+				addresses = append(addresses, a.Address)
 			}
 		}
-		vipKey := tunnel.NodeClusterVIPsPrefix + node.Name
-		joined := strings.Join(vips, ",")
-		if joined != "" && string(secret.Data[vipKey]) != joined {
-			secret.Data[vipKey] = []byte(joined)
+		addressKey := tunnel.NodeAddressesPrefix + node.Name
+		joined := strings.Join(addresses, ",")
+		if joined != "" && string(secret.Data[addressKey]) != joined {
+			secret.Data[addressKey] = []byte(joined)
 			changed = true
 		}
 	}

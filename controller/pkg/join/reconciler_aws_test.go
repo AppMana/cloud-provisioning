@@ -90,7 +90,7 @@ func TestReconcile_InfraProviderValidateErrorBlocksBootstrapSecretCreation(t *te
 		Data: map[string][]byte{
 			"node-public-key-worker-1":     []byte("c3BhcmsyYWIzLXB1YmxpYy1rZXktdGVzdC1vbmx5PT0="),
 			"node-tunnel-address-worker-1": []byte("10.100.0.1/24"),
-			"node-cluster-vips-worker-1":   []byte("10.101.0.2"),
+			"node-addresses-worker-1":      []byte("10.101.0.2"),
 		},
 	}
 	joinProvider := &countingJoinProvider{}

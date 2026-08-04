@@ -37,15 +37,15 @@ func TestLoadPeersFromSecret_AllowListAndRouteHostsAreIndependent(t *testing.T) 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "wg-dialer-peer", Namespace: "wg-dialer"},
 		Data: map[string][]byte{
-			"peer-public-key-cloud-1":  []byte("cloudpubkey1"),
-			"peer-endpoint-cloud-1":    []byte("203.0.113.10:51820"),
-			"peer-allowed-ips-cloud-1": []byte("10.100.0.2/32,10.101.0.4/32,fd8f:cf26:522a::4/128"),
-			"peer-route-hosts-cloud-1": []byte("10.100.0.2,10.101.0.4,fd8f:cf26:522a::4"),
-			"peer-public-key-cloud-2":  []byte("cloudpubkey2"),
-			"peer-endpoint-cloud-2":    []byte("pending"),
-			"peer-allowed-ips-cloud-2": []byte("10.100.0.3/32"),
-			"peer-route-host-cloud-2":  []byte("10.100.0.3"), // legacy single-host key still honored
-			"node-public-key-the on-prem host":   []byte("unrelated"),  // not a peer key
+			"peer-public-key-cloud-1":          []byte("cloudpubkey1"),
+			"peer-endpoint-cloud-1":            []byte("203.0.113.10:51820"),
+			"peer-allowed-ips-cloud-1":         []byte("10.100.0.2/32,10.101.0.4/32,fd8f:cf26:522a::4/128"),
+			"peer-route-hosts-cloud-1":         []byte("10.100.0.2,10.101.0.4,fd8f:cf26:522a::4"),
+			"peer-public-key-cloud-2":          []byte("cloudpubkey2"),
+			"peer-endpoint-cloud-2":            []byte("pending"),
+			"peer-allowed-ips-cloud-2":         []byte("10.100.0.3/32"),
+			"peer-route-host-cloud-2":          []byte("10.100.0.3"), // legacy single-host key still honored
+			"node-public-key-the on-prem host": []byte("unrelated"),  // not a peer key
 		},
 	}
 

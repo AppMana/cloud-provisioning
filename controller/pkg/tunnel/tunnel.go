@@ -23,7 +23,8 @@ import (
 // Controller-written per-node (read back by that node's dialer):
 //
 //	node-tunnel-address-<node>   tunnel address (CIDR)
-//	node-cluster-vips-<node>     comma-separated node addresses
+//	node-addresses-<node>     the node's own addresses, so a
+//	                          remote gets a host route to each
 //
 // Controller-written per-remote-machine (the on-prem peer list):
 //
@@ -35,7 +36,7 @@ import (
 const (
 	NodePublicKeyPrefix     = "node-public-key-"
 	NodeTunnelAddressPrefix = "node-tunnel-address-"
-	NodeClusterVIPsPrefix   = "node-cluster-vips-"
+	NodeAddressesPrefix     = "node-addresses-"
 	PeerPublicKeyPrefix     = "peer-public-key-"
 	PeerEndpointPrefix      = "peer-endpoint-"
 	PeerAllowedIPsPrefix    = "peer-allowed-ips-"
@@ -202,9 +203,9 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 		}
 		allowed := []string{HostCIDR(n.tunnelAddr)}
 		routeHosts := []string{n.tunnelAddr}
-		for _, vip := range SplitList(string(data[NodeClusterVIPsPrefix+n.name])) {
-			allowed = append(allowed, HostCIDR(vip))
-			routeHosts = append(routeHosts, vip)
+		for _, addr := range SplitList(string(data[NodeAddressesPrefix+n.name])) {
+			allowed = append(allowed, HostCIDR(addr))
+			routeHosts = append(routeHosts, addr)
 		}
 		if i == 0 {
 			for _, api := range apiServers {

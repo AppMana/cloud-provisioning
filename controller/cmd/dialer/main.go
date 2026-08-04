@@ -241,9 +241,19 @@ func removeDevice(iface string) {
 }
 
 // reconcileTransit tells the rest of this site which remote nodes are
-// reachable through here. The peers say which is which: an entry for a
-// machine is a node somewhere else, and an entry for a node is one of
-// this site's own, which is who needs telling.
+// reachable through here.
+//
+// The peer Secret says what is remote: an entry for a machine is a node
+// somewhere else. It does not say who needs telling. The nodes that
+// need telling are the ones with no tunnel of their own, and a node
+// with no tunnel has no entry in the mesh at all. So the audience comes
+// from the node list, minus the remotes (which are reached through the
+// tunnel, not told about it) and minus this node.
+//
+// A neighbour that was never configured is not merely ignored: the
+// speaker resets the connection, and the CNI's router reports a peer it
+// cannot establish. Taking the audience from the mesh would therefore
+// leave exactly the nodes that need transit unable to peer for it.
 func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg config, speaker *transitSpeaker) error {
 	if speaker == nil {
 		return nil
@@ -261,13 +271,29 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 	if err != nil {
 		return err
 	}
-	var remotes, site []string
+	var remotes []string
+	notSite := map[string]bool{}
 	for _, p := range peers {
-		if p.Remote {
-			remotes = append(remotes, p.AllRouteHosts()...)
+		if !p.Remote {
 			continue
 		}
-		site = append(site, p.AllRouteHosts()...)
+		for _, host := range p.AllRouteHosts() {
+			remotes = append(remotes, host)
+			notSite[host] = true
+		}
+	}
+	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("listing the site's nodes: %w", err)
+	}
+	var site []string
+	for _, node := range nodes.Items {
+		for _, addr := range node.Status.Addresses {
+			if addr.Type != corev1.NodeInternalIP || notSite[addr.Address] {
+				continue
+			}
+			site = append(site, addr.Address)
+		}
 	}
 	return speaker.reconcile(ctx, site, remotes)
 }

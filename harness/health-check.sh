@@ -124,6 +124,24 @@ for node in "${NODES[@]}"; do
   fi
 done
 
+# Run a command in the probe pod on a node, by whichever route works.
+pod_exec() {
+  local node="$1"; shift
+  if [[ "$EXEC_VIA" == "node" ]]; then
+    local cid
+    cid=$(docker exec "$node" crictl ps --name serve -q 2>/dev/null | head -1)
+    [[ -n "$cid" ]] || return 1
+    docker exec "$node" crictl exec "$cid" "$@" 2>/dev/null
+  else
+    kubectl exec "hc-${node}" -n "$NAMESPACE" -- "$@" 2>/dev/null
+  fi
+}
+
+http_from() {
+  local src="$1" url="$2"
+  pod_exec "$src" wget -q -T 5 -O - "$url" | grep -q ok
+}
+
 # A node that has just joined has to be given its pod block, have that
 # block reach the peers, and have the network distribute a route for it.
 # That is convergence, not flakiness, so it is waited for once here
@@ -170,23 +188,6 @@ check() {
   done
 }
 
-# Run a command in the probe pod on a node, by whichever route works.
-pod_exec() {
-  local node="$1"; shift
-  if [[ "$EXEC_VIA" == "node" ]]; then
-    local cid
-    cid=$(docker exec "$node" crictl ps --name serve -q 2>/dev/null | head -1)
-    [[ -n "$cid" ]] || return 1
-    docker exec "$node" crictl exec "$cid" "$@" 2>/dev/null
-  else
-    kubectl exec "hc-${node}" -n "$NAMESPACE" -- "$@" 2>/dev/null
-  fi
-}
-
-http_from() {
-  local src="$1" url="$2"
-  pod_exec "$src" wget -q -T 5 -O - "$url" | grep -q ok
-}
 
 echo
 echo "pod to pod, every pair"

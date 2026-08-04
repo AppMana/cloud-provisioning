@@ -41,6 +41,8 @@ spec:
           image: {{ include "cloud-provisioning.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
+            - "--secret-namespace={{ .Release.Namespace }}"
+            - "--aws-config-namespace={{ .Release.Namespace }}"
             - "--owner-deployment={{ include "cloud-provisioning.controllerName" . }}"
             - "--dialer-image={{ include "cloud-provisioning.dialerImage" . }}"
             {{- with .Values.cluster.podCIDRs }}

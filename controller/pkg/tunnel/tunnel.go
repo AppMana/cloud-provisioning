@@ -202,7 +202,7 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 		}
 		nodes = append(nodes, localNode{name: nodeName, tunnelAddr: strings.SplitN(addr, "/", 2)[0]})
 	}
-	sort.Slice(nodes, func(i, j int) bool { return lessIP(nodes[i].tunnelAddr, nodes[j].tunnelAddr) })
+	sort.Slice(nodes, func(i, j int) bool { return LessIP(nodes[i].tunnelAddr, nodes[j].tunnelAddr) })
 
 	var peers []PeerSpec
 	for i, n := range nodes {
@@ -279,10 +279,11 @@ func containsHost(hosts []string, addr string) bool {
 	return false
 }
 
-// lessIP orders textual IPs by byte value (string order for
+// LessIP orders textual IPs by byte value (string order for
 // unparsable input): a stable, family-aware "lowest address" for
-// the transit designation.
-func lessIP(a, b string) bool {
+// the transit designation, and for any other ordering that several
+// nodes have to agree on without coordinating.
+func LessIP(a, b string) bool {
 	ipa, ipb := net.ParseIP(a), net.ParseIP(b)
 	if ipa == nil || ipb == nil {
 		return a < b

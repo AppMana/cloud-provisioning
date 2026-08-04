@@ -24,7 +24,7 @@ func TestReconcileTransit_TellsTheNodesThatAreNotInTheMesh(t *testing.T) {
 			Data: map[string][]byte{
 				"peer-public-key-cloud-1":  []byte("cloudpubkey1"),
 				"peer-endpoint-cloud-1":    []byte("203.0.113.10:51820"),
-				"peer-allowed-ips-cloud-1": []byte("10.100.0.128/32"),
+				"peer-allowed-ips-cloud-1": []byte("10.100.0.128/32,10.244.123.128/26"),
 				"peer-route-hosts-cloud-1": []byte("10.100.0.128"),
 			},
 		},
@@ -60,8 +60,14 @@ func TestReconcileTransit_TellsTheNodesThatAreNotInTheMesh(t *testing.T) {
 	if speaker.peers["172.21.0.17"] {
 		t.Error("the speaker peered with itself")
 	}
-	if !speaker.advertised["10.100.0.128"] {
+	if !speaker.advertised["10.100.0.128/32"] {
 		t.Error("the remote node address was not advertised")
+	}
+	// The block has to be carried too. The site learns the node address
+	// over BGP, and a BGP next hop is not resolved by another BGP route,
+	// so the block the remote advertises directly stays unreachable.
+	if !speaker.advertised["10.244.123.128/26"] {
+		t.Error("the remote pod block was not advertised, so the site cannot resolve it")
 	}
 }
 
@@ -85,7 +91,7 @@ func TestTransitSpeaker_DisabledIsInert(t *testing.T) {
 	if s != nil {
 		t.Fatal("a zero port should not start a speaker")
 	}
-	if err := s.reconcile(context.Background(), []string{"10.0.0.2"}, []string{"10.1.0.1"}); err != nil {
+	if err := s.reconcile(context.Background(), []string{"10.0.0.2"}, []transitRoute{{prefix: "10.1.0.1/32"}}); err != nil {
 		t.Errorf("reconcile on a disabled speaker: %v", err)
 	}
 	s.stop(context.Background())
@@ -102,11 +108,17 @@ func TestTransitSpeaker_RefusesWithoutANextHop(t *testing.T) {
 // Advertising anything but an address would put a prefix into the site's
 // routing that no node owns.
 func TestTransitSpeaker_RefusesANonAddress(t *testing.T) {
-	s := &transitSpeaker{nextHop: "10.0.0.1", advertised: map[string]bool{}, peers: map[string]bool{}}
-	if err := s.advertise(context.Background(), "10.244.0.0/16", false); err == nil {
-		t.Fatal("expected an error for a prefix, got nil")
+	if _, err := hostRoute("10.244.0.0/16", 0); err == nil {
+		t.Fatal("expected an error for a prefix where an address is required, got nil")
 	}
-	if err := s.advertise(context.Background(), "", false); err == nil {
+	if _, err := hostRoute("", 0); err == nil {
 		t.Fatal("expected an error for an empty value, got nil")
+	}
+	// A block is a prefix, but never one that would take everything.
+	if _, err := blockRoute("0.0.0.0/0", 0); err == nil {
+		t.Fatal("expected an error for a default route, got nil")
+	}
+	if got, err := blockRoute("10.244.123.128/26", 3); err != nil || got.prefix != "10.244.123.128/26" || got.med != 3 {
+		t.Fatalf("blockRoute = %+v, %v; want the masked prefix carrying its preference", got, err)
 	}
 }

@@ -11,19 +11,19 @@
 //     (wgtypes.PeerConfig.AllowedIPs) decides which peer's key
 //     encrypts/decrypts a packet, matched against the packet's inner
 //     destination (wg_allowedips_lookup_dst, allowedips.c, reads
-//     ip_hdr(skb)->daddr and ignores kernel routing entirely). It has
-//     to include the cluster's pod/service CIDRs (--pod-cidrs/
-//     --service-cidrs) or WireGuard silently drops Calico-routed
-//     traffic. It is a packet filter, not a route source.
+//     ip_hdr(skb)->daddr and ignores kernel routing entirely). Each
+//     peer is permitted its own node's addresses and pod blocks and
+//     nothing else: the trie has one owner per prefix, so a range
+//     shared between peers would belong to whichever was written last.
+//     It is a packet filter, not a route source.
 //   - Kernel routes: one host route (/32 or /128, enforced at parse
 //     time; anything broader is a hard error, not a warning) per
 //     peer route-host, installed in the main table. Longest-prefix
 //     match is the whole mechanism: a /32 to a peer's tunnel address
-//     or node VIP wins over a LAN /24 or a VPC default route for
-//     exactly that one host and nothing else. Routing to pods is
-//     Calico's concern: bird learns pod blocks over BGP sessions
-//     that ride these node routes; this binary never installs a
-//     pod/service-CIDR route.
+//     wins over a LAN /24 or a VPC default route for exactly that one
+//     host and nothing else. Routing to pods is the network's concern:
+//     it learns pod blocks over sessions that ride these node routes,
+//     and this binary installs no pod or service route of its own.
 //
 // There is no policy-routing table here. Peer routes in a dedicated
 // table behind an after-main FIB rule are structurally unreachable on
@@ -46,6 +46,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -271,15 +272,39 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 	if err != nil {
 		return err
 	}
-	var remotes []string
+	// Which endpoint this one is, among all of them, ordered the same
+	// way on every endpoint. Every site node then prefers the same
+	// endpoint for a given remote, so a reply comes back the way the
+	// request went out. See transitRoute.
+	med := endpointRank(secret.Data, cfg.nodeName)
+
+	var routes []transitRoute
 	notSite := map[string]bool{}
 	for _, p := range peers {
 		if !p.Remote {
 			continue
 		}
+		hosts := map[string]bool{}
 		for _, host := range p.AllRouteHosts() {
-			remotes = append(remotes, host)
+			route, err := hostRoute(host, med)
+			if err != nil {
+				return err
+			}
+			routes = append(routes, route)
 			notSite[host] = true
+			hosts[route.prefix] = true
+		}
+		// Whatever this peer is permitted beyond its own addresses is
+		// the pod space behind it.
+		for _, allowed := range p.WGAllowedIPs {
+			if hosts[strings.TrimSpace(allowed)] {
+				continue
+			}
+			route, err := blockRoute(allowed, med)
+			if err != nil {
+				return err
+			}
+			routes = append(routes, route)
 		}
 	}
 	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
@@ -295,7 +320,37 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 			site = append(site, addr.Address)
 		}
 	}
-	return speaker.reconcile(ctx, site, remotes)
+	return speaker.reconcile(ctx, site, routes)
+}
+
+// endpointRank orders this node among every node that terminates a
+// tunnel, by the address the mesh allocated each of them. That
+// allocation is already stable and already agreed, so every endpoint
+// computes the same order without coordinating, and an endpoint
+// joining or leaving shifts it for all of them at once.
+func endpointRank(data map[string][]byte, self string) uint32 {
+	var addrs []string
+	selfAddr := ""
+	for key := range data {
+		if !strings.HasPrefix(key, tunnel.NodeTunnelAddressPrefix) {
+			continue
+		}
+		addr := strings.SplitN(strings.TrimSpace(string(data[key])), "/", 2)[0]
+		if addr == "" {
+			continue
+		}
+		addrs = append(addrs, addr)
+		if strings.TrimPrefix(key, tunnel.NodeTunnelAddressPrefix) == self {
+			selfAddr = addr
+		}
+	}
+	sort.Slice(addrs, func(i, j int) bool { return tunnel.LessIP(addrs[i], addrs[j]) })
+	for i, addr := range addrs {
+		if addr == selfAddr {
+			return uint32(i)
+		}
+	}
+	return uint32(len(addrs))
 }
 
 func fatal(format string, args ...any) {

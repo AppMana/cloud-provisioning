@@ -1,26 +1,34 @@
 package main
 
-// Telling the rest of the site how to reach a remote node.
+// Making every node reachable at its own address.
 //
-// A node that terminates no tunnel already has the route it needs for a
-// remote's pods: its CNI installed "remote pod block via remote node
-// address" from the cluster's own records. What it does not have is a
-// route to that next hop, so the route resolves to nothing.
+// A CNI assumes the nodes share an underlay: that any node can open a
+// session to any other at the address the cluster knows it by, and that
+// a route whose next hop is a node address resolves. That assumption is
+// what a tunnel breaks. A remote node's address is its tunnel address,
+// and a node terminating no tunnel has no route to it.
 //
-// It cannot learn one by peering with the remote either. The remote's
-// address, as far as the CNI is concerned, is its tunnel address, and a
-// node with no tunnel has no route to that. The session could never be
-// established. Something already on the tunnel has to say it.
+// Everything follows from that one gap, in order. The node cannot reach
+// the remote, so their session never establishes, so it never learns the
+// remote's pod blocks, so it has neither the blocks nor a next hop for
+// them. Restoring the address restores the rest without anything else
+// being said: the session comes up and the CNI distributes the blocks
+// over it, the way it does for any other node.
 //
-// So a node that does terminate a tunnel advertises the remote node
-// addresses with itself as the next hop. The CNI's own router receives
-// them like any other route, which is what makes withdrawal, and
-// choosing between two endpoints, its problem rather than ours.
+// So a node terminating a tunnel advertises the addresses reachable
+// through it, with itself as the next hop, to every node that cannot
+// reach them directly. The CNI's own router receives them like any other
+// route, which leaves withdrawal, and the choice between two endpoints,
+// where it belongs.
 //
-// Only node addresses are advertised, never pod blocks. The blocks are
-// already distributed by the CNI, and a prefix with two owners belongs
-// to whichever spoke last; the blocks also churn as pods come and go,
-// while a node address changes only when a node does.
+// The node addresses alone would be enough if the site learned them by
+// any other means. They do not: nothing of ours runs on a node with no
+// tunnel, so BGP is the only way to reach it, and a router will not
+// resolve one BGP route's next hop with another BGP route. The address
+// therefore arrives and the blocks behind it stay unreachable. So the
+// blocks are carried here too, with this node as the next hop, which
+// resolves against a directly connected address and asks nothing of
+// recursion. See blockRoute.
 //
 // The speaker listens on its own port. A node running a CNI that speaks
 // BGP already has something on 179.
@@ -29,6 +37,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"strings"
 
@@ -82,9 +91,16 @@ func startTransitSpeaker(ctx context.Context, port int, asn uint32, nextHop stri
 }
 
 // reconcile makes the speaker's peers and advertisements match the mesh:
-// one peering with every other node at this site, and one route for
-// every remote node address reachable through this one.
-func (t *transitSpeaker) reconcile(ctx context.Context, sitePeers, remoteAddrs []string) error {
+// one peering with every node at this site that cannot reach the
+// remotes itself, and one route for everything reachable through here.
+//
+// An empty route set withdraws nothing. Every route the site has to a
+// remote depends on these, and the session it then builds to that
+// remote depends on the route, so a withdrawal costs far more than the
+// staleness it prevents. A mesh that reads as empty is a failed read
+// until proven otherwise; a remote that is genuinely gone is removed
+// when some other remote is still there to prove the read was good.
+func (t *transitSpeaker) reconcile(ctx context.Context, sitePeers []string, routes []transitRoute) error {
 	if t == nil {
 		return nil
 	}
@@ -104,48 +120,95 @@ func (t *transitSpeaker) reconcile(ctx context.Context, sitePeers, remoteAddrs [
 		t.peers[addr] = true
 	}
 
-	want := map[string]bool{}
-	for _, addr := range remoteAddrs {
-		if addr = strings.TrimSpace(addr); addr != "" {
-			want[addr] = true
+	want := map[string]transitRoute{}
+	for _, r := range routes {
+		if r.prefix = strings.TrimSpace(r.prefix); r.prefix != "" {
+			want[r.prefix] = r
 		}
 	}
-	for addr := range want {
-		if t.advertised[addr] {
+	for _, r := range want {
+		if t.advertised[r.prefix] {
 			continue
 		}
-		if err := t.advertise(ctx, addr, false); err != nil {
+		if err := t.advertise(ctx, r, false); err != nil {
 			return err
 		}
-		t.advertised[addr] = true
+		t.advertised[r.prefix] = true
 	}
-	// A remote that has gone is withdrawn, so the site stops sending
-	// its traffic here.
-	for addr := range t.advertised {
-		if want[addr] {
+	if len(want) == 0 {
+		return nil
+	}
+	for prefix := range t.advertised {
+		if _, ok := want[prefix]; ok {
 			continue
 		}
-		if err := t.advertise(ctx, addr, true); err != nil {
+		if err := t.advertise(ctx, transitRoute{prefix: prefix}, true); err != nil {
 			return err
 		}
-		delete(t.advertised, addr)
+		delete(t.advertised, prefix)
 	}
 	return nil
 }
 
-// advertise announces or withdraws one host route for a remote node.
-func (t *transitSpeaker) advertise(ctx context.Context, addr string, withdraw bool) error {
-	ip := net.ParseIP(addr)
+// transitRoute is one thing reachable through this node.
+//
+// med orders the endpoints that can carry it. Every site node runs the
+// same selection on the same advertisements, so a shared preference is
+// what makes them agree on which endpoint to use, rather than each
+// picking independently and sending traffic whose replies come back
+// another way.
+type transitRoute struct {
+	prefix string
+	med    uint32
+}
+
+// hostRoute is a remote node's own address: the underlay repair that
+// lets a session to that node establish at all.
+func hostRoute(addr string, med uint32) (transitRoute, error) {
+	ip := net.ParseIP(strings.TrimSpace(addr))
 	if ip == nil {
-		return fmt.Errorf("refusing to advertise %q: not an address", addr)
+		return transitRoute{}, fmt.Errorf("refusing to advertise %q: not an address", addr)
 	}
-	family := &api.Family{Afi: api.Family_AFI_IP, Safi: api.Family_SAFI_UNICAST}
-	length := uint32(32)
+	length := 32
 	if ip.To4() == nil {
-		family = &api.Family{Afi: api.Family_AFI_IP6, Safi: api.Family_SAFI_UNICAST}
 		length = 128
 	}
-	nlri, err := apb.New(&api.IPAddressPrefix{Prefix: ip.String(), PrefixLen: length})
+	return transitRoute{prefix: fmt.Sprintf("%s/%d", ip.String(), length), med: med}, nil
+}
+
+// blockRoute is a remote node's pod block.
+//
+// Advertising these is not redundant with the node address, though it
+// looks it. A site node with no tunnel learns the node address from
+// this speaker, over BGP. Its router will not resolve one BGP route's
+// next hop with another BGP route, since that is how resolution loops
+// form, so the block it learns from the remote directly stays
+// unreachable no matter that the address underneath it is now routed.
+// Carrying the block here with this node as the next hop resolves it
+// against a directly connected address instead, and needs no recursion.
+func blockRoute(cidr string, med uint32) (transitRoute, error) {
+	prefix, err := netip.ParsePrefix(strings.TrimSpace(cidr))
+	if err != nil {
+		return transitRoute{}, fmt.Errorf("refusing to advertise %q: %w", cidr, err)
+	}
+	if prefix.Bits() == 0 {
+		return transitRoute{}, fmt.Errorf("refusing to advertise %q: it would take every destination", cidr)
+	}
+	return transitRoute{prefix: prefix.Masked().String(), med: med}, nil
+}
+
+// advertise announces or withdraws one route, with this node as the
+// next hop.
+func (t *transitSpeaker) advertise(ctx context.Context, route transitRoute, withdraw bool) error {
+	prefix, err := netip.ParsePrefix(route.prefix)
+	if err != nil {
+		return fmt.Errorf("refusing to advertise %q: %w", route.prefix, err)
+	}
+	family := &api.Family{Afi: api.Family_AFI_IP, Safi: api.Family_SAFI_UNICAST}
+	if prefix.Addr().Is6() {
+		family = &api.Family{Afi: api.Family_AFI_IP6, Safi: api.Family_SAFI_UNICAST}
+	}
+	nlri, err := apb.New(&api.IPAddressPrefix{Prefix: prefix.Addr().String(), PrefixLen: uint32(prefix.Bits())})
 	if err != nil {
 		return err
 	}
@@ -157,10 +220,14 @@ func (t *transitSpeaker) advertise(ctx context.Context, addr string, withdraw bo
 	if err != nil {
 		return err
 	}
+	med, err := apb.New(&api.MultiExitDiscAttribute{Med: route.med})
+	if err != nil {
+		return err
+	}
 	path := &api.Path{
 		Family: family,
 		Nlri:   nlri,
-		Pattrs: []*apb.Any{origin, nextHop},
+		Pattrs: []*apb.Any{origin, nextHop, med},
 	}
 	if withdraw {
 		return t.server.DeletePath(ctx, &api.DeletePathRequest{Path: path})

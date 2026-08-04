@@ -542,7 +542,10 @@ echo "--- reachability across every pair of nodes ---"
 # One pod per node, then every source against every destination, by pod
 # address and by service address. Two local and two remote, so the pairs
 # cross the tunnel in both directions and between the two remotes.
-"$REPO_DIR/harness/health-check.sh" \
+# Probes run through each node's container runtime: a node off the
+# local network has no path for kubectl exec, since the API server
+# reaches a kubelet directly and the control plane carries no tunnel.
+"$REPO_DIR/harness/health-check.sh" --exec node \
   "$ENDPOINT_A" "$ENDPOINT_B" "$CLOUD_NODE" "$CLOUD_NODE_2" 2>&1 | tee "$LOG_DIR/health-check.log"
 grep -q "failed: 0" "$LOG_DIR/health-check.log" \
   || fail "reachability checks failed (see $LOG_DIR/health-check.log)"

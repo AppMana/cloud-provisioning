@@ -20,12 +20,27 @@ NAMESPACE="cloud-provisioning-health"
 SERVICE_PORT=8080
 IMAGE="${HEALTH_CHECK_IMAGE:-busybox:1.37}"
 NODES=()
+# How to run a command inside a probe pod.
+#
+# kubectl exec reaches a pod by way of its node's kubelet, which the API
+# server connects to directly. A node joined over a tunnel has no return
+# path for that: the control plane carries no tunnel, which is what
+# keeps a tunnel from ever costing a control plane its default route. So
+# on a node that is off the local network, kubectl exec cannot work, and
+# using it would report the tunnel as broken when it is the exec path
+# that is absent.
+#
+# With node access, the container runtime on the node runs the command
+# instead. The traffic under test is unchanged; only the way the probe
+# is started differs.
+EXEC_VIA="${HEALTH_CHECK_EXEC:-kubectl}"   # kubectl | node
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --namespace) NAMESPACE="$2"; shift 2 ;;
     --service-port) SERVICE_PORT="$2"; shift 2 ;;
     --image) IMAGE="$2"; shift 2 ;;
+    --exec) EXEC_VIA="$2"; shift 2 ;;
     *) NODES+=("$1"); shift ;;
   esac
 done
@@ -109,7 +124,7 @@ done
 # That is convergence, not flakiness, so it is waited for once here
 # rather than folded into every check's timeout.
 http_from_early() {
-  kubectl exec "hc-$1" -n "$NAMESPACE" -- wget -q -T 5 -O - "$2" 2>/dev/null | grep -q ok
+  http_from "$1" "$2"
 }
 if [[ ${#NODES[@]} -gt 1 ]]; then
   first="${NODES[0]}"
@@ -150,9 +165,22 @@ check() {
   done
 }
 
+# Run a command in the probe pod on a node, by whichever route works.
+pod_exec() {
+  local node="$1"; shift
+  if [[ "$EXEC_VIA" == "node" ]]; then
+    local cid
+    cid=$(docker exec "$node" crictl ps --name serve -q 2>/dev/null | head -1)
+    [[ -n "$cid" ]] || return 1
+    docker exec "$node" crictl exec "$cid" "$@" 2>/dev/null
+  else
+    kubectl exec "hc-${node}" -n "$NAMESPACE" -- "$@" 2>/dev/null
+  fi
+}
+
 http_from() {
   local src="$1" url="$2"
-  kubectl exec "hc-${src}" -n "$NAMESPACE" -- wget -q -T 5 -O - "$url" 2>/dev/null | grep -q ok
+  pod_exec "$src" wget -q -T 5 -O - "$url" | grep -q ok
 }
 
 echo
@@ -175,14 +203,14 @@ echo
 echo "cluster DNS, from every node"
 for src in "${NODES[@]}"; do
   check "$src resolves kubernetes.default" \
-    kubectl exec "hc-${src}" -n "$NAMESPACE" -- nslookup kubernetes.default.svc.cluster.local
+    pod_exec "$src" nslookup kubernetes.default.svc.cluster.local
 done
 
 echo
 echo "the path off the cluster, from every node"
 for src in "${NODES[@]}"; do
   check "$src reaches 1.1.1.1" \
-    kubectl exec "hc-${src}" -n "$NAMESPACE" -- ping -c1 -W3 1.1.1.1
+    pod_exec "$src" ping -c1 -W3 1.1.1.1
 done
 
 echo

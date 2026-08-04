@@ -73,6 +73,9 @@ spec:
             - "--join-dialer-binary-url-arm64={{ . }}"
             - "--join-dialer-binary-sha256-arm64={{ $.Values.dialerBinary.arm64.sha256 | required "dialerBinary.arm64.sha256 is required when a url is set -- an unpinned download is a supply-chain hole" }}"
             {{- end }}
+            {{- with .Values.imagePullSecrets }}
+            - "--dialer-image-pull-secret={{ (first .).name }}"
+            {{- end }}
             {{- with .Values.dialerCloud.image }}
             - "--dialer-cloud-image={{ . }}"
             - "--dialer-cloud-host-binary={{ $.Values.dialerCloud.hostBinary }}"

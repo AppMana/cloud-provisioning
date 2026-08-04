@@ -58,3 +58,116 @@ func TestAllRouteHosts_FoldsLegacyField(t *testing.T) {
 		t.Fatalf("AllRouteHosts = %v, want 3 entries", got)
 	}
 }
+
+// peerSecret builds the published state for a mesh of local nodes, the
+// shape the mesh reconciler writes.
+func peerSecret(nodes map[string][2]string, pods map[string]string) map[string][]byte {
+	data := map[string][]byte{}
+	for name, pair := range nodes {
+		data[NodePublicKeyPrefix+name] = []byte(pair[0])
+		data[NodeTunnelAddressPrefix+name] = []byte(pair[1])
+	}
+	for name, cidrs := range pods {
+		data[NodePodCIDRsPrefix+name] = []byte(cidrs)
+	}
+	return data
+}
+
+// WireGuard's accept list is a trie with a single owner per prefix, so
+// the same prefix on two peers belongs to whichever was configured
+// last. Every peer must therefore carry only prefixes no other peer
+// carries.
+func TestRemotePeers_AllowedIPsArePairwiseDisjoint(t *testing.T) {
+	data := peerSecret(
+		map[string][2]string{
+			"worker-1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
+			"worker-2": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
+			"worker-3": {"ccccccccccccccccccccccccccccccccccccccccccC=", "10.100.0.3/24"},
+		},
+		map[string]string{
+			"worker-1": "10.244.1.0/26,10.244.4.0/26",
+			"worker-2": "10.244.2.0/26",
+			"worker-3": "10.244.3.0/26",
+		},
+	)
+	peers, err := RemotePeers(data, "10.100.0.128", nil)
+	if err != nil {
+		t.Fatalf("RemotePeers: %v", err)
+	}
+	if len(peers) != 3 {
+		t.Fatalf("got %d peers, want 3", len(peers))
+	}
+	owner := map[string]int{}
+	for i, p := range peers {
+		for _, cidr := range p.WGAllowedIPs {
+			if prev, seen := owner[cidr]; seen {
+				t.Errorf("%s is permitted on peer %d and peer %d; the trie gives it to one of them", cidr, prev, i)
+			}
+			owner[cidr] = i
+		}
+	}
+}
+
+// A peer carries the blocks of its own node. Carrying another node's
+// block would take that node's traffic and send it to the wrong peer.
+func TestRemotePeers_EachPeerCarriesOnlyItsOwnBlocks(t *testing.T) {
+	data := peerSecret(
+		map[string][2]string{
+			"worker-1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
+			"worker-2": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
+		},
+		map[string]string{
+			"worker-1": "10.244.1.0/26",
+			"worker-2": "10.244.2.0/26",
+		},
+	)
+	peers, err := RemotePeers(data, "10.100.0.128", nil)
+	if err != nil {
+		t.Fatalf("RemotePeers: %v", err)
+	}
+	for _, p := range peers {
+		var own, foreign string
+		switch p.PublicKey {
+		case "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=":
+			own, foreign = "10.244.1.0/26", "10.244.2.0/26"
+		case "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=":
+			own, foreign = "10.244.2.0/26", "10.244.1.0/26"
+		default:
+			t.Fatalf("unexpected peer %s", p.PublicKey)
+		}
+		var hasOwn, hasForeign bool
+		for _, cidr := range p.WGAllowedIPs {
+			if cidr == own {
+				hasOwn = true
+			}
+			if cidr == foreign {
+				hasForeign = true
+			}
+		}
+		if !hasOwn {
+			t.Errorf("peer %s does not carry its own block %s: %v", p.PublicKey, own, p.WGAllowedIPs)
+		}
+		if hasForeign {
+			t.Errorf("peer %s carries another node's block %s: %v", p.PublicKey, foreign, p.WGAllowedIPs)
+		}
+	}
+}
+
+// An encapsulated network publishes no pod blocks, and the accept list
+// must then be node addresses alone.
+func TestRemotePeers_EncapsulatedCarriesHostsOnly(t *testing.T) {
+	data := peerSecret(
+		map[string][2]string{"worker-1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"}},
+		nil,
+	)
+	data[NodeAddressesPrefix+"worker-1"] = []byte("10.0.0.11")
+	peers, err := RemotePeers(data, "10.100.0.128", nil)
+	if err != nil {
+		t.Fatalf("RemotePeers: %v", err)
+	}
+	for _, cidr := range peers[0].WGAllowedIPs {
+		if !strings.HasSuffix(cidr, "/32") && !strings.HasSuffix(cidr, "/128") {
+			t.Errorf("%s is not a host address, but the network encapsulates", cidr)
+		}
+	}
+}

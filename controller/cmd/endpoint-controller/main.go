@@ -31,6 +31,7 @@ import (
 	v1alpha1 "github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	claimpkg "github.com/appmana/cloud-provisioning/controller/pkg/claim"
+	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
 	"github.com/appmana/cloud-provisioning/controller/pkg/discover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
@@ -132,8 +133,6 @@ type meshReconciler struct {
 	dialerServiceAccount  string
 	dialerImage           string
 	dialerImagePullSecret string
-	dialerPodCIDRs        string
-	dialerServiceCIDRs    string
 	dialerPrivateKeyDir   string
 	ifaceName             string
 	apiVIP                string
@@ -144,6 +143,10 @@ type meshReconciler struct {
 	// uninstalling the release leaves the DaemonSets running, and a
 	// tunnel interface on each endpoint node with nothing managing it.
 	ownerRef *metav1.OwnerReference
+	// network is how this cluster carries pod traffic, which decides
+	// whether a peer needs pod prefixes at all and where they are read
+	// from. Re-detected when the network's own configuration changes.
+	network cni.Network
 
 	dialerCloudDaemonSetName string
 	dialerCloudListenPort    string
@@ -382,7 +385,7 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 			secret.Data[addrKey] = []byte(addr)
 			changed = true
 		}
-		// Cluster VIPs: the node's real addresses, which is what BGP
+		// The node's real addresses, which is what the network's own
 		// sessions and kubelet traffic use. The tunnel address alone is
 		// not enough for either.
 		var addresses []string
@@ -395,6 +398,29 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 		joined := strings.Join(addresses, ",")
 		if joined != "" && string(secret.Data[addressKey]) != joined {
 			secret.Data[addressKey] = []byte(joined)
+			changed = true
+		}
+
+		// The pod blocks this node owns, read from the network's own
+		// records and recomputed every pass. A block allocated later
+		// reaches the peers from here, which is why nothing about pod
+		// addressing is configuration.
+		prefixes, err := r.network.PrefixesFor(ctx, r.reader, node.Name)
+		if err != nil {
+			return fmt.Errorf("reading the pod prefixes for node %s: %w", node.Name, err)
+		}
+		texts := make([]string, 0, len(prefixes))
+		for _, prefix := range prefixes {
+			texts = append(texts, prefix.String())
+		}
+		podKey := tunnel.NodePodCIDRsPrefix + node.Name
+		joinedPods := strings.Join(texts, ",")
+		if string(secret.Data[podKey]) != joinedPods {
+			if joinedPods == "" {
+				delete(secret.Data, podKey)
+			} else {
+				secret.Data[podKey] = []byte(joinedPods)
+			}
 			changed = true
 		}
 	}
@@ -632,8 +658,6 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 								fmt.Sprintf("--secret-name=%s", r.secretName),
 								fmt.Sprintf("--iface=%s", r.ifaceName),
 								fmt.Sprintf("--private-key-file=%s/private.key", r.dialerPrivateKeyDir),
-								fmt.Sprintf("--pod-cidrs=%s", r.dialerPodCIDRs),
-								fmt.Sprintf("--service-cidrs=%s", r.dialerServiceCIDRs),
 								fmt.Sprintf("--transit-masquerade-source=%s", r.tunnelSubnet),
 								"--keepalive-seconds=15",
 								"--mtu=1420",
@@ -770,8 +794,6 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 								// the download URL only ever mattered at first
 								// boot.
 								fmt.Sprintf("--listen-port=%s", r.dialerCloudListenPort),
-								fmt.Sprintf("--pod-cidrs=%s", r.dialerPodCIDRs),
-								fmt.Sprintf("--service-cidrs=%s", r.dialerServiceCIDRs),
 								"--keepalive-seconds=15",
 								"--mtu=1420",
 								"--poll-interval=30s",
@@ -851,8 +873,6 @@ func main() {
 		dialerServiceAccount      string
 		dialerImage               string
 		dialerImagePullSecret     string
-		dialerPodCIDRs            string
-		dialerServiceCIDRs        string
 		dialerCloudDaemonSetName  string
 		dialerCloudImage          string
 		ownerDeployment           string
@@ -883,8 +903,6 @@ func main() {
 	flag.StringVar(&dialerServiceAccount, "dialer-service-account", "cloud-provisioning-dialer", "ServiceAccount the dialer DaemonSet's pods run as")
 	flag.StringVar(&dialerImage, "dialer-image", "", "REQUIRED image for the dialer DaemonSets, pinned by digest (tag@sha256:...). Deliberately has no default: a stale built-in default once pointed at a pre-hardening build")
 	flag.StringVar(&dialerImagePullSecret, "dialer-image-pull-secret", "", "optional imagePullSecret for the dialer DaemonSets; leave empty when the images are publicly pullable. Naming a Secret that does not exist makes every pod on every endpoint node log a pull-secret warning, so this defaults to none")
-	flag.StringVar(&dialerPodCIDRs, "dialer-pod-cidrs", "", "REQUIRED comma-separated cluster pod-CIDR ranges (v4/v6): WireGuard cryptokey accept-list only, never a kernel route. Empty silently drops all Calico traffic, so it is fatal instead")
-	flag.StringVar(&dialerServiceCIDRs, "dialer-service-cidrs", "", "REQUIRED comma-separated cluster service-CIDR ranges (v4/v6), same treatment as --dialer-pod-cidrs")
 	flag.StringVar(&ownerDeployment, "owner-deployment", "", "this controller's own Deployment name; everything it creates at runtime (both DaemonSets, the peer and adoption Secrets) is owned by it, so an uninstall garbage-collects them instead of orphaning a tunnel interface on every endpoint node")
 	flag.StringVar(&dialerCloudImage, "dialer-cloud-image", "", "optional PUBLIC base image for the REMOTE node's DaemonSet, which then executes --dialer-cloud-host-binary instead of carrying its own. Use when the project image is not pullable on a remote node (no preload, no registry credential): without it the adoption DaemonSet ImagePullBackOffs and the node stays on its frozen bootstrap peer list forever")
 	flag.StringVar(&dialerCloudHostBinary, "dialer-cloud-host-binary", "/host-bin/wg-dialer", "path (inside the pod) of the host binary --dialer-cloud-image executes; the bootstrap already installed and sha-verified it")
@@ -975,6 +993,7 @@ func main() {
 		}
 	}
 
+	var network cni.Network
 	// Read from the cluster whatever was not configured. These are all
 	// facts the cluster already holds, and a second copy of them in
 	// values is a copy that goes stale.
@@ -1003,24 +1022,13 @@ func main() {
 				joinAPIVIP = host
 			}
 		}
-		if dialerPodCIDRs == "" {
-			cidrs, err := discover.PodCIDRs(ctx, discoveryClient)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "cannot determine the pod CIDRs (set --dialer-pod-cidrs): %v\n", err)
-				os.Exit(1)
-			}
-			dialerPodCIDRs = strings.Join(cidrs, ",")
+		network, err = cni.Detect(ctx, discoveryClient)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cannot determine the container network: %v\n", err)
+			os.Exit(1)
 		}
-		if dialerServiceCIDRs == "" {
-			cidrs, err := discover.ServiceCIDRs(ctx, discoveryClient)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "cannot determine the service CIDRs (set --dialer-service-cidrs): %v\n", err)
-				os.Exit(1)
-			}
-			dialerServiceCIDRs = strings.Join(cidrs, ",")
-		}
-		fmt.Fprintf(os.Stderr, "cluster: api=%s pods=%s services=%s\n",
-			joinAPIAddress, dialerPodCIDRs, dialerServiceCIDRs)
+		fmt.Fprintf(os.Stderr, "cluster: api=%s network=%s/%s (%s)\n",
+			joinAPIAddress, network.Name, network.Encapsulation, network.Detail)
 	}
 
 	// The mesh's interface name is derived from the peer Secret's
@@ -1061,13 +1069,12 @@ func main() {
 			dialerServiceAccount:   dialerServiceAccount,
 			dialerImage:            dialerImage,
 			dialerImagePullSecret:  dialerImagePullSecret,
-			dialerPodCIDRs:         dialerPodCIDRs,
-			dialerServiceCIDRs:     dialerServiceCIDRs,
 			dialerPrivateKeyDir:    dialerPrivateKeyDir,
 			ifaceName:              ifaceName,
 			apiVIP:                 joinAPIVIP,
 
 			ownerRef:                 runtimeOwner,
+			network:                  network,
 			dialerCloudDaemonSetName: dialerCloudDaemonSetName,
 			dialerCloudListenPort:    dialerListenPort,
 			dialerCloudImage:         dialerCloudImage,
@@ -1122,9 +1129,6 @@ func main() {
 			APIVIP:            joinAPIVIP,
 			KubeletExtraArgs:  joinKubeletExtraArgs,
 			SSHAuthorizedKeys: sshKeys,
-
-			PodCIDRs:     dialerPodCIDRs,
-			ServiceCIDRs: dialerServiceCIDRs,
 
 			WireGuardAddress:    wireGuardAddress,
 			WireGuardListenPort: wireGuardListenPort,

@@ -37,11 +37,16 @@ const (
 	NodePublicKeyPrefix     = "node-public-key-"
 	NodeTunnelAddressPrefix = "node-tunnel-address-"
 	NodeAddressesPrefix     = "node-addresses-"
-	PeerPublicKeyPrefix     = "peer-public-key-"
-	PeerEndpointPrefix      = "peer-endpoint-"
-	PeerAllowedIPsPrefix    = "peer-allowed-ips-"
-	PeerRouteHostsPrefix    = "peer-route-hosts-"
-	PeerRouteHostPrefix     = "peer-route-host-"
+	// NodePodCIDRsPrefix carries the pod blocks that node owns, so a
+	// peer is permitted exactly the pods behind it and no others. Empty
+	// when the network encapsulates: those packets are addressed to the
+	// node itself.
+	NodePodCIDRsPrefix   = "node-pod-cidrs-"
+	PeerPublicKeyPrefix  = "peer-public-key-"
+	PeerEndpointPrefix   = "peer-endpoint-"
+	PeerAllowedIPsPrefix = "peer-allowed-ips-"
+	PeerRouteHostsPrefix = "peer-route-hosts-"
+	PeerRouteHostPrefix  = "peer-route-host-"
 
 	// PeerEndpointPending is the placeholder the join reconciler writes
 	// until the endpoint mirror learns the machine's real external IP.
@@ -207,6 +212,10 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 			allowed = append(allowed, HostCIDR(addr))
 			routeHosts = append(routeHosts, addr)
 		}
+		// This node's own pod blocks, and only its own. They are
+		// permitted but never routed: reaching a pod is the network's
+		// job, over the session these host routes make possible.
+		allowed = append(allowed, SplitList(string(data[NodePodCIDRsPrefix+n.name]))...)
 		if i == 0 {
 			for _, api := range apiServers {
 				if api = strings.TrimSpace(api); api == "" || containsHost(routeHosts, api) {

@@ -50,11 +50,12 @@ cluster:
   # Where a joining node reaches the API. Discovered from the
   # kubernetes Service's endpoints, which name every control plane.
   apiAddress: ""     # e.g. https://198.51.100.10:6443
-  # WireGuard accept-list entries, not kernel routes. Discovered from
-  # the node allocations or from the installed CNI: Calico, Cilium,
-  # Flannel and kube-router are all understood.
-  podCIDRs: ""       # e.g. 10.244.0.0/16
-  serviceCIDRs: ""   # e.g. 10.96.0.0/12
+
+# Pod addressing is not configured here at all. Which network is
+# installed, whether it encapsulates, and which blocks it gave each node
+# are read from that network's own records every reconcile, so a block
+# allocated later reaches the peers without anything being restated.
+# Calico, Cilium, Flannel and kube-router are understood.
 
 tunnel:
   # Node selector (k=v,k2=v2) choosing which local nodes terminate

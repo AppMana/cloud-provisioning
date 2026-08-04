@@ -53,12 +53,6 @@ spec:
             - "--aws-config-namespace={{ .Release.Namespace }}"
             - "--owner-deployment={{ include "cloud-provisioning.controllerName" . }}"
             - "--dialer-image={{ include "cloud-provisioning.dialerImage" . }}"
-            {{- with .Values.cluster.podCIDRs }}
-            - "--dialer-pod-cidrs={{ . }}"
-            {{- end }}
-            {{- with .Values.cluster.serviceCIDRs }}
-            - "--dialer-service-cidrs={{ . }}"
-            {{- end }}
             - "--join-provider={{ .Values.joinProvider }}"
             - "--join-template-path=/join-patterns/{{ .Values.joinProvider }}-worker.cloud-config.tmpl"
             {{- with .Values.cluster.apiAddress }}

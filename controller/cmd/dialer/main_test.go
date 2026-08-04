@@ -309,3 +309,34 @@ func TestReconcilePlan_NeverRoutesAPeerEndpointThroughTheTunnel(t *testing.T) {
 		t.Errorf("installed routes = %v, want only the tunnel address (the endpoint 172.21.0.16 must be excluded)", installed)
 	}
 }
+
+// The accept list is also an ingress filter: a peer may source packets
+// as any address it covers. An entry covering this node's own address,
+// or a peer's endpoint, or everything, is refused before the kernel is
+// touched.
+func TestParseAllowedIP_RefusesEntriesThatTakeTraffic(t *testing.T) {
+	local := []net.IP{net.ParseIP("10.0.0.11"), net.ParseIP("192.168.1.5")}
+	endpoints := map[string]bool{"203.0.113.7": true}
+
+	for _, tc := range []struct {
+		entry  string
+		reason string
+	}{
+		{"0.0.0.0/0", "a default route takes every packet"},
+		{"::/0", "a v6 default route takes every packet"},
+		{"10.0.0.0/8", "covers this node's own 10.0.0.11"},
+		{"192.168.1.0/24", "covers this node's own 192.168.1.5"},
+		{"203.0.113.0/24", "covers a peer endpoint, reachable only outside the tunnel"},
+	} {
+		if _, err := parseAllowedIP(tc.entry, local, endpoints); err == nil {
+			t.Errorf("parseAllowedIP(%q) was accepted, but it %s", tc.entry, tc.reason)
+		}
+	}
+
+	// A node's own pod block is exactly what the list is for.
+	for _, entry := range []string{"10.244.1.0/26", "10.100.0.2/32", "fd00:1::/64"} {
+		if _, err := parseAllowedIP(entry, local, endpoints); err != nil {
+			t.Errorf("parseAllowedIP(%q) was refused: %v", entry, err)
+		}
+	}
+}

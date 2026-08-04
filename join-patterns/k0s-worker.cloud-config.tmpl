@@ -53,9 +53,7 @@ write_files:
       ExecStart=/usr/local/bin/wg-dialer \
         --iface={{ .interfaceName }} \
         --peers-file=/etc/wg-dialer/peers.json \
-        --listen-port={{ .wireguardListenPort }} \
-        --pod-cidrs={{ .podCIDRs }} \
-        --service-cidrs={{ .serviceCIDRs }} \
+        --listen-port={{ .wireguardListenPort }} \ \ \
         --keepalive-seconds=15 \
         --mtu=1420 \
         --poll-interval=30s

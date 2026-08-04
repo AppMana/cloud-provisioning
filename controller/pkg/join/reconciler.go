@@ -105,14 +105,6 @@ type Reconciler struct {
 	KubeletExtraArgs  string
 	SSHAuthorizedKeys []string
 
-	// PodCIDRs/ServiceCIDRs are the cluster's own declared ranges
-	// (from the cluster's k0sctl/site config at gitops-render time).
-	// Comma-separated; fed to the cloud dialer's --pod-cidrs/
-	// --service-cidrs (WireGuard cryptokey accept-list only, not a
-	// kernel route; see cmd/dialer/main.go's package doc).
-	PodCIDRs     string
-	ServiceCIDRs string
-
 	// WireGuardAddress is the base tunnel address (e.g.
 	// "10.100.0.2/24"). The first cloud Machine gets exactly this;
 	// each subsequent one gets the next free address in the same
@@ -299,8 +291,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		"kubeletExtraArgs":        r.KubeletExtraArgs,
 		"wireguardAddress":        cloudWGAddress,
 		"wireguardListenPort":     r.WireGuardListenPort,
-		"podCIDRs":                r.PodCIDRs,
-		"serviceCIDRs":            r.ServiceCIDRs,
 		"peersFileJSON":           string(peersFileJSON),
 		"interfaceName":           r.InterfaceName,
 		"dialerBinaryURLArm64":    r.DialerBinaryURLARM64,

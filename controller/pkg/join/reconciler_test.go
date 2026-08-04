@@ -186,7 +186,7 @@ func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs 
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	tmplPath := filepath.Join(t.TempDir(), "test.tmpl")
-	tmpl := "joinToken={{.joinToken}} k0sVersion={{.k0sVersion}} apiVIP={{.apiVIP}} kubeletExtraArgs={{.kubeletExtraArgs}} wgAddress={{.wireguardAddress}} podCIDRs={{.podCIDRs}} serviceCIDRs={{.serviceCIDRs}} iface={{.interfaceName}} binURL={{.dialerBinaryURLArm64}} binSHA={{.dialerBinarySHA256Arm64}} machine={{.machineName}} peersFileJSON={{.peersFileJSON}}"
+	tmpl := "joinToken={{.joinToken}} k0sVersion={{.k0sVersion}} apiVIP={{.apiVIP}} kubeletExtraArgs={{.kubeletExtraArgs}} wgAddress={{.wireguardAddress}} iface={{.interfaceName}} binURL={{.dialerBinaryURLArm64}} binSHA={{.dialerBinarySHA256Arm64}} machine={{.machineName}} peersFileJSON={{.peersFileJSON}}"
 	if err := os.WriteFile(tmplPath, []byte(tmpl), 0o644); err != nil {
 		t.Fatalf("writing test template: %v", err)
 	}

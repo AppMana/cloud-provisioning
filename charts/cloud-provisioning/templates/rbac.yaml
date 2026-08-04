@@ -81,9 +81,17 @@ rules:
   - apiGroups: [""]
     resources: ["services"]
     verbs: ["create"]
-  # Pod ranges from whichever CNI is installed.
+  # Which network is installed, how it carries pod traffic, and which
+  # blocks it gave each node. All of it read from the network's own
+  # records, because they are what it routes by.
   - apiGroups: ["crd.projectcalico.org"]
-    resources: ["ippools"]
+    resources: ["ippools", "blockaffinities"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["cilium.io"]
+    resources: ["ciliumnodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
     verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["configmaps"]

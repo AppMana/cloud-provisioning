@@ -83,8 +83,6 @@ type config struct {
 	privateKeyFile string
 	iface          string
 	listenPort     int
-	podCIDRs       string
-	serviceCIDRs   string
 	keepaliveSecs  int
 	mtu            int
 	pollInterval   time.Duration
@@ -122,8 +120,6 @@ func main() {
 	flag.StringVar(&cfg.privateKeyFile, "private-key-file", "", "node-local file holding this node's WireGuard private key; generated (0600) on first start if absent. Required in Secret mode: the private key never travels through the API; only the public key is published")
 	flag.StringVar(&cfg.iface, "iface", "", "WireGuard interface name to create/manage (required; unique per mesh, e.g. cldt1a2b3c4d: never wg0, which collides with whatever the node already runs)")
 	flag.IntVar(&cfg.listenPort, "listen-port", 0, "fixed WireGuard listen port (0 = ephemeral, fine for a node that only dials out; a listener must set this)")
-	flag.StringVar(&cfg.podCIDRs, "pod-cidrs", "", "comma-separated cluster pod-CIDR ranges (v4/v6), added to every peer's WireGuard AllowedIPs: never installed as a kernel route")
-	flag.StringVar(&cfg.serviceCIDRs, "service-cidrs", "", "comma-separated cluster service-CIDR ranges (v4/v6), same treatment as --pod-cidrs")
 	flag.IntVar(&cfg.keepaliveSecs, "keepalive-seconds", 15, "PersistentKeepalive interval")
 	flag.IntVar(&cfg.mtu, "mtu", 1420, "interface MTU (WireGuard overhead under the cluster's normal MTU)")
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 30*time.Second, "how often to re-read the peer source and re-apply")
@@ -495,12 +491,23 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 	}
 
+	// This node's own addresses, so an accept-list entry covering one
+	// of them is refused rather than allowing a peer to source packets
+	// as this node.
+	var localAddrs []net.IP
+	if addrs, err := net.InterfaceAddrs(); err == nil {
+		for _, a := range addrs {
+			if ipNet, ok := a.(*net.IPNet); ok && ipNet.IP != nil && !ipNet.IP.IsLoopback() {
+				localAddrs = append(localAddrs, ipNet.IP)
+			}
+		}
+	}
+
 	// Parse and validate the entire peer set before touching the
 	// kernel: a refused route-host (or any malformed entry) leaves the
 	// node untouched, with no link, address, route, or WireGuard
 	// config applied.
 	keepalive := time.Duration(cfg.keepaliveSecs) * time.Second
-	sharedCIDRs := tunnel.SplitList(cfg.podCIDRs, cfg.serviceCIDRs)
 
 	// Configured endpoints join the live ones collected above. Routing
 	// a peer's own endpoint through the tunnel is an infinite
@@ -539,13 +546,18 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			}
 		}
 
+		// Only this peer's own prefixes. WireGuard's accept list is a
+		// trie with one owner per prefix, so a prefix configured on two
+		// peers belongs to whichever was configured last: overlapping
+		// peers would take each other's traffic, and which one won
+		// would depend on map ordering.
 		var allowedIPs []net.IPNet
-		for _, cidr := range append(append([]string{}, sharedCIDRs...), p.WGAllowedIPs...) {
-			_, ipNet, err := net.ParseCIDR(strings.TrimSpace(cidr))
+		for _, cidr := range p.WGAllowedIPs {
+			ipNet, err := parseAllowedIP(cidr, localAddrs, endpointHosts)
 			if err != nil {
-				return fmt.Errorf("parsing peer AllowedIPs entry %q: %w", cidr, err)
+				return err
 			}
-			allowedIPs = append(allowedIPs, *ipNet)
+			allowedIPs = append(allowedIPs, ipNet)
 		}
 
 		peerConfigs = append(peerConfigs, wgtypes.PeerConfig{
@@ -623,6 +635,34 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 	}
 	return nil
+}
+
+// parseAllowedIP parses one accept-list entry and refuses the ones that
+// would take traffic the tunnel has no business carrying: a default
+// route, anything covering this node's own addresses, and anything
+// covering a peer's endpoint, which is reachable only outside the
+// tunnel. Unlike a route, an accept-list entry is also an ingress
+// filter, so an over-broad one lets a peer source packets as any
+// address it covers.
+func parseAllowedIP(entry string, localAddrs []net.IP, endpointHosts map[string]bool) (net.IPNet, error) {
+	_, ipNet, err := net.ParseCIDR(tunnel.HostCIDR(strings.TrimSpace(entry)))
+	if err != nil {
+		return net.IPNet{}, fmt.Errorf("parsing peer AllowedIPs entry %q: %w", entry, err)
+	}
+	if ones, _ := ipNet.Mask.Size(); ones == 0 {
+		return net.IPNet{}, fmt.Errorf("refusing AllowedIPs entry %q: a default route in the accept list takes every packet", entry)
+	}
+	for _, addr := range localAddrs {
+		if ipNet.Contains(addr) {
+			return net.IPNet{}, fmt.Errorf("refusing AllowedIPs entry %q: it covers this node's own address %s", entry, addr)
+		}
+	}
+	for host := range endpointHosts {
+		if addr := net.ParseIP(host); addr != nil && ipNet.Contains(addr) {
+			return net.IPNet{}, fmt.Errorf("refusing AllowedIPs entry %q: it covers peer endpoint %s, which is reachable only outside the tunnel", entry, host)
+		}
+	}
+	return *ipNet, nil
 }
 
 // parseHostRoute parses one route-host entry and enforces the single

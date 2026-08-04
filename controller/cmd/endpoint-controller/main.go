@@ -824,6 +824,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 	}
 
 	hostPathDirectoryOrCreate := corev1.HostPathDirectoryOrCreate
+	hostPathDirectory := corev1.HostPathDirectory
 	desired := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            r.dialerDaemonSetName,
@@ -871,11 +872,19 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 								fmt.Sprintf("--transit-bgp-asn=%d", r.transitBGPASN),
 								"--transit-bgp-next-hop=$(NODE_IP)",
 								"--keepalive-seconds=15",
-								"--mtu=1420",
+								// No --mtu: it is derived from the interface the
+								// encapsulated packets leave by, so a number written
+								// here would override that with a guess about a
+								// network this does not run on.
 								"--poll-interval=30s",
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{Name: "dialer-key", MountPath: r.dialerPrivateKeyDir},
+								// The node's real sysctls. A container runtime mounts
+								// /proc/sys read-only and NET_ADMIN does not change
+								// that, so forwarding and reverse path filtering could
+								// be read but never set.
+								{Name: "sysctl-net", MountPath: tunnel.HostSysctlNet},
 							},
 						},
 					},
@@ -884,6 +893,12 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 							Name: "dialer-key",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{Path: r.dialerPrivateKeyDir, Type: &hostPathDirectoryOrCreate},
+							},
+						},
+						{
+							Name: "sysctl-net",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/proc/sys/net", Type: &hostPathDirectory},
 							},
 						},
 					},

@@ -270,6 +270,14 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 	return append(peers, remotes...), nil
 }
 
+// HostSysctlNet is where a node's real /proc/sys/net is mounted into
+// the dialer. A container runtime mounts /proc/sys read-only and
+// NET_ADMIN does not lift that, so a setting the dialer must make
+// rather than merely read has to reach the node through a mount. Both
+// the DaemonSet that creates the mount and the dialer that looks for
+// it name it here.
+const HostSysctlNet = "/host/proc/sys/net"
+
 func containsHost(hosts []string, addr string) bool {
 	for _, h := range hosts {
 		if strings.SplitN(strings.TrimSpace(h), "/", 2)[0] == addr {

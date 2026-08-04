@@ -254,17 +254,8 @@ func main() {
 func ensureForwardingPath(iface string, mtu int) error {
 	// Loose rather than off: a packet whose source this node cannot
 	// reach at all is still not one it should be forwarding.
-	//
-	// Read before write, and carry on either way. /proc/sys is mounted
-	// read-only in a container that is not privileged, and NET_ADMIN
-	// does not change that, so on many nodes this is a setting to be
-	// made by whoever builds the node rather than here. Strict
-	// filtering costs the asymmetric case; it does not cost the tunnel.
-	rp := fmt.Sprintf("/proc/sys/net/ipv4/conf/%s/rp_filter", iface)
-	if current, err := os.ReadFile(rp); err == nil && strings.TrimSpace(string(current)) == "1" {
-		if err := os.WriteFile(rp, []byte("2"), 0o644); err != nil {
-			fmt.Fprintf(os.Stderr, "leaving reverse path filtering strict on %s (a return path through a second endpoint will be dropped; set net.ipv4.conf.%s.rp_filter=2 on the node): %v\n", iface, iface, err)
-		}
+	if err := setSysctl(fmt.Sprintf("ipv4/conf/%s/rp_filter", iface), "2"); err != nil {
+		fmt.Fprintf(os.Stderr, "leaving reverse path filtering strict on %s (a return path through a second endpoint will be dropped): %v\n", iface, err)
 	}
 
 	c, err := nftables.New()
@@ -313,6 +304,41 @@ func ensureForwardingPath(iface string, mtu int) error {
 		return fmt.Errorf("clamping the segment size on %s: %w", iface, err)
 	}
 	return nil
+}
+
+// setSysctl writes one net sysctl, named relative to /proc/sys/net.
+//
+// It prefers the node's own /proc/sys/net where that has been mounted
+// in, because the one the container sees is read-only: a runtime mounts
+// it that way and NET_ADMIN does not lift it. Without the mount, a
+// setting can be read and not changed, which is how these came to be
+// documented rather than applied.
+//
+// Read before write, so a node that already has the value it needs
+// costs nothing and cannot fail.
+func setSysctl(name, value string) error {
+	paths := []string{filepath.Join(tunnel.HostSysctlNet, name), filepath.Join("/proc/sys/net", name)}
+	var firstErr error
+	for _, path := range paths {
+		current, err := os.ReadFile(path)
+		if err != nil {
+			continue // not mounted, or the interface has no such knob
+		}
+		if strings.TrimSpace(string(current)) == value {
+			return nil
+		}
+		if err := os.WriteFile(path, []byte(value), 0o644); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		return nil
+	}
+	if firstErr != nil {
+		return firstErr
+	}
+	return fmt.Errorf("no writable %s (mount the node's /proc/sys/net at %s)", name, tunnel.HostSysctlNet)
 }
 
 // wireGuardOverhead is what an encapsulated packet costs: 40 bytes of
@@ -1010,21 +1036,11 @@ func ensureTransit(cfg config) error {
 	if ip.To4() == nil {
 		return fmt.Errorf("--transit-masquerade-source must be IPv4 (got %q)", cfg.transitMasqueradeSource)
 	}
-	// Read before write. /proc/sys is mounted read-only in a container
-	// that isn't privileged, and NET_ADMIN does not change that, while
-	// a Kubernetes node already has forwarding enabled because the CNI
-	// and kube-proxy require it. Demanding write access for a setting
-	// that is already correct turns every reconcile into an error on
-	// an otherwise healthy node.
-	const ipForward = "/proc/sys/net/ipv4/ip_forward"
-	current, err := os.ReadFile(ipForward)
-	if err != nil {
-		return fmt.Errorf("reading %s: %w", ipForward, err)
-	}
-	if strings.TrimSpace(string(current)) != "1" {
-		if err := os.WriteFile(ipForward, []byte("1"), 0o644); err != nil {
-			return fmt.Errorf("enabling ip_forward (currently %q; a non-privileged container cannot write /proc/sys, so enable it on the node or run this container privileged): %w", strings.TrimSpace(string(current)), err)
-		}
+	// A Kubernetes node already has forwarding enabled, because the CNI
+	// and kube-proxy require it, so this is usually a read that finds
+	// the right answer. See setSysctl.
+	if err := setSysctl("ipv4/ip_forward", "1"); err != nil {
+		return fmt.Errorf("enabling ip_forward: %w", err)
 	}
 
 	c, err := nftables.New()

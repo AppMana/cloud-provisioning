@@ -340,3 +340,54 @@ func TestParseAllowedIP_RefusesEntriesThatTakeTraffic(t *testing.T) {
 		}
 	}
 }
+
+// An accept list entry that cannot be permitted costs that entry, and
+// nothing else.
+//
+// A site whose tunnel endpoint is not behind NAT publishes a node
+// address that is also the address the remote dials. Permitting it
+// would loop, so it has to be left out; but treating it as a bad
+// configuration abandoned the whole pass, so no peer was configured and
+// no route installed, on every pass, forever. The tunnel handshook and
+// carried nothing. The entry recurs by design, so the response to it
+// has to be survivable.
+func TestParseAllowedIP_ABadEntryCostsOnlyItself(t *testing.T) {
+	endpointHosts := map[string]bool{"172.21.0.16": true}
+	localAddrs := []net.IP{net.ParseIP("10.100.0.128")}
+
+	entries := []string{
+		"10.100.0.1/32",     // the endpoint's tunnel address, fine
+		"172.21.0.16/32",    // the endpoint itself, must be dropped
+		"10.244.232.128/26", // its pods, fine
+		"172.21.0.17/32",    // another site node, fine
+		"10.244.61.128/26",  // that node's pods, fine
+	}
+	var kept []string
+	for _, entry := range entries {
+		if _, err := parseAllowedIP(entry, localAddrs, endpointHosts); err != nil {
+			continue
+		}
+		kept = append(kept, entry)
+	}
+	if len(kept) != 4 {
+		t.Fatalf("kept %v, want every entry except the peer's own endpoint", kept)
+	}
+	for _, entry := range kept {
+		if entry == "172.21.0.16/32" {
+			t.Error("the peer's endpoint was permitted, which loops")
+		}
+	}
+	// The reachability that survives is the point: the site nodes
+	// behind the endpoint are still permitted.
+	for _, want := range []string{"172.21.0.17/32", "10.244.61.128/26"} {
+		found := false
+		for _, entry := range kept {
+			if entry == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s was dropped along with the endpoint entry", want)
+		}
+	}
+}

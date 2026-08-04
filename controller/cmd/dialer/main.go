@@ -838,13 +838,31 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		// peers belongs to whichever was configured last: overlapping
 		// peers would take each other's traffic, and which one won
 		// would depend on map ordering.
+		// An entry that cannot be permitted is dropped, not fatal. The
+		// guards below say what must never enter the accept list, and
+		// leaving one out is exactly the safe outcome; abandoning the
+		// pass is not, because it leaves every other peer unconfigured
+		// and every route uninstalled over a single entry. That is how
+		// a site whose endpoint is not behind NAT ended up with a
+		// tunnel that handshook and carried nothing: the endpoint's own
+		// address is legitimately both its peer endpoint and a node
+		// address the mesh publishes, so the entry recurred every pass
+		// and every pass gave up on reaching it.
 		var allowedIPs []net.IPNet
 		for _, cidr := range p.WGAllowedIPs {
 			ipNet, err := parseAllowedIP(cidr, localAddrs, endpointHosts)
 			if err != nil {
-				return err
+				fmt.Fprintf(os.Stderr, "not permitting one entry for peer %s: %v\n", pub, err)
+				continue
 			}
 			allowedIPs = append(allowedIPs, ipNet)
+		}
+		if len(allowedIPs) == 0 {
+			// Nothing left to carry. Configuring the peer anyway would
+			// hand it an empty accept list, which silently drops
+			// everything; leaving it out says so in the peer list.
+			fmt.Fprintf(os.Stderr, "peer %s has no usable AllowedIPs entry, skipping it\n", pub)
+			continue
 		}
 
 		peerConfigs = append(peerConfigs, wgtypes.PeerConfig{

@@ -106,13 +106,23 @@ done
 
 PASS=0
 FAIL=0
+# Reachability across a tunnel converges: a node is given its pod block
+# when the first pod lands on it, and the block reaches the peers on the
+# next pass. So each check is retried to a deadline rather than taken as
+# final on its first attempt.
+RETRY_SECONDS="${HEALTH_CHECK_RETRY_SECONDS:-120}"
 check() {
   local label="$1"; shift
-  if "$@" >/dev/null 2>&1; then
-    echo "  PASS  $label"; PASS=$((PASS+1))
-  else
-    echo "  FAIL  $label"; FAIL=$((FAIL+1))
-  fi
+  local deadline=$((SECONDS + RETRY_SECONDS))
+  while true; do
+    if "$@" >/dev/null 2>&1; then
+      echo "  PASS  $label"; PASS=$((PASS+1)); return
+    fi
+    if (( SECONDS >= deadline )); then
+      echo "  FAIL  $label"; FAIL=$((FAIL+1)); return
+    fi
+    sleep 5
+  done
 }
 
 http_from() {

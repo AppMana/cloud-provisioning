@@ -483,6 +483,16 @@ CLOUD_NODE_2=$(kubectl get node -l cloud-provisioning.appmana.com/role=cloud-wor
 echo "  remote nodes: $CLOUD_NODE and $CLOUD_NODE_2"
 assert_wan "both remote nodes joined" "${CLUSTER}-control-plane"
 
+echo "--- reachability across every pair of nodes ---"
+# One pod per node, then every source against every destination, by pod
+# address and by service address. Two local and two remote, so the pairs
+# cross the tunnel in both directions and between the two remotes.
+"$REPO_DIR/harness/health-check.sh" \
+  "$ENDPOINT_A" "$ENDPOINT_B" "$CLOUD_NODE" "$CLOUD_NODE_2" 2>&1 | tee "$LOG_DIR/health-check.log"
+grep -q "failed: 0" "$LOG_DIR/health-check.log" \
+  || fail "reachability checks failed (see $LOG_DIR/health-check.log)"
+echo "  every pair reachable, by pod and by service"
+
 echo "--- what each peer is permitted, and what it is not ---"
 # The accept list is a trie with one owner per prefix, so a prefix on
 # two peers belongs to whichever was configured last. Every peer must
@@ -531,16 +541,6 @@ if [ "$WANT_ENCAP" = "native" ]; then
   echo "  each remote's own blocks are permitted, so its pods are reachable"
 fi
 echo "  every peer carries only its own prefixes, none of them cluster wide"
-
-echo "--- reachability across every pair of nodes ---"
-# One pod per node, then every source against every destination, by pod
-# address and by service address. Two local and two remote, so the pairs
-# cross the tunnel in both directions and between the two remotes.
-"$REPO_DIR/harness/health-check.sh" \
-  "$ENDPOINT_A" "$ENDPOINT_B" "$CLOUD_NODE" "$CLOUD_NODE_2" 2>&1 | tee "$LOG_DIR/health-check.log"
-grep -q "failed: 0" "$LOG_DIR/health-check.log" \
-  || fail "reachability checks failed (see $LOG_DIR/health-check.log)"
-echo "  every pair reachable, by pod and by service"
 
 kubectl delete provisionednodeclaim public-worker-2 --wait=true >/dev/null 2>&1 || true
 assert_wan "after the second claim was withdrawn" "${CLUSTER}-control-plane"

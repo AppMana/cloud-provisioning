@@ -82,6 +82,10 @@ type PeerSpec struct {
 	// RouteHost is the legacy single-host form, folded into RouteHosts
 	// by consumers.
 	RouteHost string `json:"routeHost,omitempty"`
+	// Remote marks a peer that is not at this site. Only these are
+	// worth telling the site about: a node here can already reach the
+	// others by itself.
+	Remote bool `json:"remote,omitempty"`
 }
 
 // AllRouteHosts folds the legacy single-host field into the list.

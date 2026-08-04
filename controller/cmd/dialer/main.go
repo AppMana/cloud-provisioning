@@ -80,6 +80,9 @@ type config struct {
 	machineNameFile      string
 
 	nodeName       string
+	bgpListenPort  int
+	bgpASN         int
+	bgpNextHop     string
 	privateKeyFile string
 	iface          string
 	listenPort     int
@@ -116,6 +119,9 @@ func main() {
 	flag.StringVar(&cfg.peersSecretNamespace, "peers-secret-namespace", "", "optional (with --peers-file): namespace of a Secret whose peers.json key overrides the file's peer list once readable: the adoption/reconciliation path")
 	flag.StringVar(&cfg.peersSecretName, "peers-secret-name", "", "optional (with --peers-file): name of the peer-list override Secret")
 	flag.StringVar(&cfg.machineNameFile, "machine-name-file", "", "optional (with --peers-file): file holding this machine's CAPI Machine name (written by cloud-init); the peer-list override Secret's name is derived from it: an alternative to --peers-secret-name that lets one shared DaemonSet spec serve per-machine Secrets")
+	flag.IntVar(&cfg.bgpListenPort, "transit-bgp-port", 0, "listen port for advertising the remote node addresses reachable through this node, so a node at this site that terminates no tunnel can still route to them. 0 disables it. Not 179: a node whose CNI speaks BGP already has something there")
+	flag.IntVar(&cfg.bgpASN, "transit-bgp-asn", 64512, "autonomous system for the transit advertisement; match the cluster's own")
+	flag.StringVar(&cfg.bgpNextHop, "transit-bgp-next-hop", "", "this node's address, advertised as the next hop for the remote nodes. Required when a transit port is set")
 	flag.StringVar(&cfg.nodeName, "node-name", os.Getenv("NODE_NAME"), "this node's Kubernetes node name (defaults to $NODE_NAME)")
 	flag.StringVar(&cfg.privateKeyFile, "private-key-file", "", "node-local file holding this node's WireGuard private key; generated (0600) on first start if absent. Required in Secret mode: the private key never travels through the API; only the public key is published")
 	flag.StringVar(&cfg.iface, "iface", "", "WireGuard interface name to create/manage (required; unique per mesh, e.g. cldt1a2b3c4d: never wg0, which collides with whatever the node already runs)")
@@ -187,11 +193,20 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	speaker, err := startTransitSpeaker(ctx, cfg.bgpListenPort, uint32(cfg.bgpASN), cfg.bgpNextHop)
+	if err != nil {
+		fatal("%v", err)
+	}
+	defer speaker.stop(context.Background())
 	ticker := time.NewTicker(cfg.pollInterval)
 	defer ticker.Stop()
 	for {
 		if err := reconcile(ctx, clientset, wg, cfg); err != nil {
 			fmt.Fprintf(os.Stderr, "reconcile: %v\n", err)
+		}
+		if err := reconcileTransit(ctx, clientset, cfg, speaker); err != nil {
+			fmt.Fprintf(os.Stderr, "transit advertisement: %v\n", err)
 		}
 		select {
 		case <-ticker.C:
@@ -223,6 +238,38 @@ func removeDevice(iface string) {
 	if err := netlink.LinkDel(link); err != nil {
 		fmt.Fprintf(os.Stderr, "removing %s on shutdown: %v\n", iface, err)
 	}
+}
+
+// reconcileTransit tells the rest of this site which remote nodes are
+// reachable through here. The peers say which is which: an entry for a
+// machine is a node somewhere else, and an entry for a node is one of
+// this site's own, which is who needs telling.
+func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg config, speaker *transitSpeaker) error {
+	if speaker == nil {
+		return nil
+	}
+	// Only the Secret carries the whole mesh. A node reading a file
+	// instead is the remote one, which has nobody to tell.
+	if cfg.secretName == "" {
+		return nil
+	}
+	secret, err := clientset.CoreV1().Secrets(cfg.secretNamespace).Get(ctx, cfg.secretName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("reading the peer secret: %w", err)
+	}
+	peers, err := loadPeersFromSecret(secret)
+	if err != nil {
+		return err
+	}
+	var remotes, site []string
+	for _, p := range peers {
+		if p.Remote {
+			remotes = append(remotes, p.AllRouteHosts()...)
+			continue
+		}
+		site = append(site, p.AllRouteHosts()...)
+	}
+	return speaker.reconcile(ctx, site, remotes)
 }
 
 func fatal(format string, args ...any) {
@@ -839,6 +886,9 @@ func loadPeersFromSecret(secret *corev1.Secret) ([]tunnel.PeerSpec, error) {
 			Endpoint:     endpoint,
 			WGAllowedIPs: tunnel.SplitList(string(allowedIPsRaw)),
 			RouteHosts:   routeHosts,
+			// A machine entry is a node somewhere else. The rest of
+			// this site cannot reach it without transiting here.
+			Remote: true,
 		})
 	}
 	return peers, nil

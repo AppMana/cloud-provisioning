@@ -86,7 +86,16 @@ cluster-api-operator:
   #       namespace: capa-system
   #       version: v2.13.0
   # AWS additionally needs a credentials Secret the operator references.
+  # deployment.nodeSelector is passed straight through to the Provider
+  # CR, which is the ONLY way the provider's own controller gets one:
+  # the operator renders those Deployments from upstream manifests,
+  # which carry no OS selector. Without this a linux-only provider
+  # controller lands on a Windows node and ImagePullBackOffs with "no
+  # match for platform in manifest" (observed twice on this fleet).
   core:
     cluster-api:
       namespace: capi-system
+      deployment:
+        nodeSelector:
+          kubernetes.io/os: linux
   infrastructure: {}

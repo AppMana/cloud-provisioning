@@ -36,7 +36,7 @@ func (s *countingJoinProvider) JoinValues(ctx context.Context) (map[string]any, 
 func TestReconcile_InfraProviderValidateErrorBlocksBootstrapSecretCreation(t *testing.T) {
 	// Full Reconcile-level proof of the aws.Validator wiring, using the
 	// real aws.Provider (not a stub): reproduces the exact live bug
-	// caught against a live cluster (AWSClusterStaticIdentity's
+	// caught against a real cluster (AWSClusterStaticIdentity's
 	// secretRef Secret in the wrong namespace) and confirms Reconcile
 	// surfaces it as an immediate error instead of proceeding to create
 	// a bootstrap secret that CAPA could never actually use.

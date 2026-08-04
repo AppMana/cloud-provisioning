@@ -14,7 +14,7 @@ import (
 
 // This is the core safety regression for this binary: only exact host
 // prefixes ever become kernel routes. A broad prefix reaching the
-// route path -- the exact shape of the the on-prem host 0.0.0.0/0 incident -- is
+// route path -- the exact shape of the 0.0.0.0/0 route hijack -- is
 // rejected at parse time, before any route is touched.
 func TestParseHostRoute_RefusesAnythingBroaderThanAHost(t *testing.T) {
 	for _, bad := range []string{"0.0.0.0/0", "::/0", "10.101.0.0/24", "10.0.0.0/8", "fd8f:cf26:522a::/64"} {
@@ -33,7 +33,7 @@ func TestParseHostRoute_RefusesAnythingBroaderThanAHost(t *testing.T) {
 
 // WGAllowedIPs (WireGuard's cryptokey accept-list) and RouteHosts (the
 // only things installed as kernel routes) must come out as genuinely
-// different values -- conflating them was the root cause of the the on-prem host
+// different values -- conflating them was the root cause of the
 // incident.
 func TestLoadPeersFromSecret_AllowListAndRouteHostsAreIndependent(t *testing.T) {
 	secret := &corev1.Secret{

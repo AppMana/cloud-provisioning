@@ -5,8 +5,8 @@
 // out, no wg-quick, no dependence on the node's AppArmor profile for
 // /usr/bin/wg.
 //
-// Separation of concerns (the invariant the 2026-07-22 the on-prem host incident
-// bought): this binary provides NODE-to-NODE reachability only.
+// Separation of concerns, and the invariant the whole binary exists
+// to hold: it provides NODE-to-NODE reachability only.
 //
 //   - WireGuard's cryptokey-routing accept list
 //     (wgtypes.PeerConfig.AllowedIPs) decides which peer's key

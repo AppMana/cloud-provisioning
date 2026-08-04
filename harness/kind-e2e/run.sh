@@ -8,7 +8,7 @@
 # full cascade on delete.
 #
 # What kind CANNOT do here: real CAPA (no instance), real BGP, real
-# tunnels -- that's Phase A's job on a live cluster. The dialer's
+# tunnels -- that needs a real cluster. The dialer's
 # kernel behavior is covered by harness/netns-routing. The one
 # simulated element: the dialer pod's key publication (the dialer image
 # is in a private registry; its Secret-mode publication logic is

@@ -95,8 +95,8 @@ const (
 // DaemonSet excludes them by nodeAffinity, not merely by lacking a
 // toleration: the other side of a cloud tunnel must never land on a
 // controller. Control planes therefore carry no WireGuard interface
-// and no tunnel routes at all -- the the on-prem host incident class is excluded
-// by scheduling, not only by code. Remotes reach the API through a
+// and no tunnel routes at all, so a tunnel can never cost a control
+// plane its default route: excluded by scheduling, not only by code. Remotes reach the API through a
 // designated worker that masquerades tunnel-sourced traffic.
 const controlPlaneLabel = "node-role.kubernetes.io/control-plane"
 

@@ -8,7 +8,7 @@
 #   - the ephemeral harness/aws-bringup/ test (default USER_NAME,
 #     no ROUTE53_ZONE_ID)
 #   - a persistent in-cluster identity for a real deployment, e.g.
-#     USER_NAME=cloud-worker REGION=ap-east-1
+#     USER_NAME=cloud-worker REGION=us-west-2
 #     ROUTE53_ZONE_ID=Z0730122KCZINH3W18MZ
 #
 # Requires admin-level credentials already exported in the environment

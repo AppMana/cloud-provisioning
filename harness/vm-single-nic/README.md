@@ -1,7 +1,7 @@
 # VM single-NIC regression test (Level 4)
 
-Reproduces the the on-prem host wg-dialer incident end to end: a real, single-NIC VM
-boots real k0s (via `k0sctl`, the same tool that provisions the on-prem host), a
+Reproduces the route-hijack failure end to end: a real, single-NIC VM
+boots real k0s (via `k0sctl`, the same tool that provisions the real one), a
 `wg-dialer` DaemonSet runs one of two real dialer binaries built from real
 git revisions, and the harness asserts what happens to routing, general
 internet, and (optionally) real Tailscale connectivity.
@@ -44,7 +44,7 @@ to suppress via a netplan `dhcp4-overrides` workaround (an ad hoc VM
 reproduction earlier needed exactly that fix, because a Vagrant+libvirt setup
 had a second NAT-network NIC by default). Here there's simply nothing to
 suppress: the mgmt NIC *is* the one real uplink on both nodes, exactly like
-the on-prem host and its real EC2 peer. `wg0` (the WireGuard interface) is created
+the on-prem node and its real EC2 peer. `wg0` (the WireGuard interface) is created
 inside each guest by its own dialer process, dialing/listening over this
 same NIC — there's no second link for it to "not conflict with"; the whole
 point of this bug is that the hijack route competes with the real default
@@ -141,7 +141,7 @@ accept-list only — see `controller/cmd/dialer/main.go`'s package doc for why
 that's now a completely separate mechanism from the kernel route).
 
 Each run deploys **both** VMs fresh, installs real k0s via `k0sctl` on
-`onprem` only (config in `k0sctl.yaml`, mirroring the node's actual
+`onprem` only (config in `k0sctl.yaml`, mirroring the on-prem host's actual
 `cluster/k0sctl.yaml`: k0s `1.36.2+k0s.0`, `role: controller+worker`,
 `noTaints: true`), generates a **real, fresh WireGuard keypair for each
 side**, deploys the chosen dialer binary as a real DaemonSet (`manifests/`)
@@ -159,7 +159,7 @@ never goes stale/offline, not just "ping to 8.8.8.8 fails" — needs a real
 Tailscale auth key to join `onprem` to a real tailnet under a disposable,
 per-run hostname, and the assertion itself is checked from **this
 workstation's own Tailscale view of that guest**, not from inside the guest.
-That's deliberate: the real the on-prem host incident was that the on-prem host itself went
+That's deliberate: the failure being reproduced is that the node itself went
 stale *to everyone else on the tailnet* — the guest's own,
 possibly-compromised network stack is exactly the thing under test, so it
 can't be the vantage point the check trusts. Checking from an independent
@@ -261,7 +261,7 @@ reliably reproducible across many runs.
 
 ## What this level does and doesn't cover
 
-Covers: the actual boot-time mechanism of the the on-prem host incident (stale
+Covers: the boot-time mechanism of the route hijack (stale
 DaemonSet pod resurrection racing ahead of any reconcile-based fix), real
 k0s/kubelet, real routing, real (env-gated) Tailscale.
 

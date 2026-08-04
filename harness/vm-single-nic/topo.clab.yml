@@ -32,7 +32,7 @@ topology:
         # vrnetlab fork (~/Documents/vrnetlab/ubuntu/docker/launch.py).
       # No `links:` entries for this node on purpose: the mgmt NIC
       # (Docker-bridge-NATed, real internet egress) is its ONLY interface,
-      # matching the node's single real uplink. wg0 is created inside the
+      # matching the on-prem host's single real uplink. wg0 is created inside the
       # guest by the dialer itself and dials out over this same NIC -- there
       # is no second interface for it to "not conflict with", which is the
       # whole point: the hijack this harness reproduces is a route on the

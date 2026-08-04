@@ -100,6 +100,12 @@ rules:
   - apiGroups: ["apps"]
     resources: ["daemonsets"]
     verbs: ["get", "create", "update"]
+  # Its own Deployment: everything the controller creates at runtime is
+  # owned by it, so uninstalling the release collects those objects
+  # instead of leaving DaemonSets running with nothing behind them.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

@@ -306,6 +306,15 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, claim *v1alpha1.Provis
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
+	// The Node outlives the machine it described. Kubernetes cannot
+	// collect it on its own: a Node is cluster-scoped and this claim is
+	// not, so it cannot be an owner, and Cluster API only removes nodes
+	// for clusters it manages. Left alone it stays registered and
+	// NotReady forever, so it is removed here.
+	if err := r.deleteClaimedNodes(ctx, claim); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if containsString(claim.Finalizers, claimFinalizer) {
 		updated := claim.DeepCopy()
 		updated.Finalizers = removeString(updated.Finalizers, claimFinalizer)
@@ -341,6 +350,32 @@ func removeString(list []string, s string) []string {
 		}
 	}
 	return out
+}
+
+// ClaimAnnotation records which claim a Node was provisioned by. An
+// annotation rather than an ownerReference: a cluster-scoped Node
+// cannot be owned by a namespaced claim, and Kubernetes treats such an
+// ownerReference as a reason to collect the object immediately.
+const ClaimAnnotation = "cloud-provisioning.appmana.com/claim"
+
+// deleteClaimedNodes removes the Nodes this claim produced.
+func (r *Reconciler) deleteClaimedNodes(ctx context.Context, claim *v1alpha1.ProvisionedNodeClaim) error {
+	nodes := &corev1.NodeList{}
+	if err := r.Reader.List(ctx, nodes); err != nil {
+		return fmt.Errorf("listing nodes during teardown: %w", err)
+	}
+	want := claim.Namespace + "/" + claim.Name
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+		if node.Annotations[ClaimAnnotation] != want {
+			continue
+		}
+		if err := r.Delete(ctx, node); err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("deleting node %s: %w", node.Name, err)
+		}
+		ctrl.LoggerFrom(ctx).Info("removed node for claim teardown", "node", node.Name)
+	}
+	return nil
 }
 
 func (r *Reconciler) fail(ctx context.Context, claim *v1alpha1.ProvisionedNodeClaim, cause error) (ctrl.Result, error) {

@@ -69,7 +69,13 @@ rules:
   # changes the mesh membership).
   - apiGroups: [""]
     resources: ["nodes"]
-    verbs: ["get", "list", "watch"]
+    # patch: a provisioned node is told which address the CNI should
+    # peer on, and stamped with the claim that produced it.
+    # delete: that claim's teardown removes it, since nothing else
+    # will (a cluster-scoped Node cannot be owned by a namespaced
+    # claim, and Cluster API only removes nodes for clusters it
+    # manages).
+    verbs: ["get", "list", "watch", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

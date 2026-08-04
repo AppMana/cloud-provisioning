@@ -30,6 +30,7 @@ import (
 
 	v1alpha1 "github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/claim"
+	claimpkg "github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	"github.com/appmana/cloud-provisioning/controller/pkg/discover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
@@ -220,7 +221,13 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		nodeName, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name")
 		tunnelAddr := strings.SplitN(strings.TrimSpace(
 			machine.GetAnnotations()["cloud-provisioning.appmana.com/wireguard-addr4"]), "/", 2)[0]
-		if err := r.ensureCNINodeAddress(ctx, nodeName, tunnelAddr); err != nil {
+		claimRef := ""
+		for _, owner := range machine.GetOwnerReferences() {
+			if owner.Kind == "ProvisionedNodeClaim" {
+				claimRef = machine.GetNamespace() + "/" + owner.Name
+			}
+		}
+		if err := r.ensureCNINodeAddress(ctx, nodeName, tunnelAddr, claimRef); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -487,7 +494,7 @@ const (
 // reach by construction, and the one the dialer installs a host route
 // for. Autodetection on the node itself cannot know that, so the choice
 // is stated here rather than guessed there.
-func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tunnelAddr string) error {
+func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tunnelAddr, claim string) error {
 	if nodeName == "" || tunnelAddr == "" {
 		return nil
 	}
@@ -502,7 +509,10 @@ func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tun
 	if strings.Contains(tunnelAddr, ":") {
 		key, want = calicoIPv6Annotation, tunnelAddr+"/128"
 	}
-	if node.Annotations[key] == want {
+	// The claim is recorded here too, so its teardown can find the
+	// Node it produced. A Node is cluster-scoped and a claim is not, so
+	// an ownerReference cannot express this.
+	if node.Annotations[key] == want && (claim == "" || node.Annotations[claimpkg.ClaimAnnotation] == claim) {
 		return nil
 	}
 	patch := client.MergeFrom(node.DeepCopy())
@@ -510,6 +520,9 @@ func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tun
 		node.Annotations = map[string]string{}
 	}
 	node.Annotations[key] = want
+	if claim != "" {
+		node.Annotations[claimpkg.ClaimAnnotation] = claim
+	}
 	if err := r.Patch(ctx, node, patch); err != nil {
 		return fmt.Errorf("annotating node %s with its tunnel address: %w", nodeName, err)
 	}

@@ -452,3 +452,33 @@ func TestReconcile_TemplateAndRequestsTogetherIsAnError(t *testing.T) {
 		t.Errorf("phase = %q, want Failed", updated.Status.Phase)
 	}
 }
+
+// Deleting a claim used to leave its Node registered and NotReady
+// forever: nothing collects it, because a cluster-scoped Node cannot be
+// owned by a namespaced claim and Cluster API only removes nodes for
+// clusters it manages.
+func TestReconcileDelete_RemovesTheNodeItProduced(t *testing.T) {
+	claim := fakeClaim("public-worker")
+	claim.Finalizers = []string{claimFinalizer}
+	now := metav1.Now()
+	claim.DeletionTimestamp = &now
+
+	provisioned := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+		Name:        "ip-10-0-0-1",
+		Annotations: map[string]string{ClaimAnnotation: "default/public-worker"},
+	}}
+	other := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker-1"}}
+
+	r := newClaimReconciler(t, claim, fakeCluster("appmana"), provisioned, other)
+	if err := reconcileClaim(t, r, claim); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+
+	if err := r.Get(context.Background(), client.ObjectKey{Name: "ip-10-0-0-1"}, &corev1.Node{}); !apierrors.IsNotFound(err) {
+		t.Errorf("the provisioned Node survived claim teardown (err = %v)", err)
+	}
+	// Every other node in the cluster must be untouched.
+	if err := r.Get(context.Background(), client.ObjectKey{Name: "worker-1"}, &corev1.Node{}); err != nil {
+		t.Errorf("an unrelated node was removed: %v", err)
+	}
+}

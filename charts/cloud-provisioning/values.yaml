@@ -14,6 +14,18 @@ dialerImage:
 
 imagePullSecrets: []
 
+# The REMOTE node's DaemonSet. A remote cannot be preloaded and may
+# have no registry credential, so if the project image is not publicly
+# pullable its adoption DaemonSet ImagePullBackOffs and the node stays
+# on its frozen bootstrap peer list -- config changes never reach it.
+# Setting a public base image here makes it execute the host binary
+# that cloud-init already installed and sha-verified. Leave empty when
+# the project image is pullable; then the DaemonSet also self-installs
+# onto the host, which is the post-join upgrade channel.
+dialerCloud:
+  image: ""             # e.g. busybox:1.37
+  hostBinary: /host-bin/wg-dialer
+
 # EVERY workload this chart owns is Linux-only. Not cosmetic: a mixed
 # cluster will otherwise schedule a linux-only controller onto a
 # Windows node and it fails with "no match for platform in manifest"

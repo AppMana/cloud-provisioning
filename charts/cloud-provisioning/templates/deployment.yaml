@@ -72,6 +72,10 @@ spec:
             - "--join-dialer-binary-url-arm64={{ . }}"
             - "--join-dialer-binary-sha256-arm64={{ $.Values.dialerBinary.arm64.sha256 | required "dialerBinary.arm64.sha256 is required when a url is set -- an unpinned download is a supply-chain hole" }}"
             {{- end }}
+            {{- with .Values.dialerCloud.image }}
+            - "--dialer-cloud-image={{ . }}"
+            - "--dialer-cloud-host-binary={{ $.Values.dialerCloud.hostBinary }}"
+            {{- end }}
             {{- with .Values.cniPlugins.arm64.url }}
             - "--join-cni-plugins-url-arm64={{ . }}"
             - "--join-cni-plugins-sha256-arm64={{ $.Values.cniPlugins.arm64.sha256 | required "cniPlugins.arm64.sha256 is required when a url is set" }}"

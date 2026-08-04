@@ -138,6 +138,15 @@ type meshReconciler struct {
 
 	dialerCloudDaemonSetName string
 	dialerCloudListenPort    string
+	// dialerCloudImage, when set, is a PUBLIC base image the remote's
+	// DaemonSet runs instead of the project image, executing the host
+	// binary that cloud-init already installed and sha-verified. A
+	// remote node cannot be preloaded and may have no registry
+	// credential, and without this its adoption DaemonSet sits in
+	// ImagePullBackOff -- leaving the node stuck on the frozen
+	// bootstrap peer list, so config changes never reach it.
+	dialerCloudImage      string
+	dialerCloudHostBinary string
 }
 
 func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -618,6 +627,16 @@ func parseSelectorRequirements(raw string) []corev1.NodeSelectorRequirement {
 // --dialer-image, rolling update) instead of host binary swaps.
 func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 	hostPathDirectory := corev1.HostPathDirectory
+	// Default: the project image, which also self-installs onto the
+	// host (the upgrade channel). When the image is not pullable on a
+	// remote node, a public base image runs the host binary instead --
+	// adoption still works, it just stops being an upgrade channel.
+	cloudImage := r.dialerImage
+	var cloudCommand []string
+	if r.dialerCloudImage != "" {
+		cloudImage = r.dialerCloudImage
+		cloudCommand = []string{r.dialerCloudHostBinary}
+	}
 	desired := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.dialerCloudDaemonSetName,
@@ -641,8 +660,9 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 					Containers: []corev1.Container{
 						{
 							Name:            "dialer",
-							Image:           r.dialerImage,
+							Image:           cloudImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
+							Command:         cloudCommand,
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"NET_ADMIN"}},
 							},
@@ -664,7 +684,6 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 								// fleet upgrade is one digest bump in gitops and
 								// the download URL only ever mattered at first
 								// boot.
-								"--install-host-binary=/host-bin/wg-dialer",
 								fmt.Sprintf("--listen-port=%s", r.dialerCloudListenPort),
 								fmt.Sprintf("--pod-cidrs=%s", r.dialerPodCIDRs),
 								fmt.Sprintf("--service-cidrs=%s", r.dialerServiceCIDRs),
@@ -696,6 +715,14 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 			},
 		},
 	}
+	// Self-install is the post-join upgrade channel, and only means
+	// anything when this DaemonSet actually runs the project image -- a
+	// public base image carries no binary of its own to install.
+	if r.dialerCloudImage == "" {
+		c := &desired.Spec.Template.Spec.Containers[0]
+		c.Args = append(c.Args, "--install-host-binary=/host-bin/wg-dialer")
+	}
+
 	existing := &appsv1.DaemonSet{}
 	err := r.reader.Get(ctx, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, existing)
 	if apierrors.IsNotFound(err) {
@@ -745,6 +772,8 @@ func main() {
 		dialerPodCIDRs            string
 		dialerServiceCIDRs        string
 		dialerCloudDaemonSetName  string
+		dialerCloudImage          string
+		dialerCloudHostBinary     string
 		dialerBinaryURLARM64      string
 		dialerBinarySHA256ARM64   string
 		dialerBinaryURLAMD64      string
@@ -773,6 +802,8 @@ func main() {
 	flag.StringVar(&dialerImagePullSecret, "dialer-image-pull-secret", "ghcr-pull", "imagePullSecret for the dialer DaemonSets")
 	flag.StringVar(&dialerPodCIDRs, "dialer-pod-cidrs", "", "REQUIRED comma-separated cluster pod-CIDR ranges (v4/v6) -- WireGuard cryptokey accept-list only, never a kernel route. Empty silently drops all Calico traffic, so it is fatal instead")
 	flag.StringVar(&dialerServiceCIDRs, "dialer-service-cidrs", "", "REQUIRED comma-separated cluster service-CIDR ranges (v4/v6), same treatment as --dialer-pod-cidrs")
+	flag.StringVar(&dialerCloudImage, "dialer-cloud-image", "", "optional PUBLIC base image for the REMOTE node's DaemonSet, which then executes --dialer-cloud-host-binary instead of carrying its own. Use when the project image is not pullable on a remote node (no preload, no registry credential): without it the adoption DaemonSet ImagePullBackOffs and the node stays on its frozen bootstrap peer list forever")
+	flag.StringVar(&dialerCloudHostBinary, "dialer-cloud-host-binary", "/host-bin/wg-dialer", "path (inside the pod) of the host binary --dialer-cloud-image executes; the bootstrap already installed and sha-verified it")
 	flag.StringVar(&dialerCloudDaemonSetName, "dialer-cloud-daemonset-name", "wg-dialer-cloud", "name of the remote-side dialer DaemonSet this operator provisions directly")
 
 	flag.BoolVar(&joinEnabled, "join-enabled", true, "enable bootstrap-secret provisioning (join.Reconciler) and claim expansion -- the whole point of this operator; disable only for an endpoint-mirror-only deployment")
@@ -900,6 +931,8 @@ func main() {
 
 			dialerCloudDaemonSetName: dialerCloudDaemonSetName,
 			dialerCloudListenPort:    dialerListenPort,
+			dialerCloudImage:         dialerCloudImage,
+			dialerCloudHostBinary:    dialerCloudHostBinary,
 		})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create mesh controller: %v\n", err)

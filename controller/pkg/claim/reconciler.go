@@ -114,11 +114,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err != nil {
 		return r.fail(ctx, claim, err)
 	}
-	// An explicit instance type wins over the requests: sometimes you
-	// want exactly t3.micro (free tier) or a specific family, not
-	// "whatever satisfies 2 cpu". Requests remain the portable default.
-	instanceType := claim.Spec.InstanceType
-	if instanceType == "" {
+	// A template describes the machine completely, so nothing needs
+	// resolving against a catalogue.
+	instanceType := ""
+	if claim.Spec.TemplateRef == nil {
 		resolved, err := provisioner.ResolveInstanceType(nodeReq)
 		if err != nil {
 			return r.fail(ctx, claim, err)
@@ -142,7 +141,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	infraMachine.SetGroupVersionKind(provisioner.GVK())
 	err = r.Reader.Get(ctx, types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name}, infraMachine)
 	if apierrors.IsNotFound(err) {
-		infraMachine, err = provisioner.InfraMachine(ctx, r.Reader, claim.Namespace, instanceType, nodeReq)
+		if claim.Spec.TemplateRef != nil {
+			infraMachine, err = machineFromTemplate(ctx, r.Reader, provisioner, claim)
+		} else {
+			infraMachine, err = provisioner.InfraMachine(ctx, r.Reader, claim.Namespace, instanceType, nodeReq)
+		}
 		if err != nil {
 			return r.fail(ctx, claim, err)
 		}
@@ -455,13 +458,41 @@ func (r *Reconciler) provisionerForClusterKind(kind string) join.MachineProvisio
 	return nil
 }
 
+// machineFromTemplate builds the provider machine from the template
+// the claim names. A CAPI infrastructure machine template holds the
+// machine's whole spec under spec.template.spec, and the machine is
+// that spec with the provider's own kind on it.
+func machineFromTemplate(ctx context.Context, reader client.Reader, provisioner join.MachineProvisioner, claim *v1alpha1.ProvisionedNodeClaim) (*unstructured.Unstructured, error) {
+	ref := claim.Spec.TemplateRef
+	gvk := provisioner.GVK()
+	group := gvk.Group
+	if ref.APIGroup != nil && *ref.APIGroup != "" {
+		group = *ref.APIGroup
+	}
+	template := &unstructured.Unstructured{}
+	template.SetGroupVersionKind(schema.GroupVersionKind{Group: group, Version: gvk.Version, Kind: ref.Kind})
+	if err := reader.Get(ctx, types.NamespacedName{Namespace: claim.Namespace, Name: ref.Name}, template); err != nil {
+		return nil, fmt.Errorf("getting %s %q: %w", ref.Kind, ref.Name, err)
+	}
+	spec, found, err := unstructured.NestedMap(template.Object, "spec", "template", "spec")
+	if err != nil || !found {
+		return nil, fmt.Errorf("%s %q has no spec.template.spec", ref.Kind, ref.Name)
+	}
+	machine := &unstructured.Unstructured{Object: map[string]any{"spec": spec}}
+	machine.SetGroupVersionKind(gvk)
+	return machine, nil
+}
+
 func nodeRequest(claim *v1alpha1.ProvisionedNodeClaim) (join.NodeRequest, error) {
-	req := join.NodeRequest{Arch: claim.Spec.Arch, InternetFacing: true}
+	req := join.NodeRequest{InternetFacing: true}
 	if claim.Spec.InternetFacing != nil {
 		req.InternetFacing = *claim.Spec.InternetFacing
 	}
-	if req.Arch == "" {
-		req.Arch = "arm64"
+	if claim.Spec.TemplateRef != nil {
+		if len(claim.Spec.Requests) > 0 {
+			return req, fmt.Errorf("set spec.templateRef or spec.requests, not both")
+		}
+		return req, nil
 	}
 	if cpu, ok := claim.Spec.Requests[corev1.ResourceCPU]; ok {
 		req.CPUMillis = cpu.MilliValue()
@@ -469,8 +500,8 @@ func nodeRequest(claim *v1alpha1.ProvisionedNodeClaim) (join.NodeRequest, error)
 	if mem, ok := claim.Spec.Requests[corev1.ResourceMemory]; ok {
 		req.MemoryBytes = mem.Value()
 	}
-	if req.CPUMillis == 0 && req.MemoryBytes == 0 && claim.Spec.InstanceType == "" {
-		return req, fmt.Errorf("set spec.requests (cpu and/or memory) or spec.instanceType")
+	if req.CPUMillis == 0 && req.MemoryBytes == 0 {
+		return req, fmt.Errorf("set spec.templateRef, or spec.requests with cpu and/or memory")
 	}
 	return req, nil
 }

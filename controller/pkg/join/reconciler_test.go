@@ -89,24 +89,26 @@ func newFakeReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 	return &Reconciler{Client: c, Reader: c}
 }
 
-func TestDialerBinaryFor_UnpinnedDigestIsAlwaysFatal(t *testing.T) {
+func TestValidateDialerBinaries_UnpinnedDigestIsAlwaysFatal(t *testing.T) {
 	// Rendering userdata that downloads an unverifiable binary is a
 	// supply-chain hole, never a fallback.
 	r := &Reconciler{DialerBinaryURLARM64: "https://example.com/dialer-arm64"}
-	if _, _, err := r.dialerBinaryFor(map[string]any{}); err == nil {
+	if err := r.validateDialerBinaries(); err == nil {
 		t.Fatal("expected an error when the arm64 sha256 is unset, got nil")
 	}
 	r = &Reconciler{DialerBinarySHA256ARM64: "abc123"}
-	if _, _, err := r.dialerBinaryFor(map[string]any{}); err == nil {
+	if err := r.validateDialerBinaries(); err == nil {
 		t.Fatal("expected an error when the arm64 URL is unset, got nil")
 	}
-	r = &Reconciler{DialerBinaryURLARM64: "u", DialerBinarySHA256ARM64: "s"}
-	if _, _, err := r.dialerBinaryFor(map[string]any{"arch": "amd64"}); err == nil {
-		t.Fatal("expected an error for an amd64 machine when only arm64 is configured, got nil")
+	r = &Reconciler{}
+	if err := r.validateDialerBinaries(); err == nil {
+		t.Fatal("expected an error when no architecture is configured, got nil")
 	}
-	url, sha, err := r.dialerBinaryFor(map[string]any{"arch": "arm64"})
-	if err != nil || url != "u" || sha != "s" {
-		t.Fatalf("dialerBinaryFor(arm64) = (%q, %q, %v), want (u, s, nil)", url, sha, err)
+	// One architecture is enough: a machine of the other kind fails at
+	// boot with a clear message rather than at render time.
+	r = &Reconciler{DialerBinaryURLARM64: "u", DialerBinarySHA256ARM64: "s"}
+	if err := r.validateDialerBinaries(); err != nil {
+		t.Fatalf("one configured architecture should be valid, got %v", err)
 	}
 }
 
@@ -184,7 +186,7 @@ func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs 
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	tmplPath := filepath.Join(t.TempDir(), "test.tmpl")
-	tmpl := "joinToken={{.joinToken}} k0sVersion={{.k0sVersion}} apiVIP={{.apiVIP}} kubeletExtraArgs={{.kubeletExtraArgs}} wgAddress={{.wireguardAddress}} podCIDRs={{.podCIDRs}} serviceCIDRs={{.serviceCIDRs}} iface={{.interfaceName}} binURL={{.dialerBinaryURL}} binSHA={{.dialerBinarySHA256}} machine={{.machineName}} peersFileJSON={{.peersFileJSON}}"
+	tmpl := "joinToken={{.joinToken}} k0sVersion={{.k0sVersion}} apiVIP={{.apiVIP}} kubeletExtraArgs={{.kubeletExtraArgs}} wgAddress={{.wireguardAddress}} podCIDRs={{.podCIDRs}} serviceCIDRs={{.serviceCIDRs}} iface={{.interfaceName}} binURL={{.dialerBinaryURLArm64}} binSHA={{.dialerBinarySHA256Arm64}} machine={{.machineName}} peersFileJSON={{.peersFileJSON}}"
 	if err := os.WriteFile(tmplPath, []byte(tmpl), 0o644); err != nil {
 		t.Fatalf("writing test template: %v", err)
 	}

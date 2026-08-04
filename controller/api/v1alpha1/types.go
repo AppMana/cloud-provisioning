@@ -23,21 +23,28 @@ var GroupVersion = schema.GroupVersion{Group: "cloud-provisioning.appmana.com", 
 
 // ProvisionedNodeClaimSpec is the provider-agnostic ask.
 type ProvisionedNodeClaimSpec struct {
-	// Requests are pod-style resource requests (cpu, memory) the
-	// provisioned node must satisfy. The fulfilling provider resolves
-	// them to its smallest satisfying instance type.
-	Requests corev1.ResourceList `json:"requests"`
-
-	// InstanceType names a provider-specific instance type directly
-	// (e.g. "t3.micro"), bypassing the requests-to-catalog resolution.
-	// Use it when the exact shape matters -- a free-tier size, a GPU
-	// family, a type this project's small catalog doesn't list.
+	// TemplateRef names an infrastructure machine template that
+	// describes the machine to create: an AWSMachineTemplate, a
+	// DockerMachineTemplate, whatever the fulfilling provider reads.
+	// The template carries the whole shape of the machine, including
+	// the image, the network placement and the security groups, so a
+	// machine never needs an out-of-band change to be reachable.
+	//
+	// Architecture follows from the template's image rather than being
+	// declared here, and the bootstrap picks its own binary to match
+	// the machine it wakes up on.
+	//
+	// Exactly one of TemplateRef or Requests must be set.
 	// +optional
-	InstanceType string `json:"instanceType,omitempty"`
+	TemplateRef *corev1.TypedLocalObjectReference `json:"templateRef,omitempty"`
 
-	// Arch is the node architecture: arm64 (default) or amd64.
+	// Requests are pod-style resource requests (cpu, memory) the node
+	// must satisfy, for the case where any machine of a given size
+	// will do. The fulfilling provider resolves them against its own
+	// catalogue, using its configured defaults for everything a
+	// template would otherwise say.
 	// +optional
-	Arch string `json:"arch,omitempty"`
+	Requests corev1.ResourceList `json:"requests,omitempty"`
 
 	// InternetFacing nodes register with the internet-facing taint and
 	// a public address; the public ingress data plane tolerates that
@@ -118,6 +125,14 @@ func (in *ProvisionedNodeClaimSpec) DeepCopyInto(out *ProvisionedNodeClaimSpec) 
 		for k, v := range in.Requests {
 			out.Requests[k] = v.DeepCopy()
 		}
+	}
+	if in.TemplateRef != nil {
+		ref := *in.TemplateRef
+		if in.TemplateRef.APIGroup != nil {
+			g := *in.TemplateRef.APIGroup
+			ref.APIGroup = &g
+		}
+		out.TemplateRef = &ref
 	}
 	if in.InternetFacing != nil {
 		v := *in.InternetFacing

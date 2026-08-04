@@ -294,27 +294,28 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("getting infra values: %w", err)
 	}
 
-	binaryURL, binarySHA, err := r.dialerBinaryFor(infraValues)
-	if err != nil {
+	if err := r.validateDialerBinaries(); err != nil {
 		return ctrl.Result{}, err
 	}
 	cniURL, cniSHA := r.cniPluginsFor(infraValues)
 
 	values := map[string]any{
-		"sshAuthorizedKeys":   r.SSHAuthorizedKeys,
-		"apiVIP":              r.APIVIP,
-		"kubeletExtraArgs":    r.KubeletExtraArgs,
-		"wireguardAddress":    cloudWGAddress,
-		"wireguardListenPort": r.WireGuardListenPort,
-		"podCIDRs":            r.PodCIDRs,
-		"serviceCIDRs":        r.ServiceCIDRs,
-		"peersFileJSON":       string(peersFileJSON),
-		"interfaceName":       r.InterfaceName,
-		"dialerBinaryURL":     binaryURL,
-		"dialerBinarySHA256":  binarySHA,
-		"cniPluginsURL":       cniURL,
-		"cniPluginsSHA256":    cniSHA,
-		"machineName":         machine.GetName(),
+		"sshAuthorizedKeys":       r.SSHAuthorizedKeys,
+		"apiVIP":                  r.APIVIP,
+		"kubeletExtraArgs":        r.KubeletExtraArgs,
+		"wireguardAddress":        cloudWGAddress,
+		"wireguardListenPort":     r.WireGuardListenPort,
+		"podCIDRs":                r.PodCIDRs,
+		"serviceCIDRs":            r.ServiceCIDRs,
+		"peersFileJSON":           string(peersFileJSON),
+		"interfaceName":           r.InterfaceName,
+		"dialerBinaryURLArm64":    r.DialerBinaryURLARM64,
+		"dialerBinarySHA256Arm64": r.DialerBinarySHA256ARM64,
+		"dialerBinaryURLAmd64":    r.DialerBinaryURLAMD64,
+		"dialerBinarySHA256Amd64": r.DialerBinarySHA256AMD64,
+		"cniPluginsURL":           cniURL,
+		"cniPluginsSHA256":        cniSHA,
+		"machineName":             machine.GetName(),
 	}
 	for k, v := range joinValues {
 		values[k] = v
@@ -434,24 +435,31 @@ func (r *Reconciler) infraProviderFor(kind string) InfraProvider {
 // ever provisioned -- but an unpinned digest is always fatal: silently
 // rendering userdata that downloads an unverifiable binary is not a
 // fallback, it's a supply-chain hole.
-func (r *Reconciler) dialerBinaryFor(infraValues map[string]any) (string, string, error) {
-	arch := "arm64"
-	if v, ok := infraValues["arch"].(string); ok && v != "" {
-		arch = v
+// validateDialerBinaries refuses to render userdata that would fetch a
+// binary it cannot verify. The bootstrap picks by architecture at boot,
+// so both entries travel in every rendered document, and a URL without
+// its digest is a supply-chain hole rather than a fallback.
+func (r *Reconciler) validateDialerBinaries() error {
+	pairs := []struct {
+		arch, url, sha string
+	}{
+		{"arm64", r.DialerBinaryURLARM64, r.DialerBinarySHA256ARM64},
+		{"amd64", r.DialerBinaryURLAMD64, r.DialerBinarySHA256AMD64},
 	}
-	var url, sha string
-	switch arch {
-	case "arm64":
-		url, sha = r.DialerBinaryURLARM64, r.DialerBinarySHA256ARM64
-	case "amd64":
-		url, sha = r.DialerBinaryURLAMD64, r.DialerBinarySHA256AMD64
-	default:
-		return "", "", fmt.Errorf("no dialer binary configured for arch %q", arch)
+	configured := 0
+	for _, p := range pairs {
+		if p.url == "" && p.sha == "" {
+			continue
+		}
+		if p.url == "" || p.sha == "" {
+			return fmt.Errorf("dialer binary for %s needs both a URL and its sha256", p.arch)
+		}
+		configured++
 	}
-	if url == "" || sha == "" {
-		return "", "", fmt.Errorf("dialer binary URL/sha256 for arch %q not configured (--join-dialer-binary-url-%s/--join-dialer-binary-sha256-%s)", arch, arch, arch)
+	if configured == 0 {
+		return fmt.Errorf("no dialer binary configured for any architecture")
 	}
-	return url, sha, nil
+	return nil
 }
 
 // cniPluginsFor picks the per-arch CNI plugins tarball. Optional: a

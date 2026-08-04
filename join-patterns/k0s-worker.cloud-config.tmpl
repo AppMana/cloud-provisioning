@@ -77,8 +77,10 @@ write_files:
     content: |
       {{ .joinToken }}
 runcmd:
-  # A stock cloud image has no wg-dialer: download the per-arch release
-  # binary and verify its digest BEFORE anything depends on it. The
+  # A stock cloud image has no wg-dialer: download the release binary
+  # for whatever machine this turned out to be, and verify its digest
+  # BEFORE anything depends on it. The architecture is read here rather
+  # than declared in the claim, because the machine already knows it. The
   # sha256 is pinned into this (immutable) userdata at render time, so
   # a compromised download host cannot swap the binary -- a mismatch
   # halts the join rather than running unverified code.
@@ -90,8 +92,14 @@ runcmd:
   # works regardless.
   - |
     set -e
-    curl -fsSL -o /usr/local/bin/.wg-dialer.new '{{ .dialerBinaryURL }}'
-    echo '{{ .dialerBinarySHA256 }}  /usr/local/bin/.wg-dialer.new' | sha256sum -c -
+    case "$(uname -m)" in
+      aarch64|arm64) url='{{ .dialerBinaryURLArm64 }}'; sha='{{ .dialerBinarySHA256Arm64 }}' ;;
+      x86_64|amd64)  url='{{ .dialerBinaryURLAmd64 }}'; sha='{{ .dialerBinarySHA256Amd64 }}' ;;
+      *) echo "no wg-dialer build for $(uname -m)" >&2; exit 1 ;;
+    esac
+    [ -n "$url" ] || { echo "no wg-dialer URL configured for $(uname -m)" >&2; exit 1; }
+    curl -fsSL -o /usr/local/bin/.wg-dialer.new "$url"
+    echo "$sha  /usr/local/bin/.wg-dialer.new" | sha256sum -c -
     chmod 0755 /usr/local/bin/.wg-dialer.new
     mv -f /usr/local/bin/.wg-dialer.new /usr/local/bin/wg-dialer
   - systemctl enable --now wg-dialer.service

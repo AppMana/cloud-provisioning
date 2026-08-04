@@ -50,25 +50,30 @@ spec:
               properties:
                 requests:
                   description: >-
-                    Pod-style resource requests (cpu, memory) the
-                    provisioned node must satisfy. The fulfilling
-                    provider resolves them to its smallest satisfying
-                    instance type.
+                    Pod-style resource requests (cpu, memory) the node
+                    must satisfy, for when any machine of a given size
+                    will do. The fulfilling provider resolves them
+                    against its own catalogue. Set this or templateRef,
+                    not both.
                   type: object
                   additionalProperties:
                     anyOf: [{type: integer}, {type: string}]
                     x-kubernetes-int-or-string: true
-                instanceType:
+                templateRef:
                   description: >-
-                    Provider-specific instance type (e.g. t3.micro),
-                    bypassing requests-to-catalog resolution. Use when
-                    the exact shape matters -- a free-tier size, a GPU
-                    family, or a type the catalog does not list.
-                  type: string
-                arch:
-                  description: Node architecture. arm64 (default) or amd64.
-                  type: string
-                  enum: [arm64, amd64]
+                    An infrastructure machine template describing the
+                    machine to create, such as an AWSMachineTemplate.
+                    The template carries the whole shape of the
+                    machine, including its image, network placement and
+                    security groups, so reachability never depends on
+                    an out-of-band change. Architecture follows from
+                    the image. Set this or requests, not both.
+                  type: object
+                  required: [kind, name]
+                  properties:
+                    apiGroup: {type: string}
+                    kind: {type: string}
+                    name: {type: string}
                 internetFacing:
                   description: >-
                     Internet-facing nodes register with the

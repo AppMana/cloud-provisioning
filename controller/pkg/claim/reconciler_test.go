@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -83,7 +84,6 @@ func fakeClaim(name string) *v1alpha1.ProvisionedNodeClaim {
 				corev1.ResourceCPU:    resource.MustParse("2"),
 				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			},
-			Arch: "arm64",
 		},
 	}
 }
@@ -378,5 +378,77 @@ func TestReconcileDelete_RemovesComputeAndOnlyThenReleasesTheClaim(t *testing.T)
 	remaining := &v1alpha1.ProvisionedNodeClaim{}
 	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), remaining); !apierrors.IsNotFound(err) {
 		t.Errorf("claim survived teardown (finalizer never released): %v, finalizers=%v", err, remaining.Finalizers)
+	}
+}
+
+// A template describes the machine completely, including the security
+// groups and subnet that decide whether the tunnel can be established
+// at all. Nothing about it may be second-guessed from the claim.
+func TestReconcile_TemplateDrivesTheMachine(t *testing.T) {
+	template := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
+		"kind":       "AWSMachineTemplate",
+		"metadata":   map[string]any{"name": "public-worker", "namespace": "default"},
+		"spec": map[string]any{"template": map[string]any{"spec": map[string]any{
+			"instanceType": "m7g.large",
+			"ami":          map[string]any{"id": "ami-000000000000000ab"},
+			"additionalSecurityGroups": []any{
+				map[string]any{"id": "sg-000000000000000cd"},
+			},
+			"subnet": map[string]any{"id": "subnet-000000000000000ef"},
+		}}},
+	}}
+	claim := fakeClaim("public-worker")
+	claim.Spec.Requests = nil
+	group := "infrastructure.cluster.x-k8s.io"
+	claim.Spec.TemplateRef = &corev1.TypedLocalObjectReference{
+		APIGroup: &group, Kind: "AWSMachineTemplate", Name: "public-worker",
+	}
+
+	r := newClaimReconciler(t, claim, fakeCluster("appmana"), template, fakeNode())
+	if err := reconcileClaim(t, r, claim); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+
+	machine := &unstructured.Unstructured{}
+	machine.SetGroupVersionKind(schema.GroupVersionKind{
+		Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSMachine",
+	})
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "public-worker"}, machine); err != nil {
+		t.Fatalf("getting AWSMachine: %v", err)
+	}
+	got, _, _ := unstructured.NestedString(machine.Object, "spec", "instanceType")
+	if got != "m7g.large" {
+		t.Errorf("instanceType = %q, want the template's m7g.large", got)
+	}
+	if ami, _, _ := unstructured.NestedString(machine.Object, "spec", "ami", "id"); ami != "ami-000000000000000ab" {
+		t.Errorf("ami = %q, want the template's", ami)
+	}
+	// The security groups are the reason a template exists: carried
+	// here, reachability never depends on an out-of-band change.
+	sgs, found, _ := unstructured.NestedSlice(machine.Object, "spec", "additionalSecurityGroups")
+	if !found || len(sgs) != 1 {
+		t.Fatalf("additionalSecurityGroups = %v, want the template's one entry", sgs)
+	}
+}
+
+// Both set is ambiguous: the catalogue would silently override half of
+// what the template says.
+func TestReconcile_TemplateAndRequestsTogetherIsAnError(t *testing.T) {
+	claim := fakeClaim("public-worker")
+	group := "infrastructure.cluster.x-k8s.io"
+	claim.Spec.TemplateRef = &corev1.TypedLocalObjectReference{
+		APIGroup: &group, Kind: "AWSMachineTemplate", Name: "public-worker",
+	}
+	r := newClaimReconciler(t, claim, fakeCluster("appmana"), fakeNode())
+	if err := reconcileClaim(t, r, claim); err == nil {
+		t.Fatal("expected an error when both are set, got nil")
+	}
+	updated := &v1alpha1.ProvisionedNodeClaim{}
+	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), updated); err != nil {
+		t.Fatalf("getting claim: %v", err)
+	}
+	if updated.Status.Phase != "Failed" {
+		t.Errorf("phase = %q, want Failed", updated.Status.Phase)
 	}
 }

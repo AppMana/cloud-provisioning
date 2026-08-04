@@ -1,0 +1,191 @@
+{{- /*
+RBAC derived from the controller's actual API calls. Namespaces are the
+release namespace; the bootstrap-secret Role is bound in whatever
+namespace the CAPI Machines live in (.Values.machineNamespace).
+*/ -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}
+  namespace: {{ .Release.Namespace }}
+---
+# The dialer DaemonSets' identity (both on-prem and cloud pods): reads
+# the peer Secret, publishes the node's own public key into it, and
+# (cloud side) reads its machine's adoption Secret.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "cloud-provisioning.name" . }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}
+rules:
+  # Watch/annotate Machines (join + mesh reconcilers); the claim
+  # reconciler also creates them.
+  - apiGroups: ["cluster.x-k8s.io"]
+    resources: ["machines"]
+    # delete: the claim tears down its own compute -- ownerRef GC does
+    # not suffice, because CAPI's Machine controller replaces the
+    # claim's ownerReference with the Cluster.
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  # resolveCluster (claim reconciler).
+  - apiGroups: ["cluster.x-k8s.io"]
+    resources: ["clusters"]
+    verbs: ["get", "list"]
+  # Provider machine objects: read (join reconciler waits on
+  # existence), create (claim reconciler). CAPA cluster/identity
+  # objects: read-only preflight (aws.Provider.Validate).
+  - apiGroups: ["infrastructure.cluster.x-k8s.io"]
+    resources: ["awsmachines", "dockermachines"]
+    verbs: ["get", "create", "delete"]
+  - apiGroups: ["infrastructure.cluster.x-k8s.io"]
+    resources: ["awsclusters", "awsclusterstaticidentities"]
+    verbs: ["get"]
+  # The claim CRD itself.
+  - apiGroups: ["cloud-provisioning.appmana.com"]
+    resources: ["provisionednodeclaims"]
+    # update: the reconciler adds/removes its own finalizer so a claim
+    # cannot be deleted while the compute it created still exists.
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["cloud-provisioning.appmana.com"]
+    resources: ["provisionednodeclaims/status"]
+    verbs: ["update"]
+  # Tunnel-endpoint allocation watches Nodes (a new/relabeled node
+  # changes the mesh membership).
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "cloud-provisioning.controllerName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cloud-provisioning.controllerName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# Everything the controller does with Secrets and DaemonSets happens in
+# its own namespace: the peer Secret (get/patch), per-machine adoption
+# Secrets (get/create/patch), the AWS provider-config Secret (get), and
+# both dialer DaemonSets (get/create/update).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "cloud-provisioning.controllerName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cloud-provisioning.controllerName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# Bootstrap Secrets are created in whatever namespace the Machines live
+# in (they're owned by the Machines). Bind this in that namespace --
+# shown here for "default"; duplicate per Machine namespace if you use
+# another.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}-bootstrap-secrets
+  namespace: {{ .Values.machineNamespace | default "default" }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}-bootstrap-secrets
+  namespace: {{ .Values.machineNamespace | default "default" }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "cloud-provisioning.controllerName" . }}-bootstrap-secrets
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cloud-provisioning.controllerName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# The k0s join flow (pkg/join/k0s): mints a bootstrap-token Secret in
+# kube-system, reads kube-root-ca.crt, and lists one Node to discover
+# the k0s version.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}-join
+  namespace: kube-system
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["kube-root-ca.crt"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}-join
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "cloud-provisioning.controllerName" . }}-join
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cloud-provisioning.controllerName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# The dialer pods' own access: the peer Secret (read the mesh state,
+# merge-patch their self-published public key) and, on the cloud node,
+# the per-machine adoption Secret (read-only; its name is derived from
+# /etc/wg-dialer/machine-name, so this cannot be resourceName-scoped).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "cloud-provisioning.name" . }}
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "cloud-provisioning.name" . }}
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "cloud-provisioning.name" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cloud-provisioning.name" . }}
+    namespace: {{ .Release.Namespace }}

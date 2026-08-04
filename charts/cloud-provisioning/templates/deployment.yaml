@@ -1,0 +1,76 @@
+{{- $required := list -}}
+{{- if not .Values.cluster.apiAddress }}{{ $required = append $required "cluster.apiAddress" }}{{ end -}}
+{{- if not .Values.cluster.apiVIP }}{{ $required = append $required "cluster.apiVIP" }}{{ end -}}
+{{- if not .Values.cluster.podCIDRs }}{{ $required = append $required "cluster.podCIDRs" }}{{ end -}}
+{{- if not .Values.cluster.serviceCIDRs }}{{ $required = append $required "cluster.serviceCIDRs" }}{{ end -}}
+{{- if not .Values.cluster.nodeVIP4Prefix }}{{ $required = append $required "cluster.nodeVIP4Prefix" }}{{ end -}}
+{{- if $required -}}
+{{- /* Fail at render, not at runtime: every one of these is a value
+whose absence the binary treats as fatal, and an empty CIDR silently
+drops all Calico traffic rather than erroring. */ -}}
+{{- fail (printf "cloud-provisioning: required values not set: %s" (join ", " $required)) -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cloud-provisioning.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "cloud-provisioning.controllerName" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "cloud-provisioning.controllerName" . }}
+        {{- include "cloud-provisioning.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "cloud-provisioning.controllerName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeName }}
+      nodeName: {{ . }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: controller
+          image: {{ include "cloud-provisioning.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --dialer-image={{ include "cloud-provisioning.dialerImage" . }}
+            - --dialer-pod-cidrs={{ .Values.cluster.podCIDRs }}
+            - --dialer-service-cidrs={{ .Values.cluster.serviceCIDRs }}
+            - --join-provider={{ .Values.joinProvider }}
+            - --join-template-path=/join-patterns/{{ .Values.joinProvider }}-worker.cloud-config.tmpl
+            - --join-api-address={{ .Values.cluster.apiAddress }}
+            - --join-api-vip={{ .Values.cluster.apiVIP }}
+            - --join-node-vip4-prefix={{ .Values.cluster.nodeVIP4Prefix }}
+            {{- with .Values.cluster.nodeVIP6Prefix }}
+            - --join-node-vip6-prefix={{ . }}
+            {{- end }}
+            - --join-node-vip-start={{ .Values.cluster.nodeVIPStart }}
+            {{- with .Values.tunnel.endpoints }}
+            - --tunnel-endpoints={{ . }}
+            {{- end }}
+            {{- with .Values.dialerBinary.arm64.url }}
+            - --join-dialer-binary-url-arm64={{ . }}
+            - --join-dialer-binary-sha256-arm64={{ $.Values.dialerBinary.arm64.sha256 | required "dialerBinary.arm64.sha256 is required when a url is set -- an unpinned download is a supply-chain hole" }}
+            {{- end }}
+            {{- with .Values.dialerBinary.amd64.url }}
+            - --join-dialer-binary-url-amd64={{ . }}
+            - --join-dialer-binary-sha256-amd64={{ $.Values.dialerBinary.amd64.sha256 | required "dialerBinary.amd64.sha256 is required when a url is set -- an unpinned download is a supply-chain hole" }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

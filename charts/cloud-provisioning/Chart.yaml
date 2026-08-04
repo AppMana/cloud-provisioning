@@ -1,0 +1,20 @@
+apiVersion: v2
+name: cloud-provisioning
+description: |
+  Join a public cloud node to an on-premises, firewalled cluster over a
+  WireGuard tunnel by committing ONE resource (a ProvisionedNodeClaim).
+  Ships its Cluster API dependency as a subchart, so a cluster gets the
+  whole stack from a single release instead of an imperative
+  `clusterctl init` that gitops cannot reproduce.
+type: application
+version: 0.1.0
+appVersion: "84adecc"
+dependencies:
+  # Cluster API's own operator is the supported declarative install
+  # path (clusterctl is imperative by design and cannot be reconciled).
+  # The operator then materializes CoreProvider/InfrastructureProvider
+  # from the CRs this chart renders.
+  - name: cluster-api-operator
+    version: "0.27.0"
+    repository: https://kubernetes-sigs.github.io/cluster-api-operator
+    condition: cluster-api-operator.enabled

@@ -208,6 +208,12 @@ else
   fi
   kubectl patch ippools.crd.projectcalico.org default-ipv4-ippool --type=merge \
     -p "$POOL_PATCH" >/dev/null || fail "could not set the pool's encapsulation"
+  # calico-node programs its routes from the pool it saw at startup, so
+  # a pool changed afterwards leaves routes for the old encapsulation
+  # behind. Restart it and let it program the mode this run is for.
+  kubectl -n kube-system rollout restart daemonset/calico-node >/dev/null
+  kubectl -n kube-system rollout status daemonset/calico-node --timeout=5m >/dev/null \
+    || fail "calico-node did not come back after the pool change"
 fi
 # Calico's own IP pool is what the controller reads its pod ranges
 # from, so it has to exist before the controller starts.

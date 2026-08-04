@@ -137,7 +137,7 @@ assert_wan() {
 
 handshake_established() {
   local hs
-  hs=$(node_netns "${CLUSTER}-control-plane" wg show "$IFACE" latest-handshakes 2>/dev/null | awk 'NR==1{print $2}')
+  hs=$(node_netns "${CLUSTER}-worker" wg show "$IFACE" latest-handshakes 2>/dev/null | awk 'NR==1{print $2}')
   [ -n "$hs" ] && [ "$hs" -gt 0 ] 2>/dev/null
 }
 
@@ -409,7 +409,7 @@ assert_wan "adoption DaemonSet running on the remote" "$NODE_CONTAINER" "${CLUST
 IFACE=$(kubectl -n "$NS" get daemonset "$LOCAL_DS" -o jsonpath='{.spec.template.spec.containers[0].args}' | tr ',' '\n' | grep -o 'cldt[0-9a-f]*' | head -1)
 until_ok 180 handshake_established || fail "no WireGuard handshake on $IFACE"
 CLOUD_TUN=$(kubectl -n "$NS" get secret $PEER_SECRET -o jsonpath='{.data.peer-route-hosts-public-worker}' | base64 -d | cut -d, -f1)
-until_ok 60 node_netns "${CLUSTER}-control-plane" ping -c2 -W3 "$CLOUD_TUN" \
+until_ok 60 node_netns "${CLUSTER}-worker" ping -c2 -W3 "$CLOUD_TUN" \
   || fail "tunnel ping $CLOUD_TUN failed"
 # Both directions: the remote's own dialer must equally have a live
 # tunnel back, not just accept ours.
@@ -421,10 +421,10 @@ until_ok 60 node_netns "$NODE_CONTAINER" ping -c2 -W3 "$(kubectl -n "$NS" get se
 # is a single host, which `ip` prints bare (a /32), except the
 # connected subnet the address itself creates (proto kernel). Anything
 # else, of any width, is a route hijack.
-BAD_ROUTES=$(node_netns "${CLUSTER}-control-plane" ip route show dev "$IFACE" \
+BAD_ROUTES=$(node_netns "${CLUSTER}-worker" ip route show dev "$IFACE" \
   | grep -v "proto kernel" | awk '$1 ~ "/" && $1 !~ "/(32|128)$" {print}')
 [ -z "$BAD_ROUTES" ] || fail "non-host route via $IFACE on the control plane: $BAD_ROUTES"
-for v6 in $(node_netns "${CLUSTER}-control-plane" ip -6 route show dev "$IFACE" | grep -v "proto kernel" | awk '$1 ~ "/" && $1 !~ "/128$" {print $1}'); do
+for v6 in $(node_netns "${CLUSTER}-worker" ip -6 route show dev "$IFACE" | grep -v "proto kernel" | awk '$1 ~ "/" && $1 !~ "/128$" {print $1}'); do
   fail "non-host IPv6 route via $IFACE: $v6"
 done
 echo "  bidirectional tunnel traffic on $IFACE; only host routes installed"

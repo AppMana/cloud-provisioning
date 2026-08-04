@@ -219,6 +219,16 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, fmt.Errorf("ensuring adoption config: %w", err)
 	}
 
+	// The remote node's own pod blocks, published onto its peer entry
+	// so the nodes at home can reach the pods running on it. Its blocks
+	// are allocated after it joins, so this is recomputed here rather
+	// than written once when the machine was created.
+	if nodeName, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name"); nodeName != "" {
+		if err := r.publishRemotePodCIDRs(ctx, machine.GetName(), nodeName); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Tell the CNI which address to peer on, once the node exists.
 	{
 		nodeName, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name")
@@ -550,6 +560,45 @@ func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tun
 	}
 	if err := r.Patch(ctx, node, patch); err != nil {
 		return fmt.Errorf("annotating node %s with its tunnel address: %w", nodeName, err)
+	}
+	return nil
+}
+
+// publishRemotePodCIDRs keeps a remote machine's peer entry carrying
+// its own node's blocks, alongside its tunnel address.
+func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machineName, nodeName string) error {
+	prefixes, err := r.network.PrefixesFor(ctx, r.reader, nodeName)
+	if err != nil {
+		// The node may not have been allocated a block yet, which is
+		// not a failure: the next pass will find one.
+		return nil
+	}
+	secret := &corev1.Secret{}
+	if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, secret); err != nil {
+		return fmt.Errorf("getting peer secret: %w", err)
+	}
+	key := tunnel.PeerAllowedIPsPrefix + machineName
+	entries := tunnel.SplitList(string(secret.Data[key]))
+	var hosts []string
+	for _, entry := range entries {
+		if strings.HasSuffix(entry, "/32") || strings.HasSuffix(entry, "/128") {
+			hosts = append(hosts, entry)
+		}
+	}
+	for _, prefix := range prefixes {
+		hosts = append(hosts, prefix.String())
+	}
+	want := strings.Join(hosts, ",")
+	if want == string(secret.Data[key]) {
+		return nil
+	}
+	patch := client.MergeFrom(secret.DeepCopy())
+	if secret.Data == nil {
+		secret.Data = map[string][]byte{}
+	}
+	secret.Data[key] = []byte(want)
+	if err := r.Patch(ctx, secret, patch); err != nil {
+		return fmt.Errorf("publishing the remote node's pod blocks: %w", err)
 	}
 	return nil
 }

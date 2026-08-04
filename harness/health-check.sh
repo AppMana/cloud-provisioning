@@ -104,13 +104,38 @@ for node in "${NODES[@]}"; do
   fi
 done
 
+# A node that has just joined has to be given its pod block, have that
+# block reach the peers, and have the network distribute a route for it.
+# That is convergence, not flakiness, so it is waited for once here
+# rather than folded into every check's timeout.
+http_from_early() {
+  kubectl exec "hc-$1" -n "$NAMESPACE" -- wget -q -T 5 -O - "$2" 2>/dev/null | grep -q ok
+}
+if [[ ${#NODES[@]} -gt 1 ]]; then
+  first="${NODES[0]}"
+  echo
+  echo "waiting for reachability to converge between nodes"
+  converge_deadline=$((SECONDS + ${HEALTH_CHECK_CONVERGE_SECONDS:-420}))
+  for dst in "${NODES[@]}"; do
+    [[ "$dst" == "$first" ]] && continue
+    while ! http_from_early "$first" "http://${POD_IP[$dst]}:$SERVICE_PORT/"; do
+      if (( SECONDS >= converge_deadline )); then
+        echo "  gave up waiting for $first to reach $dst" >&2
+        break
+      fi
+      sleep 10
+    done
+  done
+  echo "  converged after $((SECONDS))s"
+fi
+
 PASS=0
 FAIL=0
 # Reachability across a tunnel converges: a node is given its pod block
 # when the first pod lands on it, and the block reaches the peers on the
 # next pass. So each check is retried to a deadline rather than taken as
 # final on its first attempt.
-RETRY_SECONDS="${HEALTH_CHECK_RETRY_SECONDS:-120}"
+RETRY_SECONDS="${HEALTH_CHECK_RETRY_SECONDS:-90}"
 check() {
   local label="$1"; shift
   local deadline=$((SECONDS + RETRY_SECONDS))

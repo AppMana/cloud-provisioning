@@ -9,8 +9,8 @@ import (
 )
 
 // requireDocker skips the test on any machine without a working Docker
-// daemon (e.g. CI without docker-in-docker) rather than failing --
-// these tests exercise a real `docker` binary, deliberately not mocked.
+// daemon (e.g. CI without docker-in-docker) rather than failing;
+// these tests exercise a real `docker` binary rather than a mock.
 func requireDocker(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("docker"); err != nil {
@@ -47,9 +47,9 @@ func TestCreateMachine_ThenRunning_ReflectsRealContainerState(t *testing.T) {
 	const name = "join-test-containernet-machine"
 	const image = "alpine:3.20"
 
-	// Red: before creation, Running must be false -- proves the green
-	// result below reflects CreateMachine's real effect, not a stub
-	// that always returns true.
+	// Before creation, Running is false. That proves the result below
+	// reflects CreateMachine's effect rather than a stub that always
+	// returns true.
 	machine := fakeContainernetMachine(name)
 	if ready, err := (Provider{}).Running(ctx, machine); err != nil || ready {
 		t.Fatalf("precondition failed: Running() = (%v, %v) before CreateMachine, want (false, nil)", ready, err)
@@ -70,7 +70,7 @@ func TestCreateMachine_ThenRunning_ReflectsRealContainerState(t *testing.T) {
 		t.Fatalf("Running: %v", err)
 	}
 	if !ready {
-		t.Error("Running = false after CreateMachine succeeded -- container should be running")
+		t.Error("Running = false after CreateMachine succeeded: container should be running")
 	}
 
 	values, err := Provider{}.InfraValues(ctx, machine)
@@ -105,7 +105,7 @@ func TestRunning_UsesContainerNameAnnotationWhenPresent(t *testing.T) {
 		t.Fatalf("Running: %v", err)
 	}
 	if !ready {
-		t.Error("Running = false despite the annotated container genuinely running -- container-name annotation isn't being honored")
+		t.Error("Running = false despite the annotated container genuinely running: container-name annotation isn't being honored")
 	}
 }
 
@@ -132,6 +132,6 @@ func TestDestroyMachine_ThenRunning_ReturnsFalseAgain(t *testing.T) {
 		t.Fatalf("Running: %v", err)
 	}
 	if ready {
-		t.Error("Running = true after DestroyMachine -- the container should be gone")
+		t.Error("Running = true after DestroyMachine: the container should be gone")
 	}
 }

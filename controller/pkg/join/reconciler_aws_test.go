@@ -127,7 +127,7 @@ func TestReconcile_InfraProviderValidateErrorBlocksBootstrapSecretCreation(t *te
 		t.Fatal("expected Reconcile to surface the misplaced-identity-secret error, got nil")
 	}
 	if !strings.Contains(err.Error(), "capa-system") {
-		t.Errorf("error %q doesn't mention the correct namespace -- not actionable", err.Error())
+		t.Errorf("error %q doesn't mention the correct namespace: not actionable", err.Error())
 	}
 	if joinProvider.calls != 0 {
 		t.Errorf("JoinValues must not be called when infra validation fails, got %d calls", joinProvider.calls)

@@ -1,16 +1,16 @@
 // Package containernet implements join.InfraProvider backed by a real
-// Docker container standing in for a "machine" -- used to integration
-// test the join.Reconciler entirely locally, without AWS/CAPA.
+// Docker container standing in for a "machine", used to integration
+// test the join.Reconciler locally, without AWS/CAPA.
 //
-// This is a genuinely different shape of InfraProvider from aws.Provider:
+// This is a different shape of InfraProvider from aws.Provider:
 // AWSMachine's creation is CAPA's job (a separate operator this
-// reconciler only ever reads, gracefully tolerating its CRD not being
-// installed yet -- see isMissingCRD in pkg/join/reconciler.go). There is
-// no equivalent "containernet operator" watching a ContainernetMachine
-// CRD in a real cluster, so this package's CreateMachine/DestroyMachine
-// do the actual provisioning themselves, driven directly by a test/
-// harness caller -- the same role CAPA plays for AWS, just invoked
-// synchronously instead of via its own reconcile loop.
+// reconciler only reads, tolerating its CRD not being installed yet;
+// see isMissingCRD in pkg/join/reconciler.go). There is no equivalent
+// containernet operator watching a ContainernetMachine CRD in a real
+// cluster, so this package's CreateMachine/DestroyMachine do the
+// provisioning themselves, driven by a test or harness caller: the
+// same role CAPA plays for AWS, invoked synchronously instead of via
+// its own reconcile loop.
 package containernet
 
 import (
@@ -29,7 +29,7 @@ var gvk = schema.GroupVersionKind{Group: "containernet.appmana.com", Version: "v
 // containerNameAnnotation lets a ContainernetMachine reference a
 // container whose name differs from the Kubernetes object's own name
 // (Docker container names and Kubernetes object names don't share a
-// charset) -- falls back to the object's own name when absent.
+// charset). It falls back to the object's own name when absent.
 const containerNameAnnotation = "containernet.appmana.com/container-name"
 
 // Provider implements join.InfraProvider for a Docker-container-backed
@@ -40,10 +40,10 @@ type Provider struct{}
 func (Provider) GVK() schema.GroupVersionKind { return gvk }
 
 // Running reports whether a real Docker container by this machine's
-// name is actually running, checked via a genuine `docker inspect`,
-// not an in-memory flag. Test helper -- the reconciler deliberately
-// never gates on infrastructure readiness (userdata must exist BEFORE
-// the compute launches; see pkg/join/reconciler.go).
+// name is running, checked via `docker inspect` rather than an
+// in-memory flag. This is a test helper; the reconciler does not gate
+// on infrastructure readiness, because userdata has to exist before
+// the compute launches (see pkg/join/reconciler.go).
 func (Provider) Running(ctx context.Context, machine *unstructured.Unstructured) (bool, error) {
 	name := containerName(machine)
 	out, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{.State.Running}}", name).CombinedOutput()
@@ -60,18 +60,19 @@ func (Provider) Running(ctx context.Context, machine *unstructured.Unstructured)
 	return running, nil
 }
 
-// InfraValues implements join.InfraProvider. Contributes nothing extra
-// today, mirroring aws.Provider's contract -- kept as a real method so
-// the interface stays honest about what a provider could contribute.
+// InfraValues implements join.InfraProvider. It contributes nothing
+// extra today, mirroring aws.Provider's contract, and is kept as a
+// real method so the interface still shows what a provider can
+// contribute.
 func (Provider) InfraValues(ctx context.Context, machine *unstructured.Unstructured) (map[string]any, error) {
 	return map[string]any{}, nil
 }
 
 // CreateMachine actually provisions the compute a ContainernetMachine
-// represents: a real, running, detached Docker container. Unlike AWS
-// (where CAPA does this outside the reconciler entirely), there is no
-// separate operator for containernet-backed machines -- a test/harness
-// caller invokes this directly, playing CAPA's role synchronously.
+// represents: a running, detached Docker container. Unlike AWS, where
+// CAPA does this outside the reconciler, there is no separate operator
+// for containernet-backed machines, so a test or harness caller
+// invokes this directly, playing CAPA's role synchronously.
 func CreateMachine(ctx context.Context, name, image string) error {
 	out, err := exec.CommandContext(ctx, "docker", "run", "-d", "--name", name, "--network", "none", image, "sleep", "infinity").CombinedOutput()
 	if err != nil {

@@ -5,14 +5,14 @@
 # No bootstrap provider (no k0smotron): its worker bootstrap controller
 # unconditionally requires Cluster.spec.controlPlaneRef to resolve to a
 # real object (confirmed by reading worker_bootstrap_controller.go's
-# setClientScope -- its own comment claims a graceful fallback to the
+# setClientScope: its own comment claims a graceful fallback to the
 # management cluster client when no ref is given, but the code errors
 # out instead with "object reference not set"). That makes it
 # fundamentally incompatible with a target cluster that isn't
 # CAPI-managed, which is exactly this case.
-# Machine.spec.bootstrap.dataSecretName exists precisely so a bootstrap
-# provider isn't required -- the claim controller presets it and the
-# join reconciler renders the Secret.
+# Machine.spec.bootstrap.dataSecretName exists so a bootstrap provider
+# isn't required: the claim controller presets it and the join
+# reconciler renders the Secret.
 #
 # Since the underlying k0s cluster isn't CAPI-managed, this pair must
 # carry the cluster.x-k8s.io/managed-by annotation so CAPA never
@@ -21,10 +21,10 @@
 # https://cluster-api-aws.sigs.k8s.io/topics/bring-your-own-aws-infrastructure#using-externally-managed-aws-clusters
 #
 # CAPI's own clustercache also needs live API access to the target
-# cluster (normally supplied by a CAPI-managed control plane) --
+# cluster (normally supplied by a CAPI-managed control plane), so
 # create a <cluster-name>-kubeconfig Secret once, out of band, from a
 # real kubeconfig pointed at the cluster's own internal API address
-# (not a tailnet/admin-only address -- it must be reachable from
+# (not a tailnet/admin-only address; it has to be reachable from
 # inside the target cluster's own pod network):
 #   kubectl create secret generic <cluster-name>-kubeconfig -n default \
 #     --from-file=value=<kubeconfig-with-server-set-to-the-internal-API-address>
@@ -59,12 +59,12 @@ spec:
     kind: AWSClusterStaticIdentity
     name: <identity-name>
 ---
-# CAPA ALWAYS resolves this secretRef against its own manager
-# namespace (capa-system), never the AWSCluster's -- a Secret placed
-# anywhere else produces an indefinite, opaque "Secret not found"
-# retry loop inside CAPA. The controller's preflight (aws.Provider
-# Validate) turns that into an immediate, actionable error, but put it
-# in capa-system in the first place.
+# CAPA resolves this secretRef against its own manager namespace
+# (capa-system), not the AWSCluster's. A Secret placed anywhere else
+# produces an indefinite, opaque "Secret not found" retry loop inside
+# CAPA. The controller's preflight (aws.Provider Validate) turns that
+# into an immediate, actionable error, but place it in capa-system in
+# the first place.
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSClusterStaticIdentity
 metadata:

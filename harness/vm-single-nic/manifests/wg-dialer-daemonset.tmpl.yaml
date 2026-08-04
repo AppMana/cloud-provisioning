@@ -1,17 +1,17 @@
-# Templated on-prem DaemonSet for the GREEN scenarios -- the driver
+# Templated on-prem DaemonSet for the green scenarios. The driver
 # script substitutes $DIALER_BINARY, $IFACE, $POD_CIDRS and
-# $SERVICE_CIDRS via envsubst before applying. Matches the real
+# $SERVICE_CIDRS via envsubst before applying. It matches the real
 # endpoint-controller's ensureDialerDaemonSet shape (hostNetwork,
 # NET_ADMIN, Secret mode, self-generated node-local key) closely enough
-# to exercise the same kernel-level behavior -- this harness runs the
+# to exercise the same kernel-level behavior. This harness runs the
 # dialer binary directly rather than through the controller's reconcile
-# loop, since what's under test is the dialer's kernel behavior on a
-# REAL booted system, not the controller's reconcile logic (that's the
-# kind e2e's job).
+# loop, since what is under test is the dialer's kernel behavior on a
+# booted system, not the controller's reconcile logic, which is the
+# kind e2e's job.
 #
 # The dialer generates its own WireGuard key under /var/lib/
-# cloud-provisioning on first start and publishes ONLY the public key
-# into the wg-dialer-peer Secret -- the driver script then renders the
+# cloud-provisioning on first start and publishes only the public key
+# into the wg-dialer-peer Secret. The driver script then renders the
 # cloud side's peers.json from that published key, proving the
 # no-manual-key-material flow end to end on a real kubelet.
 apiVersion: apps/v1
@@ -29,10 +29,10 @@ spec:
         app: dialer-repro
     spec:
       hostNetwork: true
-      # No control-plane exclusion HERE: this harness's single onprem
+      # No control-plane exclusion here: this harness's single onprem
       # node is controller+worker and is the explicitly-selected tunnel
       # endpoint (the selector-override case). The production default
-      # posture -- control planes excluded unless named -- is rendered
+      # posture, control planes excluded unless named, is rendered
       # by the endpoint-controller and asserted by harness/kind-e2e.
       affinity:
         nodeAffinity:

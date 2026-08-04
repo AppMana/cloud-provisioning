@@ -3,14 +3,14 @@
 # up the WireGuard tunnel, gate on the cluster's API VIP becoming
 # reachable through it, then join as a plain kubeadm worker using a
 # pre-minted bootstrap token + CA-hash pin. Set directly as
-# Machine.spec.bootstrap.dataSecretName content -- no bootstrap
-# provider. kubeadm is one join specialization (kind's control plane is
+# Machine.spec.bootstrap.dataSecretName content, with no bootstrap
+# provider. kubeadm is one join implementation (kind's control plane is
 # kubeadm); k0s-worker.cloud-config.tmpl is another, same contract.
 #
-# ONLY write_files and runcmd here: CAPD (this pattern's first
-# consumer) interprets cloud-config with its own parser, and any OTHER
+# Only write_files and runcmd belong here: CAPD (this pattern's first
+# consumer) interprets cloud-config with its own parser, and any other
 # top-level module lands in its "unknown" handler, which parses the
-# block as JSON and hard-fails on plain YAML -- confirmed by reading
+# block as JSON and fails on plain YAML. See
 # cluster-api/test/infrastructure/docker/internal/provisioning/
 # cloudinit/{adapter,unknown}.go. SSH keys, if a kubeadm-over-WAN
 # deployment ever needs them, belong in a write_files/runcmd step of a
@@ -62,7 +62,7 @@ write_files:
       WantedBy=multi-user.target
   # kubelet extra args (role label + internet-facing taint) via the
   # standard systemd drop-in environment file kubeadm's kubelet unit
-  # already sources -- keeps the generic kubeletExtraArgs contract
+  # already sources. This keeps the generic kubeletExtraArgs contract
   # without translating it into JoinConfiguration structure.
   - path: /etc/default/kubelet
     permissions: '0644'
@@ -71,10 +71,10 @@ write_files:
 runcmd:
   # Pinned-digest binary delivery, identical to the k0s pattern: a
   # mismatch halts the join rather than running unverified code.
-  # Download to a temp path and RENAME into place: a re-run of this
+  # Download to a temp path and rename into place: a re-run of this
   # bootstrap (cloud-init reruns, an infrastructure provider retrying)
   # would otherwise try to write a binary that is already executing,
-  # and the kernel refuses that (ETXTBSY) -- curl reports it as an
+  # and the kernel refuses that (ETXTBSY), which curl reports as an
   # opaque write failure. Rename replaces the directory entry and
   # works regardless.
   - |
@@ -91,12 +91,12 @@ runcmd:
     mv -f /usr/local/bin/.wg-dialer.new /usr/local/bin/wg-dialer
   - systemctl daemon-reload
   - systemctl enable --now wg-dialer.service
-  # Gate on the API's TCP port, NOT on ICMP: minimal cloud images ship
-  # no ping at all (kindest/node: exit 127) and cloud firewalls
+  # Gate on the API's TCP port rather than ICMP: minimal cloud images
+  # ship no ping at all (kindest/node: exit 127) and cloud firewalls
   # routinely drop ICMP while allowing the API port, so a ping gate
   # either loops forever or reports the wrong thing. curl is already a
-  # hard dependency of this pattern. Any HTTP response -- including
-  # 401/403 -- proves reachability, so no -f here.
+  # hard dependency of this pattern. Any HTTP response, including
+  # 401/403, proves reachability, so no -f here.
   - until curl -sk --max-time 3 -o /dev/null https://{{ .apiEndpoint }}/livez; do sleep 2; done
   - |
     kubeadm join {{ .joinEndpoint }} \

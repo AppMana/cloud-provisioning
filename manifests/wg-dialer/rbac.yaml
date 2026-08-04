@@ -12,10 +12,10 @@
 # AWS provider config (aws-provider-config), the image pull secret,
 # and CAPA's own credentials in capa-system.
 #
-# RBAC below is derived from the code's actual API calls, split
-# deliberately: cluster-wide access only for the types that genuinely
-# live cluster-wide (Machines, Clusters, provider machines, Nodes, the
-# claim CRD); Secret access is namespace-scoped Roles -- this identity
+# RBAC below is derived from the code's API calls and split so that
+# cluster-wide access covers only the types that live cluster-wide
+# (Machines, Clusters, provider machines, Nodes, the claim CRD).
+# Secret access uses namespace-scoped Roles, so this identity
 # cannot touch Secrets outside wg-dialer except the two specific
 # kube-system objects the k0s join flow needs and read-only CAPA
 # preflight objects.
@@ -48,7 +48,7 @@ rules:
   # reconciler also creates them.
   - apiGroups: ["cluster.x-k8s.io"]
     resources: ["machines"]
-    # delete: the claim tears down its own compute -- ownerRef GC does
+    # delete: the claim tears down its own compute. OwnerRef GC does
     # not suffice, because CAPI's Machine controller replaces the
     # claim's ownerReference with the Cluster.
     verbs: ["get", "list", "watch", "create", "patch", "delete"]

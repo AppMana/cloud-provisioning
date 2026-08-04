@@ -19,16 +19,16 @@ import (
 // every created resource carries Project=cloud-provisioning-harness (so
 // the scoped identity from scripts/aws/bootstrap-harness-iam.sh can act
 // on it and on nothing else), state is recorded before it's used, and
-// teardown tolerates already-gone resources. Deliberately the `aws` CLI
-// via exec, not an SDK dependency -- matching how containernet drives a
-// real `docker` binary.
+// teardown tolerates already-gone resources. It drives the `aws` CLI
+// via exec rather than taking an SDK dependency, matching how
+// containernet drives a real `docker` binary.
 //
 // Skipped (not failed) without working credentials, so `go test ./...`
 // stays green on machines and CI runs that have none. The launch test
 // additionally needs the same env bringup.sh requires:
 //
-//	SUBNET_ID -- subnet to launch into
-//	AMI_ID    -- arm64 AMI in the region
+//	SUBNET_ID subnet to launch into
+//	AMI_ID    arm64 AMI in the region
 const harnessTag = "Project=cloud-provisioning-harness"
 
 func requireAWS(t *testing.T) {
@@ -71,7 +71,7 @@ func awsJSON(ctx context.Context, t *testing.T, target any, args ...string) {
 // claim path's rendered values are real: resolve a request against the
 // catalog, render the AWSMachine spec from a provider-config Secret
 // (exactly what the claim reconciler does), then launch a real instance
-// from those rendered values -- playing CAPA's role synchronously, the
+// from those rendered values, playing CAPA's role synchronously the
 // same way containernet plays it for Docker. Terminated by t.Cleanup
 // even on assertion failure.
 func TestInfraMachineSpecActuallyLaunches(t *testing.T) {
@@ -100,8 +100,8 @@ func TestInfraMachineSpecActuallyLaunches(t *testing.T) {
 	}}}
 	obj.SetGroupVersionKind(gvk)
 
-	// Launch from the RENDERED values, not the inputs -- the render is
-	// what's under test.
+	// Launch from the rendered values, not the inputs; the render is
+	// what is under test.
 	renderedType, _, _ := unstructured.NestedString(obj.Object, "spec", "instanceType")
 	renderedAMI, _, _ := unstructured.NestedString(obj.Object, "spec", "ami", "id")
 	renderedSubnet, _, _ := unstructured.NestedString(obj.Object, "spec", "subnet", "id")
@@ -133,11 +133,11 @@ func TestInfraMachineSpecActuallyLaunches(t *testing.T) {
 		cctx, ccancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer ccancel()
 		if out, err := exec.CommandContext(cctx, "aws", "ec2", "terminate-instances", "--instance-ids", instanceID).CombinedOutput(); err != nil {
-			t.Errorf("terminate-instances %s: %v: %s -- TERMINATE IT MANUALLY", instanceID, err, strings.TrimSpace(string(out)))
+			t.Errorf("terminate-instances %s: %v: %s. TERMINATE IT MANUALLY", instanceID, err, strings.TrimSpace(string(out)))
 			return
 		}
 		if err := exec.CommandContext(cctx, "aws", "ec2", "wait", "instance-terminated", "--instance-ids", instanceID).Run(); err != nil {
-			t.Errorf("waiting for %s to terminate: %v -- verify manually", instanceID, err)
+			t.Errorf("waiting for %s to terminate: %v. Verify manually", instanceID, err)
 		}
 	})
 

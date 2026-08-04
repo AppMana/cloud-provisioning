@@ -10,9 +10,9 @@
 //
 // The mesh this reconciler emits is fully connected between the
 // topologically local side and every topologically isolated remote:
-// each remote peers with every selected local tunnel-endpoint node AND
-// with every other remote (isolated remotes share no LAN -- without
-// remote-to-remote peers they could not reach each other at all).
+// each remote peers with every selected local tunnel-endpoint node and
+// with every other remote. Isolated remotes share no LAN, so without
+// remote-to-remote peers they could not reach each other.
 package join
 
 import (
@@ -38,11 +38,11 @@ import (
 )
 
 // isMissingCRD reports whether err indicates the requested Kind isn't
-// registered with the API server at all -- i.e. the CRD that defines
+// registered with the API server at all, meaning the CRD that defines
 // it (owned by another operator, e.g. CAPA's AWSMachine) isn't
-// installed yet. This is expected during bootstrap ordering (this
-// reconciler can start before CAPA does) and should be treated as
-// "not ready yet, requeue quietly", never as a hard error.
+// installed yet. This is expected during bootstrap ordering, since
+// this reconciler can start before CAPA does, and is treated as "not
+// ready yet, requeue quietly" rather than a hard error.
 func isMissingCRD(err error) bool {
 	if err == nil {
 		return false
@@ -53,14 +53,14 @@ func isMissingCRD(err error) bool {
 	// The dynamic/unstructured client can surface a missing CRD as a
 	// plain "no matches for kind" / "could not find the requested
 	// resource" error message rather than a typed meta.NoKindMatchError,
-	// depending on server version -- checking the message is the only
+	// depending on server version. Checking the message is the only
 	// reliable cross-version signal for that case.
 	msg := err.Error()
 	return strings.Contains(msg, "no matches for kind") || strings.Contains(msg, "the server could not find the requested resource")
 }
 
 // crdRecheckInterval paces retries while waiting for another operator's
-// CRD (e.g. CAPA's) to appear -- long enough not to hot-loop against a
+// CRD (e.g. CAPA's) to appear: long enough not to hot-loop against a
 // slow-starting dependency, short enough that provisioning starts
 // promptly once it does.
 const crdRecheckInterval = 30 * time.Second
@@ -70,15 +70,12 @@ var machineGVK = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1
 // WireGuardAddrAnnotation records the WireGuard tunnel address
 // allocated to a cloud worker Machine, mirroring NodeVIPAnnotation.
 //
-// This exists because of a real bug this fix caught: WireGuardAddress
-// used to be handed to every Machine as the SAME static literal (e.g.
-// every cloud Machine got "10.100.0.2/24" as its own tunnel address).
-// A second cloud Machine would then get a byte-for-byte identical
-// WireGuard AllowedIPs entry AND kernel RouteHost as the first --
-// invalid/undefined for WireGuard cryptokey routing (two peers can't
-// both claim the same AllowedIPs destination) and ambiguous for the
-// on-prem dialer's own kernel route. Each cloud Machine gets its own,
-// distinct address, allocated the same way node-VIPs already are.
+// Each cloud Machine gets its own distinct address, allocated the same
+// way node VIPs are. A shared literal would give a second cloud
+// Machine an identical WireGuard AllowedIPs entry and kernel
+// RouteHost, which is undefined for WireGuard cryptokey routing (two
+// peers cannot both claim the same AllowedIPs destination) and
+// ambiguous for the on-prem dialer's kernel route.
 const WireGuardAddrAnnotation = "cloud-provisioning.appmana.com/wireguard-addr4"
 
 // Reconciler provisions bootstrap Secrets for cloud-worker Machines.
@@ -91,7 +88,7 @@ type Reconciler struct {
 	// InfraProviders is every registered infrastructure provider (AWS,
 	// a Docker-backed test double, ...). Which one applies to a given
 	// Machine is inferred from its spec.infrastructureRef.kind, matched
-	// against each provider's own GVK() -- never hardcoded here, so
+	// against each provider's own GVK() rather than hardcoded here, so
 	// adding a new cloud/test provider means registering it, not
 	// branching this reconciler.
 	InfraProviders []InfraProvider
@@ -111,13 +108,13 @@ type Reconciler struct {
 	// PodCIDRs/ServiceCIDRs are the cluster's own declared ranges
 	// (from the cluster's k0sctl/site config at gitops-render time).
 	// Comma-separated; fed to the cloud dialer's --pod-cidrs/
-	// --service-cidrs (WireGuard cryptokey accept-list only -- never a
+	// --service-cidrs (WireGuard cryptokey accept-list only, not a
 	// kernel route; see cmd/dialer/main.go's package doc).
 	PodCIDRs     string
 	ServiceCIDRs string
 
-	// WireGuardAddress is the BASE tunnel address (e.g.
-	// "10.100.0.2/24") -- the first cloud Machine gets exactly this;
+	// WireGuardAddress is the base tunnel address (e.g.
+	// "10.100.0.2/24"). The first cloud Machine gets exactly this;
 	// each subsequent one gets the next free address in the same
 	// prefix (see WireGuardAddrAnnotation).
 	WireGuardAddress    string
@@ -139,7 +136,7 @@ type Reconciler struct {
 	// Dialer binary delivery: the cloud node's stock image has no
 	// wg-dialer; cloud-init downloads it from this per-arch URL and
 	// verifies the pinned digest before enabling the unit. sha256 is
-	// pinned at render time -- a compromised download host cannot swap
+	// pinned at render time, so a compromised download host cannot swap
 	// the binary.
 	DialerBinaryURLARM64    string
 	DialerBinarySHA256ARM64 string
@@ -148,7 +145,7 @@ type Reconciler struct {
 
 	// Standard containernetworking plugins. A cluster's CNI config may
 	// chain bandwidth/portmap/tuning; calico-node installs only its
-	// own, and a stock cloud image has none -- so without these every
+	// own, and a stock cloud image has none, so without these every
 	// pod sandbox on a provisioned node fails. Same per-arch, sha-pinned
 	// delivery as the dialer binary.
 	CNIPluginsURLARM64    string
@@ -178,10 +175,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	existing := &corev1.Secret{}
 	err := r.Reader.Get(ctx, types.NamespacedName{Namespace: machine.GetNamespace(), Name: bootstrapSecretName}, existing)
 	if err == nil {
-		// Already provisioned -- nothing to do. (Re-provisioning after
-		// a spec change is a delete-and-let-us-recreate operation, same
-		// as every other CAPA spec-immutability case this project has
-		// already hit -- not something this reconciler second-guesses.)
+		// Already provisioned, nothing to do. Re-provisioning after a
+		// spec change is a delete-and-recreate operation, as with any
+		// other CAPA spec-immutability case.
 		return ctrl.Result{}, nil
 	}
 	if !apierrors.IsNotFound(err) {
@@ -203,16 +199,15 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("no InfraProvider registered for infrastructureRef kind %q", infraRefKind)
 	}
 
-	// Deliberately not gated on the infrastructure resource being
-	// "ready" (e.g. AWSMachine's instance actually running): cloud-init/
-	// user-data must exist BEFORE the underlying compute launches, for
-	// every infrastructure provider -- it's the boot mechanism, not a
-	// post-boot artifact. Waiting for "ready" first would deadlock,
-	// since the infra provider is commonly the one blocked on this very
-	// Secret existing (confirmed live: CAPA's AWSMachine controller
-	// refuses to call RunInstances until this bootstrap Secret is
-	// already there). All that's needed here is that the
-	// infrastructureRef target object itself exists.
+	// Not gated on the infrastructure resource being "ready" (e.g.
+	// AWSMachine's instance running): cloud-init user-data has to exist
+	// before the underlying compute launches, for any infrastructure
+	// provider, since it is the boot mechanism rather than a post-boot
+	// artifact. Waiting for "ready" first would deadlock, because the
+	// infra provider is commonly blocked on this Secret existing: CAPA's
+	// AWSMachine controller does not call RunInstances until the
+	// bootstrap Secret is there. All that is needed here is that the
+	// infrastructureRef target object exists.
 	infraMachine := &unstructured.Unstructured{}
 	infraMachine.SetGroupVersionKind(infra.GVK())
 	if err := r.Reader.Get(ctx, types.NamespacedName{Namespace: machine.GetNamespace(), Name: infraRefName}, infraMachine); err != nil {
@@ -252,17 +247,17 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("allocating wireguard address: %w", err)
 	}
-	// The cloud node can't read a cluster Secret before it joins -- its
-	// whole bootstrap peer list travels in cloud-init as a plain JSON
-	// file the same dialer binary reads via --peers-file. Peers:
+	// The cloud node cannot read a cluster Secret before it joins, so
+	// its bootstrap peer list travels in cloud-init as a plain JSON
+	// file the same dialer binary reads via --peers-file. The peers are
 	// every selected local tunnel-endpoint node (from the node-* keys
 	// the local dialers published and the controller allocated), plus
-	// every OTHER cloud machine already in the mesh (remote-to-remote:
-	// isolated remotes share no LAN). On the cloud side a local peer's
-	// Endpoint is deliberately empty -- the cloud node only listens for
-	// the on-prem side, which is behind NAT with no inbound path -- but
-	// a remote peer's Endpoint is its public address: two remotes have
-	// no NAT between them and must dial each other directly.
+	// each other cloud machine already in the mesh, since isolated
+	// remotes share no LAN. On the cloud side a local peer's Endpoint
+	// is empty: the cloud node only listens for the on-prem side, which
+	// is behind NAT with no inbound path. A remote peer's Endpoint is
+	// its public address, because two remotes have no NAT between them
+	// and dial each other directly.
 	cloudTunnelAddrEarly := strings.SplitN(strings.TrimSpace(cloudWGAddress), "/", 2)[0]
 	peers, err := tunnel.RemotePeers(dialerSecret.Data, cloudTunnelAddrEarly, r.apiServers(dialerSecret))
 	if err != nil {
@@ -332,9 +327,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// Owned by the Machine: `kubectl delete machine` (or a claim
 	// cascade) garbage-collects this Secret, so a re-created Machine
-	// gets a FRESH render -- join tokens expire (TTL ~2h); silently
-	// reusing a stale Secret was a confirmed way to strand a re-created
-	// node at the join step with no error anywhere.
+	// gets a fresh render. Join tokens expire (TTL ~2h), and reusing a
+	// stale Secret strands a re-created node at the join step with no
+	// error reported.
 	bootstrapSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      bootstrapSecretName,
@@ -357,16 +352,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	// Record the new node's peer entry so local dialers accept and
-	// route to it. Per-Machine-keyed (peer-*-<machine>) -- a second
-	// cloud Machine must never clobber the first's entry.
+	// route to it. Per-Machine-keyed (peer-*-<machine>), so a second
+	// cloud Machine does not clobber the first's entry.
 	//
 	// AllowedIPs vs RouteHosts (see cmd/dialer/main.go's package doc):
 	// both carry the machine's tunnel address, which is the address
 	// the CNI is told to peer on. AllowedIPs because WireGuard's
 	// cryptokey filter matches inner destinations, RouteHosts because
-	// node-to-node reachability is this tunnel layer's one routing job.
-	// Everything wider (pod blocks) is the CNI's concern, learned over
-	// the sessions these host routes make possible.
+	// node-to-node reachability is this tunnel layer's only routing
+	// job. Everything wider (pod blocks) is the CNI's concern, learned
+	// over the sessions these host routes make possible.
 	patch := client.MergeFrom(dialerSecret.DeepCopy())
 	if dialerSecret.Data == nil {
 		dialerSecret.Data = map[string][]byte{}
@@ -417,9 +412,9 @@ func (r *Reconciler) apiServers(dialerSecret *corev1.Secret) []string {
 
 // infraProviderFor finds the registered InfraProvider whose GVK.Kind
 // matches a Machine's spec.infrastructureRef.kind, or nil if none is
-// registered for it. Deliberately never anything more specific than a
-// Kind comparison, so registering a new InfraProvider is the only
-// thing needed to support a new infrastructure.
+// registered for it. The match is a Kind comparison and nothing more
+// specific, so registering a new InfraProvider is all that is needed
+// to support a new infrastructure.
 func (r *Reconciler) infraProviderFor(kind string) InfraProvider {
 	for _, p := range r.InfraProviders {
 		if p.GVK().Kind == kind {
@@ -429,13 +424,6 @@ func (r *Reconciler) infraProviderFor(kind string) InfraProvider {
 	return nil
 }
 
-// dialerBinaryFor picks the per-arch download URL + pinned sha256 for
-// the joining machine. Arch comes from the infra provider's values
-// ("arch": e.g. AWS derives it from the instance type); a provider
-// that contributes none gets arm64 -- the only arch this project has
-// ever provisioned -- but an unpinned digest is always fatal: silently
-// rendering userdata that downloads an unverifiable binary is not a
-// fallback, it's a supply-chain hole.
 // validateDialerBinaries refuses to render userdata that would fetch a
 // binary it cannot verify. The bootstrap picks by architecture at boot,
 // so both entries travel in every rendered document, and a URL without
@@ -466,8 +454,8 @@ func (r *Reconciler) validateDialerBinaries() error {
 // allocateWireGuardAddress finds the next free cloud tunnel address by
 // scanning existing cloud-worker Machines' WireGuardAddrAnnotation,
 // starting from r.WireGuardAddress (the base address). Mirrors
-// allocateNodeVIPIndex exactly (see WireGuardAddrAnnotation's doc
-// comment for the bug this fixes).
+// allocateNodeVIPIndex; see WireGuardAddrAnnotation's doc comment for
+// why each Machine needs a distinct address.
 func (r *Reconciler) allocateWireGuardAddress(ctx context.Context) (string, error) {
 	ip, ipNet, err := net.ParseCIDR(r.WireGuardAddress)
 	if err != nil {

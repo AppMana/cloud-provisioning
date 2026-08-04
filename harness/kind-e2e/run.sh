@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Declarative fan-out e2e on a real (kind) API server: apply ONE
+# Declarative fan-out e2e on a real (kind) API server: apply one
 # ProvisionedNodeClaim and assert everything the controller derives
-# from it -- the AWSMachine + Machine pair with ownerRefs, the rendered
+# from it: the AWSMachine + Machine pair with ownerRefs, the rendered
 # bootstrap Secret (binary URL + pinned sha, unique cldt* interface,
 # baked peers.json, machine-name file), the peer Secret entries, the
 # adoption Secret, both dialer DaemonSets' scheduling shapes, and the
 # full cascade on delete.
 #
-# What kind CANNOT do here: real CAPA (no instance), real BGP, real
-# tunnels -- that needs a real cluster. The dialer's
+# What kind cannot do here: real CAPA (no instance), real BGP, real
+# tunnels. Those need a real cluster. The dialer's
 # kernel behavior is covered by harness/netns-routing. The one
 # simulated element: the dialer pod's key publication (the dialer image
 # is in a private registry; its Secret-mode publication logic is
@@ -102,8 +102,8 @@ echo "--- fake k0s releases API (kind's kubelet has no +k0s suffix a real lookup
 KUBELET_VERSION=$(kubectl get node "$WORKER" -o jsonpath='{.status.nodeInfo.kubeletVersion}')
 KUBELET_VERSION="$KUBELET_VERSION" python3 ./fake-k0s-releases.py "$RELEASES_PORT" &
 RELEASES_PID=$!
-# The k0s SPECIALIZATION's own knob, in its own provider-config Secret
-# (the same pattern as aws-provider-config) -- never an operator flag.
+# The k0s implementation's own knob, in its own provider-config Secret
+# (the same pattern as aws-provider-config), not an operator flag.
 kubectl -n wg-dialer create secret generic k0s-provider-config \
   --from-literal=releases-api="http://127.0.0.1:$RELEASES_PORT" >/dev/null
 
@@ -130,7 +130,7 @@ echo "--- gate: mesh side comes up on its own (peer Secret created, worker alloc
 until_ok 60 sh -c "kubectl -n wg-dialer get secret wg-dialer-peer -o jsonpath='{.data.node-tunnel-address-$WORKER}' | grep -q ." \
   || fail "worker never allocated a tunnel address (controller must create the peer Secret itself)"
 kubectl -n wg-dialer get secret wg-dialer-peer -o jsonpath="{.data.node-tunnel-address-$CONTROL_PLANE}" | grep -q . \
-  && fail "the CONTROL-PLANE node was allocated a tunnel address -- default posture must exclude controllers"
+  && fail "the CONTROL-PLANE node was allocated a tunnel address: default posture must exclude controllers"
 until_ok 30 kubectl -n wg-dialer get daemonset wg-dialer || fail "on-prem DaemonSet never created"
 until_ok 30 kubectl -n wg-dialer get daemonset wg-dialer-cloud || fail "cloud DaemonSet never created"
 IFACE=$(kubectl -n wg-dialer get daemonset wg-dialer -o json | python3 -c "
@@ -220,8 +220,8 @@ for want in [
     'K0S_VERSION=$KUBELET_VERSION.0',  # resolved through the releases API
 ]:
     assert want in value, f'bootstrap userdata missing {want!r}'
-# The ONLY private key in userdata is the cloud node's own identity
-# (rendered fresh for this machine). No on-prem node's key may appear:
+# The only private key in userdata is the cloud node's own identity
+# (rendered fresh for this machine). No on-prem node's key appears:
 # the peer Secret never contained one to leak.
 assert value.count('privateKey') == 1, 'expected exactly the cloud node identity key'
 " || fail "bootstrap Secret content wrong"

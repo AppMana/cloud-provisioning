@@ -11,36 +11,36 @@ spec:
         keyPath: cfg/ssh/harness_key
       role: controller+worker
       # Every guest boots as "ubuntu" with the same slirp-NAT address
-      # (10.0.0.15) -- k0sctl >= 0.32 validates hostname/privateAddress
-      # uniqueness, so both are set explicitly. privateAddress MUST be
-      # guest-local: k0sctl writes it into etcd's peer listener
-      # unconditionally (ignoring spec.storage config), and etcd dies
-      # on a bind of any address the guest doesn't carry -- so the
-      # container-side mgmt IPs are unusable here. Cloud gets a unique
-      # lo-attached 10.0.0.16 (added by the driver script). Only
-      # 22/6443/51820 are forwarded into the guests, so
-      # apiserver->kubelet connections are dead -- the same documented
-      # limitation the real topology accepts.
+      # (10.0.0.15), and k0sctl >= 0.32 validates hostname and
+      # privateAddress uniqueness, so both are set explicitly.
+      # privateAddress has to be guest-local: k0sctl writes it into
+      # etcd's peer listener unconditionally (ignoring spec.storage
+      # config), and etcd dies on a bind of any address the guest
+      # doesn't carry, so the container-side mgmt IPs are unusable
+      # here. Cloud gets a unique lo-attached 10.0.0.16 (added by the
+      # driver script). Only 22/6443/51820 are forwarded into the
+      # guests, so apiserver-to-kubelet connections are dead, the same
+      # documented limitation the real topology accepts.
       hostname: onprem
       privateAddress: 10.0.0.15
       noTaints: true
       installFlags:
         - --disable-components=konnectivity-server,metrics-server
-    # cloud: mirrors the real EC2/cloud-worker join -- a plain k0s
-    # worker, registered with the SAME node-label/taint pair the real
-    # join-pattern's kubelet args apply
+    # cloud: mirrors the real EC2/cloud-worker join as a plain k0s
+    # worker, registered with the same node-label and taint pair the
+    # real join-pattern's kubelet args apply
     # (cloud-provisioning.appmana.com/role=cloud-worker,
-    # cloud-provisioning.appmana.com/internet-facing:NoSchedule -- see
+    # cloud-provisioning.appmana.com/internet-facing:NoSchedule; see
     # controller/cmd/endpoint-controller/main.go's
     # cloudWorkerRoleLabel/Value and cloudWorkerTaintKey constants).
-    # This is what makes the on-prem wg-dialer DaemonSet structurally
+    # That is what makes the on-prem wg-dialer DaemonSet structurally
     # unable to schedule here, and what lets the cloud-worker DaemonSet
-    # (manifests/wg-dialer-cloud-daemonset.tmpl.yaml) schedule ONLY
+    # (manifests/wg-dialer-cloud-daemonset.tmpl.yaml) schedule only
     # here. k0sctl's own join-token distribution replaces the real
-    # join.Reconciler's token-minting for this harness -- that flow is
-    # already covered separately (see the kind-cluster integration test
-    # done earlier this session), what's under test here is the
-    # DaemonSet-scheduling/coexistence behavior, not token minting.
+    # join.Reconciler's token-minting for this harness; that flow is
+    # covered by the kind-cluster integration test. What is under test
+    # here is the DaemonSet scheduling and coexistence behavior, not
+    # token minting.
     - ssh:
         address: 172.31.41.3
         user: sysadmin

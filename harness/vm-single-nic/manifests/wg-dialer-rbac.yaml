@@ -4,11 +4,11 @@ metadata:
   name: wg-dialer
 ---
 # The wg-dialer-peer Secret carries the cloud peer's entries (created
-# per run by scripts/run-scenario.sh -- the driver plays the join
-# reconciler's role of generating the CLOUD side's key) plus the
+# per run by scripts/run-scenario.sh, where the driver plays the join
+# reconciler's role of generating the cloud side's key) plus the
 # on-prem node's controller-side allocations. The on-prem dialer's own
-# key is NOT in it anywhere: the dialer generates it node-locally and
-# publishes only the public key -- hence "patch", not just "get".
+# key is not in it: the dialer generates it node-locally and
+# publishes only the public key, hence "patch" rather than just "get".
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

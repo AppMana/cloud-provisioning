@@ -7,30 +7,29 @@ ssh_authorized_keys:
 # the WireGuard tunnel, gate on the cluster's API VIP becoming
 # reachable through it, then join as a plain k0s worker using a
 # pre-minted join token. This is CAPA's own
-# Machine.spec.bootstrap.dataSecretName content -- no bootstrap
-# provider involved. That's deliberate, not a shortcut: a bootstrap
-# provider's whole value is generating this content FOR you from a
-# CAPI-managed control plane, and there isn't one here (see
-# ../README.md). Every value below comes from the join reconciler's
-# render, not from any control-plane object.
+# Machine.spec.bootstrap.dataSecretName content, with no bootstrap
+# provider involved. A bootstrap provider's value is generating this
+# content from a CAPI-managed control plane, and there isn't one here
+# (see ../README.md). Every value below comes from the join
+# reconciler's render, not from any control-plane object.
 write_files:
-  # Not wg0.conf/wg-quick: wg-quick auto-installs a kernel route for
-  # every AllowedIPs entry -- the exact mechanism of the 2026-07-22
-  # route-hijack incident. The same hardened Go dialer binary that runs
-  # on-prem runs here instead (listener role, systemd unit below): pod/
-  # service CIDRs go only into WireGuard's cryptokey accept-list, and
-  # the only kernel routes it will ever install are /32 and /128 host
-  # routes to peer node addresses, enforced at parse time.
+  # Not wg0.conf/wg-quick: wg-quick installs a kernel route for every
+  # AllowedIPs entry, which is a route hijack. The same Go dialer
+  # binary that runs on-prem runs here instead (listener role, systemd
+  # unit below): pod and service CIDRs go only into WireGuard's
+  # cryptokey accept-list, and the only kernel routes it installs are
+  # /32 and /128 host routes to peer node addresses, enforced at parse
+  # time.
   #
-  # This file is the BOOTSTRAP snapshot: identity (this node's private
-  # key + tunnel address, which never travel through the API) plus the
-  # peer list as of render time. Post-join, the wg-dialer-cloud
+  # This file is the bootstrap snapshot: identity (this node's private
+  # key and tunnel address, which do not travel through the API) plus
+  # the peer list as of render time. Post-join, the wg-dialer-cloud
   # DaemonSet feeds the same dialer a live peer list from an in-cluster
-  # Secret (--machine-name-file below resolves which one) -- that
-  # adoption path, not this frozen file, is how peer/CIDR corrections
-  # reach a node whose userdata is immutable. The systemd unit is never
-  # disabled: if the DaemonSet can't schedule, this file remains the
-  # floor that keeps the node reachable.
+  # Secret (--machine-name-file below resolves which one). That
+  # adoption path, not this frozen file, is how peer and CIDR
+  # corrections reach a node whose userdata is immutable. The systemd
+  # unit is not disabled: if the DaemonSet cannot schedule, this file
+  # keeps the node reachable.
   - path: /etc/wg-dialer/peers.json
     permissions: '0600'
     content: |
@@ -82,12 +81,12 @@ runcmd:
   # BEFORE anything depends on it. The architecture is read here rather
   # than declared in the claim, because the machine already knows it. The
   # sha256 is pinned into this (immutable) userdata at render time, so
-  # a compromised download host cannot swap the binary -- a mismatch
+  # a compromised download host cannot swap the binary; a mismatch
   # halts the join rather than running unverified code.
-  # Download to a temp path and RENAME into place: a re-run of this
+  # Download to a temp path and rename into place: a re-run of this
   # bootstrap (cloud-init reruns, an infrastructure provider retrying)
   # would otherwise try to write a binary that is already executing,
-  # and the kernel refuses that (ETXTBSY) -- curl reports it as an
+  # and the kernel refuses that (ETXTBSY), which curl reports as an
   # opaque write failure. Rename replaces the directory entry and
   # works regardless.
   - |
@@ -103,26 +102,26 @@ runcmd:
     chmod 0755 /usr/local/bin/.wg-dialer.new
     mv -f /usr/local/bin/.wg-dialer.new /usr/local/bin/wg-dialer
   - systemctl enable --now wg-dialer.service
-  # Gate on the API's TCP port, NOT on ICMP: minimal cloud images may
-  # ship no ping at all, and cloud firewalls routinely drop ICMP while
-  # allowing the API port, so a ping gate either loops forever or
+  # Gate on the API's TCP port rather than ICMP: minimal cloud images
+  # may ship no ping at all, and cloud firewalls routinely drop ICMP
+  # while allowing the API port, so a ping gate either loops forever or
   # reports the wrong thing. curl is already a hard dependency of this
-  # pattern. Any HTTP response -- including 401/403 -- proves
-  # reachability, so no -f here.
+  # pattern. Any HTTP response, including 401/403, proves reachability,
+  # so no -f here.
   - until curl -sk --max-time 3 -o /dev/null https://{{ .apiEndpoint }}/livez; do sleep 2; done
-  # The cluster's CNI configuration CHAINS standard plugins. Confirmed
-  # on this fleet: 10-calico.conflist is calico -> calico-ipam -> k8s
-  # -> portmap -> bandwidth. Calico's install-cni ships calico,
-  # calico-ipam, flannel, host-local, loopback, portmap and tuning --
-  # but NOT bandwidth, and k0s bundles only containerd/kubelet/iptables/
-  # runc. On existing nodes bandwidth was placed there by whatever
+  # The cluster's CNI configuration chains standard plugins. For
+  # example, 10-calico.conflist chains calico, calico-ipam, k8s,
+  # portmap and bandwidth in that order. Calico's install-cni ships
+  # calico-ipam, flannel, host-local, loopback, portmap and tuning, but
+  # not bandwidth, and k0s bundles only containerd, kubelet, iptables
+  # and runc. On existing nodes bandwidth was placed there by whatever
   # provisioned them; a freshly provisioned node has no way to get it,
   # and every pod sandbox then fails with 'failed to find plugin
   # "bandwidth" in path [/opt/cni/bin]'.
   #
-  # Fills GAPS only: a plugin Calico already installed is left alone,
-  # so this never downgrades calico-ipam or portmap to the upstream
-  # build underneath a running CNI.
+  # This fills gaps only: a plugin Calico already installed is left
+  # alone, so it does not downgrade calico-ipam or portmap to the
+  # upstream build underneath a running CNI.
   {{- if or .cniPluginsURLArm64 .cniPluginsURLAmd64 }}
   - |
     set -e
@@ -142,11 +141,11 @@ runcmd:
     rm -rf /tmp/cni-plugins /tmp/cni-plugins.tgz
   {{- end }}
   - curl -sSLf https://get.k0s.sh | K0S_VERSION={{ .k0sVersion }} sh
-  # k0s resolves node IPs by looking up the instance's own hostname, not
-  # by inspecting interfaces -- on AWS that hostname only maps to the
-  # private IPv4 in /etc/hosts, so a dual-stack cluster's kubelet fails
-  # to start ("IP address lookup didn't return addresses for both
-  # families") even when the interface genuinely has a real IPv6 GUA.
+  # k0s resolves node IPs by looking up the instance's own hostname
+  # rather than inspecting interfaces. On AWS that hostname maps only
+  # to the private IPv4 in /etc/hosts, so a dual-stack cluster's
+  # kubelet fails to start ("IP address lookup didn't return addresses
+  # for both families") even when the interface has a real IPv6 GUA.
   # --node-ip bypasses that lookup with addresses fetched directly from
   # instance metadata instead. (IMDSv2, AWS-specific: a different
   # infrastructure provider's variant of this pattern would fetch its
@@ -159,10 +158,10 @@ runcmd:
     [ -n "$NODE_IPV6" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4,$NODE_IPV6"
     k0s install worker --token-file /etc/k0s/join-token --kubelet-extra-args="{{ .kubeletExtraArgs }} $NODE_IP_ARG"
   - k0s start
-  # CAPI's bootstrap-success sentinel. Every conformant bootstrap
-  # provider writes it and infrastructure providers poll for it to
-  # decide the machine is bootstrapped; without it an infrastructure
-  # provider can re-execute this whole userdata forever. This pattern
-  # IS the bootstrap provider here, so honoring the contract is on us.
+  # CAPI's bootstrap-success sentinel. A conformant bootstrap provider
+  # writes it and infrastructure providers poll for it to decide the
+  # machine is bootstrapped; without it an infrastructure provider can
+  # re-execute this userdata indefinitely. This pattern takes the
+  # bootstrap provider's place, so it honors the same contract.
   - mkdir -p /run/cluster-api
   - touch /run/cluster-api/bootstrap-success.complete

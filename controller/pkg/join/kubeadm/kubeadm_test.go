@@ -80,15 +80,15 @@ func TestJoinValues_MintsKubeadmShapedCredentials(t *testing.T) {
 		t.Errorf("kubernetesVersion = %v, want the live node's", values["kubernetesVersion"])
 	}
 
-	// The minted Secret must carry BOTH usages: signing is what lets
-	// kubeadm's cluster-info discovery validate the JWS, and it's the
-	// one k0s's flow doesn't need -- an easy one to drop by copy-paste.
+	// The minted Secret carries both usages: signing is what lets
+	// kubeadm's cluster-info discovery validate the JWS, and it is the
+	// one k0s's flow does not need.
 	secret, err := clientset.CoreV1().Secrets("kube-system").Get(context.Background(), "bootstrap-token-"+parts[0], metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("bootstrap token secret not created: %v", err)
 	}
 	if secret.StringData["usage-bootstrap-signing"] != "true" {
-		t.Error("usage-bootstrap-signing missing -- kubeadm discovery cannot validate cluster-info without it")
+		t.Error("usage-bootstrap-signing missing: kubeadm discovery cannot validate cluster-info without it")
 	}
 	if secret.StringData["usage-bootstrap-authentication"] != "true" {
 		t.Error("usage-bootstrap-authentication missing")

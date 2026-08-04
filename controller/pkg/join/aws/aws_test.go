@@ -14,15 +14,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// Provider never calls the AWS API itself -- it renders specs and reads
-// what CAPA wrote. These tests exercise exactly that logic against fake
-// objects; they deliberately do NOT touch real AWS or CAPA (that's a
-// live-cluster/E2E concern, not a unit-test one).
+// Provider does not call the AWS API itself; it renders specs and
+// reads what CAPA wrote. These tests exercise that logic against fake
+// objects and do not touch real AWS or CAPA, which is a
+// live-cluster/e2e concern rather than a unit-test one.
 
 func TestInfraValues_NoInstanceType_ReturnsEmptyNonNilMap(t *testing.T) {
 	// Before CAPA (or the claim reconciler) has set spec.instanceType
-	// there is nothing to derive -- must be empty, not nil, not an
-	// error.
+	// there is nothing to derive: the result is empty, not nil, and not
+	// an error.
 	values, err := Provider{}.InfraValues(context.Background(), &unstructured.Unstructured{Object: map[string]any{}})
 	if err != nil {
 		t.Fatalf("InfraValues: %v", err)
@@ -47,7 +47,7 @@ func configSecretClient(t *testing.T, data map[string][]byte) client.Client {
 	}).Build()
 }
 
-// validateFixtures builds the full Cluster -> AWSCluster ->
+// validateFixtures builds the full chain of Cluster, AWSCluster and
 // AWSClusterStaticIdentity chain Validate traces, mirroring the real
 // live objects (example-cluster / cloud-worker) this check
 // was written against. secretNamespace lets a test place the
@@ -101,11 +101,10 @@ func validateFixtures(t *testing.T, secretNamespace string) (client.Client, *uns
 }
 
 func TestValidate_SecretInWrongNamespace_ReturnsActionableError(t *testing.T) {
-	// The exact live bug: the credentials Secret existed only in
-	// "default" (the AWSCluster's own namespace), never in
-	// "capa-system" (CAPA's manager namespace) -- CAPA's own error
-	// ("Secret ... not found") gave no hint about WHERE it actually
-	// needed to be.
+	// The credentials Secret exists only in "default" (the AWSCluster's
+	// own namespace) and not in "capa-system" (CAPA's manager
+	// namespace). CAPA's own error ("Secret ... not found") gives no
+	// hint about where the Secret needs to be.
 	c, awsMachine := validateFixtures(t, "default")
 
 	err := (Provider{}).Validate(context.Background(), c, awsMachine)
@@ -114,7 +113,7 @@ func TestValidate_SecretInWrongNamespace_ReturnsActionableError(t *testing.T) {
 	}
 	for _, want := range []string{"cloud-worker-credentials", "capa-system", "default"} {
 		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error message %q missing %q -- must name the secret and both namespaces so it's actually actionable", err.Error(), want)
+			t.Errorf("error message %q missing %q: must name the secret and both namespaces so it's actually actionable", err.Error(), want)
 		}
 	}
 }
@@ -136,8 +135,8 @@ func TestValidate_SecretMissingEntirely_ReturnsError(t *testing.T) {
 }
 
 func TestValidate_NoClusterNameLabel_ReturnsNil(t *testing.T) {
-	// A brand new AWSMachine CAPI hasn't labeled yet -- nothing to
-	// trace, not an error.
+	// A brand new AWSMachine CAPI hasn't labeled yet: nothing to
+	// trace, and not an error.
 	awsMachine := &unstructured.Unstructured{}
 	awsMachine.SetGroupVersionKind(gvk)
 	awsMachine.SetName("some-machine")

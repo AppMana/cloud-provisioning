@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-time bootstrap: mint a least-privilege IAM user for a
 # cloud-provisioning identity, scoped to exactly the EC2 actions needed
-# to bring up/tear down a tagged node -- plus, optionally, Route53
+# to bring up/tear down a tagged node, plus, optionally, Route53
 # access scoped to one hosted zone, for cert-manager/external-dns
 # running against that node. One script serves two shapes of caller:
 #
@@ -14,7 +14,7 @@
 # Requires admin-level credentials already exported in the environment
 # (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_DEFAULT_REGION) with
 # iam:CreateUser/CreatePolicy/CreateAccessKey. Prints the new access key
-# once, to stdout — nothing is written to disk here.
+# once, to stdout; nothing is written to disk here.
 set -euo pipefail
 
 USER_NAME="${USER_NAME:-cloud-provisioning-harness}"
@@ -23,9 +23,9 @@ REGION="${REGION:-*}"
 ROUTE53_ZONE_ID="${ROUTE53_ZONE_ID:-}"
 
 # Least privilege here means: describe calls are unscoped (read-only,
-# harmless), but every mutation that touches an EXISTING resource
+# harmless), but each mutation that touches an existing resource
 # (terminate, ingress rules, delete) is conditioned on that resource
-# carrying the harness's own tag — so this identity can only ever act on
+# carrying the harness's own tag, so this identity can act only on
 # things it created. Creation calls can't be scoped by an existing
 # resource's own tag, so they're instead constrained to require that
 # same tag be present on the thing being created (aws:RequestTag).
@@ -33,10 +33,10 @@ ROUTE53_ZONE_ID="${ROUTE53_ZONE_ID:-}"
 # RunInstances and CreateSecurityGroup each touch more than one resource
 # type in a single call (RunInstances: instance + subnet + network-interface
 # + volume + image + key-pair + security-group; CreateSecurityGroup: the
-# new security-group + the vpc it lives in) — IAM evaluates every implicated
-# resource type independently, and aws:RequestTag only ever applies to the
-# type actually being created/tagged. Putting a RequestTag condition on
-# "Resource": "*" therefore silently fails the check for the OTHER,
+# new security-group + the vpc it lives in). IAM evaluates each implicated
+# resource type independently, and aws:RequestTag applies only to the
+# type being created or tagged. Putting a RequestTag condition on
+# "Resource": "*" therefore fails the check for the other,
 # pre-existing resource types (e.g. the vpc), because that condition key
 # doesn't exist in their evaluation context. So this is split into two
 # statements per AWS's own documented pattern: one unconditioned Allow
@@ -50,7 +50,7 @@ PARTITION_ARN="arn:aws:ec2:${REGION}:*"
 # ListResourceRecordSets are scoped to that one zone; GetChange and
 # ListHostedZones(ByName) aren't zone resources in IAM's model (a change
 # ID isn't a hosted zone, and zone discovery-by-name has to run before
-# you have a zone ARN to scope to), so those stay unscoped -- read-only
+# you have a zone ARN to scope to), so those stay unscoped, read-only
 # and harmless regardless.
 ROUTE53_STATEMENTS=""
 if [ -n "$ROUTE53_ZONE_ID" ]; then
@@ -212,7 +212,7 @@ fi
 
 EXISTING_KEYS=$(aws iam list-access-keys --user-name "$USER_NAME" --query 'length(AccessKeyMetadata)' --output text)
 if [ "$EXISTING_KEYS" -ge 2 ]; then
-  echo "user already has $EXISTING_KEYS access keys (AWS max is 2) -- not creating another; reuse an existing one or delete one first" >&2
+  echo "user already has $EXISTING_KEYS access keys (AWS max is 2): not creating another; reuse an existing one or delete one first" >&2
 else
   echo "creating access key (existing keys are left alone — delete manually if rotating)" >&2
   aws iam create-access-key --user-name "$USER_NAME"

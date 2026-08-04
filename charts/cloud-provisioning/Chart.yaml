@@ -2,7 +2,7 @@ apiVersion: v2
 name: cloud-provisioning
 description: |
   Join a public cloud node to an on-premises, firewalled cluster over a
-  WireGuard tunnel by committing ONE resource (a ProvisionedNodeClaim).
+  WireGuard tunnel by committing one resource (a ProvisionedNodeClaim).
   Ships its Cluster API dependency as a subchart, so a cluster gets the
   whole stack from a single release instead of an imperative
   `clusterctl init` that gitops cannot reproduce.

@@ -1,14 +1,14 @@
 // Package k0s implements join.ClusterJoinProvider for k0s.
 //
 // Confirmed by reading k0s's own source (pkg/token/{kubeconfig,manager,joinencode}.go):
-// a k0s join token is nothing k0s-proprietary -- it's a standard
+// a k0s join token is nothing k0s-proprietary. It is a standard
 // Kubernetes bootstrap-token Secret (the same kubeadm-style mechanism
 // documented at https://kubernetes.io/docs/reference/access-authn-authz/bootstrap-tokens/),
 // wrapped in a kubeconfig (Server=the cluster's own API address,
 // CertificateAuthorityData=the cluster CA, AuthInfo="kubelet-bootstrap",
 // Token=<token-id>.<token-secret>), then gzip+base64 encoded. This
 // means a join token can be minted entirely through the Kubernetes API
-// this operator already has -- no SSH to a control-plane node needed.
+// this operator already has, with no SSH to a control-plane node.
 package k0s
 
 import (
@@ -40,35 +40,33 @@ const tokenChars = "0123456789abcdefghijklmnopqrstuvwxyz"
 type Provider struct {
 	Client kubernetes.Interface
 	// APIAddress is this cluster's own API server address as reached
-	// from a newly-joining node (e.g. "https://10.101.0.1:6443" -- the
+	// from a newly-joining node (e.g. "https://10.101.0.1:6443"), the
 	// VIP reachable once the node's WireGuard tunnel is up, not a
-	// tailnet/admin-only address).
+	// tailnet/admin-only address.
 	APIAddress string
 	// TTL is how long the minted token remains valid. Short-lived by
-	// design (matches this project's existing "2h, not 1 year"
-	// precedent) -- the exposure window this protects against is the
-	// few minutes between instance launch and first join, not
-	// indefinite credential validity.
+	// design. The exposure window this protects against is the few
+	// minutes between instance launch and first join, not indefinite
+	// credential validity.
 	TTL time.Duration
 
 	// GitHubReleasesAPI is the base URL for k0s's GitHub releases API,
-	// overridable for tests (an httptest.Server) -- defaults to the
+	// overridable for tests (an httptest.Server), defaulting to the
 	// real API when empty. See resolveK0sReleaseTag: this exists
 	// because Node.status.nodeInfo.KubeletVersion (e.g. "v1.36.2+k0s")
-	// is NOT the actual release tag/asset name k0s publishes
-	// ("v1.36.2+k0s.0") -- confirmed live: using the bare kubelet
-	// version as get.k0s.sh's K0S_VERSION 404s, since neither the
-	// release tag nor the release asset filename ever omit the
-	// trailing build-counter suffix.
+	// is not the release tag or asset name k0s publishes
+	// ("v1.36.2+k0s.0"). Using the bare kubelet version as get.k0s.sh's
+	// K0S_VERSION 404s, since neither the release tag nor the release
+	// asset filename omits the trailing build-counter suffix.
 	GitHubReleasesAPI string
 
-	// ConfigNamespace/ConfigName point at this specialization's OWN
-	// optional cluster-level config Secret -- the same pattern every
+	// ConfigNamespace/ConfigName point at this implementation's own
+	// optional cluster-level config Secret, the same pattern each
 	// provider uses for its own knobs (aws.Provider's
-	// aws-provider-config), so k0s-specific configuration never leaks
+	// aws-provider-config), so k0s-specific configuration does not leak
 	// into the operator's generic surface. Recognized keys:
 	//
-	//	releases-api -- overrides GitHubReleasesAPI (hermetic e2e)
+	//	releases-api overrides GitHubReleasesAPI (hermetic e2e)
 	ConfigNamespace string
 	ConfigName      string
 }
@@ -154,7 +152,7 @@ func hostPort(apiAddress string) (string, error) {
 }
 
 // clusterCACert reads the cluster CA from the kube-root-ca.crt
-// ConfigMap Kubernetes projects into every namespace -- a standard
+// ConfigMap Kubernetes projects into each namespace: a standard
 // built-in mechanism, not anything k0s- or cloud-provisioning-specific.
 func (p *Provider) clusterCACert(ctx context.Context) ([]byte, error) {
 	cm, err := p.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, "kube-root-ca.crt", metav1.GetOptions{})
@@ -169,7 +167,7 @@ func (p *Provider) clusterCACert(ctx context.Context) ([]byte, error) {
 }
 
 // introspectK0sVersion reads the running k0s version off any existing
-// Node's own status, rather than hardcoding it -- so this stays
+// Node's own status rather than hardcoding it, so this stays
 // correct across upgrades without a code change. The Node's
 // KubeletVersion (e.g. "v1.36.2+k0s") is only a prefix of the actual
 // release tag/asset name k0s publishes (e.g. "v1.36.2+k0s.0");
@@ -207,20 +205,18 @@ type githubRelease struct {
 // resolveK0sReleaseTag turns a bare kubelet version (e.g.
 // "v1.36.2+k0s", what Node.status.nodeInfo.KubeletVersion actually
 // reports) into the real k0s release tag (e.g. "v1.36.2+k0s.0") that
-// exists as a downloadable GitHub release/asset -- confirmed live
-// against k0sproject/k0s's actual releases: every real tag carries a
-// trailing numeric build counter the bare kubelet version never
-// includes, and get.k0s.sh's installer does no fuzzy matching of its
-// own (a bare "v1.36.2+k0s" 404s outright).
+// exists as a downloadable GitHub release/asset. Every published tag
+// carries a trailing numeric build counter the bare kubelet version
+// omits, and get.k0s.sh's installer does no fuzzy matching of its own
+// (a bare "v1.36.2+k0s" 404s).
 //
-// Deliberately does not stop at the first match (e.g. a direct
-// "<version>.0" lookup): k0sproject/k0s has genuinely published more
-// than one release for the same k8s version (confirmed live:
-// v1.35.1+k0s.0 AND v1.35.1+k0s.1 both exist, non-draft, non-prerelease)
-// -- a later counter is a re-release of the same k8s version, so it's
-// the one that should be used. Since the bare kubelet version can't
-// distinguish these, every release is listed and the highest counter
-// matching this exact version prefix wins.
+// It does not stop at the first match (e.g. a direct "<version>.0"
+// lookup): k0sproject/k0s has published more than one release for the
+// same k8s version (v1.35.1+k0s.0 and v1.35.1+k0s.1 both exist,
+// non-draft and non-prerelease). A later counter is a re-release of
+// the same k8s version, so it is the one to use. Since the bare
+// kubelet version cannot distinguish these, every release is listed
+// and the highest counter matching this version prefix wins.
 func resolveK0sReleaseTag(ctx context.Context, releasesAPI, kubeletVersion string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, releasesAPI+"?per_page=100", nil)
 	if err != nil {

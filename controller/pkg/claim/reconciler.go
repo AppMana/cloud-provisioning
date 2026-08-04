@@ -1,5 +1,5 @@
-// Package claim expands a ProvisionedNodeClaim -- the ONE resource a
-// user commits -- into the CAPI Machine + provider machine pair. The
+// Package claim expands a ProvisionedNodeClaim, the single resource a
+// user commits, into the CAPI Machine + provider machine pair. The
 // claim names no cloud: fulfillment routes through the registered
 // join.MachineProvisioner whose ClusterGVK matches the CAPI Cluster's
 // infrastructure, so "which cloud" is the existing provider
@@ -8,10 +8,9 @@
 // Everything downstream is other loops' business: CAPA (or its
 // equivalent) launches the compute, join.Reconciler renders the
 // tunnel-bootstrapping userdata into the Machine-owned bootstrap
-// Secret, the endpoint-controller runs the mesh. This reconciler is
-// deliberately a thin composition over CAPI -- no bin-packing, no
-// consolidation, no pod-watching. It is not an autoscaler and never
-// will be.
+// Secret, the endpoint-controller runs the mesh. This reconciler is a
+// thin composition over CAPI: no bin-packing, no consolidation, no
+// pod-watching. It is not an autoscaler.
 package claim
 
 import (
@@ -62,9 +61,9 @@ type Reconciler struct {
 	RoleLabel string
 	RoleValue string
 
-	// BootstrapSecretNameFormat mirrors join.Reconciler's -- the
-	// Machine is created with spec.bootstrap.dataSecretName already
-	// pointing at the Secret the join reconciler will create.
+	// BootstrapSecretNameFormat mirrors join.Reconciler's. The Machine
+	// is created with spec.bootstrap.dataSecretName already pointing at
+	// the Secret the join reconciler will create.
 	BootstrapSecretNameFormat string
 
 	// TunnelInterface is the mesh's interface name, surfaced in
@@ -86,13 +85,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return r.reconcileDelete(ctx, claim)
 	}
 	// Own the teardown explicitly with a finalizer. OwnerRef garbage
-	// collection is NOT sufficient: Cluster API's own Machine
+	// collection is not sufficient: Cluster API's own Machine
 	// controller reconciles ownerReferences and replaces them with the
 	// Cluster, so the claim's reference is gone within seconds of
-	// creation (confirmed live -- ownerReferences held only the
-	// Cluster, and deleting the claim left the Machine Running with no
-	// deletionTimestamp and a billed instance still up). The claim owns
-	// this lifecycle, so it must do the deleting itself.
+	// creation. Deleting the claim would then leave the Machine Running
+	// with no deletionTimestamp and its instance still up. The claim
+	// owns this lifecycle, so it does the deleting itself.
 	if !containsString(claim.Finalizers, claimFinalizer) {
 		updated := claim.DeepCopy()
 		updated.Finalizers = append(updated.Finalizers, claimFinalizer)
@@ -128,8 +126,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// Provider machine first (CAPA ignores it until the Machine
 	// references it), then the Machine. Both idempotent: existing
-	// objects are left untouched -- CAPA specs are immutable, and
-	// "change the claim" is delete-and-recreate, same as every other
+	// objects are left untouched. CAPA specs are immutable, so
+	// "change the claim" is delete-and-recreate, the same as any other
 	// CAPI spec change.
 	infraMachine := &unstructured.Unstructured{}
 	infraMachine.SetGroupVersionKind(provisioner.GVK())
@@ -171,14 +169,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			"spec": map[string]any{
 				"clusterName": cluster.GetName(),
 				"version":     version,
-				// Deletion must always converge. CAPI's defaults are
-				// "wait forever": drain, volume detach and node deletion
-				// each block indefinitely. The node these claims create
-				// is reached ONLY through the tunnel being torn down, so
-				// it is precisely the node that can become undrainable
-				// mid-deletion -- and then `kubectl delete
-				// provisionednodeclaim` would hang forever with a
-				// billed instance still running. Bounded here so a
+				// Deletion has to converge. CAPI's defaults are to wait
+				// indefinitely: drain, volume detach and node deletion
+				// each block without a bound. The node these claims
+				// create is reached only through the tunnel being torn
+				// down, so it can become undrainable mid-deletion, and
+				// `kubectl delete provisionednodeclaim` would then hang
+				// with its instance still running. Bounded here so a
 				// claim deletion is a reliable teardown.
 				"deletion": map[string]any{
 					"nodeDrainTimeoutSeconds":        int64(120),
@@ -248,8 +245,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 }
 
 // claimFinalizer keeps the claim alive until the compute it created is
-// actually gone -- so `kubectl delete provisionednodeclaim` is a
-// reliable teardown rather than an orphaning operation.
+// gone, so `kubectl delete provisionednodeclaim` is a reliable
+// teardown rather than an orphaning operation.
 const claimFinalizer = "cloud-provisioning.appmana.com/claim"
 
 // reconcileDelete removes what this claim created, in dependency
@@ -321,7 +318,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, claim *v1alpha1.Provis
 }
 
 // isMissingKind reports whether the error means the Kind isn't served
-// at all (a provider whose CRDs aren't installed) -- nothing of that
+// at all (a provider whose CRDs aren't installed). Nothing of that
 // kind can exist, so teardown has nothing to wait for.
 func isMissingKind(err error) bool {
 	return meta.IsNoMatchError(err) || runtime.IsNotRegisteredError(err)
@@ -407,15 +404,15 @@ func (r *Reconciler) resolveCluster(ctx context.Context, claim *v1alpha1.Provisi
 	case 0:
 		return nil, fmt.Errorf("no CAPI Cluster in namespace %s (create one, or set spec.clusterName)", claim.Namespace)
 	default:
-		return nil, fmt.Errorf("%d CAPI Clusters in namespace %s -- set spec.clusterName", len(list.Items), claim.Namespace)
+		return nil, fmt.Errorf("%d CAPI Clusters in namespace %s: set spec.clusterName", len(list.Items), claim.Namespace)
 	}
 }
 
 // ensureClusterProvisioned reports readiness for a Cluster annotated
 // cluster.x-k8s.io/managed-by: external. That annotation tells Cluster
-// API's own controllers to stand down, so nothing upstream will ever
-// set the status -- and until it is set, Machines stay stuck waiting
-// for infrastructure. The external manager is this controller, so
+// API's own controllers to stand down, so nothing upstream sets the
+// status, and until it is set Machines stay waiting for
+// infrastructure. The external manager is this controller, so
 // reporting it is this controller's job rather than a `kubectl patch`
 // an operator has to know to run after every install.
 func (r *Reconciler) ensureClusterProvisioned(ctx context.Context, cluster *unstructured.Unstructured) error {
@@ -459,7 +456,7 @@ func (r *Reconciler) ensureClusterProvisioned(ctx context.Context, cluster *unst
 }
 
 // clusterKubernetesVersion reads the running version off any existing
-// Node -- correct across upgrades without configuration, the same
+// Node: correct across upgrades without configuration, the same
 // introspection the join providers already do.
 func (r *Reconciler) clusterKubernetesVersion(ctx context.Context) (string, error) {
 	nodes := &corev1.NodeList{}
@@ -469,7 +466,7 @@ func (r *Reconciler) clusterKubernetesVersion(ctx context.Context) (string, erro
 	if len(nodes.Items) == 0 {
 		return "", fmt.Errorf("no nodes found to introspect the kubernetes version from")
 	}
-	// Strip technology build suffixes ("v1.36.2+k0s") -- Machine.spec
+	// Strip technology build suffixes ("v1.36.2+k0s"); Machine.spec
 	// .version is plain semver for every CAPI consumer.
 	version := nodes.Items[0].Status.NodeInfo.KubeletVersion
 	if i := strings.IndexByte(version, '+'); i > 0 {

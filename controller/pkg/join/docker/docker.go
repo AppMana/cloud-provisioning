@@ -1,9 +1,9 @@
 // Package docker implements join.InfraProvider and
 // join.MachineProvisioner for CAPD (the Cluster API Docker provider,
 // cluster-api's own development/test infrastructure). AWS is one
-// specialization of machine fulfillment; this is another -- same seams
-// -- and it's what makes a plain kind cluster a complete local e2e of
-// the ONE-resource flow: a ProvisionedNodeClaim against a DockerCluster
+// implementation of machine fulfillment; this is another over the same
+// seams, and it makes a plain kind cluster a complete local e2e of
+// the single-resource flow: a ProvisionedNodeClaim against a DockerCluster
 // resolves here, CAPD launches the "cloud" node as a container and
 // executes the rendered cloud-config bootstrap, and the node joins the
 // kind control plane for real. No QEMU, no bespoke cluster rig.
@@ -30,16 +30,16 @@ import (
 // ConfigNamespace/ConfigName point at this provider's cluster-level
 // config Secret (the aws-provider-config pattern). Keys:
 //
-//	node-image   -- REQUIRED: the kind node image to launch (e.g.
-//	                kindest/node:v1.33.1). Must match the control
+//	node-image   required: the kind node image to launch (e.g.
+//	                kindest/node:v1.33.1). It has to match the control
 //	                plane's version closely enough for kubeadm's skew
 //	                policy.
-//	extra-mounts -- optional comma-separated hostPath:containerPath
+//	extra-mounts optional comma-separated hostPath:containerPath
 //	                read-only mounts. This is how a local e2e delivers
 //	                the dialer binary deterministically (a file:// URL
 //	                into a mounted directory) instead of standing up a
 //	                download server with all its lifecycle problems.
-//	preload-images -- optional comma-separated image references CAPD
+//	preload-images optional comma-separated image references CAPD
 //	                loads into the node from the host's own daemon.
 //	                A real cloud node pulls from a registry; a local
 //	                container has no credentials and no registry, so

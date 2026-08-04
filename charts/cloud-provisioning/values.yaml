@@ -6,7 +6,7 @@ image:
   repository: ghcr.io/appmana/cloud-provisioning-endpoint-controller
   tag: ""            # defaults to .Chart.AppVersion
   pullPolicy: IfNotPresent
-# Image the operator renders into BOTH dialer DaemonSets. Pin by digest
+# Image the operator renders into both dialer DaemonSets. Pin by digest
 # in production; a tag is fine when the image is preloaded on the node.
 dialerImage:
   repository: ghcr.io/appmana/cloud-provisioning-dialer
@@ -14,11 +14,11 @@ dialerImage:
 
 imagePullSecrets: []
 
-# The REMOTE node's DaemonSet. A remote cannot be preloaded and may
+# The remote node's DaemonSet. A remote cannot be preloaded and may
 # have no registry credential, so if the project image is not publicly
 # pullable its adoption DaemonSet ImagePullBackOffs and the node stays
-# on its frozen bootstrap peer list -- config changes never reach it.
-# Setting a public base image here makes it execute the host binary
+# on its frozen bootstrap peer list, and config changes do not reach
+# it. Setting a public base image here makes it execute the host binary
 # that cloud-init already installed and sha-verified. Leave empty when
 # the project image is pullable; then the DaemonSet also self-installs
 # onto the host, which is the post-join upgrade channel.
@@ -26,12 +26,10 @@ dialerCloud:
   image: ""             # e.g. busybox:1.37
   hostBinary: /host-bin/wg-dialer
 
-# EVERY workload this chart owns is Linux-only. Not cosmetic: a mixed
-# cluster will otherwise schedule a linux-only controller onto a
-# Windows node and it fails with "no match for platform in manifest"
-# (observed on this fleet -- CAPI's own clusterctl manifests omit this
-# and landed on a Windows node). The same default is pushed into the
-# Cluster API subchart below.
+# Every workload this chart owns is Linux-only. Without this, a mixed
+# cluster schedules a linux-only controller onto a Windows node and it
+# fails with "no match for platform in manifest". The same default is
+# pushed into the Cluster API subchart below.
 nodeSelector:
   kubernetes.io/os: linux
 tolerations: []
@@ -52,21 +50,21 @@ cluster:
   # Where a joining node reaches the API. Discovered from the
   # kubernetes Service's endpoints, which name every control plane.
   apiAddress: ""     # e.g. https://198.51.100.10:6443
-  # WireGuard accept-list entries, never kernel routes. Discovered from
+  # WireGuard accept-list entries, not kernel routes. Discovered from
   # the node allocations or from the installed CNI: Calico, Cilium,
   # Flannel and kube-router are all understood.
   podCIDRs: ""       # e.g. 10.244.0.0/16
   serviceCIDRs: ""   # e.g. 10.96.0.0/12
 
 tunnel:
-  # Node selector (k=v,k2=v2) choosing which LOCAL nodes terminate
+  # Node selector (k=v,k2=v2) choosing which local nodes terminate
   # tunnels. Empty selects every Linux worker; control planes are
-  # excluded unless named explicitly. This is the blast radius control:
-  # only these nodes ever get a cldt* interface.
+  # excluded unless named explicitly. Only the selected nodes get a
+  # cldt* interface.
   endpoints: ""
 
 # The namespace an infrastructure provider's controller runs in, when
-# this controller must read a credentials Secret there to check a
+# this controller needs to read a credentials Secret there to check a
 # cluster identity before provisioning. Empty grants no such access.
 providerManagerNamespace: ""   # e.g. capa-system
 
@@ -106,12 +104,12 @@ cniPlugins:
     url: ""
     sha256: ""
 
-# Cluster API, available as an OPTIONAL subchart for a one-release
-# install. DISABLED by default, and the recommended production layout
-# is a SEPARATE HelmRelease for cluster-api-operator: coupling the two
-# lifecycles means a failed upgrade of this chart can delete the
-# provider namespaces (and with them the provider controllers and the
-# credentials Secrets that must live there). See the gitops example in
+# Cluster API, available as an optional subchart for a one-release
+# install. It is disabled by default, and the recommended production
+# layout is a separate HelmRelease for cluster-api-operator: coupling
+# the two lifecycles means a failed upgrade of this chart can delete
+# the provider namespaces, and with them the provider controllers and
+# the credentials Secrets that live there. See the gitops example in
 # the README.
 cluster-api-operator:
   enabled: false
@@ -129,11 +127,11 @@ cluster-api-operator:
   #       version: v2.13.0
   # AWS additionally needs a credentials Secret the operator references.
   # deployment.nodeSelector is passed straight through to the Provider
-  # CR, which is the ONLY way the provider's own controller gets one:
+  # CR, which is the only way the provider's own controller gets one:
   # the operator renders those Deployments from upstream manifests,
   # which carry no OS selector. Without this a linux-only provider
   # controller lands on a Windows node and ImagePullBackOffs with "no
-  # match for platform in manifest" (observed twice on this fleet).
+  # match for platform in manifest".
   core:
     cluster-api:
       namespace: capi-system
@@ -141,12 +139,12 @@ cluster-api-operator:
         nodeSelector:
           kubernetes.io/os: linux
   infrastructure: {}
-  # This project renders its OWN bootstrap data (the join-pattern
+  # This project renders its own bootstrap data (the join-pattern
   # cloud-config becomes the Machine's dataSecretName directly), and
-  # the target cluster's control plane is externally managed -- so
+  # the target cluster's control plane is externally managed, so
   # neither the kubeadm bootstrap provider nor the kubeadm
-  # control-plane provider is needed. Left empty deliberately; if an
-  # environment does want them, give each a
-  # deployment.nodeSelector too, for the same Windows-node reason.
+  # control-plane provider is needed. If an environment does want
+  # them, give each a deployment.nodeSelector too, for the same
+  # Windows-node reason.
   bootstrap: {}
   controlPlane: {}

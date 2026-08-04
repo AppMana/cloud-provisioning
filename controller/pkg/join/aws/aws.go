@@ -14,28 +14,28 @@ import (
 
 // Provider reads/renders unstructured CAPA objects rather than
 // importing CAPA's own types, matching how the rest of this module
-// avoids depending on AWSMachine's schema. AWSMachine's actual
-// reconciliation (RunInstances etc.) is entirely CAPA's job -- this
-// Provider renders specs and reads status, never drives AWS itself.
+// avoids depending on AWSMachine's schema. AWSMachine's own
+// reconciliation (RunInstances etc.) is CAPA's job; this Provider
+// renders specs and reads status, and does not drive AWS itself.
 //
 // ConfigNamespace/ConfigName point at a plain Secret carrying this
-// provider's cluster-level configuration -- the place AWS specifics
-// live so that ProvisionedNodeClaims never have to (see
+// provider's cluster-level configuration, the place AWS specifics live
+// so that ProvisionedNodeClaims do not have to (see
 // join.MachineProvisioner). Keys:
 //
-//	ami-arm64, ami-amd64        -- per-arch AMI IDs (at least the arch
-//	                               in use is required)
-//	ssh-key-name                -- optional EC2 keypair name
-//	security-group-ids          -- optional comma-separated sg-...
-//	subnet-id                   -- optional (CAPA picks from the
-//	                               AWSCluster otherwise)
-//	iam-instance-profile        -- optional
-//	public-ip                   -- "true"/"false" (default true: the
-//	                               whole point of these nodes)
-//	insecure-skip-secrets-manager -- "true"/"false" (default true:
-//	                               userdata already carries only a
-//	                               short-TTL join token; SSM adds an
-//	                               IAM dependency for no secret kept)
+//	ami-arm64, ami-amd64        per-arch AMI IDs (at least the arch
+//	                            in use is required)
+//	ssh-key-name                optional EC2 keypair name
+//	security-group-ids          optional comma-separated sg-...
+//	subnet-id                   optional (CAPA picks from the
+//	                            AWSCluster otherwise)
+//	iam-instance-profile        optional
+//	public-ip                   "true"/"false" (default true: these
+//	                            nodes are internet-facing)
+//	insecure-skip-secrets-manager "true"/"false" (default true:
+//	                            userdata carries only a short-TTL join
+//	                            token; SSM adds an IAM dependency for
+//	                            no secret kept)
 type Provider struct {
 	ConfigNamespace string
 	ConfigName      string
@@ -64,34 +64,32 @@ func (Provider) InfraValues(ctx context.Context, awsMachine *unstructured.Unstru
 
 // InfraMachine implements join.MachineProvisioner: renders the
 // AWSMachine spec for one claim from the provider-config Secret.
-// managerNamespace is where CAPA ALWAYS resolves an
+// managerNamespace is where CAPA resolves an
 // AWSClusterStaticIdentity's secretRef, regardless of where the
-// AWSCluster/AWSMachine themselves live -- confirmed directly from the
-// installed version's source (cluster-api-provider-aws@v2.12.1,
-// pkg/cloud/scope/session.go's buildAWSClusterStaticIdentity calling
-// system.GetManagerNamespace(), which reads the CAPA pod's own
+// AWSCluster/AWSMachine themselves live (cluster-api-provider-aws
+// v2.12.1, pkg/cloud/scope/session.go's buildAWSClusterStaticIdentity
+// calls system.GetManagerNamespace(), which reads the CAPA pod's own
 // in-cluster namespace file/POD_NAMESPACE, defaulting to
-// "capa-system"). Hardcoded to match this specific installation, not
-// discovered dynamically -- there's exactly one CAPA install per
-// cluster, in a namespace fixed by its manifest.
+// "capa-system"). It is hardcoded to match this installation rather
+// than discovered dynamically: there is one CAPA install per cluster,
+// in a namespace fixed by its manifest.
 const managerNamespace = "capa-system"
 
 const clusterNameLabel = "cluster.x-k8s.io/cluster-name"
 
 // Validate implements join.Validator: traces an AWSMachine up to its
-// Cluster -> AWSCluster -> identityRef, and -- when that identity is
-// an AWSClusterStaticIdentity -- confirms its secretRef Secret
-// actually exists in managerNamespace. A misplaced Secret produces an
-// indefinite, opaque CAPA retry loop ("Secret ... not found") with no
-// actionable signal about WHERE it needs to be; this turns that into
-// an immediate, clear error instead.
+// Cluster, then its AWSCluster, then its identityRef, and when that identity is an
+// AWSClusterStaticIdentity, confirms its secretRef Secret exists in
+// managerNamespace. A misplaced Secret produces an indefinite, opaque
+// CAPA retry loop ("Secret ... not found") with no signal about where
+// it needs to be; this turns that into an immediate, clear error.
 //
 // Every traversal step before the final Secret check fails open (nil,
 // not an error): a missing Cluster/AWSCluster, an unset or
 // non-static-identity identityRef, or an unresolvable
-// AWSClusterStaticIdentity are all either "nothing to validate yet" or
-// genuinely out of this check's scope. Only the one specific,
-// confirmed-real misconfiguration this check exists for is surfaced.
+// AWSClusterStaticIdentity are either "nothing to validate yet" or out
+// of this check's scope. Only the misconfiguration this check exists
+// for is surfaced.
 func (Provider) Validate(ctx context.Context, c client.Reader, awsMachine *unstructured.Unstructured) error {
 	clusterName := awsMachine.GetLabels()[clusterNameLabel]
 	if clusterName == "" {
@@ -133,7 +131,7 @@ func (Provider) Validate(ctx context.Context, c client.Reader, awsMachine *unstr
 	secret := &corev1.Secret{}
 	if err := c.Get(ctx, client.ObjectKey{Namespace: managerNamespace, Name: secretRefName}, secret); err != nil {
 		return fmt.Errorf(
-			"AWSClusterStaticIdentity %q references secretRef %q, but CAPA always resolves it against its own manager namespace %q, not %q (where the AWSCluster lives) -- create/move the Secret to namespace %q: %w",
+			"AWSClusterStaticIdentity %q references secretRef %q, but CAPA always resolves it against its own manager namespace %q, not %q (where the AWSCluster lives): create/move the Secret to namespace %q: %w",
 			identityRefName, secretRefName, managerNamespace, awsCluster.GetNamespace(), managerNamespace, err,
 		)
 	}

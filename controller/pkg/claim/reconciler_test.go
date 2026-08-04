@@ -20,11 +20,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// These tests use the REAL aws.Provider as the registered provisioner
+// These tests use the real aws.Provider as the registered provisioner
 // (catalog resolution, AWSMachine rendering from the provider-config
-// Secret) against a fake API server -- the claim reconciler's whole
-// job is expansion, and the expansion is only proven if the real
-// provider's output shapes are what get created.
+// Secret) against a fake API server. The claim reconciler's job is
+// expansion, and the expansion is only proven if the real provider's
+// output shapes are what get created.
 
 func testScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
@@ -292,11 +292,11 @@ func TestReconcile_NoProvisionerForClusterKind_Fails(t *testing.T) {
 }
 
 func TestReconcile_MachineDeletionTimeoutsAreBounded(t *testing.T) {
-	// CAPI's defaults wait forever on drain/detach/node-deletion. The
-	// node a claim creates is reachable ONLY through the tunnel being
-	// torn down, so it is exactly the node that can become undrainable
-	// mid-deletion -- unbounded, `kubectl delete provisionednodeclaim`
-	// would hang forever with a billed instance still running.
+	// CAPI's defaults are unbounded on drain/detach/node-deletion. The
+	// node a claim creates is reachable only through the tunnel being
+	// torn down, so it can become undrainable mid-deletion; unbounded,
+	// `kubectl delete provisionednodeclaim` would hang with its
+	// instance still running.
 	claim := fakeClaim("public-worker")
 	r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), awsConfigSecret(), fakeNode())
 
@@ -311,7 +311,7 @@ func TestReconcile_MachineDeletionTimeoutsAreBounded(t *testing.T) {
 	for _, field := range []string{"nodeDrainTimeoutSeconds", "nodeVolumeDetachTimeoutSeconds", "nodeDeletionTimeoutSeconds"} {
 		v, found, err := unstructured.NestedInt64(machine.Object, "spec", "deletion", field)
 		if err != nil || !found {
-			t.Errorf("spec.deletion.%s not set -- deletion would block indefinitely", field)
+			t.Errorf("spec.deletion.%s not set: deletion would block indefinitely", field)
 			continue
 		}
 		if v <= 0 {
@@ -321,11 +321,11 @@ func TestReconcile_MachineDeletionTimeoutsAreBounded(t *testing.T) {
 }
 
 func TestReconcileDelete_RemovesComputeAndOnlyThenReleasesTheClaim(t *testing.T) {
-	// OwnerRef GC is NOT the teardown mechanism: CAPI's own Machine
+	// OwnerRef GC is not the teardown mechanism: CAPI's own Machine
 	// controller reconciles ownerReferences and replaces the claim's
-	// with the Cluster, so a deleted claim left the Machine Running
-	// with a billed instance (confirmed live). The claim holds a
-	// finalizer and deletes the compute itself.
+	// with the Cluster, so a deleted claim would leave the Machine
+	// Running with its instance up. The claim holds a finalizer and
+	// deletes the compute itself.
 	claim := fakeClaim("public-worker")
 	r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), awsConfigSecret(), fakeNode())
 	if err := reconcileClaim(t, r, claim); err != nil {
@@ -337,7 +337,7 @@ func TestReconcileDelete_RemovesComputeAndOnlyThenReleasesTheClaim(t *testing.T)
 		t.Fatalf("getting claim: %v", err)
 	}
 	if !containsString(created.Finalizers, claimFinalizer) {
-		t.Fatalf("claim finalizers = %v, want %s -- without it deletion orphans the compute", created.Finalizers, claimFinalizer)
+		t.Fatalf("claim finalizers = %v, want %s: without it deletion orphans the compute", created.Finalizers, claimFinalizer)
 	}
 
 	// Reproduce what CAPI does: strip the claim's ownerRef from the
@@ -368,7 +368,7 @@ func TestReconcileDelete_RemovesComputeAndOnlyThenReleasesTheClaim(t *testing.T)
 		t.Errorf("provider machine still present after teardown reconcile: %v", err)
 	}
 
-	// Compute gone -> the finalizer is released and the claim goes away.
+	// Once the compute is gone the finalizer is released and the claim goes away.
 	if err := reconcileClaim(t, r, created); err != nil {
 		t.Fatalf("Reconcile(final): %v", err)
 	}

@@ -45,7 +45,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   # Per-arch raw dialer binaries: a fresh cloud instance has no
-  # container runtime when cloud-init runs -- its userdata downloads
+  # container runtime when cloud-init runs, so its userdata downloads
   # exactly one of these and verifies the sha256 the join reconciler
   # pinned at render time (--join-dialer-binary-url-*/-sha256-*).
   # Published as a GitHub release per commit SHA so the URL is stable,

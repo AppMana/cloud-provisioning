@@ -1,10 +1,10 @@
 # Only needed if --gateway-name is set (a Gateway pinned to one node via
 # hostPorts has no dependable Gateway.status.addresses for external-dns
 # to read; this annotation bypasses that). Must be the Gateway itself,
-# not its HTTPRoutes: confirmed by reading external-dns's gateway.go --
-# the target-annotation override is read from the parent Gateway object,
-# never from the route. Grant this in whatever namespace/name the
-# actual Gateway lives in -- omit entirely if the flag is unused.
+# not its HTTPRoutes: in external-dns's gateway.go the
+# target-annotation override is read from the parent Gateway object,
+# not from the route. Grant this in whatever namespace/name the
+# actual Gateway lives in, and omit it if the flag is unused.
 #
 # apiVersion: rbac.authorization.k8s.io/v1
 # kind: Role
@@ -39,11 +39,10 @@ spec:
       containers:
         - name: controller
           # Pin by digest. There is no default image anywhere in the
-          # binary -- a stale built-in default once pointed at a
-          # pre-hardening build.
+          # binary.
           image: <wg-dialer-endpoint-controller-image>@<digest>
           args:
-            # Required -- the binary exits immediately if any is unset.
+            # Required: the binary exits immediately if any is unset.
             - --dialer-image=<wg-dialer-dialer-image>@<digest>
             - --dialer-pod-cidrs=<pod-cidr-v4>,<pod-cidr-v6>
             - --dialer-service-cidrs=<service-cidr-v4>,<service-cidr-v6>

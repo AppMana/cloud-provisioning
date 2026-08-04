@@ -27,7 +27,7 @@ rules:
   # reconciler also creates them.
   - apiGroups: ["cluster.x-k8s.io"]
     resources: ["machines"]
-    # delete: the claim tears down its own compute -- ownerRef GC does
+    # delete: the claim tears down its own compute. OwnerRef GC does
     # not suffice, because CAPI's Machine controller replaces the
     # claim's ownerReference with the Cluster.
     verbs: ["get", "list", "watch", "create", "patch", "delete"]
@@ -128,7 +128,7 @@ subjects:
     namespace: {{ .Release.Namespace }}
 ---
 # Bootstrap Secrets are created in whatever namespace the Machines live
-# in (they're owned by the Machines). Bind this in that namespace --
+# in (they're owned by the Machines). Bind this in that namespace,
 # shown here for "default"; duplicate per Machine namespace if you use
 # another.
 apiVersion: rbac.authorization.k8s.io/v1
@@ -217,15 +217,15 @@ subjects:
 {{- if .Values.providerManagerNamespace }}
 {{- /* Only when the AWS provider is configured: this Role lives in
 CAPA's manager namespace, which does not exist in a cluster that
-installs a different infrastructure provider -- rendering it
-unconditionally made the whole chart uninstallable there.
+installs a different infrastructure provider, and rendering it
+unconditionally makes the chart uninstallable there.
 
-The AWS provider's preflight check (aws.Provider.Validate)
-resolves an AWSClusterStaticIdentity's secretRef against CAPA's own
-manager namespace -- that is where CAPA always looks, regardless of
-where the AWSCluster lives. Without read access there the check cannot
-verify the credential and errors out instead of passing, which blocks
-every bootstrap render. Read-only, one namespace. */}}
+The AWS provider's preflight check (aws.Provider.Validate) resolves an
+AWSClusterStaticIdentity's secretRef against CAPA's own manager
+namespace, which is where CAPA looks regardless of where the
+AWSCluster lives. Without read access there the check cannot verify
+the credential and errors out instead of passing, which blocks every
+bootstrap render. Read-only, one namespace. */}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

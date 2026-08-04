@@ -33,8 +33,8 @@ var awsMachineGVK = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s
 // secretValue reads key from a Secret's Data (real API server
 // behavior: StringData is write-only, converted to Data on write) or
 // falls back to StringData (this fake client's behavior: preserves
-// StringData across Get, never populates Data) -- correct regardless
-// of which backend a test happens to run against.
+// StringData across Get and does not populate Data), so it is correct
+// regardless of which backend a test runs against.
 func secretValue(s *corev1.Secret, key string) string {
 	if v, ok := s.Data[key]; ok {
 		return string(v)
@@ -42,9 +42,9 @@ func secretValue(s *corev1.Secret, key string) string {
 	return s.StringData[key]
 }
 
-// dialerPeerSecretFixture models the peer Secret AFTER the mesh side
+// dialerPeerSecretFixture models the peer Secret after the mesh side
 // exists: two worker nodes' dialers have published their public keys
-// (node-public-key-*, self-generated -- NO private key is ever in this
+// (node-public-key-*, self-generated; no private key is in this
 // Secret) and the endpoint-controller has allocated their tunnel
 // addresses and recorded their cluster addresses.
 func dialerPeerSecretFixture() *corev1.Secret {
@@ -80,8 +80,8 @@ func newFakeReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 		t.Fatalf("adding clientgoscheme: %v", err)
 	}
 	// Machine/MachineList are only ever used as unstructured here (no
-	// generated Go types for CAPI's Machine in this module) -- register
-	// them with the scheme as unstructured so the fake client's List()
+	// generated Go types for CAPI's Machine in this module), so they are
+	// registered with the scheme as unstructured and the fake client's List()
 	// knows what GVK a MachineList corresponds to.
 	scheme.AddKnownTypeWithName(machineGVK, &unstructured.Unstructured{})
 	scheme.AddKnownTypeWithName(machineListGVK(), &unstructured.UnstructuredList{})
@@ -112,10 +112,11 @@ func TestValidateDialerBinaries_UnpinnedDigestIsAlwaysFatal(t *testing.T) {
 	}
 }
 
-// stubJoinProvider is a mock ClusterJoinProvider -- these Reconcile-level
-// tests care about what the reconciler DOES with a JoinProvider's
-// output (render it, create the Secret), not about any real cluster
-// technology's token-minting logic (that's k0s_test.go's job).
+// stubJoinProvider is a mock ClusterJoinProvider. These
+// Reconcile-level tests care about what the reconciler does with a
+// JoinProvider's output (render it, create the Secret), not about any
+// real cluster technology's token-minting logic, which is
+// k0s_test.go's job.
 type stubJoinProvider struct {
 	values map[string]any
 	err    error
@@ -137,9 +138,9 @@ func fakeAWSMachine(name, namespace string, ready bool) *unstructured.Unstructur
 }
 
 // stubInfraProvider is a mock InfraProvider registered under a given
-// GVK -- used both as the stand-in for AWS (the real aws.Provider can't
+// GVK, used both as the stand-in for AWS (the real aws.Provider can't
 // be imported here, see awsMachineGVK's comment) and to prove provider
-// selection is genuinely inferred from spec.infrastructureRef.kind.
+// selection is inferred from spec.infrastructureRef.kind.
 type stubInfraProvider struct {
 	gvk             schema.GroupVersionKind
 	infraValues     map[string]any
@@ -157,11 +158,10 @@ func awsShapedStub() *stubInfraProvider {
 }
 
 // machineWithInfraRef builds a Machine whose infrastructureRef.kind is
-// "AWSMachine" -- this is the real, live signal (see fixed
-// infrastructureRef: {"apiGroup":"...","kind":"AWSMachine","name":"..."}
-// confirmed via kubectl against the actual example cloud-worker
-// Machine) the reconciler uses to infer which registered InfraProvider
-// applies, never a hardcoded assumption.
+// "AWSMachine". That field (infrastructureRef:
+// {"apiGroup":"...","kind":"AWSMachine","name":"..."}) is the signal
+// the reconciler uses to infer which registered InfraProvider applies,
+// rather than a hardcoded assumption.
 func machineWithInfraRef(name, namespace, infraRefName string) *unstructured.Unstructured {
 	m := fakeMachine(name, "")
 	m.SetNamespace(namespace)
@@ -217,15 +217,14 @@ func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs 
 }
 
 func TestReconcile_CreatesBootstrapSecretEvenWhenInfraNotReady(t *testing.T) {
-	// Regression test for a genuine deadlock caught live against the
-	// real the cluster cluster: CAPA's AWSMachine controller refuses to call
-	// RunInstances until this bootstrap Secret already exists (the
-	// Secret IS the cloud-init user-data the instance boots from), so
-	// gating its creation on the AWSMachine being "ready" (instance
-	// already running) can never succeed -- ready never becomes true
-	// without the Secret, and the Secret never gets created while
-	// waiting for ready. Bootstrap-secret creation must proceed as soon
-	// as the infrastructureRef target object merely exists.
+	// CAPA's AWSMachine controller does not call RunInstances until
+	// this bootstrap Secret exists, because the Secret is the
+	// cloud-init user-data the instance boots from. Gating its creation
+	// on the AWSMachine being "ready" (instance already running)
+	// deadlocks: ready never becomes true without the Secret, and the
+	// Secret is never created while waiting for ready. Bootstrap-secret
+	// creation proceeds as soon as the infrastructureRef target object
+	// exists.
 	machine := machineWithInfraRef("cloud-worker-0", "default", "cloud-worker-0")
 	awsMachine := fakeAWSMachine("cloud-worker-0", "default", false)
 	dialerSecret := dialerPeerSecretFixture()
@@ -248,9 +247,9 @@ func TestReconcile_CreatesBootstrapSecretEvenWhenInfraNotReady(t *testing.T) {
 func TestReconcile_NoPublishedTunnelEndpoints_WaitsInsteadOfBakingEmptyPeerList(t *testing.T) {
 	// Userdata is immutable once the instance launches. If no local
 	// dialer has published a key yet (fresh install ordering), rendering
-	// now would bake an empty peer list into the bootstrap -- a node
-	// that could never reach anything. The reconciler must wait, not
-	// render.
+	// now would bake an empty peer list into the bootstrap, giving a
+	// node that can reach nothing. The reconciler waits instead of
+	// rendering.
 	machine := machineWithInfraRef("cloud-worker-0", "default", "cloud-worker-0")
 	awsMachine := fakeAWSMachine("cloud-worker-0", "default", false)
 	emptyPeerSecret := &corev1.Secret{
@@ -313,8 +312,8 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	// further. This fake client does the opposite: it preserves
 	// StringData across Get and never populates Data at all. Neither
 	// behavior alone is safe to assert on, so secretValue reads
-	// whichever is actually populated -- correct against the fake here
-	// AND against anything real.
+	// whichever is populated, which is correct against the fake here and
+	// against a real API server.
 	if secretValue(bootstrapSecret, "format") != "cloud-config" {
 		t.Errorf("bootstrap secret format = %q, want cloud-config", secretValue(bootstrapSecret, "format"))
 	}
@@ -354,8 +353,8 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "wg-dialer", Name: "wg-dialer-peer"}, updatedDialerSecret); err != nil {
 		t.Fatalf("getting updated dialer secret: %v", err)
 	}
-	// Per-Machine keys, not flat singletons -- a second cloud Machine
-	// reconciling must never clobber this one's entry.
+	// Per-Machine keys, not flat singletons, so a second cloud Machine
+	// reconciling does not clobber this one's entry.
 	const machineName = "cloud-worker-0"
 	if string(updatedDialerSecret.Data["peer-endpoint-"+machineName]) != "pending" {
 		t.Errorf("peer-endpoint-%s = %q, want \"pending\" until the endpoint-controller learns the real external IP", machineName, updatedDialerSecret.Data["peer-endpoint-"+machineName])
@@ -363,11 +362,11 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	if len(updatedDialerSecret.Data["peer-public-key-"+machineName]) == 0 {
 		t.Error("peer-public-key-<machine> wasn't populated with the newly generated cloud-side public key")
 	}
-	// AllowedIPs carry tunnel address AND both node VIPs (BGP sessions
-	// and kubelet traffic ride the VIPs); RouteHosts carry the same
-	// three as bare hosts (each becomes exactly one /32 or /128 kernel
-	// route on the on-prem side, nothing wider -- pod routing is
-	// Calico's job).
+	// AllowedIPs carry the tunnel address and both node VIPs (BGP
+	// sessions and kubelet traffic ride the VIPs); RouteHosts carry the
+	// same three as bare hosts, each becoming one /32 or /128 kernel
+	// route on the on-prem side and nothing wider. Pod routing is
+	// Calico's job.
 	wantAllowed := "10.100.0.128/32"
 	if got := string(updatedDialerSecret.Data["peer-allowed-ips-"+machineName]); got != wantAllowed {
 		t.Errorf("peer-allowed-ips-%s = %q, want %q", machineName, got, wantAllowed)
@@ -387,14 +386,12 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	}
 }
 
-// TestReconcile_TwoCloudMachinesDoNotClobberEachOther is the direct
-// regression test for the actual architectural gap this redesign
-// closes: before per-Machine keys, the dialer Secret's flat
-// peer-public-key/peer-endpoint keys meant a second cloud Machine
-// reconciling would silently overwrite the first's entry -- the
-// on-prem dialer would then only ever know about whichever Machine
-// reconciled last. Two Machines reconciling in sequence must each get
-// their own independent, surviving entry.
+// TestReconcile_TwoCloudMachinesDoNotClobberEachOther covers
+// per-Machine keys in the dialer Secret. Flat
+// peer-public-key/peer-endpoint keys would let a second cloud Machine
+// overwrite the first's entry, leaving the on-prem dialer aware only
+// of whichever Machine reconciled last. Two Machines reconciling in
+// sequence each get their own surviving entry.
 func TestReconcile_TwoCloudMachinesDoNotClobberEachOther(t *testing.T) {
 	machineA := machineWithInfraRef("cloud-worker-a", "default", "cloud-worker-a")
 	awsMachineA := fakeAWSMachine("cloud-worker-a", "default", true)
@@ -420,23 +417,21 @@ func TestReconcile_TwoCloudMachinesDoNotClobberEachOther(t *testing.T) {
 	pubA := updatedDialerSecret.Data["peer-public-key-cloud-worker-a"]
 	pubB := updatedDialerSecret.Data["peer-public-key-cloud-worker-b"]
 	if len(pubA) == 0 {
-		t.Fatal("cloud-worker-a's peer-public-key entry is missing -- clobbered by cloud-worker-b's reconcile")
+		t.Fatal("cloud-worker-a's peer-public-key entry is missing: clobbered by cloud-worker-b's reconcile")
 	}
 	if len(pubB) == 0 {
 		t.Fatal("cloud-worker-b's peer-public-key entry is missing")
 	}
 	if string(pubA) == string(pubB) {
-		t.Error("cloud-worker-a and cloud-worker-b ended up with the same public key -- one clobbered the other")
+		t.Error("cloud-worker-a and cloud-worker-b ended up with the same public key: one clobbered the other")
 	}
 
-	// The actual regression case for the WireGuardAddrAnnotation fix:
-	// each Machine's own tunnel address (both its own RouteHosts/
-	// AllowedIPs entries in the dialer Secret, and its own kernel host
-	// route on the on-prem side) must be distinct -- before that fix,
-	// every cloud Machine got the SAME literal r.WireGuardAddress, which
-	// is invalid for WireGuard cryptokey routing (two peers can't share
-	// an AllowedIPs destination) and ambiguous for the kernel route it
-	// produces.
+	// Each Machine's own tunnel address (its RouteHosts and AllowedIPs
+	// entries in the dialer Secret, and its kernel host route on the
+	// on-prem side) is distinct. A shared literal r.WireGuardAddress is
+	// invalid for WireGuard cryptokey routing, since two peers cannot
+	// share an AllowedIPs destination, and ambiguous for the kernel
+	// route it produces.
 	routeHostsA := string(updatedDialerSecret.Data["peer-route-hosts-cloud-worker-a"])
 	routeHostsB := string(updatedDialerSecret.Data["peer-route-hosts-cloud-worker-b"])
 	if routeHostsA == "" || routeHostsB == "" {
@@ -456,10 +451,10 @@ func TestReconcile_TwoCloudMachinesDoNotClobberEachOther(t *testing.T) {
 		t.Errorf("cloud-worker-b's peer-endpoint = %q, want \"pending\"", updatedDialerSecret.Data["peer-endpoint-cloud-worker-b"])
 	}
 
-	// Both Machines must also get their own, non-colliding node-VIP
-	// allocation -- allocateNodeVIPIndex already scans all Machines, but
-	// confirm it actually holds end to end through two real Reconcile
-	// calls, not just in isolation.
+	// Both Machines also get their own, non-colliding node-VIP
+	// allocation. allocateNodeVIPIndex scans all Machines; this
+	// confirms it holds end to end through two Reconcile calls, not
+	// just in isolation.
 	updatedA := &unstructured.Unstructured{}
 	updatedA.SetGroupVersionKind(machineGVK)
 	if err := r.Get(context.Background(), client.ObjectKeyFromObject(machineA), updatedA); err != nil {
@@ -474,20 +469,20 @@ func TestReconcile_TwoCloudMachinesDoNotClobberEachOther(t *testing.T) {
 		t.Errorf("machineA and machineB got the same tunnel address %q, so the allocation collided", updatedA.GetAnnotations()[WireGuardAddrAnnotation])
 	}
 
-	// Machine B's baked peers.json must include machine A as a
-	// remote-to-remote peer (isolated remotes share no LAN -- without
-	// this edge they could never reach each other), and must NOT
-	// include machine B itself.
+	// Machine B's baked peers.json includes machine A as a
+	// remote-to-remote peer, since isolated remotes share no LAN and
+	// without this edge they could not reach each other, and it
+	// excludes machine B itself.
 	bootstrapB := &corev1.Secret{}
 	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "cloud-worker-b-bootstrap"}, bootstrapB); err != nil {
 		t.Fatalf("getting machine B's bootstrap secret: %v", err)
 	}
 	renderedB := secretValue(bootstrapB, "value")
 	if !strings.Contains(renderedB, string(pubA)) {
-		t.Error("machine B's baked peers.json is missing machine A's public key -- remote-to-remote mesh edge absent")
+		t.Error("machine B's baked peers.json is missing machine A's public key: remote-to-remote mesh edge absent")
 	}
 	if strings.Contains(renderedB, "10.100.0.129/32") {
-		t.Error("machine B's baked peers.json contains its own address as a peer -- self-exclusion failed")
+		t.Error("machine B's baked peers.json contains its own address as a peer: self-exclusion failed")
 	}
 }
 
@@ -514,20 +509,19 @@ func TestReconcile_SkipsIfBootstrapSecretAlreadyExists(t *testing.T) {
 		t.Fatalf("getting bootstrap secret: %v", err)
 	}
 	if string(secret.Data["value"]) != "already provisioned" {
-		t.Error("existing bootstrap secret was overwritten -- Reconcile must never touch an already-provisioned secret")
+		t.Error("existing bootstrap secret was overwritten: Reconcile must never touch an already-provisioned secret")
 	}
 }
 
 // erroringReader wraps a real client.Reader but returns a fixed error
-// for Get calls matching one GVK -- used to inject the *exact* error
-// shape a real API server's RESTMapper produces when a CRD isn't
-// installed (meta.NoKindMatchError, or its string-only equivalent).
-// The fake controller-runtime client does NOT reproduce this: an
-// unstructured Get for a GVK it doesn't know about comes back as a
-// plain NotFound (confirmed empirically), which would make a naive
-// "just don't register the scheme type" test pass for the wrong
-// reason -- it would never actually reach isMissingCRD's branch at
-// all. This makes the test honest about which branch it exercises.
+// for Get calls matching one GVK, injecting the error shape a real API
+// server's RESTMapper produces when a CRD isn't installed
+// (meta.NoKindMatchError, or its string-only equivalent). The fake
+// controller-runtime client does not reproduce this: an unstructured
+// Get for a GVK it doesn't know about comes back as a plain NotFound,
+// which would make a "just don't register the scheme type" test pass
+// without reaching isMissingCRD's branch. This keeps the test honest
+// about which branch it exercises.
 type erroringReader struct {
 	client.Reader
 	failGVK schema.GroupVersionKind
@@ -588,9 +582,9 @@ func TestReconcile_MissingInfrastructureCRD_RequeuesGracefully(t *testing.T) {
 func TestReconcile_MissingInfrastructureCRD_StringFallback_RequeuesGracefully(t *testing.T) {
 	// The string-matching fallback path: some server versions surface a
 	// missing CRD as a plain error message rather than a typed
-	// meta.NoKindMatchError (see isMissingCRD's comment) -- this proves
-	// that fallback is actually reachable through the full Reconcile
-	// path, not just a pure-function unit test of isMissingCRD itself.
+	// meta.NoKindMatchError (see isMissingCRD's comment). This proves
+	// that fallback is reachable through the full Reconcile path, not
+	// just a pure-function unit test of isMissingCRD itself.
 	r, machine, join := testMissingCRDReconciler(t, fmt.Errorf(`the server could not find the requested resource`))
 
 	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)})
@@ -606,11 +600,10 @@ func TestReconcile_MissingInfrastructureCRD_StringFallback_RequeuesGracefully(t 
 }
 
 func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
-	// Two Machines referencing two different infrastructureRef kinds,
-	// two registered providers -- only the matching provider for each
-	// Machine may be consulted. This is the actual behavior "the
-	// operator should infer which concrete implementation it uses"
-	// depends on, not just a claim in a comment.
+	// Two Machines referencing two different infrastructureRef kinds
+	// and two registered providers: only the matching provider for each
+	// Machine is consulted. This is the behavior provider inference
+	// depends on.
 	awsProvider := awsShapedStub()
 	otherProvider := &stubInfraProvider{gvk: schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "OtherMachine"}, infraValues: map[string]any{}}
 
@@ -675,11 +668,11 @@ func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
 }
 
 func TestReconcile_EmitsOnlyRealAddresses(t *testing.T) {
-	// Every entry published for a peer must parse as an address. A
-	// value assembled from a prefix and an index once produced a bare
-	// "200" on a cluster with no prefix set, and every consumer then
-	// treated it as one: "200/32" in the peer AllowedIPs, which the
-	// dialer refuses to parse, so no tunnel was ever built.
+	// Every entry published for a peer parses as an address. A value
+	// assembled from a prefix and an index can produce a bare "200" on
+	// a cluster with no prefix set, which consumers then render as
+	// "200/32" in the peer AllowedIPs; the dialer refuses to parse
+	// that, and no tunnel is built.
 	machine := machineWithInfraRef("cloud-worker-0", "default", "cloud-worker-0")
 	awsMachine := fakeAWSMachine("cloud-worker-0", "default", true)
 	join := &stubJoinProvider{values: map[string]any{"joinToken": "t", "k0sVersion": "v"}}

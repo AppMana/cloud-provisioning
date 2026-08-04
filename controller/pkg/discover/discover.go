@@ -81,8 +81,8 @@ func APIServers(ctx context.Context, c client.Client) ([]string, error) {
 // at all, so the range is read out of the error the allocator returns
 // for an out-of-range address: a dry-run Service create is rejected
 // with a message naming the valid range. That is a documented,
-// deliberately descriptive error, and it costs one rejected request
-// with no side effects.
+// descriptive error, and it costs one rejected request with no side
+// effects.
 func ServiceCIDRs(ctx context.Context, c client.Client) ([]string, error) {
 	list := &unstructured.UnstructuredList{}
 	list.SetGroupVersionKind(schema.GroupVersionKind{

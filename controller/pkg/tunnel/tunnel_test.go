@@ -9,8 +9,8 @@ func TestHostCIDR(t *testing.T) {
 	cases := map[string]string{
 		"10.100.0.2":        "10.100.0.2/32",
 		"fd8f:cf26:522a::1": "fd8f:cf26:522a::1/128",
-		"10.100.0.2/32":     "10.100.0.2/32", // already has a prefix -- left alone
-		"10.100.0.0/24":     "10.100.0.0/24", // never narrowed if already broader (rejection is the route parser's job)
+		"10.100.0.2/32":     "10.100.0.2/32", // already has a prefix, left alone
+		"10.100.0.0/24":     "10.100.0.0/24", // not narrowed if already broader (rejection is the route parser's job)
 	}
 	for in, want := range cases {
 		if got := HostCIDR(in); got != want {

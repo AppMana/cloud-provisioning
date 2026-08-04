@@ -12,9 +12,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// This is the core safety regression for this binary: only exact host
-// prefixes ever become kernel routes. A broad prefix reaching the
-// route path -- the exact shape of the 0.0.0.0/0 route hijack -- is
+// Only exact host prefixes ever become kernel routes. A broad prefix
+// reaching the route path, the shape of a 0.0.0.0/0 route hijack, is
 // rejected at parse time, before any route is touched.
 func TestParseHostRoute_RefusesAnythingBroaderThanAHost(t *testing.T) {
 	for _, bad := range []string{"0.0.0.0/0", "::/0", "10.101.0.0/24", "10.0.0.0/8", "fd8f:cf26:522a::/64"} {
@@ -32,9 +31,8 @@ func TestParseHostRoute_RefusesAnythingBroaderThanAHost(t *testing.T) {
 }
 
 // WGAllowedIPs (WireGuard's cryptokey accept-list) and RouteHosts (the
-// only things installed as kernel routes) must come out as genuinely
-// different values -- conflating them was the root cause of the
-// incident.
+// only things installed as kernel routes) come out as independent
+// values; they are not interchangeable.
 func TestLoadPeersFromSecret_AllowListAndRouteHostsAreIndependent(t *testing.T) {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "wg-dialer-peer", Namespace: "wg-dialer"},
@@ -47,7 +45,7 @@ func TestLoadPeersFromSecret_AllowListAndRouteHostsAreIndependent(t *testing.T) 
 			"peer-endpoint-cloud-2":    []byte("pending"),
 			"peer-allowed-ips-cloud-2": []byte("10.100.0.3/32"),
 			"peer-route-host-cloud-2":  []byte("10.100.0.3"), // legacy single-host key still honored
-			"node-public-key-the on-prem host":   []byte("unrelated"),  // must NOT be treated as a peer
+			"node-public-key-the on-prem host":   []byte("unrelated"),  // not a peer key
 		},
 	}
 
@@ -79,7 +77,7 @@ func TestLoadPeersFromSecret_AllowListAndRouteHostsAreIndependent(t *testing.T) 
 	}
 
 	// "pending" (the mirror's placeholder before the real external IP
-	// is known) must become an EMPTY Endpoint, not a literal string
+	// is known) becomes an empty Endpoint, not a literal string
 	// WireGuard would try (and fail) to resolve as a UDP address.
 	cloud2, ok := byPub["cloudpubkey2"]
 	if !ok {
@@ -93,9 +91,8 @@ func TestLoadPeersFromSecret_AllowListAndRouteHostsAreIndependent(t *testing.T) 
 	}
 }
 
-// A second cloud peer in the Secret must be picked up as an
-// independent, additional peer, never overwrite or get confused with
-// the first.
+// A second cloud peer in the Secret is picked up as an independent,
+// additional peer rather than overwriting the first.
 func TestLoadPeersFromSecret_MultipleCloudPeersAreIndependent(t *testing.T) {
 	secret := &corev1.Secret{
 		Data: map[string][]byte{
@@ -123,7 +120,7 @@ func TestLoadPeersFromSecret_MissingAllowedIPsIsAnError(t *testing.T) {
 		Data: map[string][]byte{
 			"peer-public-key-cloud-1":  []byte("pub"),
 			"peer-route-hosts-cloud-1": []byte("10.100.0.2"),
-			// peer-allowed-ips-cloud-1 deliberately missing
+			// peer-allowed-ips-cloud-1 omitted
 		},
 	}
 	if _, err := loadPeersFromSecret(secret); err == nil {
@@ -172,15 +169,15 @@ func TestPeersFile_RoundTrip(t *testing.T) {
 	if len(peers) != 1 || peers[0].PublicKey != "onprempub" {
 		t.Fatalf("doc.Peers = %+v, want one peer with publicKey=onprempub", peers)
 	}
-	// Endpoint absent from the file entirely -- listener role: this
-	// peer is never dialed, only ever waited for.
+	// Endpoint absent from the file entirely, the listener role: this
+	// peer is not dialed, only waited for.
 	if peers[0].Endpoint != "" {
 		t.Errorf("peers[0].Endpoint = %q, want empty (listener role never dials out)", peers[0].Endpoint)
 	}
 	// The transit route-host set includes an address (the API VIP) that
-	// belongs to no tunnel peer directly -- it must survive the
-	// round-trip untouched; whether it is a legal HOST route is
-	// parseHostRoute's job, not the file reader's.
+	// belongs to no tunnel peer directly; it survives the round-trip
+	// untouched. Whether it is a legal host route is parseHostRoute's
+	// job, not the file reader's.
 	if got := peers[0].AllRouteHosts(); len(got) != 3 {
 		t.Errorf("route hosts = %v, want 3", got)
 	}
@@ -214,7 +211,7 @@ func TestPrivateKeyFile_GeneratePersistRoundTrip(t *testing.T) {
 func TestInstallHostBinary_AtomicAndIdempotent(t *testing.T) {
 	// The post-join upgrade channel: the DaemonSet's image carries the
 	// binary and installs it onto the host, so a fleet upgrade is one
-	// image digest -- no download host, no re-rendered userdata.
+	// image digest, with no download host and no re-rendered userdata.
 	dir := t.TempDir()
 	target := filepath.Join(dir, "sub", "wg-dialer")
 
@@ -244,16 +241,16 @@ func TestInstallHostBinary_AtomicAndIdempotent(t *testing.T) {
 		t.Errorf("installed binary mode %v is not executable", info.Mode().Perm())
 	}
 
-	// Idempotent: an unchanged target must not be rewritten (same
-	// inode), so a steady-state DaemonSet restart never churns the
-	// binary the systemd unit is executing.
+	// Idempotent: an unchanged target is not rewritten (same inode),
+	// so a steady-state DaemonSet restart does not churn the binary
+	// the systemd unit is executing.
 	before, _ := os.Stat(target)
 	if err := installHostBinary(target); err != nil {
 		t.Fatalf("installHostBinary (repeat): %v", err)
 	}
 	after, _ := os.Stat(target)
 	if !os.SameFile(before, after) {
-		t.Error("unchanged binary was replaced anyway -- must be a no-op when digests match")
+		t.Error("unchanged binary was replaced anyway: must be a no-op when digests match")
 	}
 
 	// A stale copy is replaced.
@@ -273,11 +270,10 @@ func TestInstallHostBinary_AtomicAndIdempotent(t *testing.T) {
 
 func TestReconcilePlan_NeverRoutesAPeerEndpointThroughTheTunnel(t *testing.T) {
 	// Routing a peer's endpoint through the tunnel that dials it is an
-	// infinite encapsulation loop -- the encrypted packet's outer
-	// destination matches the same route. Caught live at line rate
-	// (2.29 GiB in three minutes) when a node's published address
-	// equalled the address the tunnel dials, which is the normal case
-	// for nodes dialed on their ordinary node IPs.
+	// infinite encapsulation loop: the encrypted packet's outer
+	// destination matches the same route. It arises when a node's
+	// published address equals the address the tunnel dials, the usual
+	// case for nodes dialed on their ordinary node IPs.
 	peers := []tunnel.PeerSpec{{
 		PublicKey:  "inWNVFSf+4UUVNrmz/EMjR7aKnUJcRUh5V7k4aQBSl4=",
 		Endpoint:   "172.21.0.16:51820",

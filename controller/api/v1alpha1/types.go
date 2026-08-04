@@ -1,7 +1,7 @@
-// Package v1alpha1 defines ProvisionedNodeClaim: the ONE resource a
-// user commits to get a cloud node joined to the cluster over a
+// Package v1alpha1 defines ProvisionedNodeClaim: the single resource
+// a user commits to get a cloud node joined to the cluster over a
 // WireGuard tunnel. The spec boils down to resource requests aligned
-// with cloud instance types -- it names no cloud and carries no
+// with cloud instance types; it names no cloud and carries no
 // cloud-specific field. Which cloud fulfills the claim is decided by
 // the registered provider that owns the CAPI Cluster's infrastructure
 // (join.MachineProvisioner); the claim reconciler expands the claim
@@ -41,8 +41,8 @@ type ProvisionedNodeClaimSpec struct {
 
 	// InternetFacing nodes register with the internet-facing taint and
 	// a public address; the public ingress data plane tolerates that
-	// taint. Defaults to true -- a publicly reachable node is this
-	// project's reason to exist.
+	// taint. Defaults to true; a publicly reachable node is the common
+	// case for this project.
 	// +optional
 	InternetFacing *bool `json:"internetFacing,omitempty"`
 

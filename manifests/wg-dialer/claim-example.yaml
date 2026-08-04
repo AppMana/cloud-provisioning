@@ -1,9 +1,9 @@
-# The ONE resource a user commits to get a public cloud worker joined
-# over a WireGuard tunnel. Everything else -- the CAPI Machine +
+# The single resource a user commits to get a public cloud worker
+# joined over a WireGuard tunnel. Everything else (the CAPI Machine and
 # AWSMachine pair, the tunnel-bootstrapping userdata, the tunnel
-# address allocations, both dialer DaemonSets, the adoption config --
-# is derived by the controller. Deleting this claim cascades: the
-# instance terminates, the Secrets are garbage-collected.
+# address allocations, both dialer DaemonSets, the adoption config) is
+# derived by the controller. Deleting this claim cascades: the instance
+# terminates, the Secrets are garbage-collected.
 #
 # The spec names no cloud. Which cloud fulfills it is decided by the
 # registered provider owning the CAPI Cluster's infrastructure (see
@@ -28,9 +28,9 @@ spec:
   #   matchLabels:
   #     kubernetes.io/hostname: <node>
 ---
-# The AWS provider's cluster-level configuration -- the ONLY
-# AWS-specific input, supplied once as a plain Secret (SealedSecrets/
-# SOPS is the repo owner's choice, never required). Keys the provider
+# The AWS provider's cluster-level configuration, the only AWS-specific
+# input, supplied once as a plain Secret (SealedSecrets or SOPS is the
+# repo owner's choice, not required). Keys the provider
 # reads: ami-arm64/ami-amd64, ssh-key-name, security-group-ids,
 # subnet-id, iam-instance-profile, public-ip,
 # insecure-skip-secrets-manager.
@@ -42,9 +42,9 @@ metadata:
 stringData:
   ami-arm64: <arm64-ubuntu-ami-id>
   ssh-key-name: <keypair-name>
-  # additionalSecurityGroups, NOT securityGroupOverrides, is what the
-  # rendered AWSMachine carries -- confirmed by reading CAPA's
-  # GetCoreSecurityGroups (pkg/cloud/services/ec2/instances.go): for an
+  # additionalSecurityGroups, not securityGroupOverrides, is what the
+  # rendered AWSMachine carries. In CAPA's GetCoreSecurityGroups
+  # (pkg/cloud/services/ec2/instances.go), for an
   # externally-managed Machine it ignores securityGroupOverrides
   # entirely. The wrong field leaves the instance on the VPC default SG
   # and CAPA tight-loops trying to reconcile the ENI to zero groups.

@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # Single-NIC routing e2e for the dialer binary, entirely in network
 # namespaces on one machine. Two nodes ("onprem", "cloud"), each with
-# exactly ONE uplink and a default route -- faithful to the real
-# topologies (a LAN host behind a gateway; an EC2 instance with a VPC
-# default route). A third namespace ("wan") routes between them,
-# standing in for the internet.
+# exactly one uplink and a default route, matching the real topologies
+# (a LAN host behind a gateway; an EC2 instance with a VPC default
+# route). A third namespace ("wan") routes between them, standing in
+# for the internet.
 #
-# What this proves, against the REAL binary and a REAL kernel:
+# What this proves, against the real binary and a real kernel:
 #   1. The tunnel comes up by dialing out and traffic flows.
-#   2. The ONLY kernel routes the dialer adds are /32 host routes to
+#   2. The only kernel routes the dialer adds are /32 host routes to
 #      peer node addresses, in the main table, via the cldt* interface.
 #   3. Longest-prefix match does the entire routing job: a peer /32
 #      beats both the default route and a broader covering route.
-#   4. The toxic input class from the 2026-07-22 incident
-#      (--pod-cidrs=0.0.0.0/0,::/0) adds ZERO kernel routes -- the
-#      CIDRs land only in WireGuard AllowedIPs (the cryptokey filter).
+#   4. The broad-CIDR input class (--pod-cidrs=0.0.0.0/0,::/0) adds no
+#      kernel routes; the CIDRs land only in WireGuard AllowedIPs (the
+#      cryptokey filter).
 #   5. A route-host broader than a single host is refused at parse
 #      time; nothing is installed.
 #   6. The default route is byte-identical before and after everything.
@@ -100,7 +100,7 @@ if ip netns exec "$NS_ONPREM" timeout 5 "$LOG_DIR/wg-dialer" \
 fi
 grep -q "single hosts" "$LOG_DIR/onprem/toxic-route.log" || fail "no parse-time refusal of a /8 route-host"
 if ip -n "$NS_ONPREM" link show "$IFACE" >/dev/null 2>&1; then
-  fail "the interface was created despite the refused route-host -- refusal must precede ANY kernel mutation"
+  fail "the interface was created despite the refused route-host: refusal must precede ANY kernel mutation"
 fi
 echo "  refused /8 route-host at parse time; kernel untouched (no link, no routes)"
 
@@ -127,16 +127,16 @@ done
 echo "  onprem -> cloud tunnel ping OK"
 
 echo "--- assert 2: only /32 host routes via $IFACE, main table ---"
-routes_via_iface() { # ns -- host routes via the tunnel iface, normalized
+routes_via_iface() { # ns: host routes via the tunnel iface, normalized
   ip -n "$1" route show dev "$IFACE" | { grep -v "proto kernel" || true; } | sed 's/[[:space:]]*$//' | sort
 }
 ONPREM_ROUTES=$(routes_via_iface "$NS_ONPREM")
 WANT_ONPREM=$(printf '%s\n' "$CLOUD_TUN scope link" "$CLOUD_VIP scope link" | sort)
 [ "$ONPREM_ROUTES" == "$WANT_ONPREM" ] || fail "onprem routes via $IFACE: got [$ONPREM_ROUTES], want exactly the two peer /32s"
-# The LISTENER's routes follow the first handshake by design (the
+# The listener's routes follow the first handshake by design: the
 # dialing, NAT'd side carries the endpoints; the listener learns the
 # dialer's address by roaming and only then has a viable peer to route
-# to -- before that a host route would only blackhole). Allow one poll
+# to, and before that a host route would only blackhole. Allow one poll
 # interval for them to converge.
 WANT_CLOUD=$(printf '%s\n' "$ONPREM_TUN scope link" "$ONPREM_VIP scope link" | sort)
 CLOUD_ROUTES=""
@@ -172,22 +172,22 @@ $ROUTES_BEFORE_TOXIC
 --- after ---
 $ROUTES_AFTER_TOXIC"
 ip netns exec "$NS_ONPREM" wg show "$IFACE" allowed-ips | grep -q "0.0.0.0/0" \
-  || fail "0.0.0.0/0 missing from AllowedIPs -- it must land in the cryptokey filter, just never in a route"
+  || fail "0.0.0.0/0 missing from AllowedIPs: it must land in the cryptokey filter, just never in a route"
 ip netns exec "$NS_ONPREM" ping -c1 -W2 "$CLOUD_TUN" >/dev/null || fail "tunnel broken under toxic pod-cidrs"
 ip netns exec "$NS_ONPREM" ping -c1 -W2 198.51.100.20 >/dev/null || fail "UNDERLAY HIJACKED: plain wan traffic no longer flows with 0.0.0.0/0 in AllowedIPs"
 echo "  route table byte-identical; 0.0.0.0/0 in AllowedIPs only; underlay + tunnel both alive"
 
 echo "--- assert 5: SIGTERM does NOT take the cloud node's tunnel down ---"
-# The cloud node reaches the cluster ONLY through this interface, so
-# whatever manages the dialer there must be able to stop, restart or be
-# uninstalled without stranding the node. (The opposite holds on a node
-# that has its own LAN path -- there the dialer removes the interface on
-# shutdown, so an uninstall cannot leave an orphaned tunnel. That side
-# needs a cluster and is asserted in the kind harness.)
+# The cloud node reaches the cluster only through this interface, so
+# whatever manages the dialer there can stop, restart or be uninstalled
+# without stranding the node. The opposite holds on a node that has its
+# own LAN path: there the dialer removes the interface on shutdown, so
+# an uninstall cannot leave an orphaned tunnel. That side needs a
+# cluster and is asserted in the kind harness.
 kill -TERM $CLOUD_PID 2>/dev/null || true
 wait $CLOUD_PID 2>/dev/null || true
 ip -n "$NS_CLOUD" link show "$IFACE" >/dev/null 2>&1 \
-  || fail "the cloud node's $IFACE was removed on SIGTERM -- that strands a node whose only path back is this tunnel"
+  || fail "the cloud node's $IFACE was removed on SIGTERM: that strands a node whose only path back is this tunnel"
 ip netns exec "$NS_ONPREM" ping -c1 -W2 "$CLOUD_TUN" >/dev/null \
   || fail "tunnel stopped carrying traffic after the cloud dialer exited"
 echo "  interface and traffic survive the cloud dialer exiting"

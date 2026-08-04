@@ -3,11 +3,10 @@
 container's own qemu monitor at localhost:5000) and run one command,
 printing the output.
 
-This bypasses the guest's own network stack entirely -- it works even
-when the guest has hijacked its own default route and is completely
-unreachable over SSH/kubectl. That's the whole point: it lets the harness
-prove what the guest's routing table actually looks like, rather than
-inferring it purely from reachability (or the lack of it).
+This bypasses the guest's own network stack entirely, so it works even
+when the guest has hijacked its own default route and is unreachable
+over SSH/kubectl. That lets the harness read the guest's routing table
+directly, rather than inferring it from reachability.
 
 Usage: serial-console.py <container-name> <command>
 """

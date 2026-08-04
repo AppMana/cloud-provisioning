@@ -1,13 +1,13 @@
 // Package kubeadm implements join.ClusterJoinProvider for
-// kubeadm-based control planes (including kind, whose control plane IS
-// kubeadm). k0s is one specialization of cluster-join support; this is
-// another -- same seam, different credential shape.
+// kubeadm-based control planes (including kind, whose control plane is
+// kubeadm). k0s is one implementation of cluster-join support; this is
+// another: same seam, different credential shape.
 //
 // A kubeadm worker join needs three things, all mintable through the
 // Kubernetes API this operator already has: a standard bootstrap-token
 // Secret (with the signing usage, so kubeadm's cluster-info discovery
 // can validate), the cluster CA's public-key hash (pinning discovery
-// against MITM -- kubeadm's own --discovery-token-ca-cert-hash), and
+// against MITM, kubeadm's own --discovery-token-ca-cert-hash), and
 // the API endpoint the new node should join through.
 package kubeadm
 
@@ -35,7 +35,7 @@ type Provider struct {
 	// APIAddress is the cluster's API server address as reached from a
 	// newly-joining node (e.g. "https://10.2.0.19:6443").
 	APIAddress string
-	// TTL is how long the minted token remains valid -- short-lived by
+	// TTL is how long the minted token remains valid: short-lived by
 	// design, covering the minutes between instance launch and first
 	// join, not indefinite credential validity.
 	TTL time.Duration
@@ -43,10 +43,10 @@ type Provider struct {
 
 // JoinValues implements join.ClusterJoinProvider. Contributed values:
 //
-//	joinToken         -- "<id>.<secret>", kubeadm's own token format
-//	joinEndpoint      -- "host:port" for `kubeadm join <endpoint>`
-//	caCertHash        -- "sha256:<hex>" for --discovery-token-ca-cert-hash
-//	kubernetesVersion -- from a live node, for installing matching kubelet/kubeadm
+//	joinToken         "<id>.<secret>", kubeadm's own token format
+//	joinEndpoint      "host:port" for `kubeadm join <endpoint>`
+//	caCertHash        "sha256:<hex>" for --discovery-token-ca-cert-hash
+//	kubernetesVersion from a live node, for installing matching kubelet/kubeadm
 func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
 	tokenID, err := randomToken(6)
 	if err != nil {
@@ -147,7 +147,7 @@ func (p *Provider) kubernetesVersion(ctx context.Context) (string, error) {
 	return nodes.Items[0].Status.NodeInfo.KubeletVersion, nil
 }
 
-// hostPort extracts "host:port" from the API address URL -- kubeadm
+// hostPort extracts "host:port" from the API address URL; kubeadm
 // join takes a bare endpoint, not a URL.
 func hostPort(apiAddress string) (string, error) {
 	u, err := url.Parse(apiAddress)

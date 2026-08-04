@@ -22,16 +22,16 @@ import (
 //
 // Controller-written per-node (read back by that node's dialer):
 //
-//	node-tunnel-address-<node>   -- tunnel address (CIDR)
-//	node-cluster-vips-<node>     -- comma-separated node addresses
+//	node-tunnel-address-<node>   tunnel address (CIDR)
+//	node-cluster-vips-<node>     comma-separated node addresses
 //
 // Controller-written per-remote-machine (the on-prem peer list):
 //
 //	peer-public-key-<machine>
-//	peer-endpoint-<machine>      -- "pending" until mirrored
-//	peer-allowed-ips-<machine>   -- comma-separated CIDRs
-//	peer-route-hosts-<machine>   -- comma-separated single hosts
-//	peer-route-host-<machine>    -- legacy single-host fallback
+//	peer-endpoint-<machine>      "pending" until mirrored
+//	peer-allowed-ips-<machine>   comma-separated CIDRs
+//	peer-route-hosts-<machine>   comma-separated single hosts
+//	peer-route-host-<machine>    legacy single-host fallback
 const (
 	NodePublicKeyPrefix     = "node-public-key-"
 	NodeTunnelAddressPrefix = "node-tunnel-address-"
@@ -65,10 +65,9 @@ const (
 func AdoptionSecretName(machineName string) string { return machineName + "-tunnel-peers" }
 
 // PeerSpec is one WireGuard peer a dialer maintains. AllowedIPs and
-// RouteHosts are deliberately separate: AllowedIPs is WireGuard's
-// cryptokey packet filter, RouteHosts are the peer node's own
-// addresses -- the only things that ever become kernel routes, each a
-// single host.
+// RouteHosts are separate: AllowedIPs is WireGuard's cryptokey packet
+// filter, RouteHosts are the peer node's own addresses, the only
+// things that become kernel routes, each a single host.
 type PeerSpec struct {
 	PublicKey    string   `json:"publicKey"`
 	Endpoint     string   `json:"endpoint,omitempty"`
@@ -114,7 +113,7 @@ func InterfaceName(meshID string) string {
 }
 
 // HostCIDR appends the correct single-host prefix length for addr's
-// family -- /32 for IPv4, /128 for IPv6 -- if addr doesn't already
+// family (/32 for IPv4, /128 for IPv6) if addr doesn't already
 // carry a prefix. The cluster is dual-stack; hardcoding /32 against an
 // IPv6 literal produces an entry that fails to parse or silently
 // matches the wrong host count.
@@ -142,36 +141,36 @@ func SplitList(lists ...string) []string {
 	return out
 }
 
-// RemotePeers derives a REMOTE (cloud) node's peer list from the
+// RemotePeers derives a remote (cloud) node's peer list from the
 // shared peer Secret's data: every published local tunnel-endpoint
 // node (node-* keys: public key published by that node's own dialer,
 // tunnel address and cluster VIPs written by the controller), plus
-// every OTHER remote machine (peer-* keys) -- the remote-to-remote
-// edges of the fully connected mesh (isolated remotes share no LAN;
-// without these edges they could never reach each other).
+// each other remote machine (peer-* keys), which are the
+// remote-to-remote edges of the fully connected mesh. Isolated remotes
+// share no LAN, so without these edges they could not reach each
+// other.
 //
-// selfTunnelAddr identifies which peer-* entry is the caller itself
-// (a remote knows its own tunnel address from its identity file, not
-// its Machine name -- Kubernetes node names and Machine names differ
-// on most clouds).
+// selfTunnelAddr identifies which peer-* entry is the caller itself.
+// A remote knows its own tunnel address from its identity file rather
+// than its Machine name, since Kubernetes node names and Machine names
+// differ on most clouds.
 //
 // apiVIP, when non-empty, is added to the AllowedIPs/RouteHosts of
-// the designated transit local (lowest tunnel address): control-plane
-// nodes deliberately carry no tunnel, so remotes reach the API
-// through exactly one local worker, which masquerades tunnel-sourced
-// traffic onto the LAN.
+// the designated transit local (lowest tunnel address). Control-plane
+// nodes carry no tunnel, so remotes reach the API through one local
+// worker, which masquerades tunnel-sourced traffic onto the LAN.
 //
 // Local peers get no Endpoint (the local side is behind NAT and only
-// ever dials out; the remote listens). Remote peers get their real
-// public endpoint when known -- two remotes must dial each other
-// directly.
+// dials out; the remote listens). Remote peers get their real public
+// endpoint when known, because two remotes dial each other directly.
 //
-// PUBLIC data only by construction: the Secret holds no private key
-// of any node, and this document lands on internet-facing machines.
+// The result is public data by construction: the Secret holds no
+// private key of any node, and this document lands on internet-facing
+// machines.
 //
 // This function is shared by the join reconciler (bootstrap: snapshot
 // rendered once into userdata) and the dialer's adoption mode (live:
-// re-derived from the Secret every poll) -- one derivation, two
+// re-derived from the Secret every poll): one derivation, two
 // freshness tiers, no drift.
 func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []string) ([]PeerSpec, error) {
 	type localNode struct {
@@ -187,7 +186,7 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 		addr := strings.TrimSpace(string(data[NodeTunnelAddressPrefix+nodeName]))
 		if addr == "" {
 			// Published a key but not allocated an address (not
-			// selected by any claim's tunnelEndpoints) -- not a mesh
+			// selected by any claim's tunnelEndpoints), so not a mesh
 			// member.
 			continue
 		}
@@ -267,7 +266,7 @@ func containsHost(hosts []string, addr string) bool {
 }
 
 // lessIP orders textual IPs by byte value (string order for
-// unparsable input) -- a stable, family-aware "lowest address" for
+// unparsable input): a stable, family-aware "lowest address" for
 // the transit designation.
 func lessIP(a, b string) bool {
 	ipa, ipb := net.ParseIP(a), net.ParseIP(b)

@@ -1,9 +1,8 @@
 # Publishes the Helm chart to GHCR on every change to the chart or the
 # controller. appVersion is stamped with the commit SHA at package
-# time, so a published chart always pins the images built from exactly
-# that commit -- pushing it by hand meant the registry drifted behind
-# the repository, and an install from the README got whatever was
-# pushed last.
+# time, so a published chart pins the images built from that commit.
+# Pushing it by hand lets the registry drift behind the repository, and
+# an install from the README then gets whatever was pushed last.
 name: Publish Helm chart
 on:
   push:

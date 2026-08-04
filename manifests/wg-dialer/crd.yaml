@@ -1,6 +1,6 @@
-# ProvisionedNodeClaim: the ONE resource a user commits to get a cloud
-# node joined to the cluster over a WireGuard tunnel. The spec is
-# request-shaped and names no cloud -- which cloud fulfills it is the
+# ProvisionedNodeClaim: the single resource a user commits to get a
+# cloud node joined to the cluster over a WireGuard tunnel. The spec is
+# request-shaped and names no cloud; which cloud fulfills it is the
 # registered provider abstraction's decision, routed through the CAPI
 # Cluster's infrastructureRef. Source of truth for the schema:
 # ../../controller/api/v1alpha1/types.go.

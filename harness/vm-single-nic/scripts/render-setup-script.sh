@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Generates a fresh SSH keypair for this harness (if missing) and renders
 # every node's *-setup.sh from its *-setup.sh.tmpl with the public key
-# embedded. Both the keypair and the rendered scripts are gitignored --
-# regenerated per checkout, not committed. One shared keypair for every
-# node in the topology -- this key is purely for the harness driver's own
-# SSH/k0sctl access, not identity material used inside the test itself,
-# so there's no reason for it to differ per node.
+# embedded. Both the keypair and the rendered scripts are gitignored,
+# regenerated per checkout and not committed. One shared keypair serves
+# every node in the topology: this key is only for the harness driver's
+# own SSH/k0sctl access, not identity material used inside the test, so
+# there is no reason for it to differ per node.
 set -euo pipefail
 
 HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

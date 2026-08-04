@@ -1,19 +1,18 @@
 # Mirrors endpoint-controller/main.go's ensureCloudDialerDaemonSet: the
-# SAME dialer binary, scheduled onto ONLY the cloud-worker node (via
-# nodeSelector + a toleration for the cloud-worker taint -- the exact
-# opposite of wg-dialer-daemonset.tmpl.yaml's scheduling). Identity
-# from /etc/wg-dialer/peers.json (hostPath, read-only), and the
-# adoption override pointed at the per-machine Secret named by
-# /etc/wg-dialer/machine-name -- which this harness deliberately does
-# NOT create, proving the fallback floor: an unreadable adoption Secret
-# degrades to the bootstrap file, never a dead tunnel.
+# same dialer binary, scheduled onto the cloud-worker node only (via
+# nodeSelector plus a toleration for the cloud-worker taint, the
+# inverse of wg-dialer-daemonset.tmpl.yaml's scheduling). Identity
+# comes from /etc/wg-dialer/peers.json (hostPath, read-only), and the
+# adoption override points at the per-machine Secret named by
+# /etc/wg-dialer/machine-name, which this harness does not create. That
+# exercises the fallback: an unreadable adoption Secret degrades to the
+# bootstrap file rather than a dead tunnel.
 #
-# This deliberately runs ALONGSIDE the wg-dialer.service systemd unit
-# already running on `cloud`, not instead of it -- see
+# This runs alongside the wg-dialer.service systemd unit already
+# running on `cloud`, not instead of it. See
 # ensureCloudDialerDaemonSet's own doc comment for why both running
-# forever, redundantly, is the actual safety property this harness is
-# meant to prove (the bootstrap unit must never depend on this
-# DaemonSet successfully taking over from it).
+# redundantly is the safety property this harness proves: the bootstrap
+# unit does not depend on this DaemonSet taking over from it.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:

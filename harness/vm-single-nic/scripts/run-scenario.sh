@@ -1,32 +1,32 @@
 #!/usr/bin/env bash
-# Run one GREEN scenario for the wg-dialer regression against a real
-# two-VM topology: `onprem` (real k0s controller+worker + the on-prem
-# dialer DaemonSet in Secret mode, self-generating and publishing its
-# key) and `cloud` (the dialer as a bare systemd unit, listener role,
-# plus the cloud DaemonSet proving adoption's fallback floor). Real
-# bidirectional WireGuard peering, real systemd/PID1 boot, real kubelet.
+# Run one passing scenario for the wg-dialer regression against a real
+# two-VM topology: `onprem` (real k0s controller+worker plus the
+# on-prem dialer DaemonSet in Secret mode, self-generating and
+# publishing its key) and `cloud` (the dialer as a bare systemd unit,
+# listener role, plus the cloud DaemonSet exercising adoption's
+# fallback). Real bidirectional WireGuard peering, real systemd/PID1
+# boot, real kubelet.
 #
 # Usage: run-scenario.sh <cidr-value>
 #
-#   GREEN, default -- real safe pod-CIDR:
+#   Default, a safe pod-CIDR:
 #   ./run-scenario.sh "10.244.0.0/16"
 #
-#   GREEN, toxic -- --pod-cidrs set to the maximally toxic value. This
-#   must ALSO stay GREEN: kernel routes are structurally independent of
-#   this input (see cmd/dialer/main.go's package doc).
+#   Broad CIDRs: --pod-cidrs set to the widest value. This also passes,
+#   because kernel routes are structurally independent of this input
+#   (see cmd/dialer/main.go's package doc).
 #   ./run-scenario.sh "0.0.0.0/0,::/0"
 #
-# There is no RED scenario anymore: the pre-incident binary's failure
-# class (CIDR-wide kernel routes) is refused at parse time and
-# unit-tested; rebuilding a forbidden binary to watch it break a VM
-# proves nothing the invariant doesn't already.
+# There is no failing scenario: the CIDR-wide kernel route failure
+# class is refused at parse time and unit-tested, so rebuilding such a
+# binary to watch it break a VM adds nothing to the invariant.
 set -euo pipefail
 
 CIDR_VALUE="${1:?usage: run-scenario.sh <cidr-value>}"
 DIALER_BIN="dialer-fixed"
 
-# QEMU's slirp-based mgmt NAT (the default, non-passthrough hostfwd mode --
-# see topo.clab.yml's comment on CLAB_MGMT_PASSTHROUGH) is known to stall
+# QEMU's slirp-based mgmt NAT (the default, non-passthrough hostfwd
+# mode; see topo.clab.yml's comment on CLAB_MGMT_PASSTHROUGH) can stall
 # under concurrent connections/throughput (e.g. an image pull sharing the
 # same link as an SSH/kubectl call): TCP connect succeeds instantly but the
 # subsequent data exchange can hang for 30s+ before recovering on its own.
@@ -45,11 +45,11 @@ retry() {
   done
 }
 
-# The real question isn't "does the guest still see other peers as healthy"
-# -- it's "does the REST of the tailnet see the guest itself go stale",
-# exactly what happened to the on-prem host in the real incident. That has to be
-# checked from a peer whose own connectivity never depends on the guest
-# -- this workstation. This check never touches the guest at all, so it
+# The question is not "does the guest still see other peers as
+# healthy" but "does the rest of the tailnet see the guest itself go
+# stale". That has to be checked from a peer whose own connectivity
+# does not depend on the guest, this workstation. This check never
+# touches the guest at all, so it
 # works identically whether the guest is reachable or not. sudo tailscale
 # switch changes system-wide state, so capture the original profile up
 # front and always restore it.
@@ -100,14 +100,14 @@ echo "Logs: ${LOG_DIR}"
 
 echo "--- deploy both VMs ---"
 # Both VMs get brand new host keys on every redeploy, but containerlab
-# always assigns the same mgmt IPs -- without this, ssh/k0sctl fail
+# always assigns the same mgmt IPs, so without this ssh/k0sctl fail
 # hard on a stale cached key from the previous run.
 ssh-keygen -R "${ONPREM_IP}" >/dev/null 2>&1 || true
 ssh-keygen -R "${CLOUD_IP}" >/dev/null 2>&1 || true
 ( cd "${HARNESS_DIR}" && sudo containerlab deploy -t topo.clab.yml --reconfigure ) >"${LOG_DIR}/deploy.log" 2>&1
 
-# Confirm containerlab actually assigned the IPs this script assumes --
-# fail loudly and early rather than silently talking to the wrong node
+# Confirm containerlab assigned the IPs this script assumes, failing
+# early rather than talking to the wrong node.
 # for the rest of the run.
 ACTUAL_IPS="$(cd "${HARNESS_DIR}" && sudo containerlab inspect -t topo.clab.yml -f json 2>/dev/null | python3 -c "
 import json,sys
@@ -124,11 +124,11 @@ for n in containers:
 " 2>/dev/null || true)"
 echo "containerlab-assigned IPs: ${ACTUAL_IPS}" | tee "${LOG_DIR}/assigned-ips.log"
 if ! echo "${ACTUAL_IPS}" | grep -q "onprem ${ONPREM_IP}"; then
-  echo "onprem did not get the expected mgmt IP ${ONPREM_IP} -- update ONPREM_IP/CLOUD_IP in this script to match containerlab's actual assignment (see ${LOG_DIR}/assigned-ips.log)" >&2
+  echo "onprem did not get the expected mgmt IP ${ONPREM_IP}: update ONPREM_IP/CLOUD_IP in this script to match containerlab's actual assignment (see ${LOG_DIR}/assigned-ips.log)" >&2
   exit 1
 fi
 if ! echo "${ACTUAL_IPS}" | grep -q "cloud ${CLOUD_IP}"; then
-  echo "cloud did not get the expected mgmt IP ${CLOUD_IP} -- update ONPREM_IP/CLOUD_IP in this script to match containerlab's actual assignment (see ${LOG_DIR}/assigned-ips.log)" >&2
+  echo "cloud did not get the expected mgmt IP ${CLOUD_IP}: update ONPREM_IP/CLOUD_IP in this script to match containerlab's actual assignment (see ${LOG_DIR}/assigned-ips.log)" >&2
   exit 1
 fi
 
@@ -147,7 +147,7 @@ retry 5 15 ${CLOUD_SSH} "test -f /run/wgdialer-harness-ready"
 
 echo "--- install real k0s via k0sctl (onprem: controller+worker; cloud: worker, registered with the real cloud-worker label/taint) ---"
 # Both guests carry slirp's identical 10.0.0.15; k0sctl needs unique,
-# GUEST-LOCAL privateAddresses (see k0sctl.yaml) -- give cloud its own.
+# guest-local privateAddresses (see k0sctl.yaml), so cloud gets its own.
 retry 5 15 ${CLOUD_SSH} "sudo ip addr add 10.0.0.16/32 dev lo 2>/dev/null || true"
 ( cd "${HARNESS_DIR}" && k0sctl apply --config k0sctl.yaml --no-wait ) >"${LOG_DIR}/k0sctl-apply.log" 2>&1
 ( cd "${HARNESS_DIR}" && k0sctl kubeconfig --config k0sctl.yaml ) >"${LOG_DIR}/kubeconfig.yaml" 2>"${LOG_DIR}/k0sctl-kubeconfig.log"
@@ -155,10 +155,10 @@ export KUBECONFIG="${LOG_DIR}/kubeconfig.yaml"
 
 echo "--- wait for both nodes Ready ---"
 # k0sctl joins cloud over the shared mgmt network (SSH-driven), not
-# through the WireGuard tunnel -- this harness doesn't reproduce the
-# claim/join declarative flow (harness/kind-e2e covers that). What's
+# through the WireGuard tunnel, so this harness does not reproduce the
+# claim/join declarative flow, which harness/kind-e2e covers. What is
 # under test here is real-boot kernel behavior, key self-publication on
-# a real kubelet, and DaemonSet scheduling/coexistence.
+# a real kubelet, and DaemonSet scheduling and coexistence.
 for _ in $(seq 1 90); do
   ready_count="$(kubectl get nodes --no-headers 2>/dev/null | grep -c ' Ready' || true)"
   if [[ "${ready_count}" -ge 2 ]]; then
@@ -169,7 +169,7 @@ done
 retry 5 15 kubectl get nodes -o wide
 CLOUD_NODE_NAME="$(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.cloud-provisioning\.appmana\.com/role}{"\n"}{end}' | awk -F'\t' '$2=="cloud-worker"{print $1; exit}')"
 if [[ -z "${CLOUD_NODE_NAME}" ]]; then
-  echo "no k8s Node carries the cloud-provisioning.appmana.com/role=cloud-worker label -- cloud didn't join correctly" >&2
+  echo "no k8s Node carries the cloud-provisioning.appmana.com/role=cloud-worker label: cloud didn't join correctly" >&2
   kubectl get nodes --show-labels >&2
   exit 1
 fi
@@ -187,7 +187,7 @@ if [[ -n "${WGDIALER_TEST_TAILSCALE_AUTHKEY:-}" ]]; then
   done
   echo "host-side view of ${GUEST_TS_HOSTNAME} right after joining: $(host_view_of_guest "${GUEST_TS_HOSTNAME}")" | tee "${LOG_DIR}/tailscale-status-joined.log"
 else
-  echo "WGDIALER_TEST_TAILSCALE_AUTHKEY not set -- Tailscale assertions SKIPPED" | tee "${LOG_DIR}/tailscale-SKIPPED.log"
+  echo "WGDIALER_TEST_TAILSCALE_AUTHKEY not set: Tailscale assertions SKIPPED" | tee "${LOG_DIR}/tailscale-SKIPPED.log"
 fi
 
 echo "--- keys: the script plays the JOIN RECONCILER's role (cloud keypair only); onprem's key is SELF-GENERATED by its dialer and never seen here ---"
@@ -219,11 +219,11 @@ IFACE="${IFACE}" POD_CIDRS="${CIDR_VALUE}" SERVICE_CIDRS="10.96.0.0/12" DIALER_B
 retry 5 15 kubectl apply -f "${LOG_DIR}/daemonset-rendered.yaml" >"${LOG_DIR}/apply-daemonset.log" 2>&1
 
 echo "--- wait for onprem dialer pod running (or detect immediate connectivity loss) ---"
-# On this single-NIC topology, a route hijack takes out EVERY path to
-# the guest within seconds of the dialer pod starting -- there's no
-# separate "data" link for it to spare. Distinguish "API server just
-# isn't up yet" from "guest went dark and stayed dark" -- the latter,
-# on this topology, IS the bug manifesting.
+# On this single-NIC topology, a route hijack takes out every path to
+# the guest within seconds of the dialer pod starting, since there is
+# no separate data link for it to spare. Distinguish "API server just
+# isn't up yet" from "guest went dark and stayed dark"; on this
+# topology the latter is the bug manifesting.
 POD_RUNNING="no"
 CONNECTIVITY_LOST_EARLY="no"
 consecutive_unreachable=0
@@ -238,7 +238,7 @@ for _ in $(seq 1 90); do
     consecutive_unreachable=$((consecutive_unreachable + 1))
   fi
   if (( consecutive_unreachable >= 6 )); then
-    echo "onprem unreachable for ~60s straight right after the daemonset started -- treating as a hijack"
+    echo "onprem unreachable for ~60s straight right after the daemonset started: treating as a hijack"
     CONNECTIVITY_LOST_EARLY="yes"
     break
   fi
@@ -248,10 +248,10 @@ done
 HIJACK_SEEN="no"
 TAILSCALE_WENT_STALE="no"
 
-# A hijack, under the new contract, is any route via the tunnel
-# interface that is not the connected tunnel subnet or a single host in
-# it -- most importantly a default route. Checked over the serial
-# console so it works even when the network is the casualty.
+# A hijack is any route via the tunnel interface that is not the
+# connected tunnel subnet or a single host in it, a default route
+# above all. Checked over the serial console so it works even when the
+# network is the casualty.
 serial_route_check() {
   local container="$1" logfile="$2"
   if docker inspect "${container}" >/dev/null 2>&1; then
@@ -268,7 +268,7 @@ serial_route_check() {
 
 if [[ "${CONNECTIVITY_LOST_EARLY}" == "yes" ]]; then
   HIJACK_SEEN="yes"
-  echo "immediate connectivity loss right after daemonset apply -- treated as HIJACK_SEEN=yes" > "${LOG_DIR}/observe.log"
+  echo "immediate connectivity loss right after daemonset apply: treated as HIJACK_SEEN=yes" > "${LOG_DIR}/observe.log"
   serial_route_check "clab-wgdialer-vm-single-nic-onprem" "${LOG_DIR}/serial-route-check-onprem.log" || true
 else
   retry 5 15 kubectl -n wg-dialer get pods -o wide
@@ -281,7 +281,7 @@ else
     sleep 5
   done
   if [[ -z "${ONPREM_PUB}" ]]; then
-    echo "the on-prem dialer never published its public key -- self-publication broken" >&2
+    echo "the on-prem dialer never published its public key: self-publication broken" >&2
     kubectl -n wg-dialer logs daemonset/dialer-repro --tail=20 >&2 || true
     exit 1
   fi
@@ -289,7 +289,7 @@ else
 
   echo "--- confirm the on-prem DaemonSet's pod never scheduled onto the cloud-worker node ---"
   if kubectl -n wg-dialer get pods -l app=dialer-repro -o wide --no-headers 2>/dev/null | grep -q "${CLOUD_NODE_NAME}"; then
-    echo "on-prem dialer-repro pod scheduled onto the cloud-worker node (${CLOUD_NODE_NAME}) -- the taint exclusion is broken" >&2
+    echo "on-prem dialer-repro pod scheduled onto the cloud-worker node (${CLOUD_NODE_NAME}): the taint exclusion is broken" >&2
     exit 1
   fi
   echo "confirmed: dialer-repro (on-prem DaemonSet) is absent from ${CLOUD_NODE_NAME}"
@@ -365,7 +365,7 @@ EOF
   kubectl -n wg-dialer get pods -o wide > "${LOG_DIR}/wg-dialer-pods-after-cloud-ds.log" 2>&1
   cat "${LOG_DIR}/wg-dialer-pods-after-cloud-ds.log"
   if [[ "${CLOUD_DS_SCHEDULED_CORRECTLY}" != "yes" ]]; then
-    echo "cloud DaemonSet's pod never reached Running on ${CLOUD_NODE_NAME} -- see ${LOG_DIR}/wg-dialer-pods-after-cloud-ds.log" >&2
+    echo "cloud DaemonSet's pod never reached Running on ${CLOUD_NODE_NAME}: see ${LOG_DIR}/wg-dialer-pods-after-cloud-ds.log" >&2
     exit 1
   fi
   echo "cloud-worker DaemonSet pod is Running on ${CLOUD_NODE_NAME}"
@@ -394,11 +394,10 @@ EOF
   echo "--- observe for boot-time race + up to 10 minutes ---"
   OBSERVE_LOG="${LOG_DIR}/observe.log"
   : > "${OBSERVE_LOG}"
-  # A plain reboot is expected to cause a brief (10-20s) window where
-  # EVERYTHING is down, even on a perfectly healthy system -- not the
-  # bug this harness is hunting for. Staleness only counts once it's
-  # held for 3 consecutive samples (~30s) past a grace window, and it's
-  # allowed to recover.
+  # A plain reboot causes a brief (10-20s) window where everything is
+  # down, even on a healthy system, which is not the bug this harness
+  # looks for. Staleness only counts once it is held for 3 consecutive
+  # samples (~30s) past a grace window, and it is allowed to recover.
   GRACE_PERIOD_S=20
   consecutive_stale=0
   for i in $(seq 1 60); do
@@ -446,7 +445,7 @@ TS_NOTE=""
 if [[ -n "${WGDIALER_TEST_TAILSCALE_AUTHKEY:-}" ]]; then
   TS_NOTE=", tailscale-went-stale=${TAILSCALE_WENT_STALE} (host-side check, real tailnet)"
 else
-  TS_NOTE=" (tailscale assertion SKIPPED -- WGDIALER_TEST_TAILSCALE_AUTHKEY unset)"
+  TS_NOTE=" (tailscale assertion SKIPPED: WGDIALER_TEST_TAILSCALE_AUTHKEY unset)"
 fi
 
 echo "--- verdict ---"
@@ -454,6 +453,6 @@ if [[ "${HIJACK_SEEN}" == "no" && "${TAILSCALE_WENT_STALE}" == "no" ]]; then
   echo "GREEN CONFIRMED: no hijack route on either node, self-published key, tunnel survived a real reboot, real bidirectional ping across ${IFACE} (${DIALER_BIN}, ${CIDR_VALUE})${TS_NOTE}"
   exit 0
 else
-  echo "GREEN FAILED: hijack_seen=${HIJACK_SEEN} tailscale_went_stale=${TAILSCALE_WENT_STALE} -- should both be 'no'" >&2
+  echo "GREEN FAILED: hijack_seen=${HIJACK_SEEN} tailscale_went_stale=${TAILSCALE_WENT_STALE}: should both be 'no'" >&2
   exit 1
 fi

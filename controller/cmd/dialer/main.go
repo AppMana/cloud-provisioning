@@ -1,37 +1,35 @@
 // Command wg-dialer runs on tunnel-endpoint nodes (DaemonSet,
 // hostNetwork, NET_ADMIN, or a systemd unit on a freshly-booted cloud
 // node) and keeps one WireGuard interface configured against the
-// current peer set. It talks netlink/wgctrl directly -- no shelling
+// current peer set. It talks netlink/wgctrl directly: no shelling
 // out, no wg-quick, no dependence on the node's AppArmor profile for
 // /usr/bin/wg.
 //
-// Separation of concerns, and the invariant the whole binary exists
-// to hold: it provides NODE-to-NODE reachability only.
+// It provides node-to-node reachability only.
 //
 //   - WireGuard's cryptokey-routing accept list
 //     (wgtypes.PeerConfig.AllowedIPs) decides which peer's key
 //     encrypts/decrypts a packet, matched against the packet's inner
 //     destination (wg_allowedips_lookup_dst, allowedips.c, reads
-//     ip_hdr(skb)->daddr and ignores kernel routing entirely). It must
-//     include the cluster's pod/service CIDRs (--pod-cidrs/
+//     ip_hdr(skb)->daddr and ignores kernel routing entirely). It has
+//     to include the cluster's pod/service CIDRs (--pod-cidrs/
 //     --service-cidrs) or WireGuard silently drops Calico-routed
-//     traffic. It is a packet FILTER, never a route source.
+//     traffic. It is a packet filter, not a route source.
 //   - Kernel routes: one host route (/32 or /128, enforced at parse
-//     time -- anything broader is a hard error, not a warning) per
-//     peer route-host, installed in the MAIN table. Longest-prefix
+//     time; anything broader is a hard error, not a warning) per
+//     peer route-host, installed in the main table. Longest-prefix
 //     match is the whole mechanism: a /32 to a peer's tunnel address
 //     or node VIP wins over a LAN /24 or a VPC default route for
-//     exactly that one host and nothing else. Routing to PODS is
-//     Calico's concern -- bird learns pod blocks over BGP sessions
+//     exactly that one host and nothing else. Routing to pods is
+//     Calico's concern: bird learns pod blocks over BGP sessions
 //     that ride these node routes; this binary never installs a
 //     pod/service-CIDR route.
 //
-// There is deliberately no policy-routing table here anymore. The
-// previous design put peer routes in a dedicated table behind an
-// after-main FIB rule -- which made them structurally unreachable on
-// any host with a default route (main matches everything first), i.e.
-// the "isolation" was actually "dead code". Safety does not come from
-// table placement; it comes from the host-prefix-only rule above.
+// There is no policy-routing table here. Peer routes in a dedicated
+// table behind an after-main FIB rule are structurally unreachable on
+// any host with a default route, because main matches everything
+// first. Safety comes from the host-prefix-only rule above, not from
+// table placement.
 package main
 
 import (
@@ -68,12 +66,12 @@ import (
 
 type config struct {
 	// Peer sources. Exactly one of secretName / peersFile carries this
-	// node's peer list at startup; when BOTH peersFile and
+	// node's peer list at startup; when both peersFile and
 	// peersSecretName are set (the cloud node's adoption mode), the
 	// file contributes identity (private key + local address, written
-	// once by cloud-init) and the Secret -- once it exists and is
-	// non-empty -- overrides the peer LIST, which is how post-join
-	// config corrections reach a node whose userdata is immutable.
+	// once by cloud-init) and the Secret, once it exists and is
+	// non-empty, overrides the peer list. That is how post-join config
+	// corrections reach a node whose userdata is immutable.
 	secretNamespace      string
 	secretName           string
 	peersFile            string
@@ -101,14 +99,14 @@ type config struct {
 	transitMasqueradeSource string
 
 	// installHostBinary, when set, is a host path this process keeps
-	// equal to its OWN executable. It is how the bootstrap-era
-	// download stops mattering: a remote node's first binary must come
-	// from a URL (nothing else exists before it joins), but once the
-	// node IS a cluster member, the container image is the
-	// distribution channel -- digest-pinned, gitops-controlled,
-	// rolling. The DaemonSet copy installs itself onto the host, so
-	// upgrading the fleet is bumping one image digest, never a
-	// download host, a re-render, or a per-node binary swap.
+	// equal to its own executable. It is how the bootstrap-era
+	// download stops mattering: a remote node's first binary has to
+	// come from a URL (nothing else exists before it joins), but once
+	// the node is a cluster member, the container image is the
+	// distribution channel: digest-pinned, gitops-controlled, rolling.
+	// The DaemonSet copy installs itself onto the host, so upgrading
+	// the fleet is bumping one image digest rather than a download
+	// host, a re-render, or a per-node binary swap.
 	installHostBinary string
 }
 
@@ -117,20 +115,20 @@ func main() {
 	flag.StringVar(&cfg.secretNamespace, "secret-namespace", "", "namespace of the peer Secret (in-cluster peer source; mutually exclusive with --peers-file)")
 	flag.StringVar(&cfg.secretName, "secret-name", "", "name of the peer Secret (in-cluster peer source; mutually exclusive with --peers-file)")
 	flag.StringVar(&cfg.peersFile, "peers-file", "", "path to a local JSON file holding this node's identity and bootstrap peer list (cloud node; mutually exclusive with --secret-namespace/--secret-name)")
-	flag.StringVar(&cfg.peersSecretNamespace, "peers-secret-namespace", "", "optional (with --peers-file): namespace of a Secret whose peers.json key overrides the file's peer list once readable -- the adoption/reconciliation path")
+	flag.StringVar(&cfg.peersSecretNamespace, "peers-secret-namespace", "", "optional (with --peers-file): namespace of a Secret whose peers.json key overrides the file's peer list once readable: the adoption/reconciliation path")
 	flag.StringVar(&cfg.peersSecretName, "peers-secret-name", "", "optional (with --peers-file): name of the peer-list override Secret")
-	flag.StringVar(&cfg.machineNameFile, "machine-name-file", "", "optional (with --peers-file): file holding this machine's CAPI Machine name (written by cloud-init); the peer-list override Secret's name is derived from it -- an alternative to --peers-secret-name that lets one shared DaemonSet spec serve per-machine Secrets")
+	flag.StringVar(&cfg.machineNameFile, "machine-name-file", "", "optional (with --peers-file): file holding this machine's CAPI Machine name (written by cloud-init); the peer-list override Secret's name is derived from it: an alternative to --peers-secret-name that lets one shared DaemonSet spec serve per-machine Secrets")
 	flag.StringVar(&cfg.nodeName, "node-name", os.Getenv("NODE_NAME"), "this node's Kubernetes node name (defaults to $NODE_NAME)")
-	flag.StringVar(&cfg.privateKeyFile, "private-key-file", "", "node-local file holding this node's WireGuard private key; generated (0600) on first start if absent. Required in Secret mode -- the private key never travels through the API; only the public key is published")
-	flag.StringVar(&cfg.iface, "iface", "", "WireGuard interface name to create/manage (required; unique per mesh, e.g. cldt1a2b3c4d -- never wg0, which collides with whatever the node already runs)")
+	flag.StringVar(&cfg.privateKeyFile, "private-key-file", "", "node-local file holding this node's WireGuard private key; generated (0600) on first start if absent. Required in Secret mode: the private key never travels through the API; only the public key is published")
+	flag.StringVar(&cfg.iface, "iface", "", "WireGuard interface name to create/manage (required; unique per mesh, e.g. cldt1a2b3c4d: never wg0, which collides with whatever the node already runs)")
 	flag.IntVar(&cfg.listenPort, "listen-port", 0, "fixed WireGuard listen port (0 = ephemeral, fine for a node that only dials out; a listener must set this)")
-	flag.StringVar(&cfg.podCIDRs, "pod-cidrs", "", "comma-separated cluster pod-CIDR ranges (v4/v6), added to every peer's WireGuard AllowedIPs -- never installed as a kernel route")
+	flag.StringVar(&cfg.podCIDRs, "pod-cidrs", "", "comma-separated cluster pod-CIDR ranges (v4/v6), added to every peer's WireGuard AllowedIPs: never installed as a kernel route")
 	flag.StringVar(&cfg.serviceCIDRs, "service-cidrs", "", "comma-separated cluster service-CIDR ranges (v4/v6), same treatment as --pod-cidrs")
 	flag.IntVar(&cfg.keepaliveSecs, "keepalive-seconds", 15, "PersistentKeepalive interval")
 	flag.IntVar(&cfg.mtu, "mtu", 1420, "interface MTU (WireGuard overhead under the cluster's normal MTU)")
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 30*time.Second, "how often to re-read the peer source and re-apply")
 	flag.StringVar(&cfg.transitMasqueradeSource, "transit-masquerade-source", "", "optional tunnel-subnet CIDR: enable forwarding + masquerade for tunnel-sourced traffic leaving this node toward cluster addresses that have no tunnel (transit role)")
-	flag.StringVar(&cfg.installHostBinary, "install-host-binary", "", "optional host path to keep equal to this process's own executable (atomic replace, only when the digest differs) -- the post-join upgrade channel: the container image carries the binary, so the node's systemd unit converges onto it without any download host")
+	flag.StringVar(&cfg.installHostBinary, "install-host-binary", "", "optional host path to keep equal to this process's own executable (atomic replace, only when the digest differs): the post-join upgrade channel: the container image carries the binary, so the node's systemd unit converges onto it without any download host")
 	flag.Parse()
 
 	usingSecret := cfg.secretNamespace != "" || cfg.secretName != ""
@@ -164,8 +162,8 @@ func main() {
 			// The cloud node's systemd unit runs this binary with
 			// --peers-file (and possibly --peers-secret-*): at boot
 			// there is no in-cluster environment. Degrade to file-only
-			// rather than dying -- the DaemonSet copy that arrives
-			// after join has the in-cluster env and takes over the
+			// rather than dying: the DaemonSet copy that arrives after
+			// join has the in-cluster env and takes over the
 			// reconciliation duty.
 			if usingSecret {
 				fatal("unable to load in-cluster config: %v", err)
@@ -207,9 +205,9 @@ func main() {
 			// operator removing this DaemonSet means the tunnel is
 			// meant to be gone, and leaving the device behind leaves
 			// routes with nothing reconciling them. On the cloud node
-			// (peers-file mode) NEVER do this -- the tunnel is that
-			// node's only path back to the cluster, so it is the floor
-			// that outlives anything managing it.
+			// (peers-file mode) the interface stays up: the tunnel is
+			// that node's only path back to the cluster, so it
+			// outlives anything managing it.
 			if cfg.secretName != "" {
 				removeDevice(cfg.iface)
 			}
@@ -241,18 +239,17 @@ func fatal(format string, args ...any) {
 // actually differ.
 //
 // This is the hand-off that ends the bootstrap URL's relevance. A
-// remote node's FIRST binary has to come from a download (nothing else
-// exists before it joins), but from then on the DaemonSet's image --
-// digest-pinned in gitops, rolled out by Kubernetes -- carries the
+// remote node's first binary has to come from a download (nothing else
+// exists before it joins), but from then on the DaemonSet's image,
+// digest-pinned in gitops and rolled out by Kubernetes, carries the
 // binary, and this copies it onto the host for the systemd unit that
-// is the can't-strand-the-node floor. Upgrading the fleet becomes
-// bumping one image digest: no download host to keep alive, no
-// re-rendered userdata (which is immutable anyway), no per-node
-// intervention, and no version skew between the containerized dialer
-// and the host one.
+// keeps the node reachable. Upgrading the fleet becomes bumping one
+// image digest: no download host to keep alive, no re-rendered
+// userdata (which is immutable anyway), no per-node intervention, and
+// no version skew between the containerized dialer and the host one.
 //
-// Rename, never write-in-place: the target is typically executing, and
-// the kernel refuses to open a running executable for writing
+// Rename rather than write-in-place: the target is typically
+// executing, and the kernel refuses to open a running executable for writing
 // (ETXTBSY). Rename swaps the directory entry instead; the running
 // process keeps its inode until it restarts.
 func installHostBinary(target string) error {
@@ -411,8 +408,8 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 		localAddress = strings.TrimSpace(string(secret.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName]))
 		if localAddress == "" {
-			// Not allocated yet -- the controller writes the tunnel
-			// address for every node matching a claim's tunnelEndpoints
+			// Not allocated yet. The controller writes the tunnel
+			// address for each node matching a claim's tunnelEndpoints
 			// selector. Nothing to do until then.
 			return fmt.Errorf("no %s%s in %s/%s yet (node not allocated a tunnel address)", tunnel.NodeTunnelAddressPrefix, cfg.nodeName, cfg.secretNamespace, cfg.secretName)
 		}
@@ -471,17 +468,17 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	}
 
 	// Peer viability for ROUTING: a host route toward a peer that has
-	// no endpoint AND has never completed a handshake is a pure
-	// blackhole -- WireGuard cannot send to a peer it has no address
-	// for, so the route only ever eats traffic to that host (including,
-	// on a remote node, the API VIP the join gate is pinging). Such a
-	// peer still gets its WireGuard CONFIG (so the other side can dial
-	// in and roaming can learn its address); its routes follow on the
+	// no endpoint and has never completed a handshake is a blackhole:
+	// WireGuard cannot send to a peer it has no address for, so the
+	// route only ever eats traffic to that host (including, on a
+	// remote node, the API VIP the join gate is pinging). Such a peer
+	// still gets its WireGuard config (so the other side can dial in
+	// and roaming can learn its address); its routes follow on the
 	// poll after the first handshake.
 	// Live device state feeds two invariants below: which peers have
-	// ever completed a handshake, and which addresses are ACTUALLY
-	// serving as peer endpoints right now. The latter must come from
-	// the device, not just the config: a listener's peers carry no
+	// ever completed a handshake, and which addresses are currently
+	// serving as peer endpoints. The latter comes from the device,
+	// not just the config: a listener's peers carry no
 	// configured endpoint (they dial in; it never dials out), so
 	// WireGuard learns their address by roaming and the config alone
 	// would show nothing to protect.
@@ -498,22 +495,21 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 	}
 
-	// Parse and validate the ENTIRE peer set before touching the
-	// kernel: a refused route-host (or any malformed entry) must leave
-	// the node byte-for-byte untouched -- no link, no address, no
-	// route, no WireGuard config.
+	// Parse and validate the entire peer set before touching the
+	// kernel: a refused route-host (or any malformed entry) leaves the
+	// node untouched, with no link, address, route, or WireGuard
+	// config applied.
 	keepalive := time.Duration(cfg.keepaliveSecs) * time.Second
 	sharedCIDRs := tunnel.SplitList(cfg.podCIDRs, cfg.serviceCIDRs)
 
 	// Configured endpoints join the live ones collected above. Routing
 	// a peer's own endpoint through the tunnel is an infinite
-	// encapsulation loop: the encrypted packet's OUTER destination is
+	// encapsulation loop: the encrypted packet's outer destination is
 	// that same address, so it matches the same tunnel route and is
-	// re-encapsulated forever. Observed at line rate (2.57 GiB in three
-	// minutes, with 180 bytes arriving at the far end) the first time a
-	// peer's published node address happened to equal the address the
-	// tunnel dials -- which is the NORMAL case for any cluster whose
-	// nodes are dialed on their ordinary node IPs.
+	// re-encapsulated indefinitely. This arises whenever a peer's
+	// published node address equals the address the tunnel dials,
+	// which is the usual case for any cluster whose nodes are dialed
+	// on their ordinary node IPs.
 	for _, p := range peers {
 		if p.Endpoint == "" {
 			continue
@@ -557,8 +553,8 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			Endpoint:                    endpoint,
 			PersistentKeepaliveInterval: &keepalive,
 			AllowedIPs:                  allowedIPs,
-			// Per-peer AllowedIPs replacement is a trie update -- it
-			// does NOT reset the peer's established session.
+			// Per-peer AllowedIPs replacement is a trie update; it
+			// does not reset the peer's established session.
 			ReplaceAllowedIPs: true,
 		})
 
@@ -568,13 +564,13 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 				return err
 			}
 			if p.Endpoint == "" && !handshaked[pub] {
-				// Validated but deliberately not installed yet -- see the
+				// Validated but not installed yet; see the
 				// peer-viability comment above.
 				continue
 			}
 			if endpointHosts[ipNet.IP.String()] {
-				// Never route a tunnel endpoint through the tunnel (see
-				// endpointHosts). The address stays reachable by its
+				// A tunnel endpoint is not routed through the tunnel
+				// (see endpointHosts). The address stays reachable by its
 				// ordinary route, which is exactly how the tunnel
 				// reaches it in the first place.
 				fmt.Fprintf(os.Stderr, "not routing %s via %s: it is a peer endpoint, and routing an endpoint through its own tunnel loops\n", ipNet.IP, cfg.iface)
@@ -588,11 +584,10 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		return fmt.Errorf("ensuring %s: %w", cfg.iface, err)
 	}
 
-	// NEVER ReplacePeers: replacement removes and re-adds every peer,
-	// and removal destroys the peer's established session -- so an
+	// ReplacePeers is not used: replacement removes and re-adds every
+	// peer, and removal destroys the peer's established session, so an
 	// unchanged config re-applied every poll interval would tear the
-	// tunnel down as often as it reconciles it (caught live by the
-	// netns e2e: a ping racing the peer's poll loop). Removed peers are
+	// tunnel down as often as it reconciles it. Removed peers are
 	// deleted explicitly; existing peers are updated in place (endpoint,
 	// keepalive, AllowedIPs trie), none of which resets a session.
 	desired := map[wgtypes.Key]bool{}
@@ -648,12 +643,12 @@ func parseHostRoute(h string) (net.IPNet, error) {
 }
 
 // installRoutes installs one host route per peer route-host into the
-// MAIN table. Longest-prefix match makes each /32 (/128) win over any
-// broader route (a LAN /24, a VPC default) for exactly that host --
-// which is the entire point: the peer's node addresses become
-// reachable via the tunnel, and nothing else changes. Never derived
-// from AllowedIPs; parseHostRoute has already rejected anything that
-// isn't a single host.
+// main table. Longest-prefix match makes each /32 (/128) win over any
+// broader route (a LAN /24, a VPC default) for exactly that host, so
+// the peer's node addresses become reachable via the tunnel and
+// nothing else changes. Route hosts are not derived from AllowedIPs;
+// parseHostRoute has already rejected anything that isn't a single
+// host.
 func installRoutes(cfg config, routeHosts []net.IPNet) error {
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
@@ -669,11 +664,11 @@ func installRoutes(cfg config, routeHosts []net.IPNet) error {
 		}
 	}
 
-	// Prune host routes on OUR interface that are no longer desired.
-	// Adding without ever removing meant a route that became wrong --
-	// a peer removed from the mesh, or an address that turned out to be
-	// a peer endpoint once the endpoint was learned by roaming --
-	// persisted forever, still blackholing or looping traffic. Scoped
+	// Prune host routes on this interface that are no longer desired.
+	// Adding without removing would leave a route that became wrong
+	// (a peer removed from the mesh, or an address that turned out to
+	// be a peer endpoint once the endpoint was learned by roaming)
+	// in place, still blackholing or looping traffic. Scoped
 	// strictly to this interface and to host prefixes, so the kernel's
 	// own connected route for the tunnel subnet is left alone.
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
@@ -701,12 +696,11 @@ func installRoutes(cfg config, routeHosts []net.IPNet) error {
 
 // ensureTransit makes this node forward tunnel-sourced traffic to
 // cluster addresses that have no tunnel of their own (e.g. the API
-// VIP on a control-plane node that deliberately carries no WireGuard
-// interface): enables IPv4 forwarding and installs one nftables
-// masquerade rule, scoped to the tunnel subnet and to destinations
-// outside it. nftables via netlink (google/nftables) because the
-// dialer image is distroless -- there is no iptables binary to shell
-// out to.
+// VIP on a control-plane node that carries no WireGuard interface):
+// enables IPv4 forwarding and installs one nftables masquerade rule,
+// scoped to the tunnel subnet and to destinations outside it.
+// nftables via netlink (google/nftables) because the dialer image is
+// distroless and has no iptables binary to shell out to.
 func ensureTransit(cfg config) error {
 	ip, subnet, err := net.ParseCIDR(cfg.transitMasqueradeSource)
 	if err != nil {
@@ -716,11 +710,11 @@ func ensureTransit(cfg config) error {
 		return fmt.Errorf("--transit-masquerade-source must be IPv4 (got %q)", cfg.transitMasqueradeSource)
 	}
 	// Read before write. /proc/sys is mounted read-only in a container
-	// that isn't privileged -- and NET_ADMIN does not change that --
-	// while every Kubernetes node already has forwarding enabled
-	// because the CNI and kube-proxy require it. Demanding write access
-	// for a setting that is already correct turned every reconcile into
-	// an error on an otherwise healthy node.
+	// that isn't privileged, and NET_ADMIN does not change that, while
+	// a Kubernetes node already has forwarding enabled because the CNI
+	// and kube-proxy require it. Demanding write access for a setting
+	// that is already correct turns every reconcile into an error on
+	// an otherwise healthy node.
 	const ipForward = "/proc/sys/net/ipv4/ip_forward"
 	current, err := os.ReadFile(ipForward)
 	if err != nil {

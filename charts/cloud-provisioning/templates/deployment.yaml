@@ -1,7 +1,7 @@
-{{- /* Every arg is QUOTED: an IPv6 prefix value ends in ":", and an
+{{- /* Every arg is quoted: an IPv6 prefix value ends in ":", and an
 unquoted YAML list item ending in a colon parses as a mapping key with
-a null value -- which silently injected a {} into the container args
-and made the Deployment patch invalid. */ -}}
+a null value, which injects a {} into the container args and makes the
+Deployment patch invalid. */ -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -59,7 +59,7 @@ spec:
             {{- end }}
             {{- with .Values.dialerBinary.arm64.url }}
             - "--join-dialer-binary-url-arm64={{ . }}"
-            - "--join-dialer-binary-sha256-arm64={{ $.Values.dialerBinary.arm64.sha256 | required "dialerBinary.arm64.sha256 is required when a url is set -- an unpinned download is a supply-chain hole" }}"
+            - "--join-dialer-binary-sha256-arm64={{ $.Values.dialerBinary.arm64.sha256 | required "dialerBinary.arm64.sha256 is required when a url is set: an unpinned download is a supply-chain hole" }}"
             {{- end }}
             {{- with .Values.imagePullSecrets }}
             - "--dialer-image-pull-secret={{ (first .).name }}"
@@ -78,7 +78,7 @@ spec:
             {{- end }}
             {{- with .Values.dialerBinary.amd64.url }}
             - "--join-dialer-binary-url-amd64={{ . }}"
-            - "--join-dialer-binary-sha256-amd64={{ $.Values.dialerBinary.amd64.sha256 | required "dialerBinary.amd64.sha256 is required when a url is set -- an unpinned download is a supply-chain hole" }}"
+            - "--join-dialer-binary-sha256-amd64={{ $.Values.dialerBinary.amd64.sha256 | required "dialerBinary.amd64.sha256 is required when a url is set: an unpinned download is a supply-chain hole" }}"
             {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

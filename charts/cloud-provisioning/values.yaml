@@ -46,19 +46,17 @@ resources:
   limits:
     memory: 128Mi
 
+# Read from the cluster at startup. Set one only to override what was
+# discovered.
 cluster:
-  # Cluster addresses a joining node must reach. apiAddress is what the
-  # join token's kubeconfig points at; apiVIP is what the bootstrap
-  # gates on before joining.
-  apiAddress: ""     # e.g. https://10.2.0.22:6443
-  apiVIP: ""         # e.g. 10.2.0.22
-  # Cryptokey accept-list only -- NEVER kernel routes.
-  podCIDRs: ""       # e.g. 10.3.0.0/16,2001:5a8:4298:3b01::/64
-  serviceCIDRs: ""   # e.g. 10.152.184.0/24
-  # Calico autodetection VIPs allocated to remote nodes.
-  nodeVIP4Prefix: "" # e.g. 10.2.0.
-  nodeVIP6Prefix: ""
-  nodeVIPStart: 200
+  # Where a joining node reaches the API. Discovered from the
+  # kubernetes Service's endpoints, which name every control plane.
+  apiAddress: ""     # e.g. https://198.51.100.10:6443
+  # WireGuard accept-list entries, never kernel routes. Discovered from
+  # the node allocations or from the installed CNI: Calico, Cilium,
+  # Flannel and kube-router are all understood.
+  podCIDRs: ""       # e.g. 10.244.0.0/16
+  serviceCIDRs: ""   # e.g. 10.96.0.0/12
 
 tunnel:
   # Node selector (k=v,k2=v2) choosing which LOCAL nodes terminate
@@ -67,44 +65,19 @@ tunnel:
   # only these nodes ever get a cldt* interface.
   endpoints: ""
 
-# The infrastructure provider's cluster-level configuration, rendered
-# into the Secret its provider reads. This is plain configuration --
-# AMI ids, subnet, security groups -- and belongs in values with
-# everything else; having it be an out-of-band `kubectl create secret`
-# meant no install was reproducible from the chart alone.
-#
-# Secrets are never carried here, only REFERENCED by name: the
-# credentials Secret is created out of band (it is the one thing that
-# cannot go into git) and named below.
+# The namespace an infrastructure provider's controller runs in, when
+# this controller must read a credentials Secret there to check a
+# cluster identity before provisioning. Empty grants no such access.
+providerManagerNamespace: ""   # e.g. capa-system
+
+# Cluster-level configuration for the docker provider, which fulfills a
+# claim as a local container and is how the end to end harness
+# exercises the whole path without a cloud account.
 provider:
-  aws:
-    credentialsSecret: ""   # existing Secret: AccessKeyID, SecretAccessKey
-    region: ""
-    subnetID: ""
-    securityGroupIDs: ""    # comma-separated sg-...
-    ami:
-      amd64: ""
-      arm64: ""
-    sshKeyName: ""
-    iamInstanceProfile: ""
-    publicIP: true
-  # The docker provider fulfills a claim as a local container. It is
-  # how the end-to-end harness exercises the whole path without a
-  # cloud account -- same claim, same join, same tunnel.
   docker:
     nodeImage: ""
     extraMounts: ""     # host:container, comma-separated
     preloadImages: ""   # comma-separated local image refs
-
-# The CAPI Cluster pair this release's Machines hang off. Cluster API
-# does not manage this control plane (the objects are annotated
-# managed-by: external); it only needs them to exist. Disable when the
-# cluster already has a Cluster object to join.
-targetCluster:
-  enabled: false
-  name: ""
-  namespace: ""             # defaults to the release namespace
-  infrastructureKind: AWSCluster
 
 # Which cluster technology mints join credentials (k0s | kubeadm).
 joinProvider: k0s

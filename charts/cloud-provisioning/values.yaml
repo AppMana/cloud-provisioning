@@ -69,6 +69,19 @@ dialerBinary:
     url: ""
     sha256: ""
 
+# Standard containernetworking plugins for provisioned nodes. A
+# cluster's CNI config may chain bandwidth/portmap/tuning; calico-node
+# installs only its own and a stock cloud image ships none, so without
+# these every pod sandbox on a provisioned node fails. Optional, but a
+# URL without its sha256 is ignored rather than fetched unverified.
+cniPlugins:
+  arm64:
+    url: ""
+    sha256: ""
+  amd64:
+    url: ""
+    sha256: ""
+
 # Cluster API, available as an OPTIONAL subchart for a one-release
 # install. DISABLED by default, and the recommended production layout
 # is a SEPARATE HelmRelease for cluster-api-operator: coupling the two

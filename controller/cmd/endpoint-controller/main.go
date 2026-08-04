@@ -749,6 +749,10 @@ func main() {
 		dialerBinarySHA256ARM64   string
 		dialerBinaryURLAMD64      string
 		dialerBinarySHA256AMD64   string
+		cniPluginsURLARM64        string
+		cniPluginsSHA256ARM64     string
+		cniPluginsURLAMD64        string
+		cniPluginsSHA256AMD64     string
 		awsConfigNamespace        string
 		awsConfigName             string
 	)
@@ -793,6 +797,10 @@ func main() {
 	flag.StringVar(&dialerBinarySHA256ARM64, "join-dialer-binary-sha256-arm64", "", "REQUIRED (arm64 nodes) sha256 of that binary, verified by cloud-init before the tunnel unit starts")
 	flag.StringVar(&dialerBinaryURLAMD64, "join-dialer-binary-url-amd64", "", "URL cloud-init downloads the amd64 dialer binary from")
 	flag.StringVar(&dialerBinarySHA256AMD64, "join-dialer-binary-sha256-amd64", "", "sha256 of the amd64 binary")
+	flag.StringVar(&cniPluginsURLARM64, "join-cni-plugins-url-arm64", "", "optional per-arch containernetworking-plugins tarball URL; required when the cluster's CNI config chains plugins (bandwidth/portmap/tuning) a stock cloud image does not ship")
+	flag.StringVar(&cniPluginsSHA256ARM64, "join-cni-plugins-sha256-arm64", "", "sha256 of the arm64 CNI plugins tarball; a URL without it is ignored, never fetched unverified")
+	flag.StringVar(&cniPluginsURLAMD64, "join-cni-plugins-url-amd64", "", "amd64 containernetworking-plugins tarball URL")
+	flag.StringVar(&cniPluginsSHA256AMD64, "join-cni-plugins-sha256-amd64", "", "sha256 of the amd64 CNI plugins tarball")
 	flag.StringVar(&awsConfigNamespace, "aws-config-namespace", "wg-dialer", "namespace of the AWS provider-config Secret (AMIs, subnet, security groups, keypair)")
 	flag.StringVar(&awsConfigName, "aws-config-name", "aws-provider-config", "name of the AWS provider-config Secret")
 
@@ -963,6 +971,11 @@ func main() {
 			DialerBinarySHA256ARM64: dialerBinarySHA256ARM64,
 			DialerBinaryURLAMD64:    dialerBinaryURLAMD64,
 			DialerBinarySHA256AMD64: dialerBinarySHA256AMD64,
+
+			CNIPluginsURLARM64:    cniPluginsURLARM64,
+			CNIPluginsSHA256ARM64: cniPluginsSHA256ARM64,
+			CNIPluginsURLAMD64:    cniPluginsURLAMD64,
+			CNIPluginsSHA256AMD64: cniPluginsSHA256AMD64,
 
 			BootstrapSecretNameFormat: bootstrapSecretNameFormat,
 		}

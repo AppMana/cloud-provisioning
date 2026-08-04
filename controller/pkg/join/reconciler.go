@@ -159,6 +159,16 @@ type Reconciler struct {
 	DialerBinaryURLAMD64    string
 	DialerBinarySHA256AMD64 string
 
+	// Standard containernetworking plugins. A cluster's CNI config may
+	// chain bandwidth/portmap/tuning; calico-node installs only its
+	// own, and a stock cloud image has none -- so without these every
+	// pod sandbox on a provisioned node fails. Same per-arch, sha-pinned
+	// delivery as the dialer binary.
+	CNIPluginsURLARM64    string
+	CNIPluginsSHA256ARM64 string
+	CNIPluginsURLAMD64    string
+	CNIPluginsSHA256AMD64 string
+
 	// BootstrapSecretNameFormat is templated with the Machine's name,
 	// e.g. "%s-bootstrap".
 	BootstrapSecretNameFormat string
@@ -317,6 +327,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	cniURL, cniSHA := r.cniPluginsFor(infraValues)
 
 	values := map[string]any{
 		"sshAuthorizedKeys":   r.SSHAuthorizedKeys,
@@ -332,6 +343,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		"interfaceName":       r.InterfaceName,
 		"dialerBinaryURL":     binaryURL,
 		"dialerBinarySHA256":  binarySHA,
+		"cniPluginsURL":       cniURL,
+		"cniPluginsSHA256":    cniSHA,
 		"machineName":         machine.GetName(),
 	}
 	for k, v := range joinValues {
@@ -476,6 +489,25 @@ func (r *Reconciler) dialerBinaryFor(infraValues map[string]any) (string, string
 		return "", "", fmt.Errorf("dialer binary URL/sha256 for arch %q not configured (--join-dialer-binary-url-%s/--join-dialer-binary-sha256-%s)", arch, arch, arch)
 	}
 	return url, sha, nil
+}
+
+// cniPluginsFor picks the per-arch CNI plugins tarball. Optional: a
+// cluster whose CNI config chains no extra plugins, or an image that
+// already ships them, needs nothing here -- but an unpinned digest is
+// never acceptable, so a URL without its sha is treated as unset.
+func (r *Reconciler) cniPluginsFor(infraValues map[string]any) (string, string) {
+	arch := "arm64"
+	if v, ok := infraValues["arch"].(string); ok && v != "" {
+		arch = v
+	}
+	url, sha := r.CNIPluginsURLARM64, r.CNIPluginsSHA256ARM64
+	if arch == "amd64" {
+		url, sha = r.CNIPluginsURLAMD64, r.CNIPluginsSHA256AMD64
+	}
+	if url == "" || sha == "" {
+		return "", ""
+	}
+	return url, sha
 }
 
 // allocateNodeVIPIndex finds the next free node-VIP index by scanning

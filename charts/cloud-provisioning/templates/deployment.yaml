@@ -72,6 +72,14 @@ spec:
             - "--join-dialer-binary-url-arm64={{ . }}"
             - "--join-dialer-binary-sha256-arm64={{ $.Values.dialerBinary.arm64.sha256 | required "dialerBinary.arm64.sha256 is required when a url is set -- an unpinned download is a supply-chain hole" }}"
             {{- end }}
+            {{- with .Values.cniPlugins.arm64.url }}
+            - "--join-cni-plugins-url-arm64={{ . }}"
+            - "--join-cni-plugins-sha256-arm64={{ $.Values.cniPlugins.arm64.sha256 | required "cniPlugins.arm64.sha256 is required when a url is set" }}"
+            {{- end }}
+            {{- with .Values.cniPlugins.amd64.url }}
+            - "--join-cni-plugins-url-amd64={{ . }}"
+            - "--join-cni-plugins-sha256-amd64={{ $.Values.cniPlugins.amd64.sha256 | required "cniPlugins.amd64.sha256 is required when a url is set" }}"
+            {{- end }}
             {{- with .Values.dialerBinary.amd64.url }}
             - "--join-dialer-binary-url-amd64={{ . }}"
             - "--join-dialer-binary-sha256-amd64={{ $.Values.dialerBinary.amd64.sha256 | required "dialerBinary.amd64.sha256 is required when a url is set -- an unpinned download is a supply-chain hole" }}"

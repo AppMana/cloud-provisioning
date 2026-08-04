@@ -50,7 +50,7 @@ rules:
     resources: ["awsmachines", "dockermachines"]
     verbs: ["get", "create", "delete"]
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
-    resources: ["awsclusters", "awsclusterstaticidentities"]
+    resources: ["awsclusters", "awsclusterstaticidentities", "dockerclusters"]
     verbs: ["get"]
   # Same reason as clusters/status above.
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]

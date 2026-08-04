@@ -47,27 +47,17 @@ spec:
           properties:
             spec:
               type: object
+              required: [infrastructureRef]
               properties:
-                requests:
+                infrastructureRef:
                   description: >-
-                    Pod-style resource requests (cpu, memory) the node
-                    must satisfy, for when any machine of a given size
-                    will do. The fulfilling provider resolves them
-                    against its own catalogue. Set this or templateRef,
-                    not both.
-                  type: object
-                  additionalProperties:
-                    anyOf: [{type: integer}, {type: string}]
-                    x-kubernetes-int-or-string: true
-                templateRef:
-                  description: >-
-                    An infrastructure machine template describing the
+                    The infrastructure machine template describing the
                     machine to create, such as an AWSMachineTemplate.
-                    The template carries the whole shape of the
-                    machine, including its image, network placement and
-                    security groups, so reachability never depends on
-                    an out-of-band change. Architecture follows from
-                    the image. Set this or requests, not both.
+                    It carries the whole machine, including its image,
+                    network placement and security groups, so
+                    reachability never depends on an out-of-band
+                    change. The machine created is the template's kind
+                    without the Template suffix.
                   type: object
                   required: [kind, name]
                   properties:

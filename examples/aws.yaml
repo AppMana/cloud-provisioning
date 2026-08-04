@@ -1,0 +1,98 @@
+# A complete example: the Cluster API objects, a machine template, and
+# a claim that references the template by name.
+#
+# The addresses and identifiers are documentation values. Replace them.
+
+# 1. The Cluster API objects, once per cluster.
+#
+# Cluster API does not manage this control plane, and these say so: the
+# managed-by annotation tells its controllers to stand down, and the
+# pair exists so Machines have something to belong to. They describe
+# your cluster and your cloud account rather than the provisioner, so
+# they are yours to apply rather than something the chart creates
+# behind you.
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: my-cluster
+  namespace: cloud-provisioning
+  annotations:
+    cluster.x-k8s.io/managed-by: external
+spec:
+  controlPlaneEndpoint:
+    host: 198.51.100.10
+    port: 6443
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AWSCluster
+    name: my-cluster
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSCluster
+metadata:
+  name: my-cluster
+  namespace: cloud-provisioning
+  annotations:
+    # Required on the infrastructure cluster too. Without it the AWS
+    # provider looks for a control-plane load balancer that does not
+    # exist and fails every machine with "APIServer ELB not available".
+    cluster.x-k8s.io/managed-by: external
+spec:
+  region: us-west-2
+  identityRef:
+    kind: AWSClusterStaticIdentity
+    name: my-cluster
+  controlPlaneEndpoint:
+    host: 198.51.100.10
+    port: 6443
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSClusterStaticIdentity
+metadata:
+  name: my-cluster
+spec:
+  # Create this Secret yourself, in the AWS provider's own namespace,
+  # holding AccessKeyID and SecretAccessKey. It is the one input that
+  # cannot live in git.
+  secretRef: my-cluster-aws-credentials
+  allowedNamespaces: {}
+---
+# 2. The machine template: ordinary Cluster API, the same kind you
+# would write for any other machine.
+#
+# Everything a node needs in order to be reachable is here, including
+# the security group admitting UDP 51820. A provisioned node works
+# because its template says so, not because a group was edited
+# afterwards.
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSMachineTemplate
+metadata:
+  name: public-worker
+  namespace: cloud-provisioning
+spec:
+  template:
+    spec:
+      instanceType: t3.micro
+      ami:
+        id: ami-0123456789abcdef0
+      subnet:
+        id: subnet-0123456789abcdef0
+      additionalSecurityGroups:
+        - id: sg-0123456789abcdef0
+      publicIP: true
+---
+# 3. The claim, naming the template.
+#
+# This is the only object you touch afterwards. Deleting it destroys
+# the instance and removes the node.
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: public-worker
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AWSMachineTemplate
+    name: public-worker
+  clusterName: my-cluster

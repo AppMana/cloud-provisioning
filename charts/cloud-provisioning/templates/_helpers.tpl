@@ -1,5 +1,5 @@
 {{- define "cloud-provisioning.name" -}}
-{{- default "wg-dialer" .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- default "cloud-provisioning" .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{- define "cloud-provisioning.controllerName" -}}

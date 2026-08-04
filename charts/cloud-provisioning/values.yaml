@@ -1,6 +1,6 @@
 # Default values for cloud-provisioning.
 
-nameOverride: wg-dialer
+nameOverride: ""
 
 image:
   repository: ghcr.io/appmana/cloud-provisioning-endpoint-controller

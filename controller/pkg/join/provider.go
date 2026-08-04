@@ -82,19 +82,6 @@ type MachineProvisioner interface {
 	// reconciler routes a claim to the provider that owns the CAPI
 	// Cluster's infrastructure.
 	ClusterGVK() schema.GroupVersionKind
-
-	// ResolveInstanceType picks the smallest instance type in this
-	// provider's catalog satisfying the request.
-	ResolveInstanceType(req NodeRequest) (string, error)
-
-	// InfraMachine renders the provider-specific machine object
-	// (spec only -- the claim reconciler owns metadata/ownerRefs) for
-	// one claim, from the provider's own cluster-level configuration.
-	// Takes a Reader, not a Client: it only ever reads, and routing
-	// those reads through the manager's cache would silently start
-	// cluster-wide informers (and demand list/watch RBAC) for every
-	// type it touches.
-	InfraMachine(ctx context.Context, c client.Reader, namespace, instanceType string, req NodeRequest) (*unstructured.Unstructured, error)
 }
 
 // Validator is an optional capability an InfraProvider may implement:

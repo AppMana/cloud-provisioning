@@ -43,6 +43,11 @@ var (
 
 const clusterNameLabel = "cluster.x-k8s.io/cluster-name"
 
+// infraTemplateVersion is the infrastructure API version this reads
+// machine templates at. Providers move together with Cluster API's
+// contract, so one version covers every provider on a given release.
+const infraTemplateVersion = "v1beta2"
+
 // Reconciler expands claims.
 type Reconciler struct {
 	client.Client
@@ -110,19 +115,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return r.fail(ctx, claim, fmt.Errorf("no registered provider fulfills clusters of infrastructure kind %q", infraKind))
 	}
 
-	nodeReq, err := nodeRequest(claim)
-	if err != nil {
+	if _, err := nodeRequest(claim); err != nil {
 		return r.fail(ctx, claim, err)
-	}
-	// A template describes the machine completely, so nothing needs
-	// resolving against a catalogue.
-	instanceType := ""
-	if claim.Spec.TemplateRef == nil {
-		resolved, err := provisioner.ResolveInstanceType(nodeReq)
-		if err != nil {
-			return r.fail(ctx, claim, err)
-		}
-		instanceType = resolved
 	}
 
 	ownerRef := metav1.OwnerReference{
@@ -141,11 +135,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	infraMachine.SetGroupVersionKind(provisioner.GVK())
 	err = r.Reader.Get(ctx, types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name}, infraMachine)
 	if apierrors.IsNotFound(err) {
-		if claim.Spec.TemplateRef != nil {
-			infraMachine, err = machineFromTemplate(ctx, r.Reader, provisioner, claim)
-		} else {
-			infraMachine, err = provisioner.InfraMachine(ctx, r.Reader, claim.Namespace, instanceType, nodeReq)
-		}
+		infraMachine, err = machineFromTemplate(ctx, r.Reader, claim)
 		if err != nil {
 			return r.fail(ctx, claim, err)
 		}
@@ -156,10 +146,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err := r.Create(ctx, infraMachine); err != nil {
 			return r.fail(ctx, claim, fmt.Errorf("creating %s: %w", provisioner.GVK().Kind, err))
 		}
-		log.Info("created provider machine", "kind", provisioner.GVK().Kind, "instanceType", instanceType)
+		log.Info("created provider machine", "kind", infraMachine.GetKind(), "template", claim.Spec.InfrastructureRef.Name)
 	} else if err != nil {
 		return ctrl.Result{}, fmt.Errorf("checking for provider machine: %w", err)
 	}
+
+	// Surfaced for the printer column when the provider has such a
+	// concept; a provider without one simply reports nothing.
+	instanceType, _, _ := unstructured.NestedString(infraMachine.Object, "spec", "instanceType")
 
 	machine := &unstructured.Unstructured{}
 	machine.SetGroupVersionKind(machineGVK)
@@ -494,27 +488,41 @@ func (r *Reconciler) provisionerForClusterKind(kind string) join.MachineProvisio
 }
 
 // machineFromTemplate builds the provider machine from the template
-// the claim names. A CAPI infrastructure machine template holds the
-// machine's whole spec under spec.template.spec, and the machine is
-// that spec with the provider's own kind on it.
-func machineFromTemplate(ctx context.Context, reader client.Reader, provisioner join.MachineProvisioner, claim *v1alpha1.ProvisionedNodeClaim) (*unstructured.Unstructured, error) {
-	ref := claim.Spec.TemplateRef
-	gvk := provisioner.GVK()
-	group := gvk.Group
+// the claim names. A Cluster API infrastructure machine template holds
+// the machine's whole spec under spec.template.spec, and the machine is
+// that spec carrying the provider's own kind.
+func machineFromTemplate(ctx context.Context, reader client.Reader, claim *v1alpha1.ProvisionedNodeClaim) (*unstructured.Unstructured, error) {
+	ref := claim.Spec.InfrastructureRef
+	if ref.Kind == "" || ref.Name == "" {
+		return nil, fmt.Errorf("spec.infrastructureRef needs a kind and a name")
+	}
+	if !strings.HasSuffix(ref.Kind, "Template") {
+		return nil, fmt.Errorf("spec.infrastructureRef.kind %q is not a machine template", ref.Kind)
+	}
+	group := "infrastructure.cluster.x-k8s.io"
 	if ref.APIGroup != nil && *ref.APIGroup != "" {
 		group = *ref.APIGroup
 	}
 	template := &unstructured.Unstructured{}
-	template.SetGroupVersionKind(schema.GroupVersionKind{Group: group, Version: gvk.Version, Kind: ref.Kind})
+	template.SetGroupVersionKind(schema.GroupVersionKind{Group: group, Version: infraTemplateVersion, Kind: ref.Kind})
 	if err := reader.Get(ctx, types.NamespacedName{Namespace: claim.Namespace, Name: ref.Name}, template); err != nil {
 		return nil, fmt.Errorf("getting %s %q: %w", ref.Kind, ref.Name, err)
 	}
+	// Every infrastructure machine template carries the machine's spec
+	// here, and the machine it produces is the same kind without the
+	// suffix. Both are Cluster API's provider contract rather than
+	// anything specific to a cloud, which is why this needs no
+	// knowledge of the provider it is talking to.
 	spec, found, err := unstructured.NestedMap(template.Object, "spec", "template", "spec")
 	if err != nil || !found {
 		return nil, fmt.Errorf("%s %q has no spec.template.spec", ref.Kind, ref.Name)
 	}
 	machine := &unstructured.Unstructured{Object: map[string]any{"spec": spec}}
-	machine.SetGroupVersionKind(gvk)
+	machine.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   group,
+		Version: infraTemplateVersion,
+		Kind:    strings.TrimSuffix(ref.Kind, "Template"),
+	})
 	return machine, nil
 }
 
@@ -522,21 +530,6 @@ func nodeRequest(claim *v1alpha1.ProvisionedNodeClaim) (join.NodeRequest, error)
 	req := join.NodeRequest{InternetFacing: true}
 	if claim.Spec.InternetFacing != nil {
 		req.InternetFacing = *claim.Spec.InternetFacing
-	}
-	if claim.Spec.TemplateRef != nil {
-		if len(claim.Spec.Requests) > 0 {
-			return req, fmt.Errorf("set spec.templateRef or spec.requests, not both")
-		}
-		return req, nil
-	}
-	if cpu, ok := claim.Spec.Requests[corev1.ResourceCPU]; ok {
-		req.CPUMillis = cpu.MilliValue()
-	}
-	if mem, ok := claim.Spec.Requests[corev1.ResourceMemory]; ok {
-		req.MemoryBytes = mem.Value()
-	}
-	if req.CPUMillis == 0 && req.MemoryBytes == 0 {
-		return req, fmt.Errorf("set spec.templateRef, or spec.requests with cpu and/or memory")
 	}
 	return req, nil
 }

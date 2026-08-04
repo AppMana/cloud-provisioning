@@ -10,13 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/appmana/cloud-provisioning/controller/pkg/join"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 // Real-AWS integration tests. Same conventions as harness/aws-bringup:
@@ -71,75 +67,6 @@ func awsJSON(ctx context.Context, t *testing.T, target any, args ...string) {
 	}
 }
 
-// TestCatalogMatchesRealInstanceTypes proves the static catalog's
-// arch/cpu/memory facts against the real EC2 API (read-only, creates
-// nothing): a wrong catalog row would make ResolveInstanceType hand a
-// claim an instance that can't satisfy its requests, or the wrong-arch
-// dialer binary URL.
-func TestCatalogMatchesRealInstanceTypes(t *testing.T) {
-	requireAWS(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
-	names := make([]string, 0, len(catalog))
-	for _, e := range catalog {
-		names = append(names, e.name)
-	}
-	var resp struct {
-		InstanceTypes []struct {
-			InstanceType string `json:"InstanceType"`
-			VCpuInfo     struct {
-				DefaultVCpus int64 `json:"DefaultVCpus"`
-			} `json:"VCpuInfo"`
-			MemoryInfo struct {
-				SizeInMiB int64 `json:"SizeInMiB"`
-			} `json:"MemoryInfo"`
-			ProcessorInfo struct {
-				SupportedArchitectures []string `json:"SupportedArchitectures"`
-			} `json:"ProcessorInfo"`
-		} `json:"InstanceTypes"`
-	}
-	awsJSON(ctx, t, &resp, append([]string{"ec2", "describe-instance-types", "--instance-types"}, names...)...)
-
-	real := map[string]struct {
-		cpuMillis, memoryBytes int64
-		arch                   string
-	}{}
-	for _, it := range resp.InstanceTypes {
-		arch := "amd64"
-		for _, a := range it.ProcessorInfo.SupportedArchitectures {
-			if a == "arm64" {
-				arch = "arm64"
-			}
-		}
-		real[it.InstanceType] = struct {
-			cpuMillis, memoryBytes int64
-			arch                   string
-		}{it.VCpuInfo.DefaultVCpus * 1000, it.MemoryInfo.SizeInMiB << 20, arch}
-	}
-
-	for _, e := range catalog {
-		r, ok := real[e.name]
-		if !ok {
-			t.Errorf("catalog entry %s does not exist in EC2", e.name)
-			continue
-		}
-		if r.arch != e.arch {
-			t.Errorf("%s: catalog arch %s, real arch %s", e.name, e.arch, r.arch)
-		}
-		// Floors, not equality, on capacity claims: the catalog may
-		// understate what an instance offers (harmless -- smallest-fit
-		// just picks a size up), but overstating would resolve a claim
-		// onto an instance that can't satisfy its requests.
-		if r.cpuMillis < e.cpuMillis {
-			t.Errorf("%s: catalog claims %dm cpu, real instance has only %dm", e.name, e.cpuMillis, r.cpuMillis)
-		}
-		if r.memoryBytes < e.memoryBytes {
-			t.Errorf("%s: catalog claims %dMi memory, real instance has only %dMi", e.name, e.memoryBytes>>20, r.memoryBytes>>20)
-		}
-	}
-}
-
 // TestInfraMachineSpecActuallyLaunches is the end-to-end proof that the
 // claim path's rendered values are real: resolve a request against the
 // catalog, render the AWSMachine spec from a provider-config Secret
@@ -161,28 +88,17 @@ func TestInfraMachineSpecActuallyLaunches(t *testing.T) {
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
 		t.Fatalf("adding clientgoscheme: %v", err)
 	}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(&corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "aws-provider-config", Namespace: "wg-dialer"},
-		Data: map[string][]byte{
-			"ami-arm64": []byte(amiID),
-			"subnet-id": []byte(subnetID),
-			// No public IP: this test proves launchability of the
-			// rendered spec, not reachability -- no ingress surface, no
-			// SG rules, nothing to reach it by.
-			"public-ip": []byte("false"),
-		},
-	}).Build()
-	p := Provider{ConfigNamespace: "wg-dialer", ConfigName: "aws-provider-config"}
-
-	req := join.NodeRequest{Arch: "arm64", CPUMillis: 100, MemoryBytes: 256 << 20, InternetFacing: false}
-	instanceType, err := p.ResolveInstanceType(req)
-	if err != nil {
-		t.Fatalf("ResolveInstanceType: %v", err)
-	}
-	obj, err := p.InfraMachine(ctx, c, "default", instanceType, req)
-	if err != nil {
-		t.Fatalf("InfraMachine: %v", err)
-	}
+	// The machine's spec as a template carries it: the same values a
+	// claim's infrastructureRef would hand to the provider.
+	obj := &unstructured.Unstructured{Object: map[string]any{"spec": map[string]any{
+		"instanceType": "t4g.small",
+		"ami":          map[string]any{"id": amiID},
+		"subnet":       map[string]any{"id": subnetID},
+		// No public IP: this proves the spec is launchable, not that
+		// anything can reach it.
+		"publicIP": false,
+	}}}
+	obj.SetGroupVersionKind(gvk)
 
 	// Launch from the RENDERED values, not the inputs -- the render is
 	// what's under test.

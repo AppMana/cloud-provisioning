@@ -10,7 +10,6 @@ import (
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -76,13 +75,31 @@ func fakeNode() *corev1.Node {
 	}
 }
 
+var infraGroup = "infrastructure.cluster.x-k8s.io"
+
+// fakeTemplate is the machine template a claim points at: ordinary
+// Cluster API, holding the machine's spec where the contract says.
+func fakeTemplate(name string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
+		"kind":       "AWSMachineTemplate",
+		"metadata":   map[string]any{"name": name, "namespace": "default"},
+		"spec": map[string]any{"template": map[string]any{"spec": map[string]any{
+			"instanceType": "t3.micro",
+			"ami":          map[string]any{"id": "ami-000000000000000ab"},
+			"additionalSecurityGroups": []any{
+				map[string]any{"id": "sg-000000000000000cd"},
+			},
+		}}},
+	}}
+}
+
 func fakeClaim(name string) *v1alpha1.ProvisionedNodeClaim {
 	return &v1alpha1.ProvisionedNodeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
 		Spec: v1alpha1.ProvisionedNodeClaimSpec{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("2"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
+			InfrastructureRef: corev1.TypedLocalObjectReference{
+				APIGroup: &infraGroup, Kind: "AWSMachineTemplate", Name: name,
 			},
 		},
 	}
@@ -114,7 +131,7 @@ func reconcileClaim(t *testing.T, r *Reconciler, claim *v1alpha1.ProvisionedNode
 
 func TestReconcile_ExpandsClaimIntoMachinePair(t *testing.T) {
 	claim := fakeClaim("public-worker")
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret(), fakeNode())
+	r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), awsConfigSecret(), fakeNode())
 
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("Reconcile: %v", err)
@@ -128,12 +145,12 @@ func TestReconcile_ExpandsClaimIntoMachinePair(t *testing.T) {
 		t.Fatalf("expected an AWSMachine named after the claim: %v", err)
 	}
 	instanceType, _, _ := unstructured.NestedString(awsMachine.Object, "spec", "instanceType")
-	if instanceType != "t4g.medium" {
-		t.Errorf("AWSMachine instanceType = %q, want t4g.medium (smallest arm64 fit for 2cpu/4Gi)", instanceType)
+	if instanceType != "t3.micro" {
+		t.Errorf("AWSMachine instanceType = %q, want the template's t3.micro", instanceType)
 	}
 	ami, _, _ := unstructured.NestedString(awsMachine.Object, "spec", "ami", "id")
-	if ami != "ami-0abc" {
-		t.Errorf("AWSMachine ami = %q, want the provider-config's ami-arm64", ami)
+	if ami != "ami-000000000000000ab" {
+		t.Errorf("AWSMachine ami = %q, want the template's ami", ami)
 	}
 	if len(awsMachine.GetOwnerReferences()) != 1 || awsMachine.GetOwnerReferences()[0].Kind != "ProvisionedNodeClaim" {
 		t.Errorf("AWSMachine ownerReferences = %+v, want exactly the claim (cascade delete)", awsMachine.GetOwnerReferences())
@@ -179,8 +196,8 @@ func TestReconcile_ExpandsClaimIntoMachinePair(t *testing.T) {
 	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), updated); err != nil {
 		t.Fatalf("getting updated claim: %v", err)
 	}
-	if updated.Status.InstanceType != "t4g.medium" || updated.Status.Provider != "AWSMachine" {
-		t.Errorf("claim status = %+v, want InstanceType=t4g.medium Provider=AWSMachine", updated.Status)
+	if updated.Status.InstanceType != "t3.micro" || updated.Status.Provider != "AWSMachine" {
+		t.Errorf("claim status = %+v, want InstanceType=t3.micro Provider=AWSMachine", updated.Status)
 	}
 	if updated.Status.Phase != "Resolving" {
 		t.Errorf("claim phase = %q, want Resolving before the Machine has any status", updated.Status.Phase)
@@ -192,7 +209,7 @@ func TestReconcile_ExpandsClaimIntoMachinePair(t *testing.T) {
 
 func TestReconcile_SecondPassIsIdempotent(t *testing.T) {
 	claim := fakeClaim("public-worker")
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret(), fakeNode())
+	r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), awsConfigSecret(), fakeNode())
 
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("first Reconcile: %v", err)
@@ -208,26 +225,6 @@ func TestReconcile_SecondPassIsIdempotent(t *testing.T) {
 	}
 	if len(list.Items) != 1 {
 		t.Errorf("expected exactly 1 Machine after two reconciles, got %d", len(list.Items))
-	}
-}
-
-func TestReconcile_UnsatisfiableRequests_RecordsFailedStatus(t *testing.T) {
-	claim := fakeClaim("public-worker")
-	claim.Spec.Requests[corev1.ResourceMemory] = resource.MustParse("1Ti")
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret(), fakeNode())
-
-	if err := reconcileClaim(t, r, claim); err == nil {
-		t.Fatal("expected an error for an unsatisfiable request, got nil")
-	}
-	updated := &v1alpha1.ProvisionedNodeClaim{}
-	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), updated); err != nil {
-		t.Fatalf("getting updated claim: %v", err)
-	}
-	if updated.Status.Phase != "Failed" {
-		t.Errorf("claim phase = %q, want Failed", updated.Status.Phase)
-	}
-	if !strings.Contains(updated.Status.Message, "instance type") {
-		t.Errorf("claim message %q should say no instance type satisfies the request", updated.Status.Message)
 	}
 }
 
@@ -249,7 +246,7 @@ func TestReconcile_NoClusterInNamespace_Fails(t *testing.T) {
 
 func TestReconcile_TwoClustersWithoutClusterName_IsAnErrorNotAGuess(t *testing.T) {
 	claim := fakeClaim("public-worker")
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), fakeCluster("other"), awsConfigSecret(), fakeNode())
+	r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), fakeCluster("other"), awsConfigSecret(), fakeNode())
 
 	err := reconcileClaim(t, r, claim)
 	if err == nil {
@@ -263,7 +260,7 @@ func TestReconcile_TwoClustersWithoutClusterName_IsAnErrorNotAGuess(t *testing.T
 func TestReconcile_ExplicitClusterNameSelectsAmongMany(t *testing.T) {
 	claim := fakeClaim("public-worker")
 	claim.Spec.ClusterName = "other"
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), fakeCluster("other"), awsConfigSecret(), fakeNode())
+	r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), fakeCluster("other"), awsConfigSecret(), fakeNode())
 
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("Reconcile: %v", err)
@@ -301,7 +298,7 @@ func TestReconcile_MachineDeletionTimeoutsAreBounded(t *testing.T) {
 	// mid-deletion -- unbounded, `kubectl delete provisionednodeclaim`
 	// would hang forever with a billed instance still running.
 	claim := fakeClaim("public-worker")
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret(), fakeNode())
+	r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), awsConfigSecret(), fakeNode())
 
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("Reconcile: %v", err)
@@ -330,7 +327,7 @@ func TestReconcileDelete_RemovesComputeAndOnlyThenReleasesTheClaim(t *testing.T)
 	// with a billed instance (confirmed live). The claim holds a
 	// finalizer and deletes the compute itself.
 	claim := fakeClaim("public-worker")
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), awsConfigSecret(), fakeNode())
+	r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), awsConfigSecret(), fakeNode())
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}
@@ -384,28 +381,12 @@ func TestReconcileDelete_RemovesComputeAndOnlyThenReleasesTheClaim(t *testing.T)
 // A template describes the machine completely, including the security
 // groups and subnet that decide whether the tunnel can be established
 // at all. Nothing about it may be second-guessed from the claim.
+// The template describes the machine completely, including the
+// security groups and subnet that decide whether the tunnel can be
+// established at all. Nothing about it may be second-guessed.
 func TestReconcile_TemplateDrivesTheMachine(t *testing.T) {
-	template := &unstructured.Unstructured{Object: map[string]any{
-		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
-		"kind":       "AWSMachineTemplate",
-		"metadata":   map[string]any{"name": "public-worker", "namespace": "default"},
-		"spec": map[string]any{"template": map[string]any{"spec": map[string]any{
-			"instanceType": "m7g.large",
-			"ami":          map[string]any{"id": "ami-000000000000000ab"},
-			"additionalSecurityGroups": []any{
-				map[string]any{"id": "sg-000000000000000cd"},
-			},
-			"subnet": map[string]any{"id": "subnet-000000000000000ef"},
-		}}},
-	}}
 	claim := fakeClaim("public-worker")
-	claim.Spec.Requests = nil
-	group := "infrastructure.cluster.x-k8s.io"
-	claim.Spec.TemplateRef = &corev1.TypedLocalObjectReference{
-		APIGroup: &group, Kind: "AWSMachineTemplate", Name: "public-worker",
-	}
-
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), template, fakeNode())
+	r := newClaimReconciler(t, claim, fakeTemplate("public-worker"), fakeCluster("appmana"), fakeNode())
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}
@@ -417,14 +398,13 @@ func TestReconcile_TemplateDrivesTheMachine(t *testing.T) {
 	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "public-worker"}, machine); err != nil {
 		t.Fatalf("getting AWSMachine: %v", err)
 	}
-	got, _, _ := unstructured.NestedString(machine.Object, "spec", "instanceType")
-	if got != "m7g.large" {
-		t.Errorf("instanceType = %q, want the template's m7g.large", got)
+	if got, _, _ := unstructured.NestedString(machine.Object, "spec", "instanceType"); got != "t3.micro" {
+		t.Errorf("instanceType = %q, want the template's t3.micro", got)
 	}
 	if ami, _, _ := unstructured.NestedString(machine.Object, "spec", "ami", "id"); ami != "ami-000000000000000ab" {
 		t.Errorf("ami = %q, want the template's", ami)
 	}
-	// The security groups are the reason a template exists: carried
+	// The security groups are the reason the template exists: carried
 	// here, reachability never depends on an out-of-band change.
 	sgs, found, _ := unstructured.NestedSlice(machine.Object, "spec", "additionalSecurityGroups")
 	if !found || len(sgs) != 1 {
@@ -432,26 +412,34 @@ func TestReconcile_TemplateDrivesTheMachine(t *testing.T) {
 	}
 }
 
-// Both set is ambiguous: the catalogue would silently override half of
-// what the template says.
-func TestReconcile_TemplateAndRequestsTogetherIsAnError(t *testing.T) {
+// The machine kind is the template kind without the suffix, which is
+// Cluster API's contract, so any provider's template works with no code
+// here knowing the type.
+func TestReconcile_MachineKindComesFromTheTemplateKind(t *testing.T) {
 	claim := fakeClaim("public-worker")
-	group := "infrastructure.cluster.x-k8s.io"
-	claim.Spec.TemplateRef = &corev1.TypedLocalObjectReference{
-		APIGroup: &group, Kind: "AWSMachineTemplate", Name: "public-worker",
+	claim.Spec.InfrastructureRef.Kind = "DockerMachineTemplate"
+	template := fakeTemplate("public-worker")
+	template.SetKind("DockerMachineTemplate")
+	unstructured.SetNestedMap(template.Object, map[string]any{"customImage": "kindest/node:v1.34.0"}, "spec", "template", "spec")
+
+	r := newClaimReconciler(t, claim, template, fakeCluster("appmana"), fakeNode())
+	if err := reconcileClaim(t, r, claim); err != nil {
+		t.Fatalf("Reconcile: %v", err)
 	}
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), fakeNode())
-	if err := reconcileClaim(t, r, claim); err == nil {
-		t.Fatal("expected an error when both are set, got nil")
+	machine := &unstructured.Unstructured{}
+	machine.SetGroupVersionKind(schema.GroupVersionKind{
+		Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "DockerMachine",
+	})
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "public-worker"}, machine); err != nil {
+		t.Fatalf("expected a DockerMachine from a DockerMachineTemplate: %v", err)
 	}
-	updated := &v1alpha1.ProvisionedNodeClaim{}
-	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), updated); err != nil {
-		t.Fatalf("getting claim: %v", err)
-	}
-	if updated.Status.Phase != "Failed" {
-		t.Errorf("phase = %q, want Failed", updated.Status.Phase)
+	if img, _, _ := unstructured.NestedString(machine.Object, "spec", "customImage"); img != "kindest/node:v1.34.0" {
+		t.Errorf("customImage = %q, want the template's", img)
 	}
 }
+
+// Both set is ambiguous: the catalogue would silently override half of
+// what the template says.
 
 // Deleting a claim used to leave its Node registered and NotReady
 // forever: nothing collects it, because a cluster-scoped Node cannot be
@@ -469,7 +457,7 @@ func TestReconcileDelete_RemovesTheNodeItProduced(t *testing.T) {
 	}}
 	other := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker-1"}}
 
-	r := newClaimReconciler(t, claim, fakeCluster("appmana"), provisioned, other)
+	r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), provisioned, other)
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}

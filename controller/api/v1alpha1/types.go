@@ -23,28 +23,21 @@ var GroupVersion = schema.GroupVersion{Group: "cloud-provisioning.appmana.com", 
 
 // ProvisionedNodeClaimSpec is the provider-agnostic ask.
 type ProvisionedNodeClaimSpec struct {
-	// TemplateRef names an infrastructure machine template that
-	// describes the machine to create: an AWSMachineTemplate, a
-	// DockerMachineTemplate, whatever the fulfilling provider reads.
-	// The template carries the whole shape of the machine, including
-	// the image, the network placement and the security groups, so a
-	// machine never needs an out-of-band change to be reachable.
+	// InfrastructureRef names an infrastructure machine template describing
+	// the machine to create: an AWSMachineTemplate, a
+	// DockerMachineTemplate, whichever kind the fulfilling provider
+	// reads. These are Cluster API's own resources, and the machine is
+	// created from the template's spec.template.spec as written.
 	//
-	// Architecture follows from the template's image rather than being
-	// declared here, and the bootstrap picks its own binary to match
-	// the machine it wakes up on.
+	// The template carries the whole machine, including the image, the
+	// network placement and the security groups, so reachability never
+	// depends on an out-of-band change. Architecture follows from the
+	// image; the bootstrap reads its own and takes the matching binary.
 	//
-	// Exactly one of TemplateRef or Requests must be set.
-	// +optional
-	TemplateRef *corev1.TypedLocalObjectReference `json:"templateRef,omitempty"`
-
-	// Requests are pod-style resource requests (cpu, memory) the node
-	// must satisfy, for the case where any machine of a given size
-	// will do. The fulfilling provider resolves them against its own
-	// catalogue, using its configured defaults for everything a
-	// template would otherwise say.
-	// +optional
-	Requests corev1.ResourceList `json:"requests,omitempty"`
+	// The machine created from it is the template's kind without the
+	// Template suffix, which is Cluster API's own convention, so any
+	// provider's template works without code here knowing the type.
+	InfrastructureRef corev1.TypedLocalObjectReference `json:"infrastructureRef"`
 
 	// InternetFacing nodes register with the internet-facing taint and
 	// a public address; the public ingress data plane tolerates that
@@ -120,19 +113,9 @@ type ProvisionedNodeClaimList struct {
 
 func (in *ProvisionedNodeClaimSpec) DeepCopyInto(out *ProvisionedNodeClaimSpec) {
 	*out = *in
-	if in.Requests != nil {
-		out.Requests = make(corev1.ResourceList, len(in.Requests))
-		for k, v := range in.Requests {
-			out.Requests[k] = v.DeepCopy()
-		}
-	}
-	if in.TemplateRef != nil {
-		ref := *in.TemplateRef
-		if in.TemplateRef.APIGroup != nil {
-			g := *in.TemplateRef.APIGroup
-			ref.APIGroup = &g
-		}
-		out.TemplateRef = &ref
+	if in.InfrastructureRef.APIGroup != nil {
+		g := *in.InfrastructureRef.APIGroup
+		out.InfrastructureRef.APIGroup = &g
 	}
 	if in.InternetFacing != nil {
 		v := *in.InternetFacing

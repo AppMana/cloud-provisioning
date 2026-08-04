@@ -123,12 +123,18 @@ runcmd:
   # Fills GAPS only: a plugin Calico already installed is left alone,
   # so this never downgrades calico-ipam or portmap to the upstream
   # build underneath a running CNI.
-  {{- if .cniPluginsURL }}
+  {{- if or .cniPluginsURLArm64 .cniPluginsURLAmd64 }}
   - |
     set -e
+    case "$(uname -m)" in
+      aarch64|arm64) url='{{ .cniPluginsURLArm64 }}'; sha='{{ .cniPluginsSHA256Arm64 }}' ;;
+      x86_64|amd64)  url='{{ .cniPluginsURLAmd64 }}'; sha='{{ .cniPluginsSHA256Amd64 }}' ;;
+      *) url=''; sha='' ;;
+    esac
+    [ -n "$url" ] || exit 0
     mkdir -p /opt/cni/bin /tmp/cni-plugins
-    curl -fsSL -o /tmp/cni-plugins.tgz '{{ .cniPluginsURL }}'
-    echo '{{ .cniPluginsSHA256 }}  /tmp/cni-plugins.tgz' | sha256sum -c -
+    curl -fsSL -o /tmp/cni-plugins.tgz "$url"
+    echo "$sha  /tmp/cni-plugins.tgz" | sha256sum -c -
     tar -C /tmp/cni-plugins -xzf /tmp/cni-plugins.tgz
     for f in /tmp/cni-plugins/*; do
       [ -e "/opt/cni/bin/$(basename "$f")" ] || cp -a "$f" /opt/cni/bin/

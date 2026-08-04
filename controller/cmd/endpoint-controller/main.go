@@ -873,8 +873,8 @@ func main() {
 	)
 	flag.StringVar(&machineSelector, "machine-selector", fmt.Sprintf("%s=%s", cloudWorkerRoleLabel, cloudWorkerRoleValue),
 		"label selector identifying the Machine(s) whose external address drives the dialer's endpoint")
-	flag.StringVar(&secretNamespace, "secret-namespace", "wg-dialer", "namespace of the dialer peer Secret")
-	flag.StringVar(&secretName, "secret-name", "wg-dialer-peer", "name of the dialer peer Secret")
+	flag.StringVar(&secretNamespace, "secret-namespace", "cloud-provisioning", "namespace of the dialer peer Secret")
+	flag.StringVar(&secretName, "secret-name", "tunnel-peers", "name of the dialer peer Secret")
 	flag.StringVar(&secretKey, "secret-key-prefix", tunnel.PeerEndpointPrefix, "prefix (Machine name is appended) for the Secret key this Machine's endpoint is written into -- per-Machine, not a flat singleton")
 	flag.StringVar(&port, "port", "51820", "WireGuard listen port on the joining node")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "metrics endpoint address (0 disables it)")
@@ -882,8 +882,8 @@ func main() {
 	flag.StringVar(&gatewayName, "gateway-name", "", "optional: name of a Gateway to annotate with the node's external IP for external-dns")
 	flag.StringVar(&tunnelEndpoints, "tunnel-endpoints", "", "node selector (k=v,k2=v2) choosing which local nodes terminate tunnels; empty = every Linux worker. Control-plane nodes are excluded unless this selector names node-role.kubernetes.io/control-plane explicitly")
 	flag.StringVar(&dialerPrivateKeyDir, "dialer-private-key-dir", "/var/lib/cloud-provisioning", "host directory where each node's dialer keeps its own WireGuard private key (generated on first start; never leaves the node)")
-	flag.StringVar(&dialerDaemonSetName, "dialer-daemonset-name", "wg-dialer", "name of the on-prem dialer DaemonSet this operator provisions directly")
-	flag.StringVar(&dialerServiceAccount, "dialer-service-account", "wg-dialer", "ServiceAccount the dialer DaemonSet's pods run as")
+	flag.StringVar(&dialerDaemonSetName, "dialer-daemonset-name", "tunnel-dialer", "name of the on-prem dialer DaemonSet this operator provisions directly")
+	flag.StringVar(&dialerServiceAccount, "dialer-service-account", "cloud-provisioning-dialer", "ServiceAccount the dialer DaemonSet's pods run as")
 	flag.StringVar(&dialerImage, "dialer-image", "", "REQUIRED image for the dialer DaemonSets, pinned by digest (tag@sha256:...). Deliberately has no default: a stale built-in default once pointed at a pre-hardening build")
 	flag.StringVar(&dialerImagePullSecret, "dialer-image-pull-secret", "", "optional imagePullSecret for the dialer DaemonSets; leave empty when the images are publicly pullable. Naming a Secret that does not exist makes every pod on every endpoint node log a pull-secret warning, so this defaults to none")
 	flag.StringVar(&dialerPodCIDRs, "dialer-pod-cidrs", "", "REQUIRED comma-separated cluster pod-CIDR ranges (v4/v6) -- WireGuard cryptokey accept-list only, never a kernel route. Empty silently drops all Calico traffic, so it is fatal instead")
@@ -891,7 +891,7 @@ func main() {
 	flag.StringVar(&ownerDeployment, "owner-deployment", "", "this controller's own Deployment name; everything it creates at runtime (both DaemonSets, the peer and adoption Secrets) is owned by it, so an uninstall garbage-collects them instead of orphaning a tunnel interface on every endpoint node")
 	flag.StringVar(&dialerCloudImage, "dialer-cloud-image", "", "optional PUBLIC base image for the REMOTE node's DaemonSet, which then executes --dialer-cloud-host-binary instead of carrying its own. Use when the project image is not pullable on a remote node (no preload, no registry credential): without it the adoption DaemonSet ImagePullBackOffs and the node stays on its frozen bootstrap peer list forever")
 	flag.StringVar(&dialerCloudHostBinary, "dialer-cloud-host-binary", "/host-bin/wg-dialer", "path (inside the pod) of the host binary --dialer-cloud-image executes; the bootstrap already installed and sha-verified it")
-	flag.StringVar(&dialerCloudDaemonSetName, "dialer-cloud-daemonset-name", "wg-dialer-cloud", "name of the remote-side dialer DaemonSet this operator provisions directly")
+	flag.StringVar(&dialerCloudDaemonSetName, "dialer-cloud-daemonset-name", "tunnel-dialer-remote", "name of the remote-side dialer DaemonSet this operator provisions directly")
 
 	flag.BoolVar(&joinEnabled, "join-enabled", true, "enable bootstrap-secret provisioning (join.Reconciler) and claim expansion -- the whole point of this operator; disable only for an endpoint-mirror-only deployment")
 	flag.StringVar(&joinProviderName, "join-provider", "k0s", "which cluster technology's join specialization mints join credentials (k0s, kubeadm); pair with the matching --join-template-path")
@@ -916,7 +916,7 @@ func main() {
 	flag.StringVar(&cniPluginsSHA256ARM64, "join-cni-plugins-sha256-arm64", "", "sha256 of the arm64 CNI plugins tarball; a URL without it is ignored, never fetched unverified")
 	flag.StringVar(&cniPluginsURLAMD64, "join-cni-plugins-url-amd64", "", "amd64 containernetworking-plugins tarball URL")
 	flag.StringVar(&cniPluginsSHA256AMD64, "join-cni-plugins-sha256-amd64", "", "sha256 of the amd64 CNI plugins tarball")
-	flag.StringVar(&awsConfigNamespace, "aws-config-namespace", "wg-dialer", "namespace of the AWS provider-config Secret (AMIs, subnet, security groups, keypair)")
+	flag.StringVar(&awsConfigNamespace, "aws-config-namespace", "cloud-provisioning", "namespace of the AWS provider-config Secret (AMIs, subnet, security groups, keypair)")
 	flag.StringVar(&awsConfigName, "aws-config-name", "aws-provider-config", "name of the AWS provider-config Secret")
 
 	opts := zap.Options{Development: true}

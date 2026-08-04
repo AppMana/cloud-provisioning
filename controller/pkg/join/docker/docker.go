@@ -70,14 +70,6 @@ func (Provider) InfraValues(ctx context.Context, machine *unstructured.Unstructu
 	return map[string]any{"arch": runtime.GOARCH}, nil
 }
 
-// ResolveInstanceType implements join.MachineProvisioner. Containers
-// have no instance types: every request resolves to the one shape a
-// container is. Deliberately no cpu/memory feasibility judgment -- the
-// container shares the host, which is exactly what a local e2e wants.
-func (Provider) ResolveInstanceType(req join.NodeRequest) (string, error) {
-	return "docker", nil
-}
-
 // InfraMachine implements join.MachineProvisioner.
 func (p Provider) InfraMachine(ctx context.Context, c client.Reader, namespace, instanceType string, req join.NodeRequest) (*unstructured.Unstructured, error) {
 	cfg := &corev1.Secret{}

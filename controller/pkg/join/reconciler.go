@@ -297,7 +297,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err := r.validateDialerBinaries(); err != nil {
 		return ctrl.Result{}, err
 	}
-	cniURL, cniSHA := r.cniPluginsFor(infraValues)
 
 	values := map[string]any{
 		"sshAuthorizedKeys":       r.SSHAuthorizedKeys,
@@ -313,8 +312,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		"dialerBinarySHA256Arm64": r.DialerBinarySHA256ARM64,
 		"dialerBinaryURLAmd64":    r.DialerBinaryURLAMD64,
 		"dialerBinarySHA256Amd64": r.DialerBinarySHA256AMD64,
-		"cniPluginsURL":           cniURL,
-		"cniPluginsSHA256":        cniSHA,
+		"cniPluginsURLArm64":      r.CNIPluginsURLARM64,
+		"cniPluginsSHA256Arm64":   r.CNIPluginsSHA256ARM64,
+		"cniPluginsURLAmd64":      r.CNIPluginsURLAMD64,
+		"cniPluginsSHA256Amd64":   r.CNIPluginsSHA256AMD64,
 		"machineName":             machine.GetName(),
 	}
 	for k, v := range joinValues {
@@ -460,25 +461,6 @@ func (r *Reconciler) validateDialerBinaries() error {
 		return fmt.Errorf("no dialer binary configured for any architecture")
 	}
 	return nil
-}
-
-// cniPluginsFor picks the per-arch CNI plugins tarball. Optional: a
-// cluster whose CNI config chains no extra plugins, or an image that
-// already ships them, needs nothing here -- but an unpinned digest is
-// never acceptable, so a URL without its sha is treated as unset.
-func (r *Reconciler) cniPluginsFor(infraValues map[string]any) (string, string) {
-	arch := "arm64"
-	if v, ok := infraValues["arch"].(string); ok && v != "" {
-		arch = v
-	}
-	url, sha := r.CNIPluginsURLARM64, r.CNIPluginsSHA256ARM64
-	if arch == "amd64" {
-		url, sha = r.CNIPluginsURLAMD64, r.CNIPluginsSHA256AMD64
-	}
-	if url == "" || sha == "" {
-		return "", ""
-	}
-	return url, sha
 }
 
 // allocateWireGuardAddress finds the next free cloud tunnel address by

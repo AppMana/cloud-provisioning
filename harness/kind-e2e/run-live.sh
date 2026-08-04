@@ -51,6 +51,7 @@ cleanup() {
   # assertion already deleted them on a green run. This catches red
   # runs so nothing leaks.
   docker ps -aq --filter "label=io.x-k8s.kind.cluster=${CLUSTER}" --filter "name=public-worker" | xargs -r docker rm -f >/dev/null 2>&1 || true
+  docker rm -f "${CLUSTER}-nat" >/dev/null 2>&1 || true
   kind delete cluster --name "$CLUSTER" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -107,6 +108,44 @@ until_ok() {
 # succeeds on empty input. Every tunnel assertion below therefore
 # enters the namespace instead, where the host's own wg/ping/ip apply
 # to the container's interfaces.
+# The site's edge. Every node here shares one bridge, so a node's tunnel
+# endpoint address would otherwise be its node address, and the dialer
+# refuses to route a peer's endpoint through that peer's own tunnel: the
+# encrypted packet's outer destination would match the route and
+# encapsulate itself indefinitely.
+#
+# A real site is behind NAT, where the endpoint is a public address and
+# the node address is private. This reproduces that with one router:
+# tunnel traffic from the local nodes is forced through it and
+# masqueraded, so the remote sees an endpoint that is not any node's
+# address. The dialer then installs a host route to each node address
+# through the tunnel, and a host route beats the connected subnet, so
+# the remote reaches the site only through the tunnel.
+NAT_ROUTER="${CLUSTER}-nat"
+start_nat_router() {
+  docker rm -f "$NAT_ROUTER" >/dev/null 2>&1 || true
+  docker run -d --name "$NAT_ROUTER" --network kind --privileged \
+    --entrypoint sleep "$NODE_IMAGE" infinity >/dev/null \
+    || fail "could not start the NAT router"
+  NAT_IP=$(docker inspect "$NAT_ROUTER" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+  [ -n "$NAT_IP" ] || fail "the NAT router has no address"
+  node_netns "$NAT_ROUTER" sysctl -qw net.ipv4.ip_forward=1 \
+    || fail "could not enable forwarding on the NAT router"
+  node_netns "$NAT_ROUTER" iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE \
+    || fail "could not masquerade on the NAT router"
+  echo "  NAT router $NAT_ROUTER at $NAT_IP"
+}
+
+# Route one address through the NAT router from every node that
+# terminates a tunnel, so their tunnel traffic to it is masqueraded.
+route_via_nat() {
+  local target="$1" container
+  for container in "${CLUSTER}-worker" "${CLUSTER}-worker2"; do
+    node_netns "$container" ip route replace "$target/32" via "$NAT_IP" \
+      || fail "could not route $target through the NAT router on $container"
+  done
+}
+
 node_netns() {
   local container="$1"; shift
   local pid
@@ -229,6 +268,9 @@ CP_IP=$(docker inspect "${CLUSTER}-control-plane" --format '{{range .NetworkSett
 [ -n "$CP_IP" ] || fail "could not resolve the control plane's kind network address"
 echo "  control plane: $CP_NODE @ $CP_IP"
 assert_wan "baseline, before anything touches networking" "${CLUSTER}-control-plane"
+
+echo "--- the site's edge: a NAT router, so the remote is off-network ---"
+start_nat_router
 
 # Binary delivery without a download server. The docker provider mounts
 # $LOG_DIR/binaries read-only into the node container (extra-mounts in
@@ -395,6 +437,9 @@ until_ok 60 kubectl get secret public-worker-bootstrap || fail "bootstrap Secret
 until_ok 240 sh -c "docker ps --format '{{.Names}}' | grep -q 'public-worker'" \
   || fail "CAPD never launched the node container"
 NODE_CONTAINER=$(docker ps --format '{{.Names}}' | grep public-worker | head -1)
+REMOTE_IP=$(docker inspect "$NODE_CONTAINER" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+route_via_nat "$REMOTE_IP"
+echo "  tunnel traffic to $REMOTE_IP masqueraded, so its peers are not this site's nodes"
 echo "  node container: $NODE_CONTAINER"
 assert_wan "remote node container up, bootstrap running" "$NODE_CONTAINER" "${CLUSTER}-control-plane"
 
@@ -477,6 +522,13 @@ spec:
     kind: DockerMachineTemplate
     name: public-worker
 EOF
+# Its container appears before it joins, and its path has to be
+# masqueraded before the tunnel forms.
+until_ok 240 sh -c "docker ps --format '{{.Names}}' | grep -q public-worker-2" \
+  || fail "CAPD never launched the second node container"
+NODE_CONTAINER_2=$(docker ps --format '{{.Names}}' | grep public-worker-2 | head -1)
+REMOTE_IP_2=$(docker inspect "$NODE_CONTAINER_2" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+route_via_nat "$REMOTE_IP_2"
 until_ok 420 sh -c "kubectl get node -l cloud-provisioning.appmana.com/role=cloud-worker --no-headers | grep -c Ready | grep -q 2" \
   || fail "the second remote node never joined"
 CLOUD_NODE_2=$(kubectl get node -l cloud-provisioning.appmana.com/role=cloud-worker -o jsonpath='{.items[1].metadata.name}')
@@ -484,26 +536,9 @@ echo "  remote nodes: $CLOUD_NODE and $CLOUD_NODE_2"
 assert_wan "both remote nodes joined" "${CLUSTER}-control-plane"
 
 echo "--- reachability across every pair of nodes ---"
-# Pod reachability across the tunnel cannot be proven in this topology,
-# and the reason is worth stating rather than working around.
-#
-# Every node here shares one docker bridge, so a local node's tunnel
-# endpoint address and its node address are the same address. The dialer
-# refuses to route a peer's endpoint through that peer's own tunnel,
-# because the encrypted packet's outer destination would match the route
-# and encapsulate itself indefinitely. So the remote reaches the local
-# nodes over the bridge instead, its sessions source from the tunnel
-# address but leave by the bridge, and the replies come back through the
-# tunnel: an asymmetric path no session survives.
-#
-# A real deployment has the local nodes behind NAT, where the endpoint
-# is a public address and the node address is private, so node addresses
-# are routed through the tunnel and the endpoint is not. Proving pod
-# reachability therefore needs a topology where the remote is genuinely
-# off the local network: harness/vm-single-nic, or real instances.
-if [ "${SKIP_REACHABILITY:-0}" = "1" ]; then
-  echo "  skipped: this topology cannot exercise an off-network remote"
-else
+# The remote sits behind the NAT router, so it reaches this site only
+# through the tunnel: the same shape as a real deployment, where the
+# site is NAT'd and the remote is public.
 # One pod per node, then every source against every destination, by pod
 # address and by service address. Two local and two remote, so the pairs
 # cross the tunnel in both directions and between the two remotes.
@@ -512,7 +547,6 @@ else
 grep -q "failed: 0" "$LOG_DIR/health-check.log" \
   || fail "reachability checks failed (see $LOG_DIR/health-check.log)"
 echo "  every pair reachable, by pod and by service"
-fi
 
 echo "--- what each peer is permitted, and what it is not ---"
 # The accept list is a trie with one owner per prefix, so a prefix on

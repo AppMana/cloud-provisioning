@@ -78,6 +78,22 @@ provider:
     extraMounts: ""     # host:container, comma-separated
     preloadImages: ""   # comma-separated local image refs
 
+# Reaching a remote's pods from a node that terminates no tunnel.
+#
+# That node already has the route its CNI installed for the remote's
+# pods; what it lacks is a route to the next hop, and it cannot peer
+# with the remote to learn one, because the remote's address is its
+# tunnel address. A node that does terminate a tunnel therefore
+# advertises the remote node addresses with itself as the next hop.
+#
+# Leave the port at 0 when every node that needs a remote terminates a
+# tunnel of its own. Not 179: a node whose CNI speaks BGP is already
+# there. Understood by CNIs that speak BGP, which is Calico and
+# kube-router.
+transit:
+  bgpPort: 0        # e.g. 1790
+  bgpASN: 64512
+
 # Which cluster technology mints join credentials (k0s | kubeadm).
 joinProvider: k0s
 

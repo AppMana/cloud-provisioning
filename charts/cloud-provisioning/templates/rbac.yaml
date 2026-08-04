@@ -92,6 +92,10 @@ rules:
   - apiGroups: ["crd.projectcalico.org"]
     resources: ["ippools", "blockaffinities"]
     verbs: ["get", "list", "watch"]
+  # Telling the site to peer with the speaker a tunnel endpoint runs.
+  - apiGroups: ["crd.projectcalico.org"]
+    resources: ["bgppeers"]
+    verbs: ["get", "list", "watch", "create", "update"]
   - apiGroups: ["cilium.io"]
     resources: ["ciliumnodes"]
     verbs: ["get", "list", "watch"]

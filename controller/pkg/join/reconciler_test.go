@@ -65,14 +65,11 @@ func machineListGVK() schema.GroupVersionKind {
 	return schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "MachineList"}
 }
 
-func fakeMachine(name string, nodeVIPAnnotation string) *unstructured.Unstructured {
+func fakeMachine(name string, _ string) *unstructured.Unstructured {
 	m := &unstructured.Unstructured{}
 	m.SetGroupVersionKind(machineGVK)
 	m.SetName(name)
 	m.SetNamespace("default")
-	if nodeVIPAnnotation != "" {
-		m.SetAnnotations(map[string]string{NodeVIPAnnotation: nodeVIPAnnotation})
-	}
 	return m
 }
 
@@ -89,18 +86,7 @@ func newFakeReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 	scheme.AddKnownTypeWithName(machineGVK, &unstructured.Unstructured{})
 	scheme.AddKnownTypeWithName(machineListGVK(), &unstructured.UnstructuredList{})
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
-	return &Reconciler{Client: c, Reader: c, NodeVIPStart: 4}
-}
-
-func TestAllocateNodeVIPIndex_NoExisting(t *testing.T) {
-	r := newFakeReconciler(t)
-	idx, err := r.allocateNodeVIPIndex(context.Background())
-	if err != nil {
-		t.Fatalf("allocateNodeVIPIndex: %v", err)
-	}
-	if idx != 4 {
-		t.Errorf("expected first allocation to start at NodeVIPStart=4, got %d", idx)
-	}
+	return &Reconciler{Client: c, Reader: c}
 }
 
 func TestDialerBinaryFor_UnpinnedDigestIsAlwaysFatal(t *testing.T) {
@@ -198,7 +184,7 @@ func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs 
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 	tmplPath := filepath.Join(t.TempDir(), "test.tmpl")
-	tmpl := "joinToken={{.joinToken}} k0sVersion={{.k0sVersion}} apiVIP={{.apiVIP}} nodeVIP4={{.nodeVIP4}} nodeVIP6={{.nodeVIP6}} kubeletExtraArgs={{.kubeletExtraArgs}} wgAddress={{.wireguardAddress}} podCIDRs={{.podCIDRs}} serviceCIDRs={{.serviceCIDRs}} iface={{.interfaceName}} binURL={{.dialerBinaryURL}} binSHA={{.dialerBinarySHA256}} machine={{.machineName}} peersFileJSON={{.peersFileJSON}}"
+	tmpl := "joinToken={{.joinToken}} k0sVersion={{.k0sVersion}} apiVIP={{.apiVIP}} kubeletExtraArgs={{.kubeletExtraArgs}} wgAddress={{.wireguardAddress}} podCIDRs={{.podCIDRs}} serviceCIDRs={{.serviceCIDRs}} iface={{.interfaceName}} binURL={{.dialerBinaryURL}} binSHA={{.dialerBinarySHA256}} machine={{.machineName}} peersFileJSON={{.peersFileJSON}}"
 	if err := os.WriteFile(tmplPath, []byte(tmpl), 0o644); err != nil {
 		t.Fatalf("writing test template: %v", err)
 	}
@@ -215,10 +201,6 @@ func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs 
 
 		WireGuardAddress:    "10.100.0.128/24",
 		WireGuardListenPort: "51820",
-
-		NodeVIP4Prefix: "10.101.0.",
-		NodeVIP6Prefix: "fd8f:cf26:522a::",
-		NodeVIPStart:   4,
 
 		DialerPeerSecretNamespace: "wg-dialer",
 		DialerPeerSecretName:      "wg-dialer-peer",
@@ -339,8 +321,6 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 		"joinToken=fake-token",
 		"k0sVersion=v1.36.2+k0s",
 		"apiVIP=10.101.0.1",
-		"nodeVIP4=10.101.0.4",
-		"nodeVIP6=fd8f:cf26:522a::4",
 		"wgAddress=10.100.0.128/24",
 		"iface=cldt0a1b2c3d",
 		"binURL=https://example.com/wg-dialer-linux-arm64",
@@ -386,11 +366,11 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	// three as bare hosts (each becomes exactly one /32 or /128 kernel
 	// route on the on-prem side, nothing wider -- pod routing is
 	// Calico's job).
-	wantAllowed := "10.100.0.128/32,10.101.0.4/32,fd8f:cf26:522a::4/128"
+	wantAllowed := "10.100.0.128/32"
 	if got := string(updatedDialerSecret.Data["peer-allowed-ips-"+machineName]); got != wantAllowed {
 		t.Errorf("peer-allowed-ips-%s = %q, want %q", machineName, got, wantAllowed)
 	}
-	wantRouteHosts := "10.100.0.128,10.101.0.4,fd8f:cf26:522a::4"
+	wantRouteHosts := "10.100.0.128"
 	if got := string(updatedDialerSecret.Data["peer-route-hosts-"+machineName]); got != wantRouteHosts {
 		t.Errorf("peer-route-hosts-%s = %q, want %q", machineName, got, wantRouteHosts)
 	}
@@ -399,9 +379,6 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	updatedMachine.SetGroupVersionKind(machineGVK)
 	if err := r.Get(context.Background(), client.ObjectKeyFromObject(machine), updatedMachine); err != nil {
 		t.Fatalf("getting updated machine: %v", err)
-	}
-	if updatedMachine.GetAnnotations()[NodeVIPAnnotation] != "4" {
-		t.Errorf("machine's %s annotation = %q, want \"4\" (NodeVIPStart, first allocation)", NodeVIPAnnotation, updatedMachine.GetAnnotations()[NodeVIPAnnotation])
 	}
 	if updatedMachine.GetAnnotations()[WireGuardAddrAnnotation] != "10.100.0.128/24" {
 		t.Errorf("machine's %s annotation = %q, want the base address for the first allocation", WireGuardAddrAnnotation, updatedMachine.GetAnnotations()[WireGuardAddrAnnotation])
@@ -464,9 +441,9 @@ func TestReconcile_TwoCloudMachinesDoNotClobberEachOther(t *testing.T) {
 		t.Fatalf("expected both peer-route-hosts entries to be set, got %q and %q", routeHostsA, routeHostsB)
 	}
 	if routeHostsA == routeHostsB {
-		t.Errorf("cloud-worker-a and cloud-worker-b got identical route-hosts %q -- WireGuard address/VIP allocation collided", routeHostsA)
+		t.Errorf("cloud-worker-a and cloud-worker-b got identical route-hosts %q, so the tunnel address allocation collided", routeHostsA)
 	}
-	if !strings.HasPrefix(routeHostsA, "10.100.0.128,") || !strings.HasPrefix(routeHostsB, "10.100.0.129,") {
+	if routeHostsA != "10.100.0.128" || routeHostsB != "10.100.0.129" {
 		t.Errorf("expected sequential tunnel addresses .128 then .129, got %q and %q", routeHostsA, routeHostsB)
 	}
 
@@ -491,8 +468,8 @@ func TestReconcile_TwoCloudMachinesDoNotClobberEachOther(t *testing.T) {
 	if err := r.Get(context.Background(), client.ObjectKeyFromObject(machineB), updatedB); err != nil {
 		t.Fatalf("getting updated machineB: %v", err)
 	}
-	if updatedA.GetAnnotations()[NodeVIPAnnotation] == updatedB.GetAnnotations()[NodeVIPAnnotation] {
-		t.Errorf("machineA and machineB got the same node-VIP index %q -- allocation collided", updatedA.GetAnnotations()[NodeVIPAnnotation])
+	if updatedA.GetAnnotations()[WireGuardAddrAnnotation] == updatedB.GetAnnotations()[WireGuardAddrAnnotation] {
+		t.Errorf("machineA and machineB got the same tunnel address %q, so the allocation collided", updatedA.GetAnnotations()[WireGuardAddrAnnotation])
 	}
 
 	// Machine B's baked peers.json must include machine A as a
@@ -671,9 +648,6 @@ func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
 		Join:                      &stubJoinProvider{values: map[string]any{}},
 		InfraProviders:            []InfraProvider{awsProvider, otherProvider},
 		TemplatePath:              tmplPath,
-		NodeVIP4Prefix:            "10.101.0.",
-		NodeVIP6Prefix:            "fd8f:cf26:522a::",
-		NodeVIPStart:              4,
 		WireGuardAddress:          "10.100.0.128/24",
 		DialerPeerSecretNamespace: "wg-dialer",
 		DialerPeerSecretName:      "wg-dialer-peer",
@@ -698,18 +672,16 @@ func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
 	}
 }
 
-func TestReconcile_SingleStackCluster_EmitsNoBareIndexAsAnAddress(t *testing.T) {
-	// A single-stack cluster leaves NodeVIP6Prefix empty. Concatenating
-	// the allocation index onto "" produced a bare "200", which every
-	// consumer then treated as an address: "200/32" in the peer
-	// AllowedIPs (which the dialer refuses to parse, so no tunnel is
-	// ever built) and `ip addr add 200/128` in the node's bootstrap.
-	// Caught live on appmana.
+func TestReconcile_EmitsOnlyRealAddresses(t *testing.T) {
+	// Every entry published for a peer must parse as an address. A
+	// value assembled from a prefix and an index once produced a bare
+	// "200" on a cluster with no prefix set, and every consumer then
+	// treated it as one: "200/32" in the peer AllowedIPs, which the
+	// dialer refuses to parse, so no tunnel was ever built.
 	machine := machineWithInfraRef("cloud-worker-0", "default", "cloud-worker-0")
 	awsMachine := fakeAWSMachine("cloud-worker-0", "default", true)
 	join := &stubJoinProvider{values: map[string]any{"joinToken": "t", "k0sVersion": "v"}}
 	r := newFakeJoinReconciler(t, join, machine, awsMachine, dialerPeerSecretFixture())
-	r.NodeVIP6Prefix = "" // single stack
 
 	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)}); err != nil {
 		t.Fatalf("Reconcile: %v", err)

@@ -30,6 +30,7 @@ import (
 
 	v1alpha1 "github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/claim"
+	"github.com/appmana/cloud-provisioning/controller/pkg/discover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	joindocker "github.com/appmana/cloud-provisioning/controller/pkg/join/docker"
@@ -212,6 +213,16 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// document lands on an internet-facing machine.
 	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
 		return ctrl.Result{}, fmt.Errorf("ensuring adoption config: %w", err)
+	}
+
+	// Tell the CNI which address to peer on, once the node exists.
+	{
+		nodeName, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name")
+		tunnelAddr := strings.SplitN(strings.TrimSpace(
+			machine.GetAnnotations()["cloud-provisioning.appmana.com/wireguard-addr4"]), "/", 2)[0]
+		if err := r.ensureCNINodeAddress(ctx, nodeName, tunnelAddr); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	addresses, found, err := unstructured.NestedSlice(machine.Object, "status", "addresses")
@@ -459,6 +470,52 @@ func nextFreeAddress(base string, used map[string]bool) (string, error) {
 // userdata is a frozen snapshot from provisioning time, while this
 // Secret is re-derived from cluster state on every reconcile, and the
 // cloud dialer prefers it once readable.
+// calicoIPv4Annotation and calicoIPv6Annotation are where Calico's
+// Kubernetes datastore keeps a node's BGP address (the Node resource's
+// spec.bgp.ipv4Address). Setting them per node is Calico's documented
+// alternative to a cluster-wide autodetection method.
+const (
+	calicoIPv4Annotation = "projectcalico.org/IPv4Address"
+	calicoIPv6Annotation = "projectcalico.org/IPv6Address"
+)
+
+// ensureCNINodeAddress tells the CNI which address to peer on for a
+// provisioned node.
+//
+// Its real address belongs to a cloud provider and means nothing to
+// this cluster; its tunnel address is the one every tunnel endpoint can
+// reach by construction, and the one the dialer installs a host route
+// for. Autodetection on the node itself cannot know that, so the choice
+// is stated here rather than guessed there.
+func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tunnelAddr string) error {
+	if nodeName == "" || tunnelAddr == "" {
+		return nil
+	}
+	node := &corev1.Node{}
+	if err := r.reader.Get(ctx, types.NamespacedName{Name: nodeName}, node); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("getting node %s: %w", nodeName, err)
+	}
+	key, want := calicoIPv4Annotation, tunnelAddr+"/32"
+	if strings.Contains(tunnelAddr, ":") {
+		key, want = calicoIPv6Annotation, tunnelAddr+"/128"
+	}
+	if node.Annotations[key] == want {
+		return nil
+	}
+	patch := client.MergeFrom(node.DeepCopy())
+	if node.Annotations == nil {
+		node.Annotations = map[string]string{}
+	}
+	node.Annotations[key] = want
+	if err := r.Patch(ctx, node, patch); err != nil {
+		return fmt.Errorf("annotating node %s with its tunnel address: %w", nodeName, err)
+	}
+	return nil
+}
+
 func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unstructured.Unstructured) error {
 	peerSecret := &corev1.Secret{}
 	if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, peerSecret); err != nil {
@@ -778,9 +835,6 @@ func main() {
 		wireGuardAddress          string
 		wireGuardListenPort       string
 		localAddressBase          string
-		nodeVIP4Prefix            string
-		nodeVIP6Prefix            string
-		nodeVIPStart              int
 		dialerListenPort          string
 		bootstrapSecretNameFormat string
 		dialerDaemonSetName       string
@@ -839,9 +893,6 @@ func main() {
 	flag.StringVar(&wireGuardAddress, "join-wireguard-address", "10.100.0.128/24", "base WireGuard tunnel address for REMOTE (cloud) nodes; each gets the next free address in this subnet")
 	flag.StringVar(&localAddressBase, "tunnel-local-address-base", "10.100.0.1/24", "base WireGuard tunnel address for LOCAL tunnel-endpoint nodes; each selected node gets the next free address in this subnet")
 	flag.StringVar(&wireGuardListenPort, "join-wireguard-listen-port", "51820", "WireGuard listen port on the remote side")
-	flag.StringVar(&nodeVIP4Prefix, "join-node-vip4-prefix", "", "REQUIRED IPv4 prefix for allocated Calico vip0 addresses (e.g. 10.101.0.)")
-	flag.StringVar(&nodeVIP6Prefix, "join-node-vip6-prefix", "", "IPv6 prefix for allocated Calico vip0 addresses (e.g. fd8f:cf26:522a::)")
-	flag.IntVar(&nodeVIPStart, "join-node-vip-start", 200, "first node-VIP index to allocate (must not collide with existing node addresses)")
 	flag.StringVar(&dialerListenPort, "join-dialer-listen-port", "51820", "WireGuard listen port the local dialers expect the remote peer to use")
 	flag.StringVar(&bootstrapSecretNameFormat, "join-bootstrap-secret-name-format", "%s-bootstrap", "printf format (with the Machine's name) for the bootstrap Secret's name")
 	flag.StringVar(&dialerBinaryURLARM64, "join-dialer-binary-url-arm64", "", "REQUIRED (arm64 nodes) URL cloud-init downloads the dialer binary from; nothing installs it on a stock image")
@@ -861,23 +912,12 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	// Fatal-on-empty for every value whose absence is silent breakage
-	// rather than a visible error: an empty dialer image once meant a
-	// stale pre-hardening build, and empty pod/service CIDRs mean
-	// WireGuard drops all Calico traffic with no log anywhere.
-	required := map[string]string{
-		"--dialer-image":          dialerImage,
-		"--dialer-pod-cidrs":      dialerPodCIDRs,
-		"--dialer-service-cidrs":  dialerServiceCIDRs,
-		"--join-api-address":      joinAPIAddress,
-		"--join-api-vip":          joinAPIVIP,
-		"--join-node-vip4-prefix": nodeVIP4Prefix,
-	}
-	for name, value := range required {
-		if strings.TrimSpace(value) == "" {
-			fmt.Fprintf(os.Stderr, "%s is required\n", name)
-			os.Exit(1)
-		}
+	// The dialer image has no discoverable value and no safe default: a
+	// built-in default once pointed at a build predating the routing
+	// fix.
+	if strings.TrimSpace(dialerImage) == "" {
+		fmt.Fprintf(os.Stderr, "--dialer-image is required\n")
+		os.Exit(1)
 	}
 
 	selector, err := labels.Parse(machineSelector)
@@ -925,6 +965,54 @@ func main() {
 			APIVersion: "apps/v1", Kind: "Deployment",
 			Name: dep.Name, UID: dep.UID,
 		}
+	}
+
+	// Read from the cluster whatever was not configured. These are all
+	// facts the cluster already holds, and a second copy of them in
+	// values is a copy that goes stale.
+	{
+		discoveryClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to build a client for cluster discovery: %v\n", err)
+			os.Exit(1)
+		}
+		ctx := context.Background()
+		if joinAPIAddress == "" || joinAPIVIP == "" {
+			servers, err := discover.APIServers(ctx, discoveryClient)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "cannot determine the API server address (set --join-api-address): %v\n", err)
+				os.Exit(1)
+			}
+			if joinAPIAddress == "" {
+				joinAPIAddress = "https://" + servers[0]
+			}
+			if joinAPIVIP == "" {
+				host, _, err := net.SplitHostPort(servers[0])
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "cannot split the API server address %q: %v\n", servers[0], err)
+					os.Exit(1)
+				}
+				joinAPIVIP = host
+			}
+		}
+		if dialerPodCIDRs == "" {
+			cidrs, err := discover.PodCIDRs(ctx, discoveryClient)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "cannot determine the pod CIDRs (set --dialer-pod-cidrs): %v\n", err)
+				os.Exit(1)
+			}
+			dialerPodCIDRs = strings.Join(cidrs, ",")
+		}
+		if dialerServiceCIDRs == "" {
+			cidrs, err := discover.ServiceCIDRs(ctx, discoveryClient)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "cannot determine the service CIDRs (set --dialer-service-cidrs): %v\n", err)
+				os.Exit(1)
+			}
+			dialerServiceCIDRs = strings.Join(cidrs, ",")
+		}
+		fmt.Fprintf(os.Stderr, "cluster: api=%s pods=%s services=%s\n",
+			joinAPIAddress, dialerPodCIDRs, dialerServiceCIDRs)
 	}
 
 	// The mesh's interface name is derived from the peer Secret's
@@ -1032,10 +1120,6 @@ func main() {
 
 			WireGuardAddress:    wireGuardAddress,
 			WireGuardListenPort: wireGuardListenPort,
-
-			NodeVIP4Prefix: nodeVIP4Prefix,
-			NodeVIP6Prefix: nodeVIP6Prefix,
-			NodeVIPStart:   nodeVIPStart,
 
 			DialerPeerSecretNamespace: secretNamespace,
 			DialerPeerSecretName:      secretName,

@@ -1,0 +1,34 @@
+# Publishes the Helm chart to GHCR on every change to the chart or the
+# controller. appVersion is stamped with the commit SHA at package
+# time, so a published chart always pins the images built from exactly
+# that commit -- pushing it by hand meant the registry drifted behind
+# the repository, and an install from the README got whatever was
+# pushed last.
+name: Publish Helm chart
+on:
+  push:
+    branches: [main]
+    paths:
+      - "charts/**"
+      - "controller/**"
+      - "join-patterns/**"
+      - ".github/workflows/publish-chart.yml"
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: azure/setup-helm@v4
+      - name: Log in to GHCR
+        run: helm registry login ghcr.io -u ${{ github.actor }} --password-stdin <<< "${{ secrets.GITHUB_TOKEN }}"
+      - name: Package and push
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse --short=7 HEAD)
+          # The images are tagged with the commit SHA, and the chart's
+          # templates default every image tag to .Chart.AppVersion.
+          helm package charts/cloud-provisioning --app-version "$sha" --destination /tmp/chart
+          helm push /tmp/chart/cloud-provisioning-*.tgz oci://ghcr.io/${{ github.repository_owner }}/charts

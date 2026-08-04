@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"time"
 
@@ -67,11 +66,6 @@ func isMissingCRD(err error) bool {
 const crdRecheckInterval = 30 * time.Second
 
 var machineGVK = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"}
-
-// NodeVIPAnnotation records the vip0 address allocated to a cloud
-// worker Machine, so a later reconcile (or a future Machine) can find
-// the next free one without needing separate state storage.
-const NodeVIPAnnotation = "cloud-provisioning.appmana.com/node-vip4"
 
 // WireGuardAddrAnnotation records the WireGuard tunnel address
 // allocated to a cloud worker Machine, mirroring NodeVIPAnnotation.
@@ -128,13 +122,6 @@ type Reconciler struct {
 	// prefix (see WireGuardAddrAnnotation).
 	WireGuardAddress    string
 	WireGuardListenPort string
-
-	// Node VIP range for Calico autodetection (vip0): allocated as
-	// <prefix><n>, starting at NodeVIPStart, avoiding the on-prem
-	// nodes' own fixed addresses.
-	NodeVIP4Prefix string
-	NodeVIP6Prefix string
-	NodeVIPStart   int
 
 	// Peer Secret (namespace/name): where tunnel-endpoint nodes have
 	// published their public keys and the controller has allocated
@@ -265,22 +252,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("allocating wireguard address: %w", err)
 	}
-	nodeVIPIndex, err := r.allocateNodeVIPIndex(ctx)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("allocating node VIP: %w", err)
-	}
-	nodeVIP4 := fmt.Sprintf("%s%d", r.NodeVIP4Prefix, nodeVIPIndex)
-	// Only when a v6 prefix is configured. A single-stack cluster leaves
-	// it empty, and concatenating the index onto "" produced a bare
-	// index ("200") that every consumer then treated as an address:
-	// "200/32" in the peer AllowedIPs (which the dialer refuses to
-	// parse, so no tunnel is ever built) and `ip addr add 200/128` in
-	// the node's own bootstrap.
-	nodeVIP6 := ""
-	if r.NodeVIP6Prefix != "" {
-		nodeVIP6 = fmt.Sprintf("%s%d", r.NodeVIP6Prefix, nodeVIPIndex)
-	}
-
 	// The cloud node can't read a cluster Secret before it joins -- its
 	// whole bootstrap peer list travels in cloud-init as a plain JSON
 	// file the same dialer binary reads via --peers-file. Peers:
@@ -332,8 +303,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	values := map[string]any{
 		"sshAuthorizedKeys":   r.SSHAuthorizedKeys,
 		"apiVIP":              r.APIVIP,
-		"nodeVIP4":            nodeVIP4,
-		"nodeVIP6":            nodeVIP6,
 		"kubeletExtraArgs":    r.KubeletExtraArgs,
 		"wireguardAddress":    cloudWGAddress,
 		"wireguardListenPort": r.WireGuardListenPort,
@@ -390,25 +359,20 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// cloud Machine must never clobber the first's entry.
 	//
 	// AllowedIPs vs RouteHosts (see cmd/dialer/main.go's package doc):
-	// both carry the machine's tunnel address AND its node VIPs --
-	// AllowedIPs because WireGuard's cryptokey filter matches inner
-	// destinations (BGP sessions and kubelet traffic ride the VIPs,
-	// not the tunnel address), RouteHosts because node-to-node
-	// reachability is exactly this tunnel layer's one routing job.
-	// Everything wider (pod blocks) is Calico's concern, learned over
-	// the BGP sessions these host routes make possible.
+	// both carry the machine's tunnel address, which is the address
+	// the CNI is told to peer on. AllowedIPs because WireGuard's
+	// cryptokey filter matches inner destinations, RouteHosts because
+	// node-to-node reachability is this tunnel layer's one routing job.
+	// Everything wider (pod blocks) is the CNI's concern, learned over
+	// the sessions these host routes make possible.
 	patch := client.MergeFrom(dialerSecret.DeepCopy())
 	if dialerSecret.Data == nil {
 		dialerSecret.Data = map[string][]byte{}
 	}
 	machineName := machine.GetName()
 	cloudTunnelAddr := strings.SplitN(strings.TrimSpace(cloudWGAddress), "/", 2)[0]
-	allowed := []string{tunnel.HostCIDR(cloudTunnelAddr), tunnel.HostCIDR(nodeVIP4)}
-	routeHosts := []string{cloudTunnelAddr, nodeVIP4}
-	if nodeVIP6 != "" {
-		allowed = append(allowed, tunnel.HostCIDR(nodeVIP6))
-		routeHosts = append(routeHosts, nodeVIP6)
-	}
+	allowed := []string{tunnel.HostCIDR(cloudTunnelAddr)}
+	routeHosts := []string{cloudTunnelAddr}
 	dialerSecret.Data[tunnel.PeerPublicKeyPrefix+machineName] = []byte(cloudPub.String())
 	dialerSecret.Data[tunnel.PeerEndpointPrefix+machineName] = []byte(tunnel.PeerEndpointPending)
 	dialerSecret.Data[tunnel.PeerAllowedIPsPrefix+machineName] = []byte(strings.Join(allowed, ","))
@@ -422,14 +386,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
-	annotations[NodeVIPAnnotation] = strconv.Itoa(nodeVIPIndex)
 	annotations[WireGuardAddrAnnotation] = cloudWGAddress
 	machine.SetAnnotations(annotations)
 	if err := r.Patch(ctx, machine, machinePatch); err != nil {
-		return ctrl.Result{}, fmt.Errorf("annotating machine with allocated VIP: %w", err)
+		return ctrl.Result{}, fmt.Errorf("annotating machine with its allocated tunnel address: %w", err)
 	}
 
-	log.Info("bootstrap secret provisioned", "machine", req.NamespacedName, "nodeVIP4", nodeVIP4)
+	log.Info("bootstrap secret provisioned", "machine", req.NamespacedName, "tunnelAddress", cloudTunnelAddr)
 	return ctrl.Result{}, nil
 }
 
@@ -508,32 +471,6 @@ func (r *Reconciler) cniPluginsFor(infraValues map[string]any) (string, string) 
 		return "", ""
 	}
 	return url, sha
-}
-
-// allocateNodeVIPIndex finds the next free node-VIP index by scanning
-// existing cloud-worker Machines' NodeVIPAnnotation, starting from
-// NodeVIPStart. No separate allocator state needed.
-func (r *Reconciler) allocateNodeVIPIndex(ctx context.Context) (int, error) {
-	list := &unstructured.UnstructuredList{}
-	list.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "MachineList"})
-	if err := r.List(ctx, list); err != nil {
-		return 0, err
-	}
-	maxIndex := r.NodeVIPStart - 1
-	for _, m := range list.Items {
-		v, ok := m.GetAnnotations()[NodeVIPAnnotation]
-		if !ok {
-			continue
-		}
-		n, err := strconv.Atoi(v)
-		if err != nil {
-			continue
-		}
-		if n > maxIndex {
-			maxIndex = n
-		}
-	}
-	return maxIndex + 1, nil
 }
 
 // allocateWireGuardAddress finds the next free cloud tunnel address by

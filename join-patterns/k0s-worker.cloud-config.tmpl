@@ -111,7 +111,11 @@ runcmd:
   # mechanism every other node already relies on.
   - ip link add vip0 type dummy
   - ip addr add {{ .nodeVIP4 }}/32 dev vip0
+  # v6 VIP only on a dual-stack cluster; a single-stack one leaves the
+  # prefix unset and this must not run at all.
+  {{- if .nodeVIP6 }}
   - ip addr add {{ .nodeVIP6 }}/128 dev vip0
+  {{- end }}
   - ip link set vip0 up
   - curl -sSLf https://get.k0s.sh | K0S_VERSION={{ .k0sVersion }} sh
   # k0s resolves node IPs by looking up the instance's own hostname, not

@@ -1,167 +1,140 @@
 # cloud-provisioning
 
-Utility for provisioning nodes to on-premises, firewalled clusters.
+[![images](https://img.shields.io/badge/ghcr.io-appmana%2Fcloud--provisioning-blue)](https://github.com/orgs/AppMana/packages?repo_name=cloud-provisioning)
 
-## What it does
+Join a public cloud node to an on-premises, firewalled cluster over a
+WireGuard tunnel, so the cluster can run internet-facing workloads (an
+ingress gateway, a VPN endpoint) on a node the internet can reach while
+the control plane stays private.
 
-Joins a cloud VM (with a public IP) as a worker node to a k0s cluster that
-sits behind NAT/CGNAT with no inbound connectivity — so the cluster can
-place public-facing workloads (an ingress gateway, a VPN endpoint) on a
-node that the internet can actually reach, while the control plane stays
-private.
+You commit one resource:
 
-The user commits ONE resource — a `ProvisionedNodeClaim` — and the
-controller derives everything else: the CAPI `Machine` + provider machine
-pair, the tunnel-bootstrapping userdata, WireGuard address allocation,
-both dialer DaemonSets, and the post-join adoption config. The claim's
-spec is request-shaped (`requests: {cpu, memory}`, `arch`,
-`internetFacing`) and names no cloud; which cloud fulfills it is decided
-by the registered provider that owns the CAPI Cluster's infrastructure
-(AWS/CAPA today — other providers slot in by implementing
-`join.MachineProvisioner`, never by touching a reconciler).
+```yaml
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: public-worker
+  namespace: default
+spec:
+  requests:            # resolved to the smallest satisfying instance type
+    cpu: "2"
+    memory: 2Gi
+  # instanceType: t3.micro   # ...or name one exactly, instead of requests
+  arch: amd64
+  clusterName: appmana
+```
 
-The node is a normal k0s worker. Pod networking is Calico's ordinary BGP
-mesh (`overlay: Never`) carried over a WireGuard underlay — no VXLAN, no
-overlay reconfiguration. The tunnel does the encapsulation; Calico does
-not know a WAN is involved.
+The controller creates the CAPI `Machine` + provider machine, renders
+the node's cloud-init (WireGuard identity, sha-pinned dialer binary,
+join token), and manages both dialer DaemonSets. `kubectl delete
+provisionednodeclaim public-worker` destroys the instance.
 
-## Separation of concerns (the load-bearing invariant)
+The node joins as a normal worker, labelled
+`cloud-provisioning.appmana.com/role=cloud-worker` and tainted
+`cloud-provisioning.appmana.com/internet-facing:NoSchedule`. Pod
+networking is Calico's ordinary BGP mesh (`overlay: Never`) carried
+over the tunnel — no VXLAN.
 
-The tunnel layer provides NODE-to-NODE reachability only. The only
-kernel routes the dialer ever installs are host routes (`/32`/`/128`) to
-peer node addresses — anything broader is rejected at parse time.
-Pod/service CIDRs appear ONLY in WireGuard's cryptokey accept-list
-(AllowedIPs — a packet filter, not a route source). Routing traffic to
-pods is Calico's concern: bird learns pod blocks over BGP sessions that
-ride the tunnel's host routes. See `controller/cmd/dialer/main.go`'s
-package doc.
+## Install
 
-Three further rules the dialer enforces, each found by a live failure:
+```bash
+helm install cloud-provisioning oci://ghcr.io/appmana/charts/cloud-provisioning --version 0.1.0 \
+  --namespace wg-dialer --create-namespace \
+  --set cluster.apiAddress=https://10.2.0.22:6443 \
+  --set cluster.apiVIP=10.2.0.22 \
+  --set cluster.podCIDRs=10.3.0.0/16 \
+  --set cluster.serviceCIDRs=10.152.184.0/24 \
+  --set cluster.nodeVIP4Prefix=10.2.0. \
+  --set tunnel.endpoints=kubernetes.io/hostname=worker-1
+```
 
-- **Never route a peer's own endpoint through the tunnel.** The
-  encrypted packet's outer destination is that address, so it matches
-  the same route and re-encapsulates forever (observed at line rate).
-  Endpoints are read from the live device as well as config, because a
-  listener's peers have no configured endpoint — it learns theirs by
-  roaming.
-- **Prune routes, don't just add them.** A route that becomes wrong (a
-  removed peer, an address later revealed as an endpoint) must be
-  removed, or it keeps looping or blackholing.
-- **Validate the whole peer set before touching the kernel**, and
-  install a peer's routes only once that peer is viable (it has an
-  endpoint, or a handshake proves the path). A route to a peer
-  WireGuard cannot send to is a blackhole.
+Or from a checkout: `helm install cloud-provisioning ./charts/cloud-provisioning -f values.yaml`
+(run `helm dependency update ./charts/cloud-provisioning` first if you
+enable the Cluster API subchart).
 
-The asymmetry matters: internal nodes (behind NAT, not WAN-reachable)
-always DIAL; the remote only LISTENS and learns their addresses by
-roaming.
+Required values (the chart fails at render if missing): `cluster.apiAddress`,
+`cluster.apiVIP`, `cluster.podCIDRs`, `cluster.serviceCIDRs`,
+`cluster.nodeVIP4Prefix`.
 
-## How a claim becomes a node
+Values worth knowing:
 
-1. **Claim** — `ProvisionedNodeClaim` is committed (gitops). The claim
-   reconciler resolves the CAPI Cluster, routes fulfillment to the
-   provider owning its infrastructure, resolves `requests` to the
-   smallest satisfying instance type from the provider's catalog, and
-   creates the `Machine` (+ provider machine) with ownerRefs — deleting
-   the claim cascades all the way to instance termination.
-2. **Bootstrap** — the join reconciler renders cloud-init from
-   `join-patterns/k0s-worker.cloud-config.tmpl` into the Machine-owned
-   bootstrap Secret: a pinned-sha256 dialer binary download, the
-   WireGuard listener unit (unique `cldt<hash>` interface, never `wg0`),
-   a frozen peer snapshot, and a short-TTL k0s join token. CAPA launches
-   the instance only once this Secret exists. The userdata tunnel is the
-   ONLY way the node can ever join; cloud-init gates `k0s install
-   worker` behind API-VIP reachability through it.
-3. **Mesh** — on-prem dialer pods (scheduled by the controller onto
-   selector-chosen Linux workers; control-plane nodes are excluded — the
-   remote side of a tunnel never lands on a controller) self-generate
-   their keypairs, publish public keys through the API, and dial out to
-   the instance's public endpoint, which the controller mirrors from
-   `Machine.status.addresses`. Remotes also peer with each other
-   (fully connected mesh; isolated remotes share no LAN).
-4. **Adoption** — post-join, the cloud DaemonSet runs the same dialer
-   binary against a controller-rendered, public-data-only peer Secret,
-   re-derived from live cluster state — how peer/CIDR corrections reach
-   a node whose userdata is immutable. The bootstrap systemd unit is
-   never disabled (the can't-strand-the-node floor).
-5. **Network** — Calico peers BGP across the `cldt*` link and pod/
-   service traffic flows. Drop the cluster's Calico MTU to ~1420 to fit
-   under WireGuard overhead.
+| Value | Why |
+|---|---|
+| `tunnel.endpoints` | Node selector for which local nodes terminate tunnels. Empty = every Linux worker; control planes are always excluded unless named. This is the blast radius. |
+| `dialerBinary.<arch>.url` / `.sha256` | First-boot binary for the remote (it has no image puller before it joins). A URL without its sha is refused. |
+| `cniPlugins.<arch>.url` / `.sha256` | Needed when the cluster's CNI config chains plugins a stock cloud image lacks (e.g. `bandwidth`). |
+| `cluster-api-operator.enabled` | Optional subchart. Prefer a separate release: coupling the lifecycles lets a failed upgrade here delete the provider namespaces. |
+
+Cluster API must be installed (core + an infrastructure provider). Its
+own controllers need `deployment.nodeSelector` on the Provider CRs if
+the cluster has Windows nodes — the upstream manifests carry no OS
+selector.
+
+## Prerequisites
+
+- A CAPI `Cluster` + provider cluster pair for the target cluster,
+  annotated `cluster.x-k8s.io/managed-by: external`, with
+  `status.initialization.controlPlaneInitialized` patched true.
+- A provider config Secret (`aws-provider-config`: `ami-<arch>`,
+  `subnet-id`, `security-group-ids`, `public-ip`), and provider
+  credentials in the provider's own manager namespace.
+- The security group must allow inbound UDP 51820 from the cluster's
+  egress address.
+
+## How it works
+
+1. **Claim** → the CAPI `Machine` + provider machine pair, instance type
+   resolved from `requests` (smallest fit) or taken from `instanceType`.
+2. **Bootstrap** → cloud-init brings up the tunnel and gates the join on
+   the API being reachable *through* it. This is the only way the node
+   can join, and the systemd unit is never disabled: it is the floor
+   that keeps the node reachable.
+3. **Adoption** → after joining, a DaemonSet feeds the same dialer a
+   live peer list from an in-cluster Secret, so peer and CIDR changes
+   reach a node whose userdata is immutable. It also installs its own
+   binary onto the host, making the image the upgrade channel.
+4. **Network** → Calico peers BGP across the tunnel and distributes pod
+   routes. Set the cluster's Calico MTU to ~1420.
+
+## The routing invariant
+
+The tunnel provides **node-to-node reachability only**. The dialer's
+kernel routes are host routes (`/32`, `/128`) to peer node addresses —
+anything broader is refused at parse time. Pod and service CIDRs go
+only into WireGuard's cryptokey accept-list (AllowedIPs), which is a
+packet filter, not a route source. Routing to pods is Calico's job.
+
+Three rules follow, each found by a live failure:
+
+- Never route a peer's own endpoint through the tunnel — the encrypted
+  packet's outer destination matches the same route and re-encapsulates
+  forever (observed at line rate).
+- Prune routes, don't only add them, or a route that becomes wrong
+  keeps blackholing.
+- Install a peer's routes only once it is reachable (endpoint known or
+  handshake seen); a route to an unreachable peer is a blackhole.
+
+Direction matters: internal nodes always dial out, the remote only
+listens and learns their addresses by roaming.
 
 ## Layout
 
 ```
-controller/             Go module: endpoint-controller (claim + join +
-                        mesh reconcilers) and the dialer
-                        (netlink/wgctrl, no shelling out)
-controller/pkg/join/    the two seams, one package per specialization:
-                        k0s + kubeadm (ClusterJoinProvider), aws + docker
-                        (InfraProvider/MachineProvisioner). Each keeps
-                        its own knobs in its own provider-config Secret
-controller/pkg/tunnel/  the shared wire contract: Secret key schema,
-                        peers-file shape, cldt* interface naming
-join-patterns/          versioned cloud-init templates, one per join
-                        mechanism — rendered by the join reconciler,
-                        never hand-typed
-manifests/wg-dialer/    reference deploy: CRD, RBAC (derived from code),
-                        controller Deployment, claim example
-manifests/cluster/      the externally-managed Cluster/AWSCluster pair a
-                        claim resolves against
-harness/netns-routing/  single-NIC routing e2e for the real dialer in
-                        network namespaces (fast; the safety invariants)
-harness/kind-e2e/       run-live.sh: ONE claim becomes a real second node
-                        on a kind cluster via CAPD + kubeadm, over a real
-                        tunnel, and one delete removes it. run.sh: the
-                        same declarative fan-out against shim CRDs
-harness/vm-single-nic/  real single-NIC VM (containerlab + vrnetlab),
-                        real k0s, real boot/reboot — see its README
-scripts/aws/            one-time IAM bootstrap for the least-privilege
-                        harness identity
+controller/            endpoint-controller (claim + join + mesh) and the dialer
+controller/pkg/join/   one package per specialization: k0s, kubeadm (join);
+                       aws, docker (fulfillment)
+join-patterns/         cloud-init templates, one per join mechanism
+charts/                the Helm chart
+harness/netns-routing/ single-NIC routing e2e for the dialer
+harness/kind-e2e/      one claim -> a real joined node over a real tunnel
+harness/vm-single-nic/ real VM, real boot/reboot
 ```
 
 ## Verification
 
-- `controller/`: `go test ./...` — includes the routing invariants
-  (parse-time refusal of any non-host kernel route, endpoints never
-  routed through their own tunnel), mesh derivation, claim expansion
-  and teardown, and join rendering against fakes.
-- `harness/kind-e2e/run-live.sh`: the whole contract on a real API
-  server, through the product's own abstractions — one claim becomes a
-  real kubeadm-joined node over a real WireGuard tunnel, and one delete
-  removes it. **WAN reachability is asserted at every phase on every
-  node**: the failure this project exists to prevent is a tunnel
-  costing a node its default route, and checking only at the end cannot
-  tell "never broke" from "broke and recovered". Requires kind,
-  clusterctl and docker; the assertions run inside each node's netns
-  with host tools, since the node image ships neither `wg` nor `ping`
-  (an assertion that shells into the node for those silently passes on
-  empty output — it did, once).
-- `controller/pkg/join/aws`: real-AWS integration tests (skipped without
-  EC2-capable credentials): the instance-type catalog is verified
-  against `DescribeInstanceTypes`, and the rendered AWSMachine spec is
-  proven launchable by actually running (and terminating) a tagged
-  t4g.nano — same tag-scoped identity conventions as
-  `scripts/aws/bootstrap-harness-iam.sh`.
-- `harness/vm-single-nic/`: a real, single-NIC Ubuntu VM (real
-  QEMU/KVM systemd/PID1 boot, real k0s via k0sctl) running the
-  production dialer binary. Single-NIC by design: multi-NIC rigs hide
-  exactly the routing mistakes this project exists to prevent. This is
-  the level that exists because the the on-prem host incident's mechanism —
-  kubelet resurrecting a stale DaemonSet pod faster than any
-  reconcile-based fix can intervene — needs a real init system and a
-  real kubelet to reproduce at all.
-
-Historical simulation harnesses (netns scripts, containernet, the
-wg-pullup shell dialer, aws-bringup) were retired with the E1/E2-era
-code they tested: the shell dialer and the hand-rendered join path no
-longer exist, and the safety property they probed for is now a
-parse-time invariant with unit tests instead of a live RED control.
-
-## History
-
-The first deployment attempt (the cluster, 2026-07) ended with a route
-hijack: a hardcoded `AllowedIPs=0.0.0.0/0,::/0` fed into a kernel-route
-loop installed a default route via the tunnel on the on-prem node. The
-redesign makes that class impossible rather than discouraged: AllowedIPs
-and kernel routes are separate inputs end to end, and the dialer refuses
-any kernel route broader than a single host at parse time.
+`go test ./...` covers the routing invariants, mesh derivation, claim
+expansion and teardown. `harness/kind-e2e/run-live.sh` proves the whole
+contract on a real API server: one claim becomes a kubeadm-joined node
+over a real tunnel, and one delete removes it — with WAN reachability
+asserted at every phase on every node, because the failure this project
+exists to prevent is a tunnel costing a node its default route.

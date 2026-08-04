@@ -441,8 +441,10 @@ TUNNEL_ADDR=$(kubectl -n "$NS" get machine public-worker \
 until_ok 120 sh -c "kubectl get node $CLOUD_NODE -o jsonpath='{.metadata.annotations.projectcalico\.org/IPv4Address}' | grep -q ." \
   || fail "Calico was never told the node's address"
 CALICO_ADDR=$(kubectl get node "$CLOUD_NODE" -o jsonpath='{.metadata.annotations.projectcalico\.org/IPv4Address}')
-[ "$CALICO_ADDR" = "$TUNNEL_ADDR/32" ] \
-  || fail "Calico address is $CALICO_ADDR, want the tunnel address $TUNNEL_ADDR/32"
+# Calico normalises the prefix length to what the address carries on
+# the interface, so the address is what matters here.
+[ "${CALICO_ADDR%%/*}" = "$TUNNEL_ADDR" ] \
+  || fail "Calico peers on $CALICO_ADDR, want the tunnel address $TUNNEL_ADDR"
 # Nothing may have created a second address for the node to be found on.
 node_netns "$NODE_CONTAINER" ip link show vip0 >/dev/null 2>&1 \
   && fail "a dummy vip0 interface exists; the node should carry no invented address"

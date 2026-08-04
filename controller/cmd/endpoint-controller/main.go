@@ -544,6 +544,17 @@ func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tun
 	if strings.Contains(tunnelAddr, ":") {
 		key, want = calicoIPv6Annotation, tunnelAddr+"/128"
 	}
+	// Calico rewrites this with the prefix length the address actually
+	// carries on the interface, so only the address is compared. Fixing
+	// the mask back every pass would be a fight with the thing being
+	// configured.
+	if existing := node.Annotations[key]; existing != "" &&
+		strings.SplitN(existing, "/", 2)[0] == tunnelAddr {
+		if claim == "" || node.Annotations[claimpkg.ClaimAnnotation] == claim {
+			return nil
+		}
+		want = existing
+	}
 	// The claim is recorded here too, so its teardown can find the
 	// Node it produced. A Node is cluster-scoped and a claim is not, so
 	// an ownerReference cannot express this.

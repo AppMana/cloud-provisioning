@@ -171,3 +171,66 @@ func TestRemotePeers_EncapsulatedCarriesHostsOnly(t *testing.T) {
 		}
 	}
 }
+
+// Two remotes on different clouds share no network, so the only thing
+// that makes them mutually reachable is an edge between them. Each
+// remote's own view of the mesh has to carry the other as a peer, with
+// that other's addresses and blocks and with an endpoint to dial, or
+// the two are joined to the same cluster and invisible to each other.
+func TestRemotePeers_RemotesReachEachOther(t *testing.T) {
+	data := peerSecret(
+		map[string][2]string{"worker-1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"}},
+		map[string]string{"worker-1": "10.244.1.0/26"},
+	)
+	// Two machines, as the mesh reconciler publishes them.
+	for _, m := range []struct{ name, key, endpoint, addr, block string }{
+		{"cloud-1", "ddddddddddddddddddddddddddddddddddddddddddD=", "203.0.113.10:51820", "10.100.0.128", "10.244.123.128/26"},
+		{"cloud-2", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeE=", "198.51.100.20:51820", "10.100.0.129", "10.244.231.192/26"},
+	} {
+		data[PeerPublicKeyPrefix+m.name] = []byte(m.key)
+		data[PeerEndpointPrefix+m.name] = []byte(m.endpoint)
+		data[PeerRouteHostsPrefix+m.name] = []byte(m.addr)
+		data[PeerAllowedIPsPrefix+m.name] = []byte(HostCIDR(m.addr) + "," + m.block)
+	}
+
+	// From cloud-1's side.
+	peers, err := RemotePeers(data, "10.100.0.128", nil)
+	if err != nil {
+		t.Fatalf("RemotePeers: %v", err)
+	}
+	var other *PeerSpec
+	for i := range peers {
+		if peers[i].PublicKey == "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeE=" {
+			other = &peers[i]
+		}
+		if peers[i].PublicKey == "ddddddddddddddddddddddddddddddddddddddddddD=" {
+			t.Error("a remote carries itself as a peer")
+		}
+	}
+	if other == nil {
+		t.Fatal("the other remote is absent, so the two cannot reach each other at all")
+	}
+	// An endpoint, because neither is behind the other's NAT: each has
+	// to be able to dial the other directly.
+	if other.Endpoint != "198.51.100.20:51820" {
+		t.Errorf("the other remote has no endpoint to dial: %q", other.Endpoint)
+	}
+	var hasAddr, hasBlock bool
+	for _, cidr := range other.WGAllowedIPs {
+		switch cidr {
+		case "10.100.0.129/32":
+			hasAddr = true
+		case "10.244.231.192/26":
+			hasBlock = true
+		}
+	}
+	if !hasAddr {
+		t.Errorf("the other remote's address is not permitted: %v", other.WGAllowedIPs)
+	}
+	if !hasBlock {
+		t.Errorf("the other remote's pods are not permitted: %v", other.WGAllowedIPs)
+	}
+	if !containsHost(other.AllRouteHosts(), "10.100.0.129") {
+		t.Errorf("no route to the other remote: %v", other.AllRouteHosts())
+	}
+}

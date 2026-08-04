@@ -17,7 +17,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 REPO_DIR="$(cd ../.. && pwd)"
-CLUSTER=cldt-live
+# One cluster per scenario, so two runs cannot delete each other's:
+# they share a name by default, and a run's teardown has taken another
+# run's cluster with it more than once.
+CLUSTER="${CLUSTER:-cldt-live}"
 # The release namespace, and the names the chart derives from it.
 NS=cloud-provisioning
 PEER_SECRET="$NS-peers"
@@ -46,7 +49,7 @@ case "$CNI" in
   cilium)       WANT_ENCAP=native ;;
   *) echo "unknown CNI $CNI (calico, calico-vxlan, cilium)" >&2; exit 2 ;;
 esac
-LOG_DIR="${LOG_DIR:-$(mktemp -d /tmp/cldt-live-e2e.XXXXXX)}"
+LOG_DIR="${LOG_DIR:-$(mktemp -d "/tmp/${CLUSTER}-e2e.XXXXXX")}"
 
 CONTROLLER_PID=""
 cleanup() {

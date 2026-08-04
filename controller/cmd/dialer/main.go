@@ -128,7 +128,7 @@ func main() {
 	flag.StringVar(&cfg.iface, "iface", "", "WireGuard interface name to create/manage (required; unique per mesh, e.g. cldt1a2b3c4d: never wg0, which collides with whatever the node already runs)")
 	flag.IntVar(&cfg.listenPort, "listen-port", 0, "fixed WireGuard listen port (0 = ephemeral, fine for a node that only dials out; a listener must set this)")
 	flag.IntVar(&cfg.keepaliveSecs, "keepalive-seconds", 15, "PersistentKeepalive interval")
-	flag.IntVar(&cfg.mtu, "mtu", 1420, "interface MTU (WireGuard overhead under the cluster's normal MTU)")
+	flag.IntVar(&cfg.mtu, "mtu", 0, "interface MTU. 0 derives it from the interface carrying the default route, less WireGuard's overhead, which is what a correct value is")
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 30*time.Second, "how often to re-read the peer source and re-apply")
 	flag.StringVar(&cfg.transitMasqueradeSource, "transit-masquerade-source", "", "optional tunnel-subnet CIDR: enable forwarding + masquerade for tunnel-sourced traffic leaving this node toward cluster addresses that have no tunnel (transit role)")
 	flag.StringVar(&cfg.installHostBinary, "install-host-binary", "", "optional host path to keep equal to this process's own executable (atomic replace, only when the digest differs): the post-join upgrade channel: the container image carries the binary, so the node's systemd unit converges onto it without any download host")
@@ -226,6 +226,120 @@ func main() {
 			return
 		}
 	}
+}
+
+// ensureForwardingPath makes this node able to carry traffic that is
+// neither from nor to a workload on it, which is what a tunnel endpoint
+// is for. Three things have to hold, and all three were previously
+// assumed.
+//
+// Reverse path filtering is the first. A packet arriving on the tunnel
+// carries a source address that the endpoint reaches through that same
+// tunnel, so strict mode accepts it; but a site with two endpoints has
+// traffic that legitimately arrives one way and returns another, and
+// strict mode drops exactly that. Loose mode asks only that the source
+// be reachable somehow, which is the question worth asking here.
+//
+// TCP segment size is the second. See underlayMTU for why the "packet
+// too big" path cannot be relied on: the endpoint would have to signal
+// a pod on a node it does not control. Clamping the advertised segment
+// size on the handshake means the far end never sends one too large, so
+// nothing has to be signalled at all.
+//
+// Forwarding itself is the third, and is handled by ensureTransit.
+//
+// A drop from any of these looks exactly like a missing route from the
+// outside, which is the reason to set them rather than infer them from
+// a passing test.
+func ensureForwardingPath(iface string, mtu int) error {
+	// Loose rather than off: a packet whose source this node cannot
+	// reach at all is still not one it should be forwarding.
+	rp := fmt.Sprintf("/proc/sys/net/ipv4/conf/%s/rp_filter", iface)
+	if current, err := os.ReadFile(rp); err == nil && strings.TrimSpace(string(current)) == "1" {
+		if err := os.WriteFile(rp, []byte("2"), 0o644); err != nil {
+			return fmt.Errorf("relaxing reverse path filtering on %s: %w", iface, err)
+		}
+	}
+
+	c, err := nftables.New()
+	if err != nil {
+		return fmt.Errorf("opening nftables: %w", err)
+	}
+	defer c.CloseLasting()
+
+	table := c.AddTable(&nftables.Table{Family: nftables.TableFamilyIPv4, Name: "cldt-mss-" + iface})
+	c.FlushTable(table)
+	prio := *nftables.ChainPriorityFilter
+	chain := c.AddChain(&nftables.Chain{
+		Name:     "forward",
+		Table:    table,
+		Type:     nftables.ChainTypeFilter,
+		Hooknum:  nftables.ChainHookForward,
+		Priority: &prio,
+	})
+
+	// The segment size the far end may send, once the headers it will
+	// be wrapped in are accounted for.
+	mss := uint16(mtu - 40)
+	// Both directions: a session crossing the tunnel has one endpoint
+	// on either side, and each has to be told.
+	for _, key := range []expr.MetaKey{expr.MetaKeyIIFNAME, expr.MetaKeyOIFNAME} {
+		name := make([]byte, 16)
+		copy(name, iface)
+		c.AddRule(&nftables.Rule{
+			Table: table,
+			Chain: chain,
+			Exprs: []expr.Any{
+				&expr.Meta{Key: key, Register: 1},
+				&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: name},
+				&expr.Meta{Key: expr.MetaKeyL4PROTO, Register: 1},
+				&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte{unix.IPPROTO_TCP}},
+				// Only the handshake carries the option to rewrite.
+				&expr.Payload{DestRegister: 1, Base: expr.PayloadBaseTransportHeader, Offset: 13, Len: 1},
+				&expr.Bitwise{SourceRegister: 1, DestRegister: 1, Len: 1, Mask: []byte{0x06}, Xor: []byte{0x00}},
+				&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte{0x02}},
+				&expr.Immediate{Register: 1, Data: []byte{byte(mss >> 8), byte(mss)}},
+				&expr.Exthdr{SourceRegister: 1, Type: 2, Offset: 2, Len: 2, Op: expr.ExthdrOpTcpopt},
+			},
+		})
+	}
+	if err := c.Flush(); err != nil {
+		return fmt.Errorf("clamping the segment size on %s: %w", iface, err)
+	}
+	return nil
+}
+
+// wireGuardOverhead is what an encapsulated packet costs: 40 bytes of
+// IPv6 header (20 for IPv4, so this is the safe one to assume for a
+// mesh that may carry either), 8 of UDP, and 32 of WireGuard's own.
+const wireGuardOverhead = 80
+
+// underlayMTU sizes the tunnel from the interface that carries the
+// default route, since that is what the encapsulated packets leave by.
+//
+// Getting this wrong is not a broken tunnel, which is why it is worth
+// deriving rather than assuming. A tunnel one byte too large works for
+// every small packet and stalls on the first large one, and it stalls
+// in the place hardest to see: the endpoint forwards for nodes that are
+// two hops away, so the "packet too big" it must send goes back to a
+// pod it does not host, on a node it does not control.
+func underlayMTU() int {
+	const fallback = 1500 - wireGuardOverhead
+	routes, err := netlink.RouteList(nil, netlink.FAMILY_V4)
+	if err != nil {
+		return fallback
+	}
+	for _, route := range routes {
+		if route.Dst != nil || route.LinkIndex == 0 {
+			continue // not the default route
+		}
+		link, err := netlink.LinkByIndex(route.LinkIndex)
+		if err != nil || link.Attrs().MTU == 0 {
+			continue
+		}
+		return link.Attrs().MTU - wireGuardOverhead
+	}
+	return fallback
 }
 
 // removeDevice deletes the tunnel interface, taking its addresses and
@@ -470,6 +584,10 @@ func publishNodeInfo(ctx context.Context, clientset *kubernetes.Clientset, cfg c
 // its address, and brings it up. Called every reconcile pass
 // (idempotent, self-healing if the address is removed from under it).
 func ensureLink(cfg config, localAddress string) error {
+	mtu := cfg.mtu
+	if mtu == 0 {
+		mtu = underlayMTU()
+	}
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
 		if !isLinkNotFound(err) {
@@ -477,7 +595,7 @@ func ensureLink(cfg config, localAddress string) error {
 		}
 		attrs := netlink.NewLinkAttrs()
 		attrs.Name = cfg.iface
-		attrs.MTU = cfg.mtu
+		attrs.MTU = mtu
 		wgLink := &netlink.GenericLink{LinkAttrs: attrs, LinkType: "wireguard"}
 		if err := netlink.LinkAdd(wgLink); err != nil {
 			return fmt.Errorf("creating %s: %w", cfg.iface, err)
@@ -496,7 +614,11 @@ func ensureLink(cfg config, localAddress string) error {
 		return fmt.Errorf("assigning %s to %s: %w", localAddress, cfg.iface, err)
 	}
 
-	if err := netlink.LinkSetMTU(link, cfg.mtu); err != nil {
+	if err := ensureForwardingPath(cfg.iface, mtu); err != nil {
+		return err
+	}
+
+	if err := netlink.LinkSetMTU(link, mtu); err != nil {
 		return fmt.Errorf("setting MTU on %s: %w", cfg.iface, err)
 	}
 	if err := netlink.LinkSetUp(link); err != nil {

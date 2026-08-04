@@ -41,7 +41,15 @@ spec:
           image: {{ include "cloud-provisioning.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
+            {{- /* Every name the controller creates or looks up at
+            runtime is stated here, so it matches what this chart
+            actually created rather than whatever the binary happens to
+            default to. */}}
             - "--secret-namespace={{ .Release.Namespace }}"
+            - "--secret-name={{ include "cloud-provisioning.name" . }}-peers"
+            - "--dialer-service-account={{ include "cloud-provisioning.name" . }}"
+            - "--dialer-daemonset-name={{ include "cloud-provisioning.name" . }}-dialer"
+            - "--dialer-cloud-daemonset-name={{ include "cloud-provisioning.name" . }}-dialer-remote"
             - "--aws-config-namespace={{ .Release.Namespace }}"
             - "--owner-deployment={{ include "cloud-provisioning.controllerName" . }}"
             - "--dialer-image={{ include "cloud-provisioning.dialerImage" . }}"

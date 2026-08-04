@@ -8,7 +8,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -149,5 +151,61 @@ func TestServiceCIDRReadFromAllocatorRejection(t *testing.T) {
 	}
 	if got != "10.96.0.0/12" {
 		t.Fatalf("got %q, want 10.96.0.0/12", got)
+	}
+}
+
+// A cluster can carry several pools, and a pod may be allocated from
+// any of the enabled ones, so every enabled pool has to reach the
+// accept list. A disabled pool allocates nothing and must not.
+func TestPodCIDRsCollectsEveryEnabledCalicoPool(t *testing.T) {
+	pools := &unstructured.UnstructuredList{}
+	pools.SetGroupVersionKind(schema.GroupVersionKind{
+		Group: "crd.projectcalico.org", Version: "v1", Kind: "IPPoolList",
+	})
+	for _, p := range []struct {
+		name     string
+		cidr     string
+		disabled bool
+	}{
+		{"default-ipv4-ippool", "10.244.0.0/16", false},
+		{"second-ipv4-ippool", "10.245.0.0/16", false},
+		{"default-ipv6-ippool", "fd00:10:244::/56", false},
+		{"retired-ippool", "10.240.0.0/16", true},
+	} {
+		item := unstructured.Unstructured{Object: map[string]any{
+			"apiVersion": "crd.projectcalico.org/v1",
+			"kind":       "IPPool",
+			"metadata":   map[string]any{"name": p.name},
+			"spec":       map[string]any{"cidr": p.cidr, "disabled": p.disabled},
+		}}
+		pools.Items = append(pools.Items, item)
+	}
+
+	s := runtime.NewScheme()
+	_ = scheme.AddToScheme(s)
+	s.AddKnownTypeWithName(schema.GroupVersionKind{
+		Group: "crd.projectcalico.org", Version: "v1", Kind: "IPPoolList",
+	}, &unstructured.UnstructuredList{})
+	s.AddKnownTypeWithName(schema.GroupVersionKind{
+		Group: "crd.projectcalico.org", Version: "v1", Kind: "IPPool",
+	}, &unstructured.Unstructured{})
+	objs := make([]client.Object, 0, len(pools.Items))
+	for i := range pools.Items {
+		objs = append(objs, &pools.Items[i])
+	}
+	c := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
+
+	got, err := podCIDRsFromCalico(context.Background(), c)
+	if err != nil {
+		t.Fatalf("podCIDRsFromCalico: %v", err)
+	}
+	want := map[string]bool{"10.244.0.0/16": true, "10.245.0.0/16": true, "fd00:10:244::/56": true}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want the three enabled pools", got)
+	}
+	for _, cidr := range got {
+		if !want[cidr] {
+			t.Errorf("%s is not an enabled pool", cidr)
+		}
 	}
 }

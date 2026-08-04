@@ -35,6 +35,14 @@ rules:
   - apiGroups: ["cluster.x-k8s.io"]
     resources: ["clusters"]
     verbs: ["get", "list"]
+  # A Cluster annotated managed-by: external gets no status from
+  # Cluster API's own controllers, and Machines block until it has
+  # one. This controller is that external manager, so it reports the
+  # status instead of an operator running `kubectl patch` after every
+  # install.
+  - apiGroups: ["cluster.x-k8s.io"]
+    resources: ["clusters/status"]
+    verbs: ["get", "patch"]
   # Provider machine objects: read (join reconciler waits on
   # existence), create (claim reconciler). CAPA cluster/identity
   # objects: read-only preflight (aws.Provider.Validate).
@@ -44,6 +52,10 @@ rules:
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
     resources: ["awsclusters", "awsclusterstaticidentities"]
     verbs: ["get"]
+  # Same reason as clusters/status above.
+  - apiGroups: ["infrastructure.cluster.x-k8s.io"]
+    resources: ["awsclusters/status", "dockerclusters/status"]
+    verbs: ["get", "patch"]
   # The claim CRD itself.
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodeclaims"]

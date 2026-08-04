@@ -51,6 +51,10 @@ spec:
             - "--dialer-daemonset-name={{ include "cloud-provisioning.name" . }}-dialer"
             - "--dialer-cloud-daemonset-name={{ include "cloud-provisioning.name" . }}-dialer-remote"
             - "--aws-config-namespace={{ .Release.Namespace }}"
+            {{- with .Values.transit.bgpPort }}
+            - "--transit-bgp-port={{ . }}"
+            - "--transit-bgp-asn={{ $.Values.transit.bgpASN }}"
+            {{- end }}
             - "--owner-deployment={{ include "cloud-provisioning.controllerName" . }}"
             - "--dialer-image={{ include "cloud-provisioning.dialerImage" . }}"
             - "--join-provider={{ .Values.joinProvider }}"

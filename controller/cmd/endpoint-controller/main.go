@@ -147,6 +147,10 @@ type meshReconciler struct {
 	// whether a peer needs pod prefixes at all and where they are read
 	// from. Re-detected when the network's own configuration changes.
 	network cni.Network
+	// transitBGPPort is where a tunnel endpoint's speaker listens, and
+	// zero when the site needs no transit.
+	transitBGPPort int
+	transitBGPASN  int
 
 	dialerCloudDaemonSetName string
 	dialerCloudListenPort    string
@@ -163,6 +167,14 @@ type meshReconciler struct {
 
 // owners returns the ownerReference list to stamp on everything this
 // controller creates, so an uninstall garbage-collects it.
+// firstAddress is the address the rest of the site reaches a node by.
+func firstAddress(addresses []string) string {
+	if len(addresses) == 0 {
+		return ""
+	}
+	return addresses[0]
+}
+
 func (r *meshReconciler) owners() []metav1.OwnerReference {
 	if r.ownerRef == nil {
 		return nil
@@ -435,6 +447,10 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 		for _, prefix := range prefixes {
 			texts = append(texts, prefix.String())
 		}
+		if err := r.ensureTransitPeering(ctx, node.Name, firstAddress(addresses)); err != nil {
+			return err
+		}
+
 		podKey := tunnel.NodePodCIDRsPrefix + node.Name
 		joinedPods := strings.Join(texts, ",")
 		if string(secret.Data[podKey]) != joinedPods {
@@ -556,6 +572,71 @@ const (
 // reach by construction, and the one the dialer installs a host route
 // for. Autodetection on the node itself cannot know that, so the choice
 // is stated here rather than guessed there.
+// ensureTransitPeering tells the rest of the site to peer with the
+// speaker a tunnel endpoint runs, so it can learn which remote nodes are
+// reachable through that endpoint.
+//
+// The peering is on the speaker's own port, because the node's CNI is
+// already using 179. Only nodes other than the endpoint itself take it:
+// the endpoint has the tunnel and needs telling by nobody.
+//
+// This is Calico's way of being told. A network that speaks no routing
+// protocol has nothing to configure here, and gets host routes instead.
+func (r *meshReconciler) ensureTransitPeering(ctx context.Context, endpoint string, addr string) error {
+	if r.transitBGPPort == 0 || r.network.Name != cni.Calico || addr == "" {
+		return nil
+	}
+	name := "cloud-provisioning-transit-" + endpoint
+	peer := &unstructured.Unstructured{}
+	peer.SetGroupVersionKind(schema.GroupVersionKind{
+		Group: "crd.projectcalico.org", Version: "v1", Kind: "BGPPeer",
+	})
+	peer.SetName(name)
+	spec := map[string]any{
+		"peerIP":   fmt.Sprintf("%s:%d", addr, r.transitBGPPort),
+		"asNumber": int64(r.transitBGPASN),
+		// Every node but the endpoint. The selector is Calico's own
+		// syntax, not a Kubernetes label selector.
+		"nodeSelector": fmt.Sprintf("kubernetes.io/hostname != '%s'", endpoint),
+	}
+	if err := unstructured.SetNestedMap(peer.Object, spec, "spec"); err != nil {
+		return err
+	}
+	peer.SetOwnerReferences(r.owners())
+
+	existing := &unstructured.Unstructured{}
+	existing.SetGroupVersionKind(peer.GroupVersionKind())
+	err := r.reader.Get(ctx, types.NamespacedName{Name: name}, existing)
+	if apierrors.IsNotFound(err) {
+		if err := r.Create(ctx, peer); err != nil && !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("creating the transit peering for %s: %w", endpoint, err)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("reading the transit peering for %s: %w", endpoint, err)
+	}
+	if existingSpec, _, _ := unstructured.NestedMap(existing.Object, "spec"); equalSpec(existingSpec, spec) {
+		return nil
+	}
+	existing.Object["spec"] = spec
+	if err := r.Update(ctx, existing); err != nil {
+		return fmt.Errorf("updating the transit peering for %s: %w", endpoint, err)
+	}
+	return nil
+}
+
+// equalSpec compares the fields this controller sets, leaving anything
+// else on the object alone.
+func equalSpec(existing, want map[string]any) bool {
+	for k, v := range want {
+		if fmt.Sprint(existing[k]) != fmt.Sprint(v) {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tunnelAddr, claim string) error {
 	if nodeName == "" || tunnelAddr == "" {
 		return nil
@@ -755,6 +836,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 							},
 							Env: []corev1.EnvVar{
 								{Name: "NODE_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"}}},
+								{Name: "NODE_IP", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"}}},
 							},
 							Args: []string{
 								fmt.Sprintf("--secret-namespace=%s", r.secretNamespace),
@@ -762,6 +844,12 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 								fmt.Sprintf("--iface=%s", r.ifaceName),
 								fmt.Sprintf("--private-key-file=%s/private.key", r.dialerPrivateKeyDir),
 								fmt.Sprintf("--transit-masquerade-source=%s", r.tunnelSubnet),
+								// Advertising the remote nodes to the rest of
+								// the site. The next hop is this node itself,
+								// which is where their traffic has to arrive.
+								fmt.Sprintf("--transit-bgp-port=%d", r.transitBGPPort),
+								fmt.Sprintf("--transit-bgp-asn=%d", r.transitBGPASN),
+								"--transit-bgp-next-hop=$(NODE_IP)",
 								"--keepalive-seconds=15",
 								"--mtu=1420",
 								"--poll-interval=30s",
@@ -978,6 +1066,8 @@ func main() {
 		dialerImagePullSecret     string
 		dialerCloudDaemonSetName  string
 		dialerCloudImage          string
+		transitBGPPort            int
+		transitBGPASN             int
 		ownerDeployment           string
 		dialerCloudHostBinary     string
 		dialerBinaryURLARM64      string
@@ -1006,6 +1096,8 @@ func main() {
 	flag.StringVar(&dialerServiceAccount, "dialer-service-account", "cloud-provisioning-dialer", "ServiceAccount the dialer DaemonSet's pods run as")
 	flag.StringVar(&dialerImage, "dialer-image", "", "REQUIRED image for the dialer DaemonSets, pinned by digest (tag@sha256:...). Deliberately has no default: a stale built-in default once pointed at a pre-hardening build")
 	flag.StringVar(&dialerImagePullSecret, "dialer-image-pull-secret", "", "optional imagePullSecret for the dialer DaemonSets; leave empty when the images are publicly pullable. Naming a Secret that does not exist makes every pod on every endpoint node log a pull-secret warning, so this defaults to none")
+	flag.IntVar(&transitBGPPort, "transit-bgp-port", 0, "port for the speaker each tunnel endpoint runs, telling the rest of the site which remote nodes are reachable through it. 0 leaves it off, which is right when every node that needs a remote terminates a tunnel of its own. Not 179: a node whose CNI speaks BGP is already there")
+	flag.IntVar(&transitBGPASN, "transit-bgp-asn", 64512, "autonomous system for that speaker; match the cluster's own")
 	flag.StringVar(&ownerDeployment, "owner-deployment", "", "this controller's own Deployment name; everything it creates at runtime (both DaemonSets, the peer and adoption Secrets) is owned by it, so an uninstall garbage-collects them instead of orphaning a tunnel interface on every endpoint node")
 	flag.StringVar(&dialerCloudImage, "dialer-cloud-image", "", "optional PUBLIC base image for the REMOTE node's DaemonSet, which then executes --dialer-cloud-host-binary instead of carrying its own. Use when the project image is not pullable on a remote node (no preload, no registry credential): without it the adoption DaemonSet ImagePullBackOffs and the node stays on its frozen bootstrap peer list forever")
 	flag.StringVar(&dialerCloudHostBinary, "dialer-cloud-host-binary", "/host-bin/wg-dialer", "path (inside the pod) of the host binary --dialer-cloud-image executes; the bootstrap already installed and sha-verified it")
@@ -1185,6 +1277,8 @@ func main() {
 
 			ownerRef:                 runtimeOwner,
 			network:                  network,
+			transitBGPPort:           transitBGPPort,
+			transitBGPASN:            transitBGPASN,
 			dialerCloudDaemonSetName: dialerCloudDaemonSetName,
 			dialerCloudListenPort:    dialerListenPort,
 			dialerCloudImage:         dialerCloudImage,

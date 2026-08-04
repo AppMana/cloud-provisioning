@@ -69,3 +69,58 @@ func TestInfraMachine_MissingNodeImage_IsAnError(t *testing.T) {
 		t.Fatal("expected an error when node-image is unset")
 	}
 }
+
+func TestInfraMachine_ExtraMountsAndPreloadImages(t *testing.T) {
+	// A local node container has no registry and no credentials, so
+	// locally-built images reach it only via CAPD's preload; the
+	// mounts are how a binary reaches it without a download server.
+	scheme := k8sruntime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		t.Fatalf("adding clientgoscheme: %v", err)
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(&corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "docker-provider-config", Namespace: "wg-dialer"},
+		Data: map[string][]byte{
+			"node-image":     []byte("kindest/node:v1.34.0"),
+			"extra-mounts":   []byte("/host/dist:/opt/dialer-dist, /host/other:/opt/other"),
+			"preload-images": []byte("cldt-dialer:e2e, other:tag"),
+		},
+	}).Build()
+	p := Provider{ConfigNamespace: "wg-dialer", ConfigName: "docker-provider-config"}
+
+	obj, err := p.InfraMachine(context.Background(), c, "default", "docker", join.NodeRequest{})
+	if err != nil {
+		t.Fatalf("InfraMachine: %v", err)
+	}
+	mounts, _, _ := unstructured.NestedSlice(obj.Object, "spec", "extraMounts")
+	if len(mounts) != 2 {
+		t.Fatalf("extraMounts = %v, want 2", mounts)
+	}
+	first := mounts[0].(map[string]any)
+	if first["hostPath"] != "/host/dist" || first["containerPath"] != "/opt/dialer-dist" || first["readOnly"] != true {
+		t.Errorf("first mount = %v, want /host/dist -> /opt/dialer-dist read-only", first)
+	}
+	images, _, _ := unstructured.NestedStringSlice(obj.Object, "spec", "preLoadImages")
+	if len(images) != 2 || images[0] != "cldt-dialer:e2e" {
+		t.Errorf("preLoadImages = %v, want both entries trimmed", images)
+	}
+}
+
+func TestInfraMachine_MalformedExtraMount_IsAnError(t *testing.T) {
+	scheme := k8sruntime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		t.Fatalf("adding clientgoscheme: %v", err)
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(&corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "docker-provider-config", Namespace: "wg-dialer"},
+		Data: map[string][]byte{
+			"node-image":   []byte("kindest/node:v1.34.0"),
+			"extra-mounts": []byte("/host/dist"),
+		},
+	}).Build()
+	p := Provider{ConfigNamespace: "wg-dialer", ConfigName: "docker-provider-config"}
+
+	if _, err := p.InfraMachine(context.Background(), c, "default", "docker", join.NodeRequest{}); err == nil {
+		t.Fatal("expected an error for an extra-mounts entry without a container path")
+	}
+}

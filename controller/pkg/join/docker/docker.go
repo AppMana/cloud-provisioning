@@ -30,10 +30,21 @@ import (
 // ConfigNamespace/ConfigName point at this provider's cluster-level
 // config Secret (the aws-provider-config pattern). Keys:
 //
-//	node-image -- REQUIRED: the kind node image to launch (e.g.
-//	              kindest/node:v1.33.1). Must match the control
-//	              plane's version closely enough for kubeadm's skew
-//	              policy.
+//	node-image   -- REQUIRED: the kind node image to launch (e.g.
+//	                kindest/node:v1.33.1). Must match the control
+//	                plane's version closely enough for kubeadm's skew
+//	                policy.
+//	extra-mounts -- optional comma-separated hostPath:containerPath
+//	                read-only mounts. This is how a local e2e delivers
+//	                the dialer binary deterministically (a file:// URL
+//	                into a mounted directory) instead of standing up a
+//	                download server with all its lifecycle problems.
+//	preload-images -- optional comma-separated image references CAPD
+//	                loads into the node from the host's own daemon.
+//	                A real cloud node pulls from a registry; a local
+//	                container has no credentials and no registry, so
+//	                this is how locally-built images (the dialer
+//	                DaemonSet's) reach it.
 type Provider struct {
 	ConfigNamespace string
 	ConfigName      string
@@ -78,11 +89,35 @@ func (p Provider) InfraMachine(ctx context.Context, c client.Reader, namespace, 
 		return nil, fmt.Errorf("docker provider config %s/%s has no node-image", p.ConfigNamespace, p.ConfigName)
 	}
 
-	obj := &unstructured.Unstructured{Object: map[string]any{
-		"spec": map[string]any{
-			"customImage": nodeImage,
-		},
-	}}
+	spec := map[string]any{
+		"customImage": nodeImage,
+	}
+	if raw := strings.TrimSpace(string(cfg.Data["extra-mounts"])); raw != "" {
+		var mounts []any
+		for _, m := range strings.Split(raw, ",") {
+			parts := strings.SplitN(strings.TrimSpace(m), ":", 2)
+			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+				return nil, fmt.Errorf("docker provider config extra-mounts entry %q is not hostPath:containerPath", m)
+			}
+			mounts = append(mounts, map[string]any{
+				"hostPath":      parts[0],
+				"containerPath": parts[1],
+				"readOnly":      true,
+			})
+		}
+		spec["extraMounts"] = mounts
+	}
+	if raw := strings.TrimSpace(string(cfg.Data["preload-images"])); raw != "" {
+		var images []any
+		for _, img := range strings.Split(raw, ",") {
+			if img = strings.TrimSpace(img); img != "" {
+				images = append(images, img)
+			}
+		}
+		spec["preLoadImages"] = images
+	}
+
+	obj := &unstructured.Unstructured{Object: map[string]any{"spec": spec}}
 	obj.SetGroupVersionKind(gvk)
 	obj.SetNamespace(namespace)
 	return obj, nil

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -124,10 +125,32 @@ func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
 		return nil, fmt.Errorf("encoding join token: %w", err)
 	}
 
+	apiEndpoint, err := hostPort(p.APIAddress)
+	if err != nil {
+		return nil, err
+	}
+
 	return map[string]any{
 		"joinToken":  joinToken,
 		"k0sVersion": k0sVersion,
+		// apiEndpoint is the common contract every join pattern gates
+		// on before joining: the host:port a new node must actually
+		// reach.
+		"apiEndpoint": apiEndpoint,
 	}, nil
+}
+
+// hostPort extracts "host:port" from the API address URL.
+func hostPort(apiAddress string) (string, error) {
+	u, err := url.Parse(apiAddress)
+	if err != nil || u.Host == "" {
+		return "", fmt.Errorf("APIAddress %q is not a URL with a host", apiAddress)
+	}
+	host := u.Host
+	if u.Port() == "" {
+		host += ":6443"
+	}
+	return host, nil
 }
 
 // clusterCACert reads the cluster CA from the kube-root-ca.crt

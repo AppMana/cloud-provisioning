@@ -36,11 +36,14 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -94,6 +97,17 @@ type config struct {
 	// interfaces. Scoped to exactly that subnet; never touches other
 	// traffic.
 	transitMasqueradeSource string
+
+	// installHostBinary, when set, is a host path this process keeps
+	// equal to its OWN executable. It is how the bootstrap-era
+	// download stops mattering: a remote node's first binary must come
+	// from a URL (nothing else exists before it joins), but once the
+	// node IS a cluster member, the container image is the
+	// distribution channel -- digest-pinned, gitops-controlled,
+	// rolling. The DaemonSet copy installs itself onto the host, so
+	// upgrading the fleet is bumping one image digest, never a
+	// download host, a re-render, or a per-node binary swap.
+	installHostBinary string
 }
 
 func main() {
@@ -114,6 +128,7 @@ func main() {
 	flag.IntVar(&cfg.mtu, "mtu", 1420, "interface MTU (WireGuard overhead under the cluster's normal MTU)")
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 30*time.Second, "how often to re-read the peer source and re-apply")
 	flag.StringVar(&cfg.transitMasqueradeSource, "transit-masquerade-source", "", "optional tunnel-subnet CIDR: enable forwarding + masquerade for tunnel-sourced traffic leaving this node toward cluster addresses that have no tunnel (transit role)")
+	flag.StringVar(&cfg.installHostBinary, "install-host-binary", "", "optional host path to keep equal to this process's own executable (atomic replace, only when the digest differs) -- the post-join upgrade channel: the container image carries the binary, so the node's systemd unit converges onto it without any download host")
 	flag.Parse()
 
 	usingSecret := cfg.secretNamespace != "" || cfg.secretName != ""
@@ -159,6 +174,15 @@ func main() {
 		}
 	}
 
+	if cfg.installHostBinary != "" {
+		if err := installHostBinary(cfg.installHostBinary); err != nil {
+			// Never fatal: the tunnel this process maintains matters
+			// more than the host copy being current, and a read-only
+			// or absent mount must not take the mesh down.
+			fmt.Fprintf(os.Stderr, "installing host binary at %s: %v\n", cfg.installHostBinary, err)
+		}
+	}
+
 	wg, err := wgctrl.New()
 	if err != nil {
 		fatal("unable to open wgctrl: %v", err)
@@ -179,6 +203,71 @@ func main() {
 func fatal(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, format+"\n", args...)
 	os.Exit(1)
+}
+
+// installHostBinary keeps a host path equal to this process's own
+// executable, replacing it atomically and only when the contents
+// actually differ.
+//
+// This is the hand-off that ends the bootstrap URL's relevance. A
+// remote node's FIRST binary has to come from a download (nothing else
+// exists before it joins), but from then on the DaemonSet's image --
+// digest-pinned in gitops, rolled out by Kubernetes -- carries the
+// binary, and this copies it onto the host for the systemd unit that
+// is the can't-strand-the-node floor. Upgrading the fleet becomes
+// bumping one image digest: no download host to keep alive, no
+// re-rendered userdata (which is immutable anyway), no per-node
+// intervention, and no version skew between the containerized dialer
+// and the host one.
+//
+// Rename, never write-in-place: the target is typically executing, and
+// the kernel refuses to open a running executable for writing
+// (ETXTBSY). Rename swaps the directory entry instead; the running
+// process keeps its inode until it restarts.
+func installHostBinary(target string) error {
+	self, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolving own executable: %w", err)
+	}
+	selfSum, err := fileSHA256(self)
+	if err != nil {
+		return err
+	}
+	if targetSum, err := fileSHA256(target); err == nil && targetSum == selfSum {
+		return nil
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	data, err := os.ReadFile(self)
+	if err != nil {
+		return fmt.Errorf("reading own executable: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return err
+	}
+	tmp := filepath.Join(filepath.Dir(target), "."+filepath.Base(target)+".new")
+	if err := os.WriteFile(tmp, data, 0o755); err != nil {
+		return fmt.Errorf("writing %s: %w", tmp, err)
+	}
+	if err := os.Rename(tmp, target); err != nil {
+		os.Remove(tmp)
+		return fmt.Errorf("installing %s: %w", target, err)
+	}
+	return nil
+}
+
+func fileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // loadOrGeneratePrivateKey returns the node's WireGuard private key,

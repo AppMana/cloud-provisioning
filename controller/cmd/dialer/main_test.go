@@ -209,3 +209,63 @@ func TestPrivateKeyFile_GeneratePersistRoundTrip(t *testing.T) {
 		t.Error("private key was not persisted: second load generated a different key")
 	}
 }
+
+func TestInstallHostBinary_AtomicAndIdempotent(t *testing.T) {
+	// The post-join upgrade channel: the DaemonSet's image carries the
+	// binary and installs it onto the host, so a fleet upgrade is one
+	// image digest -- no download host, no re-rendered userdata.
+	dir := t.TempDir()
+	target := filepath.Join(dir, "sub", "wg-dialer")
+
+	if err := installHostBinary(target); err != nil {
+		t.Fatalf("installHostBinary (fresh): %v", err)
+	}
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable: %v", err)
+	}
+	selfSum, err := fileSHA256(self)
+	if err != nil {
+		t.Fatalf("hashing self: %v", err)
+	}
+	installed, err := fileSHA256(target)
+	if err != nil {
+		t.Fatalf("hashing installed: %v", err)
+	}
+	if installed != selfSum {
+		t.Error("installed binary does not match this executable")
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if info.Mode().Perm()&0o111 == 0 {
+		t.Errorf("installed binary mode %v is not executable", info.Mode().Perm())
+	}
+
+	// Idempotent: an unchanged target must not be rewritten (same
+	// inode), so a steady-state DaemonSet restart never churns the
+	// binary the systemd unit is executing.
+	before, _ := os.Stat(target)
+	if err := installHostBinary(target); err != nil {
+		t.Fatalf("installHostBinary (repeat): %v", err)
+	}
+	after, _ := os.Stat(target)
+	if !os.SameFile(before, after) {
+		t.Error("unchanged binary was replaced anyway -- must be a no-op when digests match")
+	}
+
+	// A stale copy is replaced.
+	if err := os.WriteFile(target, []byte("stale"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := installHostBinary(target); err != nil {
+		t.Fatalf("installHostBinary (stale): %v", err)
+	}
+	if got, _ := fileSHA256(target); got != selfSum {
+		t.Error("stale binary was not replaced")
+	}
+	if entries, _ := os.ReadDir(filepath.Dir(target)); len(entries) != 1 {
+		t.Errorf("temp install artifacts left behind: %v", entries)
+	}
+}

@@ -637,6 +637,13 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 								// (cloud-init wrote it), never a per-node flag
 								// baked into this template.
 								"--machine-name-file=/etc/wg-dialer/machine-name",
+								// The image becomes the upgrade channel once the
+								// node has joined: this copy installs itself over
+								// the host binary the bootstrap unit runs, so a
+								// fleet upgrade is one digest bump in gitops and
+								// the download URL only ever mattered at first
+								// boot.
+								"--install-host-binary=/host-bin/wg-dialer",
 								fmt.Sprintf("--listen-port=%s", r.dialerCloudListenPort),
 								fmt.Sprintf("--pod-cidrs=%s", r.dialerPodCIDRs),
 								fmt.Sprintf("--service-cidrs=%s", r.dialerServiceCIDRs),
@@ -646,6 +653,7 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{Name: "wg-dialer-config", MountPath: "/etc/wg-dialer", ReadOnly: true},
+								{Name: "host-bin", MountPath: "/host-bin"},
 							},
 						},
 					},
@@ -654,6 +662,12 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 							Name: "wg-dialer-config",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{Path: "/etc/wg-dialer", Type: &hostPathDirectory},
+							},
+						},
+						{
+							Name: "host-bin",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/usr/local/bin", Type: &hostPathDirectory},
 							},
 						},
 					},

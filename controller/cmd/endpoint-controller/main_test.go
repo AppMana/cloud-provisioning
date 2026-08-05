@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // The selector that says which nodes terminate a tunnel becomes the
@@ -91,5 +92,35 @@ func TestParseSelectorRequirements(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// "all" means every node at this site, not every node in the cluster.
+//
+// A node this operator provisioned is on the far side of a tunnel. It
+// is addressed by its tunnel address, because that is the only address
+// the site can reach it by, and it already reaches the mesh as a peer.
+// Counting it as one of the site's own ends gives it a contradictory
+// second identity: measured, its address was pinned to the one the
+// site cannot reach it by, and the tunnel address the mesh had
+// assigned was overwritten.
+func TestIsTunnelEndpoint_NeverAProvisionedNode(t *testing.T) {
+	provisioned := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+		Name:   "public-worker",
+		Labels: map[string]string{"kubernetes.io/os": "linux", cloudWorkerRoleLabel: cloudWorkerRoleValue},
+	}}
+	site := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+		Name:   "worker",
+		Labels: map[string]string{"kubernetes.io/os": "linux"},
+	}}
+
+	for _, raw := range []string{"all", "*", ""} {
+		r := &meshReconciler{tunnelEndpointsRaw: raw}
+		if r.isTunnelEndpoint(provisioned) {
+			t.Errorf("selector %q counted a provisioned node as one of the site's tunnel endpoints", raw)
+		}
+		if !r.isTunnelEndpoint(site) {
+			t.Errorf("selector %q did not count an ordinary site node", raw)
+		}
 	}
 }

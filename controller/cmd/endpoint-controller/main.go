@@ -542,6 +542,16 @@ func (r *meshReconciler) isTunnelEndpoint(node *corev1.Node) bool {
 	if node.Labels["kubernetes.io/os"] == "windows" {
 		return false
 	}
+	// A node this operator provisioned is on the far side of a tunnel,
+	// never one of the site's ends of it. It reaches the mesh as a peer
+	// and is addressed by its tunnel address, so counting it here would
+	// give it a second, contradictory identity: a site dialer, and its
+	// own address pinned to the one the site cannot reach it by.
+	// "all" means every node at this site, not every node in the
+	// cluster, and an empty selector means the same.
+	if node.Labels[cloudWorkerRoleLabel] == cloudWorkerRoleValue {
+		return false
+	}
 	if _, isCP := node.Labels[controlPlaneLabel]; isCP && !selectorNamesControlPlane(r.tunnelEndpointsRaw) {
 		return false
 	}

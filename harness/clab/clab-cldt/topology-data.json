@@ -5,11 +5,12 @@
     "config": {
       "prefix": "clab",
       "mgmt": {
-        "network": "cldt-mgmt",
-        "bridge": "br-68aeb000d2f4",
-        "ipv4-subnet": "172.30.30.0/24",
-        "ipv4-gw": "172.30.30.1",
-        "ipv6-gw": "fe80::281a:68ff:fe1f:3b2",
+        "network": "clab",
+        "bridge": "br-f5148a42e622",
+        "ipv4-subnet": "172.20.20.0/24",
+        "ipv4-gw": "172.20.20.1",
+        "ipv6-subnet": "3fff:172:20:20::/64",
+        "ipv6-gw": "3fff:172:20:20::1",
         "external-access": true
       }
     }
@@ -27,13 +28,13 @@
       "image": "kindest/node:v1.34.0",
       "mgmt-net": "",
       "mgmt-intf": "",
-      "mgmt-ipv4-address": "172.30.30.9",
-      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
       "mgmt-ipv6-address": "",
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "linux",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/bastion",
@@ -64,7 +65,7 @@
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "bridge",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cldt-cloud-a",
@@ -95,7 +96,7 @@
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "bridge",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cldt-cloud-b",
@@ -126,7 +127,7 @@
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "bridge",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cldt-lan",
@@ -157,7 +158,7 @@
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "bridge",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cldt-wan",
@@ -182,13 +183,13 @@
       "image": "kindest/node:v1.34.0",
       "mgmt-net": "",
       "mgmt-intf": "",
-      "mgmt-ipv4-address": "172.30.30.8",
-      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
       "mgmt-ipv6-address": "",
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "linux",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cp",
@@ -213,13 +214,13 @@
       "image": "kindest/node:v1.34.0",
       "mgmt-net": "",
       "mgmt-intf": "",
-      "mgmt-ipv4-address": "172.30.30.4",
-      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
       "mgmt-ipv6-address": "",
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "linux",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/edge-a",
@@ -244,13 +245,13 @@
       "image": "kindest/node:v1.34.0",
       "mgmt-net": "",
       "mgmt-intf": "",
-      "mgmt-ipv4-address": "172.30.30.6",
-      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
       "mgmt-ipv6-address": "",
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "linux",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/edge-b",
@@ -275,13 +276,13 @@
       "image": "kindest/node:v1.34.0",
       "mgmt-net": "",
       "mgmt-intf": "",
-      "mgmt-ipv4-address": "172.30.30.7",
-      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
       "mgmt-ipv6-address": "",
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "linux",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/remote1",
@@ -306,13 +307,13 @@
       "image": "kindest/node:v1.34.0",
       "mgmt-net": "",
       "mgmt-intf": "",
-      "mgmt-ipv4-address": "172.30.30.5",
-      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
       "mgmt-ipv6-address": "",
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "linux",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/remote2",
@@ -337,13 +338,13 @@
       "image": "kindest/node:v1.34.0",
       "mgmt-net": "",
       "mgmt-intf": "",
-      "mgmt-ipv4-address": "172.30.30.10",
-      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
       "mgmt-ipv6-address": "",
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "linux",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/router",
@@ -368,13 +369,13 @@
       "image": "kindest/node:v1.34.0",
       "mgmt-net": "",
       "mgmt-intf": "",
-      "mgmt-ipv4-address": "172.30.30.3",
-      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
       "mgmt-ipv6-address": "",
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "linux",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/w1",
@@ -399,13 +400,13 @@
       "image": "kindest/node:v1.34.0",
       "mgmt-net": "",
       "mgmt-intf": "",
-      "mgmt-ipv4-address": "172.30.30.2",
-      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
       "mgmt-ipv6-address": "",
       "mgmt-ipv6-prefix-length": 0,
       "mac-address": "",
       "labels": {
-        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
         "clab-node-group": "",
         "clab-node-kind": "linux",
         "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/w2",
@@ -426,13 +427,13 @@
         "a": {
           "node": "router",
           "interface": "eth1",
-          "mac": "aa:c1:ab:71:75:f7",
+          "mac": "aa:c1:ab:e0:70:5f",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-router",
-          "mac": "aa:c1:ab:c6:bb:8e",
+          "mac": "aa:c1:ab:bd:8f:06",
           "peer": "a"
         }
       }
@@ -442,13 +443,13 @@
         "a": {
           "node": "bastion",
           "interface": "eth1",
-          "mac": "aa:c1:ab:1f:af:dc",
+          "mac": "aa:c1:ab:d2:12:90",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-bastion",
-          "mac": "aa:c1:ab:c3:ae:38",
+          "mac": "aa:c1:ab:b5:1d:71",
           "peer": "a"
         }
       }
@@ -458,13 +459,13 @@
         "a": {
           "node": "cp",
           "interface": "eth1",
-          "mac": "aa:c1:ab:24:b7:00",
+          "mac": "aa:c1:ab:51:10:1e",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-cp",
-          "mac": "aa:c1:ab:e5:6e:99",
+          "mac": "aa:c1:ab:63:e5:c3",
           "peer": "a"
         }
       }
@@ -474,13 +475,13 @@
         "a": {
           "node": "w1",
           "interface": "eth1",
-          "mac": "aa:c1:ab:fc:86:67",
+          "mac": "aa:c1:ab:0e:c1:e2",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-w1",
-          "mac": "aa:c1:ab:6b:d1:44",
+          "mac": "aa:c1:ab:4a:10:f2",
           "peer": "a"
         }
       }
@@ -490,13 +491,13 @@
         "a": {
           "node": "w2",
           "interface": "eth1",
-          "mac": "aa:c1:ab:7e:5b:4e",
+          "mac": "aa:c1:ab:f6:41:d0",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-w2",
-          "mac": "aa:c1:ab:5f:58:96",
+          "mac": "aa:c1:ab:32:96:68",
           "peer": "a"
         }
       }
@@ -506,13 +507,13 @@
         "a": {
           "node": "router",
           "interface": "eth2",
-          "mac": "aa:c1:ab:ea:a5:9b",
+          "mac": "aa:c1:ab:ba:16:71",
           "peer": "z"
         },
         "z": {
           "node": "cldt-wan",
           "interface": "wan-router",
-          "mac": "aa:c1:ab:32:15:d5",
+          "mac": "aa:c1:ab:7b:49:f2",
           "peer": "a"
         }
       }
@@ -522,13 +523,13 @@
         "a": {
           "node": "edge-a",
           "interface": "eth2",
-          "mac": "aa:c1:ab:5f:9f:f0",
+          "mac": "aa:c1:ab:01:3a:fe",
           "peer": "z"
         },
         "z": {
           "node": "cldt-wan",
           "interface": "wan-edge-a",
-          "mac": "aa:c1:ab:e4:ed:88",
+          "mac": "aa:c1:ab:d6:98:ac",
           "peer": "a"
         }
       }
@@ -538,13 +539,13 @@
         "a": {
           "node": "edge-b",
           "interface": "eth2",
-          "mac": "aa:c1:ab:64:66:7a",
+          "mac": "aa:c1:ab:8b:be:21",
           "peer": "z"
         },
         "z": {
           "node": "cldt-wan",
           "interface": "wan-edge-b",
-          "mac": "aa:c1:ab:da:c3:29",
+          "mac": "aa:c1:ab:1a:d0:27",
           "peer": "a"
         }
       }
@@ -554,13 +555,13 @@
         "a": {
           "node": "edge-a",
           "interface": "eth1",
-          "mac": "aa:c1:ab:a9:c1:c0",
+          "mac": "aa:c1:ab:29:5d:30",
           "peer": "z"
         },
         "z": {
           "node": "cldt-cloud-a",
           "interface": "a-edge",
-          "mac": "aa:c1:ab:06:fa:3c",
+          "mac": "aa:c1:ab:0f:b2:c7",
           "peer": "a"
         }
       }
@@ -570,13 +571,13 @@
         "a": {
           "node": "remote1",
           "interface": "eth1",
-          "mac": "aa:c1:ab:48:92:cb",
+          "mac": "aa:c1:ab:35:6c:d7",
           "peer": "z"
         },
         "z": {
           "node": "cldt-cloud-a",
           "interface": "a-remote1",
-          "mac": "aa:c1:ab:c7:01:fb",
+          "mac": "aa:c1:ab:3f:ba:90",
           "peer": "a"
         }
       }
@@ -586,13 +587,13 @@
         "a": {
           "node": "edge-b",
           "interface": "eth1",
-          "mac": "aa:c1:ab:20:e6:21",
+          "mac": "aa:c1:ab:fc:62:d6",
           "peer": "z"
         },
         "z": {
           "node": "cldt-cloud-b",
           "interface": "b-edge",
-          "mac": "aa:c1:ab:1d:d6:a0",
+          "mac": "aa:c1:ab:bc:32:7f",
           "peer": "a"
         }
       }
@@ -602,13 +603,13 @@
         "a": {
           "node": "remote2",
           "interface": "eth1",
-          "mac": "aa:c1:ab:f8:36:e5",
+          "mac": "aa:c1:ab:e7:26:d1",
           "peer": "z"
         },
         "z": {
           "node": "cldt-cloud-b",
           "interface": "b-remote2",
-          "mac": "aa:c1:ab:51:d6:90",
+          "mac": "aa:c1:ab:4d:78:59",
           "peer": "a"
         }
       }

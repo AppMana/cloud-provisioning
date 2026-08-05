@@ -23,44 +23,44 @@ bastion:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.9
+    hostname: 
 cp:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.8
+    hostname: 
 edge-a:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.4
+    hostname: 
 edge-b:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.6
+    hostname: 
 remote1:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.7
+    hostname: 
 remote2:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.5
+    hostname: 
 router:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.10
+    hostname: 
 w1:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.3
+    hostname: 
 w2:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.2
+    hostname: 

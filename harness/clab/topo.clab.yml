@@ -32,14 +32,21 @@
 # segment addresses only.
 name: cldt
 
-mgmt:
-  network: cldt-mgmt
-  ipv4-subnet: 172.30.30.0/24
-
 topology:
   kinds:
     linux:
       image: kindest/node:v1.34.0
+      # No management network. containerlab attaches every node to one by
+      # default, which joins the site and both clouds on a single L2: a
+      # remote then reaches the control plane whatever the routers say,
+      # and the isolation this topology exists to model is not real. It
+      # also hands each node a second address to register, which a real
+      # instance does not have, so kubelet chose the wrong one.
+      #
+      # A node here has the interfaces its segments give it and nothing
+      # else. The harness drives them with docker exec, which needs no
+      # address at all.
+      network-mode: none
 
   nodes:
     cldt-lan:

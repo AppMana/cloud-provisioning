@@ -650,9 +650,18 @@ func (r *meshReconciler) ensureTransitPeering(ctx context.Context, endpoint stri
 	spec := map[string]any{
 		"peerIP":   fmt.Sprintf("%s:%d", addr, r.transitBGPPort),
 		"asNumber": int64(r.transitBGPASN),
-		// Every node but the endpoint. The selector is Calico's own
-		// syntax, not a Kubernetes label selector.
-		"nodeSelector": fmt.Sprintf("kubernetes.io/hostname != '%s'", endpoint),
+		// Every node at this site but the endpoint itself. The
+		// selector is Calico's own syntax, not a Kubernetes label
+		// selector.
+		//
+		// A provisioned node is excluded, and must be: it reaches
+		// every site node over its own tunnels, and it cannot reach
+		// this speaker's port at all, so the session it was being told
+		// to open could only sit in Connect forever. Worse, it
+		// duplicates a peering the mesh already has, and a router
+		// keeps one session per neighbour, so the surviving one is
+		// whichever it picked rather than whichever works.
+		"nodeSelector": fmt.Sprintf("kubernetes.io/hostname != '%s' && %s != '%s'", endpoint, cloudWorkerRoleLabel, cloudWorkerRoleValue),
 	}
 	if err := unstructured.SetNestedMap(peer.Object, spec, "spec"); err != nil {
 		return err

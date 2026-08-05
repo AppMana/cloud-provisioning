@@ -254,8 +254,20 @@ func main() {
 func ensureForwardingPath(iface string, mtu int) error {
 	// Loose rather than off: a packet whose source this node cannot
 	// reach at all is still not one it should be forwarding.
-	if err := setSysctl(fmt.Sprintf("ipv4/conf/%s/rp_filter", iface), "2"); err != nil {
-		fmt.Fprintf(os.Stderr, "leaving reverse path filtering strict on %s (a return path through a second endpoint will be dropped): %v\n", iface, err)
+	//
+	// On every interface, not just this one. The asymmetry a tunnel
+	// creates is not confined to the tunnel: a node whose address is
+	// also the address a remote dials it at cannot have that address
+	// routed through the tunnel, because the encrypted packet would
+	// match its own route. So the remote reaches that node the direct
+	// way and the node replies through the tunnel, and the drop
+	// happens on the interface the traffic arrives on, which is the
+	// other one. The kernel takes the larger of the "all" value and
+	// the interface's, so setting "all" is what actually relaxes it.
+	for _, knob := range []string{"ipv4/conf/all/rp_filter", fmt.Sprintf("ipv4/conf/%s/rp_filter", iface)} {
+		if err := setSysctl(knob, "2"); err != nil {
+			fmt.Fprintf(os.Stderr, "leaving reverse path filtering strict at %s (a reply that returns by another path will be dropped): %v\n", knob, err)
+		}
 	}
 
 	c, err := nftables.New()

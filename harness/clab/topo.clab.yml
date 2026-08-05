@@ -1,23 +1,35 @@
-# Two segments that are actually two segments.
+# The site, two clouds, and the wan between them.
 #
-# The kind harness put every node on one bridge and simulated the
-# distance with routes and masquerading. That fake needed an exception
-# for the control plane, because the remote had to reach the API server
-# directly while it booted, and the exception is what produced most of
-# the failures worth chasing. A topology that needs an exception is not
-# modelling the thing.
+# Four separate L2 segments, not one bridge with routes pretending.
 #
-# Here the site is on lan and the remote is on wan, with no route
-# between them. The router masquerades traffic leaving the site and
-# forwards nothing inbound, so the site can open a connection outward
-# and the internet cannot open one in. That is the situation the
-# product exists for, so it is the one the harness should present.
+#   cldt-lan      the site: control plane and workers, private
+#   cldt-wan      the transit segment, standing in for the internet
+#   cldt-cloud-a  one cloud, one remote node with a public address
+#   cldt-cloud-b  another cloud, another remote
 #
-# Every node also has containerlab's management interface. That is how
-# the harness drives the test and nothing else: kubelet is told to use
-# the lan address, and the tunnel is built on lan and wan addresses, so
-# no part of the product sees the management network. The bring-up
-# proves that by asserting reachability against lan addresses only.
+# The three routers meet on the wan. The site's router masquerades what
+# leaves and forwards nothing in, so the site can open a connection
+# outward and nothing can open one to it. The cloud edges forward both
+# ways, because a node with a public address is reachable, which is the
+# whole reason a remote is put where it is.
+#
+# Two remotes sharing one bridge would be neighbours on a broadcast
+# domain, which is not two clouds. Here they reach each other across the
+# wan or not at all, so whether the mesh forms directly between them is
+# a question this topology can answer rather than one it presupposes.
+#
+# The kind harness put every node on a single bridge and simulated the
+# distance with host routes and masquerading. Simulating it meant it
+# could be bypassed, and it was: the remote had to reach the API server
+# directly while it booted, so the control plane was excluded from the
+# masquerade, and that exception produced most of the failures worth
+# chasing.
+#
+# Every node also has containerlab's management interface, which is how
+# the harness drives the test and nothing else. Kubelet is pinned to the
+# segment address and the tunnel is built on segment addresses, so no
+# part of the product sees it, and the assertions are written against
+# segment addresses only.
 name: cldt
 
 mgmt:
@@ -34,12 +46,21 @@ topology:
       kind: bridge
     cldt-wan:
       kind: bridge
+    cldt-cloud-a:
+      kind: bridge
+    cldt-cloud-b:
+      kind: bridge
 
-    # Two interfaces and no forwarding inward. The site's only way out.
+    # The site's edge. Anything may leave; nothing may arrive.
     router:
       kind: linux
+    # Each cloud's edge. A public address is reachable, both ways.
+    edge-a:
+      kind: linux
+    edge-b:
+      kind: linux
 
-    # The site. Nothing on wan can reach any of these.
+    # The cluster, all of it, at the site.
     cp:
       kind: linux
     w1:
@@ -47,18 +68,26 @@ topology:
     w2:
       kind: linux
 
-    # The far side, reachable from the site and unable to reach back
-    # except through a tunnel the site opened.
+    # One node in each cloud, so that they are in different clouds.
     remote1:
       kind: linux
     remote2:
       kind: linux
 
   links:
+    # the site
     - endpoints: ["router:eth1", "cldt-lan:lan-router"]
-    - endpoints: ["router:eth2", "cldt-wan:wan-router"]
     - endpoints: ["cp:eth1", "cldt-lan:lan-cp"]
     - endpoints: ["w1:eth1", "cldt-lan:lan-w1"]
     - endpoints: ["w2:eth1", "cldt-lan:lan-w2"]
-    - endpoints: ["remote1:eth1", "cldt-wan:wan-remote1"]
-    - endpoints: ["remote2:eth1", "cldt-wan:wan-remote2"]
+
+    # the wan, where the three edges meet
+    - endpoints: ["router:eth2", "cldt-wan:wan-router"]
+    - endpoints: ["edge-a:eth2", "cldt-wan:wan-edge-a"]
+    - endpoints: ["edge-b:eth2", "cldt-wan:wan-edge-b"]
+
+    # each cloud behind its own edge
+    - endpoints: ["edge-a:eth1", "cldt-cloud-a:a-edge"]
+    - endpoints: ["remote1:eth1", "cldt-cloud-a:a-remote1"]
+    - endpoints: ["edge-b:eth1", "cldt-cloud-b:b-edge"]
+    - endpoints: ["remote2:eth1", "cldt-cloud-b:b-remote2"]

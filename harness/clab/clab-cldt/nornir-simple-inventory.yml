@@ -1,4 +1,14 @@
 ---
+cldt-cloud-a:
+    username: 
+    password: 
+    platform: bridge
+    hostname: 
+cldt-cloud-b:
+    username: 
+    password: 
+    platform: bridge
+    hostname: 
 cldt-lan:
     username: 
     password: 
@@ -13,27 +23,37 @@ cp:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.2
-remote1:
+    hostname: 172.30.30.8
+edge-a:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.4
-remote2:
-    username: 
-    password: 
-    platform: linux
-    hostname: 172.30.30.3
-router:
-    username: 
-    password: 
-    platform: linux
-    hostname: 172.30.30.5
-w1:
+    hostname: 172.30.30.9
+edge-b:
     username: 
     password: 
     platform: linux
     hostname: 172.30.30.6
+remote1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.30.3
+remote2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.30.5
+router:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.30.4
+w1:
+    username: 
+    password: 
+    platform: linux
+    hostname: 172.30.30.2
 w2:
     username: 
     password: 

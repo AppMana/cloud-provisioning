@@ -7,6 +7,10 @@ all:
   children:
     bridge:
       hosts:
+        clab-cldt-cldt-cloud-a:
+          ansible_host: 
+        clab-cldt-cldt-cloud-b:
+          ansible_host: 
         clab-cldt-cldt-lan:
           ansible_host: 
         clab-cldt-cldt-wan:
@@ -14,14 +18,18 @@ all:
     linux:
       hosts:
         clab-cldt-cp:
-          ansible_host: 172.30.30.2
-        clab-cldt-remote1:
-          ansible_host: 172.30.30.4
-        clab-cldt-remote2:
-          ansible_host: 172.30.30.3
-        clab-cldt-router:
-          ansible_host: 172.30.30.5
-        clab-cldt-w1:
+          ansible_host: 172.30.30.8
+        clab-cldt-edge-a:
+          ansible_host: 172.30.30.9
+        clab-cldt-edge-b:
           ansible_host: 172.30.30.6
+        clab-cldt-remote1:
+          ansible_host: 172.30.30.3
+        clab-cldt-remote2:
+          ansible_host: 172.30.30.5
+        clab-cldt-router:
+          ansible_host: 172.30.30.4
+        clab-cldt-w1:
+          ansible_host: 172.30.30.2
         clab-cldt-w2:
           ansible_host: 172.30.30.7

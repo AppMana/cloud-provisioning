@@ -1,118 +1,123 @@
 #!/usr/bin/env bash
-# Bring up the two segments and prove they are two segments.
+# Bring up the four segments and prove they behave like four segments.
 #
-# Addresses, routes, and the one rule that makes the site a site: the
-# router masquerades what leaves and forwards nothing in. Then the
-# assertions, which run before anything is installed, because a
-# topology that does not isolate is not worth building a cluster on.
+# The assertions run before anything is installed, because a topology
+# that does not isolate makes every result taken on it meaningless.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-LAN_NET=10.10.0
-WAN_NET=203.0.113
 LAB=cldt
-
-# lan side
-declare -A LAN=( [router]=1 [cp]=10 [w1]=11 [w2]=12 )
-# wan side, addresses the site treats as public
-declare -A WAN=( [router]=1 [remote1]=10 [remote2]=11 )
+LAN=10.10.0        # the site, private
+WAN=198.51.100     # the transit segment, the internet
+CLOUD_A=203.0.113  # one cloud
+CLOUD_B=192.0.2    # another cloud
 
 c() { echo "clab-$LAB-$1"; }
 in_node() { docker exec "$(c "$1")" "${@:2}"; }
 
 # The node image ships no ping and no wg, so a reachability test run
-# with docker exec fails because the tool is missing and reads exactly
+# through docker exec fails because the tool is absent and reads exactly
 # like the network being broken. Enter the namespace and use the host's
-# tools instead: same packets, same interfaces, a result that means
-# what it says.
+# tools: same packets, same interfaces, a result that means what it says.
 netns() {
   local pid
   pid=$(docker inspect -f '{{.State.Pid}}' "$(c "$1")") || return 1
   sudo nsenter -t "$pid" -n "${@:2}"
 }
 reaches() { netns "$1" ping -c1 -W"${3:-3}" "$2" >/dev/null 2>&1; }
-
 fail() { echo "FAIL: $*" >&2; exit 1; }
+addr() {
+  in_node "$1" ip addr add "$2" dev "$3" 2>/dev/null || true
+  in_node "$1" ip link set "$3" up
+}
 
-echo "--- the two segments ---"
+echo "--- the segments ---"
 # containerlab attaches to bridges that already exist. They are given no
-# address on purpose: a host with an address on both would route between
-# them, and the isolation this harness asserts would be the assertion
-# being wrong rather than the topology being right.
-for br in cldt-lan cldt-wan; do
+# address on purpose: a host holding an address on two of them would
+# route between them, and the isolation asserted below would be the
+# assertion being wrong rather than the topology being right.
+for br in cldt-lan cldt-wan cldt-cloud-a cldt-cloud-b; do
   ip link show "$br" >/dev/null 2>&1 || sudo ip link add name "$br" type bridge
   sudo ip link set "$br" up
   sudo ip addr flush dev "$br" 2>/dev/null || true
 done
 
-echo "--- deploying the topology ---"
+echo "--- deploying ---"
 sudo containerlab deploy -t topo.clab.yml --reconfigure >/dev/null
 
 echo "--- addressing ---"
-for n in "${!LAN[@]}"; do
-  in_node "$n" ip addr add "$LAN_NET.${LAN[$n]}/24" dev eth1 2>/dev/null || true
-  in_node "$n" ip link set eth1 up
-done
-for n in "${!WAN[@]}"; do
-  dev=eth1; [ "$n" = router ] && dev=eth2
-  in_node "$n" ip addr add "$WAN_NET.${WAN[$n]}/24" dev "$dev" 2>/dev/null || true
-  in_node "$n" ip link set "$dev" up
-done
+addr router  "$LAN.1/24" eth1;      addr router "$WAN.1/24" eth2
+addr cp      "$LAN.10/24" eth1
+addr w1      "$LAN.11/24" eth1
+addr w2      "$LAN.12/24" eth1
+addr edge-a  "$CLOUD_A.1/24" eth1;  addr edge-a "$WAN.2/24" eth2
+addr edge-b  "$CLOUD_B.1/24" eth1;  addr edge-b "$WAN.3/24" eth2
+addr remote1 "$CLOUD_A.10/24" eth1
+addr remote2 "$CLOUD_B.10/24" eth1
 
-echo "--- the site's only way out ---"
-# Everything at the site leaves through the router, and leaves wearing
-# the router's address. Nothing is forwarded inward: there is no rule
-# admitting it and no route to send it by.
+echo "--- routing ---"
+for n in cp w1 w2; do in_node "$n" ip route replace default via "$LAN.1" dev eth1; done
+in_node remote1 ip route replace default via "$CLOUD_A.1" dev eth1
+in_node remote2 ip route replace default via "$CLOUD_B.1" dev eth1
+# The edges know how to reach each other's clouds across the wan. The
+# site's router needs no route back into the site from outside, because
+# nothing outside addresses anything inside.
+in_node router ip route replace "$CLOUD_A.0/24" via "$WAN.2" dev eth2
+in_node router ip route replace "$CLOUD_B.0/24" via "$WAN.3" dev eth2
+in_node edge-a ip route replace "$CLOUD_B.0/24" via "$WAN.3" dev eth2
+in_node edge-b ip route replace "$CLOUD_A.0/24" via "$WAN.2" dev eth2
+
+echo "--- what each edge does ---"
+# The site: anything may leave wearing the router's address, and only
+# the answer to something that left may come back. Masquerading alone is
+# not a site, because a router that forwards forwards inward too, which
+# is what the assertions caught the first time this was written.
 in_node router sysctl -qw net.ipv4.ip_forward=1
 in_node router iptables -t nat -F POSTROUTING
-in_node router iptables -t nat -A POSTROUTING -s "$LAN_NET.0/24" -o eth2 -j MASQUERADE
-
-# Masquerading alone is not a site. A router that forwards will happily
-# forward inward, and the far side walks straight in, which the
-# assertions below caught the first time this ran. What makes the site
-# private is the direction: anything may leave, and only the answer to
-# something that left may come back.
+in_node router iptables -t nat -A POSTROUTING -s "$LAN.0/24" -o eth2 -j MASQUERADE
 in_node router iptables -F FORWARD
 in_node router iptables -P FORWARD DROP
 in_node router iptables -A FORWARD -i eth1 -o eth2 -j ACCEPT
 in_node router iptables -A FORWARD -i eth2 -o eth1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# The clouds: a public address is reachable, which is the reason a
+# remote node is put in one. No translation, no filtering, both ways.
+for e in edge-a edge-b; do
+  in_node "$e" sysctl -qw net.ipv4.ip_forward=1
+  in_node "$e" iptables -F FORWARD
+  in_node "$e" iptables -P FORWARD ACCEPT
+done
+
+echo "--- proving it ---"
+
 for n in cp w1 w2; do
-  in_node "$n" ip route replace default via "$LAN_NET.1" dev eth1
+  reaches "$n" "$CLOUD_A.10" || fail "$n cannot reach cloud A, so the site has no way out"
+  reaches "$n" "$CLOUD_B.10" || fail "$n cannot reach cloud B, so the site has no way out"
 done
-# The remotes are on the far side and route to the site by nothing at
-# all. Their default is the wan segment, which is as far as it goes.
-for n in remote1 remote2; do
-  in_node "$n" ip route replace default via "$WAN_NET.1" dev eth1
-done
+echo "  the site reaches both clouds"
 
-echo "--- proving the two segments are two segments ---"
+# Different clouds, meeting only across the wan.
+reaches remote1 "$CLOUD_B.10" || fail "remote1 cannot reach remote2, so the clouds do not meet"
+reaches remote2 "$CLOUD_A.10" || fail "remote2 cannot reach remote1, so the clouds do not meet"
+echo "  the two clouds reach each other across the wan"
 
-# The site reaches the far side, because it opened the connection.
-for n in cp w1 w2; do
-  reaches "$n" "$WAN_NET.10" \
-    || fail "$n cannot reach the far side, so the site has no way out"
-done
-echo "  the site reaches the far side"
-
-# The far side reaches no address at the site. This is the property the
-# whole thing rests on, so it is asserted per node rather than sampled.
+# The property everything else rests on, per node and per cloud.
 for r in remote1 remote2; do
-  for n in cp w1 w2; do
-    if reaches "$r" "$LAN_NET.${LAN[$n]}" 2; then
-      fail "$r reached $n at $LAN_NET.${LAN[$n]}: the site is not private, and every result after this would be meaningless"
+  for n in cp:10 w1:11 w2:12; do
+    if reaches "$r" "$LAN.${n#*:}" 2; then
+      fail "$r reached ${n%%:*} at $LAN.${n#*:}: the site is not private, and every result after this is meaningless"
     fi
   done
 done
-echo "  the far side reaches no node at the site"
+echo "  neither cloud reaches any node at the site"
 
-# And cannot reach the API server's port even when it knows where to
-# look, which is the specific thing the previous harness had to allow.
-if netns remote1 timeout 3 bash -c "</dev/tcp/$LAN_NET.10/6443" 2>/dev/null; then
-  fail "remote1 opened a connection to the API server directly: the tunnel is not the only path, so joining over it is untested"
+if netns remote1 timeout 3 bash -c "</dev/tcp/$LAN.10/6443" 2>/dev/null; then
+  fail "remote1 opened a connection to the API server directly: a tunnel would not be the only way in, so joining over one stays untested"
 fi
-echo "  the far side cannot reach the API server except through a tunnel"
+echo "  neither cloud reaches the API server, so a tunnel is the only way in"
 
 echo
-echo "lan  $LAN_NET.0/24   cp .10  w1 .11  w2 .12   router .1"
-echo "wan  $WAN_NET.0/24   remote1 .10  remote2 .11  router .1"
-echo "the site leaves through the router and nothing comes back in"
+echo "site     $LAN.0/24      cp .10  w1 .11  w2 .12   router .1"
+echo "wan      $WAN.0/24      router .1  edge-a .2  edge-b .3"
+echo "cloud A  $CLOUD_A.0/24  remote1 .10"
+echo "cloud B  $CLOUD_B.0/24  remote2 .10"

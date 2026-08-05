@@ -53,6 +53,18 @@ func TestParseSelectorRequirements(t *testing.T) {
 			raw:   "this is not a selector",
 			empty: true,
 		},
+		{
+			// A label parser reads this as "the label all must exist",
+			// which places the DaemonSet on no node at all.
+			name:  "the every-node sentinel constrains nothing",
+			raw:   "all",
+			empty: true,
+		},
+		{
+			name:  "the other spelling of it",
+			raw:   "*",
+			empty: true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := parseSelectorRequirements(tc.raw)

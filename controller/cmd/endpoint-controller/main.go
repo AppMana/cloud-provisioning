@@ -1001,6 +1001,13 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 // (that is all a node placement selector needs here); anything else
 // is ignored rather than silently mis-scheduling.
 func parseSelectorRequirements(raw string) []corev1.NodeSelectorRequirement {
+	// "all" is this project's own word for every node, not a selector.
+	// A label parser reads it as "the label all must exist", which no
+	// node carries, so the DaemonSet would be scheduled nowhere and
+	// every node would look like it had simply declined to publish.
+	if isAllNodes(raw) {
+		return nil
+	}
 	// The same parser Kubernetes uses for a label selector, rather than
 	// splitting on commas: a set based term ("k in (a,b)") contains
 	// commas of its own, so splitting turns one requirement into two

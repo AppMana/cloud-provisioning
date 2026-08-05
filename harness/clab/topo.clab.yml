@@ -63,16 +63,26 @@ topology:
     # The cluster, all of it, at the site.
     cp:
       kind: linux
+      binds:
+        - var/cp:/var/lib/containerd
     w1:
       kind: linux
+      binds:
+        - var/w1:/var/lib/containerd
     w2:
       kind: linux
+      binds:
+        - var/w2:/var/lib/containerd
 
     # One node in each cloud, so that they are in different clouds.
     remote1:
       kind: linux
+      binds:
+        - var/remote1:/var/lib/containerd
     remote2:
       kind: linux
+      binds:
+        - var/remote2:/var/lib/containerd
 
   links:
     # the site

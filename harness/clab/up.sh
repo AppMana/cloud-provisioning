@@ -42,6 +42,29 @@ for br in cldt-lan cldt-wan cldt-cloud-a cldt-cloud-b; do
   sudo ip addr flush dev "$br" 2>/dev/null || true
 done
 
+# containerd cannot stack overlay on the container's own overlay, so
+# each node that runs containers gets its image store on a real
+# filesystem. kind gives its nodes a volume for the same reason.
+#
+# The store is seeded from the image rather than started empty. The node
+# image ships the cluster's own images inside that directory, and this
+# site has no route to a registry by design, so mounting an empty
+# directory over it leaves the node with working storage and nothing to
+# run out of it.
+NODE_IMAGE=$(awk '/image:/{print $2; exit}' topo.clab.yml)
+if [ ! -d var/seed/io.containerd.content.v1.content ]; then
+  echo "  seeding the image store from $NODE_IMAGE"
+  rm -rf var/seed && mkdir -p var/seed
+  seed=$(docker create "$NODE_IMAGE")
+  docker cp "$seed:/var/lib/containerd/." var/seed/ >/dev/null
+  docker rm -f "$seed" >/dev/null
+fi
+for n in cp w1 w2 remote1 remote2; do
+  [ -d "var/$n/io.containerd.content.v1.content" ] && continue
+  rm -rf "var/$n"; mkdir -p "var/$n"
+  sudo cp -a var/seed/. "var/$n/"
+done
+
 echo "--- deploying ---"
 sudo containerlab deploy -t topo.clab.yml --reconfigure >/dev/null
 

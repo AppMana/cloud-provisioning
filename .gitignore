@@ -12,3 +12,6 @@ harness/vm-single-nic/cfg/cloud-setup.sh
 # Vendored subchart archives: fetched by `helm dependency update` and
 # resolved by Chart.lock, not committed.
 charts/*/charts/*.tgz
+harness/clab/var/
+harness/clab/out/
+harness/clab/clab-cldt/

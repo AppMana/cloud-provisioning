@@ -23,39 +23,39 @@ cp:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.8
+    hostname: 172.30.30.5
 edge-a:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.9
+    hostname: 172.30.30.4
 edge-b:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.6
+    hostname: 172.30.30.7
 remote1:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.3
+    hostname: 172.30.30.9
 remote2:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.5
+    hostname: 172.30.30.2
 router:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.4
+    hostname: 172.30.30.3
 w1:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.2
+    hostname: 172.30.30.8
 w2:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.7
+    hostname: 172.30.30.6

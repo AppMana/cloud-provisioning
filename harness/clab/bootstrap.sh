@@ -17,6 +17,13 @@ cd "$(dirname "$0")"
 
 MACHINE="${1:?machine name}"
 CONTAINER="${2:?container}"
+# The address the site knows this machine by. A real instance has one
+# NIC and kubelet cannot choose wrongly; a lab node also carries
+# containerlab's management interface, and kubelet picked that, so the
+# node registered an address the site cannot reach. Pinning it is the
+# harness compensating for its own extra interface, not the product
+# needing to know about it.
+NODE_IP="${3:-}"
 NS="${NS:-cloud-provisioning}"
 LAB=cldt
 DIALER_DIR="${DIALER_DIR:-$PWD/out/binaries}"
@@ -77,6 +84,15 @@ for f in json.load(open("/tmp/cldt-writefiles.json")):
   in_node "$CONTAINER" chmod "$perms" "$path"
   echo "  $path ($perms)"
 done
+
+if [ -n "$NODE_IP" ]; then
+  # After write_files, because the bootstrap writes this file too and
+  # would otherwise overwrite the pin.
+  in_node "$CONTAINER" sh -c "sed -i 's/\\(KUBELET_EXTRA_ARGS=.*\\)/\\1 --node-ip=$NODE_IP/' /etc/default/kubelet 2>/dev/null || echo 'KUBELET_EXTRA_ARGS=--node-ip=$NODE_IP' >> /etc/default/kubelet"
+  in_node "$CONTAINER" grep -q -- "--node-ip=$NODE_IP" /etc/default/kubelet \
+    || fail "could not pin the node address to $NODE_IP"
+  echo "  registering as $NODE_IP"
+fi
 
 echo "--- runcmd ---"
 # In order, stopping on the first failure. A bootstrap that half ran is

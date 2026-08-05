@@ -1538,7 +1538,7 @@ func main() {
 			Complete(&claim.Reconciler{
 				Client:                    mgr.GetClient(),
 				Reader:                    mgr.GetAPIReader(),
-				Provisioners:              []join.MachineProvisioner{awsProvider, dockerProvider},
+				Provisioners:              []join.MachineProvisioner{awsProvider, dockerProvider, containernetProvider},
 				RoleLabel:                 cloudWorkerRoleLabel,
 				RoleValue:                 cloudWorkerRoleValue,
 				BootstrapSecretNameFormat: bootstrapSecretNameFormat,

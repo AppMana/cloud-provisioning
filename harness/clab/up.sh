@@ -42,6 +42,7 @@ for br in cldt-lan cldt-wan cldt-cloud-a cldt-cloud-b; do
   sudo ip addr flush dev "$br" 2>/dev/null || true
 done
 
+
 # containerd cannot stack overlay on the container's own overlay, so
 # each node that runs containers gets its image store on a real
 # filesystem. kind gives its nodes a volume for the same reason.
@@ -70,6 +71,7 @@ sudo containerlab deploy -t topo.clab.yml --reconfigure >/dev/null
 
 echo "--- addressing ---"
 addr router  "$LAN.1/24" eth1;      addr router "$WAN.1/24" eth2
+addr bastion "$LAN.2/24" eth1
 addr cp      "$LAN.10/24" eth1
 addr w1      "$LAN.11/24" eth1
 addr w2      "$LAN.12/24" eth1
@@ -79,7 +81,7 @@ addr remote1 "$CLOUD_A.10/24" eth1
 addr remote2 "$CLOUD_B.10/24" eth1
 
 echo "--- routing ---"
-for n in cp w1 w2; do in_node "$n" ip route replace default via "$LAN.1" dev eth1; done
+for n in bastion cp w1 w2; do in_node "$n" ip route replace default via "$LAN.1" dev eth1; done
 in_node remote1 ip route replace default via "$CLOUD_A.1" dev eth1
 in_node remote2 ip route replace default via "$CLOUD_B.1" dev eth1
 # The edges know how to reach each other's clouds across the wan. The
@@ -113,7 +115,7 @@ done
 
 echo "--- proving it ---"
 
-for n in cp w1 w2; do
+for n in bastion cp w1 w2; do
   reaches "$n" "$CLOUD_A.10" || fail "$n cannot reach cloud A, so the site has no way out"
   reaches "$n" "$CLOUD_B.10" || fail "$n cannot reach cloud B, so the site has no way out"
 done
@@ -126,7 +128,7 @@ echo "  the two clouds reach each other across the wan"
 
 # The property everything else rests on, per node and per cloud.
 for r in remote1 remote2; do
-  for n in cp:10 w1:11 w2:12; do
+  for n in bastion:2 cp:10 w1:11 w2:12; do
     if reaches "$r" "$LAN.${n#*:}" 2; then
       fail "$r reached ${n%%:*} at $LAN.${n#*:}: the site is not private, and every result after this is meaningless"
     fi
@@ -140,7 +142,7 @@ fi
 echo "  neither cloud reaches the API server, so a tunnel is the only way in"
 
 echo
-echo "site     $LAN.0/24      cp .10  w1 .11  w2 .12   router .1"
+echo "site     $LAN.0/24      bastion .2  cp .10  w1 .11  w2 .12   router .1"
 echo "wan      $WAN.0/24      router .1  edge-a .2  edge-b .3"
 echo "cloud A  $CLOUD_A.0/24  remote1 .10"
 echo "cloud B  $CLOUD_B.0/24  remote2 .10"

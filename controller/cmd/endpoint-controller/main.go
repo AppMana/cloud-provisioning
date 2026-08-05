@@ -35,6 +35,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/discover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
+	joincontainernet "github.com/appmana/cloud-provisioning/controller/pkg/join/containernet"
 	joindocker "github.com/appmana/cloud-provisioning/controller/pkg/join/docker"
 	joink0s "github.com/appmana/cloud-provisioning/controller/pkg/join/k0s"
 	joinkubeadm "github.com/appmana/cloud-provisioning/controller/pkg/join/kubeadm"
@@ -1460,6 +1461,11 @@ func main() {
 		}
 		awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName}
 		dockerProvider := joindocker.Provider{ConfigNamespace: secretNamespace, ConfigName: "docker-provider-config"}
+		// Adopts a container someone else owns, which is how a lab
+		// topology presents a machine. Shipped like the docker provider
+		// rather than hidden behind a build tag, so a harness exercises
+		// the same binary that is released.
+		containernetProvider := joincontainernet.Provider{}
 
 		// Each cluster technology is one implementation of
 		// join.ClusterJoinProvider behind the same seam. Selection is by
@@ -1484,7 +1490,7 @@ func main() {
 			Client:         mgr.GetClient(),
 			Reader:         mgr.GetAPIReader(),
 			Join:           joinProvider,
-			InfraProviders: []join.InfraProvider{awsProvider, dockerProvider},
+			InfraProviders: []join.InfraProvider{awsProvider, dockerProvider, containernetProvider},
 
 			TemplatePath:      joinTemplatePath,
 			APIVIP:            joinAPIVIP,

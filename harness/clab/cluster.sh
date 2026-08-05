@@ -16,7 +16,7 @@ POD_CIDR=10.244.0.0/16
 SVC_CIDR=10.96.0.0/12
 OUT="${OUT:-$PWD/out}"
 mkdir -p "$OUT"
-export KUBECONFIG="$OUT/kubeconfig"
+
 
 c() { echo "clab-$LAB-$1"; }
 in_node() { docker exec "$(c "$1")" "${@:2}"; }
@@ -25,10 +25,11 @@ in_node() { docker exec "$(c "$1")" "${@:2}"; }
 write_to() { docker exec -i "$(c "$1")" sh -c "cat >$2"; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
-# The harness reaches the API through the node's management address,
-# so the certificate has to cover it. The cluster still advertises and
-# knows itself by the site address; this only makes the way in usable.
-CP_MGMT=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$(c cp)")
+# Everything that talks to the API talks to it from the bastion, which
+# is on the site network. Nothing here reaches into the site from
+# outside it, which is what makes the same scripts work once the nodes
+# are VMs whose single NIC is on a network the host cannot address.
+k() { in_node bastion kubectl "$@"; }
 
 echo "--- control plane on cp at $LAN.10 ---"
 write_to cp /tmp/init.yaml <<EOF
@@ -48,7 +49,7 @@ networking:
   serviceSubnet: $SVC_CIDR
 controlPlaneEndpoint: $LAN.10:6443
 apiServer:
-  certSANs: [$LAN.10, $CP_MGMT, 127.0.0.1, cp]
+  certSANs: [$LAN.10, 127.0.0.1, cp]
 EOF
 
 if ! in_node cp test -f /etc/kubernetes/admin.conf; then
@@ -59,11 +60,13 @@ if ! in_node cp test -f /etc/kubernetes/admin.conf; then
     --ignore-preflight-errors=all \
     >"$OUT/init.log" 2>&1 || { tail -30 "$OUT/init.log" >&2; fail "kubeadm init (see $OUT/init.log)"; }
 fi
+# The kubeconfig points at the site address and is used from the site,
+# so nothing has to be rewritten and no certificate has to cover an
+# address that changes whenever the containers restart.
 in_node cp cat /etc/kubernetes/admin.conf > "$OUT/kubeconfig"
-# The host reaches the API through the node's management address; the
-# cluster still knows itself by the segment address.
-sed -i "s#server: https://$LAN.10:6443#server: https://$CP_MGMT:6443#" "$OUT/kubeconfig"
-kubectl get --raw /healthz >/dev/null 2>&1 || fail "the API server is not answering"
+in_node bastion mkdir -p /root/.kube
+write_to bastion /root/.kube/config < "$OUT/kubeconfig"
+k get --raw /healthz >/dev/null 2>&1 || fail "the API server is not answering"
 echo "  up, kubeconfig at $OUT/kubeconfig"
 
 echo "--- workers ---"
@@ -71,7 +74,7 @@ JOIN=$(in_node cp kubeadm token create --print-join-command 2>/dev/null | tr -d 
 [ -n "$JOIN" ] || fail "no join command"
 for w in w1 w2; do
   ip=$LAN.$( [ "$w" = w1 ] && echo 11 || echo 12 )
-  if ! kubectl get node "$w" >/dev/null 2>&1; then
+  if ! k get node "$w" >/dev/null 2>&1; then
     # node-ip belongs to kubelet, not to join, and it has to be set
     # before the node registers or it registers by whichever address it
     # picks, which here is the management one.
@@ -81,11 +84,11 @@ for w in w1 w2; do
   fi
 done
 for n in cp w1 w2; do
-  kubectl wait --for=condition=Ready node/"$n" --timeout=300s >/dev/null 2>&1 || true
+  k wait --for=condition=Ready node/"$n" --timeout=300s >/dev/null 2>&1 || true
 done
 
 echo "--- every node registered by its segment address ---"
-kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' |
+k get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' |
   while read -r name ip; do
     case "$ip" in
       $LAN.*) echo "  $name $ip" ;;

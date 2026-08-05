@@ -33,12 +33,12 @@ edge-b:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.7
+    hostname: 172.30.30.6
 remote1:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.9
+    hostname: 172.30.30.7
 remote2:
     username: 
     password: 
@@ -53,9 +53,9 @@ w1:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.8
+    hostname: 172.30.30.9
 w2:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.6
+    hostname: 172.30.30.8

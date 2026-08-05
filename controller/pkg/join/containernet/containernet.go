@@ -24,7 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var gvk = schema.GroupVersionKind{Group: "containernet.appmana.com", Version: "v1", Kind: "ContainernetMachine"}
+// v1beta2 rather than v1: the claim reconciler creates an infra machine
+// from a template at a hardcoded v1beta2 and then reads it back at the
+// provider's own version, so a provider naming any other version would
+// write an object it cannot then find.
+var gvk = schema.GroupVersionKind{Group: "containernet.appmana.com", Version: "v1beta2", Kind: "ContainernetMachine"}
+
+// clusterGVK is what a claim's CAPI Cluster points at for this provider
+// to be the one that fulfils it.
+var clusterGVK = schema.GroupVersionKind{Group: "containernet.appmana.com", Version: "v1beta2", Kind: "ContainernetCluster"}
 
 // containerNameAnnotation lets a ContainernetMachine reference a
 // container whose name differs from the Kubernetes object's own name
@@ -38,6 +46,11 @@ type Provider struct{}
 
 // GVK implements join.InfraProvider.
 func (Provider) GVK() schema.GroupVersionKind { return gvk }
+
+// ClusterGVK implements join.MachineProvisioner. Without it this is not
+// a provisioner at all and the claim reconciler refuses every claim
+// routed to it, which is the only reason a claim can name it.
+func (Provider) ClusterGVK() schema.GroupVersionKind { return clusterGVK }
 
 // Running reports whether a real Docker container by this machine's
 // name is running, checked via `docker inspect` rather than an
@@ -68,31 +81,13 @@ func (Provider) InfraValues(ctx context.Context, machine *unstructured.Unstructu
 	return map[string]any{}, nil
 }
 
-// CreateMachine actually provisions the compute a ContainernetMachine
-// represents: a running, detached Docker container. Unlike AWS, where
-// CAPA does this outside the reconciler, there is no separate operator
-// for containernet-backed machines, so a test or harness caller
-// invokes this directly, playing CAPA's role synchronously.
-func CreateMachine(ctx context.Context, name, image string) error {
-	out, err := exec.CommandContext(ctx, "docker", "run", "-d", "--name", name, "--network", "none", image, "sleep", "infinity").CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("docker run %s (%s): %w: %s", name, image, err, strings.TrimSpace(string(out)))
-	}
-	return nil
-}
-
-// DestroyMachine tears down a container CreateMachine started, e.g.
-// via a test's defer. Ignores "already gone" so cleanup after a test
-// that already destroyed it (or never fully created it) isn't itself
-// a spurious failure.
-func DestroyMachine(ctx context.Context, name string) error {
-	out, err := exec.CommandContext(ctx, "docker", "rm", "-f", name).CombinedOutput()
-	if err != nil && !strings.Contains(strings.ToLower(string(out)), "no such container") {
-		return fmt.Errorf("docker rm -f %s: %w: %s", name, err, strings.TrimSpace(string(out)))
-	}
-	return nil
-}
-
+// Nothing here creates or destroys a container.
+//
+// A machine is adopted, not made: containerlab, or whatever else owns
+// the topology, creates it and this observes it. The functions that used
+// to live here ran "docker run --network none ... sleep infinity", which
+// attaches a node to no segment at all, and were called by nothing but
+// their own test.
 func containerName(machine *unstructured.Unstructured) string {
 	if n := machine.GetAnnotations()[containerNameAnnotation]; n != "" {
 		return n

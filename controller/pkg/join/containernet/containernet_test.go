@@ -41,47 +41,6 @@ func TestRunning_NonexistentContainer_ReturnsFalseNotError(t *testing.T) {
 	}
 }
 
-func TestCreateMachine_ThenRunning_ReflectsRealContainerState(t *testing.T) {
-	requireDocker(t)
-	ctx := context.Background()
-	const name = "join-test-containernet-machine"
-	const image = "alpine:3.20"
-
-	// Before creation, Running is false. That proves the result below
-	// reflects CreateMachine's effect rather than a stub that always
-	// returns true.
-	machine := fakeContainernetMachine(name)
-	if ready, err := (Provider{}).Running(ctx, machine); err != nil || ready {
-		t.Fatalf("precondition failed: Running() = (%v, %v) before CreateMachine, want (false, nil)", ready, err)
-	}
-
-	if err := CreateMachine(ctx, name, image); err != nil {
-		t.Fatalf("CreateMachine: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := DestroyMachine(context.Background(), name); err != nil {
-			t.Errorf("DestroyMachine cleanup: %v", err)
-		}
-	})
-
-	// Green: a real container is now actually running.
-	ready, err := Provider{}.Running(ctx, machine)
-	if err != nil {
-		t.Fatalf("Running: %v", err)
-	}
-	if !ready {
-		t.Error("Running = false after CreateMachine succeeded: container should be running")
-	}
-
-	values, err := Provider{}.InfraValues(ctx, machine)
-	if err != nil {
-		t.Fatalf("InfraValues: %v", err)
-	}
-	if values == nil {
-		t.Error("InfraValues returned nil, want an empty-but-non-nil map (matches aws.Provider's contract)")
-	}
-}
-
 func TestRunning_UsesContainerNameAnnotationWhenPresent(t *testing.T) {
 	requireDocker(t)
 	ctx := context.Background()
@@ -91,13 +50,14 @@ func TestRunning_UsesContainerNameAnnotationWhenPresent(t *testing.T) {
 	machine := fakeContainernetMachine("some-other-k8s-object-name")
 	machine.SetAnnotations(map[string]string{containerNameAnnotation: containerName})
 
-	if err := CreateMachine(ctx, containerName, image); err != nil {
-		t.Fatalf("CreateMachine: %v", err)
+	// The container is made here rather than by the provider. Adopting
+	// one someone else owns is the whole point of the annotation, so a
+	// provider that could create it would be testing the wrong thing.
+	if out, err := exec.Command("docker", "run", "-d", "--name", containerName, image, "sleep", "infinity").CombinedOutput(); err != nil {
+		t.Fatalf("starting a container to adopt: %v: %s", err, out)
 	}
 	t.Cleanup(func() {
-		if err := DestroyMachine(context.Background(), containerName); err != nil {
-			t.Errorf("DestroyMachine cleanup: %v", err)
-		}
+		_ = exec.Command("docker", "rm", "-f", containerName).Run()
 	})
 
 	ready, err := Provider{}.Running(ctx, machine)
@@ -106,32 +66,5 @@ func TestRunning_UsesContainerNameAnnotationWhenPresent(t *testing.T) {
 	}
 	if !ready {
 		t.Error("Running = false despite the annotated container genuinely running: container-name annotation isn't being honored")
-	}
-}
-
-func TestDestroyMachine_ThenRunning_ReturnsFalseAgain(t *testing.T) {
-	requireDocker(t)
-	ctx := context.Background()
-	const name = "join-test-destroy-then-ready"
-	const image = "alpine:3.20"
-
-	if err := CreateMachine(ctx, name, image); err != nil {
-		t.Fatalf("CreateMachine: %v", err)
-	}
-	machine := fakeContainernetMachine(name)
-	if ready, err := (Provider{}).Running(ctx, machine); err != nil || !ready {
-		t.Fatalf("precondition failed: Running() = (%v, %v) right after CreateMachine, want (true, nil)", ready, err)
-	}
-
-	if err := DestroyMachine(ctx, name); err != nil {
-		t.Fatalf("DestroyMachine: %v", err)
-	}
-
-	ready, err := Provider{}.Running(ctx, machine)
-	if err != nil {
-		t.Fatalf("Running: %v", err)
-	}
-	if ready {
-		t.Error("Running = true after DestroyMachine: the container should be gone")
 	}
 }

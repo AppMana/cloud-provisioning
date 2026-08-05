@@ -60,6 +60,15 @@ topology:
     edge-b:
       kind: linux
 
+    # How the site is reached and provisioned, and the only thing that
+    # reaches it. An operator's jump host on the office network: it
+    # holds the kubeconfig, runs kubectl, and once the nodes are VMs it
+    # is what carries a serial or ssh session to a machine whose single
+    # NIC is on a network nothing outside can address. Modelling it is
+    # closer to how the site gets built than reaching in from the host.
+    bastion:
+      kind: linux
+
     # The cluster, all of it, at the site.
     cp:
       kind: linux
@@ -87,6 +96,7 @@ topology:
   links:
     # the site
     - endpoints: ["router:eth1", "cldt-lan:lan-router"]
+    - endpoints: ["bastion:eth1", "cldt-lan:lan-bastion"]
     - endpoints: ["cp:eth1", "cldt-lan:lan-cp"]
     - endpoints: ["w1:eth1", "cldt-lan:lan-w1"]
     - endpoints: ["w2:eth1", "cldt-lan:lan-w2"]

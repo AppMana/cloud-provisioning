@@ -50,6 +50,17 @@ networking:
 controlPlaneEndpoint: $LAN.10:6443
 apiServer:
   certSANs: [$LAN.10, 127.0.0.1, cp]
+---
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+conntrack:
+  # Left alone. kube-proxy would otherwise raise nf_conntrack_max, and
+  # /proc/sys is not writable from a container, so it exits and nothing
+  # translates a service address: the network's own pods then cannot
+  # reach the API service and never start. The kernel here belongs to
+  # the host and its value is the host's to choose.
+  maxPerCore: 0
+  min: 0
 EOF
 
 if ! in_node cp test -f /etc/kubernetes/admin.conf; then

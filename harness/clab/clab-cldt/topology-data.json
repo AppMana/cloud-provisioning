@@ -1,0 +1,382 @@
+{
+  "name": "cldt",
+  "type": "clab",
+  "clab": {
+    "config": {
+      "prefix": "clab",
+      "mgmt": {
+        "network": "cldt-mgmt",
+        "bridge": "br-68aeb000d2f4",
+        "ipv4-subnet": "172.30.30.0/24",
+        "ipv4-gw": "172.30.30.1",
+        "ipv6-gw": "fe80::8c0e:2fff:fe2c:cf23",
+        "external-access": true
+      }
+    }
+  },
+  "ssh-pub-keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDQ0xUnP61BcQKX1hmxooDVhHZCSKsjytvQpwHsLN2rLQJYSFzz9S+ANMI7YS/D7i8nogHKHmFHONtVIhTp89avT5eIXA3vV+oeLSOuN3jwacagE6ejnp42XbGJq2Z77detfYLKyutpFOfgVbC3K0wtmIE8Ryk8n3BvStZe44bA3Ap+LPLIKm3HaIVf8bue1/Rymss3KHmLvgFnooN1f/bSKUk/LJYVEKZQBHnwU6nM73p6MUM9O4tWOPBLgPNcPA4kqcp0sOsdFC0IsQm/O/JUsnFJrEfNFk3zfY76pikMk1JZM0f/MkMVtvuv26Y8lgtOxwL22HgevIOMb1OCPezPqkqulUZ+eVU/+M4NmCuKU9/+C6GVWGoqN+wguPNLwjFainpMFxa7Kthir5PxDJcPbRvbBvqC/5LAWZEiNBEjvBGoXPrl3FsNMqQ3sKsjP7ekPq7i6bAbYtwZIw+Los2nSZHXz6n92Q7g6xIzx/LAwxvaDcVdkH1MVAuJghUGM7hqM6Ch3EIPbvE+rErWv4D2neF4DMwlKQRjFGsn7s4/YH4dUSarbiraLYa8v9Y+6jh9PSWf7aauKHDVu5K62D0YVnXWjA0BRt1xCPc6jsP+nxGZ15GsRv6U+bHzmlUmZWNXuPSmSYui5vr3DNLqnrui8gr5/2L9nkTAAgbssXgZGQ==","ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDbuueD3zEnBjLvgCbG9pR7ccaYrTPYBRco0vjhL4EtP9ZxWyv5VjGqpLjFNL0/alzc2+q/QGu2zYV2enZGIcQBbMk+qXuAd0efe0Yvrlpv8h51ZY1po/jm8a6LRYZKXWR/OXDE1qonc9ys3axI141fHoWl6F6UGskFnY9Z9oLYYSVh+nnFpf9FwYqxkr5RxYnpILjjzWbQ9UKXD2K3eCGWVyfeq69LZmUNZTBZhcvkv4uFrVqAXHYxFehHOccHwkrGP18uuQDmQl71SWEpmQdKsim2tGYztvoqvov7Wj8xsGrDQ3oW/8h1mIiB/GDRzHwOwuVSIYKZtCCA2N0dTUUNiCr/Z8HZP6BgHMdG03dS25Y/orPhbnMGIn76YEvvuL/GW2lg+68cmA05xHoTamQACghc7XLph9Cp5DmsmE8dQMTUGI5r6fNuETAkMlBtacqIM0yD833TB4LPc7Fy7lRf5XFuLhX2TphJeL7vas6sHqssuPsphSNyFaEEnKZ+NH89q/FXzhPJZVuYXSAbe2/AVaB2kR9TBI/ukNMt2zQpf8oOFq+GzTAEIs/ubJeiEH48+yElLoljimtwf9Ebsfy231YFJ5xraPChdvDk9CUHgBpGzCkRiZ5JxdYCb2IkeznVoLvaTipJ3OhezTtL8Ur3BKbRW882G7f5deMLLIO3Rw=="],
+  "nodes": {
+    "cldt-lan": {
+      "index": "0",
+      "shortname": "cldt-lan",
+      "longname": "clab-cldt-cldt-lan",
+      "fqdn": "cldt-lan.cldt.io",
+      "group": "",
+      "labdir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cldt-lan",
+      "kind": "bridge",
+      "image": "",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-node-group": "",
+        "clab-node-kind": "bridge",
+        "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cldt-lan",
+        "clab-node-longname": "clab-cldt-cldt-lan",
+        "clab-node-name": "cldt-lan",
+        "clab-node-type": "",
+        "clab-owner": "administrator",
+        "clab-topo-file": "/home/administrator/Documents/cloud-provisioning/harness/clab/topo.clab.yml",
+        "containerlab": "cldt"
+      },
+      "port-bindings": [
+      ]
+    },
+    "cldt-wan": {
+      "index": "1",
+      "shortname": "cldt-wan",
+      "longname": "clab-cldt-cldt-wan",
+      "fqdn": "cldt-wan.cldt.io",
+      "group": "",
+      "labdir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cldt-wan",
+      "kind": "bridge",
+      "image": "",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-node-group": "",
+        "clab-node-kind": "bridge",
+        "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cldt-wan",
+        "clab-node-longname": "clab-cldt-cldt-wan",
+        "clab-node-name": "cldt-wan",
+        "clab-node-type": "",
+        "clab-owner": "administrator",
+        "clab-topo-file": "/home/administrator/Documents/cloud-provisioning/harness/clab/topo.clab.yml",
+        "containerlab": "cldt"
+      },
+      "port-bindings": [
+      ]
+    },
+    "cp": {
+      "index": "2",
+      "shortname": "cp",
+      "longname": "clab-cldt-cp",
+      "fqdn": "cp.cldt.io",
+      "group": "",
+      "labdir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cp",
+      "kind": "linux",
+      "image": "kindest/node:v1.34.0",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.30.30.2",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cp",
+        "clab-node-longname": "clab-cldt-cp",
+        "clab-node-name": "cp",
+        "clab-node-type": "",
+        "clab-owner": "administrator",
+        "clab-topo-file": "/home/administrator/Documents/cloud-provisioning/harness/clab/topo.clab.yml",
+        "containerlab": "cldt"
+      },
+      "port-bindings": [
+      ]
+    },
+    "remote1": {
+      "index": "3",
+      "shortname": "remote1",
+      "longname": "clab-cldt-remote1",
+      "fqdn": "remote1.cldt.io",
+      "group": "",
+      "labdir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/remote1",
+      "kind": "linux",
+      "image": "kindest/node:v1.34.0",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.30.30.4",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/remote1",
+        "clab-node-longname": "clab-cldt-remote1",
+        "clab-node-name": "remote1",
+        "clab-node-type": "",
+        "clab-owner": "administrator",
+        "clab-topo-file": "/home/administrator/Documents/cloud-provisioning/harness/clab/topo.clab.yml",
+        "containerlab": "cldt"
+      },
+      "port-bindings": [
+      ]
+    },
+    "remote2": {
+      "index": "4",
+      "shortname": "remote2",
+      "longname": "clab-cldt-remote2",
+      "fqdn": "remote2.cldt.io",
+      "group": "",
+      "labdir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/remote2",
+      "kind": "linux",
+      "image": "kindest/node:v1.34.0",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.30.30.3",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/remote2",
+        "clab-node-longname": "clab-cldt-remote2",
+        "clab-node-name": "remote2",
+        "clab-node-type": "",
+        "clab-owner": "administrator",
+        "clab-topo-file": "/home/administrator/Documents/cloud-provisioning/harness/clab/topo.clab.yml",
+        "containerlab": "cldt"
+      },
+      "port-bindings": [
+      ]
+    },
+    "router": {
+      "index": "5",
+      "shortname": "router",
+      "longname": "clab-cldt-router",
+      "fqdn": "router.cldt.io",
+      "group": "",
+      "labdir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/router",
+      "kind": "linux",
+      "image": "kindest/node:v1.34.0",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.30.30.5",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/router",
+        "clab-node-longname": "clab-cldt-router",
+        "clab-node-name": "router",
+        "clab-node-type": "",
+        "clab-owner": "administrator",
+        "clab-topo-file": "/home/administrator/Documents/cloud-provisioning/harness/clab/topo.clab.yml",
+        "containerlab": "cldt"
+      },
+      "port-bindings": [
+      ]
+    },
+    "w1": {
+      "index": "6",
+      "shortname": "w1",
+      "longname": "clab-cldt-w1",
+      "fqdn": "w1.cldt.io",
+      "group": "",
+      "labdir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/w1",
+      "kind": "linux",
+      "image": "kindest/node:v1.34.0",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.30.30.6",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/w1",
+        "clab-node-longname": "clab-cldt-w1",
+        "clab-node-name": "w1",
+        "clab-node-type": "",
+        "clab-owner": "administrator",
+        "clab-topo-file": "/home/administrator/Documents/cloud-provisioning/harness/clab/topo.clab.yml",
+        "containerlab": "cldt"
+      },
+      "port-bindings": [
+      ]
+    },
+    "w2": {
+      "index": "7",
+      "shortname": "w2",
+      "longname": "clab-cldt-w2",
+      "fqdn": "w2.cldt.io",
+      "group": "",
+      "labdir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/w2",
+      "kind": "linux",
+      "image": "kindest/node:v1.34.0",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "172.30.30.7",
+      "mgmt-ipv4-prefix-length": 24,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-68aeb000d2f4",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/w2",
+        "clab-node-longname": "clab-cldt-w2",
+        "clab-node-name": "w2",
+        "clab-node-type": "",
+        "clab-owner": "administrator",
+        "clab-topo-file": "/home/administrator/Documents/cloud-provisioning/harness/clab/topo.clab.yml",
+        "containerlab": "cldt"
+      },
+      "port-bindings": [
+      ]
+    }
+  },
+  "links": [
+    {
+      "endpoints": {
+        "a": {
+          "node": "router",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:c1:6c:d5",
+          "peer": "z"
+        },
+        "z": {
+          "node": "cldt-lan",
+          "interface": "lan-router",
+          "mac": "aa:c1:ab:6d:55:7c",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "router",
+          "interface": "eth2",
+          "mac": "aa:c1:ab:a7:36:25",
+          "peer": "z"
+        },
+        "z": {
+          "node": "cldt-wan",
+          "interface": "wan-router",
+          "mac": "aa:c1:ab:a2:33:37",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "cp",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:b0:cd:7b",
+          "peer": "z"
+        },
+        "z": {
+          "node": "cldt-lan",
+          "interface": "lan-cp",
+          "mac": "aa:c1:ab:3e:b4:dd",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "w1",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:4e:36:18",
+          "peer": "z"
+        },
+        "z": {
+          "node": "cldt-lan",
+          "interface": "lan-w1",
+          "mac": "aa:c1:ab:69:fa:d2",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "w2",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:d0:ca:ee",
+          "peer": "z"
+        },
+        "z": {
+          "node": "cldt-lan",
+          "interface": "lan-w2",
+          "mac": "aa:c1:ab:e4:35:b2",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "remote1",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:87:39:12",
+          "peer": "z"
+        },
+        "z": {
+          "node": "cldt-wan",
+          "interface": "wan-remote1",
+          "mac": "aa:c1:ab:31:4e:3e",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "remote2",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:72:21:b2",
+          "peer": "z"
+        },
+        "z": {
+          "node": "cldt-wan",
+          "interface": "wan-remote2",
+          "mac": "aa:c1:ab:0a:5d:2f",
+          "peer": "a"
+        }
+      }
+    }
+  ]
+}

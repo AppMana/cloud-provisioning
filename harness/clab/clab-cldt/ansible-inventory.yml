@@ -1,0 +1,27 @@
+all:
+  vars:
+    # The generated inventory is assumed to be used from the clab host.
+    # Hence no http proxy should be used. Therefore we make sure the http
+    # module does not attempt using any global http proxy.
+    ansible_httpapi_use_proxy: false
+  children:
+    bridge:
+      hosts:
+        clab-cldt-cldt-lan:
+          ansible_host: 
+        clab-cldt-cldt-wan:
+          ansible_host: 
+    linux:
+      hosts:
+        clab-cldt-cp:
+          ansible_host: 172.30.30.2
+        clab-cldt-remote1:
+          ansible_host: 172.30.30.4
+        clab-cldt-remote2:
+          ansible_host: 172.30.30.3
+        clab-cldt-router:
+          ansible_host: 172.30.30.5
+        clab-cldt-w1:
+          ansible_host: 172.30.30.6
+        clab-cldt-w2:
+          ansible_host: 172.30.30.7

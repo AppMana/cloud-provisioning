@@ -1,0 +1,64 @@
+# Two segments that are actually two segments.
+#
+# The kind harness put every node on one bridge and simulated the
+# distance with routes and masquerading. That fake needed an exception
+# for the control plane, because the remote had to reach the API server
+# directly while it booted, and the exception is what produced most of
+# the failures worth chasing. A topology that needs an exception is not
+# modelling the thing.
+#
+# Here the site is on lan and the remote is on wan, with no route
+# between them. The router masquerades traffic leaving the site and
+# forwards nothing inbound, so the site can open a connection outward
+# and the internet cannot open one in. That is the situation the
+# product exists for, so it is the one the harness should present.
+#
+# Every node also has containerlab's management interface. That is how
+# the harness drives the test and nothing else: kubelet is told to use
+# the lan address, and the tunnel is built on lan and wan addresses, so
+# no part of the product sees the management network. The bring-up
+# proves that by asserting reachability against lan addresses only.
+name: cldt
+
+mgmt:
+  network: cldt-mgmt
+  ipv4-subnet: 172.30.30.0/24
+
+topology:
+  kinds:
+    linux:
+      image: kindest/node:v1.34.0
+
+  nodes:
+    cldt-lan:
+      kind: bridge
+    cldt-wan:
+      kind: bridge
+
+    # Two interfaces and no forwarding inward. The site's only way out.
+    router:
+      kind: linux
+
+    # The site. Nothing on wan can reach any of these.
+    cp:
+      kind: linux
+    w1:
+      kind: linux
+    w2:
+      kind: linux
+
+    # The far side, reachable from the site and unable to reach back
+    # except through a tunnel the site opened.
+    remote1:
+      kind: linux
+    remote2:
+      kind: linux
+
+  links:
+    - endpoints: ["router:eth1", "cldt-lan:lan-router"]
+    - endpoints: ["router:eth2", "cldt-wan:wan-router"]
+    - endpoints: ["cp:eth1", "cldt-lan:lan-cp"]
+    - endpoints: ["w1:eth1", "cldt-lan:lan-w1"]
+    - endpoints: ["w2:eth1", "cldt-lan:lan-w2"]
+    - endpoints: ["remote1:eth1", "cldt-wan:wan-remote1"]
+    - endpoints: ["remote2:eth1", "cldt-wan:wan-remote2"]

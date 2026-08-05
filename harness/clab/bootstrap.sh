@@ -65,6 +65,9 @@ import json
 for f in json.load(open("/tmp/cldt-writefiles.json")):
     print(f["path"], f["permissions"], sep="\t")
 ' | while IFS=$'\t' read -r path perms; do
+  # cloud-init makes the parent directory; a shell redirect does not,
+  # and the failure names the file rather than the directory.
+  in_node "$CONTAINER" mkdir -p "$(dirname "$path")"
   python3 -c '
 import json,sys
 for f in json.load(open("/tmp/cldt-writefiles.json")):

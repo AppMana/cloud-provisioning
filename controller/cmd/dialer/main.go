@@ -234,7 +234,27 @@ func main() {
 			// whole configuration with it. Being wrong in the other
 			// direction costs a node that cannot be recovered without
 			// out-of-band access.
-
+			//
+			// So ask the cluster why, rather than inferring it from the
+			// signal. A node that is still a published endpoint is being
+			// restarted and keeps its interface. A node that is no
+			// longer published has had its retention run out, and its
+			// interface is about to become a corpse: the pod block route
+			// on it sits inside the cluster's pod pool, the CNI
+			// redistributes it, and the node keeps telling the site it
+			// can reach pods it has no tunnel for. The site installs
+			// that alongside the working path and sends half of every
+			// flow into it.
+			//
+			// The unpublish happens before the pod template stops
+			// selecting this node, so by the time this runs the answer
+			// is already in the Secret.
+			if cfg.secretName != "" {
+				if published, err := nodeStillPublished(clientset, cfg); err == nil && !published {
+					fmt.Fprintf(os.Stderr, "removing %s on the way out: this node is no longer a published endpoint\n", cfg.iface)
+					removeDevice(cfg.iface)
+				}
+			}
 			return
 		}
 	}
@@ -806,6 +826,29 @@ func readCachedPeers(path string) ([]tunnel.PeerSpec, error) {
 	return doc.Peers, nil
 }
 
+// nodeStillPublished reports whether this node is currently a tunnel
+// endpoint according to the cluster, which is what distinguishes a
+// dialer being restarted from one whose node has stopped being an
+// endpoint.
+//
+// It takes its own context: the caller's has already been cancelled by
+// the signal that prompted the question, and an API call on a cancelled
+// context answers nothing. An error is not an answer either, and the
+// caller keeps the interface when it gets one, because being wrong that
+// way costs a stale route and being wrong the other way costs the node.
+func nodeStillPublished(clientset *kubernetes.Clientset, cfg config) (bool, error) {
+	if clientset == nil {
+		return false, errors.New("no API client")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	secret, err := clientset.CoreV1().Secrets(cfg.secretNamespace).Get(ctx, cfg.secretName, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	return len(secret.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName]) > 0, nil
+}
+
 func writeClaim(path string) error {
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, []byte(time.Now().UTC().Format(time.RFC3339)+"\n"), 0o644); err != nil {
@@ -857,9 +900,29 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 		localAddress = strings.TrimSpace(string(secret.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName]))
 		if localAddress == "" {
-			// Not allocated yet. The controller writes the tunnel
-			// address for each node matching a claim's tunnelEndpoints
-			// selector. Nothing to do until then.
+			// Either this node has never been allocated an address, or it
+			// has stopped being an endpoint and its retention has run
+			// out. The two look identical here and differ in one thing:
+			// whether an interface exists.
+			//
+			// If one does, it is a corpse, and leaving it is not free.
+			// Its route for the remote's pod block sits in the kernel
+			// inside the cluster's pod pool, so the CNI redistributes it
+			// and the node goes on telling the whole site it can reach
+			// pods it cannot: a black hole that the site installs
+			// alongside the working path and sends half its traffic
+			// into. Measured on a node that had not been an endpoint for
+			// an hour, still advertising, still winning half of every
+			// flow.
+			//
+			// This is cluster state saying the node is not an endpoint,
+			// which is not the same as this process being told to stop.
+			// A restart still leaves the interface alone, because a
+			// restarting dialer is still published.
+			if _, err := netlink.LinkByName(cfg.iface); err == nil {
+				fmt.Fprintf(os.Stderr, "removing %s: this node is no longer a published tunnel endpoint\n", cfg.iface)
+				removeDevice(cfg.iface)
+			}
 			return fmt.Errorf("no %s%s in %s/%s yet (node not allocated a tunnel address)", tunnel.NodeTunnelAddressPrefix, cfg.nodeName, cfg.secretNamespace, cfg.secretName)
 		}
 		peers, err = loadPeersFromSecret(secret)
@@ -1244,7 +1307,7 @@ func installRoutes(cfg config, routeHosts, blocks []net.IPNet) error {
 		}
 	}
 
-	// A fallback route for the pod space behind each peer.
+	// The route for the pod space behind each peer.
 	//
 	// This node tells the rest of its site that the remote's blocks are
 	// reachable through it, so their traffic arrives here. Whether it
@@ -1254,18 +1317,27 @@ func installRoutes(cfg config, routeHosts, blocks []net.IPNet) error {
 	// site had "remote block via the endpoint" and the endpoint had no
 	// route to the block at all.
 	//
-	// It can always forward it: the tunnel is up and the block is
-	// permitted, which is what makes this safe to state as a route. A
-	// high metric keeps it a fallback, so any route the network
-	// distributes wins while it is there, and this one carries the
-	// traffic when it is not.
-	const fallbackMetric = 1024
+	// It carries the tunnel that block is behind, so it is the route,
+	// not a fallback behind whatever the network happens to distribute.
+	// This used to go in at metric 1024 so that any distributed route
+	// won, which is correct reasoning for a node that has no tunnel and
+	// exactly wrong here: the route the network distributes for a remote
+	// block is another endpoint's transit advertisement, and that
+	// endpoint's own best route is this node. Two endpoints each
+	// deferred to the other and the packet crossed the LAN until its TTL
+	// ran out, with the tunnel that could have delivered it up and idle
+	// on both of them. Captured on w1: request in on the tunnel, out to
+	// cp on eth1, reply back in from cp, out to cp again, repeating.
+	//
+	// Preferring the local tunnel cannot loop, because it terminates
+	// here: every endpoint prefers its own, and a node with no tunnel
+	// still learns the block over BGP from whichever endpoint has one.
 	for _, block := range blocks {
 		dst := block
 		desired[dst.String()] = true
-		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK, Priority: fallbackMetric}
+		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK}
 		if err := netlink.RouteReplace(route); err != nil {
-			fmt.Fprintf(os.Stderr, "no fallback route for %s via %s: %v\n", dst.String(), cfg.iface, err)
+			fmt.Fprintf(os.Stderr, "no route for %s via %s: %v\n", dst.String(), cfg.iface, err)
 		}
 	}
 

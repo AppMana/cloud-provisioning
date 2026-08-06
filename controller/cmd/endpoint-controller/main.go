@@ -518,7 +518,20 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 		// This node owns its own prefixes now, so nothing relays them.
 		// A node that returns to the selector takes back what it handed
 		// over when it left.
-		if stopBeingRelayed(secret.Data, node.Name) {
+		//
+		// Only once it is a peer as published, though. Selection makes
+		// this operator allocate a tunnel address; it is the node's own
+		// dialer that publishes the key, and RemotePeers renders a node
+		// only when both are there. Taking the relayed entry away at
+		// selection meant the node's address and pod block belonged to
+		// nobody in the render until that key landed, which is however
+		// long the dialer takes to schedule and come up. A remote
+		// reading the list in that window prunes the route and cannot
+		// read the correction, because the site is only reachable over
+		// what it just pruned. Measured on remote2: the host routes for
+		// all three site nodes were removed, and the API server was
+		// unreadable for 26 minutes.
+		if takeBackFromRelay(secret.Data, node.Name) {
 			changed = true
 		}
 		addrKey := tunnel.NodeTunnelAddressPrefix + node.Name
@@ -1610,6 +1623,24 @@ func parseSelectorRequirements(raw string) []corev1.NodeSelectorRequirement {
 // half leaves a returning endpoint owning its block twice, once on its
 // own peer entry and once on whichever endpoint relays the site, and the
 // accept list resolves that by keeping whichever was written last.
+// takeBackFromRelay hands a returning endpoint its own prefixes back,
+// and only once it is a peer as published.
+//
+// Selection makes this operator allocate a tunnel address; it is the
+// node's own dialer that publishes the key, and RemotePeers renders a
+// node only when both are there. Dropping the relayed entry at
+// selection left the node's address and pod block owned by nobody until
+// that key landed, which is however long the dialer takes to schedule
+// and come up. A remote reading the list in that window prunes the
+// route and cannot read the correction, because the site is reachable
+// only over what it just pruned.
+func takeBackFromRelay(data map[string][]byte, name string) bool {
+	if !publishedEndpoint(data, name) {
+		return false
+	}
+	return stopBeingRelayed(data, name)
+}
+
 func stopBeingRelayed(data map[string][]byte, name string) bool {
 	changed := false
 	for _, key := range []string{

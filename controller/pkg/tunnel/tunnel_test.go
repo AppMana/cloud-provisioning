@@ -289,3 +289,79 @@ func TestRemotePeers_PermitsTheSiteNodesWithNoTunnel(t *testing.T) {
 		}
 	}
 }
+
+// owners counts the peers permitting a prefix. One is the only correct
+// answer: zero is a prefix a remote cannot reach at all, two is a prefix
+// the accept list resolves to whichever peer was configured last.
+func owners(peers []PeerSpec, prefix string) int {
+	n := 0
+	for _, p := range peers {
+		for _, cidr := range p.WGAllowedIPs {
+			if cidr == prefix {
+				n++
+			}
+		}
+	}
+	return n
+}
+
+// A node returning to the selector is published twice for as long as it
+// takes its own dialer to put a key in the Secret: the operator has
+// already written its addresses under node-*, and the site-* entries
+// that relayed to it while it had no tunnel are still there. Whichever
+// of the two the render prefers, it must prefer exactly one.
+func TestRemotePeers_AReturningEndpointOwnsItsPrefixesOnce(t *testing.T) {
+	data := peerSecret(
+		map[string][2]string{
+			"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.17/24"},
+			"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.24/24"},
+		},
+		map[string]string{"w1": "10.244.190.64/26", "cp": "10.244.242.64/26"},
+	)
+	data[NodeAddressesPrefix+"w1"] = []byte("10.10.0.11")
+	data[NodeAddressesPrefix+"cp"] = []byte("10.10.0.10")
+	// cp was relayed through w1 until a moment ago, and the entries
+	// saying so have not been cleaned up yet.
+	data[SiteAddressesPrefix+"cp"] = []byte("10.10.0.10")
+	data[SitePodCIDRsPrefix+"cp"] = []byte("10.244.242.64/26")
+
+	peers, err := RemotePeers(data, "10.100.0.128", []string{"10.10.0.10"})
+	if err != nil {
+		t.Fatalf("RemotePeers: %v", err)
+	}
+	for _, prefix := range []string{"10.10.0.10/32", "10.244.242.64/26"} {
+		if got := owners(peers, prefix); got != 1 {
+			t.Errorf("%s is permitted on %d peers, want exactly 1", prefix, got)
+		}
+	}
+}
+
+// The relay carries the site, so it has to be a peer that is actually
+// rendered. Handing the site to whichever node sorts lowest, before
+// checking that node has a key, gives every one of those prefixes to
+// nobody: the remote prunes its routes to the site and then cannot read
+// the list that would put them back.
+func TestRemotePeers_TheSiteGoesToARenderedPeer(t *testing.T) {
+	data := peerSecret(
+		map[string][2]string{
+			"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.22/24"},
+		},
+		map[string]string{"w1": "10.244.190.64/26"},
+	)
+	// Selected, allocated an address, and its dialer has not published
+	// a key yet: half a peer, and the lowest address of the two.
+	data[NodePublicKeyPrefix+"w2"] = []byte("")
+	data[NodeTunnelAddressPrefix+"w2"] = []byte("10.100.0.17/24")
+	data[SiteAddressesPrefix+"cp"] = []byte("10.10.0.10")
+	data[SitePodCIDRsPrefix+"cp"] = []byte("10.244.242.64/26")
+
+	peers, err := RemotePeers(data, "10.100.0.128", []string{"10.10.0.10"})
+	if err != nil {
+		t.Fatalf("RemotePeers: %v", err)
+	}
+	for _, prefix := range []string{"10.10.0.10/32", "10.244.242.64/26"} {
+		if got := owners(peers, prefix); got != 1 {
+			t.Errorf("%s is permitted on %d peers, want exactly 1", prefix, got)
+		}
+	}
+}

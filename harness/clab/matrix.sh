@@ -10,7 +10,10 @@
 # A row passes only if the check ran and nothing failed. A report nobody
 # asserts on is how a broken configuration stays green.
 set -uo pipefail
-cd "$(dirname "$0")"
+# The copy this re-execs as lives in /tmp, so where the harness lives
+# has to be carried across rather than derived from $0.
+cd "${MATRIX_DIR:-$(dirname "$0")}"
+export MATRIX_DIR="$PWD"
 
 LAB=cldt
 NS=cloud-provisioning
@@ -30,8 +33,12 @@ mkdir -p "$OUT/matrix"
 # changing tunnel placement under the other, and the failures that
 # produces look exactly like product faults. It has happened.
 if [ "${MATRIX_REEXEC:-}" != 1 ]; then
-  others=$(pgrep -fc "bash /tmp/cldt-matrix-running.sh" 2>/dev/null || echo 0)
-  [ "$others" -eq 0 ] || { echo "another matrix run is in flight; wait for it or kill it" >&2; exit 2; }
+  # A lock, not a search of the process list. Matching on a pattern
+  # finds the shell doing the matching, because its own command line
+  # contains the pattern, and the guard then refuses to start on
+  # account of itself.
+  exec 9>/tmp/cldt-matrix.lock
+  flock -n 9 || { echo "another matrix run holds the lock; wait for it or kill it" >&2; exit 2; }
   # Run from a copy. bash reads a script as it goes, so editing this
   # file while it runs makes the running process execute whatever the
   # bytes became, which is a failure with no relation to the change.
@@ -125,6 +132,29 @@ print(" ".join(sorted(k[len("node-tunnel-address-"):] for k in d
     fi
     sleep 10
   done
+
+  # And wait for the cluster to agree it has converged. Moving a tunnel
+  # takes the old endpoint's dialer away at once, while a remote re-reads
+  # its peer list on its own schedule and kubelet then needs its grace
+  # period to notice the recovery, so a remote is briefly NotReady by
+  # design. Measuring during that window reports a product failure that
+  # is really a migration in progress, and pods cannot even be placed on
+  # a NotReady node, which surfaces as "pods did not all start".
+  #
+  # How long this takes is itself worth knowing, so it is reported.
+  settle_start=$SECONDS
+  for _ in $(seq 1 60); do
+    notready=$(k get nodes --no-headers 2>/dev/null | awk '$2!="Ready"{print $1}' | tr '\n' ' ')
+    [ -z "$notready" ] && break
+    sleep 10
+  done
+  if [ -n "${notready:-}" ]; then
+    echo "  FAIL still not ready after $((SECONDS - settle_start))s: $notready"
+    failed=$((failed + 1))
+    echo "### FAIL $name (endpoints=$endpoints, clouds=$remotes) never settled: $notready" >> "$OUT/matrix/summary.txt"
+    continue
+  fi
+  echo "  every node ready $((SECONDS - settle_start))s after the placement changed"
 
   HEALTH_CHECK_ARGS=--report-only bash run.sh > "$OUT/matrix/$name.log" 2>&1
   counts=$(grep -E "^checks:" "$OUT/matrix/$name.log" | tail -1)

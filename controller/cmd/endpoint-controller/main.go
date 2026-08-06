@@ -114,7 +114,10 @@ type meshReconciler struct {
 	// routing those Gets through the cached client would make
 	// controller-runtime start cluster-wide informers for those types,
 	// needing list/watch RBAC this identity does not have.
-	reader           client.Reader
+	reader client.Reader
+	// machineSelector is which Machines this operator owns, so a
+	// mesh-wide pass refreshes those and no others.
+	machineSelector  labels.Selector
 	secretNamespace  string
 	secretName       string
 	secretKey        string
@@ -206,12 +209,21 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, fmt.Errorf("ensuring cloud dialer daemonset: %w", err)
 	}
 
-	// Node events enqueue a nameless request (they change the endpoint
-	// set, not any one Machine): mesh-wide maintenance above is all
-	// they ask for. An empty-name Get would be a non-NotFound error,
-	// an infinite error requeue rather than a no-op.
+	// Node events enqueue a nameless request: they change the endpoint
+	// set rather than any one Machine. An empty-name Get would be a
+	// non-NotFound error, an infinite error requeue rather than a
+	// no-op, so the Machine-scoped work below is skipped.
+	//
+	// But every remote reads its own peer list, and that list names the
+	// endpoints. Changing which nodes hold tunnels therefore changes
+	// what every remote must be told, and nothing else will tell them:
+	// no Machine has changed, so no Machine event follows. Measured, a
+	// tunnel moved from one site node to another and the site converged
+	// while the remote went on naming a node that no longer ran a
+	// dialer, its handshake ten minutes stale, until the next resync
+	// hours later.
 	if req.Name == "" {
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.refreshAdoptionConfigs(ctx)
 	}
 
 	machine := &unstructured.Unstructured{}
@@ -775,6 +787,38 @@ func nextFreeAddress(base string, used map[string]bool) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("tunnel subnet %s is exhausted", base)
+}
+
+// refreshAdoptionConfigs re-renders every remote's peer list, for the
+// passes that were not about any one machine.
+//
+// A failure for one machine does not stop the others: they are separate
+// remotes, and leaving the rest stale because one is unreadable is the
+// blast radius this codebase keeps having to narrow.
+func (r *meshReconciler) refreshAdoptionConfigs(ctx context.Context) error {
+	machines := &unstructured.UnstructuredList{}
+	machines.SetGroupVersionKind(machineGVK.GroupVersion().WithKind(machineGVK.Kind + "List"))
+	// Every machine this operator is responsible for. Listing without
+	// the selector would re-render peer lists for machines belonging to
+	// something else.
+	opts := []client.ListOption{}
+	if r.machineSelector != nil {
+		opts = append(opts, client.MatchingLabelsSelector{Selector: r.machineSelector})
+	}
+	if err := r.List(ctx, machines, opts...); err != nil {
+		return fmt.Errorf("listing machines to refresh their peer lists: %w", err)
+	}
+	var failed []string
+	for i := range machines.Items {
+		if err := r.ensureAdoptionConfig(ctx, &machines.Items[i]); err != nil {
+			failed = append(failed, machines.Items[i].GetName())
+			ctrl.LoggerFrom(ctx).Error(err, "could not refresh a remote's peer list", "machine", machines.Items[i].GetName())
+		}
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf("could not refresh the peer list for %v", failed)
+	}
+	return nil
 }
 
 // ensureAdoptionConfig renders the live, public-data-only peer list
@@ -1587,6 +1631,7 @@ func main() {
 		Complete(&meshReconciler{
 			Client:                 mgr.GetClient(),
 			reader:                 mgr.GetAPIReader(),
+			machineSelector:        selector,
 			secretNamespace:        secretNamespace,
 			secretName:             secretName,
 			secretKey:              secretKey,

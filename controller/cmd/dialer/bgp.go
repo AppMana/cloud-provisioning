@@ -56,8 +56,13 @@ type transitSpeaker struct {
 	// site can reach and where their packets have to arrive.
 	nextHop string
 
-	peers      map[string]bool // site nodes this speaker talks to
-	advertised map[string]bool // node addresses currently advertised
+	peers map[string]bool // site nodes this speaker talks to
+	// advertised remembers the preference each prefix was spoken with,
+	// because the preference is derived from the mesh and the mesh
+	// changes. A prefix left at its old preference states an ordering
+	// no other endpoint is stating, and the site's choice then differs
+	// per prefix by nothing but when each prefix was first spoken.
+	advertised map[string]uint32
 }
 
 // startTransitSpeaker brings up a speaker on the given port. A zero port
@@ -86,7 +91,7 @@ func startTransitSpeaker(ctx context.Context, port int, asn uint32, nextHop stri
 		asn:        asn,
 		nextHop:    nextHop,
 		peers:      map[string]bool{},
-		advertised: map[string]bool{},
+		advertised: map[string]uint32{},
 	}, nil
 }
 
@@ -127,13 +132,13 @@ func (t *transitSpeaker) reconcile(ctx context.Context, sitePeers []string, rout
 		}
 	}
 	for _, r := range want {
-		if t.advertised[r.prefix] {
+		if med, ok := t.advertised[r.prefix]; ok && med == r.med {
 			continue
 		}
 		if err := t.advertise(ctx, r, false); err != nil {
 			return err
 		}
-		t.advertised[r.prefix] = true
+		t.advertised[r.prefix] = r.med
 	}
 	if len(want) == 0 {
 		return nil

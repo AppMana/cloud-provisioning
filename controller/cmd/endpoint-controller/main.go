@@ -1274,14 +1274,19 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 	// A control plane carries a NoSchedule taint, so allowing it by
 	// affinity is not enough: without a toleration a selected control
 	// plane simply never gets a pod, and the mesh silently omits it.
-	var tolerations []corev1.Toleration
-	if selectorNamesControlPlane(r.tunnelEndpointsRaw) {
-		for _, key := range []string{controlPlaneLabel, "node-role.kubernetes.io/master"} {
-			tolerations = append(tolerations, corev1.Toleration{
-				Key: key, Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule,
-			})
-		}
-	}
+	//
+	// Unconditional, because a toleration decides nothing about where a
+	// pod goes. It only removes an objection; the affinity above is what
+	// chooses, and it admits a control plane exactly when the selector
+	// names one or retention still holds one. Deriving this from the
+	// selector alone tied the two together and got retention wrong: a
+	// control plane that had just left the selector was still published,
+	// still expected to carry its tunnel through the window, and could
+	// no longer be scheduled at all. Measured with cp retained and
+	// desiredNumberScheduled 1, so the node kept a tunnel that no dialer
+	// maintained and, when its retention expired, no dialer was there to
+	// take the interface down either.
+	tolerations := dialerTolerations()
 
 	hostPathDirectoryOrCreate := corev1.HostPathDirectoryOrCreate
 	hostPathDirectory := corev1.HostPathDirectory
@@ -1543,6 +1548,18 @@ func parseSelectorRequirements(raw string) []corev1.NodeSelectorRequirement {
 // kubectl set image and kubectl apply all fail against a DaemonSet
 // carrying one, so an operator cannot restart their own dialers, on a
 // cluster where nothing is visibly wrong.
+// dialerTolerations lets a dialer run on a control plane. See the
+// caller for why this is unconditional.
+func dialerTolerations() []corev1.Toleration {
+	var tolerations []corev1.Toleration
+	for _, key := range []string{controlPlaneLabel, "node-role.kubernetes.io/master"} {
+		tolerations = append(tolerations, corev1.Toleration{
+			Key: key, Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule,
+		})
+	}
+	return tolerations
+}
+
 func imagePullSecrets(name string) []corev1.LocalObjectReference {
 	if name == "" {
 		return nil
@@ -1617,11 +1634,11 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								// Writable for one file: the interface claim
-							// that tells the node's cloud-init systemd
-							// unit to stand off while this pod holds the
-							// live peer list. The peers file and identity
-							// here are still only ever read.
-							{Name: "wg-dialer-config", MountPath: "/etc/wg-dialer"},
+								// that tells the node's cloud-init systemd
+								// unit to stand off while this pod holds the
+								// live peer list. The peers file and identity
+								// here are still only ever read.
+								{Name: "wg-dialer-config", MountPath: "/etc/wg-dialer"},
 								{Name: "host-bin", MountPath: "/host-bin"},
 							},
 						},

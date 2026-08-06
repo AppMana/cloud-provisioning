@@ -835,3 +835,44 @@ func TestImagePullSecretsOmittedWhenUnset(t *testing.T) {
 		t.Errorf("imagePullSecrets(\"regcred\") = %#v, want one reference named regcred", got)
 	}
 }
+
+// A toleration decides nothing about where a pod goes; it removes an
+// objection, and the affinity chooses. Deriving it from the selector
+// tied the two together and broke retention: a control plane that had
+// just left the selector was still published and still expected to
+// carry its tunnel through the window, but could no longer be scheduled
+// at all, so nothing maintained its tunnel and nothing was there to take
+// the interface down when its retention expired. Measured with cp
+// retained and desiredNumberScheduled 1.
+func TestDialerToleratesAControlPlaneWhicheverWayItWasSelected(t *testing.T) {
+	tol := dialerTolerations()
+	if len(tol) == 0 {
+		t.Fatal("no tolerations: a retained control plane can never be scheduled a dialer")
+	}
+	found := false
+	for _, tl := range tol {
+		if tl.Key == controlPlaneLabel && tl.Effect == corev1.TaintEffectNoSchedule {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("tolerations %#v do not cover the control-plane NoSchedule taint", tol)
+	}
+	// The affinity is what admits or refuses a control plane, and it
+	// still refuses one the selector did not name.
+	aff := dialerNodeAffinity("kubernetes.io/hostname=w1", nil)
+	refuses := false
+	for _, e := range aff.NodeSelectorTerms[0].MatchExpressions {
+		if e.Key == controlPlaneLabel && e.Operator == corev1.NodeSelectorOpDoesNotExist {
+			refuses = true
+		}
+	}
+	if !refuses {
+		t.Error("with the control plane unselected the affinity must still exclude it: the toleration is not what gates this")
+	}
+	// And admits a retained one, which is the case the conditional broke.
+	aff = dialerNodeAffinity("kubernetes.io/hostname=w1", []string{"cp"})
+	if len(aff.NodeSelectorTerms) < 2 {
+		t.Fatal("a retained node gets no term of its own, so it cannot be scheduled")
+	}
+}

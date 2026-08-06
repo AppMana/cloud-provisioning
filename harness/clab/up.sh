@@ -80,6 +80,28 @@ addr edge-b  "$CLOUD_B.1/24" eth1;  addr edge-b "$WAN.3/24" eth2
 addr remote1 "$CLOUD_A.10/24" eth1
 addr remote2 "$CLOUD_B.10/24" eth1
 
+echo "--- the wan reaches the internet ---"
+# The wan segment is where this lab meets the real world. This host is
+# its last hop: it holds an address there, masquerades what leaves, and
+# knows how to get back into each cloud.
+#
+# It gives the site the path it would really have (out through its own
+# router, translated, and out again here) and gives a cloud node the one
+# it would really have (straight out from a public address). Neither
+# creates a way in: this host has no address on the site and no route to
+# it, and the site's router still admits nothing it did not ask for.
+sudo ip addr replace "$WAN.254/24" dev cldt-wan
+sudo sysctl -qw net.ipv4.ip_forward=1
+UPLINK=$(ip route show default | awk '{print $5; exit}')
+[ -n "$UPLINK" ] || fail "this host has no default route, so the lab has no internet to reach"
+for net in "$WAN.0/24" "$CLOUD_A.0/24" "$CLOUD_B.0/24"; do
+  sudo iptables -t nat -C POSTROUTING -s "$net" -o "$UPLINK" -j MASQUERADE 2>/dev/null \
+    || sudo iptables -t nat -A POSTROUTING -s "$net" -o "$UPLINK" -j MASQUERADE
+done
+# Replies to a cloud node have to find their way back to its cloud.
+sudo ip route replace "$CLOUD_A.0/24" via "$WAN.2" dev cldt-wan
+sudo ip route replace "$CLOUD_B.0/24" via "$WAN.3" dev cldt-wan
+
 echo "--- routing ---"
 for n in bastion cp w1 w2; do in_node "$n" ip route replace default via "$LAN.1" dev eth1; done
 in_node remote1 ip route replace default via "$CLOUD_A.1" dev eth1
@@ -91,6 +113,9 @@ in_node router ip route replace "$CLOUD_A.0/24" via "$WAN.2" dev eth2
 in_node router ip route replace "$CLOUD_B.0/24" via "$WAN.3" dev eth2
 in_node edge-a ip route replace "$CLOUD_B.0/24" via "$WAN.3" dev eth2
 in_node edge-b ip route replace "$CLOUD_A.0/24" via "$WAN.2" dev eth2
+for e in router edge-a edge-b; do
+  in_node "$e" ip route replace default via "$WAN.254" dev eth2
+done
 
 echo "--- what each edge does ---"
 # The site: anything may leave wearing the router's address, and only
@@ -154,6 +179,14 @@ if netns remote1 timeout 3 bash -c "</dev/tcp/$LAN.10/6443" 2>/dev/null; then
   fail "remote1 opened a connection to the API server directly: a tunnel would not be the only way in, so joining over one stays untested"
 fi
 echo "  neither cloud reaches the API server, so a tunnel is the only way in"
+
+for n in cp w1 w2; do
+  reaches "$n" 1.1.1.1 || fail "$n has no path off the lab, which it would have through its own router"
+done
+for r in remote1 remote2; do
+  reaches "$r" 1.1.1.1 || fail "$r has no path off the lab, which it would have from a public address"
+done
+echo "  the site and both clouds reach the internet"
 
 echo
 echo "site     $LAN.0/24      bastion .2  cp .10  w1 .11  w2 .12   router .1"

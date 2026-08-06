@@ -275,8 +275,27 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 	}
 	sort.Slice(nodes, func(i, j int) bool { return LessIP(nodes[i].tunnelAddr, nodes[j].tunnelAddr) })
 
+	// The nodes that will actually be rendered as peers. A node whose
+	// key is published but blank is half a peer and is skipped below,
+	// and a prefix must not be handed to a peer that never appears.
+	// and the host addresses those peers will own on their own entries,
+	// which is what the relay must not claim a second time.
+	peerNode := map[string]bool{}
+	ownHost := map[string]bool{}
+	for _, n := range nodes {
+		if strings.TrimSpace(string(data[NodePublicKeyPrefix+n.name])) == "" {
+			continue
+		}
+		peerNode[n.name] = true
+		ownHost[n.tunnelAddr] = true
+		for _, addr := range SplitList(string(data[NodeAddressesPrefix+n.name])) {
+			ownHost[addr] = true
+		}
+	}
+
 	var peers []PeerSpec
-	for i, n := range nodes {
+	relayed := false
+	for _, n := range nodes {
 		pub := strings.TrimSpace(string(data[NodePublicKeyPrefix+n.name]))
 		if pub == "" {
 			continue
@@ -291,9 +310,17 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 		// permitted but never routed: reaching a pod is the network's
 		// job, over the session these host routes make possible.
 		allowed = append(allowed, SplitList(string(data[NodePodCIDRsPrefix+n.name]))...)
-		if i == 0 {
+		if !relayed {
+			relayed = true
+			// The API server, for a site where no node terminating a
+			// tunnel is a control plane: the relay masquerades onto the
+			// LAN to reach it. When a control plane does hold a tunnel
+			// it is a peer in its own right and already owns the
+			// address, so claiming it here as well would name it on two
+			// peers, and the accept list would send the API traffic to
+			// whichever was configured last.
 			for _, api := range apiServers {
-				if api = strings.TrimSpace(api); api == "" || containsHost(routeHosts, api) {
+				if api = strings.TrimSpace(api); api == "" || containsHost(routeHosts, api) || ownHost[api] {
 					continue
 				}
 				allowed = append(allowed, HostCIDR(api))
@@ -306,6 +333,18 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 			// to relay, so a remote has one path to the site rather
 			// than a different one per destination.
 			for _, name := range siteNodeNames(data) {
+				// A node that is a peer in its own right owns its
+				// prefixes there, so relaying them here as well would
+				// name the same prefix on two peers. The two are
+				// written by different actors: the operator publishes
+				// the addresses, the node's own dialer publishes the
+				// key that turns it into a peer, and between those two
+				// writes the Secret holds both forms. Resolving it here
+				// makes the render self-consistent whatever order they
+				// land in, rather than making correctness depend on it.
+				if peerNode[name] {
+					continue
+				}
 				for _, addr := range SplitList(string(data[SiteAddressesPrefix+name])) {
 					if containsHost(routeHosts, addr) {
 						continue

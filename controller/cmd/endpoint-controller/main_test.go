@@ -1038,3 +1038,68 @@ func TestAPrefixIsOwnedInExactlyOnePlaceAcrossAReturn(t *testing.T) {
 		}
 	}
 }
+
+// A node moving back into the selector is published by two actors: this
+// operator writes its addresses and allocates its tunnel address, its
+// own dialer writes the key that makes it a peer. The render is what a
+// remote acts on, so the invariant belongs there: at every step of the
+// return, every prefix has exactly one owner. Zero owners is the one
+// that cannot recover, because the remote prunes the route to the site
+// and the list that would correct it is only reachable over the site.
+func TestNoPrefixIsUnownedWhileAnEndpointReturns(t *testing.T) {
+	const (
+		cpAddr  = "10.10.0.10"
+		cpBlock = "10.244.242.64/26"
+	)
+	data := map[string][]byte{
+		tunnel.NodePublicKeyPrefix + "w1":     []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA="),
+		tunnel.NodeTunnelAddressPrefix + "w1": []byte("10.100.0.17/24"),
+		tunnel.NodeAddressesPrefix + "w1":     []byte("10.10.0.11"),
+		tunnel.NodePodCIDRsPrefix + "w1":      []byte("10.244.190.64/26"),
+		// cp holds no tunnel: w1 relays to it.
+		tunnel.SiteAddressesPrefix + "cp": []byte(cpAddr),
+		tunnel.SitePodCIDRsPrefix + "cp":  []byte(cpBlock),
+	}
+
+	check := func(step string) {
+		t.Helper()
+		peers, err := tunnel.RemotePeers(data, "10.100.0.128", []string{cpAddr})
+		if err != nil {
+			t.Fatalf("%s: RemotePeers: %v", step, err)
+		}
+		for _, prefix := range []string{tunnel.HostCIDR(cpAddr), cpBlock} {
+			n := 0
+			for _, p := range peers {
+				for _, cidr := range p.WGAllowedIPs {
+					if cidr == prefix {
+						n++
+					}
+				}
+			}
+			if n != 1 {
+				t.Errorf("%s: %s is permitted on %d peers, want exactly 1", step, prefix, n)
+			}
+		}
+	}
+	check("relayed through w1")
+
+	// cp is selected. This operator allocates its address and publishes
+	// its own addresses in the same pass.
+	data[tunnel.NodeTunnelAddressPrefix+"cp"] = []byte("10.100.0.24/24")
+	data[tunnel.NodeAddressesPrefix+"cp"] = []byte(cpAddr)
+	data[tunnel.NodePodCIDRsPrefix+"cp"] = []byte(cpBlock)
+	if takeBackFromRelay(data, "cp") {
+		t.Error("cp stopped being relayed before it was a peer: for as long as its dialer takes to publish a key, nothing owns its address")
+	}
+	check("selected, no key yet")
+
+	// cp's dialer publishes the key. Until the next reconcile the
+	// Secret holds both forms.
+	data[tunnel.NodePublicKeyPrefix+"cp"] = []byte("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=")
+	check("key published, relayed entry not yet cleaned up")
+
+	if !takeBackFromRelay(data, "cp") {
+		t.Fatal("cp is a peer in its own right and is still relayed")
+	}
+	check("returned")
+}

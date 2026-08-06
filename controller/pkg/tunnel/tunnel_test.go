@@ -365,3 +365,40 @@ func TestRemotePeers_TheSiteGoesToARenderedPeer(t *testing.T) {
 		}
 	}
 }
+
+// The control-plane row: the only endpoint is the control plane, one
+// worker is inside its retention window, and the other holds no tunnel.
+// The control plane owns the API server's address as an ordinary node
+// address, so nothing may claim it again on the peer designated to
+// relay, and the retained worker still carries the rest of the site.
+func TestRemotePeers_AControlPlaneEndpointOwnsTheAPIAddressOnce(t *testing.T) {
+	data := peerSecret(
+		map[string][2]string{
+			"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.24/24"},
+			"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.17/24"},
+		},
+		map[string]string{"cp": "10.244.242.64/26"},
+	)
+	data[NodeAddressesPrefix+"cp"] = []byte("10.10.0.10")
+	// w1 is retained: it keeps its key and tunnel address, and its
+	// prefixes have moved to the site entries.
+	data[SiteAddressesPrefix+"w1"] = []byte("10.10.0.11")
+	data[SitePodCIDRsPrefix+"w1"] = []byte("10.244.190.64/26")
+	// w2 never held a tunnel.
+	data[SiteAddressesPrefix+"w2"] = []byte("10.10.0.12")
+	data[SitePodCIDRsPrefix+"w2"] = []byte("10.244.80.192/26")
+
+	peers, err := RemotePeers(data, "10.100.0.129", []string{"10.10.0.10"})
+	if err != nil {
+		t.Fatalf("RemotePeers: %v", err)
+	}
+	for _, prefix := range []string{
+		"10.10.0.10/32", "10.244.242.64/26",
+		"10.10.0.11/32", "10.244.190.64/26",
+		"10.10.0.12/32", "10.244.80.192/26",
+	} {
+		if got := owners(peers, prefix); got != 1 {
+			t.Errorf("%s is permitted on %d peers, want exactly 1", prefix, got)
+		}
+	}
+}

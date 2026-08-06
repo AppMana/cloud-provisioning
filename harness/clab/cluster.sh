@@ -94,11 +94,13 @@ for w in w1 w2; do
       || { tail -20 "$OUT/join-$w.log" >&2; fail "$w did not join"; }
   fi
 done
+# Readiness is not asserted here and cannot be: a node with no network
+# installed is legitimately NotReady, and this runs before the network.
+# What can be asserted now is that every node registered, and by which
+# address. install.sh waits for Ready once there is a network to be
+# ready for, and fails there.
 for n in cp w1 w2; do
-  # A node that never became ready still has addresses, so the check
-  # below would accept it.
-  k wait --for=condition=Ready node/"$n" --timeout=300s >/dev/null 2>&1 \
-    || fail "$n joined but never became ready"
+  k get node "$n" >/dev/null 2>&1 || fail "$n never registered"
 done
 
 echo "--- every node registered by its segment address ---"

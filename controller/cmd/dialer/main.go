@@ -1106,6 +1106,9 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 
 	var peerConfigs []wgtypes.PeerConfig
 	var routeHosts []net.IPNet
+	// Hosts a peer in this list claims but that are not installable
+	// yet. Not installed, and not pruned either: see installRoutes.
+	var claimedHosts []net.IPNet
 	var blocks []net.IPNet
 	for _, p := range peers {
 		pub, err := wgtypes.ParseKey(p.PublicKey)
@@ -1178,20 +1181,18 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 				fmt.Fprintf(os.Stderr, "not routing one entry for peer %s: %v\n", pub, err)
 				continue
 			}
-			if p.Endpoint == "" && !handshaked[pub] {
-				// Validated but not installed yet; see the
-				// peer-viability comment above.
-				continue
-			}
-			if endpointHosts[ipNet.IP.String()] {
+			switch disposeRouteHost(endpointHosts[ipNet.IP.String()], p.Endpoint != "" || handshaked[pub]) {
+			case routeIsAnEndpoint:
 				// A tunnel endpoint is not routed through the tunnel
 				// (see endpointHosts). The address stays reachable by its
 				// ordinary route, which is exactly how the tunnel
 				// reaches it in the first place.
 				fmt.Fprintf(os.Stderr, "not routing %s via %s: it is a peer endpoint, and routing an endpoint through its own tunnel loops\n", ipNet.IP, cfg.iface)
-				continue
+			case routeNotYet:
+				claimedHosts = append(claimedHosts, ipNet)
+			case routeInstall:
+				routeHosts = append(routeHosts, ipNet)
 			}
-			routeHosts = append(routeHosts, ipNet)
 		}
 	}
 
@@ -1228,7 +1229,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		return err
 	}
 
-	if err := installRoutes(cfg, routeHosts, blocks); err != nil {
+	if err := installRoutes(cfg, routeHosts, claimedHosts, blocks); err != nil {
 		return err
 	}
 
@@ -1292,10 +1293,62 @@ func parseHostRoute(h string) (net.IPNet, error) {
 // nothing else changes. Route hosts are not derived from AllowedIPs;
 // parseHostRoute has already rejected anything that isn't a single
 // host.
-func installRoutes(cfg config, routeHosts, blocks []net.IPNet) error {
+// What this pass does with one of a peer's route hosts.
+type routeHostDisposition int
+
+const (
+	// Install it: the peer can carry traffic for it.
+	routeInstall routeHostDisposition = iota
+	// Claim it without installing: the peer that will carry it has no
+	// endpoint and has not handshaked, so a route toward it would be a
+	// blackhole. Claiming keeps any route already serving this host in
+	// place until the peer arrives.
+	routeNotYet
+	// Neither install nor claim: the host is serving as some peer's
+	// tunnel endpoint, and a route for it through the tunnel would
+	// send the tunnel's own packets into the tunnel. Unlike routeNotYet
+	// this is not a wait, so a route for it must be pruned, not kept.
+	routeIsAnEndpoint
+)
+
+func disposeRouteHost(isEndpointHost, peerCanCarry bool) routeHostDisposition {
+	if isEndpointHost {
+		return routeIsAnEndpoint
+	}
+	if !peerCanCarry {
+		return routeNotYet
+	}
+	return routeInstall
+}
+
+// claimedHosts are hosts some peer in the current list owns but that
+// are not installable this pass, because the peer that will carry them
+// has no endpoint and has not handshaked yet. They are not installed,
+// and they are also not pruned: withholding a route toward a peer that
+// cannot yet send avoids a blackhole, but withdrawing one that is
+// already carrying traffic buys nothing, because the alternative to a
+// route that is briefly wrong is no route at all.
+//
+// These routes name no peer. They are scope-link routes on the tunnel
+// device, and which peer receives a packet is decided by WireGuard's
+// accept list, not by the route, so a route left in place becomes
+// correct the moment the handshake lands.
+//
+// Measured on remote2, when the control plane became the endpoint: the
+// route for the API server's address was pruned at 22:17:33 because
+// the control plane, which is behind NAT and therefore dials in, had
+// not handshaked yet. The API went unreachable, so the list naming the
+// control plane could not be re-read, and only the cached copy of that
+// same list carried it back once the handshake arrived, two minutes
+// later.
+func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet) error {
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
+	}
+	claimed := map[string]bool{}
+	for _, host := range claimedHosts {
+		claimed[host.String()] = true
 	}
 	desired := map[string]bool{}
 	for _, host := range routeHosts {
@@ -1359,7 +1412,7 @@ func installRoutes(cfg config, routeHosts, blocks []net.IPNet) error {
 				continue
 			}
 			ones, bits := route.Dst.Mask.Size()
-			if desired[route.Dst.String()] {
+			if desired[route.Dst.String()] || claimed[route.Dst.String()] {
 				continue
 			}
 			// Prune only host routes. A wider prefix on this interface

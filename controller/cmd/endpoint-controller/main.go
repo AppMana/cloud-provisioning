@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -396,16 +397,23 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 		secret.Data = map[string][]byte{}
 	}
 
+	// What the nodes no longer account for, before anything is
+	// allocated: a departed endpoint's address is retired in the same
+	// pass, so the loop below cannot hand it straight to another node.
+	changed := pruneDeparted(secret.Data, r.membership(nodes.Items))
+
 	// Existing allocations stay put; new nodes take the next free host
-	// in the tunnel subnet.
+	// in the tunnel subnet. A retired address is not free.
 	used := map[string]bool{}
 	for key, val := range secret.Data {
 		if strings.HasPrefix(key, tunnel.NodeTunnelAddressPrefix) {
 			used[strings.SplitN(strings.TrimSpace(string(val)), "/", 2)[0]] = true
 		}
 	}
+	for _, addr := range tunnel.SplitList(string(secret.Data[tunnel.RetiredTunnelAddressesKey])) {
+		used[addr] = true
+	}
 
-	changed := false
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
 		if !r.isTunnelEndpoint(node) {
@@ -563,6 +571,170 @@ func (r *meshReconciler) isTunnelEndpoint(node *corev1.Node) bool {
 		return true
 	}
 	return r.tunnelEndpointSelector.Matches(labels.Set(node.Labels))
+}
+
+// meshMembership is what the nodes say the mesh contains: which of
+// them terminate a tunnel, and which are at this site with no tunnel
+// of their own. A node this operator provisioned is in neither: it is
+// not at this site at all, and reaches the mesh as a peer entry keyed
+// by its Machine name, which none of this owns.
+type meshMembership struct {
+	endpoints map[string]bool
+	siteNodes map[string]bool
+}
+
+// membership reads that off the node list. Existence and the endpoint
+// selector are its only inputs, and neither is a health signal: a
+// NotReady node, a node whose dialer pod is not running, and a node
+// whose handshake has gone stale are all members here and keep
+// everything they published. See pruneDeparted for why.
+func (r *meshReconciler) membership(nodes []corev1.Node) meshMembership {
+	want := meshMembership{endpoints: map[string]bool{}, siteNodes: map[string]bool{}}
+	for i := range nodes {
+		node := &nodes[i]
+		switch {
+		case r.isTunnelEndpoint(node):
+			want.endpoints[node.Name] = true
+		case node.Labels[cloudWorkerRoleLabel] == cloudWorkerRoleValue:
+		default:
+			want.siteNodes[node.Name] = true
+		}
+	}
+	return want
+}
+
+// pruneDeparted removes what a node published once it is no longer the
+// thing it published as, and reports whether it changed anything.
+//
+// Nothing did this, and the cost was measured. Moving the tunnel from
+// one site node to another left the departed endpoint's key and tunnel
+// address in the Secret, so every remote's derived peer list still
+// named a node running no dialer and never learned the one that was.
+// A remote whose only path to the API server is that peer goes
+// NotReady, and on a real cloud it cannot be recovered without
+// out-of-band access.
+//
+// What counts as departed is intent, never health. An operator who
+// changes the selector, deletes a node, or drains it out of the
+// cluster has said so declaratively, and acting on it promptly is
+// doing as asked. NotReady, a dialer pod that is not running and a
+// handshake that has gone stale all mean the node is expected back:
+// removing its entry churns every remote's configuration, and forces
+// the mesh to reconverge, while the fault is probably elsewhere. This
+// is transitSpeaker.reconcile's judgement applied to the other half of
+// the mesh. There is deliberately no horizon after which a sick node
+// is evicted, because no number tells a long outage from a long
+// maintenance, and the operator already has a way to say which it is.
+//
+// Two orderings within one pass are load bearing:
+//
+//   - No node-* entry goes until some surviving endpoint is fully
+//     published, meaning it has both its own key and an allocated
+//     address. A remote left with a peer it cannot reach is stale; a
+//     remote left with no peer at all is stranded, and only the second
+//     is unrecoverable from the far side.
+//   - A site-* entry goes only once that same node's endpoint
+//     publication is complete, or the node is gone from the cluster. A
+//     node in the middle of becoming an endpoint is still reached by
+//     relaying through the current one, and dropping its site entry
+//     first would take away reachability it already had. It also must
+//     go then rather than later: the accept list has one owner per
+//     prefix, and the node's addresses would otherwise be permitted
+//     both on its own peer and on the relaying one.
+func pruneDeparted(data map[string][]byte, want meshMembership) bool {
+	if len(want.endpoints) == 0 && len(want.siteNodes) == 0 {
+		// A membership that reads as empty is a failed read until
+		// proven otherwise. Nothing at a site departs all at once, and
+		// believing this reading empties the mesh.
+		return false
+	}
+	survivors := 0
+	for name := range want.endpoints {
+		if publishedEndpoint(data, name) {
+			survivors++
+		}
+	}
+	changed := false
+	drop := func(key string) {
+		if _, ok := data[key]; ok {
+			delete(data, key)
+			changed = true
+		}
+	}
+	for _, name := range publishedNames(data,
+		tunnel.NodePublicKeyPrefix, tunnel.NodeTunnelAddressPrefix,
+		tunnel.NodeAddressesPrefix, tunnel.NodePodCIDRsPrefix) {
+		if want.endpoints[name] || survivors == 0 {
+			continue
+		}
+		if retireTunnelAddress(data, string(data[tunnel.NodeTunnelAddressPrefix+name])) {
+			changed = true
+		}
+		drop(tunnel.NodePublicKeyPrefix + name)
+		drop(tunnel.NodeTunnelAddressPrefix + name)
+		drop(tunnel.NodeAddressesPrefix + name)
+		drop(tunnel.NodePodCIDRsPrefix + name)
+	}
+	for _, name := range publishedNames(data, tunnel.SiteAddressesPrefix, tunnel.SitePodCIDRsPrefix) {
+		if want.siteNodes[name] {
+			continue
+		}
+		if want.endpoints[name] && !publishedEndpoint(data, name) {
+			continue
+		}
+		drop(tunnel.SiteAddressesPrefix + name)
+		drop(tunnel.SitePodCIDRsPrefix + name)
+	}
+	return changed
+}
+
+// publishedEndpoint reports whether a node is a usable peer as
+// published: an address this operator allocated, and the public key
+// the node's own dialer put there. Either alone is half a peer, which
+// RemotePeers skips.
+func publishedEndpoint(data map[string][]byte, name string) bool {
+	return strings.TrimSpace(string(data[tunnel.NodePublicKeyPrefix+name])) != "" &&
+		strings.TrimSpace(string(data[tunnel.NodeTunnelAddressPrefix+name])) != ""
+}
+
+// publishedNames lists, once each and in a stable order, the node
+// names appearing under any of the given key prefixes.
+func publishedNames(data map[string][]byte, prefixes ...string) []string {
+	seen := map[string]bool{}
+	var names []string
+	for key := range data {
+		for _, prefix := range prefixes {
+			if !strings.HasPrefix(key, prefix) {
+				continue
+			}
+			if name := strings.TrimPrefix(key, prefix); !seen[name] {
+				seen[name] = true
+				names = append(names, name)
+			}
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+// retireTunnelAddress records an address as spent, so no later node is
+// given it. See tunnel.RetiredTunnelAddressesKey for why it is never
+// handed back.
+func retireTunnelAddress(data map[string][]byte, addr string) bool {
+	addr = strings.SplitN(strings.TrimSpace(addr), "/", 2)[0]
+	if addr == "" {
+		return false
+	}
+	retired := tunnel.SplitList(string(data[tunnel.RetiredTunnelAddressesKey]))
+	for _, existing := range retired {
+		if existing == addr {
+			return false
+		}
+	}
+	retired = append(retired, addr)
+	sort.Slice(retired, func(i, j int) bool { return tunnel.LessIP(retired[i], retired[j]) })
+	data[tunnel.RetiredTunnelAddressesKey] = []byte(strings.Join(retired, ","))
+	return true
 }
 
 // selectorNamesControlPlane reports whether the operator was asked,

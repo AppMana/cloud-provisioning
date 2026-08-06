@@ -70,6 +70,20 @@ const (
 	// --peers-secret-* override.
 	CloudPeersKey = "peers.json"
 
+	// RetiredTunnelAddressesKey lists (comma-separated) the tunnel
+	// addresses of nodes that have left the mesh. They are never
+	// allocated again while this Secret lives.
+	//
+	// An address that is freed is an address a later node can be given,
+	// and any remote still holding configuration that names it then
+	// sends that node's traffic to a different one, encrypted to a key
+	// it does not hold. Nothing here can know that no remote holds such
+	// configuration: that is exactly the state this reconciler was
+	// failing to converge. A /24 per mesh is not scarce enough for the
+	// trade to be worth making, and a mesh that exhausts its subnet is
+	// one to renumber deliberately rather than by reuse.
+	RetiredTunnelAddressesKey = "retired-tunnel-addresses"
+
 	// APIServersKey lists every control-plane address a remote must be
 	// able to reach (comma-separated). k0s workers load-balance across
 	// all of them via nllb, so one address is not enough.

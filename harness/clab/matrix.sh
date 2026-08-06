@@ -132,8 +132,15 @@ want=set(sys.argv[1].split())
 print(" ".join(sorted(k[len("node-tunnel-address-"):] for k in d
       if k.startswith("node-tunnel-address-") and k[len("node-tunnel-address-"):] not in want)))
 ' "$want" 2>/dev/null)
-    if [ "$expected" -gt 0 ] && [ "$published" -eq "$expected" ] && [ -z "$stale" ]; then
-      echo "  placed on $(echo $want | tr '\n' ' '), nothing stale"
+    # A node that has left the selector keeps its entries for the
+    # retention window on purpose, so that a remote which reads its peer
+    # list over the tunnel has time to move before the old one goes.
+    # Waiting for it to disappear would be waiting for the mechanism to
+    # finish protecting us, and would report a placement as stuck while
+    # it is working. What has to hold is that every node the selector
+    # names is published; the departed one is reported, not waited on.
+    if [ "$expected" -gt 0 ] && [ "$published" -eq "$expected" ]; then
+      echo "  placed on $(echo $want | tr '\n' ' ')${stale:+, retaining $stale}"
       break
     fi
     sleep 10

@@ -63,7 +63,22 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# A namespace left terminating from a previous run rejects everything
+# created in it, and the rejection surfaces as "pods did not all start",
+# which reads as the network being broken. Wait for it to finish going,
+# and force out anything holding it open: a probe pod on a node that was
+# briefly unreachable can hold a namespace for hours.
+if kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
+  for _ in $(seq 1 30); do
+    phase=$(kubectl get namespace "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo gone)
+    [[ "$phase" == "Terminating" ]] || break
+    kubectl -n "$NAMESPACE" delete pods --all --force --grace-period=0 >/dev/null 2>&1 || true
+    sleep 5
+  done
+fi
 kubectl create namespace "$NAMESPACE" >/dev/null 2>&1 || true
+kubectl get namespace "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null | grep -qv Terminating \
+  || { echo "FAIL: $NAMESPACE is still terminating, so nothing can be created in it" >&2; exit 1; }
 
 declare -A POD_IP
 declare -A SERVICE_IP

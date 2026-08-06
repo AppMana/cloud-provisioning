@@ -264,7 +264,18 @@ func ensureForwardingPath(iface string, mtu int) error {
 	// happens on the interface the traffic arrives on, which is the
 	// other one. The kernel takes the larger of the "all" value and
 	// the interface's, so setting "all" is what actually relaxes it.
+	// Only ever relaxed, never tightened. The kernel takes the larger of
+	// the "all" value and the interface's, so writing 2 into "all"
+	// relaxes a node whose interfaces are strict and tightens one whose
+	// interfaces are off, turning no checking into loose checking. Loose
+	// still drops a packet whose source is unroutable, which is exactly
+	// what a freshly joined remote's pod block is until its route lands,
+	// so tightening here would cost the very traffic this is meant to
+	// let through.
 	for _, knob := range []string{"ipv4/conf/all/rp_filter", fmt.Sprintf("ipv4/conf/%s/rp_filter", iface)} {
+		if current, err := readSysctl(knob); err == nil && current == "0" {
+			continue
+		}
 		if err := setSysctl(knob, "2"); err != nil {
 			fmt.Fprintf(os.Stderr, "leaving reverse path filtering strict at %s (a reply that returns by another path will be dropped): %v\n", knob, err)
 		}
@@ -328,6 +339,17 @@ func ensureForwardingPath(iface string, mtu int) error {
 //
 // Read before write, so a node that already has the value it needs
 // costs nothing and cannot fail.
+// readSysctl reports one net sysctl's current value, from the node's
+// own /proc/sys/net where that is mounted in.
+func readSysctl(name string) (string, error) {
+	for _, path := range []string{filepath.Join(tunnel.HostSysctlNet, name), filepath.Join("/proc/sys/net", name)} {
+		if current, err := os.ReadFile(path); err == nil {
+			return strings.TrimSpace(string(current)), nil
+		}
+	}
+	return "", fmt.Errorf("no readable %s", name)
+}
+
 func setSysctl(name, value string) error {
 	paths := []string{filepath.Join(tunnel.HostSysctlNet, name), filepath.Join("/proc/sys/net", name)}
 	var firstErr error

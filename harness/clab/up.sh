@@ -166,7 +166,12 @@ echo "  neither cloud reaches any node at the site"
 # check, which is exactly how the management network went unnoticed.
 for r in remote1 remote2; do
   for n in bastion cp w1 w2; do
-    for a in $(netns "$n" ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1); do
+    addrs=$(netns "$n" ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1)
+    # This is the check that caught the management network. If the list
+    # comes back empty it tests nothing and says it passed, which is the
+    # failure mode it exists to prevent.
+    [ -n "$addrs" ] || fail "could not read $n's addresses, so this check would pass having tested nothing"
+    for a in $addrs; do
       if reaches "$r" "$a" 2; then
         fail "$r reached $n at $a: a path exists that the segments do not explain"
       fi

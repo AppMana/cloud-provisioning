@@ -113,7 +113,16 @@ k apply -f /tmp/calico.yaml >/dev/null || fail "installing calico"
 for _ in $(seq 1 48); do k get ippools.crd.projectcalico.org default-ipv4-ippool >/dev/null 2>&1 && break; sleep 5; done
 k patch ippools.crd.projectcalico.org default-ipv4-ippool --type merge \
   -p '{"spec":{"ipipMode":"Never","vxlanMode":"Never"}}' >/dev/null || fail "setting the pool's mode"
-k -n kube-system rollout restart daemonset/calico-node >/dev/null 2>&1 || true
+# Waited for, not fired and forgotten. calico-node programs its routes
+# from the pool it saw when it started, so a pool changed afterwards
+# leaves the old encapsulation's routes in place. The node readiness
+# check below is satisfied by the pods that are already running, so
+# without this the harness reports a cluster whose routes and whose
+# model disagree, and says nothing.
+k -n kube-system rollout restart daemonset/calico-node >/dev/null 2>&1 \
+  || fail "could not restart calico-node after changing the pool"
+k -n kube-system rollout status daemonset/calico-node --timeout=5m >/dev/null \
+  || fail "calico-node did not come back after the pool change, so its routes still describe the old encapsulation"
 for n in cp w1 w2; do k wait --for=condition=Ready node/"$n" --timeout=420s >/dev/null 2>&1 || fail "$n never became ready"; done
 echo "  every site node ready"
 

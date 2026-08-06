@@ -133,7 +133,12 @@ pod_exec() {
   if [[ "$EXEC_VIA" == "node" ]]; then
     local cid
     local ctr="${NODE_PREFIX}${node}"
-    cid=$(docker exec "$ctr" crictl ps --name serve -q 2>/dev/null | head -1)
+    # Anchored, and scoped to this check's own namespace. --name is a
+    # substring regex, and kube-apiserver contains "serve", so on a
+    # control plane the unanchored form can select the API server, whose
+    # image has neither wget nor ping and reads as a broken network.
+    cid=$(docker exec "$ctr" crictl ps --name '^serve$' \
+      --label "io.kubernetes.pod.namespace=$NAMESPACE" -q 2>/dev/null | head -1)
     [[ -n "$cid" ]] || return 1
     docker exec "$ctr" crictl exec "$cid" "$@" 2>/dev/null
   else

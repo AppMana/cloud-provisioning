@@ -95,7 +95,10 @@ for w in w1 w2; do
   fi
 done
 for n in cp w1 w2; do
-  k wait --for=condition=Ready node/"$n" --timeout=300s >/dev/null 2>&1 || true
+  # A node that never became ready still has addresses, so the check
+  # below would accept it.
+  k wait --for=condition=Ready node/"$n" --timeout=300s >/dev/null 2>&1 \
+    || fail "$n joined but never became ready"
 done
 
 echo "--- every node registered by its segment address ---"

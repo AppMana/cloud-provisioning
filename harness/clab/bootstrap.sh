@@ -136,12 +136,27 @@ k -n "$NS" patch machine "$MACHINE" --subresource=status --type merge \
   || fail "reporting which node the machine became"
 echo "  machine $MACHINE is node $CONTAINER"
 
-for _ in $(seq 1 60); do
-  permitted=$(k -n "$NS" get secret "$NS-peers" -o jsonpath="{.data.peer-allowed-ips-$MACHINE}" 2>/dev/null | base64 -d 2>/dev/null || true)
-  case "$permitted" in *,*) break ;; esac
+# What the site permits for this machine, once there is anything to
+# permit. The network gives a node a pod block when the node first needs
+# one, so a node that has just joined and runs nothing has none, and an
+# empty accept list here is the truth rather than a fault. The two cases
+# are distinguished by asking the network, not by waiting longer.
+for _ in $(seq 1 24); do
+  block=$(k get blockaffinities.crd.projectcalico.org \
+    -o jsonpath="{range .items[?(@.spec.node=='$CONTAINER')]}{.spec.cidr}{'\n'}{end}" 2>/dev/null | grep -v '^$' | head -1)
+  [ -n "$block" ] && break
   sleep 5
 done
-case "${permitted:-}" in
-  *,*) echo "  the site permits $permitted" ;;
-  *) fail "the site permits only ${permitted:-nothing} for $MACHINE: its pods are unreachable from here" ;;
-esac
+if [ -z "${block:-}" ]; then
+  echo "  the network has given $CONTAINER no pod block yet, so there is nothing for the site to permit"
+else
+  for _ in $(seq 1 36); do
+    permitted=$(k -n "$NS" get secret "$NS-peers" -o jsonpath="{.data.peer-allowed-ips-$MACHINE}" 2>/dev/null | base64 -d 2>/dev/null || true)
+    case "$permitted" in *"$block"*) break ;; esac
+    sleep 5
+  done
+  case "${permitted:-}" in
+    *"$block"*) echo "  the site permits $permitted" ;;
+    *) fail "the network gave $CONTAINER $block and the site permits only ${permitted:-nothing}: its pods are unreachable from here" ;;
+  esac
+fi

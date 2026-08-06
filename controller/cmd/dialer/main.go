@@ -212,17 +212,29 @@ func main() {
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
-			// Asked to stop. On a node that reaches the cluster over
-			// its LAN (Secret mode), take the interface down: the
-			// operator removing this DaemonSet means the tunnel is
-			// meant to be gone, and leaving the device behind leaves
-			// routes with nothing reconciling them. On the cloud node
-			// (peers-file mode) the interface stays up: the tunnel is
-			// that node's only path back to the cluster, so it
-			// outlives anything managing it.
-			if cfg.secretName != "" {
-				removeDevice(cfg.iface)
-			}
+			// Asked to stop, which says nothing about why.
+			//
+			// This used to take the interface down whenever the node
+			// reached the cluster over its own LAN, reasoning that the
+			// DaemonSet going away means the tunnel is meant to go
+			// away. But this process is stopped far more often for
+			// reasons that mean the opposite: any edit to the
+			// DaemonSet's pod template restarts every dialer, and
+			// changing where tunnels are placed edits that template.
+			// So moving a tunnel from one node to another tore down
+			// every other node's tunnel too, and a remote that reads
+			// its peer list over one of them lost the path it needed
+			// in order to be told anything. Measured: a node still
+			// selected, still published, still retained, with no
+			// interface at all.
+			//
+			// A left-behind device is a bounded cost: the next dialer
+			// on this node adopts it, and the operator who genuinely
+			// wants it gone is uninstalling, which takes the node's
+			// whole configuration with it. Being wrong in the other
+			// direction costs a node that cannot be recovered without
+			// out-of-band access.
+
 			return
 		}
 	}

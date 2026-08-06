@@ -1440,9 +1440,24 @@ func dialerNodeAffinity(raw string, retained []string) *corev1.NodeSelector {
 	}
 	selected := append(append([]corev1.NodeSelectorRequirement{}, base...), parseSelectorRequirements(raw)...)
 	terms := []corev1.NodeSelectorTerm{{MatchExpressions: selected}}
+
+	// A retained node keeps only the exclusions that are about what a
+	// node is, never the one about whether it was chosen. The control
+	// plane exclusion exists so a tunnel does not land on a control
+	// plane nobody selected; a node being retained was selected, and
+	// held a tunnel until a moment ago. Repeating that exclusion here
+	// makes the term unsatisfiable for exactly the node it names, so a
+	// departing control plane loses its dialer at once and the remote
+	// that depends on it is stranded, which is the failure retention
+	// exists to prevent. Measured: a term reading
+	// "metadata.name In [cp] and control-plane DoesNotExist".
+	kept := []corev1.NodeSelectorRequirement{
+		{Key: "kubernetes.io/os", Operator: corev1.NodeSelectorOpIn, Values: []string{"linux"}},
+		{Key: cloudWorkerRoleLabel, Operator: corev1.NodeSelectorOpNotIn, Values: []string{cloudWorkerRoleValue}},
+	}
 	for _, name := range retained {
 		terms = append(terms, corev1.NodeSelectorTerm{
-			MatchExpressions: append([]corev1.NodeSelectorRequirement{}, base...),
+			MatchExpressions: append([]corev1.NodeSelectorRequirement{}, kept...),
 			MatchFields: []corev1.NodeSelectorRequirement{{
 				Key: "metadata.name", Operator: corev1.NodeSelectorOpIn, Values: []string{name},
 			}},

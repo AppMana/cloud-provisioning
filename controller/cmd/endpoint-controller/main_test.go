@@ -657,9 +657,25 @@ func TestDialerNodeAffinity(t *testing.T) {
 			declines: []*corev1.Node{w2, provisioned, windows},
 		},
 		{
-			name:     "a retained node is still not a control plane the selector did not name",
+			// A retained control plane keeps its dialer. The exclusion
+			// is about not putting a tunnel on a control plane nobody
+			// chose, and a node is only ever retained because it was
+			// chosen and is carrying one right now. Dropping it the
+			// instant the selector moves is the stranding this whole
+			// mechanism exists to prevent, and it was measured: the
+			// term read "metadata.name In [cp] and control-plane
+			// DoesNotExist", which nothing can satisfy.
+			name:     "a retained control plane keeps the tunnel it already has",
 			raw:      "kubernetes.io/hostname=w2",
 			retained: []string{"cp", "w1", "w2"},
+			runs:     []*corev1.Node{cp, w1, w2},
+			declines: []*corev1.Node{provisioned, windows},
+		},
+		{
+			// And one that was never chosen still gets nothing.
+			name:     "a control plane nobody named and nobody retained",
+			raw:      "kubernetes.io/hostname=w2",
+			retained: []string{"w1"},
 			runs:     []*corev1.Node{w1, w2},
 			declines: []*corev1.Node{cp, provisioned, windows},
 		},

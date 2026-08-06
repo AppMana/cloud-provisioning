@@ -1,0 +1,27 @@
+> Where the tunnels land, and how many clouds are on the far side.
+>
+> Columns, tab separated:
+>
+>   name       what to call the row
+>   endpoints  which site nodes terminate a tunnel: cp, w1, w2, a comma
+>              separated list, or all
+>   remotes    1 for cloud A alone, 2 for cloud A and cloud B
+>
+> Rows are ordered so the number of clouds only grows. A remote that has
+> joined stays joined; what changes between rows is which site nodes
+> hold tunnels, which is a chart value. Rebuilding the whole topology per
+> row would cost more than it proves.
+>
+> Every row expects total reachability: each pod reaching every other pod
+> and every service, both directions, whether or not the nodes involved
+> terminate a tunnel. A node with no tunnel reaches a remote by transiting
+> one that has one, so tunnel placement is meant to be invisible from the
+> pod network. A row that fails is that claim being wrong.
+>
+name	endpoints	remotes
+control-plane	cp	1
+one-worker	w1	1
+two-workers	w1,w2	1
+all-nodes	all	1
+one-worker-two-clouds	w1	2
+all-nodes-two-clouds	all	2

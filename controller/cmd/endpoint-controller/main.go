@@ -789,6 +789,29 @@ func nextFreeAddress(base string, used map[string]bool) (string, error) {
 	return "", fmt.Errorf("tunnel subnet %s is exhausted", base)
 }
 
+// KNOWN GAP, measured rather than theorised.
+//
+// A remote learns its peer list from the API server, and it reaches the
+// API server over the tunnel. Move a tunnel from one site node to
+// another and the departing node's dialer is descheduled the moment the
+// selector changes, because the DaemonSet's affinity follows the
+// selector directly. The remote's tunnel dies with it, and the remote
+// then cannot read the peer list that would tell it where the new
+// endpoint is. It stays stranded until something restores the old path.
+//
+// Refreshing the peer list, below, is necessary and not sufficient: the
+// site converges and the remote never hears about it. Observed with the
+// site publishing only the new endpoint while the remote's WireGuard
+// still held the old peer eighteen minutes later.
+//
+// The fix is two phase and belongs in the DaemonSet's affinity rather
+// than here: a node that has left the selector must keep running its
+// dialer until every remote has established with a surviving endpoint,
+// and only then be released. Until that exists, moving a tunnel
+// endpoint is not a safe operation on a live mesh, and the honest
+// workaround is to add the new endpoint, wait for remotes to pick it
+// up, and remove the old one in a second change.
+
 // refreshAdoptionConfigs re-renders every remote's peer list, for the
 // passes that were not about any one machine.
 //

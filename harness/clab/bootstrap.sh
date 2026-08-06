@@ -141,9 +141,15 @@ echo "  machine $MACHINE is node $CONTAINER"
 # one, so a node that has just joined and runs nothing has none, and an
 # empty accept list here is the truth rather than a fault. The two cases
 # are distinguished by asking the network, not by waiting longer.
+# The grep finds nothing on the first pass, every time, because the
+# block does not exist yet: that is what this loop is waiting for. Under
+# set -e a command substitution that ends in a failing grep takes the
+# script with it, so the wait could never reach a second iteration and
+# the whole join was reported as "cloud B never joined" moments after
+# the node had in fact joined and gone Ready.
 for _ in $(seq 1 24); do
   block=$(k get blockaffinities.crd.projectcalico.org \
-    -o jsonpath="{range .items[?(@.spec.node=='$CONTAINER')]}{.spec.cidr}{'\n'}{end}" 2>/dev/null | grep -v '^$' | head -1)
+    -o jsonpath="{range .items[?(@.spec.node=='$CONTAINER')]}{.spec.cidr}{'\n'}{end}" 2>/dev/null | grep -v '^$' | head -1 || true)
   [ -n "$block" ] && break
   sleep 5
 done

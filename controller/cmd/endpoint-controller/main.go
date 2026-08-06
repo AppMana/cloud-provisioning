@@ -1304,7 +1304,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 							RequiredDuringSchedulingIgnoredDuringExecution: dialerNodeAffinity(r.tunnelEndpointsRaw, retained),
 						},
 					},
-					ImagePullSecrets: []corev1.LocalObjectReference{{Name: r.dialerImagePullSecret}},
+					ImagePullSecrets: imagePullSecrets(r.dialerImagePullSecret),
 					Containers: []corev1.Container{
 						{
 							Name:            "dialer",
@@ -1532,6 +1532,24 @@ func parseSelectorRequirements(raw string) []corev1.NodeSelectorRequirement {
 // node with no path back to the API. What the DaemonSet adds is a
 // Kubernetes-native upgrade path (bump --dialer-image, rolling update)
 // instead of host binary swaps.
+// imagePullSecrets is the pull secret list for a dialer pod, which is
+// empty when no secret is configured rather than holding a reference to
+// nothing.
+//
+// A LocalObjectReference with an empty name is accepted by the API and
+// then breaks every strategic merge patch against the object, because
+// name is the merge key for this list and the element has none:
+// "does not contain declared merge key: name". kubectl rollout restart,
+// kubectl set image and kubectl apply all fail against a DaemonSet
+// carrying one, so an operator cannot restart their own dialers, on a
+// cluster where nothing is visibly wrong.
+func imagePullSecrets(name string) []corev1.LocalObjectReference {
+	if name == "" {
+		return nil
+	}
+	return []corev1.LocalObjectReference{{Name: name}}
+}
+
 func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 	hostPathDirectory := corev1.HostPathDirectory
 	// Default: the project image, which also self-installs onto the
@@ -1564,7 +1582,7 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 					Tolerations: []corev1.Toleration{
 						{Key: cloudWorkerTaintKey, Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule},
 					},
-					ImagePullSecrets: []corev1.LocalObjectReference{{Name: r.dialerImagePullSecret}},
+					ImagePullSecrets: imagePullSecrets(r.dialerImagePullSecret),
 					Containers: []corev1.Container{
 						{
 							Name:            "dialer",
@@ -1598,7 +1616,12 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 								"--poll-interval=30s",
 							},
 							VolumeMounts: []corev1.VolumeMount{
-								{Name: "wg-dialer-config", MountPath: "/etc/wg-dialer", ReadOnly: true},
+								// Writable for one file: the interface claim
+							// that tells the node's cloud-init systemd
+							// unit to stand off while this pod holds the
+							// live peer list. The peers file and identity
+							// here are still only ever read.
+							{Name: "wg-dialer-config", MountPath: "/etc/wg-dialer"},
 								{Name: "host-bin", MountPath: "/host-bin"},
 							},
 						},

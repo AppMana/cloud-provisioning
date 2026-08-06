@@ -693,6 +693,31 @@ func ensureLink(cfg config, localAddress string) error {
 	if err := netlink.AddrAdd(link, addr); err != nil && !isAddrExists(err) {
 		return fmt.Errorf("assigning %s to %s: %w", localAddress, cfg.iface, err)
 	}
+	// And carry no other. This interface belongs to this dialer alone,
+	// so an address on it that is not the allocated one is a previous
+	// allocation that was never taken away.
+	//
+	// Adding without removing is not harmless. The stale address stays
+	// primary, so the kernel selects it as the source for anything this
+	// node originates through the tunnel, and no peer permits it: the
+	// accept list names the address the mesh allocated. The far side
+	// drops the packet on ingress, and every route and peer entry
+	// involved is correct while nothing gets through.
+	existing, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+	if err != nil {
+		return fmt.Errorf("listing addresses on %s: %w", cfg.iface, err)
+	}
+	for i := range existing {
+		if existing[i].IPNet != nil && existing[i].IPNet.String() == addr.IPNet.String() {
+			continue
+		}
+		if existing[i].IP.IsLinkLocalUnicast() {
+			continue
+		}
+		if err := netlink.AddrDel(link, &existing[i]); err != nil {
+			return fmt.Errorf("removing superseded address %s from %s: %w", existing[i].IPNet, cfg.iface, err)
+		}
+	}
 
 	// Best effort, and deliberately not fatal. Every one of these makes
 	// forwarding work better on a node that already has a tunnel; none
@@ -710,6 +735,99 @@ func ensureLink(cfg config, localAddress string) error {
 		return fmt.Errorf("bringing up %s: %w", cfg.iface, err)
 	}
 	return nil
+}
+
+// claimPath is where the two dialers on a remote node arbitrate for
+// the interface. It sits beside the peers file, which both of them
+// already have to see: the systemd unit natively, the DaemonSet
+// through its /etc/wg-dialer mount. Named for the interface, so two
+// meshes on one node never contend.
+func claimPath(cfg config) string {
+	if cfg.peersFile == "" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(cfg.peersFile), cfg.iface+".claim")
+}
+
+// claimStale is how long a claim outlives its last refresh. Three polls,
+// so a single missed pass (a slow API server, a restarting pod) does not
+// hand the interface back and forth, and a floor of 90s keeps a short
+// --poll-interval from making the claim effectively instantaneous.
+func claimStale(poll time.Duration) time.Duration {
+	if d := 3 * poll; d > 90*time.Second {
+		return d
+	}
+	return 90 * time.Second
+}
+
+// cachePath is where the adopting dialer keeps the last peer list it
+// read from the cluster, so an API outage costs it nothing it had
+// already learned. Beside the peers file, for the same reason the claim
+// is: that directory is the one both dialers can see, and it survives
+// the pod.
+func cachePath(cfg config) string {
+	if cfg.peersFile == "" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(cfg.peersFile), cfg.iface+".peers-cache.json")
+}
+
+func writeCachedPeers(path string, peers []tunnel.PeerSpec) error {
+	if path == "" {
+		return nil
+	}
+	raw, err := json.Marshal(tunnel.PeerListDoc{Peers: peers})
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+// readCachedPeers returns the last list read from the cluster. A cache
+// that is missing or unreadable is not an error worth failing on: it
+// only means this node has never completed a read, which is exactly
+// when the bootstrap file is the right answer.
+func readCachedPeers(path string) ([]tunnel.PeerSpec, error) {
+	if path == "" {
+		return nil, os.ErrNotExist
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var doc tunnel.PeerListDoc
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return nil, err
+	}
+	return doc.Peers, nil
+}
+
+func writeClaim(path string) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(time.Now().UTC().Format(time.RFC3339)+"\n"), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+// claimHeld reports whether another dialer holds a fresh claim. An
+// unreadable or unparsable claim is not held: the floor applies its
+// list rather than standing off for a file it cannot understand.
+func claimHeld(path string, poll time.Duration) (bool, string) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return false, ""
+	}
+	stamp := strings.TrimSpace(string(raw))
+	at, err := time.Parse(time.RFC3339, stamp)
+	if err != nil {
+		return false, ""
+	}
+	return time.Since(at) < claimStale(poll), stamp
 }
 
 // reconcile reads the current peer set and applies it: WireGuard
@@ -787,10 +905,68 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 					}
 					if len(overlay.Peers) > 0 {
 						peers = overlay.Peers
+						if err := writeCachedPeers(cachePath(cfg), overlay.Peers); err != nil {
+							fmt.Fprintf(os.Stderr, "could not cache the peer list (a later API outage will cost more than it should): %v\n", err)
+						}
 					}
 				}
 			} else {
-				fmt.Fprintf(os.Stderr, "peer override secret not readable yet (%v); using %s\n", err, cfg.peersFile)
+				// The bootstrap file is not the fallback here. It is
+				// correct exactly once, at boot: it names the site as it
+				// was when this machine's userdata was rendered, and an
+				// endpoint that has moved since makes it a list of keys
+				// nobody holds. Applying it does not merely fail to help,
+				// it prunes the host routes that were carrying this
+				// node's API traffic, so the unreachable API server that
+				// caused the fallback is now unreachable because of it.
+				//
+				// The last list actually read from the cluster is the
+				// better answer to "the API server is briefly gone": it
+				// was true recently, and it keeps the path that would let
+				// it become true again.
+				if cached, cerr := readCachedPeers(cachePath(cfg)); cerr == nil && len(cached) > 0 {
+					peers = cached
+					fmt.Fprintf(os.Stderr, "peer override secret not readable (%v); holding the last list read from the cluster\n", err)
+				} else {
+					fmt.Fprintf(os.Stderr, "peer override secret not readable yet (%v); using %s\n", err, cfg.peersFile)
+				}
+			}
+		}
+
+		// A remote node runs this dialer twice: the cloud-init systemd
+		// unit, which is deliberately never disabled so the node stays
+		// reachable if the DaemonSet cannot schedule, and the DaemonSet
+		// itself, which is the only one that can read the live peer
+		// list. Both manage the same interface on the same interval, so
+		// without arbitration they overwrite each other every pass: the
+		// node alternates between the current mesh and the one that
+		// existed when its userdata was rendered, and every reachability
+		// check through it becomes a coin toss.
+		//
+		// So the one holding a cluster-sourced list claims the
+		// interface, and the file-only one stands off while that claim
+		// is fresh. The floor is kept, not removed: a claim that stops
+		// being refreshed goes stale within a few polls and the bootstrap
+		// list takes over again, which is the case the unit exists for.
+		//
+		// Which dialer this is comes from how it was configured, not
+		// from how its last read went. Keying it on the read meant the
+		// adopting dialer stood off for a claim it had written itself
+		// the moment the API server blinked: it wrote the claim while
+		// the Secret was readable, fell to the file branch when it was
+		// not, saw a fresh claim, and disabled itself. The interface was
+		// then held by nobody, with both dialers deferring to a ghost.
+		if path := claimPath(cfg); path != "" {
+			if cfg.peersSecretNamespace != "" {
+				// The adopting dialer. It holds the interface whether or
+				// not this particular pass reached the API server, since
+				// standing down would hand the node back to a peer list
+				// that is older than the one it is already applying.
+				if err := writeClaim(path); err != nil {
+					fmt.Fprintf(os.Stderr, "could not claim %s (the bootstrap unit may compete for it): %v\n", cfg.iface, err)
+				}
+			} else if held, owner := claimHeld(path, cfg.pollInterval); held {
+				return fmt.Errorf("standing off %s: the adopting dialer refreshed its claim at %s", cfg.iface, owner)
 			}
 		}
 	}

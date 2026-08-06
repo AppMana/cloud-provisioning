@@ -109,14 +109,28 @@ while IFS=$'\t' read -r name endpoints remotes <&3; do
   # only nodes that are still endpoints. The second is what the
   # migration fix is for, so a row that starts before it holds would be
   # testing the previous placement.
+  placed=
   for _ in $(seq 1 40); do
-    want=$(k get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -v '^$' \
-      | while read -r n; do
-          case "$selector" in
-            all) k get node "$n" -o jsonpath='{.metadata.labels.cloud-provisioning\.appmana\.com/role}' 2>/dev/null | grep -q cloud-worker || echo "$n" ;;
-            *) k get node "$n" -l "$selector" -o name >/dev/null 2>&1 && echo "$n" ;;
-          esac
-        done)
+    # Ask the API server which nodes the selector names, in one call.
+    # Naming a node and giving a selector in the same kubectl invocation
+    # is an error, not a filter, so a per-node loop returns nothing for
+    # every node: the wait then had nothing to wait for, ran its full
+    # length, and the row was measured with the placement unverified.
+    #
+    # "all" is every node this operator did not provision. A jsonpath
+    # filter cannot express that: a comparison against a label the node
+    # does not carry at all does not match, which would drop exactly the
+    # site nodes the row is about.
+    case "$selector" in
+      all) want=$(k get nodes -o json 2>/dev/null | python3 -c '
+import json,sys
+for n in json.load(sys.stdin)["items"]:
+    if n["metadata"].get("labels",{}).get("cloud-provisioning.appmana.com/role") != "cloud-worker":
+        print(n["metadata"]["name"])
+') ;;
+      *)   want=$(k get nodes -l "$selector" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null) ;;
+    esac
+    want=$(echo "$want" | grep -v '^$')
     published=0; expected=0
     for n in $want; do
       expected=$((expected + 1))
@@ -141,10 +155,19 @@ print(" ".join(sorted(k[len("node-tunnel-address-"):] for k in d
     # names is published; the departed one is reported, not waited on.
     if [ "$expected" -gt 0 ] && [ "$published" -eq "$expected" ]; then
       echo "  placed on $(echo $want | tr '\n' ' ')${stale:+, retaining $stale}"
+      placed=1
       break
     fi
     sleep 10
   done
+  # A wait that gives up is a result. Measuring anyway reports whatever
+  # the previous row left behind as this row's verdict.
+  if [ -z "$placed" ]; then
+    echo "  FAIL the placement never took: $published of $expected endpoints published"
+    failed=$((failed + 1))
+    echo "### FAIL $name (endpoints=$endpoints, clouds=$remotes) placement never took" >> "$OUT/matrix/summary.txt"
+    continue
+  fi
 
   # And wait for the cluster to agree it has converged. Moving a tunnel
   # takes the old endpoint's dialer away at once, while a remote re-reads

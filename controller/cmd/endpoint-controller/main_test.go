@@ -818,3 +818,20 @@ func TestSoonestRelease(t *testing.T) {
 		})
 	}
 }
+
+// A pull secret reference with an empty name is not an empty list. The
+// API accepts it, and then name is the merge key for that list and the
+// element has none, so every strategic merge patch against the
+// DaemonSet is rejected: "does not contain declared merge key: name".
+// kubectl rollout restart, set image and apply all fail, which is an
+// operator unable to restart the dialers on a cluster where nothing
+// looks wrong.
+func TestImagePullSecretsOmittedWhenUnset(t *testing.T) {
+	if got := imagePullSecrets(""); got != nil {
+		t.Errorf("imagePullSecrets(\"\") = %#v, want nil: a reference to no secret breaks every merge patch on the pod spec", got)
+	}
+	got := imagePullSecrets("regcred")
+	if len(got) != 1 || got[0].Name != "regcred" {
+		t.Errorf("imagePullSecrets(\"regcred\") = %#v, want one reference named regcred", got)
+	}
+}

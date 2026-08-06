@@ -26,6 +26,19 @@ mkdir -p "$OUT/matrix"
 # docker exec -i, which reads stdin, and inside a loop fed by the
 # scenarios file that consumes the rows: the matrix ran one row and
 # reported itself complete.
+# Two of these against one cluster is not two runs, it is each one
+# changing tunnel placement under the other, and the failures that
+# produces look exactly like product faults. It has happened.
+if [ "${MATRIX_REEXEC:-}" != 1 ]; then
+  others=$(pgrep -fc "bash /tmp/cldt-matrix-running.sh" 2>/dev/null || echo 0)
+  [ "$others" -eq 0 ] || { echo "another matrix run is in flight; wait for it or kill it" >&2; exit 2; }
+  # Run from a copy. bash reads a script as it goes, so editing this
+  # file while it runs makes the running process execute whatever the
+  # bytes became, which is a failure with no relation to the change.
+  cp "$0" /tmp/cldt-matrix-running.sh
+  MATRIX_REEXEC=1 exec bash /tmp/cldt-matrix-running.sh "$@"
+fi
+
 c() { echo "clab-$LAB-$1"; }
 in_node() { docker exec "$(c "$1")" "${@:2}"; }
 k() { in_node bastion kubectl "$@"; }
@@ -73,9 +86,45 @@ while IFS=$'\t' read -r name endpoints remotes <&3; do
       || { echo "  FAIL cloud B never joined"; failed=$((failed+1)); continue; }
   fi
 
-  # The dialers reconverge on their own schedule after the placement
-  # changes; the check's own convergence wait covers the rest.
-  sleep 45
+  # Wait for the placement to actually take, rather than for a number of
+  # seconds. A row measured before the dialers converge reports a
+  # product failure that is not one, and a fixed wait is a guess that is
+  # either too short on a slow pass or wasted on a fast one.
+  #
+  # Two things have to hold: every node the selector names is running a
+  # dialer and has published a key, and every remote's peer list names
+  # only nodes that are still endpoints. The second is what the
+  # migration fix is for, so a row that starts before it holds would be
+  # testing the previous placement.
+  for _ in $(seq 1 40); do
+    want=$(k get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -v '^$' \
+      | while read -r n; do
+          case "$selector" in
+            all) k get node "$n" -o jsonpath='{.metadata.labels.cloud-provisioning\.appmana\.com/role}' 2>/dev/null | grep -q cloud-worker || echo "$n" ;;
+            *) k get node "$n" -l "$selector" -o name >/dev/null 2>&1 && echo "$n" ;;
+          esac
+        done)
+    published=0; expected=0
+    for n in $want; do
+      expected=$((expected + 1))
+      key=$(k -n "$NS" get secret "$NS-peers" -o jsonpath="{.data.node-public-key-$n}" 2>/dev/null)
+      addr=$(k -n "$NS" get secret "$NS-peers" -o jsonpath="{.data.node-tunnel-address-$n}" 2>/dev/null)
+      [ -n "$key" ] && [ -n "$addr" ] && published=$((published + 1))
+    done
+    stale=$(k -n "$NS" get secret "$NS-peers" -o json 2>/dev/null \
+      | python3 -c '
+import json,sys
+d=json.load(sys.stdin).get("data",{})
+want=set(sys.argv[1].split())
+print(" ".join(sorted(k[len("node-tunnel-address-"):] for k in d
+      if k.startswith("node-tunnel-address-") and k[len("node-tunnel-address-"):] not in want)))
+' "$want" 2>/dev/null)
+    if [ "$expected" -gt 0 ] && [ "$published" -eq "$expected" ] && [ -z "$stale" ]; then
+      echo "  placed on $(echo $want | tr '\n' ' '), nothing stale"
+      break
+    fi
+    sleep 10
+  done
 
   HEALTH_CHECK_ARGS=--report-only bash run.sh > "$OUT/matrix/$name.log" 2>&1
   counts=$(grep -E "^checks:" "$OUT/matrix/$name.log" | tail -1)

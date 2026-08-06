@@ -275,21 +275,32 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 	}
 	sort.Slice(nodes, func(i, j int) bool { return LessIP(nodes[i].tunnelAddr, nodes[j].tunnelAddr) })
 
-	// The nodes that will actually be rendered as peers. A node whose
-	// key is published but blank is half a peer and is skipped below,
-	// and a prefix must not be handed to a peer that never appears.
-	// and the host addresses those peers will own on their own entries,
-	// which is what the relay must not claim a second time.
-	peerNode := map[string]bool{}
+	// What the peers will own on their own entries, which is what the
+	// relay must not go on to claim a second time.
+	//
+	// Being a peer is not the test, and the two families are separate.
+	// A retained endpoint is rendered as a peer, because it keeps its
+	// key and tunnel address so the tunnel it still holds goes on
+	// working, and yet its addresses and pod blocks have already moved
+	// to the site entries: treating it as owning them would leave them
+	// owned by nobody. What a node owns is exactly what is published
+	// under its own keys.
+	ownsAddresses := map[string]bool{}
+	ownsBlocks := map[string]bool{}
 	ownHost := map[string]bool{}
 	for _, n := range nodes {
 		if strings.TrimSpace(string(data[NodePublicKeyPrefix+n.name])) == "" {
 			continue
 		}
-		peerNode[n.name] = true
 		ownHost[n.tunnelAddr] = true
-		for _, addr := range SplitList(string(data[NodeAddressesPrefix+n.name])) {
-			ownHost[addr] = true
+		if addrs := SplitList(string(data[NodeAddressesPrefix+n.name])); len(addrs) > 0 {
+			ownsAddresses[n.name] = true
+			for _, addr := range addrs {
+				ownHost[addr] = true
+			}
+		}
+		if len(SplitList(string(data[NodePodCIDRsPrefix+n.name]))) > 0 {
+			ownsBlocks[n.name] = true
 		}
 	}
 
@@ -333,29 +344,30 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 			// to relay, so a remote has one path to the site rather
 			// than a different one per destination.
 			for _, name := range siteNodeNames(data) {
-				// A node that is a peer in its own right owns its
-				// prefixes there, so relaying them here as well would
-				// name the same prefix on two peers. The two are
-				// written by different actors: the operator publishes
-				// the addresses, the node's own dialer publishes the
-				// key that turns it into a peer, and between those two
-				// writes the Secret holds both forms. Resolving it here
-				// makes the render self-consistent whatever order they
-				// land in, rather than making correctness depend on it.
-				if peerNode[name] {
-					continue
-				}
-				for _, addr := range SplitList(string(data[SiteAddressesPrefix+name])) {
-					if containsHost(routeHosts, addr) {
-						continue
+				// A node already owning these on its own entry must not
+				// have them relayed here as well, or the same prefix is
+				// named on two peers. The two forms are written by
+				// different actors: this operator publishes the
+				// addresses, the node's own dialer publishes the key
+				// that turns it into a peer, and between those writes
+				// the Secret holds both. Resolving it here makes the
+				// render self-consistent whatever order they land in,
+				// rather than making correctness depend on that order.
+				if !ownsAddresses[name] {
+					for _, addr := range SplitList(string(data[SiteAddressesPrefix+name])) {
+						if containsHost(routeHosts, addr) {
+							continue
+						}
+						allowed = append(allowed, HostCIDR(addr))
+						routeHosts = append(routeHosts, addr)
 					}
-					allowed = append(allowed, HostCIDR(addr))
-					routeHosts = append(routeHosts, addr)
 				}
 				// Permitted, never routed: the route for a pod block
 				// comes from the network, over the session these host
 				// routes make possible.
-				allowed = append(allowed, SplitList(string(data[SitePodCIDRsPrefix+name]))...)
+				if !ownsBlocks[name] {
+					allowed = append(allowed, SplitList(string(data[SitePodCIDRsPrefix+name]))...)
+				}
 			}
 		}
 		peers = append(peers, PeerSpec{

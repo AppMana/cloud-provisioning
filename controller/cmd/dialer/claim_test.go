@@ -118,3 +118,32 @@ func TestCachedPeersBeatTheBootstrapFile(t *testing.T) {
 		t.Errorf("cached peers round-tripped as %#v, want the route hosts that keep the API reachable", got)
 	}
 }
+
+// A route host that no peer can carry yet is not the same as one no
+// peer should ever carry, and the difference decides whether a route
+// already serving it survives the pass.
+//
+// The endpoint case must win over the not-yet case. A host serving as
+// some peer's tunnel endpoint must never have a route through the
+// tunnel, whatever the state of the peer claiming it, because that
+// route sends the tunnel's own packets into the tunnel. Ordering the
+// checks the other way would claim such a host from an un-handshaked
+// peer and so protect exactly the route that has to go.
+func TestARouteHostThatIsNotReadyIsNotARouteHostThatIsWrong(t *testing.T) {
+	cases := []struct {
+		name           string
+		isEndpointHost bool
+		peerCanCarry   bool
+		want           routeHostDisposition
+	}{
+		{"a peer that can carry it", false, true, routeInstall},
+		{"a peer still arriving", false, false, routeNotYet},
+		{"an endpoint, peer ready", true, true, routeIsAnEndpoint},
+		{"an endpoint, peer still arriving", true, false, routeIsAnEndpoint},
+	}
+	for _, c := range cases {
+		if got := disposeRouteHost(c.isEndpointHost, c.peerCanCarry); got != c.want {
+			t.Errorf("%s: disposition %d, want %d", c.name, got, c.want)
+		}
+	}
+}

@@ -19,6 +19,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -439,10 +440,14 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 	changed := pruneDeparted(secret.Data, r.membership(nodes.Items), now, r.endpointRetention)
 
 	// Existing allocations stay put; new nodes take the next free host
-	// in the tunnel subnet. A retired address is not free.
+	// in the tunnel subnet. A retired address is not free, and neither
+	// is one reserved to a node that is not currently an endpoint: that
+	// node keeps it, so that being selected again makes it the same peer
+	// rather than a new one.
 	used := map[string]bool{}
 	for key, val := range secret.Data {
-		if strings.HasPrefix(key, tunnel.NodeTunnelAddressPrefix) {
+		if strings.HasPrefix(key, tunnel.NodeTunnelAddressPrefix) ||
+			strings.HasPrefix(key, tunnel.TunnelAddressReservationPrefix) {
 			used[strings.SplitN(strings.TrimSpace(string(val)), "/", 2)[0]] = true
 		}
 	}
@@ -465,10 +470,39 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 			// A node the selector has let go of, still inside its
 			// retention window, is still an endpoint: it holds a
 			// published key and address, its dialer still runs, and its
-			// tunnel still carries traffic. Publishing it as a site node
-			// as well would give its addresses a second owner in the
-			// accept list, on the peer that relays to the site.
+			// tunnel still carries traffic.
+			//
+			// But it stops being the way to reach anything at once. The
+			// window exists so a remote can move off this node before
+			// its tunnel goes, and a remote can only move if something
+			// else already owns the prefixes it needs. Leaving them here
+			// meant the handover happened at the same instant as the
+			// teardown: the node was unpublished, its interface swept,
+			// and only then did its addresses appear on a surviving
+			// endpoint, by which time the remote had no path left to
+			// learn that. Measured on cp, which owned the API server's
+			// address: at 14:36:11 the remote permitted 10.10.0.10 on
+			// cp's peer entry and reached the API; at 14:36:17 cp's
+			// interface was gone, the remote still named cp for
+			// 10.10.0.10, and it could not read the list that would have
+			// told it otherwise. It stayed that way for ten minutes.
+			//
+			// So a departing endpoint keeps its key and its tunnel
+			// address, which is what keeps its tunnel usable, and its
+			// node addresses and pod blocks move to the site entries
+			// now, where a surviving endpoint relays them. One owner per
+			// prefix throughout: they are published here or there, never
+			// both.
 			if publishedEndpoint(secret.Data, node.Name) {
+				if len(secret.Data[tunnel.NodeDepartedAtPrefix+node.Name]) == 0 {
+					continue
+				}
+				if r.publishSiteNode(ctx, secret, node) {
+					changed = true
+				}
+				if stopOwningAsEndpoint(secret.Data, node.Name) {
+					changed = true
+				}
 				continue
 			}
 			// A site node with no tunnel of its own. It is not a peer,
@@ -481,14 +515,33 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 			}
 			continue
 		}
+		// This node owns its own prefixes now, so nothing relays them.
+		// A node that returns to the selector takes back what it handed
+		// over when it left.
+		if stopBeingRelayed(secret.Data, node.Name) {
+			changed = true
+		}
 		addrKey := tunnel.NodeTunnelAddressPrefix + node.Name
+		reservationKey := tunnel.TunnelAddressReservationPrefix + node.Name
 		if len(secret.Data[addrKey]) == 0 {
-			addr, err := nextFreeAddress(r.localAddressBase, used)
-			if err != nil {
-				return 0, err
+			// The address this node already holds, if it has ever held
+			// one. A node returning to the selector is the same peer it
+			// was, so every remote's configuration for it is still
+			// correct and nothing has to converge.
+			addr := strings.TrimSpace(string(secret.Data[reservationKey]))
+			if addr == "" {
+				var err error
+				addr, err = nextFreeAddress(r.localAddressBase, used)
+				if err != nil {
+					return 0, err
+				}
 			}
 			used[strings.SplitN(addr, "/", 2)[0]] = true
 			secret.Data[addrKey] = []byte(addr)
+			changed = true
+		}
+		if !bytes.Equal(secret.Data[reservationKey], secret.Data[addrKey]) {
+			secret.Data[reservationKey] = secret.Data[addrKey]
 			changed = true
 		}
 		// The node's real addresses, which is what the network's own
@@ -785,8 +838,18 @@ func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, r
 		// drained out of the cluster. Nothing can schedule a dialer on
 		// it, so retaining its entries would buy a remote only a peer
 		// that no longer answers.
-		if retireTunnelAddress(data, string(data[tunnel.NodeTunnelAddressPrefix+name])) {
-			changed = true
+		//
+		// Only such a node loses its address. One that is merely no
+		// longer selected is still a node of this site and keeps its
+		// reservation, so being selected again makes it the peer it
+		// already was rather than a new one. Retiring on deselection is
+		// what turned every placement change into a new identity for
+		// every node it touched.
+		if !want.siteNodes[name] {
+			if retireTunnelAddress(data, string(data[tunnel.NodeTunnelAddressPrefix+name])) {
+				changed = true
+			}
+			drop(tunnel.TunnelAddressReservationPrefix + name)
 		}
 		drop(tunnel.NodePublicKeyPrefix + name)
 		drop(tunnel.NodeTunnelAddressPrefix + name)
@@ -1537,6 +1600,52 @@ func parseSelectorRequirements(raw string) []corev1.NodeSelectorRequirement {
 // node with no path back to the API. What the DaemonSet adds is a
 // Kubernetes-native upgrade path (bump --dialer-image, rolling update)
 // instead of host binary swaps.
+// stopBeingRelayed takes a node's addresses and blocks off the site
+// entries, which is where they live while some other endpoint relays to
+// it.
+//
+// The counterpart of stopOwningAsEndpoint, and required for the same
+// reason: a node that leaves the selector hands its prefixes to the site
+// entries, and a node that returns takes them back. Doing only the first
+// half leaves a returning endpoint owning its block twice, once on its
+// own peer entry and once on whichever endpoint relays the site, and the
+// accept list resolves that by keeping whichever was written last.
+func stopBeingRelayed(data map[string][]byte, name string) bool {
+	changed := false
+	for _, key := range []string{
+		tunnel.SiteAddressesPrefix + name,
+		tunnel.SitePodCIDRsPrefix + name,
+	} {
+		if _, ok := data[key]; ok {
+			delete(data, key)
+			changed = true
+		}
+	}
+	return changed
+}
+
+// stopOwningAsEndpoint takes a departing endpoint's node addresses and
+// pod blocks off its own peer entry, leaving its key and tunnel address
+// so the tunnel it still holds goes on working.
+//
+// Those prefixes are published as site entries in the same pass, and a
+// prefix must have exactly one owner: WireGuard's accept list is a trie,
+// so a range named on two peers belongs to whichever was written last
+// and traffic for it follows whichever that happened to be.
+func stopOwningAsEndpoint(data map[string][]byte, name string) bool {
+	changed := false
+	for _, key := range []string{
+		tunnel.NodeAddressesPrefix + name,
+		tunnel.NodePodCIDRsPrefix + name,
+	} {
+		if _, ok := data[key]; ok {
+			delete(data, key)
+			changed = true
+		}
+	}
+	return changed
+}
+
 // imagePullSecrets is the pull secret list for a dialer pod, which is
 // empty when no secret is configured rather than holding a reference to
 // nothing.

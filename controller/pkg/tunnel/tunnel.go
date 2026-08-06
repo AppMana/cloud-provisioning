@@ -84,6 +84,33 @@ const (
 	// one to renumber deliberately rather than by reuse.
 	RetiredTunnelAddressesKey = "retired-tunnel-addresses"
 
+	// TunnelAddressReservationPrefix records, per node, the tunnel
+	// address that node keeps for as long as it is part of the cluster,
+	// whether or not it is currently a selected endpoint.
+	//
+	// A tunnel address is an identity, not a lease. Every mesh built
+	// this way settles on the same rule: Tailscale hands a node an
+	// address from 100.64.0.0/10 when it registers and changes it
+	// never, and Headscale, which reimplements that contract, returns
+	// an address to its allocator only in DeleteNode, the one operation
+	// it documents as irreversible. Not on logout, not on expiry, not
+	// when a node goes offline.
+	//
+	// This mesh used to retire an address the moment a node left the
+	// endpoint selector and hand it a new one when it came back, so a
+	// node that was selected, deselected and selected again was three
+	// different peers: one control plane went through four addresses in
+	// a day of tests. Every one of those changes has to reach every
+	// remote, and a remote learns it over the tunnel, so each change is
+	// a window in which a remote permits an address nobody sources from
+	// any more. An identity that changes under a peer is the one thing
+	// the peer cannot ask about.
+	//
+	// The reservation is what makes reuse by a DIFFERENT node
+	// impossible, which is all RetiredTunnelAddressesKey was ever
+	// protecting against.
+	TunnelAddressReservationPrefix = "tunnel-address-reservation-"
+
 	// NodeDepartedAtPrefix records, per node, the RFC3339 instant at
 	// which that node first stopped being a selected tunnel endpoint
 	// while some other endpoint was already usable.

@@ -162,6 +162,9 @@ func published(endpoints map[string][2]string, sites map[string]string) map[stri
 		}
 		if pair[1] != "" {
 			data[tunnel.NodeTunnelAddressPrefix+name] = []byte(pair[1])
+			// The reconciler records a reservation whenever it allocates,
+			// because the address belongs to the node from then on.
+			data[tunnel.TunnelAddressReservationPrefix+name] = []byte(pair[1])
 		}
 		block++
 		data[tunnel.NodeAddressesPrefix+name] = []byte(fmt.Sprintf("172.21.0.%d", 30+block))
@@ -269,10 +272,14 @@ func TestPruneDeparted(t *testing.T) {
 			kept: []string{
 				tunnel.NodePublicKeyPrefix + "cp", tunnel.NodeTunnelAddressPrefix + "cp",
 				tunnel.SiteAddressesPrefix + "w2",
+				// w1 is still a node of this site, so it keeps the
+				// address it has always had. Selecting it again makes it
+				// the peer every remote already knows.
+				tunnel.TunnelAddressReservationPrefix + "w1",
 			},
-			// Retired when the entry finally goes, not when the node
-			// first departed: it was in use for the whole window.
-			retired: "10.100.0.1",
+			// Nothing is retired: retirement is for an address whose
+			// node has left the cluster, and w1 has not.
+			retired: "",
 		},
 		{
 			// The operator changed their mind, or changed it back. The
@@ -524,33 +531,69 @@ func TestMembership_HealthIsNotIntent(t *testing.T) {
 // An address a departed node held is never handed to a later node. A
 // remote still holding configuration that names it would otherwise send
 // that node's traffic somewhere else entirely.
-func TestRetiredTunnelAddressesAreNeverAllocatedAgain(t *testing.T) {
+func TestATunnelAddressIsAnIdentityNotALease(t *testing.T) {
+	// A node that leaves the endpoint selector but stays in the cluster
+	// keeps its address, so that selecting it again makes it the peer
+	// every remote is already configured for. This is the contract
+	// every mesh of this kind settles on: Tailscale assigns an address
+	// at registration and never changes it, and Headscale returns one
+	// to its allocator only when the node record is deleted.
 	data := published(map[string][2]string{
 		"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
 		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
 	}, nil)
+	data[tunnel.TunnelAddressReservationPrefix+"w1"] = []byte("10.100.0.1/24")
+	data[tunnel.TunnelAddressReservationPrefix+"cp"] = []byte("10.100.0.2/24")
+
+	// w1 leaves the selector but remains a node of this site.
 	want := meshMembership{endpoints: members("cp"), siteNodes: members("w1")}
-	// An address is retired when the entry finally goes, not when the
-	// node departed: it belongs to a working tunnel until then.
 	if !pruneDeparted(data, want, testNow, testRetention) {
 		t.Fatal("the departure of the endpoint was not recorded")
-	}
-	if got := string(data[tunnel.RetiredTunnelAddressesKey]); got != "" {
-		t.Errorf("retired %q while the address was still in use", got)
 	}
 	if !pruneDeparted(data, want, testNow.Add(testRetention), testRetention) {
 		t.Fatal("the departed endpoint was not pruned once its window was over")
 	}
+	if got := string(data[tunnel.TunnelAddressReservationPrefix+"w1"]); got != "10.100.0.1/24" {
+		t.Errorf("w1 kept %q; a node still in the cluster keeps its address", got)
+	}
 
-	used := map[string]bool{}
-	for key, val := range data {
-		if strings.HasPrefix(key, tunnel.NodeTunnelAddressPrefix) {
-			used[strings.SplitN(string(val), "/", 2)[0]] = true
-		}
+	// And nobody else may be given it, which is the whole reason the old
+	// address was retired on departure.
+	used := allocatorUsedSet(data)
+	next, err := nextFreeAddress("10.100.0.1/24", used)
+	if err != nil {
+		t.Fatalf("nextFreeAddress: %v", err)
 	}
-	for _, addr := range tunnel.SplitList(string(data[tunnel.RetiredTunnelAddressesKey])) {
-		used[addr] = true
+	if next == "10.100.0.1/24" || next == "10.100.0.2/24" {
+		t.Errorf("next free address = %q, which belongs to a node that still holds it", next)
 	}
+	if next != "10.100.0.3/24" {
+		t.Errorf("next free address = %q, want 10.100.0.3/24", next)
+	}
+}
+
+func TestAnAddressIsRetiredOnlyWhenItsNodeLeavesTheCluster(t *testing.T) {
+	data := published(map[string][2]string{
+		"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
+		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
+	}, nil)
+	data[tunnel.TunnelAddressReservationPrefix+"w1"] = []byte("10.100.0.1/24")
+
+	// w1 is gone from the cluster entirely: not an endpoint, not a site
+	// node. Nothing can schedule a dialer on it ever again.
+	want := meshMembership{endpoints: members("cp"), siteNodes: members("cp")}
+	pruneDeparted(data, want, testNow, testRetention)
+	pruneDeparted(data, want, testNow.Add(testRetention), testRetention)
+
+	if got := string(data[tunnel.RetiredTunnelAddressesKey]); got != "10.100.0.1" {
+		t.Errorf("retired = %q, want 10.100.0.1: a node that has left the cluster gives its address up", got)
+	}
+	if _, ok := data[tunnel.TunnelAddressReservationPrefix+"w1"]; ok {
+		t.Error("a node that has left the cluster keeps no reservation")
+	}
+	// Still never handed out again: a remote may hold configuration
+	// naming it, and the key behind it is gone.
+	used := allocatorUsedSet(data)
 	next, err := nextFreeAddress("10.100.0.1/24", used)
 	if err != nil {
 		t.Fatalf("nextFreeAddress: %v", err)
@@ -558,9 +601,23 @@ func TestRetiredTunnelAddressesAreNeverAllocatedAgain(t *testing.T) {
 	if next == "10.100.0.1/24" {
 		t.Error("the departed node's address was handed straight to the next node")
 	}
-	if next != "10.100.0.3/24" {
-		t.Errorf("next free address = %q, want 10.100.0.3/24", next)
+}
+
+// allocatorUsedSet builds the set of unavailable addresses exactly as the
+// mesh reconciler does, so these tests cannot pass on a set the real
+// allocator would not have used.
+func allocatorUsedSet(data map[string][]byte) map[string]bool {
+	used := map[string]bool{}
+	for key, val := range data {
+		if strings.HasPrefix(key, tunnel.NodeTunnelAddressPrefix) ||
+			strings.HasPrefix(key, tunnel.TunnelAddressReservationPrefix) {
+			used[strings.SplitN(strings.TrimSpace(string(val)), "/", 2)[0]] = true
+		}
 	}
+	for _, addr := range tunnel.SplitList(string(data[tunnel.RetiredTunnelAddressesKey])) {
+		used[addr] = true
+	}
+	return used
 }
 
 // matchesNode is the scheduler's reading of a node affinity, reduced to
@@ -874,5 +931,110 @@ func TestDialerToleratesAControlPlaneWhicheverWayItWasSelected(t *testing.T) {
 	aff = dialerNodeAffinity("kubernetes.io/hostname=w1", []string{"cp"})
 	if len(aff.NodeSelectorTerms) < 2 {
 		t.Fatal("a retained node gets no term of its own, so it cannot be scheduled")
+	}
+}
+
+// Retention exists so a remote can move off a departing endpoint before
+// that endpoint's tunnel goes away. It can only move if something else
+// already owns the prefixes it needs, so ownership has to change at the
+// START of the window while the old tunnel still carries traffic.
+//
+// Holding both together meant the handover happened at the same instant
+// as the teardown. Measured on cp, the node carrying the API server's
+// address: the remote permitted 10.10.0.10 on cp's peer entry and
+// reached the API; six seconds later cp was unpublished and its
+// interface swept, the remote still named cp for 10.10.0.10, and the
+// list that would have corrected it was only reachable through cp.
+func TestADepartingEndpointStopsOwningPrefixesAtOnce(t *testing.T) {
+	data := published(map[string][2]string{
+		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
+		"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
+	}, nil)
+	addr := string(data[tunnel.NodeAddressesPrefix+"cp"])
+	if addr == "" {
+		t.Fatal("fixture published no node address for cp")
+	}
+
+	if !stopOwningAsEndpoint(data, "cp") {
+		t.Fatal("nothing changed; cp still owns the prefixes a remote needs to reach the site")
+	}
+	// Gone from cp's own peer entry, so the site entries published in the
+	// same pass are the only owner. One prefix, one owner: the accept
+	// list keeps whichever was written last, so naming it twice decides
+	// the path by map ordering.
+	for _, key := range []string{
+		tunnel.NodeAddressesPrefix + "cp",
+		tunnel.NodePodCIDRsPrefix + "cp",
+	} {
+		if _, ok := data[key]; ok {
+			t.Errorf("%s is still owned by the departing endpoint", key)
+		}
+	}
+	// Kept, because they are what makes the tunnel it still holds usable
+	// for everything already crossing it.
+	for _, key := range []string{
+		tunnel.NodePublicKeyPrefix + "cp",
+		tunnel.NodeTunnelAddressPrefix + "cp",
+	} {
+		if len(data[key]) == 0 {
+			t.Errorf("%s went; the departing tunnel has to keep working through the window", key)
+		}
+	}
+	// Idempotent: a second pass has nothing left to move.
+	if stopOwningAsEndpoint(data, "cp") {
+		t.Error("reported a change with nothing left to change, so every pass would rewrite the Secret")
+	}
+	// And a surviving endpoint is untouched.
+	if len(data[tunnel.NodeAddressesPrefix+"w1"]) == 0 {
+		t.Error("w1 lost its addresses; only the departing endpoint hands its prefixes over")
+	}
+}
+
+// The handover has to run both ways. A node that leaves the selector
+// hands its prefixes to the site entries so a surviving endpoint relays
+// them; a node that returns takes them back. Doing only the first half
+// left a returning endpoint owning its block twice, on its own peer
+// entry and on whichever endpoint relays the site, and WireGuard
+// resolves a prefix named on two peers by keeping whichever was written
+// last. Measured after one placement change: w1 published as both
+// node-pod-cidrs-w1 and site-pod-cidrs-w1, the same block.
+func TestAPrefixIsOwnedInExactlyOnePlaceAcrossAReturn(t *testing.T) {
+	data := published(map[string][2]string{
+		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
+		"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
+	}, nil)
+	block := string(data[tunnel.NodePodCIDRsPrefix+"w1"])
+	addr := string(data[tunnel.NodeAddressesPrefix+"w1"])
+
+	// w1 leaves: its prefixes move to the site entries, as the reconciler
+	// publishes them, and off its own entry.
+	data[tunnel.SiteAddressesPrefix+"w1"] = []byte(addr)
+	data[tunnel.SitePodCIDRsPrefix+"w1"] = []byte(block)
+	if !stopOwningAsEndpoint(data, "w1") {
+		t.Fatal("w1 kept owning its prefixes while departing")
+	}
+	if _, ok := data[tunnel.NodePodCIDRsPrefix+"w1"]; ok {
+		t.Fatal("departing endpoint still owns its block")
+	}
+
+	// w1 returns.
+	if !stopBeingRelayed(data, "w1") {
+		t.Fatal("nothing was taken back; the returning endpoint is relayed and self-owned at once")
+	}
+	data[tunnel.NodeAddressesPrefix+"w1"] = []byte(addr)
+	data[tunnel.NodePodCIDRsPrefix+"w1"] = []byte(block)
+
+	for _, pair := range [][2]string{
+		{tunnel.NodeAddressesPrefix + "w1", tunnel.SiteAddressesPrefix + "w1"},
+		{tunnel.NodePodCIDRsPrefix + "w1", tunnel.SitePodCIDRsPrefix + "w1"},
+	} {
+		_, own := data[pair[0]]
+		_, relayed := data[pair[1]]
+		if own && relayed {
+			t.Errorf("%s and %s both name the same prefix: two owners, and the accept list keeps the last one written", pair[0], pair[1])
+		}
+		if !own && !relayed {
+			t.Errorf("neither %s nor %s names the prefix: a remote cannot reach it at all", pair[0], pair[1])
+		}
 	}
 }

@@ -1,14 +1,31 @@
 package main
 
 import (
+	"fmt"
+	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
+
+// testRetention is what the chart ships as the default: six of the
+// dialer's 30s polls.
+const testRetention = 3 * time.Minute
+
+// testNow is a fixed instant, so a retention window is arithmetic
+// rather than a race with the clock.
+var testNow = time.Date(2026, 8, 6, 12, 0, 0, 0, time.UTC)
+
+// departedSince pre-seeds the record pruneDeparted writes when it first
+// finds a node gone from the selector, as of ago before testNow.
+func departedSince(data map[string][]byte, name string, ago time.Duration) {
+	data[tunnel.NodeDepartedAtPrefix+name] = []byte(testNow.Add(-ago).Format(time.RFC3339))
+}
 
 // The selector that says which nodes terminate a tunnel becomes the
 // dialer DaemonSet's node affinity. Naming two nodes takes a set based
@@ -131,23 +148,40 @@ func TestIsTunnelEndpoint_NeverAProvisionedNode(t *testing.T) {
 // published builds the mesh state this reconciler writes: the endpoint
 // nodes with their keys and allocated addresses, and the site nodes
 // with theirs.
+//
+// Every node gets pod blocks of its own, as a real network hands them
+// out. Giving two nodes the same block would hide exactly the fault the
+// accept list's one-owner-per-prefix rule exists to prevent.
 func published(endpoints map[string][2]string, sites map[string]string) map[string][]byte {
 	data := map[string][]byte{}
-	for name, pair := range endpoints {
+	block := 0
+	for _, name := range sortedKeys(endpoints) {
+		pair := endpoints[name]
 		if pair[0] != "" {
 			data[tunnel.NodePublicKeyPrefix+name] = []byte(pair[0])
 		}
 		if pair[1] != "" {
 			data[tunnel.NodeTunnelAddressPrefix+name] = []byte(pair[1])
 		}
-		data[tunnel.NodeAddressesPrefix+name] = []byte("172.21.0.1" + name[len(name)-1:])
-		data[tunnel.NodePodCIDRsPrefix+name] = []byte("10.244.1.0/26")
+		block++
+		data[tunnel.NodeAddressesPrefix+name] = []byte(fmt.Sprintf("172.21.0.%d", 30+block))
+		data[tunnel.NodePodCIDRsPrefix+name] = []byte(fmt.Sprintf("10.244.%d.0/26", block))
 	}
-	for name, addr := range sites {
-		data[tunnel.SiteAddressesPrefix+name] = []byte(addr)
-		data[tunnel.SitePodCIDRsPrefix+name] = []byte("10.244.2.0/26")
+	for _, name := range sortedKeys(sites) {
+		data[tunnel.SiteAddressesPrefix+name] = []byte(sites[name])
+		block++
+		data[tunnel.SitePodCIDRsPrefix+name] = []byte(fmt.Sprintf("10.244.%d.0/26", block))
 	}
 	return data
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	names := make([]string, 0, len(m))
+	for name := range m {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func members(names ...string) map[string]bool {
@@ -170,32 +204,107 @@ func TestPruneDeparted(t *testing.T) {
 		keyCP = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB="
 	)
 	for _, tc := range []struct {
-		name    string
-		data    map[string][]byte
-		want    meshMembership
-		changed bool
-		gone    []string
-		kept    []string
-		retired string
+		name string
+		data map[string][]byte
+		// departed pre-seeds a node's departure record as of this long
+		// before testNow, which is how a case sits inside or past the
+		// retention window without waiting for one.
+		departed map[string]time.Duration
+		want     meshMembership
+		changed  bool
+		gone     []string
+		kept     []string
+		retired  string
 	}{
 		{
-			// The measured case, once the new endpoint is up.
-			name: "the selector moved the tunnel and the new endpoint is published",
+			// The measured case. The remote learns where the new
+			// endpoint is by reading the Secret over the tunnel the old
+			// one carries, so this pass must not take that tunnel away:
+			// it records the departure and changes nothing else.
+			name: "the pass that first finds an endpoint deselected retains it",
 			data: published(
 				map[string][2]string{"w1": {keyW1, "10.100.0.1/24"}, "cp": {keyCP, "10.100.0.2/24"}},
 				map[string]string{"w2": "172.21.0.17"},
 			),
 			want:    meshMembership{endpoints: members("cp"), siteNodes: members("w1", "w2")},
 			changed: true,
+			kept: []string{
+				tunnel.NodePublicKeyPrefix + "w1", tunnel.NodeTunnelAddressPrefix + "w1",
+				tunnel.NodeAddressesPrefix + "w1", tunnel.NodePodCIDRsPrefix + "w1",
+				tunnel.NodeDepartedAtPrefix + "w1",
+				tunnel.NodePublicKeyPrefix + "cp", tunnel.NodeTunnelAddressPrefix + "cp",
+			},
+		},
+		{
+			name: "a deselected endpoint is still an endpoint inside the window",
+			data: published(
+				map[string][2]string{"w1": {keyW1, "10.100.0.1/24"}, "cp": {keyCP, "10.100.0.2/24"}},
+				nil,
+			),
+			departed: map[string]time.Duration{"w1": testRetention - time.Minute},
+			want:     meshMembership{endpoints: members("cp"), siteNodes: members("w1")},
+			changed:  false,
+			kept: []string{
+				tunnel.NodePublicKeyPrefix + "w1", tunnel.NodeTunnelAddressPrefix + "w1",
+				tunnel.NodeDepartedAtPrefix + "w1",
+			},
+		},
+		{
+			// Long enough for six of the dialer's polls to have gone by.
+			// Whatever a remote has not learned by now it will not learn
+			// from this tunnel.
+			name: "the window expires and the departed endpoint is released",
+			data: published(
+				map[string][2]string{"w1": {keyW1, "10.100.0.1/24"}, "cp": {keyCP, "10.100.0.2/24"}},
+				map[string]string{"w2": "172.21.0.17"},
+			),
+			departed: map[string]time.Duration{"w1": testRetention + time.Minute},
+			want:     meshMembership{endpoints: members("cp"), siteNodes: members("w1", "w2")},
+			changed:  true,
 			gone: []string{
 				tunnel.NodePublicKeyPrefix + "w1", tunnel.NodeTunnelAddressPrefix + "w1",
 				tunnel.NodeAddressesPrefix + "w1", tunnel.NodePodCIDRsPrefix + "w1",
+				tunnel.NodeDepartedAtPrefix + "w1",
 			},
 			kept: []string{
 				tunnel.NodePublicKeyPrefix + "cp", tunnel.NodeTunnelAddressPrefix + "cp",
 				tunnel.SiteAddressesPrefix + "w2",
 			},
+			// Retired when the entry finally goes, not when the node
+			// first departed: it was in use for the whole window.
 			retired: "10.100.0.1",
+		},
+		{
+			// The operator changed their mind, or changed it back. The
+			// node never stopped being an endpoint, so there is nothing
+			// to undo but the record.
+			name: "a node the selector takes back before the window is over keeps everything",
+			data: published(
+				map[string][2]string{"w1": {keyW1, "10.100.0.1/24"}, "cp": {keyCP, "10.100.0.2/24"}},
+				nil,
+			),
+			departed: map[string]time.Duration{"w1": testRetention - time.Minute},
+			want:     meshMembership{endpoints: members("w1", "cp"), siteNodes: members()},
+			changed:  true,
+			gone:     []string{tunnel.NodeDepartedAtPrefix + "w1"},
+			kept: []string{
+				tunnel.NodePublicKeyPrefix + "w1", tunnel.NodeTunnelAddressPrefix + "w1",
+				tunnel.NodeAddressesPrefix + "w1",
+			},
+		},
+		{
+			// And the clock does not go on running underneath it: the
+			// window it left behind is not a window it is still in.
+			name: "a node taken back and let go again gets the whole window over",
+			data: published(
+				map[string][2]string{"w1": {keyW1, "10.100.0.1/24"}, "cp": {keyCP, "10.100.0.2/24"}},
+				nil,
+			),
+			departed: map[string]time.Duration{"w1": 10 * testRetention},
+			want:     meshMembership{endpoints: members("w1", "cp"), siteNodes: members()},
+			changed:  true,
+			gone:     []string{tunnel.NodeDepartedAtPrefix + "w1"},
+			kept:     []string{tunnel.NodePublicKeyPrefix + "w1", tunnel.NodeTunnelAddressPrefix + "w1"},
 		},
 		{
 			// Make before break. The address is allocated one pass
@@ -211,6 +320,10 @@ func TestPruneDeparted(t *testing.T) {
 			kept: []string{
 				tunnel.NodePublicKeyPrefix + "w1", tunnel.NodeTunnelAddressPrefix + "w1",
 			},
+			// The clock does not start either: retention is time for a
+			// remote to learn about a replacement, and there is not one
+			// yet to learn about.
+			gone: []string{tunnel.NodeDepartedAtPrefix + "w1"},
 		},
 		{
 			name: "a deleted node loses everything it published",
@@ -275,7 +388,10 @@ func TestPruneDeparted(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			changed := pruneDeparted(tc.data, tc.want)
+			for name, ago := range tc.departed {
+				departedSince(tc.data, name, ago)
+			}
+			changed := pruneDeparted(tc.data, tc.want, testNow, testRetention)
 			if changed != tc.changed {
 				t.Errorf("pruneDeparted reported changed=%v, want %v", changed, tc.changed)
 			}
@@ -322,7 +438,7 @@ func TestPruneDeparted_TheRemoteFollowsTheNewEndpoint(t *testing.T) {
 	// The pass that allocates cp an address, before its dialer has
 	// published a key. w1 still holds the tunnel and must still be the
 	// remote's peer.
-	pruneDeparted(data, r.membership(nodes))
+	pruneDeparted(data, r.membership(nodes), testNow, testRetention)
 	data[tunnel.NodeTunnelAddressPrefix+"cp"] = []byte("10.100.0.3/24")
 	peers, err := tunnel.RemotePeers(data, "10.100.0.128", nil)
 	if err != nil {
@@ -332,10 +448,24 @@ func TestPruneDeparted_TheRemoteFollowsTheNewEndpoint(t *testing.T) {
 		t.Fatalf("mid-migration the remote has %d peers (%+v), want only w1", len(peers), peers)
 	}
 
-	// cp's dialer publishes, and the next pass finishes the move.
+	// cp's dialer publishes. w1 is retained for the window, so the
+	// remote now has two peers and two working paths, and reads the one
+	// naming cp over the one w1 still carries.
 	data[tunnel.NodePublicKeyPrefix+"cp"] = []byte(keyCP)
-	if !pruneDeparted(data, r.membership(nodes)) {
-		t.Fatal("nothing was pruned once the new endpoint was published")
+	if !pruneDeparted(data, r.membership(nodes), testNow, testRetention) {
+		t.Fatal("the departure of the old endpoint was not recorded")
+	}
+	peers, err = tunnel.RemotePeers(data, "10.100.0.128", nil)
+	if err != nil {
+		t.Fatalf("RemotePeers: %v", err)
+	}
+	if len(peers) != 2 {
+		t.Fatalf("during retention the remote has %d peers (%+v), want w1 and cp", len(peers), peers)
+	}
+
+	// And the window runs out.
+	if !pruneDeparted(data, r.membership(nodes), testNow.Add(testRetention), testRetention) {
+		t.Fatal("nothing was pruned once the window had run out")
 	}
 	peers, err = tunnel.RemotePeers(data, "10.100.0.128", nil)
 	if err != nil {
@@ -386,7 +516,7 @@ func TestMembership_HealthIsNotIntent(t *testing.T) {
 		"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
 		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
 	}, nil)
-	if pruneDeparted(data, want) {
+	if pruneDeparted(data, want, testNow, testRetention) {
 		t.Error("an unhealthy node's published entries were pruned")
 	}
 }
@@ -399,8 +529,17 @@ func TestRetiredTunnelAddressesAreNeverAllocatedAgain(t *testing.T) {
 		"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
 		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
 	}, nil)
-	if !pruneDeparted(data, meshMembership{endpoints: members("cp"), siteNodes: members("w1")}) {
-		t.Fatal("the departed endpoint was not pruned")
+	want := meshMembership{endpoints: members("cp"), siteNodes: members("w1")}
+	// An address is retired when the entry finally goes, not when the
+	// node departed: it belongs to a working tunnel until then.
+	if !pruneDeparted(data, want, testNow, testRetention) {
+		t.Fatal("the departure of the endpoint was not recorded")
+	}
+	if got := string(data[tunnel.RetiredTunnelAddressesKey]); got != "" {
+		t.Errorf("retired %q while the address was still in use", got)
+	}
+	if !pruneDeparted(data, want, testNow.Add(testRetention), testRetention) {
+		t.Fatal("the departed endpoint was not pruned once its window was over")
 	}
 
 	used := map[string]bool{}
@@ -421,5 +560,245 @@ func TestRetiredTunnelAddressesAreNeverAllocatedAgain(t *testing.T) {
 	}
 	if next != "10.100.0.3/24" {
 		t.Errorf("next free address = %q, want 10.100.0.3/24", next)
+	}
+}
+
+// matchesNode is the scheduler's reading of a node affinity, reduced to
+// what this affinity uses: expressions over labels, ORed across terms
+// and ANDed within one, and metadata.name as a field.
+func matchesNode(sel *corev1.NodeSelector, node *corev1.Node) bool {
+	for _, term := range sel.NodeSelectorTerms {
+		matched := true
+		for _, req := range term.MatchExpressions {
+			value, present := node.Labels[req.Key]
+			if !requirementMatches(req, value, present) {
+				matched = false
+				break
+			}
+		}
+		for _, req := range term.MatchFields {
+			if req.Key != "metadata.name" {
+				matched = false
+				break
+			}
+			if !requirementMatches(req, node.Name, true) {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
+func requirementMatches(req corev1.NodeSelectorRequirement, value string, present bool) bool {
+	in := false
+	for _, want := range req.Values {
+		if want == value {
+			in = true
+		}
+	}
+	switch req.Operator {
+	case corev1.NodeSelectorOpIn:
+		return present && in
+	case corev1.NodeSelectorOpNotIn:
+		return !present || !in
+	case corev1.NodeSelectorOpExists:
+		return present
+	case corev1.NodeSelectorOpDoesNotExist:
+		return !present
+	}
+	return false
+}
+
+// The dialer's affinity is the other half of a two phase migration, and
+// the half without which the first is useless. A remote reads its peer
+// list from the API server over the tunnel, so the node the selector has
+// just let go of has to keep running its dialer while the remote reads
+// the list naming its replacement. Measured: the selector moved from w1
+// to cp, w1's dialer went with it, and the remote sat NotReady for
+// eighteen minutes holding w1 as its only peer.
+func TestDialerNodeAffinity(t *testing.T) {
+	linux := func(name string, extra map[string]string) *corev1.Node {
+		labels := map[string]string{"kubernetes.io/os": "linux", "kubernetes.io/hostname": name}
+		for k, v := range extra {
+			labels[k] = v
+		}
+		return &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}}
+	}
+	var (
+		cp          = linux("cp", map[string]string{controlPlaneLabel: ""})
+		w1          = linux("w1", nil)
+		w2          = linux("w2", nil)
+		provisioned = linux("remote1", map[string]string{cloudWorkerRoleLabel: cloudWorkerRoleValue})
+		windows     = &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+			Name:   "win1",
+			Labels: map[string]string{"kubernetes.io/os": "windows", "kubernetes.io/hostname": "win1"},
+		}}
+	)
+
+	for _, tc := range []struct {
+		name     string
+		raw      string
+		retained []string
+		runs     []*corev1.Node
+		declines []*corev1.Node
+	}{
+		{
+			// The migration itself: cp is what the selector now says, w1
+			// is what the mesh still publishes, and both dial until the
+			// entries are pruned.
+			name:     "a node the selector has let go of keeps its dialer while its entries stand",
+			raw:      "kubernetes.io/hostname=cp," + controlPlaneLabel,
+			retained: []string{"cp", "w1"},
+			runs:     []*corev1.Node{cp, w1},
+			declines: []*corev1.Node{w2, provisioned, windows},
+		},
+		{
+			name:     "a retained node is still not a control plane the selector did not name",
+			raw:      "kubernetes.io/hostname=w2",
+			retained: []string{"cp", "w1", "w2"},
+			runs:     []*corev1.Node{w1, w2},
+			declines: []*corev1.Node{cp, provisioned, windows},
+		},
+		{
+			// A provisioned node is on the far side of a tunnel and
+			// terminates none of its own, whatever the Secret says.
+			name:     "every node at this site, and never a provisioned one",
+			raw:      "all",
+			retained: []string{"remote1"},
+			runs:     []*corev1.Node{cp, w1, w2},
+			declines: []*corev1.Node{provisioned, windows},
+		},
+		{
+			name:     "nothing retained is the selector on its own",
+			raw:      "kubernetes.io/hostname=w1",
+			retained: nil,
+			runs:     []*corev1.Node{w1},
+			declines: []*corev1.Node{cp, w2, provisioned, windows},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			affinity := dialerNodeAffinity(tc.raw, tc.retained)
+			for _, node := range tc.runs {
+				if !matchesNode(affinity, node) {
+					t.Errorf("%s runs no dialer", node.Name)
+				}
+			}
+			for _, node := range tc.declines {
+				if matchesNode(affinity, node) {
+					t.Errorf("%s was given a dialer", node.Name)
+				}
+			}
+			// A field selector takes exactly one value, so a term with
+			// several would be rejected by the API server rather than
+			// mis-scheduled.
+			for _, term := range affinity.NodeSelectorTerms {
+				for _, req := range term.MatchFields {
+					if len(req.Values) != 1 {
+						t.Errorf("field requirement %+v has %d values, want exactly one", req, len(req.Values))
+					}
+				}
+			}
+		})
+	}
+}
+
+// During retention a remote has two peers, and the accept list still has
+// one owner per prefix: each carries its own node's addresses and blocks,
+// and the site nodes that terminate no tunnel go on exactly one of them.
+// A prefix on two peers is resolved by whichever was written last, which
+// is the failure this reconciler exists to avoid.
+func TestRetainedAndNewEndpointCarryDisjointPrefixes(t *testing.T) {
+	const (
+		keyW1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA="
+		keyCP = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB="
+	)
+	data := published(
+		map[string][2]string{"w1": {keyW1, "10.100.0.1/24"}, "cp": {keyCP, "10.100.0.2/24"}},
+		map[string]string{"w2": "172.21.0.17"},
+	)
+	want := meshMembership{endpoints: members("cp"), siteNodes: members("w1", "w2")}
+	if !pruneDeparted(data, want, testNow, testRetention) {
+		t.Fatal("the departure of the old endpoint was not recorded")
+	}
+
+	peers, err := tunnel.RemotePeers(data, "10.100.0.128", []string{"172.21.0.10"})
+	if err != nil {
+		t.Fatalf("RemotePeers: %v", err)
+	}
+	if len(peers) != 2 {
+		t.Fatalf("the remote has %d peers (%+v), want the retained one and the new one", len(peers), peers)
+	}
+	keys := map[string]bool{peers[0].PublicKey: true, peers[1].PublicKey: true}
+	if !keys[keyW1] || !keys[keyCP] {
+		t.Fatalf("the remote's peers are %+v, want both w1 and cp", peers)
+	}
+	owner := map[string]string{}
+	for _, peer := range peers {
+		for _, prefix := range peer.WGAllowedIPs {
+			if held, ok := owner[prefix]; ok {
+				t.Errorf("%s is permitted on both %s and %s", prefix, held, peer.PublicKey)
+				continue
+			}
+			owner[prefix] = peer.PublicKey
+		}
+	}
+	// Both tunnel addresses are reachable, which is what makes this two
+	// paths rather than a gamble on which one the remote picked.
+	for _, addr := range []string{"10.100.0.1/32", "10.100.0.2/32"} {
+		if owner[addr] == "" {
+			t.Errorf("%s is permitted on neither peer", addr)
+		}
+	}
+}
+
+// The release of a retained endpoint is a deadline, and no event
+// coincides with it: no node and no Machine changes when the window runs
+// out. Without a requeue the entries would sit published until the next
+// full resync, which is hours, and the migration would look stuck.
+func TestSoonestRelease(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		data map[string][]byte
+		want time.Duration
+	}{
+		{
+			name: "nothing retained asks for nothing",
+			data: map[string][]byte{tunnel.NodePublicKeyPrefix + "w1": []byte("k")},
+			want: 0,
+		},
+		{
+			// Just past the deadline rather than exactly on it: a timer
+			// that fires a hair early reads as not yet expired, and the
+			// node would be held a second whole window.
+			name: "the nearest deadline, a moment after it",
+			data: func() map[string][]byte {
+				data := map[string][]byte{}
+				departedSince(data, "w1", testRetention-time.Minute)
+				departedSince(data, "w2", testRetention-2*time.Minute)
+				return data
+			}(),
+			want: time.Minute + time.Second,
+		},
+		{
+			// Already expired and still here means it is waiting on a
+			// surviving endpoint being published, not on the clock.
+			name: "a window already run out comes back on the dialer's cadence",
+			data: func() map[string][]byte {
+				data := map[string][]byte{}
+				departedSince(data, "w1", 10*testRetention)
+				return data
+			}(),
+			want: 30 * time.Second,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := soonestRelease(tc.data, testNow, testRetention); got != tc.want {
+				t.Errorf("soonestRelease = %s, want %s", got, tc.want)
+			}
+		})
 	}
 }

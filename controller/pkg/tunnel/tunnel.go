@@ -84,6 +84,24 @@ const (
 	// one to renumber deliberately rather than by reuse.
 	RetiredTunnelAddressesKey = "retired-tunnel-addresses"
 
+	// NodeDepartedAtPrefix records, per node, the RFC3339 instant at
+	// which that node first stopped being a selected tunnel endpoint
+	// while some other endpoint was already usable.
+	//
+	// A remote reads its peer list from the API server and reaches the
+	// API server over the tunnel, so taking a departed endpoint away in
+	// the same pass that names its replacement removes the only path the
+	// replacement's name could have travelled. The departed node stays a
+	// full endpoint, dialer and published entries both, until this
+	// instant is far enough behind that a remote polling the Secret has
+	// had its chance to see the replacement.
+	//
+	// It lives in the Secret rather than in the controller's memory
+	// because a controller restart during the migration would otherwise
+	// either restart the clock forever or drop the node immediately, and
+	// which of those happened would depend on when the pod was rescheduled.
+	NodeDepartedAtPrefix = "node-departed-at-"
+
 	// APIServersKey lists every control-plane address a remote must be
 	// able to reach (comma-separated). k0s workers load-balance across
 	// all of them via nllb, so one address is not enough.

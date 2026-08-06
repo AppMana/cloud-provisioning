@@ -132,6 +132,13 @@ type meshReconciler struct {
 	tunnelEndpointsRaw     string
 	tunnelSubnet           string
 	localAddressBase       string
+	// endpointRetention is how long a node that has left the selector
+	// goes on being an endpoint: dialer scheduled, entries published,
+	// tunnel carrying traffic. It is the time a remote is given to read
+	// a peer list naming its replacement, over the tunnel it is about to
+	// lose, so it is measured in the dialer's poll interval and never in
+	// anything about the departing node's health.
+	endpointRetention time.Duration
 
 	// Dialer DaemonSets: this operator owns both specs directly. There
 	// is no CRD and they are not hand-authored in gitops.
@@ -188,14 +195,30 @@ func (r *meshReconciler) owners() []metav1.OwnerReference {
 	return []metav1.OwnerReference{*r.ownerRef}
 }
 
-func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	log := ctrl.LoggerFrom(ctx)
+
+	// A retained endpoint is released on a deadline, and a deadline is
+	// not an event: nothing about any node or Machine changes when the
+	// retention window runs out, so without a requeue the departed
+	// node's entries would sit published until the next full resync,
+	// hours away. Whichever deadline is nearer wins.
+	releaseIn := time.Duration(0)
+	defer func() {
+		if err != nil || releaseIn <= 0 {
+			return
+		}
+		if result.RequeueAfter == 0 || releaseIn < result.RequeueAfter {
+			result.RequeueAfter = releaseIn
+		}
+	}()
 
 	// Allocate tunnel addresses and cluster VIPs for every selected
 	// endpoint node first: the peer graph the dialers and the join
 	// reconciler read is derived from these, and a node that hasn't
 	// been allocated one is not a mesh member.
-	if err := r.reconcileTunnelEndpoints(ctx); err != nil {
+	releaseIn, err = r.reconcileTunnelEndpoints(ctx)
+	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("reconciling tunnel endpoints: %w", err)
 	}
 
@@ -384,24 +407,24 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 //
 // A node's own dialer publishes its public key; this loop never sees
 // or wants a private key.
-func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
+func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Duration, error) {
 	nodes := &corev1.NodeList{}
 	if err := r.List(ctx, nodes); err != nil {
-		return fmt.Errorf("listing nodes: %w", err)
+		return 0, fmt.Errorf("listing nodes: %w", err)
 	}
 
 	secret := &corev1.Secret{}
 	secretKey := types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}
 	if err := r.reader.Get(ctx, secretKey, secret); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("getting secret %s: %w", secretKey, err)
+			return 0, fmt.Errorf("getting secret %s: %w", secretKey, err)
 		}
 		// The peer Secret is controller-managed state; nothing else has
 		// to create it (no manual steps, no gitops-authored Secret for a
 		// controller-owned object).
 		secret = &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: r.secretNamespace, Name: r.secretName, OwnerReferences: r.owners()}}
 		if err := r.Create(ctx, secret); err != nil {
-			return fmt.Errorf("creating peer secret %s: %w", secretKey, err)
+			return 0, fmt.Errorf("creating peer secret %s: %w", secretKey, err)
 		}
 	}
 	patch := client.MergeFrom(secret.DeepCopy())
@@ -412,7 +435,8 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 	// What the nodes no longer account for, before anything is
 	// allocated: a departed endpoint's address is retired in the same
 	// pass, so the loop below cannot hand it straight to another node.
-	changed := pruneDeparted(secret.Data, r.membership(nodes.Items))
+	now := time.Now()
+	changed := pruneDeparted(secret.Data, r.membership(nodes.Items), now, r.endpointRetention)
 
 	// Existing allocations stay put; new nodes take the next free host
 	// in the tunnel subnet. A retired address is not free.
@@ -438,6 +462,15 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 			if node.Labels[cloudWorkerRoleLabel] == cloudWorkerRoleValue {
 				continue
 			}
+			// A node the selector has let go of, still inside its
+			// retention window, is still an endpoint: it holds a
+			// published key and address, its dialer still runs, and its
+			// tunnel still carries traffic. Publishing it as a site node
+			// as well would give its addresses a second owner in the
+			// accept list, on the peer that relays to the site.
+			if publishedEndpoint(secret.Data, node.Name) {
+				continue
+			}
 			// A site node with no tunnel of its own. It is not a peer,
 			// but a remote still has to be permitted to reach it, so
 			// its addresses and blocks are published for whichever
@@ -452,7 +485,7 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 		if len(secret.Data[addrKey]) == 0 {
 			addr, err := nextFreeAddress(r.localAddressBase, used)
 			if err != nil {
-				return err
+				return 0, err
 			}
 			used[strings.SplitN(addr, "/", 2)[0]] = true
 			secret.Data[addrKey] = []byte(addr)
@@ -549,10 +582,44 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) error {
 		changed = true
 	}
 
+	// When a retained endpoint is due to be released, come back for it:
+	// see Reconcile, where a deadline is turned into a requeue.
+	releaseIn := soonestRelease(secret.Data, now, r.endpointRetention)
 	if !changed {
-		return nil
+		return releaseIn, nil
 	}
-	return r.Patch(ctx, secret, patch)
+	return releaseIn, r.Patch(ctx, secret, patch)
+}
+
+// soonestRelease is how long until the nearest retained endpoint may be
+// pruned, or zero when none is retained.
+//
+// A second past the deadline rather than exactly on it, because a timer
+// that fires a hair early reads as not yet expired and would cost
+// another whole window. A record whose window has already run out and
+// which this pass did not prune is waiting on something else entirely
+// (no surviving endpoint is published yet), so it comes back on the
+// dialer's own cadence rather than as fast as the queue will run.
+func soonestRelease(data map[string][]byte, now time.Time, retention time.Duration) time.Duration {
+	const stillWaiting = 30 * time.Second
+	soonest := time.Duration(0)
+	for key, val := range data {
+		if !strings.HasPrefix(key, tunnel.NodeDepartedAtPrefix) {
+			continue
+		}
+		since, err := time.Parse(time.RFC3339, strings.TrimSpace(string(val)))
+		if err != nil {
+			continue
+		}
+		remaining := since.Add(retention).Sub(now) + time.Second
+		if remaining <= 0 {
+			remaining = stillWaiting
+		}
+		if soonest == 0 || remaining < soonest {
+			soonest = remaining
+		}
+	}
+	return soonest
 }
 
 // isTunnelEndpoint reports whether a node should terminate tunnels:
@@ -645,6 +712,18 @@ func (r *meshReconciler) membership(nodes []corev1.Node) meshMembership {
 //     address. A remote left with a peer it cannot reach is stale; a
 //     remote left with no peer at all is stranded, and only the second
 //     is unrecoverable from the far side.
+//   - No node-* entry goes in the pass that first finds the node
+//     departed. Publishing the replacement and withdrawing the current
+//     endpoint together is what stranded a remote for eighteen minutes:
+//     the sentence naming the replacement has to travel over the
+//     endpoint being withdrawn. The instant of departure is recorded
+//     instead, and the entries go once retention has elapsed, which is
+//     time measured in the dialer's poll interval rather than in
+//     anything about the node's health. A node the selector takes back
+//     before then has the record cleared and never notices. A node that
+//     has left the cluster is not retained at all: nothing can schedule
+//     a dialer on it, so keeping its entries offers a remote a peer
+//     that no longer answers.
 //   - A site-* entry goes only once that same node's endpoint
 //     publication is complete, or the node is gone from the cluster. A
 //     node in the middle of becoming an endpoint is still reached by
@@ -653,7 +732,7 @@ func (r *meshReconciler) membership(nodes []corev1.Node) meshMembership {
 //     go then rather than later: the accept list has one owner per
 //     prefix, and the node's addresses would otherwise be permitted
 //     both on its own peer and on the relaying one.
-func pruneDeparted(data map[string][]byte, want meshMembership) bool {
+func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, retention time.Duration) bool {
 	if len(want.endpoints) == 0 && len(want.siteNodes) == 0 {
 		// A membership that reads as empty is a failed read until
 		// proven otherwise. Nothing at a site departs all at once, and
@@ -675,10 +754,37 @@ func pruneDeparted(data map[string][]byte, want meshMembership) bool {
 	}
 	for _, name := range publishedNames(data,
 		tunnel.NodePublicKeyPrefix, tunnel.NodeTunnelAddressPrefix,
-		tunnel.NodeAddressesPrefix, tunnel.NodePodCIDRsPrefix) {
-		if want.endpoints[name] || survivors == 0 {
+		tunnel.NodeAddressesPrefix, tunnel.NodePodCIDRsPrefix,
+		tunnel.NodeDepartedAtPrefix) {
+		if want.endpoints[name] {
+			// Back in the selector. Whatever it was part way through is
+			// abandoned, and it is an endpoint like any other.
+			drop(tunnel.NodeDepartedAtPrefix + name)
 			continue
 		}
+		if survivors == 0 {
+			// Nowhere for a remote to go, so there is nothing for it to
+			// be given time to learn. The clock starts when a
+			// replacement exists, not when the selector changed.
+			continue
+		}
+		if want.siteNodes[name] {
+			// Still a node of this site, merely no longer selected. It
+			// keeps its dialer and its entries for the retention window,
+			// which is what gives a remote two working paths across the
+			// change instead of none.
+			expired, recorded := departedLongEnough(data, name, now, retention)
+			if recorded {
+				changed = true
+			}
+			if !expired {
+				continue
+			}
+		}
+		// A node that is not at this site at all has been deleted or
+		// drained out of the cluster. Nothing can schedule a dialer on
+		// it, so retaining its entries would buy a remote only a peer
+		// that no longer answers.
 		if retireTunnelAddress(data, string(data[tunnel.NodeTunnelAddressPrefix+name])) {
 			changed = true
 		}
@@ -686,9 +792,13 @@ func pruneDeparted(data map[string][]byte, want meshMembership) bool {
 		drop(tunnel.NodeTunnelAddressPrefix + name)
 		drop(tunnel.NodeAddressesPrefix + name)
 		drop(tunnel.NodePodCIDRsPrefix + name)
+		drop(tunnel.NodeDepartedAtPrefix + name)
 	}
 	for _, name := range publishedNames(data, tunnel.SiteAddressesPrefix, tunnel.SitePodCIDRsPrefix) {
-		if want.siteNodes[name] {
+		// A retained endpoint is still an endpoint: it carries its own
+		// addresses on its own peer, and the same addresses on a site
+		// entry would be a second owner for those prefixes.
+		if want.siteNodes[name] && !publishedEndpoint(data, name) {
 			continue
 		}
 		if want.endpoints[name] && !publishedEndpoint(data, name) {
@@ -698,6 +808,26 @@ func pruneDeparted(data map[string][]byte, want meshMembership) bool {
 		drop(tunnel.SitePodCIDRsPrefix + name)
 	}
 	return changed
+}
+
+// departedLongEnough reports whether a node left the selector far
+// enough back that a remote has had a real chance to read the peer list
+// naming its replacement, and whether this call had to write the
+// departure record. The first pass that finds a node departed records
+// the instant and reports not yet.
+//
+// A record this cannot parse is rewritten as now rather than read as
+// expired: the recoverable reading of unreadable state is the one that
+// keeps the endpoint, and an endpoint retained one window too long
+// costs a remote nothing but a second working tunnel.
+func departedLongEnough(data map[string][]byte, name string, now time.Time, retention time.Duration) (expired, recorded bool) {
+	key := tunnel.NodeDepartedAtPrefix + name
+	since, err := time.Parse(time.RFC3339, strings.TrimSpace(string(data[key])))
+	if err != nil {
+		data[key] = []byte(now.UTC().Format(time.RFC3339))
+		return false, true
+	}
+	return !now.Before(since.Add(retention)), false
 }
 
 // publishedEndpoint reports whether a node is a usable peer as
@@ -789,28 +919,23 @@ func nextFreeAddress(base string, used map[string]bool) (string, error) {
 	return "", fmt.Errorf("tunnel subnet %s is exhausted", base)
 }
 
-// KNOWN GAP, measured rather than theorised.
+// Refreshing a remote's peer list is necessary and not sufficient, and
+// the other half is not here.
 //
-// A remote learns its peer list from the API server, and it reaches the
-// API server over the tunnel. Move a tunnel from one site node to
-// another and the departing node's dialer is descheduled the moment the
-// selector changes, because the DaemonSet's affinity follows the
-// selector directly. The remote's tunnel dies with it, and the remote
-// then cannot read the peer list that would tell it where the new
-// endpoint is. It stays stranded until something restores the old path.
+// A remote learns its peer list from the API server and reaches the API
+// server over the tunnel, so a pass that names the new endpoint and
+// withdraws the old one at once removes the only path the new name
+// could have travelled by. Measured: the site published only the new
+// endpoint, the remote's own peer list was correctly re-rendered to
+// name it, and the remote's WireGuard still held the old peer eighteen
+// minutes later, NotReady throughout.
 //
-// Refreshing the peer list, below, is necessary and not sufficient: the
-// site converges and the remote never hears about it. Observed with the
-// site publishing only the new endpoint while the remote's WireGuard
-// still held the old peer eighteen minutes later.
-//
-// The fix is two phase and belongs in the DaemonSet's affinity rather
-// than here: a node that has left the selector must keep running its
-// dialer until every remote has established with a surviving endpoint,
-// and only then be released. Until that exists, moving a tunnel
-// endpoint is not a safe operation on a live mesh, and the honest
-// workaround is to add the new endpoint, wait for remotes to pick it
-// up, and remove the old one in a second change.
+// The other half is two phase, and it is pruneDeparted's retention
+// window together with dialerNodeAffinity's second term. A node the
+// selector has let go of stays a full endpoint, dialer and published
+// entries both, for as long as it takes a remote to poll and read the
+// list naming the replacement. For that window a remote has two working
+// paths rather than none, which is the whole trick.
 
 // refreshAdoptionConfigs re-renders every remote's peer list, for the
 // passes that were not about any one machine.
@@ -1136,16 +1261,15 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 // controlPlaneLabel) and no toleration for the cloud-worker taint (so
 // it never lands on the remote node it dials).
 func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
-	nodeSelectorTerms := []corev1.NodeSelectorRequirement{
-		{Key: "kubernetes.io/os", Operator: corev1.NodeSelectorOpIn, Values: []string{"linux"}},
-	}
-	if !selectorNamesControlPlane(r.tunnelEndpointsRaw) {
-		nodeSelectorTerms = append(nodeSelectorTerms, corev1.NodeSelectorRequirement{
-			Key: controlPlaneLabel, Operator: corev1.NodeSelectorOpDoesNotExist,
-		})
-	}
-	for _, req := range parseSelectorRequirements(r.tunnelEndpointsRaw) {
-		nodeSelectorTerms = append(nodeSelectorTerms, req)
+	// A node that has left the selector but still holds a published
+	// tunnel address is still an endpoint, and an endpoint with no
+	// dialer is an endpoint that is not there. Reading this from the
+	// Secret rather than remembering it keeps the two halves of the
+	// migration, the affinity and the published entries, deciding from
+	// one fact.
+	retained, err := r.retainedEndpoints(ctx)
+	if err != nil {
+		return err
 	}
 	// A control plane carries a NoSchedule taint, so allowing it by
 	// affinity is not enough: without a toleration a selected control
@@ -1177,9 +1301,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 					Tolerations:        tolerations,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-								NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: nodeSelectorTerms}},
-							},
+							RequiredDuringSchedulingIgnoredDuringExecution: dialerNodeAffinity(r.tunnelEndpointsRaw, retained),
 						},
 					},
 					ImagePullSecrets: []corev1.LocalObjectReference{{Name: r.dialerImagePullSecret}},
@@ -1244,7 +1366,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 	}
 
 	existing := &appsv1.DaemonSet{}
-	err := r.reader.Get(ctx, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, existing)
+	err = r.reader.Get(ctx, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, existing)
 	if apierrors.IsNotFound(err) {
 		return r.Create(ctx, desired)
 	}
@@ -1253,6 +1375,80 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 	}
 	existing.Spec = desired.Spec
 	return r.Update(ctx, existing)
+}
+
+// retainedEndpoints lists the nodes the peer Secret still publishes a
+// tunnel address for. During a migration that is the departing node as
+// well as the arriving one, which is the whole point: the departing
+// node's dialer has to outlive the selector change that names its
+// replacement, because the replacement's name travels over it.
+//
+// No Secret yet means no mesh yet, which is not an error: the first
+// reconcile creates both the Secret and this DaemonSet.
+func (r *meshReconciler) retainedEndpoints(ctx context.Context) ([]string, error) {
+	secret := &corev1.Secret{}
+	key := types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}
+	if err := r.reader.Get(ctx, key, secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("getting secret %s to find retained endpoints: %w", key, err)
+	}
+	var names []string
+	for k, v := range secret.Data {
+		if !strings.HasPrefix(k, tunnel.NodeTunnelAddressPrefix) {
+			continue
+		}
+		if strings.TrimSpace(string(v)) == "" {
+			continue
+		}
+		names = append(names, strings.TrimPrefix(k, tunnel.NodeTunnelAddressPrefix))
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+// dialerNodeAffinity is where the on-prem dialer is allowed to run: the
+// nodes the selector names, or the nodes that still hold a published
+// tunnel address. Two terms, because node affinity ORs terms and ANDs
+// the expressions within one, and this is genuinely a union.
+//
+// The second term is what makes moving an endpoint survivable. A
+// selector change alone deschedules the departing node's dialer in the
+// same instant it names the replacement, and a remote cannot be told
+// where the replacement is except over the tunnel that just went away.
+// Both dialers run until the departing node's entries are pruned, so a
+// remote has two working paths across the change rather than none.
+//
+// The exclusions hold in both terms: a control plane is not an endpoint
+// unless the selector named it, a node this operator provisioned is on
+// the far side of a tunnel and never one of the site's ends of it, and
+// Windows terminates nothing. A retained node is named by
+// metadata.name, the identity the Secret's keys are written under,
+// rather than by a hostname label that is only conventionally the same.
+// A field selector takes exactly one value, so retained nodes get a
+// term each, which is what ORing them means anyway.
+func dialerNodeAffinity(raw string, retained []string) *corev1.NodeSelector {
+	base := []corev1.NodeSelectorRequirement{
+		{Key: "kubernetes.io/os", Operator: corev1.NodeSelectorOpIn, Values: []string{"linux"}},
+		{Key: cloudWorkerRoleLabel, Operator: corev1.NodeSelectorOpNotIn, Values: []string{cloudWorkerRoleValue}},
+	}
+	if !selectorNamesControlPlane(raw) {
+		base = append(base, corev1.NodeSelectorRequirement{
+			Key: controlPlaneLabel, Operator: corev1.NodeSelectorOpDoesNotExist,
+		})
+	}
+	selected := append(append([]corev1.NodeSelectorRequirement{}, base...), parseSelectorRequirements(raw)...)
+	terms := []corev1.NodeSelectorTerm{{MatchExpressions: selected}}
+	for _, name := range retained {
+		terms = append(terms, corev1.NodeSelectorTerm{
+			MatchExpressions: append([]corev1.NodeSelectorRequirement{}, base...),
+			MatchFields: []corev1.NodeSelectorRequirement{{
+				Key: "metadata.name", Operator: corev1.NodeSelectorOpIn, Values: []string{name},
+			}},
+		})
+	}
+	return &corev1.NodeSelector{NodeSelectorTerms: terms}
 }
 
 // parseSelectorRequirements turns a plain "k=v,k2=v2" selector string
@@ -1442,6 +1638,7 @@ func main() {
 		gatewayName      string
 
 		tunnelEndpoints     string
+		endpointRetention   time.Duration
 		dialerPrivateKeyDir string
 
 		joinEnabled               bool
@@ -1488,6 +1685,7 @@ func main() {
 	flag.StringVar(&gatewayNamespace, "gateway-namespace", "", "optional: namespace of a Gateway to annotate with the node's external IP for external-dns (blank disables this)")
 	flag.StringVar(&gatewayName, "gateway-name", "", "optional: name of a Gateway to annotate with the node's external IP for external-dns")
 	flag.StringVar(&tunnelEndpoints, "tunnel-endpoints", "", "node selector (k=v,k2=v2) choosing which local nodes terminate tunnels; empty = every Linux worker. Control-plane nodes are excluded unless this selector names node-role.kubernetes.io/control-plane explicitly")
+	flag.DurationVar(&endpointRetention, "tunnel-endpoint-retention", 3*time.Minute, "how long a node that has left --tunnel-endpoints goes on being one: dialer still scheduled, entries still published, tunnel still carrying traffic. A remote reads its peer list over the tunnel it is about to lose, so this is the time it is given to read the one naming the replacement, and it is measured in the dialer's 30s poll interval rather than in anything about the departing node's health")
 	flag.StringVar(&dialerPrivateKeyDir, "dialer-private-key-dir", "/var/lib/cloud-provisioning", "host directory where each node's dialer keeps its own WireGuard private key (generated on first start; never leaves the node)")
 	flag.StringVar(&dialerDaemonSetName, "dialer-daemonset-name", "tunnel-dialer", "name of the on-prem dialer DaemonSet this operator provisions directly")
 	flag.StringVar(&dialerServiceAccount, "dialer-service-account", "cloud-provisioning-dialer", "ServiceAccount the dialer DaemonSet's pods run as")
@@ -1663,6 +1861,7 @@ func main() {
 			gatewayName:            gatewayName,
 			tunnelEndpointSelector: endpointSelector,
 			tunnelEndpointsRaw:     rawTunnelEndpoints,
+			endpointRetention:      endpointRetention,
 			tunnelSubnet:           tunnelSubnet,
 			localAddressBase:       localAddressBase,
 			dialerDaemonSetName:    dialerDaemonSetName,

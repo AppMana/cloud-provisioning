@@ -64,6 +64,17 @@ tunnel:
   # cldt* interface.
   endpoints: ""
 
+  # How long a node that has left the selector goes on being an
+  # endpoint: its dialer stays scheduled, its entries stay published,
+  # its tunnel keeps carrying traffic. A remote reads its peer list from
+  # the API server and reaches the API server over the tunnel, so
+  # withdrawing the old endpoint in the same pass that names the new one
+  # removes the only path the new one's name could travel by. This is
+  # the time a remote is given to read it, so it is measured in the
+  # dialer's 30s poll interval, and not in anything about the departing
+  # node's health.
+  endpointRetention: 3m
+
 # The namespace an infrastructure provider's controller runs in, when
 # this controller needs to read a credentials Secret there to check a
 # cluster identity before provisioning. Empty grants no such access.

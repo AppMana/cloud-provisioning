@@ -65,6 +65,9 @@ spec:
             {{- with .Values.tunnel.endpoints }}
             - "--tunnel-endpoints={{ . }}"
             {{- end }}
+            {{- with .Values.tunnel.endpointRetention }}
+            - "--tunnel-endpoint-retention={{ . }}"
+            {{- end }}
             {{- with .Values.dialerBinary.arm64.url }}
             - "--join-dialer-binary-url-arm64={{ . }}"
             - "--join-dialer-binary-sha256-arm64={{ $.Values.dialerBinary.arm64.sha256 | required "dialerBinary.arm64.sha256 is required when a url is set: an unpinned download is a supply-chain hole" }}"

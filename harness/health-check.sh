@@ -177,18 +177,35 @@ if [[ ${#NODES[@]} -gt 1 ]]; then
   first="${NODES[0]}"
   echo
   echo "waiting for reachability to converge between nodes"
+  converge_start=$SECONDS
   converge_deadline=$((SECONDS + ${HEALTH_CHECK_CONVERGE_SECONDS:-420}))
-  for dst in "${NODES[@]}"; do
-    [[ "$dst" == "$first" ]] && continue
-    while ! http_from_early "$first" "http://${POD_IP[$dst]}:$SERVICE_PORT/"; do
+  # The gate has to probe what the checks then measure, or it opens on
+  # paths the checks do not take and the checks eat the convergence out
+  # of their own much shorter retries. Three paths per node: to it, from
+  # it, and from it by service address. The return path is not implied
+  # by the forward one: the accept list that admits a source on one
+  # tunnel says nothing about the reverse direction, and a service path
+  # additionally waits on the node's own kube-proxy programming.
+  wait_path() {
+    local label="$1"; shift
+    while ! "$@" >/dev/null 2>&1; do
       if (( SECONDS >= converge_deadline )); then
-        echo "  gave up waiting for $first to reach $dst" >&2
-        break
+        echo "  gave up waiting for $label" >&2
+        return 1
       fi
       sleep 10
     done
+  }
+  for other in "${NODES[@]}"; do
+    [[ "$other" == "$first" ]] && continue
+    wait_path "$first to reach $other" \
+      http_from_early "$first" "http://${POD_IP[$other]}:$SERVICE_PORT/"
+    wait_path "$other to reach $first" \
+      http_from_early "$other" "http://${POD_IP[$first]}:$SERVICE_PORT/"
+    wait_path "$other to reach $first by service address" \
+      http_from_early "$other" "http://${SERVICE_IP[$first]}:$SERVICE_PORT/"
   done
-  echo "  converged after $((SECONDS))s"
+  echo "  converged after $((SECONDS - converge_start))s"
 fi
 
 PASS=0

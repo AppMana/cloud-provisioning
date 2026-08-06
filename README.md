@@ -105,7 +105,13 @@ drift.
 
 tunnel.endpoints says which of your nodes terminate tunnels. It takes a
 label selector, a set such as kubernetes.io/hostname in (worker-1,
-worker-2), or the word all. Empty means all. Control planes are left
+worker-2), or the word all. Empty means all. A set contains commas, and
+helm reads a comma in --set as the separator between values, so escape
+them or the release fails to install:
+
+```bash
+--set-string tunnel.endpoints='kubernetes.io/hostname in (worker-1\,worker-2)'
+``` Control planes are left
 out unless the selector names them, so a tunnel cannot cost a control
 plane its default route, and nodes this operator provisioned are never
 included, since they are the far end of a tunnel rather than one of

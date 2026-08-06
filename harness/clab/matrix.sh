@@ -51,6 +51,12 @@ in_node() { docker exec "$(c "$1")" "${@:2}"; }
 k() { in_node bastion kubectl "$@"; }
 
 # Which nodes a row's endpoint spec names, as a selector the chart takes.
+#
+# A set based selector contains commas, and helm --set reads a comma as
+# the separator between values, so "hostname in (w1,w2)" arrives at the
+# chart as two mangled fragments and the release fails to install. The
+# commas belong to the term, so they are escaped, and --set-string keeps
+# helm from interpreting anything else in it.
 selector_for() {
   case "$1" in
     all) echo "all" ;;
@@ -79,7 +85,7 @@ while IFS=$'\t' read -r name endpoints remotes <&3; do
     --namespace "$NS" --create-namespace --wait --timeout 6m \
     --set image.repository=cldt-controller --set image.tag=e2e --set image.pullPolicy=Never \
     --set dialerImage.repository=cldt-dialer --set dialerImage.tag=e2e \
-    --set tunnel.endpoints="$selector" \
+    --set-string tunnel.endpoints="${selector//,/\\,}" \
     --set joinProvider=kubeadm \
     --set dialerBinary.amd64.url="file:///opt/dialer-dist/wg-dialer-linux-amd64" \
     --set dialerBinary.amd64.sha256="$BIN_SHA" >/dev/null 2>&1 \

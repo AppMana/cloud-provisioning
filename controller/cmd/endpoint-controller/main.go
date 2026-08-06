@@ -289,19 +289,8 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	}
 
 	// Tell the CNI which address to peer on, once the node exists.
-	{
-		nodeName, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name")
-		tunnelAddr := strings.SplitN(strings.TrimSpace(
-			machine.GetAnnotations()["cloud-provisioning.appmana.com/wireguard-addr4"]), "/", 2)[0]
-		claimRef := ""
-		for _, owner := range machine.GetOwnerReferences() {
-			if owner.Kind == "ProvisionedNodeClaim" {
-				claimRef = machine.GetNamespace() + "/" + owner.Name
-			}
-		}
-		if err := r.ensureCNINodeAddress(ctx, nodeName, tunnelAddr, claimRef); err != nil {
-			return ctrl.Result{}, err
-		}
+	if err := r.ensureCNINodeAddressForMachine(ctx, machine); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	addresses, found, err := unstructured.NestedSlice(machine.Object, "status", "addresses")
@@ -1034,6 +1023,18 @@ func (r *meshReconciler) refreshAdoptionConfigs(ctx context.Context) error {
 	}
 	var failed []string
 	for i := range machines.Items {
+		// The address the CNI peers on is re-asserted here, not only on
+		// the machine's own reconcile. The CNI's address monitor
+		// restates its autodetected address whenever an interface
+		// changes underneath it, which is exactly when tunnels move,
+		// and the only signal that overwrite produces is a Node event:
+		// the Machine holding the right value has not changed, so
+		// waiting for a Machine event is waiting for nothing.
+		if err := r.ensureCNINodeAddressForMachine(ctx, &machines.Items[i]); err != nil {
+			failed = append(failed, machines.Items[i].GetName())
+			ctrl.LoggerFrom(ctx).Error(err, "could not re-assert a remote's CNI address", "machine", machines.Items[i].GetName())
+			continue
+		}
 		if err := r.ensureAdoptionConfig(ctx, &machines.Items[i]); err != nil {
 			failed = append(failed, machines.Items[i].GetName())
 			ctrl.LoggerFrom(ctx).Error(err, "could not refresh a remote's peer list", "machine", machines.Items[i].GetName())
@@ -1140,6 +1141,22 @@ func equalSpec(existing, want map[string]any) bool {
 		}
 	}
 	return true
+}
+
+// ensureCNINodeAddressForMachine reads what ensureCNINodeAddress needs
+// off the machine: the node it produced, the tunnel address the mesh
+// allocated it, and the claim that owns it.
+func (r *meshReconciler) ensureCNINodeAddressForMachine(ctx context.Context, machine *unstructured.Unstructured) error {
+	nodeName, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name")
+	tunnelAddr := strings.SplitN(strings.TrimSpace(
+		machine.GetAnnotations()["cloud-provisioning.appmana.com/wireguard-addr4"]), "/", 2)[0]
+	claimRef := ""
+	for _, owner := range machine.GetOwnerReferences() {
+		if owner.Kind == "ProvisionedNodeClaim" {
+			claimRef = machine.GetNamespace() + "/" + owner.Name
+		}
+	}
+	return r.ensureCNINodeAddress(ctx, nodeName, tunnelAddr, claimRef)
 }
 
 func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tunnelAddr, claim string) error {

@@ -107,6 +107,17 @@ for n in $SITE_NODES; do preload "$n" cldt-controller:e2e; done
 
 docker cp "$OUT/calico.yaml" "$(c bastion)":/tmp/calico.yaml
 k apply -f /tmp/calico.yaml >/dev/null || fail "installing calico"
+# Autodetect the address a node reaches the cluster by, not the first
+# interface that has one. On a site node the two agree. On a remote
+# they cannot: first-found lands on the interface that faces the
+# internet, an address the site has no route to, and calico's address
+# monitor re-detects at every interface change, so it restates that
+# address exactly when a tunnel moves. can-reach follows the route to
+# the API server, which on a remote is the tunnel, so the monitor's
+# own re-detection converges on the address the mesh gave the node.
+k -n kube-system set env daemonset/calico-node \
+  IP_AUTODETECTION_METHOD="can-reach=$LAN.10" >/dev/null \
+  || fail "setting calico's autodetection method"
 # The stock manifest encapsulates. This mesh carries pod traffic
 # natively, and the model the controller reads back has to match what
 # the network actually does.

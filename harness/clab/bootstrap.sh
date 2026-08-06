@@ -123,4 +123,25 @@ for i in $(seq 0 $((COUNT - 1))); do
 done
 
 echo "--- joined ---"
-k get node "$CONTAINER" -o wide 2>/dev/null || echo "  (node not registered yet; the join may still be settling)"
+for _ in $(seq 1 60); do k get node "$CONTAINER" >/dev/null 2>&1 && break; sleep 5; done
+k get node "$CONTAINER" -o wide 2>/dev/null || fail "the node never registered"
+
+# The last thing the infrastructure controller would have reported: which
+# node this machine became. Without it the mesh cannot map the machine to
+# a node, so it never reads that node's pod blocks and never permits
+# them, and the tunnel comes up carrying node traffic and no pod traffic
+# at all. That failure looks like a broken tunnel and is a missing field.
+k -n "$NS" patch machine "$MACHINE" --subresource=status --type merge \
+  -p "{\"status\":{\"nodeRef\":{\"apiVersion\":\"v1\",\"kind\":\"Node\",\"name\":\"$CONTAINER\"}}}" >/dev/null \
+  || fail "reporting which node the machine became"
+echo "  machine $MACHINE is node $CONTAINER"
+
+for _ in $(seq 1 60); do
+  permitted=$(k -n "$NS" get secret "$NS-peers" -o jsonpath="{.data.peer-allowed-ips-$MACHINE}" 2>/dev/null | base64 -d 2>/dev/null || true)
+  case "$permitted" in *,*) break ;; esac
+  sleep 5
+done
+case "${permitted:-}" in
+  *,*) echo "  the site permits $permitted" ;;
+  *) fail "the site permits only ${permitted:-nothing} for $MACHINE: its pods are unreachable from here" ;;
+esac

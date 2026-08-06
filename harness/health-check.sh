@@ -34,6 +34,9 @@ NODES=()
 # instead. The traffic under test is unchanged; only the way the probe
 # is started differs.
 EXEC_VIA="${HEALTH_CHECK_EXEC:-kubectl}"   # kubectl | node
+# A node's container is not always named after the node. A lab names
+# them for the lab, so the two differ and the exec has to be told.
+NODE_PREFIX="${HEALTH_CHECK_NODE_PREFIX:-}"
 # Report the matrix and exit 0 rather than failing on the first
 # unreachable pair. Which pairs reach each other is the measurement
 # when comparing tunnel placements, not a pass or fail.
@@ -129,9 +132,10 @@ pod_exec() {
   local node="$1"; shift
   if [[ "$EXEC_VIA" == "node" ]]; then
     local cid
-    cid=$(docker exec "$node" crictl ps --name serve -q 2>/dev/null | head -1)
+    local ctr="${NODE_PREFIX}${node}"
+    cid=$(docker exec "$ctr" crictl ps --name serve -q 2>/dev/null | head -1)
     [[ -n "$cid" ]] || return 1
-    docker exec "$node" crictl exec "$cid" "$@" 2>/dev/null
+    docker exec "$ctr" crictl exec "$cid" "$@" 2>/dev/null
   else
     kubectl exec "hc-${node}" -n "$NAMESPACE" -- "$@" 2>/dev/null
   fi

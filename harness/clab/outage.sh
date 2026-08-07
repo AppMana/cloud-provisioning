@@ -100,6 +100,23 @@ wait_ready() {
   return 1
 }
 
+# The way back from an outage, in full: link up, then the main-table
+# routes the kernel dropped at link-down and will not restore on its
+# own, the default among them. The site dials out to the remotes, so a
+# victim with its link up but no default route cannot re-open a single
+# tunnel, and every row after it inherits a cluster that never healed.
+# This ran only on the happy path once, and the rows after a failed one
+# measured that mistake instead of the product.
+restore_victim() {
+  local name="$1" victim="$2"
+  in_node "$victim" ip link set eth1 up || return 1
+  while read -r route; do
+    case "$route" in *" proto kernel "*|"") continue ;; esac
+    in_node "$victim" ip route replace $route 2>/dev/null
+  done < "$OUT/outage/$name-routes"
+  return 0
+}
+
 # One health-check pass over the named nodes; green means ran and
 # nothing failed. The check's own convergence gate is the recovery
 # window: it waits for the paths before measuring, so a pass that
@@ -186,13 +203,7 @@ while IFS=$'\t' read -r name endpoints victim <&3; do
     grep -E "converged after" "$OUT/outage/$name-survivors.log" | sed 's/^/    /'
 
     echo "  bringing $victim back"
-    in_node "$victim" ip link set eth1 up || { why="could not bring the link back"; break; }
-    # Only what the kernel dropped and will not restore on its own:
-    # the non-connected main-table routes, the default among them.
-    while read -r route; do
-      case "$route" in *" proto kernel "*|"") continue ;; esac
-      in_node "$victim" ip route replace $route 2>/dev/null
-    done < "$OUT/outage/$name-routes"
+    restore_victim "$name" "$victim" || { why="could not bring the link back"; break; }
     wait_ready || { why="$victim never came back"; break; }
     echo "  $victim Ready again"
 
@@ -205,8 +216,10 @@ while IFS=$'\t' read -r name endpoints victim <&3; do
     break
   done
 
-  # Whatever happened, never leave the link down for the next row.
-  in_node "$victim" ip link set eth1 up 2>/dev/null
+  # Whatever happened, never leave the victim dark for the next row:
+  # the link and the routes both, or the next row starts on a cluster
+  # this one broke.
+  restore_victim "$name" "$victim" 2>/dev/null
   if [ "$verdict" = FAIL ]; then
     failed=$((failed + 1))
     echo "  FAIL $why"

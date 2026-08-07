@@ -165,6 +165,13 @@ metadata:
   namespace: kube-system
 spec:
   hostNetwork: true
+  # kube-vip dials the name "kubernetes"; the alias points it at this
+  # node's own API server, the one instance that is always reachable
+  # from a control plane whatever the VIP is doing. Omitting this
+  # sends the dial to whatever DNS answers, which is nothing here.
+  hostAliases:
+    - ip: 127.0.0.1
+      hostnames: [kubernetes]
   containers:
     - name: kube-vip
       image: $KUBE_VIP_IMAGE

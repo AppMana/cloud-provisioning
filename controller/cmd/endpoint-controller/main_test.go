@@ -670,13 +670,15 @@ func requirementMatches(req corev1.NodeSelectorRequirement, value string, presen
 	return false
 }
 
-// The dialer's affinity is the other half of a two phase migration, and
-// the half without which the first is useless. A remote reads its peer
-// list from the API server over the tunnel, so the node the selector has
-// just let go of has to keep running its dialer while the remote reads
-// the list naming its replacement. Measured: the selector moved from w1
-// to cp, w1's dialer went with it, and the remote sat NotReady for
-// eighteen minutes holding w1 as its only peer.
+// The dialer runs on every Linux node at the site, and placement never
+// appears in its affinity. Which nodes hold tunnels is decided by the
+// Secret; a node with no tunnel runs the same dialer for the transit
+// it derives from that same Secret, and a node the selector let go of
+// keeps its dialer through retention and past it, because the process
+// that built its interface is the one that tears it down. What the
+// affinity still decides is what a site node is at all: a node this
+// operator provisioned is on the far side of a tunnel, and Windows
+// terminates nothing.
 func TestDialerNodeAffinity(t *testing.T) {
 	linux := func(name string, extra map[string]string) *corev1.Node {
 		labels := map[string]string{"kubernetes.io/os": "linux", "kubernetes.io/hostname": name}
@@ -696,86 +698,16 @@ func TestDialerNodeAffinity(t *testing.T) {
 		}}
 	)
 
-	for _, tc := range []struct {
-		name     string
-		raw      string
-		retained []string
-		runs     []*corev1.Node
-		declines []*corev1.Node
-	}{
-		{
-			// The migration itself: cp is what the selector now says, w1
-			// is what the mesh still publishes, and both dial until the
-			// entries are pruned.
-			name:     "a node the selector has let go of keeps its dialer while its entries stand",
-			raw:      "kubernetes.io/hostname=cp," + controlPlaneLabel,
-			retained: []string{"cp", "w1"},
-			runs:     []*corev1.Node{cp, w1},
-			declines: []*corev1.Node{w2, provisioned, windows},
-		},
-		{
-			// A retained control plane keeps its dialer. The exclusion
-			// is about not putting a tunnel on a control plane nobody
-			// chose, and a node is only ever retained because it was
-			// chosen and is carrying one right now. Dropping it the
-			// instant the selector moves is the stranding this whole
-			// mechanism exists to prevent, and it was measured: the
-			// term read "metadata.name In [cp] and control-plane
-			// DoesNotExist", which nothing can satisfy.
-			name:     "a retained control plane keeps the tunnel it already has",
-			raw:      "kubernetes.io/hostname=w2",
-			retained: []string{"cp", "w1", "w2"},
-			runs:     []*corev1.Node{cp, w1, w2},
-			declines: []*corev1.Node{provisioned, windows},
-		},
-		{
-			// And one that was never chosen still gets nothing.
-			name:     "a control plane nobody named and nobody retained",
-			raw:      "kubernetes.io/hostname=w2",
-			retained: []string{"w1"},
-			runs:     []*corev1.Node{w1, w2},
-			declines: []*corev1.Node{cp, provisioned, windows},
-		},
-		{
-			// A provisioned node is on the far side of a tunnel and
-			// terminates none of its own, whatever the Secret says.
-			name:     "every node at this site, and never a provisioned one",
-			raw:      "all",
-			retained: []string{"remote1"},
-			runs:     []*corev1.Node{cp, w1, w2},
-			declines: []*corev1.Node{provisioned, windows},
-		},
-		{
-			name:     "nothing retained is the selector on its own",
-			raw:      "kubernetes.io/hostname=w1",
-			retained: nil,
-			runs:     []*corev1.Node{w1},
-			declines: []*corev1.Node{cp, w2, provisioned, windows},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			affinity := dialerNodeAffinity(tc.raw, tc.retained)
-			for _, node := range tc.runs {
-				if !matchesNode(affinity, node) {
-					t.Errorf("%s runs no dialer", node.Name)
-				}
-			}
-			for _, node := range tc.declines {
-				if matchesNode(affinity, node) {
-					t.Errorf("%s was given a dialer", node.Name)
-				}
-			}
-			// A field selector takes exactly one value, so a term with
-			// several would be rejected by the API server rather than
-			// mis-scheduled.
-			for _, term := range affinity.NodeSelectorTerms {
-				for _, req := range term.MatchFields {
-					if len(req.Values) != 1 {
-						t.Errorf("field requirement %+v has %d values, want exactly one", req, len(req.Values))
-					}
-				}
-			}
-		})
+	affinity := dialerNodeAffinity()
+	for _, node := range []*corev1.Node{cp, w1, w2} {
+		if !matchesNode(affinity, node) {
+			t.Errorf("%s runs no dialer, so it either terminates no tunnel or has no transit to the remotes", node.Name)
+		}
+	}
+	for _, node := range []*corev1.Node{provisioned, windows} {
+		if matchesNode(affinity, node) {
+			t.Errorf("%s was given a site dialer", node.Name)
+		}
 	}
 }
 
@@ -894,17 +826,13 @@ func TestImagePullSecretsOmittedWhenUnset(t *testing.T) {
 }
 
 // A toleration decides nothing about where a pod goes; it removes an
-// objection, and the affinity chooses. Deriving it from the selector
-// tied the two together and broke retention: a control plane that had
-// just left the selector was still published and still expected to
-// carry its tunnel through the window, but could no longer be scheduled
-// at all, so nothing maintained its tunnel and nothing was there to take
-// the interface down when its retention expired. Measured with cp
-// retained and desiredNumberScheduled 1.
-func TestDialerToleratesAControlPlaneWhicheverWayItWasSelected(t *testing.T) {
+// objection. A control plane carries a NoSchedule taint, and its
+// dialer has a job there whether or not it holds a tunnel, so the
+// toleration is unconditional.
+func TestDialerToleratesAControlPlane(t *testing.T) {
 	tol := dialerTolerations()
 	if len(tol) == 0 {
-		t.Fatal("no tolerations: a retained control plane can never be scheduled a dialer")
+		t.Fatal("no tolerations: a control plane can never be scheduled a dialer")
 	}
 	found := false
 	for _, tl := range tol {
@@ -914,23 +842,6 @@ func TestDialerToleratesAControlPlaneWhicheverWayItWasSelected(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("tolerations %#v do not cover the control-plane NoSchedule taint", tol)
-	}
-	// The affinity is what admits or refuses a control plane, and it
-	// still refuses one the selector did not name.
-	aff := dialerNodeAffinity("kubernetes.io/hostname=w1", nil)
-	refuses := false
-	for _, e := range aff.NodeSelectorTerms[0].MatchExpressions {
-		if e.Key == controlPlaneLabel && e.Operator == corev1.NodeSelectorOpDoesNotExist {
-			refuses = true
-		}
-	}
-	if !refuses {
-		t.Error("with the control plane unselected the affinity must still exclude it: the toleration is not what gates this")
-	}
-	// And admits a retained one, which is the case the conditional broke.
-	aff = dialerNodeAffinity("kubernetes.io/hostname=w1", []string{"cp"})
-	if len(aff.NodeSelectorTerms) < 2 {
-		t.Fatal("a retained node gets no term of its own, so it cannot be scheduled")
 	}
 }
 

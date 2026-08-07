@@ -585,13 +585,6 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 		for _, prefix := range prefixes {
 			texts = append(texts, prefix.String())
 		}
-		// Side effects on the network's own objects. A failure here
-		// costs transit or address pinning for this node; it is not a
-		// reason to abandon every other node's allocation.
-		if err := r.ensureTransitPeering(ctx, node.Name, firstAddress(addresses)); err != nil {
-			ctrl.LoggerFrom(ctx).Error(err, "no transit peering for this node", "node", node.Name)
-		}
-
 		// Keep this node's own address the one its site reaches it by.
 		//
 		// A CNI that picks a node's address by looking at its
@@ -1069,83 +1062,6 @@ const (
 // reach by construction, and the one the dialer installs a host route
 // for. Autodetection on the node itself cannot know that, so the choice
 // is stated here rather than guessed there.
-// ensureTransitPeering tells the rest of the site to peer with the
-// speaker a tunnel endpoint runs, so it can learn which remote nodes are
-// reachable through that endpoint.
-//
-// The peering is on the speaker's own port, because the node's CNI is
-// already using 179. Only nodes other than the endpoint itself take it:
-// the endpoint has the tunnel and needs telling by nobody.
-//
-// This is Calico's way of being told. A network that speaks no routing
-// protocol has nothing to configure here, and gets host routes instead.
-func (r *meshReconciler) ensureTransitPeering(ctx context.Context, endpoint string, addr string) error {
-	if r.transitBGPPort == 0 || r.network.Name != cni.Calico || addr == "" {
-		return nil
-	}
-	name := "cloud-provisioning-transit-" + endpoint
-	peer := &unstructured.Unstructured{}
-	peer.SetGroupVersionKind(schema.GroupVersionKind{
-		Group: "crd.projectcalico.org", Version: "v1", Kind: "BGPPeer",
-	})
-	peer.SetName(name)
-	spec := map[string]any{
-		"peerIP":   fmt.Sprintf("%s:%d", addr, r.transitBGPPort),
-		"asNumber": int64(r.transitBGPASN),
-		// Every node at this site but the endpoint itself. The
-		// selector is Calico's own syntax, not a Kubernetes label
-		// selector.
-		//
-		// A provisioned node is excluded, and must be: it reaches
-		// every site node over its own tunnels, and it cannot reach
-		// this speaker's port at all, so the session it was being told
-		// to open could only sit in Connect forever. Worse, it
-		// duplicates a peering the mesh already has, and a router
-		// keeps one session per neighbour, so the surviving one is
-		// whichever it picked rather than whichever works.
-		"nodeSelector": fmt.Sprintf("kubernetes.io/hostname != '%s' && %s != '%s'", endpoint, cloudWorkerRoleLabel, cloudWorkerRoleValue),
-	}
-	if err := unstructured.SetNestedMap(peer.Object, spec, "spec"); err != nil {
-		return err
-	}
-	peer.SetOwnerReferences(r.owners())
-
-	existing := &unstructured.Unstructured{}
-	existing.SetGroupVersionKind(peer.GroupVersionKind())
-	err := r.reader.Get(ctx, types.NamespacedName{Name: name}, existing)
-	if apierrors.IsNotFound(err) {
-		if err := r.Create(ctx, peer); err != nil && !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("creating the transit peering for %s: %w", endpoint, err)
-		}
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("reading the transit peering for %s: %w", endpoint, err)
-	}
-	if existingSpec, _, _ := unstructured.NestedMap(existing.Object, "spec"); equalSpec(existingSpec, spec) {
-		return nil
-	}
-	existing.Object["spec"] = spec
-	if err := r.Update(ctx, existing); err != nil {
-		return fmt.Errorf("updating the transit peering for %s: %w", endpoint, err)
-	}
-	return nil
-}
-
-// equalSpec compares the fields this controller sets, leaving anything
-// else on the object alone.
-func equalSpec(existing, want map[string]any) bool {
-	for k, v := range want {
-		if fmt.Sprint(existing[k]) != fmt.Sprint(v) {
-			return false
-		}
-	}
-	return true
-}
-
-// ensureCNINodeAddressForMachine reads what ensureCNINodeAddress needs
-// off the machine: the node it produced, the tunnel address the mesh
-// allocated it, and the claim that owns it.
 func (r *meshReconciler) ensureCNINodeAddressForMachine(ctx context.Context, machine *unstructured.Unstructured) error {
 	nodeName, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name")
 	tunnelAddr := strings.SplitN(strings.TrimSpace(
@@ -1354,16 +1270,6 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 // controlPlaneLabel) and no toleration for the cloud-worker taint (so
 // it never lands on the remote node it dials).
 func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
-	// A node that has left the selector but still holds a published
-	// tunnel address is still an endpoint, and an endpoint with no
-	// dialer is an endpoint that is not there. Reading this from the
-	// Secret rather than remembering it keeps the two halves of the
-	// migration, the affinity and the published entries, deciding from
-	// one fact.
-	retained, err := r.retainedEndpoints(ctx)
-	if err != nil {
-		return err
-	}
 	// A control plane carries a NoSchedule taint, so allowing it by
 	// affinity is not enough: without a toleration a selected control
 	// plane simply never gets a pod, and the mesh silently omits it.
@@ -1399,7 +1305,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 					Tolerations:        tolerations,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: dialerNodeAffinity(r.tunnelEndpointsRaw, retained),
+							RequiredDuringSchedulingIgnoredDuringExecution: dialerNodeAffinity(),
 						},
 					},
 					ImagePullSecrets: imagePullSecrets(r.dialerImagePullSecret),
@@ -1464,7 +1370,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 	}
 
 	existing := &appsv1.DaemonSet{}
-	err = r.reader.Get(ctx, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, existing)
+	err := r.reader.Get(ctx, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, existing)
 	if apierrors.IsNotFound(err) {
 		return r.Create(ctx, desired)
 	}
@@ -1506,62 +1412,33 @@ func (r *meshReconciler) retainedEndpoints(ctx context.Context) ([]string, error
 	return names, nil
 }
 
-// dialerNodeAffinity is where the on-prem dialer is allowed to run: the
-// nodes the selector names, or the nodes that still hold a published
-// tunnel address. Two terms, because node affinity ORs terms and ANDs
-// the expressions within one, and this is genuinely a union.
+// dialerNodeAffinity is where the on-prem dialer is allowed to run:
+// every Linux node at the site. Not only the selected endpoints,
+// because the dialer has a job on every node. On an endpoint it
+// terminates the tunnel; on a node with no tunnel it installs the
+// transit that reaches the remotes through the relay, derived from the
+// same data the render uses.
 //
-// The second term is what makes moving an endpoint survivable. A
-// selector change alone deschedules the departing node's dialer in the
-// same instant it names the replacement, and a remote cannot be told
-// where the replacement is except over the tunnel that just went away.
-// Both dialers run until the departing node's entries are pruned, so a
-// remote has two working paths across the change rather than none.
+// Placement no longer appears here at all, and that is load bearing
+// twice over. Which nodes hold tunnels is decided by the Secret the
+// controller writes, and the dialer reads it every pass, so moving a
+// tunnel changes data rather than pod scheduling: no dialer restarts,
+// no speaker or session teardown, no window in which the node that
+// must hand over is the node whose pod was just killed. And a node the
+// selector let go of keeps its dialer for the retention window and
+// after it, so the teardown of its interface is done by the same
+// process that built it, rather than by a shutdown hook racing the
+// scheduler.
 //
-// The exclusions hold in both terms: a control plane is not an endpoint
-// unless the selector named it, a node this operator provisioned is on
-// the far side of a tunnel and never one of the site's ends of it, and
-// Windows terminates nothing. A retained node is named by
-// metadata.name, the identity the Secret's keys are written under,
-// rather than by a hostname label that is only conventionally the same.
-// A field selector takes exactly one value, so retained nodes get a
-// term each, which is what ORing them means anyway.
-func dialerNodeAffinity(raw string, retained []string) *corev1.NodeSelector {
-	base := []corev1.NodeSelectorRequirement{
-		{Key: "kubernetes.io/os", Operator: corev1.NodeSelectorOpIn, Values: []string{"linux"}},
-		{Key: cloudWorkerRoleLabel, Operator: corev1.NodeSelectorOpNotIn, Values: []string{cloudWorkerRoleValue}},
-	}
-	if !selectorNamesControlPlane(raw) {
-		base = append(base, corev1.NodeSelectorRequirement{
-			Key: controlPlaneLabel, Operator: corev1.NodeSelectorOpDoesNotExist,
-		})
-	}
-	selected := append(append([]corev1.NodeSelectorRequirement{}, base...), parseSelectorRequirements(raw)...)
-	terms := []corev1.NodeSelectorTerm{{MatchExpressions: selected}}
-
-	// A retained node keeps only the exclusions that are about what a
-	// node is, never the one about whether it was chosen. The control
-	// plane exclusion exists so a tunnel does not land on a control
-	// plane nobody selected; a node being retained was selected, and
-	// held a tunnel until a moment ago. Repeating that exclusion here
-	// makes the term unsatisfiable for exactly the node it names, so a
-	// departing control plane loses its dialer at once and the remote
-	// that depends on it is stranded, which is the failure retention
-	// exists to prevent. Measured: a term reading
-	// "metadata.name In [cp] and control-plane DoesNotExist".
-	kept := []corev1.NodeSelectorRequirement{
-		{Key: "kubernetes.io/os", Operator: corev1.NodeSelectorOpIn, Values: []string{"linux"}},
-		{Key: cloudWorkerRoleLabel, Operator: corev1.NodeSelectorOpNotIn, Values: []string{cloudWorkerRoleValue}},
-	}
-	for _, name := range retained {
-		terms = append(terms, corev1.NodeSelectorTerm{
-			MatchExpressions: append([]corev1.NodeSelectorRequirement{}, kept...),
-			MatchFields: []corev1.NodeSelectorRequirement{{
-				Key: "metadata.name", Operator: corev1.NodeSelectorOpIn, Values: []string{name},
-			}},
-		})
-	}
-	return &corev1.NodeSelector{NodeSelectorTerms: terms}
+// A node this operator provisioned is on the far side of a tunnel and
+// never one of the site's ends of it, and Windows terminates nothing.
+func dialerNodeAffinity() *corev1.NodeSelector {
+	return &corev1.NodeSelector{NodeSelectorTerms: []corev1.NodeSelectorTerm{{
+		MatchExpressions: []corev1.NodeSelectorRequirement{
+			{Key: "kubernetes.io/os", Operator: corev1.NodeSelectorOpIn, Values: []string{"linux"}},
+			{Key: cloudWorkerRoleLabel, Operator: corev1.NodeSelectorOpNotIn, Values: []string{cloudWorkerRoleValue}},
+		},
+	}}}
 }
 
 // parseSelectorRequirements turns a plain "k=v,k2=v2" selector string

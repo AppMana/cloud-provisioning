@@ -150,7 +150,6 @@ in_node bastion helm upgrade --install cloud-provisioning /tmp/chart \
   --set dialerImage.repository=cldt-dialer --set dialerImage.tag=e2e \
   --set tunnel.endpoints="$TUNNEL_ENDPOINTS" \
   --set joinProvider=kubeadm \
-  --set transit.bgpPort=1790 \
   --set dialerBinary.amd64.url="file:///opt/dialer-dist/wg-dialer-linux-amd64" \
   --set dialerBinary.amd64.sha256="$BIN_SHA" \
   >/dev/null || fail "installing the chart"

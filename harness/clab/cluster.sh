@@ -166,8 +166,11 @@ write_to bastion /root/.kube/config < "$OUT/kubeconfig"
 # invocation instead. The real addresses are in every server
 # certificate's SANs, so --server needs no other accommodation.
 if ! in_node bastion test -f /usr/local/bin/kubectl.real; then
-  in_node bastion cp /usr/local/bin/kubectl /usr/local/bin/kubectl.real 2>/dev/null \
-    || in_node bastion cp "$(in_node bastion command -v kubectl)" /usr/local/bin/kubectl.real
+  # command -v is a shell builtin, so it needs a shell to run in; the
+  # copy lands the original wherever it was found, and the wrapper
+  # then shadows it from /usr/local/bin.
+  in_node bastion sh -c 'cp "$(command -v kubectl)" /usr/local/bin/kubectl.real' \
+    || fail "no kubectl on the bastion to wrap"
 fi
 write_to bastion /usr/local/bin/kubectl <<EOF
 #!/bin/sh

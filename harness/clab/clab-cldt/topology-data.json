@@ -489,13 +489,13 @@
         "a": {
           "node": "router",
           "interface": "eth1",
-          "mac": "aa:c1:ab:0d:70:85",
+          "mac": "aa:c1:ab:f2:fe:05",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-router",
-          "mac": "aa:c1:ab:bc:64:33",
+          "mac": "aa:c1:ab:85:c8:b1",
           "peer": "a"
         }
       }
@@ -505,13 +505,13 @@
         "a": {
           "node": "bastion",
           "interface": "eth1",
-          "mac": "aa:c1:ab:31:01:f9",
+          "mac": "aa:c1:ab:f6:31:eb",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-bastion",
-          "mac": "aa:c1:ab:89:31:c7",
+          "mac": "aa:c1:ab:00:5e:48",
           "peer": "a"
         }
       }
@@ -521,13 +521,13 @@
         "a": {
           "node": "cp",
           "interface": "eth1",
-          "mac": "aa:c1:ab:c0:73:94",
+          "mac": "aa:c1:ab:02:72:7d",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-cp",
-          "mac": "aa:c1:ab:26:f2:b2",
+          "mac": "aa:c1:ab:1f:35:7f",
           "peer": "a"
         }
       }
@@ -537,13 +537,13 @@
         "a": {
           "node": "cp2",
           "interface": "eth1",
-          "mac": "aa:c1:ab:2c:6a:60",
+          "mac": "aa:c1:ab:78:2c:14",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-cp2",
-          "mac": "aa:c1:ab:6c:36:6d",
+          "mac": "aa:c1:ab:f8:06:59",
           "peer": "a"
         }
       }
@@ -553,13 +553,13 @@
         "a": {
           "node": "cp3",
           "interface": "eth1",
-          "mac": "aa:c1:ab:29:2f:a3",
+          "mac": "aa:c1:ab:67:cf:98",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-cp3",
-          "mac": "aa:c1:ab:4a:ed:db",
+          "mac": "aa:c1:ab:75:27:12",
           "peer": "a"
         }
       }
@@ -569,13 +569,13 @@
         "a": {
           "node": "w1",
           "interface": "eth1",
-          "mac": "aa:c1:ab:4b:20:96",
+          "mac": "aa:c1:ab:68:09:60",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-w1",
-          "mac": "aa:c1:ab:c4:63:d3",
+          "mac": "aa:c1:ab:5d:c6:a0",
           "peer": "a"
         }
       }
@@ -585,13 +585,13 @@
         "a": {
           "node": "w2",
           "interface": "eth1",
-          "mac": "aa:c1:ab:ff:ef:fa",
+          "mac": "aa:c1:ab:96:3e:86",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-w2",
-          "mac": "aa:c1:ab:79:71:a2",
+          "mac": "aa:c1:ab:93:fa:6e",
           "peer": "a"
         }
       }
@@ -601,13 +601,13 @@
         "a": {
           "node": "router",
           "interface": "eth2",
-          "mac": "aa:c1:ab:e5:7a:2c",
+          "mac": "aa:c1:ab:87:11:b2",
           "peer": "z"
         },
         "z": {
           "node": "cldt-wan",
           "interface": "wan-router",
-          "mac": "aa:c1:ab:e2:3b:8e",
+          "mac": "aa:c1:ab:00:ac:c9",
           "peer": "a"
         }
       }
@@ -617,13 +617,13 @@
         "a": {
           "node": "edge-a",
           "interface": "eth2",
-          "mac": "aa:c1:ab:3c:c3:b3",
+          "mac": "aa:c1:ab:2e:46:db",
           "peer": "z"
         },
         "z": {
           "node": "cldt-wan",
           "interface": "wan-edge-a",
-          "mac": "aa:c1:ab:53:ce:83",
+          "mac": "aa:c1:ab:63:3f:5b",
           "peer": "a"
         }
       }
@@ -633,13 +633,13 @@
         "a": {
           "node": "edge-b",
           "interface": "eth2",
-          "mac": "aa:c1:ab:53:60:9d",
+          "mac": "aa:c1:ab:d6:4a:32",
           "peer": "z"
         },
         "z": {
           "node": "cldt-wan",
           "interface": "wan-edge-b",
-          "mac": "aa:c1:ab:0d:49:6b",
+          "mac": "aa:c1:ab:6b:8e:ac",
           "peer": "a"
         }
       }
@@ -649,13 +649,13 @@
         "a": {
           "node": "edge-a",
           "interface": "eth1",
-          "mac": "aa:c1:ab:d5:cf:f3",
+          "mac": "aa:c1:ab:ec:26:a7",
           "peer": "z"
         },
         "z": {
           "node": "cldt-cloud-a",
           "interface": "a-edge",
-          "mac": "aa:c1:ab:85:a5:da",
+          "mac": "aa:c1:ab:1e:58:d8",
           "peer": "a"
         }
       }
@@ -665,13 +665,13 @@
         "a": {
           "node": "remote1",
           "interface": "eth1",
-          "mac": "aa:c1:ab:0a:1d:ff",
+          "mac": "aa:c1:ab:ee:38:ad",
           "peer": "z"
         },
         "z": {
           "node": "cldt-cloud-a",
           "interface": "a-remote1",
-          "mac": "aa:c1:ab:4b:32:07",
+          "mac": "aa:c1:ab:6b:24:46",
           "peer": "a"
         }
       }
@@ -681,13 +681,13 @@
         "a": {
           "node": "edge-b",
           "interface": "eth1",
-          "mac": "aa:c1:ab:e3:f3:40",
+          "mac": "aa:c1:ab:e7:4e:88",
           "peer": "z"
         },
         "z": {
           "node": "cldt-cloud-b",
           "interface": "b-edge",
-          "mac": "aa:c1:ab:cf:fe:66",
+          "mac": "aa:c1:ab:4a:7e:a5",
           "peer": "a"
         }
       }
@@ -697,13 +697,13 @@
         "a": {
           "node": "remote2",
           "interface": "eth1",
-          "mac": "aa:c1:ab:d2:a8:d8",
+          "mac": "aa:c1:ab:d6:4b:e2",
           "peer": "z"
         },
         "z": {
           "node": "cldt-cloud-b",
           "interface": "b-remote2",
-          "mac": "aa:c1:ab:db:b0:88",
+          "mac": "aa:c1:ab:15:80:49",
           "peer": "a"
         }
       }

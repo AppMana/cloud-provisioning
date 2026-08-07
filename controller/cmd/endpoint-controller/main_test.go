@@ -1014,3 +1014,64 @@ func TestNoPrefixIsUnownedWhileAnEndpointReturns(t *testing.T) {
 	}
 	check("returned")
 }
+
+// Retention is a floor, not a ceiling. The window exists so a remote
+// can read the list naming the replacement while the old path still
+// carries it, and a clock cannot know whether that read happened: a
+// controller outage or a slow render can eat the entire window, and a
+// departed endpoint released on schedule then strands every remote
+// that still names only it. Measured: both remotes NotReady for
+// fifteen minutes, holding a list whose one peer had been swept, the
+// correction rendered seconds after their last successful read.
+//
+// The evidence is observable at the site. A remote that has moved
+// shows a handshake with a current endpoint after the departure was
+// recorded; until every remote shows one, the departed node's entries
+// stand, whatever the clock says.
+func TestADepartedEndpointIsHeldUntilEveryRemoteHasMoved(t *testing.T) {
+	data := published(map[string][2]string{
+		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
+		"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
+	}, nil)
+	data["peer-public-key-remote1"] = []byte("R1KEY")
+	departedSince(data, "cp", testRetention+time.Minute)
+	want := meshMembership{endpoints: members("w1"), siteNodes: members("cp", "w1")}
+
+	// No evidence that remote1 has ever handshaked with w1: releasing
+	// cp now would leave remote1 a list it cannot reach and a peer
+	// that no longer answers.
+	pruneDeparted(data, want, testNow, testRetention)
+	if _, ok := data[tunnel.NodePublicKeyPrefix+"cp"]; !ok {
+		t.Fatal("cp was released with no evidence remote1 moved: the remote's only working path was torn down on a clock")
+	}
+
+	// w1 observes a handshake from remote1 after cp's departure was
+	// recorded: every remote has moved, and the hold releases.
+	data[tunnel.NodePeerHandshakesPrefix+"w1"] = []byte(tunnel.FormatHandshakes(map[string]int64{
+		"remote1": testNow.Add(-30 * time.Second).Unix(),
+	}))
+	pruneDeparted(data, want, testNow, testRetention)
+	if _, ok := data[tunnel.NodePublicKeyPrefix+"cp"]; ok {
+		t.Fatal("cp is still held after every remote proved it moved")
+	}
+}
+
+// Evidence from the departed node itself is not evidence of moving:
+// a remote handshaking the node that is leaving is exactly the state
+// the hold exists to protect.
+func TestTheDepartedNodesOwnHandshakesDoNotRelease(t *testing.T) {
+	data := published(map[string][2]string{
+		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
+		"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
+	}, nil)
+	data["peer-public-key-remote1"] = []byte("R1KEY")
+	departedSince(data, "cp", testRetention+time.Minute)
+	data[tunnel.NodePeerHandshakesPrefix+"cp"] = []byte(tunnel.FormatHandshakes(map[string]int64{
+		"remote1": testNow.Add(-10 * time.Second).Unix(),
+	}))
+	want := meshMembership{endpoints: members("w1"), siteNodes: members("cp", "w1")}
+	pruneDeparted(data, want, testNow, testRetention)
+	if _, ok := data[tunnel.NodePublicKeyPrefix+"cp"]; !ok {
+		t.Fatal("cp was released on its own handshake evidence: the remote is provably still attached to the node being torn down")
+	}
+}

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -133,7 +134,54 @@ const (
 	// able to reach (comma-separated). k0s workers load-balance across
 	// all of them via nllb, so one address is not enough.
 	APIServersKey = "api-servers"
+
+	// NodePeerHandshakesPrefix records, per site node, when that node
+	// last completed a WireGuard handshake with each remote machine
+	// (machine=unix-seconds, comma-separated). One writer per key: the
+	// node's own dialer, from its own kernel.
+	//
+	// This is the evidence retention releases on. A departed endpoint
+	// is held not for a length of time but until every remote shows a
+	// handshake with a current endpoint after the departure, because a
+	// clock cannot know whether the remote read the list naming the
+	// replacement, and releasing before it did tears down the only
+	// path the correction could travel.
+	NodePeerHandshakesPrefix = "node-peer-handshakes-"
 )
+
+// FormatHandshakes renders a node's handshake observations for its
+// NodePeerHandshakesPrefix entry.
+func FormatHandshakes(byMachine map[string]int64) string {
+	names := make([]string, 0, len(byMachine))
+	for name := range byMachine {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	parts := make([]string, 0, len(names))
+	for _, name := range names {
+		parts = append(parts, fmt.Sprintf("%s=%d", name, byMachine[name]))
+	}
+	return strings.Join(parts, ",")
+}
+
+// ParseHandshakes reads a NodePeerHandshakesPrefix entry back. Entries
+// that do not parse are dropped: a malformed observation is no
+// observation.
+func ParseHandshakes(raw string) map[string]int64 {
+	out := map[string]int64{}
+	for _, part := range SplitList(raw) {
+		name, value, found := strings.Cut(part, "=")
+		if !found {
+			continue
+		}
+		ts, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+		if err != nil {
+			continue
+		}
+		out[strings.TrimSpace(name)] = ts
+	}
+	return out
+}
 
 // AdoptionSecretName is the per-machine adoption Secret's name --
 // derived from the Machine name on both sides (the endpoint-controller

@@ -828,6 +828,16 @@ func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, r
 			if !expired {
 				continue
 			}
+			// The window is a floor, not a ceiling. A clock cannot know
+			// whether a remote read the list naming the replacement:
+			// a controller outage or a slow render can eat the whole
+			// window, and releasing on schedule then strands every
+			// remote still holding only the departed node. Held until
+			// each remote shows a handshake with a current endpoint
+			// after the departure, which is the read made observable.
+			if !everyRemoteMoved(data, want, name) {
+				continue
+			}
 		}
 		// A node that is not at this site at all has been deleted or
 		// drained out of the cluster. Nothing can schedule a dialer on
@@ -878,6 +888,49 @@ func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, r
 // expired: the recoverable reading of unreadable state is the one that
 // keeps the endpoint, and an endpoint retained one window too long
 // costs a remote nothing but a second working tunnel.
+// everyRemoteMoved reports whether each remote machine has completed a
+// WireGuard handshake with some current endpoint since the named node
+// departed. The observations come from the endpoints' own dialers (see
+// tunnel.NodePeerHandshakesPrefix); the departed node's own are not
+// evidence, because a remote handshaking the node that is leaving is
+// exactly the state the hold protects.
+//
+// No machines means nothing to protect. A machine with no evidence
+// holds the release indefinitely: the rare cost of carrying a stale
+// tunnel is a peer entry nobody uses, and the rare cost of releasing
+// early was measured as every remote NotReady holding a list whose one
+// peer had been swept.
+func everyRemoteMoved(data map[string][]byte, want meshMembership, departed string) bool {
+	raw := strings.TrimSpace(string(data[tunnel.NodeDepartedAtPrefix+departed]))
+	departedAt, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		// No usable instant to compare against; the clock gate above
+		// already decided the window question.
+		return true
+	}
+	for key := range data {
+		if !strings.HasPrefix(key, tunnel.PeerPublicKeyPrefix) {
+			continue
+		}
+		machine := strings.TrimPrefix(key, tunnel.PeerPublicKeyPrefix)
+		moved := false
+		for endpoint := range want.endpoints {
+			if endpoint == departed || !publishedEndpoint(data, endpoint) {
+				continue
+			}
+			seen := tunnel.ParseHandshakes(string(data[tunnel.NodePeerHandshakesPrefix+endpoint]))
+			if ts, ok := seen[machine]; ok && ts >= departedAt.Unix() {
+				moved = true
+				break
+			}
+		}
+		if !moved {
+			return false
+		}
+	}
+	return true
+}
+
 func departedLongEnough(data map[string][]byte, name string, now time.Time, retention time.Duration) (expired, recorded bool) {
 	key := tunnel.NodeDepartedAtPrefix + name
 	since, err := time.Parse(time.RFC3339, strings.TrimSpace(string(data[key])))

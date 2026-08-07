@@ -1,12 +1,13 @@
 package main
 
 import (
+	"net"
 	"os"
-
-	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 )
 
 // A remote node runs two dialers on one interface: the cloud-init
@@ -144,6 +145,41 @@ func TestARouteHostThatIsNotReadyIsNotARouteHostThatIsWrong(t *testing.T) {
 	for _, c := range cases {
 		if got := disposeRouteHost(c.isEndpointHost, c.peerCanCarry); got != c.want {
 			t.Errorf("%s: disposition %d, want %d", c.name, got, c.want)
+		}
+	}
+}
+
+// A relayed node's egress goes the way the remotes accept it.
+//
+// Measured, twice, as the one failure left in an otherwise green row:
+// the retained control plane routed remote pod blocks into its own
+// tunnel while every remote's accept list had already moved its
+// prefixes to the relay, so its pod-sourced packets arrived on a peer
+// entry that permits only the tunnel address, and were dropped without
+// a trace. The tunnel-subnet exception is the other half: traffic the
+// node sources from its tunnel address is exactly what the bare entry
+// still permits, so it keeps going direct.
+func TestARelayedNodeLeavesItsEgressToTheRelay(t *testing.T) {
+	_, tunnelSubnet, err := net.ParseCIDR("10.100.0.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name        string
+		selfRelayed bool
+		dst         string
+		subnet      *net.IPNet
+		viaRelay    bool
+	}{
+		{"an owning node routes a remote block itself", false, "10.244.159.10", tunnelSubnet, false},
+		{"a relayed node leaves a remote block to the relay", true, "10.244.159.10", tunnelSubnet, true},
+		{"a relayed node leaves a remote node address to the relay", true, "203.0.113.10", tunnelSubnet, true},
+		{"a relayed node still reaches a tunnel address directly", true, "10.100.0.128", tunnelSubnet, false},
+		{"a relayed node with no known tunnel subnet leaves everything", true, "10.100.0.128", nil, true},
+	}
+	for _, c := range cases {
+		if got := egressViaRelay(c.selfRelayed, net.ParseIP(c.dst), c.subnet); got != c.viaRelay {
+			t.Errorf("%s: egressViaRelay = %v, want %v", c.name, got, c.viaRelay)
 		}
 	}
 }

@@ -894,6 +894,10 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		privateKey   wgtypes.Key
 		peers        []tunnel.PeerSpec
 		usingSecret  = cfg.secretName != ""
+		// Whether this node's own prefixes are relayed through another
+		// endpoint, which is how the remotes accept its sources. See
+		// egressViaRelay.
+		selfRelayed bool
 	)
 
 	if usingSecret {
@@ -942,6 +946,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		if err != nil {
 			return fmt.Errorf("loading peer list: %w", err)
 		}
+		selfRelayed = len(tunnel.SplitList(string(secret.Data[tunnel.SiteAddressesPrefix+cfg.nodeName]))) > 0
 	} else {
 		doc, err := readPeersFileDoc(cfg.peersFile)
 		if err != nil {
@@ -1123,6 +1128,15 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	// yet. Not installed, and not pruned either: see installRoutes.
 	var claimedHosts []net.IPNet
 	var blocks []net.IPNet
+	// The tunnel subnet, for egressViaRelay: a destination inside it is
+	// sourced from this node's tunnel address, which a bare peer entry
+	// still permits.
+	var tunnelSubnet *net.IPNet
+	if cfg.transitMasqueradeSource != "" {
+		if _, subnet, err := net.ParseCIDR(cfg.transitMasqueradeSource); err == nil {
+			tunnelSubnet = subnet
+		}
+	}
 	for _, p := range peers {
 		pub, err := wgtypes.ParseKey(p.PublicKey)
 		if err != nil {
@@ -1161,8 +1175,11 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			}
 			allowedIPs = append(allowedIPs, ipNet)
 			// Anything wider than a host is the pod space behind this
-			// peer, which this node may have to forward to.
-			if ones, bits := ipNet.Mask.Size(); ones != bits {
+			// peer, which this node may have to forward to. Not while
+			// relayed: see egressViaRelay. The accept list above is
+			// untouched, because remotes that have not read the new
+			// list yet still send here directly.
+			if ones, bits := ipNet.Mask.Size(); ones != bits && !selfRelayed {
 				blocks = append(blocks, ipNet)
 			}
 		}
@@ -1192,6 +1209,13 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 				// than a host) is preserved by dropping the entry. The
 				// two guards below already reason this way.
 				fmt.Fprintf(os.Stderr, "not routing one entry for peer %s: %v\n", pub, err)
+				continue
+			}
+			if egressViaRelay(selfRelayed, ipNet.IP, tunnelSubnet) {
+				// Neither installed nor claimed, so an installed one is
+				// pruned: the transit path through the relay carries
+				// this, and a route into this node's own tunnel sends
+				// sources the far side no longer accepts from it.
 				continue
 			}
 			switch disposeRouteHost(endpointHosts[ipNet.IP.String()], p.Endpoint != "" || handshaked[pub]) {
@@ -1332,6 +1356,27 @@ func disposeRouteHost(isEndpointHost, peerCanCarry bool) routeHostDisposition {
 		return routeNotYet
 	}
 	return routeInstall
+}
+
+// egressViaRelay reports whether this node must leave a destination to
+// the site's transit rather than route it into its own tunnel.
+//
+// Ownership follows what the site renders. A node whose own prefixes
+// are relayed is accepted by the remotes only through the relay: a
+// packet it sources from a pod or node address and sends down its own
+// tunnel arrives on a peer entry whose accept list names nothing but
+// the tunnel address, and is dropped without a trace. Its retained
+// tunnel exists for the remotes that have not yet read the new list,
+// which still send to it directly; its own egress has to go the way
+// the updated remotes accept, which is the transit path through the
+// relay. The one exception is a destination inside the tunnel subnet:
+// a packet sourced from this node's tunnel address is exactly what the
+// bare peer entry still permits.
+func egressViaRelay(selfRelayed bool, dst net.IP, tunnelSubnet *net.IPNet) bool {
+	if !selfRelayed {
+		return false
+	}
+	return tunnelSubnet == nil || !tunnelSubnet.Contains(dst)
 }
 
 // claimedHosts are hosts some peer in the current list owns but that

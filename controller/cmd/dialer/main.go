@@ -896,8 +896,10 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		usingSecret  = cfg.secretName != ""
 		// Whether this node's own prefixes are relayed through another
 		// endpoint, which is how the remotes accept its sources. See
-		// egressViaRelay.
-		selfRelayed bool
+		// egressViaRelay. relayTransit is where the withheld egress
+		// goes instead.
+		selfRelayed  bool
+		relayTransit *tunnel.TransitSpec
 	)
 
 	if usingSecret {
@@ -948,6 +950,36 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			return fmt.Errorf("loading peer list: %w", err)
 		}
 		selfRelayed = len(tunnel.SplitList(string(secret.Data[tunnel.SiteAddressesPrefix+cfg.nodeName]))) > 0
+		if selfRelayed {
+			// The egress this node withholds from its own tunnel (see
+			// egressViaRelay) must leave by the relay instead, and
+			// nothing else installs that route: the network's own view
+			// of the remote blocks resolves through this node's still
+			// standing tunnel, which is exactly the path the remotes
+			// no longer accept its sources on.
+			relayTransit, err = tunnel.SiteTransit(secret.Data)
+			if err != nil {
+				return fmt.Errorf("deriving transit while relayed: %w", err)
+			}
+			if relayTransit == nil {
+				// No relay to leave it to. Keeping the tunnel routes
+				// serves the remotes that still accept them, which is
+				// better than serving nobody.
+				selfRelayed = false
+			} else if via := net.ParseIP(relayTransit.Via); via != nil {
+				if addrs, err := net.InterfaceAddrs(); err == nil {
+					for _, a := range addrs {
+						if ipNet, ok := a.(*net.IPNet); ok && ipNet.IP.Equal(via) {
+							// This node is the relay: its own entry
+							// carries the relayed prefixes, so its own
+							// tunnel is the accepted path after all.
+							selfRelayed = false
+							relayTransit = nil
+						}
+					}
+				}
+			}
+		}
 	} else {
 		doc, err := readPeersFileDoc(cfg.peersFile)
 		if err != nil {
@@ -1267,7 +1299,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		return err
 	}
 
-	if err := installRoutes(cfg, routeHosts, claimedHosts, blocks); err != nil {
+	if err := installRoutes(cfg, routeHosts, claimedHosts, blocks, relayTransit); err != nil {
 		return err
 	}
 
@@ -1400,7 +1432,7 @@ func egressViaRelay(selfRelayed bool, dst net.IP, tunnelSubnet *net.IPNet) bool 
 // control plane could not be re-read, and only the cached copy of that
 // same list carried it back once the handshake arrived, two minutes
 // later.
-func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet) error {
+func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relayTransit *tunnel.TransitSpec) error {
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
@@ -1460,17 +1492,38 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet) err
 		}
 	}
 
+	// The egress withheld from this tunnel while relayed, sent by the
+	// relay instead. Same table, so the prune below covers both kinds
+	// and switching between them replaces rather than accumulates.
+	if relayTransit != nil {
+		if via := net.ParseIP(relayTransit.Via); via != nil {
+			for _, entry := range append(append([]string{}, relayTransit.Hosts...), relayTransit.Blocks...) {
+				_, dst, err := net.ParseCIDR(tunnel.HostCIDR(strings.TrimSpace(entry)))
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "not routing transit entry %q: %v\n", entry, err)
+					continue
+				}
+				desired[dst.String()] = true
+				route := &netlink.Route{Dst: dst, Gw: via, Table: cfg.routeTable}
+				if err := netlink.RouteReplace(route); err != nil {
+					fmt.Fprintf(os.Stderr, "no transit route for %s via %s: %v\n", dst.String(), via, err)
+				}
+			}
+		}
+	}
+
 	// Prune routes in the dialer's table that are no longer desired.
 	// Adding without removing would leave a route that became wrong
 	// (a peer removed from the mesh, or an address that turned out to
 	// be a peer endpoint once the endpoint was learned by roaming)
 	// in place, still blackholing or looping traffic. Everything in
-	// this table on this interface is the dialer's own, so hosts and
-	// blocks alike are prunable here; nothing else writes to it.
+	// this table is the dialer's own, whichever interface it leaves
+	// by, so hosts and blocks alike are prunable here; nothing else
+	// writes to it.
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
 		existing, err := netlink.RouteListFiltered(family,
-			&netlink.Route{LinkIndex: link.Attrs().Index, Table: cfg.routeTable},
-			netlink.RT_FILTER_OIF|netlink.RT_FILTER_TABLE)
+			&netlink.Route{Table: cfg.routeTable},
+			netlink.RT_FILTER_TABLE)
 		if err != nil {
 			return fmt.Errorf("listing routes on %s: %w", cfg.iface, err)
 		}

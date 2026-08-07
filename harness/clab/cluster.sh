@@ -189,6 +189,26 @@ in_node bastion chmod 0755 /usr/local/bin/kubectl
 k get --raw /healthz >/dev/null 2>&1 || fail "the API server is not answering"
 echo "  up, kubeconfig at $OUT/kubeconfig"
 
+# A joining node needs its loopback forwarder before kubelet exists to
+# run the static pod: kubeadm join reads the cluster's configuration
+# through the server cluster-info names, which is the loopback. So the
+# same nginx runs transiently under containerd for the join's duration
+# and is killed as soon as the join returns, freeing the port for the
+# static pod kubelet then keeps forever. cp never needs this: its
+# kubelet, started by init, launches the API server and the forwarder
+# as static pods together.
+boot_forwarder() {
+  in_node "$1" ctr -n k8s.io run -d --net-host \
+    --mount "type=bind,src=/etc/api-proxy,dst=/etc/api-proxy,options=rbind:ro" \
+    "docker.io/library/$NGINX_IMAGE" api-proxy-boot \
+    nginx -g "daemon off;" -c /etc/api-proxy/nginx.conf 2>/dev/null || true
+}
+stop_boot_forwarder() {
+  in_node "$1" ctr -n k8s.io task kill -s SIGKILL api-proxy-boot 2>/dev/null || true
+  sleep 1
+  in_node "$1" ctr -n k8s.io container rm api-proxy-boot 2>/dev/null || true
+}
+
 echo "--- the other control planes ---"
 # A fresh certificate key each run: upload-certs re-encrypts the CA
 # bundle into the cluster for two minutes, which is all the join needs.
@@ -203,10 +223,12 @@ for n in cp2 cp3; do
   ip=$(cp_addr "$n")
   if ! in_node "$n" test -f /etc/kubernetes/kubelet.conf; then
     write_to "$n" /etc/default/kubelet <<<"KUBELET_EXTRA_ARGS=--node-ip=$ip"
+    boot_forwarder "$n"
     in_node "$n" sh -c "$JOIN --control-plane --certificate-key $CERT_KEY \
       --apiserver-advertise-address $ip --ignore-preflight-errors=all" \
       >"$OUT/join-$n.log" 2>&1 \
-      || { tail -20 "$OUT/join-$n.log" >&2; fail "$n did not join as a control plane"; }
+      || { stop_boot_forwarder "$n"; tail -20 "$OUT/join-$n.log" >&2; fail "$n did not join as a control plane"; }
+    stop_boot_forwarder "$n"
   fi
 done
 
@@ -218,8 +240,10 @@ for w in w1 w2; do
     # before the node registers or it registers by whichever address it
     # picks, which here is the management one.
     write_to "$w" /etc/default/kubelet <<<"KUBELET_EXTRA_ARGS=--node-ip=$ip"
+    boot_forwarder "$w"
     in_node "$w" sh -c "$JOIN --ignore-preflight-errors=all" >"$OUT/join-$w.log" 2>&1 \
-      || { tail -20 "$OUT/join-$w.log" >&2; fail "$w did not join"; }
+      || { stop_boot_forwarder "$w"; tail -20 "$OUT/join-$w.log" >&2; fail "$w did not join"; }
+    stop_boot_forwarder "$w"
   fi
 done
 # Readiness is not asserted here and cannot be: a node with no network

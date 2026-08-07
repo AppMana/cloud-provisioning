@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net"
 	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -135,52 +134,26 @@ const (
 	// all of them via nllb, so one address is not enough.
 	APIServersKey = "api-servers"
 
-	// NodePeerHandshakesPrefix records, per site node, when that node
-	// last completed a WireGuard handshake with each remote machine
-	// (machine=unix-seconds, comma-separated). One writer per key: the
-	// node's own dialer, from its own kernel.
+	// AppliedListAnnotation is the remote dialer's acknowledgment,
+	// written onto its own adoption Secret: the sha256 of the
+	// peers.json it most recently applied in full.
 	//
 	// This is the evidence retention releases on. A departed endpoint
-	// is held not for a length of time but until every remote shows a
-	// handshake with a current endpoint after the departure, because a
-	// clock cannot know whether the remote read the list naming the
+	// is held not for a length of time but until every remote has
+	// applied the render that no longer names it, because a clock
+	// cannot know whether the remote read the list naming the
 	// replacement, and releasing before it did tears down the only
-	// path the correction could travel.
-	NodePeerHandshakesPrefix = "node-peer-handshakes-"
+	// path the correction could travel. The comparison is a hash of
+	// content against content: no counter, no clock, nothing to drift.
+	AppliedListAnnotation = "cloud-provisioning.appmana.com/applied"
 )
 
-// FormatHandshakes renders a node's handshake observations for its
-// NodePeerHandshakesPrefix entry.
-func FormatHandshakes(byMachine map[string]int64) string {
-	names := make([]string, 0, len(byMachine))
-	for name := range byMachine {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	parts := make([]string, 0, len(names))
-	for _, name := range names {
-		parts = append(parts, fmt.Sprintf("%s=%d", name, byMachine[name]))
-	}
-	return strings.Join(parts, ",")
-}
-
-// ParseHandshakes reads a NodePeerHandshakesPrefix entry back. Entries
-// that do not parse are dropped: a malformed observation is no
-// observation.
-func ParseHandshakes(raw string) map[string]int64 {
-	out := map[string]int64{}
-	for _, part := range SplitList(raw) {
-		name, value, found := strings.Cut(part, "=")
-		if !found {
-			continue
-		}
-		ts, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
-		if err != nil {
-			continue
-		}
-		out[strings.TrimSpace(name)] = ts
-	}
-	return out
+// HashPeerList is the digest both sides compare: the remote stamps it
+// on its adoption Secret after applying, the controller compares it
+// against the current render.
+func HashPeerList(peersJSON []byte) string {
+	sum := sha256.Sum256(peersJSON)
+	return fmt.Sprintf("%x", sum)
 }
 
 // AdoptionSecretName is the per-machine adoption Secret's name --

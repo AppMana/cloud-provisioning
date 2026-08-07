@@ -426,7 +426,7 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 	// allocated: a departed endpoint's address is retired in the same
 	// pass, so the loop below cannot hand it straight to another node.
 	now := time.Now()
-	changed := pruneDeparted(secret.Data, r.membership(nodes.Items), now, r.endpointRetention)
+	changed := pruneDeparted(secret.Data, r.membership(nodes.Items), now, r.endpointRetention, r.convergedMachines(ctx, secret.Data))
 
 	// Existing allocations stay put; new nodes take the next free host
 	// in the tunnel subnet. A retired address is not free, and neither
@@ -780,7 +780,7 @@ func (r *meshReconciler) membership(nodes []corev1.Node) meshMembership {
 //     go then rather than later: the accept list has one owner per
 //     prefix, and the node's addresses would otherwise be permitted
 //     both on its own peer and on the relaying one.
-func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, retention time.Duration) bool {
+func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, retention time.Duration, converged map[string]bool) bool {
 	if len(want.endpoints) == 0 && len(want.siteNodes) == 0 {
 		// A membership that reads as empty is a failed read until
 		// proven otherwise. Nothing at a site departs all at once, and
@@ -835,7 +835,7 @@ func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, r
 			// remote still holding only the departed node. Held until
 			// each remote shows a handshake with a current endpoint
 			// after the departure, which is the read made observable.
-			if !everyRemoteMoved(data, want, name) {
+			if !everyRemoteAcknowledged(data, converged) {
 				continue
 			}
 		}
@@ -888,43 +888,50 @@ func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, r
 // expired: the recoverable reading of unreadable state is the one that
 // keeps the endpoint, and an endpoint retained one window too long
 // costs a remote nothing but a second working tunnel.
-// everyRemoteMoved reports whether each remote machine has completed a
-// WireGuard handshake with some current endpoint since the named node
-// departed. The observations come from the endpoints' own dialers (see
-// tunnel.NodePeerHandshakesPrefix); the departed node's own are not
-// evidence, because a remote handshaking the node that is leaving is
-// exactly the state the hold protects.
-//
-// No machines means nothing to protect. A machine with no evidence
-// holds the release indefinitely: the rare cost of carrying a stale
-// tunnel is a peer entry nobody uses, and the rare cost of releasing
-// early was measured as every remote NotReady holding a list whose one
-// peer had been swept.
-func everyRemoteMoved(data map[string][]byte, want meshMembership, departed string) bool {
-	raw := strings.TrimSpace(string(data[tunnel.NodeDepartedAtPrefix+departed]))
-	departedAt, err := time.Parse(time.RFC3339, raw)
-	if err != nil {
-		// No usable instant to compare against; the clock gate above
-		// already decided the window question.
-		return true
-	}
+// convergedMachines reads each remote's acknowledgment: the hash it
+// stamped on its adoption Secret after applying a list, compared with
+// the hash of what that Secret carries now. Content against content;
+// an unreadable Secret is no acknowledgment, never a failure of the
+// pass that asks.
+func (r *meshReconciler) convergedMachines(ctx context.Context, data map[string][]byte) map[string]bool {
+	converged := map[string]bool{}
 	for key := range data {
 		if !strings.HasPrefix(key, tunnel.PeerPublicKeyPrefix) {
 			continue
 		}
 		machine := strings.TrimPrefix(key, tunnel.PeerPublicKeyPrefix)
-		moved := false
-		for endpoint := range want.endpoints {
-			if endpoint == departed || !publishedEndpoint(data, endpoint) {
-				continue
-			}
-			seen := tunnel.ParseHandshakes(string(data[tunnel.NodePeerHandshakesPrefix+endpoint]))
-			if ts, ok := seen[machine]; ok && ts >= departedAt.Unix() {
-				moved = true
-				break
-			}
+		adoption := &corev1.Secret{}
+		if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: tunnel.AdoptionSecretName(machine)}, adoption); err != nil {
+			continue
 		}
-		if !moved {
+		raw, ok := adoption.Data[tunnel.CloudPeersKey]
+		if !ok || len(raw) == 0 {
+			continue
+		}
+		converged[machine] = adoption.Annotations[tunnel.AppliedListAnnotation] == tunnel.HashPeerList(raw)
+	}
+	return converged
+}
+
+// everyRemoteAcknowledged reports whether each remote machine has
+// applied the current render, per the hash it stamped on its adoption
+// Secret (tunnel.AppliedListAnnotation). Only its own acknowledgment
+// counts: a handshake proves a tunnel, not a read, and a remote can
+// handshake a current endpoint on keepalive alone while routing every
+// packet by a list two placements old.
+//
+// No machines means nothing to protect. A machine without an
+// acknowledgment holds the release indefinitely, and that is the
+// right trade: the cost of holding is one unused peer entry, and the
+// cost of releasing early was measured as both clouds dark, refusing
+// the replacement's handshakes because nothing had ever told them its
+// key.
+func everyRemoteAcknowledged(data map[string][]byte, converged map[string]bool) bool {
+	for key := range data {
+		if !strings.HasPrefix(key, tunnel.PeerPublicKeyPrefix) {
+			continue
+		}
+		if !converged[strings.TrimPrefix(key, tunnel.PeerPublicKeyPrefix)] {
 			return false
 		}
 	}

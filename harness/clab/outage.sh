@@ -164,19 +164,34 @@ EOF
       done < "$OUT/outage/$name-routes"
       ;;
     reboot)
-      if [ "$(docker inspect -f '{{.State.Running}}' "$(c "$victim")" 2>/dev/null)" != "true" ]; then
-        docker start "$(c "$victim")" >/dev/null || return 1
-      fi
+      # docker start on a freshly killed kind node fails transiently;
+      # a machine that takes two tries to power on is still a machine
+      # that powers on. Each step names itself on failure, because a
+      # restore that fails silently costs a row and then hides which
+      # of its four steps to fix.
+      started=
+      for _ in 1 2 3; do
+        if [ "$(docker inspect -f '{{.State.Running}}' "$(c "$victim")" 2>/dev/null)" = "true" ] \
+          || docker start "$(c "$victim")" >/dev/null 2>&1; then
+          started=1
+          break
+        fi
+        sleep 5
+      done
+      [ -n "$started" ] || { echo "  restore: docker start $(c "$victim") failed three times" >&2; return 1; }
       for _ in $(seq 1 24); do
         in_node "$victim" true 2>/dev/null && break
         sleep 5
       done
       if ! in_node "$victim" ip link show eth1 >/dev/null 2>&1; then
-        sudo containerlab tools veth create -a "$(c "$victim"):eth1" -b "bridge:$bridge:$peer" >/dev/null 2>&1 || return 1
+        sudo containerlab tools veth create -a "$(c "$victim"):eth1" -b "bridge:$bridge:$peer" >"$OUT/outage/$name-veth.log" 2>&1 \
+          || { echo "  restore: veth re-plumb failed, see $OUT/outage/$name-veth.log" >&2; return 1; }
       fi
-      in_node "$victim" ip addr replace "$addr" dev eth1 || return 1
+      in_node "$victim" ip addr replace "$addr" dev eth1 \
+        || { echo "  restore: could not address eth1" >&2; return 1; }
       in_node "$victim" ip link set eth1 up
-      in_node "$victim" ip route replace default via "$gw" dev eth1 || return 1
+      in_node "$victim" ip route replace default via "$gw" dev eth1 \
+        || { echo "  restore: could not restore the default route" >&2; return 1; }
       ;;
   esac
   return 0

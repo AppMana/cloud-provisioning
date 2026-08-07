@@ -205,6 +205,20 @@ if [[ ${#NODES[@]} -gt 1 ]]; then
     wait_path "$other to reach $first by service address" \
       http_from_early "$other" "http://${SERVICE_IP[$first]}:$SERVICE_PORT/"
   done
+  # Cluster DNS too, per node, because the checks measure it and a
+  # check that is not gated eats convergence out of its own single
+  # try. This is the one path class with cluster-side convergence in
+  # it: a DNS replica on a node that died ungracefully stays in the
+  # service's endpoints until the node lifecycle controller marks that
+  # node's pods NotReady, and until then the service address is a coin
+  # flip. That is Kubernetes' documented window, not this mesh's, and
+  # the checks below assert recovery, not luck. Measured: cp died
+  # ungracefully, pods and services converged, and three nodes' DNS
+  # lost the flip inside the window.
+  for n in "${NODES[@]}"; do
+    wait_path "$n to resolve cluster DNS" \
+      pod_exec "$n" nslookup kubernetes.default.svc.cluster.local
+  done
   echo "  converged after $((SECONDS - converge_start))s"
 fi
 

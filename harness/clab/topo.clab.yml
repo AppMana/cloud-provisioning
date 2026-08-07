@@ -76,11 +76,23 @@ topology:
     bastion:
       kind: linux
 
-    # The cluster, all of it, at the site.
+    # The cluster, all of it, at the site. Three control planes,
+    # because two is worse than one: stacked etcd needs a majority, and
+    # a majority of two is two, so either death halts the cluster. With
+    # three, any single node may die and the cluster keeps its quorum,
+    # which is what the outage rows exist to prove.
     cp:
       kind: linux
       binds:
         - var/cp:/var/lib/containerd
+    cp2:
+      kind: linux
+      binds:
+        - var/cp2:/var/lib/containerd
+    cp3:
+      kind: linux
+      binds:
+        - var/cp3:/var/lib/containerd
     w1:
       kind: linux
       binds:
@@ -105,6 +117,8 @@ topology:
     - endpoints: ["router:eth1", "cldt-lan:lan-router"]
     - endpoints: ["bastion:eth1", "cldt-lan:lan-bastion"]
     - endpoints: ["cp:eth1", "cldt-lan:lan-cp"]
+    - endpoints: ["cp2:eth1", "cldt-lan:lan-cp2"]
+    - endpoints: ["cp3:eth1", "cldt-lan:lan-cp3"]
     - endpoints: ["w1:eth1", "cldt-lan:lan-w1"]
     - endpoints: ["w2:eth1", "cldt-lan:lan-w2"]
 

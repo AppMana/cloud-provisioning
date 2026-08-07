@@ -425,7 +425,7 @@ func TestSiteTransit_FollowsTheRenderElection(t *testing.T) {
 		"peer-route-hosts-remote1": []byte("10.100.0.128,203.0.113.10"),
 		"peer-allowed-ips-remote1": []byte("10.100.0.128/32,203.0.113.10/32,10.244.159.0/26"),
 	}
-	transit, err := SiteTransit(data)
+	transit, err := SiteTransit(data, nil)
 	if err != nil {
 		t.Fatalf("SiteTransit: %v", err)
 	}
@@ -460,7 +460,7 @@ func TestSiteTransit_ARetainedRelayIsStillReachable(t *testing.T) {
 		"peer-route-hosts-remote1": []byte("10.100.0.128"),
 		"peer-allowed-ips-remote1": []byte("10.100.0.128/32,10.244.159.0/26"),
 	}
-	transit, err := SiteTransit(data)
+	transit, err := SiteTransit(data, nil)
 	if err != nil {
 		t.Fatalf("SiteTransit: %v", err)
 	}
@@ -476,11 +476,136 @@ func TestSiteTransit_NoRelayMeansNoTransit(t *testing.T) {
 		"node-tunnel-address-early": []byte("10.100.0.5/24"),
 		"peer-public-key-remote1":   []byte("R1KEY"),
 		"peer-route-hosts-remote1":  []byte("10.100.0.128"),
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("SiteTransit: %v", err)
 	}
 	if transit != nil {
 		t.Fatalf("transit = %+v, want none: there is no endpoint to carry it", transit)
+	}
+}
+
+// The render elects one local to carry what nobody owns: the API
+// servers and the site nodes with no tunnel. That set rides the relay
+// by election, not by ownership, and the applier on the far side is
+// allowed to move exactly that set when its own kernel says the relay
+// is dead. So the render has to say which prefixes those are; an
+// applier guessing would be a second authority on ownership, and every
+// defect this tree has fixed was two authorities disagreeing.
+func TestRemotePeers_TheElectedRelayDeclaresItsTransit(t *testing.T) {
+	data := peerSecret(
+		map[string][2]string{
+			"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
+			"w2": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
+		},
+		map[string]string{"w1": "10.244.1.0/26", "w2": "10.244.2.0/26"},
+	)
+	data[NodeAddressesPrefix+"w1"] = []byte("10.10.0.11")
+	data[NodeAddressesPrefix+"w2"] = []byte("10.10.0.12")
+	data[SiteAddressesPrefix+"cp"] = []byte("10.10.0.10")
+	data[SitePodCIDRsPrefix+"cp"] = []byte("10.244.0.0/26")
+
+	peers, err := RemotePeers(data, "10.100.0.128", []string{"10.10.0.10"})
+	if err != nil {
+		t.Fatalf("RemotePeers: %v", err)
+	}
+	if len(peers) != 2 {
+		t.Fatalf("got %d peers, want 2", len(peers))
+	}
+	relay, other := peers[0], peers[1]
+	if len(other.Transit) != 0 || len(other.TransitHosts) != 0 {
+		t.Errorf("the unelected local declares transit %v %v; only the relay carries any", other.Transit, other.TransitHosts)
+	}
+	wantTransit := map[string]bool{"10.10.0.10/32": true, "10.244.0.0/26": true}
+	for _, cidr := range relay.Transit {
+		if !wantTransit[cidr] {
+			t.Errorf("transit declares %s, which the relay owns or nobody claimed", cidr)
+		}
+		delete(wantTransit, cidr)
+	}
+	if len(wantTransit) != 0 {
+		t.Errorf("transit misses %v", wantTransit)
+	}
+	wantHosts := map[string]bool{"10.10.0.10": true}
+	for _, h := range relay.TransitHosts {
+		if !wantHosts[h] {
+			t.Errorf("transit hosts declare %s, which is not transit", h)
+		}
+		delete(wantHosts, h)
+	}
+	if len(wantHosts) != 0 {
+		t.Errorf("transit hosts miss %v", wantHosts)
+	}
+	// The declaration is a labeling of the entry, not a second grant.
+	allowed := map[string]bool{}
+	for _, cidr := range relay.WGAllowedIPs {
+		allowed[cidr] = true
+	}
+	for _, cidr := range relay.Transit {
+		if !allowed[cidr] {
+			t.Errorf("transit %s is not in the relay's accept list; the label and the grant disagree", cidr)
+		}
+	}
+	hosts := map[string]bool{}
+	for _, h := range relay.RouteHosts {
+		hosts[h] = true
+	}
+	for _, h := range relay.TransitHosts {
+		if !hosts[h] {
+			t.Errorf("transit host %s is not in the relay's route hosts", h)
+		}
+	}
+}
+
+// A relay the API server calls NotReady is passed over: a node with no
+// tunnel chooses its way out from the same record as everyone else,
+// plus the one fact it legitimately owns, what the cluster says about
+// its neighbours' health.
+func TestSiteTransit_ANotReadyRelayIsPassedOver(t *testing.T) {
+	data := map[string][]byte{
+		"node-public-key-w1":     []byte("W1KEY"),
+		"node-tunnel-address-w1": []byte("10.100.0.17/24"),
+		"node-addresses-w1":      []byte("10.10.0.11"),
+		"node-public-key-w2":     []byte("W2KEY"),
+		"node-tunnel-address-w2": []byte("10.100.0.22/24"),
+		"node-addresses-w2":      []byte("10.10.0.12"),
+		"peer-public-key-remote1":  []byte("R1KEY"),
+		"peer-route-hosts-remote1": []byte("10.100.0.128,203.0.113.10"),
+		"peer-allowed-ips-remote1": []byte("10.100.0.128/32,203.0.113.10/32,10.244.159.0/26"),
+	}
+	transit, err := SiteTransit(data, map[string]bool{"w1": true})
+	if err != nil {
+		t.Fatalf("SiteTransit: %v", err)
+	}
+	if transit == nil {
+		t.Fatal("no transit derived")
+	}
+	if transit.Via != "10.10.0.12" {
+		t.Errorf("transit via %q, want the live w2's 10.10.0.12: routing through a dead relay is a black hole with a quorum of one", transit.Via)
+	}
+}
+
+// Every candidate NotReady falls back to the render's election. A
+// maybe-dead relay is a path that may come back; no relay is no path
+// at all, and the report that produced the NotReady may itself be the
+// thing that is stale.
+func TestSiteTransit_AllNotReadyFallsBackToTheElection(t *testing.T) {
+	data := map[string][]byte{
+		"node-public-key-w1":     []byte("W1KEY"),
+		"node-tunnel-address-w1": []byte("10.100.0.17/24"),
+		"node-addresses-w1":      []byte("10.10.0.11"),
+		"node-public-key-w2":     []byte("W2KEY"),
+		"node-tunnel-address-w2": []byte("10.100.0.22/24"),
+		"node-addresses-w2":      []byte("10.10.0.12"),
+		"peer-public-key-remote1":  []byte("R1KEY"),
+		"peer-route-hosts-remote1": []byte("10.100.0.128"),
+		"peer-allowed-ips-remote1": []byte("10.100.0.128/32"),
+	}
+	transit, err := SiteTransit(data, map[string]bool{"w1": true, "w2": true})
+	if err != nil {
+		t.Fatalf("SiteTransit: %v", err)
+	}
+	if transit == nil || transit.Via != "10.10.0.11" {
+		t.Fatalf("transit = %+v, want the rendered election's w1", transit)
 	}
 }

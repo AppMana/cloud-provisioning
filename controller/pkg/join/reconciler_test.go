@@ -345,8 +345,13 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 			t.Errorf("baked peers.json missing %q; rendered: %s", want, rendered)
 		}
 	}
-	if strings.Count(rendered, "10.101.0.1/32") != 1 {
-		t.Errorf("API VIP must appear in exactly ONE local peer's AllowedIPs (the designated transit), got %d occurrences", strings.Count(rendered, "10.101.0.1/32"))
+	// Exactly one local peer carries the VIP, written twice on that
+	// one entry: the grant (allowedIPs) and the transit declaration
+	// (transit), which is what lets the applier move it when this
+	// relay dies. A third occurrence would be a second peer claiming
+	// it, and the accept list would give it to whichever came last.
+	if strings.Count(rendered, "10.101.0.1/32") != 2 {
+		t.Errorf("API VIP must ride exactly ONE local peer, as its grant plus its transit declaration, got %d occurrences", strings.Count(rendered, "10.101.0.1/32"))
 	}
 
 	updatedDialerSecret := &corev1.Secret{}

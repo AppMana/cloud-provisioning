@@ -178,6 +178,17 @@ type PeerSpec struct {
 	// worth telling the site about: a node here can already reach the
 	// others by itself.
 	Remote bool `json:"remote,omitempty"`
+	// Transit and TransitHosts are the subset of WGAllowedIPs and
+	// RouteHosts this peer carries by election rather than ownership:
+	// the API servers and the site nodes with no tunnel of their own.
+	// They ride this peer because some peer must carry them, not
+	// because they are its, and that difference is the applier's
+	// permission: when its own kernel says this peer's session is dead
+	// past WireGuard's horizon and another local is handshaking, it may
+	// move exactly this set there. Everything outside it is the peer's
+	// own and dies with it.
+	Transit      []string `json:"transit,omitempty"`
+	TransitHosts []string `json:"transitHosts,omitempty"`
 }
 
 // AllRouteHosts folds the legacy single-host field into the list.
@@ -342,6 +353,7 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 		// permitted but never routed: reaching a pod is the network's
 		// job, over the session these host routes make possible.
 		allowed = append(allowed, SplitList(string(data[NodePodCIDRsPrefix+n.name]))...)
+		var transit, transitHosts []string
 		if !relayed {
 			relayed = true
 			// The API server, for a site where no node terminating a
@@ -357,6 +369,8 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 				}
 				allowed = append(allowed, HostCIDR(api))
 				routeHosts = append(routeHosts, api)
+				transit = append(transit, HostCIDR(api))
+				transitHosts = append(transitHosts, api)
 			}
 			// The rest of the site: nodes with no tunnel, reached by
 			// relaying through this one. They go on a single peer
@@ -381,13 +395,17 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 						}
 						allowed = append(allowed, HostCIDR(addr))
 						routeHosts = append(routeHosts, addr)
+						transit = append(transit, HostCIDR(addr))
+						transitHosts = append(transitHosts, addr)
 					}
 				}
 				// Permitted, never routed: the route for a pod block
 				// comes from the network, over the session these host
 				// routes make possible.
 				if !ownsBlocks[name] {
-					allowed = append(allowed, SplitList(string(data[SitePodCIDRsPrefix+name]))...)
+					blocks := SplitList(string(data[SitePodCIDRsPrefix+name]))
+					allowed = append(allowed, blocks...)
+					transit = append(transit, blocks...)
 				}
 			}
 		}
@@ -395,6 +413,8 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 			PublicKey:    pub,
 			WGAllowedIPs: allowed,
 			RouteHosts:   routeHosts,
+			Transit:      transit,
+			TransitHosts: transitHosts,
 		})
 	}
 	if len(peers) == 0 {
@@ -457,7 +477,13 @@ type TransitSpec struct {
 //
 // Returns nil when no published endpoint exists: there is nothing to
 // carry the traffic, and no route is better than a guessed one.
-func SiteTransit(data map[string][]byte) (*TransitSpec, error) {
+// notReady names endpoints the cluster reports unhealthy; the election
+// passes over them while any candidate remains. It is the one fact a
+// node with no tunnel legitimately owns about its neighbours, read from
+// the same API server everything else here is read from. With every
+// candidate unhealthy the rendered election stands: a maybe-dead relay
+// is a path that may come back, and the report may itself be stale.
+func SiteTransit(data map[string][]byte, notReady map[string]bool) (*TransitSpec, error) {
 	type candidate struct {
 		name       string
 		tunnelAddr string
@@ -482,6 +508,12 @@ func SiteTransit(data map[string][]byte) (*TransitSpec, error) {
 	}
 	sort.Slice(nodes, func(i, j int) bool { return LessIP(nodes[i].tunnelAddr, nodes[j].tunnelAddr) })
 	relay := nodes[0]
+	for _, n := range nodes {
+		if !notReady[n.name] {
+			relay = n
+			break
+		}
+	}
 
 	// The relay's reachable address. An owning relay publishes it under
 	// its node entry; a retained relay's addresses have already moved

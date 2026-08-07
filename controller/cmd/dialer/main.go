@@ -1002,7 +1002,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			}
 			// Not an endpoint, so this node's job is the other one:
 			// reach the remotes through the node that relays for it.
-			return reconcileSiteTransit(cfg, secret)
+			return reconcileSiteTransit(ctx, cfg, clientset, secret)
 		}
 		peers, err = loadPeersFromSecret(secret)
 		if err != nil {
@@ -1017,7 +1017,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			// of the remote blocks resolves through this node's still
 			// standing tunnel, which is exactly the path the remotes
 			// no longer accept its sources on.
-			relayTransit, err = tunnel.SiteTransit(secret.Data)
+			relayTransit, err = tunnel.SiteTransit(secret.Data, notReadyNodes(ctx, clientset))
 			if err != nil {
 				return fmt.Errorf("deriving transit while relayed: %w", err)
 			}
@@ -1171,16 +1171,29 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	// would show nothing to protect.
 	handshaked := map[wgtypes.Key]bool{}
 	endpointHosts := map[string]bool{}
+	lastShake := map[string]time.Time{}
 	if device, err := wg.Device(cfg.iface); err == nil {
 		for _, p := range device.Peers {
 			if !p.LastHandshakeTime.IsZero() {
 				handshaked[p.PublicKey] = true
+				lastShake[p.PublicKey.String()] = p.LastHandshakeTime
 			}
 			if p.Endpoint != nil && p.Endpoint.IP != nil {
 				endpointHosts[p.Endpoint.IP.String()] = true
 			}
 		}
 	}
+
+	// The rendered election, corrected by the kernel's session clock:
+	// a relay silent past WireGuard's own horizon hands the declared
+	// transit set to a live local, and hands it back the moment it
+	// handshakes again. Only lists that declare a transit set are
+	// affected, which is only the remote's view; a site node's list
+	// declares none. See rehomeTransit.
+	peers = rehomeTransit(peers, func(pub string) (time.Time, bool) {
+		t, ok := lastShake[pub]
+		return t, ok
+	}, time.Now())
 
 	// This node's own addresses, so an accept-list entry covering one
 	// of them is refused rather than allowing a peer to source packets
@@ -1702,8 +1715,36 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 // accept list. A routing protocol carried this before, and its windows
 // were measured: the choice was in flight while the routes it replaced
 // were already gone.
-func reconcileSiteTransit(cfg config, secret *corev1.Secret) error {
-	transit, err := tunnel.SiteTransit(secret.Data)
+// notReadyNodes is the set of node names whose Ready condition the API
+// server does not report true. It is advisory input to the transit
+// election: no reachable API server or no listable nodes means no
+// override, and the rendered election stands, because an absence of
+// evidence must never move traffic.
+func notReadyNodes(ctx context.Context, clientset *kubernetes.Clientset) map[string]bool {
+	if clientset == nil {
+		return nil
+	}
+	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil
+	}
+	dead := map[string]bool{}
+	for _, n := range nodes.Items {
+		ready := false
+		for _, c := range n.Status.Conditions {
+			if c.Type == corev1.NodeReady && c.Status == corev1.ConditionTrue {
+				ready = true
+			}
+		}
+		if !ready {
+			dead[n.Name] = true
+		}
+	}
+	return dead
+}
+
+func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes.Clientset, secret *corev1.Secret) error {
+	transit, err := tunnel.SiteTransit(secret.Data, notReadyNodes(ctx, clientset))
 	if err != nil {
 		return err
 	}

@@ -9,11 +9,13 @@
 # back up, the whole cluster is green again, with no one needing to be
 # reinstalled, restarted, or forgiven.
 #
-# The victim's link goes down; the victim does not. Its kubelet, dialer,
-# and containerd keep running against a dead NIC, which is what a power
-# event, a pulled cable, or a dead switch looks like from every other
-# node: silence, not a goodbye. Anything that only works because the
-# departing node said goodbye is what this file exists to catch.
+# Two ways down, chosen per row (see outages.tsv). link: the NIC dies
+# and the victim keeps running against it, a pulled cable, silence
+# rather than a goodbye. reboot: the machine dies, SIGKILL, and comes
+# back with only what a platform provides, so everything it was must
+# be rebuilt by what it runs at boot. Anything that only works because
+# the departing node said goodbye, or that only exists because someone
+# once configured it by hand, is what this file exists to catch.
 set -uo pipefail
 cd "${OUTAGE_DIR:-$(dirname "$0")}"
 export OUTAGE_DIR="$PWD"
@@ -100,20 +102,83 @@ wait_ready() {
   return 1
 }
 
-# The way back from an outage, in full: link up, then the main-table
-# routes the kernel dropped at link-down and will not restore on its
-# own, the default among them. The site dials out to the remotes, so a
-# victim with its link up but no default route cannot re-open a single
-# tunnel, and every row after it inherits a cluster that never healed.
-# This ran only on the happy path once, and the rows after a failed one
-# measured that mistake instead of the product.
+# Each node's single NIC: the segment bridge it hangs off, the
+# containerlab peer name on that bridge, its address, and its gateway.
+# The same facts up.sh plumbs at deploy, needed again because a
+# rebooted container gets a fresh network namespace and its veth dies
+# with the old one.
+node_net() {
+  case "$1" in
+    cp)      echo "cldt-lan lan-cp 10.10.0.10/24 10.10.0.1" ;;
+    cp2)     echo "cldt-lan lan-cp2 10.10.0.13/24 10.10.0.1" ;;
+    cp3)     echo "cldt-lan lan-cp3 10.10.0.14/24 10.10.0.1" ;;
+    w1)      echo "cldt-lan lan-w1 10.10.0.11/24 10.10.0.1" ;;
+    w2)      echo "cldt-lan lan-w2 10.10.0.12/24 10.10.0.1" ;;
+    remote1) echo "cldt-cloud-a a-remote1 203.0.113.10/24 203.0.113.1" ;;
+    remote2) echo "cldt-cloud-b b-remote2 192.0.2.10/24 192.0.2.1" ;;
+    *) return 1 ;;
+  esac
+}
+
+# The way down. A link outage takes the NIC and leaves everything
+# running against it; a reboot takes the machine, SIGKILL, because a
+# power loss does not say goodbye and anything that only works after a
+# goodbye is what these rows exist to catch.
+take_down() {
+  local victim="$1" mode="$2"
+  case "$mode" in
+    link)   in_node "$victim" ip link set eth1 down ;;
+    reboot) docker kill "$(c "$victim")" >/dev/null ;;
+  esac
+}
+
+# The way back from an outage, in full, on every path out of a row.
+#
+# link: the NIC returns, then the main-table routes the kernel dropped
+# at link-down and will not restore on its own, the default among
+# them. The site dials out to the remotes, so a victim with its link
+# up but no default route cannot re-open a single tunnel, and every
+# row after it inherits a cluster that never healed. This ran only on
+# the happy path once, and the rows after a failed one measured that
+# mistake instead of the product.
+#
+# reboot: the machine returns from scratch. Only what the platform
+# would provide comes back by hand: the NIC (a fresh veth to the same
+# segment, since the old one died with the old namespace), its
+# address, and its gateway. Everything else -- the tunnel, the routes,
+# the forwarding state, the node's membership -- must be rebuilt by
+# what the node itself runs at boot, because that is the claim a
+# reboot row makes.
 restore_victim() {
-  local name="$1" victim="$2"
-  in_node "$victim" ip link set eth1 up || return 1
-  while read -r route; do
-    case "$route" in *" proto kernel "*|"") continue ;; esac
-    in_node "$victim" ip route replace $route 2>/dev/null
-  done < "$OUT/outage/$name-routes"
+  local name="$1" victim="$2" mode="${3:-link}"
+  local bridge peer addr gw
+  read -r bridge peer addr gw <<EOF
+$(node_net "$victim")
+EOF
+  case "$mode" in
+    link)
+      in_node "$victim" ip link set eth1 up || return 1
+      while read -r route; do
+        case "$route" in *" proto kernel "*|"") continue ;; esac
+        in_node "$victim" ip route replace $route 2>/dev/null
+      done < "$OUT/outage/$name-routes"
+      ;;
+    reboot)
+      if [ "$(docker inspect -f '{{.State.Running}}' "$(c "$victim")" 2>/dev/null)" != "true" ]; then
+        docker start "$(c "$victim")" >/dev/null || return 1
+      fi
+      for _ in $(seq 1 24); do
+        in_node "$victim" true 2>/dev/null && break
+        sleep 5
+      done
+      if ! in_node "$victim" ip link show eth1 >/dev/null 2>&1; then
+        sudo containerlab tools veth create -a "$(c "$victim"):eth1" -b "bridge:$bridge:$peer" >/dev/null 2>&1 || return 1
+      fi
+      in_node "$victim" ip addr replace "$addr" dev eth1 || return 1
+      in_node "$victim" ip link set eth1 up
+      in_node "$victim" ip route replace default via "$gw" dev eth1 || return 1
+      ;;
+  esac
   return 0
 }
 
@@ -139,7 +204,8 @@ control_planes() {
 }
 
 rows=0; failed=0
-while IFS=$'\t' read -r name endpoints victim <&3; do
+while IFS=$'\t' read -r name endpoints victim mode <&3; do
+  mode="${mode:-link}"
   case "$name" in \>*|''|name) continue ;; esac
   [ -n "$ONLY" ] && case " $ONLY " in *" $name "*) ;; *) continue ;; esac
   # A control plane may die only where quorum survives it: stacked
@@ -157,7 +223,7 @@ while IFS=$'\t' read -r name endpoints victim <&3; do
   selector=$(selector_for "$endpoints")
   rows=$((rows + 1))
   echo
-  echo "================ $name: endpoints=$endpoints, victim=$victim ================"
+  echo "================ $name: endpoints=$endpoints, victim=$victim, mode=$mode ================"
 
   in_node bastion helm upgrade --install cloud-provisioning /tmp/chart \
     --namespace "$NS" --create-namespace --wait --timeout 6m \
@@ -190,8 +256,8 @@ while IFS=$'\t' read -r name endpoints victim <&3; do
     # what the return leg asserts.
     in_node "$victim" ip -4 route show > "$OUT/outage/$name-routes" 2>/dev/null
 
-    echo "  taking $victim's link down"
-    in_node "$victim" ip link set eth1 down || { why="could not take the link down"; break; }
+    echo "  taking $victim down ($mode)"
+    take_down "$victim" "$mode" || { why="could not take $victim down"; break; }
     down_at=$SECONDS
 
     # The cluster must notice, or nothing that follows measures an
@@ -215,7 +281,7 @@ while IFS=$'\t' read -r name endpoints victim <&3; do
     grep -E "converged after" "$OUT/outage/$name-survivors.log" | sed 's/^/    /'
 
     echo "  bringing $victim back"
-    restore_victim "$name" "$victim" || { why="could not bring the link back"; break; }
+    restore_victim "$name" "$victim" "$mode" || { why="could not bring $victim back"; break; }
     wait_ready || { why="$victim never came back"; break; }
     echo "  $victim Ready again"
 
@@ -229,9 +295,9 @@ while IFS=$'\t' read -r name endpoints victim <&3; do
   done
 
   # Whatever happened, never leave the victim dark for the next row:
-  # the link and the routes both, or the next row starts on a cluster
-  # this one broke.
-  restore_victim "$name" "$victim" 2>/dev/null
+  # the machine, the link, and the routes, or the next row starts on a
+  # cluster this one broke.
+  restore_victim "$name" "$victim" "$mode" 2>/dev/null
   if [ "$verdict" = FAIL ]; then
     failed=$((failed + 1))
     echo "  FAIL $why"

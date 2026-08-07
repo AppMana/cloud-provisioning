@@ -38,10 +38,23 @@
 > because silence is what NotReady looks like, and a machine that
 > returns must still be a member.
 >
-name	endpoints	victim
-relay-dies-with-spare	w1,w2	w1
-spare-dies	w1,w2	w2
-endpoint-dies-under-all	all	w2
-cp-dies	w1,w2	cp
-cp-follower-dies	w1,w2	cp3
-remote-dies	w1,w2	remote1
+> The mode column separates two deaths. link takes the NIC and leaves
+> everything running against it: a pulled cable, seen from everywhere
+> else as silence. reboot takes the machine, SIGKILL, and brings it
+> back with only what the platform would provide (a NIC, an address, a
+> gateway): the tunnel, the routes, and the membership must be rebuilt
+> by what the node itself runs at boot. reboot-remote is the
+> invariant's proof: the host unit must raise the tunnel from its
+> cached list with the cluster unreachable, because the cluster is on
+> the far side of the tunnel it is raising.
+>
+name	endpoints	victim	mode
+relay-dies-with-spare	w1,w2	w1	link
+spare-dies	w1,w2	w2	link
+endpoint-dies-under-all	all	w2	link
+cp-dies	w1,w2	cp	link
+cp-follower-dies	w1,w2	cp3	link
+remote-dies	w1,w2	remote1	link
+reboot-endpoint	w1,w2	w1	reboot
+reboot-remote	w1,w2	remote1	reboot
+reboot-cp	w1,w2	cp	reboot

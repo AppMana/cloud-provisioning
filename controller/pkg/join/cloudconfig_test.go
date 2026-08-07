@@ -138,6 +138,22 @@ func TestKubeadmWithoutTheBalancerJoinsTheEndpointDirectly(t *testing.T) {
 	}
 }
 
+// kubeadm's kubelet drop-in sources /etc/default/kubelet on
+// Debian-family systems and /etc/sysconfig/kubelet on RPM-family
+// (RHEL, Fedora, Amazon Linux). A pattern that writes only the Debian
+// path silently drops the role label and the internet-facing taint on
+// half the distributions it claims to support: the node joins, looks
+// healthy, and is missing exactly the properties that make it a cloud
+// worker.
+func TestKubeletArgsReachBothFamilies(t *testing.T) {
+	rendered := renderKubeadmPattern(t, 7445)
+	for _, path := range []string{"/etc/default/kubelet", "/etc/sysconfig/kubelet"} {
+		if !strings.Contains(rendered, path) {
+			t.Errorf("the kubeadm pattern does not write %s, so kubelet args are lost on that family", path)
+		}
+	}
+}
+
 func renderKubeadmPattern(t *testing.T, proxyPort int) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "join-patterns", "kubeadm-worker.cloud-config.tmpl"))

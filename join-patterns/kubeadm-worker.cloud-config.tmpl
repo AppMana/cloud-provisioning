@@ -62,10 +62,19 @@ write_files:
       [Install]
       WantedBy=multi-user.target
   # kubelet extra args (role label + internet-facing taint) via the
-  # standard systemd drop-in environment file kubeadm's kubelet unit
-  # already sources. This keeps the generic kubeletExtraArgs contract
-  # without translating it into JoinConfiguration structure.
+  # environment file kubeadm's kubelet drop-in already sources. Both
+  # families' paths, because they differ and only one is read:
+  # /etc/default/kubelet on Debian-family, /etc/sysconfig/kubelet on
+  # RPM-family (RHEL, Fedora, Amazon Linux). Writing one path silently
+  # drops the args on the other family: the node joins, looks healthy,
+  # and is missing exactly the label and taint that make it a cloud
+  # worker. This keeps the generic kubeletExtraArgs contract without
+  # translating it into JoinConfiguration structure.
   - path: /etc/default/kubelet
+    permissions: '0644'
+    content: |
+      KUBELET_EXTRA_ARGS={{ .kubeletExtraArgs }}
+  - path: /etc/sysconfig/kubelet
     permissions: '0644'
     content: |
       KUBELET_EXTRA_ARGS={{ .kubeletExtraArgs }}

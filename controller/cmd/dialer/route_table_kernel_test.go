@@ -37,7 +37,7 @@ func TestInstalledRoutesAreInvisibleToAMainTableScan(t *testing.T) {
 	cfg := config{iface: "cldttest0", routeTable: 517}
 	host := net.IPNet{IP: net.ParseIP("10.10.0.10").To4(), Mask: net.CIDRMask(32, 32)}
 	block := net.IPNet{IP: net.ParseIP("10.244.242.64").To4(), Mask: net.CIDRMask(26, 32)}
-	if err := installRoutes(cfg, []net.IPNet{host}, nil, []net.IPNet{block}, nil); err != nil {
+	if err := installRoutes(cfg, []net.IPNet{host}, nil, []net.IPNet{block}, nil, nil); err != nil {
 		t.Fatalf("installRoutes: %v", err)
 	}
 

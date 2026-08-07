@@ -945,6 +945,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		localAddress string
 		privateKey   wgtypes.Key
 		peers        []tunnel.PeerSpec
+		meshSecret   *corev1.Secret
 		usingSecret  = cfg.secretName != ""
 		// The override list being applied this pass, acknowledged on
 		// the adoption Secret once the pass completes. The hash is the
@@ -1007,6 +1008,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		if err != nil {
 			return fmt.Errorf("loading peer list: %w", err)
 		}
+		meshSecret = secret
 		selfRelayed = len(tunnel.SplitList(string(secret.Data[tunnel.SiteAddressesPrefix+cfg.nodeName]))) > 0
 		if selfRelayed {
 			// The egress this node withholds from its own tunnel (see
@@ -1225,6 +1227,38 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	// yet. Not installed, and not pruned either: see installRoutes.
 	var claimedHosts []net.IPNet
 	var blocks []net.IPNet
+	// Destinations that leave by the relay while this node is relayed:
+	// exactly the prefixes of the remotes that acknowledged the render.
+	var relayDsts []net.IPNet
+	// Which remotes have acknowledged the current render. While this
+	// node is relayed, its egress follows each remote's applied view,
+	// not the render's: a remote that has not acknowledged still
+	// accepts this node's sources only on this node's own entry, and
+	// one that has accepts them only through the relay. Sending every
+	// remote down the relay was measured as the deadlock it caused:
+	// the stale remote's API replies left by the relay, were dropped,
+	// and the list that would have updated it stayed unreadable.
+	peerName := map[string]string{}
+	peerAcked := map[string]bool{}
+	if selfRelayed && meshSecret != nil && clientset != nil {
+		for dataKey, raw := range meshSecret.Data {
+			if !strings.HasPrefix(dataKey, tunnel.PeerPublicKeyPrefix) {
+				continue
+			}
+			machine := strings.TrimPrefix(dataKey, tunnel.PeerPublicKeyPrefix)
+			peerName[strings.TrimSpace(string(raw))] = machine
+			adoption, err := clientset.CoreV1().Secrets(cfg.secretNamespace).Get(ctx, tunnel.AdoptionSecretName(machine), metav1.GetOptions{})
+			if err != nil {
+				continue
+			}
+			doc, ok := adoption.Data[tunnel.CloudPeersKey]
+			if !ok || len(doc) == 0 {
+				continue
+			}
+			peerAcked[machine] = adoption.Annotations[tunnel.AppliedListAnnotation] == tunnel.HashPeerList(doc)
+		}
+	}
+
 	// The tunnel subnet, for egressViaRelay: a destination inside it is
 	// sourced from this node's tunnel address, which a bare peer entry
 	// still permits.
@@ -1247,6 +1281,12 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 				return fmt.Errorf("resolving peer endpoint %q: %w", p.Endpoint, err)
 			}
 		}
+
+		// Whether this peer's prefixes leave by the relay: only when
+		// this node is relayed AND this remote has acknowledged the
+		// render that says so. A stale remote keeps the direct routes
+		// its accept list still honours.
+		relayThis := selfRelayed && peerAcked[peerName[p.PublicKey]]
 
 		// Only this peer's own prefixes. WireGuard's accept list is a
 		// trie with one owner per prefix, so a prefix configured on two
@@ -1276,8 +1316,12 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			// relayed: see egressViaRelay. The accept list above is
 			// untouched, because remotes that have not read the new
 			// list yet still send here directly.
-			if ones, bits := ipNet.Mask.Size(); ones != bits && !selfRelayed {
-				blocks = append(blocks, ipNet)
+			if ones, bits := ipNet.Mask.Size(); ones != bits {
+				if relayThis {
+					relayDsts = append(relayDsts, ipNet)
+				} else {
+					blocks = append(blocks, ipNet)
+				}
 			}
 		}
 		if len(allowedIPs) == 0 {
@@ -1308,11 +1352,11 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 				fmt.Fprintf(os.Stderr, "not routing one entry for peer %s: %v\n", pub, err)
 				continue
 			}
-			if egressViaRelay(selfRelayed, ipNet.IP, tunnelSubnet) {
-				// Neither installed nor claimed, so an installed one is
-				// pruned: the transit path through the relay carries
-				// this, and a route into this node's own tunnel sends
-				// sources the far side no longer accepts from it.
+			if egressViaRelay(relayThis, ipNet.IP, tunnelSubnet) {
+				// Carried by the relay instead, and pruned from this
+				// tunnel: this remote's applied list no longer accepts
+				// this node's sources here.
+				relayDsts = append(relayDsts, ipNet)
 				continue
 			}
 			switch disposeRouteHost(endpointHosts[ipNet.IP.String()], p.Endpoint != "" || handshaked[pub]) {
@@ -1363,7 +1407,11 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		return err
 	}
 
-	if err := installRoutes(cfg, routeHosts, claimedHosts, blocks, relayTransit); err != nil {
+	var relayVia net.IP
+	if relayTransit != nil {
+		relayVia = net.ParseIP(relayTransit.Via)
+	}
+	if err := installRoutes(cfg, routeHosts, claimedHosts, blocks, relayVia, relayDsts); err != nil {
 		return err
 	}
 
@@ -1512,7 +1560,7 @@ func egressViaRelay(selfRelayed bool, dst net.IP, tunnelSubnet *net.IPNet) bool 
 // control plane could not be re-read, and only the cached copy of that
 // same list carried it back once the handshake arrived, two minutes
 // later.
-func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relayTransit *tunnel.TransitSpec) error {
+func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relayVia net.IP, relayDsts []net.IPNet) error {
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
@@ -1573,21 +1621,17 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	}
 
 	// The egress withheld from this tunnel while relayed, sent by the
-	// relay instead. Same table, so the prune below covers both kinds
-	// and switching between them replaces rather than accumulates.
-	if relayTransit != nil {
-		if via := net.ParseIP(relayTransit.Via); via != nil {
-			for _, entry := range append(append([]string{}, relayTransit.Hosts...), relayTransit.Blocks...) {
-				_, dst, err := net.ParseCIDR(tunnel.HostCIDR(strings.TrimSpace(entry)))
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "not routing transit entry %q: %v\n", entry, err)
-					continue
-				}
-				desired[dst.String()] = true
-				route := &netlink.Route{Dst: dst, Gw: via, Table: cfg.routeTable}
-				if err := netlink.RouteReplace(route); err != nil {
-					fmt.Fprintf(os.Stderr, "no transit route for %s via %s: %v\n", dst.String(), via, err)
-				}
+	// relay instead: exactly the prefixes of the remotes that have
+	// acknowledged the render. Same table, so the prune below covers
+	// both kinds and switching between them replaces rather than
+	// accumulates.
+	if relayVia != nil {
+		for i := range relayDsts {
+			dst := relayDsts[i]
+			desired[dst.String()] = true
+			route := &netlink.Route{Dst: &dst, Gw: relayVia, Table: cfg.routeTable}
+			if err := netlink.RouteReplace(route); err != nil {
+				fmt.Fprintf(os.Stderr, "no transit route for %s via %s: %v\n", dst.String(), relayVia, err)
 			}
 		}
 	}

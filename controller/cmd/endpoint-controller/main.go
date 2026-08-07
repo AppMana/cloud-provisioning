@@ -152,6 +152,10 @@ type meshReconciler struct {
 	dialerPrivateKeyDir   string
 	ifaceName             string
 	apiVIP                string
+	// apiServerPort makes the api-servers record dialable for the
+	// remote's loopback balancer; read from the join API address, not
+	// restated as configuration.
+	apiServerPort string
 
 	// ownerRef ties everything this controller creates at runtime
 	// (both DaemonSets, the peer Secret, per-machine adoption Secrets)
@@ -183,6 +187,15 @@ type meshReconciler struct {
 
 // owners returns the ownerReference list to stamp on everything this
 // controller creates, so an uninstall garbage-collects it.
+// apiServerPortOf reads the API port out of the address the join
+// dials, defaulting to Kubernetes' own 6443: one fact, one source.
+func apiServerPortOf(apiAddress string) string {
+	if u, err := url.Parse(apiAddress); err == nil && u.Port() != "" {
+		return u.Port()
+	}
+	return "6443"
+}
+
 // firstAddress is the address the rest of the site reaches a node by.
 func firstAddress(addresses []string) string {
 	if len(addresses) == 0 {
@@ -1302,14 +1315,21 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 		return fmt.Errorf("getting peer secret: %w", err)
 	}
 	selfTunnelAddr := strings.SplitN(strings.TrimSpace(machine.GetAnnotations()["cloud-provisioning.appmana.com/wireguard-addr4"]), "/", 2)[0]
-	peers, err := tunnel.RemotePeers(peerSecret.Data, selfTunnelAddr, tunnel.SplitList(string(peerSecret.Data[tunnel.APIServersKey]), r.apiVIP))
+	apiHosts := tunnel.SplitList(string(peerSecret.Data[tunnel.APIServersKey]), r.apiVIP)
+	peers, err := tunnel.RemotePeers(peerSecret.Data, selfTunnelAddr, apiHosts)
 	if err != nil {
 		return err
 	}
 	if len(peers) == 0 {
 		return nil
 	}
-	doc, err := json.Marshal(tunnel.PeerListDoc{Peers: peers})
+	// The same hosts, dialable, for the node's loopback balancer: the
+	// live half of the list the bootstrap render froze into userdata.
+	apiEndpoints := make([]string, 0, len(apiHosts))
+	for _, h := range apiHosts {
+		apiEndpoints = append(apiEndpoints, net.JoinHostPort(h, r.apiServerPort))
+	}
+	doc, err := json.Marshal(tunnel.PeerListDoc{Peers: peers, APIServers: apiEndpoints})
 	if err != nil {
 		return err
 	}
@@ -1885,6 +1905,7 @@ func main() {
 		joinTemplatePath          string
 		joinAPIAddress            string
 		joinAPIVIP                string
+		joinAPIProxyPort          int
 		joinKubeletExtraArgs      string
 		joinSSHAuthorizedKeys     string
 		joinTokenTTL              time.Duration
@@ -1943,6 +1964,7 @@ func main() {
 	flag.StringVar(&joinTemplatePath, "join-template-path", "/join-patterns/k0s-worker.cloud-config.tmpl", "path to the join-pattern template to render")
 	flag.StringVar(&joinAPIAddress, "join-api-address", "", "REQUIRED cluster API server address used to mint join tokens (bracket IPv6 literals, e.g. https://[fd8f:cf26:522a::1]:6443)")
 	flag.StringVar(&joinAPIVIP, "join-api-vip", "", "REQUIRED cluster API VIP the new node must reach through the tunnel before joining")
+	flag.IntVar(&joinAPIProxyPort, "join-api-proxy-port", 7445, "port of the loopback API balancer the remote's dialer serves; the join gates on it and kubelet keeps dialing it")
 	flag.StringVar(&joinKubeletExtraArgs, "join-kubelet-extra-args",
 		fmt.Sprintf("--node-labels=%s=%s --register-with-taints=%s:NoSchedule", cloudWorkerRoleLabel, cloudWorkerRoleValue, cloudWorkerTaintKey),
 		"extra kubelet args applied to every joining cloud-worker node: defaults derived from the same constants the DaemonSet toleration and --machine-selector default use, so they can't drift")
@@ -2125,6 +2147,7 @@ func main() {
 			dialerPrivateKeyDir:    dialerPrivateKeyDir,
 			ifaceName:              ifaceName,
 			apiVIP:                 joinAPIVIP,
+			apiServerPort:          apiServerPortOf(joinAPIAddress),
 
 			ownerRef:                 runtimeOwner,
 			network:                  network,
@@ -2187,6 +2210,7 @@ func main() {
 
 			TemplatePath:      joinTemplatePath,
 			APIVIP:            joinAPIVIP,
+			APIProxyPort:      joinAPIProxyPort,
 			KubeletExtraArgs:  joinKubeletExtraArgs,
 			SSHAuthorizedKeys: sshKeys,
 

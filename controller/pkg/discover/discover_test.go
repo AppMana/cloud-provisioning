@@ -240,6 +240,34 @@ clusters:
 	}
 }
 
+// A loopback endpoint is a statement about every node, not an address
+// anyone else can dial: it means the cluster balances node-locally
+// (each node runs its own forwarder to the control planes), so the
+// member list is the answer for anything rendered off-cluster, and
+// returning 127.0.0.1 would bake a self-reference into a remote's
+// view of the site.
+func TestAPIEndpointSkipsALoopbackServer(t *testing.T) {
+	clusterInfo := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-info", Namespace: "kube-public"},
+		Data: map[string]string{
+			"kubeconfig": `apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://127.0.0.1:7445
+  name: ""
+`,
+		},
+	}
+	got, err := APIEndpoint(context.Background(), newClient(clusterInfo))
+	if err != nil {
+		t.Fatalf("APIEndpoint: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("got %q, want empty: a loopback endpoint is node-local by definition", got)
+	}
+}
+
 // No cluster-info is an answer, not an error: the caller falls back
 // to the endpoint list, which is correct on the clusters that have no
 // stable endpoint to prefer.

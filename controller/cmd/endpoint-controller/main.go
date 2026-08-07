@@ -1375,15 +1375,14 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 
 	role := &rbacv1.Role{}
 	key := types.NamespacedName{Namespace: r.secretNamespace, Name: r.dialerServiceAccount}
-	err := r.reader.Get(ctx, key, role)
-	if apierrors.IsNotFound(err) {
-		role = &rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{Name: r.dialerServiceAccount, Namespace: r.secretNamespace, OwnerReferences: r.owners()},
-			Rules:      desired,
-		}
-		return r.Create(ctx, role)
-	}
-	if err != nil {
+	// The chart owns the Role's existence (its floor names the peer
+	// Secret alone); this method only reshapes the one that is there.
+	// A Role missing entirely is the install broken, not something to
+	// paper over by creating one, and this identity holds no create on
+	// roles anyway: the dialer's scope is maintained by a different
+	// identity than the one it confines, and narrowing what this one
+	// can do to the RBAC group is part of the point.
+	if err := r.reader.Get(ctx, key, role); err != nil {
 		return fmt.Errorf("reading the dialer Role: %w", err)
 	}
 	if len(role.Rules) == 1 && equalStrings(role.Rules[0].APIGroups, desired[0].APIGroups) &&

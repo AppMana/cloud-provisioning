@@ -398,7 +398,7 @@ func TestPruneDeparted(t *testing.T) {
 			for name, ago := range tc.departed {
 				departedSince(tc.data, name, ago)
 			}
-			changed := pruneDeparted(tc.data, tc.want, testNow, testRetention)
+			changed := pruneDeparted(tc.data, tc.want, testNow, testRetention, nil)
 			if changed != tc.changed {
 				t.Errorf("pruneDeparted reported changed=%v, want %v", changed, tc.changed)
 			}
@@ -445,7 +445,7 @@ func TestPruneDeparted_TheRemoteFollowsTheNewEndpoint(t *testing.T) {
 	// The pass that allocates cp an address, before its dialer has
 	// published a key. w1 still holds the tunnel and must still be the
 	// remote's peer.
-	pruneDeparted(data, r.membership(nodes), testNow, testRetention)
+	pruneDeparted(data, r.membership(nodes), testNow, testRetention, nil)
 	data[tunnel.NodeTunnelAddressPrefix+"cp"] = []byte("10.100.0.3/24")
 	peers, err := tunnel.RemotePeers(data, "10.100.0.128", nil)
 	if err != nil {
@@ -459,7 +459,7 @@ func TestPruneDeparted_TheRemoteFollowsTheNewEndpoint(t *testing.T) {
 	// remote now has two peers and two working paths, and reads the one
 	// naming cp over the one w1 still carries.
 	data[tunnel.NodePublicKeyPrefix+"cp"] = []byte(keyCP)
-	if !pruneDeparted(data, r.membership(nodes), testNow, testRetention) {
+	if !pruneDeparted(data, r.membership(nodes), testNow, testRetention, nil) {
 		t.Fatal("the departure of the old endpoint was not recorded")
 	}
 	peers, err = tunnel.RemotePeers(data, "10.100.0.128", nil)
@@ -471,7 +471,7 @@ func TestPruneDeparted_TheRemoteFollowsTheNewEndpoint(t *testing.T) {
 	}
 
 	// And the window runs out.
-	if !pruneDeparted(data, r.membership(nodes), testNow.Add(testRetention), testRetention) {
+	if !pruneDeparted(data, r.membership(nodes), testNow.Add(testRetention), testRetention, nil) {
 		t.Fatal("nothing was pruned once the window had run out")
 	}
 	peers, err = tunnel.RemotePeers(data, "10.100.0.128", nil)
@@ -523,7 +523,7 @@ func TestMembership_HealthIsNotIntent(t *testing.T) {
 		"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
 		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
 	}, nil)
-	if pruneDeparted(data, want, testNow, testRetention) {
+	if pruneDeparted(data, want, testNow, testRetention, nil) {
 		t.Error("an unhealthy node's published entries were pruned")
 	}
 }
@@ -547,10 +547,10 @@ func TestATunnelAddressIsAnIdentityNotALease(t *testing.T) {
 
 	// w1 leaves the selector but remains a node of this site.
 	want := meshMembership{endpoints: members("cp"), siteNodes: members("w1")}
-	if !pruneDeparted(data, want, testNow, testRetention) {
+	if !pruneDeparted(data, want, testNow, testRetention, nil) {
 		t.Fatal("the departure of the endpoint was not recorded")
 	}
-	if !pruneDeparted(data, want, testNow.Add(testRetention), testRetention) {
+	if !pruneDeparted(data, want, testNow.Add(testRetention), testRetention, nil) {
 		t.Fatal("the departed endpoint was not pruned once its window was over")
 	}
 	if got := string(data[tunnel.TunnelAddressReservationPrefix+"w1"]); got != "10.100.0.1/24" {
@@ -582,8 +582,8 @@ func TestAnAddressIsRetiredOnlyWhenItsNodeLeavesTheCluster(t *testing.T) {
 	// w1 is gone from the cluster entirely: not an endpoint, not a site
 	// node. Nothing can schedule a dialer on it ever again.
 	want := meshMembership{endpoints: members("cp"), siteNodes: members("cp")}
-	pruneDeparted(data, want, testNow, testRetention)
-	pruneDeparted(data, want, testNow.Add(testRetention), testRetention)
+	pruneDeparted(data, want, testNow, testRetention, nil)
+	pruneDeparted(data, want, testNow.Add(testRetention), testRetention, nil)
 
 	if got := string(data[tunnel.RetiredTunnelAddressesKey]); got != "10.100.0.1" {
 		t.Errorf("retired = %q, want 10.100.0.1: a node that has left the cluster gives its address up", got)
@@ -726,7 +726,7 @@ func TestRetainedAndNewEndpointCarryDisjointPrefixes(t *testing.T) {
 		map[string]string{"w2": "172.21.0.17"},
 	)
 	want := meshMembership{endpoints: members("cp"), siteNodes: members("w1", "w2")}
-	if !pruneDeparted(data, want, testNow, testRetention) {
+	if !pruneDeparted(data, want, testNow, testRetention, nil) {
 		t.Fatal("the departure of the old endpoint was not recorded")
 	}
 
@@ -1020,15 +1020,21 @@ func TestNoPrefixIsUnownedWhileAnEndpointReturns(t *testing.T) {
 // carries it, and a clock cannot know whether that read happened: a
 // controller outage or a slow render can eat the entire window, and a
 // departed endpoint released on schedule then strands every remote
-// that still names only it. Measured: both remotes NotReady for
-// fifteen minutes, holding a list whose one peer had been swept, the
-// correction rendered seconds after their last successful read.
+// that still names only it. Measured twice: both remotes NotReady,
+// holding a list whose one peer had been swept, the correction
+// rendered seconds after their last successful read.
 //
-// The evidence is observable at the site. A remote that has moved
-// shows a handshake with a current endpoint after the departure was
-// recorded; until every remote shows one, the departed node's entries
-// stand, whatever the clock says.
-func TestADepartedEndpointIsHeldUntilEveryRemoteHasMoved(t *testing.T) {
+// Nor is a live handshake evidence. A retained-era config keeps bare
+// peers handshaking on keepalive alone, so a remote can handshake a
+// current endpoint continuously while routing every packet by a list
+// two placements old. Measured: a hold built on handshakes released
+// on schedule, into exactly the stranding it existed to prevent.
+//
+// The only honest evidence is the remote's own acknowledgment: it
+// stamps the hash of the list it applied, and it has moved when that
+// hash matches the current render, which no longer names the departed
+// node as an owner.
+func TestADepartedEndpointIsHeldUntilEveryRemoteAcknowledges(t *testing.T) {
 	data := published(map[string][2]string{
 		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
 		"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
@@ -1037,41 +1043,34 @@ func TestADepartedEndpointIsHeldUntilEveryRemoteHasMoved(t *testing.T) {
 	departedSince(data, "cp", testRetention+time.Minute)
 	want := meshMembership{endpoints: members("w1"), siteNodes: members("cp", "w1")}
 
-	// No evidence that remote1 has ever handshaked with w1: releasing
-	// cp now would leave remote1 a list it cannot reach and a peer
-	// that no longer answers.
-	pruneDeparted(data, want, testNow, testRetention)
+	// The clock is long expired, and w1 may have been handshaking
+	// remote1 on keepalive the whole time; none of that says remote1
+	// applied the list that moved cp's prefixes.
+	pruneDeparted(data, want, testNow, testRetention, map[string]bool{"remote1": false})
 	if _, ok := data[tunnel.NodePublicKeyPrefix+"cp"]; !ok {
-		t.Fatal("cp was released with no evidence remote1 moved: the remote's only working path was torn down on a clock")
+		t.Fatal("cp was released without remote1's acknowledgment: the remote's only working path was torn down on a clock")
 	}
 
-	// w1 observes a handshake from remote1 after cp's departure was
-	// recorded: every remote has moved, and the hold releases.
-	data[tunnel.NodePeerHandshakesPrefix+"w1"] = []byte(tunnel.FormatHandshakes(map[string]int64{
-		"remote1": testNow.Add(-30 * time.Second).Unix(),
-	}))
-	pruneDeparted(data, want, testNow, testRetention)
+	// remote1 stamps the current render's hash: it has provably
+	// applied the list that no longer names cp, and the hold releases.
+	pruneDeparted(data, want, testNow, testRetention, map[string]bool{"remote1": true})
 	if _, ok := data[tunnel.NodePublicKeyPrefix+"cp"]; ok {
-		t.Fatal("cp is still held after every remote proved it moved")
+		t.Fatal("cp is still held after every remote acknowledged the render that moved it")
 	}
 }
 
-// Evidence from the departed node itself is not evidence of moving:
-// a remote handshaking the node that is leaving is exactly the state
-// the hold exists to protect.
-func TestTheDepartedNodesOwnHandshakesDoNotRelease(t *testing.T) {
+// A machine with no acknowledgment at all holds the release: absence
+// of evidence is the state the hold exists for, not an exemption.
+func TestAnUnacknowledgedRemoteHoldsTheRelease(t *testing.T) {
 	data := published(map[string][2]string{
 		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
 		"w1": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA=", "10.100.0.1/24"},
 	}, nil)
 	data["peer-public-key-remote1"] = []byte("R1KEY")
 	departedSince(data, "cp", testRetention+time.Minute)
-	data[tunnel.NodePeerHandshakesPrefix+"cp"] = []byte(tunnel.FormatHandshakes(map[string]int64{
-		"remote1": testNow.Add(-10 * time.Second).Unix(),
-	}))
 	want := meshMembership{endpoints: members("w1"), siteNodes: members("cp", "w1")}
-	pruneDeparted(data, want, testNow, testRetention)
+	pruneDeparted(data, want, testNow, testRetention, nil)
 	if _, ok := data[tunnel.NodePublicKeyPrefix+"cp"]; !ok {
-		t.Fatal("cp was released on its own handshake evidence: the remote is provably still attached to the node being torn down")
+		t.Fatal("cp was released with no acknowledgment from any remote")
 	}
 }

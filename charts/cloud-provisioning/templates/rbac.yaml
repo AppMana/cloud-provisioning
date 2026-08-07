@@ -148,6 +148,21 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "create", "patch"]
+  # The dialer Role's resourceNames are maintained at runtime
+  # (ensureDialerRole derives them from the machine list). Update is
+  # name-scoped; create is the fallback for an install missing the
+  # Role, and cannot be name-scoped because RBAC evaluates create
+  # before a name exists. Kubernetes' escalation check still applies:
+  # this account can only grant what it holds, the secrets access
+  # above.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles"]
+    verbs: ["get", "update"]
+    resourceNames:
+      - {{ include "cloud-provisioning.name" . }}
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles"]
+    verbs: ["create"]
   - apiGroups: ["apps"]
     resources: ["daemonsets"]
     verbs: ["get", "create", "update"]
@@ -232,9 +247,14 @@ subjects:
     namespace: {{ .Release.Namespace }}
 ---
 # The dialer pods' own access: the peer Secret (read the mesh state,
-# merge-patch their self-published public key) and, on the cloud node,
-# the per-machine adoption Secret (read-only; its name is derived from
-# /etc/wg-dialer/machine-name, so this cannot be resourceName-scoped).
+# merge-patch their self-published public key) and the per-machine
+# adoption Secrets (get everywhere, because a relay reads every
+# remote's applied-list acknowledgment; patch, because a remote stamps
+# its own). The chart cannot name the adoption Secrets, because
+# machines come and go after install, so this is the floor: the
+# controller keeps the resourceNames current from its machine list
+# (ensureDialerRole), and an upgrade that resets this Role to the
+# floor is repaired by the controller's first pass after restart.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -244,6 +264,8 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "patch"]
+    resourceNames:
+      - {{ include "cloud-provisioning.name" . }}-peers
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

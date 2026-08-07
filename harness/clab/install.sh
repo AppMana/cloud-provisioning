@@ -22,7 +22,7 @@ OUT="${OUT:-$PWD/out}"
 CAPI_VERSION="${CAPI_VERSION:-v1.11.1}"
 CALICO_MANIFEST="${CALICO_MANIFEST:-https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/calico.yaml}"
 TUNNEL_ENDPOINTS="${TUNNEL_ENDPOINTS:-kubernetes.io/hostname=w1}"
-SITE_NODES="cp w1 w2"
+SITE_NODES="cp cp2 cp3 w1 w2"
 CLOUD_NODES="remote1 remote2"
 
 c() { echo "clab-$LAB-$1"; }
@@ -116,7 +116,7 @@ k apply -f /tmp/calico.yaml >/dev/null || fail "installing calico"
 # the API server, which on a remote is the tunnel, so the monitor's
 # own re-detection converges on the address the mesh gave the node.
 k -n kube-system set env daemonset/calico-node \
-  IP_AUTODETECTION_METHOD="can-reach=$LAN.10" >/dev/null \
+  IP_AUTODETECTION_METHOD="can-reach=$LAN.100" >/dev/null \
   || fail "setting calico's autodetection method"
 # The stock manifest encapsulates. This mesh carries pod traffic
 # natively, and the model the controller reads back has to match what
@@ -134,7 +134,7 @@ k -n kube-system rollout restart daemonset/calico-node >/dev/null 2>&1 \
   || fail "could not restart calico-node after changing the pool"
 k -n kube-system rollout status daemonset/calico-node --timeout=5m >/dev/null \
   || fail "calico-node did not come back after the pool change, so its routes still describe the old encapsulation"
-for n in cp w1 w2; do k wait --for=condition=Ready node/"$n" --timeout=420s >/dev/null 2>&1 || fail "$n never became ready"; done
+for n in cp cp2 cp3 w1 w2; do k wait --for=condition=Ready node/"$n" --timeout=420s >/dev/null 2>&1 || fail "$n never became ready"; done
 echo "  every site node ready"
 
 echo "--- the chart ---"

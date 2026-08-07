@@ -138,28 +138,10 @@ control_planes() {
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -v '^$'
 }
 
-# Which control plane holds the API VIP right now. The strongest
-# victim: its death takes both an etcd member and the address every
-# kubeconfig names, and the claim is that kube-vip moves the second
-# while quorum absorbs the first.
-vip_holder() {
-  local n
-  for n in $(control_planes); do
-    if in_node "$n" ip -4 addr show eth1 2>/dev/null | grep -q "10.10.0.100/"; then
-      echo "$n"
-      return 0
-    fi
-  done
-  return 1
-}
-
 rows=0; failed=0
 while IFS=$'\t' read -r name endpoints victim <&3; do
   case "$name" in \>*|''|name) continue ;; esac
   [ -n "$ONLY" ] && case " $ONLY " in *" $name "*) ;; *) continue ;; esac
-  if [ "$victim" = "vip-holder" ]; then
-    victim=$(vip_holder) || { echo "  FAIL no control plane holds the VIP, so there is no holder to kill"; failed=$((failed+1)); rows=$((rows+1)); continue; }
-  fi
   # A control plane may die only where quorum survives it: stacked
   # etcd with fewer than three members loses the cluster with the
   # node, and a cluster with no API server is not a scenario, it is

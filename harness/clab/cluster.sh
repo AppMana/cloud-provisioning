@@ -1,33 +1,37 @@
 #!/usr/bin/env bash
 # Build the cluster on the site's five nodes: three control planes and
-# two workers.
+# two workers, with no VIP anywhere.
 #
 # Three control planes, not two: stacked etcd needs a majority, and a
 # majority of two is two, so a second control plane only adds a way to
-# halt. Three is the smallest number that tolerates a death, which is
-# what the outage rows take away.
+# halt. Three is the smallest number that tolerates a death.
 #
-# The cluster knows itself by one address, the API VIP, held by
-# kube-vip on whichever control plane currently leads. Every cert
-# carries it (controlPlaneEndpoint), every kubeconfig names it, and a
-# remote reaches it over the tunnel like any other site address. When
-# the holder dies the VIP moves; nothing that dials it has to know.
+# There is no address that moves between nodes. Every node holds all
+# three control-plane addresses and reaches "the API server" through
+# its own loopback: a static-pod TCP forwarder on 127.0.0.1:7445,
+# written before kubeadm ever runs, because kubelet starts static pods
+# from disk with no API access at all. controlPlaneEndpoint states that
+# loopback, so every kubelet.conf kubeadm writes points at the node's
+# own forwarder and no single member's death strands any node. This is
+# the same shape the remotes get from the dialer's own balancer, and
+# the same shape k0s calls nllb: the worker just has the three
+# addresses.
 #
 # Every address the cluster knows itself by is a segment address. The
 # management interface exists so this script can drive the lab and for
-# nothing else, so kubelet is told which address to register and the API
-# server is told which to advertise. If either were left to autodetect,
-# the cluster would form on the management network and the isolation the
-# topology asserts would be true and irrelevant.
+# nothing else, so kubelet is told which address to register and the
+# API server which to advertise; joins bootstrap through a real
+# member's address, because the loopback forwarder is only meaningful
+# on a node that already has one.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 LAB=cldt
 LAN=10.10.0
-VIP=$LAN.100
 POD_CIDR=10.244.0.0/16
 SVC_CIDR=10.96.0.0/12
-KUBE_VIP_IMAGE="${KUBE_VIP_IMAGE:-ghcr.io/kube-vip/kube-vip:v0.8.9}"
+PROXY_PORT=7445
+NGINX_IMAGE="${NGINX_IMAGE:-nginx:1.27-alpine}"
 OUT="${OUT:-$PWD/out}"
 mkdir -p "$OUT"
 
@@ -39,11 +43,12 @@ write_to() { docker exec -i "$(c "$1")" sh -c "cat >$2"; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 # Everything that talks to the API talks to it from the bastion, which
-# is on the site network. Nothing here reaches into the site from
-# outside it, which is what makes the same scripts work once the nodes
-# are VMs whose single NIC is on a network the host cannot address.
+# is on the site network. The wrapper below picks a live control plane
+# per invocation, because the bastion is not a cluster node and runs no
+# forwarder of its own.
 k() { in_node bastion kubectl "$@"; }
 
+CP_ADDRS="$LAN.10 $LAN.13 $LAN.14"
 cp_addr() {
   case "$1" in
     cp)  echo "$LAN.10" ;;
@@ -52,13 +57,59 @@ cp_addr() {
   esac
 }
 
-echo "--- first control plane on cp at $LAN.10, endpoint $VIP ---"
-# The VIP is held by hand on cp until kube-vip can hold it properly:
-# kube-vip leader-elects through the API server, so it cannot answer
-# for the endpoint before the endpoint exists. The manual address is
-# removed once kube-vip is installed on all three.
-in_node cp ip addr replace "$VIP/24" dev eth1
+echo "--- the loopback forwarder, on every site node, before anything else ---"
+# Preload the image (the site pulls nothing) and write the config and
+# the static-pod manifest. kubelet reads /etc/kubernetes/manifests from
+# disk whenever it runs, so the forwarder exists on a node before,
+# during, and after any control plane's death, with no dependency on
+# the API it fronts.
+if ! docker image inspect "$NGINX_IMAGE" >/dev/null 2>&1; then
+  docker pull -q "$NGINX_IMAGE" >/dev/null || fail "could not pull $NGINX_IMAGE"
+fi
+for n in cp cp2 cp3 w1 w2; do
+  docker save "$NGINX_IMAGE" | docker exec -i "$(c "$n")" ctr -n k8s.io images import - >/dev/null 2>&1 \
+    || fail "could not import $NGINX_IMAGE into $n"
+  in_node "$n" mkdir -p /etc/api-proxy /etc/kubernetes/manifests
+  write_to "$n" /etc/api-proxy/nginx.conf <<EOF
+worker_processes 1;
+events { worker_connections 256; }
+stream {
+  upstream api {
+$(for a in $CP_ADDRS; do echo "    server $a:6443 max_fails=1 fail_timeout=5s;"; done)
+  }
+  server {
+    listen 127.0.0.1:$PROXY_PORT;
+    proxy_connect_timeout 2s;
+    proxy_pass api;
+  }
+}
+EOF
+  write_to "$n" /etc/kubernetes/manifests/api-proxy.yaml <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: api-proxy
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  priorityClassName: system-node-critical
+  containers:
+    - name: nginx
+      image: $NGINX_IMAGE
+      imagePullPolicy: Never
+      command: ["nginx", "-g", "daemon off;", "-c", "/etc/api-proxy/nginx.conf"]
+      volumeMounts:
+        - {name: conf, mountPath: /etc/api-proxy, readOnly: true}
+  volumes:
+    - name: conf
+      hostPath:
+        path: /etc/api-proxy
+        type: Directory
+EOF
+done
+echo "  $NGINX_IMAGE on 127.0.0.1:$PROXY_PORT, fanning to: $CP_ADDRS"
 
+echo "--- first control plane on cp at $LAN.10 ---"
 write_to cp /tmp/init.yaml <<EOF
 apiVersion: kubeadm.k8s.io/v1beta4
 kind: InitConfiguration
@@ -74,9 +125,15 @@ kind: ClusterConfiguration
 networking:
   podSubnet: $POD_CIDR
   serviceSubnet: $SVC_CIDR
-controlPlaneEndpoint: $VIP:6443
+# The node-local forwarder: every kubelet.conf kubeadm writes points
+# here, which on any node is that node's own path to whichever control
+# plane is alive. Loopback in every API server's SANs is what lets a
+# client verify the certificate for the address it dialed; the real
+# addresses are there for the bastion and for anything that dials a
+# member directly.
+controlPlaneEndpoint: 127.0.0.1:$PROXY_PORT
 apiServer:
-  certSANs: [$VIP, $LAN.10, $LAN.13, $LAN.14, 127.0.0.1, cp, cp2, cp3]
+  certSANs: [127.0.0.1, $LAN.10, $LAN.13, $LAN.14, cp, cp2, cp3]
 ---
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
@@ -93,25 +150,50 @@ EOF
 if ! in_node cp test -f /etc/kubernetes/admin.conf; then
   # Preflight inspects the kernel it is running on, and in a container
   # that is this host's, so it checks things the node neither owns nor
-  # can change. kind passes the same flag for the same reason.
+  # can change. It also objects to a manifests directory that already
+  # holds the forwarder, which is there on purpose. kind passes the
+  # same flag for the same reasons.
   in_node cp kubeadm init --config /tmp/init.yaml --skip-token-print \
     --upload-certs --ignore-preflight-errors=all \
     >"$OUT/init.log" 2>&1 || { tail -30 "$OUT/init.log" >&2; fail "kubeadm init (see $OUT/init.log)"; }
 fi
-# The kubeconfig points at the VIP and is used from the site, so
-# nothing has to be rewritten and no certificate has to cover an
-# address that changes whenever the containers restart.
 in_node cp cat /etc/kubernetes/admin.conf > "$OUT/kubeconfig"
 in_node bastion mkdir -p /root/.kube
 write_to bastion /root/.kube/config < "$OUT/kubeconfig"
+
+# The bastion is not a cluster node: nothing serves its loopback, and
+# its kubeconfig names the loopback endpoint. Pick a live member per
+# invocation instead. The real addresses are in every server
+# certificate's SANs, so --server needs no other accommodation.
+if ! in_node bastion test -f /usr/local/bin/kubectl.real; then
+  in_node bastion cp /usr/local/bin/kubectl /usr/local/bin/kubectl.real 2>/dev/null \
+    || in_node bastion cp "$(in_node bastion command -v kubectl)" /usr/local/bin/kubectl.real
+fi
+write_to bastion /usr/local/bin/kubectl <<EOF
+#!/bin/sh
+# Pick a live control plane, then run the real kubectl against it. A
+# probe failure is connectivity, so trying the next member is right; a
+# kubectl failure after a good probe is an answer, not a reason to ask
+# someone else.
+for s in $CP_ADDRS; do
+  if curl -ksm 2 -o /dev/null "https://\$s:6443/livez" 2>/dev/null; then
+    exec /usr/local/bin/kubectl.real --server="https://\$s:6443" "\$@"
+  fi
+done
+exec /usr/local/bin/kubectl.real "\$@"
+EOF
+in_node bastion chmod 0755 /usr/local/bin/kubectl
 k get --raw /healthz >/dev/null 2>&1 || fail "the API server is not answering"
 echo "  up, kubeconfig at $OUT/kubeconfig"
 
 echo "--- the other control planes ---"
 # A fresh certificate key each run: upload-certs re-encrypts the CA
 # bundle into the cluster for two minutes, which is all the join needs.
+# Joins bootstrap through cp's real address; kubelet.conf comes out
+# pointing at the loopback forwarder, per controlPlaneEndpoint.
 JOIN=$(in_node cp kubeadm token create --print-join-command 2>/dev/null | tr -d '\r')
 [ -n "$JOIN" ] || fail "no join command"
+JOIN=$(echo "$JOIN" | sed "s/127.0.0.1:$PROXY_PORT/$LAN.10:6443/")
 CERT_KEY=$(in_node cp kubeadm init phase upload-certs --upload-certs 2>/dev/null | tail -1 | tr -d '\r')
 [ -n "$CERT_KEY" ] || fail "no certificate key"
 for n in cp2 cp3; do
@@ -146,81 +228,18 @@ for n in cp cp2 cp3 w1 w2; do
   k get node "$n" >/dev/null 2>&1 || fail "$n never registered"
 done
 
-echo "--- kube-vip takes the endpoint ---"
-# Leader-elected ARP on the LAN: the VIP lives on exactly one control
-# plane and moves when its holder stops renewing. Installed after the
-# joins so /etc/kubernetes/admin.conf exists on all three, and only
-# then is cp's manual hold released.
-if ! docker image inspect "$KUBE_VIP_IMAGE" >/dev/null 2>&1; then
-  docker pull -q "$KUBE_VIP_IMAGE" >/dev/null || fail "could not pull $KUBE_VIP_IMAGE"
-fi
-for n in cp cp2 cp3; do
-  docker save "$KUBE_VIP_IMAGE" | docker exec -i "$(c "$n")" ctr -n k8s.io images import - >/dev/null 2>&1 \
-    || fail "could not import kube-vip into $n"
-  write_to "$n" /etc/kubernetes/manifests/kube-vip.yaml <<EOF
-apiVersion: v1
-kind: Pod
-metadata:
-  name: kube-vip
-  namespace: kube-system
-spec:
-  hostNetwork: true
-  # kube-vip dials the name "kubernetes"; the alias points it at this
-  # node's own API server, the one instance that is always reachable
-  # from a control plane whatever the VIP is doing. Omitting this
-  # sends the dial to whatever DNS answers, which is nothing here.
-  hostAliases:
-    - ip: 127.0.0.1
-      hostnames: [kubernetes]
-  containers:
-    - name: kube-vip
-      image: $KUBE_VIP_IMAGE
-      imagePullPolicy: Never
-      args: ["manager"]
-      env:
-        - {name: vip_arp, value: "true"}
-        - {name: address, value: "$VIP"}
-        - {name: port, value: "6443"}
-        - {name: vip_interface, value: eth1}
-        - {name: vip_cidr, value: "32"}
-        - {name: cp_enable, value: "true"}
-        - {name: cp_namespace, value: kube-system}
-        - {name: vip_leaderelection, value: "true"}
-        - {name: vip_leaseduration, value: "5"}
-        - {name: vip_renewdeadline, value: "3"}
-        - {name: vip_retryperiod, value: "1"}
-      securityContext:
-        capabilities:
-          add: [NET_ADMIN, NET_RAW]
-      volumeMounts:
-        - {mountPath: /etc/kubernetes/admin.conf, name: kubeconfig}
-  volumes:
-    - name: kubeconfig
-      hostPath:
-        path: /etc/kubernetes/admin.conf
-EOF
+echo "--- every kubelet dials its own forwarder ---"
+# The claim the design makes, checked rather than assumed: kubeadm
+# writes kubelet.conf from controlPlaneEndpoint, so every node should
+# depend on its own loopback and none on any single member.
+for n in cp cp2 cp3 w1 w2; do
+  server=$(in_node "$n" sh -c "grep -o 'server: .*' /etc/kubernetes/kubelet.conf" | awk '{print $2}')
+  case "$server" in
+    "https://127.0.0.1:$PROXY_PORT") ;;
+    *) fail "$n's kubelet dials $server, not its own forwarder: that node just inherited a single point of failure" ;;
+  esac
 done
-# Wait for a kube-vip to hold a lease before releasing the manual VIP,
-# or the endpoint goes dark with nobody yet responsible for it.
-held=
-for _ in $(seq 1 30); do
-  if k -n kube-system get lease plndr-cp-lock -o jsonpath='{.spec.holderIdentity}' 2>/dev/null | grep -q .; then
-    held=1; break
-  fi
-  sleep 5
-done
-[ -n "$held" ] || fail "kube-vip never took its lease, so releasing the VIP would orphan the endpoint"
-in_node cp ip addr del "$VIP/24" dev eth1 2>/dev/null || true
-# The kernel's neighbours may still map the VIP to cp's MAC until the
-# leader's gratuitous ARP lands; the check below rides through it.
-ok=
-for _ in $(seq 1 24); do
-  if k get --raw /healthz >/dev/null 2>&1; then ok=1; break; fi
-  sleep 5
-done
-[ -n "$ok" ] || fail "the API endpoint did not survive the handoff to kube-vip"
-holder=$(k -n kube-system get lease plndr-cp-lock -o jsonpath='{.spec.holderIdentity}' 2>/dev/null)
-echo "  $VIP answered after the handoff, leader: ${holder:-unknown}"
+echo "  all five at https://127.0.0.1:$PROXY_PORT"
 
 echo "--- every node registered by its segment address ---"
 k get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' |

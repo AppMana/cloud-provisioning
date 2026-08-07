@@ -116,7 +116,7 @@ k apply -f /tmp/calico.yaml >/dev/null || fail "installing calico"
 # the API server, which on a remote is the tunnel, so the monitor's
 # own re-detection converges on the address the mesh gave the node.
 k -n kube-system set env daemonset/calico-node \
-  IP_AUTODETECTION_METHOD="can-reach=$LAN.100" >/dev/null \
+  IP_AUTODETECTION_METHOD="can-reach=$LAN.10" >/dev/null \
   || fail "setting calico's autodetection method"
 # The stock manifest encapsulates. This mesh carries pod traffic
 # natively, and the model the controller reads back has to match what

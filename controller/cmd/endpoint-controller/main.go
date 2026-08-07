@@ -44,6 +44,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -268,6 +269,17 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	// internet-facing machine.
 	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
 		return ctrl.Result{}, fmt.Errorf("ensuring adoption config: %w", err)
+	}
+
+	// The Role admitting this machine's adoption Secret, on the same
+	// event: a machine created moments ago must be readable by name
+	// before its dialer's first adoption read, and the nameless pass
+	// that would otherwise add it has no reason to run. After the
+	// adoption config, not before: a Role write refused (an upgrade
+	// window where this controller outruns its own RBAC) must not
+	// keep the peer list stale too.
+	if err := r.ensureDialerRole(ctx); err != nil {
+		return ctrl.Result{}, fmt.Errorf("scoping the dialer Role: %w", err)
 	}
 
 	// The remote node's own pod blocks, published onto its peer entry
@@ -1074,6 +1086,13 @@ func (r *meshReconciler) refreshAdoptionConfigs(ctx context.Context) error {
 	if err := r.List(ctx, machines, opts...); err != nil {
 		return fmt.Errorf("listing machines to refresh their peer lists: %w", err)
 	}
+	// The Role admitting these machines' adoption Secrets is a
+	// derivation of the same list, so it is refreshed on the same
+	// passes. Its failure does not stop the per-machine work below.
+	roleErr := r.ensureDialerRole(ctx)
+	if roleErr != nil {
+		ctrl.LoggerFrom(ctx).Error(roleErr, "could not scope the dialer Role")
+	}
 	var failed []string
 	for i := range machines.Items {
 		// The address the CNI peers on is re-asserted here, not only on
@@ -1096,7 +1115,7 @@ func (r *meshReconciler) refreshAdoptionConfigs(ctx context.Context) error {
 	if len(failed) > 0 {
 		return fmt.Errorf("could not refresh the peer list for %v", failed)
 	}
-	return nil
+	return roleErr
 }
 
 // ensureAdoptionConfig renders the live, public-data-only peer list
@@ -1316,6 +1335,78 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 	}
 	existing.Data[tunnel.CloudPeersKey] = doc
 	return r.Patch(ctx, existing, patch)
+}
+
+// ensureDialerRole keeps the dialer ServiceAccount's Role scoped to
+// exactly the Secrets a dialer touches: the peer Secret (get, and
+// merge-patch to self-publish a key) and each machine's adoption
+// Secret (get everywhere -- a relay reads every remote's applied-list
+// acknowledgment -- and patch to write its own). The chart cannot name
+// the adoption Secrets, because machines come and go after install, so
+// it renders the Role with only the peer Secret's name and this method
+// carries the rest, derived from the same machine list that drives the
+// adoption Secrets themselves. A helm upgrade may reset the Role to
+// the chart's floor; the upgrade also restarts this controller, whose
+// first pass restores it.
+func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
+	if r.dialerServiceAccount == "" {
+		return nil
+	}
+	machines := &unstructured.UnstructuredList{}
+	machines.SetGroupVersionKind(machineGVK.GroupVersion().WithKind(machineGVK.Kind + "List"))
+	opts := []client.ListOption{}
+	if r.machineSelector != nil {
+		opts = append(opts, client.MatchingLabelsSelector{Selector: r.machineSelector})
+	}
+	if err := r.List(ctx, machines, opts...); err != nil {
+		return fmt.Errorf("listing machines to scope the dialer Role: %w", err)
+	}
+	adoption := make([]string, 0, len(machines.Items))
+	for i := range machines.Items {
+		adoption = append(adoption, tunnel.AdoptionSecretName(machines.Items[i].GetName()))
+	}
+	sort.Strings(adoption)
+	desired := []rbacv1.PolicyRule{{
+		APIGroups:     []string{""},
+		Resources:     []string{"secrets"},
+		Verbs:         []string{"get", "patch"},
+		ResourceNames: append([]string{r.secretName}, adoption...),
+	}}
+
+	role := &rbacv1.Role{}
+	key := types.NamespacedName{Namespace: r.secretNamespace, Name: r.dialerServiceAccount}
+	err := r.reader.Get(ctx, key, role)
+	if apierrors.IsNotFound(err) {
+		role = &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{Name: r.dialerServiceAccount, Namespace: r.secretNamespace, OwnerReferences: r.owners()},
+			Rules:      desired,
+		}
+		return r.Create(ctx, role)
+	}
+	if err != nil {
+		return fmt.Errorf("reading the dialer Role: %w", err)
+	}
+	if len(role.Rules) == 1 && equalStrings(role.Rules[0].APIGroups, desired[0].APIGroups) &&
+		equalStrings(role.Rules[0].Resources, desired[0].Resources) &&
+		equalStrings(role.Rules[0].Verbs, desired[0].Verbs) &&
+		equalStrings(role.Rules[0].ResourceNames, desired[0].ResourceNames) &&
+		len(role.Rules[0].NonResourceURLs) == 0 {
+		return nil
+	}
+	role.Rules = desired
+	return r.Update(ctx, role)
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // ensureDialerDaemonSet creates or updates the on-prem dialer

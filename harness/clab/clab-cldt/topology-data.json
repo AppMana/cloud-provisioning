@@ -15,7 +15,7 @@
       }
     }
   },
-  "ssh-pub-keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDbuueD3zEnBjLvgCbG9pR7ccaYrTPYBRco0vjhL4EtP9ZxWyv5VjGqpLjFNL0/alzc2+q/QGu2zYV2enZGIcQBbMk+qXuAd0efe0Yvrlpv8h51ZY1po/jm8a6LRYZKXWR/OXDE1qonc9ys3axI141fHoWl6F6UGskFnY9Z9oLYYSVh+nnFpf9FwYqxkr5RxYnpILjjzWbQ9UKXD2K3eCGWVyfeq69LZmUNZTBZhcvkv4uFrVqAXHYxFehHOccHwkrGP18uuQDmQl71SWEpmQdKsim2tGYztvoqvov7Wj8xsGrDQ3oW/8h1mIiB/GDRzHwOwuVSIYKZtCCA2N0dTUUNiCr/Z8HZP6BgHMdG03dS25Y/orPhbnMGIn76YEvvuL/GW2lg+68cmA05xHoTamQACghc7XLph9Cp5DmsmE8dQMTUGI5r6fNuETAkMlBtacqIM0yD833TB4LPc7Fy7lRf5XFuLhX2TphJeL7vas6sHqssuPsphSNyFaEEnKZ+NH89q/FXzhPJZVuYXSAbe2/AVaB2kR9TBI/ukNMt2zQpf8oOFq+GzTAEIs/ubJeiEH48+yElLoljimtwf9Ebsfy231YFJ5xraPChdvDk9CUHgBpGzCkRiZ5JxdYCb2IkeznVoLvaTipJ3OhezTtL8Ur3BKbRW882G7f5deMLLIO3Rw==","ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDQ0xUnP61BcQKX1hmxooDVhHZCSKsjytvQpwHsLN2rLQJYSFzz9S+ANMI7YS/D7i8nogHKHmFHONtVIhTp89avT5eIXA3vV+oeLSOuN3jwacagE6ejnp42XbGJq2Z77detfYLKyutpFOfgVbC3K0wtmIE8Ryk8n3BvStZe44bA3Ap+LPLIKm3HaIVf8bue1/Rymss3KHmLvgFnooN1f/bSKUk/LJYVEKZQBHnwU6nM73p6MUM9O4tWOPBLgPNcPA4kqcp0sOsdFC0IsQm/O/JUsnFJrEfNFk3zfY76pikMk1JZM0f/MkMVtvuv26Y8lgtOxwL22HgevIOMb1OCPezPqkqulUZ+eVU/+M4NmCuKU9/+C6GVWGoqN+wguPNLwjFainpMFxa7Kthir5PxDJcPbRvbBvqC/5LAWZEiNBEjvBGoXPrl3FsNMqQ3sKsjP7ekPq7i6bAbYtwZIw+Los2nSZHXz6n92Q7g6xIzx/LAwxvaDcVdkH1MVAuJghUGM7hqM6Ch3EIPbvE+rErWv4D2neF4DMwlKQRjFGsn7s4/YH4dUSarbiraLYa8v9Y+6jh9PSWf7aauKHDVu5K62D0YVnXWjA0BRt1xCPc6jsP+nxGZ15GsRv6U+bHzmlUmZWNXuPSmSYui5vr3DNLqnrui8gr5/2L9nkTAAgbssXgZGQ=="],
+  "ssh-pub-keys": ["ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDQ0xUnP61BcQKX1hmxooDVhHZCSKsjytvQpwHsLN2rLQJYSFzz9S+ANMI7YS/D7i8nogHKHmFHONtVIhTp89avT5eIXA3vV+oeLSOuN3jwacagE6ejnp42XbGJq2Z77detfYLKyutpFOfgVbC3K0wtmIE8Ryk8n3BvStZe44bA3Ap+LPLIKm3HaIVf8bue1/Rymss3KHmLvgFnooN1f/bSKUk/LJYVEKZQBHnwU6nM73p6MUM9O4tWOPBLgPNcPA4kqcp0sOsdFC0IsQm/O/JUsnFJrEfNFk3zfY76pikMk1JZM0f/MkMVtvuv26Y8lgtOxwL22HgevIOMb1OCPezPqkqulUZ+eVU/+M4NmCuKU9/+C6GVWGoqN+wguPNLwjFainpMFxa7Kthir5PxDJcPbRvbBvqC/5LAWZEiNBEjvBGoXPrl3FsNMqQ3sKsjP7ekPq7i6bAbYtwZIw+Los2nSZHXz6n92Q7g6xIzx/LAwxvaDcVdkH1MVAuJghUGM7hqM6Ch3EIPbvE+rErWv4D2neF4DMwlKQRjFGsn7s4/YH4dUSarbiraLYa8v9Y+6jh9PSWf7aauKHDVu5K62D0YVnXWjA0BRt1xCPc6jsP+nxGZ15GsRv6U+bHzmlUmZWNXuPSmSYui5vr3DNLqnrui8gr5/2L9nkTAAgbssXgZGQ==","ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDbuueD3zEnBjLvgCbG9pR7ccaYrTPYBRco0vjhL4EtP9ZxWyv5VjGqpLjFNL0/alzc2+q/QGu2zYV2enZGIcQBbMk+qXuAd0efe0Yvrlpv8h51ZY1po/jm8a6LRYZKXWR/OXDE1qonc9ys3axI141fHoWl6F6UGskFnY9Z9oLYYSVh+nnFpf9FwYqxkr5RxYnpILjjzWbQ9UKXD2K3eCGWVyfeq69LZmUNZTBZhcvkv4uFrVqAXHYxFehHOccHwkrGP18uuQDmQl71SWEpmQdKsim2tGYztvoqvov7Wj8xsGrDQ3oW/8h1mIiB/GDRzHwOwuVSIYKZtCCA2N0dTUUNiCr/Z8HZP6BgHMdG03dS25Y/orPhbnMGIn76YEvvuL/GW2lg+68cmA05xHoTamQACghc7XLph9Cp5DmsmE8dQMTUGI5r6fNuETAkMlBtacqIM0yD833TB4LPc7Fy7lRf5XFuLhX2TphJeL7vas6sHqssuPsphSNyFaEEnKZ+NH89q/FXzhPJZVuYXSAbe2/AVaB2kR9TBI/ukNMt2zQpf8oOFq+GzTAEIs/ubJeiEH48+yElLoljimtwf9Ebsfy231YFJ5xraPChdvDk9CUHgBpGzCkRiZ5JxdYCb2IkeznVoLvaTipJ3OhezTtL8Ur3BKbRW882G7f5deMLLIO3Rw=="],
   "nodes": {
     "bastion": {
       "index": "0",
@@ -203,8 +203,70 @@
       "port-bindings": [
       ]
     },
-    "edge-a": {
+    "cp2": {
       "index": "6",
+      "shortname": "cp2",
+      "longname": "clab-cldt-cp2",
+      "fqdn": "cp2.cldt.io",
+      "group": "",
+      "labdir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cp2",
+      "kind": "linux",
+      "image": "kindest/node:v1.34.0",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cp2",
+        "clab-node-longname": "clab-cldt-cp2",
+        "clab-node-name": "cp2",
+        "clab-node-type": "",
+        "clab-owner": "administrator",
+        "clab-topo-file": "/home/administrator/Documents/cloud-provisioning/harness/clab/topo.clab.yml",
+        "containerlab": "cldt"
+      },
+      "port-bindings": [
+      ]
+    },
+    "cp3": {
+      "index": "7",
+      "shortname": "cp3",
+      "longname": "clab-cldt-cp3",
+      "fqdn": "cp3.cldt.io",
+      "group": "",
+      "labdir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cp3",
+      "kind": "linux",
+      "image": "kindest/node:v1.34.0",
+      "mgmt-net": "",
+      "mgmt-intf": "",
+      "mgmt-ipv4-address": "",
+      "mgmt-ipv4-prefix-length": 0,
+      "mgmt-ipv6-address": "",
+      "mgmt-ipv6-prefix-length": 0,
+      "mac-address": "",
+      "labels": {
+        "clab-mgmt-net-bridge": "br-f5148a42e622",
+        "clab-node-group": "",
+        "clab-node-kind": "linux",
+        "clab-node-lab-dir": "/home/administrator/Documents/cloud-provisioning/harness/clab/clab-cldt/cp3",
+        "clab-node-longname": "clab-cldt-cp3",
+        "clab-node-name": "cp3",
+        "clab-node-type": "",
+        "clab-owner": "administrator",
+        "clab-topo-file": "/home/administrator/Documents/cloud-provisioning/harness/clab/topo.clab.yml",
+        "containerlab": "cldt"
+      },
+      "port-bindings": [
+      ]
+    },
+    "edge-a": {
+      "index": "8",
       "shortname": "edge-a",
       "longname": "clab-cldt-edge-a",
       "fqdn": "edge-a.cldt.io",
@@ -235,7 +297,7 @@
       ]
     },
     "edge-b": {
-      "index": "7",
+      "index": "9",
       "shortname": "edge-b",
       "longname": "clab-cldt-edge-b",
       "fqdn": "edge-b.cldt.io",
@@ -266,7 +328,7 @@
       ]
     },
     "remote1": {
-      "index": "8",
+      "index": "10",
       "shortname": "remote1",
       "longname": "clab-cldt-remote1",
       "fqdn": "remote1.cldt.io",
@@ -297,7 +359,7 @@
       ]
     },
     "remote2": {
-      "index": "9",
+      "index": "11",
       "shortname": "remote2",
       "longname": "clab-cldt-remote2",
       "fqdn": "remote2.cldt.io",
@@ -328,7 +390,7 @@
       ]
     },
     "router": {
-      "index": "10",
+      "index": "12",
       "shortname": "router",
       "longname": "clab-cldt-router",
       "fqdn": "router.cldt.io",
@@ -359,7 +421,7 @@
       ]
     },
     "w1": {
-      "index": "11",
+      "index": "13",
       "shortname": "w1",
       "longname": "clab-cldt-w1",
       "fqdn": "w1.cldt.io",
@@ -390,7 +452,7 @@
       ]
     },
     "w2": {
-      "index": "12",
+      "index": "14",
       "shortname": "w2",
       "longname": "clab-cldt-w2",
       "fqdn": "w2.cldt.io",
@@ -427,13 +489,13 @@
         "a": {
           "node": "router",
           "interface": "eth1",
-          "mac": "aa:c1:ab:c8:90:47",
+          "mac": "aa:c1:ab:0d:70:85",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-router",
-          "mac": "aa:c1:ab:27:e0:5e",
+          "mac": "aa:c1:ab:bc:64:33",
           "peer": "a"
         }
       }
@@ -443,13 +505,13 @@
         "a": {
           "node": "bastion",
           "interface": "eth1",
-          "mac": "aa:c1:ab:b9:4f:ff",
+          "mac": "aa:c1:ab:31:01:f9",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-bastion",
-          "mac": "aa:c1:ab:48:70:96",
+          "mac": "aa:c1:ab:89:31:c7",
           "peer": "a"
         }
       }
@@ -459,13 +521,45 @@
         "a": {
           "node": "cp",
           "interface": "eth1",
-          "mac": "aa:c1:ab:b9:24:a3",
+          "mac": "aa:c1:ab:c0:73:94",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-cp",
-          "mac": "aa:c1:ab:20:54:56",
+          "mac": "aa:c1:ab:26:f2:b2",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "cp2",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:2c:6a:60",
+          "peer": "z"
+        },
+        "z": {
+          "node": "cldt-lan",
+          "interface": "lan-cp2",
+          "mac": "aa:c1:ab:6c:36:6d",
+          "peer": "a"
+        }
+      }
+    },
+    {
+      "endpoints": {
+        "a": {
+          "node": "cp3",
+          "interface": "eth1",
+          "mac": "aa:c1:ab:29:2f:a3",
+          "peer": "z"
+        },
+        "z": {
+          "node": "cldt-lan",
+          "interface": "lan-cp3",
+          "mac": "aa:c1:ab:4a:ed:db",
           "peer": "a"
         }
       }
@@ -475,13 +569,13 @@
         "a": {
           "node": "w1",
           "interface": "eth1",
-          "mac": "aa:c1:ab:a6:e3:03",
+          "mac": "aa:c1:ab:4b:20:96",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-w1",
-          "mac": "aa:c1:ab:18:f1:6a",
+          "mac": "aa:c1:ab:c4:63:d3",
           "peer": "a"
         }
       }
@@ -491,13 +585,13 @@
         "a": {
           "node": "w2",
           "interface": "eth1",
-          "mac": "aa:c1:ab:e2:a5:68",
+          "mac": "aa:c1:ab:ff:ef:fa",
           "peer": "z"
         },
         "z": {
           "node": "cldt-lan",
           "interface": "lan-w2",
-          "mac": "aa:c1:ab:c3:2a:54",
+          "mac": "aa:c1:ab:79:71:a2",
           "peer": "a"
         }
       }
@@ -507,13 +601,13 @@
         "a": {
           "node": "router",
           "interface": "eth2",
-          "mac": "aa:c1:ab:6f:5a:a6",
+          "mac": "aa:c1:ab:e5:7a:2c",
           "peer": "z"
         },
         "z": {
           "node": "cldt-wan",
           "interface": "wan-router",
-          "mac": "aa:c1:ab:f8:ca:f8",
+          "mac": "aa:c1:ab:e2:3b:8e",
           "peer": "a"
         }
       }
@@ -523,13 +617,13 @@
         "a": {
           "node": "edge-a",
           "interface": "eth2",
-          "mac": "aa:c1:ab:9d:99:fb",
+          "mac": "aa:c1:ab:3c:c3:b3",
           "peer": "z"
         },
         "z": {
           "node": "cldt-wan",
           "interface": "wan-edge-a",
-          "mac": "aa:c1:ab:7b:c3:59",
+          "mac": "aa:c1:ab:53:ce:83",
           "peer": "a"
         }
       }
@@ -539,13 +633,13 @@
         "a": {
           "node": "edge-b",
           "interface": "eth2",
-          "mac": "aa:c1:ab:89:b8:29",
+          "mac": "aa:c1:ab:53:60:9d",
           "peer": "z"
         },
         "z": {
           "node": "cldt-wan",
           "interface": "wan-edge-b",
-          "mac": "aa:c1:ab:24:6b:ed",
+          "mac": "aa:c1:ab:0d:49:6b",
           "peer": "a"
         }
       }
@@ -555,13 +649,13 @@
         "a": {
           "node": "edge-a",
           "interface": "eth1",
-          "mac": "aa:c1:ab:71:67:ec",
+          "mac": "aa:c1:ab:d5:cf:f3",
           "peer": "z"
         },
         "z": {
           "node": "cldt-cloud-a",
           "interface": "a-edge",
-          "mac": "aa:c1:ab:70:c4:65",
+          "mac": "aa:c1:ab:85:a5:da",
           "peer": "a"
         }
       }
@@ -571,13 +665,13 @@
         "a": {
           "node": "remote1",
           "interface": "eth1",
-          "mac": "aa:c1:ab:74:fd:52",
+          "mac": "aa:c1:ab:0a:1d:ff",
           "peer": "z"
         },
         "z": {
           "node": "cldt-cloud-a",
           "interface": "a-remote1",
-          "mac": "aa:c1:ab:1c:b3:7f",
+          "mac": "aa:c1:ab:4b:32:07",
           "peer": "a"
         }
       }
@@ -587,13 +681,13 @@
         "a": {
           "node": "edge-b",
           "interface": "eth1",
-          "mac": "aa:c1:ab:13:f6:17",
+          "mac": "aa:c1:ab:e3:f3:40",
           "peer": "z"
         },
         "z": {
           "node": "cldt-cloud-b",
           "interface": "b-edge",
-          "mac": "aa:c1:ab:11:66:36",
+          "mac": "aa:c1:ab:cf:fe:66",
           "peer": "a"
         }
       }
@@ -603,13 +697,13 @@
         "a": {
           "node": "remote2",
           "interface": "eth1",
-          "mac": "aa:c1:ab:e4:62:70",
+          "mac": "aa:c1:ab:d2:a8:d8",
           "peer": "z"
         },
         "z": {
           "node": "cldt-cloud-b",
           "interface": "b-remote2",
-          "mac": "aa:c1:ab:e6:0c:da",
+          "mac": "aa:c1:ab:db:b0:88",
           "peer": "a"
         }
       }

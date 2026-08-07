@@ -21,6 +21,10 @@ all:
           ansible_host: 
         clab-cldt-cp:
           ansible_host: 
+        clab-cldt-cp2:
+          ansible_host: 
+        clab-cldt-cp3:
+          ansible_host: 
         clab-cldt-edge-a:
           ansible_host: 
         clab-cldt-edge-b:

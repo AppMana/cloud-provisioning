@@ -27,19 +27,21 @@
 > costs only the direct tunnels it terminated.
 >
 > With three control planes, a control plane is a legitimate victim:
-> stacked etcd keeps quorum at two of three, and the API VIP is held
-> by kube-vip on whichever control plane leads. vip-holder resolves at
-> row start to the node actually holding it, because that death is the
-> strongest claim: an etcd member and the address every kubeconfig
-> names, gone in the same instant. remote-dies turns the question
-> around: the site must not sweep a node that went silent, because
-> silence is what NotReady looks like, and a machine that returns must
-> still be a member.
+> stacked etcd keeps quorum at two of three, and there is no address
+> that moves between nodes to save anyone. Every node holds all three
+> members and balances through its own loopback (site nodes via a
+> static-pod forwarder, remotes via the dialer's balancer), so a
+> member's death must cost nothing but that member. cp is the
+> strongest of them: the init member, first in every upstream list,
+> the address every join bootstrapped through. remote-dies turns the
+> question around: the site must not sweep a node that went silent,
+> because silence is what NotReady looks like, and a machine that
+> returns must still be a member.
 >
 name	endpoints	victim
 relay-dies-with-spare	w1,w2	w1
 spare-dies	w1,w2	w2
 endpoint-dies-under-all	all	w2
-vip-holder-dies	w1,w2	vip-holder
+cp-dies	w1,w2	cp
 cp-follower-dies	w1,w2	cp3
 remote-dies	w1,w2	remote1

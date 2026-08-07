@@ -29,6 +29,16 @@ cp:
     password: 
     platform: linux
     hostname: 
+cp2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+cp3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
 edge-a:
     username: 
     password: 

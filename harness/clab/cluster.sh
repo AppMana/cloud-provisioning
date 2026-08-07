@@ -255,18 +255,23 @@ for n in cp cp2 cp3 w1 w2; do
   k get node "$n" >/dev/null 2>&1 || fail "$n never registered"
 done
 
-echo "--- every kubelet dials its own forwarder ---"
-# The claim the design makes, checked rather than assumed: kubeadm
-# writes kubelet.conf from controlPlaneEndpoint, so every node should
-# depend on its own loopback and none on any single member.
+echo "--- no kubelet depends on another node ---"
+# The claim the design makes, checked rather than assumed. A worker's
+# kubelet must dial its own forwarder, or it inherited a single point
+# of failure from whichever member its join went through. A control
+# plane's kubelet dialing its own API server is kubeadm's own choice
+# and just as good: that server dies only when the node does, which is
+# no cross-node dependency at all.
 for n in cp cp2 cp3 w1 w2; do
   server=$(in_node "$n" sh -c "grep -o 'server: .*' /etc/kubernetes/kubelet.conf" | awk '{print $2}')
-  case "$server" in
-    "https://127.0.0.1:$PROXY_PORT") ;;
-    *) fail "$n's kubelet dials $server, not its own forwarder: that node just inherited a single point of failure" ;;
+  ok=""
+  case "$n" in
+    cp|cp2|cp3) [ "$server" = "https://127.0.0.1:$PROXY_PORT" ] || [ "$server" = "https://$(cp_addr "$n"):6443" ] && ok=1 ;;
+    *)          [ "$server" = "https://127.0.0.1:$PROXY_PORT" ] && ok=1 ;;
   esac
+  [ -n "$ok" ] || fail "$n's kubelet dials $server, a dependency on another node's survival"
+  echo "  $n $server"
 done
-echo "  all five at https://127.0.0.1:$PROXY_PORT"
 
 echo "--- every node registered by its segment address ---"
 k get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}' |

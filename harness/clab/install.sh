@@ -142,7 +142,22 @@ echo "--- the chart ---"
 # cluster. The host cannot reach the API server and should not be able
 # to. helm is carried in rather than downloaded, because the site has no
 # route to anywhere to download it from.
-docker cp "$(command -v helm)" "$(c bastion)":/usr/local/bin/helm
+# helm reads the kubeconfig's server, which names the loopback
+# forwarder no one serves on the bastion; like kubectl (see
+# cluster.sh), it gets a wrapper that picks a live control plane per
+# invocation. The kubeconfig's credentials and CA still apply, and the
+# members' real addresses are in every server certificate's SANs.
+docker cp "$(command -v helm)" "$(c bastion)":/usr/local/bin/helm.real
+write_to bastion /usr/local/bin/helm <<EOF
+#!/bin/sh
+for s in $LAN.10 $LAN.13 $LAN.14; do
+  if curl -ksm 2 -o /dev/null "https://\$s:6443/livez" 2>/dev/null; then
+    exec /usr/local/bin/helm.real --kube-apiserver="https://\$s:6443" "\$@"
+  fi
+done
+exec /usr/local/bin/helm.real "\$@"
+EOF
+in_node bastion chmod 0755 /usr/local/bin/helm
 docker cp "$REPO_DIR/charts/cloud-provisioning" "$(c bastion)":/tmp/chart
 in_node bastion helm upgrade --install cloud-provisioning /tmp/chart \
   --namespace "$NS" --create-namespace --wait --timeout 6m \

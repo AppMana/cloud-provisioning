@@ -209,3 +209,46 @@ func TestPodCIDRsCollectsEveryEnabledCalicoPool(t *testing.T) {
 		}
 	}
 }
+
+// The address a joining node should dial is the cluster's own stated
+// endpoint, not whichever control plane happens to be listed first.
+// cluster-info in kube-public exists exactly to answer this question
+// (kubeadm token joins bootstrap from it), and on an HA cluster it
+// names the VIP that outlives any one control plane. Deriving the
+// join address from the endpoint list instead pins every remote to
+// one specific member, and its death strands them with quorum intact.
+func TestAPIEndpointPrefersTheClusterInfoServer(t *testing.T) {
+	clusterInfo := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-info", Namespace: "kube-public"},
+		Data: map[string]string{
+			"kubeconfig": `apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority-data: LS0t
+    server: https://10.10.0.100:6443
+  name: ""
+`,
+		},
+	}
+	got, err := APIEndpoint(context.Background(), newClient(clusterInfo))
+	if err != nil {
+		t.Fatalf("APIEndpoint: %v", err)
+	}
+	if got != "https://10.10.0.100:6443" {
+		t.Fatalf("got %q, want the cluster-info server https://10.10.0.100:6443", got)
+	}
+}
+
+// No cluster-info is an answer, not an error: the caller falls back
+// to the endpoint list, which is correct on the clusters that have no
+// stable endpoint to prefer.
+func TestAPIEndpointAbsentIsEmptyNotError(t *testing.T) {
+	got, err := APIEndpoint(context.Background(), newClient())
+	if err != nil {
+		t.Fatalf("APIEndpoint on a cluster without cluster-info: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("got %q, want empty", got)
+	}
+}

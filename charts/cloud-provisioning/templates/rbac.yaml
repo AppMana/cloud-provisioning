@@ -149,29 +149,41 @@ rules:
     resources: ["secrets"]
     verbs: ["get", "create", "patch"]
   # The dialer Role's resourceNames are maintained at runtime
-  # (ensureDialerRole derives them from the machine list). Update is
-  # name-scoped; create is the fallback for an install missing the
-  # Role, and cannot be name-scoped because RBAC evaluates create
-  # before a name exists. Kubernetes' escalation check still applies:
-  # this account can only grant what it holds, the secrets access
+  # (ensureDialerRole derives them from the machine list): one Role,
+  # by name, and nothing else in the RBAC group. The chart renders the
+  # Role's floor, so the controller never creates one, and it cannot
+  # touch bindings or its own grants: the dialer's scope is maintained
+  # by a different identity than the one it confines, and this
+  # identity's scope is maintained by nobody but the chart.
+  # Kubernetes' escalation check bounds the mechanism anyway: an
+  # account can only ever grant what it holds, the secrets access
   # above.
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["roles"]
     verbs: ["get", "update"]
     resourceNames:
       - {{ include "cloud-provisioning.name" . }}
-  - apiGroups: ["rbac.authorization.k8s.io"]
-    resources: ["roles"]
-    verbs: ["create"]
+  # The two dialer DaemonSets, which this operator creates and owns at
+  # runtime. Get/update are pinned to their names; create cannot be,
+  # because RBAC evaluates create before the object has a name.
   - apiGroups: ["apps"]
     resources: ["daemonsets"]
-    verbs: ["get", "create", "update"]
-  # Its own Deployment: everything the controller creates at runtime is
-  # owned by it, so uninstalling the release collects those objects
-  # instead of leaving DaemonSets running with nothing behind them.
+    verbs: ["get", "update"]
+    resourceNames:
+      - {{ include "cloud-provisioning.name" . }}-dialer
+      - {{ include "cloud-provisioning.name" . }}-dialer-remote
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["create"]
+  # Its own Deployment, by name: everything the controller creates at
+  # runtime is owned by it, so uninstalling the release collects those
+  # objects instead of leaving DaemonSets running with nothing behind
+  # them.
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get"]
+    resourceNames:
+      - {{ include "cloud-provisioning.controllerName" . }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

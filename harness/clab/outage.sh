@@ -190,6 +190,22 @@ EOF
       in_node "$victim" ip addr replace "$addr" dev eth1 \
         || { echo "  restore: could not address eth1" >&2; return 1; }
       in_node "$victim" ip link set eth1 up
+      # The pair's host side can be left down: a re-plumb that races
+      # the old pair's deletion gets a generated name instead of the
+      # requested one, and nothing raises it. Carrier is part of the
+      # NIC a platform provides, so find the peer by ifindex, the one
+      # identity a veth cannot lose, and raise it. Measured: cp came
+      # back addressed, routed, UP, and NO-CARRIER, and its etcd
+      # called elections into a wire that was not plugged in.
+      peer_idx=$(in_node "$victim" cat /sys/class/net/eth1/iflink 2>/dev/null | tr -d '\r')
+      if [ -n "$peer_idx" ]; then
+        peer_if=$(ip -o link | awk -F': ' -v i="$peer_idx" '$1==i {print $2}' | cut -d@ -f1)
+        [ -n "$peer_if" ] && sudo ip link set "$peer_if" up 2>/dev/null
+      fi
+      if ! in_node "$victim" ip link show eth1 2>/dev/null | grep -q "LOWER_UP"; then
+        echo "  restore: eth1 has no carrier, the host-side peer is not up" >&2
+        return 1
+      fi
       in_node "$victim" ip route replace default via "$gw" dev eth1 \
         || { echo "  restore: could not restore the default route" >&2; return 1; }
       ;;

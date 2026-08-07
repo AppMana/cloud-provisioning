@@ -411,6 +411,109 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 	return append(peers, remotes...), nil
 }
 
+// TransitSpec is how a site node with no tunnel of its own reaches the
+// remotes: every remote prefix, via the node that relays for the rest
+// of the site.
+type TransitSpec struct {
+	// Via is the relay's own address: the next hop for everything
+	// below, reachable over the site's ordinary network.
+	Via string
+	// Hosts are the remote node addresses, one host each.
+	Hosts []string
+	// Blocks are the remote pod blocks.
+	Blocks []string
+}
+
+// SiteTransit derives the transit a no-tunnel site node installs for
+// itself, from the same data and the same election as RemotePeers.
+//
+// The relay it picks is, by construction, the peer whose entry carries
+// this node's own prefixes in every remote's accept list, so its
+// sources are accepted at the far end. Having a protocol carry this
+// choice instead was tried, and left windows in which the choice was
+// in flight while the routes it replaced were already gone; a shared
+// derivation has no window.
+//
+// Returns nil when no published endpoint exists: there is nothing to
+// carry the traffic, and no route is better than a guessed one.
+func SiteTransit(data map[string][]byte) (*TransitSpec, error) {
+	type candidate struct {
+		name       string
+		tunnelAddr string
+	}
+	var nodes []candidate
+	for key := range data {
+		if !strings.HasPrefix(key, NodePublicKeyPrefix) {
+			continue
+		}
+		name := strings.TrimPrefix(key, NodePublicKeyPrefix)
+		if strings.TrimSpace(string(data[key])) == "" {
+			continue
+		}
+		addr := strings.TrimSpace(string(data[NodeTunnelAddressPrefix+name]))
+		if addr == "" {
+			continue
+		}
+		nodes = append(nodes, candidate{name: name, tunnelAddr: strings.SplitN(addr, "/", 2)[0]})
+	}
+	if len(nodes) == 0 {
+		return nil, nil
+	}
+	sort.Slice(nodes, func(i, j int) bool { return LessIP(nodes[i].tunnelAddr, nodes[j].tunnelAddr) })
+	relay := nodes[0]
+
+	// The relay's reachable address. An owning relay publishes it under
+	// its node entry; a retained relay's addresses have already moved
+	// to the site entry, and it is still the relay and still reachable.
+	via := ""
+	if addrs := SplitList(string(data[NodeAddressesPrefix+relay.name])); len(addrs) > 0 {
+		via = addrs[0]
+	} else if addrs := SplitList(string(data[SiteAddressesPrefix+relay.name])); len(addrs) > 0 {
+		via = addrs[0]
+	}
+	if via == "" {
+		return nil, nil
+	}
+
+	transit := &TransitSpec{Via: via}
+	seen := map[string]bool{}
+	for key := range data {
+		if !strings.HasPrefix(key, PeerPublicKeyPrefix) {
+			continue
+		}
+		name := strings.TrimPrefix(key, PeerPublicKeyPrefix)
+		var hosts []string
+		if raw, ok := data[PeerRouteHostsPrefix+name]; ok {
+			hosts = SplitList(string(raw))
+		} else if raw, ok := data[PeerRouteHostPrefix+name]; ok {
+			hosts = []string{strings.TrimSpace(string(raw))}
+		}
+		hostSet := map[string]bool{}
+		for _, h := range hosts {
+			hostSet[h] = true
+			if !seen[h] {
+				seen[h] = true
+				transit.Hosts = append(transit.Hosts, h)
+			}
+		}
+		// Whatever the peer is permitted beyond its own addresses is
+		// the pod space behind it.
+		for _, allowed := range SplitList(string(data[PeerAllowedIPsPrefix+name])) {
+			host := strings.SplitN(allowed, "/", 2)[0]
+			if hostSet[host] {
+				continue
+			}
+			if !seen[allowed] {
+				seen[allowed] = true
+				transit.Blocks = append(transit.Blocks, allowed)
+			}
+		}
+	}
+	sort.Strings(transit.Hosts)
+	sort.Strings(transit.Blocks)
+	return transit, nil
+}
+
 // HostSysctlNet is where a node's real /proc/sys/net is mounted into
 // the dialer. A container runtime mounts /proc/sys read-only and
 // NET_ADMIN does not lift that, so a setting the dialer must make

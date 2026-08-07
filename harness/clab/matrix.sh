@@ -87,8 +87,7 @@ while IFS=$'\t' read -r name endpoints remotes <&3; do
     --set dialerImage.repository=cldt-dialer --set dialerImage.tag=e2e \
     --set-string tunnel.endpoints="${selector//,/\\,}" \
     --set joinProvider=kubeadm \
-    --set transit.bgpPort=1790 \
-    --set dialerBinary.amd64.url="file:///opt/dialer-dist/wg-dialer-linux-amd64" \
+      --set dialerBinary.amd64.url="file:///opt/dialer-dist/wg-dialer-linux-amd64" \
     --set dialerBinary.amd64.sha256="$BIN_SHA" >/dev/null 2>&1 \
     || { echo "  FAIL could not place the tunnels"; failed=$((failed+1)); continue; }
 

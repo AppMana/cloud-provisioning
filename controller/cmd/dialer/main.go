@@ -938,9 +938,10 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			if _, err := netlink.LinkByName(cfg.iface); err == nil {
 				fmt.Fprintf(os.Stderr, "removing %s: this node is no longer a published tunnel endpoint\n", cfg.iface)
 				removeDevice(cfg.iface)
-				removeRouteRule(cfg.routeTable)
 			}
-			return fmt.Errorf("no %s%s in %s/%s yet (node not allocated a tunnel address)", tunnel.NodeTunnelAddressPrefix, cfg.nodeName, cfg.secretNamespace, cfg.secretName)
+			// Not an endpoint, so this node's job is the other one:
+			// reach the remotes through the node that relays for it.
+			return reconcileSiteTransit(cfg, secret)
 		}
 		peers, err = loadPeersFromSecret(secret)
 		if err != nil {
@@ -1509,6 +1510,91 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet) err
 				return fmt.Errorf("moving route %s out of the main table: %w", route.Dst, err)
 			}
 			fmt.Fprintf(os.Stderr, "moved %s out of the main table: the dialer's routes are not the network's to learn\n", route.Dst)
+		}
+	}
+	return nil
+}
+
+// reconcileSiteTransit is the dialer's whole job on a site node that
+// terminates no tunnel: reach the remotes through the node that relays
+// for it.
+//
+// The next hop is derived from the same data and the same election the
+// render uses (see tunnel.SiteTransit), so it is, by construction, the
+// peer whose entry carries this node's own prefixes in every remote's
+// accept list. A routing protocol carried this before, and its windows
+// were measured: the choice was in flight while the routes it replaced
+// were already gone.
+func reconcileSiteTransit(cfg config, secret *corev1.Secret) error {
+	transit, err := tunnel.SiteTransit(secret.Data)
+	if err != nil {
+		return err
+	}
+	if err := ensureRouteRule(cfg.routeTable); err != nil {
+		return fmt.Errorf("ensuring the rule for table %d: %w", cfg.routeTable, err)
+	}
+	desired := map[string]bool{}
+	if transit != nil {
+		via := net.ParseIP(transit.Via)
+		if via == nil {
+			return fmt.Errorf("transit next hop %q is not an address", transit.Via)
+		}
+		// Never via ourselves: a relay routes remotes through its own
+		// tunnel, not through a route that points back at it.
+		self := false
+		if addrs, err := net.InterfaceAddrs(); err == nil {
+			for _, a := range addrs {
+				if ipNet, ok := a.(*net.IPNet); ok && ipNet.IP.Equal(via) {
+					self = true
+				}
+			}
+		}
+		if !self {
+			var dsts []net.IPNet
+			for _, h := range transit.Hosts {
+				ipNet, err := parseHostRoute(h)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "not routing one transit host: %v\n", err)
+					continue
+				}
+				dsts = append(dsts, ipNet)
+			}
+			for _, b := range transit.Blocks {
+				_, ipNet, err := net.ParseCIDR(strings.TrimSpace(b))
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "not routing one transit block %q: %v\n", b, err)
+					continue
+				}
+				dsts = append(dsts, *ipNet)
+			}
+			for i := range dsts {
+				dst := dsts[i]
+				desired[dst.String()] = true
+				route := &netlink.Route{Dst: &dst, Gw: via, Table: cfg.routeTable}
+				if err := netlink.RouteReplace(route); err != nil {
+					fmt.Fprintf(os.Stderr, "no transit route for %s via %s: %v\n", dst.String(), via, err)
+				}
+			}
+		}
+	}
+	// Prune what is no longer wanted. Everything in this table is the
+	// dialer's own; on a node with no tunnel that is exactly the
+	// transit set.
+	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
+		existing, err := netlink.RouteListFiltered(family,
+			&netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
+		if err != nil {
+			return fmt.Errorf("listing table %d: %w", cfg.routeTable, err)
+		}
+		for i := range existing {
+			route := existing[i]
+			if route.Dst == nil || desired[route.Dst.String()] {
+				continue
+			}
+			if err := netlink.RouteDel(&route); err != nil {
+				return fmt.Errorf("removing stale transit route %s: %w", route.Dst, err)
+			}
+			fmt.Fprintf(os.Stderr, "removed stale transit route %s\n", route.Dst)
 		}
 	}
 	return nil

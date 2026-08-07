@@ -402,3 +402,85 @@ func TestRemotePeers_AControlPlaneEndpointOwnsTheAPIAddressOnce(t *testing.T) {
 		}
 	}
 }
+
+// A site node with no tunnel reaches the remotes through the node that
+// relays for it, and it must pick that node the way the render picks
+// it, from the same data, or the two disagree and traffic dies at an
+// accept list. This is derivation instead of convergence: no protocol
+// carries the choice, so there is no window in which the choice is in
+// flight.
+func TestSiteTransit_FollowsTheRenderElection(t *testing.T) {
+	data := map[string][]byte{
+		// w1 is the relay: lowest tunnel address with a published key.
+		"node-public-key-w1":     []byte("W1KEY"),
+		"node-tunnel-address-w1": []byte("10.100.0.17/24"),
+		"node-addresses-w1":      []byte("10.10.0.11"),
+		"node-public-key-w2":     []byte("W2KEY"),
+		"node-tunnel-address-w2": []byte("10.100.0.22/24"),
+		"node-addresses-w2":      []byte("10.10.0.12"),
+		// An allocation whose key has not landed is not a relay.
+		"node-tunnel-address-early": []byte("10.100.0.5/24"),
+
+		"peer-public-key-remote1":  []byte("R1KEY"),
+		"peer-route-hosts-remote1": []byte("10.100.0.128,203.0.113.10"),
+		"peer-allowed-ips-remote1": []byte("10.100.0.128/32,203.0.113.10/32,10.244.159.0/26"),
+	}
+	transit, err := SiteTransit(data)
+	if err != nil {
+		t.Fatalf("SiteTransit: %v", err)
+	}
+	if transit == nil {
+		t.Fatal("no transit derived, so a node with no tunnel has no path to any remote")
+	}
+	if transit.Via != "10.10.0.11" {
+		t.Errorf("transit via %q, want the relay w1's node address 10.10.0.11: any other choice is a peer the remotes will not accept relayed sources from", transit.Via)
+	}
+	wantHosts := map[string]bool{"10.100.0.128": true, "203.0.113.10": true}
+	for _, h := range transit.Hosts {
+		delete(wantHosts, h)
+	}
+	if len(wantHosts) != 0 {
+		t.Errorf("transit misses remote hosts %v", wantHosts)
+	}
+	if len(transit.Blocks) != 1 || transit.Blocks[0] != "10.244.159.0/26" {
+		t.Errorf("transit blocks = %v, want the remote pod block alone", transit.Blocks)
+	}
+}
+
+// A retained relay's addresses have already moved to the site entries.
+// It is still the relay, and it is still reachable; the address is
+// simply published under the other family.
+func TestSiteTransit_ARetainedRelayIsStillReachable(t *testing.T) {
+	data := map[string][]byte{
+		"node-public-key-w1":     []byte("W1KEY"),
+		"node-tunnel-address-w1": []byte("10.100.0.17/24"),
+		"site-addresses-w1":      []byte("10.10.0.11"),
+
+		"peer-public-key-remote1":  []byte("R1KEY"),
+		"peer-route-hosts-remote1": []byte("10.100.0.128"),
+		"peer-allowed-ips-remote1": []byte("10.100.0.128/32,10.244.159.0/26"),
+	}
+	transit, err := SiteTransit(data)
+	if err != nil {
+		t.Fatalf("SiteTransit: %v", err)
+	}
+	if transit == nil || transit.Via != "10.10.0.11" {
+		t.Fatalf("transit = %+v, want via 10.10.0.11 from the site entry", transit)
+	}
+}
+
+// No relay, no transit: the caller reports nothing rather than
+// guessing a next hop.
+func TestSiteTransit_NoRelayMeansNoTransit(t *testing.T) {
+	transit, err := SiteTransit(map[string][]byte{
+		"node-tunnel-address-early": []byte("10.100.0.5/24"),
+		"peer-public-key-remote1":   []byte("R1KEY"),
+		"peer-route-hosts-remote1":  []byte("10.100.0.128"),
+	})
+	if err != nil {
+		t.Fatalf("SiteTransit: %v", err)
+	}
+	if transit != nil {
+		t.Fatalf("transit = %+v, want none: there is no endpoint to carry it", transit)
+	}
+}

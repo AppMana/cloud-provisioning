@@ -207,12 +207,18 @@ type PeersFileDoc struct {
 	PrivateKey   string     `json:"privateKey"`
 	LocalAddress string     `json:"localAddress"`
 	Peers        []PeerSpec `json:"peers"`
+	// APIServers is every control plane's host:port, for the node's
+	// own loopback balancer: a worker holds all of them and fails over
+	// by its own evidence, so no single member's death strands it and
+	// no address has to move between nodes to save it.
+	APIServers []string `json:"apiServers,omitempty"`
 }
 
 // PeerListDoc is the adoption-Secret shape (CloudPeersKey): the peer
 // list only, no identity.
 type PeerListDoc struct {
-	Peers []PeerSpec `json:"peers"`
+	Peers      []PeerSpec `json:"peers"`
+	APIServers []string   `json:"apiServers,omitempty"`
 }
 
 // InterfaceName derives the unique per-mesh WireGuard interface name:

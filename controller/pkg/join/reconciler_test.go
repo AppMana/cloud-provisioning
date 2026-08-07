@@ -353,6 +353,13 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 	if strings.Count(rendered, "10.101.0.1/32") != 2 {
 		t.Errorf("API VIP must ride exactly ONE local peer, as its grant plus its transit declaration, got %d occurrences", strings.Count(rendered, "10.101.0.1/32"))
 	}
+	// The baked doc also carries the control planes as dialable
+	// endpoints, for the node's loopback balancer; the port comes from
+	// the join provider's own apiEndpoint (absent here, so Kubernetes'
+	// 6443), never restated as configuration.
+	if !strings.Contains(rendered, `"apiServers":["10.101.0.1:6443"]`) {
+		t.Errorf("baked peers.json carries no dialable API servers for the loopback balancer; rendered: %s", rendered)
+	}
 
 	updatedDialerSecret := &corev1.Secret{}
 	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "wg-dialer", Name: "wg-dialer-peer"}, updatedDialerSecret); err != nil {

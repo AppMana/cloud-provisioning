@@ -1,11 +1,13 @@
 package join
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"text/template"
 )
 
 var templateActions = regexp.MustCompile(`{{.*?}}`)
@@ -48,7 +50,12 @@ func TestUnitExecStartPassesOnlyFlags(t *testing.T) {
 }
 
 // execStartCommands returns each ExecStart= value with its line
-// continuations joined, as systemd would assemble them.
+// continuations joined, as systemd would assemble them. Template
+// control lines ({{- if }}, {{- else }}, {{- end }}) render to
+// nothing, so the joiner skips them the way the renderer erases them;
+// what remains is what systemd sees in at least one rendering.
+var controlLine = regexp.MustCompile(`^\{\{-?\s*(if|else|end)\b`)
+
 func execStartCommands(tmpl string) []string {
 	var cmds []string
 	lines := strings.Split(tmpl, "\n")
@@ -59,9 +66,13 @@ func execStartCommands(tmpl string) []string {
 		}
 		cmd := strings.TrimPrefix(line, "ExecStart=")
 		for strings.HasSuffix(strings.TrimSpace(cmd), `\`) && i+1 < len(lines) {
-			cmd = strings.TrimSuffix(strings.TrimSpace(cmd), `\`)
 			i++
-			cmd += " " + strings.TrimSpace(lines[i])
+			next := strings.TrimSpace(lines[i])
+			if controlLine.MatchString(next) {
+				continue
+			}
+			cmd = strings.TrimSuffix(strings.TrimSpace(cmd), `\`)
+			cmd += " " + next
 		}
 		cmds = append(cmds, cmd)
 	}
@@ -84,4 +95,78 @@ func TestPatternsWriteTheMachineNameForAdoption(t *testing.T) {
 			t.Errorf("%s writes no machine-name file, so the DaemonSet cannot resolve this machine's adoption Secret", filepath.Base(path))
 		}
 	}
+}
+
+// The kubeadm pattern joins through the node's own loopback balancer
+// and gates on it: one probe proves the tunnel, the balancer, and a
+// live control plane. Joining a specific control plane's address
+// instead pins kubelet to that member forever (kubeadm writes
+// kubelet.conf from the join endpoint), and its death then strands
+// the node with quorum intact.
+func TestKubeadmJoinsThroughTheLoopbackBalancer(t *testing.T) {
+	rendered := renderKubeadmPattern(t, 7445)
+	if !strings.Contains(rendered, "kubeadm join 127.0.0.1:7445") {
+		t.Error("the join does not dial the loopback balancer, so kubelet is pinned to one control plane")
+	}
+	if !strings.Contains(rendered, "https://127.0.0.1:7445/livez") {
+		t.Error("the gate does not probe the loopback balancer, so a join can start before the balancer serves")
+	}
+	if !strings.Contains(rendered, "--api-proxy-port=7445") {
+		t.Error("the host unit does not serve the balancer, and nothing else may: kubelet depends on it before any pod can run")
+	}
+}
+
+// The balancer is per-distribution, not a constant of this operator:
+// k3s and RKE2 agents carry their own client-side balancer, Talos has
+// KubePrism, k0s has nllb, and only kubeadm-family clusters have
+// nothing. Port zero is how a setup that balances for itself says so,
+// and the pattern must then join the endpoint directly, exactly as it
+// did before the balancer existed.
+func TestKubeadmWithoutTheBalancerJoinsTheEndpointDirectly(t *testing.T) {
+	rendered := renderKubeadmPattern(t, 0)
+	if strings.Contains(rendered, "--api-proxy-port") {
+		t.Error("port zero still passes --api-proxy-port, so the unit serves a balancer nobody asked for")
+	}
+	if !strings.Contains(rendered, "kubeadm join 10.101.0.1:6443") {
+		t.Error("port zero does not join the endpoint directly")
+	}
+	if !strings.Contains(rendered, "https://10.101.0.1:6443/livez") {
+		t.Error("port zero does not gate on the endpoint directly")
+	}
+	if strings.Contains(rendered, "127.0.0.1:0") {
+		t.Error("a literal port zero leaked into the render")
+	}
+}
+
+func renderKubeadmPattern(t *testing.T, proxyPort int) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "join-patterns", "kubeadm-worker.cloud-config.tmpl"))
+	if err != nil {
+		t.Fatalf("reading the kubeadm pattern: %v", err)
+	}
+	tmpl, err := template.New("kubeadm").Option("missingkey=error").Parse(string(raw))
+	if err != nil {
+		t.Fatalf("parsing the kubeadm pattern: %v", err)
+	}
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, map[string]any{
+		"peersFileJSON":           "{}",
+		"machineName":             "remote1",
+		"interfaceName":           "cldt0",
+		"wireguardListenPort":     "51820",
+		"apiProxyPort":            proxyPort,
+		"apiEndpoint":             "10.101.0.1:6443",
+		"joinEndpoint":            "10.101.0.1:6443",
+		"joinToken":               "t.t",
+		"caCertHash":              "sha256:x",
+		"kubeletExtraArgs":        "",
+		"dialerBinaryURLArm64":    "https://example.com/a",
+		"dialerBinarySHA256Arm64": "a",
+		"dialerBinaryURLAmd64":    "https://example.com/b",
+		"dialerBinarySHA256Amd64": "b",
+	})
+	if err != nil {
+		t.Fatalf("rendering the kubeadm pattern: %v", err)
+	}
+	return buf.String()
 }

@@ -107,7 +107,10 @@ func TestCachedPeersBeatTheBootstrapFile(t *testing.T) {
 		t.Error("no cache yet must be an error, so a node that has never read the cluster falls back to its bootstrap file")
 	}
 
-	want := []tunnel.PeerSpec{{PublicKey: "k", RouteHosts: []string{"10.10.0.10"}, WGAllowedIPs: []string{"10.10.0.10/32"}}}
+	want := tunnel.PeerListDoc{
+		Peers:      []tunnel.PeerSpec{{PublicKey: "k", RouteHosts: []string{"10.10.0.10"}, WGAllowedIPs: []string{"10.10.0.10/32"}}},
+		APIServers: []string{"10.10.0.10:6443", "10.10.0.13:6443", "10.10.0.14:6443"},
+	}
 	if err := writeCachedPeers(cachePath(cfg), want); err != nil {
 		t.Fatalf("writeCachedPeers: %v", err)
 	}
@@ -115,8 +118,14 @@ func TestCachedPeersBeatTheBootstrapFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("readCachedPeers: %v", err)
 	}
-	if len(got) != 1 || got[0].PublicKey != "k" || len(got[0].RouteHosts) != 1 || got[0].RouteHosts[0] != "10.10.0.10" {
-		t.Errorf("cached peers round-tripped as %#v, want the route hosts that keep the API reachable", got)
+	if len(got.Peers) != 1 || got.Peers[0].PublicKey != "k" || len(got.Peers[0].RouteHosts) != 1 || got.Peers[0].RouteHosts[0] != "10.10.0.10" {
+		t.Errorf("cached peers round-tripped as %#v, want the route hosts that keep the API reachable", got.Peers)
+	}
+	// The API server list rides the same cache: it is how the pod's
+	// cluster reads reach the host unit that serves the loopback
+	// balancer, which has no cluster access of its own.
+	if len(got.APIServers) != 3 || got.APIServers[1] != "10.10.0.13:6443" {
+		t.Errorf("cached API servers round-tripped as %v, want all three", got.APIServers)
 	}
 }
 

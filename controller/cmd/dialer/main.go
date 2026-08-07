@@ -120,6 +120,21 @@ type config struct {
 	// the fleet is bumping one image digest rather than a download
 	// host, a re-render, or a per-node binary swap.
 	installHostBinary string
+	// apiProxyPort, when set, serves the node-local API balancer on
+	// 127.0.0.1: the loopback address kubelet and the join dial so
+	// that no single control plane's death strands this node. Host
+	// unit only, never the pod: kubelet depends on it before any pod
+	// can run.
+	apiProxyPort int
+}
+
+// nodeAPIProxy is the loopback balancer, when this dialer serves one.
+var nodeAPIProxy *apiProxy
+
+func setAPIProxyBackends(addrs []string) {
+	if nodeAPIProxy != nil && len(addrs) > 0 {
+		nodeAPIProxy.SetBackends(addrs)
+	}
 }
 
 func main() {
@@ -142,6 +157,7 @@ func main() {
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 30*time.Second, "how often to re-read the peer source and re-apply")
 	flag.IntVar(&cfg.routeTable, "route-table", 517, "routing table for the dialer's routes, consulted by an ip rule of the same priority. Not main: a CNI router that learns alien routes from main would re-announce them as this node's, and every node with a tunnel would claim the whole mesh")
 	flag.StringVar(&cfg.transitMasqueradeSource, "transit-masquerade-source", "", "optional tunnel-subnet CIDR: enable forwarding + masquerade for tunnel-sourced traffic leaving this node toward cluster addresses that have no tunnel (transit role)")
+	flag.IntVar(&cfg.apiProxyPort, "api-proxy-port", 0, "serve a node-local API balancer on 127.0.0.1:<port>, forwarding each connection to the first control plane that answers (the peer list carries their addresses). 0 disables it. Host unit only: kubelet depends on this before any pod can run")
 	flag.StringVar(&cfg.installHostBinary, "install-host-binary", "", "optional host path to keep equal to this process's own executable (atomic replace, only when the digest differs): the post-join upgrade channel: the container image carries the binary, so the node's systemd unit converges onto it without any download host")
 	flag.Parse()
 
@@ -202,6 +218,14 @@ func main() {
 		fatal("unable to open wgctrl: %v", err)
 	}
 	defer wg.Close()
+
+	if cfg.apiProxyPort > 0 {
+		nodeAPIProxy, err = newAPIProxy(fmt.Sprintf("127.0.0.1:%d", cfg.apiProxyPort))
+		if err != nil {
+			fatal("%v", err)
+		}
+		defer nodeAPIProxy.Close()
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -856,11 +880,11 @@ func cachePath(cfg config) string {
 	return filepath.Join(filepath.Dir(cfg.peersFile), cfg.iface+".peers-cache.json")
 }
 
-func writeCachedPeers(path string, peers []tunnel.PeerSpec) error {
+func writeCachedPeers(path string, doc tunnel.PeerListDoc) error {
 	if path == "" {
 		return nil
 	}
-	raw, err := json.Marshal(tunnel.PeerListDoc{Peers: peers})
+	raw, err := json.Marshal(doc)
 	if err != nil {
 		return err
 	}
@@ -875,19 +899,25 @@ func writeCachedPeers(path string, peers []tunnel.PeerSpec) error {
 // that is missing or unreadable is not an error worth failing on: it
 // only means this node has never completed a read, which is exactly
 // when the bootstrap file is the right answer.
-func readCachedPeers(path string) ([]tunnel.PeerSpec, error) {
+//
+// The bootstrap unit reads it too, though it never writes it: the
+// adopting pod is the one with cluster access, and this file is how
+// what it learned (the API servers above all) reaches the unit that
+// serves the node's loopback balancer without any cluster access of
+// its own.
+func readCachedPeers(path string) (tunnel.PeerListDoc, error) {
+	var doc tunnel.PeerListDoc
 	if path == "" {
-		return nil, os.ErrNotExist
+		return doc, os.ErrNotExist
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return doc, err
 	}
-	var doc tunnel.PeerListDoc
 	if err := json.Unmarshal(raw, &doc); err != nil {
-		return nil, err
+		return doc, err
 	}
-	return doc.Peers, nil
+	return doc, nil
 }
 
 // nodeStillPublished reports whether this node is currently a tunnel
@@ -1058,6 +1088,18 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		localAddress = doc.LocalAddress
 		peers = doc.Peers
 
+		// The loopback balancer's backends, freshest source first: the
+		// cache if the adopting pod has ever written one, the bootstrap
+		// file's snapshot otherwise. Refreshed before the interface
+		// claim arbitration below, because the standing-off unit
+		// returns from there and it is exactly the process serving the
+		// proxy: its backends must not freeze at boot.
+		apiServers := doc.APIServers
+		if cached, cerr := readCachedPeers(cachePath(cfg)); cerr == nil && len(cached.APIServers) > 0 {
+			apiServers = cached.APIServers
+		}
+		setAPIProxyBackends(apiServers)
+
 		// Adoption: once the override Secret is readable and carries a
 		// peer list, it supersedes the file's (bootstrap-era) peers.
 		// The file remains the identity source and the fallback floor.
@@ -1079,7 +1121,8 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 					}
 					if len(overlay.Peers) > 0 {
 						peers = overlay.Peers
-						if err := writeCachedPeers(cachePath(cfg), overlay.Peers); err != nil {
+						setAPIProxyBackends(overlay.APIServers)
+						if err := writeCachedPeers(cachePath(cfg), overlay); err != nil {
 							fmt.Fprintf(os.Stderr, "could not cache the peer list (a later API outage will cost more than it should): %v\n", err)
 						}
 						// Acknowledged at the end of the pass, once
@@ -1104,8 +1147,9 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 				// better answer to "the API server is briefly gone": it
 				// was true recently, and it keeps the path that would let
 				// it become true again.
-				if cached, cerr := readCachedPeers(cachePath(cfg)); cerr == nil && len(cached) > 0 {
-					peers = cached
+				if cached, cerr := readCachedPeers(cachePath(cfg)); cerr == nil && len(cached.Peers) > 0 {
+					peers = cached.Peers
+					setAPIProxyBackends(cached.APIServers)
 					fmt.Fprintf(os.Stderr, "peer override secret not readable (%v); holding the last list read from the cluster\n", err)
 				} else {
 					fmt.Fprintf(os.Stderr, "peer override secret not readable yet (%v); using %s\n", err, cfg.peersFile)

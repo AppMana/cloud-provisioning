@@ -104,6 +104,11 @@ type Reconciler struct {
 	APIVIP            string
 	KubeletExtraArgs  string
 	SSHAuthorizedKeys []string
+	// APIProxyPort is where the remote's own loopback API balancer
+	// listens (the dialer host unit serves it): the join gates on it
+	// and kubelet keeps dialing it, so the node depends on the set of
+	// control planes rather than any one of them.
+	APIProxyPort int
 
 	// WireGuardAddress is the base tunnel address (e.g.
 	// "10.100.0.2/24"). The first cloud Machine gets exactly this;
@@ -263,18 +268,35 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{RequeueAfter: crdRecheckInterval}, nil
 	}
 
+	joinValues, err := r.Join.JoinValues(ctx)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("getting cluster join values: %w", err)
+	}
+
+	// The control planes as dialable host:port, for the node's own
+	// loopback balancer. The hosts are the mesh's api-servers record
+	// (plain addresses, because they double as route hosts); the port
+	// is the one the join itself dials, read from the provider's
+	// apiEndpoint value rather than restated as configuration.
+	apiPort := "6443"
+	if ep, ok := joinValues["apiEndpoint"].(string); ok {
+		if _, p, err := net.SplitHostPort(ep); err == nil && p != "" {
+			apiPort = p
+		}
+	}
+	var apiServerEndpoints []string
+	for _, host := range r.apiServers(dialerSecret) {
+		apiServerEndpoints = append(apiServerEndpoints, net.JoinHostPort(host, apiPort))
+	}
+
 	peersFileJSON, err := json.Marshal(tunnel.PeersFileDoc{
 		PrivateKey:   cloudPriv.String(),
 		LocalAddress: cloudWGAddress,
 		Peers:        peers,
+		APIServers:   apiServerEndpoints,
 	})
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("marshaling cloud-side peers file: %w", err)
-	}
-
-	joinValues, err := r.Join.JoinValues(ctx)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("getting cluster join values: %w", err)
 	}
 	infraValues, err := infra.InfraValues(ctx, infraMachine)
 	if err != nil {
@@ -288,6 +310,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	values := map[string]any{
 		"sshAuthorizedKeys":       r.SSHAuthorizedKeys,
 		"apiVIP":                  r.APIVIP,
+		"apiProxyPort":            r.APIProxyPort,
 		"kubeletExtraArgs":        r.KubeletExtraArgs,
 		"wireguardAddress":        cloudWGAddress,
 		"wireguardListenPort":     r.WireGuardListenPort,

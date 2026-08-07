@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -63,7 +64,20 @@ func APIEndpoint(ctx context.Context, c client.Client) (string, error) {
 	if len(doc.Clusters) == 0 || doc.Clusters[0].Cluster.Server == "" {
 		return "", nil
 	}
-	return doc.Clusters[0].Cluster.Server, nil
+	server := doc.Clusters[0].Cluster.Server
+	// A loopback endpoint is a statement about every node, not an
+	// address anyone else can dial: the cluster balances node-locally
+	// (k0s nllb, and this operator's own loopback balancer), so for
+	// anything rendered off-cluster the member list is the answer.
+	if u, err := url.Parse(server); err == nil {
+		if ip := net.ParseIP(u.Hostname()); ip != nil && ip.IsLoopback() {
+			return "", nil
+		}
+		if u.Hostname() == "localhost" {
+			return "", nil
+		}
+	}
+	return server, nil
 }
 
 // APIServers returns every control-plane API address, as host:port.

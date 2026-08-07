@@ -744,6 +744,56 @@ func publishNodeInfo(ctx context.Context, clientset *kubernetes.Clientset, cfg c
 	return nil
 }
 
+// publishHandshakes records when this node last completed a handshake
+// with each remote machine. This is the evidence a departed endpoint
+// is held against: a remote counts as moved only when a current
+// endpoint has seen it, and the seeing is here. Written only when an
+// observation advances by at least the keepalive interval, so steady
+// state costs at most a small patch per pass and usually nothing.
+func publishHandshakes(ctx context.Context, clientset *kubernetes.Clientset, cfg config, secret *corev1.Secret, handshakeAt map[wgtypes.Key]int64) error {
+	byKey := map[string]string{}
+	for dataKey, raw := range secret.Data {
+		if strings.HasPrefix(dataKey, tunnel.PeerPublicKeyPrefix) {
+			byKey[strings.TrimSpace(string(raw))] = strings.TrimPrefix(dataKey, tunnel.PeerPublicKeyPrefix)
+		}
+	}
+	observed := map[string]int64{}
+	for pub, ts := range handshakeAt {
+		if machine, ok := byKey[pub.String()]; ok {
+			observed[machine] = ts
+		}
+	}
+	entry := tunnel.NodePeerHandshakesPrefix + cfg.nodeName
+	previous := tunnel.ParseHandshakes(string(secret.Data[entry]))
+	advanced := false
+	for machine, ts := range observed {
+		if ts >= previous[machine]+int64(cfg.keepaliveSecs) {
+			advanced = true
+		}
+	}
+	if !advanced {
+		return nil
+	}
+	// Merged forward, never backward: an observation is a fact about
+	// the past, and a pass that read the device a moment early must
+	// not retract one.
+	for machine, ts := range previous {
+		if ts > observed[machine] {
+			observed[machine] = ts
+		}
+	}
+	patch, err := json.Marshal(map[string]any{
+		"data": map[string]string{entry: base64.StdEncoding.EncodeToString([]byte(tunnel.FormatHandshakes(observed)))},
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := clientset.CoreV1().Secrets(cfg.secretNamespace).Patch(ctx, cfg.secretName, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+		return fmt.Errorf("publishing %s: %w", entry, err)
+	}
+	return nil
+}
+
 // ensureLink creates the WireGuard link if it doesn't exist, assigns
 // its address, and brings it up. Called every reconcile pass
 // (idempotent, self-healing if the address is removed from under it).
@@ -945,6 +995,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		localAddress string
 		privateKey   wgtypes.Key
 		peers        []tunnel.PeerSpec
+		meshSecret   *corev1.Secret
 		usingSecret  = cfg.secretName != ""
 		// Whether this node's own prefixes are relayed through another
 		// endpoint, which is how the remotes accept its sources. See
@@ -1001,6 +1052,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		if err != nil {
 			return fmt.Errorf("loading peer list: %w", err)
 		}
+		meshSecret = secret
 		selfRelayed = len(tunnel.SplitList(string(secret.Data[tunnel.SiteAddressesPrefix+cfg.nodeName]))) > 0
 		if selfRelayed {
 			// The egress this node withholds from its own tunnel (see
@@ -1156,15 +1208,27 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	// WireGuard learns their address by roaming and the config alone
 	// would show nothing to protect.
 	handshaked := map[wgtypes.Key]bool{}
+	handshakeAt := map[wgtypes.Key]int64{}
 	endpointHosts := map[string]bool{}
 	if device, err := wg.Device(cfg.iface); err == nil {
 		for _, p := range device.Peers {
 			if !p.LastHandshakeTime.IsZero() {
 				handshaked[p.PublicKey] = true
+				handshakeAt[p.PublicKey] = p.LastHandshakeTime.Unix()
 			}
 			if p.Endpoint != nil && p.Endpoint.IP != nil {
 				endpointHosts[p.Endpoint.IP.String()] = true
 			}
+		}
+	}
+
+	// The evidence a departed endpoint's retention releases on: when
+	// this node last completed a handshake with each remote. Best
+	// effort; the tunnel does not depend on it, only the release of
+	// somebody else's.
+	if meshSecret != nil && clientset != nil {
+		if err := publishHandshakes(ctx, clientset, cfg, meshSecret, handshakeAt); err != nil {
+			fmt.Fprintf(os.Stderr, "publishing handshake evidence: %v\n", err)
 		}
 	}
 

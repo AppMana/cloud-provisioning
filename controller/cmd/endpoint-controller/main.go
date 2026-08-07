@@ -25,6 +25,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -2041,21 +2042,35 @@ func main() {
 		}
 		ctx := context.Background()
 		if joinAPIAddress == "" || joinAPIVIP == "" {
-			servers, err := discover.APIServers(ctx, discoveryClient)
+			// The cluster's own stated endpoint first: on an HA
+			// cluster that is the VIP that outlives any one control
+			// plane, and deriving from the member list instead pins
+			// every remote to one specific member, whose death then
+			// strands them with quorum intact. The member list is the
+			// fallback for a cluster that never stated an endpoint.
+			endpoint, err := discover.APIEndpoint(ctx, discoveryClient)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "cannot determine the API server address (set --join-api-address): %v\n", err)
-				os.Exit(1)
+				fmt.Fprintf(os.Stderr, "reading the cluster's stated API endpoint: %v\n", err)
 			}
-			if joinAPIAddress == "" {
-				joinAPIAddress = "https://" + servers[0]
-			}
-			if joinAPIVIP == "" {
-				host, _, err := net.SplitHostPort(servers[0])
+			target := endpoint
+			if target == "" {
+				servers, err := discover.APIServers(ctx, discoveryClient)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "cannot split the API server address %q: %v\n", servers[0], err)
+					fmt.Fprintf(os.Stderr, "cannot determine the API server address (set --join-api-address): %v\n", err)
 					os.Exit(1)
 				}
-				joinAPIVIP = host
+				target = "https://" + servers[0]
+			}
+			if joinAPIAddress == "" {
+				joinAPIAddress = target
+			}
+			if joinAPIVIP == "" {
+				u, err := url.Parse(target)
+				if err != nil || u.Hostname() == "" {
+					fmt.Fprintf(os.Stderr, "cannot read a host from the API address %q: %v\n", target, err)
+					os.Exit(1)
+				}
+				joinAPIVIP = u.Hostname()
 			}
 		}
 		network, err = cni.Detect(ctx, discoveryClient)

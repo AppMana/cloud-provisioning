@@ -91,6 +91,16 @@ type config struct {
 	mtu            int
 	pollInterval   time.Duration
 
+	// routeTable is where this dialer's routes live: a table of its
+	// own, consulted by an ip rule ahead of main and invisible to
+	// anything that scans main. A CNI whose router learns alien routes
+	// from the main table re-announces everything inside the cluster's
+	// pools with this node as the owner; every node with a tunnel holds
+	// routes for the whole mesh, so routes left in main make every such
+	// node claim every prefix, and a node choosing between those claims
+	// steers traffic to a peer whose accept list drops it.
+	routeTable int
+
 	// transitMasqueradeSource, when set (a CIDR, the tunnel subnet),
 	// makes this node a transit for tunnel peers reaching cluster
 	// addresses that have no tunnel of their own (e.g. a control-plane
@@ -130,6 +140,7 @@ func main() {
 	flag.IntVar(&cfg.keepaliveSecs, "keepalive-seconds", 15, "PersistentKeepalive interval")
 	flag.IntVar(&cfg.mtu, "mtu", 0, "interface MTU. 0 derives it from the interface carrying the default route, less WireGuard's overhead, which is what a correct value is")
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 30*time.Second, "how often to re-read the peer source and re-apply")
+	flag.IntVar(&cfg.routeTable, "route-table", 517, "routing table for the dialer's routes, consulted by an ip rule of the same priority. Not main: a CNI router that learns alien routes from main would re-announce them as this node's, and every node with a tunnel would claim the whole mesh")
 	flag.StringVar(&cfg.transitMasqueradeSource, "transit-masquerade-source", "", "optional tunnel-subnet CIDR: enable forwarding + masquerade for tunnel-sourced traffic leaving this node toward cluster addresses that have no tunnel (transit role)")
 	flag.StringVar(&cfg.installHostBinary, "install-host-binary", "", "optional host path to keep equal to this process's own executable (atomic replace, only when the digest differs): the post-join upgrade channel: the container image carries the binary, so the node's systemd unit converges onto it without any download host")
 	flag.Parse()
@@ -253,6 +264,7 @@ func main() {
 				if published, err := nodeStillPublished(clientset, cfg); err == nil && !published {
 					fmt.Fprintf(os.Stderr, "removing %s on the way out: this node is no longer a published endpoint\n", cfg.iface)
 					removeDevice(cfg.iface)
+					removeRouteRule(cfg.routeTable)
 				}
 			}
 			return
@@ -922,6 +934,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			if _, err := netlink.LinkByName(cfg.iface); err == nil {
 				fmt.Fprintf(os.Stderr, "removing %s: this node is no longer a published tunnel endpoint\n", cfg.iface)
 				removeDevice(cfg.iface)
+				removeRouteRule(cfg.routeTable)
 			}
 			return fmt.Errorf("no %s%s in %s/%s yet (node not allocated a tunnel address)", tunnel.NodeTunnelAddressPrefix, cfg.nodeName, cfg.secretNamespace, cfg.secretName)
 		}
@@ -1346,6 +1359,13 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet) err
 	if err != nil {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
 	}
+	// The dialer's own table, consulted ahead of main. See
+	// config.routeTable: a route in main is an ownership claim to any
+	// router that learns alien routes there, and these routes are this
+	// node's private knowledge, not claims.
+	if err := ensureRouteRule(cfg.routeTable); err != nil {
+		return fmt.Errorf("ensuring the rule for table %d: %w", cfg.routeTable, err)
+	}
 	claimed := map[string]bool{}
 	for _, host := range claimedHosts {
 		claimed[host.String()] = true
@@ -1354,7 +1374,7 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet) err
 	for _, host := range routeHosts {
 		dst := host
 		desired[dst.String()] = true
-		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK}
+		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK, Table: cfg.routeTable}
 		if err := netlink.RouteReplace(route); err != nil {
 			return fmt.Errorf("adding route %s dev %s: %w", dst.String(), cfg.iface, err)
 		}
@@ -1388,21 +1408,23 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet) err
 	for _, block := range blocks {
 		dst := block
 		desired[dst.String()] = true
-		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK}
+		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK, Table: cfg.routeTable}
 		if err := netlink.RouteReplace(route); err != nil {
 			fmt.Fprintf(os.Stderr, "no route for %s via %s: %v\n", dst.String(), cfg.iface, err)
 		}
 	}
 
-	// Prune host routes on this interface that are no longer desired.
+	// Prune routes in the dialer's table that are no longer desired.
 	// Adding without removing would leave a route that became wrong
 	// (a peer removed from the mesh, or an address that turned out to
 	// be a peer endpoint once the endpoint was learned by roaming)
-	// in place, still blackholing or looping traffic. Scoped
-	// strictly to this interface and to host prefixes, so the kernel's
-	// own connected route for the tunnel subnet is left alone.
+	// in place, still blackholing or looping traffic. Everything in
+	// this table on this interface is the dialer's own, so hosts and
+	// blocks alike are prunable here; nothing else writes to it.
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
-		existing, err := netlink.RouteList(link, family)
+		existing, err := netlink.RouteListFiltered(family,
+			&netlink.Route{LinkIndex: link.Attrs().Index, Table: cfg.routeTable},
+			netlink.RT_FILTER_OIF|netlink.RT_FILTER_TABLE)
 		if err != nil {
 			return fmt.Errorf("listing routes on %s: %w", cfg.iface, err)
 		}
@@ -1411,15 +1433,7 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet) err
 			if route.Dst == nil || route.Protocol == unix.RTPROT_KERNEL {
 				continue
 			}
-			ones, bits := route.Dst.Mask.Size()
 			if desired[route.Dst.String()] || claimed[route.Dst.String()] {
-				continue
-			}
-			// Prune only host routes. A wider prefix on this interface
-			// is either a fallback this pass no longer wants, which
-			// desired already covers, or something else's, which is
-			// not this function's to remove.
-			if ones != bits {
 				continue
 			}
 			if err := netlink.RouteDel(&route); err != nil {
@@ -1427,8 +1441,72 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet) err
 			}
 			fmt.Fprintf(os.Stderr, "removed stale route %s via %s\n", route.Dst, cfg.iface)
 		}
+
+		// Migration: earlier dialers wrote these routes into main,
+		// where they stand as claims. Anything of the dialer's shape
+		// (its own protocol, this interface) is moved out by pruning
+		// it from main; the table above already carries the current
+		// truth. The connected route for the tunnel subnet is the
+		// kernel's (proto kernel) and the CNI router's own entries
+		// carry its protocol, so neither is touched.
+		inMain, err := netlink.RouteListFiltered(family,
+			&netlink.Route{LinkIndex: link.Attrs().Index, Table: unix.RT_TABLE_MAIN},
+			netlink.RT_FILTER_OIF|netlink.RT_FILTER_TABLE)
+		if err != nil {
+			return fmt.Errorf("listing main-table routes on %s: %w", cfg.iface, err)
+		}
+		for i := range inMain {
+			route := inMain[i]
+			if route.Dst == nil || route.Protocol != unix.RTPROT_BOOT {
+				continue
+			}
+			if err := netlink.RouteDel(&route); err != nil {
+				return fmt.Errorf("moving route %s out of the main table: %w", route.Dst, err)
+			}
+			fmt.Fprintf(os.Stderr, "moved %s out of the main table: the dialer's routes are not the network's to learn\n", route.Dst)
+		}
 	}
 	return nil
+}
+
+// ensureRouteRule makes the kernel consult the dialer's table for every
+// lookup, ahead of main. Idempotent: one rule per family, keyed by the
+// table number.
+func ensureRouteRule(table int) error {
+	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
+		rules, err := netlink.RuleListFiltered(family, &netlink.Rule{Table: table}, netlink.RT_FILTER_TABLE)
+		if err != nil {
+			return fmt.Errorf("listing rules: %w", err)
+		}
+		if len(rules) > 0 {
+			continue
+		}
+		rule := netlink.NewRule()
+		rule.Family = family
+		rule.Table = table
+		rule.Priority = table
+		if err := netlink.RuleAdd(rule); err != nil && !os.IsExist(err) {
+			return fmt.Errorf("adding the rule for table %d: %w", table, err)
+		}
+	}
+	return nil
+}
+
+// removeRouteRule is ensureRouteRule's teardown half, for the path that
+// removes the device: the table's routes die with the interface, and
+// the rule pointing at the empty table goes here.
+func removeRouteRule(table int) {
+	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
+		rules, err := netlink.RuleListFiltered(family, &netlink.Rule{Table: table}, netlink.RT_FILTER_TABLE)
+		if err != nil {
+			continue
+		}
+		for i := range rules {
+			if err := netlink.RuleDel(&rules[i]); err != nil {
+				fmt.Fprintf(os.Stderr, "removing the rule for table %d: %v\n", table, err)
+			}
+		}
+	}
 }
 
 // ensureTransit makes this node forward tunnel-sourced traffic to

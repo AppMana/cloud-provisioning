@@ -29,3 +29,25 @@ forwarder written before kubeadm runs (see `harness/clab/cluster.sh`):
 kubelet starts static pods from disk with no API access, which is the
 same reason the remote's balancer lives in the dialer's host unit and
 never in a pod.
+
+## Distribution assumptions
+
+What each pattern requires of the machine image, kept explicit so a
+new distribution's gaps are found by reading rather than by a node
+that joins and is quietly wrong:
+
+- Both patterns: systemd, curl, sha256sum, a kernel with the
+  WireGuard module (mainline since 5.6; present on current
+  Debian/Ubuntu, RHEL 9+, Fedora, Amazon Linux 2's 5.10, Arch, and
+  the Azure/GCP default images; absent on RHEL 8's 4.18 without
+  elrepo). The dialer needs no package beyond the binary the pattern
+  verifies and installs.
+- kubeadm: kubeadm and kubelet must already be on the image; the
+  pattern deliberately installs no packages, because package-manager
+  syntax is the least portable thing a cloud-config can contain and
+  the machine template already chooses the image. Kubelet extra args
+  are written to both families' environment files
+  (/etc/default/kubelet and /etc/sysconfig/kubelet), because each
+  family's kubelet drop-in reads only its own.
+- k0s: self-installs from k0s's pinned release download, so the image
+  needs nothing Kubernetes-related at all.

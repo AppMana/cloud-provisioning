@@ -370,6 +370,58 @@ func ensureForwardingPath(iface string, mtu int) error {
 	if err := c.Flush(); err != nil {
 		return fmt.Errorf("clamping the segment size on %s: %w", iface, err)
 	}
+
+	// The tunnel does not carry the network's control plane. Everything
+	// a routing session across it could say, the mesh's own record
+	// already says better: the accept lists decide what a peer may
+	// source, the derived tables decide where a prefix goes. What such
+	// a session adds is failure. It rides TCP over the very path a
+	// placement change moves, so each transition leaves it half-dead
+	// and retrying, and it re-announces whatever stale view it held
+	// when the path moved underneath it, a claim nothing then
+	// withdraws. Refusing BGP at the boundary makes the design's
+	// assumption a property of the boundary.
+	bgpTable := c.AddTable(&nftables.Table{Family: nftables.TableFamilyIPv4, Name: "cldt-bgp-" + iface})
+	c.FlushTable(bgpTable)
+	name := make([]byte, 16)
+	copy(name, iface)
+	port := []byte{0, 179}
+	for _, hook := range []struct {
+		chain string
+		num   *nftables.ChainHook
+		key   expr.MetaKey
+	}{
+		{"input", nftables.ChainHookInput, expr.MetaKeyIIFNAME},
+		{"output", nftables.ChainHookOutput, expr.MetaKeyOIFNAME},
+		{"forward", nftables.ChainHookForward, expr.MetaKeyOIFNAME},
+	} {
+		chain := c.AddChain(&nftables.Chain{
+			Name:     hook.chain,
+			Table:    bgpTable,
+			Type:     nftables.ChainTypeFilter,
+			Hooknum:  hook.num,
+			Priority: &prio,
+		})
+		c.AddRule(&nftables.Rule{
+			Table: bgpTable,
+			Chain: chain,
+			Exprs: []expr.Any{
+				&expr.Meta{Key: hook.key, Register: 1},
+				&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: name},
+				&expr.Meta{Key: expr.MetaKeyL4PROTO, Register: 1},
+				&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte{unix.IPPROTO_TCP}},
+				// Destination port 179: every session has one end
+				// listening there, so whichever side dials, the packet
+				// that crosses the tunnel names it.
+				&expr.Payload{DestRegister: 1, Base: expr.PayloadBaseTransportHeader, Offset: 2, Len: 2},
+				&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: port},
+				&expr.Verdict{Kind: expr.VerdictDrop},
+			},
+		})
+	}
+	if err := c.Flush(); err != nil {
+		return fmt.Errorf("refusing BGP across %s: %w", iface, err)
+	}
 	return nil
 }
 

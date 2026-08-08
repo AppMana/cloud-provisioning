@@ -25,6 +25,9 @@ NS=cloud-provisioning
 OUT="${OUT:-$PWD/out}"
 OUTAGES="${OUTAGES:-outages.tsv}"
 ONLY="${ONLY:-}"
+# The join provider follows the distribution the site was built as;
+# rows change placement and take nodes down, never the pairing.
+JOIN_PROVIDER="${JOIN_PROVIDER:-${DISTRO:-kubeadm}}"
 [ -r "$OUTAGES" ] || { echo "cannot read $OUTAGES" >&2; exit 2; }
 mkdir -p "$OUT/outage"
 : > "$OUT/outage/summary.txt"
@@ -32,8 +35,13 @@ mkdir -p "$OUT/outage"
 # Same lock as the matrix: two drivers changing tunnel placement under
 # one cluster produce failures that look exactly like product faults.
 if [ "${OUTAGE_REEXEC:-}" != 1 ]; then
-  exec 9>/tmp/cldt-matrix.lock
-  flock -n 9 || { echo "another run holds the lock; wait for it or kill it" >&2; exit 2; }
+  # A parent driver (distro-matrix.sh) holds this same lock across a
+  # whole distribution's run and says so; contending with one's own
+  # caller would deadlock every run it starts.
+  if [ "${CLDT_LOCK_HELD:-}" != 1 ]; then
+    exec 9>/tmp/cldt-matrix.lock
+    flock -n 9 || { echo "another run holds the lock; wait for it or kill it" >&2; exit 2; }
+  fi
   # Run from a copy: bash reads a script as it goes, and editing this
   # file mid-run would have the running process execute the mixture.
   cp "$0" /tmp/cldt-outage-running.sh
@@ -261,7 +269,7 @@ while IFS=$'\t' read -r name endpoints victim mode <&3; do
     --set image.repository=cldt-controller --set image.tag=e2e --set image.pullPolicy=Never \
     --set dialerImage.repository=cldt-dialer --set dialerImage.tag=e2e \
     --set-string tunnel.endpoints="${selector//,/\\,}" \
-    --set joinProvider=kubeadm \
+    --set joinProvider="$JOIN_PROVIDER" \
     --set dialerBinary.amd64.url="file:///opt/dialer-dist/wg-dialer-linux-amd64" \
     --set dialerBinary.amd64.sha256="$BIN_SHA" >/dev/null 2>&1 \
     || { echo "  FAIL could not place the tunnels"; failed=$((failed+1)); continue; }

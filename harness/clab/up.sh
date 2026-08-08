@@ -79,6 +79,17 @@ for _ in 1 2 3; do
   sleep 2
 done
 [ -z "$(docker ps -aq --filter "name=clab-$LAB-")" ] || fail "the previous lab's containers cannot be removed"
+# A veth's host side can outlive its container: the outage harness
+# re-plumbs NICs on reboot rows, and a pair created that way is not
+# torn down by the container's removal. With every lab container gone,
+# any link still enslaved to a lab bridge is by definition stale, and
+# containerlab refuses to deploy over a name that already exists.
+for br in cldt-lan cldt-wan cldt-cloud-a cldt-cloud-b; do
+  ip -o link show master "$br" 2>/dev/null | awk -F': ' '{print $2}' | cut -d@ -f1 |
+    while read -r ifc; do
+      [ -n "$ifc" ] && sudo ip link del "$ifc" 2>/dev/null
+    done
+done
 sudo containerlab deploy -t topo.clab.yml --reconfigure >/dev/null
 
 echo "--- addressing ---"

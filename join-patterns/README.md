@@ -16,9 +16,9 @@ one rather than stacking two balancers or leaving none:
 |---|---|---|
 | kubeadm | none: kubelet dials the join endpoint forever | **on** (default 7445): join and kubelet dial `127.0.0.1`, the dialer's host unit forwards to whichever control plane answers. Requires the loopback address in the API servers' certificate SANs (`certSANs`) |
 | k0s | `nodeLocalLoadBalancing` (opt-in in the k0s spec; this operator's target sites enable it) | off: k0s workers balance for themselves once nllb is enabled. A k0s site without nllb has the kubeadm problem and should enable it there, not here |
-| k3s | built into the agent: a client-side load balancer across all servers, maintained automatically after registration | off (pattern not yet written) |
-| RKE2 | same agent balancer as k3s | off (pattern not yet written) |
-| Talos | KubePrism, `127.0.0.1:7445`, enabled by default on current releases | off, and the whole pattern differs: Talos has no systemd and runs no foreign binaries, so the tunnel itself must come from the machine config's own WireGuard support or a system extension, not this dialer. Open design question |
+| k3s | built into the agent: a client-side load balancer across all servers, maintained automatically after registration (state in `<data-dir>/agent/etc/k3s-agent-load-balancer.json`) | off: the pattern never references the balancer port, and a render test pins that |
+| RKE2 | same agent balancer as k3s, registering through the supervisor on 9345 | off, same render test |
+| Talos | KubePrism, `127.0.0.1:7445`, enabled by default on current releases | excluded from the pattern matrix, by decision: the tunnel is host-configured *because* a worker's tunnels must not rely on the Kubernetes they carry, and Talos runs no foreign binaries and has no systemd to host that floor. Supporting Talos is a different product surface (WireGuard in the machine config, or a system extension), not a join pattern; this row is the tracking record for that open design question |
 
 `--join-api-proxy-port=0` turns the operator's balancer off for a
 kubeadm-family cluster that terminates its API behind an external
@@ -51,6 +51,12 @@ that joins and is quietly wrong:
   family's kubelet drop-in reads only its own.
 - k0s: self-installs from k0s's pinned release download, so the image
   needs nothing Kubernetes-related at all.
+- k3s and RKE2: the same self-install property, from get.k3s.io and
+  get.rke2.io, pinned to the cluster's own version (a k3s/RKE2 kubelet
+  reports the full install version, so the provider pins it verbatim).
+  The token is k3s's secure format, minted through the API by
+  pkg/join/k3s (RKE2 is a flavor of the same provider; see its package
+  doc for the source-verified equivalence).
 
 ## Which images machine templates should name
 
@@ -66,6 +72,11 @@ selected:
   Canonical ubuntu-24_04-lts. Every one of these carries systemd,
   cloud-init, curl, sha256sum, and a WireGuard-capable kernel. Zero
   image maintenance is part of why k0s is the production choice here.
+- **k3s / RKE2** (self-installing, like k0s): the same stock distro
+  cloud images as the k0s row, nothing Kubernetes on them. RKE2's
+  agent downloads more at first start (its components run as images
+  its containerd pulls), which is startup time, not an image
+  requirement.
 - **kubeadm**: an image built with kubernetes-sigs/image-builder (the
   Cluster API standard), pinned to a Kubernetes version matching the
   cluster's -- JoinValues discovers kubernetesVersion for exactly this
@@ -73,4 +84,5 @@ selected:
   series only, are deleted as series age out, and are explicitly not
   recommended for production: lab and development only. Building and
   retaining your own image-builder AMIs per version is the supported
-  path, and it is image maintenance the k0s row simply does not have.
+  path, and it is image maintenance the self-installing rows simply
+  do not have.

@@ -62,18 +62,20 @@ ensure_image() {
 # theirs at agent start, which is exactly when a joining remote needs
 # the images to appear.
 import_into() {
-  local node="$1" image="$2" name
+  # Through sudo, because a running distribution owns its data root:
+  # k0s pre-creates its images directory as root, and a user-level
+  # write into it is refused.
+  local node="$1" image="$2" name dir
   name=$(echo "$image" | tr '/:' '__')
   case "$DISTRO" in
-    kubeadm) docker save "$image" | docker exec -i "$(c "$node")" ctr -n k8s.io images import - ;;
-    k0s)     mkdir -p "var-k0s/$node/images" \
-               && docker save "$image" -o "var-k0s/$node/images/$name.tar" ;;
-    k3s)     mkdir -p "var-rancher/$node/k3s/agent/images" \
-               && docker save "$image" -o "var-rancher/$node/k3s/agent/images/$name.tar" ;;
-    rke2)    mkdir -p "var-rancher/$node/rke2/agent/images" \
-               && docker save "$image" -o "var-rancher/$node/rke2/agent/images/$name.tar" ;;
+    kubeadm) docker save "$image" | docker exec -i "$(c "$node")" ctr -n k8s.io images import -; return ;;
+    k0s)     dir="var-k0s/$node/images" ;;
+    k3s)     dir="var-rancher/$node/k3s/agent/images" ;;
+    rke2)    dir="var-rancher/$node/rke2/agent/images" ;;
     *) fail "no image import path for DISTRO=$DISTRO" ;;
   esac
+  sudo mkdir -p "$dir" \
+    && docker save "$image" | sudo tee "$dir/$name.tar" >/dev/null
 }
 
 preload() {

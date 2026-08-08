@@ -16,7 +16,17 @@
 # Usage: health-check.sh [--namespace NS] [--service-port PORT] NODE...
 set -uo pipefail
 
-NAMESPACE="cloud-provisioning-health"
+# Unique per run. A fixed name couples this run to the previous run's
+# cleanup having finished, and namespace deletion is allowed to hang
+# in real clusters: with a node dead ungracefully, an aggregated API
+# served from it (k0s ships metrics-server) makes the namespace
+# controller's discovery fail, and every deletion waits until the
+# aggregated API reschedules. Measured: cp3 down, the previous check's
+# namespace Terminating for the whole 150s wait, and the survivors'
+# check reported "no checks ran" on a healthy network. A fresh name
+# needs nobody's deletion to finish; the old ones drain on their own
+# once discovery recovers.
+NAMESPACE="cloud-provisioning-health-$(date +%s)"
 SERVICE_PORT=8080
 IMAGE="${HEALTH_CHECK_IMAGE:-busybox:1.37}"
 NODES=()

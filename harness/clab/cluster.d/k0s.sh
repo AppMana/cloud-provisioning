@@ -147,6 +147,16 @@ distro_build() {
     [ -n "$all" ] && break
     sleep 5
   done
+
+  # k0s registers a controller's node with no role label at all
+  # (ROLES <none>), unlike every other distribution here, and the
+  # placement rows select control planes by the standard label. The
+  # role is a fact about the site, so the site's builder states it,
+  # exactly as an operator labeling their nodes would.
+  for n in cp cp2 cp3; do
+    k label node "$n" node-role.kubernetes.io/control-plane= --overwrite >/dev/null 2>&1 \
+      || fail "could not label $n as a control plane"
+  done
 }
 
 distro_kubelet_invariant() {

@@ -55,7 +55,7 @@ k() { in_node bastion kubectl "$@"; }
 selector_for() {
   case "$1" in
     all) echo "all" ;;
-    cp)  echo "node-role.kubernetes.io/control-plane=" ;;
+    cp)  echo "node-role.kubernetes.io/control-plane" ;;
     *)   case "$1" in
            *,*) echo "kubernetes.io/hostname in (${1})" ;;
            *)   echo "kubernetes.io/hostname=$1" ;;
@@ -244,7 +244,7 @@ check() {
 }
 
 control_planes() {
-  k get nodes -l node-role.kubernetes.io/control-plane= \
+  k get nodes -l node-role.kubernetes.io/control-plane \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -v '^$'
 }
 

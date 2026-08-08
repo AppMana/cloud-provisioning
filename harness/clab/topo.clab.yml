@@ -85,32 +85,46 @@ topology:
       kind: linux
       binds:
         - var/cp:/var/lib/containerd
+        - var-k0s/cp:/var/lib/k0s
+        - var-rancher/cp:/var/lib/rancher
     cp2:
       kind: linux
       binds:
         - var/cp2:/var/lib/containerd
+        - var-k0s/cp2:/var/lib/k0s
+        - var-rancher/cp2:/var/lib/rancher
     cp3:
       kind: linux
       binds:
         - var/cp3:/var/lib/containerd
+        - var-k0s/cp3:/var/lib/k0s
+        - var-rancher/cp3:/var/lib/rancher
     w1:
       kind: linux
       binds:
         - var/w1:/var/lib/containerd
+        - var-k0s/w1:/var/lib/k0s
+        - var-rancher/w1:/var/lib/rancher
     w2:
       kind: linux
       binds:
         - var/w2:/var/lib/containerd
+        - var-k0s/w2:/var/lib/k0s
+        - var-rancher/w2:/var/lib/rancher
 
     # One node in each cloud, so that they are in different clouds.
     remote1:
       kind: linux
       binds:
         - var/remote1:/var/lib/containerd
+        - var-k0s/remote1:/var/lib/k0s
+        - var-rancher/remote1:/var/lib/rancher
     remote2:
       kind: linux
       binds:
         - var/remote2:/var/lib/containerd
+        - var-k0s/remote2:/var/lib/k0s
+        - var-rancher/remote2:/var/lib/rancher
 
   links:
     # the site

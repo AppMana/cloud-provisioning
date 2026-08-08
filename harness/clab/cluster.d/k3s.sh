@@ -19,7 +19,10 @@
 K3S_VERSION="${K3S_VERSION:-}"
 
 # One download on the host serves all five nodes. The version defaults
-# to k3s's own stable channel, pinnable through the environment.
+# to k3s's own stable channel, pinnable through the environment. Sets
+# K3S_BIN and K3S_VERSION rather than echoing: a command substitution
+# would run this in a subshell and the resolved version would never
+# reach the caller.
 fetch_k3s() {
   if [ -z "$K3S_VERSION" ]; then
     local tag_url
@@ -28,15 +31,14 @@ fetch_k3s() {
     K3S_VERSION="${tag_url##*/}"
     [ -n "$K3S_VERSION" ] || fail "the stable channel redirect carried no tag"
   fi
-  local bin="$OUT/binaries/k3s-$K3S_VERSION"
-  if [ ! -f "$bin" ]; then
+  K3S_BIN="$OUT/binaries/k3s-$K3S_VERSION"
+  if [ ! -f "$K3S_BIN" ]; then
     mkdir -p "$OUT/binaries"
-    curl -fsSL -o "$bin.part" \
+    curl -fsSL -o "$K3S_BIN.part" \
       "https://github.com/k3s-io/k3s/releases/download/$K3S_VERSION/k3s" \
       || fail "could not download k3s $K3S_VERSION"
-    chmod 0755 "$bin.part" && mv "$bin.part" "$bin"
+    chmod 0755 "$K3S_BIN.part" && mv "$K3S_BIN.part" "$K3S_BIN"
   fi
-  echo "$bin"
 }
 
 # The unit the official installer would write, because the binary is
@@ -82,12 +84,11 @@ EOF
 
 distro_build() {
   echo "--- the k3s binary, carried onto every site node ---"
-  local bin
-  bin=$(fetch_k3s)
+  fetch_k3s
   echo "  $K3S_VERSION"
   for n in $SITE_NODES; do
     in_node "$n" test -x /usr/local/bin/k3s \
-      || docker cp "$bin" "$(c "$n")":/usr/local/bin/k3s
+      || docker cp "$K3S_BIN" "$(c "$n")":/usr/local/bin/k3s
     in_node "$n" mkdir -p /etc/rancher/k3s
   done
 

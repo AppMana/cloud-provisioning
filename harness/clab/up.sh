@@ -66,6 +66,21 @@ for n in cp cp2 cp3 w1 w2 remote1 remote2; do
   sudo cp -a var/seed/. "var/$n/"
 done
 
+# The same overlay rule applies to every distribution's own data root:
+# k0s runs its containerd under /var/lib/k0s, k3s and RKE2 under
+# /var/lib/rancher, and an overlay upperdir on the node's own overlay
+# is refused by the kernel (measured: k0s's nllb envoy sandbox,
+# "failed to mount rootfs ... invalid argument"). Unlike the seeded
+# containerd store above, these directories carry cluster state, etcd
+# among it, so a fresh lab starts them empty rather than inheriting a
+# previous cluster's identity.
+for n in cp cp2 cp3 w1 w2 remote1 remote2; do
+  for d in var-k0s var-rancher; do
+    sudo rm -rf "${d:?}/$n"
+    mkdir -p "$d/$n"
+  done
+done
+
 echo "--- deploying ---"
 # A loaded node takes longer to die than docker waits for its exit
 # event, so a reconfigure's destroy can report failure having actually

@@ -24,22 +24,24 @@ NLLB_PORT=7443
 # One download on the host serves all five nodes; the site itself
 # pulls nothing. The version defaults to the latest release so the lab
 # tracks what a new site would actually install, and can be pinned
-# through the environment when a specific one is under test.
+# through the environment when a specific one is under test. Sets
+# K0S_BIN and K0S_VERSION rather than echoing: a command substitution
+# would run this in a subshell and the resolved version would never
+# reach the caller.
 fetch_k0s() {
   if [ -z "$K0S_VERSION" ]; then
     K0S_VERSION=$(curl -fsSL https://api.github.com/repos/k0sproject/k0s/releases/latest \
       | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])') \
       || fail "could not resolve the latest k0s release"
   fi
-  local bin="$OUT/binaries/k0s-$K0S_VERSION"
-  if [ ! -f "$bin" ]; then
+  K0S_BIN="$OUT/binaries/k0s-$K0S_VERSION"
+  if [ ! -f "$K0S_BIN" ]; then
     mkdir -p "$OUT/binaries"
-    curl -fsSL -o "$bin.part" \
+    curl -fsSL -o "$K0S_BIN.part" \
       "https://github.com/k0sproject/k0s/releases/download/$K0S_VERSION/k0s-$K0S_VERSION-amd64" \
       || fail "could not download k0s $K0S_VERSION"
-    chmod 0755 "$bin.part" && mv "$bin.part" "$bin"
+    chmod 0755 "$K0S_BIN.part" && mv "$K0S_BIN.part" "$K0S_BIN"
   fi
-  echo "$bin"
 }
 
 write_k0s_config() {
@@ -88,12 +90,11 @@ start_k0s() {
 
 distro_build() {
   echo "--- the k0s binary, carried onto every site node ---"
-  local bin
-  bin=$(fetch_k0s)
+  fetch_k0s
   echo "  $K0S_VERSION"
   for n in $SITE_NODES; do
     in_node "$n" test -x /usr/local/bin/k0s \
-      || docker cp "$bin" "$(c "$n")":/usr/local/bin/k0s
+      || docker cp "$K0S_BIN" "$(c "$n")":/usr/local/bin/k0s
   done
 
   echo "--- first controller on cp at $LAN.10 ---"

@@ -24,6 +24,12 @@ CALICO_MANIFEST="${CALICO_MANIFEST:-https://raw.githubusercontent.com/projectcal
 TUNNEL_ENDPOINTS="${TUNNEL_ENDPOINTS:-kubernetes.io/hostname=w1}"
 SITE_NODES="cp cp2 cp3 w1 w2"
 CLOUD_NODES="remote1 remote2"
+# The distribution the site was built as (cluster.sh), which is also
+# which specialization mints join credentials: a k0s site hands out k0s
+# tokens, and installing anything else would test a pairing no cluster
+# has.
+DISTRO="${DISTRO:-kubeadm}"
+JOIN_PROVIDER="${JOIN_PROVIDER:-$DISTRO}"
 
 c() { echo "clab-$LAB-$1"; }
 in_node() { docker exec "$(c "$1")" "${@:2}"; }
@@ -43,13 +49,25 @@ ensure_image() {
   docker tag "quay.io/$image" "$image"
 }
 
+# Where an import lands depends on whose containerd runs the node's
+# pods. kubeadm nodes run the image's stock containerd; k0s, k3s, and
+# RKE2 each bring their own, with their own root and socket, and an
+# image imported into the wrong one does not exist as far as the
+# kubelet is concerned.
+import_into() {
+  case "$DISTRO" in
+    kubeadm) docker exec -i "$(c "$1")" ctr -n k8s.io images import - ;;
+    *) fail "no image import path for DISTRO=$DISTRO" ;;
+  esac
+}
+
 preload() {
   local node="$1"; shift
   local image
   for image in "$@"; do
     [ -n "$image" ] || continue
     ensure_image "$image" || fail "could not obtain $image from any registry"
-    docker save "$image" | docker exec -i "$(c "$node")" ctr -n k8s.io images import - >/dev/null 2>&1 \
+    docker save "$image" | import_into "$node" >/dev/null 2>&1 \
       || fail "could not import $image into $node"
   done
 }
@@ -134,7 +152,7 @@ k -n kube-system rollout restart daemonset/calico-node >/dev/null 2>&1 \
   || fail "could not restart calico-node after changing the pool"
 k -n kube-system rollout status daemonset/calico-node --timeout=5m >/dev/null \
   || fail "calico-node did not come back after the pool change, so its routes still describe the old encapsulation"
-for n in cp cp2 cp3 w1 w2; do k wait --for=condition=Ready node/"$n" --timeout=420s >/dev/null 2>&1 || fail "$n never became ready"; done
+for n in $SITE_NODES; do k wait --for=condition=Ready node/"$n" --timeout=420s >/dev/null 2>&1 || fail "$n never became ready"; done
 echo "  every site node ready"
 
 echo "--- the chart ---"
@@ -164,7 +182,7 @@ in_node bastion helm upgrade --install cloud-provisioning /tmp/chart \
   --set image.repository=cldt-controller --set image.tag=e2e --set image.pullPolicy=Never \
   --set dialerImage.repository=cldt-dialer --set dialerImage.tag=e2e \
   --set tunnel.endpoints="$TUNNEL_ENDPOINTS" \
-  --set joinProvider=kubeadm \
+  --set joinProvider="$JOIN_PROVIDER" \
   --set dialerBinary.amd64.url="file:///opt/dialer-dist/wg-dialer-linux-amd64" \
   --set dialerBinary.amd64.sha256="$BIN_SHA" \
   >/dev/null || fail "installing the chart"

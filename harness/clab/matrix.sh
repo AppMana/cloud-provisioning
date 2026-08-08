@@ -21,6 +21,9 @@ REPO_DIR="$(cd ../.. && pwd)"
 OUT="${OUT:-$PWD/out}"
 SCENARIOS="${SCENARIOS:-scenarios.tsv}"
 ONLY="${ONLY:-}"
+# The join provider follows the distribution the site was built as;
+# rows change placement, never the pairing.
+JOIN_PROVIDER="${JOIN_PROVIDER:-${DISTRO:-kubeadm}}"
 [ -r "$SCENARIOS" ] || { echo "cannot read $SCENARIOS" >&2; exit 2; }
 mkdir -p "$OUT/matrix"
 : > "$OUT/matrix/summary.txt"
@@ -37,8 +40,14 @@ if [ "${MATRIX_REEXEC:-}" != 1 ]; then
   # finds the shell doing the matching, because its own command line
   # contains the pattern, and the guard then refuses to start on
   # account of itself.
-  exec 9>/tmp/cldt-matrix.lock
-  flock -n 9 || { echo "another matrix run holds the lock; wait for it or kill it" >&2; exit 2; }
+  #
+  # A parent driver (distro-matrix.sh) holds this same lock across a
+  # whole distribution's run and says so; contending with one's own
+  # caller would deadlock every run it starts.
+  if [ "${CLDT_LOCK_HELD:-}" != 1 ]; then
+    exec 9>/tmp/cldt-matrix.lock
+    flock -n 9 || { echo "another matrix run holds the lock; wait for it or kill it" >&2; exit 2; }
+  fi
   # Run from a copy. bash reads a script as it goes, so editing this
   # file while it runs makes the running process execute whatever the
   # bytes became, which is a failure with no relation to the change.
@@ -86,7 +95,7 @@ while IFS=$'\t' read -r name endpoints remotes <&3; do
     --set image.repository=cldt-controller --set image.tag=e2e --set image.pullPolicy=Never \
     --set dialerImage.repository=cldt-dialer --set dialerImage.tag=e2e \
     --set-string tunnel.endpoints="${selector//,/\\,}" \
-    --set joinProvider=kubeadm \
+    --set joinProvider="$JOIN_PROVIDER" \
       --set dialerBinary.amd64.url="file:///opt/dialer-dist/wg-dialer-linux-amd64" \
     --set dialerBinary.amd64.sha256="$BIN_SHA" >/dev/null 2>&1 \
     || { echo "  FAIL could not place the tunnels"; failed=$((failed+1)); continue; }

@@ -1,0 +1,13 @@
+> The distribution dimension. Each row rebuilds the whole lab as that
+> distribution and runs its suite: the named placement rows from
+> scenarios.tsv, the named outage rows from outages.tsv, and then
+> mechanism.sh asserts who balances the API path on the live remotes.
+> "full" in a column means every row in that file.
+>
+> The suite is deliberately not the full cross product. What varies by
+> distribution is how the site is built, how a remote joins, and who
+> balances the API path; the mesh itself is distro-invariant, which the
+> all-nodes-two-clouds row (every pair, 112 checks) is there to prove
+> once per distribution rather than six times.
+name	placement	outages
+kubeadm	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp

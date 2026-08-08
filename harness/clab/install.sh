@@ -132,18 +132,16 @@ echo "  cluster, machine, and the containernet kinds"
 
 echo "--- the network ---"
 curl -fsSL "$CALICO_MANIFEST" -o "$OUT/calico.yaml" || fail "fetching calico"
-# k3s keeps its CNI directories inside its own data dir (verified in
-# k3s pkg/executor/embed/embed.go: conf under agent/etc/cni/net.d, bin
-# beside its bundled host-local, reachable through the data/current
-# symlink), so the stock manifest's hostPaths would install Calico
-# where k3s never looks. kubeadm, k0s and RKE2 all use the stock
-# paths.
-if [ "$DISTRO" = k3s ]; then
-  sed -i \
-    -e 's|path: /etc/cni/net.d|path: /var/lib/rancher/k3s/agent/etc/cni/net.d|' \
-    -e 's|path: /opt/cni/bin|path: /var/lib/rancher/k3s/data/current/bin|' \
-    "$OUT/calico.yaml"
-fi
+# No per-distribution CNI path overrides, k3s included. k3s moves its
+# CNI directories into its data dir ONLY when its embedded flannel
+# runs: the assignment sits inside the flannel branch
+# (pkg/executor/embed/embed.go, "if Flannel.Backend != BackendNone"),
+# so with flannel-backend none the dirs stay unset and k3s's
+# containerd falls back to the stock /etc/cni/net.d and /opt/cni/bin.
+# Measured before reading the branch: redirected hostPaths delivered
+# Calico's conflist and binaries into the data dir perfectly, and
+# containerd, looking at the stock paths, said "cni plugin not
+# initialized" on every node.
 CNI_IMAGES=$(grep -oE 'image: [^ ]+' "$OUT/calico.yaml" | awk '{print $2}' | sort -u)
 [ -n "$CNI_IMAGES" ] || fail "no images in the calico manifest"
 echo "  preloading $(echo $CNI_IMAGES | wc -w) network images plus the dialer and busybox"

@@ -48,6 +48,37 @@ for r in $remotes; do
         || fail "$r's loopback balancer does not answer /livez"
       echo "  $r: dialer balances on 127.0.0.1:$PROXY_PORT, kubelet dials it, it answers"
       ;;
+    k0s)
+      echo "$unit" | grep -q -- "--api-proxy-port" \
+        && fail "$r's dialer unit carries --api-proxy-port, a second balancer stacked on nllb"
+      server=$(in_node "$r" sh -c "grep -o 'server: .*' /var/lib/k0s/kubelet.conf" 2>/dev/null | awk '{print $2}')
+      [ "$server" = "https://127.0.0.1:7443" ] \
+        || fail "$r's kubelet dials ${server:-nothing}, not its own nllb envoy"
+      in_node "$r" curl -ksm 3 -o /dev/null "https://127.0.0.1:7443/livez" \
+        || fail "$r's nllb envoy does not answer /livez"
+      echo "  $r: nllb balances on 127.0.0.1:7443, kubelet dials it, it answers"
+      ;;
+    k3s|rke2)
+      echo "$unit" | grep -q -- "--api-proxy-port" \
+        && fail "$r's dialer unit carries --api-proxy-port, a second balancer stacked on the agent's own"
+      # The agent's client-side balancer persists its server list in
+      # its state file (k3s pkg/agent/loadbalancer: <dataDir>/etc/
+      # <service>.json); every control plane must be in it, or the
+      # balancer balances across less than the cluster.
+      lb_state="/var/lib/rancher/$DISTRO/agent/etc/$DISTRO-agent-load-balancer.json"
+      state=$(in_node "$r" cat "$lb_state" 2>/dev/null) \
+        || fail "$r has no agent load-balancer state at $lb_state"
+      for a in 10.10.0.10 10.10.0.13 10.10.0.14; do
+        echo "$state" | grep -q "$a" \
+          || fail "$r's agent balancer does not hold control plane $a; it has: $state"
+      done
+      server=$(in_node "$r" sh -c "grep -o 'server: .*' /var/lib/rancher/$DISTRO/agent/kubelet.kubeconfig" 2>/dev/null | awk '{print $2}')
+      case "$server" in
+        https://127.0.0.1:*) ;;
+        *) fail "$r's kubelet dials ${server:-nothing}, not the agent's own loopback balancer" ;;
+      esac
+      echo "  $r: the agent balancer holds all three control planes, kubelet dials $server"
+      ;;
     *)
       fail "no mechanism assertions written for DISTRO=$DISTRO: the table row exists, its check does not"
       ;;

@@ -53,10 +53,15 @@ ensure_image() {
 # pods. kubeadm nodes run the image's stock containerd; k0s, k3s, and
 # RKE2 each bring their own, with their own root and socket, and an
 # image imported into the wrong one does not exist as far as the
-# kubelet is concerned.
+# kubelet is concerned. Each distribution ships its own ctr wired to
+# its own socket, which is the authoritative way in.
 import_into() {
   case "$DISTRO" in
     kubeadm) docker exec -i "$(c "$1")" ctr -n k8s.io images import - ;;
+    k0s)     docker exec -i "$(c "$1")" k0s ctr -n k8s.io images import - ;;
+    k3s)     docker exec -i "$(c "$1")" k3s ctr -n k8s.io images import - ;;
+    rke2)    docker exec -i "$(c "$1")" /var/lib/rancher/rke2/bin/ctr \
+               --address /run/k3s/containerd/containerd.sock -n k8s.io images import - ;;
     *) fail "no image import path for DISTRO=$DISTRO" ;;
   esac
 }
@@ -115,6 +120,18 @@ echo "  cluster, machine, and the containernet kinds"
 
 echo "--- the network ---"
 curl -fsSL "$CALICO_MANIFEST" -o "$OUT/calico.yaml" || fail "fetching calico"
+# k3s keeps its CNI directories inside its own data dir (verified in
+# k3s pkg/executor/embed/embed.go: conf under agent/etc/cni/net.d, bin
+# beside its bundled host-local, reachable through the data/current
+# symlink), so the stock manifest's hostPaths would install Calico
+# where k3s never looks. kubeadm, k0s and RKE2 all use the stock
+# paths.
+if [ "$DISTRO" = k3s ]; then
+  sed -i \
+    -e 's|path: /etc/cni/net.d|path: /var/lib/rancher/k3s/agent/etc/cni/net.d|' \
+    -e 's|path: /opt/cni/bin|path: /var/lib/rancher/k3s/data/current/bin|' \
+    "$OUT/calico.yaml"
+fi
 CNI_IMAGES=$(grep -oE 'image: [^ ]+' "$OUT/calico.yaml" | awk '{print $2}' | sort -u)
 [ -n "$CNI_IMAGES" ] || fail "no images in the calico manifest"
 echo "  preloading $(echo $CNI_IMAGES | wc -w) network images plus the dialer and busybox"

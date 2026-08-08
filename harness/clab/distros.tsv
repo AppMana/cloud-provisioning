@@ -11,3 +11,6 @@
 > once per distribution rather than six times.
 name	placement	outages
 kubeadm	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
+k0s	full	full
+k3s	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
+rke2	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp

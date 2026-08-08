@@ -37,6 +37,12 @@ EXEC_VIA="${HEALTH_CHECK_EXEC:-kubectl}"   # kubectl | node
 # A node's container is not always named after the node. A lab names
 # them for the lab, so the two differ and the exec has to be told.
 NODE_PREFIX="${HEALTH_CHECK_NODE_PREFIX:-}"
+# Which containerd crictl asks. Empty means crictl's default, which is
+# where kubeadm's pods live; a distribution that brings its own
+# runtime keeps its pods behind its own socket, and a crictl aimed at
+# the wrong one sees no containers, which reads as every path being
+# broken at once.
+CRI_ENDPOINT="${HEALTH_CHECK_CRI_ENDPOINT:-}"
 # Report the matrix and exit 0 rather than failing on the first
 # unreachable pair. Which pairs reach each other is the measurement
 # when comparing tunnel placements, not a pass or fail.
@@ -152,10 +158,10 @@ pod_exec() {
     # substring regex, and kube-apiserver contains "serve", so on a
     # control plane the unanchored form can select the API server, whose
     # image has neither wget nor ping and reads as a broken network.
-    cid=$(docker exec "$ctr" crictl ps --name '^serve$' \
+    cid=$(docker exec "$ctr" crictl ${CRI_ENDPOINT:+--runtime-endpoint "$CRI_ENDPOINT"} ps --name '^serve$' \
       --label "io.kubernetes.pod.namespace=$NAMESPACE" -q 2>/dev/null | head -1)
     [[ -n "$cid" ]] || return 1
-    docker exec "$ctr" crictl exec "$cid" "$@" 2>/dev/null
+    docker exec "$ctr" crictl ${CRI_ENDPOINT:+--runtime-endpoint "$CRI_ENDPOINT"} exec "$cid" "$@" 2>/dev/null
   else
     kubectl exec "hc-${node}" -n "$NAMESPACE" -- "$@" 2>/dev/null
   fi

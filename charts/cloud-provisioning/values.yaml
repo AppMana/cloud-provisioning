@@ -105,7 +105,7 @@ transit:
   bgpPort: 0        # e.g. 1790
   bgpASN: 64512
 
-# Which cluster technology mints join credentials (k0s | kubeadm).
+# Which cluster technology mints join credentials (k0s | kubeadm | k3s).
 joinProvider: k0s
 
 # First-boot binary delivery. A remote node has no image puller before

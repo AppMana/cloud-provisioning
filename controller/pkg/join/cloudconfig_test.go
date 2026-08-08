@@ -154,6 +154,64 @@ func TestKubeletArgsReachBothFamilies(t *testing.T) {
 	}
 }
 
+// The k3s agent carries its own client-side balancer across every
+// server it learns from the supervisor, so its pattern must show no
+// trace of the operator's balancer: no --api-proxy-port in the unit
+// and no loopback join. It gates on and joins the rendered endpoint,
+// with the token in a root-only file rather than on a command line.
+func TestK3sJoinsTheEndpointAndCarriesNoSecondBalancer(t *testing.T) {
+	rendered := renderPattern(t, "k3s-worker.cloud-config.tmpl", map[string]any{
+		"peersFileJSON":           "{}",
+		"machineName":             "remote1",
+		"interfaceName":           "cldt0",
+		"wireguardListenPort":     "51820",
+		"apiEndpoint":             "10.101.0.1:6443",
+		"joinServerURL":           "https://10.101.0.1:6443",
+		"joinToken":               "K10aaaa::id.secret",
+		"k3sVersion":              "v1.33.3+k3s1",
+		"kubeletExtraArgs":        "--node-labels=x=y",
+		"dialerBinaryURLArm64":    "https://example.com/a",
+		"dialerBinarySHA256Arm64": "a",
+		"dialerBinaryURLAmd64":    "https://example.com/b",
+		"dialerBinarySHA256Amd64": "b",
+	})
+	if strings.Contains(rendered, "--api-proxy-port") {
+		t.Error("the k3s pattern passes --api-proxy-port, stacking a second balancer on the agent's own")
+	}
+	if !strings.Contains(rendered, "https://10.101.0.1:6443/livez") {
+		t.Error("the gate does not probe the rendered endpoint")
+	}
+	if !strings.Contains(rendered, "--server 'https://10.101.0.1:6443'") {
+		t.Error("the agent is not pointed at the supervisor")
+	}
+	if !strings.Contains(rendered, "INSTALL_K3S_VERSION='v1.33.3+k3s1'") {
+		t.Error("the install is not pinned to the cluster's own version")
+	}
+	if !strings.Contains(rendered, "--token-file /etc/rancher/k3s/join-token") {
+		t.Error("the token does not travel by file")
+	}
+	if strings.Contains(rendered, "K3S_TOKEN=") {
+		t.Error("the token leaked onto a command line")
+	}
+}
+
+func renderPattern(t *testing.T, name string, values map[string]any) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "join-patterns", name))
+	if err != nil {
+		t.Fatalf("reading %s: %v", name, err)
+	}
+	tmpl, err := template.New(name).Option("missingkey=error").Parse(string(raw))
+	if err != nil {
+		t.Fatalf("parsing %s: %v", name, err)
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, values); err != nil {
+		t.Fatalf("rendering %s: %v", name, err)
+	}
+	return buf.String()
+}
+
 func renderKubeadmPattern(t *testing.T, proxyPort int) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "join-patterns", "kubeadm-worker.cloud-config.tmpl"))

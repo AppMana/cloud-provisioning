@@ -1,0 +1,139 @@
+#cloud-config
+# k3s-agent join pattern: download the pinned dialer binary, bring up
+# the WireGuard tunnel, gate on the cluster's API becoming reachable
+# through it, then join as a plain k3s agent using a pre-minted
+# bootstrap token in k3s's secure format (K10<CA-hash>::<id>.<secret>,
+# see pkg/join/k3s). Set directly as Machine.spec.bootstrap.dataSecretName
+# content, with no bootstrap provider; kubeadm-worker and k0s-worker
+# are the same contract.
+#
+# Only write_files and runcmd belong here, for the same reason as the
+# kubeadm pattern: CAPD-style interpreters parse any other top-level
+# module with an "unknown" handler that fails on plain YAML.
+#
+# The dialer's loopback balancer flag appears nowhere in this file,
+# deliberately: the k3s agent carries its own client-side balancer
+# across every server it learns from the supervisor, so ours would be
+# a second balancer stacked on a working one
+# (join-patterns/README.md tracks who balances per distribution).
+write_files:
+  # Same hardened dialer, same separation of concerns as the other
+  # patterns: pod/service CIDRs only ever enter WireGuard's cryptokey
+  # accept-list; kernel routes are /32-/128 host routes to peer nodes,
+  # enforced at parse time. This file is the BOOTSTRAP snapshot; the
+  # wg-dialer-cloud DaemonSet supplies the live peer list post-join
+  # (--machine-name-file resolves this machine's adoption Secret).
+  - path: /etc/wg-dialer/peers.json
+    permissions: '0600'
+    content: |
+      {{ .peersFileJSON }}
+  - path: /etc/wg-dialer/machine-name
+    permissions: '0644'
+    content: |
+      {{ .machineName }}
+  - path: /etc/systemd/system/wg-dialer.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=wg-dialer (listener role)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      ExecStart=/usr/local/bin/wg-dialer \
+        --iface={{ .interfaceName }} \
+        --peers-file=/etc/wg-dialer/peers.json \
+        --listen-port={{ .wireguardListenPort }} \
+        --keepalive-seconds=15 \
+        --mtu=1420 \
+        --poll-interval=30s
+      Restart=always
+      # Re-exec hourly so the unit converges onto whatever binary is at
+      # the path: after the node joins, the wg-dialer-cloud DaemonSet
+      # installs its own (image-carried, digest-pinned) binary there,
+      # which is how upgrades reach this floor without a download host
+      # or any per-node action. Restart is <1s and the tunnel config is
+      # idempotent, so the re-exec is not a disruption.
+      RuntimeMaxSec=1h
+      AmbientCapabilities=CAP_NET_ADMIN
+
+      [Install]
+      WantedBy=multi-user.target
+  # The token in a root-only file rather than on a command line, read
+  # by the agent through its own --token-file flag.
+  - path: /etc/rancher/k3s/join-token
+    permissions: '0600'
+    content: |
+      {{ .joinToken }}
+runcmd:
+  # Pinned-digest binary delivery, identical to the other patterns: a
+  # mismatch halts the join rather than running unverified code.
+  # Download to a temp path and rename into place: a re-run of this
+  # bootstrap (cloud-init reruns, an infrastructure provider retrying)
+  # would otherwise try to write a binary that is already executing,
+  # and the kernel refuses that (ETXTBSY), which curl reports as an
+  # opaque write failure. Rename replaces the directory entry and
+  # works regardless.
+  - |
+    set -e
+    case "$(uname -m)" in
+      aarch64|arm64) url='{{ .dialerBinaryURLArm64 }}'; sha='{{ .dialerBinarySHA256Arm64 }}' ;;
+      x86_64|amd64)  url='{{ .dialerBinaryURLAmd64 }}'; sha='{{ .dialerBinarySHA256Amd64 }}' ;;
+      *) echo "no wg-dialer build for $(uname -m)" >&2; exit 1 ;;
+    esac
+    [ -n "$url" ] || { echo "no wg-dialer URL configured for $(uname -m)" >&2; exit 1; }
+    curl -fsSL -o /usr/local/bin/.wg-dialer.new "$url"
+    echo "$sha  /usr/local/bin/.wg-dialer.new" | sha256sum -c -
+    chmod 0755 /usr/local/bin/.wg-dialer.new
+    mv -f /usr/local/bin/.wg-dialer.new /usr/local/bin/wg-dialer
+  - systemctl daemon-reload
+  - systemctl enable --now wg-dialer.service
+  # Gate on the API's TCP port rather than ICMP: minimal cloud images
+  # may ship no ping at all, and cloud firewalls routinely drop ICMP
+  # while allowing the API port. curl is already a hard dependency of
+  # this pattern. Any HTTP response, including 401/403, proves
+  # reachability, so no -f here. For k3s this endpoint is also the
+  # supervisor the agent registers through: one probe proves the whole
+  # join path.
+  - until curl -sk --max-time 3 -o /dev/null https://{{ .apiEndpoint }}/livez; do sleep 2; done
+  # No CNI gap-fill block here (contrast k0s-worker): k3s bundles a
+  # multicall CNI binary that already provides bandwidth, portmap and
+  # the other chained plugins, so the gap that block fills for k0s does
+  # not exist on a k3s node.
+  #
+  # --node-ip from instance metadata where a metadata service exists
+  # (IMDSv2, AWS-specific), because k3s resolves node addresses by
+  # hostname lookup, which on AWS maps only to the private IPv4. Where
+  # there is no metadata service the probe fails fast and k3s's own
+  # address detection applies unchanged.
+  #
+  # kubeletExtraArgs arrive as one opaque string of --flag=value words
+  # (the generic contract), and k3s takes kubelet args one per
+  # --kubelet-arg, so the string is re-worded here. The values this
+  # operator renders (a role label, a taint) contain no whitespace, so
+  # word-splitting is the correct parser for them.
+  - |
+    set -e
+    NODE_IP_ARG=""
+    IMDS_TOKEN=$(curl -sf -m 2 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
+    if [ -n "$IMDS_TOKEN" ]; then
+      NODE_IPV4=$(curl -sf -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4 || true)
+      NODE_IPV6=$(curl -sf -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/ipv6 || true)
+      [ -n "$NODE_IPV4" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4"
+      [ -n "$NODE_IPV6" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4,$NODE_IPV6"
+    fi
+    KUBELET_ARGS=""
+    KEXTRA='{{ .kubeletExtraArgs }}'
+    for a in $KEXTRA; do
+      KUBELET_ARGS="$KUBELET_ARGS --kubelet-arg=${a#--}"
+    done
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION='{{ .k3sVersion }}' sh -s - agent \
+      --server '{{ .joinServerURL }}' \
+      --token-file /etc/rancher/k3s/join-token \
+      --node-name "$(hostname)" \
+      $NODE_IP_ARG $KUBELET_ARGS
+  # CAPI's bootstrap-success sentinel, same contract as the other
+  # patterns: this pattern takes the bootstrap provider's place, so it
+  # honors what infrastructure providers poll for.
+  - mkdir -p /run/cluster-api
+  - touch /run/cluster-api/bootstrap-success.complete

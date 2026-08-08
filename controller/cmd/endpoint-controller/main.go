@@ -43,6 +43,7 @@ import (
 	joink0s "github.com/appmana/cloud-provisioning/controller/pkg/join/k0s"
 	joink3s "github.com/appmana/cloud-provisioning/controller/pkg/join/k3s"
 	joinkubeadm "github.com/appmana/cloud-provisioning/controller/pkg/join/kubeadm"
+	joinrke2 "github.com/appmana/cloud-provisioning/controller/pkg/join/rke2"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -1961,7 +1962,7 @@ func main() {
 	flag.StringVar(&dialerCloudDaemonSetName, "dialer-cloud-daemonset-name", "tunnel-dialer-remote", "name of the remote-side dialer DaemonSet this operator provisions directly")
 
 	flag.BoolVar(&joinEnabled, "join-enabled", true, "enable bootstrap-secret provisioning (join.Reconciler) and claim expansion: the whole point of this operator; disable only for an endpoint-mirror-only deployment")
-	flag.StringVar(&joinProviderName, "join-provider", "k0s", "which cluster technology's join specialization mints join credentials (k0s, kubeadm, k3s); pair with the matching --join-template-path")
+	flag.StringVar(&joinProviderName, "join-provider", "k0s", "which cluster technology's join specialization mints join credentials (k0s, kubeadm, k3s, rke2); pair with the matching --join-template-path")
 	flag.StringVar(&joinTemplatePath, "join-template-path", "/join-patterns/k0s-worker.cloud-config.tmpl", "path to the join-pattern template to render")
 	flag.StringVar(&joinAPIAddress, "join-api-address", "", "REQUIRED cluster API server address used to mint join tokens (bracket IPv6 literals, e.g. https://[fd8f:cf26:522a::1]:6443)")
 	flag.StringVar(&joinAPIVIP, "join-api-vip", "", "REQUIRED cluster API VIP the new node must reach through the tunnel before joining")
@@ -2200,8 +2201,10 @@ func main() {
 			joinProvider = &joinkubeadm.Provider{Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL}
 		case "k3s":
 			joinProvider = &joink3s.Provider{Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL}
+		case "rke2":
+			joinProvider = &joinrke2.Provider{Client: clientset, APIAddress: joinAPIAddress, TTL: joinTokenTTL}
 		default:
-			fmt.Fprintf(os.Stderr, "unknown --join-provider %q (registered specializations: k0s, kubeadm, k3s)\n", joinProviderName)
+			fmt.Fprintf(os.Stderr, "unknown --join-provider %q (registered specializations: k0s, kubeadm, k3s, rke2)\n", joinProviderName)
 			os.Exit(1)
 		}
 

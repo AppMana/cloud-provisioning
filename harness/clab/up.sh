@@ -67,6 +67,18 @@ for n in cp cp2 cp3 w1 w2 remote1 remote2; do
 done
 
 echo "--- deploying ---"
+# A loaded node takes longer to die than docker waits for its exit
+# event, so a reconfigure's destroy can report failure having actually
+# killed the container, and the deploy then refuses because the corpse
+# still exists. Remove whatever is left before deploying; a machine
+# that takes two tries to power off still powers off.
+for _ in 1 2 3; do
+  left=$(docker ps -aq --filter "name=clab-$LAB-")
+  [ -z "$left" ] && break
+  docker rm -f $left >/dev/null 2>&1
+  sleep 2
+done
+[ -z "$(docker ps -aq --filter "name=clab-$LAB-")" ] || fail "the previous lab's containers cannot be removed"
 sudo containerlab deploy -t topo.clab.yml --reconfigure >/dev/null
 
 echo "--- addressing ---"

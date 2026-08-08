@@ -77,14 +77,19 @@ install_bastion_kubectl() {
 # trying the next member is right; a kubectl failure after a good
 # probe is an answer, not a reason to ask someone else.
 #
-# /readyz with -f, not /livez without: a returning member answers
-# /livez while its authorizer's informers are still syncing, and every
-# request sent there in that window comes back Forbidden. Measured:
-# cp back from a link outage, kubernetes-admin "cannot list nodes",
-# and cp is first in this loop, so everything funneled to it. Only a
-# 200 from /readyz means the member can actually serve.
+# The probe is an AUTHENTICATED /readyz, with this kubeconfig's own
+# credentials, because nothing weaker distinguishes ready from not:
+# /livez passes while a returning member's authorizer is still
+# syncing and every request then comes back Forbidden (measured,
+# kubeadm), and an anonymous /readyz is 401 on k0s before readiness
+# is ever consulted, so with -f every member failed the probe and the
+# wrapper fell through to the kubeconfig's default server, which was
+# exactly the member that was down: the harness went blind and called
+# it "cp never went NotReady" (measured, k0s). A 200 on an
+# authenticated /readyz proves the member serves AND authorizes.
 for s in $CP_ADDRS; do
-  if curl -ksfm 2 -o /dev/null "https://\$s:6443/readyz" 2>/dev/null; then
+  if /usr/local/bin/kubectl.real --server="https://\$s:6443" --request-timeout=2s \
+       get --raw /readyz >/dev/null 2>&1; then
     exec /usr/local/bin/kubectl.real --server="https://\$s:6443" "\$@"
   fi
 done

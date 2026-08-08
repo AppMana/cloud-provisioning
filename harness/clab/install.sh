@@ -197,11 +197,12 @@ echo "--- the chart ---"
 docker cp "$(command -v helm)" "$(c bastion)":/usr/local/bin/helm.real
 write_to bastion /usr/local/bin/helm <<EOF
 #!/bin/sh
-# /readyz with -f, same as the kubectl wrapper (see cluster.sh): a
-# member back from an outage answers /livez while its authorizer is
-# still syncing, and a release operation sent there fails Forbidden.
+# The same authenticated /readyz probe as the kubectl wrapper (see
+# cluster.sh for why nothing weaker works), through kubectl.real,
+# which cluster.sh installed before this wrapper could exist.
 for s in $LAN.10 $LAN.13 $LAN.14; do
-  if curl -ksfm 2 -o /dev/null "https://\$s:6443/readyz" 2>/dev/null; then
+  if /usr/local/bin/kubectl.real --server="https://\$s:6443" --request-timeout=2s \
+       get --raw /readyz >/dev/null 2>&1; then
     exec /usr/local/bin/helm.real --kube-apiserver="https://\$s:6443" "\$@"
   fi
 done

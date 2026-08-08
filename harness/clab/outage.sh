@@ -192,6 +192,12 @@ EOF
         sleep 5
       done
       if ! in_node "$victim" ip link show eth1 >/dev/null 2>&1; then
+        # The old pair's host side can outlive the killed container,
+        # and the re-plumb then fails renaming onto the name it still
+        # holds ("failed to rename link: file exists", measured on
+        # remote1). With the container's side gone, the leftover is
+        # dead by definition, so it is removed by name first.
+        sudo ip link del "$peer" 2>/dev/null || true
         sudo containerlab tools veth create -a "$(c "$victim"):eth1" -b "bridge:$bridge:$peer" >"$OUT/outage/$name-veth.log" 2>&1 \
           || { echo "  restore: veth re-plumb failed, see $OUT/outage/$name-veth.log" >&2; return 1; }
       fi

@@ -50,18 +50,28 @@ ensure_image() {
 }
 
 # Where an import lands depends on whose containerd runs the node's
-# pods. kubeadm nodes run the image's stock containerd; k0s, k3s, and
-# RKE2 each bring their own, with their own root and socket, and an
-# image imported into the wrong one does not exist as far as the
-# kubelet is concerned. Each distribution ships its own ctr wired to
-# its own socket, which is the authoritative way in.
+# pods. kubeadm nodes run the image's stock containerd, always
+# present, so the import goes through its ctr. The self-installing
+# distributions bring their runtime with the join, so on a remote
+# there is nothing to exec into at install time; instead, every one
+# of them auto-imports tarballs from an images directory inside its
+# data root, which is a host bind here (see topo.clab.yml). Writing
+# the tarball there from the host works before the distribution
+# exists on the node and after: a running k0s watches the directory
+# (its OCIBundleReconciler says so in the journal), and k3s/RKE2 scan
+# theirs at agent start, which is exactly when a joining remote needs
+# the images to appear.
 import_into() {
+  local node="$1" image="$2" name
+  name=$(echo "$image" | tr '/:' '__')
   case "$DISTRO" in
-    kubeadm) docker exec -i "$(c "$1")" ctr -n k8s.io images import - ;;
-    k0s)     docker exec -i "$(c "$1")" k0s ctr -n k8s.io images import - ;;
-    k3s)     docker exec -i "$(c "$1")" k3s ctr -n k8s.io images import - ;;
-    rke2)    docker exec -i "$(c "$1")" /var/lib/rancher/rke2/bin/ctr \
-               --address /run/k3s/containerd/containerd.sock -n k8s.io images import - ;;
+    kubeadm) docker save "$image" | docker exec -i "$(c "$node")" ctr -n k8s.io images import - ;;
+    k0s)     mkdir -p "var-k0s/$node/images" \
+               && docker save "$image" -o "var-k0s/$node/images/$name.tar" ;;
+    k3s)     mkdir -p "var-rancher/$node/k3s/agent/images" \
+               && docker save "$image" -o "var-rancher/$node/k3s/agent/images/$name.tar" ;;
+    rke2)    mkdir -p "var-rancher/$node/rke2/agent/images" \
+               && docker save "$image" -o "var-rancher/$node/rke2/agent/images/$name.tar" ;;
     *) fail "no image import path for DISTRO=$DISTRO" ;;
   esac
 }
@@ -72,7 +82,7 @@ preload() {
   for image in "$@"; do
     [ -n "$image" ] || continue
     ensure_image "$image" || fail "could not obtain $image from any registry"
-    docker save "$image" | import_into "$node" >/dev/null 2>&1 \
+    import_into "$node" "$image" >/dev/null 2>&1 \
       || fail "could not import $image into $node"
   done
 }

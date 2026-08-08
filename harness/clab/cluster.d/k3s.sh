@@ -26,7 +26,7 @@ K3S_VERSION="${K3S_VERSION:-}"
 fetch_k3s() {
   if [ -z "$K3S_VERSION" ]; then
     local tag_url
-    tag_url=$(curl -fsSL -o /dev/null -w '%{redirect_url}' "https://update.k3s.io/v1-release/channels/stable") \
+    tag_url=$(curl -fsS -o /dev/null -w "%{redirect_url}" "https://update.k3s.io/v1-release/channels/stable") \
       || fail "could not resolve k3s's stable channel"
     K3S_VERSION="${tag_url##*/}"
     [ -n "$K3S_VERSION" ] || fail "the stable channel redirect carried no tag"

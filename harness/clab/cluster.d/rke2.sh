@@ -23,7 +23,7 @@ RKE2_VERSION="${RKE2_VERSION:-}"
 fetch_rke2() {
   if [ -z "$RKE2_VERSION" ]; then
     local tag_url
-    tag_url=$(curl -fsSL -o /dev/null -w '%{redirect_url}' "https://update.rke2.io/v1-release/channels/stable") \
+    tag_url=$(curl -fsS -o /dev/null -w "%{redirect_url}" "https://update.rke2.io/v1-release/channels/stable") \
       || fail "could not resolve rke2's stable channel"
     RKE2_VERSION="${tag_url##*/}"
     [ -n "$RKE2_VERSION" ] || fail "the stable channel redirect carried no tag"

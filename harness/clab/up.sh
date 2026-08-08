@@ -66,20 +66,11 @@ for n in cp cp2 cp3 w1 w2 remote1 remote2; do
   sudo cp -a var/seed/. "var/$n/"
 done
 
-# The same overlay rule applies to every distribution's own data root:
-# k0s runs its containerd under /var/lib/k0s, k3s and RKE2 under
-# /var/lib/rancher, and an overlay upperdir on the node's own overlay
-# is refused by the kernel (measured: k0s's nllb envoy sandbox,
-# "failed to mount rootfs ... invalid argument"). Unlike the seeded
-# containerd store above, these directories carry cluster state, etcd
-# among it, so a fresh lab starts them empty rather than inheriting a
-# previous cluster's identity.
-for n in cp cp2 cp3 w1 w2 remote1 remote2; do
-  for d in var-k0s var-rancher; do
-    sudo rm -rf "${d:?}/$n"
-    mkdir -p "$d/$n"
-  done
-done
+# The distribution data-root binds (var-k0s, var-rancher) are wiped in
+# the deploy section below, after the previous lab's containers are
+# gone: wiping them here would race the running containers' own
+# overlay mounts inside those directories, and rm loses that race
+# ("Directory not empty" on a live k0s data root).
 
 echo "--- deploying ---"
 # A loaded node takes longer to die than docker waits for its exit
@@ -94,6 +85,29 @@ for _ in 1 2 3; do
   sleep 2
 done
 [ -z "$(docker ps -aq --filter "name=clab-$LAB-")" ] || fail "the previous lab's containers cannot be removed"
+# The same overlay rule that gives /var/lib/containerd a real
+# filesystem applies to every distribution's own data root: k0s runs
+# its containerd under /var/lib/k0s, k3s and RKE2 under
+# /var/lib/rancher, and an overlay upperdir on the node's own overlay
+# is refused by the kernel (measured: k0s's nllb envoy sandbox,
+# "failed to mount rootfs ... invalid argument"). Unlike the seeded
+# containerd store, these directories carry cluster state, etcd among
+# it, so a fresh lab starts them empty rather than inheriting a
+# previous cluster's identity. Only after the containers are gone: a
+# running node holds overlay mounts inside these, and rm loses that
+# race. The mounts' teardown is itself asynchronous, so the wipe
+# retries.
+for n in cp cp2 cp3 w1 w2 remote1 remote2; do
+  for d in var-k0s var-rancher; do
+    for _ in 1 2 3 4 5; do
+      sudo rm -rf "${d:?}/$n" 2>/dev/null && break
+      sleep 2
+    done
+    [ -e "$d/$n" ] && fail "cannot clear $d/$n, the previous lab still holds mounts in it"
+    mkdir -p "$d/$n"
+  done
+done
+
 # A veth's host side can outlive its container: the outage harness
 # re-plumbs NICs on reboot rows, and a pair created that way is not
 # torn down by the container's removal. With every lab container gone,

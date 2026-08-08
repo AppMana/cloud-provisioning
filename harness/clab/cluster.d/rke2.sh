@@ -16,7 +16,10 @@ RKE2_VERSION="${RKE2_VERSION:-}"
 
 # One tarball download on the host serves all five nodes: bin/rke2 and
 # the systemd units RKE2 itself ships. Its images it pulls from the
-# registry on first start, which the site's outbound path allows.
+# registry on first start, which the site's outbound path allows. Sets
+# RKE2_TARBALL and RKE2_VERSION rather than echoing: a command
+# substitution would run this in a subshell and the resolved version
+# would never reach the caller.
 fetch_rke2() {
   if [ -z "$RKE2_VERSION" ]; then
     local tag_url
@@ -25,21 +28,20 @@ fetch_rke2() {
     RKE2_VERSION="${tag_url##*/}"
     [ -n "$RKE2_VERSION" ] || fail "the stable channel redirect carried no tag"
   fi
-  local tarball="$OUT/binaries/rke2-$RKE2_VERSION.tar.gz"
-  if [ ! -f "$tarball" ]; then
+  RKE2_TARBALL="$OUT/binaries/rke2-$RKE2_VERSION.tar.gz"
+  if [ ! -f "$RKE2_TARBALL" ]; then
     mkdir -p "$OUT/binaries"
-    curl -fsSL -o "$tarball.part" \
+    curl -fsSL -o "$RKE2_TARBALL.part" \
       "https://github.com/rancher/rke2/releases/download/$RKE2_VERSION/rke2.linux-amd64.tar.gz" \
       || fail "could not download rke2 $RKE2_VERSION"
-    mv "$tarball.part" "$tarball"
+    mv "$RKE2_TARBALL.part" "$RKE2_TARBALL"
   fi
-  echo "$tarball"
 }
 
 install_rke2() {
   local n="$1"
   in_node "$n" test -x /usr/local/bin/rke2 && return 0
-  docker cp "$(fetch_rke2)" "$(c "$n")":/tmp/rke2.tar.gz
+  docker cp "$RKE2_TARBALL" "$(c "$n")":/tmp/rke2.tar.gz
   in_node "$n" tar -xzf /tmp/rke2.tar.gz -C /usr/local
   in_node "$n" sh -c 'cp /usr/local/lib/systemd/system/rke2-*.service /etc/systemd/system/'
   in_node "$n" rm -f /tmp/rke2.tar.gz

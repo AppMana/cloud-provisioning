@@ -152,22 +152,41 @@ distro_build() {
 distro_kubelet_invariant() {
   # nllb is the claim: a pure worker's kubelet dials its own loopback
   # envoy, which holds every controller address, so no single
-  # controller's death strands it. A controller's kubelet dialing its
-  # own API server is k0s's arrangement for --enable-worker nodes
-  # (nllb's documented limitation there), and is no cross-node
-  # dependency either.
+  # controller's death strands it. Measured, not assumed, against the
+  # kubeconfig the running kubelet actually loads: nllb hands kubelet
+  # its own file under /run/k0s/nllb (the kubelet process's
+  # --kubeconfig says so), aimed at the envoy on the node's own
+  # loopback, k0s's choice of family included ([::1]). The file at
+  # /var/lib/k0s/kubelet.conf keeps the bootstrap-time join server
+  # forever and describes nothing the kubelet still does. The envoy
+  # image is pulled on first start, so this converges rather than
+  # holding instantly, and a check without a deadline's patience
+  # reports the wrong verdict on a healthy node.
+  #
+  # A controller's kubelet dialing its own API server is k0s's
+  # arrangement for --enable-worker nodes (nllb's documented
+  # limitation there), and is no cross-node dependency either.
+  local deadline=$((SECONDS + 300)) server ok
   for n in $SITE_NODES; do
-    server=$(in_node "$n" sh -c "grep -o 'server: .*' /var/lib/k0s/kubelet.conf" 2>/dev/null | awk '{print $2}')
-    ok=""
-    case "$n" in
-      cp|cp2|cp3)
-        case "$server" in
-          https://127.0.0.1:*|https://localhost:*|"https://$(cp_addr "$n"):6443") ok=1 ;;
-        esac ;;
-      *)
-        [ "$server" = "https://127.0.0.1:$NLLB_PORT" ] && ok=1 ;;
-    esac
-    [ -n "$ok" ] || fail "$n's kubelet dials ${server:-nothing}, a dependency on another node's survival"
-    echo "  $n $server"
+    while :; do
+      ok=""
+      case "$n" in
+        cp|cp2|cp3)
+          server=$(in_node "$n" sh -c "grep -o 'server: .*' /var/lib/k0s/kubelet.conf" 2>/dev/null | awk '{print $2}')
+          case "$server" in
+            https://127.0.0.1:*|https://localhost:*|"https://$(cp_addr "$n"):6443") ok=1 ;;
+          esac ;;
+        *)
+          server=$(in_node "$n" sh -c "grep -o 'server: .*' /run/k0s/nllb/kubeconfig.yaml" 2>/dev/null | awk '{print $2}')
+          case "$server" in
+            "https://[::1]:$NLLB_PORT"|"https://127.0.0.1:$NLLB_PORT") ok=1 ;;
+          esac ;;
+      esac
+      if [ -n "$ok" ]; then echo "  $n $server"; break; fi
+      if [ "$SECONDS" -ge "$deadline" ]; then
+        fail "$n's kubelet dials ${server:-nothing}, a dependency on another node's survival"
+      fi
+      sleep 5
+    done
   done
 }

@@ -51,12 +51,19 @@ for r in $remotes; do
     k0s)
       echo "$unit" | grep -q -- "--api-proxy-port" \
         && fail "$r's dialer unit carries --api-proxy-port, a second balancer stacked on nllb"
-      server=$(in_node "$r" sh -c "grep -o 'server: .*' /var/lib/k0s/kubelet.conf" 2>/dev/null | awk '{print $2}')
-      [ "$server" = "https://127.0.0.1:7443" ] \
-        || fail "$r's kubelet dials ${server:-nothing}, not its own nllb envoy"
-      in_node "$r" curl -ksm 3 -o /dev/null "https://127.0.0.1:7443/livez" \
+      # The kubeconfig the running kubelet actually loads: nllb hands
+      # it its own file under /run/k0s/nllb, aimed at the envoy on the
+      # node's own loopback, k0s's choice of family included ([::1]).
+      # /var/lib/k0s/kubelet.conf keeps the bootstrap-time join server
+      # forever and proves nothing about the running node.
+      server=$(in_node "$r" sh -c "grep -o 'server: .*' /run/k0s/nllb/kubeconfig.yaml" 2>/dev/null | awk '{print $2}')
+      case "$server" in
+        "https://[::1]:7443"|"https://127.0.0.1:7443") ;;
+        *) fail "$r's kubelet dials ${server:-nothing}, not its own nllb envoy" ;;
+      esac
+      in_node "$r" sh -c 'curl -ksm 3 -o /dev/null https://127.0.0.1:7443/livez || curl -ksm 3 -o /dev/null "https://[::1]:7443/livez"' \
         || fail "$r's nllb envoy does not answer /livez"
-      echo "  $r: nllb balances on 127.0.0.1:7443, kubelet dials it, it answers"
+      echo "  $r: nllb balances on the node's loopback ($server), kubelet dials it, it answers"
       ;;
     k3s|rke2)
       echo "$unit" | grep -q -- "--api-proxy-port" \

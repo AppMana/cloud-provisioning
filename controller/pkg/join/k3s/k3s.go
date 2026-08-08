@@ -33,6 +33,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -47,11 +48,43 @@ import (
 // lowercase alphanumeric only (RFC: [a-z0-9]).
 const tokenChars = "0123456789abcdefghijklmnopqrstuvwxyz"
 
-// nodeBootstrapTokenAuthGroup mirrors k3s pkg/kubeadm/token.go's
-// default for `k3s token create`.
-const nodeBootstrapTokenAuthGroup = "system:bootstrappers:k3s:default-node-token"
+// Flavor is what actually differs between k3s and a distribution
+// built from k3s's own server code. RKE2's `rke2 token` subcommand is
+// k3s's token.Create wired verbatim (rke2 pkg/cli/cmds/token.go), its
+// supervisor is the same router on port 9345 (rke2
+// pkg/cli/defaults/defaults.go), and version.Program changes the
+// default bootstrap group and the kubelet's version suffix; nothing
+// else about the join differs. Modeling that as constants mirrors the
+// reality that the mechanism is one mechanism, and keeps the CA-hash
+// algorithm, whose smallest deviation makes every agent reject its
+// token, in exactly one place.
+type Flavor struct {
+	// VersionSuffix is the marker the kubelet's reported version must
+	// carry ("+k3s", "+rke2"): its presence proves the cluster runs
+	// this flavor, and the full version string is the flavor's install
+	// pin verbatim.
+	VersionSuffix string
+	// VersionKey names the join value the flavor's pattern reads the
+	// version from ("k3sVersion", "rke2Version").
+	VersionKey string
+	// ExtraGroup is `<program> token create`'s default
+	// auth-extra-groups entry.
+	ExtraGroup string
+	// SupervisorPort is where agents register: k3s muxes the
+	// supervisor onto the API port, RKE2 gives it 9345.
+	SupervisorPort string
+}
 
-// Provider implements join.ClusterJoinProvider for k3s.
+var k3sFlavor = Flavor{
+	VersionSuffix:  "+k3s",
+	VersionKey:     "k3sVersion",
+	ExtraGroup:     "system:bootstrappers:k3s:default-node-token",
+	SupervisorPort: "6443",
+}
+
+// Provider implements join.ClusterJoinProvider for k3s, and for
+// distributions that are k3s's server code under another name (see
+// Flavor; pkg/join/rke2 is such a wrapper).
 type Provider struct {
 	Client kubernetes.Interface
 	// APIAddress is this cluster's own API server address as reached
@@ -64,10 +97,21 @@ type Provider struct {
 	// launch and first join, and k3s's own tokencleaner reaps the
 	// Secret at expiry.
 	TTL time.Duration
+	// Flavor selects the k3s-derived distribution; the zero value is
+	// k3s itself.
+	Flavor Flavor
+}
+
+func (p *Provider) flavor() Flavor {
+	if p.Flavor == (Flavor{}) {
+		return k3sFlavor
+	}
+	return p.Flavor
 }
 
 // JoinValues implements join.ClusterJoinProvider.
 func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
+	flavor := p.flavor()
 	tokenID, err := randomToken(6)
 	if err != nil {
 		return nil, fmt.Errorf("generating token id: %w", err)
@@ -90,13 +134,13 @@ func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
 			"token-secret": tokenSecret,
 			"expiration":   expiry.Format(time.RFC3339),
 			// Both usages and the extra group mirror what
-			// `k3s token create` itself defaults to
+			// `<program> token create` itself defaults to
 			// (pkg/kubeadm/token.go: KnownTokenUsages and the
-			// k3s:default-node-token group), so a token from here is
-			// indistinguishable from one the CLI minted.
+			// <program>:default-node-token group), so a token from
+			// here is indistinguishable from one the CLI minted.
 			"usage-bootstrap-authentication": "true",
 			"usage-bootstrap-signing":        "true",
-			"auth-extra-groups":              nodeBootstrapTokenAuthGroup,
+			"auth-extra-groups":              flavor.ExtraGroup,
 		},
 	}
 	if _, err := p.Client.CoreV1().Secrets(metav1.NamespaceSystem).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
@@ -112,24 +156,28 @@ func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
 		return nil, fmt.Errorf("hashing cluster CA: %w", err)
 	}
 
-	k3sVersion, err := p.introspectK3sVersion(ctx)
+	version, err := p.introspectVersion(ctx, flavor)
 	if err != nil {
-		return nil, fmt.Errorf("introspecting k3s version: %w", err)
+		return nil, fmt.Errorf("introspecting %s version: %w", strings.TrimPrefix(flavor.VersionSuffix, "+"), err)
 	}
 
 	apiEndpoint, err := hostPort(p.APIAddress)
 	if err != nil {
 		return nil, err
 	}
+	host, _, err := net.SplitHostPort(apiEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("splitting %q: %w", apiEndpoint, err)
+	}
 
 	return map[string]any{
 		// The full secure format: the hash is what lets the agent
 		// refuse an impostor server before presenting anything.
 		"joinToken": "K10" + caHash + "::" + tokenID + "." + tokenSecret,
-		// K3S_URL: scheme and all, the supervisor the agent registers
-		// through and the balancer's first server list entry.
-		"joinServerURL": "https://" + apiEndpoint,
-		"k3sVersion":    k3sVersion,
+		// The supervisor the agent registers through: the API address
+		// itself for k3s, the same host on its own port for RKE2.
+		"joinServerURL":    "https://" + net.JoinHostPort(host, flavor.SupervisorPort),
+		flavor.VersionKey: version,
 		// apiEndpoint is the common contract every join pattern gates
 		// on before joining: the host:port a new node must actually
 		// reach.
@@ -202,25 +250,26 @@ func hashCA(b []byte) (string, error) {
 	return hex.EncodeToString(digest[:]), nil
 }
 
-// introspectK3sVersion reads the running k3s version off any existing
-// Node. Unlike k0s, whose kubelet reports only a prefix of the release
-// tag, a k3s kubelet reports the full install version ("v1.33.3+k3s1"),
-// which is exactly what get.k3s.io's INSTALL_K3S_VERSION takes, so
-// nothing needs resolving against a release list. A version without
-// the k3s suffix means this is not a k3s cluster, and installing
+// introspectVersion reads the running version off any existing Node.
+// Unlike k0s, whose kubelet reports only a prefix of the release tag,
+// a k3s or RKE2 kubelet reports the full install version
+// ("v1.33.3+k3s1", "v1.33.3+rke2r1"), which is exactly what the
+// flavor's install script takes as its version pin, so nothing needs
+// resolving against a release list. A version without the flavor's
+// suffix means this cluster does not run the flavor, and installing
 // something other than what the cluster runs is refused rather than
 // guessed at.
-func (p *Provider) introspectK3sVersion(ctx context.Context) (string, error) {
+func (p *Provider) introspectVersion(ctx context.Context, flavor Flavor) (string, error) {
 	nodes, err := p.Client.CoreV1().Nodes().List(ctx, metav1.ListOptions{Limit: 1})
 	if err != nil {
 		return "", err
 	}
 	if len(nodes.Items) == 0 {
-		return "", fmt.Errorf("no nodes found to introspect k3s version from")
+		return "", fmt.Errorf("no nodes found to introspect the version from")
 	}
 	kubeletVersion := nodes.Items[0].Status.NodeInfo.KubeletVersion
-	if !strings.Contains(kubeletVersion, "+k3s") {
-		return "", fmt.Errorf("kubelet version %q carries no +k3s suffix, so this cluster does not run k3s and no k3s install version can be derived from it", kubeletVersion)
+	if !strings.Contains(kubeletVersion, flavor.VersionSuffix) {
+		return "", fmt.Errorf("kubelet version %q carries no %s suffix, so this cluster does not run that distribution and no install version can be derived from it", kubeletVersion, flavor.VersionSuffix)
 	}
 	return kubeletVersion, nil
 }

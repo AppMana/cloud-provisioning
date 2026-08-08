@@ -195,6 +195,46 @@ func TestK3sJoinsTheEndpointAndCarriesNoSecondBalancer(t *testing.T) {
 	}
 }
 
+// RKE2 differs from k3s in exactly the ways its provider says it
+// does: the join dials the supervisor on 9345, everything travels
+// through config.yaml plus a token file, and again no second
+// balancer.
+func TestRKE2JoinsTheSupervisorAndCarriesNoSecondBalancer(t *testing.T) {
+	rendered := renderPattern(t, "rke2-worker.cloud-config.tmpl", map[string]any{
+		"peersFileJSON":           "{}",
+		"machineName":             "remote1",
+		"interfaceName":           "cldt0",
+		"wireguardListenPort":     "51820",
+		"apiEndpoint":             "10.101.0.1:6443",
+		"joinServerURL":           "https://10.101.0.1:9345",
+		"joinToken":               "K10aaaa::id.secret",
+		"rke2Version":             "v1.33.4+rke2r1",
+		"kubeletExtraArgs":        "--node-labels=x=y",
+		"dialerBinaryURLArm64":    "https://example.com/a",
+		"dialerBinarySHA256Arm64": "a",
+		"dialerBinaryURLAmd64":    "https://example.com/b",
+		"dialerBinarySHA256Amd64": "b",
+	})
+	if strings.Contains(rendered, "--api-proxy-port") {
+		t.Error("the rke2 pattern passes --api-proxy-port, stacking a second balancer on the agent's own")
+	}
+	if !strings.Contains(rendered, "server: https://10.101.0.1:9345") {
+		t.Error("the agent's config does not point at the supervisor")
+	}
+	if !strings.Contains(rendered, "https://10.101.0.1:9345/ping") {
+		t.Error("the gate does not probe the supervisor the join will dial")
+	}
+	if !strings.Contains(rendered, "INSTALL_RKE2_VERSION='v1.33.4+rke2r1'") {
+		t.Error("the install is not pinned to the cluster's own version")
+	}
+	if !strings.Contains(rendered, "token-file: /etc/rancher/rke2/join-token") {
+		t.Error("the token does not travel by file")
+	}
+	if strings.Contains(rendered, "RKE2_TOKEN=") {
+		t.Error("the token leaked onto a command line")
+	}
+}
+
 func renderPattern(t *testing.T, name string, values map[string]any) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "join-patterns", name))

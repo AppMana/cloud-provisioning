@@ -72,12 +72,19 @@ install_bastion_kubectl() {
   fi
   write_to bastion /usr/local/bin/kubectl <<EOF
 #!/bin/sh
-# Pick a live control plane, then run the real kubectl against it. A
-# probe failure is connectivity, so trying the next member is right; a
-# kubectl failure after a good probe is an answer, not a reason to ask
-# someone else.
+# Pick a READY control plane, then run the real kubectl against it. A
+# probe failure is connectivity or a member that cannot serve yet, so
+# trying the next member is right; a kubectl failure after a good
+# probe is an answer, not a reason to ask someone else.
+#
+# /readyz with -f, not /livez without: a returning member answers
+# /livez while its authorizer's informers are still syncing, and every
+# request sent there in that window comes back Forbidden. Measured:
+# cp back from a link outage, kubernetes-admin "cannot list nodes",
+# and cp is first in this loop, so everything funneled to it. Only a
+# 200 from /readyz means the member can actually serve.
 for s in $CP_ADDRS; do
-  if curl -ksm 2 -o /dev/null "https://\$s:6443/livez" 2>/dev/null; then
+  if curl -ksfm 2 -o /dev/null "https://\$s:6443/readyz" 2>/dev/null; then
     exec /usr/local/bin/kubectl.real --server="https://\$s:6443" "\$@"
   fi
 done

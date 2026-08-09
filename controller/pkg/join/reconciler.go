@@ -307,10 +307,19 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
+	// The balancer port reaches a render only when the provider says
+	// its distribution needs one (join.NodeLocalBalancer): the
+	// who-balances decision is the provider's, made once, not
+	// restated per pattern. Zero renders no balancer unit at all.
+	apiProxyPort := 0
+	if b, ok := r.Join.(NodeLocalBalancer); ok && b.NeedsAPIProxy() {
+		apiProxyPort = r.APIProxyPort
+	}
+
 	values := map[string]any{
 		"sshAuthorizedKeys":       r.SSHAuthorizedKeys,
 		"apiVIP":                  r.APIVIP,
-		"apiProxyPort":            r.APIProxyPort,
+		"apiProxyPort":            apiProxyPort,
 		"kubeletExtraArgs":        r.KubeletExtraArgs,
 		"wireguardAddress":        cloudWGAddress,
 		"wireguardListenPort":     r.WireGuardListenPort,

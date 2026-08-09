@@ -102,3 +102,20 @@ type MachineProvisioner interface {
 type Validator interface {
 	Validate(ctx context.Context, c client.Reader, infraMachine *unstructured.Unstructured) error
 }
+
+// NodeLocalBalancer is an optional capability a ClusterJoinProvider
+// implements when its distribution ships no node-local balancing of
+// its own, so a joining worker needs the operator's loopback balancer
+// (wg-apiproxy) to avoid depending on any single control plane.
+//
+// This is the one place the who-balances decision lives in code; the
+// table in join-patterns/README.md is its record. kubeadm implements
+// it (kubelet would otherwise dial the join endpoint forever); k0s
+// (nllb), k3s and RKE2 (the agent's client-side balancer) do not, and
+// their absence here is what keeps apiProxyPort zero in their renders,
+// so the shared pattern blocks emit no balancer unit at all. A second
+// balancer stacked on a distribution's own is not redundancy, it is
+// two owners for one address.
+type NodeLocalBalancer interface {
+	NeedsAPIProxy() bool
+}

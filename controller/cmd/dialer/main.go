@@ -91,6 +91,18 @@ type config struct {
 	mtu            int
 	pollInterval   time.Duration
 
+	// fwmark marks the tunnel's own encrypted packets, and an ip rule
+	// exempts marked traffic from the dialer's route table. That is
+	// what makes it safe to route a peer's ENDPOINT address through
+	// the tunnel: the one flow that must not take that route, the
+	// tunnel's own outers, is identified by the mark rather than by
+	// withholding the route from everyone. Withholding was the old
+	// answer, and it silently broke every encapsulating network:
+	// flannel's vxlan outers are addressed to the remote's node
+	// address, which is also its WireGuard endpoint, so they took the
+	// site's NAT path and died in the masquerade. wg-quick solves the
+	// same loop the same way.
+	fwmark int
 	// routeTable is where this dialer's routes live: a table of its
 	// own, consulted by an ip rule ahead of main and invisible to
 	// anything that scans main. A CNI whose router learns alien routes
@@ -217,6 +229,7 @@ func main() {
 	flag.IntVar(&cfg.mtu, "mtu", 0, "interface MTU. 0 derives it from the interface carrying the default route, less WireGuard's overhead, which is what a correct value is")
 	flag.DurationVar(&cfg.pollInterval, "poll-interval", 30*time.Second, "how often to re-read the peer source and re-apply")
 	flag.IntVar(&cfg.routeTable, "route-table", 517, "routing table for the dialer's routes, consulted by an ip rule of the same priority. Not main: a CNI router that learns alien routes from main would re-announce them as this node's, and every node with a tunnel would claim the whole mesh")
+	flag.IntVar(&cfg.fwmark, "fwmark", 517, "firewall mark for the tunnel's own encrypted packets, exempted from the dialer's route table by an ip rule so that peer endpoint addresses can be routed through the tunnel without looping the tunnel's own traffic (encapsulating networks address their packets to exactly those). 0 disables the mark and restores the old behavior of never routing an endpoint address")
 	flag.StringVar(&cfg.transitMasqueradeSource, "transit-masquerade-source", "", "optional tunnel-subnet CIDR: enable forwarding + masquerade for tunnel-sourced traffic leaving this node toward cluster addresses that have no tunnel (transit role)")
 	flag.IntVar(&cfg.apiProxyPort, "api-proxy-port", 0, "serve a node-local API balancer on 127.0.0.1:<port>, forwarding each connection to the first control plane that answers (the peer list carries their addresses). 0 disables it. Host unit only: kubelet depends on this before any pod can run")
 	flag.BoolVar(&cfg.apiProxyOnly, "api-proxy-only", false, "run only the node-local API balancer, in its own unit with its own lifecycle, so kubelet's API path does not share the dialer's restarts. Requires --api-proxy-port, --peers-file and --iface (the adoption cache is named for the interface)")
@@ -1429,7 +1442,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		// and every pass gave up on reaching it.
 		var allowedIPs []net.IPNet
 		for _, cidr := range p.WGAllowedIPs {
-			ipNet, err := parseAllowedIP(cidr, localAddrs, endpointHosts)
+			ipNet, err := parseAllowedIP(cidr, localAddrs, endpointHosts, cfg.fwmark > 0)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "not permitting one entry for peer %s: %v\n", pub, err)
 				continue
@@ -1483,7 +1496,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 				relayDsts = append(relayDsts, ipNet)
 				continue
 			}
-			switch disposeRouteHost(endpointHosts[ipNet.IP.String()], p.Endpoint != "" || handshaked[pub]) {
+			switch disposeRouteHost(cfg.fwmark > 0, endpointHosts[ipNet.IP.String()], p.Endpoint != "" || handshaked[pub]) {
 			case routeIsAnEndpoint:
 				// A tunnel endpoint is not routed through the tunnel
 				// (see endpointHosts). The address stays reachable by its
@@ -1526,6 +1539,9 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	}
 	if cfg.listenPort != 0 {
 		deviceCfg.ListenPort = &cfg.listenPort
+	}
+	if cfg.fwmark > 0 {
+		deviceCfg.FirewallMark = &cfg.fwmark
 	}
 	if err := wg.ConfigureDevice(cfg.iface, deviceCfg); err != nil {
 		return err
@@ -1570,7 +1586,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 // tunnel. Unlike a route, an accept-list entry is also an ingress
 // filter, so an over-broad one lets a peer source packets as any
 // address it covers.
-func parseAllowedIP(entry string, localAddrs []net.IP, endpointHosts map[string]bool) (net.IPNet, error) {
+func parseAllowedIP(entry string, localAddrs []net.IP, endpointHosts map[string]bool, marked bool) (net.IPNet, error) {
 	_, ipNet, err := net.ParseCIDR(tunnel.HostCIDR(strings.TrimSpace(entry)))
 	if err != nil {
 		return net.IPNet{}, fmt.Errorf("parsing peer AllowedIPs entry %q: %w", entry, err)
@@ -1583,9 +1599,17 @@ func parseAllowedIP(entry string, localAddrs []net.IP, endpointHosts map[string]
 			return net.IPNet{}, fmt.Errorf("refusing AllowedIPs entry %q: it covers this node's own address %s", entry, addr)
 		}
 	}
-	for host := range endpointHosts {
-		if addr := net.ParseIP(host); addr != nil && ipNet.Contains(addr) {
-			return net.IPNet{}, fmt.Errorf("refusing AllowedIPs entry %q: it covers peer endpoint %s, which is reachable only outside the tunnel", entry, host)
+	// Without the mark, an entry covering a peer endpoint is refused:
+	// the address is reachable only outside the tunnel, and accepting
+	// it invites traffic the routes cannot return. With the mark, the
+	// endpoint address is a legitimate tunnel destination (the outers
+	// are exempted by the mark, everything else rides inside), and an
+	// encapsulating network's packets are addressed to exactly it.
+	if !marked {
+		for host := range endpointHosts {
+			if addr := net.ParseIP(host); addr != nil && ipNet.Contains(addr) {
+				return net.IPNet{}, fmt.Errorf("refusing AllowedIPs entry %q: it covers peer endpoint %s, which is reachable only outside the tunnel", entry, host)
+			}
 		}
 	}
 	return *ipNet, nil
@@ -1633,8 +1657,13 @@ const (
 	routeIsAnEndpoint
 )
 
-func disposeRouteHost(isEndpointHost, peerCanCarry bool) routeHostDisposition {
-	if isEndpointHost {
+// marked reports whether the tunnel's own packets carry the fwmark
+// and are exempted from the dialer's table: with the mark, an
+// endpoint address is safe to route (the loop is broken by the mark,
+// not by withholding the route), and encapsulating networks need
+// exactly that route, because their packets are addressed to nodes.
+func disposeRouteHost(marked, isEndpointHost, peerCanCarry bool) routeHostDisposition {
+	if isEndpointHost && !marked {
 		return routeIsAnEndpoint
 	}
 	if !peerCanCarry {
@@ -1693,7 +1722,7 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	// config.routeTable: a route in main is an ownership claim to any
 	// router that learns alien routes there, and these routes are this
 	// node's private knowledge, not claims.
-	if err := ensureRouteRule(cfg.routeTable); err != nil {
+	if err := ensureRouteRule(cfg.routeTable, cfg.fwmark); err != nil {
 		return fmt.Errorf("ensuring the rule for table %d: %w", cfg.routeTable, err)
 	}
 	claimed := map[string]bool{}
@@ -1859,7 +1888,7 @@ func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes
 	if err != nil {
 		return err
 	}
-	if err := ensureRouteRule(cfg.routeTable); err != nil {
+	if err := ensureRouteRule(cfg.routeTable, cfg.fwmark); err != nil {
 		return fmt.Errorf("ensuring the rule for table %d: %w", cfg.routeTable, err)
 	}
 	desired := map[string]bool{}
@@ -1931,9 +1960,29 @@ func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes
 
 // ensureRouteRule makes the kernel consult the dialer's table for every
 // lookup, ahead of main. Idempotent: one rule per family, keyed by the
-// table number.
-func ensureRouteRule(table int) error {
+// table number. With a mark set, a second rule one priority earlier
+// sends the tunnel's own marked packets straight to main, which is
+// what lets the dialer's table carry routes to the very addresses the
+// tunnel dials: everything except the tunnel's outers may ride the
+// tunnel.
+func ensureRouteRule(table, fwmark int) error {
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
+		if fwmark > 0 {
+			exempt, err := netlink.RuleListFiltered(family, &netlink.Rule{Priority: table - 1}, netlink.RT_FILTER_PRIORITY)
+			if err != nil {
+				return fmt.Errorf("listing rules: %w", err)
+			}
+			if len(exempt) == 0 {
+				rule := netlink.NewRule()
+				rule.Family = family
+				rule.Table = unix.RT_TABLE_MAIN
+				rule.Priority = table - 1
+				rule.Mark = uint32(fwmark)
+				if err := netlink.RuleAdd(rule); err != nil && !os.IsExist(err) {
+					return fmt.Errorf("adding the mark exemption rule: %w", err)
+				}
+			}
+		}
 		rules, err := netlink.RuleListFiltered(family, &netlink.Rule{Table: table}, netlink.RT_FILTER_TABLE)
 		if err != nil {
 			return fmt.Errorf("listing rules: %w", err)
@@ -1964,6 +2013,20 @@ func removeRouteRule(table int) {
 		for i := range rules {
 			if err := netlink.RuleDel(&rules[i]); err != nil {
 				fmt.Fprintf(os.Stderr, "removing the rule for table %d: %v\n", table, err)
+			}
+		}
+		// The mark exemption at table-1 goes with it: it exists only
+		// to serve the table's routes.
+		exempt, err := netlink.RuleListFiltered(family, &netlink.Rule{Priority: table - 1}, netlink.RT_FILTER_PRIORITY)
+		if err != nil {
+			continue
+		}
+		for i := range exempt {
+			if exempt[i].Mark == 0 {
+				continue
+			}
+			if err := netlink.RuleDel(&exempt[i]); err != nil {
+				fmt.Fprintf(os.Stderr, "removing the mark exemption rule: %v\n", err)
 			}
 		}
 	}

@@ -142,17 +142,25 @@ func TestCachedPeersBeatTheBootstrapFile(t *testing.T) {
 func TestARouteHostThatIsNotReadyIsNotARouteHostThatIsWrong(t *testing.T) {
 	cases := []struct {
 		name           string
+		marked         bool
 		isEndpointHost bool
 		peerCanCarry   bool
 		want           routeHostDisposition
 	}{
-		{"a peer that can carry it", false, true, routeInstall},
-		{"a peer still arriving", false, false, routeNotYet},
-		{"an endpoint, peer ready", true, true, routeIsAnEndpoint},
-		{"an endpoint, peer still arriving", true, false, routeIsAnEndpoint},
+		{"a peer that can carry it", false, false, true, routeInstall},
+		{"a peer still arriving", false, false, false, routeNotYet},
+		{"an endpoint, peer ready, unmarked", false, true, true, routeIsAnEndpoint},
+		{"an endpoint, peer still arriving, unmarked", false, true, false, routeIsAnEndpoint},
+		// With the tunnel's own packets marked and exempted, an
+		// endpoint address is an ordinary route host: the loop the
+		// old refusal guarded against is broken by the mark, and an
+		// encapsulating network's node-addressed packets need exactly
+		// this route.
+		{"an endpoint, peer ready, marked", true, true, true, routeInstall},
+		{"an endpoint, peer still arriving, marked", true, true, false, routeNotYet},
 	}
 	for _, c := range cases {
-		if got := disposeRouteHost(c.isEndpointHost, c.peerCanCarry); got != c.want {
+		if got := disposeRouteHost(c.marked, c.isEndpointHost, c.peerCanCarry); got != c.want {
 			t.Errorf("%s: disposition %d, want %d", c.name, got, c.want)
 		}
 	}

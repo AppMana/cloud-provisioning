@@ -9,8 +9,21 @@
 > balances the API path; the mesh itself is distro-invariant, which the
 > all-nodes-two-clouds row (every pair, 112 checks) is there to prove
 > once per distribution rather than six times.
+> rke2 runs cp-dies' outage as reboots only, by recorded decision, not
+> oversight: a sustained partition of an RKE2 server node wedges that
+> node's etcd beyond the distribution's own recovery. rke2-server
+> fatals on "leaderelection lost" (by design, expecting a clean
+> restart), its containerd dies with it while the pod shims survive,
+> and the orphaned etcd, its log consumer gone, keeps heartbeating
+> raft while its serving paths block on a full stderr pipe; every
+> restart then dies reading the datastore, forever, even after the
+> partition heals. Measured here, recovered only by killing the
+> orphaned etcd by hand (~3 minutes to Ready afterwards); known
+> upstream (rancher/rke2 issues 4510, 4479, 7155). k3s embeds etcd in
+> process, restarts it with itself, and passes the same row; power
+> loss orphans nothing, so the reboot rows stand for rke2.
 name	placement	outages
 kubeadm	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
 k0s	full	full
 k3s	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
-rke2	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
+rke2	control-plane all-nodes-two-clouds	reboot-remote reboot-cp

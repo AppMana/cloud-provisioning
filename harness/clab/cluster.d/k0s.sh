@@ -61,9 +61,9 @@ spec:
     etcd:
       peerAddress: $ip
   network:
-    # The product's Calico goes on in install.sh, same as every other
-    # distribution here, so the network under test is the same network.
-    provider: custom
+    # "custom" hands the pod network to install.sh's cni.d installer;
+    # CNI=default keeps kuberouter, the network k0s itself ships.
+    provider: $( [ "${CNI:-calico}" = default ] && echo kuberouter || echo custom )
     podCIDR: $POD_CIDR
     serviceCIDR: $SVC_CIDR
     nodeLocalLoadBalancing:

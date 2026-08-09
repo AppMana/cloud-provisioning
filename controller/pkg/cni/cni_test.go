@@ -128,6 +128,42 @@ func TestDetect(t *testing.T) {
 			wantCNI: Flannel, wantEnc: Encapsulated,
 		},
 		{
+			// k3s's embedded flannel runs in-process: no DaemonSet, no
+			// ConfigMap, nothing in kube-flannel. What every flannel
+			// leaves, embedded or not, is its annotations on each node
+			// it serves, and those are the durable signal.
+			name: "k3s embedded flannel leaves only node annotations",
+			objs: []client.Object{&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name:        "w1",
+				Annotations: map[string]string{"flannel.alpha.coreos.com/backend-type": "vxlan"},
+			}}},
+			wantCNI: Flannel, wantEnc: Encapsulated,
+		},
+		{
+			name: "embedded flannel host-gw routes natively",
+			objs: []client.Object{&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name:        "w1",
+				Annotations: map[string]string{"flannel.alpha.coreos.com/backend-type": "host-gw"},
+			}}},
+			wantCNI: Flannel, wantEnc: Native,
+		},
+		{
+			// Canal is flannel carrying calico's policy engine: calico's
+			// CRDs and pools exist, but pods route by flannel's vxlan,
+			// so classifying it as calico would model routes the network
+			// does not have. The canal DaemonSet is the tiebreak, and it
+			// must win over the pool check.
+			name: "canal is flannel wearing calico's policy, not calico",
+			objs: []client.Object{
+				&appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Namespace: "kube-system", Name: "rke2-canal"},
+					Spec: appsv1.DaemonSetSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "calico-node"}, {Name: "kube-flannel"}},
+					}}}},
+				ipPool("default-ipv4-ippool", "10.42.0.0/16", "Never", "Never"),
+			},
+			wantCNI: Flannel, wantEnc: Encapsulated,
+		},
+		{
 			name: "kube-router with the overlay turned off",
 			objs: []client.Object{&appsv1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "kube-system", Name: "kube-router"},

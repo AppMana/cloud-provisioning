@@ -287,6 +287,82 @@ into the tunnel. The tunnel carries traffic belonging to neither of the
 two nodes holding it, in both directions, which is what makes this work
 at all.
 
+## Compatibility
+
+What each distribution has passed on the containerlab harness: a
+seven-node HA lab (three control planes, two site workers behind a
+NAT router, two remotes in separate clouds meeting only across a
+modelled internet), the site built by `harness/clab/cluster.d/`, the
+remotes joined through this operator's own provider for that
+distribution.
+
+| | kubeadm | k0s | k3s | RKE2 |
+|---|---|---|---|---|
+| native join through the provider | bootstrap token + CA pin | bootstrap token in a kubeconfig, gzip+base64 | `K10<CA-hash>::<id>.<secret>`, minted via the API | same, supervisor on 9345 |
+| who balances the API path | **wg-apiproxy** (ours) | nllb (envoy, `[::1]:7443`) | agent balancer (`127.0.0.1:6444`) | agent balancer (`127.0.0.1:6443`) |
+| placement: `control-plane` | pass | pass | pass | pass |
+| placement: `all-nodes-two-clouds` (112 checks) | pass | pass | pass | pass |
+| placement: full six rows | pass | pass | suite | suite |
+| outage: `cp-dies` (link) | pass | pass | pass | **excluded: RKE2 limitation** |
+| outage: `reboot-remote` | pass | pass | pass | pass |
+| outage: `reboot-cp` | pass | pass | pass | pass |
+| outage: full nine rows | pass | pass | suite | suite |
+| mechanism assertions | pass | pass | pass | pass |
+
+The rows, and what each one claims:
+
+- **Placement rows** (`harness/clab/scenarios.tsv`) vary which site
+  nodes hold tunnels, from one control plane to every node, against
+  one or two clouds. Each row measures every pair of nodes in both
+  directions, by pod address and by service address, plus cluster DNS
+  and the path off the cluster: 84 checks with one cloud, 112 with
+  two. The `all-nodes-two-clouds` row is the superset, so a
+  distribution that passes it has proven the mesh does not care what
+  built the cluster.
+- **Outage rows** (`harness/clab/outages.tsv`) make three claims in
+  sequence: the full matrix is green before anything breaks, the
+  survivors converge to green among themselves while the victim is
+  down, and the victim's return brings the whole lab back to green
+  with nothing reinstalled or forgiven. `link` rows pull the cable and
+  leave the machine running; `reboot` rows SIGKILL the machine and
+  give it back only what a platform provides (a NIC, an address, a
+  gateway), so everything else must be rebuilt by what the node runs
+  at boot. `reboot-remote` is the core invariant made executable: the
+  host unit raises the tunnel from its cached peer list while the
+  cluster is unreachable, because the tunnel must never depend on the
+  Kubernetes it carries.
+- **Mechanism assertions** (`harness/clab/mechanism.sh`) verify the
+  who-balances table on the live remotes: kubeadm's wg-apiproxy
+  answering on the loopback with kubelet dialing it and surviving the
+  dialer's death; k0s's nllb envoy; the k3s/RKE2 agent balancer's
+  state file holding all three control planes. "Full" versus "suite"
+  above is scope, not doubt: kubeadm and k0s (the production
+  distribution) ran every row; k3s and RKE2 run the distro suite,
+  which covers the superset placement row and the outage rows whose
+  mechanics differ per distribution.
+
+**The RKE2 exclusion** is RKE2's own recovery story, measured and
+recorded rather than papered over (`harness/clab/distros.tsv` carries
+the full mechanism): a sustained partition of an RKE2 server node
+wedges that node's etcd beyond the distribution's unaided recovery.
+rke2-server fatals on lost leader election (by design, expecting a
+clean restart), its containerd dies with it while the pod shims
+survive, and the orphaned etcd keeps heartbeating raft while its
+serving paths block on a log pipe nobody reads anymore; every restart
+then dies at the datastore reconcile, even after the partition heals.
+Killing the orphaned etcd by hand recovers the node in about three
+minutes. Known upstream (rancher/rke2#4510, #4479, #7155). k3s embeds
+etcd in-process, restarts it with itself, and passes the identical
+row. The mesh stayed green throughout: no tunnel was on the affected
+node.
+
+Talos is excluded from the matrix by design decision, not omission:
+it runs no foreign binaries and has no systemd, and this tunnel is
+host-configured precisely so it cannot depend on the Kubernetes it
+carries. Supporting Talos means WireGuard in the machine config or a
+system extension, a different product surface tracked in
+`join-patterns/README.md`.
+
 ## Layout
 
 ```

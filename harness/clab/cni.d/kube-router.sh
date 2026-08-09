@@ -18,6 +18,9 @@
 KUBE_ROUTER_MANIFEST="${KUBE_ROUTER_MANIFEST:-https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml}"
 
 install_network() {
+  # The delegated plugins first: this network chains the standard
+  # bridge plugin, which the node image does not ship.
+  ensure_cni_plugins $SITE_NODES $CLOUD_NODES
   curl -fsSL "$KUBE_ROUTER_MANIFEST" -o "$OUT/kube-router.yaml" || fail "fetching kube-router"
   local images
   images=$(grep -oE 'image: [^ ]+' "$OUT/kube-router.yaml" | awk '{print $2}' | sort -u)

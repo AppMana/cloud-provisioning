@@ -16,6 +16,9 @@
 FLANNEL_MANIFEST="${FLANNEL_MANIFEST:-https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml}"
 
 install_network() {
+  # The delegated plugins first: this network chains the standard
+  # bridge plugin, which the node image does not ship.
+  ensure_cni_plugins $SITE_NODES $CLOUD_NODES
   curl -fsSL "$FLANNEL_MANIFEST" -o "$OUT/flannel.yaml" || fail "fetching flannel"
   grep -q "\"Network\": \"$POD_CIDR\"" "$OUT/flannel.yaml" \
     || fail "the flannel manifest's Network is not $POD_CIDR; align it before installing"

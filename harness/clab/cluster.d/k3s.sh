@@ -18,6 +18,20 @@
 
 K3S_VERSION="${K3S_VERSION:-}"
 
+# CNI=default keeps k3s's embedded flannel (vxlan), the distribution's
+# own network; anything else disables it so install.sh's cni.d
+# installer owns the pod network. Emitted where both server configs
+# are written, so the two can never disagree.
+k3s_network_lines() {
+  if [ "${CNI:-calico}" = default ]; then
+    return 0
+  fi
+  cat <<EOF
+flannel-backend: none
+disable-network-policy: true
+EOF
+}
+
 # One download on the host serves all five nodes. The version defaults
 # to k3s's own stable channel, pinnable through the environment. Sets
 # K3S_BIN and K3S_VERSION rather than echoing: a command substitution
@@ -98,10 +112,7 @@ cluster-init: true
 tls-san: [127.0.0.1, $LAN.10, $LAN.13, $LAN.14, cp, cp2, cp3]
 cluster-cidr: $POD_CIDR
 service-cidr: $SVC_CIDR
-# The product's Calico goes on in install.sh, same as every other
-# distribution here.
-flannel-backend: none
-disable-network-policy: true
+$(k3s_network_lines)
 disable: [traefik, servicelb, metrics-server, local-storage]
 $(k3s_config_common cp "$LAN.10")
 EOF
@@ -133,8 +144,7 @@ token-file: /etc/rancher/k3s/cluster-token
 tls-san: [127.0.0.1, $LAN.10, $LAN.13, $LAN.14, cp, cp2, cp3]
 cluster-cidr: $POD_CIDR
 service-cidr: $SVC_CIDR
-flannel-backend: none
-disable-network-policy: true
+$(k3s_network_lines)
 disable: [traefik, servicelb, metrics-server, local-storage]
 $(k3s_config_common "$n" "$ip")
 EOF

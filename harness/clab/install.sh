@@ -17,10 +17,10 @@ cd "$(dirname "$0")"
 LAB=cldt
 NS=cloud-provisioning
 LAN=10.10.0
+POD_CIDR=10.244.0.0/16
 REPO_DIR="$(cd ../.. && pwd)"
 OUT="${OUT:-$PWD/out}"
 CAPI_VERSION="${CAPI_VERSION:-v1.11.1}"
-CALICO_MANIFEST="${CALICO_MANIFEST:-https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/calico.yaml}"
 TUNNEL_ENDPOINTS="${TUNNEL_ENDPOINTS:-kubernetes.io/hostname=w1}"
 SITE_NODES="cp cp2 cp3 w1 w2"
 CLOUD_NODES="remote1 remote2"
@@ -30,6 +30,13 @@ CLOUD_NODES="remote1 remote2"
 # has.
 DISTRO="${DISTRO:-kubeadm}"
 JOIN_PROVIDER="${JOIN_PROVIDER:-$DISTRO}"
+# Which container network the cluster runs: a cni.d/<name>.sh
+# installer, or "default" for a distribution that enabled its own
+# built-in at build time (cluster.d honors the same variable), in
+# which case there is nothing to install here. The controller detects
+# whichever network is running from that network's own resources
+# (pkg/cni), so nothing product-side is told.
+CNI="${CNI:-calico}"
 
 c() { echo "clab-$LAB-$1"; }
 in_node() { docker exec "$(c "$1")" "${@:2}"; }
@@ -130,55 +137,24 @@ docker cp crds/containernet.yaml "$(c bastion)":/tmp/containernet.yaml
 k apply -f /tmp/containernet.yaml >/dev/null || fail "applying containernet crds"
 echo "  cluster, machine, and the containernet kinds"
 
-echo "--- the network ---"
-curl -fsSL "$CALICO_MANIFEST" -o "$OUT/calico.yaml" || fail "fetching calico"
-# No per-distribution CNI path overrides, k3s included. k3s moves its
-# CNI directories into its data dir ONLY when its embedded flannel
-# runs: the assignment sits inside the flannel branch
-# (pkg/executor/embed/embed.go, "if Flannel.Backend != BackendNone"),
-# so with flannel-backend none the dirs stay unset and k3s's
-# containerd falls back to the stock /etc/cni/net.d and /opt/cni/bin.
-# Measured before reading the branch: redirected hostPaths delivered
-# Calico's conflist and binaries into the data dir perfectly, and
-# containerd, looking at the stock paths, said "cni plugin not
-# initialized" on every node.
-CNI_IMAGES=$(grep -oE 'image: [^ ]+' "$OUT/calico.yaml" | awk '{print $2}' | sort -u)
-[ -n "$CNI_IMAGES" ] || fail "no images in the calico manifest"
-echo "  preloading $(echo $CNI_IMAGES | wc -w) network images plus the dialer and busybox"
+echo "--- the network ($CNI) ---"
+# One installer per network, under cni.d/, each defining
+# install_network; "default" means the distribution's own built-in was
+# enabled at build time and there is nothing to install. The product's
+# images ride in regardless: the dialer and busybox everywhere, the
+# controller on the site.
+echo "  preloading the dialer and busybox"
 for n in $SITE_NODES $CLOUD_NODES; do
-  preload "$n" $CNI_IMAGES cldt-dialer:e2e busybox:1.37
+  preload "$n" cldt-dialer:e2e busybox:1.37
 done
 for n in $SITE_NODES; do preload "$n" cldt-controller:e2e; done
 
-docker cp "$OUT/calico.yaml" "$(c bastion)":/tmp/calico.yaml
-k apply -f /tmp/calico.yaml >/dev/null || fail "installing calico"
-# Autodetect the address a node reaches the cluster by, not the first
-# interface that has one. On a site node the two agree. On a remote
-# they cannot: first-found lands on the interface that faces the
-# internet, an address the site has no route to, and calico's address
-# monitor re-detects at every interface change, so it restates that
-# address exactly when a tunnel moves. can-reach follows the route to
-# the API server, which on a remote is the tunnel, so the monitor's
-# own re-detection converges on the address the mesh gave the node.
-k -n kube-system set env daemonset/calico-node \
-  IP_AUTODETECTION_METHOD="can-reach=$LAN.10" >/dev/null \
-  || fail "setting calico's autodetection method"
-# The stock manifest encapsulates. This mesh carries pod traffic
-# natively, and the model the controller reads back has to match what
-# the network actually does.
-for _ in $(seq 1 48); do k get ippools.crd.projectcalico.org default-ipv4-ippool >/dev/null 2>&1 && break; sleep 5; done
-k patch ippools.crd.projectcalico.org default-ipv4-ippool --type merge \
-  -p '{"spec":{"ipipMode":"Never","vxlanMode":"Never"}}' >/dev/null || fail "setting the pool's mode"
-# Waited for, not fired and forgotten. calico-node programs its routes
-# from the pool it saw when it started, so a pool changed afterwards
-# leaves the old encapsulation's routes in place. The node readiness
-# check below is satisfied by the pods that are already running, so
-# without this the harness reports a cluster whose routes and whose
-# model disagree, and says nothing.
-k -n kube-system rollout restart daemonset/calico-node >/dev/null 2>&1 \
-  || fail "could not restart calico-node after changing the pool"
-k -n kube-system rollout status daemonset/calico-node --timeout=5m >/dev/null \
-  || fail "calico-node did not come back after the pool change, so its routes still describe the old encapsulation"
+if [ "$CNI" != default ]; then
+  [ -r "cni.d/$CNI.sh" ] \
+    || fail "no installer for CNI=$CNI (have: $(ls cni.d/ | sed 's/\.sh$//' | tr '\n' ' ') default)"
+  . "cni.d/$CNI.sh"
+  install_network
+fi
 for n in $SITE_NODES; do k wait --for=condition=Ready node/"$n" --timeout=420s >/dev/null 2>&1 || fail "$n never became ready"; done
 echo "  every site node ready"
 

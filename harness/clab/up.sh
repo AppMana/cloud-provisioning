@@ -146,6 +146,18 @@ echo "--- the wan reaches the internet ---"
 # it, and the site's router still admits nothing it did not ask for.
 sudo ip addr replace "$WAN.254/24" dev cldt-wan
 sudo sysctl -qw net.ipv4.ip_forward=1
+# br_netfilter, loaded on the host because a container cannot load
+# modules and the nodes need the files to exist: flannel refuses to
+# start at all when /proc/sys/net/bridge/bridge-nf-call-iptables is
+# absent (k0s logs the same condition and carries on), and loading
+# the module is the standard Kubernetes node prerequisite kind also
+# demands of its host. The sysctls are per-namespace on this kernel,
+# so the host's own bridges keep their current behavior by pinning
+# the host's value to 0; each node sets its own inside its namespace.
+if ! [ -e /proc/sys/net/bridge/bridge-nf-call-iptables ]; then
+  sudo modprobe br_netfilter || fail "cannot load br_netfilter, which the nodes' networks require"
+fi
+sudo sysctl -qw net.bridge.bridge-nf-call-iptables=0 net.bridge.bridge-nf-call-ip6tables=0
 UPLINK=$(ip route show default | awk '{print $5; exit}')
 [ -n "$UPLINK" ] || fail "this host has no default route, so the lab has no internet to reach"
 for net in "$WAN.0/24" "$CLOUD_A.0/24" "$CLOUD_B.0/24"; do

@@ -19,6 +19,10 @@
 PROXY_PORT=7445
 NGINX_IMAGE="${NGINX_IMAGE:-nginx:1.27-alpine}"
 
+# kubeadm ships no network at all, so "the distribution's default CNI"
+# names nothing here.
+[ "${CNI:-calico}" = default ] && fail "kubeadm has no built-in network; pick an installer from cni.d/"
+
 # A joining node needs its loopback forwarder before kubelet exists to
 # run the static pod: kubeadm join reads the cluster's configuration
 # through the server cluster-info names, which is the loopback. So the

@@ -76,9 +76,10 @@ distro_build() {
 tls-san: [127.0.0.1, $LAN.10, $LAN.13, $LAN.14, cp, cp2, cp3]
 cluster-cidr: $POD_CIDR
 service-cidr: $SVC_CIDR
-# The product's Calico goes on in install.sh, same as every other
-# distribution here.
-cni: none
+# "none" hands the pod network to install.sh's cni.d installer;
+# CNI=default keeps canal (flannel vxlan + calico policy), the
+# network RKE2 itself ships.
+cni: $( [ "${CNI:-calico}" = default ] && echo canal || echo none )
 disable: [rke2-ingress-nginx, rke2-metrics-server]
 $(rke2_config_common cp "$LAN.10")
 EOF
@@ -107,7 +108,7 @@ token-file: /etc/rancher/rke2/cluster-token
 tls-san: [127.0.0.1, $LAN.10, $LAN.13, $LAN.14, cp, cp2, cp3]
 cluster-cidr: $POD_CIDR
 service-cidr: $SVC_CIDR
-cni: none
+cni: $( [ "${CNI:-calico}" = default ] && echo canal || echo none )
 disable: [rke2-ingress-nginx, rke2-metrics-server]
 $(rke2_config_common "$n" "$ip")
 EOF

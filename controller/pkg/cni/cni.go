@@ -92,6 +92,15 @@ var (
 // recognised by that, and only a cluster with none of them falls through
 // to the per node allocations the controller manager writes.
 func Detect(ctx context.Context, c client.Reader) (Network, error) {
+	// Canal first, ahead of Calico: canal installs calico's CRDs and
+	// pools for its policy engine while pods route by flannel's
+	// vxlan, so the pool check would classify it as native calico and
+	// model routes the network does not have.
+	if n, ok, err := detectCanal(ctx, c); err != nil {
+		return Network{}, err
+	} else if ok {
+		return n, nil
+	}
 	if n, ok, err := detectCalico(ctx, c); err != nil {
 		return Network{}, err
 	} else if ok {
@@ -180,6 +189,39 @@ func ciliumTunnelDetail(cm *corev1.ConfigMap) string {
 	return "tunnel-protocol=vxlan"
 }
 
+// detectCanal recognises canal by its DaemonSet: flannel carrying
+// calico's policy engine, deployed under the name canal (or RKE2's
+// rke2-canal). It must run before the calico check, because canal's
+// pools exist for policy while pods route by flannel; the
+// encapsulation follows flannel's backend, vxlan unless canal's own
+// config says otherwise.
+func detectCanal(ctx context.Context, c client.Reader) (Network, bool, error) {
+	for _, name := range []string{"rke2-canal", "canal"} {
+		ds := &appsv1.DaemonSet{}
+		if err := c.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: name}, ds); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return Network{}, false, fmt.Errorf("reading the %s DaemonSet: %w", name, err)
+		}
+		backend := "vxlan"
+		for _, cmName := range []string{name + "-config", "canal-config"} {
+			cm := &corev1.ConfigMap{}
+			if err := c.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: cmName}, cm); err == nil {
+				if b := jsonStringValue(cm.Data["net-conf.json"], "Type"); b != "" {
+					backend = b
+					break
+				}
+			}
+		}
+		if strings.EqualFold(backend, "host-gw") {
+			return Network{Name: Flannel, Encapsulation: Native, Detail: "canal, Backend.Type=host-gw"}, true, nil
+		}
+		return Network{Name: Flannel, Encapsulation: Encapsulated, Detail: "canal, Backend.Type=" + backend}, true, nil
+	}
+	return Network{}, false, nil
+}
+
 func detectFlannel(ctx context.Context, c client.Reader) (Network, bool, error) {
 	for _, ns := range []string{"kube-flannel", "kube-system"} {
 		cm := &corev1.ConfigMap{}
@@ -197,6 +239,28 @@ func detectFlannel(ctx context.Context, c client.Reader) (Network, bool, error) 
 			backend = "vxlan"
 		}
 		return Network{Name: Flannel, Encapsulation: Encapsulated, Detail: "Backend.Type=" + backend}, true, nil
+	}
+	// No ConfigMap does not mean no flannel: k3s's embedded flannel
+	// runs in-process, with its configuration in a file on each node
+	// and nothing of its own in the API. What every flannel leaves,
+	// embedded or not, is its annotations on each node it serves, and
+	// the backend type is among them.
+	nodes := &corev1.NodeList{}
+	if err := c.List(ctx, nodes); err != nil {
+		if meaningfulError(err) {
+			return Network{}, false, fmt.Errorf("listing nodes for flannel annotations: %w", err)
+		}
+		return Network{}, false, nil
+	}
+	for _, node := range nodes.Items {
+		backend := node.Annotations["flannel.alpha.coreos.com/backend-type"]
+		if backend == "" {
+			continue
+		}
+		if strings.EqualFold(backend, "host-gw") {
+			return Network{Name: Flannel, Encapsulation: Native, Detail: "node annotation backend-type=host-gw"}, true, nil
+		}
+		return Network{Name: Flannel, Encapsulation: Encapsulated, Detail: "node annotation backend-type=" + backend}, true, nil
 	}
 	return Network{}, false, nil
 }

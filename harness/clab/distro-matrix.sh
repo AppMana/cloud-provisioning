@@ -49,15 +49,18 @@ stage() {
 }
 
 rows=0; failed=0
-while IFS=$'\t' read -r name placement outages <&3; do
-  case "$name" in \>*|''|name) continue ;; esac
-  [ -n "$ONLY_DISTRO" ] && case " $ONLY_DISTRO " in *" $name "*) ;; *) continue ;; esac
+while IFS=$'\t' read -r name cni placement outages <&3; do
+  case "$name" in \>*|''|distro|name) continue ;; esac
+  key="$name-$cni"
+  # A bare distro name in the filter matches all of its network rows;
+  # the full key names one.
+  [ -n "$ONLY_DISTRO" ] && case " $ONLY_DISTRO " in *" $key "*|*" $name "*) ;; *) continue ;; esac
 
   rows=$((rows + 1))
-  export DISTRO="$name"
-  log="$OUT/distro/$name"
+  export DISTRO="$name" CNI="$cni"
+  log="$OUT/distro/$key"
   echo
-  echo "================ $name: placement=[$placement] outages=[$outages] ================"
+  echo "================ $key: placement=[$placement] outages=[$outages] ================"
 
   verdict=FAIL; why=
   while :; do

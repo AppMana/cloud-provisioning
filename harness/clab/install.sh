@@ -96,6 +96,29 @@ preload() {
   done
 }
 
+# The standard CNI plugins, for the networks that delegate to them:
+# flannel's conflist chains bridge, kube-router's does too, and the
+# kindest image ships kind's own set (ptp and friends) with no bridge
+# in it. Calico never noticed because it installs its own binaries.
+# One tarball download on the host serves every node.
+CNI_PLUGINS_VERSION="${CNI_PLUGINS_VERSION:-v1.6.2}"
+ensure_cni_plugins() {
+  local tgz="$OUT/binaries/cni-plugins-$CNI_PLUGINS_VERSION.tgz"
+  if [ ! -f "$tgz" ]; then
+    mkdir -p "$OUT/binaries"
+    curl -fsSL -o "$tgz.part" \
+      "https://github.com/containernetworking/plugins/releases/download/$CNI_PLUGINS_VERSION/cni-plugins-linux-amd64-$CNI_PLUGINS_VERSION.tgz" \
+      || fail "could not download the CNI plugins $CNI_PLUGINS_VERSION"
+    mv "$tgz.part" "$tgz"
+  fi
+  local n
+  for n in "$@"; do
+    docker cp "$tgz" "$(c "$n")":/tmp/cni-plugins.tgz
+    in_node "$n" tar -xzf /tmp/cni-plugins.tgz -C /opt/cni/bin
+    in_node "$n" rm -f /tmp/cni-plugins.tgz
+  done
+}
+
 echo "--- building ---"
 ( cd "$REPO_DIR" && docker build -q --target dialer -t cldt-dialer:e2e -f controller/Dockerfile . >/dev/null \
   && docker build -q --target endpoint-controller -t cldt-controller:e2e -f controller/Dockerfile . >/dev/null ) \

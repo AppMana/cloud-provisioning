@@ -37,8 +37,15 @@ for r in $remotes; do
     || fail "$r has no wg-dialer unit to inspect"
   case "$DISTRO" in
     kubeadm)
-      echo "$unit" | grep -q -- "--api-proxy-port=$PROXY_PORT" \
-        || fail "$r's dialer unit carries no --api-proxy-port: nothing balances for kubeadm"
+      # The balancer is its own unit, its own lifecycle. The dialer's
+      # unit must carry no trace of it: an API path that shares the
+      # dialer's restarts is the coupling wg-apiproxy exists to end.
+      proxy_unit=$(in_node "$r" systemctl cat wg-apiproxy 2>/dev/null) \
+        || fail "$r has no wg-apiproxy unit: nothing balances for kubeadm"
+      echo "$proxy_unit" | grep -q -- "--api-proxy-port=$PROXY_PORT" \
+        || fail "$r's wg-apiproxy unit does not carry the balancer port"
+      echo "$unit" | grep -q -- "--api-proxy-port" \
+        && fail "$r's dialer unit still carries the balancer: the two lifecycles are meant to be decoupled"
       server=$(in_node "$r" sh -c "grep -o 'server: .*' /etc/kubernetes/kubelet.conf" 2>/dev/null | awk '{print $2}')
       [ "$server" = "https://127.0.0.1:$PROXY_PORT" ] \
         || fail "$r's kubelet dials ${server:-nothing}, not its own balancer"
@@ -46,7 +53,17 @@ for r in $remotes; do
       # whose every backend is wrong still listens.
       in_node "$r" curl -ksm 3 -o /dev/null "https://127.0.0.1:$PROXY_PORT/livez" \
         || fail "$r's loopback balancer does not answer /livez"
-      echo "  $r: dialer balances on 127.0.0.1:$PROXY_PORT, kubelet dials it, it answers"
+      # The decoupling itself, measured: kill the dialer and the API
+      # path must not blink. The tunnel is kernel state, the balancer
+      # is another process; if this probe fails, kubelet's API path
+      # dies with our most-frequently-restarted component.
+      in_node "$r" systemctl stop wg-dialer
+      if ! in_node "$r" curl -ksm 3 -o /dev/null "https://127.0.0.1:$PROXY_PORT/livez"; then
+        in_node "$r" systemctl start wg-dialer
+        fail "$r's balancer died with the dialer, the coupling wg-apiproxy exists to end"
+      fi
+      in_node "$r" systemctl start wg-dialer
+      echo "  $r: wg-apiproxy balances on 127.0.0.1:$PROXY_PORT, kubelet dials it, and it survives the dialer's death"
       ;;
     k0s)
       echo "$unit" | grep -q -- "--api-proxy-port" \

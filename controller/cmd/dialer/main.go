@@ -126,6 +126,16 @@ type config struct {
 	// unit only, never the pod: kubelet depends on it before any pod
 	// can run.
 	apiProxyPort int
+	// apiProxyOnly runs the balancer and nothing else: no netlink, no
+	// wgctrl, no cluster client, no capability. It exists so the
+	// balancer can live in its own systemd unit with its own
+	// lifecycle: the tunnel is kernel state that survives this
+	// process, but a proxy dies with whoever serves it, and kubelet's
+	// API path must not share the dialer's restarts, crashes, and
+	// hourly re-exec. Backends come from the same files the dialer
+	// maintains: the adoption cache when the DaemonSet has written
+	// one, the bootstrap snapshot until then.
+	apiProxyOnly bool
 }
 
 // nodeAPIProxy is the loopback balancer, when this dialer serves one.
@@ -134,6 +144,57 @@ var nodeAPIProxy *apiProxy
 func setAPIProxyBackends(addrs []string) {
 	if nodeAPIProxy != nil && len(addrs) > 0 {
 		nodeAPIProxy.SetBackends(addrs)
+	}
+}
+
+// apiProxyBackendsFromFiles is the balancer's view of the control
+// planes, freshest source first: the adoption cache if the DaemonSet
+// dialer has ever written one, the bootstrap snapshot otherwise. The
+// same order the dialer itself applies; the proxy just reads it from
+// the files instead of holding it in the dialer's process.
+func apiProxyBackendsFromFiles(cfg config) []string {
+	if cached, err := readCachedPeers(cachePath(cfg)); err == nil && len(cached.APIServers) > 0 {
+		return cached.APIServers
+	}
+	if doc, err := readPeersFileDoc(cfg.peersFile); err == nil && len(doc.APIServers) > 0 {
+		return doc.APIServers
+	}
+	return nil
+}
+
+// runAPIProxyOnly serves the loopback balancer and nothing else. It
+// touches no kernel state and needs no capability: a small TCP
+// splicer whose only job is to be up, in a unit whose lifecycle is
+// its own. The property k0s buys with envoy, bought here with the
+// binary the node already verified.
+func runAPIProxyOnly(cfg config) {
+	if cfg.apiProxyPort <= 0 {
+		fatal("--api-proxy-only requires --api-proxy-port")
+	}
+	if cfg.peersFile == "" || cfg.iface == "" {
+		fatal("--api-proxy-only requires --peers-file and --iface (the adoption cache is named for the interface)")
+	}
+	proxy, err := newAPIProxy(fmt.Sprintf("127.0.0.1:%d", cfg.apiProxyPort))
+	if err != nil {
+		fatal("%v", err)
+	}
+	defer proxy.Close()
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	ticker := time.NewTicker(cfg.pollInterval)
+	defer ticker.Stop()
+	for {
+		// Empty reads change nothing: a briefly unreadable file must
+		// not empty a serving backend list.
+		if backends := apiProxyBackendsFromFiles(cfg); len(backends) > 0 {
+			proxy.SetBackends(backends)
+		}
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
@@ -158,8 +219,14 @@ func main() {
 	flag.IntVar(&cfg.routeTable, "route-table", 517, "routing table for the dialer's routes, consulted by an ip rule of the same priority. Not main: a CNI router that learns alien routes from main would re-announce them as this node's, and every node with a tunnel would claim the whole mesh")
 	flag.StringVar(&cfg.transitMasqueradeSource, "transit-masquerade-source", "", "optional tunnel-subnet CIDR: enable forwarding + masquerade for tunnel-sourced traffic leaving this node toward cluster addresses that have no tunnel (transit role)")
 	flag.IntVar(&cfg.apiProxyPort, "api-proxy-port", 0, "serve a node-local API balancer on 127.0.0.1:<port>, forwarding each connection to the first control plane that answers (the peer list carries their addresses). 0 disables it. Host unit only: kubelet depends on this before any pod can run")
+	flag.BoolVar(&cfg.apiProxyOnly, "api-proxy-only", false, "run only the node-local API balancer, in its own unit with its own lifecycle, so kubelet's API path does not share the dialer's restarts. Requires --api-proxy-port, --peers-file and --iface (the adoption cache is named for the interface)")
 	flag.StringVar(&cfg.installHostBinary, "install-host-binary", "", "optional host path to keep equal to this process's own executable (atomic replace, only when the digest differs): the post-join upgrade channel: the container image carries the binary, so the node's systemd unit converges onto it without any download host")
 	flag.Parse()
+
+	if cfg.apiProxyOnly {
+		runAPIProxyOnly(cfg)
+		return
+	}
 
 	usingSecret := cfg.secretNamespace != "" || cfg.secretName != ""
 	usingFile := cfg.peersFile != ""

@@ -212,14 +212,30 @@ if [[ ${#NODES[@]} -gt 1 ]]; then
       sleep 10
     done
   }
-  for other in "${NODES[@]}"; do
-    [[ "$other" == "$first" ]] && continue
-    wait_path "$first to reach $other" \
-      http_from_early "$first" "http://${POD_IP[$other]}:$SERVICE_PORT/"
-    wait_path "$other to reach $first" \
-      http_from_early "$other" "http://${POD_IP[$first]}:$SERVICE_PORT/"
-    wait_path "$other to reach $first by service address" \
-      http_from_early "$other" "http://${SERVICE_IP[$first]}:$SERVICE_PORT/"
+  # Every ordered pair, not a sample through the first node. The pairs
+  # the sample missed are exactly the slowest ones: a transit pair
+  # (neither end holds a tunnel; the path goes through a relay) after
+  # a placement shrink converges on the rehoming evidence's schedule,
+  # minutes, not seconds, and a gate that never probed it left the
+  # checks' own short retries to eat that convergence. Measured:
+  # endpoints moved from all to w1,w2, and the two transit pairs
+  # (cp2 to remote2, cp3 to remote1) were the 2 of 112 still
+  # converging when the checks ran. Once converged, this is n-squared
+  # fast probes; while converging, it is the wait the measurement
+  # needs to mean anything.
+  for src in "${NODES[@]}"; do
+    for dst in "${NODES[@]}"; do
+      [[ "$src" == "$dst" ]] && continue
+      wait_path "$src to reach $dst" \
+        http_from_early "$src" "http://${POD_IP[$dst]}:$SERVICE_PORT/"
+    done
+    # One service-address path per source: the service hop beyond the
+    # pod path is the source node's own kube-proxy programming, which
+    # does not vary by destination.
+    if [[ "$src" != "$first" ]]; then
+      wait_path "$src to reach $first by service address" \
+        http_from_early "$src" "http://${SERVICE_IP[$first]}:$SERVICE_PORT/"
+    fi
   done
   # Cluster DNS too, per node, because the checks measure it and a
   # check that is not gated eats convergence out of its own single

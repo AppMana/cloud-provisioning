@@ -1,13 +1,13 @@
 package join
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
-	"text/template"
+
+	"github.com/appmana/cloud-provisioning/controller/pkg/render"
 )
 
 var templateActions = regexp.MustCompile(`{{.*?}}`)
@@ -25,7 +25,10 @@ var templateActions = regexp.MustCompile(`{{.*?}}`)
 // --keepalive-seconds, --mtu and --poll-interval never reached the
 // dialer on any bootstrapped node.
 func TestUnitExecStartPassesOnlyFlags(t *testing.T) {
-	patterns, err := filepath.Glob(filepath.Join("..", "..", "..", "join-patterns", "*.cloud-config.tmpl"))
+	// Every template, the shared blocks included: the units live in
+	// _shared.tmpl now, and a sweep that skipped it would lint
+	// nothing.
+	patterns, err := filepath.Glob(filepath.Join("..", "..", "..", "join-patterns", "*.tmpl"))
 	if err != nil || len(patterns) == 0 {
 		t.Fatalf("no join patterns found: %v", err)
 	}
@@ -85,13 +88,24 @@ func execStartCommands(tmpl string) []string {
 // spec finds this machine's own adoption Secret, which is the only
 // source of a peer list that is not frozen at render time.
 func TestPatternsWriteTheMachineNameForAdoption(t *testing.T) {
+	// The file itself is written by the shared wg-dialer-files block,
+	// so each pattern must invoke it (or write the path directly), and
+	// the shared block must actually contain the path.
+	shared, err := os.ReadFile(filepath.Join("..", "..", "..", "join-patterns", "_shared.tmpl"))
+	if err != nil {
+		t.Fatalf("reading _shared.tmpl: %v", err)
+	}
+	if !strings.Contains(string(shared), "/etc/wg-dialer/machine-name") {
+		t.Fatal("_shared.tmpl's wg-dialer-files block writes no machine-name file")
+	}
 	patterns, _ := filepath.Glob(filepath.Join("..", "..", "..", "join-patterns", "*.cloud-config.tmpl"))
 	for _, path := range patterns {
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("reading %s: %v", path, err)
 		}
-		if !strings.Contains(string(raw), "/etc/wg-dialer/machine-name") {
+		if !strings.Contains(string(raw), `template "wg-dialer-files"`) &&
+			!strings.Contains(string(raw), "/etc/wg-dialer/machine-name") {
 			t.Errorf("%s writes no machine-name file, so the DaemonSet cannot resolve this machine's adoption Secret", filepath.Base(path))
 		}
 	}
@@ -111,8 +125,22 @@ func TestKubeadmJoinsThroughTheLoopbackBalancer(t *testing.T) {
 	if !strings.Contains(rendered, "https://127.0.0.1:7445/livez") {
 		t.Error("the gate does not probe the loopback balancer, so a join can start before the balancer serves")
 	}
-	if !strings.Contains(rendered, "--api-proxy-port=7445") {
-		t.Error("the host unit does not serve the balancer, and nothing else may: kubelet depends on it before any pod can run")
+	// The balancer is its own unit with its own lifecycle: kubelet's
+	// API path must not share the dialer's restarts, crashes, or
+	// hourly re-exec. The dialer unit therefore carries no balancer
+	// flag at all: exactly one ExecStart names the port, and it is the
+	// proxy's, in proxy-only mode.
+	if !strings.Contains(rendered, "wg-apiproxy.service") {
+		t.Error("no wg-apiproxy unit: the balancer would share the dialer's lifecycle, which is the failure envoy exists to avoid")
+	}
+	if !strings.Contains(rendered, "--api-proxy-only") {
+		t.Error("the balancer unit does not run in proxy-only mode")
+	}
+	if n := strings.Count(rendered, "--api-proxy-port="); n != 1 {
+		t.Errorf("--api-proxy-port appears %d times; exactly one unit (the proxy's) may carry it", n)
+	}
+	if !strings.Contains(rendered, "systemctl enable --now wg-apiproxy.service") {
+		t.Error("the balancer unit is never enabled")
 	}
 }
 
@@ -125,7 +153,10 @@ func TestKubeadmJoinsThroughTheLoopbackBalancer(t *testing.T) {
 func TestKubeadmWithoutTheBalancerJoinsTheEndpointDirectly(t *testing.T) {
 	rendered := renderKubeadmPattern(t, 0)
 	if strings.Contains(rendered, "--api-proxy-port") {
-		t.Error("port zero still passes --api-proxy-port, so the unit serves a balancer nobody asked for")
+		t.Error("port zero still passes --api-proxy-port, so a unit serves a balancer nobody asked for")
+	}
+	if strings.Contains(rendered, "wg-apiproxy.service") {
+		t.Error("port zero still renders the balancer unit")
 	}
 	if !strings.Contains(rendered, "kubeadm join 10.101.0.1:6443") {
 		t.Error("port zero does not join the endpoint directly")
@@ -169,6 +200,7 @@ func TestK3sJoinsTheEndpointAndCarriesNoSecondBalancer(t *testing.T) {
 		"joinServerURL":           "https://10.101.0.1:6443",
 		"joinToken":               "K10aaaa::id.secret",
 		"k3sVersion":              "v1.33.3+k3s1",
+		"apiProxyPort":            0,
 		"kubeletExtraArgs":        "--node-labels=x=y",
 		"dialerBinaryURLArm64":    "https://example.com/a",
 		"dialerBinarySHA256Arm64": "a",
@@ -209,6 +241,7 @@ func TestRKE2JoinsTheSupervisorAndCarriesNoSecondBalancer(t *testing.T) {
 		"joinServerURL":           "https://10.101.0.1:9345",
 		"joinToken":               "K10aaaa::id.secret",
 		"rke2Version":             "v1.33.4+rke2r1",
+		"apiProxyPort":            0,
 		"kubeletExtraArgs":        "--node-labels=x=y",
 		"dialerBinaryURLArm64":    "https://example.com/a",
 		"dialerBinarySHA256Arm64": "a",
@@ -235,35 +268,21 @@ func TestRKE2JoinsTheSupervisorAndCarriesNoSecondBalancer(t *testing.T) {
 	}
 }
 
+// renderPattern renders through pkg/render, the reconciler's own
+// path, so the shared blocks parse here exactly as they do in
+// production.
 func renderPattern(t *testing.T, name string, values map[string]any) string {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "join-patterns", name))
+	rendered, err := render.Pattern(filepath.Join("..", "..", "..", "join-patterns", name), values)
 	if err != nil {
-		t.Fatalf("reading %s: %v", name, err)
-	}
-	tmpl, err := template.New(name).Option("missingkey=error").Parse(string(raw))
-	if err != nil {
-		t.Fatalf("parsing %s: %v", name, err)
-	}
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, values); err != nil {
 		t.Fatalf("rendering %s: %v", name, err)
 	}
-	return buf.String()
+	return rendered
 }
 
 func renderKubeadmPattern(t *testing.T, proxyPort int) string {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "join-patterns", "kubeadm-worker.cloud-config.tmpl"))
-	if err != nil {
-		t.Fatalf("reading the kubeadm pattern: %v", err)
-	}
-	tmpl, err := template.New("kubeadm").Option("missingkey=error").Parse(string(raw))
-	if err != nil {
-		t.Fatalf("parsing the kubeadm pattern: %v", err)
-	}
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, map[string]any{
+	return renderPattern(t, "kubeadm-worker.cloud-config.tmpl", map[string]any{
 		"peersFileJSON":           "{}",
 		"machineName":             "remote1",
 		"interfaceName":           "cldt0",
@@ -279,8 +298,4 @@ func renderKubeadmPattern(t *testing.T, proxyPort int) string {
 		"dialerBinaryURLAmd64":    "https://example.com/b",
 		"dialerBinarySHA256Amd64": "b",
 	})
-	if err != nil {
-		t.Fatalf("rendering the kubeadm pattern: %v", err)
-	}
-	return buf.String()
 }

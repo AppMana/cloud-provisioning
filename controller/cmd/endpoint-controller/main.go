@@ -375,13 +375,32 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	// Per-Machine key (r.secretKey is a prefix, e.g. "peer-endpoint-"),
 	// not a flat singleton, so a second cloud Machine does not clobber
 	// the first's endpoint entry.
+	//
+	// The same address joins the machine's accept list and route
+	// hosts. It is one fact, learned here: the machine's node address.
+	// An encapsulating network addresses its packets to exactly it
+	// (flannel's vxlan outers, cilium's tunnel outers), so the site's
+	// dialers must both accept it through cryptokey routing and route
+	// it into the tunnel; the dialer's fwmark is what makes that route
+	// safe for the address the tunnel also dials. The join reconciler
+	// cannot write these at render time because the address does not
+	// exist yet; this mirror is where it first becomes known.
 	machineKey := r.secretKey + machine.GetName()
-	if string(secret.Data[machineKey]) != endpoint {
+	allowedKey := tunnel.PeerAllowedIPsPrefix + machine.GetName()
+	routeHostsKey := tunnel.PeerRouteHostsPrefix + machine.GetName()
+	allowed := tunnel.SplitList(string(secret.Data[allowedKey]))
+	routeHosts := tunnel.SplitList(string(secret.Data[routeHostsKey]))
+	wantAllowed := appendMissing(allowed, tunnel.HostCIDR(externalIP))
+	wantRouteHosts := appendMissing(routeHosts, externalIP)
+	if string(secret.Data[machineKey]) != endpoint ||
+		len(wantAllowed) != len(allowed) || len(wantRouteHosts) != len(routeHosts) {
 		patch := client.MergeFrom(secret.DeepCopy())
 		if secret.Data == nil {
 			secret.Data = map[string][]byte{}
 		}
 		secret.Data[machineKey] = []byte(endpoint)
+		secret.Data[allowedKey] = []byte(strings.Join(wantAllowed, ","))
+		secret.Data[routeHostsKey] = []byte(strings.Join(wantRouteHosts, ","))
 		if err := r.Patch(ctx, secret, patch); err != nil {
 			return ctrl.Result{}, fmt.Errorf("patching secret %s: %w", secretKey, err)
 		}
@@ -414,6 +433,19 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 	return ctrl.Result{}, nil
+}
+
+// appendMissing appends value to list unless an equal entry is
+// already there, preserving whatever order the list arrived in: the
+// mirror only ever adds the one fact it owns, never rewrites the
+// render's.
+func appendMissing(list []string, value string) []string {
+	for _, have := range list {
+		if strings.TrimSpace(have) == value {
+			return list
+		}
+	}
+	return append(append([]string{}, list...), value)
 }
 
 // reconcileTunnelEndpoints allocates a tunnel address and records the

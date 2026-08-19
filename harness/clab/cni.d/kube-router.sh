@@ -22,6 +22,18 @@ install_network() {
   # bridge plugin, which the node image does not ship.
   ensure_cni_plugins $SITE_NODES $CLOUD_NODES
   curl -fsSL "$KUBE_ROUTER_MANIFEST" -o "$OUT/kube-router.yaml" || fail "fetching kube-router"
+  # The bridge must reflect a frame back out the port it arrived on: a
+  # pod that dials its own service is DNATed straight back to itself,
+  # and without hairpin on its bridge port that frame has nowhere to
+  # go. The stock conf leaves the bridge plugin's hairpinMode at its
+  # false default; flannel's conf sets it true, and calico has no
+  # bridge to tell. kube-proxy already owns the NAT half (this variant
+  # runs --run-service-proxy=false, and kube-proxy masquerades the
+  # hairpin flow), so the bridge port is the only half missing.
+  sed -i 's/"isDefaultGateway":true,/"isDefaultGateway":true,\n             "hairpinMode":true,/' \
+    "$OUT/kube-router.yaml"
+  grep -q '"hairpinMode":true' "$OUT/kube-router.yaml" \
+    || fail "the kube-router manifest's bridge conf changed shape; hairpinMode was not set"
   local images
   images=$(grep -oE 'image: [^ ]+' "$OUT/kube-router.yaml" | awk '{print $2}' | sort -u)
   [ -n "$images" ] || fail "no images in the kube-router manifest"

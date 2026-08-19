@@ -174,16 +174,32 @@ func TestDetect(t *testing.T) {
 			wantCNI: KubeRouter, wantEnc: Native,
 		},
 		{
-			// The overlay is on unless it is turned off, so an absent
-			// flag must not be read as native.
-			name: "kube-router defaults to an overlay",
+			// kube-router's overlay is on by default, and it is still
+			// native here: the overlay encapsulates only along routes
+			// its BGP learned, and no session crosses the tunnel, so a
+			// pod packet the tunnel carries is unwrapped whatever the
+			// flags say. Reading the default as encapsulated would
+			// withhold every pod block from the mesh.
+			name: "kube-router with the default overlay is still native to the tunnel",
 			objs: []client.Object{&appsv1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "kube-system", Name: "kube-router"},
 				Spec: appsv1.DaemonSetSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{Name: "kube-router", Args: []string{"--run-router=true"}}},
 				}}},
 			}},
-			wantCNI: KubeRouter, wantEnc: Encapsulated,
+			wantCNI: KubeRouter, wantEnc: Native,
+		},
+		{
+			// Even a full overlay reaches only the nodes its BGP mesh
+			// reaches, and the tunnel is not one of them.
+			name: "kube-router with a full overlay is still native to the tunnel",
+			objs: []client.Object{&appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "kube-system", Name: "kube-router"},
+				Spec: appsv1.DaemonSetSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "kube-router", Args: []string{"--run-router=true", "--overlay-type=full"}}},
+				}}},
+			}},
+			wantCNI: KubeRouter, wantEnc: Native,
 		},
 		{
 			name:    "an unrecognised network is reported as such",

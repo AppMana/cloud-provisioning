@@ -1,0 +1,12 @@
+k0s-cilium reboot-remote: after remote1 is SIGKILLed and returns, the
+remote1<->remote2 pairs alone never recover: the convergence gate
+waited its full 420s and gave up on both directions, while all 108
+other checks (remote<->site included) passed. cp-dies on the same row
+passed. kubeadm-cilium passed this identical row, so the distribution
+is the variable, not the network.
+
+The remote<->remote leg is the only one that crosses cloud to cloud
+directly, peer to peer over public addresses rather than through a
+site endpoint, and the only one a remote bootstrap list cannot
+describe: remote1 was rendered before remote2 existed, so after a
+reboot that path exists only if the adoption cache is re-read.

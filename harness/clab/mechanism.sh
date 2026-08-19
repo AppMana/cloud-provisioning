@@ -20,12 +20,53 @@ cd "$(dirname "$0")"
 
 LAB=cldt
 DISTRO="${DISTRO:-kubeadm}"
+CNI="${CNI:-calico}"
 PROXY_PORT="${PROXY_PORT:-7445}"
 
 c() { echo "clab-$LAB-$1"; }
 in_node() { docker exec "$(c "$1")" "${@:2}"; }
 k() { in_node bastion kubectl "$@"; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
+
+# What this row installed, in the terms the controller reports. The
+# encapsulation is as much of the claim as the name: it decides
+# whether a peer is permitted pod prefixes or node addresses alone,
+# and getting it wrong publishes nothing while every component looks
+# healthy (measured on kube-router, whose overlay the model believed
+# in for two full rows).
+expected_network() {
+  case "$CNI" in
+    calico)      echo "calico/native" ;;
+    kube-router) echo "kube-router/native" ;;
+    flannel)     echo "flannel/encapsulated" ;;
+    cilium)      echo "cilium/encapsulated" ;;
+    default)
+      # The distribution's own network, named by what it actually
+      # ships: k0s bundles kube-router, k3s embeds flannel, and RKE2's
+      # canal is flannel carrying calico's policy, which the detector
+      # must report as flannel rather than the calico its CRDs
+      # advertise.
+      case "$DISTRO" in
+        k0s)      echo "kube-router/native" ;;
+        k3s|rke2) echo "flannel/encapsulated" ;;
+        *) fail "no built-in network is defined for $DISTRO" ;;
+      esac ;;
+    *) fail "no expected network for CNI=$CNI" ;;
+  esac
+}
+
+# The model the mesh is actually running on, read from the controller
+# rather than assumed. Absence is a failure, not a skip: an assertion
+# that cannot find its evidence has proved nothing.
+echo "--- the network the controller models (CNI=$CNI DISTRO=$DISTRO) ---"
+want=$(expected_network)
+got=$(k -n cloud-provisioning logs deploy/cloud-provisioning-endpoint-controller --tail=2000 2>/dev/null \
+  | grep -oE "network=[a-z0-9-]+/[a-z]+" | tail -1)
+[ -n "$got" ] || fail "the controller never reported which network it detected"
+got=${got#network=}
+[ "$got" = "$want" ] \
+  || fail "the controller models $got, but this row installed $CNI on $DISTRO, which is $want"
+echo "  $got, as installed"
 
 remotes=$(k get nodes -l cloud-provisioning.appmana.com/role=cloud-worker \
   -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -v '^$' || true)

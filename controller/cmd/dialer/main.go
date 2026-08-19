@@ -400,34 +400,36 @@ func main() {
 // outside, which is the reason to set them rather than infer them from
 // a passing test.
 func ensureForwardingPath(iface string, mtu int) error {
-	// Loose rather than off: a packet whose source this node cannot
-	// reach at all is still not one it should be forwarding.
+	// Reverse path filtering, on every interface the node has rather
+	// than the two this process owns.
 	//
-	// On every interface, not just this one. The asymmetry a tunnel
-	// creates is not confined to the tunnel: a node whose address is
-	// also the address a remote dials it at cannot have that address
-	// routed through the tunnel, because the encrypted packet would
-	// match its own route. So the remote reaches that node the direct
-	// way and the node replies through the tunnel, and the drop
-	// happens on the interface the traffic arrives on, which is the
-	// other one. The kernel takes the larger of the "all" value and
-	// the interface's, so setting "all" is what actually relaxes it.
-	// Only ever relaxed, never tightened. The kernel takes the larger of
-	// the "all" value and the interface's, so writing 2 into "all"
-	// relaxes a node whose interfaces are strict and tightens one whose
-	// interfaces are off, turning no checking into loose checking. Loose
-	// still drops a packet whose source is unroutable, which is exactly
-	// what a freshly joined remote's pod block is until its route lands,
-	// so tightening here would cost the very traffic this is meant to
-	// let through.
-	for _, knob := range []string{"ipv4/conf/all/rp_filter", fmt.Sprintf("ipv4/conf/%s/rp_filter", iface)} {
-		if current, err := readSysctl(knob); err == nil && current == "0" {
-			continue
-		}
-		if err := setSysctl(knob, "2"); err != nil {
-			fmt.Fprintf(os.Stderr, "leaving reverse path filtering strict at %s (a reply that returns by another path will be dropped): %v\n", knob, err)
-		}
-	}
+	// The asymmetry a tunnel creates is not confined to the tunnel. A
+	// peer's own address is routed THROUGH the tunnel here (that is
+	// what carries an encapsulating network's node-addressed packets),
+	// while the peer's WireGuard packets arrive on the underlay
+	// interface. Strict filtering asks whether the route back to the
+	// source leaves by the interface it arrived on, gets "no, by the
+	// tunnel", and drops the peer's handshake before any socket sees
+	// it.
+	//
+	// The kernel uses max(conf/all, conf/<iface>), and 2 (loose) is
+	// numerically greater than 1 (strict), so a single 2 anywhere in
+	// that pair decides it. That is why relaxing only "all" is not
+	// enough: with all=0 an interface that is itself 1 stays strict.
+	// Measured on a rebooted remote, where the restored NIC inherited
+	// conf/default/rp_filter=1 while all was 0: the peer's handshake
+	// responses arrived on the wire, IPReversePathFilter counted every
+	// one of them, WireGuard's rx never moved, and that node's
+	// cloud-to-cloud tunnel stayed dead while every other path worked.
+	//
+	// So: every knob that is strict becomes loose, and a knob that is
+	// off is left alone. Loose still drops a packet whose source is
+	// unroutable, which is what a freshly joined remote's pod block is
+	// until its route lands, so this never turns off a check the node
+	// was making. Enumerated rather than named, because the underlay
+	// interface is not this process's to know, and after a platform
+	// hands a node its NIC back that interface is new.
+	relaxReversePathFiltering(iface)
 
 	c, err := nftables.New()
 	if err != nil {
@@ -541,6 +543,51 @@ func ensureForwardingPath(iface string, mtu int) error {
 // costs nothing and cannot fail.
 // readSysctl reports one net sysctl's current value, from the node's
 // own /proc/sys/net where that is mounted in.
+// relaxReversePathFiltering turns every strict rp_filter on this node
+// loose, and leaves every disabled one alone. See
+// ensureForwardingPath for why the effective value is what matters
+// and why "all" alone cannot carry it.
+func relaxReversePathFiltering(iface string) {
+	for _, knob := range reversePathKnobs(iface) {
+		current, err := readSysctl(knob)
+		if err != nil || current != "1" {
+			continue
+		}
+		if err := setSysctl(knob, "2"); err != nil {
+			fmt.Fprintf(os.Stderr, "leaving reverse path filtering strict at %s (a peer whose reply returns by another path will be dropped): %v\n", knob, err)
+		}
+	}
+}
+
+// reversePathKnobs is every rp_filter this node has: conf/all, the
+// tunnel's own, and one per interface the kernel currently knows.
+// Enumerating is the point (see ensureForwardingPath): the interface
+// a peer's packets arrive on belongs to the platform, not to this
+// process, and it may not have existed when the dialer started.
+func reversePathKnobs(iface string) []string {
+	knobs := []string{"ipv4/conf/all/rp_filter", fmt.Sprintf("ipv4/conf/%s/rp_filter", iface)}
+	seen := map[string]bool{knobs[0]: true, knobs[1]: true}
+	for _, base := range []string{filepath.Join(tunnel.HostSysctlNet, "ipv4/conf"), "/proc/sys/net/ipv4/conf"} {
+		entries, err := os.ReadDir(base)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			// "default" is the template new interfaces inherit, not a
+			// live interface: relaxing it changes what the next NIC
+			// starts as, which is exactly the case that broke, so it
+			// is included deliberately.
+			knob := fmt.Sprintf("ipv4/conf/%s/rp_filter", entry.Name())
+			if !seen[knob] {
+				seen[knob] = true
+				knobs = append(knobs, knob)
+			}
+		}
+		break
+	}
+	return knobs
+}
+
 func readSysctl(name string) (string, error) {
 	for _, path := range []string{filepath.Join(tunnel.HostSysctlNet, name), filepath.Join("/proc/sys/net", name)} {
 		if current, err := os.ReadFile(path); err == nil {

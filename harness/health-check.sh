@@ -28,6 +28,12 @@ set -uo pipefail
 # once discovery recovers.
 NAMESPACE="cloud-provisioning-health-$(date +%s)"
 SERVICE_PORT=8080
+# The large object every pod serves, for the transfer check below. A
+# megabyte is far past any MTU on this path, so a size that comes back
+# short or a transfer that stalls is the packet-size failure and
+# nothing else.
+BIG_KIB="${HEALTH_CHECK_BIG_KIB:-1024}"
+BIG_BYTES=$((BIG_KIB * 1024))
 IMAGE="${HEALTH_CHECK_IMAGE:-busybox:1.37}"
 NODES=()
 # How to run a command inside a probe pod.
@@ -116,7 +122,7 @@ spec:
   containers:
     - name: serve
       image: $IMAGE
-      command: ["sh","-c","mkdir -p /tmp/www; printf ok > /tmp/www/index.html; httpd -f -p $SERVICE_PORT -h /tmp/www"]
+      command: ["sh","-c","mkdir -p /tmp/www; printf ok > /tmp/www/index.html; dd if=/dev/zero of=/tmp/www/big bs=1024 count=$BIG_KIB 2>/dev/null; httpd -f -p $SERVICE_PORT -h /tmp/www"]
       ports: [{containerPort: $SERVICE_PORT}]
 EOF
   kubectl apply -n "$NAMESPACE" -f - >/dev/null <<EOF
@@ -180,6 +186,26 @@ pod_exec() {
 http_from() {
   local src="$1" url="$2"
   pod_exec "$src" wget -q -T 5 -O - "$url" | grep -q ok
+}
+
+# A transfer big enough to need full-size segments, verified by size.
+#
+# Every check above this one fits in a single small packet, so all of
+# them pass on a path whose largest packet cannot cross: the request
+# goes, the reply goes, and the failure waits for the first real
+# workload. What makes that failure invisible rather than loud is that
+# nothing can report it. An endpoint forwards for nodes two hops away,
+# so the "packet too big" it would have to send goes back to a pod it
+# does not host, on a node it does not control (see the dialer's
+# underlayMTU). That is why the dialer clamps the advertised segment
+# size on the handshake instead of relying on discovery, and this is
+# the check that holds the clamp to its claim: an encapsulating
+# network stacks its own header inside the tunnel's, so the margin
+# this measures is the one that actually gets consumed.
+big_from() {
+  local src="$1" url="$2" got
+  got=$(pod_exec "$src" wget -q -T 20 -O - "$url" | wc -c)
+  [[ "$got" == "$BIG_BYTES" ]]
 }
 
 # A node that has just joined has to be given its pod block, have that
@@ -289,6 +315,14 @@ echo "pod to service, every pair, with no service range permitted on the tunnel"
 for src in "${NODES[@]}"; do
   for dst in "${NODES[@]}"; do
     check "$src to $dst service (${SERVICE_IP[$dst]})" http_from "$src" "http://${SERVICE_IP[$dst]}:$SERVICE_PORT/"
+  done
+done
+
+echo
+echo "a ${BIG_KIB}KiB transfer, every pair: the segment size the tunnel clamps to"
+for src in "${NODES[@]}"; do
+  for dst in "${NODES[@]}"; do
+    check "$src to $dst ${BIG_KIB}KiB (${POD_IP[$dst]})" big_from "$src" "http://${POD_IP[$dst]}:$SERVICE_PORT/big"
   done
 done
 

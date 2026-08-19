@@ -106,7 +106,7 @@ while IFS=$'\t' read -r name cni placement outages <&3; do
 
   [ "$verdict" = FAIL ] && { failed=$((failed + 1)); echo "  FAIL $why failed"; }
   {
-    echo "### $verdict $name"
+    echo "### $verdict $key"
     [ -n "$why" ] && echo "    failed at $why"
     echo
   } >> "$OUT/distro/summary.txt"

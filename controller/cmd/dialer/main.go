@@ -1978,25 +1978,44 @@ func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes
 	return nil
 }
 
+// exemptRulePriority is where the tunnel's mark exemption lives:
+// ahead of every CNI's own fwmark classifier, because those match by
+// MASK and can capture our mark by accident. Measured: cilium
+// installs "from all fwmark 0x200/0xf00 lookup 2004" at priority 9,
+// our 0x205 & 0xf00 == 0x200, and table 2004 is "local default dev
+// lo", so every encrypted packet the tunnel sent was delivered to
+// loopback: zero egress, zero handshakes, a join gate that waited
+// twelve hours. The exemption matches our exact mark and nothing
+// else, so sitting at priority 1 takes precisely the tunnel's own
+// packets and no one else's.
+const exemptRulePriority = 1
+
 // ensureRouteRule makes the kernel consult the dialer's table for every
 // lookup, ahead of main. Idempotent: one rule per family, keyed by the
-// table number. With a mark set, a second rule one priority earlier
-// sends the tunnel's own marked packets straight to main, which is
-// what lets the dialer's table carry routes to the very addresses the
-// tunnel dials: everything except the tunnel's outers may ride the
-// tunnel.
+// table number. With a mark set, an exact-match rule at
+// exemptRulePriority sends the tunnel's own marked packets straight
+// to main, which is what lets the dialer's table carry routes to the
+// very addresses the tunnel dials: everything except the tunnel's
+// outers may ride the tunnel.
 func ensureRouteRule(table, fwmark int) error {
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
 		if fwmark > 0 {
-			exempt, err := netlink.RuleListFiltered(family, &netlink.Rule{Priority: table - 1}, netlink.RT_FILTER_PRIORITY)
+			exempt, err := netlink.RuleListFiltered(family, &netlink.Rule{Priority: exemptRulePriority}, netlink.RT_FILTER_PRIORITY)
 			if err != nil {
 				return fmt.Errorf("listing rules: %w", err)
 			}
-			if len(exempt) == 0 {
+			ours := false
+			for i := range exempt {
+				if exempt[i].Mark == uint32(fwmark) {
+					ours = true
+					break
+				}
+			}
+			if !ours {
 				rule := netlink.NewRule()
 				rule.Family = family
 				rule.Table = unix.RT_TABLE_MAIN
-				rule.Priority = table - 1
+				rule.Priority = exemptRulePriority
 				rule.Mark = uint32(fwmark)
 				if err := netlink.RuleAdd(rule); err != nil && !os.IsExist(err) {
 					return fmt.Errorf("adding the mark exemption rule: %w", err)
@@ -2035,9 +2054,10 @@ func removeRouteRule(table int) {
 				fmt.Fprintf(os.Stderr, "removing the rule for table %d: %v\n", table, err)
 			}
 		}
-		// The mark exemption at table-1 goes with it: it exists only
-		// to serve the table's routes.
-		exempt, err := netlink.RuleListFiltered(family, &netlink.Rule{Priority: table - 1}, netlink.RT_FILTER_PRIORITY)
+		// The mark exemption goes with it: it exists only to serve the
+		// table's routes. Matched by carrying a mark at our priority;
+		// unmarked rules there belong to someone else.
+		exempt, err := netlink.RuleListFiltered(family, &netlink.Rule{Priority: exemptRulePriority}, netlink.RT_FILTER_PRIORITY)
 		if err != nil {
 			continue
 		}

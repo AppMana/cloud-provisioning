@@ -38,10 +38,23 @@ if [ "${DMATRIX_REEXEC:-}" != 1 ]; then
 fi
 export CLDT_LOCK_HELD=1
 
+# Build and join stages get a deadline, because a stage that can hang
+# holds the whole lab hostage: a join gate that never opens is a
+# 12-hour wedge, not a wait (measured: cilium's classifier swallowing
+# the tunnel's outers, the bootstrap gate looping on it overnight).
+# The measurement stages run unbounded; their own drivers already
+# bound every wait they contain.
 stage() {
-  local log="$1"; shift
+  local secs="$1" log="$2"; shift 2
   echo "  -- $*"
-  if ! "$@" >"$log" 2>&1; then
+  local rc=0
+  if [ "$secs" -gt 0 ]; then
+    timeout "$secs" "$@" >"$log" 2>&1 || rc=$?
+  else
+    "$@" >"$log" 2>&1 || rc=$?
+  fi
+  if [ "$rc" -ne 0 ]; then
+    [ "$rc" -eq 124 ] && echo "  TIMED OUT after ${secs}s" >>"$log"
     echo "  FAIL at: $* (see $log)" >&2
     tail -25 "$log" >&2
     return 1
@@ -64,24 +77,24 @@ while IFS=$'\t' read -r name cni placement outages <&3; do
 
   verdict=FAIL; why=
   while :; do
-    stage "$log-up.log"        bash up.sh                       || { why="the topology"; break; }
-    stage "$log-cluster.log"   bash cluster.sh                  || { why="the site cluster"; break; }
-    stage "$log-install.log"   bash install.sh                  || { why="the install"; break; }
-    stage "$log-claim.log"     bash claim.sh remote1 remote1 203.0.113.10 \
-                                                                || { why="the claim"; break; }
-    stage "$log-bootstrap.log" bash bootstrap.sh remote1 remote1 203.0.113.10 \
-                                                                || { why="the first cloud's join"; break; }
+    stage 900  "$log-up.log"        bash up.sh                       || { why="the topology"; break; }
+    stage 1800 "$log-cluster.log"   bash cluster.sh                  || { why="the site cluster"; break; }
+    stage 1800 "$log-install.log"   bash install.sh                  || { why="the install"; break; }
+    stage 600  "$log-claim.log"     bash claim.sh remote1 remote1 203.0.113.10 \
+                                                                     || { why="the claim"; break; }
+    stage 1800 "$log-bootstrap.log" bash bootstrap.sh remote1 remote1 203.0.113.10 \
+                                                                     || { why="the first cloud's join"; break; }
 
     # "full" is every row in the file; the children treat an empty
     # ONLY the same way.
     p_only="$placement"; [ "$placement" = full ] && p_only=""
     o_only="$outages";   [ "$outages"   = full ] && o_only=""
 
-    stage "$log-placement.log" env ONLY="$p_only" bash matrix.sh || { why="a placement row"; break; }
+    stage 0 "$log-placement.log" env ONLY="$p_only" bash matrix.sh || { why="a placement row"; break; }
     cp "$OUT/matrix/summary.txt" "$log-placement-summary.txt" 2>/dev/null
-    stage "$log-outage.log"    env ONLY="$o_only" bash outage.sh || { why="an outage row"; break; }
+    stage 0 "$log-outage.log"    env ONLY="$o_only" bash outage.sh || { why="an outage row"; break; }
     cp "$OUT/outage/summary.txt" "$log-outage-summary.txt" 2>/dev/null
-    stage "$log-mechanism.log" bash mechanism.sh                 || { why="the mechanism assertions"; break; }
+    stage 600 "$log-mechanism.log" bash mechanism.sh                || { why="the mechanism assertions"; break; }
 
     verdict=PASS
     break

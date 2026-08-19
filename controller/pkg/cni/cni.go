@@ -265,8 +265,19 @@ func detectFlannel(ctx context.Context, c client.Reader) (Network, bool, error) 
 	return Network{}, false, nil
 }
 
-// detectKubeRouter reads the overlay setting off the DaemonSet's own
-// arguments, which is where kube-router is configured.
+// detectKubeRouter recognises kube-router by its DaemonSet, and it is
+// native regardless of the overlay arguments there.
+//
+// The encapsulation question here is what the tunnel sees, and
+// kube-router's overlay never reaches it. It distributes routes over
+// its BGP sessions alone, and its overlay encapsulates only along
+// routes those sessions learned (a tunnel interface is created per
+// injected route, from BGP best-path updates and nothing else); the
+// mesh refuses BGP across its tunnels, so no route kube-router holds
+// ever crosses one, and a pod packet the mesh carries arrives
+// unwrapped whatever --enable-overlay and --overlay-type say. Those
+// flags describe node pairs kube-router routes between itself, which
+// across the tunnel is none.
 func detectKubeRouter(ctx context.Context, c client.Reader) (Network, bool, error) {
 	ds := &appsv1.DaemonSet{}
 	if err := c.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: "kube-router"}, ds); err != nil {
@@ -275,18 +286,11 @@ func detectKubeRouter(ctx context.Context, c client.Reader) (Network, bool, erro
 		}
 		return Network{}, false, fmt.Errorf("reading the kube-router DaemonSet: %w", err)
 	}
-	for _, container := range ds.Spec.Template.Spec.Containers {
-		for _, arg := range append(append([]string{}, container.Command...), container.Args...) {
-			switch {
-			case strings.HasPrefix(arg, "--enable-overlay=false"):
-				return Network{Name: KubeRouter, Encapsulation: Native, Detail: "enable-overlay=false"}, true, nil
-			case strings.HasPrefix(arg, "--overlay-type="):
-				return Network{Name: KubeRouter, Encapsulation: Encapsulated, Detail: strings.TrimPrefix(arg, "--")}, true, nil
-			}
-		}
-	}
-	// Overlay is on unless turned off.
-	return Network{Name: KubeRouter, Encapsulation: Encapsulated, Detail: "enable-overlay defaults to true"}, true, nil
+	return Network{
+		Name:          KubeRouter,
+		Encapsulation: Native,
+		Detail:        "routes are distributed by BGP alone, which never crosses the tunnel, so pod packets do",
+	}, true, nil
 }
 
 // PrefixesFor returns the prefixes a peer must be permitted so that pods

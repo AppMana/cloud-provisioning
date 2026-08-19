@@ -5,6 +5,56 @@ import (
 	"testing"
 )
 
+// The relay-egress decision is a content question, not a freshness
+// question. A site node being relayed must not send a remote its
+// traffic through the relay until that remote's APPLIED list actually
+// carries the node's addresses on the relay: an applied hash that
+// matches a list which still routes the node directly means the
+// remote's accept list still owns those sources on the direct entry,
+// and everything arriving via the relay is dropped by cryptokey
+// routing. Measured: a placement shrink, cp3 switching to the relay
+// on a fresh-but-direct acknowledgment, and 78 seconds of its return
+// traffic dying inside remote2's trie.
+func TestDocRelaysNode(t *testing.T) {
+	direct := PeerListDoc{Peers: []PeerSpec{
+		{PublicKey: "CP3", WGAllowedIPs: []string{"10.10.0.14/32", "10.244.2.0/24"}},
+		{PublicKey: "W1", WGAllowedIPs: []string{"10.10.0.11/32"}},
+	}}
+	if DocRelaysNode(direct, "CP3", []string{"10.10.0.14"}) {
+		t.Error("a list that still routes the node directly was taken as relaying it")
+	}
+
+	relayed := PeerListDoc{Peers: []PeerSpec{
+		{PublicKey: "W1", WGAllowedIPs: []string{"10.10.0.11/32", "10.10.0.14/32", "10.244.2.0/24"},
+			Transit: []string{"10.244.2.0/24"}, TransitHosts: []string{"10.10.0.14"}},
+	}}
+	if !DocRelaysNode(relayed, "CP3", []string{"10.10.0.14"}) {
+		t.Error("a list that carries the node's addresses on the relay's transit was not taken as relaying it")
+	}
+
+	// Present on both: the direct entry still owns the sources (one
+	// owner per prefix, and cryptokey routing gives a prefix to
+	// whichever entry was written last), so this is not safely
+	// relayed.
+	both := PeerListDoc{Peers: []PeerSpec{
+		{PublicKey: "CP3", WGAllowedIPs: []string{"10.10.0.14/32"}},
+		{PublicKey: "W1", WGAllowedIPs: []string{"10.10.0.11/32"}, TransitHosts: []string{"10.10.0.14"}},
+	}}
+	if DocRelaysNode(both, "CP3", []string{"10.10.0.14"}) {
+		t.Error("a list that still carries the direct entry was taken as relaying")
+	}
+
+	// No transit anywhere and no direct entry either: the node is
+	// simply absent. Not relayed: sending via the relay would still
+	// be dropped.
+	absent := PeerListDoc{Peers: []PeerSpec{
+		{PublicKey: "W1", WGAllowedIPs: []string{"10.10.0.11/32"}},
+	}}
+	if DocRelaysNode(absent, "CP3", []string{"10.10.0.14"}) {
+		t.Error("a list with no trace of the node was taken as relaying it")
+	}
+}
+
 func TestHostCIDR(t *testing.T) {
 	cases := map[string]string{
 		"10.100.0.2":        "10.100.0.2/32",

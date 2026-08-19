@@ -1378,6 +1378,19 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	peerName := map[string]string{}
 	peerAcked := map[string]bool{}
 	if selfRelayed && meshSecret != nil && clientset != nil {
+		// What the remote applied, not merely that it applied: the
+		// hash equality proves the remote holds the current list, and
+		// DocRelaysNode asks the question the egress decision actually
+		// turns on, whether that list carries THIS node's addresses on
+		// the relay. Right after a placement shrink the remote's
+		// current list is the old one, applied long ago and still
+		// routing this node directly; a freshness-only test read that
+		// as acknowledged, this node egressed via the relay, and the
+		// remote's cryptokey trie dropped every packet: 78 seconds of
+		// dead return traffic, then an oscillation as re-renders
+		// toggled the freshness. Content does not oscillate.
+		myAddrs := tunnel.SplitList(string(meshSecret.Data[tunnel.SiteAddressesPrefix+cfg.nodeName]))
+		myPub := privateKey.PublicKey().String()
 		for dataKey, raw := range meshSecret.Data {
 			if !strings.HasPrefix(dataKey, tunnel.PeerPublicKeyPrefix) {
 				continue
@@ -1388,11 +1401,18 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			if err != nil {
 				continue
 			}
-			doc, ok := adoption.Data[tunnel.CloudPeersKey]
-			if !ok || len(doc) == 0 {
+			docRaw, ok := adoption.Data[tunnel.CloudPeersKey]
+			if !ok || len(docRaw) == 0 {
 				continue
 			}
-			peerAcked[machine] = adoption.Annotations[tunnel.AppliedListAnnotation] == tunnel.HashPeerList(doc)
+			if adoption.Annotations[tunnel.AppliedListAnnotation] != tunnel.HashPeerList(docRaw) {
+				continue
+			}
+			var doc tunnel.PeerListDoc
+			if err := json.Unmarshal(docRaw, &doc); err != nil {
+				continue
+			}
+			peerAcked[machine] = tunnel.DocRelaysNode(doc, myPub, myAddrs)
 		}
 	}
 

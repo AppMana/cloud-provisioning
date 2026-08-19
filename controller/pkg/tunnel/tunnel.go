@@ -471,6 +471,52 @@ type TransitSpec struct {
 	Blocks []string
 }
 
+// DocRelaysNode reports whether a remote's peer list carries the
+// named node's addresses on a relay's transit rather than on the
+// node's own entry. This is the content behind an acknowledgment: an
+// applied hash proves the remote holds this list, and only this
+// question decides whether traffic the node sends through the relay
+// will be accepted by the remote's cryptokey routing. A list that
+// still carries the node's own entry routes it directly, whatever
+// else it declares: the accept trie has one owner per prefix, and
+// egressing via the relay against a direct-owning list is dropped at
+// the remote (measured: 78 seconds of a relayed node's return
+// traffic dying after a placement shrink, acknowledged fresh the
+// whole time).
+func DocRelaysNode(doc PeerListDoc, publicKey string, addrs []string) bool {
+	covered := map[string]bool{}
+	for _, p := range doc.Peers {
+		if p.PublicKey == publicKey {
+			// The node's own entry still exists: it owns whatever it
+			// carries, so the remote routes it directly.
+			for _, allowed := range p.WGAllowedIPs {
+				for _, addr := range addrs {
+					if HostCIDR(strings.TrimSpace(allowed)) == HostCIDR(addr) {
+						return false
+					}
+				}
+			}
+			continue
+		}
+		for _, host := range p.TransitHosts {
+			for _, addr := range addrs {
+				if HostCIDR(strings.TrimSpace(host)) == HostCIDR(addr) {
+					covered[addr] = true
+				}
+			}
+		}
+	}
+	if len(addrs) == 0 {
+		return false
+	}
+	for _, addr := range addrs {
+		if !covered[addr] {
+			return false
+		}
+	}
+	return true
+}
+
 // SiteTransit derives the transit a no-tunnel site node installs for
 // itself, from the same data and the same election as RemotePeers.
 //

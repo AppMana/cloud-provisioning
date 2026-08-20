@@ -840,7 +840,7 @@ func (r *meshReconciler) membership(nodes []corev1.Node) meshMembership {
 //     go then rather than later: the accept list has one owner per
 //     prefix, and the node's addresses would otherwise be permitted
 //     both on its own peer and on the relaying one.
-func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, retention time.Duration, converged map[string]bool) bool {
+func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, retention time.Duration, converged map[string]map[string]bool) bool {
 	if len(want.endpoints) == 0 && len(want.siteNodes) == 0 {
 		// A membership that reads as empty is a failed read until
 		// proven otherwise. Nothing at a site departs all at once, and
@@ -895,7 +895,7 @@ func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, r
 			// remote still holding only the departed node. Held until
 			// each remote shows a handshake with a current endpoint
 			// after the departure, which is the read made observable.
-			if !everyRemoteAcknowledged(data, converged) {
+			if !everyRemoteAcknowledged(data, converged, name) {
 				continue
 			}
 		}
@@ -953,8 +953,8 @@ func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, r
 // the hash of what that Secret carries now. Content against content;
 // an unreadable Secret is no acknowledgment, never a failure of the
 // pass that asks.
-func (r *meshReconciler) convergedMachines(ctx context.Context, data map[string][]byte) map[string]bool {
-	converged := map[string]bool{}
+func (r *meshReconciler) convergedMachines(ctx context.Context, data map[string][]byte) map[string]map[string]bool {
+	converged := map[string]map[string]bool{}
 	for key := range data {
 		if !strings.HasPrefix(key, tunnel.PeerPublicKeyPrefix) {
 			continue
@@ -968,9 +968,48 @@ func (r *meshReconciler) convergedMachines(ctx context.Context, data map[string]
 		if !ok || len(raw) == 0 {
 			continue
 		}
-		converged[machine] = adoption.Annotations[tunnel.AppliedListAnnotation] == tunnel.HashPeerList(raw)
+		// A stale stamp acknowledges nothing: the machine is still
+		// holding some older list, whatever it says.
+		if adoption.Annotations[tunnel.AppliedListAnnotation] != tunnel.HashPeerList(raw) {
+			continue
+		}
+		var doc tunnel.PeerListDoc
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			continue
+		}
+		converged[machine] = relaysFromApplied(doc, data)
 	}
 	return converged
+}
+
+// relaysFromApplied reports, per site node, whether an applied peer
+// list carries that node's addresses on a relay rather than on the
+// node's own entry.
+//
+// This is the content behind an acknowledgment. A departing endpoint
+// is held until every remote has moved, and "moved" cannot mean "has
+// applied its current list": right after a placement change the
+// current list is the one the remote applied long ago, still routing
+// the departing node directly, so a freshness test releases the node
+// the moment before the remote learns where it went. The node then
+// loses its own tunnel while the remotes still accept its sources
+// only there, and everything it sends is dropped by cryptokey
+// routing until the next render reaches them. Measured as a
+// sub-minute flap on exactly the transit pairs after a placement
+// shrink; the dialer's own egress decision had the same defect and
+// the same fix.
+func relaysFromApplied(doc tunnel.PeerListDoc, data map[string][]byte) map[string]bool {
+	relays := map[string]bool{}
+	for key := range data {
+		if !strings.HasPrefix(key, tunnel.SiteAddressesPrefix) {
+			continue
+		}
+		name := strings.TrimPrefix(key, tunnel.SiteAddressesPrefix)
+		addrs := tunnel.SplitList(string(data[key]))
+		pub := strings.TrimSpace(string(data[tunnel.NodePublicKeyPrefix+name]))
+		relays[name] = tunnel.DocRelaysNode(doc, pub, addrs)
+	}
+	return relays
 }
 
 // everyRemoteAcknowledged reports whether each remote machine has
@@ -986,12 +1025,15 @@ func (r *meshReconciler) convergedMachines(ctx context.Context, data map[string]
 // cost of releasing early was measured as both clouds dark, refusing
 // the replacement's handshakes because nothing had ever told them its
 // key.
-func everyRemoteAcknowledged(data map[string][]byte, converged map[string]bool) bool {
+func everyRemoteAcknowledged(data map[string][]byte, converged map[string]map[string]bool, name string) bool {
 	for key := range data {
 		if !strings.HasPrefix(key, tunnel.PeerPublicKeyPrefix) {
 			continue
 		}
-		if !converged[strings.TrimPrefix(key, tunnel.PeerPublicKeyPrefix)] {
+		// Not "has this machine applied something recent" but "does
+		// what it applied carry THIS node on a relay": the question
+		// the departing node's traffic actually turns on.
+		if !converged[strings.TrimPrefix(key, tunnel.PeerPublicKeyPrefix)][name] {
 			return false
 		}
 	}

@@ -1046,14 +1046,14 @@ func TestADepartedEndpointIsHeldUntilEveryRemoteAcknowledges(t *testing.T) {
 	// The clock is long expired, and w1 may have been handshaking
 	// remote1 on keepalive the whole time; none of that says remote1
 	// applied the list that moved cp's prefixes.
-	pruneDeparted(data, want, testNow, testRetention, map[string]bool{"remote1": false})
+	pruneDeparted(data, want, testNow, testRetention, map[string]map[string]bool{"remote1": {"cp": false}})
 	if _, ok := data[tunnel.NodePublicKeyPrefix+"cp"]; !ok {
 		t.Fatal("cp was released without remote1's acknowledgment: the remote's only working path was torn down on a clock")
 	}
 
 	// remote1 stamps the current render's hash: it has provably
 	// applied the list that no longer names cp, and the hold releases.
-	pruneDeparted(data, want, testNow, testRetention, map[string]bool{"remote1": true})
+	pruneDeparted(data, want, testNow, testRetention, map[string]map[string]bool{"remote1": {"cp": true}})
 	if _, ok := data[tunnel.NodePublicKeyPrefix+"cp"]; ok {
 		t.Fatal("cp is still held after every remote acknowledged the render that moved it")
 	}

@@ -296,29 +296,49 @@ modelled internet), the site built by `harness/clab/cluster.d/`, the
 remotes joined through this operator's own provider for that
 distribution.
 
+Two axes, because both change what the mesh must do: the
+distribution decides how a remote joins and who balances its API
+path, and the container network decides whether the tunnel carries
+pod addresses or node addresses.
+
 | | kubeadm | k0s | k3s | RKE2 |
 |---|---|---|---|---|
 | native join through the provider | bootstrap token + CA pin | bootstrap token in a kubeconfig, gzip+base64 | `K10<CA-hash>::<id>.<secret>`, minted via the API | same, supervisor on 9345 |
 | who balances the API path | **wg-apiproxy** (ours) | nllb (envoy, `[::1]:7443`) | agent balancer (`127.0.0.1:6444`) | agent balancer (`127.0.0.1:6443`) |
-| placement: `control-plane` | pass | pass | pass | pass |
-| placement: `all-nodes-two-clouds` (112 checks) | pass | pass | pass | pass |
-| placement: full six rows | pass | pass | suite | suite |
+| calico (native) | pass | pass, full 6×9 | pass | pass |
+| kube-router (native) | pass | pass (built-in) | — | — |
+| flannel (encapsulated) | pass | — | pass (embedded) | pass (canal, built-in) |
+| cilium (encapsulated) | pass | pass | pass | pass |
 | outage: `cp-dies` (link) | pass | pass | pass | **excluded: RKE2 limitation** |
-| outage: `reboot-remote` | pass | pass | pass | pass |
-| outage: `reboot-cp` | pass | pass | pass | pass |
-| outage: full nine rows | pass | pass | suite | suite |
+| outage: `reboot-remote`, `reboot-cp` | pass | pass | pass | pass |
 | mechanism assertions | pass | pass | pass | pass |
+
+Thirteen combinations, each rebuilt from an empty topology and joined
+through the product's own provider. A dash is a combination not run
+rather than one that failed: each distribution carries its own
+network as a row (`default`), and the ones not listed add no
+mechanism the other cells do not already cover.
+
+What a row measures, when every check is enabled: every ordered pair
+of nodes by pod address, the same by service address, a 1 MiB
+transfer per pair, cluster DNS from each node, and the path off the
+cluster from each node. That is 120 checks on the six-node rows and
+161 on the seven-node ones. The transfer check was added late, after
+the campaign found that every other check fits in a single small
+packet and so cannot see a path whose largest packet does not cross;
+the k0s-cilium and RKE2-cilium rows have run with it, the others
+predate it.
 
 The rows, and what each one claims:
 
 - **Placement rows** (`harness/clab/scenarios.tsv`) vary which site
   nodes hold tunnels, from one control plane to every node, against
   one or two clouds. Each row measures every pair of nodes in both
-  directions, by pod address and by service address, plus cluster DNS
-  and the path off the cluster: 84 checks with one cloud, 112 with
-  two. The `all-nodes-two-clouds` row is the superset, so a
-  distribution that passes it has proven the mesh does not care what
-  built the cluster.
+  directions, by pod address and by service address, by a transfer far
+  larger than any packet the path can carry, plus cluster DNS and the
+  path off the cluster. The `all-nodes-two-clouds` row is the
+  superset, so a combination that passes it has proven the mesh does
+  not care what built the cluster or what carries its pods.
 - **Outage rows** (`harness/clab/outages.tsv`) make three claims in
   sequence: the full matrix is green before anything breaks, the
   survivors converge to green among themselves while the victim is
@@ -335,11 +355,15 @@ The rows, and what each one claims:
   who-balances table on the live remotes: kubeadm's wg-apiproxy
   answering on the loopback with kubelet dialing it and surviving the
   dialer's death; k0s's nllb envoy; the k3s/RKE2 agent balancer's
-  state file holding all three control planes. "Full" versus "suite"
-  above is scope, not doubt: kubeadm and k0s (the production
-  distribution) ran every row; k3s and RKE2 run the distro suite,
-  which covers the superset placement row and the outage rows whose
-  mechanics differ per distribution.
+  state file holding all three control planes. They also compare the
+  network the controller says it is modeling against the one the row
+  installed, encapsulation included: a mesh that models the wrong
+  network publishes the wrong prefixes while every component reports
+  healthy, which is how kube-router stayed broken for two full rows.
+  "Full" versus the shorter suite is scope, not doubt: k0s-calico (the
+  production pairing) ran all six placement rows and all nine outage
+  rows; the rest run the superset placement row plus the outage rows
+  whose mechanics differ.
 
 **The RKE2 exclusion** is RKE2's own recovery story, measured and
 recorded rather than papered over (`harness/clab/distros.tsv` carries

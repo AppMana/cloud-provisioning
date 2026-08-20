@@ -319,15 +319,19 @@ rather than one that failed: each distribution carries its own
 network as a row (`default`), and the ones not listed add no
 mechanism the other cells do not already cover.
 
-What a row measures, when every check is enabled: every ordered pair
-of nodes by pod address, the same by service address, a 1 MiB
-transfer per pair, cluster DNS from each node, and the path off the
-cluster from each node. That is 120 checks on the six-node rows and
-161 on the seven-node ones. The transfer check was added late, after
-the campaign found that every other check fits in a single small
-packet and so cannot see a path whose largest packet does not cross;
-the k0s-cilium and RKE2-cilium rows have run with it, the others
-predate it.
+What a row measures: every ordered pair of nodes by pod address, the
+same by service address, a 1 MiB transfer per pair, cluster DNS from
+each node, and the path off the cluster from each node. That is 120
+checks on the six-node rows and 161 on the seven-node ones. The
+transfer check exists because every other check fits in a single
+small packet and so cannot see a path whose largest packet does not
+cross, which an encapsulating network stacking its own header inside
+the tunnel's is the obvious way to produce.
+
+All thirteen rows come from one campaign against one build, each row
+rebuilt from an empty topology with every check enabled: thirteen
+passed, none failed. Earlier campaigns are not folded in, because
+they ran against trees that still carried defects these rows found.
 
 The rows, and what each one claims:
 

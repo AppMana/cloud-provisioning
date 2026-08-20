@@ -287,6 +287,136 @@ into the tunnel. The tunnel carries traffic belonging to neither of the
 two nodes holding it, in both directions, which is what makes this work
 at all.
 
+## Testing
+
+Four harnesses live under `harness/`, and they are not
+interchangeable. Each exists because the level below it could not
+reproduce a specific class of failure, so the first question is always
+which level the mechanism lives at.
+
+| harness | runs on | proves | cost |
+|---|---|---|---|
+| `harness/netns-routing` | bare network namespaces, one host, no cluster | the dialer's own route and rule discipline against a real kernel | seconds |
+| `harness/kind-e2e` | one kind cluster, no topology | what the controller derives from a claim: CAPI objects, rendered userdata, peer and adoption Secrets, both DaemonSets, the delete cascade | ~2 min |
+| `harness/clab` | **kind node containers** under containerlab, four L2 segments | the distribution × network matrix: placement, outages, and the mechanism assertions | ~15 min/row |
+| `harness/vm-single-nic` | **real VMs** under QEMU/KVM via vrnetlab | failures that need a genuine cold boot: real PID 1, real kubelet start ordering | ~30 min/run |
+
+The last two are the ones people confuse, because both use
+containerlab and both talk about nodes. The difference is what a node
+*is*: in `clab` a node is a `kindest/node` container reached with
+`docker exec`; in `vm-single-nic` a node is an Ubuntu VM booted under
+QEMU/KVM and reached over SSH. `vm-single-nic` exists because the
+route-hijack bug is a boot-time race between kubelet resurrecting a
+stale DaemonSet pod and anything else getting a chance to intervene,
+and a container cannot reproduce that: there is no cold init to race
+against. Its README carries the full reasoning.
+
+### The matrix harness (`harness/clab`)
+
+Four separate L2 segments, never one bridge pretending to be four: the
+site LAN (`10.10.0/24`), a transit segment standing in for the
+internet (`198.51.100/24`), and two clouds (`203.0.113/24`,
+`192.0.2/24`) that can reach each other only across it. Nodes run with
+`network-mode: none`, so containerlab's management network cannot
+quietly join the site and both clouds on one L2 and make the isolation
+imaginary. A node has the interfaces its segments give it and nothing
+else; the harness drives it with `docker exec`, which needs no address
+at all.
+
+Seven cluster nodes (three control planes, two site workers behind a
+NAT router, two remotes in separate clouds), plus routers, cloud edges
+and a bastion. This host cannot reach the API server and should not be
+able to, so everything that talks to the cluster goes through the
+bastion.
+
+Stages, in the order a row runs them:
+
+| stage | what it does |
+|---|---|
+| `up.sh` | builds the topology and **proves the four segments isolate** before anything is installed |
+| `cluster.sh` → `cluster.d/<distro>.sh` | builds the site cluster with that distribution's own tooling |
+| `install.sh` → `cni.d/<cni>.sh` | installs the network, then the product: images carried in from this host, because the site has no route to a registry |
+| `claim.sh` | applies a claim the way an operator would, and fills in only what an infrastructure controller would have reported |
+| `bootstrap.sh` | applies the rendered userdata to the remote |
+| `matrix.sh` | placement rows from `scenarios.tsv` |
+| `outage.sh` | outage rows from `outages.tsv` |
+| `mechanism.sh` | asserts the network the controller models, and who balances the API path |
+
+`distro-matrix.sh` is the outer loop over `distros.tsv` (13 rows,
+distribution × network). A distribution change rebuilds the cluster,
+so it is a loop *around* the matrices rather than a column inside
+them; placement rows deliberately never rebuild the topology, because
+what they differ in is placement.
+
+### What a check actually measures
+
+`harness/health-check.sh` puts one pod on each node and then walks
+**every ordered pair** — by pod address and by service address — plus
+a 1 MiB transfer per pair, cluster DNS from each node, and the path
+off the cluster. That is 120 checks on the six-node rows and 161 on
+the seven-node ones.
+
+Two details that are load-bearing:
+
+- **`kubectl exec` cannot be used on a remote.** It reaches a pod by
+  way of its node's kubelet, which the API server connects to
+  directly, and a node joined over a tunnel has no return path for
+  that. Using it would report the tunnel as broken when it is the exec
+  path that is absent. `HEALTH_CHECK_EXEC=node` runs the probe through
+  the node's own container runtime instead; the traffic under test is
+  unchanged.
+- **The transfer check exists because every other check fits in one
+  small packet.** A path whose largest packet cannot cross looks
+  perfectly healthy to a ping-sized probe, which is exactly the
+  failure an encapsulating network stacking its header inside the
+  tunnel's would produce.
+
+Outage rows make three claims in sequence: the matrix is green before
+anything breaks (a failure measured on a broken baseline names the
+wrong culprit), the survivors converge among themselves while the
+victim is down, and the victim's return brings everything back with
+nothing reinstalled or forgiven. `link` rows pull the cable and leave
+the machine running; `reboot` rows SIGKILL it and give it back only
+what a platform provides — a NIC, an address, a gateway.
+
+### Discipline the harness enforces
+
+- **Zero rows is a failure, not a pass.** An assertion that found
+  nothing to assert on proved nothing.
+- **One lock** (`/tmp/cldt-matrix.lock`) serialises every run; kill by
+  explicit PID from `fuser`, never by pattern.
+- **Stage deadlines**, so a wedged join fails the row instead of
+  holding the lab overnight.
+- **Read verdicts from live files**, never from a row copy that may
+  predate the run you are watching.
+
+### What this harness cannot prove
+
+Being explicit, because the container rig is faithful in ways that
+invite over-trust. The kernel is real: WireGuard, netfilter, ip rules,
+routing tables, cryptokey routing and reverse-path filtering are all
+exercised per network namespace against the host's actual kernel, and
+every defect the matrix has found was a genuine kernel-datapath bug
+rather than a container artifact.
+
+What it cannot reach:
+
+- **First-boot userdata.** `bootstrap.sh` parses the rendered
+  cloud-config and interprets `write_files` and `runcmd` itself. Real
+  cloud-init never runs, so the templates are constrained to those two
+  keys on purpose — and nothing beyond them is proven.
+- **Per-node kernels.** Every node shares this host's kernel.
+  `br_netfilter` already showed the seam: the module had to be loaded
+  on the host and its values pinned globally, which on real machines
+  would be a node-local concern.
+- **Bootloader and initramfs.** They do not exist here — which is
+  precisely where OpenShift's ignition runs.
+- **Immutable operating systems.** RHCOS, SCOS and Talos cannot be
+  containers at all.
+
+Those four gaps are the case for the VM tier, and they are why
+`vm-single-nic` exists at the level it does.
+
 ## Compatibility
 
 What each distribution has passed on the containerlab harness: a

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
@@ -68,7 +69,18 @@ func (r *Rig) Up(ctx context.Context) error {
 	if err := os.WriteFile(r.TopologyPath(), []byte(yaml), 0o644); err != nil {
 		return err
 	}
-	_, errb, code, err := r.runner()(ctx, nil, "containerlab", "deploy", "-t", r.TopologyPath(), "--reconfigure")
+	// A bind's host side has to exist before containerlab will deploy
+	// over it. Derived from the nodes rather than listed, so a node
+	// added to the topology brings its own directories with it.
+	for _, n := range r.Topology.Nodes {
+		for _, bind := range n.Binds {
+			host, _, _ := strings.Cut(bind, ":")
+			if err := os.MkdirAll(filepath.Join(r.WorkDir, host), 0o755); err != nil {
+				return fmt.Errorf("creating the bind directory %s: %w", host, err)
+			}
+		}
+	}
+	_, errb, code, err := r.runner()(ctx, nil, "sudo", "containerlab", "deploy", "-t", r.TopologyPath(), "--reconfigure")
 	if err != nil {
 		return fmt.Errorf("deploying: %w", err)
 	}
@@ -80,7 +92,7 @@ func (r *Rig) Up(ctx context.Context) error {
 
 // Down destroys the topology.
 func (r *Rig) Down(ctx context.Context) error {
-	_, errb, code, err := r.runner()(ctx, nil, "containerlab", "destroy", "-t", r.TopologyPath(), "--cleanup")
+	_, errb, code, err := r.runner()(ctx, nil, "sudo", "containerlab", "destroy", "-t", r.TopologyPath(), "--cleanup")
 	if err != nil {
 		return fmt.Errorf("destroying: %w", err)
 	}

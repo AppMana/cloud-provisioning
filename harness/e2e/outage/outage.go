@@ -98,6 +98,17 @@ type Deps struct {
 	// Restart runs between the victim leaving and returning, so a
 	// caller can re-plumb whatever the platform would have given back.
 	Restart func(ctx context.Context, victim string) error
+	// Refresh re-reads where the probe pods are.
+	//
+	// A pod dies with its node and comes back somewhere else, with a
+	// different address. Measuring the address it had before the
+	// outage reports the path as broken when what is broken is the
+	// harness's memory of it — and it does so selectively, which is
+	// worse: the service address still resolves to whatever is
+	// serving now, so a stale pod address fails while the service
+	// address beside it passes, and the pattern reads exactly like a
+	// routing fault.
+	Refresh func(ctx context.Context) ([]check.Target, error)
 }
 
 // Run executes one row.
@@ -129,7 +140,12 @@ func Run(ctx context.Context, row Row, d Deps) Result {
 
 	// The survivors, among themselves. The victim's own pods are gone
 	// with it, which is allowed; everyone else's must not be.
-	survivors := without(d.Targets, row.Victim)
+	targets, err := d.refresh(ctx)
+	if err != nil {
+		res.Failed, res.Err = "re-reading where the probes are", err
+		return res
+	}
+	survivors := without(targets, row.Victim)
 	res.Survivors = check.Converge(ctx, d.Prober, survivors, d.Options, d.Converge, 10*time.Second)
 	if !res.Survivors.OK() {
 		res.Failed = "the survivors did not converge among themselves: losing one node cost more than that node"
@@ -142,12 +158,26 @@ func Run(ctx context.Context, row Row, d Deps) Result {
 	}
 
 	// And the whole cluster again, with nothing reinstalled.
-	res.Returned = check.Converge(ctx, d.Prober, d.Targets, d.Options, d.Converge, 10*time.Second)
+	targets, err = d.refresh(ctx)
+	if err != nil {
+		res.Failed, res.Err = "re-reading where the probes are", err
+		return res
+	}
+	res.Returned = check.Converge(ctx, d.Prober, targets, d.Options, d.Converge, 10*time.Second)
 	if !res.Returned.OK() {
 		res.Failed = "the cluster did not return to green after the victim came back"
 		return res
 	}
 	return res
+}
+
+// refresh re-reads the probes, falling back to what the row started
+// with when a caller offered no way to.
+func (d Deps) refresh(ctx context.Context) ([]check.Target, error) {
+	if d.Refresh == nil {
+		return d.Targets, nil
+	}
+	return d.Refresh(ctx)
 }
 
 func takeDown(ctx context.Context, victim rig.Node, mode Mode) error {

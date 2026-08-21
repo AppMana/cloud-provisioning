@@ -192,16 +192,21 @@ func main() {
 					fail("%v", err)
 				}
 
-				// And Cluster API links the Machine to that Node.
-				// Nothing here writes nodeRef: if this never appears,
-				// the dependency the product declares is not doing its
-				// job, which is a condition an operator's cluster could
-				// be in and one the harness must not paper over.
-				linked, err := prod.WaitForNodeRef(ctx, claim.Namespace, name, 5*time.Minute)
+				// The product's own evidence that it resolved this
+				// machine to a node: the remote's pod blocks published
+				// onto its peer entry.
+				//
+				// Not Machine.status.nodeRef. Cluster API only writes
+				// that when it holds a connection to the workload
+				// cluster, and the setup this product documents has
+				// nothing to create the Secret that connection comes
+				// from — so waiting on it would be waiting on plumbing
+				// an operator does not have.
+				blocks, err := claim.WaitForPodBlocks(ctx, d.Kube, name, 5*time.Minute)
 				if err != nil {
 					fail("%v", err)
 				}
-				fmt.Printf("  Cluster API linked the machine to node %s\n", linked)
+				fmt.Printf("  the mesh published %s's pod blocks: %s\n", name, blocks)
 				fmt.Println("  the node ran the userdata the product rendered")
 				if cn, ok := r.Node(name).(*container.Node); ok {
 					for _, why := range cn.Accommodations() {
@@ -242,6 +247,12 @@ func main() {
 						// What a platform gives a machine back: its NIC,
 						// its address, its gateway. Everything else the
 						// node must rebuild from what it runs at boot.
+						// A pod that died with its node comes back at a
+						// different address; measuring the old one reads
+						// as a routing fault and is not.
+						Refresh: func(ctx context.Context) ([]check.Target, error) {
+							return pods.Start(ctx, nodes, 6*time.Minute)
+						},
 						Restart: func(ctx context.Context, v string) error {
 							return bringup.Replumb(ctx, topo, r, host, v)
 						},

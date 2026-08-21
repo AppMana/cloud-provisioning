@@ -307,7 +307,22 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	// after it joins, so this comes back until it does. Nothing else
 	// would bring it back: the reconciler is driven by Machine events,
 	// and the machine stops changing once it is running.
-	remoteBlocksPending := false
+	// Pending until proven otherwise, which includes the case where
+	// this machine has no node yet.
+	//
+	// A node has no blocks until something is scheduled on it, and it
+	// has no node at all until it joins — both after the Machine
+	// stopped changing. Gating the requeue on the node already being
+	// known therefore never comes back for the one case that needs it:
+	// the machine is reconciled while the node is still absent, sets
+	// nothing pending, and is never reconciled again. The blocks are
+	// never published, the site cannot reach a pod on the remote, and
+	// every component reports healthy.
+	//
+	// This was hidden for as long as the node was found through
+	// status.nodeRef, because Cluster API writing that field was
+	// itself a Machine event: the data source doubled as the trigger.
+	remoteBlocksPending := true
 	if nodeName := r.nodeNameForMachine(ctx, machine); nodeName != "" {
 		published, err := r.publishRemotePodCIDRs(ctx, machine.GetName(), nodeName)
 		if err != nil {

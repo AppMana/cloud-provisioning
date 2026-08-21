@@ -17,14 +17,20 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/bringup"
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/kubeadm"
+	"github.com/appmana/cloud-provisioning/harness/e2e/install"
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
+	"github.com/appmana/cloud-provisioning/harness/e2e/network"
+	_ "github.com/appmana/cloud-provisioning/harness/e2e/network/calico"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
 )
 
 func main() {
 	var (
 		distro  = flag.String("distro", "", "also build the site cluster with this distribution")
+		cni     = flag.String("cni", "", "also install this container network")
+		product = flag.Bool("product", false, "also install the product's chart")
+		repoDir = flag.String("repo-dir", "../..", "the repository root")
 		workDir = flag.String("work-dir", "_work", "where the generated topology is written")
 		down    = flag.Bool("down", false, "destroy the lab instead of building it")
 		timeout = flag.Duration("timeout", 20*time.Minute, "deadline for the whole bring-up")
@@ -93,6 +99,49 @@ func main() {
 			fail("reading the cluster's nodes: %v", err)
 		}
 		fmt.Printf("  registered: %v\n", nodes)
+
+		if *cni != "" {
+			inst, err := network.For(*cni)
+			if err != nil {
+				fail("%v", err)
+			}
+			step("installing " + *cni)
+			nd := network.Deps{
+				Topology: topo, Rig: r, Kube: d.Kube, Images: r, WorkDir: *workDir,
+				PodCIDR: d.PodCIDR, APIServer: cluster.ControlPlaneAddresses(topo)[0],
+			}
+			if err := inst.Install(ctx, nd); err != nil {
+				fail("installing %s: %v", *cni, err)
+			}
+			step("waiting for every node to be Ready")
+			if err := waitReady(ctx, d.Kube, nodes); err != nil {
+				fail("%v", err)
+			}
+			fmt.Println("  every node Ready")
+		}
+
+		if *product {
+			step("installing the product")
+			prod := &install.Product{
+				Kube: d.Kube, Rig: r, Images: r, Topology: topo,
+				RepoDir: *repoDir, WorkDir: *workDir,
+			}
+			sha, err := prod.Build(ctx)
+			if err != nil {
+				fail("building: %v", err)
+			}
+			fmt.Printf("  dialer %s\n", sha)
+			if err := prod.Distribute(ctx, sha); err != nil {
+				fail("distributing: %v", err)
+			}
+			if err := prod.Install(ctx, install.Options{
+				TunnelEndpoints: "kubernetes.io/hostname in (w1,w2)",
+				JoinProvider:    *distro,
+			}, sha); err != nil {
+				fail("%v", err)
+			}
+			fmt.Println("  the chart is installed")
+		}
 	}
 
 	fmt.Println("\n  the site reaches both clouds")
@@ -104,6 +153,34 @@ func main() {
 	fmt.Printf("wan      %s.0/24  router .1  edge-a .2  edge-b .3  this host .254\n", lab.WANPrefix)
 	fmt.Printf("cloud A  %s.0/24  remote1 .10\n", lab.CloudAPrefix)
 	fmt.Printf("cloud B  %s.0/24    remote2 .10\n", lab.CloudBPrefix)
+}
+
+// waitReady blocks until every node reports Ready. A node with no
+// network installed is legitimately NotReady, so this is only ever
+// called after one is.
+func waitReady(ctx context.Context, k *kube.Client, nodes []string) error {
+	deadline := time.Now().Add(10 * time.Minute)
+	for {
+		all := len(nodes) > 0
+		for _, n := range nodes {
+			ready, err := k.Ready(ctx, n)
+			if err != nil || !ready {
+				all = false
+				break
+			}
+		}
+		if all {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("not every node became Ready")
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(10 * time.Second):
+		}
+	}
 }
 
 func step(name string) { fmt.Printf("--- %s ---\n", name) }

@@ -121,6 +121,21 @@ func (c *Client) Ready(ctx context.Context, node string) (bool, error) {
 	return out == "True", nil
 }
 
+// Helm runs helm on the bastion against a ready member.
+//
+// helm reads the kubeconfig's server, which names a node-local
+// endpoint nobody serves on the bastion, so it is told which member
+// to use for the same reason kubectl is. The kubeconfig's credentials
+// and CA still apply, and the members' real addresses are in every
+// server certificate's SANs.
+func (c *Client) Helm(ctx context.Context, args ...string) ([]byte, error) {
+	server, err := c.Server(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return c.Bastion.Exec(ctx, append([]string{"helm", "--kube-apiserver=" + server}, args...)...)
+}
+
 // Install writes the kubeconfig onto the bastion, so that a plain
 // kubectl there works for anyone looking at the lab by hand.
 func (c *Client) Install(ctx context.Context, kubeconfig []byte) error {

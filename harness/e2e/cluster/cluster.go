@@ -1,0 +1,94 @@
+// Package cluster builds the site cluster, one implementation per
+// distribution.
+//
+// What varies by distribution is how the site is built, how a remote
+// joins, and who balances the API path. The first is here; the second
+// is the product's own join provider, which is the thing under test
+// and is never reimplemented here; the third is asserted separately.
+//
+// The site may be built with the distribution's own tooling. That is
+// deliberate and is the line this package draws: a lab that
+// hand-assembles a cluster proves the harness can assemble one, and
+// the remote join — the part that must go through the product — is
+// the only part that matters for what is being measured.
+package cluster
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
+	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
+	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+)
+
+// Deps is what a builder needs to work.
+type Deps struct {
+	Topology lab.Topology
+	Rig      rig.Rig
+	Kube     *kube.Client
+	WorkDir  string
+	PodCIDR  string
+	SvcCIDR  string
+}
+
+// Builder builds one distribution's site cluster.
+type Builder interface {
+	// Name is the distribution's name, as a row spells it.
+	Name() string
+
+	// Build brings up the site: control planes, then workers.
+	Build(ctx context.Context, d Deps) error
+
+	// KubeletInvariant asserts no kubelet on this site depends on
+	// another node's survival.
+	//
+	// Every distribution answers this differently and every one has to
+	// answer it, because a kubelet pinned to one control plane turns
+	// that member's death into an outage for a node that had quorum
+	// available the whole time. Where the answer lives is
+	// distribution-specific, which is why this is on the builder and
+	// not in one shared check reading one path.
+	KubeletInvariant(ctx context.Context, d Deps) error
+
+	// CRIEndpoint is where crictl finds this distribution's runtime. A
+	// crictl aimed at the wrong socket sees no containers, which reads
+	// as every path being broken at once.
+	CRIEndpoint() string
+}
+
+// Registry is every distribution the harness can build.
+var Registry = map[string]Builder{}
+
+// Register adds a builder. Called from each implementation's init.
+func Register(b Builder) { Registry[b.Name()] = b }
+
+// For returns the builder for a distribution.
+func For(name string) (Builder, error) {
+	b, ok := Registry[name]
+	if !ok {
+		have := make([]string, 0, len(Registry))
+		for k := range Registry {
+			have = append(have, k)
+		}
+		return nil, fmt.Errorf("no site builder for %q (have %v)", name, have)
+	}
+	return b, nil
+}
+
+// SiteNodes are the cluster nodes at the site, in build order:
+// control planes first, because a worker has nothing to join until
+// one exists.
+func SiteNodes(t lab.Topology) []lab.Node {
+	return append(t.NodesInRole(lab.ControlPlane), t.NodesInRole(lab.Worker)...)
+}
+
+// ControlPlaneAddresses are the site addresses of the members, which
+// is what every node balances across and what the bastion dials.
+func ControlPlaneAddresses(t lab.Topology) []string {
+	var out []string
+	for _, n := range t.NodesInRole(lab.ControlPlane) {
+		out = append(out, n.Address(lab.LANSegment))
+	}
+	return out
+}

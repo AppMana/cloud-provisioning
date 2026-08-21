@@ -25,6 +25,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/network"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/network/calico"
+	"github.com/appmana/cloud-provisioning/harness/e2e/outage"
 	"github.com/appmana/cloud-provisioning/harness/e2e/provider"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
 )
@@ -36,6 +37,7 @@ func main() {
 		product = flag.Bool("product", false, "also install the product's chart")
 		remotes = flag.String("remotes", "", "comma-separated remotes to claim and bootstrap (e.g. remote1)")
 		checks  = flag.Bool("check", false, "also run the reachability matrix")
+		outages = flag.String("outage", "", "also run an outage row: <victim>:<cut|reboot>")
 		repoDir = flag.String("repo-dir", "../..", "the repository root")
 		workDir = flag.String("work-dir", "_work", "where the generated topology is written")
 		down    = flag.Bool("down", false, "destroy the lab instead of building it")
@@ -227,6 +229,34 @@ func main() {
 					fail("%v", err)
 				}
 				defer pods.Stop(context.Background())
+
+				if *outages != "" {
+					victim, mode, _ := strings.Cut(*outages, ":")
+					step("outage: " + victim + " " + mode)
+					res := outage.Run(ctx, outage.Row{
+						Name: victim + "-" + mode, Victim: victim, Mode: outage.Mode(mode),
+					}, outage.Deps{
+						Rig: r, Prober: pods, Targets: targets,
+						Options:  check.Options{Port: check.Port, ExternalURL: "http://1.1.1.1"},
+						Converge: 7 * time.Minute, Down: 90 * time.Second,
+						// What a platform gives a machine back: its NIC,
+						// its address, its gateway. Everything else the
+						// node must rebuild from what it runs at boot.
+						Restart: func(ctx context.Context, v string) error {
+							return bringup.Replumb(ctx, topo, r, host, v)
+						},
+					})
+					fmt.Println(res)
+					for _, m := range []*check.Matrix{res.Baseline, res.Survivors, res.Returned} {
+						if m != nil {
+							fmt.Println(m.Report())
+						}
+					}
+					if !res.OK() {
+						fail("the outage row failed")
+					}
+					return
+				}
 
 				m := check.Converge(ctx, pods, targets,
 					check.Options{Port: check.Port, ExternalURL: "http://1.1.1.1"},

@@ -308,7 +308,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	// would bring it back: the reconciler is driven by Machine events,
 	// and the machine stops changing once it is running.
 	remoteBlocksPending := false
-	if nodeName, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name"); nodeName != "" {
+	if nodeName := r.nodeNameForMachine(ctx, machine); nodeName != "" {
 		published, err := r.publishRemotePodCIDRs(ctx, machine.GetName(), nodeName)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -1231,8 +1231,47 @@ const (
 // reach by construction, and the one the dialer installs a host route
 // for. Autodetection on the node itself cannot know that, so the choice
 // is stated here rather than guessed there.
+
+// nodeNameForMachine is which node this machine turned out to be.
+//
+// Cluster API's Machine controller writes status.nodeRef, and when it
+// is there it is the answer. But it only gets there if Cluster API
+// holds a connection to the workload cluster, which it takes from a
+// <cluster>-kubeconfig Secret — and this product's model is a
+// pre-existing, self-managed cluster with no control plane provider
+// to write one (see examples/aws.yaml, which an operator applies in
+// full and which contains no such Secret). Depending on nodeRef alone
+// therefore half-works in exactly the documented setup: the node
+// joins and goes Ready, its pod blocks are never published, the CNI
+// is never told which address to peer on, and nothing reports a
+// problem.
+//
+// So failing that, the same match Cluster API itself makes: the node
+// whose spec.providerID equals this machine's. In a cloud the
+// provider sets one side and the cloud controller manager the other,
+// and both are local reads that need no workload connection at all.
+func (r *meshReconciler) nodeNameForMachine(ctx context.Context, machine *unstructured.Unstructured) string {
+	if name, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name"); name != "" {
+		return name
+	}
+	providerID, _, _ := unstructured.NestedString(machine.Object, "spec", "providerID")
+	if providerID == "" {
+		return ""
+	}
+	nodes := &corev1.NodeList{}
+	if err := r.reader.List(ctx, nodes); err != nil {
+		return ""
+	}
+	for i := range nodes.Items {
+		if nodes.Items[i].Spec.ProviderID == providerID {
+			return nodes.Items[i].Name
+		}
+	}
+	return ""
+}
+
 func (r *meshReconciler) ensureCNINodeAddressForMachine(ctx context.Context, machine *unstructured.Unstructured) error {
-	nodeName, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name")
+	nodeName := r.nodeNameForMachine(ctx, machine)
 	tunnelAddr := strings.SplitN(strings.TrimSpace(
 		machine.GetAnnotations()["cloud-provisioning.appmana.com/wireguard-addr4"]), "/", 2)[0]
 	claimRef := ""

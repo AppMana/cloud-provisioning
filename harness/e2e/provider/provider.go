@@ -30,7 +30,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -381,56 +380,4 @@ func (c *Controller) ReconcileCluster(ctx context.Context, namespace, name, host
 		return fmt.Errorf("reporting the cluster ready: %w", err)
 	}
 	return nil
-}
-
-// PublishKubeconfig gives Cluster API a way to reach the workload
-// cluster.
-//
-// Cluster API talks to the cluster a Machine belongs to in order to
-// find its Node, and it looks for that connection in a Secret named
-// <cluster>-kubeconfig. Without one it reports "Remote connection not
-// established yet" and never links a Machine to anything. Publishing
-// it is the provider's job: in a managed cluster the control plane
-// provider writes it, and here the lab owns the cluster.
-//
-// The server is rewritten to a control plane's real address. The
-// admin kubeconfig names the node-local forwarder on 127.0.0.1, which
-// is a host loopback: correct for anything running on a node, and
-// unreachable from inside a pod, which is where Cluster API runs.
-func (c *Controller) PublishKubeconfig(ctx context.Context, namespace, cluster, admin, apiServer string) error {
-	if _, err := c.Kube.Get(ctx, namespace, "secret", cluster+"-kubeconfig", "{.metadata.name}"); err == nil {
-		return nil
-	}
-	rewritten := serverRE.ReplaceAllString(admin, "server: https://"+apiServer+":6443")
-	if !strings.Contains(rewritten, apiServer) {
-		return fmt.Errorf("the kubeconfig names no server that could be rewritten")
-	}
-	manifest := fmt.Sprintf(`apiVersion: v1
-kind: Secret
-metadata:
-  name: %s-kubeconfig
-  namespace: %s
-  labels:
-    cluster.x-k8s.io/cluster-name: %s
-type: cluster.x-k8s.io/secret
-stringData:
-  value: |
-%s
-`, cluster, namespace, cluster, indent(rewritten, "    "))
-	if err := c.Kube.Apply(ctx, []byte(manifest)); err != nil {
-		return fmt.Errorf("publishing the workload kubeconfig: %w", err)
-	}
-	return nil
-}
-
-var serverRE = regexp.MustCompile(`server: \S+`)
-
-func indent(body, with string) string {
-	var b strings.Builder
-	for _, line := range strings.Split(strings.TrimRight(body, "\n"), "\n") {
-		b.WriteString(with)
-		b.WriteString(line)
-		b.WriteString("\n")
-	}
-	return strings.TrimRight(b.String(), "\n")
 }

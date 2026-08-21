@@ -359,6 +359,10 @@ func (t Topology) Links() []Link {
 // A cloud's own edge is named just "edge": within one cloud there is
 // only one, so the suffix its node name carries to tell the two
 // clouds apart repeats what the bridge already says.
+// EndpointName is exported so that a rig re-plumbing a rebooted
+// machine names its host side exactly as the deploy did.
+func EndpointName(segment string, n Node) string { return endpointName(segment, n) }
+
 func endpointName(segment string, n Node) string {
 	short := strings.TrimPrefix(segment, "cldt-")
 	switch short {

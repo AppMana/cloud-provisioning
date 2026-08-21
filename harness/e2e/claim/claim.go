@@ -107,16 +107,21 @@ func (c *Claimer) Claim(ctx context.Context, name, node string) error {
 		return err
 	}
 
-	// And a way for Cluster API to reach the cluster the machine
-	// joins, which it needs to find the Node at all.
-	admin, err := c.Rig.Node(c.Topology.NodesInRole(lab.ControlPlane)[0].Name).
-		Exec(ctx, "cat", "/etc/kubernetes/admin.conf")
-	if err != nil {
-		return fmt.Errorf("reading the cluster's kubeconfig: %w", err)
-	}
-	if err := c.Provider.PublishKubeconfig(ctx, Namespace, ClusterName, string(admin), apiServer); err != nil {
-		return err
-	}
+	// No <cluster>-kubeconfig is published here, deliberately.
+	//
+	// Cluster API needs one to connect to the workload cluster and set
+	// Machine.status.nodeRef, and for a while the harness wrote it —
+	// which made the rows pass and hid a real gap: this product's
+	// model is a pre-existing, self-managed cluster with no control
+	// plane provider to write that Secret, and examples/aws.yaml, the
+	// complete set an operator applies, contains none. Publishing it
+	// here would prove the product against a harness that had
+	// supplied the missing piece.
+	//
+	// The controller now resolves a machine's node by matching
+	// providerID, which is what Cluster API itself matches on and
+	// needs no workload connection, so nodeRef is a preference rather
+	// than a requirement.
 
 	// The product's own reconciler creates these. Waiting for them is
 	// waiting for the product to have done its half.

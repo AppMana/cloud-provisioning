@@ -1,0 +1,182 @@
+// Package outage takes a node away and makes three claims about
+// everyone else.
+//
+// A row is a sequence, and each step exists because the one before it
+// would otherwise mean something weaker:
+//
+//   - The baseline is green before anything breaks. A failure
+//     measured on a broken baseline names the wrong culprit.
+//   - The survivors converge among themselves while the victim is
+//     down. Losing one node may cost that node's pods and nothing
+//     else.
+//   - The victim returns and the whole cluster is green again, with
+//     nothing reinstalled, restarted or forgiven.
+//
+// Two ways down, and they are different claims. A cut takes the
+// network and leaves the machine running against it: a pulled cable,
+// which from everywhere else is silence. A reboot takes the machine,
+// ungracefully, and gives it back only what a platform provides — a
+// NIC, an address, a gateway — so the tunnel, the routes and the
+// membership must be rebuilt by what the node itself runs at boot.
+//
+// reboot-remote is the invariant's proof: the host unit has to raise
+// the tunnel from its cached peer list while the cluster is
+// unreachable, because the cluster is on the far side of the tunnel
+// it is raising.
+package outage
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/appmana/cloud-provisioning/harness/e2e/check"
+	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+)
+
+// Mode is how a node goes away.
+type Mode string
+
+const (
+	// Cut pulls the cable and leaves the machine running.
+	Cut Mode = "cut"
+	// Reboot kills the machine and brings it back.
+	Reboot Mode = "reboot"
+)
+
+// Row is one outage.
+type Row struct {
+	Name string
+	// Victim is the node that goes away.
+	Victim string
+	Mode   Mode
+}
+
+// Result is what a row observed, kept as values so a report is
+// generated rather than parsed back out of a log.
+type Result struct {
+	Row       Row
+	Baseline  *check.Matrix
+	Survivors *check.Matrix
+	Returned  *check.Matrix
+	// Failed says which claim failed, empty when the row passed.
+	Failed string
+	Err    error
+}
+
+// OK reports whether the row passed.
+func (r Result) OK() bool { return r.Failed == "" && r.Err == nil }
+
+func (r Result) String() string {
+	verdict := "PASS"
+	detail := ""
+	if !r.OK() {
+		verdict = "FAIL"
+		detail = "  " + r.Failed
+		if r.Err != nil {
+			detail += ": " + r.Err.Error()
+		}
+	}
+	return fmt.Sprintf("### %s %s (victim=%s, mode=%s)%s",
+		verdict, r.Row.Name, r.Row.Victim, r.Row.Mode, detail)
+}
+
+// Deps is what a row needs to run.
+type Deps struct {
+	Rig    rig.Rig
+	Prober check.Prober
+	// Targets is every probe pod, including the victim's.
+	Targets []check.Target
+	Options check.Options
+	// Converge is how long a claim has to become true. Bounded,
+	// because the claim is not that these paths work eventually: it is
+	// that they work within the time an operator would wait.
+	Converge time.Duration
+	// Down is how long to wait for the cluster to notice a node has
+	// gone before measuring the survivors.
+	Down time.Duration
+	// Restart runs between the victim leaving and returning, so a
+	// caller can re-plumb whatever the platform would have given back.
+	Restart func(ctx context.Context, victim string) error
+}
+
+// Run executes one row.
+func Run(ctx context.Context, row Row, d Deps) Result {
+	res := Result{Row: row}
+
+	// Everything green before anything breaks.
+	res.Baseline = check.Converge(ctx, d.Prober, d.Targets, d.Options, d.Converge, 10*time.Second)
+	if !res.Baseline.OK() {
+		res.Failed = "the baseline was already broken, so a failure after this would name the wrong culprit"
+		return res
+	}
+
+	victim := d.Rig.Node(row.Victim)
+	if err := takeDown(ctx, victim, row.Mode); err != nil {
+		res.Failed, res.Err = "taking the victim down", err
+		return res
+	}
+
+	// Give the cluster time to notice. Measuring the instant the link
+	// drops measures the moment of the break rather than what the
+	// survivors settle to.
+	select {
+	case <-ctx.Done():
+		res.Failed, res.Err = "waiting for the victim to be noticed", ctx.Err()
+		return res
+	case <-time.After(d.Down):
+	}
+
+	// The survivors, among themselves. The victim's own pods are gone
+	// with it, which is allowed; everyone else's must not be.
+	survivors := without(d.Targets, row.Victim)
+	res.Survivors = check.Converge(ctx, d.Prober, survivors, d.Options, d.Converge, 10*time.Second)
+	if !res.Survivors.OK() {
+		res.Failed = "the survivors did not converge among themselves: losing one node cost more than that node"
+		return res
+	}
+
+	if err := bringBack(ctx, victim, row.Mode, d.Restart); err != nil {
+		res.Failed, res.Err = "bringing the victim back", err
+		return res
+	}
+
+	// And the whole cluster again, with nothing reinstalled.
+	res.Returned = check.Converge(ctx, d.Prober, d.Targets, d.Options, d.Converge, 10*time.Second)
+	if !res.Returned.OK() {
+		res.Failed = "the cluster did not return to green after the victim came back"
+		return res
+	}
+	return res
+}
+
+func takeDown(ctx context.Context, victim rig.Node, mode Mode) error {
+	if mode == Reboot {
+		return victim.Kill(ctx)
+	}
+	return victim.Cut(ctx)
+}
+
+func bringBack(ctx context.Context, victim rig.Node, mode Mode, restart func(context.Context, string) error) error {
+	if mode == Reboot {
+		if err := victim.Boot(ctx); err != nil {
+			return err
+		}
+		if restart != nil {
+			return restart(ctx, victim.Name())
+		}
+		return nil
+	}
+	return victim.Restore(ctx)
+}
+
+// without drops one node from the targets.
+func without(targets []check.Target, node string) []check.Target {
+	var out []check.Target
+	for _, t := range targets {
+		if t.Node != node {
+			out = append(out, t)
+		}
+	}
+	return out
+}

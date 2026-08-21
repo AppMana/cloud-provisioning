@@ -88,8 +88,26 @@ func (Provider) InfraValues(ctx context.Context, machine *unstructured.Unstructu
 // to live here ran "docker run --network none ... sleep infinity", which
 // attaches a node to no segment at all, and were called by nothing but
 // their own test.
+// containerName is which container backs this machine, freshest
+// source first.
+//
+// The annotation wins because it is what the printer column shows and
+// what already-created objects carry. Then the machine's own spec,
+// which is where a template puts it: a ContainernetMachineTemplate
+// carries spec.template.spec.containerName and the claim reconciler
+// copies that spec into the machine it creates, the same way an
+// AWSMachineTemplate's instanceType reaches an AWSMachine. Reading
+// only the annotation left that field dead, so the binding had to be
+// written twice — once where the API says it goes and once where the
+// code actually looked.
+//
+// Failing that, the object's own name: a machine and a container may
+// share one, and guessing is better than returning nothing.
 func containerName(machine *unstructured.Unstructured) string {
 	if n := machine.GetAnnotations()[containerNameAnnotation]; n != "" {
+		return n
+	}
+	if n, found, err := unstructured.NestedString(machine.Object, "spec", "containerName"); err == nil && found && n != "" {
 		return n
 	}
 	return machine.GetName()

@@ -340,7 +340,7 @@ func (t Topology) Links() []Link {
 		for _, i := range n.Interfaces {
 			out = append(out, Link{
 				From: n.Name + ":" + i.Name,
-				To:   i.Segment + ":" + endpointName(i.Segment, n.Name),
+				To:   i.Segment + ":" + endpointName(i.Segment, n),
 			})
 		}
 	}
@@ -348,11 +348,18 @@ func (t Topology) Links() []Link {
 	return out
 }
 
-// endpointName names the bridge side of a cable. containerlab needs
-// each to be unique on its bridge, and a name that says which node it
-// leads to makes a stale interface on the host identifiable when a
-// deploy refuses because one is still there.
-func endpointName(segment, node string) string {
+// endpointName names the bridge side of a cable.
+//
+// These become interface names on this host, so each must be unique
+// on its bridge and short enough for the kernel to take. A name that
+// says which node it leads to is what makes a stale one identifiable
+// when a deploy refuses because the interface is still there, which
+// happens after an ungraceful teardown.
+//
+// A cloud's own edge is named just "edge": within one cloud there is
+// only one, so the suffix its node name carries to tell the two
+// clouds apart repeats what the bridge already says.
+func endpointName(segment string, n Node) string {
 	short := strings.TrimPrefix(segment, "cldt-")
 	switch short {
 	case "cloud-a":
@@ -360,5 +367,9 @@ func endpointName(segment, node string) string {
 	case "cloud-b":
 		short = "b"
 	}
-	return short + "-" + node
+	name := n.Name
+	if n.Role == Edge && strings.HasPrefix(segment, "cldt-cloud-") {
+		name = "edge"
+	}
+	return short + "-" + name
 }

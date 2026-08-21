@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/bringup"
+	"github.com/appmana/cloud-provisioning/harness/e2e/check"
 	"github.com/appmana/cloud-provisioning/harness/e2e/claim"
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/kubeadm"
@@ -34,6 +35,7 @@ func main() {
 		cni     = flag.String("cni", "", "also install this container network")
 		product = flag.Bool("product", false, "also install the product's chart")
 		remotes = flag.String("remotes", "", "comma-separated remotes to claim and bootstrap (e.g. remote1)")
+		checks  = flag.Bool("check", false, "also run the reachability matrix")
 		repoDir = flag.String("repo-dir", "../..", "the repository root")
 		workDir = flag.String("work-dir", "_work", "where the generated topology is written")
 		down    = flag.Bool("down", false, "destroy the lab instead of building it")
@@ -139,6 +141,13 @@ func main() {
 			if err := prod.ApplyCRDs(ctx); err != nil {
 				fail("%v", err)
 			}
+			// cert-manager and Cluster API: the product's README names
+			// both as dependencies, and the join path reads a field
+			// only Cluster API's Machine controller writes.
+			step("cert-manager and Cluster API")
+			if err := prod.InstallCAPI(ctx); err != nil {
+				fail("%v", err)
+			}
 			if err := prod.Distribute(ctx, sha); err != nil {
 				fail("distributing: %v", err)
 			}
@@ -168,11 +177,63 @@ func main() {
 				if err := c.Bootstrap(ctx, name, name); err != nil {
 					fail("%v", err)
 				}
+
+				// The node joins after the machine is reported, and
+				// then the cloud tells Kubernetes which machine it is.
+				// That is the cloud's job — a cloud controller manager
+				// does it, or kubelet started with a provider — and
+				// here the lab is the cloud.
+				adoptCtx, cancelAdopt := context.WithTimeout(ctx, 10*time.Minute)
+				err := c.Provider.AdoptNodes(adoptCtx, claim.Namespace, 5*time.Second)
+				cancelAdopt()
+				if err != nil {
+					fail("%v", err)
+				}
+
+				// And Cluster API links the Machine to that Node.
+				// Nothing here writes nodeRef: if this never appears,
+				// the dependency the product declares is not doing its
+				// job, which is a condition an operator's cluster could
+				// be in and one the harness must not paper over.
+				linked, err := prod.WaitForNodeRef(ctx, claim.Namespace, name, 5*time.Minute)
+				if err != nil {
+					fail("%v", err)
+				}
+				fmt.Printf("  Cluster API linked the machine to node %s\n", linked)
 				fmt.Println("  the node ran the userdata the product rendered")
 				if cn, ok := r.Node(name).(*container.Node); ok {
 					for _, why := range cn.Accommodations() {
 						fmt.Printf("  NOTE this rig %s\n", why)
 					}
+				}
+			}
+
+			if *checks {
+				step("the reachability matrix")
+				nodes, err := d.Kube.Nodes(ctx)
+				if err != nil {
+					fail("reading the cluster's nodes: %v", err)
+				}
+				if err := waitReady(ctx, d.Kube, nodes); err != nil {
+					fail("%v", err)
+				}
+				pods := &check.Pods{
+					Kube: d.Kube, Rig: r,
+					Namespace:   check.UniqueNamespace(time.Now().Unix()),
+					CRIEndpoint: b.CRIEndpoint(),
+				}
+				targets, err := pods.Start(ctx, nodes, 5*time.Minute)
+				if err != nil {
+					fail("%v", err)
+				}
+				defer pods.Stop(context.Background())
+
+				m := check.Converge(ctx, pods, targets,
+					check.Options{Port: check.Port, ExternalURL: "http://1.1.1.1"},
+					5*time.Minute, 15*time.Second)
+				fmt.Println(m.Report())
+				if !m.OK() {
+					fail("the matrix is not green")
 				}
 			}
 		}

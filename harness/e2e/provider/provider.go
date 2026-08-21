@@ -30,6 +30,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -42,7 +43,13 @@ import (
 const (
 	containerNameAnnotation = "containernet.appmana.com/container-name"
 	machineKind             = "containernetmachine"
+	providerScheme          = "containernet://"
 )
+
+// ProviderID is how this provider names a machine. Cluster API's
+// Machine controller links a Machine to a Node by matching it, so the
+// infrastructure machine and the node have to agree on it exactly.
+func ProviderID(node string) string { return providerScheme + node }
 
 // Controller reports the lab's machines the way an infrastructure
 // provider reports a cloud's.
@@ -214,35 +221,216 @@ func (c *Controller) node(binding string) (lab.Node, error) {
 }
 
 func (c *Controller) setProviderID(ctx context.Context, namespace, name, node string) error {
-	patch := fmt.Sprintf(`{"spec":{"providerID":%q}}`, "containernet://"+node)
+	patch := fmt.Sprintf(`{"spec":{"providerID":%q}}`, ProviderID(node))
 	_, err := c.Kube.Run(ctx, "-n", namespace, "patch", machineKind, name, "--type", "merge", "-p", patch)
 	return err
 }
 
-// setAddresses reports where the machine can be reached, on the
-// infrastructure machine and on the Machine that owns it.
+// setAddresses reports where the machine can be reached.
 //
-// Both, because Cluster API's own controllers are not running here:
-// in a real cluster the machine controller copies an infrastructure
-// machine's addresses up, and with nothing doing that the consumer
-// would read a Machine with no address however correct the
-// infrastructure object was.
+// On the infrastructure machine only. Cluster API's Machine
+// controller copies them up to the Machine, and that is its job: a
+// harness that wrote both would be standing in for a dependency the
+// product declares, and no row would notice if that dependency were
+// missing.
 func (c *Controller) setAddresses(ctx context.Context, namespace, name, address string) error {
 	addresses := fmt.Sprintf(
 		`[{"type":"ExternalIP","address":%q},{"type":"InternalIP","address":%q}]`, address, address)
 
-	for _, kind := range []string{machineKind, "machine"} {
-		patch := fmt.Sprintf(`{"status":{"addresses":%s}}`, addresses)
-		if _, err := c.Kube.Run(ctx, "-n", namespace, "patch", kind, name,
-			"--subresource=status", "--type", "merge", "-p", patch); err != nil {
-			return fmt.Errorf("reporting %s's address on the %s: %w", name, kind, err)
-		}
+	patch := fmt.Sprintf(`{"status":{"addresses":%s}}`, addresses)
+	if _, err := c.Kube.Run(ctx, "-n", namespace, "patch", machineKind, name,
+		"--subresource=status", "--type", "merge", "-p", patch); err != nil {
+		return fmt.Errorf("reporting %s's address: %w", name, err)
 	}
 	return nil
 }
 
+// setReady says the machine is usable, in the terms the contract in
+// use requires.
+//
+// Both fields. status.ready is the v1beta1 contract; the v1beta2
+// contract replaced it with status.initialization.provisioned, and
+// Cluster API v1.11 reads only the latter — it reported
+// "ContainernetMachine status.initialization.provisioned is false"
+// while status.ready had been true the whole time. The CRD declares
+// both contracts, so it satisfies both.
 func (c *Controller) setReady(ctx context.Context, namespace, name string) error {
 	_, err := c.Kube.Run(ctx, "-n", namespace, "patch", machineKind, name,
-		"--subresource=status", "--type", "merge", "-p", `{"status":{"ready":true}}`)
+		"--subresource=status", "--type", "merge",
+		"-p", `{"status":{"ready":true,"initialization":{"provisioned":true}}}`)
 	return err
+}
+
+// SetNodeProviderID tells Kubernetes which machine a node is.
+//
+// In a cloud this is the cloud controller manager's job, or kubelet's
+// when it is started with a provider. Here the lab is the cloud, so
+// the lab does it — and this is the line worth keeping straight: it
+// is the CLOUD's job, not Cluster API's. Cluster API's Machine
+// controller then links the Machine to the Node by matching this
+// against the Machine's own providerID, and this harness does not
+// write nodeRef at all.
+//
+// A node whose providerID is already set is left alone: the field is
+// immutable once written.
+func (c *Controller) SetNodeProviderID(ctx context.Context, node, providerID string) error {
+	existing, err := c.Kube.Get(ctx, "", "node", node, "{.spec.providerID}")
+	if err != nil {
+		return err
+	}
+	if existing != "" {
+		return nil
+	}
+	patch := fmt.Sprintf(`{"spec":{"providerID":%q}}`, providerID)
+	if _, err := c.Kube.Run(ctx, "patch", "node", node, "--type", "merge", "-p", patch); err != nil {
+		return fmt.Errorf("giving node %s its provider identity: %w", node, err)
+	}
+	return nil
+}
+
+// AdoptNodes gives every node that a machine reported an address for
+// the provider identity Cluster API matches on.
+//
+// Found by address rather than by name, because the address is the
+// fact the provider already reported: a machine bound to the wrong
+// node then adopts nothing instead of adopting the wrong node.
+func (c *Controller) AdoptNodes(ctx context.Context, namespace string, every time.Duration) error {
+	for {
+		machines, err := c.Reconcile(ctx, namespace)
+		if err == nil {
+			adopted := len(machines) > 0
+			for _, m := range machines {
+				node, err := c.nodeAt(ctx, m.Address)
+				if err != nil {
+					return err
+				}
+				if node == "" {
+					adopted = false
+					continue
+				}
+				if err := c.SetNodeProviderID(ctx, node, ProviderID(m.Node)); err != nil {
+					return err
+				}
+			}
+			if adopted {
+				return nil
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("no node took the provider's identity: %w", ctx.Err())
+		case <-time.After(every):
+		}
+	}
+}
+
+// nodeAt finds the node holding an address.
+func (c *Controller) nodeAt(ctx context.Context, address string) (string, error) {
+	out, err := c.Kube.Run(ctx, "get", "nodes", "-o",
+		`jsonpath={range .items[*]}{.metadata.name}{" "}{range .status.addresses[*]}{.address}{","}{end}{"\n"}{end}`)
+	if err != nil {
+		return "", err
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		name, addrs, ok := strings.Cut(strings.TrimSpace(line), " ")
+		if !ok {
+			continue
+		}
+		for _, a := range strings.Split(addrs, ",") {
+			if a == address {
+				return name, nil
+			}
+		}
+	}
+	return "", nil
+}
+
+// ReconcileCluster reports the infrastructure cluster.
+//
+// Cluster API's Cluster controller will not move a Cluster out of
+// Provisioning until its infrastructure reports ready, and until the
+// Cluster is provisioned every Machine in it stays Pending — so
+// nothing is ever linked to a node and the mesh is never told a peer
+// exists. That is a real provider responsibility, not a lab detail:
+// CAPA reports an AWSCluster the same way, once the load balancer and
+// the network exist.
+//
+// The endpoint is stated because Cluster API requires one before it
+// considers a cluster usable. It names a real control plane: the site
+// has no address that moves between nodes, so any member is as good
+// as any other and the first is chosen for being deterministic.
+func (c *Controller) ReconcileCluster(ctx context.Context, namespace, name, host string, port int) error {
+	ready, err := c.Kube.Get(ctx, namespace, "containernetcluster", name, "{.status.ready}")
+	if err != nil {
+		return fmt.Errorf("reading the infrastructure cluster: %w", err)
+	}
+	if ready == "true" {
+		return nil
+	}
+
+	// Spec before status, as everywhere else: an endpoint has to be
+	// readable before anything is told the cluster is usable.
+	endpoint := fmt.Sprintf(`{"spec":{"controlPlaneEndpoint":{"host":%q,"port":%d}}}`, host, port)
+	if _, err := c.Kube.Run(ctx, "-n", namespace, "patch", "containernetcluster", name,
+		"--type", "merge", "-p", endpoint); err != nil {
+		return fmt.Errorf("stating the cluster's endpoint: %w", err)
+	}
+	if _, err := c.Kube.Run(ctx, "-n", namespace, "patch", "containernetcluster", name,
+		"--subresource=status", "--type", "merge",
+		"-p", `{"status":{"ready":true,"initialization":{"provisioned":true}}}`); err != nil {
+		return fmt.Errorf("reporting the cluster ready: %w", err)
+	}
+	return nil
+}
+
+// PublishKubeconfig gives Cluster API a way to reach the workload
+// cluster.
+//
+// Cluster API talks to the cluster a Machine belongs to in order to
+// find its Node, and it looks for that connection in a Secret named
+// <cluster>-kubeconfig. Without one it reports "Remote connection not
+// established yet" and never links a Machine to anything. Publishing
+// it is the provider's job: in a managed cluster the control plane
+// provider writes it, and here the lab owns the cluster.
+//
+// The server is rewritten to a control plane's real address. The
+// admin kubeconfig names the node-local forwarder on 127.0.0.1, which
+// is a host loopback: correct for anything running on a node, and
+// unreachable from inside a pod, which is where Cluster API runs.
+func (c *Controller) PublishKubeconfig(ctx context.Context, namespace, cluster, admin, apiServer string) error {
+	if _, err := c.Kube.Get(ctx, namespace, "secret", cluster+"-kubeconfig", "{.metadata.name}"); err == nil {
+		return nil
+	}
+	rewritten := serverRE.ReplaceAllString(admin, "server: https://"+apiServer+":6443")
+	if !strings.Contains(rewritten, apiServer) {
+		return fmt.Errorf("the kubeconfig names no server that could be rewritten")
+	}
+	manifest := fmt.Sprintf(`apiVersion: v1
+kind: Secret
+metadata:
+  name: %s-kubeconfig
+  namespace: %s
+  labels:
+    cluster.x-k8s.io/cluster-name: %s
+type: cluster.x-k8s.io/secret
+stringData:
+  value: |
+%s
+`, cluster, namespace, cluster, indent(rewritten, "    "))
+	if err := c.Kube.Apply(ctx, []byte(manifest)); err != nil {
+		return fmt.Errorf("publishing the workload kubeconfig: %w", err)
+	}
+	return nil
+}
+
+var serverRE = regexp.MustCompile(`server: \S+`)
+
+func indent(body, with string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(strings.TrimRight(body, "\n"), "\n") {
+		b.WriteString(with)
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+	return strings.TrimRight(b.String(), "\n")
 }

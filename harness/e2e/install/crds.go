@@ -36,13 +36,9 @@ func (p *Product) ApplyCRDs(ctx context.Context) error {
 		return fmt.Errorf("installing the lab's own kinds: %w", err)
 	}
 
-	capi, err := p.capiCRDs(ctx)
-	if err != nil {
-		return err
-	}
-	if err := p.Kube.Apply(ctx, capi); err != nil {
-		return fmt.Errorf("installing Cluster API's kinds: %w", err)
-	}
+	// Cluster API's kinds arrive with Cluster API itself, which is
+	// installed in full: the controllers are the dependency, not just
+	// the schema.
 	return nil
 }
 

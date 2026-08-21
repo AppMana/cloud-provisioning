@@ -99,6 +99,25 @@ func (c *Claimer) Claim(ctx context.Context, name, node string) error {
 		return fmt.Errorf("committing the claim: %w", err)
 	}
 
+	// The infrastructure cluster, reported before anything waits on a
+	// machine: Cluster API keeps every Machine Pending until the
+	// Cluster its infrastructure belongs to is provisioned.
+	apiServer := c.Topology.NodesInRole(lab.ControlPlane)[0].Address(lab.LANSegment)
+	if err := c.Provider.ReconcileCluster(ctx, Namespace, ClusterName, apiServer, 6443); err != nil {
+		return err
+	}
+
+	// And a way for Cluster API to reach the cluster the machine
+	// joins, which it needs to find the Node at all.
+	admin, err := c.Rig.Node(c.Topology.NodesInRole(lab.ControlPlane)[0].Name).
+		Exec(ctx, "cat", "/etc/kubernetes/admin.conf")
+	if err != nil {
+		return fmt.Errorf("reading the cluster's kubeconfig: %w", err)
+	}
+	if err := c.Provider.PublishKubeconfig(ctx, Namespace, ClusterName, string(admin), apiServer); err != nil {
+		return err
+	}
+
 	// The product's own reconciler creates these. Waiting for them is
 	// waiting for the product to have done its half.
 	if err := c.waitFor(ctx, "containernetmachine", name, 3*time.Minute); err != nil {

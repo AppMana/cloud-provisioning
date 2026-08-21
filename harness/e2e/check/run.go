@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Run measures every ordered pair and every per-node check.
@@ -132,4 +133,32 @@ func truncate(s string) string {
 		return s[:max] + "..."
 	}
 	return s
+}
+
+// Converge runs the matrix until it is green or the window runs out,
+// and returns the last one it ran.
+//
+// A single pass measures a moment, not a state. Routes converge
+// asynchronously — a remote's pod block is published after it joins,
+// the transit for a node with no tunnel follows an election, and a
+// network's own agent programs its routes on its own schedule — so a
+// matrix taken the instant a node appears reports a lab that is still
+// assembling itself as a lab that is broken.
+//
+// The window is bounded and its expiry is a failure, because the
+// claim is not that these paths work eventually: it is that they work
+// within the time an operator would wait.
+func Converge(ctx context.Context, p Prober, targets []Target, opts Options, within, every time.Duration) *Matrix {
+	deadline := time.Now().Add(within)
+	for {
+		m := Run(ctx, p, targets, opts)
+		if m.OK() || time.Now().After(deadline) || ctx.Err() != nil {
+			return m
+		}
+		select {
+		case <-ctx.Done():
+			return m
+		case <-time.After(every):
+		}
+	}
 }

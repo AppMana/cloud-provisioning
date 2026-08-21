@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
@@ -99,12 +100,14 @@ func TestTheContractIsAppliedInOrder(t *testing.T) {
 	}
 }
 
-// Addresses are reported on the Machine as well as the infrastructure
-// machine, because Cluster API's own controllers are not running
-// here: in a real cluster the machine controller copies them up, and
-// with nothing doing that the consumer reads a Machine with no
-// address however correct the infrastructure object is.
-func TestAddressesReachTheMachineToo(t *testing.T) {
+// Addresses go on the infrastructure machine and nowhere else.
+//
+// Copying them up to the Machine is Cluster API's Machine controller's
+// job. A harness that wrote both would be standing in for a
+// dependency the product declares, and no row would notice if that
+// dependency were missing — which is exactly what happened for as
+// long as the lab ran without Cluster API installed.
+func TestAddressesGoOnTheInfrastructureMachineOnly(t *testing.T) {
 	k := &fakeKube{objects: map[string]string{
 		"remote1": `{"metadata":{"name":"remote1"},"spec":{"containerName":"clab-cldt-remote1"}}`,
 	}}
@@ -113,15 +116,21 @@ func TestAddressesReachTheMachineToo(t *testing.T) {
 	if _, err := c.Reconcile(context.Background(), "cloud-provisioning"); err != nil {
 		t.Fatal(err)
 	}
-	var onMachine bool
+	var onInfra bool
 	for _, call := range k.calls {
 		joined := strings.Join(call, " ")
-		if strings.Contains(joined, "patch machine ") && strings.Contains(joined, "addresses") {
-			onMachine = true
+		if !strings.Contains(joined, "addresses") {
+			continue
+		}
+		switch {
+		case strings.Contains(joined, "patch containernetmachine"):
+			onInfra = true
+		case strings.Contains(joined, "patch machine "):
+			t.Errorf("the harness wrote the Machine's addresses, which Cluster API copies up: %v", call)
 		}
 	}
-	if !onMachine {
-		t.Error("the Machine never received the address, so the consumer reads one with none")
+	if !onInfra {
+		t.Error("the infrastructure machine never received its address")
 	}
 }
 
@@ -147,6 +156,7 @@ func TestAReportedMachineIsNotRewritten(t *testing.T) {
 // fakeKube answers kubectl through a bastion that is not there.
 type fakeKube struct {
 	objects map[string]string
+	nodes   string
 	calls   [][]string
 }
 
@@ -182,6 +192,14 @@ func (n *fakeNode) Exec(ctx context.Context, argv ...string) ([]byte, error) {
 			}
 		}
 		return nil, errNotFound
+	case containsPrefix(argv, "jsonpath=") && contains(argv, "nodes"):
+		return []byte(n.k.nodes), nil
+	case containsPrefix(argv, "jsonpath={.spec.providerID}"):
+		return nil, nil
+	case containsPrefix(argv, "jsonpath={.status.nodeRef.name}"):
+		// Unlinked until something links it, which is the state every
+		// machine starts in.
+		return nil, nil
 	case containsPrefix(argv, "jsonpath="):
 		var names []string
 		for name := range n.k.objects {
@@ -228,3 +246,79 @@ var errNotFound = &notFound{}
 type notFound struct{}
 
 func (*notFound) Error() string { return "not found" }
+
+// The cloud tells Kubernetes which machine a node is, and Cluster
+// API links the Machine to it from there.
+//
+// That split is the point. Setting spec.providerID on the Node is the
+// cloud's job — a cloud controller manager does it, or kubelet with a
+// provider — and here the lab is the cloud. Writing nodeRef is
+// Cluster API's job, and this harness does not do it at all: if it
+// did, no row would notice a dependency the product declares being
+// absent.
+func TestTheCloudGivesANodeItsIdentityAndNothingMore(t *testing.T) {
+	k := &fakeKube{
+		objects: map[string]string{
+			"remote1": `{"metadata":{"name":"remote1"},"spec":{"containerName":"clab-cldt-remote1"}}`,
+		},
+		nodes: "cp 10.10.0.10,\nremote1 203.0.113.10,\n",
+	}
+	c := &Controller{Kube: k.client(), Topology: lab.Default(), LabName: "cldt"}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := c.AdoptNodes(ctx, "cloud-provisioning", 10*time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+
+	var gaveIdentity bool
+	for _, call := range k.calls {
+		joined := strings.Join(call, " ")
+		if strings.Contains(joined, "patch node") && strings.Contains(joined, ProviderID("remote1")) {
+			gaveIdentity = true
+		}
+		if strings.Contains(joined, "nodeRef") {
+			t.Errorf("the harness wrote nodeRef, which is Cluster API's job: %v", call)
+		}
+	}
+	if !gaveIdentity {
+		t.Errorf("the node was never given the provider's identity: %v", k.calls)
+	}
+}
+
+// The node is found by the address the provider reported, not by
+// name. A machine bound to the wrong node would otherwise adopt that
+// node and fail somewhere far from the cause.
+func TestTheNodeIsFoundByAddressNotByName(t *testing.T) {
+	k := &fakeKube{
+		objects: map[string]string{
+			"remote1": `{"metadata":{"name":"remote1"},"spec":{"containerName":"clab-cldt-remote1"}}`,
+		},
+		// A node named remote1 exists, but at the wrong address.
+		nodes: "remote1 10.10.0.99,\n",
+	}
+	c := &Controller{Kube: k.client(), Topology: lab.Default(), LabName: "cldt"}
+
+	node, err := c.nodeAt(context.Background(), lab.CloudAPrefix+".10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node != "" {
+		t.Errorf("matched node %q on name while its address differs", node)
+	}
+}
+
+// An address the provider reported and a node that holds it is a
+// match, whatever either is called.
+func TestANodeHoldingTheAddressIsTheMachine(t *testing.T) {
+	k := &fakeKube{nodes: "some-other-name 203.0.113.10,\n"}
+	c := &Controller{Kube: k.client(), Topology: lab.Default(), LabName: "cldt"}
+
+	node, err := c.nodeAt(context.Background(), lab.CloudAPrefix+".10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node != "some-other-name" {
+		t.Errorf("nodeAt = %q, want the node holding the address", node)
+	}
+}

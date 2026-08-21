@@ -128,14 +128,27 @@ func (p *Product) Build(ctx context.Context) (dialerSHA string, err error) {
 // which one is claimed is a row's choice and a node that is handed a
 // URL it cannot read fails at first boot with nothing useful to say.
 func (p *Product) Distribute(ctx context.Context, dialerSHA string) error {
-	var site []string
+	var site, everywhere []string
 	for _, n := range cluster.SiteNodes(p.Topology) {
 		site = append(site, n.Name)
+		everywhere = append(everywhere, n.Name)
 	}
-	for _, image := range []string{ControllerImage, DialerImage} {
-		if err := p.Images.Load(ctx, image, site); err != nil {
-			return fmt.Errorf("carrying %s in: %w", image, err)
-		}
+	// The dialer runs on the remotes too, as its own DaemonSet, and
+	// that copy is what keeps a remote's peer list current from the
+	// adoption cache once it has joined. A remote without the image
+	// joins, goes Ready, and then reaches nothing across the tunnel,
+	// because the pod that would maintain its routes is stuck pulling
+	// from a registry its cloud cannot reach.
+	for _, n := range p.Topology.NodesInRole(lab.Remote) {
+		everywhere = append(everywhere, n.Name)
+	}
+
+	// The controller runs on an endpoint, which is always a site node.
+	if err := p.Images.Load(ctx, ControllerImage, site); err != nil {
+		return fmt.Errorf("carrying %s in: %w", ControllerImage, err)
+	}
+	if err := p.Images.Load(ctx, DialerImage, everywhere); err != nil {
+		return fmt.Errorf("carrying %s in: %w", DialerImage, err)
 	}
 
 	binary, err := os.ReadFile(p.binaryPath())

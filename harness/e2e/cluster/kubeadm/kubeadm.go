@@ -24,6 +24,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
+	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 )
 
 func init() { cluster.Register(Builder{}) }
@@ -61,7 +62,113 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 	if err := b.init(ctx, d, first, addrs); err != nil {
 		return fmt.Errorf("initialising %s: %w", first.Name, err)
 	}
+
+	kubeconfig, err := d.Rig.Node(first.Name).Exec(ctx, "cat", "/etc/kubernetes/admin.conf")
+	if err != nil {
+		return fmt.Errorf("reading the kubeconfig: %w", err)
+	}
+	if err := d.Kube.Install(ctx, kubeconfig); err != nil {
+		return fmt.Errorf("installing the kubeconfig on the bastion: %w", err)
+	}
+
+	join, certKey, err := b.joinCredentials(ctx, d, first)
+	if err != nil {
+		return err
+	}
+	for _, n := range cps[1:] {
+		if err := b.join(ctx, d, n, join, certKey); err != nil {
+			return fmt.Errorf("%s joining as a control plane: %w", n.Name, err)
+		}
+	}
+	for _, n := range d.Topology.NodesInRole(lab.Worker) {
+		if err := b.join(ctx, d, n, join, ""); err != nil {
+			return fmt.Errorf("%s joining: %w", n.Name, err)
+		}
+	}
 	return nil
+}
+
+// joinCredentials mints a join command and a certificate key.
+//
+// A fresh certificate key each run: upload-certs re-encrypts the CA
+// bundle into the cluster for two minutes, which is all a join needs.
+// The join bootstraps through the first member's real address rather
+// than the loopback, because the joining node's forwarder is not
+// running yet; kubelet.conf still comes out pointing at the loopback,
+// per controlPlaneEndpoint.
+func (b Builder) joinCredentials(ctx context.Context, d cluster.Deps, first lab.Node) (string, string, error) {
+	node := d.Rig.Node(first.Name)
+	out, err := node.Exec(ctx, "kubeadm", "token", "create", "--print-join-command")
+	if err != nil {
+		return "", "", fmt.Errorf("minting a join command: %w", err)
+	}
+	join := strings.TrimSpace(strings.ReplaceAll(string(out), "\r", ""))
+	if join == "" {
+		return "", "", fmt.Errorf("kubeadm printed no join command")
+	}
+	join = strings.ReplaceAll(join,
+		fmt.Sprintf("127.0.0.1:%d", ProxyPort),
+		first.Address(lab.LANSegment)+":6443")
+
+	out, err = node.Exec(ctx, "kubeadm", "init", "phase", "upload-certs", "--upload-certs")
+	if err != nil {
+		return "", "", fmt.Errorf("uploading certificates: %w", err)
+	}
+	lines := strings.Split(strings.TrimSpace(strings.ReplaceAll(string(out), "\r", "")), "\n")
+	certKey := strings.TrimSpace(lines[len(lines)-1])
+	if certKey == "" {
+		return "", "", fmt.Errorf("kubeadm printed no certificate key")
+	}
+	return join, certKey, nil
+}
+
+// join brings one node into the cluster. An empty certKey joins it as
+// a worker.
+func (b Builder) join(ctx context.Context, d cluster.Deps, n lab.Node, join, certKey string) error {
+	node := d.Rig.Node(n.Name)
+	if _, err := node.Exec(ctx, "test", "-f", "/etc/kubernetes/kubelet.conf"); err == nil {
+		return nil // already joined
+	}
+
+	// node-ip belongs to kubelet, not to join, and it has to be set
+	// before the node registers or it registers by whichever address
+	// it picks for itself.
+	ip := n.Address(lab.LANSegment)
+	if err := node.Put(ctx, strings.NewReader("KUBELET_EXTRA_ARGS=--node-ip="+ip+"\n"),
+		"/etc/default/kubelet", 0o644); err != nil {
+		return err
+	}
+
+	// A joining node needs its loopback forwarder before kubelet
+	// exists to run the static pod, because kubeadm join reads the
+	// cluster's configuration through the server cluster-info names,
+	// which is the loopback. The same proxy runs transiently under
+	// containerd for the join's duration and is killed as soon as it
+	// returns, freeing the port for the static pod kubelet then keeps.
+	b.startBootForwarder(ctx, node)
+	defer b.stopBootForwarder(ctx, node)
+
+	argv := join + " --ignore-preflight-errors=all"
+	if certKey != "" {
+		argv += fmt.Sprintf(" --control-plane --certificate-key %s --apiserver-advertise-address %s", certKey, ip)
+	}
+	out, err := node.Exec(ctx, "sh", "-c", argv)
+	if err != nil {
+		return fmt.Errorf("%w\n%s", err, tail(out, 20))
+	}
+	return nil
+}
+
+func (b Builder) startBootForwarder(ctx context.Context, node rig.Node) {
+	_, _ = node.Exec(ctx, "ctr", "-n", "k8s.io", "run", "-d", "--net-host",
+		"--mount", "type=bind,src=/etc/api-proxy,dst=/etc/api-proxy,options=rbind:ro",
+		"docker.io/library/"+NginxImage, "api-proxy-boot",
+		"nginx", "-g", "daemon off;", "-c", "/etc/api-proxy/nginx.conf")
+}
+
+func (b Builder) stopBootForwarder(ctx context.Context, node rig.Node) {
+	_, _ = node.Exec(ctx, "ctr", "-n", "k8s.io", "task", "kill", "-s", "SIGKILL", "api-proxy-boot")
+	_, _ = node.Exec(ctx, "ctr", "-n", "k8s.io", "container", "rm", "api-proxy-boot")
 }
 
 // forwarders puts the node-local TCP proxy on every site node.
@@ -108,6 +215,16 @@ spec:
         path: /etc/api-proxy
         type: Directory
 `, NginxImage)
+
+	var names []string
+	for _, n := range cluster.SiteNodes(d.Topology) {
+		names = append(names, n.Name)
+	}
+	if d.Images != nil {
+		if err := d.Images.Load(ctx, NginxImage, names); err != nil {
+			return fmt.Errorf("carrying the forwarder's image in: %w", err)
+		}
+	}
 
 	for _, n := range cluster.SiteNodes(d.Topology) {
 		node := d.Rig.Node(n.Name)
@@ -191,25 +308,38 @@ conntrack:
 	return nil
 }
 
-// KubeletInvariant checks that every kubelet dials its own loopback
-// forwarder rather than a specific member.
+// KubeletInvariant checks that no kubelet depends on another node's
+// survival.
 //
-// A kubelet pinned to one control plane turns that member's death
-// into an outage for a node that had quorum available the whole time,
-// and nothing about a healthy cluster reveals the difference — which
-// is why it is asserted rather than assumed.
+// That is the claim, and it is narrower than "everything dials the
+// loopback". A worker's kubelet must dial its own forwarder, or it
+// inherited a single point of failure from whichever member its join
+// happened to go through. A control plane's kubelet dialling its own
+// API server is kubeadm's own choice during init and is just as good:
+// that server dies only when the node does, which is no cross-node
+// dependency at all.
+//
+// Nothing about a healthy cluster reveals the difference, which is
+// why this is asserted rather than assumed: a kubelet pinned to
+// another member turns that member's death into an outage for a node
+// that had quorum available the whole time.
 func (b Builder) KubeletInvariant(ctx context.Context, d cluster.Deps) error {
-	want := fmt.Sprintf("server: https://127.0.0.1:%d", ProxyPort)
+	loopback := fmt.Sprintf("https://127.0.0.1:%d", ProxyPort)
 	var checked int
 	for _, n := range cluster.SiteNodes(d.Topology) {
 		out, err := d.Rig.Node(n.Name).Exec(ctx, "grep", "-o", "server: .*", "/etc/kubernetes/kubelet.conf")
 		if err != nil {
 			return fmt.Errorf("reading %s's kubelet.conf: %w", n.Name, err)
 		}
-		got := strings.TrimSpace(string(out))
-		if got != want {
-			return fmt.Errorf("%s's kubelet dials %q, not its own forwarder (%q): "+
-				"one member's death would strand it with quorum intact", n.Name, got, want)
+		got := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(string(out)), "server:"))
+
+		ok := got == loopback
+		if !ok && n.Role == lab.ControlPlane {
+			ok = got == "https://"+n.Address(lab.LANSegment)+":6443"
+		}
+		if !ok {
+			return fmt.Errorf("%s's kubelet dials %s, which is another node's survival: "+
+				"that member's death would strand it with quorum intact", n.Name, got)
 		}
 		checked++
 	}

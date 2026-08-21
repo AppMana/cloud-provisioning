@@ -15,12 +15,16 @@ import (
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/bringup"
+	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
+	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/kubeadm"
+	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
 )
 
 func main() {
 	var (
+		distro  = flag.String("distro", "", "also build the site cluster with this distribution")
 		workDir = flag.String("work-dir", "_work", "where the generated topology is written")
 		down    = flag.Bool("down", false, "destroy the lab instead of building it")
 		timeout = flag.Duration("timeout", 20*time.Minute, "deadline for the whole bring-up")
@@ -64,6 +68,31 @@ func main() {
 	step("proving it")
 	if err := bringup.Prove(ctx, topo, host); err != nil {
 		fail("%v", err)
+	}
+
+	if *distro != "" {
+		b, err := cluster.For(*distro)
+		if err != nil {
+			fail("%v", err)
+		}
+		step("building the " + *distro + " site")
+		d := cluster.Deps{
+			Topology: topo, Rig: r, WorkDir: *workDir, Images: r,
+			PodCIDR: "10.244.0.0/16", SvcCIDR: "10.96.0.0/12",
+			Kube: &kube.Client{Bastion: r.Node("bastion"), ControlPlanes: cluster.ControlPlaneAddresses(topo)},
+		}
+		if err := b.Build(ctx, d); err != nil {
+			fail("building the site: %v", err)
+		}
+		step("no kubelet depends on another node")
+		if err := b.KubeletInvariant(ctx, d); err != nil {
+			fail("%v", err)
+		}
+		nodes, err := d.Kube.Nodes(ctx)
+		if err != nil {
+			fail("reading the cluster's nodes: %v", err)
+		}
+		fmt.Printf("  registered: %v\n", nodes)
 	}
 
 	fmt.Println("\n  the site reaches both clouds")

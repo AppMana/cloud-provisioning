@@ -96,13 +96,27 @@ func TestTheKubeletInvariantCatchesAPinnedNode(t *testing.T) {
 		t.Errorf("a correctly configured site failed the invariant: %v", err)
 	}
 
+	// A control plane dialling its OWN API server is kubeadm's choice
+	// during init and is no cross-node dependency: that server dies
+	// only when the node does.
+	d.Rig = &fakeRig{execOut: map[string]string{
+		"":   "server: https://127.0.0.1:7445",
+		"cp": "server: https://10.10.0.10:6443",
+	}}
+	if err := (Builder{}).KubeletInvariant(context.Background(), d); err != nil {
+		t.Errorf("a control plane dialling its own API server failed the invariant: %v", err)
+	}
+
+	// A worker dialling a member is the real failure: it inherited a
+	// single point of failure from whichever member its join went
+	// through.
 	d.Rig = &fakeRig{execOut: map[string]string{
 		"":   "server: https://127.0.0.1:7445",
 		"w2": "server: https://10.10.0.10:6443",
 	}}
 	err := (Builder{}).KubeletInvariant(context.Background(), d)
 	if err == nil {
-		t.Fatal("a kubelet pinned to one member passed the invariant")
+		t.Fatal("a worker pinned to one member passed the invariant")
 	}
 	if !strings.Contains(err.Error(), "w2") || !strings.Contains(err.Error(), "quorum") {
 		t.Errorf("the failure does not say which node or what it costs: %v", err)

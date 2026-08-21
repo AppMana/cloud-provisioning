@@ -22,6 +22,16 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 )
 
+// Images carries an image from this host onto nodes.
+//
+// The site has no route to a registry — that is what makes it a site
+// — so every image a node needs arrives this way. How it arrives is
+// the rig's business: a container has a runtime this host can talk
+// to, a machine does not.
+type Images interface {
+	Load(ctx context.Context, image string, nodes []string) error
+}
+
 // Deps is what a builder needs to work.
 type Deps struct {
 	Topology lab.Topology
@@ -30,6 +40,7 @@ type Deps struct {
 	WorkDir  string
 	PodCIDR  string
 	SvcCIDR  string
+	Images   Images
 }
 
 // Builder builds one distribution's site cluster.

@@ -214,3 +214,58 @@ func has(argv []string, want string) bool {
 	}
 	return false
 }
+
+// The container rig cannot satisfy kubeadm's preflight, because
+// preflight inspects the kernel it runs on and in a container that is
+// this host's. So the command is relaxed — and the relaxation is
+// reported, which is the whole difference from what it replaces: the
+// shell harness rewrote the rendered command with a string
+// substitution and said nothing, so every kubeadm row ran something
+// the product had not rendered and no reader could tell.
+func TestPreflightIsRelaxedAndSaidOutLoud(t *testing.T) {
+	rec := &recorder{}
+	n := testNode(t, rec)
+
+	doc := []byte("#cloud-config\n" +
+		"write_files:\n  - path: /tmp/x\n    content: x\n" +
+		"runcmd:\n" +
+		"  - |\n    kubeadm join 127.0.0.1:7445 \\\n      --token a.b\n")
+	if err := n.Userdata(context.Background(), doc); err != nil {
+		t.Fatal(err)
+	}
+
+	var joined string
+	for _, call := range rec.calls {
+		if has(call, "kubeadm join") {
+			joined = strings.Join(call, " ")
+		}
+	}
+	if joined == "" {
+		t.Fatal("the join never ran")
+	}
+	if !strings.Contains(joined, "--ignore-preflight-errors=all") {
+		t.Error("preflight was not relaxed, so the join fails on a kernel the node does not own")
+	}
+	if len(n.Accommodations()) != 1 {
+		t.Fatalf("%d accommodations reported, want the one that was made: %v", len(n.Accommodations()), n.Accommodations())
+	}
+	if !strings.Contains(n.Accommodations()[0], "kernel") {
+		t.Errorf("the accommodation does not say why it was needed: %q", n.Accommodations()[0])
+	}
+}
+
+// A document that needs no accommodation reports none, so the list
+// means something when it is not empty.
+func TestADocumentNeedingNothingReportsNothing(t *testing.T) {
+	rec := &recorder{}
+	n := testNode(t, rec)
+
+	doc := []byte("#cloud-config\nwrite_files:\n  - path: /tmp/x\n    content: x\n" +
+		"runcmd:\n  - [systemctl, enable, --now, wg-dialer]\n")
+	if err := n.Userdata(context.Background(), doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(n.Accommodations()) != 0 {
+		t.Errorf("accommodations reported for a document that needed none: %v", n.Accommodations())
+	}
+}

@@ -54,6 +54,10 @@ type Node struct {
 	node    lab.Node
 	labName string
 	run     Runner
+
+	// accommodations records what this rig had to change about the
+	// last document it applied. See Accommodations.
+	accommodations []string
 }
 
 // Container is the name docker knows this node by. The topology calls
@@ -181,12 +185,17 @@ func (n *Node) Userdata(ctx context.Context, cloudConfig []byte) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", n.Name(), err)
 	}
+	n.accommodations = nil
 	for _, f := range doc.WriteFiles {
 		if err := n.Put(ctx, strings.NewReader(f.Content), f.Path, fs.FileMode(f.Mode)); err != nil {
 			return err
 		}
 	}
 	for _, c := range doc.RunCmd {
+		c, why := accommodate(c)
+		if why != "" {
+			n.accommodations = append(n.accommodations, why)
+		}
 		argv := c.Argv
 		if c.Shell {
 			argv = []string{"sh", "-c", c.Argv[0]}
@@ -196,6 +205,43 @@ func (n *Node) Userdata(ctx context.Context, cloudConfig []byte) error {
 		}
 	}
 	return nil
+}
+
+// Accommodations are the changes this rig made to the last document
+// it applied, because a container cannot satisfy what the document
+// asked for.
+//
+// Reported rather than silent. The shell harness rewrote the rendered
+// kubeadm join with a string substitution and said nothing, so every
+// kubeadm row ran a command the product had not rendered and no
+// reader could tell.
+func (n *Node) Accommodations() []string { return n.accommodations }
+
+// accommodate adjusts one command for what a container cannot do, and
+// says why.
+//
+// Only the container rig does this, and that is the point: a virtual
+// machine has a kernel of its own, so it runs the rendered command
+// unchanged and preflight means something there. Anything this
+// function has to touch is a fidelity gap the VM tier closes.
+func accommodate(c cloudinit.Cmd) (cloudinit.Cmd, string) {
+	const join = "kubeadm join"
+	const relax = " --ignore-preflight-errors=all"
+
+	for i, word := range c.Argv {
+		if !strings.Contains(word, join) || strings.Contains(word, "--ignore-preflight-errors") {
+			continue
+		}
+		// kubeadm's preflight inspects the kernel it runs on, which
+		// in a container is this host's: it cannot load the "configs"
+		// module, cannot read what it needs from /proc/sys, and
+		// objects to things the node neither owns nor can change.
+		out := c
+		out.Argv = append([]string(nil), c.Argv...)
+		out.Argv[i] = strings.Replace(word, join, join+relax, 1)
+		return out, "relaxed kubeadm's preflight: a container shares this host's kernel and cannot satisfy it"
+	}
+	return c, ""
 }
 
 // Skipped reports the cloud-config keys this rig would not apply for

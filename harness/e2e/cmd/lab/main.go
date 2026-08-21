@@ -12,9 +12,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/bringup"
+	"github.com/appmana/cloud-provisioning/harness/e2e/claim"
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/kubeadm"
 	"github.com/appmana/cloud-provisioning/harness/e2e/install"
@@ -22,6 +24,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/network"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/network/calico"
+	"github.com/appmana/cloud-provisioning/harness/e2e/provider"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
 )
 
@@ -30,6 +33,7 @@ func main() {
 		distro  = flag.String("distro", "", "also build the site cluster with this distribution")
 		cni     = flag.String("cni", "", "also install this container network")
 		product = flag.Bool("product", false, "also install the product's chart")
+		remotes = flag.String("remotes", "", "comma-separated remotes to claim and bootstrap (e.g. remote1)")
 		repoDir = flag.String("repo-dir", "../..", "the repository root")
 		workDir = flag.String("work-dir", "_work", "where the generated topology is written")
 		down    = flag.Bool("down", false, "destroy the lab instead of building it")
@@ -131,6 +135,10 @@ func main() {
 				fail("building: %v", err)
 			}
 			fmt.Printf("  dialer %s\n", sha)
+			step("the kinds the product watches")
+			if err := prod.ApplyCRDs(ctx); err != nil {
+				fail("%v", err)
+			}
 			if err := prod.Distribute(ctx, sha); err != nil {
 				fail("distributing: %v", err)
 			}
@@ -141,6 +149,32 @@ func main() {
 				fail("%v", err)
 			}
 			fmt.Println("  the chart is installed")
+
+			for _, name := range strings.Split(*remotes, ",") {
+				if name = strings.TrimSpace(name); name == "" {
+					continue
+				}
+				c := &claim.Claimer{
+					Kube: d.Kube, Rig: r, Topology: topo, LabName: topo.Name,
+					Provider: &provider.Controller{Kube: d.Kube, Topology: topo, LabName: topo.Name},
+				}
+				step("claiming " + name)
+				if err := c.Claim(ctx, name, name); err != nil {
+					fail("%v", err)
+				}
+				fmt.Println("  the mesh published a peer")
+
+				step("bootstrapping " + name)
+				if err := c.Bootstrap(ctx, name, name); err != nil {
+					fail("%v", err)
+				}
+				fmt.Println("  the node ran the userdata the product rendered")
+				if cn, ok := r.Node(name).(*container.Node); ok {
+					for _, why := range cn.Accommodations() {
+						fmt.Printf("  NOTE this rig %s\n", why)
+					}
+				}
+			}
 		}
 	}
 

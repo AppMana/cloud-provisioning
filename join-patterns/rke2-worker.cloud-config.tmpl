@@ -1,4 +1,5 @@
 #cloud-config
+{{- template "ssh-authorized-keys" . }}
 # rke2-agent join pattern: bring up the tunnel (the shared blocks in
 # _shared.tmpl), gate on the cluster's supervisor becoming reachable
 # through it, then join as a plain RKE2 agent using a pre-minted

@@ -66,54 +66,64 @@ func TestEveryShippedPatternIsApplicableByThisRig(t *testing.T) {
 	}
 }
 
-// Only the k0s pattern injects ssh_authorized_keys; kubeadm, k3s and
-// RKE2 do not. That asymmetry is recorded here rather than asserted
-// away in either direction, because it is a product question this
-// harness is not the place to answer: either a remote should be
-// reachable by SSH for an operator and three patterns are missing it,
-// or it should not be and one pattern grants a login on an
-// internet-facing node that the others deny.
+// --join-ssh-authorized-keys says "on every new node". Every pattern
+// must honour it, and the empty case must render nothing at all.
 //
-// What this test does claim is that the harness knows about it. The
-// container rig cannot install a login it never uses, so it reports
-// the key as skipped; the bash harness ignored it silently, and the
-// difference between what the pattern said and what a row proved was
-// invisible.
-func TestTheSSHKeyAsymmetryBetweenPatternsIsVisible(t *testing.T) {
+// This test previously recorded the opposite: only k0s read the value,
+// so an operator who set the flag and ran kubeadm, k3s or RKE2 got no
+// keys and no error. It was written to make the asymmetry visible
+// rather than to bless it, and it failed the moment the patterns were
+// fixed, which is what it was for.
+//
+// The container rig cannot install a login it never uses — it reaches
+// nodes by docker exec — so it reports the key as skipped rather than
+// applying it. That difference closes on the VM rig, where a real
+// cloud-init reads the document.
+func TestEveryPatternHonoursTheAuthorizedKeysFlag(t *testing.T) {
 	dir := patternDir(t)
-	granting := map[string]bool{}
-	for _, name := range []string{
-		"kubeadm-worker.cloud-config.tmpl",
-		"k0s-worker.cloud-config.tmpl",
-		"k3s-worker.cloud-config.tmpl",
-		"rke2-worker.cloud-config.tmpl",
-	} {
-		rendered, err := render.Pattern(filepath.Join(dir, name), patternValues())
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var seen int
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".cloud-config.tmpl") || strings.HasPrefix(e.Name(), "_") {
+			continue
+		}
+		seen++
+		values := patternValues()
+		values["sshAuthorizedKeys"] = []string{"ssh-ed25519 AAAAKEY operator@example"}
+		rendered, err := render.Pattern(filepath.Join(dir, e.Name()), values)
 		if err != nil {
-			t.Fatalf("%s: %v", name, err)
+			t.Fatalf("%s: %v", e.Name(), err)
 		}
 		doc, err := Parse([]byte(rendered))
 		if err != nil {
-			t.Fatalf("%s: %v", name, err)
+			t.Fatalf("%s: %v", e.Name(), err)
 		}
-		for _, skipped := range doc.Skipped {
-			if skipped == "ssh_authorized_keys" {
-				granting[name] = true
+		var skipped bool
+		for _, k := range doc.Skipped {
+			if k == "ssh_authorized_keys" {
+				skipped = true
 			}
 		}
-	}
-
-	if !granting["k0s-worker.cloud-config.tmpl"] {
-		t.Error("k0s no longer grants a login: if that was deliberate, this test and the note above should go")
-	}
-	for _, name := range []string{
-		"kubeadm-worker.cloud-config.tmpl",
-		"k3s-worker.cloud-config.tmpl",
-		"rke2-worker.cloud-config.tmpl",
-	} {
-		if granting[name] {
-			t.Errorf("%s now grants a login too, so the asymmetry is resolved: decide it deliberately and update this test", name)
+		if !skipped {
+			t.Errorf("%s does not honour --join-ssh-authorized-keys, so the flag silently does nothing there", e.Name())
 		}
+
+		// And with no keys, no key at all: a bare ssh_authorized_keys
+		// is a null list, not an absent one.
+		values["sshAuthorizedKeys"] = []string{}
+		rendered, err = render.Pattern(filepath.Join(dir, e.Name()), values)
+		if err != nil {
+			t.Fatalf("%s: %v", e.Name(), err)
+		}
+		if strings.Contains(rendered, "ssh_authorized_keys:") {
+			t.Errorf("%s emits ssh_authorized_keys with no keys under it", e.Name())
+		}
+	}
+	if seen == 0 {
+		t.Fatal("no patterns were checked")
 	}
 }
 

@@ -111,6 +111,43 @@ func TestPatternsWriteTheMachineNameForAdoption(t *testing.T) {
 	}
 }
 
+// --join-ssh-authorized-keys says "on every new node", and the
+// reconciler renders the value into every pattern. Only k0s ever read
+// it: an operator who set the flag and ran kubeadm, k3s or RKE2 got
+// no keys and no complaint, which is the worst shape a configuration
+// bug can take, because the option looks supported everywhere.
+//
+// Also asserts the empty case, which is the default: a pattern that
+// emits a bare "ssh_authorized_keys:" with nothing under it has
+// written a null, and a real cloud-init reads that as a key list that
+// is present and empty rather than absent.
+func TestEveryPatternHonoursTheAuthorizedKeysFlag(t *testing.T) {
+	patterns, err := filepath.Glob(filepath.Join("..", "..", "..", "join-patterns", "*.cloud-config.tmpl"))
+	if err != nil || len(patterns) == 0 {
+		t.Fatalf("no patterns found: %v", err)
+	}
+
+	for _, path := range patterns {
+		name := filepath.Base(path)
+		t.Run(name, func(t *testing.T) {
+			withKeys := renderPatternWith(t, name, map[string]any{
+				"sshAuthorizedKeys": []string{"ssh-ed25519 AAAAKEY operator@example"},
+			})
+			if !strings.Contains(withKeys, "ssh_authorized_keys:") {
+				t.Error("the pattern ignores --join-ssh-authorized-keys, so the flag silently does nothing here")
+			}
+			if !strings.Contains(withKeys, "ssh-ed25519 AAAAKEY operator@example") {
+				t.Error("the key never reaches the document")
+			}
+
+			none := renderPatternWith(t, name, map[string]any{"sshAuthorizedKeys": []string{}})
+			if strings.Contains(none, "ssh_authorized_keys:") {
+				t.Error("with no keys the pattern still emits ssh_authorized_keys, which is a null list rather than an absent one")
+			}
+		})
+	}
+}
+
 // The kubeadm pattern joins through the node's own loopback balancer
 // and gates on it: one probe proves the tunnel, the balancer, and a
 // live control plane. Joining a specific control plane's address
@@ -193,6 +230,7 @@ func TestKubeletArgsReachBothFamilies(t *testing.T) {
 func TestK3sJoinsTheEndpointAndCarriesNoSecondBalancer(t *testing.T) {
 	rendered := renderPattern(t, "k3s-worker.cloud-config.tmpl", map[string]any{
 		"peersFileJSON":           "{}",
+		"sshAuthorizedKeys":       []string{},
 		"machineName":             "remote1",
 		"interfaceName":           "cldt0",
 		"wireguardListenPort":     "51820",
@@ -234,6 +272,7 @@ func TestK3sJoinsTheEndpointAndCarriesNoSecondBalancer(t *testing.T) {
 func TestRKE2JoinsTheSupervisorAndCarriesNoSecondBalancer(t *testing.T) {
 	rendered := renderPattern(t, "rke2-worker.cloud-config.tmpl", map[string]any{
 		"peersFileJSON":           "{}",
+		"sshAuthorizedKeys":       []string{},
 		"machineName":             "remote1",
 		"interfaceName":           "cldt0",
 		"wireguardListenPort":     "51820",
@@ -271,6 +310,43 @@ func TestRKE2JoinsTheSupervisorAndCarriesNoSecondBalancer(t *testing.T) {
 // renderPattern renders through pkg/render, the reconciler's own
 // path, so the shared blocks parse here exactly as they do in
 // production.
+// renderPatternWith renders any pattern with a full set of values,
+// overridden by the caller's. Patterns read different keys, so a test
+// that applies to all of them cannot supply only the ones it cares
+// about.
+func renderPatternWith(t *testing.T, name string, override map[string]any) string {
+	t.Helper()
+	values := map[string]any{
+		"peersFileJSON":           "{}",
+		"machineName":             "remote1",
+		"interfaceName":           "cldt0",
+		"wireguardListenPort":     "51820",
+		"apiProxyPort":            7445,
+		"apiEndpoint":             "10.10.0.10:6443",
+		"joinEndpoint":            "10.10.0.10:6443",
+		"joinToken":               "t.t",
+		"caCertHash":              "sha256:x",
+		"kubeletExtraArgs":        "",
+		"sshAuthorizedKeys":       []string{},
+		"joinServerURL":           "https://10.10.0.10:6443",
+		"k3sVersion":              "v1.34.0+k3s1",
+		"rke2Version":             "v1.34.0+rke2r1",
+		"k0sVersion":              "v1.34.0+k0s.0",
+		"dialerBinaryURLArm64":    "https://example.invalid/a",
+		"dialerBinarySHA256Arm64": "a",
+		"dialerBinaryURLAmd64":    "https://example.invalid/b",
+		"dialerBinarySHA256Amd64": "b",
+		"cniPluginsURLArm64":      "https://example.invalid/c",
+		"cniPluginsSHA256Arm64":   "c",
+		"cniPluginsURLAmd64":      "https://example.invalid/d",
+		"cniPluginsSHA256Amd64":   "d",
+	}
+	for k, v := range override {
+		values[k] = v
+	}
+	return renderPattern(t, name, values)
+}
+
 func renderPattern(t *testing.T, name string, values map[string]any) string {
 	t.Helper()
 	rendered, err := render.Pattern(filepath.Join("..", "..", "..", "join-patterns", name), values)
@@ -284,6 +360,7 @@ func renderKubeadmPattern(t *testing.T, proxyPort int) string {
 	t.Helper()
 	return renderPattern(t, "kubeadm-worker.cloud-config.tmpl", map[string]any{
 		"peersFileJSON":           "{}",
+		"sshAuthorizedKeys":       []string{},
 		"machineName":             "remote1",
 		"interfaceName":           "cldt0",
 		"wireguardListenPort":     "51820",

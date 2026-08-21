@@ -1,8 +1,5 @@
 #cloud-config
-ssh_authorized_keys:
-{{- range .sshAuthorizedKeys }}
-  - {{ . }}
-{{- end }}
+{{- template "ssh-authorized-keys" . }}
 # k0s-worker join pattern: bring up the tunnel (the shared blocks in
 # _shared.tmpl), gate on the cluster's API becoming reachable through
 # it, then join as a plain k0s worker using a pre-minted join token.

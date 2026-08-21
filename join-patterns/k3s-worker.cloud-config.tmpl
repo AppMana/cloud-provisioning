@@ -1,4 +1,5 @@
 #cloud-config
+{{- template "ssh-authorized-keys" . }}
 # k3s-agent join pattern: bring up the tunnel (the shared blocks in
 # _shared.tmpl), gate on the cluster's API becoming reachable through
 # it, then join as a plain k3s agent using a pre-minted bootstrap

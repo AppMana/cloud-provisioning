@@ -13,6 +13,29 @@ itself renders no trace of it, and the render tests pin that.
 
 {{/* The bootstrap identity and peer snapshot, plus the machine name
 the adoption path resolves this node's own Secret from. */}}
+{{- /*
+ssh-authorized-keys: the logins --join-ssh-authorized-keys asks for.
+
+That flag says "on every new node", and the reconciler renders its
+value into every pattern, but for a long time only k0s read it: an
+operator who set the flag and ran kubeadm, k3s or RKE2 got no keys and
+no error. Shared here so a pattern cannot be written that quietly
+drops it.
+
+Rendered only when there are keys. A bare "ssh_authorized_keys:" with
+nothing under it is a null, not an empty list, and the default is no
+keys, so emitting the key unconditionally would put a null into every
+document that never asked for one.
+*/}}
+{{- define "ssh-authorized-keys" }}
+{{- if .sshAuthorizedKeys }}
+ssh_authorized_keys:
+{{- range .sshAuthorizedKeys }}
+  - {{ . }}
+{{- end }}
+{{- end }}
+{{- end }}
+
 {{- define "wg-dialer-files" }}
   - path: /etc/wg-dialer/peers.json
     permissions: '0600'

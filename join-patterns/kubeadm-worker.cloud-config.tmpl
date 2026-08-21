@@ -1,4 +1,5 @@
 #cloud-config
+{{- template "ssh-authorized-keys" . }}
 # kubeadm-worker join pattern: bring up the tunnel and the node-local
 # API balancer (the shared blocks in _shared.tmpl), gate on the API
 # through them, then join as a plain kubeadm worker using a pre-minted

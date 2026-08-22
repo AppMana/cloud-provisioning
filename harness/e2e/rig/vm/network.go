@@ -15,6 +15,23 @@ const (
 	ManagementInterface = "enp1s0"
 )
 
+// Resolver is the nameserver a machine is given.
+//
+// On its lab interface, never on management. A machine resolving
+// through the management NIC would be reaching a service by a path no
+// router in this topology explains, which is the same borrowed route
+// the management default gateway used to provide — and with it a node
+// could pull images while the segments it is supposed to depend on
+// were down, so an outage row would measure nothing.
+//
+// It has to be given at all because a machine has no images but the
+// ones it pulls: k0s runs its node-local balancer as a static pod, so
+// a worker that cannot resolve a registry cannot start the balancer,
+// cannot reach the API through it, and never registers. A container
+// image ships with those layers already in it and needed no resolver,
+// which is why removing the borrowed one broke only machines.
+const Resolver = "9.9.9.9"
+
 // NetworkConfig renders the platform's network configuration for one
 // machine, in the form cloud-init reads.
 //
@@ -59,6 +76,8 @@ func NetworkConfig(n lab.Node) (string, error) {
 			b.WriteString("    routes:\n")
 			b.WriteString("      - to: default\n")
 			fmt.Fprintf(&b, "        via: %s\n", via)
+			b.WriteString("    nameservers:\n")
+			fmt.Fprintf(&b, "      addresses: [%s]\n", Resolver)
 		}
 	}
 	return b.String(), nil

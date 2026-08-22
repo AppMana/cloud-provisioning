@@ -65,3 +65,37 @@ func TestTheManagementPathIsNotAWayOut(t *testing.T) {
 		t.Errorf("the management NIC carries a way out of the lab:\n%s", mgmt)
 	}
 }
+
+// A machine is given a resolver, and given it on the segment it
+// routes by.
+//
+// It needs one at all because a machine has no images but the ones it
+// pulls: k0s runs its node-local balancer as a static pod, so a
+// worker that cannot resolve a registry cannot start the balancer,
+// cannot reach the API through it, and never registers. The run that
+// found this reported "w1, w2 never registered" — four steps from a
+// DNS lookup.
+//
+// And on the lab segment rather than management, because a machine
+// resolving over management reaches a service by a path no router in
+// the topology explains. That borrowed path is what made an earlier
+// run pass, and with it a node could pull images while the segments
+// it is supposed to depend on were down.
+func TestAMachineIsGivenAResolverOnTheSegmentItRoutesBy(t *testing.T) {
+	cfg, err := NetworkConfig(lab.Default().MustNode("w1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cfg, Resolver) {
+		t.Fatalf("the machine is given no resolver:\n%s", cfg)
+	}
+
+	data := cfg[strings.Index(cfg, GuestInterface(0)+":"):]
+	if !strings.Contains(data, Resolver) {
+		t.Errorf("the resolver is not on the segment the machine routes by:\n%s", cfg)
+	}
+	mgmt := cfg[strings.Index(cfg, ManagementInterface+":"):strings.Index(cfg, GuestInterface(0)+":")]
+	if strings.Contains(mgmt, Resolver) {
+		t.Errorf("the resolver is reachable over management, which no router explains:\n%s", mgmt)
+	}
+}

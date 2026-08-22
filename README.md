@@ -492,6 +492,10 @@ being papered over. It also means every kubeadm row on containers is
 running a weaker check than it appears to, and the machine tier is
 where that claim is actually tested.
 
+With the node built and preflight passing, the row measures green
+too: `checks: 70  passed: 70  failed: 0  converged after 26s` across
+the site's pairs.
+
 kubeadm is also the one distribution that does not bring its own
 runtime, so the machine rig builds the node first — containerd, runc,
 CNI plugins, a kubelet and its supervisor, pinned to the version

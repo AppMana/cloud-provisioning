@@ -136,7 +136,7 @@ func TestEveryMachineIsReachedOnABridgeOfItsOwn(t *testing.T) {
 		if m == nil {
 			continue
 		}
-		if strings.HasPrefix(m[2], "cldt-mgmt-") {
+		if strings.HasPrefix(m[2], "mgmt-") {
 			on[m[2]] = append(on[m[2]], m[1])
 		}
 	}
@@ -169,7 +169,7 @@ func dataLinks(t *testing.T, yaml string) string {
 	}
 	var kept []string
 	for _, line := range strings.Split(links, "\n") {
-		if strings.TrimSpace(line) == "" || strings.Contains(line, "cldt-mgmt-") {
+		if strings.TrimSpace(line) == "" || strings.Contains(line, "mgmt-") {
 			continue
 		}
 		kept = append(kept, strings.TrimSpace(line))

@@ -370,7 +370,17 @@ const VMCPUs = 2
 // it would be a path between them that the lab's own segments do not
 // explain, which is the thing containerlab's management network does
 // and the reason this topology cannot use it.
-func ManagementBridge(node string) string { return "cldt-mgmt-" + node }
+//
+// The name is short because the kernel will not take one longer than
+// fifteen characters, and says so only when the interface is used
+// rather than when it is named: "cldt-mgmt-remote1" is seventeen, and
+// failed as "Cannot find device" on the line after the one that could
+// not create it.
+func ManagementBridge(node string) string { return "mgmt-" + node }
+
+// MaxInterfaceName is what the kernel accepts, IFNAMSIZ less its
+// terminator.
+const MaxInterfaceName = 15
 
 // Link is one cable.
 type Link struct{ From, To string }

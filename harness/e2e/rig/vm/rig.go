@@ -131,6 +131,28 @@ chmod 600 /home/%[1]s/.ssh/authorized_keys
 		}
 	}
 
+	// Each machine's own bridge, before anything is deployed onto it.
+	//
+	// containerlab attaches to bridges that already exist and refuses
+	// a topology naming one that does not. These carry no address: a
+	// machine is reached through its wrapper, on the wrapper's own
+	// loopback, so nothing needs to be routable here — the bridge
+	// exists so that the machine has a management link of its own
+	// rather than one shared with every other node in the lab.
+	for _, n := range r.Topology.Nodes {
+		if !n.IsClusterNode() {
+			continue
+		}
+		bridge := lab.ManagementBridge(n.Name)
+		_, _, _, _ = r.runner()(ctx, nil, "sudo", "ip", "link", "add", "name", bridge, "type", "bridge")
+		if _, errb, code, err := r.runner()(ctx, nil, "sudo", "ip", "link", "set", bridge, "up"); err != nil || code != 0 {
+			if err != nil {
+				return fmt.Errorf("raising %s: %w", bridge, err)
+			}
+			return fmt.Errorf("raising %s: %s", bridge, errb)
+		}
+	}
+
 	yaml, err := r.Topology.ContainerlabYAML(lab.VM)
 	if err != nil {
 		return err

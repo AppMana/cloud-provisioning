@@ -109,3 +109,29 @@ func TestAnOuterDeadlineKeepsTheReason(t *testing.T) {
 		t.Errorf("the last failure was thrown away: %v", err)
 	}
 }
+
+// Some failures are not the condition being false yet. A machine
+// whose launcher crashes on its own configuration is restarted by its
+// supervisor and crashes again, and waiting adds nothing but the
+// delay before anyone is told — twelve minutes, in the run that
+// prompted this.
+func TestAFailureWaitingCannotFixEndsTheWait(t *testing.T) {
+	var attempts int
+	start := time.Now()
+	err := Until(context.Background(), time.Hour, "the machine to answer", func(context.Context) error {
+		attempts++
+		return Fatal(errors.New("its launcher is crash-looping"))
+	})
+	if err == nil {
+		t.Fatal("no error")
+	}
+	if attempts != 1 {
+		t.Errorf("tried %d times against a failure that cannot change", attempts)
+	}
+	if time.Since(start) > 2*time.Second {
+		t.Error("the wait kept waiting")
+	}
+	if !strings.Contains(err.Error(), "crash-looping") {
+		t.Errorf("the reason was dropped: %v", err)
+	}
+}

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -265,13 +266,54 @@ func (r *Rig) WaitReady(ctx context.Context, within time.Duration) error {
 	return nil
 }
 
-// waitForNode blocks until one machine answers.
+// waitForNode blocks until one machine answers, or until it is clear
+// that it will not.
 func (r *Rig) waitForNode(ctx context.Context, node string, within time.Duration) error {
 	return wait.Until(ctx, within, node+" did not become reachable after being started",
 		func(ctx context.Context) error {
-			_, err := r.Node(node).Exec(ctx, "true")
-			return err
+			if _, err := r.Node(node).Exec(ctx, "true"); err != nil {
+				if crash := r.crashing(ctx, node); crash != nil {
+					return wait.Fatal(crash)
+				}
+				return err
+			}
+			return nil
 		})
+}
+
+// RestartsMeaningCrashLoop is how many restarts distinguish a wrapper
+// failing to start from one that has merely been restarted once.
+const RestartsMeaningCrashLoop = 2
+
+// crashing reports the wrapper failing to start at all, rather than a
+// guest that has not finished booting.
+//
+// The two look identical from outside — nothing answers either way —
+// and only one of them is worth waiting for. A wrapper whose launcher
+// rejects its own configuration exits, its supervisor starts it
+// again, and it exits again; waiting the full boot timeout on that
+// spends twelve minutes to report a machine as slow when what
+// happened is that it never ran. The launcher's own output says which
+// it is, so it is carried out with the failure rather than left for
+// whoever goes looking.
+func (r *Rig) crashing(ctx context.Context, node string) error {
+	wrapper := "clab-" + r.Topology.Name + "-" + node
+	out, _, code, err := r.runner()(ctx, nil, "docker", "inspect",
+		"--format", "{{.State.Status}} {{.RestartCount}}", wrapper)
+	if err != nil || code != 0 {
+		return nil
+	}
+	var status string
+	var restarts int
+	if _, err := fmt.Sscan(strings.TrimSpace(string(out)), &status, &restarts); err != nil {
+		return nil
+	}
+	if status != "restarting" || restarts < RestartsMeaningCrashLoop {
+		return nil
+	}
+	logs, _, _, _ := r.runner()(ctx, nil, "docker", "logs", "--tail", "20", wrapper)
+	return fmt.Errorf("%s's wrapper has failed to start %d times, so no machine is booting:\n%s",
+		node, restarts, strings.TrimSpace(string(logs)))
 }
 
 // Down destroys the lab.

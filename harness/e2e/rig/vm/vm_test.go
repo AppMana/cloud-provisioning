@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 )
@@ -15,6 +16,10 @@ type recorder struct {
 	calls  [][]string
 	stdins []string
 	code   int
+	// crashLoop makes the wrapper look like one whose launcher keeps
+	// exiting, which is what docker reports while a restart policy
+	// keeps trying.
+	crashLoop bool
 }
 
 func (r *recorder) run(ctx context.Context, stdin io.Reader, argv ...string) ([]byte, []byte, int, error) {
@@ -25,6 +30,16 @@ func (r *recorder) run(ctx context.Context, stdin io.Reader, argv ...string) ([]
 		body = string(b)
 	}
 	r.stdins = append(r.stdins, body)
+	if r.crashLoop {
+		switch {
+		case len(argv) > 1 && argv[1] == "inspect":
+			return []byte("restarting 22\n"), nil, 0, nil
+		case len(argv) > 1 && argv[1] == "logs":
+			return []byte("UnicodeEncodeError: 'ascii' codec can't encode character"), nil, 0, nil
+		default:
+			return nil, []byte("Container is restarting, wait until the container is running"), 1, nil
+		}
+	}
 	return nil, nil, r.code, nil
 }
 
@@ -213,5 +228,32 @@ func TestTheManagementLinkIsRestoredToo(t *testing.T) {
 	}
 	if !found {
 		t.Error("the machine was booted with no management link, which the launcher waits for forever")
+	}
+}
+
+// A wrapper that cannot start is not a machine that is booting
+// slowly. Its launcher exits, its supervisor starts it again, and it
+// exits again; waiting the full boot timeout on that reports a
+// twelve-minute delay instead of the crash that caused it, and buries
+// the launcher's own explanation.
+func TestAWrapperThatCannotStartIsNotASlowBoot(t *testing.T) {
+	rec := &recorder{crashLoop: true}
+	r := &Rig{Topology: lab.Default(), WorkDir: t.TempDir(), Run: rec.run}
+
+	start := time.Now()
+	err := r.waitForNode(context.Background(), "remote1", 10*time.Minute)
+	if err == nil {
+		t.Fatal("a crash-looping wrapper was reported as reachable")
+	}
+	if time.Since(start) > 30*time.Second {
+		t.Error("the wait sat out the whole boot timeout on a machine that was never starting")
+	}
+	if !strings.Contains(err.Error(), "failed to start") {
+		t.Errorf("the failure does not say the wrapper never ran: %v", err)
+	}
+	// The launcher's own words, so the next step is reading them
+	// rather than going to find them.
+	if !strings.Contains(err.Error(), "UnicodeEncodeError") {
+		t.Errorf("the launcher's output was not carried out with the failure: %v", err)
 	}
 }

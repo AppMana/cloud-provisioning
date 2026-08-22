@@ -117,9 +117,22 @@ func (p *Pods) Start(ctx context.Context, nodes []string, within time.Duration) 
 func (p *Pods) targets(ctx context.Context, nodes []string) ([]Target, error) {
 	var out []Target
 	for _, node := range nodes {
-		phase, err := p.Kube.Get(ctx, p.Namespace, "pod", "hc-"+node, "{.status.phase}")
-		if err != nil || phase != "Running" {
-			return out, fmt.Errorf("%s's probe is %q", node, phase)
+		// Ready, not merely Running.
+		//
+		// A pod whose node was killed comes back at a new address, and
+		// for a moment the API still carries the old object: phase
+		// Running, and the address it had before. Reading that gives
+		// every prober a target that no longer exists, and the failure
+		// is selective — the service address still resolves to
+		// whatever is serving now, so pod checks fail while service
+		// checks beside them pass, a pattern that reads exactly like a
+		// routing fault. Measured: every site node failing
+		// "to remote1 pod" against 10.244.159.0 while the pod had come
+		// back at 10.244.159.1.
+		ready, err := p.Kube.Get(ctx, p.Namespace, "pod", "hc-"+node,
+			`{.status.conditions[?(@.type=="Ready")].status}`)
+		if err != nil || ready != "True" {
+			return out, fmt.Errorf("%s's probe is not ready (%q)", node, ready)
 		}
 		podIP, err := p.Kube.Get(ctx, p.Namespace, "pod", "hc-"+node, "{.status.podIP}")
 		if err != nil || podIP == "" {

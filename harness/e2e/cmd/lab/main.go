@@ -28,6 +28,8 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/network"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/network/calico"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/network/cilium"
+	_ "github.com/appmana/cloud-provisioning/harness/e2e/network/flannel"
+	_ "github.com/appmana/cloud-provisioning/harness/e2e/network/kuberouter"
 	"github.com/appmana/cloud-provisioning/harness/e2e/outage"
 	"github.com/appmana/cloud-provisioning/harness/e2e/provider"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"

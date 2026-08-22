@@ -36,6 +36,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 )
 
@@ -45,7 +46,6 @@ const (
 	KubernetesVersion = "v1.34.0"
 	ContainerdVersion = "1.7.28"
 	RuncVersion       = "v1.2.6"
-	CNIPluginsVersion = "v1.6.2"
 )
 
 // EnsureStack makes each node a Kubernetes node, where it is not one
@@ -64,6 +64,13 @@ func EnsureStack(ctx context.Context, r rig.Rig, workDir string, nodes []string)
 		return nil
 	}
 
+	// The plugins every network chains, which this node also has none
+	// of; shared with the installers that need them on a node image
+	// that already has a runtime.
+	if err := cluster.EnsureCNIPlugins(ctx, r, workDir, missing); err != nil {
+		return err
+	}
+
 	parts, err := fetchStack(ctx, workDir)
 	if err != nil {
 		return err
@@ -79,7 +86,6 @@ func EnsureStack(ctx context.Context, r rig.Rig, workDir string, nodes []string)
 // stack is every file a node needs, already on this host.
 type stack struct {
 	containerd map[string][]byte // basename -> binary, from the release tarball
-	cniPlugins []byte            // the tarball itself, unpacked on the node
 	runc       []byte
 	kubeadm    []byte
 	kubelet    []byte
@@ -103,18 +109,6 @@ func installStack(ctx context.Context, n rig.Node, s *stack) error {
 		if err := n.Put(ctx, bytes.NewReader(body), path, 0o755); err != nil {
 			return err
 		}
-	}
-
-	// The CNI plugins go where every network's own installer expects
-	// to find loopback and bridge already sitting: a pod sandbox
-	// cannot be created without them, and the failure reads as the
-	// network being broken.
-	if err := n.Put(ctx, bytes.NewReader(s.cniPlugins), "/tmp/cni-plugins.tgz", 0o644); err != nil {
-		return err
-	}
-	if _, err := n.Exec(ctx, "sh", "-c",
-		"mkdir -p /opt/cni/bin && tar -C /opt/cni/bin -xzf /tmp/cni-plugins.tgz && rm -f /tmp/cni-plugins.tgz"); err != nil {
-		return fmt.Errorf("unpacking the CNI plugins: %w", err)
 	}
 
 	// What a container inherited from this host and a machine has to
@@ -247,11 +241,6 @@ func fetchStack(ctx context.Context, workDir string) (*stack, error) {
 		return nil, fmt.Errorf("the containerd archive carried no binaries")
 	}
 
-	if s.cniPlugins, err = cached(ctx, workDir, "cni-plugins-"+CNIPluginsVersion+".tgz",
-		fmt.Sprintf("https://github.com/containernetworking/plugins/releases/download/%[1]s/cni-plugins-linux-amd64-%[1]s.tgz",
-			CNIPluginsVersion)); err != nil {
-		return nil, err
-	}
 	if s.runc, err = cached(ctx, workDir, "runc-"+RuncVersion,
 		"https://github.com/opencontainers/runc/releases/download/"+RuncVersion+"/runc.amd64"); err != nil {
 		return nil, err

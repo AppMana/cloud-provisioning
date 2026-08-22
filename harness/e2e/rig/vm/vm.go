@@ -51,6 +51,9 @@ type Node struct {
 	node    lab.Node
 	labName string
 	run     Runner
+	// rig is what launches this machine. A node can be replaced, and
+	// replacing one needs the lab it belongs to.
+	rig *Rig
 }
 
 // Wrapper is the container the machine runs inside.
@@ -187,17 +190,46 @@ func (n *Node) Boot(ctx context.Context) error {
 	return nil
 }
 
-// Userdata is not implemented here on purpose.
+// Userdata launches the machine with this userdata.
 //
-// A machine's userdata is read by its own cloud-init at first boot,
-// from the seed its platform gave it — so it has to be in place
-// before the machine starts, not handed to a running one. The rig
-// writes it into the node's seed when the lab is built; a caller that
-// reaches this has tried to bootstrap a machine that is already
-// running, which on a real platform is not a thing that happens.
+// A machine reads its userdata once, at its first boot, from the seed
+// its platform gave it. Handing it to an instance that is already
+// running is not something a platform does — and interpreting it
+// here, which is all the container rig can do, is the thing this rig
+// exists to stop.
+//
+// What a platform does is launch an instance with it, so that is what
+// this does. The bytes go into the node's seed, the instance is taken
+// away, and one is created in its place: the new wrapper builds a
+// fresh cloud-init ISO from the seed and qemu gets a fresh overlay
+// disk, so the guest boots for the first time and its own cloud-init
+// reads the userdata the product rendered. The instance has to be
+// replaced rather than restarted because vrnetlab creates the overlay
+// only when none exists, and a restart keeps the container's writable
+// layer — the guest would come back as the same instance, past its
+// first boot, having read nothing.
 func (n *Node) Userdata(ctx context.Context, cloudConfig []byte) error {
-	return fmt.Errorf("%s: a machine reads its userdata at first boot, from the seed its platform gave it; "+
-		"it cannot be handed to one that is already running", n.Name())
+	if n.rig == nil {
+		return fmt.Errorf("%s: no lab to launch into", n.Name())
+	}
+	if err := n.rig.Seed(n.node.Name, cloudConfig); err != nil {
+		return fmt.Errorf("seeding %s: %w", n.Name(), err)
+	}
+	if _, errb, code, err := n.run(ctx, nil, "docker", "rm", "-f", n.Wrapper()); err != nil {
+		return fmt.Errorf("taking %s away: %w", n.Name(), err)
+	} else if code != 0 {
+		return fmt.Errorf("taking %s away: %s", n.Name(), errb)
+	}
+	if _, errb, code, err := n.run(ctx, nil,
+		"sudo", "containerlab", "deploy", "-t", n.rig.TopologyPath()); err != nil {
+		return fmt.Errorf("launching %s: %w", n.Name(), err)
+	} else if code != 0 {
+		return fmt.Errorf("launching %s: containerlab exited %d: %s", n.Name(), code, errb)
+	}
+	if err := n.rig.placeKey(ctx, n.node.Name); err != nil {
+		return err
+	}
+	return n.rig.waitForNode(ctx, n.node.Name, BootTimeout)
 }
 
 // Interface is what the guest calls the lab's nth link.

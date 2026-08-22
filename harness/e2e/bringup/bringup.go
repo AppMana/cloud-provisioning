@@ -192,12 +192,6 @@ func Configure(ctx context.Context, t lab.Topology, r rig.Rig, h Host) error {
 // routes points each node at its own segment's edge, and each edge at
 // the others across the wan.
 func routes(ctx context.Context, t lab.Topology, r rig.Rig) error {
-	gateway := map[string]string{
-		lab.LANSegment:    lab.SitePrefix + ".1",
-		lab.CloudASegment: lab.CloudAPrefix + ".1",
-		lab.CloudBSegment: lab.CloudBPrefix + ".1",
-	}
-
 	for _, n := range t.Nodes {
 		node := r.Node(n.Name)
 		switch n.Role {
@@ -210,7 +204,7 @@ func routes(ctx context.Context, t lab.Topology, r rig.Rig) error {
 			}
 		default:
 			seg := n.Interfaces[0].Segment
-			via, ok := gateway[seg]
+			via, ok := lab.Gateway(seg)
 			if !ok {
 				return fmt.Errorf("%s is on %s, which has no edge", n.Name, seg)
 			}

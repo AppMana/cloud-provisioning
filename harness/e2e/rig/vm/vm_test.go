@@ -3,6 +3,8 @@ package vm
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -115,19 +117,63 @@ func TestCuttingLeavesTheManagementLinkAlone(t *testing.T) {
 	}
 }
 
-// A machine reads its userdata at first boot, from the seed its
-// platform gave it. Handing it to a running machine is not a thing a
-// platform does, and a rig that pretended otherwise would be back to
-// interpreting the document itself.
-func TestUserdataCannotBeHandedToARunningMachine(t *testing.T) {
+// A machine reads its userdata at its first boot, so giving one
+// userdata means giving it a first boot: the bytes go into its seed
+// and the instance is replaced.
+//
+// Replaced, not restarted. vrnetlab creates the guest's overlay disk
+// only when none exists, so a restarted wrapper brings the same
+// instance back past its first boot, having read nothing — the run
+// would then report a bootstrap that succeeded and a node that never
+// joined.
+func TestUserdataLaunchesTheMachineRatherThanRestartingIt(t *testing.T) {
 	rec := &recorder{}
-	n := testNode(t, rec)
-
-	err := n.Userdata(context.Background(), []byte("#cloud-config\n"))
-	if err == nil {
-		t.Fatal("a running machine accepted userdata")
+	r := &Rig{Topology: lab.Default(), WorkDir: t.TempDir(), Run: rec.run}
+	if err := r.ensureKey(); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(err.Error(), "first boot") {
-		t.Errorf("the error does not say when userdata is read: %v", err)
+	n := r.Node("remote1").(*Node)
+
+	const doc = "#cloud-config\nruncmd: [true]\n"
+	if err := n.Userdata(context.Background(), []byte(doc)); err != nil {
+		t.Fatal(err)
+	}
+
+	seeded, err := os.ReadFile(filepath.Join(r.SeedDir("remote1"), "extra-userdata.yaml"))
+	if err != nil {
+		t.Fatalf("the userdata never reached the seed: %v", err)
+	}
+	if string(seeded) != doc {
+		t.Errorf("the seed carries %q, not the document the product rendered", seeded)
+	}
+
+	var removed, deployed, restarted int
+	for _, call := range rec.calls {
+		cmd := strings.Join(call, " ")
+		switch {
+		case strings.Contains(cmd, "docker rm"):
+			removed++
+		case strings.Contains(cmd, "containerlab deploy"):
+			deployed++
+		case strings.Contains(cmd, "docker restart"), strings.Contains(cmd, "docker start"):
+			restarted++
+		}
+	}
+	if removed == 0 || deployed == 0 {
+		t.Errorf("the instance was not replaced: removed %d, deployed %d", removed, deployed)
+	}
+	if restarted > 0 {
+		t.Error("the instance was restarted, so the guest came back past its first boot and read nothing")
+	}
+	// The seed has to be written before the instance is launched: the
+	// wrapper builds the cloud-init ISO as it starts, from whatever is
+	// there then.
+	for i, call := range rec.calls {
+		if strings.Contains(strings.Join(call, " "), "containerlab deploy") {
+			if i == 0 {
+				t.Error("the instance was launched before its seed was written")
+			}
+			break
+		}
 	}
 }

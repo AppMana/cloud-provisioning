@@ -1,0 +1,67 @@
+package vm
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
+)
+
+// A machine is addressed on the segment its own bootstrap uses,
+// before that bootstrap runs.
+func TestAMachineIsAddressedByItsPlatform(t *testing.T) {
+	topo := lab.Default()
+	remote := topo.MustNode("remote1")
+
+	cfg, err := NetworkConfig(remote)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cfg, remote.Interfaces[0].Address) {
+		t.Errorf("remote1 boots with no address on its own segment:\n%s", cfg)
+	}
+	// Its kernel's name for the link, not the topology's: a
+	// configuration naming eth1 addresses nothing and says so nowhere.
+	if !strings.Contains(cfg, GuestInterface(0)+":") {
+		t.Errorf("the configuration names a link the guest does not have:\n%s", cfg)
+	}
+	if strings.Contains(cfg, remote.Interfaces[0].Name+":") {
+		t.Errorf("the configuration uses the topology's name for the link:\n%s", cfg)
+	}
+}
+
+// Every cluster node can be given one, and each leaves by its own
+// segment's edge.
+func TestEveryMachineLeavesByItsOwnEdge(t *testing.T) {
+	topo := lab.Default()
+	for _, n := range topo.Nodes {
+		if !n.IsClusterNode() {
+			continue
+		}
+		cfg, err := NetworkConfig(n)
+		if err != nil {
+			t.Fatalf("%s: %v", n.Name, err)
+		}
+		via, _ := lab.Gateway(n.Interfaces[0].Segment)
+		if !strings.Contains(cfg, "via: "+via) {
+			t.Errorf("%s does not leave by %s:\n%s", n.Name, via, cfg)
+		}
+	}
+}
+
+// The management path is not a way out of the lab. A machine that
+// could leave by it would leave by a path no router in the topology
+// explains, and the isolation proof would be proving nothing.
+func TestTheManagementPathIsNotAWayOut(t *testing.T) {
+	cfg, err := NetworkConfig(lab.Default().MustNode("remote1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mgmt := cfg[strings.Index(cfg, ManagementInterface):]
+	if end := strings.Index(mgmt[1:], "\n  e"); end >= 0 {
+		mgmt = mgmt[:end]
+	}
+	if strings.Contains(mgmt, "default") || strings.Contains(mgmt, "gateway") {
+		t.Errorf("the management NIC carries a way out of the lab:\n%s", mgmt)
+	}
+}

@@ -76,7 +76,7 @@ func (r *Rig) Node(name string) rig.Node {
 	if !n.IsClusterNode() {
 		return r.appliances().Node(name)
 	}
-	return &Node{node: n, labName: r.Topology.Name, run: r.runner()}
+	return &Node{node: n, labName: r.Topology.Name, run: r.runner(), rig: r}
 }
 
 // appliances reaches the containers this rig still has.
@@ -140,6 +140,17 @@ chmod 600 /home/%[1]s/.ssh/authorized_keys
 		if err := os.WriteFile(filepath.Join(dir, "extra-setup.sh"), []byte(setup), 0o755); err != nil {
 			return err
 		}
+		// The platform's network configuration, applied by the
+		// guest's cloud-init before any userdata runs — so a machine
+		// whose bootstrap dials the site has a segment to dial from.
+		netcfg, err := NetworkConfig(n)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dir, "extra-network.yaml"), []byte(netcfg), 0o644); err != nil {
+			return err
+		}
+
 		// An empty document by default: a machine with nothing to do
 		// at first boot still needs the file to exist, because its
 		// wrapper binds it.
@@ -191,24 +202,32 @@ chmod 600 /home/%[1]s/.ssh/authorized_keys
 		return fmt.Errorf("deploying: containerlab exited %d: %s", code, errb)
 	}
 
-	// Each wrapper gets the key for its own guest, because that is
-	// where the command that uses it runs.
-	key, err := os.ReadFile(r.privateKeyPath())
-	if err != nil {
-		return err
-	}
 	for _, n := range r.Topology.Nodes {
 		if !n.IsClusterNode() {
 			continue
 		}
-		wrapper := "clab-" + r.Topology.Name + "-" + n.Name
-		if _, _, _, err := r.runner()(ctx, bytes.NewReader(key),
-			"docker", "exec", "-i", wrapper, "sh", "-c", "cat > "+KeyPath+" && chmod 600 "+KeyPath); err != nil {
-			return fmt.Errorf("placing the key in %s: %w", wrapper, err)
+		if err := r.placeKey(ctx, n.Name); err != nil {
+			return err
 		}
 	}
 
 	return r.WaitReady(ctx, BootTimeout)
+}
+
+// placeKey puts the guest's key in its own wrapper, which is where
+// the command that uses it runs. A wrapper that was replaced has a
+// fresh filesystem and needs one again.
+func (r *Rig) placeKey(ctx context.Context, node string) error {
+	key, err := os.ReadFile(r.privateKeyPath())
+	if err != nil {
+		return err
+	}
+	wrapper := "clab-" + r.Topology.Name + "-" + node
+	if _, _, _, err := r.runner()(ctx, bytes.NewReader(key),
+		"docker", "exec", "-i", wrapper, "sh", "-c", "cat > "+KeyPath+" && chmod 600 "+KeyPath); err != nil {
+		return fmt.Errorf("placing the key in %s: %w", wrapper, err)
+	}
+	return nil
 }
 
 // BootTimeout is how long a machine has to become reachable.
@@ -231,16 +250,20 @@ func (r *Rig) WaitReady(ctx context.Context, within time.Duration) error {
 		if !n.IsClusterNode() {
 			continue
 		}
-		err := wait.Until(ctx, within, n.Name+" did not become reachable after being started",
-			func(ctx context.Context) error {
-				_, err := r.Node(n.Name).Exec(ctx, "true")
-				return err
-			})
-		if err != nil {
+		if err := r.waitForNode(ctx, n.Name, within); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// waitForNode blocks until one machine answers.
+func (r *Rig) waitForNode(ctx context.Context, node string, within time.Duration) error {
+	return wait.Until(ctx, within, node+" did not become reachable after being started",
+		func(ctx context.Context) error {
+			_, err := r.Node(node).Exec(ctx, "true")
+			return err
+		})
 }
 
 // Down destroys the lab.

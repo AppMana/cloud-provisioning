@@ -323,6 +323,9 @@ func (t Topology) ContainerlabYAML(rig Rig) (string, error) {
 			fmt.Fprintf(&b, "      binds:\n")
 			fmt.Fprintf(&b, "        - seed/%s/extra-setup.sh:/extra-setup.sh:ro\n", n.Name)
 			fmt.Fprintf(&b, "        - seed/%s/extra-userdata.yaml:/extra-userdata.yaml:ro\n", n.Name)
+			// The platform's own network configuration, which
+			// cloud-init applies before it runs any userdata.
+			fmt.Fprintf(&b, "        - seed/%s/extra-network.yaml:/extra-network.yaml:ro\n", n.Name)
 		}
 		// Binds exist to keep a container runtime's state off an
 		// overlay. A VM has a disk of its own and needs none of them.
@@ -376,6 +379,24 @@ const VMMemoryMB = 4096
 
 // VMCPUs per cluster node.
 const VMCPUs = 2
+
+// Gateway is the edge a segment leaves by.
+//
+// One statement of the fact, because two would drift: the harness
+// configures a running node by it, and a machine is handed it at boot
+// in its platform's network configuration. A node addressed by one
+// and routed by the other would be reachable and unable to answer.
+func Gateway(segment string) (string, bool) {
+	switch segment {
+	case LANSegment:
+		return SitePrefix + ".1", true
+	case CloudASegment:
+		return CloudAPrefix + ".1", true
+	case CloudBSegment:
+		return CloudBPrefix + ".1", true
+	}
+	return "", false
+}
 
 // ManagementBridge names the bridge one machine is reached on.
 //

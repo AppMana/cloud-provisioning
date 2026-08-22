@@ -95,9 +95,21 @@ func (p GuestProber) Addresses(ctx context.Context, node string) ([]string, erro
 	if err != nil {
 		return nil, err
 	}
-	// A machine is reached on its management link, which is a channel
-	// this harness owns and not part of the lab it models. Excluding
-	// it keeps the proof about the segments the topology describes.
+	return p.parse(out)
+}
+
+// parse keeps the addresses the lab gave and drops the one qemu did.
+func (p GuestProber) parse(out []byte) ([]string, error) {
+	// A machine's management address is left out, and it has to be:
+	// it is not an address the lab gave anyone.
+	//
+	// qemu's usermode network hands every guest the same one, so every
+	// machine in the lab holds 10.0.0.15. Counting it makes the proof
+	// ask whether one node can reach an address another node holds and
+	// answer yes — for the node's own interface, which is the one
+	// thing that is not a path between them. The proof caught exactly
+	// this on the first VM bring-up and refused the lab, which was the
+	// right instinct about the wrong address.
 	var kept []string
 	for _, a := range parseAddresses(out) {
 		if !strings.HasPrefix(a, ManagementPrefix) {
@@ -107,8 +119,10 @@ func (p GuestProber) Addresses(ctx context.Context, node string) ([]string, erro
 	return kept, nil
 }
 
-// ManagementPrefix is the range a machine's own management link uses.
-const ManagementPrefix = "10.90."
+// ManagementPrefix is the range qemu's usermode network gives a
+// guest for the link this harness reaches it on. Every guest gets the
+// same address there, and none of them can reach another's.
+const ManagementPrefix = "10.0.0."
 
 // MixedProber asks each node in whichever way that node can answer.
 //

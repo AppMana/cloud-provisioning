@@ -170,6 +170,12 @@ func (b Builder) join(ctx context.Context, d cluster.Deps, first, n lab.Node, ro
 		return nil
 	}
 
+	// The token is minted through the first controller's status
+	// socket, so it has to still be serving: a controller that has
+	// just been joined can restart the one that admitted it.
+	if err := b.waitForAPI(ctx, d, first, 3*time.Minute); err != nil {
+		return err
+	}
 	token, err := d.Rig.Node(first.Name).Exec(ctx, "k0s", "token", "create", "--role", role)
 	if err != nil {
 		return fmt.Errorf("minting a %s token: %w", role, err)
@@ -209,15 +215,27 @@ func (b Builder) start(ctx context.Context, d cluster.Deps, n lab.Node, args str
 	return nil
 }
 
-// waitForAPI blocks until the first controller serves.
+// waitForAPI blocks until the first controller is actually serving.
+//
+// Asks k0s itself, and then for the kubeconfig. "k0s kubeconfig
+// admin" alone is not a readiness probe: it can answer from what is
+// on disk before the controller is up, and then the next thing that
+// needs a running k0s — minting a join token, which goes through
+// /run/k0s/status.sock — fails with a connection reset that reads as
+// the distribution being broken rather than as not started yet.
 func (b Builder) waitForAPI(ctx context.Context, d cluster.Deps, n lab.Node, within time.Duration) error {
 	deadline := time.Now().Add(within)
 	for {
-		if _, err := d.Rig.Node(n.Name).Exec(ctx, "k0s", "kubeconfig", "admin"); err == nil {
+		node := d.Rig.Node(n.Name)
+		statusOK := false
+		if _, err := node.Exec(ctx, "k0s", "status"); err == nil {
+			statusOK = true
+		}
+		if _, err := node.Exec(ctx, "k0s", "kubeconfig", "admin"); err == nil && statusOK {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("%s's API never came up", n.Name)
+			return fmt.Errorf("%s's k0s never reported itself running within %s", n.Name, within)
 		}
 		select {
 		case <-ctx.Done():

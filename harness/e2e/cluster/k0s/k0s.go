@@ -239,11 +239,23 @@ func (b Builder) waitForAPI(ctx context.Context, d cluster.Deps, n lab.Node, wit
 		if _, err := node.Exec(ctx, "k0s", "status"); err == nil {
 			statusOK = true
 		}
-		if _, err := node.Exec(ctx, "k0s", "kubeconfig", "admin"); err == nil && statusOK {
+		// And the API answering, not merely the process running.
+		//
+		// k0s status reports on the supervisor; the API server behind
+		// it comes up later, and on a machine that gap is wide enough
+		// to matter — minting a token went through and timed out
+		// waiting for a request the server could not yet serve. On
+		// containers the same gap existed and was too small to notice,
+		// which is the sort of thing only a slower rig finds.
+		servesOK := false
+		if _, err := node.Exec(ctx, "k0s", "kubectl", "get", "--raw", "/readyz"); err == nil {
+			servesOK = true
+		}
+		if _, err := node.Exec(ctx, "k0s", "kubeconfig", "admin"); err == nil && statusOK && servesOK {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("%s's k0s never reported itself running within %s", n.Name, within)
+			return fmt.Errorf("%s's k0s never served a ready API within %s", n.Name, within)
 		}
 		select {
 		case <-ctx.Done():

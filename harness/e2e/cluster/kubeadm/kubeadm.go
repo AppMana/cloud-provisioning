@@ -59,6 +59,17 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 		return fmt.Errorf("the topology has no control planes")
 	}
 
+	// kubeadm configures a node; it does not make one. Every other
+	// distribution here ships its own runtime in one binary, so this
+	// is the only builder that has to check.
+	var site []string
+	for _, n := range cluster.SiteNodes(d.Topology) {
+		site = append(site, n.Name)
+	}
+	if err := EnsureStack(ctx, d.Rig, d.WorkDir, site); err != nil {
+		return err
+	}
+
 	if err := b.forwarders(ctx, d, addrs); err != nil {
 		return err
 	}

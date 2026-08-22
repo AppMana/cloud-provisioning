@@ -64,15 +64,29 @@ func Until(ctx context.Context, within time.Duration, what string, attempt func(
 		// a run that is being torn down should say so rather than
 		// spend the full wait discovering it.
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return outer(ctx, what, last)
 		}
 		if time.Now().After(deadline) {
 			return fmt.Errorf("%s within %s: %w", what, within, last)
 		}
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return outer(ctx, what, last)
 		case <-time.After(Interval):
 		}
 	}
+}
+
+// outer reports the caller's cancellation without throwing away what
+// the condition was or how it last failed.
+//
+// A wait cut short by an outer deadline used to return a bare
+// "context deadline exceeded", which names neither the thing being
+// waited for nor the reason it had not happened — the caller is then
+// left to work out which of a run's several waits it was.
+func outer(ctx context.Context, what string, last error) error {
+	if last == nil {
+		return fmt.Errorf("%s: %w", what, ctx.Err())
+	}
+	return fmt.Errorf("%s: %w (last failure: %v)", what, ctx.Err(), last)
 }

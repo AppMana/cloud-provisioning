@@ -84,3 +84,28 @@ func TestSuccessReturnsImmediately(t *testing.T) {
 		t.Error("a condition already true waited anyway")
 	}
 }
+
+// A wait cut short by the caller's own deadline still says what it
+// was waiting for and how that last failed. Returning a bare
+// "context deadline exceeded" leaves the caller to work out which of
+// a run's several waits it was.
+func TestAnOuterDeadlineKeepsTheReason(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	err := Until(ctx, time.Hour, "every node to register", func(context.Context) error {
+		return errors.New("w1, w2 never registered")
+	})
+	if err == nil {
+		t.Fatal("no error")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("the cancellation is no longer recognisable: %v", err)
+	}
+	if !strings.Contains(err.Error(), "every node to register") {
+		t.Errorf("the failure does not say what was awaited: %v", err)
+	}
+	if !strings.Contains(err.Error(), "w1, w2 never registered") {
+		t.Errorf("the last failure was thrown away: %v", err)
+	}
+}

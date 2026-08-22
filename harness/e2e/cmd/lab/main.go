@@ -124,9 +124,12 @@ func main() {
 		if err := b.KubeletInvariant(ctx, d); err != nil {
 			fail("%v", err)
 		}
-		nodes, err := d.Kube.Nodes(ctx)
+		// Every node the topology puts at the site, not whichever
+		// happened to have registered by now: a short list here is
+		// measured by everything downstream.
+		nodes, err := cluster.WaitRegistered(ctx, d.Kube, topo)
 		if err != nil {
-			fail("reading the cluster's nodes: %v", err)
+			fail("%v", err)
 		}
 		fmt.Printf("  registered: %v\n", nodes)
 

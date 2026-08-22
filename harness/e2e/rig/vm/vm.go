@@ -37,8 +37,23 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 )
 
-// Guest is the account the launcher creates.
-const Guest = "sysadmin"
+// Guest is the account this harness reaches a machine by.
+//
+// root, because that is who cloud-init gives the keys that arrive as
+// instance metadata. Its ssh module asks for a user marked default
+// and, finding none, writes them to root alone — measured on a guest,
+// in cloud-init's own log: "Writing to /root/.ssh/authorized_keys
+// [600] 81 bytes", and nothing written to the unprivileged account
+// the launcher creates. Marking that account default does not change
+// it.
+//
+// This is also what the access is. The harness is the platform, and a
+// platform's way into an instance is out of band — over a management
+// path no segment of the lab carries — not an ordinary login that
+// escalates. Saying so removes the sudo every command used to be
+// wrapped in, and with it a quoting seam that had already produced
+// one failure.
+const Guest = "root"
 
 // KeyPath is where each wrapper keeps the key for its own guest.
 const KeyPath = "/tmp/cldt-guest-key"
@@ -93,8 +108,7 @@ func (n *Node) ssh(stdin bool, argv ...string) []string {
 	// Quoting here is what keeps the promise the interface makes,
 	// that a value containing a space or a quote cannot become two
 	// words, across a transport that would otherwise break it.
-	quoted := make([]string, 0, len(argv)+1)
-	quoted = append(quoted, "sudo")
+	quoted := make([]string, 0, len(argv))
 	for _, word := range argv {
 		quoted = append(quoted, shellQuote(word))
 	}

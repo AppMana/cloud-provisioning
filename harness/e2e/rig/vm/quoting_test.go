@@ -14,9 +14,9 @@ import (
 // guest that the caller never wrote.
 //
 // Measured: writing the k0s binary ran
-// "sudo sh -c cat > '/usr/local/bin/k0s'", the login shell performed
-// the redirect as the unprivileged user, and it failed with a
-// permission denied on a command that had asked for root.
+// "sh -c cat > '/usr/local/bin/k0s'", the login shell performed the
+// redirect itself, and the word the caller passed was not the word
+// the guest ran.
 func TestWordsSurviveTheTransport(t *testing.T) {
 	rec := &recorder{}
 	n := testNode(t, rec)
@@ -29,9 +29,6 @@ func TestWordsSurviveTheTransport(t *testing.T) {
 	// The whole command is one word as far as this host is concerned,
 	// and every word inside it is quoted so the guest's shell cannot
 	// find a redirect the caller did not write.
-	if !strings.HasPrefix(remote, "sudo ") {
-		t.Errorf("the remote command does not ask for root: %q", remote)
-	}
 	if strings.Contains(remote, "-c cat >") {
 		t.Errorf("the redirect escaped its quotes and belongs to the login shell: %q", remote)
 	}

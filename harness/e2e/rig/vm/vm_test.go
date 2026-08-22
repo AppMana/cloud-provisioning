@@ -56,14 +56,18 @@ func TestTheGuestIsReachedThroughItsWrapper(t *testing.T) {
 	if !strings.Contains(cmd, "clab-cldt-remote1") {
 		t.Errorf("the wrong wrapper: %s", cmd)
 	}
-	if !strings.Contains(cmd, "sysadmin@127.0.0.1") {
+	if !strings.Contains(cmd, Guest+"@127.0.0.1") {
 		t.Errorf("the guest is not reached over the wrapper's loopback: %s", cmd)
 	}
-	// A node's work is its root's work, and the login is not root.
-	// Every word is quoted, because ssh hands one string to a shell
-	// on the far side rather than an argv.
-	if !strings.Contains(cmd, "-- sudo 'true'") {
-		t.Errorf("the command does not run as root: %s", cmd)
+	// A node's work is its root's work, and the login is root — which
+	// is who cloud-init gives the keys that arrive as metadata. Every
+	// word is still quoted, because ssh hands one string to a shell on
+	// the far side rather than an argv.
+	if !strings.Contains(cmd, "-- 'true'") {
+		t.Errorf("the command is not passed as quoted words: %s", cmd)
+	}
+	if strings.Contains(cmd, "sudo") {
+		t.Errorf("the command escalates, when the login already is root: %s", cmd)
 	}
 }
 

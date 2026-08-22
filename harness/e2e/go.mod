@@ -6,7 +6,11 @@ replace github.com/appmana/cloud-provisioning/controller => ../../controller
 
 require (
 	github.com/appmana/cloud-provisioning/controller v0.0.0-00010101000000-000000000000
+	golang.org/x/crypto v0.47.0
 	sigs.k8s.io/yaml v1.6.0
 )
 
-require go.yaml.in/yaml/v2 v2.4.3 // indirect
+require (
+	go.yaml.in/yaml/v2 v2.4.3 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+)

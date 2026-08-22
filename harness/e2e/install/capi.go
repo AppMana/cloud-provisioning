@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 )
@@ -138,36 +137,6 @@ func ImagesIn(manifest []byte) []string {
 	}
 	sort.Strings(out)
 	return out
-}
-
-// WaitForNodeRef waits for Cluster API to link a Machine to its Node.
-//
-// This is the assertion that the dependency is doing its job. The
-// product reads Machine.status.nodeRef.name, Cluster API's Machine
-// controller writes it by matching a Node whose spec.providerID
-// equals the Machine's, and nothing in this harness writes it at all.
-// If it never appears, either Cluster API is not running or no node
-// carries the provider's identity — both of which are conditions an
-// operator's cluster could be in, and neither of which the harness
-// should paper over.
-func (p *Product) WaitForNodeRef(ctx context.Context, namespace, machine string, within time.Duration) (string, error) {
-	deadline := time.Now().Add(within)
-	for {
-		node, err := p.Kube.Get(ctx, namespace, "machine", machine, "{.status.nodeRef.name}")
-		if err == nil && node != "" {
-			return node, nil
-		}
-		if time.Now().After(deadline) {
-			return "", fmt.Errorf(
-				"Cluster API never linked %s to a node: it reads a Node whose spec.providerID matches the Machine's",
-				machine)
-		}
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-time.After(5 * time.Second):
-		}
-	}
 }
 
 // clusterctlVar matches the variables Cluster API's release file

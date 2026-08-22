@@ -26,6 +26,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/provider"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 )
 
 // Namespace is where claims and the mesh's own Secrets live.
@@ -164,42 +165,34 @@ func (c *Claimer) Bootstrap(ctx context.Context, name, node string) error {
 
 // userdata reads the rendered bootstrap Secret.
 func (c *Claimer) userdata(ctx context.Context, name string, within time.Duration) ([]byte, error) {
-	deadline := time.Now().Add(within)
-	for {
-		encoded, err := c.Kube.Get(ctx, Namespace, "secret", name+"-bootstrap", "{.data.value}")
-		if err == nil && encoded != "" {
-			decoded, err := base64.StdEncoding.DecodeString(encoded)
+	var out []byte
+	err := wait.Until(ctx, within,
+		"no "+name+"-bootstrap secret: the mesh published no peer, so nothing was rendered",
+		func(ctx context.Context) error {
+			encoded, err := c.Kube.Get(ctx, Namespace, "secret", name+"-bootstrap", "{.data.value}")
 			if err != nil {
-				return nil, fmt.Errorf("decoding %s's bootstrap: %w", name, err)
+				return err
 			}
-			return decoded, nil
-		}
-		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("no %s-bootstrap secret: the mesh published no peer, so nothing was rendered", name)
-		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(5 * time.Second):
-		}
+			if encoded == "" {
+				return fmt.Errorf("the secret carries no value yet")
+			}
+			out, err = base64.StdEncoding.DecodeString(encoded)
+			if err != nil {
+				return fmt.Errorf("decoding %s's bootstrap: %w", name, err)
+			}
+			return nil
+		})
+	if err != nil {
+		return nil, err
 	}
+	return out, nil
 }
 
 func (c *Claimer) waitFor(ctx context.Context, kind, name string, within time.Duration) error {
-	deadline := time.Now().Add(within)
-	for {
-		if _, err := c.Kube.Run(ctx, "-n", Namespace, "get", kind, name); err == nil {
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("%s/%s never appeared", kind, name)
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(5 * time.Second):
-		}
-	}
+	return wait.Until(ctx, within, kind+"/"+name+" never appeared", func(ctx context.Context) error {
+		_, err := c.Kube.Run(ctx, "-n", Namespace, "get", kind, name)
+		return err
+	})
 }
 
 // waitForPeer waits for the mesh to mirror an endpoint for a machine.

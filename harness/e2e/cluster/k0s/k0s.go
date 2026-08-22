@@ -24,6 +24,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
+	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 )
 
 func init() { cluster.Register(Builder{}) }
@@ -232,12 +233,10 @@ func (b Builder) start(ctx context.Context, d cluster.Deps, n lab.Node, args str
 // /run/k0s/status.sock — fails with a connection reset that reads as
 // the distribution being broken rather than as not started yet.
 func (b Builder) waitForAPI(ctx context.Context, d cluster.Deps, n lab.Node, within time.Duration) error {
-	deadline := time.Now().Add(within)
-	for {
+	return wait.Until(ctx, within, n.Name+"'s k0s never served a ready API", func(ctx context.Context) error {
 		node := d.Rig.Node(n.Name)
-		statusOK := false
-		if _, err := node.Exec(ctx, "k0s", "status"); err == nil {
-			statusOK = true
+		if _, err := node.Exec(ctx, "k0s", "status"); err != nil {
+			return fmt.Errorf("k0s status: %w", err)
 		}
 		// And the API answering, not merely the process running.
 		//
@@ -247,22 +246,14 @@ func (b Builder) waitForAPI(ctx context.Context, d cluster.Deps, n lab.Node, wit
 		// waiting for a request the server could not yet serve. On
 		// containers the same gap existed and was too small to notice,
 		// which is the sort of thing only a slower rig finds.
-		servesOK := false
-		if _, err := node.Exec(ctx, "k0s", "kubectl", "get", "--raw", "/readyz"); err == nil {
-			servesOK = true
+		if _, err := node.Exec(ctx, "k0s", "kubectl", "get", "--raw", "/readyz"); err != nil {
+			return fmt.Errorf("readyz: %w", err)
 		}
-		if _, err := node.Exec(ctx, "k0s", "kubeconfig", "admin"); err == nil && statusOK && servesOK {
-			return nil
+		if _, err := node.Exec(ctx, "k0s", "kubeconfig", "admin"); err != nil {
+			return fmt.Errorf("kubeconfig: %w", err)
 		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("%s's k0s never served a ready API within %s", n.Name, within)
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(5 * time.Second):
-		}
-	}
+		return nil
+	})
 }
 
 // KubeletInvariant checks that no kubelet depends on another node's
@@ -310,22 +301,14 @@ func (b Builder) KubeletInvariant(ctx context.Context, d cluster.Deps) error {
 // readWithDeadline reads the server line from a node's nllb
 // kubeconfig, waiting for the file to exist.
 func (b Builder) readWithDeadline(ctx context.Context, d cluster.Deps, n lab.Node, within time.Duration) ([]byte, error) {
-	deadline := time.Now().Add(within)
-	for {
-		out, err := d.Rig.Node(n.Name).Exec(ctx, "sh", "-c",
+	var out []byte
+	err := wait.Until(ctx, within, "nllb wrote no kubeconfig on "+n.Name, func(ctx context.Context) error {
+		var err error
+		out, err = d.Rig.Node(n.Name).Exec(ctx, "sh", "-c",
 			"grep -o 'server: .*' /run/k0s/nllb/kubeconfig.yaml")
-		if err == nil {
-			return out, nil
-		}
-		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("nllb wrote no kubeconfig within %s: %w", within, err)
-		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(5 * time.Second):
-		}
-	}
+		return err
+	})
+	return out, err
 }
 
 // binary fetches the pinned release once and caches it, because this

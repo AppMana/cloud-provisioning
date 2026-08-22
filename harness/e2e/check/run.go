@@ -148,11 +148,21 @@ func truncate(s string) string {
 // The window is bounded and its expiry is a failure, because the
 // claim is not that these paths work eventually: it is that they work
 // within the time an operator would wait.
+// passShare bounds one pass as a fraction of the window, so a pass
+// that cannot finish costs a retry rather than the whole budget.
+const passShare = 3
+
 func Converge(ctx context.Context, p Prober, targets []Target, opts Options, within, every time.Duration) *Matrix {
 	started := time.Now()
 	deadline := started.Add(within)
 	for {
-		m := Run(ctx, p, targets, opts)
+		// Each pass on its own clock. Run reaches every node through
+		// the rig, and a probe into a machine that has stopped talking
+		// returns only when something takes it away — which without a
+		// bound here is never, leaving a window that cannot expire.
+		pass, cancel := context.WithTimeout(ctx, within/passShare)
+		m := Run(pass, p, targets, opts)
+		cancel()
 		m.Elapsed = time.Since(started)
 		m.Window = within
 		m.Cancelled = ctx.Err() != nil

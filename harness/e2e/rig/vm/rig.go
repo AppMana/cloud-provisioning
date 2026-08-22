@@ -20,6 +20,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
+	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 )
 
 var (
@@ -226,23 +227,17 @@ const BootTimeout = 12 * time.Minute
 // bring-up failed on "Connection timed out during banner exchange",
 // which is sshd not being up yet and reads like a network fault.
 func (r *Rig) WaitReady(ctx context.Context, within time.Duration) error {
-	deadline := time.Now().Add(within)
 	for _, n := range r.Topology.Nodes {
 		if !n.IsClusterNode() {
 			continue
 		}
-		for {
-			if _, err := r.Node(n.Name).Exec(ctx, "true"); err == nil {
-				break
-			}
-			if time.Now().After(deadline) {
-				return fmt.Errorf("%s did not become reachable within %s of being started", n.Name, within)
-			}
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(10 * time.Second):
-			}
+		err := wait.Until(ctx, within, n.Name+" did not become reachable after being started",
+			func(ctx context.Context) error {
+				_, err := r.Node(n.Name).Exec(ctx, "true")
+				return err
+			})
+		if err != nil {
+			return err
 		}
 	}
 	return nil

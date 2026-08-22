@@ -197,3 +197,43 @@ func linksOf(t *testing.T, yaml string) string {
 	}
 	return links
 }
+
+// Every machine is given a name of its own.
+//
+// The launcher names a guest "ubuntu" unless told otherwise, and a lab
+// of identically-named machines fails in ways that do not mention the
+// name. etcd identifies its members by hostname: the second control
+// plane was handed an initial-cluster list holding "ubuntu" twice,
+// could not tell which entry was itself, and started a cluster of its
+// own that then poisoned the first one. The kubelets would have
+// collapsed five machines into one Node object by the same mechanism.
+//
+// A container takes its name from containerlab and never needed this,
+// which is exactly why the container tier could not have found it.
+func TestEveryMachineIsGivenItsOwnName(t *testing.T) {
+	topo := Default()
+	yaml, err := topo.ContainerlabYAML(VM)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	given := map[string]string{}
+	for _, n := range topo.Nodes {
+		if !n.IsClusterNode() {
+			continue
+		}
+		want := "--hostname " + n.Name
+		if !strings.Contains(yaml, want) {
+			t.Errorf("%s is never told its own name: the launcher will call it ubuntu, "+
+				"as it will call every other machine in the lab", n.Name)
+			continue
+		}
+		if prior, ok := given[want]; ok {
+			t.Errorf("%s and %s are both named %s", prior, n.Name, n.Name)
+		}
+		given[want] = n.Name
+	}
+	if len(given) == 0 {
+		t.Fatal("no machine is named at all")
+	}
+}

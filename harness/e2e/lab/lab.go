@@ -307,6 +307,19 @@ func (t Topology) ContainerlabYAML(rig Rig) (string, error) {
 			// The wrapper carries the machine; the image is the one
 			// vrnetlab built around a cloud image.
 			fmt.Fprintf(&b, "      image: %s\n", VMImage)
+			// The machine's own name, handed to it by the platform.
+			//
+			// The launcher writes whatever it is given into the
+			// cloud-config it builds, and its default is "ubuntu" for
+			// every guest. Nothing downstream survives that: etcd names
+			// its members by hostname, so a second control plane joins
+			// an initial-cluster list holding its own name twice, fails
+			// to identify itself, and forks a cluster of its own — and
+			// the kubelets would have collapsed a five-node site into
+			// one Node object the same way. A container gets its name
+			// from containerlab and needed nothing here, which is why
+			// this only appeared on machines.
+			fmt.Fprintf(&b, "      cmd: %q\n", "--hostname "+n.Name)
 			fmt.Fprintf(&b, "      binds:\n")
 			fmt.Fprintf(&b, "        - seed/%s/extra-setup.sh:/extra-setup.sh:ro\n", n.Name)
 			fmt.Fprintf(&b, "        - seed/%s/extra-userdata.yaml:/extra-userdata.yaml:ro\n", n.Name)

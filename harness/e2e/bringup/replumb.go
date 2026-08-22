@@ -7,6 +7,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 )
 
 // Replumb gives a machine back exactly what a platform would: its
@@ -35,19 +36,11 @@ func Replumb(ctx context.Context, t lab.Topology, r rig.Rig, h Host, victim stri
 	node := t.MustNode(victim)
 
 	// Wait for the machine to be running again before touching it.
-	deadline := time.Now().Add(2 * time.Minute)
-	for {
-		if _, err := r.Node(victim).Exec(ctx, "true"); err == nil {
-			break
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("%s never came back", victim)
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(3 * time.Second):
-		}
+	if err := wait.Until(ctx, 2*time.Minute, victim+" never came back", func(ctx context.Context) error {
+		_, err := r.Node(victim).Exec(ctx, "true")
+		return err
+	}); err != nil {
+		return err
 	}
 
 	for _, i := range node.Interfaces {

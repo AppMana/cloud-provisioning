@@ -9,6 +9,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 )
 
 // Image the probe pods run. Small, and it has httpd and wget, which
@@ -97,21 +98,22 @@ func (p *Pods) Start(ctx context.Context, nodes []string, within time.Duration) 
 		}
 	}
 
-	deadline := time.Now().Add(within)
-	for {
-		targets, err := p.targets(ctx, nodes)
-		if err == nil && len(targets) == len(nodes) {
-			return targets, nil
+	var targets []Target
+	err := wait.Until(ctx, within, "the probe pods did not all start", func(ctx context.Context) error {
+		var err error
+		targets, err = p.targets(ctx, nodes)
+		if err != nil {
+			return err
 		}
-		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("the probe pods did not all start: %w", err)
+		if len(targets) != len(nodes) {
+			return fmt.Errorf("%d of %d probes are ready", len(targets), len(nodes))
 		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(5 * time.Second):
-		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
+	return targets, nil
 }
 
 func (p *Pods) targets(ctx context.Context, nodes []string) ([]Target, error) {

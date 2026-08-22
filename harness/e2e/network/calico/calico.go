@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/network"
+	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 )
 
 func init() { network.Register(Installer{}) }
@@ -135,19 +136,12 @@ func (i Installer) assertPool(ctx context.Context, d network.Deps) error {
 // makeNative turns encapsulation off and restarts the daemonset.
 func (i Installer) makeNative(ctx context.Context, d network.Deps) error {
 	const pool = "ippools.crd.projectcalico.org"
-	deadline := time.Now().Add(4 * time.Minute)
-	for {
-		if _, err := d.Kube.Run(ctx, "get", pool, "default-ipv4-ippool"); err == nil {
-			break
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("Calico never created its default pool")
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(5 * time.Second):
-		}
+	if err := wait.Until(ctx, 4*time.Minute, "Calico never created its default pool",
+		func(ctx context.Context) error {
+			_, err := d.Kube.Run(ctx, "get", pool, "default-ipv4-ippool")
+			return err
+		}); err != nil {
+		return err
 	}
 
 	if _, err := d.Kube.Run(ctx, "patch", pool, "default-ipv4-ippool", "--type", "merge",

@@ -31,6 +31,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm"
+	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 )
 
 func main() {
@@ -376,28 +377,21 @@ func main() {
 // network installed is legitimately NotReady, so this is only ever
 // called after one is.
 func waitReady(ctx context.Context, k *kube.Client, nodes []string) error {
-	deadline := time.Now().Add(10 * time.Minute)
-	for {
-		all := len(nodes) > 0
+	if len(nodes) == 0 {
+		return fmt.Errorf("no node was waited for, so this proved nothing")
+	}
+	return wait.Until(ctx, 10*time.Minute, "not every node became Ready", func(ctx context.Context) error {
 		for _, n := range nodes {
 			ready, err := k.Ready(ctx, n)
-			if err != nil || !ready {
-				all = false
-				break
+			if err != nil {
+				return fmt.Errorf("%s: %w", n, err)
+			}
+			if !ready {
+				return fmt.Errorf("%s is not Ready", n)
 			}
 		}
-		if all {
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("not every node became Ready")
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(10 * time.Second):
-		}
-	}
+		return nil
+	})
 }
 
 func step(name string) { fmt.Printf("--- %s ---\n", name) }

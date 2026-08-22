@@ -92,10 +92,20 @@ func (c *Controller) Reconcile(ctx context.Context, namespace string) ([]Machine
 	return out, nil
 }
 
+// ReconcileTimeout bounds one pass.
+//
+// Without it the loop's only limit is the caller's context, and a
+// single call that does not return spends the whole of it — the
+// caller then reports that a machine was never seen, when what
+// happened is that nothing was ever asked a second time.
+const ReconcileTimeout = 90 * time.Second
+
 // WaitFor reconciles until every named machine is reported ready.
 func (c *Controller) WaitFor(ctx context.Context, namespace string, want []string, every time.Duration) error {
 	for {
-		observed, err := c.Reconcile(ctx, namespace)
+		pass, cancel := context.WithTimeout(ctx, ReconcileTimeout)
+		observed, err := c.Reconcile(pass, namespace)
+		cancel()
 		if err == nil && ready(observed, want) {
 			return nil
 		}
@@ -295,7 +305,9 @@ func (c *Controller) SetNodeProviderID(ctx context.Context, node, providerID str
 // node then adopts nothing instead of adopting the wrong node.
 func (c *Controller) AdoptNodes(ctx context.Context, namespace string, every time.Duration) error {
 	for {
-		machines, err := c.Reconcile(ctx, namespace)
+		pass, cancel := context.WithTimeout(ctx, ReconcileTimeout)
+		machines, err := c.Reconcile(pass, namespace)
+		cancel()
 		if err == nil {
 			adopted := len(machines) > 0
 			for _, m := range machines {

@@ -51,6 +51,10 @@ func main() {
 	)
 	flag.Parse()
 
+	if err := preconditions(*distro, *cni, *product, *remotes, *outages, *checks); err != nil {
+		fail("%v", err)
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 	ctx, cancelTimeout := context.WithTimeout(ctx, *timeout)

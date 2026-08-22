@@ -100,6 +100,18 @@ func (Provider) InfraValues(ctx context.Context, machine *unstructured.Unstructu
 	if addr := reportedAddress(machine); addr != "" {
 		values["nodeAddress"] = addr
 	}
+	// And the identity Cluster API binds a Machine to a Node by.
+	//
+	// Some distributions assign one themselves — k3s gives every node
+	// k3s://<name> as it registers, RKE2 the same — so a node that is
+	// not told otherwise carries an identity the Machine does not
+	// have. nodeRef is then never set, the controller that publishes
+	// the remote's pod block never finds a node, and the remote joins,
+	// goes Ready and is unreachable from the site with everything
+	// reporting healthy.
+	if id, found, err := unstructured.NestedString(machine.Object, "spec", "providerID"); err == nil && found && id != "" {
+		values["providerID"] = id
+	}
 	return values, nil
 }
 

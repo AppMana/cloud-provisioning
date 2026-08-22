@@ -37,11 +37,11 @@ write_files:
   - path: /etc/default/kubelet
     permissions: '0644'
     content: |
-      KUBELET_EXTRA_ARGS={{ .kubeletExtraArgs }}
+      KUBELET_EXTRA_ARGS={{ .kubeletExtraArgs }}{{ if .providerID }} --provider-id={{ .providerID }}{{ end }}
   - path: /etc/sysconfig/kubelet
     permissions: '0644'
     content: |
-      KUBELET_EXTRA_ARGS={{ .kubeletExtraArgs }}
+      KUBELET_EXTRA_ARGS={{ .kubeletExtraArgs }}{{ if .providerID }} --provider-id={{ .providerID }}{{ end }}
 runcmd:
 {{- template "dialer-install" . }}
   # Gate on the API becoming reachable through the tunnel before

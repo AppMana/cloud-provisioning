@@ -65,6 +65,12 @@ runcmd:
     # rke2 takes it in its config file rather than as a flag, so the
     # shared block's answer is unwrapped here.
     [ -n "$NODE_IP_ARG" ] && echo "node-ip: ${NODE_IP_ARG#--node-ip=}" >> /etc/rancher/rke2/config.yaml
+{{- if .providerID }}
+    # rke2 names every node rke2://<name> as it registers, so a node
+    # that is not told otherwise carries an identity the Machine does
+    # not have and Cluster API never binds the two.
+    printf 'kubelet-arg:\n  - "provider-id={{ .providerID }}"\n' >> /etc/rancher/rke2/config.yaml
+{{- end }}
     echo "node-name: $(hostname)" >> /etc/rancher/rke2/config.yaml
     curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION='{{ .rke2Version }}' INSTALL_RKE2_TYPE=agent sh -
     systemctl enable --now rke2-agent.service

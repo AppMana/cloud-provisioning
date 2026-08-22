@@ -57,6 +57,12 @@ runcmd:
     set -e
 {{- template "node-ip-arg" . }}
     KUBELET_ARGS=""
+{{- if .providerID }}
+    # k3s names every node k3s://<name> as it registers, so a node
+    # that is not told otherwise carries an identity the Machine does
+    # not have and Cluster API never binds the two.
+    KUBELET_ARGS="--kubelet-arg=provider-id={{ .providerID }}"
+{{- end }}
     KEXTRA='{{ .kubeletExtraArgs }}'
     for a in $KEXTRA; do
       KUBELET_ARGS="$KUBELET_ARGS --kubelet-arg=${a#--}"

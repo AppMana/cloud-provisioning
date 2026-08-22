@@ -368,6 +368,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		// its address has to ask the platform it is running on
 		// instead, and the pattern falls back to doing that.
 		"nodeAddress": "",
+		// The identity Cluster API binds a Machine to a Node by, when
+		// the infrastructure provider has assigned one.
+		"providerID": "",
 	}
 	for k, v := range joinValues {
 		values[k] = v

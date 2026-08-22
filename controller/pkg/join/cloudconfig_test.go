@@ -232,6 +232,7 @@ func TestK3sJoinsTheEndpointAndCarriesNoSecondBalancer(t *testing.T) {
 		"peersFileJSON":           "{}",
 		"sshAuthorizedKeys":       []string{},
 		"nodeAddress":             "",
+		"providerID":              "",
 		"machineName":             "remote1",
 		"interfaceName":           "cldt0",
 		"wireguardListenPort":     "51820",
@@ -275,6 +276,7 @@ func TestRKE2JoinsTheSupervisorAndCarriesNoSecondBalancer(t *testing.T) {
 		"peersFileJSON":           "{}",
 		"sshAuthorizedKeys":       []string{},
 		"nodeAddress":             "",
+		"providerID":              "",
 		"machineName":             "remote1",
 		"interfaceName":           "cldt0",
 		"wireguardListenPort":     "51820",
@@ -343,6 +345,7 @@ func renderPatternWith(t *testing.T, name string, override map[string]any) strin
 		"cniPluginsURLAmd64":      "https://example.invalid/d",
 		"cniPluginsSHA256Amd64":   "d",
 		"nodeAddress":             "",
+		"providerID":              "",
 	}
 	for k, v := range override {
 		values[k] = v
@@ -365,6 +368,7 @@ func renderKubeadmPattern(t *testing.T, proxyPort int) string {
 		"peersFileJSON":           "{}",
 		"sshAuthorizedKeys":       []string{},
 		"nodeAddress":             "",
+		"providerID":              "",
 		"machineName":             "remote1",
 		"interfaceName":           "cldt0",
 		"wireguardListenPort":     "51820",
@@ -479,5 +483,51 @@ func TestAnUnknownAddressStillAsksTheInstance(t *testing.T) {
 	rendered := renderPatternWith(t, "k0s-worker.cloud-config.tmpl", nil)
 	if !strings.Contains(rendered, "169.254.169.254") {
 		t.Error("a machine whose address nobody reported has no way left to learn it")
+	}
+}
+
+// Every pattern tells the node the identity Cluster API binds it by.
+//
+// Cluster API matches a Machine to a Node on spec.providerID, and
+// some distributions assign one themselves as the node registers —
+// k3s writes k3s://<name>, RKE2 writes rke2://<name>. A node left to
+// do that carries an identity the Machine does not have, so
+// status.nodeRef is never set; the controller that publishes a
+// remote's pod block then never finds a node to publish for, and the
+// remote joins, goes Ready, and is unreachable from the site while
+// every component reports healthy. Measured on a k3s row: the node
+// said k3s://remote1 and the Machine said containernet://remote1.
+//
+// The ones that do not self-assign are told too. It is the same fact,
+// it belongs to the node at registration rather than being patched in
+// afterwards by something standing in for a cloud controller manager,
+// and a pattern that only worked because its distribution happened to
+// stay quiet is not a pattern that works.
+func TestEveryPatternTellsTheNodeItsProviderIdentity(t *testing.T) {
+	patterns, err := filepath.Glob(filepath.Join("..", "..", "..", "join-patterns", "*.cloud-config.tmpl"))
+	if err != nil || len(patterns) == 0 {
+		t.Fatalf("no patterns found: %v", err)
+	}
+	const id = "containernet://remote1"
+	for _, path := range patterns {
+		name := filepath.Base(path)
+		t.Run(name, func(t *testing.T) {
+			with := renderPatternWith(t, name, map[string]any{"providerID": id})
+			if !strings.Contains(with, id) {
+				t.Errorf("the node is never told its provider identity, so a distribution "+
+					"that assigns its own wins and nothing binds the Machine to it:\n%s", name)
+			}
+			if !strings.Contains(with, "provider-id") {
+				t.Error("the identity is present but not as the flag the kubelet reads")
+			}
+
+			// And with none assigned, nothing is claimed: the node
+			// keeps whatever its distribution or cloud gives it.
+			without := renderPatternWith(t, name, map[string]any{"providerID": ""})
+			if strings.Contains(without, "provider-id=") {
+				t.Error("an empty provider identity was rendered as a flag, " +
+					"which sets the node's identity to nothing at all")
+			}
+		})
 	}
 }

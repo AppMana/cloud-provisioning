@@ -125,3 +125,49 @@ func TestInfraValuesSayNothingWhenNoAddressIsReported(t *testing.T) {
 		t.Errorf("an address was invented from nothing: %q", got)
 	}
 }
+
+// The provider's identity for a machine reaches the node, because
+// Cluster API binds the two by it.
+//
+// Some distributions assign one themselves. k3s gives every node
+// k3s://<name> as it registers, and RKE2 does the same, so a node
+// that is not told otherwise ends up carrying an identity the Machine
+// does not have: spec.providerID says containernet://remote1, the
+// node says k3s://remote1, status.nodeRef is never set, and the
+// controller that publishes the remote's pod block never finds a node
+// to publish for. The remote joins, goes Ready, and nothing at the
+// site can reach a pod on it, with every component reporting healthy.
+func TestInfraValuesCarryTheProviderIdentity(t *testing.T) {
+	machine := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
+		"kind":       "ContainernetMachine",
+		"metadata":   map[string]any{"name": "remote1", "namespace": "default"},
+		"spec":       map[string]any{"providerID": "containernet://remote1"},
+	}}
+
+	values, err := Provider{}.InfraValues(context.Background(), machine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if values["providerID"] != "containernet://remote1" {
+		t.Errorf("the node is told %q, so a distribution that names itself wins and "+
+			"Cluster API never binds the Machine to it", values["providerID"])
+	}
+}
+
+// With none assigned yet there is nothing to say, and the node keeps
+// whatever its distribution or cloud provider gives it.
+func TestInfraValuesSayNothingWithoutAProviderIdentity(t *testing.T) {
+	machine := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
+		"kind":       "ContainernetMachine",
+		"metadata":   map[string]any{"name": "remote1", "namespace": "default"},
+	}}
+	values, err := Provider{}.InfraValues(context.Background(), machine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := values["providerID"]; ok && got != "" {
+		t.Errorf("an identity was invented from nothing: %q", got)
+	}
+}

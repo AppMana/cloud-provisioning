@@ -71,6 +71,6 @@ runcmd:
   - |
     set -e
 {{- template "node-ip-arg" . }}
-    k0s install worker --token-file /etc/k0s/join-token --kubelet-extra-args="{{ .kubeletExtraArgs }} $NODE_IP_ARG"
+    k0s install worker --token-file /etc/k0s/join-token --kubelet-extra-args="{{ .kubeletExtraArgs }} $NODE_IP_ARG{{ if .providerID }} --provider-id={{ .providerID }}{{ end }}"
   - k0s start
 {{- template "bootstrap-sentinel" . }}

@@ -274,6 +274,13 @@ func main() {
 				if err := waitReady(ctx, d.Kube, nodes); err != nil {
 					fail("%v", err)
 				}
+				// The probes run inside the pod being measured from
+				// and reach it through the node's own CRI, so every
+				// node needs the tool for that. A Kubernetes node
+				// image has one; a cloud image does not.
+				if err := cluster.EnsureCRICTL(ctx, r, *workDir, nodes); err != nil {
+					fail("%v", err)
+				}
 				pods := &check.Pods{
 					Kube: d.Kube, Rig: r,
 					Namespace:   check.UniqueNamespace(time.Now().Unix()),

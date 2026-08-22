@@ -22,6 +22,7 @@ import (
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/k0s"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/k3s"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/kubeadm"
+	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/rke2"
 	"github.com/appmana/cloud-provisioning/harness/e2e/install"
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"

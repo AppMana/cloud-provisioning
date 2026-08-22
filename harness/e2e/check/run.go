@@ -155,11 +155,13 @@ func Converge(ctx context.Context, p Prober, targets []Target, opts Options, wit
 		m := Run(ctx, p, targets, opts)
 		m.Elapsed = time.Since(started)
 		m.Window = within
-		if m.OK() || time.Now().After(deadline) || ctx.Err() != nil {
+		m.Cancelled = ctx.Err() != nil
+		if m.OK() || time.Now().After(deadline) || m.Cancelled {
 			return m
 		}
 		select {
 		case <-ctx.Done():
+			m.Cancelled = true
 			return m
 		case <-time.After(every):
 		}

@@ -41,7 +41,7 @@ func main() {
 		repoDir = flag.String("repo-dir", "../..", "the repository root")
 		workDir = flag.String("work-dir", "_work", "where the generated topology is written")
 		down    = flag.Bool("down", false, "destroy the lab instead of building it")
-		timeout = flag.Duration("timeout", 20*time.Minute, "deadline for the whole bring-up")
+		timeout = flag.Duration("timeout", 2*time.Hour, "deadline for the whole run")
 	)
 	flag.Parse()
 

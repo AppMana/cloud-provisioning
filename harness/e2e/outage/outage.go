@@ -166,6 +166,9 @@ func Run(ctx context.Context, row Row, d Deps) Result {
 	res.Returned = check.Converge(ctx, d.Prober, targets, d.Options, d.Converge, 10*time.Second)
 	if !res.Returned.OK() {
 		res.Failed = "the cluster did not return to green after the victim came back"
+		if res.Returned.Cancelled {
+			res.Failed = "the run was cancelled before the cluster had its window to return, so this row settles nothing"
+		}
 		return res
 	}
 	return res

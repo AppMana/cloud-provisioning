@@ -105,6 +105,16 @@ type Matrix struct {
 	Elapsed time.Duration
 	// Window is how long it was allowed.
 	Window time.Duration
+	// Cancelled says the run was stopped from outside rather than
+	// having used up its window.
+	//
+	// Reported separately because the two mean opposite things: a run
+	// that used its window measured something and found it wanting, a
+	// run that was cancelled measured nothing conclusive at all. Not
+	// distinguishing them is what makes a reader reach for a shell to
+	// find out, and a result that needs a human with a shell is not a
+	// result.
+	Cancelled bool
 }
 
 // Add records one result. Safe to call from many goroutines, which is
@@ -177,6 +187,9 @@ func (m *Matrix) Summary() string {
 		return line
 	case m.OK():
 		return fmt.Sprintf("%s  converged after %s", line, m.Elapsed.Round(time.Second))
+	case m.Cancelled:
+		return fmt.Sprintf("%s  CUT SHORT after %s of %s: the run was cancelled, so this settles nothing",
+			line, m.Elapsed.Round(time.Second), m.Window.Round(time.Second))
 	default:
 		return fmt.Sprintf("%s  gave up after %s of %s", line,
 			m.Elapsed.Round(time.Second), m.Window.Round(time.Second))

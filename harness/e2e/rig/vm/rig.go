@@ -18,6 +18,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
 )
 
 var (
@@ -60,8 +61,25 @@ func (r *Rig) runner() Runner {
 	return r.Run
 }
 
+// Node returns the node, which is a machine only if it runs a
+// kubelet.
+//
+// The routers, the cloud edges and the bastion stay containers under
+// this rig, as the topology says: an appliance with no kubelet gains
+// nothing from a kernel of its own. They are also reached the way
+// containers are — there is no guest inside them to ssh to, and
+// trying produced a command not found on the first bring-up.
 func (r *Rig) Node(name string) rig.Node {
-	return &Node{node: r.Topology.MustNode(name), labName: r.Topology.Name, run: r.runner()}
+	n := r.Topology.MustNode(name)
+	if !n.IsClusterNode() {
+		return r.appliances().Node(name)
+	}
+	return &Node{node: n, labName: r.Topology.Name, run: r.runner()}
+}
+
+// appliances reaches the containers this rig still has.
+func (r *Rig) appliances() *container.Rig {
+	return &container.Rig{Topology: r.Topology, WorkDir: r.WorkDir, Run: container.Runner(r.runner())}
 }
 
 // SeedDir is where a machine's first-boot material lives on this

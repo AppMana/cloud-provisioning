@@ -56,14 +56,23 @@ type Installer interface {
 	// Install puts it on the cluster and waits for it to be carrying
 	// traffic, not merely applied.
 	Install(ctx context.Context, d Deps) error
-	// LoadImages carries the network's own images onto nodes.
+	// LoadImages carries whatever this network needs onto nodes that
+	// have only just acquired a runtime.
 	//
-	// Separate from Install because a remote cannot receive them at
-	// install time: the network goes on before any remote has joined,
-	// and a remote has no container runtime of its own until it does.
-	// Its images have to arrive after the join, into the runtime its
-	// kubelet actually talks to — which on a distribution that brings
-	// its own containerd is not the one on the node's PATH.
+	// Separate from Install because a remote cannot receive any of it
+	// at install time: the network goes on before any remote has
+	// joined, and a remote has no container runtime of its own until
+	// it does. Its images have to arrive after the join, into the
+	// runtime its kubelet actually talks to — which on a distribution
+	// that brings its own containerd is not the one on the node's
+	// PATH.
+	//
+	// Images are not the whole of it, which the name understates. A
+	// network that chains a delegated plugin needs that plugin here
+	// too: the site's nodes were given it at install time and a remote
+	// was not, so the remote creates no pod sandbox at all and its
+	// probe sits in ContainerCreating while every agent on it reports
+	// running.
 	LoadImages(ctx context.Context, d Deps, nodes []string) error
 }
 

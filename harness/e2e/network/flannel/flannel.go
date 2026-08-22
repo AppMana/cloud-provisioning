@@ -72,6 +72,12 @@ func (i Installer) LoadImages(ctx context.Context, d network.Deps, nodes []strin
 	if err != nil {
 		return err
 	}
+	// The delegated plugin, on a node that has only just acquired a
+	// runtime. Install put it on the site's nodes; a remote joined
+	// after that and has none, and without it creates no pod sandbox.
+	if err := cluster.EnsureCNIPlugins(ctx, d.Rig, d.WorkDir, nodes); err != nil {
+		return err
+	}
 	images := network.ImagesIn(manifest)
 	if len(images) == 0 {
 		return fmt.Errorf("no images in the Flannel manifest, so nothing would be carried in")

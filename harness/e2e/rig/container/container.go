@@ -67,6 +67,15 @@ func (n *Node) Container() string { return "clab-" + n.labName + "-" + n.node.Na
 // Name is the topology's name for the node.
 func (n *Node) Name() string { return n.node.Name }
 
+// Interface is what a container calls the lab's nth link, which is
+// what the topology calls it: containerlab names them directly.
+func (n *Node) Interface(nth int) string {
+	if nth < 0 || nth >= len(n.node.Interfaces) {
+		return ""
+	}
+	return n.node.Interfaces[nth].Name
+}
+
 func (n *Node) Exec(ctx context.Context, argv ...string) ([]byte, error) {
 	return n.Pipe(ctx, nil, argv...)
 }
@@ -118,8 +127,8 @@ func (n *Node) Put(ctx context.Context, src io.Reader, dst string, mode fs.FileM
 // Not docker network disconnect: the interfaces are containerlab's,
 // and what a pulled cable does is stop the link, not remove it.
 func (n *Node) Cut(ctx context.Context) error {
-	for _, i := range n.node.Interfaces {
-		if _, err := n.Exec(ctx, "ip", "link", "set", i.Name, "down"); err != nil {
+	for idx := range n.node.Interfaces {
+		if _, err := n.Exec(ctx, "ip", "link", "set", n.Interface(idx), "down"); err != nil {
 			return err
 		}
 	}
@@ -130,12 +139,12 @@ func (n *Node) Cut(ctx context.Context) error {
 // address does not survive a link going down on every kernel path
 // that can take it away, so it is replaced rather than assumed.
 func (n *Node) Restore(ctx context.Context) error {
-	for _, i := range n.node.Interfaces {
-		if _, err := n.Exec(ctx, "ip", "link", "set", i.Name, "up"); err != nil {
+	for idx, i := range n.node.Interfaces {
+		if _, err := n.Exec(ctx, "ip", "link", "set", n.Interface(idx), "up"); err != nil {
 			return err
 		}
 		if i.Address != "" {
-			if _, err := n.Exec(ctx, "ip", "addr", "replace", i.Address, "dev", i.Name); err != nil {
+			if _, err := n.Exec(ctx, "ip", "addr", "replace", i.Address, "dev", n.Interface(idx)); err != nil {
 				return err
 			}
 		}

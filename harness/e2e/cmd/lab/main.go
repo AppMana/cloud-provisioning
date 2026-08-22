@@ -28,7 +28,9 @@ import (
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/network/calico"
 	"github.com/appmana/cloud-provisioning/harness/e2e/outage"
 	"github.com/appmana/cloud-provisioning/harness/e2e/provider"
+	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
+	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm"
 )
 
 func main() {
@@ -41,6 +43,7 @@ func main() {
 		outages = flag.String("outage", "", "also run an outage row: <victim>:<cut|reboot>")
 		places  = flag.String("placements", "", "also walk these placements, comma separated (e.g. control-plane,two-workers,all-nodes)")
 		repoDir = flag.String("repo-dir", "../..", "the repository root")
+		rigKind = flag.String("rig", "container", "what a cluster node is made of: container or vm")
 		workDir = flag.String("work-dir", "_work", "where the generated topology is written")
 		down    = flag.Bool("down", false, "destroy the lab instead of building it")
 		timeout = flag.Duration("timeout", 2*time.Hour, "deadline for the whole run")
@@ -53,8 +56,23 @@ func main() {
 	defer cancelTimeout()
 
 	topo := lab.Default()
-	r := container.New(topo, *workDir)
 	host := bringup.LocalHost{Lab: topo.Name}
+
+	// What a node is made of, and nothing else: every stage below
+	// reaches nodes through the same interface either way.
+	var r rig.Rig
+	var images cluster.Images
+	var prober bringup.Prober
+	switch *rigKind {
+	case "container":
+		cr := container.New(topo, *workDir)
+		r, images, prober = cr, cr, bringup.HostProber{Host: host}
+	case "vm":
+		vr := vm.New(topo, *workDir)
+		r, images, prober = vr, vr, bringup.GuestProber{Rig: vr}
+	default:
+		fail("no rig called %q: container or vm", *rigKind)
+	}
 
 	if *down {
 		if err := r.Down(ctx); err != nil {
@@ -82,7 +100,7 @@ func main() {
 	// Before anything is installed, because a topology that does not
 	// isolate makes every result taken on it meaningless.
 	step("proving it")
-	if err := bringup.Prove(ctx, topo, bringup.HostProber{Host: host}); err != nil {
+	if err := bringup.Prove(ctx, topo, prober); err != nil {
 		fail("%v", err)
 	}
 
@@ -94,7 +112,7 @@ func main() {
 		step("building the " + *distro + " site")
 		d := cluster.Deps{
 			Topology: topo, Rig: r, WorkDir: *workDir, Network: *cni,
-			Images:  cluster.Importer{Images: r, Args: b.ImportArgs()},
+			Images:  cluster.Importer{Images: images, Args: b.ImportArgs()},
 			PodCIDR: "10.244.0.0/16", SvcCIDR: "10.96.0.0/12",
 			Kube: &kube.Client{Bastion: r.Node("bastion"), ControlPlanes: cluster.ControlPlaneAddresses(topo)},
 		}

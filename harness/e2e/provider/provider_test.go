@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"io/fs"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -322,3 +323,7 @@ func TestANodeHoldingTheAddressIsTheMachine(t *testing.T) {
 		t.Errorf("nodeAt = %q, want the node holding the address", node)
 	}
 }
+
+// Interface is what this node calls the lab's nth link. A fake stands
+// in for a container, which calls it what the topology does.
+func (n *fakeNode) Interface(nth int) string { return "eth" + strconv.Itoa(nth+1) }

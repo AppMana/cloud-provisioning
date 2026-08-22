@@ -115,14 +115,19 @@ const ManagementPrefix = "10.90."
 func Configure(ctx context.Context, t lab.Topology, r rig.Rig, h Host) error {
 	for _, n := range t.Nodes {
 		node := r.Node(n.Name)
-		for _, i := range n.Interfaces {
+		for idx, i := range n.Interfaces {
+			// The node's own name for the link, not the topology's: a
+			// machine's kernel names interfaces for the bus it finds
+			// them on, and addressing a name the guest does not have
+			// succeeds at nothing while reporting nothing.
+			dev := node.Interface(idx)
 			if i.Address != "" {
-				if _, err := node.Exec(ctx, "ip", "addr", "replace", i.Address, "dev", i.Name); err != nil {
-					return fmt.Errorf("addressing %s %s: %w", n.Name, i.Name, err)
+				if _, err := node.Exec(ctx, "ip", "addr", "replace", i.Address, "dev", dev); err != nil {
+					return fmt.Errorf("addressing %s %s: %w", n.Name, dev, err)
 				}
 			}
-			if _, err := node.Exec(ctx, "ip", "link", "set", i.Name, "up"); err != nil {
-				return fmt.Errorf("raising %s %s: %w", n.Name, i.Name, err)
+			if _, err := node.Exec(ctx, "ip", "link", "set", dev, "up"); err != nil {
+				return fmt.Errorf("raising %s %s: %w", n.Name, dev, err)
 			}
 		}
 	}
@@ -159,7 +164,7 @@ func routes(ctx context.Context, t lab.Topology, r rig.Rig) error {
 				return fmt.Errorf("%s is on %s, which has no edge", n.Name, seg)
 			}
 			if _, err := node.Exec(ctx, "ip", "route", "replace", "default",
-				"via", via, "dev", n.Interfaces[0].Name); err != nil {
+				"via", via, "dev", node.Interface(0)); err != nil {
 				return fmt.Errorf("%s default route: %w", n.Name, err)
 			}
 		}

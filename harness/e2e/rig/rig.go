@@ -27,6 +27,14 @@ type Node interface {
 	// whatever the rig calls the thing implementing it.
 	Name() string
 
+	// Interface is what this node calls the lab's nth link.
+	//
+	// A container calls it what the topology does. A machine does not:
+	// its kernel names interfaces for the bus it finds them on, so the
+	// lab's first link is ens2 inside the guest. Configuring a machine
+	// with the topology's names silently addresses nothing.
+	Interface(nth int) string
+
 	// Exec runs argv on the node and returns its standard output. The
 	// words are passed through as they are: nothing here goes through
 	// a shell unless the caller asks for one by name, so a value

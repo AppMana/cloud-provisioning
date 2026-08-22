@@ -184,6 +184,14 @@ func (n *Node) Userdata(ctx context.Context, cloudConfig []byte) error {
 		"it cannot be handed to one that is already running", n.Name())
 }
 
+// Interface is what the guest calls the lab's nth link.
+func (n *Node) Interface(nth int) string {
+	if nth < 0 || nth >= len(n.node.Interfaces) {
+		return ""
+	}
+	return GuestInterface(nth)
+}
+
 // dataInterfaces are the guest's names for the lab's links.
 //
 // The guest does not see them as eth1..N: the kernel names them for

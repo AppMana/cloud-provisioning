@@ -326,6 +326,10 @@ func (t Topology) ContainerlabYAML(rig Rig) (string, error) {
 			// The platform's own network configuration, which
 			// cloud-init applies before it runs any userdata.
 			fmt.Fprintf(&b, "        - seed/%s/extra-network.yaml:/extra-network.yaml:ro\n", n.Name)
+			// The keys the platform installs, which arrive as
+			// instance metadata so that the userdata under test
+			// cannot displace them.
+			fmt.Fprintf(&b, "        - seed/%s/extra-authorized-keys:/extra-authorized-keys:ro\n", n.Name)
 		}
 		// Binds exist to keep a container runtime's state off an
 		// overlay. A VM has a disk of its own and needs none of them.

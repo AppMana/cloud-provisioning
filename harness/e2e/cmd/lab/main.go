@@ -179,9 +179,19 @@ func main() {
 			if err := prod.Distribute(ctx, sha); err != nil {
 				fail("distributing: %v", err)
 			}
+			// Where a node fetches the first-boot binary. It has to
+			// answer before any remote is launched, because a remote
+			// fetches it during its own first boot.
+			origin := &install.Origin{Path: prod.BinaryPath()}
+			if err := origin.Start(ctx); err != nil {
+				fail("%v", err)
+			}
+			defer func() { _ = origin.Stop(context.Background()) }()
+
 			if err := prod.Install(ctx, install.Options{
 				TunnelEndpoints: "kubernetes.io/hostname in (w1,w2)",
 				JoinProvider:    *distro,
+				DialerURL:       origin.URL(),
 			}, sha); err != nil {
 				fail("%v", err)
 			}
@@ -312,6 +322,7 @@ func main() {
 					step("placement: " + placement.Name + " (" + placement.Endpoints + ")")
 					if err := prod.Move(ctx, placement, install.Options{
 						JoinProvider: *distro,
+						DialerURL:    origin.URL(),
 					}, sha); err != nil {
 						fail("%v", err)
 					}

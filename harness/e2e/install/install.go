@@ -59,7 +59,7 @@ type Product struct {
 
 // binaryPath is where the first-boot binary is, whether or not Build
 // ran in this process.
-func (p *Product) binaryPath() string {
+func (p *Product) BinaryPath() string {
 	if p.binary != "" {
 		return p.binary
 	}
@@ -78,6 +78,9 @@ type Options struct {
 	TunnelEndpoints string
 	// JoinProvider is the distribution a remote joins as.
 	JoinProvider string
+	// DialerURL is where a node fetches the first-boot binary, which
+	// it has to be able to do before it has joined anything.
+	DialerURL string
 }
 
 // Build compiles the images and the first-boot binary.
@@ -142,17 +145,13 @@ func (p *Product) Distribute(ctx context.Context, dialerSHA string) error {
 		}
 	}
 
-	binary, err := os.ReadFile(p.binaryPath())
-	if err != nil {
-		return err
-	}
-	for _, n := range p.Topology.NodesInRole(lab.Remote) {
-		node := p.Rig.Node(n.Name)
-		if err := node.Put(ctx, bytes.NewReader(binary),
-			DialerDistDir+"/wg-dialer-linux-amd64", 0o755); err != nil {
-			return fmt.Errorf("placing the dialer on %s: %w", n.Name, err)
-		}
-	}
+	// The first-boot binary is not staged here.
+	//
+	// A remote is launched as a new instance to read its userdata, so
+	// anything put on the old instance's disk goes with it. The node
+	// fetches the binary from the URL the chart gives it, which is
+	// what that value is for and what the lab's own segments already
+	// prove it can reach.
 	return nil
 }
 
@@ -198,7 +197,7 @@ func (p *Product) Install(ctx context.Context, opts Options, dialerSHA string) e
 		"--set", "dialerImage.tag=" + strings.Split(DialerImage, ":")[1],
 		"--set-string", "tunnel.endpoints=" + escapeHelmValue(opts.TunnelEndpoints),
 		"--set", "joinProvider=" + opts.JoinProvider,
-		"--set", "dialerBinary.amd64.url=file://" + DialerDistDir + "/wg-dialer-linux-amd64",
+		"--set", "dialerBinary.amd64.url=" + opts.DialerURL,
 		"--set", "dialerBinary.amd64.sha256=" + dialerSHA,
 	}
 	out, err := p.Kube.Helm(ctx, args...)

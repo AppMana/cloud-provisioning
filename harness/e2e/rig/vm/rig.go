@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -128,18 +127,27 @@ func (r *Rig) Up(ctx context.Context) error {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
-		// The login this harness reaches the machine by, installed by
-		// the guest's own cloud-init on first boot.
-		setup := fmt.Sprintf(`#!/bin/sh
-mkdir -p /home/%[1]s/.ssh
-printf '%%s\n' %[2]q >> /home/%[1]s/.ssh/authorized_keys
-chown -R %[1]s:%[1]s /home/%[1]s/.ssh
-chmod 700 /home/%[1]s/.ssh
-chmod 600 /home/%[1]s/.ssh/authorized_keys
-`, Guest, strings.TrimSpace(string(pub)))
-		if err := os.WriteFile(filepath.Join(dir, "extra-setup.sh"), []byte(setup), 0o755); err != nil {
+		// The login this harness reaches the machine by, handed to
+		// the instance as metadata.
+		//
+		// Metadata rather than a script in the user-data, because
+		// cloud-init merges a multipart user-data by replacing lists:
+		// a key installed from a runcmd is lost the moment the
+		// document under test carries a runcmd of its own, and the
+		// machine then boots, answers on sshd, and denies every
+		// login. A cloud hands the instance its keypair through the
+		// datasource for exactly this reason — what the tenant puts
+		// in user-data cannot take away the operator's way in.
+		if err := os.WriteFile(filepath.Join(dir, "extra-authorized-keys"), pub, 0o644); err != nil {
 			return err
 		}
+		// Kept because the wrapper binds it, and because a machine
+		// may yet need first-boot setup that is the platform's rather
+		// than the tenant's.
+		if err := os.WriteFile(filepath.Join(dir, "extra-setup.sh"), []byte("#!/bin/sh\n:\n"), 0o755); err != nil {
+			return err
+		}
+
 		// The platform's network configuration, applied by the
 		// guest's cloud-init before any userdata runs — so a machine
 		// whose bootstrap dials the site has a segment to dial from.

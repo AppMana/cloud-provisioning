@@ -474,6 +474,32 @@ list while the cluster was on the far side of the tunnel it was
 raising. The rest of the lab kept carrying traffic while it was gone.
 
 
+### The accommodation the machine tier closed
+
+The container rig cannot run `kubeadm join` as the product renders
+it. kubeadm's preflight inspects the kernel it runs on, which in a
+container is this host's, so the rig rewrites the command with
+`--ignore-preflight-errors=all` and **reports that it did** — the
+shell harness made the same substitution silently, so every kubeadm
+row ran a command the product had not rendered and no reader could
+tell.
+
+On machines there is no such mechanism: cloud-init runs the document
+as written. The kubeadm site builds there with all five nodes
+registered and preflight passing, which settles what the
+accommodation was: a real container limitation, not a product problem
+being papered over. It also means every kubeadm row on containers is
+running a weaker check than it appears to, and the machine tier is
+where that claim is actually tested.
+
+kubeadm is also the one distribution that does not bring its own
+runtime, so the machine rig builds the node first — containerd, runc,
+CNI plugins, a kubelet and its supervisor, pinned to the version
+`kindest/node` ships. Its *remotes* still need a baked node image,
+because a remote is launched from the base image and its join pattern
+runs kubeadm directly, which is what a kubeadm deployment assumes an
+AMI to have provided.
+
 ### The matrix harness (`harness/clab`)
 
 Four separate L2 segments, never one bridge pretending to be four: the

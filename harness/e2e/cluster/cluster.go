@@ -41,6 +41,11 @@ type Deps struct {
 	PodCIDR  string
 	SvcCIDR  string
 	Images   Images
+	// Network is what the row installs, or "default" for the one the
+	// distribution itself ships. A builder needs it because some
+	// distributions must be told at build time whether to bring their
+	// own.
+	Network string
 }
 
 // Builder builds one distribution's site cluster.

@@ -19,6 +19,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/check"
 	"github.com/appmana/cloud-provisioning/harness/e2e/claim"
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
+	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/k0s"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/kubeadm"
 	"github.com/appmana/cloud-provisioning/harness/e2e/install"
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
@@ -92,7 +93,7 @@ func main() {
 		}
 		step("building the " + *distro + " site")
 		d := cluster.Deps{
-			Topology: topo, Rig: r, WorkDir: *workDir, Images: r,
+			Topology: topo, Rig: r, WorkDir: *workDir, Images: r, Network: *cni,
 			PodCIDR: "10.244.0.0/16", SvcCIDR: "10.96.0.0/12",
 			Kube: &kube.Client{Bastion: r.Node("bastion"), ControlPlanes: cluster.ControlPlaneAddresses(topo)},
 		}

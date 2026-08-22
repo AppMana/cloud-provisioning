@@ -206,17 +206,27 @@ func takeDown(ctx context.Context, victim rig.Node, mode Mode) error {
 	return victim.Cut(ctx)
 }
 
+// bringBack returns the victim, and then gives it the platform's
+// share.
+//
+// Both, for either mode. A machine that was killed needs its NIC
+// back; a machine whose cable was pulled has one, but a link that
+// went down took its routes with it and nothing in the kernel puts
+// them back. Restoring an address and not a gateway leaves a node
+// reachable on its own segment and nowhere else, which reads exactly
+// like the cluster failing to readmit it.
 func bringBack(ctx context.Context, victim rig.Node, mode Mode, restart func(context.Context, string) error) error {
 	if mode == Reboot {
 		if err := victim.Boot(ctx); err != nil {
 			return err
 		}
-		if restart != nil {
-			return restart(ctx, victim.Name())
-		}
-		return nil
+	} else if err := victim.Restore(ctx); err != nil {
+		return err
 	}
-	return victim.Restore(ctx)
+	if restart != nil {
+		return restart(ctx, victim.Name())
+	}
+	return nil
 }
 
 // without drops one node from the targets.

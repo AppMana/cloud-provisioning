@@ -71,6 +71,31 @@ func TestACutLeavesTheMachineRunning(t *testing.T) {
 	}
 }
 
+// A pulled cable takes the node's routes with it, and nothing in the
+// kernel puts them back. So a cut row is given the platform's share
+// too: a node restored with an address and no gateway is reachable on
+// its own segment and nowhere else, which reads exactly like the
+// cluster failing to readmit it. Measured on cp, whose every check
+// failed for a full fifteen minute window with its address restored
+// and its default route gone.
+func TestACutRowAlsoGetsThePlatformsShare(t *testing.T) {
+	r := &fakeRig{}
+	p := &fakeProber{}
+	d := deps(p)
+	d.Rig = r
+	var restored string
+	d.Restart = func(ctx context.Context, victim string) error {
+		restored = victim
+		return nil
+	}
+
+	Run(context.Background(), Row{Name: "x", Victim: "c", Mode: Cut}, d)
+
+	if restored != "c" {
+		t.Errorf("a cut row never had the platform'''s share restored (%q)", restored)
+	}
+}
+
 // A reboot takes the machine and gives back only what a platform
 // provides, so the caller is given the chance to re-plumb exactly
 // that and nothing else.

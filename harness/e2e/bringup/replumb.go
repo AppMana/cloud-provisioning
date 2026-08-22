@@ -12,6 +12,14 @@ import (
 // Replumb gives a machine back exactly what a platform would: its
 // NIC, its address, its gateway, and nothing else.
 //
+// For either way of losing it. A killed machine needs the host side
+// of its veth rebuilt; a machine whose cable was pulled still has
+// one, but a link that goes down takes its routes with it and the
+// kernel does not put them back — on a real machine something else
+// does, and here that something is this. A node restored with an
+// address and no gateway is reachable on its own segment and nowhere
+// else, which reads as the cluster failing to readmit it.
+//
 // That "nothing else" is the whole point of a reboot row. The tunnel,
 // the routes and the cluster membership have to be rebuilt by what
 // the node itself runs at boot — the host unit raising the tunnel
@@ -43,6 +51,16 @@ func Replumb(ctx context.Context, t lab.Topology, r rig.Rig, h Host, victim stri
 	}
 
 	for _, i := range node.Interfaces {
+		// Only when the NIC is actually gone.
+		//
+		// A machine that was killed lost the host side of its veth
+		// with its namespace, and needs one back. A machine whose
+		// cable was pulled still has it, and tearing it down to
+		// rebuild it would be doing more than the platform does — and
+		// would take away an interface the node is still using.
+		if _, err := r.Node(victim).Exec(ctx, "ip", "link", "show", i.Name); err == nil {
+			continue
+		}
 		endpoint := i.Segment + ":" + victim
 		// A stale host-side veth outlives the namespace it belonged
 		// to, and a new one cannot take a name that already exists.

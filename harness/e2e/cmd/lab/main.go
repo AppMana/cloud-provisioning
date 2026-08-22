@@ -256,8 +256,8 @@ func main() {
 						// A pod that died with its node comes back at a
 						// different address; measuring the old one reads
 						// as a routing fault and is not.
-						Refresh: func(ctx context.Context) ([]check.Target, error) {
-							return pods.Start(ctx, nodes, 6*time.Minute)
+						Refresh: func(ctx context.Context, want []string) ([]check.Target, error) {
+							return pods.Start(ctx, want, 8*time.Minute)
 						},
 						Restart: func(ctx context.Context, v string) error {
 							return bringup.Replumb(ctx, topo, r, host, v)

@@ -98,7 +98,11 @@ type Deps struct {
 	// Restart runs between the victim leaving and returning, so a
 	// caller can re-plumb whatever the platform would have given back.
 	Restart func(ctx context.Context, victim string) error
-	// Refresh re-reads where the probe pods are.
+	// Refresh re-reads where the probe pods are, for the nodes given.
+	//
+	// The nodes given, and not all of them: while the victim is down
+	// its probe cannot be ready, and waiting for it would fail the
+	// row for the thing the row is doing on purpose.
 	//
 	// A pod dies with its node and comes back somewhere else, with a
 	// different address. Measuring the address it had before the
@@ -108,7 +112,7 @@ type Deps struct {
 	// serving now, so a stale pod address fails while the service
 	// address beside it passes, and the pattern reads exactly like a
 	// routing fault.
-	Refresh func(ctx context.Context) ([]check.Target, error)
+	Refresh func(ctx context.Context, nodes []string) ([]check.Target, error)
 }
 
 // Run executes one row.
@@ -140,9 +144,11 @@ func Run(ctx context.Context, row Row, d Deps) Result {
 
 	// The survivors, among themselves. The victim's own pods are gone
 	// with it, which is allowed; everyone else's must not be.
-	targets, err := d.refresh(ctx)
+	// The survivors only: the victim is down, so its probe is not
+	// ready and never will be until it returns.
+	targets, err := d.refresh(ctx, names(without(d.Targets, row.Victim)))
 	if err != nil {
-		res.Failed, res.Err = "re-reading where the probes are", err
+		res.Failed, res.Err = "re-reading where the surviving probes are", err
 		return res
 	}
 	survivors := without(targets, row.Victim)
@@ -157,10 +163,11 @@ func Run(ctx context.Context, row Row, d Deps) Result {
 		return res
 	}
 
-	// And the whole cluster again, with nothing reinstalled.
-	targets, err = d.refresh(ctx)
+	// And the whole cluster again, with nothing reinstalled. Every
+	// node this time, the returned victim included.
+	targets, err = d.refresh(ctx, names(d.Targets))
 	if err != nil {
-		res.Failed, res.Err = "re-reading where the probes are", err
+		res.Failed, res.Err = "re-reading where the probes are once the victim is back", err
 		return res
 	}
 	res.Returned = check.Converge(ctx, d.Prober, targets, d.Options, d.Converge, 10*time.Second)
@@ -176,11 +183,20 @@ func Run(ctx context.Context, row Row, d Deps) Result {
 
 // refresh re-reads the probes, falling back to what the row started
 // with when a caller offered no way to.
-func (d Deps) refresh(ctx context.Context) ([]check.Target, error) {
+func (d Deps) refresh(ctx context.Context, nodes []string) ([]check.Target, error) {
 	if d.Refresh == nil {
 		return d.Targets, nil
 	}
-	return d.Refresh(ctx)
+	return d.Refresh(ctx, nodes)
+}
+
+// names lists the nodes a set of targets covers.
+func names(targets []check.Target) []string {
+	out := make([]string, 0, len(targets))
+	for _, t := range targets {
+		out = append(out, t.Node)
+	}
+	return out
 }
 
 func takeDown(ctx context.Context, victim rig.Node, mode Mode) error {

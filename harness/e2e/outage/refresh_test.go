@@ -33,9 +33,19 @@ func TestTheProbesAreReReadAfterTheVictimReturns(t *testing.T) {
 		{Node: "c", PodIP: "10.0.0.3", ServiceIP: "10.96.0.3"},
 	}
 	var refreshed int
-	d.Refresh = func(ctx context.Context) ([]check.Target, error) {
+	var askedFor [][]string
+	d.Refresh = func(ctx context.Context, want []string) ([]check.Target, error) {
 		refreshed++
-		return moved, nil
+		askedFor = append(askedFor, want)
+		var out []check.Target
+		for _, t := range moved {
+			for _, w := range want {
+				if t.Node == w {
+					out = append(out, t)
+				}
+			}
+		}
+		return out, nil
 	}
 
 	res := Run(context.Background(), Row{Name: "x", Victim: "c", Mode: Reboot}, d)
@@ -46,6 +56,24 @@ func TestTheProbesAreReReadAfterTheVictimReturns(t *testing.T) {
 	// return: both are after something moved.
 	if refreshed < 2 {
 		t.Errorf("the probes were re-read %d times, want one per measurement after the victim moved", refreshed)
+	}
+	// While the victim is down its probe cannot be ready, so the
+	// survivors' refresh must not wait for it: doing so fails the row
+	// for the thing the row is doing on purpose.
+	for _, n := range askedFor[0] {
+		if n == "c" {
+			t.Error("the survivors' refresh waited for the victim's probe, which is down by definition")
+		}
+	}
+	// And the return's refresh does want it back.
+	var wantedVictim bool
+	for _, n := range askedFor[len(askedFor)-1] {
+		if n == "c" {
+			wantedVictim = true
+		}
+	}
+	if !wantedVictim {
+		t.Error("the return's refresh did not wait for the victim to come back")
 	}
 }
 

@@ -41,6 +41,15 @@ type Installer interface {
 	// Install puts it on the cluster and waits for it to be carrying
 	// traffic, not merely applied.
 	Install(ctx context.Context, d Deps) error
+	// LoadImages carries the network's own images onto nodes.
+	//
+	// Separate from Install because a remote cannot receive them at
+	// install time: the network goes on before any remote has joined,
+	// and a remote has no container runtime of its own until it does.
+	// Its images have to arrive after the join, into the runtime its
+	// kubelet actually talks to — which on a distribution that brings
+	// its own containerd is not the one on the node's PATH.
+	LoadImages(ctx context.Context, d Deps, nodes []string) error
 }
 
 // Registry is every network the harness can install.
@@ -68,6 +77,18 @@ func AllNodes(t lab.Topology) []string {
 	var out []string
 	for _, n := range t.Nodes {
 		if n.IsClusterNode() {
+			out = append(out, n.Name)
+		}
+	}
+	return out
+}
+
+// SiteNodes is every cluster node at the site: the ones that exist
+// when a network is installed.
+func SiteNodes(t lab.Topology) []string {
+	var out []string
+	for _, n := range t.Nodes {
+		if n.Role == lab.ControlPlane || n.Role == lab.Worker {
 			out = append(out, n.Name)
 		}
 	}

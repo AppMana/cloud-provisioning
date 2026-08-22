@@ -40,16 +40,11 @@ func (i Installer) Install(ctx context.Context, d network.Deps) error {
 		return err
 	}
 
-	// Every image the manifest names, carried in: the site has no
-	// route to a registry.
-	images := imagesIn(manifest)
-	if len(images) == 0 {
-		return fmt.Errorf("no images in the Calico manifest, so nothing would be carried in")
-	}
-	for _, image := range images {
-		if err := d.Images.Load(ctx, image, network.AllNodes(d.Topology), nil); err != nil {
-			return fmt.Errorf("carrying %s in: %w", image, err)
-		}
+	// Onto the site's nodes only. A remote has no runtime of its own
+	// until it joins, which is after this; its images arrive then,
+	// through LoadImages.
+	if err := i.LoadImages(ctx, d, network.SiteNodes(d.Topology)); err != nil {
+		return err
 	}
 
 	if err := d.Kube.Apply(ctx, manifest); err != nil {
@@ -74,6 +69,24 @@ func (i Installer) Install(ctx context.Context, d network.Deps) error {
 
 	if err := i.makeNative(ctx, d); err != nil {
 		return err
+	}
+	return nil
+}
+
+// LoadImages carries Calico's own images onto the given nodes.
+func (i Installer) LoadImages(ctx context.Context, d network.Deps, nodes []string) error {
+	manifest, err := i.manifest(ctx, d)
+	if err != nil {
+		return err
+	}
+	images := imagesIn(manifest)
+	if len(images) == 0 {
+		return fmt.Errorf("no images in the Calico manifest, so nothing would be carried in")
+	}
+	for _, image := range images {
+		if err := d.Images.Load(ctx, image, nodes, nil); err != nil {
+			return fmt.Errorf("carrying %s in: %w", image, err)
+		}
 	}
 	return nil
 }

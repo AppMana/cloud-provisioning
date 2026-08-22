@@ -198,6 +198,24 @@ func main() {
 
 				claimed = append(claimed, name)
 				fmt.Println("  the node ran the userdata the product rendered")
+
+				// The network's images, now that this node has a
+				// runtime of its own. Before the join it had none, and
+				// on a distribution that brings its own containerd the
+				// one on the node's PATH is not the one its kubelet
+				// talks to.
+				if *cni != "" {
+					inst, err := network.For(*cni)
+					if err != nil {
+						fail("%v", err)
+					}
+					if err := inst.LoadImages(ctx, network.Deps{
+						Topology: topo, Rig: r, Kube: d.Kube, Images: d.Images,
+						WorkDir: *workDir, PodCIDR: d.PodCIDR,
+					}, []string{name}); err != nil {
+						fail("%v", err)
+					}
+				}
 				if cn, ok := r.Node(name).(*container.Node); ok {
 					for _, why := range cn.Accommodations() {
 						fmt.Printf("  NOTE this rig %s\n", why)

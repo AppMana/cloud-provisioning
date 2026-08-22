@@ -376,3 +376,66 @@ func renderKubeadmPattern(t *testing.T, proxyPort int) string {
 		"dialerBinarySHA256Amd64": "b",
 	})
 }
+
+// A pattern that asks a cloud's instance-metadata service for the
+// node's addresses must survive not being on that cloud.
+//
+// The service answers on a link-local address that nothing routes, so
+// where it is absent the request does not fail — it hangs until the
+// connection times out, and then, if the command was not allowed to
+// fail, takes the rest of the bootstrap with it. Measured on a real
+// first boot, in a lab with no metadata service:
+//
+//	curl: (28) Failed to connect to 169.254.169.254 port 80
+//	      after 129587 ms: Connection timed out
+//	cc_scripts_user.py[WARNING]: Failed to run module scripts_user
+//
+// The dialer was installed and the tunnel was up; "k0s install
+// worker" and "k0s start" were in the same aborted block and never
+// ran. The node joined nothing, and did it slowly.
+//
+// The addresses are an optimisation — a distribution that cannot get
+// them falls back to resolving its own hostname, which is what it
+// does everywhere this operator is not — so absence has to be cheap
+// and survivable. Two of the patterns already bounded the wait and
+// tolerated the failure; this makes it every pattern's contract
+// rather than a habit two of them happened to have.
+func TestEveryPatternSurvivesTheAbsenceOfAMetadataService(t *testing.T) {
+	patterns, err := filepath.Glob(filepath.Join("..", "..", "..", "join-patterns", "*.cloud-config.tmpl"))
+	if err != nil || len(patterns) == 0 {
+		t.Fatalf("no patterns found: %v", err)
+	}
+
+	for _, path := range patterns {
+		name := filepath.Base(path)
+		t.Run(name, func(t *testing.T) {
+			rendered := renderPatternWith(t, name, nil)
+			for _, line := range strings.Split(rendered, "\n") {
+				if !strings.Contains(line, "169.254.169.254") {
+					continue
+				}
+				if !strings.Contains(line, "curl") {
+					continue
+				}
+				if !hasConnectBound(line) {
+					t.Errorf("this request has no bound on how long it waits, "+
+						"so off that cloud it stalls the boot instead of failing:\n  %s",
+						strings.TrimSpace(line))
+				}
+				if !strings.Contains(line, "|| true") {
+					t.Errorf("this request is not allowed to fail, so its absence "+
+						"aborts everything after it in the same block:\n  %s",
+						strings.TrimSpace(line))
+				}
+			}
+		})
+	}
+}
+
+// hasConnectBound reports whether a curl is told how long it may wait.
+// Either bound will do: -m caps the whole request, --connect-timeout
+// caps the part that hangs when nothing answers.
+func hasConnectBound(line string) bool {
+	return strings.Contains(line, "-m ") || strings.Contains(line, "--max-time") ||
+		strings.Contains(line, "--connect-timeout")
+}

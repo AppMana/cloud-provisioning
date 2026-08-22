@@ -70,12 +70,27 @@ runcmd:
   # instance metadata instead. (IMDSv2, AWS-specific: a different
   # infrastructure provider's variant of this pattern would fetch its
   # own metadata service here instead.)
+  #
+  # Where there is no such service the addresses are simply not
+  # available, and the join proceeds without --node-ip: k0s then
+  # resolves its own hostname, which is what it does everywhere this
+  # operator is not. So every request is bounded and every one is
+  # allowed to fail. Unbounded, they do not fail at all — the service
+  # answers on a link-local address that nothing routes, so the
+  # request hangs until the connection times out, and with -sSf it
+  # then took the rest of this block with it: the dialer was
+  # installed, the tunnel was up, and "k0s install worker" and
+  # "k0s start" below never ran.
   - |
-    IMDS_TOKEN=$(curl -sSf -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
-    NODE_IPV4=$(curl -sSf -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
-    NODE_IPV6=$(curl -sSf -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/ipv6 || true)
-    NODE_IP_ARG="--node-ip=$NODE_IPV4"
-    [ -n "$NODE_IPV6" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4,$NODE_IPV6"
+    set -e
+    NODE_IP_ARG=""
+    IMDS_TOKEN=$(curl -sf -m 2 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
+    if [ -n "$IMDS_TOKEN" ]; then
+      NODE_IPV4=$(curl -sf -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4 || true)
+      NODE_IPV6=$(curl -sf -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/ipv6 || true)
+      [ -n "$NODE_IPV4" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4"
+      [ -n "$NODE_IPV6" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4,$NODE_IPV6"
+    fi
     k0s install worker --token-file /etc/k0s/join-token --kubelet-extra-args="{{ .kubeletExtraArgs }} $NODE_IP_ARG"
   - k0s start
 {{- template "bootstrap-sentinel" . }}

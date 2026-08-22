@@ -63,8 +63,8 @@ runcmd:
     fi
     IMDS_TOKEN=$(curl -sf -m 2 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
     if [ -n "$IMDS_TOKEN" ]; then
-      NODE_IPV4=$(curl -sf -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4 || true)
-      NODE_IPV6=$(curl -sf -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/ipv6 || true)
+      NODE_IPV4=$(curl -sf -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4 || true)
+      NODE_IPV6=$(curl -sf -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/ipv6 || true)
       if [ -n "$NODE_IPV4" ] && [ -n "$NODE_IPV6" ]; then
         echo "node-ip: $NODE_IPV4,$NODE_IPV6" >> /etc/rancher/rke2/config.yaml
       elif [ -n "$NODE_IPV4" ]; then

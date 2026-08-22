@@ -343,7 +343,7 @@ func (t Topology) ContainerlabYAML(rig Rig) (string, error) {
 			fmt.Fprintf(&b, "        QEMU_SMP: \"%d\"\n", VMCPUs)
 			// This lab provides the management interface as one of its
 			// own links, so the launcher must not wait for one more.
-			fmt.Fprintf(&b, "        CLAB_MGMT_INTF: \"eth0\"\n")
+			fmt.Fprintf(&b, "        CLAB_MGMT_INTF: %q\n", ManagementInterfaceName)
 			fmt.Fprintf(&b, "        VR_MGMT_IS_A_LINK: \"1\"\n")
 		}
 	}
@@ -353,7 +353,7 @@ func (t Topology) ContainerlabYAML(rig Rig) (string, error) {
 		for _, n := range t.Nodes {
 			if n.IsClusterNode() {
 				fmt.Fprintf(&b, "    - endpoints: [%q, %q]\n",
-					n.Name+":eth0", ManagementBridge(n.Name)+":m-"+n.Name)
+					n.Name+":"+ManagementInterfaceName, ManagementBridge(n.Name)+":m-"+n.Name)
 			}
 		}
 	}
@@ -379,6 +379,13 @@ const VMMemoryMB = 4096
 
 // VMCPUs per cluster node.
 const VMCPUs = 2
+
+// ManagementInterfaceName is the wrapper interface a machine is
+// reached over. It is one of the lab's links like any other, on a
+// bridge shared with nothing, because containerlab's own management
+// network is a single L2 for every node and this topology cannot have
+// one.
+const ManagementInterfaceName = "eth0"
 
 // Gateway is the edge a segment leaves by.
 //

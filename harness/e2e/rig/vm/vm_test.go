@@ -147,33 +147,67 @@ func TestUserdataLaunchesTheMachineRatherThanRestartingIt(t *testing.T) {
 		t.Errorf("the seed carries %q, not the document the product rendered", seeded)
 	}
 
-	var removed, deployed, restarted int
+	var discarded, started, plumbed int
 	for _, call := range rec.calls {
 		cmd := strings.Join(call, " ")
 		switch {
-		case strings.Contains(cmd, "docker rm"):
-			removed++
-		case strings.Contains(cmd, "containerlab deploy"):
-			deployed++
-		case strings.Contains(cmd, "docker restart"), strings.Contains(cmd, "docker start"):
-			restarted++
+		case strings.Contains(cmd, "-overlay.qcow2"):
+			discarded++
+		case strings.Contains(cmd, "docker start"):
+			started++
+		case strings.Contains(cmd, "veth create"):
+			plumbed++
 		}
 	}
-	if removed == 0 || deployed == 0 {
-		t.Errorf("the instance was not replaced: removed %d, deployed %d", removed, deployed)
+	if discarded == 0 {
+		t.Error("the instance kept its disk, so it came back past its first boot having read nothing")
 	}
-	if restarted > 0 {
-		t.Error("the instance was restarted, so the guest came back past its first boot and read nothing")
+	if started == 0 {
+		t.Error("the instance was never started")
 	}
-	// The seed has to be written before the instance is launched: the
-	// wrapper builds the cloud-init ISO as it starts, from whatever is
-	// there then.
+	// Its links too: a restarted wrapper gets a new network namespace
+	// and loses every one of them, and the launcher will not start
+	// qemu until the management link is back.
+	if plumbed <= len(lab.Default().MustNode("remote1").Interfaces) {
+		t.Errorf("%d links restored, want the lab's links and the management one", plumbed)
+	}
+
+	// The disk has to go before the instance is stopped, because
+	// afterwards there is nothing running to remove it in.
+	var discardedAt, killedAt = -1, -1
 	for i, call := range rec.calls {
-		if strings.Contains(strings.Join(call, " "), "containerlab deploy") {
-			if i == 0 {
-				t.Error("the instance was launched before its seed was written")
-			}
-			break
+		cmd := strings.Join(call, " ")
+		if discardedAt < 0 && strings.Contains(cmd, "-overlay.qcow2") {
+			discardedAt = i
 		}
+		if killedAt < 0 && strings.Contains(cmd, "docker kill") {
+			killedAt = i
+		}
+	}
+	if discardedAt < 0 || killedAt < 0 || discardedAt > killedAt {
+		t.Errorf("the disk was discarded at %d and the instance stopped at %d", discardedAt, killedAt)
+	}
+}
+
+// The management link is restored along with the lab's own. The
+// launcher waits for it before it starts qemu, so a machine booted
+// without it does not come back slowly — it hangs.
+func TestTheManagementLinkIsRestoredToo(t *testing.T) {
+	rec := &recorder{}
+	r := &Rig{Topology: lab.Default(), WorkDir: t.TempDir(), Run: rec.run}
+	n := r.Node("remote1").(*Node)
+
+	if err := n.Boot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, call := range rec.calls {
+		cmd := strings.Join(call, " ")
+		if strings.Contains(cmd, "veth create") && strings.Contains(cmd, lab.ManagementBridge("remote1")) {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("the machine was booted with no management link, which the launcher waits for forever")
 	}
 }

@@ -177,8 +177,19 @@ func (n *Node) Kill(ctx context.Context) error {
 	return nil
 }
 
-// Boot starts the machine again, which boots it: a real bootloader,
-// a real init, and the whole start-up ordering a container never has.
+// Boot brings the machine back: its links, then its guest.
+//
+// A restarted container gets a new network namespace, so every link
+// containerlab made into the old one is gone — and on this rig that
+// is all of them, the management link included, because the wrapper
+// runs with no network of its own. The launcher waits for the
+// management interface to appear before it starts qemu at all, so a
+// machine booted without its links does not come back slowly, it
+// hangs.
+//
+// Restoring them is the platform handing a machine its NICs back, and
+// it belongs here rather than in a generic replumb because only this
+// rig knows a machine has a management link to restore.
 func (n *Node) Boot(ctx context.Context) error {
 	_, errb, code, err := n.run(ctx, nil, "docker", "start", n.Wrapper())
 	if err != nil {
@@ -187,7 +198,51 @@ func (n *Node) Boot(ctx context.Context) error {
 	if code != 0 {
 		return &rig.ExitError{Node: n.Name(), Argv: []string{"docker", "start"}, Code: code, Stderr: errb}
 	}
+	return n.plumb(ctx)
+}
+
+// plumb gives the wrapper every link the topology says it has.
+func (n *Node) plumb(ctx context.Context) error {
+	for _, l := range n.links() {
+		// A stale host-side veth outlives the namespace it belonged
+		// to, and a new one cannot take a name that already exists.
+		_, _, _, _ = n.run(ctx, nil, "sudo", "ip", "link", "del", l.endpoint)
+		if _, errb, code, err := n.run(ctx, nil, "sudo", "containerlab", "tools", "veth", "create",
+			"-a", n.Wrapper()+":"+l.wrapperInterface,
+			"-b", "bridge:"+l.bridge+":"+l.endpoint); err != nil {
+			return fmt.Errorf("re-plumbing %s %s: %w", n.Name(), l.wrapperInterface, err)
+		} else if code != 0 {
+			return fmt.Errorf("re-plumbing %s %s: %s", n.Name(), l.wrapperInterface, errb)
+		}
+	}
 	return nil
+}
+
+// link is one of the wrapper's connections, as the topology declares
+// it.
+type link struct {
+	wrapperInterface string
+	bridge           string
+	endpoint         string
+}
+
+// links are the management link first, then the lab's own, in the
+// order the topology writes them — which is the order qemu attaches
+// them and so the order the guest names them.
+func (n *Node) links() []link {
+	out := []link{{
+		wrapperInterface: lab.ManagementInterfaceName,
+		bridge:           lab.ManagementBridge(n.node.Name),
+		endpoint:         "m-" + n.node.Name,
+	}}
+	for _, i := range n.node.Interfaces {
+		out = append(out, link{
+			wrapperInterface: i.Name,
+			bridge:           i.Segment,
+			endpoint:         lab.EndpointName(i.Segment, n.node),
+		})
+	}
+	return out
 }
 
 // Userdata launches the machine with this userdata.
@@ -215,16 +270,31 @@ func (n *Node) Userdata(ctx context.Context, cloudConfig []byte) error {
 	if err := n.rig.Seed(n.node.Name, cloudConfig); err != nil {
 		return fmt.Errorf("seeding %s: %w", n.Name(), err)
 	}
-	if _, errb, code, err := n.run(ctx, nil, "docker", "rm", "-f", n.Wrapper()); err != nil {
-		return fmt.Errorf("taking %s away: %w", n.Name(), err)
+	// The instance's disk goes, and with it everything the last one
+	// ever did.
+	//
+	// vrnetlab creates the overlay only when none exists and disables
+	// cloud-init after a first boot, so a guest whose disk survives
+	// comes back as the same instance having read nothing — the run
+	// would report a bootstrap that succeeded and a node that never
+	// joined. Unlinking it while qemu still holds it open is safe:
+	// the process keeps writing to an inode with no name until it
+	// exits, and what starts next finds nothing there.
+	//
+	// The wrapper itself stays. It is the chassis, not the instance,
+	// and containerlab will not put a node back into a lab it has
+	// already deployed — with or without a node filter, it refuses.
+	if _, errb, code, err := n.run(ctx, nil, "docker", "exec", n.Wrapper(),
+		"sh", "-c", "rm -f /*-overlay.qcow2"); err != nil {
+		return fmt.Errorf("replacing %s's disk: %w", n.Name(), err)
 	} else if code != 0 {
-		return fmt.Errorf("taking %s away: %s", n.Name(), errb)
+		return fmt.Errorf("replacing %s's disk: %s", n.Name(), errb)
 	}
-	if _, errb, code, err := n.run(ctx, nil,
-		"sudo", "containerlab", "deploy", "-t", n.rig.TopologyPath()); err != nil {
+	if err := n.Kill(ctx); err != nil {
+		return fmt.Errorf("stopping %s: %w", n.Name(), err)
+	}
+	if err := n.Boot(ctx); err != nil {
 		return fmt.Errorf("launching %s: %w", n.Name(), err)
-	} else if code != 0 {
-		return fmt.Errorf("launching %s: containerlab exited %d: %s", n.Name(), code, errb)
 	}
 	if err := n.rig.placeKey(ctx, n.node.Name); err != nil {
 		return err

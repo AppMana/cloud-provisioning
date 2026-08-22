@@ -68,3 +68,60 @@ func TestRunning_UsesContainerNameAnnotationWhenPresent(t *testing.T) {
 		t.Error("Running = false despite the annotated container genuinely running: container-name annotation isn't being honored")
 	}
 }
+
+// The provider reports where a machine can be reached, so it can also
+// tell the machine's own kubelet which address that is.
+//
+// A node that picks its own address gets it wrong wherever there is
+// more than one to pick from. Measured on a machine with a management
+// interface beside its real one: the kubelet registered 10.0.0.15,
+// the out-of-band address every machine in the lab shares, instead of
+// the 203.0.113.10 the mesh had already published for it. It joined,
+// went Ready, and then no node carried the identity the provider was
+// looking for, so nothing was ever adopted.
+//
+// The address is not a guess here. It is the same one this provider
+// reports to Cluster API and the same one the peer list is built
+// from, so a kubelet pinned to it agrees with everything else that
+// already believes it.
+func TestInfraValuesTellTheNodeItsOwnAddress(t *testing.T) {
+	machine := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
+		"kind":       "ContainernetMachine",
+		"metadata":   map[string]any{"name": "remote1", "namespace": "default"},
+		"status": map[string]any{
+			"addresses": []any{
+				map[string]any{"type": "ExternalIP", "address": "203.0.113.10"},
+				map[string]any{"type": "InternalIP", "address": "203.0.113.10"},
+			},
+		},
+	}}
+
+	values, err := Provider{}.InfraValues(context.Background(), machine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if values["nodeAddress"] != "203.0.113.10" {
+		t.Errorf("the provider reports 203.0.113.10 and tells the node %q, "+
+			"so the kubelet is left to pick from every interface it has", values["nodeAddress"])
+	}
+}
+
+// With no address reported there is nothing to say, and saying
+// nothing has to leave the node exactly as it was: free to work it
+// out however its distribution does.
+func TestInfraValuesSayNothingWhenNoAddressIsReported(t *testing.T) {
+	machine := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
+		"kind":       "ContainernetMachine",
+		"metadata":   map[string]any{"name": "remote1", "namespace": "default"},
+	}}
+
+	values, err := Provider{}.InfraValues(context.Background(), machine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := values["nodeAddress"]; ok && got != "" {
+		t.Errorf("an address was invented from nothing: %q", got)
+	}
+}

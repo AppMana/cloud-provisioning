@@ -334,6 +334,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		"cniPluginsURLAmd64":      r.CNIPluginsURLAMD64,
 		"cniPluginsSHA256Amd64":   r.CNIPluginsSHA256AMD64,
 		"machineName":             machine.GetName(),
+		// Where the machine is, when the infrastructure provider knows.
+		// Empty by default, and a provider that reports an address
+		// overrides it below: an instance created before anyone knows
+		// its address has to ask the platform it is running on
+		// instead, and the pattern falls back to doing that.
+		"nodeAddress": "",
 	}
 	for k, v := range joinValues {
 		values[k] = v

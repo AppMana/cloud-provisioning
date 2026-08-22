@@ -231,6 +231,7 @@ func TestK3sJoinsTheEndpointAndCarriesNoSecondBalancer(t *testing.T) {
 	rendered := renderPattern(t, "k3s-worker.cloud-config.tmpl", map[string]any{
 		"peersFileJSON":           "{}",
 		"sshAuthorizedKeys":       []string{},
+		"nodeAddress":             "",
 		"machineName":             "remote1",
 		"interfaceName":           "cldt0",
 		"wireguardListenPort":     "51820",
@@ -273,6 +274,7 @@ func TestRKE2JoinsTheSupervisorAndCarriesNoSecondBalancer(t *testing.T) {
 	rendered := renderPattern(t, "rke2-worker.cloud-config.tmpl", map[string]any{
 		"peersFileJSON":           "{}",
 		"sshAuthorizedKeys":       []string{},
+		"nodeAddress":             "",
 		"machineName":             "remote1",
 		"interfaceName":           "cldt0",
 		"wireguardListenPort":     "51820",
@@ -340,6 +342,7 @@ func renderPatternWith(t *testing.T, name string, override map[string]any) strin
 		"cniPluginsSHA256Arm64":   "c",
 		"cniPluginsURLAmd64":      "https://example.invalid/d",
 		"cniPluginsSHA256Amd64":   "d",
+		"nodeAddress":             "",
 	}
 	for k, v := range override {
 		values[k] = v
@@ -361,6 +364,7 @@ func renderKubeadmPattern(t *testing.T, proxyPort int) string {
 	return renderPattern(t, "kubeadm-worker.cloud-config.tmpl", map[string]any{
 		"peersFileJSON":           "{}",
 		"sshAuthorizedKeys":       []string{},
+		"nodeAddress":             "",
 		"machineName":             "remote1",
 		"interfaceName":           "cldt0",
 		"wireguardListenPort":     "51820",
@@ -438,4 +442,42 @@ func TestEveryPatternSurvivesTheAbsenceOfAMetadataService(t *testing.T) {
 func hasConnectBound(line string) bool {
 	return strings.Contains(line, "-m ") || strings.Contains(line, "--max-time") ||
 		strings.Contains(line, "--connect-timeout")
+}
+
+// When the infrastructure provider knows where the machine is, the
+// node is told, and nothing asks a metadata service at all.
+//
+// A kubelet left to choose gets it wrong wherever there is more than
+// one address to choose from. Measured: a machine with an
+// out-of-band interface beside its real one registered the
+// out-of-band address, the one every machine in that lab shares,
+// while the mesh had already published the other. It joined, went
+// Ready, and carried an identity nothing was looking for.
+func TestAKnownAddressReachesTheNodeAndReplacesTheMetadataLookup(t *testing.T) {
+	for _, name := range []string{
+		"k0s-worker.cloud-config.tmpl",
+		"k3s-worker.cloud-config.tmpl",
+		"rke2-worker.cloud-config.tmpl",
+	} {
+		t.Run(name, func(t *testing.T) {
+			rendered := renderPatternWith(t, name, map[string]any{"nodeAddress": "203.0.113.10"})
+			if !strings.Contains(rendered, "203.0.113.10") {
+				t.Error("the provider knows this machine's address and the node is never told it")
+			}
+			if strings.Contains(rendered, "169.254.169.254") {
+				t.Error("a metadata service is still asked for an address already known, " +
+					"which off that cloud is two seconds of waiting for an answer nobody needs")
+			}
+		})
+	}
+}
+
+// With no address known, the metadata lookup is still there: a
+// provider that creates an instance before it knows its address —
+// which is most of them — has nowhere else to get it.
+func TestAnUnknownAddressStillAsksTheInstance(t *testing.T) {
+	rendered := renderPatternWith(t, "k0s-worker.cloud-config.tmpl", nil)
+	if !strings.Contains(rendered, "169.254.169.254") {
+		t.Error("a machine whose address nobody reported has no way left to learn it")
+	}
 }

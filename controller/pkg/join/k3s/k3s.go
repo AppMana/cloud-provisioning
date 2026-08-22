@@ -176,7 +176,7 @@ func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
 		"joinToken": "K10" + caHash + "::" + tokenID + "." + tokenSecret,
 		// The supervisor the agent registers through: the API address
 		// itself for k3s, the same host on its own port for RKE2.
-		"joinServerURL":    "https://" + net.JoinHostPort(host, flavor.SupervisorPort),
+		"joinServerURL":   "https://" + net.JoinHostPort(host, flavor.SupervisorPort),
 		flavor.VersionKey: version,
 		// apiEndpoint is the common contract every join pattern gates
 		// on before joining: the host:port a new node must actually

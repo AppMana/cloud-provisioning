@@ -73,12 +73,56 @@ func (Provider) Running(ctx context.Context, machine *unstructured.Unstructured)
 	return running, nil
 }
 
-// InfraValues implements join.InfraProvider. It contributes nothing
-// extra today, mirroring aws.Provider's contract, and is kept as a
-// real method so the interface still shows what a provider can
-// contribute.
+// InfraValues implements join.InfraProvider: it tells the machine
+// which of its addresses is the one this provider reports.
+//
+// A node left to choose gets it wrong wherever there is more than one
+// address to choose from. On a machine with an out-of-band interface
+// beside its real one the kubelet registered the out-of-band address
+// — the same on every machine, and part of no network the cluster
+// models — while the mesh had already published the other one. The
+// node joined, went Ready, and carried an identity nothing was
+// looking for, so it was never adopted.
+//
+// This is not a guess: it is the address this provider reports to
+// Cluster API and the address the peer list is built from, so a
+// kubelet pinned to it agrees with everything that already believes
+// it. Where none has been reported yet, nothing is said, and the
+// distribution works it out however it normally would.
 func (Provider) InfraValues(ctx context.Context, machine *unstructured.Unstructured) (map[string]any, error) {
-	return map[string]any{}, nil
+	values := map[string]any{}
+	if addr := reportedAddress(machine); addr != "" {
+		values["nodeAddress"] = addr
+	}
+	return values, nil
+}
+
+// reportedAddress is the address this provider published for the
+// machine. InternalIP first: that is the address a node is reached by
+// from inside the cluster, which is what a kubelet is registering.
+func reportedAddress(machine *unstructured.Unstructured) string {
+	addresses, found, err := unstructured.NestedSlice(machine.Object, "status", "addresses")
+	if err != nil || !found {
+		return ""
+	}
+	var fallback string
+	for _, entry := range addresses {
+		item, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		address, _ := item["address"].(string)
+		if address == "" {
+			continue
+		}
+		if item["type"] == "InternalIP" {
+			return address
+		}
+		if fallback == "" {
+			fallback = address
+		}
+	}
+	return fallback
 }
 
 // Nothing here creates or destroys a container.

@@ -61,16 +61,10 @@ runcmd:
         echo "  - \"${a#--}\"" >> /etc/rancher/rke2/config.yaml
       done
     fi
-    IMDS_TOKEN=$(curl -sf -m 2 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
-    if [ -n "$IMDS_TOKEN" ]; then
-      NODE_IPV4=$(curl -sf -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4 || true)
-      NODE_IPV6=$(curl -sf -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/ipv6 || true)
-      if [ -n "$NODE_IPV4" ] && [ -n "$NODE_IPV6" ]; then
-        echo "node-ip: $NODE_IPV4,$NODE_IPV6" >> /etc/rancher/rke2/config.yaml
-      elif [ -n "$NODE_IPV4" ]; then
-        echo "node-ip: $NODE_IPV4" >> /etc/rancher/rke2/config.yaml
-      fi
-    fi
+{{- template "node-ip-arg" . }}
+    # rke2 takes it in its config file rather than as a flag, so the
+    # shared block's answer is unwrapped here.
+    [ -n "$NODE_IP_ARG" ] && echo "node-ip: ${NODE_IP_ARG#--node-ip=}" >> /etc/rancher/rke2/config.yaml
     echo "node-name: $(hostname)" >> /etc/rancher/rke2/config.yaml
     curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION='{{ .rke2Version }}' INSTALL_RKE2_TYPE=agent sh -
     systemctl enable --now rke2-agent.service

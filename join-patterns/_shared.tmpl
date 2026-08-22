@@ -157,3 +157,41 @@ provider's place, so they honor the same contract. */}}
   - mkdir -p /run/cluster-api
   - touch /run/cluster-api/bootstrap-success.complete
 {{- end }}
+
+{{/* How a node learns which of its addresses is its own.
+
+A kubelet left to choose gets it wrong wherever there is more than one
+address to choose from: on a machine with an out-of-band interface
+beside its real one it registered the out-of-band address, which every
+machine in that fleet shares and which is part of no network the
+cluster models. It joined, went Ready, and carried an identity nothing
+was looking for.
+
+So the infrastructure provider says. It already reports this machine's
+address to Cluster API and the peer list is already built from it, so
+a kubelet pinned to the same address agrees with everything that
+already believes it, and no instance-metadata service is involved at
+all.
+
+Where the provider reports nothing -- which is every provider that
+creates an instance before it knows its address -- the instance is
+asked instead. That request is bounded and allowed to fail: the
+service answers on a link-local address nothing routes, so off that
+cloud it does not fail, it hangs, and unbounded it takes the rest of
+the block with it. Failing all of that, NODE_IP_ARG stays empty and
+the distribution resolves its own hostname, which is what it does
+everywhere this operator is not. */}}
+{{- define "node-ip-arg" }}
+    NODE_IP_ARG=""
+{{- if .nodeAddress }}
+    NODE_IP_ARG="--node-ip={{ .nodeAddress }}"
+{{- else }}
+    IMDS_TOKEN=$(curl -sf -m 2 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
+    if [ -n "$IMDS_TOKEN" ]; then
+      NODE_IPV4=$(curl -sf -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4 || true)
+      NODE_IPV6=$(curl -sf -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/ipv6 || true)
+      [ -n "$NODE_IPV4" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4"
+      [ -n "$NODE_IPV6" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4,$NODE_IPV6"
+    fi
+{{- end }}
+{{- end }}

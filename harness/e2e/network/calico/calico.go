@@ -47,7 +47,7 @@ func (i Installer) Install(ctx context.Context, d network.Deps) error {
 		return err
 	}
 
-	if err := d.Kube.Apply(ctx, manifest); err != nil {
+	if err := d.Kube.Apply(ctx, pinPool(manifest, d.PodCIDR)); err != nil {
 		return fmt.Errorf("installing Calico: %w", err)
 	}
 
@@ -70,7 +70,9 @@ func (i Installer) Install(ctx context.Context, d network.Deps) error {
 	if err := i.makeNative(ctx, d); err != nil {
 		return err
 	}
-	return nil
+	// The pod network has to be the one this row says it installed,
+	// or two distributions are not comparable.
+	return i.assertPool(ctx, d)
 }
 
 // LoadImages carries Calico's own images onto the given nodes.
@@ -87,6 +89,45 @@ func (i Installer) LoadImages(ctx context.Context, d network.Deps, nodes []strin
 		if err := d.Images.Load(ctx, image, nodes, nil); err != nil {
 			return fmt.Errorf("carrying %s in: %w", image, err)
 		}
+	}
+	return nil
+}
+
+// pinPool makes Calico allocate from the cluster's own pod CIDR.
+//
+// The stock manifest leaves CALICO_IPV4POOL_CIDR commented out, and
+// calico-node then creates its default pool from its own built-in
+// 192.168.0.0/16 — whatever the cluster was configured with. On
+// kubeadm the two happened to agree; on k0s they did not, and the row
+// passed anyway with the mesh carrying 192.168.159.0/26 for a cluster
+// told 10.244.0.0/16.
+//
+// It passes because the product reads the network's own records
+// rather than the cluster's configuration, which is the right way
+// round. But a lab whose pod network is not the one the row says it
+// installed makes two distributions incomparable, and hides any
+// disagreement between the two from ever being noticed.
+//
+// The pool's CIDR is immutable once created, so this has to be set
+// before calico-node first runs: uncommenting the variable the
+// manifest already carries is exactly what an operator does.
+func pinPool(manifest []byte, podCIDR string) []byte {
+	const commented = `            # - name: CALICO_IPV4POOL_CIDR
+            #   value: "192.168.0.0/16"`
+	pinned := fmt.Sprintf(`            - name: CALICO_IPV4POOL_CIDR
+              value: %q`, podCIDR)
+	return []byte(strings.Replace(string(manifest), commented, pinned, 1))
+}
+
+// assertPool refuses a pool that is not the cluster's own.
+func (i Installer) assertPool(ctx context.Context, d network.Deps) error {
+	got, err := d.Kube.Get(ctx, "", "ippools.crd.projectcalico.org", "default-ipv4-ippool", "{.spec.cidr}")
+	if err != nil {
+		return fmt.Errorf("reading Calico's pool: %w", err)
+	}
+	if got != d.PodCIDR {
+		return fmt.Errorf("Calico allocates from %s, but this cluster was configured with %s: "+
+			"the pod network is not the one this row installed", got, d.PodCIDR)
 	}
 	return nil
 }

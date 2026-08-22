@@ -38,6 +38,7 @@ func main() {
 		remotes = flag.String("remotes", "", "comma-separated remotes to claim and bootstrap (e.g. remote1)")
 		checks  = flag.Bool("check", false, "also run the reachability matrix")
 		outages = flag.String("outage", "", "also run an outage row: <victim>:<cut|reboot>")
+		places  = flag.String("placements", "", "also walk these placements, comma separated (e.g. control-plane,two-workers,all-nodes)")
 		repoDir = flag.String("repo-dir", "../..", "the repository root")
 		workDir = flag.String("work-dir", "_work", "where the generated topology is written")
 		down    = flag.Bool("down", false, "destroy the lab instead of building it")
@@ -239,6 +240,36 @@ func main() {
 						fail("%v", err)
 					}
 					fmt.Printf("  the mesh published %s's pod blocks: %s\n", name, blocks)
+				}
+
+				// The placement axis: which site nodes hold tunnels.
+				//
+				// The claim is that changing it is invisible from the
+				// pod network — a node with no tunnel reaches a remote
+				// by transiting one that has one — so every ordered
+				// pair must pass under every placement. The move goes
+				// through helm, the way an operator makes it.
+				for _, name := range strings.Split(*places, ",") {
+					if name = strings.TrimSpace(name); name == "" {
+						continue
+					}
+					placement, err := install.PlacementNamed(name)
+					if err != nil {
+						fail("%v", err)
+					}
+					step("placement: " + placement.Name + " (" + placement.Endpoints + ")")
+					if err := prod.Move(ctx, placement, install.Options{
+						JoinProvider: *distro,
+					}, sha); err != nil {
+						fail("%v", err)
+					}
+					pm := check.Converge(ctx, pods, targets,
+						check.Options{Port: check.Port, ExternalURL: "http://1.1.1.1"},
+						10*time.Minute, 15*time.Second)
+					fmt.Println(pm.Report())
+					if !pm.OK() {
+						fail("the %s placement is not green", placement.Name)
+					}
 				}
 
 				if *outages != "" {

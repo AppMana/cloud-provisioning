@@ -239,8 +239,12 @@ func (b Builder) waitForAPI(ctx context.Context, d cluster.Deps, n lab.Node, wit
 func (b Builder) KubeletInvariant(ctx context.Context, d cluster.Deps) error {
 	var checked int
 	for _, n := range cluster.SiteNodes(d.Topology) {
-		out, err := d.Rig.Node(n.Name).Exec(ctx, "sh", "-c",
-			"grep -o 'server: .*' /run/k0s/nllb/kubeconfig.yaml")
+		// With a deadline: nllb writes this file when the node's envoy
+		// comes up, which is after k0s starts and after this builder
+		// returns. Reading it the instant the site is built finds
+		// nothing and says the node has no balancer, when what it has
+		// is a balancer that is still starting.
+		out, err := b.readWithDeadline(ctx, d, n, 3*time.Minute)
 		if err != nil {
 			// A controller that is also a worker may keep its own
 			// arrangement; nllb's own documentation says as much. What
@@ -263,6 +267,27 @@ func (b Builder) KubeletInvariant(ctx context.Context, d cluster.Deps) error {
 		return fmt.Errorf("no node was checked, so this invariant proved nothing")
 	}
 	return nil
+}
+
+// readWithDeadline reads the server line from a node's nllb
+// kubeconfig, waiting for the file to exist.
+func (b Builder) readWithDeadline(ctx context.Context, d cluster.Deps, n lab.Node, within time.Duration) ([]byte, error) {
+	deadline := time.Now().Add(within)
+	for {
+		out, err := d.Rig.Node(n.Name).Exec(ctx, "sh", "-c",
+			"grep -o 'server: .*' /run/k0s/nllb/kubeconfig.yaml")
+		if err == nil {
+			return out, nil
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("nllb wrote no kubeconfig within %s: %w", within, err)
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(5 * time.Second):
+		}
+	}
 }
 
 // binary fetches the pinned release once and caches it, because this

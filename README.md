@@ -450,6 +450,29 @@ cloud-init would read the document the product rendered, with nothing
 in the harness interpreting it, and the isolation assertions hold
 underneath the whole run.
 
+The same row on the container rig agrees with it — same checks, same
+published pod blocks — which is what licenses using containers as the
+fast tier at all:
+
+| rig | checks | converged | wall clock |
+|---|---|---|---|
+| container | 140/140 | 46s | ~11 min |
+| machine | 140/140 | 2m47s | ~19 min |
+
+And a power event, which is the row a container cannot honestly run:
+
+```
+### PASS remote1-reboot (victim=remote1, mode=reboot)
+    checks: 140  passed: 140  failed: 0  converged after 56s
+    checks: 102  passed: 102  failed: 0  converged after 1m42s
+    checks: 140  passed: 140  failed: 0  converged after 1m26s
+```
+
+The machine lost power and came back through firmware, a bootloader, a
+kernel and an init, rebuilding its own tunnel from its cached peer
+list while the cluster was on the far side of the tunnel it was
+raising. The rest of the lab kept carrying traffic while it was gone.
+
 
 ### The matrix harness (`harness/clab`)
 

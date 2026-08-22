@@ -33,6 +33,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Kind is what one check measured.
@@ -96,6 +97,14 @@ func (r Result) String() string {
 type Matrix struct {
 	mu      sync.Mutex
 	results []Result
+	// Elapsed is how long it took to become green, or how long was
+	// spent failing to. Reported either way: a run that says only
+	// "failed" leaves a reader unable to tell a broken path from one
+	// that needed longer than it was given, and those call for
+	// opposite responses.
+	Elapsed time.Duration
+	// Window is how long it was allowed.
+	Window time.Duration
 }
 
 // Add records one result. Safe to call from many goroutines, which is
@@ -162,7 +171,16 @@ func (m *Matrix) OK() bool { return m.Total() > 0 && m.Failed() == 0 }
 
 // Summary is the one line a row's log carries.
 func (m *Matrix) Summary() string {
-	return fmt.Sprintf("checks: %d  passed: %d  failed: %d", m.Total(), m.Passed(), m.Failed())
+	line := fmt.Sprintf("checks: %d  passed: %d  failed: %d", m.Total(), m.Passed(), m.Failed())
+	switch {
+	case m.Elapsed == 0:
+		return line
+	case m.OK():
+		return fmt.Sprintf("%s  converged after %s", line, m.Elapsed.Round(time.Second))
+	default:
+		return fmt.Sprintf("%s  gave up after %s of %s", line,
+			m.Elapsed.Round(time.Second), m.Window.Round(time.Second))
+	}
 }
 
 // Report renders the failures and the summary.

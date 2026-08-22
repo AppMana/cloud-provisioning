@@ -149,9 +149,12 @@ func truncate(s string) string {
 // claim is not that these paths work eventually: it is that they work
 // within the time an operator would wait.
 func Converge(ctx context.Context, p Prober, targets []Target, opts Options, within, every time.Duration) *Matrix {
-	deadline := time.Now().Add(within)
+	started := time.Now()
+	deadline := started.Add(within)
 	for {
 		m := Run(ctx, p, targets, opts)
+		m.Elapsed = time.Since(started)
+		m.Window = within
 		if m.OK() || time.Now().After(deadline) || ctx.Err() != nil {
 			return m
 		}

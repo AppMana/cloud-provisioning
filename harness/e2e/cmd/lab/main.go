@@ -128,6 +128,7 @@ func main() {
 			fmt.Println("  every node Ready")
 		}
 
+		var claimed []string
 		if *product {
 			step("installing the product")
 			prod := &install.Product{
@@ -192,21 +193,7 @@ func main() {
 					fail("%v", err)
 				}
 
-				// The product's own evidence that it resolved this
-				// machine to a node: the remote's pod blocks published
-				// onto its peer entry.
-				//
-				// Not Machine.status.nodeRef. Cluster API only writes
-				// that when it holds a connection to the workload
-				// cluster, and the setup this product documents has
-				// nothing to create the Secret that connection comes
-				// from — so waiting on it would be waiting on plumbing
-				// an operator does not have.
-				blocks, err := claim.WaitForPodBlocks(ctx, d.Kube, name, 5*time.Minute)
-				if err != nil {
-					fail("%v", err)
-				}
-				fmt.Printf("  the mesh published %s's pod blocks: %s\n", name, blocks)
+				claimed = append(claimed, name)
 				fmt.Println("  the node ran the userdata the product rendered")
 				if cn, ok := r.Node(name).(*container.Node); ok {
 					for _, why := range cn.Accommodations() {
@@ -235,6 +222,25 @@ func main() {
 				}
 				defer pods.Stop(context.Background())
 
+				// Now, and not before: a node has no pod block until
+				// something that needs one runs on it, and the probes
+				// are the first such thing. Asserting earlier would
+				// wait for a block nothing had asked to be allocated.
+				//
+				// This is the product's own evidence that it resolved
+				// the machine to a node — not Machine.status.nodeRef,
+				// which Cluster API only writes when it holds a
+				// connection to the workload cluster, and the setup
+				// this product documents creates nothing that would
+				// give it one.
+				for _, name := range claimed {
+					blocks, err := claim.WaitForPodBlocks(ctx, d.Kube, name, 5*time.Minute)
+					if err != nil {
+						fail("%v", err)
+					}
+					fmt.Printf("  the mesh published %s's pod blocks: %s\n", name, blocks)
+				}
+
 				if *outages != "" {
 					victim, mode, _ := strings.Cut(*outages, ":")
 					step("outage: " + victim + " " + mode)
@@ -243,7 +249,7 @@ func main() {
 					}, outage.Deps{
 						Rig: r, Prober: pods, Targets: targets,
 						Options:  check.Options{Port: check.Port, ExternalURL: "http://1.1.1.1"},
-						Converge: 7 * time.Minute, Down: 90 * time.Second,
+						Converge: 15 * time.Minute, Down: 90 * time.Second,
 						// What a platform gives a machine back: its NIC,
 						// its address, its gateway. Everything else the
 						// node must rebuild from what it runs at boot.

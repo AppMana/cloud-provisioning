@@ -33,6 +33,83 @@ type Host interface {
 	InNamespace(ctx context.Context, node string, argv ...string) ([]byte, error)
 }
 
+// Prober answers questions about a node from inside that node.
+//
+// Which is not the same place for every rig, and getting it wrong is
+// silent. A container's interfaces are in its own namespace, so this
+// host can enter it and use its own tools — the node image ships no
+// ping, and a probe that fails because the tool is absent reads
+// exactly like the network being broken. A machine's interfaces are
+// inside the guest; its wrapper's namespace holds the taps qemu was
+// handed and none of the addresses, so entering that would answer
+// confidently about the wrong thing.
+type Prober interface {
+	// Reaches reports whether a node can reach an address.
+	Reaches(ctx context.Context, node, addr string, waitSeconds int) bool
+	// Dials reports whether a node can open a connection to a port.
+	Dials(ctx context.Context, node, addr string, port int) bool
+	// Addresses is every global IPv4 address a node holds.
+	Addresses(ctx context.Context, node string) ([]string, error)
+}
+
+// HostProber answers from a container's own namespace, using this
+// host's tools.
+type HostProber struct{ Host Host }
+
+func (p HostProber) Reaches(ctx context.Context, node, addr string, waitSeconds int) bool {
+	_, err := p.Host.InNamespace(ctx, node, "ping", "-c1", fmt.Sprintf("-W%d", waitSeconds), addr)
+	return err == nil
+}
+
+func (p HostProber) Dials(ctx context.Context, node, addr string, port int) bool {
+	_, err := p.Host.InNamespace(ctx, node, "timeout", "3", "bash", "-c",
+		fmt.Sprintf("</dev/tcp/%s/%d", addr, port))
+	return err == nil
+}
+
+func (p HostProber) Addresses(ctx context.Context, node string) ([]string, error) {
+	out, err := p.Host.InNamespace(ctx, node, "ip", "-4", "-o", "addr", "show", "scope", "global")
+	if err != nil {
+		return nil, err
+	}
+	return parseAddresses(out), nil
+}
+
+// GuestProber answers from inside a machine, which is where a
+// machine's interfaces are.
+type GuestProber struct{ Rig rig.Rig }
+
+func (p GuestProber) Reaches(ctx context.Context, node, addr string, waitSeconds int) bool {
+	_, err := p.Rig.Node(node).Exec(ctx, "ping", "-c1", fmt.Sprintf("-W%d", waitSeconds), addr)
+	return err == nil
+}
+
+func (p GuestProber) Dials(ctx context.Context, node, addr string, port int) bool {
+	_, err := p.Rig.Node(node).Exec(ctx, "timeout", "3", "bash", "-c",
+		fmt.Sprintf("</dev/tcp/%s/%d", addr, port))
+	return err == nil
+}
+
+func (p GuestProber) Addresses(ctx context.Context, node string) ([]string, error) {
+	out, err := p.Rig.Node(node).Exec(ctx, "ip", "-4", "-o", "addr", "show", "scope", "global")
+	if err != nil {
+		return nil, err
+	}
+	// A machine is reached on its management link, which is a channel
+	// this harness owns and not part of the lab it models. Excluding
+	// it keeps the proof about the segments the topology describes.
+	var kept []string
+	for _, a := range parseAddresses(out) {
+		if !strings.HasPrefix(a, ManagementPrefix) {
+			kept = append(kept, a)
+		}
+	}
+	return kept, nil
+}
+
+// ManagementPrefix is the range a machine's own management link uses.
+const ManagementPrefix = "10.90."
+
 // Configure addresses every interface, sets every route, and applies
 // each edge's policy.
 func Configure(ctx context.Context, t lab.Topology, r rig.Rig, h Host) error {
@@ -157,14 +234,14 @@ func policy(ctx context.Context, t lab.Topology, r rig.Rig) error {
 //
 // Every failure here stops the lab, because each one means a
 // different thing was measured than the one intended.
-func Prove(ctx context.Context, t lab.Topology, h Host) error {
+func Prove(ctx context.Context, t lab.Topology, p Prober) error {
 	site := t.NodesInRole(lab.ControlPlane, lab.Worker, lab.Bastion)
 	remotes := t.NodesInRole(lab.Remote)
 
 	// The site can get out.
 	for _, n := range site {
 		for _, r := range remotes {
-			if !reaches(ctx, h, n.Name, r.Address(r.Interfaces[0].Segment), 3) {
+			if !reachesVia(ctx, p, n.Name, r.Address(r.Interfaces[0].Segment), 3) {
 				return fmt.Errorf("%s cannot reach %s, so the site has no way out", n.Name, r.Name)
 			}
 		}
@@ -176,7 +253,7 @@ func Prove(ctx context.Context, t lab.Topology, h Host) error {
 			if a.Name == b.Name {
 				continue
 			}
-			if !reaches(ctx, h, a.Name, b.Address(b.Interfaces[0].Segment), 3) {
+			if !reachesVia(ctx, p, a.Name, b.Address(b.Interfaces[0].Segment), 3) {
 				return fmt.Errorf("%s cannot reach %s, so the clouds do not meet", a.Name, b.Name)
 			}
 		}
@@ -193,7 +270,7 @@ func Prove(ctx context.Context, t lab.Topology, h Host) error {
 	// nothing.
 	for _, r := range remotes {
 		for _, n := range site {
-			addrs, err := addresses(ctx, h, n.Name)
+			addrs, err := addressesVia(ctx, p, n.Name)
 			if err != nil {
 				return fmt.Errorf("reading %s's addresses: %w", n.Name, err)
 			}
@@ -203,7 +280,7 @@ func Prove(ctx context.Context, t lab.Topology, h Host) error {
 				return fmt.Errorf("%s reported no addresses, so this check would pass having tested nothing", n.Name)
 			}
 			for _, a := range addrs {
-				if reaches(ctx, h, r.Name, a, 2) {
+				if reachesVia(ctx, p, r.Name, a, 2) {
 					return fmt.Errorf("%s reached %s at %s: a path exists that the segments do not explain, "+
 						"and every result taken on this lab would be meaningless", r.Name, n.Name, a)
 				}
@@ -215,7 +292,7 @@ func Prove(ctx context.Context, t lab.Topology, h Host) error {
 	// untested.
 	for _, r := range remotes {
 		for _, cp := range t.NodesInRole(lab.ControlPlane) {
-			if dials(ctx, h, r.Name, cp.Address(lab.LANSegment), 6443) {
+			if dialsVia(ctx, p, r.Name, cp.Address(lab.LANSegment), 6443) {
 				return fmt.Errorf("%s opened a connection to %s's API server directly, "+
 					"so a tunnel is not the only way in", r.Name, cp.Name)
 			}
@@ -228,30 +305,27 @@ func Prove(ctx context.Context, t lab.Topology, h Host) error {
 		if n.Role == lab.Bastion {
 			continue
 		}
-		if !reaches(ctx, h, n.Name, "1.1.1.1", 3) {
+		if !reachesVia(ctx, p, n.Name, "1.1.1.1", 3) {
 			return fmt.Errorf("%s has no path off the lab", n.Name)
 		}
 	}
 	return nil
 }
 
-func reaches(ctx context.Context, h Host, node, addr string, waitSeconds int) bool {
-	_, err := h.InNamespace(ctx, node, "ping", "-c1", fmt.Sprintf("-W%d", waitSeconds), addr)
-	return err == nil
+func reachesVia(ctx context.Context, p Prober, node, addr string, waitSeconds int) bool {
+	return p.Reaches(ctx, node, addr, waitSeconds)
 }
 
-func dials(ctx context.Context, h Host, node, addr string, port int) bool {
-	_, err := h.InNamespace(ctx, node, "timeout", "3", "bash", "-c",
-		fmt.Sprintf("</dev/tcp/%s/%d", addr, port))
-	return err == nil
+func dialsVia(ctx context.Context, p Prober, node, addr string, port int) bool {
+	return p.Dials(ctx, node, addr, port)
 }
 
-// addresses reads every global IPv4 address a node holds.
-func addresses(ctx context.Context, h Host, node string) ([]string, error) {
-	out, err := h.InNamespace(ctx, node, "ip", "-4", "-o", "addr", "show", "scope", "global")
-	if err != nil {
-		return nil, err
-	}
+func addressesVia(ctx context.Context, p Prober, node string) ([]string, error) {
+	return p.Addresses(ctx, node)
+}
+
+// parseAddresses reads every global IPv4 address out of ip's output.
+func parseAddresses(out []byte) []string {
 	var addrs []string
 	for _, line := range strings.Split(string(out), "\n") {
 		fields := strings.Fields(line)
@@ -262,5 +336,5 @@ func addresses(ctx context.Context, h Host, node string) ([]string, error) {
 			}
 		}
 	}
-	return addrs, nil
+	return addrs
 }

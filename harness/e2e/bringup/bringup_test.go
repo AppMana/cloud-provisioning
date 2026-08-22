@@ -22,7 +22,7 @@ func TestAVacuousIsolationProofIsAFailure(t *testing.T) {
 		// enumeration.
 		addrOutput: "",
 	}
-	err := Prove(context.Background(), lab.Default(), h)
+	err := Prove(context.Background(), lab.Default(), HostProber{Host: h})
 	if err == nil {
 		t.Fatal("the proof passed while reading no addresses at all")
 	}
@@ -41,7 +41,7 @@ func TestAPathTheSegmentsDoNotExplainFailsTheProof(t *testing.T) {
 		// site node at an address the topology never gave it.
 		reachable: map[string]bool{"remote1->10.10.0.10": true},
 	}
-	err := Prove(context.Background(), lab.Default(), h)
+	err := Prove(context.Background(), lab.Default(), HostProber{Host: h})
 	if err == nil {
 		t.Fatal("a reachable site address passed the proof")
 	}

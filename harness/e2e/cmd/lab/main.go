@@ -82,7 +82,7 @@ func main() {
 	// Before anything is installed, because a topology that does not
 	// isolate makes every result taken on it meaningless.
 	step("proving it")
-	if err := bringup.Prove(ctx, topo, host); err != nil {
+	if err := bringup.Prove(ctx, topo, bringup.HostProber{Host: host}); err != nil {
 		fail("%v", err)
 	}
 

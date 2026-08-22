@@ -300,6 +300,7 @@ which level the mechanism lives at.
 | `harness/kind-e2e` | one kind cluster, no topology | what the controller derives from a claim: CAPI objects, rendered userdata, peer and adoption Secrets, both DaemonSets, the delete cascade | ~2 min |
 | `harness/clab` | **kind node containers** under containerlab, four L2 segments | the distribution × network matrix: placement, outages, and the mechanism assertions | ~15 min/row |
 | `harness/vm-single-nic` | **real VMs** under QEMU/KVM via vrnetlab | failures that need a genuine cold boot: real PID 1, real kubelet start ordering | ~30 min/run |
+| `harness/e2e` | the same containerlab lab, driven from Go | the same rows as `harness/clab`, with typed results and its own tests; the rig is a seam, so a row can run on containers or machines | ~15 min/row |
 
 The last two are the ones people confuse, because both use
 containerlab and both talk about nodes. The difference is what a node
@@ -310,6 +311,47 @@ route-hijack bug is a boot-time race between kubelet resurrecting a
 stale DaemonSet pod and anything else getting a chance to intervene,
 and a container cannot reproduce that: there is no cold init to race
 against. Its README carries the full reasoning.
+
+### `harness/e2e`, and what a harness may not do
+
+`harness/e2e` is the same lab driven from Go, and it is replacing
+`harness/clab` row by row. The reason is not that shell is unpleasant.
+It is that the shell harness could not be tested, so its own defects
+were indistinguishable from the product's: it read verdicts by
+grepping text files, and a stale copy of one was once reported as a
+live result.
+
+The line it draws is the important part. A harness may **be the
+platform** — run machines, give them addresses and routes, hand them
+the userdata a cloud would hand them, take them away — and it may
+**measure**. It may not do the product's work, and it may not do a
+dependency's work. Every time this rule was broken, a row passed for
+the wrong reason:
+
+- The shell harness rewrote the rendered `kubeadm join` with a string
+  substitution, so no row ever ran the userdata as rendered. The
+  accommodation is real, because a container cannot satisfy kubeadm's
+  preflight against a kernel it does not own, but it belongs to the
+  rig that needs it and it is now printed by the run.
+- The shell harness patched `Machine.status.nodeRef`, which is Cluster
+  API's to write. Removing that exposed two real defects in the
+  product, described in the commit history.
+- Cluster API and cert-manager were not installed at all, on the
+  stated grounds that "the join path never talks to them". The join
+  path does. They are installed now, and installing them for real
+  exposed four conformance requirements this repository's own
+  infrastructure provider had never met.
+
+What the harness writes to the cluster is now three things, all of
+them a cloud's: the infrastructure cluster's status, the
+infrastructure machine's status, and a Node's `spec.providerID`, which
+is what a cloud controller manager sets.
+
+Nothing is verified by hand. If a run reports a failure and the only
+way to tell whether it is real is a shell command, that is a defect in
+the harness: it now reports how long a claim took against the window
+it was given, and says when a run was cancelled rather than having
+used that window up.
 
 ### The matrix harness (`harness/clab`)
 

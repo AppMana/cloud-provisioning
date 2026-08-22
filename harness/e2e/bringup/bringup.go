@@ -110,6 +110,43 @@ func (p GuestProber) Addresses(ctx context.Context, node string) ([]string, erro
 // ManagementPrefix is the range a machine's own management link uses.
 const ManagementPrefix = "10.90."
 
+// MixedProber asks each node in whichever way that node can answer.
+//
+// A lab on machines still has containers in it — the routers, the
+// cloud edges, the bastion — and the two cannot be asked the same
+// way. A container is entered from this host because the node image
+// ships no ping, and a probe that fails for a missing tool reads
+// exactly like a broken network; a machine is asked from inside
+// itself, because that is where its interfaces are.
+//
+// Getting this wrong is not an error, it is a wrong answer: the first
+// VM bring-up reported that the bastion could not reach a remote,
+// when what had happened is that ping does not exist in a container.
+type MixedProber struct {
+	Topology lab.Topology
+	Rig      rig.Rig
+	Host     Host
+}
+
+func (p MixedProber) prober(node string) Prober {
+	if p.Topology.MustNode(node).IsClusterNode() {
+		return GuestProber{Rig: p.Rig}
+	}
+	return HostProber{Host: p.Host}
+}
+
+func (p MixedProber) Reaches(ctx context.Context, node, addr string, waitSeconds int) bool {
+	return p.prober(node).Reaches(ctx, node, addr, waitSeconds)
+}
+
+func (p MixedProber) Dials(ctx context.Context, node, addr string, port int) bool {
+	return p.prober(node).Dials(ctx, node, addr, port)
+}
+
+func (p MixedProber) Addresses(ctx context.Context, node string) ([]string, error) {
+	return p.prober(node).Addresses(ctx, node)
+}
+
 // Configure addresses every interface, sets every route, and applies
 // each edge's policy.
 func Configure(ctx context.Context, t lab.Topology, r rig.Rig, h Host) error {

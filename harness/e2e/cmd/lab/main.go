@@ -69,7 +69,7 @@ func main() {
 		r, images, prober = cr, cr, bringup.HostProber{Host: host}
 	case "vm":
 		vr := vm.New(topo, *workDir)
-		r, images, prober = vr, vr, bringup.GuestProber{Rig: vr}
+		r, images, prober = vr, vr, bringup.MixedProber{Topology: topo, Rig: vr, Host: host}
 	default:
 		fail("no rig called %q: container or vm", *rigKind)
 	}

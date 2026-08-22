@@ -42,6 +42,14 @@ func (Builder) Name() string { return "k0s" }
 // broken at once.
 func (Builder) CRIEndpoint() string { return "unix:///run/k0s/containerd.sock" }
 
+// ImportArgs goes through k0s's own ctr, because k0s brings its own
+// containerd and does not share the one on the node's PATH. An image
+// imported into the wrong one is invisible to the kubelet that needs
+// it.
+func (Builder) ImportArgs() []string {
+	return []string{"k0s", "ctr", "images", "import", "-"}
+}
+
 // Build carries the binary in, writes each node's config, and starts
 // the controllers and then the workers.
 func (b Builder) Build(ctx context.Context, d cluster.Deps) error {

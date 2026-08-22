@@ -112,7 +112,10 @@ func (r *Rig) Up(ctx context.Context) error {
 // Through a pipe held by this process rather than a temporary file:
 // the stream is large, and a file would have to be written, copied
 // and cleaned up on every node.
-func (r *Rig) Load(ctx context.Context, image string, nodes []string) error {
+func (r *Rig) Load(ctx context.Context, image string, nodes []string, importArgs []string) error {
+	if len(importArgs) == 0 {
+		importArgs = []string{"ctr", "-n", "k8s.io", "images", "import", "-"}
+	}
 	if _, _, code, err := r.runner()(ctx, nil, "docker", "image", "inspect", image); err != nil || code != 0 {
 		if _, errb, code, err := r.runner()(ctx, nil, "docker", "pull", "-q", image); err != nil || code != 0 {
 			return fmt.Errorf("pulling %s: %v %s", image, err, errb)
@@ -124,7 +127,7 @@ func (r *Rig) Load(ctx context.Context, image string, nodes []string) error {
 			return fmt.Errorf("saving %s: %v", image, err)
 		}
 		node := r.Node(name)
-		if _, err := node.Pipe(ctx, bytes.NewReader(saved), "ctr", "-n", "k8s.io", "images", "import", "-"); err != nil {
+		if _, err := node.Pipe(ctx, bytes.NewReader(saved), importArgs...); err != nil {
 			return fmt.Errorf("importing %s into %s: %w", image, name, err)
 		}
 	}

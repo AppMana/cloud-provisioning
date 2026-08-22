@@ -45,6 +45,12 @@ func (Builder) Name() string { return "kubeadm" }
 // leaves it.
 func (Builder) CRIEndpoint() string { return "unix:///run/containerd/containerd.sock" }
 
+// ImportArgs uses the containerd on the node's PATH, which is the one
+// kubeadm's kubelet talks to.
+func (Builder) ImportArgs() []string {
+	return []string{"ctr", "-n", "k8s.io", "images", "import", "-"}
+}
+
 // Build writes the forwarder onto every site node, initialises the
 // first control plane, then joins the rest.
 func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
@@ -221,7 +227,7 @@ spec:
 		names = append(names, n.Name)
 	}
 	if d.Images != nil {
-		if err := d.Images.Load(ctx, NginxImage, names); err != nil {
+		if err := d.Images.Load(ctx, NginxImage, names, b.ImportArgs()); err != nil {
 			return fmt.Errorf("carrying the forwarder's image in: %w", err)
 		}
 	}

@@ -47,7 +47,7 @@ func (i Installer) Install(ctx context.Context, d network.Deps) error {
 		return fmt.Errorf("no images in the Calico manifest, so nothing would be carried in")
 	}
 	for _, image := range images {
-		if err := d.Images.Load(ctx, image, network.AllNodes(d.Topology)); err != nil {
+		if err := d.Images.Load(ctx, image, network.AllNodes(d.Topology), nil); err != nil {
 			return fmt.Errorf("carrying %s in: %w", image, err)
 		}
 	}

@@ -60,7 +60,7 @@ func (p *Product) InstallCAPI(ctx context.Context) error {
 			nodes = append(nodes, n.Name)
 		}
 		for _, image := range images {
-			if err := p.Images.Load(ctx, image, nodes); err != nil {
+			if err := p.Images.Load(ctx, image, nodes, nil); err != nil {
 				return fmt.Errorf("carrying %s in: %w", image, err)
 			}
 		}

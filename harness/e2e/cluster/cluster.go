@@ -29,7 +29,20 @@ import (
 // the rig's business: a container has a runtime this host can talk
 // to, a machine does not.
 type Images interface {
-	Load(ctx context.Context, image string, nodes []string) error
+	Load(ctx context.Context, image string, nodes []string, importArgs []string) error
+}
+
+// Importer pairs an image carrier with the way one distribution's
+// runtime takes an image, so callers that do not know the
+// distribution can still carry images in.
+type Importer struct {
+	Images Images
+	Args   []string
+}
+
+// Load implements Images.
+func (i Importer) Load(ctx context.Context, image string, nodes []string, _ []string) error {
+	return i.Images.Load(ctx, image, nodes, i.Args)
 }
 
 // Deps is what a builder needs to work.
@@ -71,6 +84,17 @@ type Builder interface {
 	// crictl aimed at the wrong socket sees no containers, which reads
 	// as every path being broken at once.
 	CRIEndpoint() string
+
+	// ImportArgs is how this distribution's runtime takes an image on
+	// standard input.
+	//
+	// A distribution that brings its own containerd does not share the
+	// one on the node's PATH, and an image imported into the wrong one
+	// is invisible to the kubelet that needs it: the pod sits in
+	// ErrImageNeverPull while `ctr images ls` shows the image present,
+	// because they are two different runtimes. Measured on k0s, whose
+	// containerd held none of the images the default one held.
+	ImportArgs() []string
 }
 
 // Registry is every distribution the harness can build.

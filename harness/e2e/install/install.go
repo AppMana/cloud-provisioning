@@ -144,10 +144,10 @@ func (p *Product) Distribute(ctx context.Context, dialerSHA string) error {
 	}
 
 	// The controller runs on an endpoint, which is always a site node.
-	if err := p.Images.Load(ctx, ControllerImage, site); err != nil {
+	if err := p.Images.Load(ctx, ControllerImage, site, nil); err != nil {
 		return fmt.Errorf("carrying %s in: %w", ControllerImage, err)
 	}
-	if err := p.Images.Load(ctx, DialerImage, everywhere); err != nil {
+	if err := p.Images.Load(ctx, DialerImage, everywhere, nil); err != nil {
 		return fmt.Errorf("carrying %s in: %w", DialerImage, err)
 	}
 

@@ -93,7 +93,8 @@ func main() {
 		}
 		step("building the " + *distro + " site")
 		d := cluster.Deps{
-			Topology: topo, Rig: r, WorkDir: *workDir, Images: r, Network: *cni,
+			Topology: topo, Rig: r, WorkDir: *workDir, Network: *cni,
+			Images:  cluster.Importer{Images: r, Args: b.ImportArgs()},
 			PodCIDR: "10.244.0.0/16", SvcCIDR: "10.96.0.0/12",
 			Kube: &kube.Client{Bastion: r.Node("bastion"), ControlPlanes: cluster.ControlPlaneAddresses(topo)},
 		}
@@ -117,7 +118,7 @@ func main() {
 			}
 			step("installing " + *cni)
 			nd := network.Deps{
-				Topology: topo, Rig: r, Kube: d.Kube, Images: r, WorkDir: *workDir,
+				Topology: topo, Rig: r, Kube: d.Kube, Images: d.Images, WorkDir: *workDir,
 				PodCIDR: d.PodCIDR, APIServer: cluster.ControlPlaneAddresses(topo)[0],
 			}
 			if err := inst.Install(ctx, nd); err != nil {
@@ -134,7 +135,7 @@ func main() {
 		if *product {
 			step("installing the product")
 			prod := &install.Product{
-				Kube: d.Kube, Rig: r, Images: r, Topology: topo,
+				Kube: d.Kube, Rig: r, Images: d.Images, Topology: topo,
 				RepoDir: *repoDir, WorkDir: *workDir,
 			}
 			sha, err := prod.Build(ctx)

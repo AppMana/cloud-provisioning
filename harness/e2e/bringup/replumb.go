@@ -35,38 +35,59 @@ import (
 func Replumb(ctx context.Context, t lab.Topology, r rig.Rig, h Host, victim string) error {
 	node := t.MustNode(victim)
 
-	// Wait for the machine to be running again before touching it.
-	if err := wait.Until(ctx, 2*time.Minute, victim+" never came back", func(ctx context.Context) error {
+	// The links first, and from the host, before anything expects the
+	// node to answer.
+	//
+	// Both halves of that ordering were wrong and both only showed on
+	// machines. The check ran inside the node against the topology's
+	// name for the link, which a machine does not use — its kernel
+	// names interfaces for the bus it finds them on — so it never
+	// found one that was there. And it ran after waiting for the node
+	// to answer, which on a machine it cannot do until it has booted,
+	// which it cannot do until it has the links: the wait and the work
+	// that would end it were the wrong way round.
+	//
+	// Asking the host settles both. The host side of a veth dies with
+	// the namespace it was joined to, so its absence is exactly the
+	// question being asked — the machine was taken away and needs a
+	// NIC back — while a machine whose cable was merely pulled still
+	// has it, and rebuilding that would take away an interface the
+	// node is still using. It is also the only place that can answer
+	// before the node is up.
+	for _, i := range node.Interfaces {
+		endpoint := lab.EndpointName(i.Segment, node)
+		if _, err := h.Run(ctx, "ip", "link", "show", endpoint); err == nil {
+			continue
+		}
+		// A stale host-side veth outlives the namespace it belonged
+		// to, and a new one cannot take a name that already exists.
+		_, _ = h.Run(ctx, "sudo", "ip", "link", "del", endpoint)
+		if _, err := h.Run(ctx, "sudo", "containerlab", "tools", "veth", "create",
+			"-a", "clab-"+t.Name+"-"+victim+":"+i.Name,
+			"-b", "bridge:"+i.Segment+":"+endpoint); err != nil {
+			return fmt.Errorf("re-plumbing %s: %w", i.Segment+":"+victim, err)
+		}
+	}
+
+	// Now it can be expected to answer: a machine needs its links to
+	// finish booting, and a container needs them to be reachable.
+	if err := wait.Until(ctx, BackTimeout, victim+" never came back", func(ctx context.Context) error {
 		_, err := r.Node(victim).Exec(ctx, "true")
 		return err
 	}); err != nil {
 		return err
 	}
 
-	for _, i := range node.Interfaces {
-		// Only when the NIC is actually gone.
-		//
-		// A machine that was killed lost the host side of its veth
-		// with its namespace, and needs one back. A machine whose
-		// cable was pulled still has it, and tearing it down to
-		// rebuild it would be doing more than the platform does — and
-		// would take away an interface the node is still using.
-		if _, err := r.Node(victim).Exec(ctx, "ip", "link", "show", i.Name); err == nil {
-			continue
-		}
-		endpoint := i.Segment + ":" + victim
-		// A stale host-side veth outlives the namespace it belonged
-		// to, and a new one cannot take a name that already exists.
-		_, _ = h.Run(ctx, "sudo", "ip", "link", "del", lab.EndpointName(i.Segment, node))
-		if _, err := h.Run(ctx, "sudo", "containerlab", "tools", "veth", "create",
-			"-a", "clab-"+t.Name+"-"+victim+":"+i.Name,
-			"-b", "bridge:"+i.Segment+":"+lab.EndpointName(i.Segment, node)); err != nil {
-			return fmt.Errorf("re-plumbing %s: %w", endpoint, err)
-		}
-	}
 	if err := Configure(ctx, lab.Topology{Name: t.Name, Segments: t.Segments,
 		Nodes: []lab.Node{node}}, r, h); err != nil {
 		return fmt.Errorf("re-addressing %s: %w", victim, err)
 	}
 	return nil
 }
+
+// BackTimeout is how long a node has to come back.
+//
+// Long enough for a boot, because on the authoritative rig that is
+// what coming back is: firmware, a bootloader, a kernel and an init,
+// none of which a container has.
+const BackTimeout = 8 * time.Minute

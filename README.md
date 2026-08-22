@@ -407,6 +407,50 @@ None of these were product defects. Each was the harness meeting a
 real machine for the first time, which is the point of having the
 tier.
 
+Eventually they stopped being harness defects. The machine tier's
+first two product findings were both in what a node does at its own
+first boot, which is the one thing a container cannot reach:
+
+- **A join assumed the cloud it was written for.** The k0s worker
+  pattern asked EC2's instance-metadata service for the node's
+  addresses with no timeout and no tolerance for failure. That
+  service answers on a link-local address nothing routes, so off that
+  cloud the request does not fail — it hangs for two minutes and then
+  aborts the rest of the block. The dialer was installed and the
+  tunnel was up, so the machine looked provisioned and had joined
+  nothing. Any k0s remote outside AWS failed that way. k3s and rke2
+  already handled it, which made it an inconsistency rather than a
+  decision.
+- **Nothing told the node which of its addresses was its own.** With
+  the metadata lookup bounded, the node chose for itself and chose
+  the out-of-band address every machine in the lab shares. It joined,
+  went Ready, and carried an identity nothing was looking for, so it
+  was never adopted. The address was never something to discover:
+  this operator's own infrastructure provider reports it and builds
+  the peer list from it. Rendering had to wait for it, too — userdata
+  is read once, so a document written before the address arrives can
+  never carry it, which is the same reason an empty peer list is
+  waited out rather than baked.
+
+### What the machine tier has proven
+
+One full row, k0s with Calico, end to end on machines:
+
+```
+registered: [cp cp2 cp3 w1 w2]
+every node Ready
+the node ran the userdata the product rendered   (remote1, remote2)
+the mesh published remote1's pod blocks: 10.244.159.0/26
+the mesh published remote2's pod blocks: 10.244.133.0/26
+checks: 140  passed: 140  failed: 0  converged after 2m47s
+```
+
+Both remotes were launched as new instances so that their own
+cloud-init would read the document the product rendered, with nothing
+in the harness interpreting it, and the isolation assertions hold
+underneath the whole run.
+
+
 ### The matrix harness (`harness/clab`)
 
 Four separate L2 segments, never one bridge pretending to be four: the

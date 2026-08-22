@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
 	"github.com/appmana/cloud-provisioning/harness/e2e/network"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 )
@@ -30,6 +31,10 @@ const Manifest = "https://raw.githubusercontent.com/projectcalico/calico/v3.29.1
 type Installer struct{}
 
 func (Installer) Name() string { return "calico" }
+
+// Encapsulation is Native: this row turns the stock manifest's
+// encapsulation off, so the tunnel sees packets addressed to pods.
+func (Installer) Encapsulation() cni.Encapsulation { return cni.Native }
 
 // Install fetches the manifest on this host, carries its images in,
 // applies it, and then makes it native.

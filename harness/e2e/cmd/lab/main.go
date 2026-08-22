@@ -310,11 +310,16 @@ func main() {
 				// this product documents creates nothing that would
 				// give it one.
 				for _, name := range claimed {
-					blocks, err := claim.WaitForPodBlocks(ctx, d.Kube, name, 5*time.Minute)
+					inst, err := network.For(*cni)
 					if err != nil {
 						fail("%v", err)
 					}
-					fmt.Printf("  the mesh published %s's pod blocks: %s\n", name, blocks)
+					blocks, err := claim.WaitForRemoteReach(ctx, d.Kube, name,
+						inst.Encapsulation(), 5*time.Minute)
+					if err != nil {
+						fail("%v", err)
+					}
+					fmt.Printf("  the mesh carries %s's %s\n", name, blocks)
 				}
 
 				// The placement axis: which site nodes hold tunnels.

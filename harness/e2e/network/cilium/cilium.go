@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
 	"github.com/appmana/cloud-provisioning/harness/e2e/network"
 )
 
@@ -35,6 +36,10 @@ const Version = "1.16.5"
 type Installer struct{}
 
 func (Installer) Name() string { return "cilium" }
+
+// Encapsulation is Encapsulated: this row routes in a vxlan tunnel,
+// so the mesh carries node addresses and no pod blocks.
+func (Installer) Encapsulation() cni.Encapsulation { return cni.Encapsulated }
 
 // Install renders the chart, carries its images in, applies it, and
 // waits for it to be carrying traffic.

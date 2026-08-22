@@ -14,6 +14,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
+
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
@@ -38,6 +40,19 @@ type Deps struct {
 type Installer interface {
 	// Name is the network's name, as a row spells it.
 	Name() string
+
+	// Encapsulation is what this network does to a pod packet, in the
+	// product's own terms.
+	//
+	// It decides what the mesh should be carrying for a remote, and
+	// the two answers are opposites: a native network puts pod
+	// addresses on the tunnel, so each peer's accept list carries the
+	// blocks its node owns; an encapsulating one addresses its packets
+	// to nodes, so the list carries node addresses and no blocks at
+	// all. A harness that expected blocks either way would fail every
+	// encapsulating row for doing the right thing — and did, the first
+	// time there were two networks to be wrong about.
+	Encapsulation() cni.Encapsulation
 	// Install puts it on the cluster and waits for it to be carrying
 	// traffic, not merely applied.
 	Install(ctx context.Context, d Deps) error

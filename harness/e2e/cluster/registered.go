@@ -23,7 +23,7 @@ type NodeLister interface {
 const RegistrationTimeout = 10 * time.Minute
 
 // WaitRegistered blocks until every node the topology puts at the
-// site has registered, and fails if any is missing.
+// site has registered, and fails if any is missing. Its variadic
 //
 // A floor, not a reading. This was a single list and a printed line,
 // and it reported "registered: [cp cp2 cp3]" for a five-node site as
@@ -34,11 +34,15 @@ const RegistrationTimeout = 10 * time.Minute
 //
 // On containers a kubelet registers fast enough that one read caught
 // them all, which is how a missing gate survived a green matrix.
-func WaitRegistered(ctx context.Context, k NodeLister, t lab.Topology) ([]string, error) {
+// also names nodes beyond the site that must be there by now: a
+// remote that has been claimed and bootstrapped is one of them, and a
+// matrix measured before it joined is a matrix that never tested it.
+func WaitRegistered(ctx context.Context, k NodeLister, t lab.Topology, also ...string) ([]string, error) {
 	want := make([]string, 0, len(t.Nodes))
 	for _, n := range SiteNodes(t) {
 		want = append(want, n.Name)
 	}
+	want = append(want, also...)
 	if len(want) == 0 {
 		return nil, fmt.Errorf("the topology puts no node at the site, so this proved nothing")
 	}

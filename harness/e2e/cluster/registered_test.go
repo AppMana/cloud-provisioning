@@ -84,3 +84,24 @@ func TestAnUnreadableClusterIsAFailure(t *testing.T) {
 }
 
 func topoOrDie(t *testing.T) lab.Topology { t.Helper(); return lab.Default() }
+
+// A remote that was claimed and bootstrapped has to be there before
+// anything measures the lab. A matrix taken while it is still joining
+// tests a lab without the thing under test, and passes.
+func TestAClaimedRemoteMustHaveJoined(t *testing.T) {
+	topo := lab.Default()
+	site := &fakeLister{sets: [][]string{{"cp", "cp2", "cp3", "w1", "w2"}}}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	if _, err := WaitRegistered(ctx, site, topo, "remote1"); err == nil {
+		t.Fatal("a matrix was allowed to run before the claimed remote had joined")
+	} else if !strings.Contains(err.Error(), "remote1") {
+		t.Errorf("the failure does not name the remote: %v", err)
+	}
+
+	joined := &fakeLister{sets: [][]string{{"cp", "cp2", "cp3", "w1", "w2", "remote1"}}}
+	if _, err := WaitRegistered(context.Background(), joined, topo, "remote1"); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -253,9 +253,13 @@ func main() {
 
 			if *checks {
 				step("the reachability matrix")
-				nodes, err := d.Kube.Nodes(ctx)
+				// Every site node and every remote that was claimed: a
+				// matrix taken before a remote joined measures a lab
+				// that does not include the thing under test, and
+				// passes.
+				nodes, err := cluster.WaitRegistered(ctx, d.Kube, topo, claimed...)
 				if err != nil {
-					fail("reading the cluster's nodes: %v", err)
+					fail("%v", err)
 				}
 				if err := waitReady(ctx, d.Kube, nodes); err != nil {
 					fail("%v", err)

@@ -128,27 +128,18 @@ func (p *Product) Build(ctx context.Context) (dialerSHA string, err error) {
 // which one is claimed is a row's choice and a node that is handed a
 // URL it cannot read fails at first boot with nothing useful to say.
 func (p *Product) Distribute(ctx context.Context, dialerSHA string) error {
-	var site, everywhere []string
+	var site []string
 	for _, n := range cluster.SiteNodes(p.Topology) {
 		site = append(site, n.Name)
-		everywhere = append(everywhere, n.Name)
 	}
-	// The dialer runs on the remotes too, as its own DaemonSet, and
-	// that copy is what keeps a remote's peer list current from the
-	// adoption cache once it has joined. A remote without the image
-	// joins, goes Ready, and then reaches nothing across the tunnel,
-	// because the pod that would maintain its routes is stuck pulling
-	// from a registry its cloud cannot reach.
-	for _, n := range p.Topology.NodesInRole(lab.Remote) {
-		everywhere = append(everywhere, n.Name)
-	}
-
-	// The controller runs on an endpoint, which is always a site node.
-	if err := p.Images.Load(ctx, ControllerImage, site, nil); err != nil {
-		return fmt.Errorf("carrying %s in: %w", ControllerImage, err)
-	}
-	if err := p.Images.Load(ctx, DialerImage, everywhere, nil); err != nil {
-		return fmt.Errorf("carrying %s in: %w", DialerImage, err)
+	// The site's nodes only. A remote has no container runtime of its
+	// own until it joins, and the one it then has belongs to the
+	// distribution — so its images arrive after the join, through
+	// LoadOnto.
+	for _, image := range []string{ControllerImage, DialerImage} {
+		if err := p.Images.Load(ctx, image, site, nil); err != nil {
+			return fmt.Errorf("carrying %s in: %w", image, err)
+		}
 	}
 
 	binary, err := os.ReadFile(p.binaryPath())
@@ -161,6 +152,22 @@ func (p *Product) Distribute(ctx context.Context, dialerSHA string) error {
 			DialerDistDir+"/wg-dialer-linux-amd64", 0o755); err != nil {
 			return fmt.Errorf("placing the dialer on %s: %w", n.Name, err)
 		}
+	}
+	return nil
+}
+
+// LoadOnto carries the product's own images onto nodes that have
+// only just acquired a runtime.
+//
+// The dialer runs on a remote as its own DaemonSet, and that copy is
+// what keeps the remote's peer list current from the adoption cache
+// once it has joined. A remote without the image joins, goes Ready,
+// and then reaches nothing across the tunnel, because the pod that
+// would maintain its routes is stuck pulling from a registry its
+// cloud cannot reach.
+func (p *Product) LoadOnto(ctx context.Context, nodes []string) error {
+	if err := p.Images.Load(ctx, DialerImage, nodes, nil); err != nil {
+		return fmt.Errorf("carrying %s in: %w", DialerImage, err)
 	}
 	return nil
 }

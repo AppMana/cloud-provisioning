@@ -199,8 +199,14 @@ func main() {
 				claimed = append(claimed, name)
 				fmt.Println("  the node ran the userdata the product rendered")
 
-				// The network's images, now that this node has a
-				// runtime of its own. Before the join it had none, and
+				// The dialer's image, now that this node has a runtime
+				// of its own: the DaemonSet copy is what keeps its
+				// peer list current once it has joined.
+				if err := prod.LoadOnto(ctx, []string{name}); err != nil {
+					fail("%v", err)
+				}
+
+				// And the network's images, for the same reason. Before the join it had none, and
 				// on a distribution that brings its own containerd the
 				// one on the node's PATH is not the one its kubelet
 				// talks to.

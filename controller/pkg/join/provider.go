@@ -119,3 +119,25 @@ type Validator interface {
 type NodeLocalBalancer interface {
 	NeedsAPIProxy() bool
 }
+
+// AddressObserver is an optional capability an InfraProvider
+// implements when it observes machines that already exist, so it
+// knows where one is before that machine is bootstrapped.
+//
+// It decides whether rendering may proceed without an address. A
+// provider that creates the instance cannot know it: CAPA does not
+// call RunInstances until the bootstrap Secret exists, so waiting for
+// an address there deadlocks, and the instance has to ask its own
+// metadata service once it is running. A provider that adopts a
+// machine already has the answer, and rendering before it arrives
+// bakes a document that tells the node nothing — the same failure as
+// baking an empty peer list, and for the same reason: userdata is
+// read once.
+//
+// The cost of getting it wrong is not a failed join. The node comes
+// up, chooses an address for itself, and picks the wrong one wherever
+// it has more than one; it then joins, goes Ready, and carries an
+// identity nothing is looking for.
+type AddressObserver interface {
+	ObservesAddresses() bool
+}

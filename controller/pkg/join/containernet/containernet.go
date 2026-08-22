@@ -73,6 +73,12 @@ func (Provider) Running(ctx context.Context, machine *unstructured.Unstructured)
 	return running, nil
 }
 
+// ObservesAddresses implements join.AddressObserver: this provider
+// adopts machines that already exist, so where one is is known before
+// it is bootstrapped, and there is no reason to render a document
+// that cannot say.
+func (Provider) ObservesAddresses() bool { return true }
+
 // InfraValues implements join.InfraProvider: it tells the machine
 // which of its addresses is the one this provider reports.
 //

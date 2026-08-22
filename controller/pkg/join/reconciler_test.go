@@ -707,3 +707,71 @@ func TestReconcile_EmitsOnlyRealAddresses(t *testing.T) {
 		}
 	}
 }
+
+// observingInfraStub is a provider that adopts machines already
+// running, so it knows where one is — once its own controller has
+// looked.
+type observingInfraStub struct {
+	*stubInfraProvider
+	address string
+}
+
+func (s *observingInfraStub) ObservesAddresses() bool { return true }
+
+func (s *observingInfraStub) InfraValues(ctx context.Context, m *unstructured.Unstructured) (map[string]any, error) {
+	values := map[string]any{"arch": "arm64"}
+	if s.address != "" {
+		values["nodeAddress"] = s.address
+	}
+	return values, nil
+}
+
+// Userdata is read once, so a document rendered before the machine's
+// address is known can never carry it. The node then chooses for
+// itself and chooses wrong wherever it has more than one address:
+// measured on a machine with an out-of-band interface, the kubelet
+// registered 10.0.0.15 — shared by every machine in that lab, part of
+// no network the cluster models — while the provider had published
+// 203.0.113.10 for the same node. It joined, went Ready, and was
+// never adopted, because no node carried the identity being looked
+// for.
+//
+// Waiting is safe precisely for the providers this applies to: they
+// observe machines that already exist, so nothing is waiting on this
+// Secret to create one. A provider that creates the instance is not
+// waited for, and must not be — CAPA does not call RunInstances until
+// the Secret exists.
+func TestReconcile_WaitsForAnObservedAddressInsteadOfRenderingWithout(t *testing.T) {
+	machine := machineWithInfraRef("cloud-worker-0", "default", "cloud-worker-0")
+	infraMachine := fakeAWSMachine("cloud-worker-0", "default", false)
+	dialerSecret := dialerPeerSecretFixture()
+	join := &stubJoinProvider{values: map[string]any{"joinToken": "fake-token", "k0sVersion": "v1.36.2+k0s"}}
+
+	r := newFakeJoinReconciler(t, join, machine, infraMachine, dialerSecret)
+	r.InfraProviders = []InfraProvider{&observingInfraStub{stubInfraProvider: awsShapedStub()}}
+
+	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)})
+	if err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if res.RequeueAfter == 0 {
+		t.Error("the reconcile did not come back for the address it was missing")
+	}
+	secret := &corev1.Secret{}
+	err = r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "cloud-worker-0-bootstrap"}, secret)
+	if err == nil {
+		t.Fatal("userdata was rendered before anyone knew where the machine is, " +
+			"and userdata is read once")
+	}
+
+	// And once the provider has looked, it renders.
+	r.InfraProviders = []InfraProvider{
+		&observingInfraStub{stubInfraProvider: awsShapedStub(), address: "203.0.113.10"},
+	}
+	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)}); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "cloud-worker-0-bootstrap"}, secret); err != nil {
+		t.Fatalf("no bootstrap secret once the address was known: %v", err)
+	}
+}

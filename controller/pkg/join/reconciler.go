@@ -78,6 +78,11 @@ var machineGVK = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1
 // ambiguous for the on-prem dialer's kernel route.
 const WireGuardAddrAnnotation = "cloud-provisioning.appmana.com/wireguard-addr4"
 
+// AddressWait is how long to leave between checks for a machine's
+// address. Short, because the machine already exists and its provider
+// is reconciling it: this is a handoff, not a provisioning wait.
+const AddressWait = 5 * time.Second
+
 // Reconciler provisions bootstrap Secrets for cloud-worker Machines.
 type Reconciler struct {
 	client.Client
@@ -301,6 +306,29 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	infraValues, err := infra.InfraValues(ctx, infraMachine)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("getting infra values: %w", err)
+	}
+
+	// A provider that knows where its machines are is waited for.
+	//
+	// Userdata is read once, so a document rendered before the address
+	// arrives can never carry it, and the node then chooses for itself
+	// — choosing wrong wherever it has more than one address, then
+	// joining, going Ready, and carrying an identity nothing is
+	// looking for. This is the same reason an empty peer list is
+	// waited out rather than baked.
+	//
+	// Only for providers that observe machines that already exist. One
+	// that creates the instance cannot report an address before there
+	// is an instance, and CAPA will not make one until this Secret
+	// exists, so waiting there would deadlock; those render without an
+	// address and the instance asks its own metadata service.
+	if observer, ok := infra.(AddressObserver); ok && observer.ObservesAddresses() {
+		if address, _ := infraValues["nodeAddress"].(string); address == "" {
+			log.Info("waiting for the infrastructure provider to report where this machine is, "+
+				"rather than rendering userdata that cannot tell the node its own address",
+				"machine", machine.GetName())
+			return ctrl.Result{RequeueAfter: AddressWait}, nil
+		}
 	}
 
 	if err := r.validateDialerBinaries(); err != nil {

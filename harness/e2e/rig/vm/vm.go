@@ -76,10 +76,26 @@ func (n *Node) ssh(stdin bool, argv ...string) []string {
 		"-o", "UserKnownHostsFile=/dev/null",
 		"-o", "LogLevel=ERROR",
 		"-o", "ConnectTimeout=10",
-		Guest+"@127.0.0.1")
-	// Everything a caller passes runs under sudo, because a node's
-	// work is a node's root's work and the login is not root.
-	return append(full, append([]string{"sudo"}, argv...)...)
+		Guest+"@127.0.0.1", "--")
+	// One quoted word, not many.
+	//
+	// ssh does not take an argv: it joins whatever it is given and
+	// hands the result to a shell on the far side, which splits it
+	// again. Passing the words through would let that shell find
+	// meaning in them that the caller never wrote — a redirect in
+	// "sh -c 'cat > /usr/local/bin/k0s'" was performed by the login
+	// shell as the unprivileged user, and failed with a permission
+	// denied on a command that had asked for root.
+	//
+	// Quoting here is what keeps the promise the interface makes,
+	// that a value containing a space or a quote cannot become two
+	// words, across a transport that would otherwise break it.
+	quoted := make([]string, 0, len(argv)+1)
+	quoted = append(quoted, "sudo")
+	for _, word := range argv {
+		quoted = append(quoted, shellQuote(word))
+	}
+	return append(full, strings.Join(quoted, " "))
 }
 
 func (n *Node) Exec(ctx context.Context, argv ...string) ([]byte, error) {

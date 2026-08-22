@@ -58,7 +58,9 @@ func TestTheGuestIsReachedThroughItsWrapper(t *testing.T) {
 		t.Errorf("the guest is not reached over the wrapper's loopback: %s", cmd)
 	}
 	// A node's work is its root's work, and the login is not root.
-	if !strings.Contains(cmd, " sudo true") {
+	// Every word is quoted, because ssh hands one string to a shell
+	// on the far side rather than an argv.
+	if !strings.Contains(cmd, "-- sudo 'true'") {
 		t.Errorf("the command does not run as root: %s", cmd)
 	}
 }
@@ -104,7 +106,7 @@ func TestCuttingLeavesTheManagementLinkAlone(t *testing.T) {
 		if strings.Contains(cmd, GuestInterface(-1)) {
 			t.Errorf("the management interface was taken down: %s", cmd)
 		}
-		if !strings.Contains(cmd, "link set") || !strings.Contains(cmd, "down") {
+		if !strings.Contains(cmd, "'link' 'set'") || !strings.Contains(cmd, "'down'") {
 			t.Errorf("unexpected command while cutting: %s", cmd)
 		}
 	}

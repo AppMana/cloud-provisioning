@@ -531,3 +531,48 @@ func TestEveryPatternTellsTheNodeItsProviderIdentity(t *testing.T) {
 		})
 	}
 }
+
+// A pattern that writes a config file must not write the same key
+// twice.
+//
+// RKE2 takes its kubelet arguments as a YAML list in a config file,
+// and YAML has no notion of appending: a second kubelet-arg key later
+// in the file replaces the first rather than adding to it. Writing
+// the operator's kubeletExtraArgs under one key and the provider
+// identity under another silently drops the role label and the taint
+// this operator renders — the node joins, schedulable and unlabelled,
+// and nothing says so.
+func TestNoPatternWritesAConfigKeyTwice(t *testing.T) {
+	patterns, err := filepath.Glob(filepath.Join("..", "..", "..", "join-patterns", "*.cloud-config.tmpl"))
+	if err != nil || len(patterns) == 0 {
+		t.Fatalf("no patterns found: %v", err)
+	}
+	for _, path := range patterns {
+		name := filepath.Base(path)
+		t.Run(name, func(t *testing.T) {
+			// Everything a real render carries at once, which is when
+			// two writers of one key collide.
+			rendered := renderPatternWith(t, name, map[string]any{
+				"providerID":       "containernet://remote1",
+				"nodeAddress":      "203.0.113.10",
+				"kubeletExtraArgs": "--node-labels=role=cloud-worker --register-with-taints=x:NoSchedule",
+			})
+			counts := map[string]int{}
+			for _, line := range strings.Split(rendered, "\n") {
+				trimmed := strings.TrimSpace(line)
+				for _, key := range []string{"kubelet-arg:", "node-ip:", "node-name:"} {
+					// Only the writes, not a mention inside a comment.
+					if strings.Contains(trimmed, "'"+key+"'") || strings.Contains(trimmed, `"`+key) {
+						counts[key]++
+					}
+				}
+			}
+			for key, n := range counts {
+				if n > 1 {
+					t.Errorf("%s is written %d times; the later write replaces the earlier "+
+						"and whatever it carried is silently lost", key, n)
+				}
+			}
+		})
+	}
+}

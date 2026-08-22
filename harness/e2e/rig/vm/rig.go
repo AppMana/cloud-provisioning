@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 
@@ -203,6 +204,45 @@ chmod 600 /home/%[1]s/.ssh/authorized_keys
 		if _, _, _, err := r.runner()(ctx, bytes.NewReader(key),
 			"docker", "exec", "-i", wrapper, "sh", "-c", "cat > "+KeyPath+" && chmod 600 "+KeyPath); err != nil {
 			return fmt.Errorf("placing the key in %s: %w", wrapper, err)
+		}
+	}
+
+	return r.WaitReady(ctx, BootTimeout)
+}
+
+// BootTimeout is how long a machine has to become reachable.
+//
+// Generous, because this is a boot: firmware, a bootloader, a kernel,
+// an init, and a cloud-init that has to run before there is a login
+// to use. A container is ready when it starts and needed none of
+// this, which is why nothing waited until there were machines.
+const BootTimeout = 12 * time.Minute
+
+// WaitReady blocks until every machine answers.
+//
+// A cloud does not hand out an instance that cannot be reached, and a
+// harness that configured one before it had booted would report the
+// machine broken for the time it was still starting: the first VM
+// bring-up failed on "Connection timed out during banner exchange",
+// which is sshd not being up yet and reads like a network fault.
+func (r *Rig) WaitReady(ctx context.Context, within time.Duration) error {
+	deadline := time.Now().Add(within)
+	for _, n := range r.Topology.Nodes {
+		if !n.IsClusterNode() {
+			continue
+		}
+		for {
+			if _, err := r.Node(n.Name).Exec(ctx, "true"); err == nil {
+				break
+			}
+			if time.Now().After(deadline) {
+				return fmt.Errorf("%s did not become reachable within %s of being started", n.Name, within)
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(10 * time.Second):
+			}
 		}
 	}
 	return nil

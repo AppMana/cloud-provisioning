@@ -1,6 +1,8 @@
 package lab
 
 import (
+	"regexp"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -80,7 +82,7 @@ func TestQuorumSurvivesOneDeath(t *testing.T) {
 // rigs. Everything else — segments, links, addresses — is shared, so
 // that a VM row and a container row differ in what a node *is* and
 // nothing else.
-func TestTheRigDecidesOnlyTheNodeKind(t *testing.T) {
+func TestTheRigDecidesOnlyWhatANodeIsMadeOf(t *testing.T) {
 	asContainers, err := Default().ContainerlabYAML(Container)
 	if err != nil {
 		t.Fatal(err)
@@ -90,32 +92,90 @@ func TestTheRigDecidesOnlyTheNodeKind(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(asContainers, "kindest/node") {
+	if !strings.Contains(asContainers, NodeImage) {
 		t.Error("the container rig does not name the node image")
 	}
-	if !strings.Contains(asVMs, "generic_vm") {
-		t.Error("the VM rig does not use containerlab's VM kind")
-	}
-	// The appliances are containers in both: a router with no kubelet
-	// gains nothing from being a VM and costs RAM and a boot. Counted
-	// as node declarations, not bare occurrences, because the kinds
-	// block names the kind once before any node uses it.
-	vmNodes := strings.Count(asVMs, "kind: generic_vm")
+	// A machine is a wrapper carrying one, named by its image rather
+	// than by a kind: containerlab runs it as an ordinary node.
+	vmNodes := strings.Count(asVMs, "image: "+VMImage)
 	if want := len(Default().NodesInRole(ControlPlane, Worker, Remote)); vmNodes != want {
-		t.Errorf("the VM rig made %d nodes into VMs, want %d (the cluster, and nothing else)", vmNodes, want)
+		t.Errorf("the VM rig made %d nodes into machines, want %d (the cluster, and nothing else)", vmNodes, want)
 	}
 	for _, appliance := range []string{"router", "edge-a", "edge-b", "bastion"} {
 		node, _, _ := strings.Cut(afterNode(t, asVMs, appliance), "\n    ")
-		if strings.Contains(node, "generic_vm") {
-			t.Errorf("%s is a VM: an appliance with no kubelet costs RAM and a boot for nothing", appliance)
+		if strings.Contains(node, VMImage) {
+			t.Errorf("%s is a machine: an appliance with no kubelet costs RAM and a boot for nothing", appliance)
 		}
 	}
 
-	// Links are topology, not rig. If these diverge, a VM row is not
-	// measuring the same network a container row measured.
-	if linksOf(t, asContainers) != linksOf(t, asVMs) {
-		t.Error("the two rigs generate different links, so their rows are not comparable")
+	// The data plane is the same lab either way. Only the management
+	// channel differs, because a machine needs one and a container
+	// reached by docker exec does not.
+	if dataLinks(t, asContainers) != dataLinks(t, asVMs) {
+		t.Errorf("the two rigs wire the lab differently, so their rows are not comparable:\n container %s\n vm       %s",
+			dataLinks(t, asContainers), dataLinks(t, asVMs))
 	}
+}
+
+// Every machine is reached on a bridge of its own.
+//
+// containerlab's management network is one L2 for the whole lab, and
+// a topology modelling a private site and two separate clouds cannot
+// have one: it would give every remote a path to the site the routers
+// do not explain, which is exactly how it went unnoticed the first
+// time. So each machine gets a bridge with one node on it.
+func TestEveryMachineIsReachedOnABridgeOfItsOwn(t *testing.T) {
+	asVMs, err := Default().ContainerlabYAML(VM)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	on := map[string][]string{}
+	for _, line := range strings.Split(asVMs, "\n") {
+		m := regexp.MustCompile(`- endpoints: \["([^:]+):[^"]+", "([^:]+):`).FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		if strings.HasPrefix(m[2], "cldt-mgmt-") {
+			on[m[2]] = append(on[m[2]], m[1])
+		}
+	}
+
+	machines := Default().NodesInRole(ControlPlane, Worker, Remote)
+	if len(on) != len(machines) {
+		t.Fatalf("%d management bridges for %d machines", len(on), len(machines))
+	}
+	for bridge, nodes := range on {
+		if len(nodes) != 1 {
+			t.Errorf("%s carries %v: a bridge with two machines on it is a path the segments do not explain",
+				bridge, nodes)
+		}
+	}
+	// And no appliance is on one, because nothing reaches an appliance
+	// that way.
+	for _, appliance := range []string{"router", "edge-a", "edge-b", "bastion"} {
+		if _, ok := on[ManagementBridge(appliance)]; ok {
+			t.Errorf("%s has a management bridge it does not need", appliance)
+		}
+	}
+}
+
+// dataLinks is every cable that is not a management one.
+func dataLinks(t *testing.T, yaml string) string {
+	t.Helper()
+	_, links, ok := strings.Cut(yaml, "links:")
+	if !ok {
+		t.Fatal("the generated topology has no links")
+	}
+	var kept []string
+	for _, line := range strings.Split(links, "\n") {
+		if strings.TrimSpace(line) == "" || strings.Contains(line, "cldt-mgmt-") {
+			continue
+		}
+		kept = append(kept, strings.TrimSpace(line))
+	}
+	sort.Strings(kept)
+	return strings.Join(kept, "\n")
 }
 
 // afterNode returns the generated stanza for one node, so an

@@ -282,24 +282,35 @@ func (t Topology) ContainerlabYAML(rig Rig) (string, error) {
 	// to model is not real. It also hands each node a second address
 	// to register, which a real instance does not have.
 	fmt.Fprintf(&b, "    linux:\n      image: %s\n      network-mode: none\n", ApplianceImage)
-	if rig == VM {
-		// The guest is reached through its wrapper rather than over a
-		// management network, for the same reason: a control channel
-		// that is also an L2 shortcut between segments would answer
-		// the questions this topology asks.
-		fmt.Fprintf(&b, "    generic_vm:\n      image: %s\n      network-mode: none\n", VMImage)
-	}
 
 	fmt.Fprintf(&b, "\n  nodes:\n")
 	for _, s := range t.Segments {
 		fmt.Fprintf(&b, "    %s:\n      kind: bridge\n", s)
 	}
-	for _, n := range t.Nodes {
-		kind := "linux"
-		if rig == VM && n.IsClusterNode() {
-			kind = "generic_vm"
+	// One management bridge per machine, shared with nothing.
+	//
+	// containerlab's own management network is a single L2 for every
+	// node in a lab, which this topology cannot have: it would give
+	// every remote a path to the site that the routers do not
+	// explain. A machine still needs somewhere to be reached, so it
+	// gets a bridge of its own, with exactly one node on it.
+	if rig == VM {
+		for _, n := range t.Nodes {
+			if n.IsClusterNode() {
+				fmt.Fprintf(&b, "    %s:\n      kind: bridge\n", ManagementBridge(n.Name))
+			}
 		}
-		fmt.Fprintf(&b, "    %s:\n      kind: %s\n", n.Name, kind)
+	}
+	for _, n := range t.Nodes {
+		fmt.Fprintf(&b, "    %s:\n      kind: linux\n", n.Name)
+		if rig == VM && n.IsClusterNode() {
+			// The wrapper carries the machine; the image is the one
+			// vrnetlab built around a cloud image.
+			fmt.Fprintf(&b, "      image: %s\n", VMImage)
+			fmt.Fprintf(&b, "      binds:\n")
+			fmt.Fprintf(&b, "        - seed/%s/extra-setup.sh:/extra-setup.sh:ro\n", n.Name)
+			fmt.Fprintf(&b, "        - seed/%s/extra-userdata.yaml:/extra-userdata.yaml:ro\n", n.Name)
+		}
 		// Binds exist to keep a container runtime's state off an
 		// overlay. A VM has a disk of its own and needs none of them.
 		if rig == Container && len(n.Binds) > 0 {
@@ -309,11 +320,27 @@ func (t Topology) ContainerlabYAML(rig Rig) (string, error) {
 			}
 		}
 		if rig == VM && n.IsClusterNode() {
-			fmt.Fprintf(&b, "      env:\n        RAM: %d\n", VMMemoryMB)
+			fmt.Fprintf(&b, "      env:\n")
+			// The launcher's own default is 512MB, which is a network
+			// device's worth and not a Kubernetes node's.
+			fmt.Fprintf(&b, "        QEMU_MEMORY: \"%d\"\n", VMMemoryMB)
+			fmt.Fprintf(&b, "        QEMU_SMP: \"%d\"\n", VMCPUs)
+			// This lab provides the management interface as one of its
+			// own links, so the launcher must not wait for one more.
+			fmt.Fprintf(&b, "        CLAB_MGMT_INTF: \"eth0\"\n")
+			fmt.Fprintf(&b, "        VR_MGMT_IS_A_LINK: \"1\"\n")
 		}
 	}
 
 	fmt.Fprintf(&b, "\n  links:\n")
+	if rig == VM {
+		for _, n := range t.Nodes {
+			if n.IsClusterNode() {
+				fmt.Fprintf(&b, "    - endpoints: [%q, %q]\n",
+					n.Name+":eth0", ManagementBridge(n.Name)+":m-"+n.Name)
+			}
+		}
+	}
 	for _, l := range t.Links() {
 		fmt.Fprintf(&b, "    - endpoints: [%q, %q]\n", l.From, l.To)
 	}
@@ -322,12 +349,28 @@ func (t Topology) ContainerlabYAML(rig Rig) (string, error) {
 
 // VMImage is the vrnetlab-wrapped guest image cluster nodes run under
 // the VM rig.
-const VMImage = "vrnetlab/cldt_site:latest"
+//
+// A stock Ubuntu cloud image in a vrnetlab wrapper. Nothing about the
+// cluster is baked in: a machine gets its distribution the way a real
+// one does, from what its userdata tells it to install, which is part
+// of what this tier is for.
+const VMImage = "vrnetlab/canonical_ubuntu:jammy"
 
 // VMMemoryMB is what a cluster node gets under the VM rig. The
-// upstream vrnetlab default is 512, which is not enough to run a
-// kubelet and a control plane.
+// upstream vrnetlab default is 512, which is a network device's worth
+// and not enough to run a kubelet and a control plane.
 const VMMemoryMB = 4096
+
+// VMCPUs per cluster node.
+const VMCPUs = 2
+
+// ManagementBridge names the bridge one machine is reached on.
+//
+// One per machine, shared with nothing: a bridge with two machines on
+// it would be a path between them that the lab's own segments do not
+// explain, which is the thing containerlab's management network does
+// and the reason this topology cannot use it.
+func ManagementBridge(node string) string { return "cldt-mgmt-" + node }
 
 // Link is one cable.
 type Link struct{ From, To string }

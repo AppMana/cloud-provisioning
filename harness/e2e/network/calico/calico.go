@@ -13,8 +13,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -82,7 +80,7 @@ func (i Installer) LoadImages(ctx context.Context, d network.Deps, nodes []strin
 	if err != nil {
 		return err
 	}
-	images := imagesIn(manifest)
+	images := network.ImagesIn(manifest)
 	if len(images) == 0 {
 		return fmt.Errorf("no images in the Calico manifest, so nothing would be carried in")
 	}
@@ -200,23 +198,4 @@ func (i Installer) manifest(ctx context.Context, d network.Deps) ([]byte, error)
 		return nil, err
 	}
 	return body, nil
-}
-
-// Both forms occur in a real manifest: image as a later key of a
-// list item, and image as its first, where YAML puts the dash on the
-// same line.
-var imageLine = regexp.MustCompile(`(?m)^\s*-?\s*image:\s*(\S+)\s*$`)
-
-// imagesIn lists every image a manifest names, deduplicated.
-func imagesIn(manifest []byte) []string {
-	seen := map[string]bool{}
-	for _, m := range imageLine.FindAllStringSubmatch(string(manifest), -1) {
-		seen[strings.Trim(m[1], `"'`)] = true
-	}
-	out := make([]string, 0, len(seen))
-	for image := range seen {
-		out = append(out, image)
-	}
-	sort.Strings(out)
-	return out
 }

@@ -353,6 +353,60 @@ the harness: it now reports how long a claim took against the window
 it was given, and says when a run was cancelled rather than having
 used that window up.
 
+### Two rigs, and what only machines can find
+
+`harness/e2e` reaches every node through one interface, so a row runs
+unchanged on either rig and the two are comparable. What differs is
+what a node *is*, and nothing else:
+
+| | container rig | machine rig |
+|---|---|---|
+| a cluster node is | a `kindest/node` container | an Ubuntu guest under QEMU/KVM, wrapped by vrnetlab |
+| reached by | `docker exec` | into the wrapper, then ssh to loopback behind qemu's NAT |
+| kernel | this host's | its own |
+| first boot | none | firmware, bootloader, kernel, init, cloud-init |
+| userdata | the rig interprets `write_files`/`runcmd` itself | the guest's own cloud-init reads it; the harness interprets nothing |
+| addressed by | the harness, after start | its platform, at boot, before any userdata runs |
+| routers, edges, bastion | containers | containers — an appliance with no kubelet gains nothing from a kernel |
+
+Containers stay the fast tier. Machines are the authoritative one, and
+every assumption below was invisible until a node became one:
+
+- **A machine had no name.** The launcher calls every guest `ubuntu`
+  unless told otherwise, and etcd identifies members by hostname: the
+  second control plane got an initial-cluster list holding its own
+  name twice, could not tell which entry was itself, and started a
+  cluster of its own. The kubelets would have collapsed five machines
+  into one Node object the same way. A container takes its name from
+  containerlab and never needed one.
+- **Deadlines bounded nothing.** Every wait checked the clock between
+  attempts, so a probe that never returned defeated the limit it sat
+  inside. No probe had ever hung on containers; a wedged `k0s status`
+  on a machine hangs indefinitely.
+- **A reading was never a gate.** The node list was read once and
+  printed, so a five-node site reported three and everything
+  downstream measured the short list. Registration is fast enough on
+  containers that the single read always caught them all.
+- **Userdata was handed to a running node**, which is not a thing a
+  platform does. A machine reads it once, at first boot, so giving one
+  userdata means launching an instance with it — replaced, not
+  restarted, because the guest's overlay disk is created only when
+  none exists.
+- **Addressing came after boot**, which is fine for a site node the
+  harness configures later and far too late for a remote whose
+  userdata dials the site the moment it runs. It is now in the
+  platform's network configuration, which cloud-init applies before
+  any userdata — and which is also what the reboot rows require.
+- **Link restoration waited for the node it was unblocking.** A guest
+  cannot finish booting without its interfaces, so waiting for it to
+  answer before creating them is a deadlock; and the check asked the
+  node about the topology's name for a link, which a machine's kernel
+  never uses.
+
+None of these were product defects. Each was the harness meeting a
+real machine for the first time, which is the point of having the
+tier.
+
 ### The matrix harness (`harness/clab`)
 
 Four separate L2 segments, never one bridge pretending to be four: the

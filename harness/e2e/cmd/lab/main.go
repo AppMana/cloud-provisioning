@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -38,6 +39,9 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 )
+
+// NodeImageName is what cmd/nodeimage writes into the work directory.
+const NodeImageName = "kubeadm-node.qcow2"
 
 func main() {
 	var (
@@ -66,6 +70,32 @@ func main() {
 	defer cancelTimeout()
 
 	topo := lab.Default()
+
+	// Which disk the machines boot from, decided before the rig is
+	// made: the rig renders the topology it was given.
+	//
+	// A distribution that configures a node rather than making one
+	// needs one that is already a node. Its site could be built in
+	// place, but a remote is launched as a new instance so that its
+	// own cloud-init reads the rendered document, and that document
+	// joins a cluster on a disk seconds old. Refused rather than
+	// worked around: a run without the image would fail later, on the
+	// remote, as something that looks like the product.
+	if *rigKind == "vm" && *distro != "" {
+		b, err := cluster.For(*distro)
+		if err != nil {
+			fail("%v", err)
+		}
+		if b.NeedsNodeImage() {
+			if _, err := os.Stat(filepath.Join(*workDir, NodeImageName)); err != nil {
+				fail("%s on machines boots a node image, and %s is not there: "+
+					"build one with `go run ./cmd/nodeimage -work-dir %s`",
+					*distro, filepath.Join(*workDir, NodeImageName), *workDir)
+			}
+			topo.VMBaseImage = NodeImageName
+		}
+	}
+
 	host := bringup.LocalHost{Lab: topo.Name}
 
 	// What a node is made of, and nothing else: every stage below

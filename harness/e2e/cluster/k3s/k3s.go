@@ -52,6 +52,10 @@ func (Builder) Name() string { return "k3s" }
 // a crictl aimed at the default one sees no containers at all.
 func (Builder) CRIEndpoint() string { return "unix:///run/k3s/containerd/containerd.sock" }
 
+// NeedsNodeImage is false: k3s installs its own runtime, so a
+// machine needs nothing underneath it.
+func (Builder) NeedsNodeImage() bool { return false }
+
 // ImportArgs goes through k3s's bundled ctr, for the same reason: an
 // image imported into the runtime on the node's PATH is invisible to
 // the kubelet that needs it.

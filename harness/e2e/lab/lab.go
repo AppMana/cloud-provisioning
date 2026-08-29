@@ -114,6 +114,18 @@ func (n Node) Segments() []string {
 
 // Topology is the whole lab.
 type Topology struct {
+	// VMBaseImage is a disk the machines boot from instead of the one
+	// their wrapper ships.
+	//
+	// For distributions that configure a node rather than making one.
+	// A site node can be built in place, because the harness reaches
+	// it before anything asks it to be a node; a remote cannot, since
+	// it is launched as a new instance precisely so its own cloud-init
+	// reads the rendered document, and that document joins a cluster
+	// on a disk seconds old. Which is what a prepared image is for,
+	// and what such a deployment assumes it has.
+	VMBaseImage string
+
 	Name     string
 	Segments []string
 	Nodes    []Node
@@ -330,6 +342,11 @@ func (t Topology) ContainerlabYAML(rig Rig) (string, error) {
 			// instance metadata so that the userdata under test
 			// cannot displace them.
 			fmt.Fprintf(&b, "        - seed/%s/extra-authorized-keys:/extra-authorized-keys:ro\n", n.Name)
+			// Over the disk the wrapper ships, by the name its
+			// launcher looks for.
+			if t.VMBaseImage != "" {
+				fmt.Fprintf(&b, "        - %s:%s:ro\n", t.VMBaseImage, VMBaseImagePath)
+			}
 		}
 		// Binds exist to keep a container runtime's state off an
 		// overlay. A VM has a disk of its own and needs none of them.
@@ -375,6 +392,10 @@ func (t Topology) ContainerlabYAML(rig Rig) (string, error) {
 // one does, from what its userdata tells it to install, which is part
 // of what this tier is for.
 const VMImage = "vrnetlab/canonical_ubuntu:jammy"
+
+// VMBaseImagePath is where the wrapper's launcher looks for the disk
+// its guest boots from.
+const VMBaseImagePath = "/jammy-ubuntu-cloud.qcow2"
 
 // VMMemoryMB is what a cluster node gets under the VM rig. The
 // upstream vrnetlab default is 512, which is a network device's worth

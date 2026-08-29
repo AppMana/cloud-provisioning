@@ -62,6 +62,10 @@ func (Builder) Name() string { return "rke2" }
 // with k3s.
 func (Builder) CRIEndpoint() string { return "unix:///run/k3s/containerd/containerd.sock" }
 
+// NeedsNodeImage is false: RKE2 installs its own runtime, so a
+// machine needs nothing underneath it.
+func (Builder) NeedsNodeImage() bool { return false }
+
 // ImportArgs goes through the ctr RKE2 ships, at the path it ships it,
 // against its own socket: the one on the node's PATH, if there is
 // one, is a different runtime holding different images.

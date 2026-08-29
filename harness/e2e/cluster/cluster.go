@@ -85,6 +85,17 @@ type Builder interface {
 	// as every path being broken at once.
 	CRIEndpoint() string
 
+	// NeedsNodeImage is whether this distribution expects a node that
+	// is already a Kubernetes node.
+	//
+	// Only kubeadm does. The others ship one binary that installs
+	// everything below the kubelet, so a machine needs nothing
+	// underneath them; kubeadm configures a node and expects the
+	// runtime, the plugins and the tools to be there — which for a
+	// remote means an image, because a remote is launched and joins
+	// on a disk seconds old.
+	NeedsNodeImage() bool
+
 	// ImportArgs is how this distribution's runtime takes an image on
 	// standard input.
 	//

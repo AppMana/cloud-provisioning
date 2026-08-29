@@ -45,6 +45,11 @@ func (Builder) Name() string { return "kubeadm" }
 // leaves it.
 func (Builder) CRIEndpoint() string { return "unix:///run/containerd/containerd.sock" }
 
+// NeedsNodeImage is true: kubeadm configures a node rather than
+// making one, and a remote is launched and joins on a disk seconds
+// old, so the disk has to arrive already a node.
+func (Builder) NeedsNodeImage() bool { return true }
+
 // ImportArgs uses the containerd on the node's PATH, which is the one
 // kubeadm's kubelet talks to.
 func (Builder) ImportArgs() []string {

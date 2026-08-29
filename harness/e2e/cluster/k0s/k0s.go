@@ -43,6 +43,10 @@ func (Builder) Name() string { return "k0s" }
 // broken at once.
 func (Builder) CRIEndpoint() string { return "unix:///run/k0s/containerd.sock" }
 
+// NeedsNodeImage is false: k0s installs its own runtime, so a
+// machine needs nothing underneath it.
+func (Builder) NeedsNodeImage() bool { return false }
+
 // ImportArgs goes through k0s's own ctr, because k0s brings its own
 // containerd and does not share the one on the node's PATH. An image
 // imported into the wrong one is invisible to the kubelet that needs

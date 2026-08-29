@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -357,3 +358,57 @@ func (r *Rig) ensureKey() error {
 	}
 	return os.WriteFile(r.publicKeyPath(), ssh.MarshalAuthorizedKey(signer), 0o644)
 }
+
+// StartBuilder runs a single guest outside any lab, for making an
+// image from.
+//
+// Outside a lab deliberately: it wants a route out and nothing else,
+// so it takes docker's own network rather than the segments this
+// topology models, and the launcher's default addressing rather than
+// the platform's. Nothing about the lab is being tested here — the
+// guest exists to be provisioned and then flattened into a disk.
+func (r *Rig) StartBuilder(ctx context.Context, wrapper string) error {
+	if err := r.ensureKey(); err != nil {
+		return err
+	}
+	pub, err := os.ReadFile(r.publicKeyPath())
+	if err != nil {
+		return err
+	}
+	dir := r.SeedDir(builderSeed)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "extra-authorized-keys"), pub, 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "extra-userdata.yaml"), []byte("#cloud-config\n{}\n"), 0o644); err != nil {
+		return err
+	}
+
+	_, _, _, _ = r.runner()(ctx, nil, "docker", "rm", "-f", wrapper)
+
+	seed, err := filepath.Abs(dir)
+	if err != nil {
+		return err
+	}
+	_, errb, code, err := r.runner()(ctx, nil, "docker", "run", "-d", "--name", wrapper,
+		"--privileged",
+		"-e", "QEMU_MEMORY="+strconv.Itoa(lab.VMMemoryMB),
+		"-e", "QEMU_SMP="+strconv.Itoa(lab.VMCPUs),
+		"-e", "CLAB_MGMT_INTF=eth0",
+		"-e", "VR_MGMT_IS_A_LINK=1",
+		"-v", seed+"/extra-authorized-keys:/extra-authorized-keys:ro",
+		"-v", seed+"/extra-userdata.yaml:/extra-userdata.yaml:ro",
+		lab.VMImage, "--hostname", builderSeed)
+	if err != nil {
+		return fmt.Errorf("starting the builder: %w", err)
+	}
+	if code != 0 {
+		return fmt.Errorf("starting the builder: %s", errb)
+	}
+	return r.placeKey(ctx, strings.TrimPrefix(wrapper, "clab-"+r.Topology.Name+"-"))
+}
+
+// builderSeed is the name the image builder's guest goes by.
+const builderSeed = "builder"

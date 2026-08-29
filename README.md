@@ -494,6 +494,35 @@ distribution or a rig rather than from running the same row again,
 which is the argument for the matrix having breadth: the second of a
 thing is what exposes what the first one's assumptions were.
 
+### The rows that only mean something on machines
+
+Both axes, both placements of a tunnel, and every way a node can be
+taken away — all on KVM guests:
+
+| row | before | during | after |
+|---|---|---|---|
+| remote1-reboot | 140/140 | 102/102 | 140/140 |
+| remote1-cut | 140/140 | 102/102 | 140/140 |
+| cp-cut | 140/140 | 102/102 | 140/140 |
+| cp-reboot | 140/140 | 102/102 | 140/140 in 3m47s |
+
+The 102 is the pairs that do not involve the victim: the rest of the
+lab keeps carrying traffic while a node is gone, which is the claim.
+cp-cut partitions a control plane while it keeps running and the
+remotes stay up through the tunnel; cp-reboot takes its power away,
+and 3m47s is what it costs a control plane to come back through
+firmware, a bootloader, a kernel, an init, a distribution restarting,
+etcd rejoining and the network re-establishing its sessions.
+
+Tunnel placement moves, too, and the whole matrix is re-measured after
+each move:
+
+| placement | checks | converged |
+|---|---|---|
+| control-plane | 140/140 | 46s |
+| two-workers | 140/140 | 5s |
+| all-nodes | 140/140 | 5s |
+
 ### The accommodation the machine tier closed
 
 The container rig cannot run `kubeadm join` as the product renders

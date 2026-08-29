@@ -58,6 +58,11 @@ const Guest = "root"
 // KeyPath is where each wrapper keeps the key for its own guest.
 const KeyPath = "/tmp/cldt-guest-key"
 
+// ControlPath is where a wrapper keeps the shared connection to its
+// own guest. %C is a hash of the destination, so a wrapper that
+// reaches one guest keeps one socket.
+const ControlPath = "/tmp/cldt-ssh-%C"
+
 // Runner executes a command on this host.
 type Runner func(ctx context.Context, stdin io.Reader, argv ...string) (stdout, stderr []byte, code int, err error)
 
@@ -94,6 +99,24 @@ func (n *Node) ssh(stdin bool, argv ...string) []string {
 		"-o", "UserKnownHostsFile=/dev/null",
 		"-o", "LogLevel=ERROR",
 		"-o", "ConnectTimeout=10",
+		// One connection per guest, shared by every command.
+		//
+		// A guest's sshd admits ten unauthenticated connections at
+		// once and drops the rest: the reachability matrix opens one
+		// ssh per check and fans out over every pair, so a row on
+		// machines walks straight into it. Measured in the guest's own
+		// log — "beginning MaxStartups throttling", "drop connection
+		// #11 ... past MaxStartups" — while the check it killed
+		// reported ssh's exit 255 against a crictl that never ran, and
+		// the row failed one of a hundred and forty for a reason that
+		// had nothing to do with the datapath.
+		//
+		// Multiplexing also removes a TCP handshake and a key exchange
+		// from every command, which on this rig is every command the
+		// harness runs.
+		"-o", "ControlMaster=auto",
+		"-o", "ControlPath="+ControlPath,
+		"-o", "ControlPersist=120s",
 		Guest+"@127.0.0.1", "--")
 	// One quoted word, not many.
 	//

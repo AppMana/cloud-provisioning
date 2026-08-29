@@ -133,16 +133,22 @@ func TestEveryPatternHonoursTheAuthorizedKeysFlag(t *testing.T) {
 // not its contents.
 func patternValues() map[string]any {
 	return map[string]any{
-		"peersFileJSON":           "{}",
-		"machineName":             "remote1",
-		"interfaceName":           "cldt0",
-		"wireguardListenPort":     "51820",
-		"apiProxyPort":            7445,
-		"apiEndpoint":             "10.10.0.10:6443",
-		"joinEndpoint":            "10.10.0.10:6443",
-		"joinToken":               "t.t",
-		"caCertHash":              "sha256:x",
-		"kubeletExtraArgs":        "",
+		"peersFileJSON":       "{}",
+		"machineName":         "remote1",
+		"interfaceName":       "cldt0",
+		"wireguardListenPort": "51820",
+		"apiProxyPort":        7445,
+		"apiEndpoint":         "10.10.0.10:6443",
+		"joinEndpoint":        "10.10.0.10:6443",
+		"joinToken":           "t.t",
+		"caCertHash":          "sha256:x",
+		"kubeletExtraArgs":    "",
+		// What the infrastructure provider contributes when it knows.
+		// Present and empty rather than absent: the renderer refuses a
+		// key it was never given, which is the behaviour that caught
+		// this.
+		"nodeAddress":             "",
+		"providerID":              "",
 		"sshAuthorizedKeys":       []string{"ssh-ed25519 AAAA test@harness"},
 		"joinServerURL":           "https://10.10.0.10:6443",
 		"k3sVersion":              "v1.34.0+k3s1",

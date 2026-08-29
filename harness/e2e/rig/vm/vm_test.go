@@ -257,3 +257,27 @@ func TestAWrapperThatCannotStartIsNotASlowBoot(t *testing.T) {
 		t.Errorf("the launcher's output was not carried out with the failure: %v", err)
 	}
 }
+
+// Every command to one guest shares a connection.
+//
+// A guest's sshd admits ten unauthenticated connections at once and
+// drops the rest. The reachability matrix opens one ssh per check and
+// fans out over every pair, so a row on machines walks into that
+// limit: measured in the guest's own log as "drop connection #11 ...
+// past MaxStartups", surfacing as ssh's exit 255 against a crictl
+// that never ran, and failing one check of a hundred and forty for a
+// reason with nothing to do with the datapath.
+func TestCommandsToOneGuestShareAConnection(t *testing.T) {
+	rec := &recorder{}
+	n := testNode(t, rec)
+
+	if _, err := n.Exec(context.Background(), "true"); err != nil {
+		t.Fatal(err)
+	}
+	cmd := strings.Join(rec.calls[0], " ")
+	for _, want := range []string{"ControlMaster=auto", "ControlPath=", "ControlPersist="} {
+		if !strings.Contains(cmd, want) {
+			t.Errorf("every command opens its own connection (%s missing): %s", want, cmd)
+		}
+	}
+}

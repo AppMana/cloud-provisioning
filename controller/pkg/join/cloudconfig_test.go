@@ -458,15 +458,20 @@ func hasConnectBound(line string) bool {
 // while the mesh had already published the other. It joined, went
 // Ready, and carried an identity nothing was looking for.
 func TestAKnownAddressReachesTheNodeAndReplacesTheMetadataLookup(t *testing.T) {
-	for _, name := range []string{
-		"k0s-worker.cloud-config.tmpl",
-		"k3s-worker.cloud-config.tmpl",
-		"rke2-worker.cloud-config.tmpl",
-	} {
+	patterns, err := filepath.Glob(filepath.Join("..", "..", "..", "join-patterns", "*.cloud-config.tmpl"))
+	if err != nil || len(patterns) == 0 {
+		t.Fatalf("no patterns found: %v", err)
+	}
+	for _, path := range patterns {
+		name := filepath.Base(path)
 		t.Run(name, func(t *testing.T) {
 			rendered := renderPatternWith(t, name, map[string]any{"nodeAddress": "203.0.113.10"})
 			if !strings.Contains(rendered, "203.0.113.10") {
-				t.Error("the provider knows this machine's address and the node is never told it")
+				t.Error("the provider knows this machine's address and the node is never told it, " +
+					"so the kubelet chooses for itself and chooses wrong wherever it has more than one")
+			}
+			if !strings.Contains(rendered, "node-ip") {
+				t.Error("the address is present but not as the flag the kubelet reads")
 			}
 			if strings.Contains(rendered, "169.254.169.254") {
 				t.Error("a metadata service is still asked for an address already known, " +

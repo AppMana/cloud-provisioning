@@ -44,6 +44,26 @@ write_files:
       KUBELET_EXTRA_ARGS={{ .kubeletExtraArgs }}{{ if .providerID }} --provider-id={{ .providerID }}{{ end }}
 runcmd:
 {{- template "dialer-install" . }}
+  # Which of its own addresses this node registers with.
+  #
+  # Appended to the same environment files, and before the join,
+  # because kubeadm starts the kubelet and the kubelet reads them
+  # then. Without it the node chooses for itself and chooses wrong
+  # wherever it has more than one address: measured on a machine with
+  # an out-of-band interface, the kubelet registered 10.0.0.15 — the
+  # address every machine in that fleet shares — while the provider
+  # had published the other one, so nothing ever bound the Machine to
+  # the Node.
+  - |
+    set -e
+{{- template "node-ip-arg" . }}
+    if [ -n "$NODE_IP_ARG" ]; then
+      for f in /etc/default/kubelet /etc/sysconfig/kubelet; do
+        if [ -f "$f" ]; then
+          sed -i "s|^KUBELET_EXTRA_ARGS=.*|& $NODE_IP_ARG|" "$f"
+        fi
+      done
+    fi
   # Gate on the API becoming reachable through the tunnel before
   # joining. TCP rather than ICMP: minimal cloud images ship no ping at
   # all (kindest/node: exit 127) and cloud firewalls routinely drop

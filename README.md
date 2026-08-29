@@ -474,6 +474,26 @@ list while the cluster was on the far side of the tunnel it was
 raising. The rest of the lab kept carrying traffic while it was gone.
 
 
+### What runs on machines
+
+Every distribution and both halves of the network model, on
+hardware-accelerated KVM guests — one `qemu-system-x86_64 -enable-kvm`
+per cluster node, each with its own kernel, `Hypervisor detected: KVM`
+and `kvm-clock` inside the guest. The routers, edges and bastion stay
+containers, as the topology says.
+
+| distribution | machines | note |
+|---|---|---|
+| k0s | 140/140 | plus the reboot and cut outage rows |
+| kubeadm | 70/70 | site only; its remotes need a baked node image |
+| k3s | 140/140 | |
+| RKE2 | 140/140 | reboot rows only, by recorded upstream limitation |
+
+Two of the three product defects found here came from adding a
+distribution or a rig rather than from running the same row again,
+which is the argument for the matrix having breadth: the second of a
+thing is what exposes what the first one's assumptions were.
+
 ### The accommodation the machine tier closed
 
 The container rig cannot run `kubeadm join` as the product renders

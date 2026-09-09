@@ -290,5 +290,6 @@ func TestRealAPIScaleContract(t *testing.T) {
 	verifyDeletingGroupCreation(t, fresh)
 	verifySerialGatewayRetirement(t, fresh)
 	verifyPeerWithdrawalCapture(t, fresh)
+	verifyRegisteredGroups(t, fresh, cfg)
 
 }

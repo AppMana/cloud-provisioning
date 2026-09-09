@@ -47,6 +47,7 @@ import (
 	joinkubeadm "github.com/appmana/cloud-provisioning/controller/pkg/join/kubeadm"
 	joinmicrok8s "github.com/appmana/cloud-provisioning/controller/pkg/join/microk8s"
 	joinrke2 "github.com/appmana/cloud-provisioning/controller/pkg/join/rke2"
+	"github.com/appmana/cloud-provisioning/controller/pkg/nodegroup"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -2153,6 +2154,7 @@ func main() {
 
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
+	nodeGroups := flag.Bool("experimental-node-groups", false, "enable experimental node groups in the mesh namespace; requires the group CRD and drain RBAC")
 	gatewayConfig := flag.String("aws-gateway-config", "", "optional path to AWS Windows Calico gateway scope JSON")
 	flag.Parse()
 	if _, err := parseDialerPullPolicy(dialerImagePullPolicy); err != nil {
@@ -2466,6 +2468,16 @@ func main() {
 		}
 	}
 
+	if *nodeGroups {
+		if !joinEnabled {
+			fmt.Fprintln(os.Stderr, "experimental node groups require --join-enabled")
+			os.Exit(1)
+		}
+		if err := nodegroup.Register(mgr, secretNamespace, secretName, joinAPIVIP, apiServerPortOf(joinAPIAddress)); err != nil {
+			fmt.Fprintf(os.Stderr, "unable to register node groups: %v\n", err)
+			os.Exit(1)
+		}
+	}
 	if *gatewayConfig != "" {
 		if err := registerGateway(mgr, *gatewayConfig, secretNamespace, secretName, joinAPIVIP, apiServerPortOf(joinAPIAddress)); err != nil {
 			fmt.Fprintf(os.Stderr, "unable to register AWS gateway controller: %v\n", err)

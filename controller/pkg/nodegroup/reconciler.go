@@ -18,7 +18,7 @@ const GroupFinalizer = "cloud-provisioning.appmana.com/node-group"
 
 // Reconciler orchestrates claims independently of their machine provider. API
 // must bypass the cache so planning observes completed creation and deletion.
-// This experimental reconciler is not registered in the production manager yet.
+// Manager registration requires the explicit experimental-node-groups flag.
 type Reconciler struct {
 	API             client.Client
 	Workload        client.Client

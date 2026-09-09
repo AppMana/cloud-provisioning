@@ -1,8 +1,30 @@
 # Provisioned node groups
 
 Status: experimental API and claim reconciler; the current `ProvisionedNodeClaim`
-provisions one machine. Group orchestration is separate from the production
-reconciler and remains under development.
+provisions one machine. Group orchestration requires explicit enablement and
+remains under development.
+
+## Enable in an isolated harness
+
+Install the experimental API contract, then enable the controller on the harness
+release using its existing values and a newly built controller image:
+
+```sh
+kubectl apply -f controller/pkg/nodegroup/testdata/provisionednodegroupclaims.yaml
+helm upgrade cloud-provisioning charts/cloud-provisioning \
+  --namespace cloud-provisioning --reuse-values \
+  --set experimentalNodeGroups=true \
+  --set image.tag=YOUR_TESTED_BUILD_TAG
+```
+
+Confirm the chart's image repository and tag match the build available to the
+VMs. The group controller shares the existing mesh leader election and watches
+its release namespace. CAPI and workload Nodes must be in this cluster API;
+separate management/workload cluster registration remains to be implemented.
+The value adds group status and child creation/deletion permissions in the
+release namespace, plus pod listing and eviction permissions for workload drain.
+It defaults to `false`; the group CRD is installed separately for this experiment.
+Ready aggregation, KEDA integration and complete VM qualification remain pending.
 
 ## API and ownership
 
@@ -108,7 +130,12 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Add API types and an experimental CRD with scale and status subresources.
       An isolated API test verifies defaulting, scale-to-zero, status preservation,
       and resource-version conflicts. The CRD is in `controller/pkg/nodegroup/testdata`.
-- [ ] Ship the CRD with controller RBAC, watches, and lifecycle orchestration.
+- [x] Register the experimental controller behind an explicit flag, with namespace
+      filtering, child ownership watches and opt-in Helm RBAC. The real-manager
+      API test observes group creation and creates the owned child through its
+      watch loop. Helm rendering verifies enabled and disabled configurations.
+- [ ] Promote the group CRD from manual experimental installation after lifecycle
+      and VM acceptance.
 - [x] Add deterministic child construction and ownership validation. Child names
       include a hash of the group UID; a recreated group cannot adopt its predecessor’s
       claims. Template copies are independent, and terminating children retain slots.

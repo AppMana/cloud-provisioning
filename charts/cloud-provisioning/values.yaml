@@ -193,3 +193,6 @@ cluster-api-operator:
 awsGateway:
   configMap: ""
   credentialsSecret: "" # optional AWS_* env keys; restart after credential rotation
+
+# Requires manual installation of the experimental group CRD.
+experimentalNodeGroups: false

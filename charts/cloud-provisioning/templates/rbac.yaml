@@ -23,6 +23,17 @@ kind: ClusterRole
 metadata:
   name: {{ include "cloud-provisioning.controllerName" . }}
 rules:
+  {{- if .Values.experimentalNodeGroups }}
+  - apiGroups: ["cloud-provisioning.appmana.com"]
+    resources: ["provisionednodegroupclaims"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/eviction"]
+    verbs: ["create"]
+  {{- end }}
   - apiGroups: ["autopilot.k0sproject.io"]
     resources: ["controlnodes"]
     verbs: ["get", "list"]
@@ -151,6 +162,14 @@ metadata:
   name: {{ include "cloud-provisioning.controllerName" . }}
   namespace: {{ .Release.Namespace }}
 rules:
+  {{- if .Values.experimentalNodeGroups }}
+  - apiGroups: ["cloud-provisioning.appmana.com"]
+    resources: ["provisionednodegroupclaims", "provisionednodegroupclaims/status"]
+    verbs: ["update", "patch"]
+  - apiGroups: ["cloud-provisioning.appmana.com"]
+    resources: ["provisionednodeclaims"]
+    verbs: ["create", "delete"]
+  {{- end }}
   # A mesh-scoped Lease serializes controllers, including overlapping releases.
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]

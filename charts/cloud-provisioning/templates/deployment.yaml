@@ -63,6 +63,9 @@ spec:
           {{- end }}
           {{- end }}
           args:
+            {{- if .Values.experimentalNodeGroups }}
+            - "--experimental-node-groups=true"
+            {{- end }}
             {{- if .Values.awsGateway.configMap }}
             - "--aws-gateway-config=/etc/cloud-provisioning/gateway/scope.json"
             {{- end }}

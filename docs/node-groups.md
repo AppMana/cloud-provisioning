@@ -107,7 +107,11 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Add deterministic child construction and ownership validation. Child names
       include a hash of the group UID; a recreated group cannot adopt its predecessor’s
       claims. Template copies are independent, and terminating children retain slots.
-- [ ] Commit creation intent and reconcile children with conflict-safe updates.
+- [x] Persist a pending action with a resource-version check before changing children.
+      Creation intent freezes the template; removal intent records the child UID.
+      The real API test verifies competing reservations conflict and scale updates
+      preserve an in-flight action. Pending actions survive controller restarts.
+- [ ] Resume or cancel persisted actions and reconcile child changes idempotently.
 - [ ] Aggregate Ready Nodes and attachment health.
 - [ ] Implement cordon, eviction, withdrawal, and serialized removal.
 - [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.

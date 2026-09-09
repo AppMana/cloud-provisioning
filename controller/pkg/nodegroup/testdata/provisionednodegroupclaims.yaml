@@ -158,3 +158,76 @@ spec:
                       type: string
                     message:
                       type: string
+              pendingAction:
+                type: object
+                required:
+                - id
+                - type
+                - generation
+                - ordinal
+                - childName
+                properties:
+                  id:
+                    type: string
+                    minLength: 1
+                  type:
+                    type: string
+                    enum:
+                    - Create
+                    - Drain
+                  generation:
+                    type: integer
+                    format: int64
+                    minimum: 1
+                  ordinal:
+                    type: integer
+                    format: int32
+                    minimum: 0
+                  childName:
+                    type: string
+                    minLength: 1
+                  childUID:
+                    type: string
+                  template:
+                    type: object
+                    required:
+                    - spec
+                    properties:
+                      spec:
+                        type: object
+                        required:
+                        - infrastructureRef
+                        properties:
+                          infrastructureRef:
+                            description: The infrastructure machine template describing
+                              the machine to create, such as an AWSMachineTemplate.
+                              It carries the whole machine, including its image, network
+                              placement and security groups, so reachability never
+                              depends on an out-of-band change. The machine created
+                              is the template's kind without the Template suffix.
+                            type: object
+                            required:
+                            - kind
+                            - name
+                            properties:
+                              apiGroup:
+                                type: string
+                              kind:
+                                type: string
+                              name:
+                                type: string
+                          internetFacing:
+                            description: Internet-facing nodes register with the internet-facing
+                              taint and a public address; the public ingress data
+                              plane tolerates that taint. Defaults to true.
+                            type: boolean
+                          tunnelEndpoints:
+                            description: Selects which topologically-local nodes terminate
+                              tunnels to this node. Empty selects every Linux worker;
+                              control-plane nodes are excluded unless explicitly selected.
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+                          clusterName:
+                            description: The CAPI Cluster this node joins. Optional
+                              when exactly one Cluster exists in the claim's namespace.
+                            type: string

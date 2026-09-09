@@ -16,6 +16,12 @@ func TestGroupSchemeAndDeepCopy(t *testing.T) {
 		Spec:       ProvisionedNodeGroupClaimSpec{Replicas: &replicas, WorkloadSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "render"}}, Template: ProvisionedNodeClaimTemplate{Spec: ProvisionedNodeClaimSpec{InternetFacing: &public, InfrastructureRef: corev1.TypedLocalObjectReference{APIGroup: &apiGroup, Kind: "AWSMachineTemplate", Name: "gpu"}, TunnelEndpoints: &metav1.LabelSelector{MatchLabels: map[string]string{"endpoint": "yes"}}}}},
 		Status:     ProvisionedNodeGroupClaimStatus{Conditions: []metav1.Condition{{Type: "Ready", Status: metav1.ConditionFalse}}},
 	}
+	original.Status.PendingAction = &NodeGroupAction{
+		ID: "reserved", Type: "Create", Generation: 1,
+		Template: &ProvisionedNodeClaimTemplate{Spec: ProvisionedNodeClaimSpec{
+			InfrastructureRef: corev1.TypedLocalObjectReference{APIGroup: &apiGroup, Kind: "AWSMachineTemplate", Name: "frozen"},
+		}},
+	}
 	copy := original.DeepCopyObject().(*ProvisionedNodeGroupClaim)
 	*copy.Spec.Replicas = 1
 	*copy.Spec.Template.Spec.InternetFacing = false
@@ -26,6 +32,15 @@ func TestGroupSchemeAndDeepCopy(t *testing.T) {
 	copy.Status.Conditions[0].Status = metav1.ConditionTrue
 	if replicas != 3 || !public || apiGroup != "infrastructure.cluster.x-k8s.io" || original.Labels["team"] != "render" || original.Spec.WorkloadSelector.MatchLabels["app"] != "render" || original.Spec.Template.Spec.TunnelEndpoints.MatchLabels["endpoint"] != "yes" || original.Status.Conditions[0].Status != metav1.ConditionFalse {
 		t.Fatal("copy mutated cached group")
+	}
+	if copy.Status.PendingAction.Template.Spec.InfrastructureRef.Name != "frozen" {
+		t.Fatal("copy lost reserved template")
+	}
+	copy.Status.PendingAction.ID = "changed"
+	copy.Status.PendingAction.Template.Spec.InfrastructureRef.Name = "changed"
+	*copy.Status.PendingAction.Template.Spec.InfrastructureRef.APIGroup = "changed"
+	if original.Status.PendingAction.ID != "reserved" || original.Status.PendingAction.Template.Spec.InfrastructureRef.Name != "frozen" || apiGroup != "infrastructure.cluster.x-k8s.io" {
+		t.Fatal("copy mutated reserved action")
 	}
 	list := &ProvisionedNodeGroupClaimList{Items: []ProvisionedNodeGroupClaim{*original}}
 	listCopy := list.DeepCopyObject().(*ProvisionedNodeGroupClaimList)

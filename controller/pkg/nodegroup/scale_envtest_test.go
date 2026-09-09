@@ -2,7 +2,11 @@ package nodegroup
 
 import (
 	"context"
+	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -110,4 +114,60 @@ func TestRealAPIScaleContract(t *testing.T) {
 	if _, e = groups.Update(ctx, scale, metav1.UpdateOptions{}, "scale"); !apierrors.IsInvalid(e) {
 		t.Fatalf("negative replica target accepted: %v", e)
 	}
+	// Controller intent uses the same resource version as KEDA scale updates.
+	scheme := runtime.NewScheme()
+	if e = v1alpha1.AddToScheme(scheme); e != nil {
+		t.Fatal(e)
+	}
+	typed, e := client.New(cfg, client.Options{Scheme: scheme})
+	if e != nil {
+		t.Fatal(e)
+	}
+	observed := &v1alpha1.ProvisionedNodeGroupClaim{}
+	key := types.NamespacedName{Namespace: "default", Name: created.GetName()}
+	if e = typed.Get(ctx, key, observed); e != nil {
+		t.Fatal(e)
+	}
+	action, e := ProposeAction(observed, nil)
+	if e != nil || action == nil {
+		t.Fatal(action, e)
+	}
+	staleGroup := observed.DeepCopy()
+	committed, e := ReserveAction(ctx, typed, observed, action)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if observed.Status.PendingAction != nil {
+		t.Fatal("reservation mutated cached input")
+	}
+	if _, e = ReserveAction(ctx, typed, staleGroup, action); !apierrors.IsConflict(e) {
+		t.Fatalf("concurrent reservation accepted: %v", e)
+	}
+	restarted := &v1alpha1.ProvisionedNodeGroupClaim{}
+	if e = typed.Get(ctx, key, restarted); e != nil {
+		t.Fatal(e)
+	}
+	if restarted.Status.PendingAction == nil || restarted.Status.PendingAction.ID != committed.Status.PendingAction.ID || restarted.Status.PendingAction.Template.Spec.InfrastructureRef.Name != "gpu" {
+		t.Fatal("restart lost frozen intent")
+	}
+	if _, e = ProposeAction(restarted, nil); e == nil {
+		t.Fatal("proposed duplicate while action pending")
+	}
+	// A scale event can alter desired capacity while the original operation is
+	// outstanding; it must retain the operation for explicit resume/cancellation.
+	scale, e = groups.Get(ctx, created.GetName(), metav1.GetOptions{}, "scale")
+	if e != nil {
+		t.Fatal(e)
+	}
+	_ = unstructured.SetNestedField(scale.Object, int64(0), "spec", "replicas")
+	if _, e = groups.Update(ctx, scale, metav1.UpdateOptions{}, "scale"); e != nil {
+		t.Fatal(e)
+	}
+	if e = typed.Get(ctx, key, restarted); e != nil {
+		t.Fatal(e)
+	}
+	if *restarted.Spec.Replicas != 0 || restarted.Status.PendingAction.ID != action.ID {
+		t.Fatal("scale update rewrote pending operation")
+	}
+
 }

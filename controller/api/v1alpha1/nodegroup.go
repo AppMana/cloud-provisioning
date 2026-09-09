@@ -15,7 +15,18 @@ type ProvisionedNodeGroupClaimSpec struct {
 type ProvisionedNodeClaimTemplate struct {
 	Spec ProvisionedNodeClaimSpec `json:"spec"`
 }
+type NodeGroupAction struct {
+	ID         string                        `json:"id"`
+	Type       string                        `json:"type"`
+	Generation int64                         `json:"generation"`
+	Ordinal    int32                         `json:"ordinal"`
+	ChildName  string                        `json:"childName"`
+	ChildUID   string                        `json:"childUID,omitempty"`
+	Template   *ProvisionedNodeClaimTemplate `json:"template,omitempty"`
+}
+
 type ProvisionedNodeGroupClaimStatus struct {
+	PendingAction      *NodeGroupAction   `json:"pendingAction,omitempty"`
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
 	Replicas           int32              `json:"replicas"`
 	ReadyReplicas      int32              `json:"readyReplicas"`
@@ -40,6 +51,14 @@ type ProvisionedNodeGroupClaimList struct {
 func (in *ProvisionedNodeGroupClaim) DeepCopyInto(out *ProvisionedNodeGroupClaim) {
 	*out = *in
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Status.PendingAction != nil {
+		action := *in.Status.PendingAction
+		out.Status.PendingAction = &action
+		if action.Template != nil {
+			out.Status.PendingAction.Template = new(ProvisionedNodeClaimTemplate)
+			in.Status.PendingAction.Template.Spec.DeepCopyInto(&out.Status.PendingAction.Template.Spec)
+		}
+	}
 	in.Spec.Template.Spec.DeepCopyInto(&out.Spec.Template.Spec)
 	if in.Spec.Replicas != nil {
 		v := *in.Spec.Replicas

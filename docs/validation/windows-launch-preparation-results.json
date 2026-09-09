@@ -1,0 +1,69 @@
+{
+  "observedAt": "2026-09-07T03:54:54.294248+00:00",
+  "scope": "AWS Windows launch preparation; not a Windows CAPI join or CNI matrix result",
+  "helpers": {
+    "testsPassed": 15,
+    "coverageIncludesSubprocesses": true,
+    "coverage": {
+      "harness/e2e/aws/claim.py": {
+        "covered_lines": 49,
+        "num_statements": 51,
+        "percent_covered": 93.65079365079364,
+        "percent_covered_display": "94",
+        "missing_lines": 2,
+        "excluded_lines": 0,
+        "num_branches": 12,
+        "num_partial_branches": 2,
+        "covered_branches": 10,
+        "missing_branches": 2
+      },
+      "harness/e2e/aws/publisher.py": {
+        "covered_lines": 66,
+        "num_statements": 72,
+        "percent_covered": 84.78260869565217,
+        "percent_covered_display": "85",
+        "missing_lines": 6,
+        "excluded_lines": 0,
+        "num_branches": 20,
+        "num_partial_branches": 6,
+        "covered_branches": 12,
+        "missing_branches": 8
+      },
+      "harness/e2e/aws/windows_image.py": {
+        "covered_lines": 61,
+        "num_statements": 97,
+        "percent_covered": 60.46511627906977,
+        "percent_covered_display": "60",
+        "missing_lines": 36,
+        "excluded_lines": 0,
+        "num_branches": 32,
+        "num_partial_branches": 7,
+        "covered_branches": 17,
+        "missing_branches": 15
+      }
+    }
+  },
+  "controller": {
+    "imageConfigDigest": "sha256:ce1ec35944f98b3b6b05ae91ebc5106de81e155c3b0e0310bc8b189214327edf",
+    "isolatedRolloutReady": true,
+    "existingReadyNodes": 7
+  },
+  "publisher": {
+    "manifestDigest": "sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326",
+    "privateECRDigestVerified": true,
+    "restrictedPullCredentialRegistryReadVerified": true,
+    "daemonSetCreated": true,
+    "actualWindowsPodExecution": false
+  },
+  "images": {
+    "2022": "pending",
+    "2025": "pending"
+  },
+  "remaining": [
+    "AMI availability and explicit run policy authorization",
+    "fresh native EC2Launch boot through CAPI",
+    "Windows Node association and readiness",
+    "HostProcess projected token and receipt delivery",
+    "add/remove/replacement and CNI isolation matrix"
+  ]
+}

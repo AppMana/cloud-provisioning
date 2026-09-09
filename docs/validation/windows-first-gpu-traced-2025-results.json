@@ -1,0 +1,462 @@
+{
+  "observedAt": "2026-09-08T03:03:53.799235+00:00",
+  "scope": "Fresh single-ENI CAPA Windows 2025 g6f.large, corrected cached AMI and build-selected GPU plugin, first ordinary full GPU probe, no warmup or guest runtime repair.",
+  "instance": {
+    "InstanceId": "i-0c02e790b777f4286",
+    "ImageId": "ami-0b5bfc5a6d0e2007c",
+    "InstanceType": "g6f.large",
+    "LaunchTime": "2026-09-08T02:45:18+00:00",
+    "State": "running",
+    "ENIs": [
+      "eni-0eac8db42403eafb4"
+    ],
+    "PrivateIpAddress": "172.29.0.62"
+  },
+  "binding": {
+    "instanceID": "i-0c02e790b777f4286",
+    "machineUID": "bdb5d2b0-beaa-466b-8517-3f56e467a140",
+    "nodeUID": "a17ed81e-5011-4449-a1ae-81578bdea44d",
+    "node": "aws-win2025-gpu-traced-v1"
+  },
+  "firstApplicationGuard": {
+    "passed": true,
+    "checks": {
+      "sameNode": true,
+      "windowsNode": true,
+      "nodeReady": true,
+      "noPriorOrdinaryContainers": true
+    },
+    "nodeUID": "a17ed81e-5011-4449-a1ae-81578bdea44d",
+    "ordinaryContainers": [],
+    "scope": "Pre-application Kubernetes snapshot; does not establish absence of deleted Pods or out-of-band containers"
+  },
+  "podSnapshotsBeforeApplication": 21,
+  "pluginPlacementChecks": {
+    "profilesPresent": true,
+    "buildSelectors": true,
+    "windows2025RuntimeMountsSkipped": true,
+    "supportedNodesPresent": true,
+    "oneReadyPluginPerNode": true
+  },
+  "joinChecks": {
+    "expectedWindowsBuild": true,
+    "onePhysicalNIC": true,
+    "k0sWorkerRunning": true,
+    "tunnelRunning": true,
+    "bootstrapInstalled": true,
+    "capiAssociation": true,
+    "windowsNode": true,
+    "matchesSiteKubelet": true,
+    "containerd2": true,
+    "cloudWorkerLabel": true,
+    "internetFacingTaint": true,
+    "nodeReady": true,
+    "publisherReady": true,
+    "expectedWorkerVersion": true,
+    "expectedWorkerHash": true,
+    "expectedTunnelHash": true,
+    "expectedRunningTunnelHash": true,
+    "peerDelivery": true
+  },
+  "gpu": {
+    "passed": false,
+    "checks": {
+      "podSucceeded": false,
+      "jobComplete": false,
+      "containerExitedZero": false,
+      "containerIdentityPresent": true,
+      "hardwareRenderAndEncode": false
+    },
+    "podUID": "d1cedd71-7f4a-4d64-af10-2e8494c1ae90",
+    "job": "windows-render-nvenc-2025-traced-v1",
+    "phase": "Failed",
+    "terminal": {
+      "containerID": "containerd://b9e44324f240a8b099597a2dfe51927f09654442c098898d47d80c431c06e918",
+      "exitCode": 128,
+      "finishedAt": "2026-09-08T02:58:48Z",
+      "message": "failed to start containerd task \"b9e44324f240a8b099597a2dfe51927f09654442c098898d47d80c431c06e918\": hcs::System::CreateProcess: powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\gpu-probe\\run.ps1 b9e44324f240a8b099597a2dfe51927f09654442c098898d47d80c431c06e918: The RPC server is unavailable.",
+      "reason": "StartError",
+      "startedAt": "1970-01-01T00:00:00Z"
+    }
+  },
+  "hcsTimeline": {
+    "podUID": "d1cedd71-7f4a-4d64-af10-2e8494c1ae90",
+    "node": "aws-win2025-gpu-traced-v1",
+    "containerID": "b9e44324f240a8b099597a2dfe51927f09654442c098898d47d80c431c06e918",
+    "terminalReason": "StartError",
+    "stages": [
+      {
+        "at": "2026-09-08T02:58:02.724001+00:00",
+        "stage": "createSystem",
+        "result": "0xc0370103",
+        "operationPending": true
+      },
+      {
+        "at": "2026-09-08T02:58:11.139690+00:00",
+        "stage": "startSystem",
+        "result": "0xc0370103",
+        "operationPending": true
+      },
+      {
+        "at": "2026-09-08T02:58:43.069195+00:00",
+        "stage": "containerStarted",
+        "result": null,
+        "operationPending": false
+      },
+      {
+        "at": "2026-09-08T02:58:43.196166+00:00",
+        "stage": "createProcess",
+        "result": "0x800706ba",
+        "operationPending": false
+      },
+      {
+        "at": "2026-09-08T02:58:43.200854+00:00",
+        "stage": "terminateSystem",
+        "result": "0xc0370103",
+        "operationPending": true
+      },
+      {
+        "at": "2026-09-08T02:58:43.382028+00:00",
+        "stage": "terminateSystem",
+        "result": "0xc0370103",
+        "operationPending": true
+      }
+    ],
+    "scope": "Identity-bound HCS startup timeline; no root-cause or GPU-success inference"
+  },
+  "capture": {
+    "before": {
+      "at": "2026-09-08T02:54:32.1915690Z",
+      "memory": {
+        "FreePhysicalMemory": 5692124,
+        "TotalVisibleMemorySize": 8044588,
+        "LastBootUpTime": "/Date(1788835751499)/"
+      },
+      "lastRecordID": null,
+      "oldestRecord": 0,
+      "operationalEnabled": true,
+      "services": [
+        {
+          "Name": "k0sworker",
+          "Status": 4
+        },
+        {
+          "Name": "vmcompute",
+          "Status": 1
+        }
+      ],
+      "recordCount": 0
+    },
+    "recordsExamined": 28,
+    "limit": 1000,
+    "matchingEvents": 12,
+    "oldestRecordAfter": 1,
+    "systemChannels": [
+      {
+        "channel": "System",
+        "limit": 1000,
+        "count": 175
+      },
+      {
+        "channel": "Application",
+        "limit": 1000,
+        "count": 4
+      },
+      {
+        "channel": "Microsoft-Windows-Hyper-V-Compute-Admin",
+        "limit": 1000,
+        "count": 1
+      }
+    ],
+    "bootstrapLogObservation": {
+      "commandID": "1f9b1904-763a-472e-b53f-cef8498ecee6",
+      "terminalStatus": "Success",
+      "responseCode": 0,
+      "stdoutCharacters": 24000,
+      "payloadComplete": false,
+      "reason": "Recovered SSM stdout hit its 24000-character limit; JSON parsing failed. Raw partial output retained privately; no bootstrap-log conclusion drawn."
+    }
+  },
+  "rootCause": "unresolved",
+  "interpretation": "Reproduces the previous cold HCS process-start RPC failure; successful joining and a healthy GPU allocation do not qualify first-application reliability. Two recorded cold failures and one clean success with corrected image/plugin settings are not a statistical failure-rate estimate.",
+  "cleanup": {
+    "status": "complete",
+    "initialPreflight": {
+      "passed": false,
+      "checks": {
+        "targetMachineIdentity": true,
+        "noDeletingMachines": true,
+        "nodeAssociation": true,
+        "allNodesReady": true,
+        "targetGatewayLeasesReady": true,
+        "otherGatewayLeasesReady": false
+      },
+      "claim": "aws-win2025-gpu-traced-v1",
+      "machineUID": "bdb5d2b0-beaa-466b-8517-3f56e467a140",
+      "nodeUID": "a17ed81e-5011-4449-a1ae-81578bdea44d",
+      "providerID": "aws:///us-west-2a/i-0c02e790b777f4286",
+      "targetLeasePhases": {
+        "network-attachment-0ef07080a82a1b1d278ba66e750f578e": "Ready"
+      },
+      "otherLeasePhases": {
+        "network-attachment-157078f2ab5e8687be57aace685946aa": "Ready",
+        "network-attachment-6b32fae7b7b59f9868b31e34630bc454": "Publishing",
+        "network-attachment-9065ccc1adea9514d4e30290eefd0c09": "Ready",
+        "network-attachment-b9665a3a0cf8f46a0806d528033cc990": "Ready",
+        "network-attachment-c5994feb22803fbdc169b9d295cf6e56": "Ready"
+      },
+      "scope": "Snapshot preflight for Ready-attachment removal with survivors; does not delete resources or authorize reuse after state changes"
+    },
+    "receipt": {
+      "claim": "aws-win2025-gpu-traced-v1",
+      "instanceID": "i-0c02e790b777f4286",
+      "node": "aws-win2025-gpu-traced-v1",
+      "nodeUID": "a17ed81e-5011-4449-a1ae-81578bdea44d",
+      "observedAt": "2026-09-08T03:08:24.618809753Z",
+      "productCleanup": true,
+      "providerID": "aws:///us-west-2a/i-0c02e790b777f4286",
+      "terminated": true
+    },
+    "qualifiedPreflight": {
+      "passed": true,
+      "checks": {
+        "targetMachineIdentity": true,
+        "noDeletingMachines": true,
+        "nodeAssociation": true,
+        "allNodesReady": true,
+        "targetGatewayLeasesReady": true,
+        "otherGatewayLeasesReady": true
+      },
+      "claim": "aws-win2025-gpu-traced-v1",
+      "machineUID": "bdb5d2b0-beaa-466b-8517-3f56e467a140",
+      "nodeUID": "a17ed81e-5011-4449-a1ae-81578bdea44d",
+      "providerID": "aws:///us-west-2a/i-0c02e790b777f4286",
+      "targetLeasePhases": {
+        "network-attachment-0ef07080a82a1b1d278ba66e750f578e": "Ready"
+      },
+      "otherLeasePhases": {
+        "network-attachment-157078f2ab5e8687be57aace685946aa": "Ready",
+        "network-attachment-6b32fae7b7b59f9868b31e34630bc454": "Ready",
+        "network-attachment-9065ccc1adea9514d4e30290eefd0c09": "Ready",
+        "network-attachment-b9665a3a0cf8f46a0806d528033cc990": "Ready",
+        "network-attachment-c5994feb22803fbdc169b9d295cf6e56": "Ready"
+      },
+      "scope": "Snapshot preflight for Ready-attachment removal with survivors; does not delete resources or authorize reuse after state changes"
+    },
+    "survivorsDuringRemoval": {
+      "at": "2026-09-08T03:08:27.007927+00:00",
+      "checks": {
+        "aws-win2022-gpu": true,
+        "aws-win2022-v3": true,
+        "aws-win2025": true,
+        "aws-win2025-gpu": true,
+        "aws-win2025-v3": true,
+        "cp": true,
+        "cp2": true,
+        "cp3": true,
+        "ip-172-29-0-9": true,
+        "remote1": true,
+        "remote2": true,
+        "w1": true,
+        "w2": true
+      }
+    },
+    "convergence": {
+      "passed": true,
+      "checks": {
+        "instanceTerminated": true,
+        "productCleanup": true,
+        "targetMachineAbsent": true,
+        "survivorMachineIdentities": true,
+        "exactSurvivorSet": true,
+        "survivorIdentitiesAndReadiness": true,
+        "targetGatewayLeasesComplete": true,
+        "otherGatewayLeasesPreserved": true
+      },
+      "survivorCount": 13,
+      "retiredGatewayLeaseCount": 1,
+      "preservedGatewayLeaseCount": 5,
+      "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+    },
+    "temporaryJobDeleted": true,
+    "unusedMachineTemplateDeleted": true,
+    "runtimeCoverage": {
+      "packages": [
+        "./cmd/awsremove",
+        "./claim",
+        "./kube",
+        "./rig/aws"
+      ],
+      "combinedStatementsPercent": 29.0,
+      "awsremoveRunPercent": 70.6,
+      "scope": "Instrumented native removal only; not project-wide coverage."
+    },
+    "initialPreflightReason": "No deletion issued by initial guard because an existing Windows 2022 GPU attachment was Publishing. A fresh all-Ready preflight is required."
+  },
+  "artifactSHA256": {
+    "gpu-observation.json": "9dc966150f98f4e6b5bea945b0ba807c94a668e5bf9c3afa7630643a37ce009b",
+    "hcs-native.json": "3fb6e3037fa72a526cd9229dd7a007243939e166026c8cc8069204d31aee734e",
+    "system-native.private.json": "7046078f28b9a2b40fd2740533cd97375ca84aa8d3084989b3f61475964120d8",
+    "join-observation.json": "fa0a73f08b20c8d3cfd958c2966a0055d3cfd2c743b768e6f6ce1ae325d5836f",
+    "first-application-intent.json": "926ae491f55fd7c4de25704f0e303fca7aa40b73010df12363574cfea9447f93",
+    "removal.json": "54e3ea2324c4b374552b96fdb0bb857b480cd9db83fbc77649669d264d1ca69f",
+    "after-removal.json": "5b132ca9309e425832d5f4eeff0575213582772c5562a3a29e690d10aa635ae4",
+    "removal-guard-qualified.json": "3eadfb78f5e5165f8ff63609116f45ea778ee5d4d5a0ac2b6cb702b41b3082d8",
+    "removal-native-coverage.out": "4e1f660ecb5dd1230cd4e1136b8f90c597da9cd20967e35035c8d0661619a88e",
+    "survivor-traffic.json": "580c48f11a285cc23292926690b6a626ccd3bde7b0f02e8c7690e7e01b4193bf"
+  },
+  "nextExperiment": "On a separate fresh VM, keep the same cached image and first application command but omit only the GPU resource assignment; compare HCS process creation, not render success. This tests whether device assignment is necessary for the cold RPC failure without warming the GPU test VM.",
+  "postRemovalTraffic": {
+    "scope": "Linux w1 and CPU Windows 2022/2025 survivors; six directed checks, 20 UDP probes per direction, 64-byte payload. Does not cover large-packet fragmentation or traffic during deletion.",
+    "report": {
+      "observedAt": "2026-09-08T03:11:47.975196+00:00",
+      "scope": "Distinct-node ordinary-pod UDP sweep through Kubernetes exec; excludes policy and failover",
+      "parameters": {
+        "udpTries": 20,
+        "udpPayloadBytes": [
+          64
+        ],
+        "udpOnly": true
+      },
+      "targets": [
+        {
+          "pod": "net-w1",
+          "podUID": "5982bf45-2e0e-40c4-bd40-4b407742dc66",
+          "node": "w1",
+          "nodeUID": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+          "os": "linux",
+          "container": "serve",
+          "containerID": "containerd://ebb3abd4f0ed02e9122f5eced7fec62cf30d2266567dc39d676745eb415c2535",
+          "podIP": "10.244.190.81",
+          "serviceUID": "0d250803-853a-49a2-937b-5c9c2c0e49fb",
+          "serviceIP": "10.96.85.157"
+        },
+        {
+          "pod": "net-aws-win2022-v3",
+          "podUID": "536d831a-e33d-4cd3-840c-f7bd2bddb920",
+          "node": "aws-win2022-v3",
+          "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+          "os": "windows",
+          "container": "serve",
+          "containerID": "containerd://b9bf8094c22348d5bb0d2006fb4883c2834bd51789b1c653eb50f524dfa4aa26",
+          "podIP": "10.244.114.4",
+          "serviceUID": "3c9309bd-53ad-4c2b-a134-aa811391ec19",
+          "serviceIP": "10.98.160.233"
+        },
+        {
+          "pod": "net-aws-win2025-v3",
+          "podUID": "75637776-7d30-4065-916c-d27f46a9b7a8",
+          "node": "aws-win2025-v3",
+          "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+          "os": "windows",
+          "container": "serve",
+          "containerID": "containerd://d14528932a8ceba3ee2c87898e57cb09c47d28e95588e8aa353521a70c8f5d23",
+          "podIP": "10.244.42.6",
+          "serviceUID": "475a88d2-cc49-4739-8db6-f521dcac28c4",
+          "serviceIP": "10.99.76.215"
+        }
+      ],
+      "checks": [
+        {
+          "ok": true,
+          "expectedResponses": 20,
+          "reportedResponses": 20,
+          "exactResponses": 20,
+          "responsesPresent": true,
+          "errors": [],
+          "commandExitCode": 0,
+          "source": "net-w1",
+          "target": "net-aws-win2022-v3",
+          "kind": "udp",
+          "payloadBytes": 64,
+          "startedAt": "2026-09-08T03:11:43.519899+00:00",
+          "finishedAt": "2026-09-08T03:11:44.176994+00:00",
+          "rawBody": "{\"responses\":[\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}"
+        },
+        {
+          "ok": true,
+          "expectedResponses": 20,
+          "reportedResponses": 20,
+          "exactResponses": 20,
+          "responsesPresent": true,
+          "errors": [],
+          "commandExitCode": 0,
+          "source": "net-w1",
+          "target": "net-aws-win2025-v3",
+          "kind": "udp",
+          "payloadBytes": 64,
+          "startedAt": "2026-09-08T03:11:44.177039+00:00",
+          "finishedAt": "2026-09-08T03:11:44.817166+00:00",
+          "rawBody": "{\"responses\":[\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}"
+        },
+        {
+          "ok": true,
+          "expectedResponses": 20,
+          "reportedResponses": 20,
+          "exactResponses": 20,
+          "responsesPresent": true,
+          "errors": [],
+          "commandExitCode": 0,
+          "source": "net-aws-win2022-v3",
+          "target": "net-w1",
+          "kind": "udp",
+          "payloadBytes": 64,
+          "startedAt": "2026-09-08T03:11:44.817208+00:00",
+          "finishedAt": "2026-09-08T03:11:45.661646+00:00",
+          "rawBody": "{\"responses\":[\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}"
+        },
+        {
+          "ok": true,
+          "expectedResponses": 20,
+          "reportedResponses": 20,
+          "exactResponses": 20,
+          "responsesPresent": true,
+          "errors": [],
+          "commandExitCode": 0,
+          "source": "net-aws-win2022-v3",
+          "target": "net-aws-win2025-v3",
+          "kind": "udp",
+          "payloadBytes": 64,
+          "startedAt": "2026-09-08T03:11:45.661692+00:00",
+          "finishedAt": "2026-09-08T03:11:45.969143+00:00",
+          "rawBody": "{\"responses\":[\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}"
+        },
+        {
+          "ok": true,
+          "expectedResponses": 20,
+          "reportedResponses": 20,
+          "exactResponses": 20,
+          "responsesPresent": true,
+          "errors": [],
+          "commandExitCode": 0,
+          "source": "net-aws-win2025-v3",
+          "target": "net-w1",
+          "kind": "udp",
+          "payloadBytes": 64,
+          "startedAt": "2026-09-08T03:11:45.969188+00:00",
+          "finishedAt": "2026-09-08T03:11:46.733654+00:00",
+          "rawBody": "{\"responses\":[\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}"
+        },
+        {
+          "ok": true,
+          "expectedResponses": 20,
+          "reportedResponses": 20,
+          "exactResponses": 20,
+          "responsesPresent": true,
+          "errors": [],
+          "commandExitCode": 0,
+          "source": "net-aws-win2025-v3",
+          "target": "net-aws-win2022-v3",
+          "kind": "udp",
+          "payloadBytes": 64,
+          "startedAt": "2026-09-08T03:11:46.733699+00:00",
+          "finishedAt": "2026-09-08T03:11:47.103187+00:00",
+          "rawBody": "{\"responses\":[\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"]}"
+        }
+      ],
+      "identitiesStable": true,
+      "identityError": null,
+      "ok": true
+    }
+  }
+}

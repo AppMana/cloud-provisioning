@@ -1,0 +1,25 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ObserveGatewayInterface",
+      "Effect": "Allow",
+      "Action": "ec2:DescribeNetworkInterfaces",
+      "Resource": "*",
+      "Condition": {"StringEquals": {"aws:RequestedRegion": "${AWS_REGION}"}}
+    },
+    {
+      "Sid": "ManageOnlyOwnedGatewaySourceCheck",
+      "Effect": "Allow",
+      "Action": "ec2:ModifyNetworkInterfaceAttribute",
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:network-interface/${GATEWAY_ENI_ID}",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ec2:ResourceTag/cloud-provisioning-test": "${RUN_ID}",
+          "ec2:Attribute/SourceDestCheck": ["true", "false"]
+        }
+      }
+    }
+  ]
+}

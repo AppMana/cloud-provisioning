@@ -1,0 +1,183 @@
+﻿{
+    "interfaces":  [
+                       {
+                           "InterfaceAlias":  "vEthernet (f158e55431408cc223e062913ac11b0dbfb03abd9337b432fbb9e182e2c5eee8_Calico)",
+                           "InterfaceIndex":  32,
+                           "CompartmentId":  6,
+                           "WeakHostReceive":  0,
+                           "WeakHostSend":  0,
+                           "Forwarding":  0,
+                           "NlMtu":  1370
+                       },
+                       {
+                           "InterfaceAlias":  "Loopback Pseudo-Interface 6",
+                           "InterfaceIndex":  31,
+                           "CompartmentId":  6,
+                           "WeakHostReceive":  0,
+                           "WeakHostSend":  0,
+                           "Forwarding":  0,
+                           "NlMtu":  4294967295
+                       },
+                       {
+                           "InterfaceAlias":  "4096",
+                           "InterfaceIndex":  25,
+                           "CompartmentId":  4,
+                           "WeakHostReceive":  0,
+                           "WeakHostSend":  0,
+                           "Forwarding":  0,
+                           "NlMtu":  1450
+                       },
+                       {
+                           "InterfaceAlias":  "Loopback Pseudo-Interface 4",
+                           "InterfaceIndex":  24,
+                           "CompartmentId":  4,
+                           "WeakHostReceive":  0,
+                           "WeakHostSend":  0,
+                           "Forwarding":  0,
+                           "NlMtu":  4294967295
+                       },
+                       {
+                           "InterfaceAlias":  "9999",
+                           "InterfaceIndex":  23,
+                           "CompartmentId":  3,
+                           "WeakHostReceive":  0,
+                           "WeakHostSend":  0,
+                           "Forwarding":  0,
+                           "NlMtu":  1450
+                       },
+                       {
+                           "InterfaceAlias":  "Loopback Pseudo-Interface 3",
+                           "InterfaceIndex":  22,
+                           "CompartmentId":  3,
+                           "WeakHostReceive":  0,
+                           "WeakHostSend":  0,
+                           "Forwarding":  0,
+                           "NlMtu":  4294967295
+                       },
+                       {
+                           "InterfaceAlias":  "vEthernet (Container NIC 070372ba)",
+                           "InterfaceIndex":  18,
+                           "CompartmentId":  2,
+                           "WeakHostReceive":  0,
+                           "WeakHostSend":  0,
+                           "Forwarding":  0,
+                           "NlMtu":  1450
+                       },
+                       {
+                           "InterfaceAlias":  "Loopback Pseudo-Interface 2",
+                           "InterfaceIndex":  17,
+                           "CompartmentId":  2,
+                           "WeakHostReceive":  0,
+                           "WeakHostSend":  0,
+                           "Forwarding":  0,
+                           "NlMtu":  4294967295
+                       },
+                       {
+                           "InterfaceAlias":  "vEthernet (Ethernet 3)",
+                           "InterfaceIndex":  9,
+                           "CompartmentId":  1,
+                           "WeakHostReceive":  0,
+                           "WeakHostSend":  0,
+                           "Forwarding":  0,
+                           "NlMtu":  1450
+                       },
+                       {
+                           "InterfaceAlias":  "cldt1775f69e",
+                           "InterfaceIndex":  11,
+                           "CompartmentId":  1,
+                           "WeakHostReceive":  1,
+                           "WeakHostSend":  1,
+                           "Forwarding":  0,
+                           "NlMtu":  1420
+                       },
+                       {
+                           "InterfaceAlias":  "Loopback Pseudo-Interface 1",
+                           "InterfaceIndex":  1,
+                           "CompartmentId":  1,
+                           "WeakHostReceive":  0,
+                           "WeakHostSend":  0,
+                           "Forwarding":  0,
+                           "NlMtu":  4294967295
+                       }
+                   ],
+    "addresses":  [
+                      {
+                          "InterfaceAlias":  "vEthernet (f158e55431408cc223e062913ac11b0dbfb03abd9337b432fbb9e182e2c5eee8_Calico)",
+                          "InterfaceIndex":  32,
+                          "CompartmentId":  null,
+                          "IPAddress":  "10.244.114.4",
+                          "PrefixLength":  26
+                      },
+                      {
+                          "InterfaceAlias":  "Loopback Pseudo-Interface 6",
+                          "InterfaceIndex":  31,
+                          "CompartmentId":  null,
+                          "IPAddress":  "127.0.0.1",
+                          "PrefixLength":  8
+                      },
+                      {
+                          "InterfaceAlias":  "4096",
+                          "InterfaceIndex":  25,
+                          "CompartmentId":  null,
+                          "IPAddress":  "10.244.114.1",
+                          "PrefixLength":  26
+                      },
+                      {
+                          "InterfaceAlias":  "Loopback Pseudo-Interface 4",
+                          "InterfaceIndex":  24,
+                          "CompartmentId":  null,
+                          "IPAddress":  "127.0.0.1",
+                          "PrefixLength":  8
+                      },
+                      {
+                          "InterfaceAlias":  "9999",
+                          "InterfaceIndex":  23,
+                          "CompartmentId":  null,
+                          "IPAddress":  "192.168.255.1",
+                          "PrefixLength":  30
+                      },
+                      {
+                          "InterfaceAlias":  "Loopback Pseudo-Interface 3",
+                          "InterfaceIndex":  22,
+                          "CompartmentId":  null,
+                          "IPAddress":  "127.0.0.1",
+                          "PrefixLength":  8
+                      },
+                      {
+                          "InterfaceAlias":  "vEthernet (Container NIC 070372ba)",
+                          "InterfaceIndex":  18,
+                          "CompartmentId":  null,
+                          "IPAddress":  "169.254.168.160",
+                          "PrefixLength":  16
+                      },
+                      {
+                          "InterfaceAlias":  "Loopback Pseudo-Interface 2",
+                          "InterfaceIndex":  17,
+                          "CompartmentId":  null,
+                          "IPAddress":  "127.0.0.1",
+                          "PrefixLength":  8
+                      },
+                      {
+                          "InterfaceAlias":  "vEthernet (Ethernet 3)",
+                          "InterfaceIndex":  9,
+                          "CompartmentId":  null,
+                          "IPAddress":  "172.29.0.24",
+                          "PrefixLength":  25
+                      },
+                      {
+                          "InterfaceAlias":  "cldt1775f69e",
+                          "InterfaceIndex":  11,
+                          "CompartmentId":  null,
+                          "IPAddress":  "10.100.0.139",
+                          "PrefixLength":  32
+                      },
+                      {
+                          "InterfaceAlias":  "Loopback Pseudo-Interface 1",
+                          "InterfaceIndex":  1,
+                          "CompartmentId":  null,
+                          "IPAddress":  "127.0.0.1",
+                          "PrefixLength":  8
+                      }
+                  ],
+    "at":  "2026-09-08T22:25:50.5123059Z"
+}

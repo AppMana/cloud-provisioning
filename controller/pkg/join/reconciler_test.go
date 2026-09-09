@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/bootstrap"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -171,8 +172,8 @@ func machineWithInfraRef(name, namespace, infraRefName string) *unstructured.Uns
 }
 
 // newFakeJoinReconciler builds a Reconciler wired for a full
-// Reconcile() call: unlike newFakeReconciler (allocateNodeVIPIndex
-// tests only), this registers AWSMachine too and fills in every field
+// Reconcile() call: unlike the allocation-only fake, this registers
+// AWSMachine too and fills in every field
 // Reconcile actually reads.
 func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs ...client.Object) *Reconciler {
 	t.Helper()
@@ -197,9 +198,9 @@ func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs 
 		Join:           joinProvider,
 		InfraProviders: []InfraProvider{awsShapedStub()},
 
-		TemplatePath:     tmplPath,
-		APIVIP:           "10.101.0.1",
-		KubeletExtraArgs: "--node-labels=cloud-provisioning.appmana.com/role=cloud-worker",
+		BootstrapRenderers: map[string]BootstrapRenderer{"linux": PatternBootstrap{Path: tmplPath, Format: bootstrap.CloudConfig}},
+		APIVIP:             "10.101.0.1",
+		KubeletExtraArgs:   "--node-labels=cloud-provisioning.appmana.com/role=cloud-worker",
 
 		WireGuardAddress:    "10.100.0.128/24",
 		WireGuardListenPort: "51820",
@@ -345,8 +346,20 @@ func TestReconcile_ProvisionsBootstrapSecretEndToEnd(t *testing.T) {
 			t.Errorf("baked peers.json missing %q; rendered: %s", want, rendered)
 		}
 	}
-	if strings.Count(rendered, "10.101.0.1/32") != 1 {
-		t.Errorf("API VIP must appear in exactly ONE local peer's AllowedIPs (the designated transit), got %d occurrences", strings.Count(rendered, "10.101.0.1/32"))
+	// Exactly one local peer carries the VIP, written twice on that
+	// one entry: the grant (allowedIPs) and the transit declaration
+	// (transit), which is what lets the applier move it when this
+	// relay dies. A third occurrence would be a second peer claiming
+	// it, and the accept list would give it to whichever came last.
+	if strings.Count(rendered, "10.101.0.1/32") != 2 {
+		t.Errorf("API VIP must ride exactly ONE local peer, as its grant plus its transit declaration, got %d occurrences", strings.Count(rendered, "10.101.0.1/32"))
+	}
+	// The baked doc also carries the control planes as dialable
+	// endpoints, for the node's loopback balancer; the port comes from
+	// the join provider's own apiEndpoint (absent here, so Kubernetes'
+	// 6443), never restated as configuration.
+	if !strings.Contains(rendered, `"apiServers":["10.101.0.1:6443"]`) {
+		t.Errorf("baked peers.json carries no dialable API servers for the loopback balancer; rendered: %s", rendered)
 	}
 
 	updatedDialerSecret := &corev1.Secret{}
@@ -451,10 +464,8 @@ func TestReconcile_TwoCloudMachinesDoNotClobberEachOther(t *testing.T) {
 		t.Errorf("cloud-worker-b's peer-endpoint = %q, want \"pending\"", updatedDialerSecret.Data["peer-endpoint-cloud-worker-b"])
 	}
 
-	// Both Machines also get their own, non-colliding node-VIP
-	// allocation. allocateNodeVIPIndex scans all Machines; this
-	// confirms it holds end to end through two Reconcile calls, not
-	// just in isolation.
+	// Both Machines get distinct tunnel-address reservations. This
+	// checks allocation through two full Reconcile calls.
 	updatedA := &unstructured.Unstructured{}
 	updatedA.SetGroupVersionKind(machineGVK)
 	if err := r.Get(context.Background(), client.ObjectKeyFromObject(machineA), updatedA); err != nil {
@@ -642,7 +653,7 @@ func TestReconcile_InfersInfraProviderFromMachineKind(t *testing.T) {
 		Reader:                    c,
 		Join:                      &stubJoinProvider{values: map[string]any{}},
 		InfraProviders:            []InfraProvider{awsProvider, otherProvider},
-		TemplatePath:              tmplPath,
+		BootstrapRenderers:        map[string]BootstrapRenderer{"linux": PatternBootstrap{Path: tmplPath, Format: bootstrap.CloudConfig}},
 		WireGuardAddress:          "10.100.0.128/24",
 		DialerPeerSecretNamespace: "wg-dialer",
 		DialerPeerSecretName:      "wg-dialer-peer",
@@ -693,5 +704,73 @@ func TestReconcile_EmitsOnlyRealAddresses(t *testing.T) {
 				t.Errorf("%s contains %q, which is not an IP address (whole value: %q)", key, entry, val)
 			}
 		}
+	}
+}
+
+// observingInfraStub is a provider that adopts machines already
+// running, so it knows where one is — once its own controller has
+// looked.
+type observingInfraStub struct {
+	*stubInfraProvider
+	address string
+}
+
+func (s *observingInfraStub) ObservesAddresses() bool { return true }
+
+func (s *observingInfraStub) InfraValues(ctx context.Context, m *unstructured.Unstructured) (map[string]any, error) {
+	values := map[string]any{"arch": "arm64"}
+	if s.address != "" {
+		values["nodeAddress"] = s.address
+	}
+	return values, nil
+}
+
+// Userdata is read once, so a document rendered before the machine's
+// address is known can never carry it. The node then chooses for
+// itself and chooses wrong wherever it has more than one address:
+// measured on a machine with an out-of-band interface, the kubelet
+// registered 10.0.0.15 — shared by every machine in that lab, part of
+// no network the cluster models — while the provider had published
+// 203.0.113.10 for the same node. It joined, went Ready, and was
+// never adopted, because no node carried the identity being looked
+// for.
+//
+// Waiting is safe precisely for the providers this applies to: they
+// observe machines that already exist, so nothing is waiting on this
+// Secret to create one. A provider that creates the instance is not
+// waited for, and must not be — CAPA does not call RunInstances until
+// the Secret exists.
+func TestReconcile_WaitsForAnObservedAddressInsteadOfRenderingWithout(t *testing.T) {
+	machine := machineWithInfraRef("cloud-worker-0", "default", "cloud-worker-0")
+	infraMachine := fakeAWSMachine("cloud-worker-0", "default", false)
+	dialerSecret := dialerPeerSecretFixture()
+	join := &stubJoinProvider{values: map[string]any{"joinToken": "fake-token", "k0sVersion": "v1.36.2+k0s"}}
+
+	r := newFakeJoinReconciler(t, join, machine, infraMachine, dialerSecret)
+	r.InfraProviders = []InfraProvider{&observingInfraStub{stubInfraProvider: awsShapedStub()}}
+
+	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)})
+	if err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if res.RequeueAfter == 0 {
+		t.Error("the reconcile did not come back for the address it was missing")
+	}
+	secret := &corev1.Secret{}
+	err = r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "cloud-worker-0-bootstrap"}, secret)
+	if err == nil {
+		t.Fatal("userdata was rendered before anyone knew where the machine is, " +
+			"and userdata is read once")
+	}
+
+	// And once the provider has looked, it renders.
+	r.InfraProviders = []InfraProvider{
+		&observingInfraStub{stubInfraProvider: awsShapedStub(), address: "203.0.113.10"},
+	}
+	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)}); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "cloud-worker-0-bootstrap"}, secret); err != nil {
+		t.Fatalf("no bootstrap secret once the address was known: %v", err)
 	}
 }

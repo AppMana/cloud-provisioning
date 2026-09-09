@@ -1,0 +1,48 @@
+{
+  "observedAt": "2026-09-08T16:58:02.423801+00:00",
+  "scope": "Workload/profile preflight and cache-reuse regressions derived from the original Windows2022 GPU trial",
+  "testsPassed": 10,
+  "coverage": {
+    "covered_lines": 91,
+    "num_statements": 91,
+    "percent_covered": 100.0,
+    "percent_covered_display": "100",
+    "missing_lines": 0,
+    "excluded_lines": 0,
+    "num_branches": 41,
+    "num_partial_branches": 0,
+    "covered_branches": 41,
+    "missing_branches": 0
+  },
+  "fixtures": [
+    "docs/validation/windows-workload-platform-publication-results.json",
+    "harness/e2e/observe/testdata/windows-cache-complete-ready-2022.json"
+  ],
+  "checks": [
+    "Observed 2022 image selected with legacy 2025 image present",
+    "Wrong Windows platform rejected",
+    "Uncached image rejected",
+    "Missing versioned record or pull Secret rejected",
+    "Selection does not mutate recorded inventory",
+    "Import from unrelated working directory without PYTHONPATH succeeds",
+    "Actual Windows2022 profile missing from recipe rejected",
+    "Duplicate, missing, altered-selector, affinity or unpinned plugin profiles rejected"
+  ],
+  "sourceSHA256": {
+    "harness/e2e/aws/windows_gpu_workload.py": "02a91884c02fadca88dac1066dc1d8fcace51f1a1ffc2e7d3099f1bba1ae3132",
+    "harness/e2e/aws/test_windows_gpu_workload.py": "79ae0ca41a50b39680b700ee692e74504796da48036e2bd5f2b6654b441971b1"
+  },
+  "limitations": [
+    "Coverage is limited to the selected helpers, not the overall provisioning system.",
+    "The corrected recipe has only passed admission; native image preparation and fresh-clone complete cache reuse remain required.",
+    "The original GPU workload passed, while complete startup cache and survivor reliability failed."
+  ],
+  "nativeInvocationFinding": "Initial observer imports failed without the test PYTHONPATH before any API calls or Job submission; helper now locates the repository from its own path",
+  "externalWorkingDirectoryImportTestPassed": true,
+  "coverageScope": "Selected workload/profile preflight and cache-reuse evaluator only; no guest or full-project instrumentation",
+  "nativeCacheFinding": "The first Windows2022 worker pulled its selected upstream device-plugin image because the copied recipe only included the Windows2025 profile image. Nine other container entries were cache hits.",
+  "profilePreflightRejectsObservedIncompleteRecipe": true,
+  "nativeTrial": "windows-capi-gpu-startup-cache-2022-results.json",
+  "canonicalReferenceFinding": "The actual distribution/reference v0.6.0 parser used by containerd 2.3.2 normalizes index.docker.io to docker.io; the native 17-reference builder only registered the former.",
+  "canonicalReferenceFixture": "harness/e2e/observe/testdata/windows-cri-reference-alias-native.json"
+}

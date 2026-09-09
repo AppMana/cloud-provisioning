@@ -1,0 +1,79 @@
+#cloud-config
+{{- template "ssh-authorized-keys" . }}
+# rke2-agent join pattern: bring up the tunnel (the shared blocks in
+# _shared.tmpl), gate on the cluster's supervisor becoming reachable
+# through it, then join as a plain RKE2 agent using a pre-minted
+# bootstrap token in the same secure format as k3s
+# (K10<CA-hash>::<id>.<secret>; RKE2 is k3s's server code with its
+# supervisor on 9345, see pkg/join/rke2). Set directly as
+# Machine.spec.bootstrap.dataSecretName content, with no bootstrap
+# provider; the other patterns are the same contract.
+#
+# Only write_files and runcmd belong here, for the same reason as the
+# kubeadm pattern: CAPD-style interpreters parse any other top-level
+# module with an "unknown" handler that fails on plain YAML.
+#
+# No balancer here: the RKE2 agent carries the same client-side
+# balancer as k3s across every server it learns from the supervisor,
+# so the rke2 provider does not implement join.NodeLocalBalancer,
+# apiProxyPort renders zero, and the shared blocks emit no wg-apiproxy
+# unit (join-patterns/README.md tracks who balances per distribution).
+write_files:
+{{- template "wg-dialer-files" . }}
+{{- template "wg-dialer-unit" . }}
+{{- template "wg-apiproxy-unit" . }}
+  # The token in a root-only file rather than on a command line, read
+  # by the agent through its config's token-file key.
+  - path: /etc/rancher/rke2/join-token
+    permissions: '0600'
+    content: |
+      {{ .joinToken }}
+  # The agent's own config. kubelet args and any metadata-derived
+  # node-ip are appended in runcmd, because they are computed on the
+  # machine.
+  - path: /etc/rancher/rke2/config.yaml
+    permissions: '0600'
+    content: |
+      server: {{ .joinServerURL }}
+      token-file: /etc/rancher/rke2/join-token
+runcmd:
+{{- template "dialer-install" . }}
+  # Gate on the supervisor the join will actually dial, through the
+  # tunnel. Its /ping answers unauthenticated, and any HTTP response
+  # proves reachability. TCP rather than ICMP for the same reasons as
+  # every other pattern: minimal images ship no ping, and cloud
+  # firewalls drop ICMP while admitting the port that matters.
+  - until curl -sk --max-time 3 -o /dev/null {{ .joinServerURL }}/ping; do sleep 2; done
+  # kubeletExtraArgs arrive as one opaque string of --flag=value words
+  # (the generic contract); RKE2 takes kubelet args one per kubelet-arg
+  # config entry, so the string is re-worded here. The values this
+  # operator renders (a role label, a taint) contain no whitespace, so
+  # word-splitting is the correct parser for them. node-ip from
+  # instance metadata where a metadata service exists (IMDSv2,
+  # AWS-specific); where there is none the probe fails fast and RKE2's
+  # own address detection applies unchanged.
+  - |
+    set -e
+    KEXTRA='{{ .kubeletExtraArgs }}'
+    # One kubelet-arg list, written once. RKE2 reads YAML, so a second
+    # kubelet-arg key later in the file replaces this one rather than
+    # adding to it, and the role label and taint would go with it.
+    KARGS=""
+    for a in $KEXTRA; do
+      KARGS="$KARGS ${a#--}"
+    done
+{{- template "node-ip-arg" . }}
+    [ -z "$PROVIDER_ID_ARG" ] || KARGS="$KARGS ${PROVIDER_ID_ARG#--}"
+    if [ -n "$KARGS" ]; then
+      echo 'kubelet-arg:' >> /etc/rancher/rke2/config.yaml
+      for a in $KARGS; do
+        echo "  - \"$a\"" >> /etc/rancher/rke2/config.yaml
+      done
+    fi
+    # rke2 takes it in its config file rather than as a flag, so the
+    # shared block's answer is unwrapped here.
+    [ -n "$NODE_IP_ARG" ] && echo "node-ip: ${NODE_IP_ARG#--node-ip=}" >> /etc/rancher/rke2/config.yaml
+    echo "node-name: $(hostname)" >> /etc/rancher/rke2/config.yaml
+    curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION='{{ .rke2Version }}' INSTALL_RKE2_TYPE=agent sh -
+    systemctl enable --now rke2-agent.service
+{{- template "bootstrap-sentinel" . }}

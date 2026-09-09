@@ -1,0 +1,59 @@
+{
+  "observedAt": "2026-09-08T17:36:32.185533+00:00",
+  "scope": "Explicit native-sampler diagnostic mode; independent GPU observation cannot qualify a combined lifecycle row",
+  "testsPassed": 17,
+  "coverage": {
+    "covered_lines": 161,
+    "num_statements": 195,
+    "percent_covered": 82.56410256410257,
+    "percent_covered_display": "83",
+    "missing_lines": 34,
+    "excluded_lines": 0
+  },
+  "coverageFiles": {
+    "observe/survivor_native.py": {
+      "covered_lines": 122,
+      "num_statements": 154,
+      "percent_covered": 79.22077922077922,
+      "percent_covered_display": "79",
+      "missing_lines": 32,
+      "excluded_lines": 0
+    },
+    "observe/survivor_stream.py": {
+      "covered_lines": 39,
+      "num_statements": 41,
+      "percent_covered": 95.1219512195122,
+      "percent_covered_display": "95",
+      "missing_lines": 2,
+      "excluded_lines": 0
+    }
+  },
+  "nativeFixture": "survivor-preflight-loss.json",
+  "sourceSHA256": {
+    "observe/survivor_native.py": "d9913481d630468d1bd911d45886b91a100cca443164f69322154785ac212a24",
+    "observe/survivor_stream.py": "4aa2f39edac91e2f0011d8f2f1b86dbd1c5706e271c3e9299c8275ea6a8fdf81",
+    "observe/testdata/survivor-preflight-loss.json": "bfa51d1347effdc259f11ce4de47e2ac7c715a715905583c79da7f69437de9e0"
+  },
+  "checks": {
+    "defaultPreflightStillRejectsLoss": true,
+    "diagnosticPreservesNativeLossCount": true,
+    "changedIdentityAndInvalidCountersRejected": true,
+    "diagnosticCannotReturnQualifiedSuccess": true
+  },
+  "nativeDiagnosticLifecycleExecuted": true,
+  "limitations": [
+    "Selected Python unit-test coverage only.",
+    "The native diagnostic retained known UDP failures and cannot establish combined lifecycle qualification."
+  ],
+  "nativeTrial": {
+    "report": "windows-capi-gpu-startup-cache-canonical-2022-results.json",
+    "combinedPassed": false,
+    "qualificationEligible": false,
+    "attempts": 84971,
+    "failed": 12,
+    "allOriginalLanesBracketWindow": true,
+    "identitiesStable": true,
+    "cleanupPassed": true
+  },
+  "updatedAt": "2026-09-08T18:06:32.564291+00:00"
+}

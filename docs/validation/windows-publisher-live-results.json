@@ -1,0 +1,37 @@
+{
+  "scope": "Real Windows HostProcess projected-token authentication, native service receipt, and Kubernetes Secret acknowledgement; token rotation, traffic and replacement remain separate gates",
+  "publisherAPIServer": "https://[::1]:7443",
+  "controllerImage": "cldt/controller-windows:v3",
+  "results": [
+    {
+      "windowsVersion": "2022",
+      "machine": "aws-win2022",
+      "instanceID": "i-0a25d4ef52b34a8cf",
+      "observedAt": "2026-09-07T04:57:45.487948+00:00",
+      "receiptAgeSeconds": 4.249066,
+      "checks": {
+        "requestMatchesSecretUID": true,
+        "receiptMatchesRequest": true,
+        "receiptMatchesSecretUID": true,
+        "receiptMatchesPayload": true,
+        "receiptFresh": true,
+        "ackMatchesPayload": true
+      }
+    },
+    {
+      "windowsVersion": "2025",
+      "machine": "aws-win2025",
+      "instanceID": "i-0b09fc50f9652095f",
+      "observedAt": "2026-09-07T04:57:49.035904+00:00",
+      "receiptAgeSeconds": 4.295887,
+      "checks": {
+        "requestMatchesSecretUID": true,
+        "receiptMatchesRequest": true,
+        "receiptMatchesSecretUID": true,
+        "receiptMatchesPayload": true,
+        "receiptFresh": true,
+        "ackMatchesPayload": true
+      }
+    }
+  ]
+}

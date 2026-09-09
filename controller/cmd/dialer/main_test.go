@@ -328,16 +328,33 @@ func TestParseAllowedIP_RefusesEntriesThatTakeTraffic(t *testing.T) {
 		{"192.168.1.0/24", "covers this node's own 192.168.1.5"},
 		{"203.0.113.0/24", "covers a peer endpoint, reachable only outside the tunnel"},
 	} {
-		if _, err := parseAllowedIP(tc.entry, local, endpoints); err == nil {
+		if _, err := parseAllowedIP(tc.entry, local, endpoints, false); err == nil {
 			t.Errorf("parseAllowedIP(%q) was accepted, but it %s", tc.entry, tc.reason)
 		}
 	}
 
 	// A node's own pod block is exactly what the list is for.
 	for _, entry := range []string{"10.244.1.0/26", "10.100.0.2/32", "fd00:1::/64"} {
-		if _, err := parseAllowedIP(entry, local, endpoints); err != nil {
+		if _, err := parseAllowedIP(entry, local, endpoints, false); err != nil {
 			t.Errorf("parseAllowedIP(%q) was refused: %v", entry, err)
 		}
+	}
+
+	// With the tunnel's own packets marked and exempted, a peer's
+	// endpoint address is a legitimate accept-list entry: an
+	// encapsulating network addresses its packets to exactly it, and
+	// the loop the refusal guarded against is broken by the mark. The
+	// node's own addresses and the default route stay refused: the
+	// mark changes what may ride the tunnel, not who may impersonate
+	// this node.
+	if _, err := parseAllowedIP("203.0.113.7/32", local, endpoints, true); err != nil {
+		t.Errorf("a marked tunnel refused its peer's endpoint address: %v", err)
+	}
+	if _, err := parseAllowedIP("10.0.0.0/8", local, endpoints, true); err == nil {
+		t.Error("a marked tunnel accepted an entry covering this node's own address")
+	}
+	if _, err := parseAllowedIP("0.0.0.0/0", local, endpoints, true); err == nil {
+		t.Error("a marked tunnel accepted a default route")
 	}
 }
 
@@ -364,7 +381,7 @@ func TestParseAllowedIP_ABadEntryCostsOnlyItself(t *testing.T) {
 	}
 	var kept []string
 	for _, entry := range entries {
-		if _, err := parseAllowedIP(entry, localAddrs, endpointHosts); err != nil {
+		if _, err := parseAllowedIP(entry, localAddrs, endpointHosts, false); err != nil {
 			continue
 		}
 		kept = append(kept, entry)

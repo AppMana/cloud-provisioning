@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-08",
+  "scope": "Fresh k0s kube-router site bringup and observed-resource regression; excludes remote lifecycle and packet matrix results",
+  "result": "passed",
+  "rig": "single-NIC QEMU/KVM guests; serial QGA; private Docker daemon/network/PID runner",
+  "k0sVersion": "v1.36.2+k0s.0",
+  "kubeRouterImage": "quay.io/k0sproject/kube-router:v2.10.0-iptables1.8.13-k0s.0",
+  "nodes": [
+    {
+      "name": "cp",
+      "uid": "f86f50dd-8891-4249-a618-d5af82a873e3",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s",
+      "containerRuntimeVersion": "containerd://2.3.2",
+      "podCIDRs": [
+        "10.244.0.0/24"
+      ]
+    },
+    {
+      "name": "cp2",
+      "uid": "e74ad1b3-eaff-4c3f-ba13-2f4071a233d9",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s",
+      "containerRuntimeVersion": "containerd://2.3.2",
+      "podCIDRs": [
+        "10.244.1.0/24"
+      ]
+    },
+    {
+      "name": "cp3",
+      "uid": "332a19ff-1dc9-4dca-86f7-8ecca07ce316",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s",
+      "containerRuntimeVersion": "containerd://2.3.2",
+      "podCIDRs": [
+        "10.244.2.0/24"
+      ]
+    },
+    {
+      "name": "w1",
+      "uid": "564ba6ff-694c-4d83-8533-f6ac423b054d",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s",
+      "containerRuntimeVersion": "containerd://2.3.2",
+      "podCIDRs": [
+        "10.244.3.0/24"
+      ]
+    },
+    {
+      "name": "w2",
+      "uid": "d647dd1a-19d9-4daa-b6f9-0af77d08d733",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s",
+      "containerRuntimeVersion": "containerd://2.3.2",
+      "podCIDRs": [
+        "10.244.4.0/24"
+      ]
+    }
+  ],
+  "prebootstrapHardwareAndNetworkAssertions": "passed for seven guest slots",
+  "retainedCluster": {
+    "readyNodes": 13,
+    "nodeUIDsUnchanged": true,
+    "hostRoutesUnchanged": true
+  },
+  "source": {
+    "runnerImageOriginallyStarted": "sha256:1815da72f95bf4fd3c35212f3b6563ca9a29d9083429ac3e05a648da5a0dde51",
+    "correctedRunnerImage": "sha256:b0f246bf21ee954313d4098980ca6f331f8c3578bf669159221363643dce1a29",
+    "liveRunnerCorrections": [
+      "containerlab mode 0755",
+      "git safe.directory /workspace"
+    ],
+    "correctedDockerfileSHA256": "27bce5a37f076a52a19d69a66c3bd5e312ab95b3b8cc98c2f737c89a449e7a79",
+    "labBinarySHA256": "42c0c9ac92937154612b8fffd9e092e56c88df1324c700a60ea9c2c529cc8f81",
+    "failedLaunchCountersSeparated": true
+  },
+  "observedRegression": {
+    "command": "go test ./pkg/cni -run TestObservedK0sBundledKubeRouter -count=1 -coverprofile=<private>/cni-observed.cover",
+    "passed": true,
+    "fixtures": [
+      "k0s-v1.34.1-kube-router-v2.6.1",
+      "k0s-v1.36.2-kube-router"
+    ],
+    "coverage": {
+      "scope": "controller/pkg/cni statements exercised by this selected test only",
+      "covered": 66,
+      "total": 222,
+      "percent": 29.73
+    }
+  },
+  "limitations": [
+    "No remote lifecycle, replacement, placement or packet result is asserted by this site report.",
+    "No Windows, GPU, AWS, IPv6 or release qualification is asserted.",
+    "The runner shares the host kernel and is not a security boundary."
+  ],
+  "nativeHarnessCoverage": {
+    "covered": 835,
+    "total": 3192,
+    "percent": 26.16,
+    "scope": "Instrumented harness packages linked into cmd/lab; fresh site execution ended at Helm packaging failure, before remote claims; excludes initial non-executable-containerlab attempt and subsequent site reuse"
+  },
+  "runnerPackaging": {
+    "initialFailure": "copied containerlab lacked executable mode",
+    "secondFailure": "Alpine musl-linked Helm could not execute in Debian bastion",
+    "corrections": [
+      "explicit mode 0755 and execution build check",
+      "checksum-bound static Helm with linkage build check",
+      "portable Helm 3.19.4 executed successfully in runner and Debian bastion"
+    ],
+    "finalDockerfileSHA256": "4606917d0b5bd2c55c1f0e87ca9f85db32180ebbcaecc9aed2653c38f037a34f",
+    "finalRunnerImage": "sha256:6875476523d9b8568e659e91c332f71f4cfdf1782681e19a33f23d3d073ba2da"
+  }
+}

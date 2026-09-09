@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "completedUTC": "2026-09-09T00:59:14.513748+00:00",
+  "result": "passed",
+  "scope": "Shared read-only observer on retained Windows Server 2022 and 2025 CPU instances; not network/GPU qualification",
+  "binarySHA256": "5d9dee4abed135266ca497976f38a9f68abd6be1c8fa301dfdd71b9909965f93",
+  "versions": {
+    "2022": {
+      "build": 20348,
+      "samples": 3,
+      "peerCounts": [
+        9,
+        9,
+        9
+      ],
+      "dllSHA256": "b1b85e072c45d81358be29d94c599dc76652f912be8c0f0a41e2d5d89a6461d3"
+    },
+    "2025": {
+      "build": 26100,
+      "samples": 3,
+      "peerCounts": [
+        9,
+        9,
+        9
+      ],
+      "dllSHA256": "b1b85e072c45d81358be29d94c599dc76652f912be8c0f0a41e2d5d89a6461d3"
+    }
+  },
+  "schema": "Hashed public identities, endpoints, byte counters and lastHandshakeFiletime; exact allowed peer fields checked",
+  "cleanup": {
+    "guestBinaryDLLCopyAndReportsHashCheckedAndRemoved": true,
+    "newInstancesCreated": false,
+    "workerPackagesInstalled": false,
+    "servicesRestarted": false
+  },
+  "retainedCluster": {
+    "readyNodes": 13,
+    "nodeUIDsUnchanged": true
+  },
+  "limitations": [
+    "No mitigation or new qualification of the known Windows UDP loss is established.",
+    "Native samples validate reading current adapters; they do not measure uninterrupted traffic.",
+    "The observer binary was not instrumented for native runtime coverage."
+  ]
+}

@@ -1,0 +1,286 @@
+{
+  "scope": "Single-physical-NIC QEMU cp2 full OS reboot with concurrent ordinary-pod survivor UDP via QEMU serial CRI and Windows 2022/2025 EC2 SSM CRI",
+  "operation": {
+    "victim": "cp2",
+    "initialBootID": "d641be1e-851b-4325-9d95-cdbf6bdc0eb8",
+    "beforeNodes": {
+      "aws-win2022-gpu": {
+        "uid": "dd54061d-491a-4b12-95a7-27393e847780",
+        "ready": true
+      },
+      "aws-win2022-v3": {
+        "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ready": true
+      },
+      "aws-win2025": {
+        "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+        "ready": true
+      },
+      "aws-win2025-gpu": {
+        "uid": "258d7b62-e774-48bc-94dc-e31ff042f585",
+        "ready": true
+      },
+      "aws-win2025-v3": {
+        "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ready": true
+      },
+      "cp": {
+        "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+        "ready": true
+      },
+      "cp2": {
+        "uid": "947de62f-0920-408c-aa31-ac80a2344128",
+        "ready": true
+      },
+      "cp3": {
+        "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+        "ready": true
+      },
+      "ip-172-29-0-9": {
+        "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+        "ready": true
+      },
+      "remote1": {
+        "uid": "8935dd28-de93-44be-a887-73110fe88c51",
+        "ready": true
+      },
+      "remote2": {
+        "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+        "ready": true
+      },
+      "w1": {
+        "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+        "ready": true
+      },
+      "w2": {
+        "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+        "ready": true
+      }
+    },
+    "startedAt": "2026-09-08T07:43:43.733095+00:00",
+    "rebootRequestExitCode": 0,
+    "finalBootID": "9be07280-a17f-4dcd-b849-217e2ec5453b",
+    "afterNodes": {
+      "aws-win2022-gpu": {
+        "uid": "dd54061d-491a-4b12-95a7-27393e847780",
+        "ready": true
+      },
+      "aws-win2022-v3": {
+        "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ready": true
+      },
+      "aws-win2025": {
+        "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+        "ready": true
+      },
+      "aws-win2025-gpu": {
+        "uid": "258d7b62-e774-48bc-94dc-e31ff042f585",
+        "ready": true
+      },
+      "aws-win2025-v3": {
+        "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ready": true
+      },
+      "cp": {
+        "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+        "ready": true
+      },
+      "cp2": {
+        "uid": "947de62f-0920-408c-aa31-ac80a2344128",
+        "ready": true
+      },
+      "cp3": {
+        "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+        "ready": true
+      },
+      "ip-172-29-0-9": {
+        "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+        "ready": true
+      },
+      "remote1": {
+        "uid": "8935dd28-de93-44be-a887-73110fe88c51",
+        "ready": true
+      },
+      "remote2": {
+        "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+        "ready": true
+      },
+      "w1": {
+        "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+        "ready": true
+      },
+      "w2": {
+        "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+        "ready": true
+      }
+    },
+    "leaseRenewTime": "2026-09-08T07:44:26.549841Z",
+    "finishedAt": "2026-09-08T07:44:26.970289+00:00",
+    "passed": true
+  },
+  "traffic": {
+    "finishedAt": "2026-09-08T07:44:42.048874+00:00",
+    "elapsedSeconds": 67.27648882899666,
+    "scope": "Concurrent sampled 64-byte UDP echoes; excludes delivery between attempts and fragmented UDP qualification",
+    "executor": "OutOfBand",
+    "maxAllowedGapSeconds": 30.0,
+    "intervalSeconds": 0.1,
+    "identitiesStable": true,
+    "identityError": null,
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 0.4427132199634798,
+        "attempts": 242,
+        "passed": 242,
+        "maxGapSeconds": 0.10051436303183436,
+        "maxAttemptSeconds": 0.34233214700361714,
+        "ok": true
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 0.3565886300057173,
+        "attempts": 245,
+        "passed": 245,
+        "maxGapSeconds": 0.10048684099456295,
+        "maxAttemptSeconds": 0.25625561899505556,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 5.520910282037221,
+        "attempts": 13,
+        "passed": 13,
+        "maxGapSeconds": 0.10043633700115606,
+        "maxAttemptSeconds": 5.420565188047476,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 5.553573276964016,
+        "attempts": 13,
+        "passed": 13,
+        "maxGapSeconds": 0.10039302601944655,
+        "maxAttemptSeconds": 5.453248942969367,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 5.556238721997943,
+        "attempts": 13,
+        "passed": 13,
+        "maxGapSeconds": 0.10044325899798423,
+        "maxAttemptSeconds": 5.455991561990231,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 5.587187390017789,
+        "attempts": 13,
+        "passed": 13,
+        "maxGapSeconds": 0.10041861300123855,
+        "maxAttemptSeconds": 5.486777422018349,
+        "ok": true
+      }
+    ],
+    "stopRequested": true,
+    "ready": true,
+    "ok": true
+  },
+  "window": {
+    "startedAt": "2026-09-08T07:43:43.733095+00:00",
+    "finishedAt": "2026-09-08T07:44:26.970289+00:00",
+    "lanesBracketWindow": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "lanesPassed": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ok": true,
+    "scope": "Successful sampled survivor probes bracket the operation; gaps and latency remain in the observer report"
+  },
+  "earlierBaselines": [
+    {
+      "run": "survivor-oob-baseline-v1",
+      "ok": false,
+      "attempts": 273,
+      "passed": 243
+    },
+    {
+      "run": "survivor-oob-baseline-v2",
+      "ok": false,
+      "attempts": 266,
+      "passed": 240
+    },
+    {
+      "run": "survivor-oob-baseline-v3",
+      "ok": true,
+      "attempts": 265,
+      "passed": 265
+    }
+  ],
+  "setupFindings": [
+    "Original configured Windows CRI path absent; no reboot requested in failed baseline",
+    "Bundled Windows k0s ctr exec started original agnhost server command and failed binding occupied ports; executor option rejected",
+    "Pinned crictl staged and checksum verified in owned Windows directories; CRI baseline passed"
+  ],
+  "tests": {
+    "survivorTestsPassed": 14,
+    "podMatrixTestsPassed": 7,
+    "OOBAdapterUnitStatementCoveragePercent": 100,
+    "OOBAdapterNativeStatementCoveragePercent": 74,
+    "scope": "Observer/adapter coverage only; no whole-project coverage claim"
+  },
+  "artifactSHA256": {
+    "initial.json": "85fd79204fb7b10347270b1f9493d9aea5dc423ae4ea917ff1c69a533ae94986",
+    "lane-00.jsonl": "86c4d8329b1dcac76e0826405365734c6f1f016554dbd303d16d854cdb51682e",
+    "lane-01.jsonl": "f2b40ab886aa9e918762d78d0810d4c156fe2cd04836f72cf1432f9e3789b644",
+    "lane-02.jsonl": "311bb1847ab810fac5799f6d46101005bbfc81c2760b7f8363ce1df27d753cfe",
+    "lane-03.jsonl": "435883e0c134c57b0ed33a696024cf4078f953264c1ebc943d321c64ae26fe18",
+    "lane-04.jsonl": "5ade293a473ad03dc9d4f1327dcde11d02e987b7b1d1a7b7432bfc395fc15f7a",
+    "lane-05.jsonl": "338ec631245487813d974662adc894737f3d3f6489fdaae13a97da513cdb63f1",
+    "READY.json": "e584618fb1eaca2cc8902a249acc5ed20fc42211c19fbc620ec4cfb3deb5346f",
+    "operation-start.json": "2bdd254dfd78fa0d14c3d43311d9a58124430141aa9bb70224d0361db0ad92a0",
+    "operation.json": "da38613649c263be39724e4733ea85bd801201954c0e680f250fd6b6da774b21",
+    "STOP": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "result.json": "83d8c4e4d8306425d7f3fefcc6f936c50f64ea53747c4eea31d4bbd5588fb7c3",
+    "window.json": "3a543baa5a4a8ab17cff178790ecd1f9906a165f8cfd8782d602d6e6a0a1e7c4"
+  },
+  "limitations": [
+    "Sampled 64-byte echoes only; no proof of packet delivery between samples or fragmented UDP support",
+    "SSM command latency determines Windows sampling frequency",
+    "Kubernetes API used only for initial/final identity snapshots and operation recovery checks",
+    "CAPI addition/removal/replacement with this observer remains outstanding",
+    "This run uses current deployed mesh binaries, not the unpromoted Linux empty-peer candidate"
+  ],
+  "cleanup": [
+    {
+      "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "ownedExecutableRemoved": true,
+      "ownedDirectoryRemoved": true,
+      "noOwnedCRIProcesses": true
+    },
+    {
+      "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "ownedExecutableRemoved": true,
+      "ownedDirectoryRemoved": true,
+      "noOwnedCRIProcesses": true
+    }
+  ]
+}

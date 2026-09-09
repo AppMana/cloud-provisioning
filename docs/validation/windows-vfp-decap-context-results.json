@@ -1,0 +1,991 @@
+{
+  "observedAt": "2026-09-09T02:04:48.757117+00:00",
+  "scope": "Retained single-NIC Windows Server 2022/2025 VMs; same-host VFP and Packet Monitor context for three native UDP drops plus six adjacent successful controls.",
+  "qualificationEligible": false,
+  "hosts": [
+    {
+      "windowsServer": "2022",
+      "vfpCapture": {
+        "build": 20348,
+        "session": "cldt-vfp-b2ab3da3ce874cf09740302e2f356399",
+        "startedAt": "2026-09-09T01:43:35.3701734Z",
+        "stoppedAt": "2026-09-09T01:44:06.0004006Z",
+        "requestedSeconds": 30,
+        "traceStopped": true,
+        "traceFilteringUnchanged": true,
+        "xmlExported": false,
+        "xmlEventLimit": 10000,
+        "xmlEventLimitReached": false,
+        "eventCount": 0,
+        "counts": {},
+        "artifacts": [
+          {
+            "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+            "name": "provider.json",
+            "bytes": 311964
+          },
+          {
+            "sha256": "8e59a4fa01d22ca90749acd6d8b16270ad8c69a41884ab61b9566fe222a65460",
+            "name": "vfp.etl",
+            "bytes": 67108864
+          }
+        ],
+        "qualificationEligible": false,
+        "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation."
+      },
+      "packetMonitor": {
+        "firstPacket": "2026-09-09T01:43:35.047401Z",
+        "lastPacket": "2026-09-09T01:44:06.892615Z",
+        "packetCount": 194240,
+        "stopReportedNoEventsLost": true
+      },
+      "firstRetainedVFPDataEvent": "2026-09-09T01:43:42.9167429Z",
+      "artifacts": [
+        {
+          "sha256": "e1bb80ba19f676c653dcaacc1ad49c434bde42ddb5b216105fa7309cc3854121",
+          "name": "capture.etl",
+          "bytes": 3981243
+        },
+        {
+          "sha256": "e6c1d0b86aea4beee72568d68289270cb4b7f2e5f30a925abf09fe5ee313bc98",
+          "name": "capture.pcapng",
+          "bytes": 34041816
+        },
+        {
+          "sha256": "2afebdfea427740a187dcb479b250cfe4057a896a36476abf9dfe8a88a1287c6",
+          "name": "capture.txt.gz",
+          "bytes": 4188048
+        },
+        {
+          "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+          "name": "vfp\\provider.json",
+          "bytes": 311964
+        },
+        {
+          "sha256": "30c8d20c2c5ee3c507713ea061dae12ea3503c893d667ef4c0f9b22f01c32a3e",
+          "name": "vfp\\result.json",
+          "bytes": 740
+        },
+        {
+          "sha256": "8e59a4fa01d22ca90749acd6d8b16270ad8c69a41884ab61b9566fe222a65460",
+          "name": "vfp\\vfp.etl",
+          "bytes": 67108864
+        },
+        {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "name": "vfp-drop-00.jsonl.gz",
+          "bytes": 0
+        },
+        {
+          "sha256": "9e434625933ccd4ba2cc2332d5cad7727af16e4c00413dc11228e30e66a08278",
+          "name": "vfp-context-00.jsonl.gz",
+          "bytes": 3396
+        },
+        {
+          "sha256": "04cbf14528191b80e732f507c001f0b2d99a74c449aa23712df04a7ca1c7f31a",
+          "name": "vfp-control-00-before.jsonl.gz",
+          "bytes": 7308
+        },
+        {
+          "sha256": "cf51cbacf19d2e3f738281f535abba6555a59097228e3fdc6aafcceec83fd7b7",
+          "name": "vfp-control-00-after.jsonl.gz",
+          "bytes": 7342
+        },
+        {
+          "sha256": "49204dbe3b0a98419701a2c9279ec7a1b16bdf3f65cf9fed177f0bad042595e5",
+          "name": "vfp-limit.jsonl.gz",
+          "bytes": 628
+        }
+      ],
+      "hashVerifiedDownloads": true,
+      "guestArtifactsRemoved": true,
+      "queryVerification": {
+        "hashtableKnownEventMatches": 0,
+        "xpathKnownEventMatches": 2
+      }
+    },
+    {
+      "windowsServer": "2025",
+      "vfpCapture": {
+        "build": 26100,
+        "session": "cldt-vfp-a3020d20f4354ecf8518e01b182980e0",
+        "startedAt": "2026-09-09T01:43:35.4843450Z",
+        "stoppedAt": "2026-09-09T01:44:06.0557124Z",
+        "requestedSeconds": 30,
+        "traceStopped": true,
+        "traceFilteringUnchanged": true,
+        "xmlExported": false,
+        "xmlEventLimit": 10000,
+        "xmlEventLimitReached": false,
+        "eventCount": 0,
+        "counts": {},
+        "artifacts": [
+          {
+            "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+            "name": "provider.json",
+            "bytes": 327652
+          },
+          {
+            "sha256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+            "name": "vfp.etl",
+            "bytes": 67108864
+          }
+        ],
+        "qualificationEligible": false,
+        "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation."
+      },
+      "packetMonitor": {
+        "firstPacket": "2026-09-09T01:43:35.270383Z",
+        "lastPacket": "2026-09-09T01:44:06.732383Z",
+        "packetCount": 199316,
+        "stopReportedNoEventsLost": true
+      },
+      "firstRetainedVFPDataEvent": "2026-09-09T01:43:44.3642191Z",
+      "artifacts": [
+        {
+          "sha256": "eae3cb239fa1589ed8d638d54cdc05c801474f3eb4e11f2a67c66ce898c56f40",
+          "name": "capture.etl",
+          "bytes": 4509642
+        },
+        {
+          "sha256": "72341930e335281c9d0deb5c1ab8b49d7e6081f28690ca95278eb3ec7a52092d",
+          "name": "capture.pcapng",
+          "bytes": 34932968
+        },
+        {
+          "sha256": "fef0f521b7835b56f00ecce828345590d3125b314605e49f8c15074db0bf1f86",
+          "name": "capture.txt.gz",
+          "bytes": 4539772
+        },
+        {
+          "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+          "name": "vfp\\provider.json",
+          "bytes": 327652
+        },
+        {
+          "sha256": "2bb280ef4371b8606a7cf8c050c3faafeeb9e090b5a600f03c6f225b1a9e0b19",
+          "name": "vfp\\result.json",
+          "bytes": 740
+        },
+        {
+          "sha256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+          "name": "vfp\\vfp.etl",
+          "bytes": 67108864
+        },
+        {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "name": "vfp-drop-01.jsonl.gz",
+          "bytes": 0
+        },
+        {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "name": "vfp-drop-02.jsonl.gz",
+          "bytes": 0
+        },
+        {
+          "sha256": "70389ec6d1a651ce52d85d5d3788782f5e3b6577cf94912048d27c8993bc8c2c",
+          "name": "vfp-context-01.jsonl.gz",
+          "bytes": 2424
+        },
+        {
+          "sha256": "70389ec6d1a651ce52d85d5d3788782f5e3b6577cf94912048d27c8993bc8c2c",
+          "name": "vfp-context-02.jsonl.gz",
+          "bytes": 2424
+        },
+        {
+          "sha256": "87e98cbbf6f5eeb93501a9fe954c2c0cb95c9b9a03fc2f116609ee62a0a6e813",
+          "name": "vfp-control-01-before.jsonl.gz",
+          "bytes": 4447
+        },
+        {
+          "sha256": "aff020caaf0aa432c2ef49ac112c1ed4bfe463b003b08517db3054207c524923",
+          "name": "vfp-control-01-after.jsonl.gz",
+          "bytes": 7771
+        },
+        {
+          "sha256": "6b9e0e60a69615f4dd58ae010baeb87a9116942b9c61b9e12efb63b5042e868b",
+          "name": "vfp-control-02-before.jsonl.gz",
+          "bytes": 3846
+        },
+        {
+          "sha256": "8978f12d376552e793fa819ce573072265b155c02fd2ece5a117bf5839c67db1",
+          "name": "vfp-control-02-after.jsonl.gz",
+          "bytes": 3869
+        },
+        {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "name": "vfp-empty.jsonl.gz",
+          "bytes": 0
+        }
+      ],
+      "hashVerifiedDownloads": true,
+      "guestArtifactsRemoved": true,
+      "queryVerification": {
+        "hashtableKnownEventMatches": 0,
+        "xpathKnownEventMatches": 2
+      }
+    }
+  ],
+  "traffic": {
+    "attempts": 28676,
+    "failed": 6,
+    "identitiesStable": true,
+    "controlWindowVerified": true,
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "attempts": 3346,
+        "passed": 3345,
+        "maxStartIntervalSeconds": 5.0124743939999945,
+        "samplesSHA256": "e5b69ec7199455ec019a7084ac5ddd6155ebc178a7fe6aaa3a6bad11cd995b94",
+        "ok": false
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "attempts": 3671,
+        "passed": 3671,
+        "maxStartIntervalSeconds": 0.12852925099998913,
+        "samplesSHA256": "f782657006f480ee0b82c5653e02df45dad8c1ee79c8170f4c5161b94184a366",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "attempts": 3147,
+        "passed": 3146,
+        "maxStartIntervalSeconds": 5.011336200000002,
+        "samplesSHA256": "5ea3644b6b3f53d46a8f648aa542d40d56a8db2a572f0376a692925b38129aae",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "attempts": 7586,
+        "passed": 7585,
+        "maxStartIntervalSeconds": 5.0104714,
+        "samplesSHA256": "06ee735fa0690d4758dbdc6b2e960f75ab20a32184b752a5a905c967bb6ce137",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "attempts": 3310,
+        "passed": 3309,
+        "maxStartIntervalSeconds": 5.016379300000004,
+        "samplesSHA256": "c2df52c07d1be7541ba90529d2e3d1f90afbb26800b4a6ff51bbf6ae3f149358",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "attempts": 7616,
+        "passed": 7614,
+        "maxStartIntervalSeconds": 5.0115689,
+        "samplesSHA256": "3f184b84f5363db5e1455d8dacd04d9c2e563054bd2ddb94eeaee09439fbe673",
+        "ok": false
+      }
+    ]
+  },
+  "drops": [
+    {
+      "hostVersion": "2022",
+      "lane": 2,
+      "sample": {
+        "sequence": 1692,
+        "source": "10.244.114.4:49977",
+        "startedAt": "2026-09-09T01:43:49.5835594Z",
+        "finishedAt": "2026-09-09T01:43:54.5845055Z",
+        "ok": false,
+        "error": "read udp 10.244.114.4:49977->10.244.190.81:8081: i/o timeout",
+        "nonce": "ff1396e2d92e075ff2ca13332aa34ae0",
+        "pid": 5176,
+        "startOffsetSeconds": 63.2380579,
+        "finishOffsetSeconds": 68.239004,
+        "attempts": 1693,
+        "passed": 1692,
+        "maxStartIntervalSeconds": 0.1419174,
+        "healthy": false,
+        "stopBoundary": false
+      },
+      "direction": "reply",
+      "drop": {
+        "timestamp": "2026-09-09 01:43:49.639595100",
+        "group": 134871,
+        "packet": 1,
+        "component": 74,
+        "componentInfo": {
+          "driver": "tcpip.sys",
+          "name": "TCP/IPv4 - L3/L4"
+        },
+        "reason": "Not locally destined",
+        "location": "0xE0004136",
+        "ipID": 11539,
+        "fragmentOffsetBytes": 0,
+        "header": "[00]09AC.05F4::2026-09-09 01:43:49.639595100 [Microsoft-Windows-PktMon] Drop: PktGroupId 134871, PktNumber 1, Appearance 17, Direction Rx , Type IP , Component 74, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 142, LoggedSize 142 ",
+        "trafficClassesBeforeDrop": [
+          0
+        ],
+        "trafficClassAtDrop": 0,
+        "trafficClassChanged": false
+      }
+    },
+    {
+      "hostVersion": "2025",
+      "lane": 3,
+      "sample": {
+        "sequence": 4511,
+        "source": "10.244.114.4:50543",
+        "startedAt": "2026-09-09T01:43:56.5807113Z",
+        "finishedAt": "2026-09-09T01:44:01.5809744Z",
+        "ok": false,
+        "error": "read udp 10.244.114.4:50543->10.244.42.6:8081: i/o timeout",
+        "nonce": "861eecb52b2e22b8a42c6bd41b747bc1",
+        "pid": 356,
+        "startOffsetSeconds": 65.4140534,
+        "finishOffsetSeconds": 70.4143165,
+        "attempts": 4512,
+        "passed": 4511,
+        "maxStartIntervalSeconds": 0.1799767,
+        "healthy": false,
+        "stopBoundary": false
+      },
+      "direction": "request",
+      "drop": {
+        "timestamp": "2026-09-09 01:43:56.968664300",
+        "group": 2283966,
+        "packet": 1,
+        "component": 73,
+        "componentInfo": {
+          "driver": "tcpip.sys",
+          "name": "TCP/IPv4 - L3/L4"
+        },
+        "reason": "Not locally destined",
+        "location": "0xE0004136",
+        "ipID": 19189,
+        "fragmentOffsetBytes": 0,
+        "header": "[00]09B0.1828::2026-09-09 01:43:56.968664300 [Microsoft-Windows-PktMon] Drop: PktGroupId 2283966, PktNumber 1, Appearance 0, Direction Rx , Type IP , Component 73, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 147, LoggedSize 147 ",
+        "trafficClassesBeforeDrop": [
+          0
+        ],
+        "trafficClassAtDrop": 0,
+        "trafficClassChanged": false
+      }
+    },
+    {
+      "hostVersion": "2025",
+      "lane": 4,
+      "sample": {
+        "sequence": 1711,
+        "source": "10.244.42.6:60801",
+        "startedAt": "2026-09-09T01:43:56.9334579Z",
+        "finishedAt": "2026-09-09T01:44:01.9391856Z",
+        "ok": false,
+        "error": "read udp 10.244.42.6:60801->10.244.190.81:8081: i/o timeout",
+        "nonce": "5b95c824c69ba387a6edcc6f920cc579",
+        "pid": 6048,
+        "startOffsetSeconds": 61.9602928,
+        "finishOffsetSeconds": 66.9660205,
+        "attempts": 1712,
+        "passed": 1711,
+        "maxStartIntervalSeconds": 0.0970021,
+        "healthy": false,
+        "stopBoundary": false
+      },
+      "direction": "reply",
+      "drop": {
+        "timestamp": "2026-09-09 01:43:56.968570800",
+        "group": 2283949,
+        "packet": 1,
+        "component": 73,
+        "componentInfo": {
+          "driver": "tcpip.sys",
+          "name": "TCP/IPv4 - L3/L4"
+        },
+        "reason": "Not locally destined",
+        "location": "0xE0004136",
+        "ipID": 61097,
+        "fragmentOffsetBytes": 0,
+        "header": "[00]09B0.1828::2026-09-09 01:43:56.968570800 [Microsoft-Windows-PktMon] Drop: PktGroupId 2283949, PktNumber 1, Appearance 0, Direction Rx , Type IP , Component 73, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 142, LoggedSize 142 ",
+        "trafficClassesBeforeDrop": [
+          0
+        ],
+        "trafficClassAtDrop": 0,
+        "trafficClassChanged": false
+      }
+    }
+  ],
+  "flowComparisons": [
+    {
+      "windowsServer": "2022",
+      "dropIndex": 0,
+      "source": "10.244.190.81",
+      "sourcePort": 8081,
+      "destination": "10.244.114.4",
+      "destinationPort": 49977,
+      "portName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+      "failedFlowAction": "Ignore",
+      "successfulControls": [
+        {
+          "kind": "before",
+          "source": "10.244.190.81",
+          "sourcePort": 8081,
+          "destination": "10.244.114.4",
+          "destinationPort": 49973,
+          "action": "Pop",
+          "differentRecordedFields": [
+            "DstPort",
+            "EncapTransposition0",
+            "UnifiedFlow"
+          ]
+        },
+        {
+          "kind": "after",
+          "source": "10.244.190.81",
+          "sourcePort": 8081,
+          "destination": "10.244.114.4",
+          "destinationPort": 50340,
+          "action": "Pop",
+          "differentRecordedFields": [
+            "DstPort",
+            "EncapTransposition0",
+            "UnifiedFlow"
+          ]
+        }
+      ]
+    },
+    {
+      "windowsServer": "2025",
+      "dropIndex": 1,
+      "source": "10.244.114.4",
+      "sourcePort": 50543,
+      "destination": "10.244.42.6",
+      "destinationPort": 8081,
+      "portName": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+      "failedFlowAction": "Ignore",
+      "successfulControls": [
+        {
+          "kind": "before",
+          "source": "10.244.114.4",
+          "sourcePort": 50542,
+          "destination": "10.244.42.6",
+          "destinationPort": 8081,
+          "action": "Pop",
+          "differentRecordedFields": [
+            "EncapTransposition0",
+            "SrcPort",
+            "UnifiedFlow"
+          ]
+        },
+        {
+          "kind": "after",
+          "source": "10.244.114.4",
+          "sourcePort": 50680,
+          "destination": "10.244.42.6",
+          "destinationPort": 8081,
+          "action": "Pop",
+          "differentRecordedFields": [
+            "EncapTransposition0",
+            "SrcPort",
+            "UnifiedFlow"
+          ]
+        }
+      ]
+    },
+    {
+      "windowsServer": "2025",
+      "dropIndex": 2,
+      "source": "10.244.190.81",
+      "sourcePort": 8081,
+      "destination": "10.244.42.6",
+      "destinationPort": 60801,
+      "portName": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+      "failedFlowAction": "Ignore",
+      "successfulControls": [
+        {
+          "kind": "before",
+          "source": "10.244.190.81",
+          "sourcePort": 8081,
+          "destination": "10.244.42.6",
+          "destinationPort": 60797,
+          "action": "Pop",
+          "differentRecordedFields": [
+            "DstPort",
+            "EncapTransposition0",
+            "UnifiedFlow"
+          ]
+        },
+        {
+          "kind": "after",
+          "source": "10.244.190.81",
+          "sourcePort": 8081,
+          "destination": "10.244.42.6",
+          "destinationPort": 61178,
+          "action": "Pop",
+          "differentRecordedFields": [
+            "DstPort",
+            "EncapTransposition0",
+            "UnifiedFlow"
+          ]
+        }
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "file": "2022-vfp-context-00.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T01:43:49.6385950+00:00",
+      "endUtc": "2026-09-09T01:43:49.6405950+00:00",
+      "sourceSHA256": "8e59a4fa01d22ca90749acd6d8b16270ad8c69a41884ab61b9566fe222a65460",
+      "sourceUnchanged": true,
+      "eventCount": 34,
+      "queriedEventCount": 34,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "9e434625933ccd4ba2cc2332d5cad7727af16e4c00413dc11228e30e66a08278",
+        "name": "vfp-context-00.jsonl.gz",
+        "bytes": 3396
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2022-vfp-control-00-after.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T01:43:54.6179210+00:00",
+      "endUtc": "2026-09-09T01:43:54.6199210+00:00",
+      "sourceSHA256": "8e59a4fa01d22ca90749acd6d8b16270ad8c69a41884ab61b9566fe222a65460",
+      "sourceUnchanged": true,
+      "eventCount": 77,
+      "queriedEventCount": 77,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "cf51cbacf19d2e3f738281f535abba6555a59097228e3fdc6aafcceec83fd7b7",
+        "name": "vfp-control-00-after.jsonl.gz",
+        "bytes": 7342
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2022-vfp-control-00-before.jsonl.gz",
+      "outsideRequestedWindowCount": 29,
+      "startUtc": "2026-09-09T01:43:49.5698500+00:00",
+      "endUtc": "2026-09-09T01:43:49.5718500+00:00",
+      "sourceSHA256": "8e59a4fa01d22ca90749acd6d8b16270ad8c69a41884ab61b9566fe222a65460",
+      "sourceUnchanged": true,
+      "eventCount": 77,
+      "queriedEventCount": 77,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "04cbf14528191b80e732f507c001f0b2d99a74c449aa23712df04a7ca1c7f31a",
+        "name": "vfp-control-00-before.jsonl.gz",
+        "bytes": 7308
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2022-vfp-drop-00.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T01:43:49.6385950+00:00",
+      "endUtc": "2026-09-09T01:43:49.6405950+00:00",
+      "sourceSHA256": "8e59a4fa01d22ca90749acd6d8b16270ad8c69a41884ab61b9566fe222a65460",
+      "sourceUnchanged": true,
+      "eventCount": 0,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "name": "vfp-drop-00.jsonl.gz",
+        "bytes": 0
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2022-vfp-limit.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T01:43:49.6385950+00:00",
+      "endUtc": "2026-09-09T01:43:49.6405950+00:00",
+      "sourceSHA256": "8e59a4fa01d22ca90749acd6d8b16270ad8c69a41884ab61b9566fe222a65460",
+      "sourceUnchanged": true,
+      "eventCount": 1,
+      "queriedEventCount": 1,
+      "maxEvents": 1,
+      "eventLimitReached": true,
+      "artifact": {
+        "sha256": "49204dbe3b0a98419701a2c9279ec7a1b16bdf3f65cf9fed177f0bad042595e5",
+        "name": "vfp-limit.jsonl.gz",
+        "bytes": 628
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2025-vfp-context-01.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T01:43:56.9676640+00:00",
+      "endUtc": "2026-09-09T01:43:56.9696640+00:00",
+      "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+      "sourceUnchanged": true,
+      "eventCount": 19,
+      "queriedEventCount": 19,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "70389ec6d1a651ce52d85d5d3788782f5e3b6577cf94912048d27c8993bc8c2c",
+        "name": "vfp-context-01.jsonl.gz",
+        "bytes": 2424
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2025-vfp-context-02.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T01:43:56.9675700+00:00",
+      "endUtc": "2026-09-09T01:43:56.9695700+00:00",
+      "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+      "sourceUnchanged": true,
+      "eventCount": 19,
+      "queriedEventCount": 19,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "70389ec6d1a651ce52d85d5d3788782f5e3b6577cf94912048d27c8993bc8c2c",
+        "name": "vfp-context-02.jsonl.gz",
+        "bytes": 2424
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2025-vfp-control-01-after.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T01:44:01.9682960+00:00",
+      "endUtc": "2026-09-09T01:44:01.9702960+00:00",
+      "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+      "sourceUnchanged": true,
+      "eventCount": 88,
+      "queriedEventCount": 88,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "aff020caaf0aa432c2ef49ac112c1ed4bfe463b003b08517db3054207c524923",
+        "name": "vfp-control-01-after.jsonl.gz",
+        "bytes": 7771
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2025-vfp-control-01-before.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T01:43:56.9461920+00:00",
+      "endUtc": "2026-09-09T01:43:56.9481920+00:00",
+      "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+      "sourceUnchanged": true,
+      "eventCount": 44,
+      "queriedEventCount": 44,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "87e98cbbf6f5eeb93501a9fe954c2c0cb95c9b9a03fc2f116609ee62a0a6e813",
+        "name": "vfp-control-01-before.jsonl.gz",
+        "bytes": 4447
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2025-vfp-control-02-after.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T01:44:01.9736610+00:00",
+      "endUtc": "2026-09-09T01:44:01.9756610+00:00",
+      "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+      "sourceUnchanged": true,
+      "eventCount": 33,
+      "queriedEventCount": 33,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "8978f12d376552e793fa819ce573072265b155c02fd2ece5a117bf5839c67db1",
+        "name": "vfp-control-02-after.jsonl.gz",
+        "bytes": 3869
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2025-vfp-control-02-before.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T01:43:56.9217970+00:00",
+      "endUtc": "2026-09-09T01:43:56.9237970+00:00",
+      "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+      "sourceUnchanged": true,
+      "eventCount": 33,
+      "queriedEventCount": 33,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "6b9e0e60a69615f4dd58ae010baeb87a9116942b9c61b9e12efb63b5042e868b",
+        "name": "vfp-control-02-before.jsonl.gz",
+        "bytes": 3846
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2025-vfp-drop-01.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T01:43:56.9676640+00:00",
+      "endUtc": "2026-09-09T01:43:56.9696640+00:00",
+      "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+      "sourceUnchanged": true,
+      "eventCount": 0,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "name": "vfp-drop-01.jsonl.gz",
+        "bytes": 0
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2025-vfp-drop-02.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T01:43:56.9675700+00:00",
+      "endUtc": "2026-09-09T01:43:56.9695700+00:00",
+      "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+      "sourceUnchanged": true,
+      "eventCount": 0,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "name": "vfp-drop-02.jsonl.gz",
+        "bytes": 0
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    },
+    {
+      "file": "2025-vfp-empty.jsonl.gz",
+      "outsideRequestedWindowCount": 0,
+      "startUtc": "2026-09-09T02:00:00.0000000+00:00",
+      "endUtc": "2026-09-09T02:00:00.0010000+00:00",
+      "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+      "sourceUnchanged": true,
+      "eventCount": 0,
+      "queriedEventCount": 0,
+      "maxEvents": 1000,
+      "eventLimitReached": false,
+      "artifact": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "name": "vfp-empty.jsonl.gz",
+        "bytes": 0
+      },
+      "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+    }
+  ],
+  "fixtures": {
+    "file": "windows-vfp-decap-cases.json",
+    "sha256": "8f37c587275b927e8a0210621d6575d37b065acc996b9a1e0064a09049e9a01b"
+  },
+  "collectorSHA256": "c6b6f63d0cb7979f2962ed700db667784e9eed4763f7c2905fdc7acb1a4aa432",
+  "validation": {
+    "testsPassed": 25,
+    "pktmonStatementsCovered": 62,
+    "pktmonStatements": 64,
+    "vfpDecoderStatementsCovered": 53,
+    "vfpDecoderStatements": 53,
+    "scope": "Selected Python observer packages, plus native PowerShell positive/limited/empty queries. No whole-project coverage claim."
+  },
+  "findings": [
+    "All three correlated drops occur inside both same-host capture windows and have native VFP context.",
+    "The matching newly created inbound DR flows retain VXLAN with EncapHeaderAction=Ignore; immediate successful neighbors use Pop on the same DR ports.",
+    "Other recorded creation fields match between each failure and both controls, apart from ephemeral port, flow identity and encapsulation transformation.",
+    "Protocol 252 records carry encapsulation selectors; raw destination selector 4096 must not be byte-swapped into transport port 16.",
+    "Combined Path/ProviderName/Id hashtable queries missed known ETL events on both builds. XPath queries recovered them; original empty outputs are retained as failed-query evidence.",
+    "Independent checking found 29 early records in one original XPath slice. The current exporter applies exact UTC bounds after native selection; six native positive, limited and empty exports passed independent XML validation."
+  ],
+  "limits": [
+    "Flow tuple/time correlation is context, not an independent packet identity or explanation for the classifier decision.",
+    "The earliest retained VFP data events follow capture start; the 64 MiB circular trace may overwrite records. These three contexts were explicitly recovered; completeness of all VFP events is not established.",
+    "Packet Monitor reported no events lost, but VFP event loss was not independently audited.",
+    "Six failures span complete sampler lifetimes: three have correlated native drops, two other failures occurred during capture without a correlated drop, and one occurred after capture.",
+    "No forwarding setting, driver, CNI or image was changed; no mitigation or release is qualified.",
+    "Original context slices preserve native XPath selection, including its coarse lower-bound behavior. The selected comparison records are within their requested windows; the corrected exporter is validated separately on retained copies."
+  ],
+  "cleanup": {
+    "originalNodesReady": 13,
+    "originalNodeUIDsUnchanged": true,
+    "samplersTerminalAndCollected": true,
+    "podAndHostToolsRemoved": true,
+    "allCapturesStopped": true,
+    "allGuestCaptureArtifactsRemoved": true
+  },
+  "next": "Investigate why the inbound DR classifier intermittently omits decapsulation, comparing current tuple simulation and layer/rule state with these observed Ignore/Pop cases.",
+  "sources": [
+    "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-winevent",
+    "https://learn.microsoft.com/en-us/windows/win32/wes/consuming-events"
+  ],
+  "capturedContextExporterSHA256": "43196679225d881b4d0303a74de57f4d8d5b4e6e70fdbf9954d539b0b4c63762",
+  "currentEventExporter": {
+    "sha256": "0fcbc99d699102909b5f9396d9ae499c436a0bd7ed37b7ac28a1e664a79fb083",
+    "nativeHosts": [
+      {
+        "windowsServer": "2022",
+        "results": [
+          {
+            "startUtc": "2026-09-09T01:43:49.5698500+00:00",
+            "endUtc": "2026-09-09T01:43:49.5718500+00:00",
+            "sourceSHA256": "8e59a4fa01d22ca90749acd6d8b16270ad8c69a41884ab61b9566fe222a65460",
+            "sourceUnchanged": true,
+            "eventCount": 48,
+            "queriedEventCount": 77,
+            "outsideWindowEventCount": 29,
+            "maxEvents": 1000,
+            "eventLimitReached": false,
+            "artifact": {
+              "sha256": "ca0b54291b4321a7829480a26947c7dc8019802136c46d857429add69cb896ea",
+              "name": "exact.jsonl.gz",
+              "bytes": 4953
+            },
+            "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+          },
+          {
+            "startUtc": "2026-09-09T01:43:49.5698500+00:00",
+            "endUtc": "2026-09-09T01:43:49.5718500+00:00",
+            "sourceSHA256": "8e59a4fa01d22ca90749acd6d8b16270ad8c69a41884ab61b9566fe222a65460",
+            "sourceUnchanged": true,
+            "eventCount": 0,
+            "queriedEventCount": 1,
+            "outsideWindowEventCount": 1,
+            "maxEvents": 1,
+            "eventLimitReached": true,
+            "artifact": {
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "name": "limited.jsonl.gz",
+              "bytes": 0
+            },
+            "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+          },
+          {
+            "startUtc": "2026-09-09T02:00:00.0000000+00:00",
+            "endUtc": "2026-09-09T02:00:00.0010000+00:00",
+            "sourceSHA256": "8e59a4fa01d22ca90749acd6d8b16270ad8c69a41884ab61b9566fe222a65460",
+            "sourceUnchanged": true,
+            "eventCount": 0,
+            "queriedEventCount": 0,
+            "outsideWindowEventCount": 0,
+            "maxEvents": 1000,
+            "eventLimitReached": false,
+            "artifact": {
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "name": "empty.jsonl.gz",
+              "bytes": 0
+            },
+            "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+          }
+        ],
+        "artifacts": [
+          {
+            "sha256": "ca0b54291b4321a7829480a26947c7dc8019802136c46d857429add69cb896ea",
+            "name": "exact.jsonl.gz",
+            "bytes": 4953
+          },
+          {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "name": "limited.jsonl.gz",
+            "bytes": 0
+          },
+          {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "name": "empty.jsonl.gz",
+            "bytes": 0
+          }
+        ],
+        "sourceSHA256": "8e59a4fa01d22ca90749acd6d8b16270ad8c69a41884ab61b9566fe222a65460",
+        "exactWindowXMLIndependentlyVerified": true,
+        "artifactsDownloadedAndHashVerified": true,
+        "guestETLCopyAndExportsRemoved": true
+      },
+      {
+        "windowsServer": "2025",
+        "results": [
+          {
+            "startUtc": "2026-09-09T01:43:56.9461920+00:00",
+            "endUtc": "2026-09-09T01:43:56.9481920+00:00",
+            "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+            "sourceUnchanged": true,
+            "eventCount": 44,
+            "queriedEventCount": 44,
+            "outsideWindowEventCount": 0,
+            "maxEvents": 1000,
+            "eventLimitReached": false,
+            "artifact": {
+              "sha256": "87e98cbbf6f5eeb93501a9fe954c2c0cb95c9b9a03fc2f116609ee62a0a6e813",
+              "name": "exact.jsonl.gz",
+              "bytes": 4447
+            },
+            "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+          },
+          {
+            "startUtc": "2026-09-09T01:43:56.9461920+00:00",
+            "endUtc": "2026-09-09T01:43:56.9481920+00:00",
+            "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+            "sourceUnchanged": true,
+            "eventCount": 1,
+            "queriedEventCount": 1,
+            "outsideWindowEventCount": 0,
+            "maxEvents": 1,
+            "eventLimitReached": true,
+            "artifact": {
+              "sha256": "e2df206d845c12c453c04734578864f31dab990e796a5d661c2bcfc0836a8c91",
+              "name": "limited.jsonl.gz",
+              "bytes": 672
+            },
+            "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+          },
+          {
+            "startUtc": "2026-09-09T02:00:00.0000000+00:00",
+            "endUtc": "2026-09-09T02:00:00.0010000+00:00",
+            "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+            "sourceUnchanged": true,
+            "eventCount": 0,
+            "queriedEventCount": 0,
+            "outsideWindowEventCount": 0,
+            "maxEvents": 1000,
+            "eventLimitReached": false,
+            "artifact": {
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "name": "empty.jsonl.gz",
+              "bytes": 0
+            },
+            "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+          }
+        ],
+        "artifacts": [
+          {
+            "sha256": "87e98cbbf6f5eeb93501a9fe954c2c0cb95c9b9a03fc2f116609ee62a0a6e813",
+            "name": "exact.jsonl.gz",
+            "bytes": 4447
+          },
+          {
+            "sha256": "e2df206d845c12c453c04734578864f31dab990e796a5d661c2bcfc0836a8c91",
+            "name": "limited.jsonl.gz",
+            "bytes": 672
+          },
+          {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "name": "empty.jsonl.gz",
+            "bytes": 0
+          }
+        ],
+        "sourceSHA256": "dccc7dd9cafcf89567ba10b381168ecb2990d42a0afd8ef9e271a511baf8052e",
+        "exactWindowXMLIndependentlyVerified": true,
+        "artifactsDownloadedAndHashVerified": true,
+        "guestETLCopyAndExportsRemoved": true
+      }
+    ],
+    "scope": "Re-export from hash-identical retained ETLs on both Windows versions; no new packet capture or network qualification.",
+    "exactUTCBoundsAppliedAfterNativeQuery": true,
+    "queryLimitIncludesExcludedRecords": true
+  }
+}

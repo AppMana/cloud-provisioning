@@ -1,0 +1,158 @@
+{
+  "profile": "microk8s/calico",
+  "revision": "9063",
+  "node": "remote1",
+  "sourceSHA256": {
+    "daemonset": "684e4394a4329491547b493bfbe36836516580a8b37897156949363dcf16b915",
+    "pod": "189ba6f88a7add3f3576957dab09970c0515e4298c44188a3cf3ee19d601fcfa"
+  },
+  "daemonset": {
+    "metadata": {
+      "name": "cloud-provisioning-dialer-remote",
+      "namespace": "cloud-provisioning",
+      "uid": "ff4d71bc-f4cb-4a2c-a85b-b45761e185e5",
+      "ownerReferences": [
+        {
+          "apiVersion": "apps/v1",
+          "kind": "Deployment",
+          "name": "cloud-provisioning-endpoint-controller",
+          "uid": "cc822a39-0726-479d-a6df-2860cb129bbb"
+        }
+      ]
+    },
+    "spec": {
+      "template": {
+        "spec": {
+          "containers": [
+            {
+              "name": "dialer",
+              "image": "cldt-dialer:feaef057bb3326a26fe07552b1b28bb648485570f8ca2fcaaacb2c6325391d2b"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "pending": {
+    "items": [
+      {
+        "metadata": {
+          "name": "cloud-provisioning-dialer-remote-4d48p",
+          "namespace": "cloud-provisioning",
+          "uid": "c70e6fde-e2e9-4ad0-9ea0-534819eb06a4",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "DaemonSet",
+              "name": "cloud-provisioning-dialer-remote",
+              "uid": "ff4d71bc-f4cb-4a2c-a85b-b45761e185e5"
+            }
+          ]
+        },
+        "spec": {
+          "nodeName": "remote1",
+          "containers": [
+            {
+              "name": "dialer",
+              "image": "cldt-dialer:feaef057bb3326a26fe07552b1b28bb648485570f8ca2fcaaacb2c6325391d2b"
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-09T07:30:19Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-09T07:30:17Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-09T07:30:17Z",
+              "message": "containers with unready status: [dialer]",
+              "observedGeneration": 1,
+              "reason": "ContainersNotReady",
+              "status": "False",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-09T07:30:17Z",
+              "message": "containers with unready status: [dialer]",
+              "observedGeneration": 1,
+              "reason": "ContainersNotReady",
+              "status": "False",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-09T07:30:17Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "image": "cldt-dialer:feaef057bb3326a26fe07552b1b28bb648485570f8ca2fcaaacb2c6325391d2b",
+              "imageID": "",
+              "lastState": {},
+              "name": "dialer",
+              "ready": false,
+              "restartCount": 0,
+              "started": false,
+              "state": {
+                "waiting": {
+                  "message": "failed to create containerd container: error unpacking image: unexpected media type text/html for sha256:e96a0b3e8b0b8163e88656a0bc6665094928cc00655d7b7cfdc2a2e76f729eb8: not found",
+                  "reason": "CreateContainerError"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/etc/wg-dialer",
+                  "name": "wg-dialer-config"
+                },
+                {
+                  "mountPath": "/host-bin",
+                  "name": "host-bin"
+                },
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-9cxms",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "203.0.113.10",
+          "hostIPs": [
+            {
+              "ip": "203.0.113.10"
+            }
+          ],
+          "observedGeneration": 1,
+          "phase": "Pending",
+          "podIP": "203.0.113.10",
+          "podIPs": [
+            {
+              "ip": "203.0.113.10"
+            }
+          ],
+          "qosClass": "BestEffort",
+          "startTime": "2026-09-09T07:30:17Z"
+        }
+      }
+    ]
+  }
+}

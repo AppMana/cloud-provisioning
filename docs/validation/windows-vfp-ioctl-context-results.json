@@ -1,0 +1,1765 @@
+{
+  "scope": "Single-NIC Windows Server AWS VMs, paired UDP/VFP ControlValidation observation. No forwarding mutations.",
+  "qualificationEligible": false,
+  "attempts": 27979,
+  "failed": 7,
+  "identitiesStable": true,
+  "postCleanup": {
+    "nodesReady": 13,
+    "trafficNodeUIDsUnchanged": true
+  },
+  "collectorSHA256": "5bbb0d15acd77293aadc5494c73e61a3227d5f25cc33036c10be493ab2f8551b",
+  "eventExporterSHA256": "1412c208823e2645a6db4fd464f2c2e1baacd5ead0abd4773ecb4c759d1fff83",
+  "observeUnitTestsPassed": 192,
+  "hosts": [
+    {
+      "windowsServer": "2022",
+      "capture": {
+        "startedAt": "2026-09-09T02:39:25.2360324Z",
+        "stoppedAt": "2026-09-09T02:39:55.8616825Z",
+        "keywordMask": "0xcd0e0f",
+        "maxFileMiB": 256,
+        "traceStopped": true,
+        "traceFilteringUnchanged": true
+      },
+      "packetMonitorStop": "Flushing logs...\r\nMerging metadata...\r\nLog file: C:\\ProgramData\\CloudProvisioning\\diagnostics\\vfp-control-capture-v2\\capture.etl (No events lost)\r\n",
+      "correlatedDrop": {
+        "hostVersion": "2022",
+        "lane": 2,
+        "sample": {
+          "sequence": 2007,
+          "source": "10.244.114.4:64676",
+          "startedAt": "2026-09-09T02:39:50.2607197Z",
+          "finishedAt": "2026-09-09T02:39:55.261841Z",
+          "ok": false,
+          "error": "read udp 10.244.114.4:64676->10.244.190.81:8081: i/o timeout",
+          "nonce": "02d47a1ce19ef822056322f1e2ff55de",
+          "pid": 280,
+          "startOffsetSeconds": 74.6567191,
+          "finishOffsetSeconds": 79.6578404,
+          "attempts": 2008,
+          "passed": 2007,
+          "maxStartIntervalSeconds": 0.1287803,
+          "healthy": false,
+          "stopBoundary": false
+        },
+        "direction": "reply",
+        "drop": {
+          "timestamp": "2026-09-09 02:39:50.307399400",
+          "group": 153115,
+          "packet": 1,
+          "component": 74,
+          "componentInfo": {
+            "driver": "tcpip.sys",
+            "name": "TCP/IPv4 - L3/L4"
+          },
+          "reason": "Not locally destined",
+          "location": "0xE0004136",
+          "ipID": 60117,
+          "fragmentOffsetBytes": 0,
+          "header": "[00]0518.1318::2026-09-09 02:39:50.307399400 [Microsoft-Windows-PktMon] Drop: PktGroupId 153115, PktNumber 1, Appearance 17, Direction Rx , Type IP , Component 74, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 142, LoggedSize 142 ",
+          "trafficClassesBeforeDrop": [
+            0
+          ],
+          "trafficClassAtDrop": 0,
+          "trafficClassChanged": false
+        }
+      },
+      "controlValidationExport": {
+        "eventCount": 143,
+        "sourceSHA256": "7d05c6b9a8355cdb51e4818a3f359e4d0e41a8bd7a7fe3c9b4226754f81cc9e0",
+        "artifact": {
+          "sha256": "0b4255d93420487e16c80a8260a8e9ec828740e76bcf6d3772b4c4f6b4169845",
+          "name": "validation-events.jsonl.gz",
+          "bytes": 4554
+        },
+        "eventLimitReached": false
+      },
+      "controlValidationCounts": {
+        "702": 60,
+        "704": 60,
+        "706": 1,
+        "700": 14,
+        "701": 8
+      },
+      "process": {
+        "ProcessId": 1304,
+        "Name": "svchost.exe",
+        "CreationDate": "/Date(1788788755272)/"
+      },
+      "sameProcessBeforeAfter": true,
+      "serviceSnapshot": {
+        "at": "2026-09-09T02:41:43.8304543Z",
+        "service": {
+          "Name": "hns",
+          "ProcessId": 1304
+        }
+      },
+      "eventIdSelectionChecks": [
+        {
+          "export": {
+            "startUtc": "2026-09-09T02:39:50.2073990+00:00",
+            "endUtc": "2026-09-09T02:39:50.4073990+00:00",
+            "sourceSHA256": "7d05c6b9a8355cdb51e4818a3f359e4d0e41a8bd7a7fe3c9b4226754f81cc9e0",
+            "sourceUnchanged": true,
+            "eventCount": 1000,
+            "queriedEventCount": 1000,
+            "outsideWindowEventCount": 0,
+            "maxEvents": 1000,
+            "eventLimitReached": true,
+            "eventIds": [
+              101,
+              110,
+              115,
+              600,
+              604,
+              608
+            ],
+            "artifact": {
+              "sha256": "33cdf0bf6419a1ab36abd38997a6854c2f800097a3c13ed8368b896363e2d340",
+              "name": "vfp-selected-00.jsonl.gz",
+              "bytes": 53963
+            },
+            "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+          },
+          "independentXMLChecksPassed": true
+        },
+        {
+          "export": {
+            "startUtc": "2026-09-09T02:39:50.2073990+00:00",
+            "endUtc": "2026-09-09T02:39:50.4073990+00:00",
+            "sourceSHA256": "7d05c6b9a8355cdb51e4818a3f359e4d0e41a8bd7a7fe3c9b4226754f81cc9e0",
+            "sourceUnchanged": true,
+            "eventCount": 10000,
+            "queriedEventCount": 10000,
+            "outsideWindowEventCount": 0,
+            "maxEvents": 10000,
+            "eventLimitReached": true,
+            "eventIds": [
+              101,
+              110,
+              115,
+              600,
+              604,
+              608
+            ],
+            "artifact": {
+              "sha256": "558e560481cdddce70eefb77ededbb309ee3433b0addfb83fa15f759c610d5bd",
+              "name": "vfp-selected-wide-00.jsonl.gz",
+              "bytes": 473035
+            },
+            "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+          },
+          "independentXMLChecksPassed": true
+        },
+        {
+          "export": {
+            "startUtc": "2026-09-09T02:39:50.2673990+00:00",
+            "endUtc": "2026-09-09T02:39:50.3473990+00:00",
+            "sourceSHA256": "7d05c6b9a8355cdb51e4818a3f359e4d0e41a8bd7a7fe3c9b4226754f81cc9e0",
+            "sourceUnchanged": true,
+            "eventCount": 26,
+            "queriedEventCount": 26,
+            "outsideWindowEventCount": 0,
+            "maxEvents": 10000,
+            "eventLimitReached": false,
+            "eventIds": [
+              600
+            ],
+            "artifact": {
+              "sha256": "0e899ad54bd590671d76f7d430214ff9833f9150ad8450d95fef818a24d31f08",
+              "name": "vfp-creations-00.jsonl.gz",
+              "bytes": 3035
+            },
+            "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+          },
+          "independentXMLChecksPassed": true
+        }
+      ],
+      "hnsLogWindow": {
+        "events": 160,
+        "firstRetained": "2026-09-09T02:39:56.2152304Z",
+        "lastRetained": "2026-09-09T02:39:59.8302392Z",
+        "coversPacketDrop": false
+      },
+      "artifacts": [
+        {
+          "sha256": "492fc3639aac44fdab24307d1d4d8a3a42f352ff1bd44be02f0527f23c6a7dc0",
+          "name": "capture.etl",
+          "bytes": 4030397
+        },
+        {
+          "sha256": "7965806073ffe58ead1af9d0c5c7f4665f9ab970d9999d44a4a217f9d2534d2e",
+          "name": "capture.pcapng",
+          "bytes": 34517616
+        },
+        {
+          "sha256": "5395a09e7e0347fd970c897599a3829199e97edcc23a8f07852bff28c9938a73",
+          "name": "capture.txt.gz",
+          "bytes": 4251362
+        },
+        {
+          "sha256": "fb599573134bed8fc8e8a60ea4ed08e5925c0a0005b8103eb8e0234e9e393c95",
+          "name": "processes-after.json",
+          "bytes": 17978
+        },
+        {
+          "sha256": "1e22a32aba14766d003b7aa940814917cd1fef7450f1c1d3638034424e3e3728",
+          "name": "processes-before.json",
+          "bytes": 17716
+        },
+        {
+          "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+          "name": "vfp\\provider.json",
+          "bytes": 311964
+        },
+        {
+          "sha256": "fab5048a560626600be12ee4e3d69a9905cb0be006916e5e3d1d1926f417dcf4",
+          "name": "vfp\\result.json",
+          "bytes": 839
+        },
+        {
+          "sha256": "7d05c6b9a8355cdb51e4818a3f359e4d0e41a8bd7a7fe3c9b4226754f81cc9e0",
+          "name": "vfp\\vfp.etl",
+          "bytes": 132775936
+        },
+        {
+          "sha256": "0b4255d93420487e16c80a8260a8e9ec828740e76bcf6d3772b4c4f6b4169845",
+          "name": "validation-events.jsonl.gz",
+          "bytes": 4554
+        },
+        {
+          "sha256": "20a157686663eac8cedac8cba13f16b7d7afa5e2c0adf67c915fdcce8c2359bd",
+          "name": "vfp-context-00.jsonl.gz",
+          "bytes": 3517
+        },
+        {
+          "sha256": "a4c81260006c0fbc1ccd562ebb231ed2f5b5c1ae52e53bf2d5674367b353504c",
+          "name": "validation-rendered.jsonl.gz",
+          "bytes": 6205
+        },
+        {
+          "sha256": "ffefe31ac924998a248ca004cca5ca8e9d812390a43a8cbe2966320533d72483",
+          "name": "hns-log-window-v2.jsonl.gz",
+          "bytes": 4040
+        },
+        {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "name": "hns-log-window.jsonl.gz",
+          "bytes": 0
+        },
+        {
+          "sha256": "0e899ad54bd590671d76f7d430214ff9833f9150ad8450d95fef818a24d31f08",
+          "name": "vfp-creations-00.jsonl.gz",
+          "bytes": 3035
+        },
+        {
+          "sha256": "33cdf0bf6419a1ab36abd38997a6854c2f800097a3c13ed8368b896363e2d340",
+          "name": "vfp-selected-00.jsonl.gz",
+          "bytes": 53963
+        },
+        {
+          "sha256": "558e560481cdddce70eefb77ededbb309ee3433b0addfb83fa15f759c610d5bd",
+          "name": "vfp-selected-wide-00.jsonl.gz",
+          "bytes": 473035
+        }
+      ],
+      "cleanup": {
+        "traceAbsent": true,
+        "traceFiltering": "Trace filtering is Disabled\r\nCommand get-trace-filtering-state succeeded!\r\n",
+        "directoryAbsent": true
+      },
+      "drPortControlRecords": [
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2733029Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2733052Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "3221225525"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2733273Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "156",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2733293Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "2147483653"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2733438Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "156",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2733451Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2733587Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12546",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2733618Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "2147483653"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2733752Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12546",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2733858Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2735597Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12544",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 700,
+          "at": "2026-09-09T02:39:50.2735650Z",
+          "fields": {
+            "Id": "0782A040-B640-4E75-A4DE-20B2B1F38A70",
+            "TraceObjectOperationType": "0",
+            "ItemType": "10",
+            "SubType": "0",
+            "Flags": "0",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "3221225525",
+            "ControlFailureReason": "101",
+            "FailureReason": "101",
+            "Name": "VNET_ENCAP_SPACE"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2735679Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "3221225525"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2735857Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12802",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2735877Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "2147483653"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2736002Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12802",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2736014Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2736221Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12544",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 700,
+          "at": "2026-09-09T02:39:50.2736243Z",
+          "fields": {
+            "Id": "0782A040-B640-4E75-A4DE-20B2B1F38A70_V6",
+            "TraceObjectOperationType": "0",
+            "ItemType": "10",
+            "SubType": "0",
+            "Flags": "0",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "3221225525",
+            "ControlFailureReason": "101",
+            "FailureReason": "101",
+            "Name": "VNET_ENCAP_SPACE"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2736256Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "3221225525"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2736382Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12802",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2736394Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2736570Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12544",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 700,
+          "at": "2026-09-09T02:39:50.2736596Z",
+          "fields": {
+            "Id": "2309541D-F748-41C0-BB76-D267848B4215",
+            "TraceObjectOperationType": "0",
+            "ItemType": "10",
+            "SubType": "0",
+            "Flags": "0",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "3221225525",
+            "ControlFailureReason": "101",
+            "FailureReason": "101",
+            "Name": "VNET_ENCAP_SPACE"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2736612Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "3221225525"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2736749Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12802",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2736825Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "2147483653"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2737012Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12802",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2737069Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2737507Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12800",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 701,
+          "at": "2026-09-09T02:39:50.2737577Z",
+          "fields": {
+            "Id": null,
+            "TraceObjectOperationType": "0",
+            "ItemType": "11",
+            "SubType": "0",
+            "Flags": "7",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "0",
+            "ControlFailureReason": "1",
+            "FailureReason": "1",
+            "Name": null
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2737641Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2737828Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12544",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 700,
+          "at": "2026-09-09T02:39:50.2737847Z",
+          "fields": {
+            "Id": "2309541D-F748-41C0-BB76-D267848B4215_V6",
+            "TraceObjectOperationType": "0",
+            "ItemType": "10",
+            "SubType": "0",
+            "Flags": "0",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "3221225525",
+            "ControlFailureReason": "101",
+            "FailureReason": "101",
+            "Name": "VNET_ENCAP_SPACE"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2737862Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "3221225525"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2738001Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "12802",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2738013Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2738201Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4353",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.2738315Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "3221225524"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.2738459Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4353",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3074320Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3075335Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4352",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 700,
+          "at": "2026-09-09T02:39:50.3075428Z",
+          "fields": {
+            "Id": "VNET_PA_ROUTE_LAYER",
+            "TraceObjectOperationType": "0",
+            "ItemType": "3",
+            "SubType": "2",
+            "Flags": "1",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "3221225525",
+            "ControlFailureReason": "101",
+            "FailureReason": "101",
+            "Name": "VNET_PA_ROUTE_LAYER"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3075464Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "3221225525"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3075762Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4608",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 700,
+          "at": "2026-09-09T02:39:50.3075807Z",
+          "fields": {
+            "Id": "VNET_GROUP_PA_ROUTE_IPV4_OUT",
+            "TraceObjectOperationType": "0",
+            "ItemType": "4",
+            "SubType": "2",
+            "Flags": "0",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "3221225525",
+            "ControlFailureReason": "101",
+            "FailureReason": "101",
+            "Name": "VNET_GROUP_PA_ROUTE_IPV4_OUT"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3075827Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "3221225525"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3076026Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4867",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3076063Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "2147483653"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3076268Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4867",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3076293Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3076621Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4608",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 700,
+          "at": "2026-09-09T02:39:50.3076648Z",
+          "fields": {
+            "Id": "VNET_GROUP_PA_ROUTE_IPV6_OUT",
+            "TraceObjectOperationType": "0",
+            "ItemType": "4",
+            "SubType": "4",
+            "Flags": "0",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "3221225525",
+            "ControlFailureReason": "101",
+            "FailureReason": "101",
+            "Name": "VNET_GROUP_PA_ROUTE_IPV6_OUT"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3076661Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "3221225525"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3076823Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4867",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3076837Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3076988Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4866",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3077008Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3077173Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4352",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 701,
+          "at": "2026-09-09T02:39:50.3077865Z",
+          "fields": {
+            "Id": "VNET_ENCAP_LAYER",
+            "TraceObjectOperationType": "0",
+            "ItemType": "3",
+            "SubType": "1",
+            "Flags": "4",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "0",
+            "ControlFailureReason": "1",
+            "FailureReason": "1",
+            "Name": "VNET_ENCAP_LAYER"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3077875Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3078191Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4608",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 701,
+          "at": "2026-09-09T02:39:50.3078237Z",
+          "fields": {
+            "Id": "VNET_GROUP_ENCAP_IPV4_IN",
+            "TraceObjectOperationType": "0",
+            "ItemType": "4",
+            "SubType": "1",
+            "Flags": "0",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "0",
+            "ControlFailureReason": "1",
+            "FailureReason": "1",
+            "Name": "VNET_GROUP_ENCAP_IPV4_IN"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3078248Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3078452Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4868",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 701,
+          "at": "2026-09-09T02:39:50.3078536Z",
+          "fields": {
+            "Id": null,
+            "TraceObjectOperationType": "0",
+            "ItemType": "5",
+            "SubType": "6",
+            "Flags": "769",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "0",
+            "ControlFailureReason": "1",
+            "FailureReason": "1",
+            "Name": null
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3078565Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3078747Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4608",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 701,
+          "at": "2026-09-09T02:39:50.3078774Z",
+          "fields": {
+            "Id": "VNET_GROUP_ENCAP_IPV4_OUT",
+            "TraceObjectOperationType": "0",
+            "ItemType": "4",
+            "SubType": "2",
+            "Flags": "0",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "0",
+            "ControlFailureReason": "1",
+            "FailureReason": "1",
+            "Name": "VNET_GROUP_ENCAP_IPV4_OUT"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3078783Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3078966Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4868",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 701,
+          "at": "2026-09-09T02:39:50.3079074Z",
+          "fields": {
+            "Id": null,
+            "TraceObjectOperationType": "0",
+            "ItemType": "5",
+            "SubType": "9",
+            "Flags": "1",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "0",
+            "ControlFailureReason": "1",
+            "FailureReason": "1",
+            "Name": null
+          }
+        },
+        {
+          "id": 701,
+          "at": "2026-09-09T02:39:50.3079082Z",
+          "fields": {
+            "Id": null,
+            "TraceObjectOperationType": "0",
+            "ItemType": "5",
+            "SubType": "9",
+            "Flags": "1",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Status": "0",
+            "ControlFailureReason": "1",
+            "FailureReason": "1",
+            "Name": null
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3079100Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3079281Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4609",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3079296Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "3221225524"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3079452Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "4609",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3079466Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "3221225524"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3079709Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "132",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3079745Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 704,
+          "at": "2026-09-09T02:39:50.3081195Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "3",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "0"
+          }
+        },
+        {
+          "id": 702,
+          "at": "2026-09-09T02:39:50.3081207Z",
+          "fields": {
+            "SwitchName": "FF5476D1-4B93-4834-BE56-C0904D0A6C11",
+            "PortId": "3",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "Operation": "0",
+            "ProcessId": "1304",
+            "Irp": "0xffff918c88d97520",
+            "Status": "3221225488"
+          }
+        }
+      ],
+      "failedTupleFlowDeletions": [
+        {
+          "eventID": 608,
+          "version": 0,
+          "timestamp": "2026-09-09T02:39:50.3077546Z",
+          "source": "10.244.190.81",
+          "destination": "10.244.114.4",
+          "sourcePort": 8081,
+          "destinationPort": 64676,
+          "protocol": 17,
+          "portName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+          "fields": {
+            "PortId": "3",
+            "Direction": "1",
+            "IsMain": "1",
+            "IsPending": "0",
+            "TNI": "0",
+            "VLAN": "0",
+            "NumEncaps": "1",
+            "EncapType0": "VXLAN",
+            "EncapSrcMacAddr0": "02-FF-D6-32-CE-F1",
+            "EncapDestMacAddr0": "02-FF-F6-B6-D8-ED",
+            "EncapSrcIpv4Addr0": "184551946",
+            "EncapDstIpv4Addr0": "402660780",
+            "TenantId0": "4096",
+            "EncryptVxlanId0": "0",
+            "EncapType1": "None",
+            "EncapSrcMacAddr1": null,
+            "EncapDestMacAddr1": null,
+            "EncapSrcIpv4Addr1": "0",
+            "EncapDstIpv4Addr1": "0",
+            "TenantId1": "0",
+            "EncryptVxlanId1": "0",
+            "IpProtocol": "17",
+            "SrcMacAddr": "66-29-27-B4-64-9C",
+            "DestMacAddr": "00-15-5D-3A-31-08",
+            "SrcIpv4Addr": "1371468810",
+            "DstIpv4Addr": "74642442",
+            "SrcPort": "37151",
+            "DstPort": "42236",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "PortFriendlyName": "Container NIC 070372ba",
+            "UnifiedFlow": "18446622631751497864",
+            "IsSecondary": "0",
+            "IsMirror": "0",
+            "IsHairpin": "0",
+            "HairpinChecked": "0",
+            "OriginalInbound": "0"
+          }
+        },
+        {
+          "eventID": 608,
+          "version": 0,
+          "timestamp": "2026-09-09T02:39:50.3077563Z",
+          "source": "10.244.114.4",
+          "destination": "10.244.190.81",
+          "sourcePort": 64676,
+          "destinationPort": 8081,
+          "protocol": 17,
+          "portName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+          "fields": {
+            "PortId": "3",
+            "Direction": "0",
+            "IsMain": "0",
+            "IsPending": "0",
+            "TNI": "0",
+            "VLAN": "0",
+            "NumEncaps": "1",
+            "EncapType0": "VXLAN",
+            "EncapSrcMacAddr0": "02-FF-F6-B6-D8-ED",
+            "EncapDestMacAddr0": "02-FF-D6-32-CE-F1",
+            "EncapSrcIpv4Addr0": "402660780",
+            "EncapDstIpv4Addr0": "184551946",
+            "TenantId0": "4096",
+            "EncryptVxlanId0": "0",
+            "EncapType1": "None",
+            "EncapSrcMacAddr1": null,
+            "EncapDestMacAddr1": null,
+            "EncapSrcIpv4Addr1": "0",
+            "EncapDstIpv4Addr1": "0",
+            "TenantId1": "0",
+            "EncryptVxlanId1": "0",
+            "IpProtocol": "17",
+            "SrcMacAddr": "00-15-5D-3A-31-08",
+            "DestMacAddr": "66-29-27-B4-64-9C",
+            "SrcIpv4Addr": "74642442",
+            "DstIpv4Addr": "1371468810",
+            "SrcPort": "42236",
+            "DstPort": "37151",
+            "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "PortFriendlyName": "Container NIC 070372ba",
+            "UnifiedFlow": "18446622631713750072",
+            "IsSecondary": "0",
+            "IsMirror": "0",
+            "IsHairpin": "0",
+            "HairpinChecked": "1",
+            "OriginalInbound": "0"
+          }
+        }
+      ],
+      "encapsulationLayerNativeAddDescription": "Success during control processing for object. Id: VNET_ENCAP_LAYER, Name: VNET_ENCAP_LAYER, Operation Type: AddObject, Type: Layer, SubType: 1, Flags: 4, Port id: 3, Port name: 7D2CED1C-ED91-49F6-9FA0-0A2184B37676"
+    },
+    {
+      "windowsServer": "2025",
+      "capture": {
+        "startedAt": "2026-09-09T02:39:25.2991322Z",
+        "stoppedAt": "2026-09-09T02:39:55.8304023Z",
+        "keywordMask": "0xcd0e0f",
+        "maxFileMiB": 256,
+        "traceStopped": true,
+        "traceFilteringUnchanged": true
+      },
+      "packetMonitorStop": "Flushing logs...\r\nMerging metadata...\r\nLog file: C:\\ProgramData\\CloudProvisioning\\diagnostics\\vfp-control-capture-v2\\capture.etl (No events lost)\r\n",
+      "correlatedDrop": {
+        "hostVersion": "2025",
+        "lane": 3,
+        "sample": {
+          "sequence": 2645,
+          "source": "10.244.114.4:62489",
+          "startedAt": "2026-09-09T02:39:24.6948814Z",
+          "finishedAt": "2026-09-09T02:39:29.6994627Z",
+          "ok": false,
+          "error": "read udp 10.244.114.4:62489->10.244.42.6:8081: i/o timeout",
+          "nonce": "1197e09f8619810fc5a2f87e9f6faac4",
+          "pid": 6004,
+          "startOffsetSeconds": 44.2138947,
+          "finishOffsetSeconds": 49.218476,
+          "attempts": 2646,
+          "passed": 2644,
+          "maxStartIntervalSeconds": 5.0118685,
+          "healthy": false,
+          "stopBoundary": false
+        },
+        "direction": "request",
+        "drop": {
+          "timestamp": "2026-09-09 02:39:25.083544600",
+          "group": 2488326,
+          "packet": 1,
+          "component": 93,
+          "componentInfo": {
+            "driver": "vfpext.sys",
+            "name": "VFP Extension"
+          },
+          "reason": "Invalid Packet",
+          "location": "0xE0006096",
+          "ipID": 45517,
+          "fragmentOffsetBytes": 0,
+          "header": "[00]1B64.1238::2026-09-09 02:39:25.083544600 [Microsoft-Windows-PktMon] Drop: PktGroupId 2488326, PktNumber 1, Appearance 0, Direction Tx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 161, LoggedSize 161 ",
+          "trafficClassesBeforeDrop": [
+            0
+          ],
+          "trafficClassAtDrop": 0,
+          "trafficClassChanged": false
+        }
+      },
+      "controlValidationExport": {
+        "eventCount": 29,
+        "sourceSHA256": "7e751ec65d2313976e1029571d59eb7f339a801aedc932ba7dc425f8bad96203",
+        "artifact": {
+          "sha256": "2f466aefd6daacdfddb8a5af2f78ea44204cab234d7fca348c127b01ae1e8e06",
+          "name": "validation-events.jsonl.gz",
+          "bytes": 1316
+        },
+        "eventLimitReached": false
+      },
+      "controlValidationCounts": {
+        "704": 14,
+        "702": 14,
+        "706": 1
+      },
+      "process": {
+        "ProcessId": 2480,
+        "Name": "svchost.exe",
+        "CreationDate": "/Date(1788791296532)/"
+      },
+      "sameProcessBeforeAfter": true,
+      "serviceSnapshot": {
+        "at": "2026-09-09T02:41:45.2477598Z",
+        "service": {
+          "Name": "hns",
+          "ProcessId": 2480
+        }
+      },
+      "eventIdSelectionChecks": [
+        {
+          "export": {
+            "startUtc": "2026-09-09T02:39:24.9835440+00:00",
+            "endUtc": "2026-09-09T02:39:25.1835440+00:00",
+            "sourceSHA256": "7e751ec65d2313976e1029571d59eb7f339a801aedc932ba7dc425f8bad96203",
+            "sourceUnchanged": true,
+            "eventCount": 0,
+            "queriedEventCount": 0,
+            "outsideWindowEventCount": 0,
+            "maxEvents": 1000,
+            "eventLimitReached": false,
+            "eventIds": [
+              101,
+              110,
+              115,
+              600,
+              604,
+              608
+            ],
+            "artifact": {
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "name": "vfp-selected-01.jsonl.gz",
+              "bytes": 0
+            },
+            "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+          },
+          "independentXMLChecksPassed": true
+        },
+        {
+          "export": {
+            "startUtc": "2026-09-09T02:39:35.2307000+00:00",
+            "endUtc": "2026-09-09T02:39:35.4307000+00:00",
+            "sourceSHA256": "7e751ec65d2313976e1029571d59eb7f339a801aedc932ba7dc425f8bad96203",
+            "sourceUnchanged": true,
+            "eventCount": 4,
+            "queriedEventCount": 4,
+            "outsideWindowEventCount": 0,
+            "maxEvents": 10000,
+            "eventLimitReached": false,
+            "eventIds": [
+              704
+            ],
+            "artifact": {
+              "sha256": "d44a670cb0ddb86ac806c26b3b8a17109d4067b0608549c4951058a3037a4dbe",
+              "name": "vfp-selected-wide-01.jsonl.gz",
+              "bytes": 640
+            },
+            "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+          },
+          "independentXMLChecksPassed": true
+        },
+        {
+          "export": {
+            "startUtc": "2026-09-09T02:39:35.2907000+00:00",
+            "endUtc": "2026-09-09T02:39:35.3707000+00:00",
+            "sourceSHA256": "7e751ec65d2313976e1029571d59eb7f339a801aedc932ba7dc425f8bad96203",
+            "sourceUnchanged": true,
+            "eventCount": 4,
+            "queriedEventCount": 4,
+            "outsideWindowEventCount": 0,
+            "maxEvents": 10000,
+            "eventLimitReached": false,
+            "eventIds": [
+              704
+            ],
+            "artifact": {
+              "sha256": "d44a670cb0ddb86ac806c26b3b8a17109d4067b0608549c4951058a3037a4dbe",
+              "name": "vfp-creations-01.jsonl.gz",
+              "bytes": 640
+            },
+            "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+          },
+          "independentXMLChecksPassed": true
+        }
+      ],
+      "hnsLogWindow": {
+        "events": 160,
+        "firstRetained": "2026-09-09T02:39:56.6017469Z",
+        "lastRetained": "2026-09-09T02:39:59.4374196Z",
+        "coversPacketDrop": false
+      },
+      "artifacts": [
+        {
+          "sha256": "c3cbeeee995e36627e162c14ecdbbb89634a66c8fc2b763e5338ca789d499416",
+          "name": "capture.etl",
+          "bytes": 4745800
+        },
+        {
+          "sha256": "fcc67b0cfba210900e040fd9e0c625b716057ad7ec775857705440f2469c4644",
+          "name": "capture.pcapng",
+          "bytes": 36672552
+        },
+        {
+          "sha256": "f9de63064f118eab1ca8401d121f4a377620e0adf384e127f8fff2b82f38d8ce",
+          "name": "capture.txt.gz",
+          "bytes": 4778662
+        },
+        {
+          "sha256": "ff8559413fd7b201d30a83c83966f64cd8257ab844fb6f589fa32037a97ac09d",
+          "name": "processes-after.json",
+          "bytes": 19807
+        },
+        {
+          "sha256": "ff8559413fd7b201d30a83c83966f64cd8257ab844fb6f589fa32037a97ac09d",
+          "name": "processes-before.json",
+          "bytes": 19807
+        },
+        {
+          "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+          "name": "vfp\\provider.json",
+          "bytes": 327652
+        },
+        {
+          "sha256": "bf9a2be03d4843b16d551f810096008b993cde5b422d09c315358d4a50b3fd99",
+          "name": "vfp\\result.json",
+          "bytes": 839
+        },
+        {
+          "sha256": "7e751ec65d2313976e1029571d59eb7f339a801aedc932ba7dc425f8bad96203",
+          "name": "vfp\\vfp.etl",
+          "bytes": 137691136
+        },
+        {
+          "sha256": "2f466aefd6daacdfddb8a5af2f78ea44204cab234d7fca348c127b01ae1e8e06",
+          "name": "validation-events.jsonl.gz",
+          "bytes": 1316
+        },
+        {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "name": "vfp-context-01.jsonl.gz",
+          "bytes": 0
+        },
+        {
+          "sha256": "18811b466badbc5227f20cf028412551d51a29c7bb947b4f3e15296e45ee09fa",
+          "name": "validation-rendered.jsonl.gz",
+          "bytes": 1662
+        },
+        {
+          "sha256": "941e57080c5721bb2bb37f8840f6b6e4896d027529ea2d964cdb2a4ba5691fd2",
+          "name": "hns-log-window-v2.jsonl.gz",
+          "bytes": 4018
+        },
+        {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "name": "hns-log-window.jsonl.gz",
+          "bytes": 0
+        },
+        {
+          "sha256": "d44a670cb0ddb86ac806c26b3b8a17109d4067b0608549c4951058a3037a4dbe",
+          "name": "vfp-creations-01.jsonl.gz",
+          "bytes": 640
+        },
+        {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "name": "vfp-selected-01.jsonl.gz",
+          "bytes": 0
+        },
+        {
+          "sha256": "d44a670cb0ddb86ac806c26b3b8a17109d4067b0608549c4951058a3037a4dbe",
+          "name": "vfp-selected-wide-01.jsonl.gz",
+          "bytes": 640
+        }
+      ],
+      "cleanup": {
+        "traceAbsent": true,
+        "traceFiltering": "Trace filtering is Disabled\r\nCommand get-trace-filtering-state succeeded!\r\n",
+        "directoryAbsent": true
+      }
+    }
+  ],
+  "findings": [
+    "Windows 2022 TCPIP Not locally destined drop at 02:39:50.3073994 UTC falls between DR-port IOCTL operation 4353 at 02:39:50.2738459 and 4352 at 02:39:50.3075335, issued by PID 1304. Operation numbers are retained without assuming undocumented meanings.",
+    "Native event 701 describes AddObject for VNET_ENCAP_LAYER at 02:39:50.3077865 UTC, 387.1 microseconds after the drop.",
+    "Event 608 records deletion of the matching failed reply flow at 02:39:50.3077546 UTC, 355.2 microseconds after the drop.",
+    "The IOCTL PID is stable svchost.exe across capture snapshots and matches hns in the subsequent service snapshot. This does not identify the upstream HNS caller.",
+    "Windows 2025 VFP Invalid Packet drop preceded its VFP capture by about 216 milliseconds; no paired VFP context claim applies."
+  ],
+  "limitations": [
+    "ControlValidation export did not hit its query limit, but circular VFP retention and event loss are not independently audited.",
+    "No matching new-flow record was found in the selected 80 ms window; the failed sample started before that window.",
+    "The 1000- and 10000-event broader selections hit their limits. The narrower event-600 query and known-event-704 query completed.",
+    "HNS policy logs retained by the requested query begin after capture stop. They cannot identify the trigger of the earlier in-window VFP activity.",
+    "Calico logs show later VTEP updates; temporal separation prevents attributing the failed packet to those updates.",
+    "No mitigation, Windows GPU qualification, release qualification, or whole-project code coverage is established."
+  ]
+}

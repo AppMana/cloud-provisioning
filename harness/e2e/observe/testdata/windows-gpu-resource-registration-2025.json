@@ -1,0 +1,165 @@
+{
+  "before": {
+    "metadata": {
+      "uid": "80ae8073-65e2-4419-b346-71fd4d4741af",
+      "name": "aws-win2025-gpu-refreshed-v1",
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/os": "windows",
+        "cloud-provisioning.appmana.com/gpu-test": "true",
+        "cloud-provisioning.appmana.com/role": "cloud-worker",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "aws-win2025-gpu-refreshed-v1",
+        "kubernetes.io/os": "windows",
+        "node.kubernetes.io/windows-build": "10.0.26100"
+      }
+    },
+    "status": {
+      "capacity": {
+        "cpu": "2",
+        "ephemeral-storage": "104329196Ki",
+        "memory": "8044588Ki",
+        "pods": "110"
+      },
+      "allocatable": {
+        "cpu": "2",
+        "ephemeral-storage": "96149786875",
+        "memory": "7532588Ki",
+        "pods": "110"
+      },
+      "conditions": [
+        {
+          "lastHeartbeatTime": "2026-09-08T05:28:51Z",
+          "lastTransitionTime": "2026-09-08T05:28:51Z",
+          "message": "Calico is running on this node",
+          "reason": "CalicoIsUp",
+          "status": "False",
+          "type": "NetworkUnavailable"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-08T05:29:09Z",
+          "lastTransitionTime": "2026-09-08T05:25:23Z",
+          "message": "kubelet has sufficient memory available",
+          "reason": "KubeletHasSufficientMemory",
+          "status": "False",
+          "type": "MemoryPressure"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-08T05:29:09Z",
+          "lastTransitionTime": "2026-09-08T05:25:23Z",
+          "message": "kubelet has no disk pressure",
+          "reason": "KubeletHasNoDiskPressure",
+          "status": "False",
+          "type": "DiskPressure"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-08T05:29:09Z",
+          "lastTransitionTime": "2026-09-08T05:25:23Z",
+          "message": "kubelet has sufficient PID available",
+          "reason": "KubeletHasSufficientPID",
+          "status": "False",
+          "type": "PIDPressure"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-08T05:29:09Z",
+          "lastTransitionTime": "2026-09-08T05:28:38Z",
+          "message": "kubelet is posting ready status",
+          "reason": "KubeletReady",
+          "status": "True",
+          "type": "Ready"
+        },
+        {
+          "lastHeartbeatTime": null,
+          "lastTransitionTime": "2026-09-08T05:25:25Z",
+          "message": "No containerd deprecation warnings detected",
+          "reason": "NoDeprecations",
+          "status": "True",
+          "type": "ContainerdHasNoDeprecations"
+        }
+      ]
+    }
+  },
+  "after": {
+    "metadata": {
+      "uid": "80ae8073-65e2-4419-b346-71fd4d4741af",
+      "name": "aws-win2025-gpu-refreshed-v1",
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/os": "windows",
+        "cloud-provisioning.appmana.com/gpu-test": "true",
+        "cloud-provisioning.appmana.com/role": "cloud-worker",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "aws-win2025-gpu-refreshed-v1",
+        "kubernetes.io/os": "windows",
+        "node.kubernetes.io/windows-build": "10.0.26100"
+      }
+    },
+    "status": {
+      "capacity": {
+        "cpu": "2",
+        "directx.microsoft.com/display": "1",
+        "ephemeral-storage": "104329196Ki",
+        "memory": "8044588Ki",
+        "pods": "110"
+      },
+      "allocatable": {
+        "cpu": "2",
+        "directx.microsoft.com/display": "1",
+        "ephemeral-storage": "96149786875",
+        "memory": "7532588Ki",
+        "pods": "110"
+      },
+      "conditions": [
+        {
+          "lastHeartbeatTime": "2026-09-08T05:28:51Z",
+          "lastTransitionTime": "2026-09-08T05:28:51Z",
+          "message": "Calico is running on this node",
+          "reason": "CalicoIsUp",
+          "status": "False",
+          "type": "NetworkUnavailable"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-08T05:47:53Z",
+          "lastTransitionTime": "2026-09-08T05:25:23Z",
+          "message": "kubelet has sufficient memory available",
+          "reason": "KubeletHasSufficientMemory",
+          "status": "False",
+          "type": "MemoryPressure"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-08T05:47:53Z",
+          "lastTransitionTime": "2026-09-08T05:25:23Z",
+          "message": "kubelet has no disk pressure",
+          "reason": "KubeletHasNoDiskPressure",
+          "status": "False",
+          "type": "DiskPressure"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-08T05:47:53Z",
+          "lastTransitionTime": "2026-09-08T05:25:23Z",
+          "message": "kubelet has sufficient PID available",
+          "reason": "KubeletHasSufficientPID",
+          "status": "False",
+          "type": "PIDPressure"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-08T05:47:53Z",
+          "lastTransitionTime": "2026-09-08T05:28:38Z",
+          "message": "kubelet is posting ready status",
+          "reason": "KubeletReady",
+          "status": "True",
+          "type": "Ready"
+        },
+        {
+          "lastHeartbeatTime": null,
+          "lastTransitionTime": "2026-09-08T05:25:25Z",
+          "message": "No containerd deprecation warnings detected",
+          "reason": "NoDeprecations",
+          "status": "True",
+          "type": "ContainerdHasNoDeprecations"
+        }
+      ]
+    }
+  },
+  "scope": "Native Node resource snapshots before scheduling and after completion; unit tests supply separate mock Pod inventories."
+}

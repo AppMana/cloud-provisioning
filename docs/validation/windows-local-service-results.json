@@ -1,0 +1,38 @@
+{
+  "scope": "Separate client Pod to server Pod and Service on the same Windows node",
+  "observedAt": "2026-09-07T09:29:44.507511+00:00",
+  "results": [
+    {
+      "windowsVersion": "2022",
+      "clientPodIP": "10.244.167.133",
+      "checks": [
+        {
+          "kind": "same-node-pod",
+          "ip": "10.244.167.132",
+          "ok": true
+        },
+        {
+          "kind": "same-node-service",
+          "ip": "10.103.252.160",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "windowsVersion": "2025",
+      "clientPodIP": "10.244.233.133",
+      "checks": [
+        {
+          "kind": "same-node-pod",
+          "ip": "10.244.233.132",
+          "ok": true
+        },
+        {
+          "kind": "same-node-service",
+          "ip": "10.99.245.177",
+          "ok": true
+        }
+      ]
+    }
+  ]
+}

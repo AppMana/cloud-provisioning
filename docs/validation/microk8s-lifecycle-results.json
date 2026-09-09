@@ -1,0 +1,211 @@
+{
+  "result": "native-lifecycle-and-four-placement-matrices-passed",
+  "observedAt": "2026-09-09T07:11:45.765496+00:00",
+  "profile": "microk8s/calico",
+  "version": "v1.34.9",
+  "snapRevision": "9063",
+  "cniVersion": "3.29.3",
+  "rig": "seven single-NIC KVM guests on an AWS r7i.2xlarge nested-virtualization runner",
+  "provisioning": "local CAPI infrastructure provider with real CAPI Machine association; this is not CAPA worker qualification",
+  "management": "virtio-serial QEMU Guest Agent",
+  "commandID": "d489103d-a8a0-4195-a173-0e2ef5b42645",
+  "nativeExit": 0,
+  "replacements": [
+    {
+      "newNodeUID": "4f4d2d2c-f30c-42fc-9dd6-ad8ee3e2a22c",
+      "node": "remote1",
+      "oldNodeUID": "ebf5ab80-83e5-46dc-8174-99059d95d070"
+    },
+    {
+      "newNodeUID": "d58ed2d2-100e-4298-b601-b92dc2fd98c4",
+      "node": "remote2",
+      "oldNodeUID": "e888e344-d403-4bb8-bc9e-5342da08645a"
+    }
+  ],
+  "finalMatrices": [
+    {
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "12.054404333s",
+      "cancelled": false
+    },
+    {
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "8.8551217s",
+      "cancelled": false
+    },
+    {
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "28.630850434s",
+      "cancelled": false
+    },
+    {
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "7.126105665s",
+      "cancelled": false
+    },
+    {
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "9.802270509s",
+      "cancelled": false
+    },
+    {
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "10.842059116s",
+      "cancelled": false
+    },
+    {
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "12.963793755s",
+      "cancelled": false
+    },
+    {
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "9.477266817s",
+      "cancelled": false
+    },
+    {
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "7.200191263s",
+      "cancelled": false
+    },
+    {
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "6.8861903s",
+      "cancelled": false
+    }
+  ],
+  "requiredChecksPassed": 1324,
+  "failedCompletedAttempts": 0,
+  "lifecyclePlacement": "two-workers",
+  "remainingPlacements": [],
+  "coverage": {
+    "status": "verified native counters",
+    "coveredStatements": 1506,
+    "totalStatements": 3248,
+    "percent": 46.37,
+    "scope": "instrumented harness packages, not whole repository"
+  },
+  "retainedFleets": [
+    {
+      "fleet": "original",
+      "ready": 13,
+      "nodes": 13,
+      "UIDsUnchanged": true
+    },
+    {
+      "fleet": "kuberouter",
+      "ready": 7,
+      "nodes": 7,
+      "UIDsUnchanged": true
+    }
+  ],
+  "evidenceSHA256": {
+    "observation": "e69798d29c32d3840e97ddf300f33abf9410858d1fe69a13e81881d880b8c88c",
+    "events": "b3e9ec36959311cdc84d028e1ec140743e7360500c32310cae962933601503a0",
+    "coverage": "9898e4e12544b05ce9e1c30bb581b7225ec95c7ee89a2852a9eb49a0c2fc8f4c"
+  },
+  "limits": [
+    "Converged matrices do not prove continuous loss-free traffic.",
+    "Lifecycle cycles are not repeated under each placement.",
+    "Running binary predates the corrected MicroK8s infrastructure endpoint port.",
+    "CAPA MicroK8s workers, outages and GPU behavior remain separate gates."
+  ],
+  "passedPlacements": [
+    "control-plane",
+    "one-worker",
+    "two-workers",
+    "all-nodes"
+  ],
+  "startedAt": "2026-09-09T06:36:37.673808779Z",
+  "finishedAt": "2026-09-09T07:09:56.086594378Z",
+  "completedAttempts": 10,
+  "allMatricesPassedFirstAttempt": true,
+  "binarySHA256": "c4523db96fd04bf243059eb689e5aaf255926a9d215f934f42de9f23ddf3f8b6",
+  "evidenceArchive": {
+    "sha256": "c36e96c0a705196b9a8b20e31b9bd2938b1bfad0206434e0263f514457b1d828",
+    "bytes": 17139898,
+    "verifiedLocally": true
+  },
+  "finalNodes": [
+    {
+      "name": "cp",
+      "uid": "adc82fda-09b4-4b91-974d-ec8c62d4ff6e",
+      "ready": "True",
+      "kubelet": "v1.34.9",
+      "runtime": "containerd://1.7.29"
+    },
+    {
+      "name": "cp2",
+      "uid": "97244420-d915-4f35-b596-1f3314ca30a9",
+      "ready": "True",
+      "kubelet": "v1.34.9",
+      "runtime": "containerd://1.7.29"
+    },
+    {
+      "name": "cp3",
+      "uid": "c0a2791b-c8f7-4229-a53c-9a35c72ac211",
+      "ready": "True",
+      "kubelet": "v1.34.9",
+      "runtime": "containerd://1.7.29"
+    },
+    {
+      "name": "remote1",
+      "uid": "4f4d2d2c-f30c-42fc-9dd6-ad8ee3e2a22c",
+      "ready": "True",
+      "kubelet": "v1.34.9",
+      "runtime": "containerd://1.7.29"
+    },
+    {
+      "name": "remote2",
+      "uid": "d58ed2d2-100e-4298-b601-b92dc2fd98c4",
+      "ready": "True",
+      "kubelet": "v1.34.9",
+      "runtime": "containerd://1.7.29"
+    },
+    {
+      "name": "w1",
+      "uid": "0a6e69b4-810e-4494-b7e6-0a6d649fc593",
+      "ready": "True",
+      "kubelet": "v1.34.9",
+      "runtime": "containerd://1.7.29"
+    },
+    {
+      "name": "w2",
+      "uid": "4cc95c2d-6b4b-4e22-bf3d-89d7c9219c82",
+      "ready": "True",
+      "kubelet": "v1.34.9",
+      "runtime": "containerd://1.7.29"
+    }
+  ],
+  "siteNodeUIDsUnchanged": true
+}

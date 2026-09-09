@@ -1,0 +1,71 @@
+{
+  "scope": "Native metadata alias creation/removal on existing Windows VMs; not builder preparation, Sysprep, fresh-clone cache reuse or pull-policy qualification.",
+  "versions": {
+    "2022": {
+      "windowsBuild": 20348,
+      "source": "registry.k8s.io/e2e-test-images/agnhost@sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "alias": "registry.k8s.io/e2e-test-images/agnhost:cldt-cache-alias-native-v1",
+      "sourceTarget": "sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "aliasTarget": "sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "sourceUnchanged": true,
+      "aliasRemoved": true,
+      "runtime": "containerd github.com/containerd/containerd/v2 2.3.2 fff62f14765df376e5fc36f5a8f8e795b5670f61"
+    },
+    "2025": {
+      "windowsBuild": 26100,
+      "source": "registry.k8s.io/e2e-test-images/agnhost@sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "alias": "registry.k8s.io/e2e-test-images/agnhost:cldt-cache-alias-native-v1",
+      "sourceTarget": "sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "aliasTarget": "sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "sourceUnchanged": true,
+      "aliasRemoved": true,
+      "runtime": "containerd github.com/containerd/containerd/v2 2.3.2 fff62f14765df376e5fc36f5a8f8e795b5670f61"
+    }
+  },
+  "initialFailure": {
+    "scope": "First Windows 2022 diagnostic failed before alias creation because images inspect prints a display tree. No cache preparation was attempted.",
+    "stderrSHA256": "dafe84e9fec406e5cd4c879f0d9430fb9527cfcbc12b70b8f69194fac3c2a0e0"
+  },
+  "powershellSyntax": {
+    "windows2022": [
+      {
+        "errors": [],
+        "name": "prepare-cache.ps1"
+      },
+      {
+        "errors": [],
+        "name": "inspect-cache.ps1"
+      },
+      {
+        "errors": [],
+        "name": "verify-cache.ps1"
+      }
+    ],
+    "scope": "Parsing only, not execution of cache preparation or fresh-clone reuse."
+  },
+  "nativeMetadataParser": {
+    "2022": {
+      "targetCount": 22,
+      "registeredCount": 22,
+      "allTargetsValid": true
+    },
+    "2025": {
+      "targetCount": 22,
+      "registeredCount": 22,
+      "allTargetsValid": true
+    }
+  },
+  "sourceSHA256": {
+    "images/windows/cache.py": "3e4bedf3bd73002df01ae91e99da8cc612b62aa017deeeaece907376d8886531",
+    "images/windows/prepare-cache.ps1": "eb62e82ecb962332faffe57e8c3c4501dc9e7377cbb4616d7a5b47161e57fba7",
+    "images/windows/inspect-cache.ps1": "1eb82701e6c7515d231c105e0ff94fae50cd35b53b0f7e55835de45e5b469939",
+    "images/windows/verify-cache.ps1": "9dfd56df5b00f62161a54b9450570e98660dba99caa5600cd432a6ba979b967a"
+  },
+  "tests": {
+    "cacheRegressionTests": 14,
+    "claimTests": 13,
+    "imageLifecycleTests": 19,
+    "cachePythonStatementCoveragePercent": 78,
+    "scope": "Focused Python tests and native metadata/syntax observations only; full cache preparation and fresh-clone reuse remain outstanding."
+  }
+}

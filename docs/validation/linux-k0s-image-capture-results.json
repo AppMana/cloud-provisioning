@@ -1,0 +1,95 @@
+{
+  "observedAt": "2026-09-08T18:44:29.299226+00:00",
+  "scope": "Single-NIC Linux EC2 image builder using shared k0s preparation and public AWS capture",
+  "imageCapturePassed": true,
+  "candidateQualified": false,
+  "candidateAMIID": "ami-03d6fada2ec266b4f",
+  "builder": {
+    "instanceID": "i-0203caf5dc76ed39c",
+    "imageID": "ami-01dd03eb59b89f98b",
+    "physicalENIs": 1,
+    "instanceType": "t3.small",
+    "cleanupRequired": false,
+    "terminated": true
+  },
+  "preparation": {
+    "schemaVersion": 1,
+    "version": "v1.36.2+k0s.0",
+    "sha256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+    "executable": "/usr/local/bin/k0s",
+    "scope": "Executable only; no runtime or workload cache",
+    "preparedAt": "2026-09-08T18:41:02.701626+00:00"
+  },
+  "verification": {
+    "Status": "Success",
+    "ResponseCode": 0
+  },
+  "boundSSMVerification": {
+    "instanceID": "i-0203caf5dc76ed39c",
+    "commandSHA256": "ed6424a49af75d779b311a9e35b7b044c3a0c04a7a420681cd2b9e8ba7c8321a",
+    "status": "Success",
+    "commandID": "c92ff4e5-8585-4d83-8f1b-54d7b078913c",
+    "responseCode": 0,
+    "capturedImageID": "ami-03d6fada2ec266b4f"
+  },
+  "failedInitialAttempt": {
+    "stage": "private recipe composition",
+    "cloudInitPassed": false,
+    "imageCaptured": false,
+    "reason": "Unscoped SHA placeholder replacement altered the opening heredoc delimiter",
+    "sharedPreparationReceiptPassed": true,
+    "correction": "Restore exact delimiter; verify generated shell and embedded Python before fresh builder"
+  },
+  "unitTestsPassed": 16,
+  "unitCoverage": {
+    "covered_lines": 169,
+    "num_statements": 198,
+    "percent_covered": 85.35353535353535,
+    "percent_covered_display": "85",
+    "missing_lines": 29,
+    "excluded_lines": 0
+  },
+  "nativeRuntimeCoverageCollected": false,
+  "sourceSHA256": {
+    "images/linux/prepare_k0s.py": "16f5b6e02ed86017806fa91b929db2bdd285172c25334161cd8939722ba2a6b6",
+    "harness/e2e/aws/bake.py": "214834bf49657d6f04c013e75876e93c8314bd0fd12d5a3b34b7dbb0a14dccd7",
+    "harness/e2e/aws/linux_recipe.py": "9c1eaf6b37a790f85c7d049a1b5f28fe006bf61aac95da29771619290c974842",
+    "harness/e2e/aws/test_linux_recipe.py": "a22f374ff7c2ea59e5132e6f0a9fa44794df9cfa520a9a42b9fbafd6e3e28816",
+    "harness/e2e/aws/testdata/linux-recipe-heredoc.sh": "aa4f8aac07b0a3d6821c68b96f667d89b0145339d3ebe33c9cabea422650e7cf"
+  },
+  "evidenceSHA256": {
+    "readiness-result.json": "4b36a116381e28754469903d5b5077c5b07cc173b02d5760ae584930bbd4a859",
+    "image-preparation.json": "feffea35eb2c8af0205c615d711fab410f9588a73dfb79292d8ed16d6c7d5848",
+    "prepare.sh": "5f07a7710d92b4021c65b0712bba0c6bc6aef6afb8765cf30921ece9cb1a0fe0",
+    "verify.sh": "e20a053d54551efe5b70c6dbd7cecc0be0d778901dcf63c369e4e639406e9d4f",
+    "capture.exit.json": "47b8b6b49d4695fe6e036bd916538aff4f46773e212ca0d429db80f3963e2cfe",
+    "completion.json": "899fadb8871ca4f0f199a45982d4a0d074d921ffb307500082674f7454256420",
+    "candidate-retention.json": "3e2c52cbb50ebe798a733f6e6d254a4c38379f128af3cf2d4cca9b916f65e185"
+  },
+  "cleanupStatus": "complete",
+  "limitations": [
+    "No fresh CAPI worker bootstrap or add/remove lifecycle executed for this candidate",
+    "No GPU allocated; NVIDIA driver/toolkit and containerd/workload caches are not included in this executable layer",
+    "Native run validates normal SSM verification and stopped-builder capture; interruption recovery remains unit-tested only",
+    "Shell warning preflight was added after the fresh builder launched; regression tests reject the observed malformed heredoc before a mocked AWS launch",
+    "Worker AMI selection and IAM launch policy have not been changed"
+  ],
+  "completion": {
+    "at": "2026-09-08T18:44:48.155651+00:00",
+    "imageID": "ami-03d6fada2ec266b4f",
+    "imageState": "available",
+    "private": true,
+    "snapshots": [
+      "snap-0954e6c3e201e4d84"
+    ],
+    "builderInstanceID": "i-0203caf5dc76ed39c",
+    "builderTerminated": true,
+    "failedBuilderTerminated": true,
+    "retainedNodesReady": 13,
+    "retainedNodeUIDsUnchangedDuringCleanup": true,
+    "promoted": false,
+    "workerIAMPolicyChanged": false
+  },
+  "imageState": "available",
+  "private": true
+}

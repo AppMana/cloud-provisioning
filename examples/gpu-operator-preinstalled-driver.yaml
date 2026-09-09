@@ -1,0 +1,34 @@
+# GPU Operator values for Linux workers with image-baked NVIDIA drivers.
+# Container Toolkit is operator-managed; CDI/NRI must also be enabled in the runtime.
+cdi:
+  enabled: true
+  nriPluginEnabled: true
+daemonsets:
+  tolerations:
+  - effect: NoSchedule
+    key: nvidia.com/gpu
+    operator: Exists
+  - effect: NoSchedule
+    key: cloud-provisioning.appmana.com/internet-facing
+    operator: Exists
+driver:
+  enabled: false
+node-feature-discovery:
+  worker:
+    tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/control-plane
+      operator: Exists
+    - effect: NoSchedule
+      key: nvidia.com/gpu
+      operator: Exists
+    - effect: NoSchedule
+      key: cloud-provisioning.appmana.com/internet-facing
+      operator: Exists
+    nodeSelector:
+      kubernetes.io/os: linux
+operator:
+  nodeSelector:
+    kubernetes.io/os: linux
+toolkit:
+  enabled: true

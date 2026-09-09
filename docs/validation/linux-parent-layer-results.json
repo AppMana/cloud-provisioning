@@ -1,0 +1,41 @@
+{
+  "observedAt": "2026-09-08T19:51:33.991782+00:00",
+  "scope": "Owned Linux parent-image selection and first native GPU builder launch; image acceptance pending",
+  "unitTests": {
+    "passed": 23,
+    "coverageScope": [
+      "harness/e2e/aws/bake.py",
+      "harness/e2e/aws/image_policy.py"
+    ],
+    "coveredStatements": 210,
+    "statements": 240,
+    "percent": 87.5,
+    "nativeGPUExecution": false
+  },
+  "nativeLaunch": {
+    "instanceID": "i-033de761b45a0bddc",
+    "imageID": "ami-03d6fada2ec266b4f",
+    "instanceType": "g4dn.xlarge",
+    "state": "running",
+    "eniCount": 1,
+    "launchTime": "2026-09-08T19:48:32Z",
+    "ssm": "Online",
+    "preparation": "cloud-init running, parent receipt present, apt-get active at last observation",
+    "GPUAcceptanceComplete": false,
+    "parentK0sReceiptValidatedBeforeDriverInstall": true
+  },
+  "workerDefaultsChanged": false,
+  "qualified": false,
+  "limitations": [
+    "Native launch and SSM availability do not prove driver preparation, reboot acceptance, capture, fresh CAPI boot, GPU workload execution or cache reuse.",
+    "Unit tests use a reduced disk-layout fixture based on the observed k0s parent AMI; synthetic larger-root and rejection cases are not separate native launches.",
+    "Toolkit and runtime/workload cache layers remain pending."
+  ],
+  "sourceSHA256": {
+    "harness/e2e/aws/bake.py": "2f9f030a69ed5a52dad9765099d8af15e2848c6585a4f55a92700c2d80fffb44",
+    "harness/e2e/aws/image_policy.py": "58e5c8ec637dea1c6d6be92f1535ab935f4ae4a2c4dc67bd76186da6871abb56",
+    "harness/e2e/aws/test_bake_parent.py": "5e4fbdb7bceacc34e5de7b11d9957cb99b1e48dd9b7d7578a411237642fd844c",
+    "harness/e2e/aws/test_bake_capture.py": "abdfa87b6ce4f0d287e77f84bbc3e338a7212efa1b863c279d71bd43127418bf"
+  },
+  "followupEvidence": "linux-k0s-gpu-image-capture-results.json"
+}

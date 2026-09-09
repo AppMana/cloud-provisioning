@@ -1,0 +1,98 @@
+{
+  "scope": "Native Windows Calico ingress policy: Linux and same-node denied sources, allowed remote Windows source, unaffected target, then cleanup recovery",
+  "observedAt": "2026-09-07T09:33:59.694643+00:00",
+  "baseline": [
+    {
+      "source": "net-w1",
+      "target": "net-aws-win2022",
+      "connected": true
+    },
+    {
+      "source": "client-aws-win2022",
+      "target": "net-aws-win2022",
+      "connected": true
+    },
+    {
+      "source": "client-aws-win2025",
+      "target": "net-aws-win2022",
+      "connected": true
+    },
+    {
+      "source": "net-w1",
+      "target": "net-aws-win2025",
+      "connected": true
+    }
+  ],
+  "policyAttempts": [
+    [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022",
+        "connected": true
+      },
+      {
+        "source": "client-aws-win2022",
+        "target": "net-aws-win2022",
+        "connected": false
+      },
+      {
+        "source": "client-aws-win2025",
+        "target": "net-aws-win2022",
+        "connected": true
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025",
+        "connected": true
+      }
+    ],
+    [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022",
+        "connected": false
+      },
+      {
+        "source": "client-aws-win2022",
+        "target": "net-aws-win2022",
+        "connected": false
+      },
+      {
+        "source": "client-aws-win2025",
+        "target": "net-aws-win2022",
+        "connected": true
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025",
+        "connected": true
+      }
+    ]
+  ],
+  "enforced": true,
+  "recoveryAttempts": [
+    [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022",
+        "connected": true
+      },
+      {
+        "source": "client-aws-win2022",
+        "target": "net-aws-win2022",
+        "connected": true
+      },
+      {
+        "source": "client-aws-win2025",
+        "target": "net-aws-win2022",
+        "connected": true
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025",
+        "connected": true
+      }
+    ]
+  ],
+  "recovered": true
+}

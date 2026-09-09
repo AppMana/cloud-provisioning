@@ -1,0 +1,26 @@
+{
+  "scope": "First combined controller attempt and complete withdrawal; readiness not achieved",
+  "observedAt": "2026-09-07T09:02:04.866340+00:00",
+  "windowsVersion": "2022",
+  "preparedRoutes": 7,
+  "preparedIngressRules": 8,
+  "reached": "Publishing",
+  "finding": "Native route suppression blocked Windows management/API reachability; a restored-document acknowledgement did not prove native site kernel routes had returned",
+  "recovery": "Restored two mesh and five native site host routes through SSM; controller withdrew publication and released all owned AWS resources; Windows returned Ready",
+  "routesMatchBaseline": true,
+  "ingressMatchesBaseline": true,
+  "sourceDestCheckRestored": true,
+  "phase": "Complete",
+  "activeProjectionAbsent": true,
+  "nativeCNIOwnershipAbsent": true,
+  "nodesReady": 10,
+  "fix": "Separated siteReturnSources from siteTransport with regression tests; native site/API route restoration and reachability still require a fix",
+  "fixDeployed": false,
+  "remaining": [
+    "Investigate Windows tunnel route re-addition after projection withdrawal",
+    "Preserve API backend reachability while moving native CNI transport",
+    "Deploy and repeat combined request",
+    "Full packet and CAPI lifecycle matrix",
+    "Broader distro/GPU/image workstream"
+  ]
+}

@@ -1,0 +1,2031 @@
+{
+  "before": {
+    "nodes": {
+      "items": [
+        {
+          "metadata": {
+            "name": "aws-win2022-gpu",
+            "uid": "827bc785-b23e-43d6-a054-e5ac98ed7a97"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-06183ddba1bd2c36e"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T17:42:01Z",
+                "lastTransitionTime": "2026-09-07T17:42:01Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:28:32Z",
+                "lastTransitionTime": "2026-09-07T17:39:36Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:28:32Z",
+                "lastTransitionTime": "2026-09-07T17:39:36Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:28:32Z",
+                "lastTransitionTime": "2026-09-07T17:39:36Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:28:32Z",
+                "lastTransitionTime": "2026-09-07T17:41:39Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-07T17:39:37Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2022-v3",
+            "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0ddaed6f030330992"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T13:53:41Z",
+                "lastTransitionTime": "2026-09-07T13:53:41Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:10Z",
+                "lastTransitionTime": "2026-09-07T13:50:52Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:10Z",
+                "lastTransitionTime": "2026-09-07T13:50:52Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:10Z",
+                "lastTransitionTime": "2026-09-07T13:50:52Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:10Z",
+                "lastTransitionTime": "2026-09-07T13:53:17Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-07T13:50:54Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2025",
+            "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0b09fc50f9652095f"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T12:35:41Z",
+                "lastTransitionTime": "2026-09-07T12:35:41Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:26:04Z",
+                "lastTransitionTime": "2026-09-07T04:40:40Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:26:04Z",
+                "lastTransitionTime": "2026-09-07T04:40:40Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:26:04Z",
+                "lastTransitionTime": "2026-09-07T04:40:40Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:26:04Z",
+                "lastTransitionTime": "2026-09-07T04:43:55Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-07T04:40:41Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2025-gpu",
+            "uid": "4b517f86-d9a2-41a9-b865-bf780f166487"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0c7786299087ff242"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T17:23:54Z",
+                "lastTransitionTime": "2026-09-07T17:23:54Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:55Z",
+                "lastTransitionTime": "2026-09-07T17:21:01Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:55Z",
+                "lastTransitionTime": "2026-09-07T17:21:01Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:55Z",
+                "lastTransitionTime": "2026-09-07T17:21:01Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:55Z",
+                "lastTransitionTime": "2026-09-07T17:23:35Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-07T17:21:04Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2025-v3",
+            "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-07c9859f5ce8ed42b"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T14:37:18Z",
+                "lastTransitionTime": "2026-09-07T14:37:18Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:25:43Z",
+                "lastTransitionTime": "2026-09-07T14:33:35Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:25:43Z",
+                "lastTransitionTime": "2026-09-07T14:33:35Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:25:43Z",
+                "lastTransitionTime": "2026-09-07T14:33:35Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:25:43Z",
+                "lastTransitionTime": "2026-09-07T14:36:51Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-07T14:33:36Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "cp",
+            "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580"
+          },
+          "spec": {
+            "providerID": null
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:34:43Z",
+                "lastTransitionTime": "2026-09-07T10:34:43Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:27:58Z",
+                "lastTransitionTime": "2026-09-06T20:04:17Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:27:58Z",
+                "lastTransitionTime": "2026-09-06T20:04:17Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:27:58Z",
+                "lastTransitionTime": "2026-09-06T20:04:17Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:27:58Z",
+                "lastTransitionTime": "2026-09-06T20:05:01Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:04:22Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "cp2",
+            "uid": "947de62f-0920-408c-aa31-ac80a2344128"
+          },
+          "spec": {
+            "providerID": null
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:35:26Z",
+                "lastTransitionTime": "2026-09-07T10:35:26Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:27:45Z",
+                "lastTransitionTime": "2026-09-06T20:04:32Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:27:45Z",
+                "lastTransitionTime": "2026-09-06T20:04:32Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:27:45Z",
+                "lastTransitionTime": "2026-09-06T20:04:32Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:27:45Z",
+                "lastTransitionTime": "2026-09-06T20:05:17Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:04:37Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "cp3",
+            "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64"
+          },
+          "spec": {
+            "providerID": null
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:35:11Z",
+                "lastTransitionTime": "2026-09-07T10:35:11Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:28Z",
+                "lastTransitionTime": "2026-09-07T12:35:19Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:28Z",
+                "lastTransitionTime": "2026-09-07T12:35:19Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:28Z",
+                "lastTransitionTime": "2026-09-07T12:35:19Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:28Z",
+                "lastTransitionTime": "2026-09-07T12:35:19Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:04:55Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "ip-172-29-0-9",
+            "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0c31429bc71403d5b"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:34:00Z",
+                "lastTransitionTime": "2026-09-07T10:34:00Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:28:58Z",
+                "lastTransitionTime": "2026-09-07T05:35:44Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:28:58Z",
+                "lastTransitionTime": "2026-09-07T05:35:44Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:28:58Z",
+                "lastTransitionTime": "2026-09-07T05:35:44Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:28:58Z",
+                "lastTransitionTime": "2026-09-07T05:36:35Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-07T05:35:47Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "remote1",
+            "uid": "8935dd28-de93-44be-a887-73110fe88c51"
+          },
+          "spec": {
+            "providerID": "containernet://remote1"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:35:40Z",
+                "lastTransitionTime": "2026-09-07T10:35:40Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:38Z",
+                "lastTransitionTime": "2026-09-06T20:47:03Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:38Z",
+                "lastTransitionTime": "2026-09-06T20:47:03Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:38Z",
+                "lastTransitionTime": "2026-09-06T20:47:03Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:38Z",
+                "lastTransitionTime": "2026-09-06T20:47:03Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:24:32Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "remote2",
+            "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3"
+          },
+          "spec": {
+            "providerID": "containernet://remote2"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:34:12Z",
+                "lastTransitionTime": "2026-09-07T10:34:12Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:42Z",
+                "lastTransitionTime": "2026-09-06T21:12:38Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:42Z",
+                "lastTransitionTime": "2026-09-06T21:12:38Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:42Z",
+                "lastTransitionTime": "2026-09-06T21:12:38Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:42Z",
+                "lastTransitionTime": "2026-09-06T21:12:38Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:27:41Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "w1",
+            "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376"
+          },
+          "spec": {
+            "providerID": null
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:34:27Z",
+                "lastTransitionTime": "2026-09-07T10:34:27Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:16Z",
+                "lastTransitionTime": "2026-09-06T20:05:04Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:16Z",
+                "lastTransitionTime": "2026-09-06T20:05:04Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:16Z",
+                "lastTransitionTime": "2026-09-06T20:05:04Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:16Z",
+                "lastTransitionTime": "2026-09-06T20:05:44Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:05:07Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "w2",
+            "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da"
+          },
+          "spec": {
+            "providerID": null
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:34:57Z",
+                "lastTransitionTime": "2026-09-07T10:34:57Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:15Z",
+                "lastTransitionTime": "2026-09-06T20:05:06Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:15Z",
+                "lastTransitionTime": "2026-09-06T20:05:06Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:15Z",
+                "lastTransitionTime": "2026-09-06T20:05:06Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:15Z",
+                "lastTransitionTime": "2026-09-06T20:05:45Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:05:10Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "machines": {
+      "items": [
+        {
+          "metadata": {
+            "name": "aws-relay1",
+            "uid": "8400ceb2-cf22-4abf-b875-fd2ebdc3b463"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0c31429bc71403d5b"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "ip-172-29-0-9"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2022-gpu",
+            "uid": "2e93d4d7-7b31-43ea-9c14-56e029a1800f"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-06183ddba1bd2c36e"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "aws-win2022-gpu"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2022-v3",
+            "uid": "797d3edd-a961-4003-ae43-ee418c238dd4"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0ddaed6f030330992"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "aws-win2022-v3"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2025",
+            "uid": "bf1f1050-0096-4022-af96-ad39ffa3d051"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0b09fc50f9652095f"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "aws-win2025"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2025-gpu",
+            "uid": "bcf034e3-8d1d-48ff-a4c5-a77c4b38100f"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0c7786299087ff242"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "aws-win2025-gpu"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2025-v3",
+            "uid": "d655db95-4e7d-4575-b5c9-e245f4efafc9"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-07c9859f5ce8ed42b"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "aws-win2025-v3"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "remote1",
+            "uid": "f30f4f56-0a6b-427a-8f63-41c28a8c7a8f"
+          },
+          "spec": {
+            "providerID": "containernet://remote1"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "remote1"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "remote2",
+            "uid": "e669680b-b020-47ec-bd3f-9edeaa00caa4"
+          },
+          "spec": {
+            "providerID": "containernet://remote2"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "remote2"
+            }
+          }
+        }
+      ]
+    },
+    "configmaps": {
+      "items": [
+        {
+          "metadata": {
+            "name": "network-attachment-0cb09d34163e3bdb9cb58cc447067aa7",
+            "uid": "eb3c88af-5608-40c7-8d5b-380264ffbbee"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2022-v3/98da58e6-082e-4495-afc5-1fe73db6c9fd\",\"lease\":\"AQR47W43XVB6SZ4JMQ5W6PTEUS\",\"digest\":\"0b4b0ca5bcf5da8c4aaaa0f7186942e535b8c57a8cf27102816f241b339e9a0a\",\"plan\":{\"worker\":{\"uid\":\"2c9f9236-2fb6-41b4-8081-2797b8c65ba4\",\"nodeUID\":\"5da46e69-f779-46ad-8ce0-8e2775de38bd\",\"providerID\":\"aws:///us-west-2a/i-0a258f92654d33817\",\"interfaceID\":\"eni-03409b2e4c7ec56ef\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.54\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.54/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789},\"phase\":\"Complete\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-157078f2ab5e8687be57aace685946aa",
+            "uid": "2e76eea4-6ee3-4cd6-8ee9-d515df02dc63"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2022-v3/299e9e5f-733f-4e30-9949-ed51edd60f91\",\"lease\":\"GHBWFA2BKV6UGYZ3ZV6DOWF66M\",\"digest\":\"c3862fda117dfb46a6db33fbcdc4e052915f887079b0be3e021f7d73b1f09bc1\",\"plan\":{\"worker\":{\"uid\":\"797d3edd-a961-4003-ae43-ee418c238dd4\",\"nodeUID\":\"3ea1abf0-65bf-48d1-a9a3-e008444349a7\",\"providerID\":\"aws:///us-west-2a/i-0ddaed6f030330992\",\"interfaceID\":\"eni-0509bfd9d100550e6\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.24\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.24/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789,\"tcpPorts\":[8132]},\"phase\":\"Ready\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-17e8cd9551710251442ec525ecf6133c",
+            "uid": "a28ebaa2-58db-4e10-b5e6-ad69a8257630"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2022/82f7006e-0784-49c7-9d90-d89b6cbf1300\",\"lease\":\"UGVCFKNHEJQLTEZVUBPM2662GY\",\"digest\":\"9f01d360b8b25b6a02e0754a3d26f3e1c84ccdaaa5cdb3cfa24f80eb80e8a94e\",\"plan\":{\"worker\":{\"uid\":\"b60e6dd5-28a0-4560-b823-eb25a5ca674c\",\"nodeUID\":\"817a65b2-fc50-41a9-af96-05eba64ce024\",\"providerID\":\"aws:///us-west-2a/i-0a25d4ef52b34a8cf\",\"interfaceID\":\"eni-039aaacc1e49c541a\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.21\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.21/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"udpPort\":4789},\"phase\":\"Complete\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-1d6c83fcfa8240fb07b5f31a6f5cb02d",
+            "uid": "0f7ed42c-3ffb-4700-9474-0cc3303dddfb"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2025-v3/83460a7a-ed27-40ed-ba30-dbd4d1fa76d7\",\"lease\":\"W4JLTQWTFI3ZULPVPKFR5DSU3S\",\"digest\":\"a2e7323c81dddd39161940abe2ea13bf2b963ba9c000a45dd0c411c83759ac32\",\"plan\":{\"worker\":{\"uid\":\"e5070003-dd3b-4a4f-bac9-f5923a46b3ff\",\"nodeUID\":\"90f3d1eb-5127-4e0a-b2d8-19b9f9fad9b7\",\"providerID\":\"aws:///us-west-2a/i-0dc2c8deb3a92b613\",\"interfaceID\":\"eni-0329390537ec48b87\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.25\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.25/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789},\"phase\":\"Complete\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-231de8204fc1cbe590fc5461dbc86827",
+            "uid": "cb4948dd-2585-40ca-9279-b810f2d73a3c"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2022/e7ccc6ee-3e1a-42a1-bb97-6e6f9e4d7550\",\"lease\":\"M2C3S6NHBQLMQJXEYCLJIBITDB\",\"digest\":\"45ce5ddb49d8981fe746758951fcb4662b0f17eb518f3be2403d43776d5d9b13\",\"plan\":{\"worker\":{\"uid\":\"b60e6dd5-28a0-4560-b823-eb25a5ca674c\",\"nodeUID\":\"817a65b2-fc50-41a9-af96-05eba64ce024\",\"providerID\":\"aws:///us-west-2a/i-0a25d4ef52b34a8cf\",\"interfaceID\":\"eni-039aaacc1e49c541a\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.21\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.21/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789},\"phase\":\"Complete\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-58f923ea104f2fe9ccd459a4a353f6f8",
+            "uid": "8a345f63-826e-4cd1-aa2d-55b188404614"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2025-gpu/e569c970-85f9-4663-8761-34ada27d2191\",\"lease\":\"GFCMCVZ64R7BXVXD32L3ZFA3O5\",\"digest\":\"bae3a06f98d23c5f249e5feaa741f9202b9080b5d78cdb62346b3c67c69a4065\",\"plan\":{\"worker\":{\"uid\":\"bcf034e3-8d1d-48ff-a4c5-a77c4b38100f\",\"nodeUID\":\"4b517f86-d9a2-41a9-b865-bf780f166487\",\"providerID\":\"aws:///us-west-2a/i-0c7786299087ff242\",\"interfaceID\":\"eni-0ff53dc7db9fbf623\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.109\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.109/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789,\"tcpPorts\":[8132]},\"phase\":\"Ready\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-6b7d4bc754f72bde4094b166e4a89a0a",
+            "uid": "bbe1bc33-5713-437c-ace8-03d6d0904b01"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2022/d3bff6db-9b3c-491d-a746-d75a1c10c425\",\"lease\":\"YFCCTFIUGPME3UTYB7WYSZ2KDQ\",\"digest\":\"45ce5ddb49d8981fe746758951fcb4662b0f17eb518f3be2403d43776d5d9b13\",\"plan\":{\"worker\":{\"uid\":\"b60e6dd5-28a0-4560-b823-eb25a5ca674c\",\"nodeUID\":\"817a65b2-fc50-41a9-af96-05eba64ce024\",\"providerID\":\"aws:///us-west-2a/i-0a25d4ef52b34a8cf\",\"interfaceID\":\"eni-039aaacc1e49c541a\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.21\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.21/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789},\"phase\":\"Complete\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-9065ccc1adea9514d4e30290eefd0c09",
+            "uid": "fffd0135-ae99-4b22-b632-d043aa9089d1"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2025-v3/2b175570-fb16-4afe-aad5-e64ffb90356f\",\"lease\":\"24WM3OFCSZNCJXQXOFNBQ65I4O\",\"digest\":\"8a7e65263ec52a5f64429bab39fdb80bb8e316c5ae37a22b49d5688efb611a00\",\"plan\":{\"worker\":{\"uid\":\"d655db95-4e7d-4575-b5c9-e245f4efafc9\",\"nodeUID\":\"2ce1fc67-02f4-4b75-9f38-1af9fbc43128\",\"providerID\":\"aws:///us-west-2a/i-07c9859f5ce8ed42b\",\"interfaceID\":\"eni-0ecf3c4b792b70a34\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.68\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.68/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789,\"tcpPorts\":[8132]},\"phase\":\"Ready\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-b9665a3a0cf8f46a0806d528033cc990",
+            "uid": "d601ca32-a7a4-4d58-9e4b-f04ac0995c4d"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2025/d1a435eb-7e99-47c7-ac5c-ab73897d11c8\",\"lease\":\"FOCWDXGYXYIDZ7KE2FIPNNDEZ2\",\"digest\":\"0e3f938fbd06ea7819874fc87e6825932b70daa1107134e43a378ee3b695efc5\",\"plan\":{\"worker\":{\"uid\":\"bf1f1050-0096-4022-af96-ad39ffa3d051\",\"nodeUID\":\"21cdcf96-038b-46ba-bbba-2d014c4e6dee\",\"providerID\":\"aws:///us-west-2a/i-0b09fc50f9652095f\",\"interfaceID\":\"eni-02b4c46135fb3a386\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.13\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.13/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789},\"phase\":\"Ready\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-ec0e404d6ae24fbed24dcf621a4cd762",
+            "uid": "30a908a6-1992-4912-9e76-d7662f4c788f"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2022-gpu/4e009fd2-b0eb-4b45-821d-a22d54cdd931\",\"lease\":\"E43ZW5OWBOGMK2DGVNRVOMIKLE\",\"digest\":\"4f76d6762abe7410b737ac749cb8aedec2765063cf10a8daed99c5c43a03baca\",\"plan\":{\"worker\":{\"uid\":\"2e93d4d7-7b31-43ea-9c14-56e029a1800f\",\"nodeUID\":\"827bc785-b23e-43d6-a054-e5ac98ed7a97\",\"providerID\":\"aws:///us-west-2a/i-06183ddba1bd2c36e\",\"interfaceID\":\"eni-0137cd3c20c97f6e8\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.77\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.77/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789,\"tcpPorts\":[8132]},\"phase\":\"Ready\"}"
+          }
+        }
+      ]
+    }
+  },
+  "after": {
+    "nodes": {
+      "items": [
+        {
+          "metadata": {
+            "name": "aws-win2022-gpu",
+            "uid": "827bc785-b23e-43d6-a054-e5ac98ed7a97"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-06183ddba1bd2c36e"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T17:42:01Z",
+                "lastTransitionTime": "2026-09-07T17:42:01Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:33:38Z",
+                "lastTransitionTime": "2026-09-07T17:39:36Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:33:38Z",
+                "lastTransitionTime": "2026-09-07T17:39:36Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:33:38Z",
+                "lastTransitionTime": "2026-09-07T17:39:36Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:33:38Z",
+                "lastTransitionTime": "2026-09-07T17:41:39Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-07T17:39:37Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2022-v3",
+            "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0ddaed6f030330992"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T13:53:41Z",
+                "lastTransitionTime": "2026-09-07T13:53:41Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:10Z",
+                "lastTransitionTime": "2026-09-07T13:50:52Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:10Z",
+                "lastTransitionTime": "2026-09-07T13:50:52Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:10Z",
+                "lastTransitionTime": "2026-09-07T13:50:52Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:10Z",
+                "lastTransitionTime": "2026-09-07T13:53:17Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-07T13:50:54Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2025",
+            "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0b09fc50f9652095f"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T12:35:41Z",
+                "lastTransitionTime": "2026-09-07T12:35:41Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:31:09Z",
+                "lastTransitionTime": "2026-09-07T04:40:40Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:31:09Z",
+                "lastTransitionTime": "2026-09-07T04:40:40Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:31:09Z",
+                "lastTransitionTime": "2026-09-07T04:40:40Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:31:09Z",
+                "lastTransitionTime": "2026-09-07T04:43:55Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-07T04:40:41Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2025-gpu",
+            "uid": "4b517f86-d9a2-41a9-b865-bf780f166487"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0c7786299087ff242"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T17:23:54Z",
+                "lastTransitionTime": "2026-09-07T17:23:54Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:55Z",
+                "lastTransitionTime": "2026-09-07T18:34:22Z",
+                "message": "Kubelet stopped posting node status.",
+                "reason": "NodeStatusUnknown",
+                "status": "Unknown",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:55Z",
+                "lastTransitionTime": "2026-09-07T18:34:22Z",
+                "message": "Kubelet stopped posting node status.",
+                "reason": "NodeStatusUnknown",
+                "status": "Unknown",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:55Z",
+                "lastTransitionTime": "2026-09-07T18:34:22Z",
+                "message": "Kubelet stopped posting node status.",
+                "reason": "NodeStatusUnknown",
+                "status": "Unknown",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:29:55Z",
+                "lastTransitionTime": "2026-09-07T18:34:22Z",
+                "message": "Kubelet stopped posting node status.",
+                "reason": "NodeStatusUnknown",
+                "status": "Unknown",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-07T17:21:04Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2025-v3",
+            "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-07c9859f5ce8ed42b"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T14:37:18Z",
+                "lastTransitionTime": "2026-09-07T14:37:18Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:49Z",
+                "lastTransitionTime": "2026-09-07T14:33:35Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:49Z",
+                "lastTransitionTime": "2026-09-07T14:33:35Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:49Z",
+                "lastTransitionTime": "2026-09-07T14:33:35Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:49Z",
+                "lastTransitionTime": "2026-09-07T14:36:51Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-07T14:33:36Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "cp",
+            "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580"
+          },
+          "spec": {
+            "providerID": null
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:34:43Z",
+                "lastTransitionTime": "2026-09-07T10:34:43Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:33:05Z",
+                "lastTransitionTime": "2026-09-06T20:04:17Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:33:05Z",
+                "lastTransitionTime": "2026-09-06T20:04:17Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:33:05Z",
+                "lastTransitionTime": "2026-09-06T20:04:17Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:33:05Z",
+                "lastTransitionTime": "2026-09-06T20:05:01Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:04:22Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "cp2",
+            "uid": "947de62f-0920-408c-aa31-ac80a2344128"
+          },
+          "spec": {
+            "providerID": null
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:35:26Z",
+                "lastTransitionTime": "2026-09-07T10:35:26Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:32:51Z",
+                "lastTransitionTime": "2026-09-06T20:04:32Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:32:51Z",
+                "lastTransitionTime": "2026-09-06T20:04:32Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:32:51Z",
+                "lastTransitionTime": "2026-09-06T20:04:32Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:32:51Z",
+                "lastTransitionTime": "2026-09-06T20:05:17Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:04:37Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "cp3",
+            "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64"
+          },
+          "spec": {
+            "providerID": null
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:35:11Z",
+                "lastTransitionTime": "2026-09-07T10:35:11Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:28Z",
+                "lastTransitionTime": "2026-09-07T12:35:19Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:28Z",
+                "lastTransitionTime": "2026-09-07T12:35:19Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:28Z",
+                "lastTransitionTime": "2026-09-07T12:35:19Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:28Z",
+                "lastTransitionTime": "2026-09-07T12:35:19Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:04:55Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "ip-172-29-0-9",
+            "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0c31429bc71403d5b"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:34:00Z",
+                "lastTransitionTime": "2026-09-07T10:34:00Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:05Z",
+                "lastTransitionTime": "2026-09-07T05:35:44Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:05Z",
+                "lastTransitionTime": "2026-09-07T05:35:44Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:05Z",
+                "lastTransitionTime": "2026-09-07T05:35:44Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:05Z",
+                "lastTransitionTime": "2026-09-07T05:36:35Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-07T05:35:47Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "remote1",
+            "uid": "8935dd28-de93-44be-a887-73110fe88c51"
+          },
+          "spec": {
+            "providerID": "containernet://remote1"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:35:40Z",
+                "lastTransitionTime": "2026-09-07T10:35:40Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:38Z",
+                "lastTransitionTime": "2026-09-06T20:47:03Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:38Z",
+                "lastTransitionTime": "2026-09-06T20:47:03Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:38Z",
+                "lastTransitionTime": "2026-09-06T20:47:03Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:30:38Z",
+                "lastTransitionTime": "2026-09-06T20:47:03Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:24:32Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "remote2",
+            "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3"
+          },
+          "spec": {
+            "providerID": "containernet://remote2"
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:34:12Z",
+                "lastTransitionTime": "2026-09-07T10:34:12Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:47Z",
+                "lastTransitionTime": "2026-09-06T21:12:38Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:47Z",
+                "lastTransitionTime": "2026-09-06T21:12:38Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:47Z",
+                "lastTransitionTime": "2026-09-06T21:12:38Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:47Z",
+                "lastTransitionTime": "2026-09-06T21:12:38Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:27:41Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "w1",
+            "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376"
+          },
+          "spec": {
+            "providerID": null
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:34:27Z",
+                "lastTransitionTime": "2026-09-07T10:34:27Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:22Z",
+                "lastTransitionTime": "2026-09-06T20:05:04Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:22Z",
+                "lastTransitionTime": "2026-09-06T20:05:04Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:22Z",
+                "lastTransitionTime": "2026-09-06T20:05:04Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:22Z",
+                "lastTransitionTime": "2026-09-06T20:05:44Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:05:07Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        },
+        {
+          "metadata": {
+            "name": "w2",
+            "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da"
+          },
+          "spec": {
+            "providerID": null
+          },
+          "status": {
+            "conditions": [
+              {
+                "lastHeartbeatTime": "2026-09-07T10:34:57Z",
+                "lastTransitionTime": "2026-09-07T10:34:57Z",
+                "message": "Calico is running on this node",
+                "reason": "CalicoIsUp",
+                "status": "False",
+                "type": "NetworkUnavailable"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:21Z",
+                "lastTransitionTime": "2026-09-06T20:05:06Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:21Z",
+                "lastTransitionTime": "2026-09-06T20:05:06Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:21Z",
+                "lastTransitionTime": "2026-09-06T20:05:06Z",
+                "message": "kubelet has sufficient PID available",
+                "reason": "KubeletHasSufficientPID",
+                "status": "False",
+                "type": "PIDPressure"
+              },
+              {
+                "lastHeartbeatTime": "2026-09-07T18:34:21Z",
+                "lastTransitionTime": "2026-09-06T20:05:45Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+              },
+              {
+                "lastHeartbeatTime": null,
+                "lastTransitionTime": "2026-09-06T20:05:10Z",
+                "message": "No containerd deprecation warnings detected",
+                "reason": "NoDeprecations",
+                "status": "True",
+                "type": "ContainerdHasNoDeprecations"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "machines": {
+      "items": [
+        {
+          "metadata": {
+            "name": "aws-relay1",
+            "uid": "8400ceb2-cf22-4abf-b875-fd2ebdc3b463"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0c31429bc71403d5b"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "ip-172-29-0-9"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2022-gpu",
+            "uid": "2e93d4d7-7b31-43ea-9c14-56e029a1800f"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-06183ddba1bd2c36e"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "aws-win2022-gpu"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2022-v3",
+            "uid": "797d3edd-a961-4003-ae43-ee418c238dd4"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0ddaed6f030330992"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "aws-win2022-v3"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2025",
+            "uid": "bf1f1050-0096-4022-af96-ad39ffa3d051"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0b09fc50f9652095f"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "aws-win2025"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "deletionTimestamp": "2026-09-07T18:31:08Z",
+            "name": "aws-win2025-gpu",
+            "uid": "bcf034e3-8d1d-48ff-a4c5-a77c4b38100f"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-0c7786299087ff242"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "aws-win2025-gpu"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "aws-win2025-v3",
+            "uid": "d655db95-4e7d-4575-b5c9-e245f4efafc9"
+          },
+          "spec": {
+            "providerID": "aws:///us-west-2a/i-07c9859f5ce8ed42b"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "aws-win2025-v3"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "remote1",
+            "uid": "f30f4f56-0a6b-427a-8f63-41c28a8c7a8f"
+          },
+          "spec": {
+            "providerID": "containernet://remote1"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "remote1"
+            }
+          }
+        },
+        {
+          "metadata": {
+            "name": "remote2",
+            "uid": "e669680b-b020-47ec-bd3f-9edeaa00caa4"
+          },
+          "spec": {
+            "providerID": "containernet://remote2"
+          },
+          "status": {
+            "nodeRef": {
+              "name": "remote2"
+            }
+          }
+        }
+      ]
+    },
+    "configmaps": {
+      "items": [
+        {
+          "metadata": {
+            "name": "network-attachment-0cb09d34163e3bdb9cb58cc447067aa7",
+            "uid": "eb3c88af-5608-40c7-8d5b-380264ffbbee"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2022-v3/98da58e6-082e-4495-afc5-1fe73db6c9fd\",\"lease\":\"AQR47W43XVB6SZ4JMQ5W6PTEUS\",\"digest\":\"0b4b0ca5bcf5da8c4aaaa0f7186942e535b8c57a8cf27102816f241b339e9a0a\",\"plan\":{\"worker\":{\"uid\":\"2c9f9236-2fb6-41b4-8081-2797b8c65ba4\",\"nodeUID\":\"5da46e69-f779-46ad-8ce0-8e2775de38bd\",\"providerID\":\"aws:///us-west-2a/i-0a258f92654d33817\",\"interfaceID\":\"eni-03409b2e4c7ec56ef\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.54\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.54/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789},\"phase\":\"Complete\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-157078f2ab5e8687be57aace685946aa",
+            "uid": "2e76eea4-6ee3-4cd6-8ee9-d515df02dc63"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2022-v3/299e9e5f-733f-4e30-9949-ed51edd60f91\",\"lease\":\"GHBWFA2BKV6UGYZ3ZV6DOWF66M\",\"digest\":\"c3862fda117dfb46a6db33fbcdc4e052915f887079b0be3e021f7d73b1f09bc1\",\"plan\":{\"worker\":{\"uid\":\"797d3edd-a961-4003-ae43-ee418c238dd4\",\"nodeUID\":\"3ea1abf0-65bf-48d1-a9a3-e008444349a7\",\"providerID\":\"aws:///us-west-2a/i-0ddaed6f030330992\",\"interfaceID\":\"eni-0509bfd9d100550e6\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.24\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.24/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789,\"tcpPorts\":[8132]},\"phase\":\"Publishing\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-17e8cd9551710251442ec525ecf6133c",
+            "uid": "a28ebaa2-58db-4e10-b5e6-ad69a8257630"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2022/82f7006e-0784-49c7-9d90-d89b6cbf1300\",\"lease\":\"UGVCFKNHEJQLTEZVUBPM2662GY\",\"digest\":\"9f01d360b8b25b6a02e0754a3d26f3e1c84ccdaaa5cdb3cfa24f80eb80e8a94e\",\"plan\":{\"worker\":{\"uid\":\"b60e6dd5-28a0-4560-b823-eb25a5ca674c\",\"nodeUID\":\"817a65b2-fc50-41a9-af96-05eba64ce024\",\"providerID\":\"aws:///us-west-2a/i-0a25d4ef52b34a8cf\",\"interfaceID\":\"eni-039aaacc1e49c541a\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.21\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.21/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"udpPort\":4789},\"phase\":\"Complete\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-1d6c83fcfa8240fb07b5f31a6f5cb02d",
+            "uid": "0f7ed42c-3ffb-4700-9474-0cc3303dddfb"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2025-v3/83460a7a-ed27-40ed-ba30-dbd4d1fa76d7\",\"lease\":\"W4JLTQWTFI3ZULPVPKFR5DSU3S\",\"digest\":\"a2e7323c81dddd39161940abe2ea13bf2b963ba9c000a45dd0c411c83759ac32\",\"plan\":{\"worker\":{\"uid\":\"e5070003-dd3b-4a4f-bac9-f5923a46b3ff\",\"nodeUID\":\"90f3d1eb-5127-4e0a-b2d8-19b9f9fad9b7\",\"providerID\":\"aws:///us-west-2a/i-0dc2c8deb3a92b613\",\"interfaceID\":\"eni-0329390537ec48b87\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.25\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.25/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789},\"phase\":\"Complete\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-231de8204fc1cbe590fc5461dbc86827",
+            "uid": "cb4948dd-2585-40ca-9279-b810f2d73a3c"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2022/e7ccc6ee-3e1a-42a1-bb97-6e6f9e4d7550\",\"lease\":\"M2C3S6NHBQLMQJXEYCLJIBITDB\",\"digest\":\"45ce5ddb49d8981fe746758951fcb4662b0f17eb518f3be2403d43776d5d9b13\",\"plan\":{\"worker\":{\"uid\":\"b60e6dd5-28a0-4560-b823-eb25a5ca674c\",\"nodeUID\":\"817a65b2-fc50-41a9-af96-05eba64ce024\",\"providerID\":\"aws:///us-west-2a/i-0a25d4ef52b34a8cf\",\"interfaceID\":\"eni-039aaacc1e49c541a\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.21\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.21/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789},\"phase\":\"Complete\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-58f923ea104f2fe9ccd459a4a353f6f8",
+            "uid": "8a345f63-826e-4cd1-aa2d-55b188404614"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2025-gpu/e569c970-85f9-4663-8761-34ada27d2191\",\"lease\":\"GFCMCVZ64R7BXVXD32L3ZFA3O5\",\"digest\":\"bae3a06f98d23c5f249e5feaa741f9202b9080b5d78cdb62346b3c67c69a4065\",\"plan\":{\"worker\":{\"uid\":\"bcf034e3-8d1d-48ff-a4c5-a77c4b38100f\",\"nodeUID\":\"4b517f86-d9a2-41a9-b865-bf780f166487\",\"providerID\":\"aws:///us-west-2a/i-0c7786299087ff242\",\"interfaceID\":\"eni-0ff53dc7db9fbf623\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.109\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.109/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789,\"tcpPorts\":[8132]},\"phase\":\"Complete\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-6b7d4bc754f72bde4094b166e4a89a0a",
+            "uid": "bbe1bc33-5713-437c-ace8-03d6d0904b01"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2022/d3bff6db-9b3c-491d-a746-d75a1c10c425\",\"lease\":\"YFCCTFIUGPME3UTYB7WYSZ2KDQ\",\"digest\":\"45ce5ddb49d8981fe746758951fcb4662b0f17eb518f3be2403d43776d5d9b13\",\"plan\":{\"worker\":{\"uid\":\"b60e6dd5-28a0-4560-b823-eb25a5ca674c\",\"nodeUID\":\"817a65b2-fc50-41a9-af96-05eba64ce024\",\"providerID\":\"aws:///us-west-2a/i-0a25d4ef52b34a8cf\",\"interfaceID\":\"eni-039aaacc1e49c541a\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.21\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.21/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789},\"phase\":\"Complete\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-9065ccc1adea9514d4e30290eefd0c09",
+            "uid": "fffd0135-ae99-4b22-b632-d043aa9089d1"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2025-v3/2b175570-fb16-4afe-aad5-e64ffb90356f\",\"lease\":\"24WM3OFCSZNCJXQXOFNBQ65I4O\",\"digest\":\"8a7e65263ec52a5f64429bab39fdb80bb8e316c5ae37a22b49d5688efb611a00\",\"plan\":{\"worker\":{\"uid\":\"d655db95-4e7d-4575-b5c9-e245f4efafc9\",\"nodeUID\":\"2ce1fc67-02f4-4b75-9f38-1af9fbc43128\",\"providerID\":\"aws:///us-west-2a/i-07c9859f5ce8ed42b\",\"interfaceID\":\"eni-0ecf3c4b792b70a34\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.68\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.68/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789,\"tcpPorts\":[8132]},\"phase\":\"Publishing\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-b9665a3a0cf8f46a0806d528033cc990",
+            "uid": "d601ca32-a7a4-4d58-9e4b-f04ac0995c4d"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2025/d1a435eb-7e99-47c7-ac5c-ab73897d11c8\",\"lease\":\"FOCWDXGYXYIDZ7KE2FIPNNDEZ2\",\"digest\":\"0e3f938fbd06ea7819874fc87e6825932b70daa1107134e43a378ee3b695efc5\",\"plan\":{\"worker\":{\"uid\":\"bf1f1050-0096-4022-af96-ad39ffa3d051\",\"nodeUID\":\"21cdcf96-038b-46ba-bbba-2d014c4e6dee\",\"providerID\":\"aws:///us-west-2a/i-0b09fc50f9652095f\",\"interfaceID\":\"eni-02b4c46135fb3a386\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.13\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.13/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789},\"phase\":\"Ready\"}"
+          }
+        },
+        {
+          "metadata": {
+            "name": "network-attachment-ec0e404d6ae24fbed24dcf621a4cd762",
+            "uid": "30a908a6-1992-4912-9e76-d7662f4c788f"
+          },
+          "data": {
+            "record.json": "{\"id\":\"cloud-provisioning/gateway-aws-win2022-gpu/4e009fd2-b0eb-4b45-821d-a22d54cdd931\",\"lease\":\"E43ZW5OWBOGMK2DGVNRVOMIKLE\",\"digest\":\"4f76d6762abe7410b737ac749cb8aedec2765063cf10a8daed99c5c43a03baca\",\"plan\":{\"worker\":{\"uid\":\"2e93d4d7-7b31-43ea-9c14-56e029a1800f\",\"nodeUID\":\"827bc785-b23e-43d6-a054-e5ac98ed7a97\",\"providerID\":\"aws:///us-west-2a/i-06183ddba1bd2c36e\",\"interfaceID\":\"eni-0137cd3c20c97f6e8\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.77\"},\"gateway\":{\"uid\":\"8400ceb2-cf22-4abf-b875-fd2ebdc3b463\",\"nodeUID\":\"5855f046-1e36-4c14-8a4c-5713b2989c66\",\"providerID\":\"aws:///us-west-2a/i-0c31429bc71403d5b\",\"interfaceID\":\"eni-00401d5aafd52f51c\",\"networkID\":\"aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46\",\"subnet\":\"172.29.0.0/25\",\"address\":\"172.29.0.9\"},\"workerHost\":\"172.29.0.77/32\",\"returnHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\",\"10.100.0.1/32\",\"10.100.0.2/32\"],\"directHosts\":[\"10.10.0.10/32\",\"10.10.0.11/32\",\"10.10.0.12/32\",\"10.10.0.13/32\",\"10.10.0.14/32\"],\"udpPort\":4789,\"tcpPorts\":[8132]},\"phase\":\"Publishing\"}"
+          }
+        }
+      ]
+    }
+  },
+  "receipt": {
+    "claim": "aws-win2025-gpu",
+    "node": "aws-win2025-gpu",
+    "nodeUID": "4b517f86-d9a2-41a9-b865-bf780f166487",
+    "instanceID": "i-0c7786299087ff242",
+    "providerID": "aws:///us-west-2a/i-0c7786299087ff242",
+    "terminated": false,
+    "productCleanup": false
+  },
+  "scope": "Native snapshots during CAPI removal, EC2 observed shutting-down; termination receipt not yet available"
+}

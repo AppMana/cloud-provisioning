@@ -1,0 +1,190 @@
+{
+  "observedAt": "2026-09-07T22:25:58.373045+00:00",
+  "scope": "Untouched single-NIC CAPI Windows 2022 cache-v2 replacement; separate networking qualifications remain incomplete",
+  "imageID": "ami-0f5c22e0cb0ec6f50",
+  "instanceID": "i-0000db3df1240df44",
+  "machineUID": "2854b541-e310-408a-a2bc-60f8815adf60",
+  "nodeUID": "dd54061d-491a-4b12-95a7-27393e847780",
+  "eniID": "eni-0ff9fbc640faef9ce",
+  "guestRepairPerformed": false,
+  "join": {
+    "expectedWindowsBuild": true,
+    "onePhysicalNIC": true,
+    "k0sWorkerRunning": true,
+    "tunnelRunning": true,
+    "bootstrapInstalled": true,
+    "capiAssociation": true,
+    "windowsNode": true,
+    "matchesSiteKubelet": true,
+    "containerd2": true,
+    "cloudWorkerLabel": true,
+    "internetFacingTaint": true,
+    "nodeReady": true,
+    "publisherReady": true,
+    "expectedWorkerVersion": true,
+    "expectedWorkerHash": true,
+    "expectedTunnelHash": true,
+    "peerDelivery": true
+  },
+  "gpu": {
+    "passed": true,
+    "checks": {
+      "podSucceeded": true,
+      "jobComplete": true,
+      "containerExitedZero": true,
+      "containerIdentityPresent": true,
+      "hardwareRenderAndEncode": true
+    },
+    "receipt": {
+      "encoder": "h264_nvenc",
+      "containerWindowsBuild": 20348,
+      "decodedFrames": 30,
+      "render": {
+        "api": "Direct3D11",
+        "vendorID": 4318,
+        "deviceID": 10168,
+        "frames": 30,
+        "pixelsPerFrame": 4096,
+        "greenPixels": 1152,
+        "bluePixels": 2944,
+        "hardwareOnly": true
+      },
+      "encodedBytes": 3936
+    },
+    "podUID": "e64aac50-eacb-49d8-8490-1763810b3c4b",
+    "nodeUID": "dd54061d-491a-4b12-95a7-27393e847780",
+    "jobUID": "f0e22fab-ab9c-46e9-a9fb-43a0ae6cab5d",
+    "podPhase": "Succeeded",
+    "containerStatus": {
+      "allocatedResources": {
+        "directx.microsoft.com/display": "1"
+      },
+      "allocatedResourcesStatus": [
+        {
+          "name": "directx.microsoft.com/display",
+          "resources": [
+            {
+              "health": "Healthy",
+              "resourceID": "PCI\\VEN_10DE&DEV_27B8&SUBSYS_173310DE&REV_A1\\4&EE1B678&0&0000\\0"
+            }
+          ]
+        }
+      ],
+      "containerID": "containerd://61bf68a0fe16b5c074d613fe364afefbb6e51cfc04174b9cbb59dc8a711aef1f",
+      "image": "sha256:903cd697133287523b9362733a8c418afe23de6e233d26b5c3fa934b6fe7e6bc",
+      "imageID": "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+      "lastState": {},
+      "name": "render-nvenc",
+      "ready": false,
+      "resources": {
+        "limits": {
+          "directx.microsoft.com/display": "1"
+        },
+        "requests": {
+          "directx.microsoft.com/display": "1"
+        }
+      },
+      "restartCount": 0,
+      "started": false,
+      "state": {
+        "terminated": {
+          "containerID": "containerd://61bf68a0fe16b5c074d613fe364afefbb6e51cfc04174b9cbb59dc8a711aef1f",
+          "exitCode": 0,
+          "finishedAt": "2026-09-07T22:23:35Z",
+          "reason": "Completed",
+          "startedAt": "2026-09-07T22:23:06Z"
+        }
+      },
+      "volumeMounts": [
+        {
+          "mountPath": "C:\\gpu-probe",
+          "name": "probe",
+          "readOnly": true,
+          "recursiveReadOnly": "Disabled"
+        }
+      ]
+    },
+    "image": "index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+    "hostNodeInfo": {
+      "architecture": "amd64",
+      "bootID": "668",
+      "containerRuntimeVersion": "containerd://2.3.2",
+      "kernelVersion": "10.0.20348.5499",
+      "kubeProxyVersion": "",
+      "kubeletVersion": "v1.36.2+k0s",
+      "machineID": "EC2AMAZ-V0E2VA5",
+      "operatingSystem": "windows",
+      "osImage": "Windows Server 2022 Datacenter",
+      "systemUUID": "EC276F25-FD96-6DF7-18BF-0859A7634950"
+    },
+    "scope": "Single ordinary-container render and encode observation; no streaming or tenant-isolation claim",
+    "probeIdentity": {
+      "configMapName": "windows-gpu-probe-v3",
+      "configMapUID": "e812a41a-aac2-4fd6-b028-61401144bc35",
+      "binarySHA256": "c3bd523139eac3615577f4e0b3dfb395e58083defe5e58e9fc7419df43b22e77",
+      "scriptSHA256": "5db856f0ff73ad6c9329a89493091b00999cc41473e14fe5f3f53d184f06169c"
+    },
+    "logReadError": null,
+    "observedAt": "2026-09-07T22:24:24.169780+00:00",
+    "logs": "{\"encoder\":\"h264_nvenc\",\"containerWindowsBuild\":20348,\"decodedFrames\":30,\"render\":{\"api\":\"Direct3D11\",\"vendorID\":4318,\"deviceID\":10168,\"frames\":30,\"pixelsPerFrame\":4096,\"greenPixels\":1152,\"bluePixels\":2944,\"hardwareOnly\":true},\"encodedBytes\":3936}\n"
+  },
+  "nativeGPUAndCache": {
+    "gpu": [
+      "NVIDIA L4-3Q, 582.53, WDDM"
+    ],
+    "gpuStagePresent": false,
+    "readyImages": [
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ],
+    "license": [
+      "Product Brand                                      : NVIDIA RTX Virtual Workstation",
+      "GPU Virtualization Mode",
+      "Virtualization Mode                            : VGPU",
+      "License Status                                 : Licensed (Expiry: N/A)"
+    ],
+    "dataInheritsPermissions": true
+  },
+  "removalGuard": {
+    "passed": true,
+    "checks": {
+      "instanceTerminated": true,
+      "productCleanup": true,
+      "targetMachineAbsent": true,
+      "survivorMachineIdentities": true,
+      "exactSurvivorSet": true,
+      "survivorIdentitiesAndReadiness": true,
+      "targetGatewayLeasesComplete": true,
+      "otherGatewayLeasesPreserved": true
+    },
+    "survivorCount": 12,
+    "retiredGatewayLeaseCount": 1,
+    "preservedGatewayLeaseCount": 4,
+    "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+  },
+  "survivorGPU": {
+    "before": true,
+    "after": true
+  },
+  "cacheEvents": [
+    {
+      "reason": "Pulled",
+      "message": "Container image \"index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe\" already present on machine and can be accessed by the pod",
+      "firstTimestamp": "2026-09-07T22:22:11Z"
+    },
+    {
+      "reason": "Created",
+      "message": "Container created",
+      "firstTimestamp": "2026-09-07T22:22:12Z"
+    },
+    {
+      "reason": "Started",
+      "message": "Container started",
+      "firstTimestamp": "2026-09-07T22:23:06Z"
+    }
+  ],
+  "limitations": [
+    "Corrected Windows 2025 image still needs untouched replacement validation",
+    "Seven small-UDP failures observed in the removal diagnostic; Calico address-ownership canary now in progress",
+    "VFP fragmentation finding not yet resolved"
+  ]
+}

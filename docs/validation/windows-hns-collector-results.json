@@ -1,0 +1,314 @@
+{
+  "scope": "Single-NIC Windows AWS VMs: paired HNS, HNM, VFP and Packet Monitor collector validation.",
+  "qualificationEligible": false,
+  "attempts": 29903,
+  "failed": 8,
+  "identitiesStable": true,
+  "matchedPacketDrops": 0,
+  "hosts": [
+    {
+      "windowsServer": "2022",
+      "vfpCapture": {
+        "startedAt": "2026-09-09T02:58:00.3933372Z",
+        "stoppedAt": "2026-09-09T02:58:30.6881138Z",
+        "keywordMask": "0xcd0e0f",
+        "maxFileMiB": 256
+      },
+      "hnsTraceStopped": true,
+      "hnmTraceStopped": true,
+      "failedSamplesStartingInVfpWindow": 0,
+      "packetMonitorStop": "Flushing logs...\r\nMerging metadata...\r\nLog file: C:\\ProgramData\\CloudProvisioning\\diagnostics\\hns-paired-v1\\capture.etl (No events lost)\r\n",
+      "getWinEvent": {
+        "records": 923,
+        "hnsRecords": 922,
+        "hnsProcessingErrors": 857
+      },
+      "tracerpt": {
+        "totalRecords": 926,
+        "decodedHnsRecords": 922,
+        "otherProviderProcessingErrors": [
+          {
+            "provider": "9e814aad-3204-11d2-9a82-006008a86939",
+            "code": "15005"
+          },
+          {
+            "provider": "9e814aad-3204-11d2-9a82-006008a86939",
+            "code": "15005"
+          }
+        ],
+        "requestMethods": {
+          "GET": 127
+        },
+        "tasks": {
+          "OnRundown": 2,
+          "Entity": 126,
+          "RequestHandler": 254,
+          "HnsRpcV2_Enumerate": 58,
+          "HnsRpcV2_Open": 164,
+          "HnsRpcV2_Query": 164,
+          "RpcCall": 82,
+          "None": 65,
+          "TimerCallback": 1,
+          "GoalStateDriverCallBack": 2,
+          "GetMacAddress": 2,
+          "NdResponderNoMac": 1,
+          "InterceptedPacketDropped": 1
+        },
+        "endpointGetStatsResultCodes": {}
+      },
+      "artifacts": [
+        {
+          "sha256": "f6dfdceb316a3a3ee3c147fc9902e1809d0cbfe5cfc4838ec0b220c7385f65aa",
+          "name": "capture.etl",
+          "bytes": 4679575
+        },
+        {
+          "sha256": "dffa4ad0bb1685475e6a215ac07c8b6b5794aeb0f7d6ff833a5030432fae4d1f",
+          "name": "capture.pcapng",
+          "bytes": 39998856
+        },
+        {
+          "sha256": "379cce941b5f8091cc17f615672671237626c806ab8d6d010f6fbf4d2533cc1f",
+          "name": "capture.txt.gz",
+          "bytes": 4929263
+        },
+        {
+          "sha256": "ae336eb75f41b1aed8067f2f27ba1bac3e271ed96348407cf5096610de46d1fd",
+          "name": "hnm.etl",
+          "bytes": 8192
+        },
+        {
+          "sha256": "1871ec96fc01aab86919b5a530263a11878ce36b1ab279e37aa665c1d8ae16ee",
+          "name": "hns-providers.json",
+          "bytes": 39902
+        },
+        {
+          "sha256": "4033431d680452d4b62d4ee079f883f35630a7d1ffb545d63308f636ce5526b9",
+          "name": "hns.etl",
+          "bytes": 630784
+        },
+        {
+          "sha256": "a7bfb1ab8edfa4d4ff9e6ef175ca49e9c95dad9c9ea4c06f9647f994a5e25933",
+          "name": "processes-after.json",
+          "bytes": 17847
+        },
+        {
+          "sha256": "f2bdb45b7e14fd5b21c90f0280c1ed97f20abf99f3532d60d1c4e9f767f20ec5",
+          "name": "processes-before.json",
+          "bytes": 17717
+        },
+        {
+          "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+          "name": "vfp\\provider.json",
+          "bytes": 311964
+        },
+        {
+          "sha256": "befeaaadfb3070ffb9df52f69681c0c3a99e5ca477fc883d9896605f47941b0a",
+          "name": "vfp\\result.json",
+          "bytes": 839
+        },
+        {
+          "sha256": "f23dbb98386b9f85bb1c46d6b1fb1005b104b3cca18025aa2a9bd8b06c683177",
+          "name": "vfp\\vfp.etl",
+          "bytes": 138412032
+        },
+        {
+          "sha256": "7f7f6982df6d50105975de91f1cd9a966784897e3b19284d0ec3a3f66d35c10a",
+          "name": "hns-events.jsonl.gz",
+          "bytes": 66726
+        },
+        {
+          "sha256": "3c4f186959fb4f0b0ff292057ae42f193510d6762eb1e012ce9992c1cbd2cefd",
+          "name": "hnm-events.jsonl.gz",
+          "bytes": 456
+        },
+        {
+          "sha256": "4e9454af93d218b1b808037ab74eb923743bb96167e31f3dd0ffb4df6027ae2a",
+          "name": "validation-rendered.jsonl.gz",
+          "bytes": 850
+        },
+        {
+          "sha256": "77f90d738309532120f8de3eac1dda7deaea5b3d524cf1ca650a10ce7c0b55c7",
+          "name": "hns-tracerpt.xml.gz",
+          "bytes": 49369
+        },
+        {
+          "sha256": "5c36d409f02143a964ee462be13f0e43b8991f949e6008ba3d6439aa2a62528f",
+          "name": "tracerpt-status.txt",
+          "bytes": 1030
+        }
+      ],
+      "cleanup": {
+        "traceAbsent": true,
+        "traceFiltering": "Trace filtering is Disabled\r\nCommand get-trace-filtering-state succeeded!\r\n",
+        "directoryAbsent": true
+      }
+    },
+    {
+      "windowsServer": "2025",
+      "vfpCapture": {
+        "startedAt": "2026-09-09T02:58:00.5809559Z",
+        "stoppedAt": "2026-09-09T02:58:30.7916343Z",
+        "keywordMask": "0xcd0e0f",
+        "maxFileMiB": 256
+      },
+      "hnsTraceStopped": true,
+      "hnmTraceStopped": true,
+      "failedSamplesStartingInVfpWindow": 0,
+      "packetMonitorStop": "Flushing logs...\r\nMerging metadata...\r\nLog file: C:\\ProgramData\\CloudProvisioning\\diagnostics\\hns-paired-v1\\capture.etl (No events lost)\r\n",
+      "getWinEvent": {
+        "records": 1512,
+        "hnsRecords": 1511,
+        "hnsProcessingErrors": 1446
+      },
+      "tracerpt": {
+        "totalRecords": 1515,
+        "decodedHnsRecords": 1511,
+        "otherProviderProcessingErrors": [
+          {
+            "provider": "9e814aad-3204-11d2-9a82-006008a86939",
+            "code": "15005"
+          },
+          {
+            "provider": "9e814aad-3204-11d2-9a82-006008a86939",
+            "code": "15005"
+          }
+        ],
+        "requestMethods": {
+          "GET": 127
+        },
+        "tasks": {
+          "OnRundown": 2,
+          "Entity": 126,
+          "RequestHandler": 254,
+          "HnsRpcV2_Enumerate": 58,
+          "HnsRpcV2_Open": 164,
+          "HnsRpcV2_Query": 164,
+          "RpcCall": 164,
+          "None": 65,
+          "ActivityError": 228,
+          "Endpoint::GetStats": 228,
+          "VfpPort::GetVfpPortCounters": 6,
+          "GetMacAddress": 4,
+          "NdResponderNoMac": 2,
+          "InterceptedPacketDropped": 2,
+          "TimerCallback": 1,
+          "GoalStateDriverCallBack": 2,
+          "AddingSpace": 8,
+          "UpdatingMappings": 8,
+          "AddingMapping": 2,
+          "RemovingLayer": 2,
+          "AddingLayer": 3,
+          "AddingGroup": 6,
+          "UpdatingRules": 4,
+          "RemovingAllRules": 2,
+          "ReplacingRules": 2,
+          "RemovingGroup": 2,
+          "AppliedPortSettings": 2
+        },
+        "endpointGetStatsResultCodes": {
+          "0": 228
+        }
+      },
+      "artifacts": [
+        {
+          "sha256": "2a8c55ddc0a17f2b955205d6b284e325e86e668b49064b1c412445f40fcdbfdb",
+          "name": "capture.etl",
+          "bytes": 5184041
+        },
+        {
+          "sha256": "2ee6c748a2c9c872f56362684f6c98e1469978bc0a4fc631e89d4d12e145619f",
+          "name": "capture.pcapng",
+          "bytes": 40117848
+        },
+        {
+          "sha256": "fa28a5b36453903ce1b47e3180ece45213cb0b1b2293b624d3ba37621924d672",
+          "name": "capture.txt.gz",
+          "bytes": 5208697
+        },
+        {
+          "sha256": "f200486ff207fed91030cf569cb926817358058bc2f7a1e501aae0e433495275",
+          "name": "hnm.etl",
+          "bytes": 8192
+        },
+        {
+          "sha256": "4e943f55801ef89a80cf84dfa50d13267d23e98da373f5ce661a5af4cc48cadb",
+          "name": "hns-providers.json",
+          "bytes": 41618
+        },
+        {
+          "sha256": "c2cdac7350585082a20d2e9d544fa5d116c6c1554407c141405917566128a6c7",
+          "name": "hns.etl",
+          "bytes": 909312
+        },
+        {
+          "sha256": "538a5264a5928f5452305800cb9a81da3e00d00861de5227e311447e5995fd45",
+          "name": "processes-after.json",
+          "bytes": 19936
+        },
+        {
+          "sha256": "ae1f3eca03cdb60eccff888521f0544e792474705d67e694df099a565f48f386",
+          "name": "processes-before.json",
+          "bytes": 19807
+        },
+        {
+          "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+          "name": "vfp\\provider.json",
+          "bytes": 327652
+        },
+        {
+          "sha256": "512dd974c8c3406733fbaf470164d51d4f26cf8b3e1864523184152cb3c8fda4",
+          "name": "vfp\\result.json",
+          "bytes": 839
+        },
+        {
+          "sha256": "9b7fae98b179fcd1e14bbd59652db8348237f5731f11a9f9021a1ba38a5a3602",
+          "name": "vfp\\vfp.etl",
+          "bytes": 149028864
+        },
+        {
+          "sha256": "677f5acd6c54feee00bae825de8021b985b7c2b08f14a764db91dd25ad171ee0",
+          "name": "hns-events.jsonl.gz",
+          "bytes": 86356
+        },
+        {
+          "sha256": "a94ec19f4936fed804c0e84c658a243e6a3552a31515117c48a629b1ee230bc7",
+          "name": "hnm-events.jsonl.gz",
+          "bytes": 455
+        },
+        {
+          "sha256": "15b19da657e06afffdc64735ef2bd3d0f7e2677b640c282c56cb40a3245fb6c4",
+          "name": "validation-rendered.jsonl.gz",
+          "bytes": 6758
+        },
+        {
+          "sha256": "3ba926ddc6c367cc76ec6d9f9532ca44073fb072d0302e10f34e02f1c0c13157",
+          "name": "hns-tracerpt.xml.gz",
+          "bytes": 65370
+        },
+        {
+          "sha256": "f4c2c5044f2c85f61303c50342a988172127ec829208124507c9b8178bc40dcb",
+          "name": "tracerpt-status.txt",
+          "bytes": 1078
+        }
+      ],
+      "cleanup": {
+        "traceAbsent": true,
+        "traceFiltering": "Trace filtering is Disabled\r\nCommand get-trace-filtering-state succeeded!\r\n",
+        "directoryAbsent": true
+      }
+    }
+  ],
+  "tracerptDocumentation": "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/tracerpt",
+  "limitations": [
+    "Failed samples began outside the VFP windows; some timeout intervals overlap capture start. No correlated native drop was found.",
+    "Decoded HNS request handlers are GET requests. This does not prove absence of internal HNS reconfiguration.",
+    "The remaining tracerpt errors belong to provider 9e814aad-3204-11d2-9a82-006008a86939, not HNS. Their content remains undecoded.",
+    "ActivityError task names are not failed-operation evidence: the paired Endpoint::GetStats records have resultCode 0.",
+    "No forwarding change, mitigation qualification, image promotion or release qualification."
+  ],
+  "postCleanup": {
+    "nodesReady": 13,
+    "trafficNodeUIDsUnchanged": true
+  }
+}

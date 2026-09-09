@@ -1,0 +1,44 @@
+# Test-only deployment. Label only the Windows GPU nodes under qualification:
+# cloud-provisioning.appmana.com/gpu-test=true
+# This HostProcess plugin allocates devices; application tests must use ordinary pods.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cldt-windows-gpu
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: windows-wddm-device-plugin
+  namespace: cldt-windows-gpu
+spec:
+  selector:
+    matchLabels:
+      app: windows-wddm-device-plugin
+  template:
+    metadata:
+      labels:
+        app: windows-wddm-device-plugin
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/os: windows
+        kubernetes.io/arch: amd64
+        node.kubernetes.io/windows-build: '10.0.20348'
+        cloud-provisioning.appmana.com/gpu-test: 'true'
+      tolerations:
+        - key: cloud-provisioning.appmana.com/internet-facing
+          operator: Exists
+          effect: NoSchedule
+      hostNetwork: true
+      securityContext:
+        windowsOptions:
+          hostProcess: true
+          runAsUserName: 'NT AUTHORITY\SYSTEM'
+      containers:
+        - name: plugin
+          # Upstream published 0.0.1 image, pinned independently of source HEAD.
+          image: index.docker.io/tensorworks/wddm-device-plugin@sha256:47f97c76c16ad24490caf1d344b4a9bc0ccc05fe787e2b68fe5a1051818ce9ec
+          imagePullPolicy: IfNotPresent

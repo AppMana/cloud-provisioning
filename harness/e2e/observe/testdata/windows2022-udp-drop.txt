@@ -1,0 +1,43 @@
+[00]2024.2200::2026-09-07 11:31:43.212455900 [Microsoft-Windows-PktMon] PktGroupId 2882, PktNumber 1, Appearance 1, Direction Tx , Type Ethernet , Component 206, Edge 1, Filter 1, OriginalSize 1378, LoggedSize 192 
+	0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 1378: (tos 0x0, ttl 128, id 28730, offset 0, flags [+], proto UDP (17), length 1364)
+    10.244.167.145.63113 > 10.244.233.145.8081: UDP, bad length 1805 > 1336
+[00]2024.2200::2026-09-07 11:31:43.212456800 [Microsoft-Windows-PktMon] PktGroupId 2882, PktNumber 2, Appearance 1, Direction Tx , Type Ethernet , Component 206, Edge 1, Filter 1, OriginalSize 503, LoggedSize 192 
+	0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 503: (tos 0x0, ttl 128, id 28730, offset 1344, flags [none], proto UDP (17), length 489)
+    10.244.167.145 > 10.244.233.145: ip-proto-17
+[00]2024.2200::2026-09-07 11:31:43.212458800 [Microsoft-Windows-PktMon] PktGroupId 2882, PktNumber 1, Appearance 2, Direction Tx , Type Ethernet , Component 202, Edge 1, Filter 1, OriginalSize 1378, LoggedSize 192 
+	0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 1378: (tos 0x0, ttl 128, id 28730, offset 0, flags [+], proto UDP (17), length 1364)
+    10.244.167.145.63113 > 10.244.233.145.8081: UDP, bad length 1805 > 1336
+[00]2024.2200::2026-09-07 11:31:43.212459200 [Microsoft-Windows-PktMon] PktGroupId 2882, PktNumber 2, Appearance 2, Direction Tx , Type Ethernet , Component 202, Edge 1, Filter 1, OriginalSize 503, LoggedSize 192 
+	0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 503: (tos 0x0, ttl 128, id 28730, offset 1344, flags [none], proto UDP (17), length 489)
+    10.244.167.145 > 10.244.233.145: ip-proto-17
+[00]2024.2200::2026-09-07 11:31:43.212464000 [Microsoft-Windows-PktMon] PktGroupId 2882, PktNumber 1, Appearance 3, Direction Tx , Type Ethernet , Component 49, Edge 1, Filter 1, OriginalSize 1378, LoggedSize 192 
+	0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 1378: (tos 0x0, ttl 128, id 28730, offset 0, flags [+], proto UDP (17), length 1364)
+    10.244.167.145.63113 > 10.244.233.145.8081: UDP, bad length 1805 > 1336
+[00]2024.2200::2026-09-07 11:31:43.212464400 [Microsoft-Windows-PktMon] PktGroupId 2882, PktNumber 2, Appearance 3, Direction Tx , Type Ethernet , Component 49, Edge 1, Filter 1, OriginalSize 503, LoggedSize 192 
+	0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 503: (tos 0x0, ttl 128, id 28730, offset 1344, flags [none], proto UDP (17), length 489)
+    10.244.167.145 > 10.244.233.145: ip-proto-17
+[00]2024.2200::2026-09-07 11:31:43.212465700 [Microsoft-Windows-PktMon] PktGroupId 2882, PktNumber 1, Appearance 4, Direction Tx , Type Ethernet , Component 22, Edge 1, Filter 1, OriginalSize 1378, LoggedSize 192 
+	0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 1378: (tos 0x0, ttl 128, id 28730, offset 0, flags [+], proto UDP (17), length 1364)
+    10.244.167.145.63113 > 10.244.233.145.8081: UDP, bad length 1805 > 1336
+[00]2024.2200::2026-09-07 11:31:43.212466200 [Microsoft-Windows-PktMon] PktGroupId 2882, PktNumber 2, Appearance 4, Direction Tx , Type Ethernet , Component 22, Edge 1, Filter 1, OriginalSize 503, LoggedSize 192 
+	0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 503: (tos 0x0, ttl 128, id 28730, offset 1344, flags [none], proto UDP (17), length 489)
+    10.244.167.145 > 10.244.233.145: ip-proto-17
+[00]2024.2200::2026-09-07 11:31:43.212470000 [Microsoft-Windows-PktMon] PktGroupId 2882, PktNumber 1, Appearance 5, Direction Tx , Type Ethernet , Component 22, Edge 2, Filter 1, OriginalSize 1378, LoggedSize 192 
+	0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 1378: (tos 0x0, ttl 128, id 28730, offset 0, flags [+], proto UDP (17), length 1364)
+    10.244.167.145.63113 > 10.244.233.145.8081: UDP, bad length 1805 > 1336
+[00]2024.2200::2026-09-07 11:31:43.212470600 [Microsoft-Windows-PktMon] PktGroupId 2882, PktNumber 2, Appearance 5, Direction Tx , Type Ethernet , Component 22, Edge 2, Filter 1, OriginalSize 503, LoggedSize 192 
+	0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 503: (tos 0x0, ttl 128, id 28730, offset 1344, flags [none], proto UDP (17), length 489)
+    10.244.167.145 > 10.244.233.145: ip-proto-17
+[00]2024.2200::2026-09-07 11:31:43.212471700 [Microsoft-Windows-PktMon] PktGroupId 2882, PktNumber 1, Appearance 6, Direction Tx , Type Ethernet , Component 17, Edge 1, Filter 1, OriginalSize 1378, LoggedSize 192 
+	0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 1378: (tos 0x0, ttl 128, id 28730, offset 0, flags [+], proto UDP (17), length 1364)
+    10.244.167.145.63113 > 10.244.233.145.8081: UDP, bad length 1805 > 1336
+[00]2024.2200::2026-09-07 11:31:43.212472700 [Microsoft-Windows-PktMon] PktGroupId 2882, PktNumber 2, Appearance 6, Direction Tx , Type Ethernet , Component 17, Edge 1, Filter 1, OriginalSize 503, LoggedSize 192 
+	0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 503: (tos 0x0, ttl 128, id 28730, offset 1344, flags [none], proto UDP (17), length 489)
+    10.244.167.145 > 10.244.233.145: ip-proto-17
+[00]2024.2200::2026-09-07 11:31:43.212519600 [Microsoft-Windows-PktMon] Drop: PktGroupId 2882, PktNumber 1, Appearance 7, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 1378, LoggedSize 192 
+	Drop: 0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 1378: (tos 0x0, ttl 128, id 28730, offset 0, flags [+], proto UDP (17), length 1364)
+    10.244.167.145.35318 > 10.244.233.145.37151: UDP, bad length 1805 > 1336
+[00]2024.2200::2026-09-07 11:31:43.212520100 [Microsoft-Windows-PktMon] Drop: PktGroupId 2882, PktNumber 2, Appearance 7, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 503, LoggedSize 192 
+	Drop: 0E-2A-0A-F4-A7-91 > 00-15-5D-90-DF-59, ethertype IPv4 (0x0800), length 503: (tos 0x0, ttl 128, id 28730, offset 1344, flags [none], proto UDP (17), length 489)
+    10.244.167.145 > 10.244.233.145: ip-proto-17
+[00]230C.1DC8::2026-09-07 11:31:53.886586600 [Microsoft-Windows-PktMon] Component 93, Type Filter , Name vfpext.sys, VFP Extension 

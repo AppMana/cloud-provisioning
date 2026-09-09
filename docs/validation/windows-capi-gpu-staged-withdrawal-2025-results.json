@@ -1,0 +1,610 @@
+{
+  "observedAt": "2026-09-08T13:56:29.638622+00:00",
+  "scope": "Fresh single-NIC Windows2025 GPU CAPI trial on staged-worker-withdrawal controller; all workload, traffic and removal gates remain independent",
+  "binding": {
+    "instanceID": "i-00b452d9a09f04964",
+    "machineUID": "e819b357-9906-483d-9bbf-9e652a8c4f82",
+    "nodeUID": "14c798d3-b8fe-4ac4-9a3f-9569abd352a4",
+    "node": "aws-win2025-gpu-withdraw-v1"
+  },
+  "imageID": "ami-0356e19b7ba44ee73",
+  "controllerImage": "cldt/controller-windows:v15-staged-withdrawal",
+  "controllerIdentity": {
+    "deploymentUID": "651be826-baf1-4e56-bfae-b314a1f58314",
+    "generation": 66,
+    "observedGeneration": 66,
+    "binarySHA256": "dbade1e77695c2bb89c6e2986622c32c069fc921d87bf5a46ba88f237837b92d",
+    "pods": [
+      {
+        "pod": "cloud-provisioning-endpoint-controller-f47b996f8-6gdk5",
+        "podUID": "7b409238-4fbe-448d-b28f-5c4cf5af83dd",
+        "node": "w2",
+        "phase": "Running",
+        "containers": [
+          {
+            "name": "controller",
+            "imageID": "sha256:07f1a23cb3b1e5339703f2dee2b19b97909c7317c2342da4e62b6bd539027b9b",
+            "ready": true,
+            "restartCount": 0
+          }
+        ]
+      }
+    ]
+  },
+  "joinChecks": {
+    "expectedWindowsBuild": true,
+    "onePhysicalNIC": true,
+    "k0sWorkerRunning": true,
+    "tunnelRunning": true,
+    "bootstrapInstalled": true,
+    "capiAssociation": true,
+    "windowsNode": true,
+    "matchesSiteKubelet": true,
+    "containerd2": true,
+    "cloudWorkerLabel": true,
+    "internetFacingTaint": true,
+    "nodeReady": true,
+    "publisherReady": true,
+    "expectedWorkerVersion": true,
+    "expectedWorkerHash": true,
+    "expectedTunnelHash": true,
+    "expectedRunningTunnelHash": true,
+    "peerDelivery": true,
+    "gatewayAttachmentReady": true
+  },
+  "gpu": {
+    "passed": true,
+    "checks": {
+      "podSucceeded": true,
+      "jobComplete": true,
+      "containerExitedZero": true,
+      "containerIdentityPresent": true,
+      "hardwareRenderAndEncode": true
+    },
+    "receipt": {
+      "encoder": "h264_nvenc",
+      "containerWindowsBuild": 26100,
+      "decodedFrames": 30,
+      "render": {
+        "api": "Direct3D11",
+        "vendorID": 4318,
+        "deviceID": 10168,
+        "frames": 30,
+        "pixelsPerFrame": 4096,
+        "greenPixels": 1152,
+        "bluePixels": 2944,
+        "hardwareOnly": true
+      },
+      "encodedBytes": 3936
+    },
+    "podUID": "2e978e27-dfa1-4161-909c-824136f42bd1",
+    "jobUID": "f69dc3f9-1a3f-4010-b7d5-92c7d38074c1",
+    "licenseObservation": {
+      "observedAt": "2026-09-08T13:48:50.1422562Z",
+      "driverVersion": "582.53",
+      "product": "NVIDIA RTX Virtual Workstation",
+      "status": "Licensed (Expiry: N/A)",
+      "instanceID": "i-00b452d9a09f04964",
+      "scope": "Runtime activation observation on this AWS worker; image license scope remains AWS-specific"
+    }
+  },
+  "cacheReuse": {
+    "declaredCacheReused": true,
+    "completeStartupCache": true,
+    "checks": {
+      "sameWindowsNode": true,
+      "nativeIdentity": true,
+      "declaredReferencesReady": true,
+      "declaredReferenceTargets": true,
+      "podIdentityBindings": true,
+      "declared": true,
+      "ifNotPresent": true,
+      "resolvedTargetMatches": true,
+      "cacheHitEvent": true,
+      "noObservedPodImagePulls": true
+    },
+    "containers": [
+      {
+        "pod": "windows-render-nvenc-2025-withdraw-v1-l7kvw",
+        "podUID": "2e978e27-dfa1-4161-909c-824136f42bd1",
+        "container": "render-nvenc",
+        "kind": "containers",
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "windows-wddm-device-plugin-runtime-mounts-mjkzn",
+        "podUID": "d76c61b1-0ed9-4002-a231-fa498f120b2d",
+        "container": "plugin",
+        "kind": "containers",
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-device-plugin@sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "cloud-provisioning-dialer-remote-windows-8gm6w",
+        "podUID": "321c9ad6-7f5f-404a-89a6-1ecb72fabe57",
+        "container": "peer-publisher",
+        "kind": "containers",
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-publisher@sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "calico-node-windows-6lsxz",
+        "podUID": "524279b1-f9a1-4c93-bdfc-333bc90ab796",
+        "container": "uninstall-calico",
+        "kind": "initContainers",
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "calico-node-windows-6lsxz",
+        "podUID": "524279b1-f9a1-4c93-bdfc-333bc90ab796",
+        "container": "install-cni",
+        "kind": "initContainers",
+        "image": "docker.io/calico/cni-windows:v3.32.0",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "calico-node-windows-6lsxz",
+        "podUID": "524279b1-f9a1-4c93-bdfc-333bc90ab796",
+        "container": "felix",
+        "kind": "containers",
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "calico-node-windows-6lsxz",
+        "podUID": "524279b1-f9a1-4c93-bdfc-333bc90ab796",
+        "container": "node",
+        "kind": "containers",
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "konnectivity-agent-5524v",
+        "podUID": "522bae5f-7036-40e4-a121-21387d4c107f",
+        "container": "konnectivity-agent",
+        "kind": "containers",
+        "image": "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "kube-proxy-windows-dvjct",
+        "podUID": "dfcfe08e-a2b8-4e01-9bbb-92876fb0c224",
+        "container": "kube-proxy",
+        "kind": "containers",
+        "image": "docker.io/sigwindowstools/kube-proxy:v1.36.2-calico-hostprocess",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "nllb-aws-win2025-gpu-withdraw-v1",
+        "podUID": "43a48652-1e6e-46f9-b970-b5ac9fa21683",
+        "container": "nllb",
+        "kind": "containers",
+        "image": "quay.io/k0sproject/traefik:v3.7.5-k0s.0",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      }
+    ],
+    "undeclaredRuntimeImageTargets": [],
+    "additionalReferences": [],
+    "scope": "Observed Pod image cache reuse and native runtime inventory; not proof of zero registry access or startup performance"
+  },
+  "operation": {
+    "startedAt": "2026-09-08T13:32:17.369541+00:00",
+    "name": "aws-win2025-gpu-withdraw-v1",
+    "imageID": "ami-0356e19b7ba44ee73",
+    "survivorTargets": [
+      "net-w1=584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "net-aws-win2022-v3=3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "net-aws-win2025-v3=2ce1fc67-02f4-4b75-9f38-1af9fbc43128"
+    ],
+    "removalStartedAt": "2026-09-08T13:47:53.108343+00:00",
+    "finishedAt": "2026-09-08T13:55:38.998031+00:00",
+    "removalPassed": true,
+    "networkMatrixPassed": false,
+    "startupCachePassed": true,
+    "gpuPassed": true,
+    "passed": false
+  },
+  "removal": {
+    "passed": true,
+    "checks": {
+      "instanceTerminated": true,
+      "productCleanup": true,
+      "targetMachineAbsent": true,
+      "survivorMachineIdentities": true,
+      "exactSurvivorSet": true,
+      "survivorIdentitiesAndReadiness": true,
+      "targetGatewayLeasesComplete": true,
+      "otherGatewayLeasesPreserved": true
+    },
+    "survivorCount": 13,
+    "retiredGatewayLeaseCount": 1,
+    "preservedGatewayLeaseCount": 5,
+    "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+  },
+  "withdrawalObservation": {
+    "passed": true,
+    "checks": {
+      "sameMesh": true,
+      "sameWorkerSecret": true,
+      "stagingObserved": true,
+      "globalWithdrawalObserved": true,
+      "changedDocument": true,
+      "newDocumentPendingThenAcknowledged": true,
+      "workerAcknowledgedBeforeGlobalWithdrawal": true,
+      "ackObservedWhileProjectionStable": true,
+      "nodeReadyThroughTransition": true,
+      "withdrawalIrreversible": true,
+      "originalMachineEventuallyAbsent": true
+    },
+    "originalDocumentSHA256": "a010a77db58f7499cbe37ff94cf7bae0a29d58f54f2da1f2eb2fd5cc1cbc27bc",
+    "withdrawnDocumentSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+    "firstNewDocumentAt": "2026-09-08T13:48:28.872618+00:00",
+    "firstNewAcknowledgementAt": "2026-09-08T13:48:35.869132+00:00",
+    "globalWithdrawalAt": "2026-09-08T13:48:44.258476+00:00",
+    "samples": 223,
+    "scope": "Observed changed-document acknowledgement before global withdrawal; requires separate native traffic and provider-cleanup evidence"
+  },
+  "withdrawalSamplerSummary": {
+    "stagingObserved": true,
+    "workerAcknowledgementObservedBeforeGlobalWithdrawal": true,
+    "originalMachineEventuallyAbsent": true,
+    "samples": 223,
+    "scope": "Read-only API snapshots of original Machine and public-state hashes; sampling can miss a short acknowledged stage"
+  },
+  "survivor": {
+    "transport": "native-oob",
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "attempts": 11468,
+        "passed": 11466,
+        "maxStartIntervalSeconds": 5.103834575000008,
+        "samplesSHA256": "c24175d2bbb7835409f4033ff1898e3db700167ba26576f5394842bba0bb0c22",
+        "ok": false
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "attempts": 11568,
+        "passed": 11568,
+        "maxStartIntervalSeconds": 0.1719864559997859,
+        "samplesSHA256": "516db7798b5e1497fea24a3021deeaf226e333123c659db2c3fc18205d36de7f",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "attempts": 11410,
+        "passed": 11409,
+        "maxStartIntervalSeconds": 5.102679699999953,
+        "samplesSHA256": "92ec4e59cf73e44c8fd4ba21a9ca3a493ea777ef032b27c4116af0abb8d6ed90",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "attempts": 13722,
+        "passed": 13717,
+        "maxStartIntervalSeconds": 5.105024200000003,
+        "samplesSHA256": "3cb990607d67924450fcf3e9aea8f350a76ecdd24715b9740f1b19c2dc8df920",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "attempts": 11458,
+        "passed": 11458,
+        "maxStartIntervalSeconds": 0.20053339999999986,
+        "samplesSHA256": "0a5b8263811c1223af46534981e805b38e8b059de2cde9faaf81e1eaff21c507",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "attempts": 13947,
+        "passed": 13945,
+        "maxStartIntervalSeconds": 5.101654299999836,
+        "samplesSHA256": "e96a036168eabec804f7475714a8a50b5d42a44413dde331e1ea109732106126",
+        "ok": false
+      }
+    ],
+    "identitiesStable": true,
+    "window": {
+      "lanesBracketWindow": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "ok": true,
+      "scope": "Host OOB control ordering only; requires independent terminal logs and identity validation"
+    },
+    "ok": false
+  },
+  "failedSamples": [
+    {
+      "sourcePod": "net-w1",
+      "targetPod": "net-aws-win2022-v3",
+      "sequence": 2630,
+      "source": "10.244.190.81:36588",
+      "startedAt": "2026-09-08T13:36:58.884073173Z",
+      "finishedAt": "2026-09-08T13:37:03.887513354Z",
+      "ok": false,
+      "error": "read udp 10.244.190.81:36588->10.244.114.4:8081: i/o timeout",
+      "nonce": "df2e563065c5eaef41c2527d004d1ac9",
+      "pid": 174888,
+      "startOffsetSeconds": 330.076796219,
+      "finishOffsetSeconds": 335.080310992,
+      "attempts": 2631,
+      "passed": 2630,
+      "maxStartIntervalSeconds": 0.192860489,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-w1",
+      "targetPod": "net-aws-win2022-v3",
+      "sequence": 8793,
+      "source": "10.244.190.81:44213",
+      "startedAt": "2026-09-08T13:49:57.98306797Z",
+      "finishedAt": "2026-09-08T13:50:02.984499711Z",
+      "ok": false,
+      "error": "read udp 10.244.190.81:44213->10.244.114.4:8081: i/o timeout",
+      "nonce": "df2e563065c5eaef41c2527d004d1ac9",
+      "pid": 174888,
+      "startOffsetSeconds": 1109.175822236,
+      "finishOffsetSeconds": 1114.177284924,
+      "attempts": 8794,
+      "passed": 8792,
+      "maxStartIntervalSeconds": 5.103834575,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2022-v3",
+      "targetPod": "net-w1",
+      "sequence": 8735,
+      "source": "10.244.114.4:53399",
+      "startedAt": "2026-09-08T13:49:57.4726069Z",
+      "finishedAt": "2026-09-08T13:50:02.4739592Z",
+      "ok": false,
+      "error": "read udp 10.244.114.4:53399->10.244.190.81:8081: i/o timeout",
+      "nonce": "b360f16313d940c03fda2f5bc9f29ff5",
+      "pid": 7156,
+      "startOffsetSeconds": 1105.8680165,
+      "finishOffsetSeconds": 1110.8693688,
+      "attempts": 8736,
+      "passed": 8735,
+      "maxStartIntervalSeconds": 0.21664,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2022-v3",
+      "targetPod": "net-aws-win2025-v3",
+      "sequence": 2958,
+      "source": "10.244.114.4:56040",
+      "startedAt": "2026-09-08T13:36:42.8055249Z",
+      "finishedAt": "2026-09-08T13:36:47.8064234Z",
+      "ok": false,
+      "error": "read udp 10.244.114.4:56040->10.244.42.6:8081: i/o timeout",
+      "nonce": "f22f3cf23fba409230862c1132175179",
+      "pid": 1804,
+      "startOffsetSeconds": 306.7131253,
+      "finishOffsetSeconds": 311.7140238,
+      "attempts": 2959,
+      "passed": 2958,
+      "maxStartIntervalSeconds": 0.1954655,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2022-v3",
+      "targetPod": "net-aws-win2025-v3",
+      "sequence": 5216,
+      "source": "10.244.114.4:60197",
+      "startedAt": "2026-09-08T13:40:42.8429871Z",
+      "finishedAt": "2026-09-08T13:40:47.8441486Z",
+      "ok": false,
+      "error": "read udp 10.244.114.4:60197->10.244.42.6:8081: i/o timeout",
+      "nonce": "f22f3cf23fba409230862c1132175179",
+      "pid": 1804,
+      "startOffsetSeconds": 546.7505875,
+      "finishOffsetSeconds": 551.7518869,
+      "attempts": 5217,
+      "passed": 5215,
+      "maxStartIntervalSeconds": 5.1012604,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2022-v3",
+      "targetPod": "net-aws-win2025-v3",
+      "sequence": 5746,
+      "source": "10.244.114.4:61202",
+      "startedAt": "2026-09-08T13:41:42.8472553Z",
+      "finishedAt": "2026-09-08T13:41:47.8484312Z",
+      "ok": false,
+      "error": "read udp 10.244.114.4:61202->10.244.42.6:8081: i/o timeout",
+      "nonce": "f22f3cf23fba409230862c1132175179",
+      "pid": 1804,
+      "startOffsetSeconds": 606.7548557,
+      "finishOffsetSeconds": 611.7560316,
+      "attempts": 5747,
+      "passed": 5744,
+      "maxStartIntervalSeconds": 5.1020631,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2022-v3",
+      "targetPod": "net-aws-win2025-v3",
+      "sequence": 8013,
+      "source": "10.244.114.4:65366",
+      "startedAt": "2026-09-08T13:45:42.8793089Z",
+      "finishedAt": "2026-09-08T13:45:47.8832358Z",
+      "ok": false,
+      "error": "read udp 10.244.114.4:65366->10.244.42.6:8081: i/o timeout",
+      "nonce": "f22f3cf23fba409230862c1132175179",
+      "pid": 1804,
+      "startOffsetSeconds": 846.7869093,
+      "finishOffsetSeconds": 851.7908362,
+      "attempts": 8014,
+      "passed": 8010,
+      "maxStartIntervalSeconds": 5.1020631,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2022-v3",
+      "targetPod": "net-aws-win2025-v3",
+      "sequence": 10613,
+      "source": "10.244.114.4:53715",
+      "startedAt": "2026-09-08T13:50:17.7716899Z",
+      "finishedAt": "2026-09-08T13:50:22.7728297Z",
+      "ok": false,
+      "error": "read udp 10.244.114.4:53715->10.244.42.6:8081: i/o timeout",
+      "nonce": "f22f3cf23fba409230862c1132175179",
+      "pid": 1804,
+      "startOffsetSeconds": 1121.6792903,
+      "finishOffsetSeconds": 1126.6805774,
+      "attempts": 10614,
+      "passed": 10609,
+      "maxStartIntervalSeconds": 5.1050242,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2025-v3",
+      "targetPod": "net-aws-win2022-v3",
+      "sequence": 6737,
+      "source": "10.244.42.6:52080",
+      "startedAt": "2026-09-08T13:43:17.9747808Z",
+      "finishedAt": "2026-09-08T13:43:22.9752574Z",
+      "ok": false,
+      "error": "read udp 10.244.42.6:52080->10.244.114.4:8081: i/o timeout",
+      "nonce": "72f6b159c2a4e1f373e5fa9cc31accfa",
+      "pid": 5256,
+      "startOffsetSeconds": 694.6118161,
+      "finishOffsetSeconds": 699.6122927,
+      "attempts": 6738,
+      "passed": 6737,
+      "maxStartIntervalSeconds": 0.1650622,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2025-v3",
+      "targetPod": "net-aws-win2022-v3",
+      "sequence": 10175,
+      "source": "10.244.42.6:58366",
+      "startedAt": "2026-09-08T13:49:18.0190437Z",
+      "finishedAt": "2026-09-08T13:49:23.0200564Z",
+      "ok": false,
+      "error": "read udp 10.244.42.6:58366->10.244.114.4:8081: i/o timeout",
+      "nonce": "72f6b159c2a4e1f373e5fa9cc31accfa",
+      "pid": 5256,
+      "startOffsetSeconds": 1054.656079,
+      "finishOffsetSeconds": 1059.6570917,
+      "attempts": 10176,
+      "passed": 10174,
+      "maxStartIntervalSeconds": 5.1012132,
+      "healthy": false,
+      "stopBoundary": false
+    }
+  ],
+  "matrix": {
+    "executed": false,
+    "passed": false,
+    "checks": 0,
+    "reason": "Native survivor gate rejected matrix launch"
+  },
+  "cleanup": {
+    "temporaryWorkerRemoved": true,
+    "podToolsRemoved": true,
+    "hostToolsRemoved": true,
+    "ownedResourcesRemoved": true
+  },
+  "passed": false,
+  "limitations": [
+    "One fresh Windows2025 GPU VM does not establish repeated reliability or Windows2022 staged removal.",
+    "Startup cache evidence is runtime inventory plus observed Pod image events, not proof of zero registry access or a controlled startup-speed comparison.",
+    "Observed UDP losses remain failures even if join, GPU, cache and removal pass.",
+    "No release or broad distro/CNI/provider qualification follows from this single row."
+  ],
+  "evidenceSHA256": {
+    "gpu-observation.json": "b3616e20ca6538c29ca98676bc2baf4737e326c901c210b3e705085cd87e7367",
+    "cache-reuse-result.json": "566f2609c61c54c751003abf74b71fb391f3bc57977a44272a31a197e09ea778",
+    "join-observation.json": "dcbe9a440f014e83eb24c5735a5ba18e60d3735223505bf23c7c96ef1f6d5f94",
+    "survivor-result.json": "8b95b8a1f773f73287ba09f0400ea7bf5772bb1328673d9a9c9c184cc7c37f7d",
+    "removal.json": "01c63d3071245cd691a177f0987efd53c05f1b597f6bf2c449edd0929b75551f",
+    "after-removal.json": "065ae444b4a700491b45aa73b44c53c2f184e741951221409fc0c5a1ffe8236b",
+    "withdrawal-sequence.jsonl": "5fe1e36e665c99ccfc8c72ea823f28df378ca59b99923635824959f14490a766",
+    "withdrawal-sequence-result.json": "dcc897ef25b200b572c73e9ffd708e8a305e0270f43b31c3236620a799fce2af",
+    "withdrawal-ordering-result.json": "6ac7d1d1deda97ce6950fe6af62ecb777923c1f40c0772c1dc028b12962676d5",
+    "gpu-license-observation.json": "6e17c8072b09a8da7cdb3774b5d5e9dbb5b901fc32648b561296c0e638f11fb0",
+    "gpu-license-summary.json": "db66d28530da21c8d19f3ff91889ba320cff3052ad81a50123391272371164a6",
+    "withdrawal-observer-coverage.json": "ee8455105098a514e4af5ab441e585cbe72adb3deb1e9fc42e850cbc9d1a0c26"
+  },
+  "withdrawalObserverCoverage": {
+    "testMethods": 4,
+    "summary": {
+      "covered_lines": 20,
+      "num_statements": 20,
+      "percent_covered": 100.0,
+      "percent_covered_display": "100",
+      "missing_lines": 0,
+      "excluded_lines": 0,
+      "num_branches": 7,
+      "num_partial_branches": 0,
+      "covered_branches": 7,
+      "missing_branches": 0
+    },
+    "scope": "Coverage.py statement and branch coverage of gateway_withdrawal.py only; excludes native drivers and CAPI controllers"
+  }
+}

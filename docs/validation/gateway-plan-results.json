@@ -1,0 +1,100 @@
+{
+  "scope": "Read-only live topology validation and peer projection; no cloud routes or controller integration applied",
+  "observedAt": "2026-09-07T06:26:37.660935+00:00",
+  "results": [
+    {
+      "windowsVersion": "2022",
+      "plan": {
+        "worker": {
+          "uid": "b60e6dd5-28a0-4560-b823-eb25a5ca674c",
+          "nodeUID": "817a65b2-fc50-41a9-af96-05eba64ce024",
+          "providerID": "aws:///us-west-2a/i-0a25d4ef52b34a8cf",
+          "interfaceID": "eni-039aaacc1e49c541a",
+          "networkID": "aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46",
+          "subnet": "172.29.0.0/25",
+          "address": "172.29.0.21"
+        },
+        "gateway": {
+          "uid": "8400ceb2-cf22-4abf-b875-fd2ebdc3b463",
+          "nodeUID": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+          "providerID": "aws:///us-west-2a/i-0c31429bc71403d5b",
+          "interfaceID": "eni-00401d5aafd52f51c",
+          "networkID": "aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46",
+          "subnet": "172.29.0.0/25",
+          "address": "172.29.0.9"
+        },
+        "workerHost": "172.29.0.21/32",
+        "returnHosts": [
+          "10.10.0.10/32",
+          "10.10.0.11/32",
+          "10.10.0.12/32",
+          "10.10.0.13/32",
+          "10.10.0.14/32",
+          "10.100.0.1/32",
+          "10.100.0.2/32"
+        ],
+        "directHosts": [
+          "10.10.0.10/32",
+          "10.10.0.11/32",
+          "10.10.0.12/32",
+          "10.10.0.13/32",
+          "10.10.0.14/32",
+          "10.100.0.1/32",
+          "10.100.0.2/32"
+        ],
+        "udpPort": 4789
+      },
+      "providerIdentityRevalidated": true,
+      "peerProjectionRendered": true
+    },
+    {
+      "windowsVersion": "2025",
+      "plan": {
+        "worker": {
+          "uid": "bf1f1050-0096-4022-af96-ad39ffa3d051",
+          "nodeUID": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+          "providerID": "aws:///us-west-2a/i-0b09fc50f9652095f",
+          "interfaceID": "eni-02b4c46135fb3a386",
+          "networkID": "aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46",
+          "subnet": "172.29.0.0/25",
+          "address": "172.29.0.13"
+        },
+        "gateway": {
+          "uid": "8400ceb2-cf22-4abf-b875-fd2ebdc3b463",
+          "nodeUID": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+          "providerID": "aws:///us-west-2a/i-0c31429bc71403d5b",
+          "interfaceID": "eni-00401d5aafd52f51c",
+          "networkID": "aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46",
+          "subnet": "172.29.0.0/25",
+          "address": "172.29.0.9"
+        },
+        "workerHost": "172.29.0.13/32",
+        "returnHosts": [
+          "10.10.0.10/32",
+          "10.10.0.11/32",
+          "10.10.0.12/32",
+          "10.10.0.13/32",
+          "10.10.0.14/32",
+          "10.100.0.1/32",
+          "10.100.0.2/32"
+        ],
+        "directHosts": [
+          "10.10.0.10/32",
+          "10.10.0.11/32",
+          "10.10.0.12/32",
+          "10.10.0.13/32",
+          "10.10.0.14/32",
+          "10.100.0.1/32",
+          "10.100.0.2/32"
+        ],
+        "udpPort": 4789
+      },
+      "providerIdentityRevalidated": true,
+      "peerProjectionRendered": true
+    }
+  ],
+  "unitCoverage": {
+    "planningAndPeerProjectionStatementPercent": 100.0,
+    "scope": "Plan and peer projection only; see gateway-lifecycle-contract-results.json for expanded package coverage"
+  }
+}

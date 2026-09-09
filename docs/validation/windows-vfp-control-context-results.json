@@ -1,0 +1,407 @@
+{
+  "qualificationEligible": false,
+  "scope": "Paired Windows Server VM traffic and VFP context; no mitigation qualification or root-cause claim.",
+  "attempts": 27426,
+  "failed": 10,
+  "identitiesStable": true,
+  "capturedCollectorSHA256": "ce89868e6da9569b200ce5397d27907312369fa178bb9dd3d7f896b8d6cb354a",
+  "hosts": [
+    {
+      "windowsServer": "2022",
+      "vfpCapture": {
+        "startedAt": "2026-09-09T02:19:29.6702977Z",
+        "stoppedAt": "2026-09-09T02:20:00.3273574Z",
+        "keywordMask": "0x8d0e0f",
+        "maxFileMiB": 128,
+        "traceStopped": true,
+        "traceFilteringUnchanged": true
+      },
+      "packetMonitorStop": "Flushing logs...\r\nMerging metadata...\r\nLog file: C:\\ProgramData\\CloudProvisioning\\diagnostics\\vfp-control-capture-v1\\capture.etl (No events lost)\r\n",
+      "drop": {
+        "hostVersion": "2022",
+        "lane": 2,
+        "sample": {
+          "sequence": 1790,
+          "source": "10.244.114.4:58087",
+          "startedAt": "2026-09-09T02:19:50.0738119Z",
+          "finishedAt": "2026-09-09T02:19:55.0751778Z",
+          "ok": false,
+          "error": "read udp 10.244.114.4:58087->10.244.190.81:8081: i/o timeout",
+          "nonce": "937703a0752dd764dabe9f3a1679372e",
+          "pid": 5948,
+          "startOffsetSeconds": 65.9155084,
+          "finishOffsetSeconds": 70.9168743,
+          "attempts": 1791,
+          "passed": 1790,
+          "maxStartIntervalSeconds": 0.1418799,
+          "healthy": false,
+          "stopBoundary": false
+        },
+        "direction": "reply",
+        "drop": {
+          "timestamp": "2026-09-09 02:19:50.108032900",
+          "group": 144226,
+          "packet": 1,
+          "component": 74,
+          "componentInfo": {
+            "driver": "tcpip.sys",
+            "name": "TCP/IPv4 - L3/L4"
+          },
+          "reason": "Not locally destined",
+          "location": "0xE0004136",
+          "ipID": 389,
+          "fragmentOffsetBytes": 0,
+          "header": "[00]17B4.109C::2026-09-09 02:19:50.108032900 [Microsoft-Windows-PktMon] Drop: PktGroupId 144226, PktNumber 1, Appearance 17, Direction Rx , Type IP , Component 74, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 142, LoggedSize 142 ",
+          "trafficClassesBeforeDrop": [
+            0
+          ],
+          "trafficClassAtDrop": 0,
+          "trafficClassChanged": false
+        }
+      },
+      "matchedInboundFlow": {
+        "eventID": 600,
+        "version": 0,
+        "timestamp": "2026-09-09T02:19:50.1079546Z",
+        "source": "10.244.190.81",
+        "destination": "10.244.114.4",
+        "sourcePort": 8081,
+        "destinationPort": 58087,
+        "protocol": 17,
+        "portName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+        "fields": {
+          "PortId": "3",
+          "Direction": "1",
+          "IsMain": "1",
+          "IsPending": "0",
+          "TNI": "0",
+          "VLAN": "0",
+          "NumEncaps": "1",
+          "EncapType0": "VXLAN",
+          "EncapSrcMacAddr0": "02-FF-D6-32-CE-F1",
+          "EncapDestMacAddr0": "02-FF-F6-B6-D8-ED",
+          "EncapSrcIpv4Addr0": "184551946",
+          "EncapDstIpv4Addr0": "402660780",
+          "TenantId0": "4096",
+          "EncryptVxlanId0": "0",
+          "EncapType1": "None",
+          "EncapSrcMacAddr1": null,
+          "EncapDestMacAddr1": null,
+          "EncapSrcIpv4Addr1": "0",
+          "EncapDstIpv4Addr1": "0",
+          "TenantId1": "0",
+          "EncryptVxlanId1": "0",
+          "IpProtocol": "17",
+          "SrcMacAddr": "66-29-27-B4-64-9C",
+          "DestMacAddr": "00-15-5D-3A-31-08",
+          "SrcIpv4Addr": "1371468810",
+          "DstIpv4Addr": "74642442",
+          "SrcPort": "37151",
+          "DstPort": "59362",
+          "IsTcpSyn": "false",
+          "EncapTransposition0": "MacHeaderAction=Ignore, IpHeaderAction=Ignore, EncapHeaderAction=Ignore",
+          "EncapTransposition1": "NULL",
+          "Transposition": "TniAction=Ignore, VlanIdAction=Ignore, MssDeltaAction=Ignore, MacHeaderAction=Ignore, IpHeaderAction=Ignore, TransportHeaderAction=Ignore",
+          "PortName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+          "PortFriendlyName": "Container NIC 070372ba",
+          "UnifiedFlow": "18446622631693392200",
+          "IsSecondary": "0",
+          "IsMirror": "0",
+          "IsHairpin": "0",
+          "HairpinChecked": "0",
+          "OriginalInbound": "0"
+        },
+        "encapsulationAction": "Ignore"
+      },
+      "contextExport": {
+        "startUtc": "2026-09-09T02:19:50.1070320+00:00",
+        "endUtc": "2026-09-09T02:19:50.1090320+00:00",
+        "sourceSHA256": "416064c77e5d6d30b96c221bc520045001a9411917819266ac85b723265ab018",
+        "sourceUnchanged": true,
+        "eventCount": 28,
+        "queriedEventCount": 39,
+        "outsideWindowEventCount": 11,
+        "maxEvents": 1000,
+        "eventLimitReached": false,
+        "artifact": {
+          "sha256": "1ce29aca9749d47fba0e2b68c069c84a05d5cb4102935cab6e75ea01848bee70",
+          "name": "vfp-context-00.jsonl.gz",
+          "bytes": 2803
+        },
+        "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+      },
+      "broadControlExport": {
+        "eventCount": 10000,
+        "sourceSHA256": "416064c77e5d6d30b96c221bc520045001a9411917819266ac85b723265ab018",
+        "artifact": {
+          "sha256": "426bc5ecace316da9dd14c8288b2083c3bd4f730248956d350525673ccdda81c",
+          "name": "control-events.jsonl.gz",
+          "bytes": 145270
+        },
+        "eventLimitReached": true
+      },
+      "artifacts": [
+        {
+          "sha256": "0605456af1a7f52382be9293d65822d3ca52870f2979550c45b7c1641c32dbbc",
+          "name": "capture.etl",
+          "bytes": 4144528
+        },
+        {
+          "sha256": "954dc700adbb17c220f54cf98031554f7406b82ae82c98fcc3e9e5bd153d7a24",
+          "name": "capture.pcapng",
+          "bytes": 35302112
+        },
+        {
+          "sha256": "3a2bdbef5ef30d57f8e0a15e4522d8f66f9d02dc8eadfebbec36c4b6015349ea",
+          "name": "capture.txt.gz",
+          "bytes": 4336066
+        },
+        {
+          "sha256": "04c279e2bf52ed94998957514113a2ba806528a72ce5cdeb732282c5a83ea524",
+          "name": "processes-after.json",
+          "bytes": 17846
+        },
+        {
+          "sha256": "d33ef281b108f09cfc0cce22a711ea144ec698f6095899d94aee75f1fcccb442",
+          "name": "processes-before.json",
+          "bytes": 17853
+        },
+        {
+          "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+          "name": "vfp\\provider.json",
+          "bytes": 311964
+        },
+        {
+          "sha256": "df079f07a7b151a2a3dc0487ab6a93006d513b086f83cf149d7bc4827247ce1f",
+          "name": "vfp\\result.json",
+          "bytes": 806
+        },
+        {
+          "sha256": "416064c77e5d6d30b96c221bc520045001a9411917819266ac85b723265ab018",
+          "name": "vfp\\vfp.etl",
+          "bytes": 134217728
+        },
+        {
+          "sha256": "426bc5ecace316da9dd14c8288b2083c3bd4f730248956d350525673ccdda81c",
+          "name": "control-events.jsonl.gz",
+          "bytes": 145270
+        },
+        {
+          "sha256": "1ce29aca9749d47fba0e2b68c069c84a05d5cb4102935cab6e75ea01848bee70",
+          "name": "vfp-context-00.jsonl.gz",
+          "bytes": 2803
+        }
+      ]
+    },
+    {
+      "windowsServer": "2025",
+      "vfpCapture": {
+        "startedAt": "2026-09-09T02:19:30.1490425Z",
+        "stoppedAt": "2026-09-09T02:20:00.7532526Z",
+        "keywordMask": "0x8d0e0f",
+        "maxFileMiB": 128,
+        "traceStopped": true,
+        "traceFilteringUnchanged": true
+      },
+      "packetMonitorStop": "Flushing logs...\r\nMerging metadata...\r\nLog file: C:\\ProgramData\\CloudProvisioning\\diagnostics\\vfp-control-capture-v1\\capture.etl (No events lost)\r\n",
+      "drop": {
+        "hostVersion": "2025",
+        "lane": 3,
+        "sample": {
+          "sequence": 4278,
+          "source": "10.244.114.4:58612",
+          "startedAt": "2026-09-09T02:19:56.5912149Z",
+          "finishedAt": "2026-09-09T02:20:01.6072043Z",
+          "ok": false,
+          "error": "read udp 10.244.114.4:58612->10.244.42.6:8081: i/o timeout",
+          "nonce": "d29583d26717300be615ccad8a4a4306",
+          "pid": 408,
+          "startOffsetSeconds": 69.4498193,
+          "finishOffsetSeconds": 74.4658087,
+          "attempts": 4279,
+          "passed": 4276,
+          "maxStartIntervalSeconds": 5.0127741,
+          "healthy": false,
+          "stopBoundary": false
+        },
+        "direction": "request",
+        "drop": {
+          "timestamp": "2026-09-09 02:19:56.986011300",
+          "group": 2469027,
+          "packet": 1,
+          "component": 73,
+          "componentInfo": {
+            "driver": "tcpip.sys",
+            "name": "TCP/IPv4 - L3/L4"
+          },
+          "reason": "Not locally destined",
+          "location": "0xE0004136",
+          "ipID": 34232,
+          "fragmentOffsetBytes": 0,
+          "header": "[00]09B0.1078::2026-09-09 02:19:56.986011300 [Microsoft-Windows-PktMon] Drop: PktGroupId 2469027, PktNumber 1, Appearance 0, Direction Rx , Type IP , Component 73, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 147, LoggedSize 147 ",
+          "trafficClassesBeforeDrop": [
+            0
+          ],
+          "trafficClassAtDrop": 0,
+          "trafficClassChanged": false
+        }
+      },
+      "matchedInboundFlow": {
+        "eventID": 600,
+        "version": 0,
+        "timestamp": "2026-09-09T02:19:56.9859313Z",
+        "source": "10.244.114.4",
+        "destination": "10.244.42.6",
+        "sourcePort": 58612,
+        "destinationPort": 8081,
+        "protocol": 17,
+        "portName": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+        "fields": {
+          "PortId": "3",
+          "Direction": "1",
+          "IsMain": "1",
+          "IsPending": "0",
+          "TNI": "0",
+          "VLAN": "0",
+          "NumEncaps": "1",
+          "EncapType0": "VXLAN",
+          "EncapSrcMacAddr0": "02-FF-F6-B6-D8-ED",
+          "EncapDestMacAddr0": "02-FF-C0-FA-46-77",
+          "EncapSrcIpv4Addr0": "402660780",
+          "EncapDstIpv4Addr0": "1140858284",
+          "TenantId0": "4096",
+          "EncryptVxlanId0": "0",
+          "EncapType1": "None",
+          "EncapSrcMacAddr1": null,
+          "EncapDestMacAddr1": null,
+          "EncapSrcIpv4Addr1": "0",
+          "EncapDstIpv4Addr1": "0",
+          "TenantId1": "0",
+          "EncryptVxlanId1": "0",
+          "IpProtocol": "17",
+          "SrcMacAddr": "0E-2A-0A-F4-72-04",
+          "DestMacAddr": "00-15-5D-2E-C0-7B",
+          "SrcIpv4Addr": "74642442",
+          "DstIpv4Addr": "103478282",
+          "SrcPort": "62692",
+          "DstPort": "37151",
+          "IsTcpSyn": "false",
+          "EncapTransposition0": "MacHeaderAction=Ignore, IpHeaderAction=Ignore, EncapHeaderAction=Ignore",
+          "EncapTransposition1": "NULL",
+          "Transposition": "TniAction=Ignore, VlanIdAction=Ignore, MssDeltaAction=Ignore, MacHeaderAction=Ignore, IpHeaderAction=Ignore, TransportHeaderAction=Ignore",
+          "PortName": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+          "PortFriendlyName": "DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0",
+          "UnifiedFlow": "18446669868152548024",
+          "IsSecondary": "0",
+          "IsMirror": "0",
+          "IsHairpin": "0",
+          "HairpinChecked": "0",
+          "OriginalInbound": "0"
+        },
+        "encapsulationAction": "Ignore"
+      },
+      "contextExport": {
+        "startUtc": "2026-09-09T02:19:56.9850110+00:00",
+        "endUtc": "2026-09-09T02:19:56.9870110+00:00",
+        "sourceSHA256": "9a2d7057877a048cd561a318a92e8f51fe7ad7e0e89cf6e68cd51873288421a2",
+        "sourceUnchanged": true,
+        "eventCount": 9,
+        "queriedEventCount": 9,
+        "outsideWindowEventCount": 0,
+        "maxEvents": 1000,
+        "eventLimitReached": false,
+        "artifact": {
+          "sha256": "d2415f57d37531949ca43cdebabe26f312099ab480e96372b40d24beffad7db7",
+          "name": "vfp-context-01.jsonl.gz",
+          "bytes": 1703
+        },
+        "scope": "Same-host event-time context only; no packet identity, event-loss audit or network qualification."
+      },
+      "broadControlExport": {
+        "eventCount": 10000,
+        "sourceSHA256": "9a2d7057877a048cd561a318a92e8f51fe7ad7e0e89cf6e68cd51873288421a2",
+        "artifact": {
+          "sha256": "dcd3b2afc2c7c890e675c366d2ae44864218fbfa80e328dccd95a6d5927cc061",
+          "name": "control-events.jsonl.gz",
+          "bytes": 133674
+        },
+        "eventLimitReached": true
+      },
+      "artifacts": [
+        {
+          "sha256": "345b0f9dd0c9534797e4ee43d2192a8480b24959cf9d98da328f58e9029d0dc1",
+          "name": "capture.etl",
+          "bytes": 4779771
+        },
+        {
+          "sha256": "f7dfe5752e4bca5c320539697221fa16db102de28147f94662b7ec99dde85594",
+          "name": "capture.pcapng",
+          "bytes": 36959280
+        },
+        {
+          "sha256": "017534b7d6f5c0213abfd662c6ba66da46d327a8d5abc853cef4bd10fb9e5b7f",
+          "name": "capture.txt.gz",
+          "bytes": 4810887
+        },
+        {
+          "sha256": "90d1124f62150342a66c8562135fef9d6eec562e78fa5b96c653d62094aae8cd",
+          "name": "processes-after.json",
+          "bytes": 19806
+        },
+        {
+          "sha256": "3cd77e0e10d71cb55a507fe601bbeba092482f84d32a8af6d168d7824e207dc0",
+          "name": "processes-before.json",
+          "bytes": 19677
+        },
+        {
+          "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+          "name": "vfp\\provider.json",
+          "bytes": 327652
+        },
+        {
+          "sha256": "e3696c2d50d8e01bd0a8b1b3f5532dde557bb19ae02202e12f7166155657e8de",
+          "name": "vfp\\result.json",
+          "bytes": 806
+        },
+        {
+          "sha256": "9a2d7057877a048cd561a318a92e8f51fe7ad7e0e89cf6e68cd51873288421a2",
+          "name": "vfp\\vfp.etl",
+          "bytes": 134217728
+        },
+        {
+          "sha256": "dcd3b2afc2c7c890e675c366d2ae44864218fbfa80e328dccd95a6d5927cc061",
+          "name": "control-events.jsonl.gz",
+          "bytes": 133674
+        },
+        {
+          "sha256": "d2415f57d37531949ca43cdebabe26f312099ab480e96372b40d24beffad7db7",
+          "name": "vfp-context-01.jsonl.gz",
+          "bytes": 1703
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "The captured 0x8d0e0f mask included Control but omitted ControlValidation (4194304), which selects IOCTL/object-processing events 700\u2013706.",
+    "Both broad Control exports hit the 10000-event query limit before the drop windows; they cannot establish control-event absence or causality.",
+    "Exact drop-window exports were complete within their query limits. Matching tuples and timestamps do not establish packet identity.",
+    "Packet Monitor reported no events lost; VFP circular trace retention and loss were not independently qualified.",
+    "Current tuple simulations decapsulate historical failed tuples, so no persistent rule defect or corrective change is established."
+  ],
+  "cleanup": {
+    "2022": {
+      "traceAbsent": true,
+      "traceFiltering": "Trace filtering is Disabled\r\nCommand get-trace-filtering-state succeeded!\r\n",
+      "directoryAbsent": true
+    },
+    "2025": {
+      "traceAbsent": true,
+      "traceFiltering": "Trace filtering is Disabled\r\nCommand get-trace-filtering-state succeeded!\r\n",
+      "directoryAbsent": true
+    }
+  },
+  "postCleanupNodes": {
+    "ready": 13,
+    "observedTrafficNodeUIDsUnchanged": true
+  }
+}

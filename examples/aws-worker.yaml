@@ -1,0 +1,44 @@
+# Apply to the API where the product and CAPI controllers run, after cluster setup.
+# Replace the AMI, network, profile and ownership-tag values with your approved ones.
+# The template, claim and referenced Cluster must share a namespace.
+# See docs/aws.md#add-an-aws-worker for setup requirements and lifecycle commands.
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSMachineTemplate
+metadata:
+  name: public-worker
+  namespace: cloud-provisioning
+spec:
+  template:
+    spec:
+      instanceType: t3.large
+      iamInstanceProfile: cldt-example-node
+      sshKeyName: ""
+      additionalTags:
+        cloud-provisioning-test: cldt-example
+      cloudInit:
+        insecureSkipSecretsManager: false
+      ami:
+        id: ami-0123456789abcdef0
+      subnet:
+        id: subnet-0123456789abcdef0
+      additionalSecurityGroups:
+        - id: sg-0123456789abcdef0
+      publicIP: true
+      rootVolume:
+        size: 40
+        type: gp3
+        encrypted: true
+---
+# One claim requests one instance. Additional claims can reuse this template.
+# Deleting a claim removes that instance; deleting the template does not.
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: public-worker-1
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: AWSMachineTemplate
+    name: public-worker
+  clusterName: my-cluster

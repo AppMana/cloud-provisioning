@@ -1,0 +1,494 @@
+{
+  "state": {
+    "runID": "cldt-windows-v2",
+    "account": "270666084746",
+    "region": "us-west-2",
+    "vpcID": "vpc-08bba2b9e5f0ffd46",
+    "subnetID": "subnet-04b17e2d6751fde09"
+  },
+  "subnet": {
+    "SubnetId": "subnet-04b17e2d6751fde09",
+    "VpcId": "vpc-08bba2b9e5f0ffd46",
+    "CidrBlock": "172.29.0.0/25"
+  },
+  "template": {
+    "worker": {
+      "uid": "d655db95-4e7d-4575-b5c9-e245f4efafc9",
+      "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "providerID": "aws:///us-west-2a/i-07c9859f5ce8ed42b",
+      "interfaceID": "eni-0ecf3c4b792b70a34",
+      "networkID": "aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46",
+      "subnet": "172.29.0.0/25",
+      "address": "172.29.0.68"
+    },
+    "gateway": {
+      "uid": "8400ceb2-cf22-4abf-b875-fd2ebdc3b463",
+      "nodeUID": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+      "providerID": "aws:///us-west-2a/i-0c31429bc71403d5b",
+      "interfaceID": "eni-00401d5aafd52f51c",
+      "networkID": "aws:270666084746:us-west-2:vpc-08bba2b9e5f0ffd46",
+      "subnet": "172.29.0.0/25",
+      "address": "172.29.0.9"
+    },
+    "siteTransport": [
+      "10.10.0.10",
+      "10.10.0.11",
+      "10.10.0.12",
+      "10.10.0.13",
+      "10.10.0.14"
+    ],
+    "underlay": [
+      "16.146.98.223",
+      "18.237.90.169",
+      "192.0.2.10",
+      "203.0.113.10",
+      "35.163.248.36",
+      "44.251.58.244",
+      "44.255.96.143"
+    ],
+    "udpPort": 4789,
+    "siteReturnSources": [
+      "10.100.0.1",
+      "10.100.0.2"
+    ],
+    "tcpPorts": [
+      8132
+    ]
+  },
+  "worker": {
+    "machine": {
+      "metadata": {
+        "uid": "d421bc25-db65-45d9-9a82-09018f97ffff",
+        "name": "aws-win2025-gpu"
+      },
+      "spec": {
+        "providerID": "aws:///us-west-2a/i-0a0b16147b2137572",
+        "clusterName": "cldt-windows-v2"
+      },
+      "status": {
+        "nodeRef": {
+          "name": "aws-win2025-gpu"
+        }
+      }
+    },
+    "node": {
+      "metadata": {
+        "uid": "d50b4863-9add-4771-ac68-d0e16ec26b6f",
+        "name": "aws-win2025-gpu"
+      },
+      "spec": {
+        "providerID": "aws:///us-west-2a/i-0a0b16147b2137572"
+      }
+    },
+    "instance": {
+      "InstanceId": "i-0a0b16147b2137572",
+      "VpcId": "vpc-08bba2b9e5f0ffd46",
+      "SubnetId": "subnet-04b17e2d6751fde09",
+      "State": {
+        "Code": 16,
+        "Name": "running"
+      },
+      "NetworkInterfaces": [
+        {
+          "Association": {
+            "IpOwnerId": "amazon",
+            "PublicDnsName": "ec2-34-217-91-107.us-west-2.compute.amazonaws.com",
+            "PublicIp": "34.217.91.107"
+          },
+          "Attachment": {
+            "AttachTime": "2026-09-07T18:40:19+00:00",
+            "AttachmentId": "eni-attach-04d3bf10b76f688f5",
+            "DeleteOnTermination": true,
+            "DeviceIndex": 0,
+            "Status": "attached",
+            "NetworkCardIndex": 0
+          },
+          "Description": "",
+          "Groups": [
+            {
+              "GroupId": "sg-079cc1ad238659c86",
+              "GroupName": "cldt-windows-v2"
+            }
+          ],
+          "Ipv6Addresses": [],
+          "MacAddress": "02:ff:e3:98:9c:25",
+          "NetworkInterfaceId": "eni-0e6eb3eee6110e7a0",
+          "OwnerId": "270666084746",
+          "PrivateDnsName": "ip-172-29-0-29.us-west-2.compute.internal",
+          "PrivateIpAddress": "172.29.0.29",
+          "PrivateIpAddresses": [
+            {
+              "Association": {
+                "IpOwnerId": "amazon",
+                "PublicDnsName": "ec2-34-217-91-107.us-west-2.compute.amazonaws.com",
+                "PublicIp": "34.217.91.107"
+              },
+              "Primary": true,
+              "PrivateDnsName": "ip-172-29-0-29.us-west-2.compute.internal",
+              "PrivateIpAddress": "172.29.0.29"
+            }
+          ],
+          "SourceDestCheck": true,
+          "Status": "in-use",
+          "SubnetId": "subnet-04b17e2d6751fde09",
+          "VpcId": "vpc-08bba2b9e5f0ffd46",
+          "InterfaceType": "interface",
+          "Operator": {
+            "Managed": false
+          }
+        }
+      ],
+      "PrivateIpAddress": "172.29.0.29",
+      "Tags": [
+        {
+          "Key": "kubernetes.io/cluster/cldt-windows-v2",
+          "Value": "owned"
+        },
+        {
+          "Key": "cloud-provisioning-test",
+          "Value": "cldt-windows-v2"
+        },
+        {
+          "Key": "sigs.k8s.io/cluster-api-provider-aws/cluster/cldt-windows-v2",
+          "Value": "owned"
+        },
+        {
+          "Key": "Name",
+          "Value": "aws-win2025-gpu"
+        },
+        {
+          "Key": "sigs.k8s.io/cluster-api-provider-aws/role",
+          "Value": "node"
+        },
+        {
+          "Key": "MachineName",
+          "Value": "cloud-provisioning/aws-win2025-gpu"
+        }
+      ]
+    },
+    "expectedUID": "d421bc25-db65-45d9-9a82-09018f97ffff"
+  },
+  "gateway": {
+    "machine": {
+      "metadata": {
+        "uid": "8400ceb2-cf22-4abf-b875-fd2ebdc3b463",
+        "name": "aws-relay1"
+      },
+      "spec": {
+        "providerID": "aws:///us-west-2a/i-0c31429bc71403d5b",
+        "clusterName": "cldt-windows-v2"
+      },
+      "status": {
+        "nodeRef": {
+          "name": "ip-172-29-0-9"
+        }
+      }
+    },
+    "node": {
+      "metadata": {
+        "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+        "name": "ip-172-29-0-9"
+      },
+      "spec": {
+        "providerID": "aws:///us-west-2a/i-0c31429bc71403d5b"
+      }
+    },
+    "instance": {
+      "InstanceId": "i-0c31429bc71403d5b",
+      "VpcId": "vpc-08bba2b9e5f0ffd46",
+      "SubnetId": "subnet-04b17e2d6751fde09",
+      "State": {
+        "Code": 16,
+        "Name": "running"
+      },
+      "NetworkInterfaces": [
+        {
+          "Association": {
+            "IpOwnerId": "amazon",
+            "PublicDnsName": "ec2-16-146-98-223.us-west-2.compute.amazonaws.com",
+            "PublicIp": "16.146.98.223"
+          },
+          "Attachment": {
+            "AttachTime": "2026-09-07T05:33:41+00:00",
+            "AttachmentId": "eni-attach-0cb11c3189bd643f1",
+            "DeleteOnTermination": true,
+            "DeviceIndex": 0,
+            "Status": "attached",
+            "NetworkCardIndex": 0
+          },
+          "Description": "",
+          "Groups": [
+            {
+              "GroupId": "sg-079cc1ad238659c86",
+              "GroupName": "cldt-windows-v2"
+            }
+          ],
+          "Ipv6Addresses": [],
+          "MacAddress": "02:ff:d6:32:ce:f1",
+          "NetworkInterfaceId": "eni-00401d5aafd52f51c",
+          "OwnerId": "270666084746",
+          "PrivateDnsName": "ip-172-29-0-9.us-west-2.compute.internal",
+          "PrivateIpAddress": "172.29.0.9",
+          "PrivateIpAddresses": [
+            {
+              "Association": {
+                "IpOwnerId": "amazon",
+                "PublicDnsName": "ec2-16-146-98-223.us-west-2.compute.amazonaws.com",
+                "PublicIp": "16.146.98.223"
+              },
+              "Primary": true,
+              "PrivateDnsName": "ip-172-29-0-9.us-west-2.compute.internal",
+              "PrivateIpAddress": "172.29.0.9"
+            }
+          ],
+          "SourceDestCheck": false,
+          "Status": "in-use",
+          "SubnetId": "subnet-04b17e2d6751fde09",
+          "VpcId": "vpc-08bba2b9e5f0ffd46",
+          "InterfaceType": "interface",
+          "Operator": {
+            "Managed": false
+          }
+        }
+      ],
+      "PrivateIpAddress": "172.29.0.9",
+      "Tags": [
+        {
+          "Key": "sigs.k8s.io/cluster-api-provider-aws/role",
+          "Value": "node"
+        },
+        {
+          "Key": "sigs.k8s.io/cluster-api-provider-aws/cluster/cldt-windows-v2",
+          "Value": "owned"
+        },
+        {
+          "Key": "MachineName",
+          "Value": "cloud-provisioning/aws-relay1"
+        },
+        {
+          "Key": "cloud-provisioning-test",
+          "Value": "cldt-windows-v2"
+        },
+        {
+          "Key": "kubernetes.io/cluster/cldt-windows-v2",
+          "Value": "owned"
+        },
+        {
+          "Key": "Name",
+          "Value": "aws-relay1"
+        }
+      ]
+    },
+    "expectedUID": "8400ceb2-cf22-4abf-b875-fd2ebdc3b463"
+  },
+  "underlayMachines": [
+    {
+      "metadata": {
+        "name": "aws-relay1"
+      },
+      "spec": {
+        "clusterName": "cldt-windows-v2"
+      },
+      "status": {
+        "addresses": [
+          {
+            "address": "ip-172-29-0-9.us-west-2.compute.internal",
+            "type": "InternalDNS"
+          },
+          {
+            "address": "172.29.0.9",
+            "type": "InternalIP"
+          },
+          {
+            "address": "ec2-16-146-98-223.us-west-2.compute.amazonaws.com",
+            "type": "ExternalDNS"
+          },
+          {
+            "address": "16.146.98.223",
+            "type": "ExternalIP"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "aws-win2022-gpu"
+      },
+      "spec": {
+        "clusterName": "cldt-windows-v2"
+      },
+      "status": {
+        "addresses": [
+          {
+            "address": "ip-172-29-0-77.us-west-2.compute.internal",
+            "type": "InternalDNS"
+          },
+          {
+            "address": "172.29.0.77",
+            "type": "InternalIP"
+          },
+          {
+            "address": "ec2-54-68-68-221.us-west-2.compute.amazonaws.com",
+            "type": "ExternalDNS"
+          },
+          {
+            "address": "54.68.68.221",
+            "type": "ExternalIP"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "aws-win2022-v3"
+      },
+      "spec": {
+        "clusterName": "cldt-windows-v2"
+      },
+      "status": {
+        "addresses": [
+          {
+            "address": "ip-172-29-0-24.us-west-2.compute.internal",
+            "type": "InternalDNS"
+          },
+          {
+            "address": "172.29.0.24",
+            "type": "InternalIP"
+          },
+          {
+            "address": "ec2-44-255-96-143.us-west-2.compute.amazonaws.com",
+            "type": "ExternalDNS"
+          },
+          {
+            "address": "44.255.96.143",
+            "type": "ExternalIP"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "aws-win2025"
+      },
+      "spec": {
+        "clusterName": "cldt-windows-v2"
+      },
+      "status": {
+        "addresses": [
+          {
+            "address": "ip-172-29-0-13.us-west-2.compute.internal",
+            "type": "InternalDNS"
+          },
+          {
+            "address": "172.29.0.13",
+            "type": "InternalIP"
+          },
+          {
+            "address": "ec2-35-163-248-36.us-west-2.compute.amazonaws.com",
+            "type": "ExternalDNS"
+          },
+          {
+            "address": "35.163.248.36",
+            "type": "ExternalIP"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "aws-win2025-gpu"
+      },
+      "spec": {
+        "clusterName": "cldt-windows-v2"
+      },
+      "status": {
+        "addresses": [
+          {
+            "address": "ip-172-29-0-29.us-west-2.compute.internal",
+            "type": "InternalDNS"
+          },
+          {
+            "address": "172.29.0.29",
+            "type": "InternalIP"
+          },
+          {
+            "address": "ec2-34-217-91-107.us-west-2.compute.amazonaws.com",
+            "type": "ExternalDNS"
+          },
+          {
+            "address": "34.217.91.107",
+            "type": "ExternalIP"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "aws-win2025-v3"
+      },
+      "spec": {
+        "clusterName": "cldt-windows-v2"
+      },
+      "status": {
+        "addresses": [
+          {
+            "address": "ip-172-29-0-68.us-west-2.compute.internal",
+            "type": "InternalDNS"
+          },
+          {
+            "address": "172.29.0.68",
+            "type": "InternalIP"
+          },
+          {
+            "address": "ec2-44-251-58-244.us-west-2.compute.amazonaws.com",
+            "type": "ExternalDNS"
+          },
+          {
+            "address": "44.251.58.244",
+            "type": "ExternalIP"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "remote1"
+      },
+      "spec": {
+        "clusterName": "cldt"
+      },
+      "status": {
+        "addresses": [
+          {
+            "address": "203.0.113.10",
+            "type": "ExternalIP"
+          },
+          {
+            "address": "203.0.113.10",
+            "type": "InternalIP"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "remote2"
+      },
+      "spec": {
+        "clusterName": "cldt"
+      },
+      "status": {
+        "addresses": [
+          {
+            "address": "192.0.2.10",
+            "type": "ExternalIP"
+          },
+          {
+            "address": "192.0.2.10",
+            "type": "InternalIP"
+          }
+        ]
+      }
+    }
+  ]
+}

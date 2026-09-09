@@ -1,0 +1,35 @@
+{
+  "scope": "Calico 3.32.0 Felix MTU scheduling contract; native rollout unverified",
+  "testsPassed": true,
+  "command": "go test ./felix/dataplane/windows ./libcalico-go/lib/winmtu -coverprofile=/var/tmp/felix-v332-mtu-coverage.out",
+  "windowsDataplanePortableStatementCoveragePercent": 60.2,
+  "mtuHelperPortableStatementCoveragePercent": 100,
+  "checks": [
+    "Unassigned compartment defers policy and remains pending across repeated reconciliation",
+    "Other endpoints can converge while MTU is pending",
+    "Successful verification permits policy convergence",
+    "ACL cache does not bypass MTU verification on update",
+    "Deletion does not require a surviving interface"
+  ],
+  "remaining": [
+    "Live Felix rollout and fresh-pod policy ordering",
+    "Large UDP and persistent Linux distro configuration",
+    "Periodic MTU drift repair"
+  ],
+  "sourceVersion": "v3.32.0",
+  "sourceCommit": "eb1cf57823a1dd8d25c48b82fd023ea9e3e17996",
+  "olderForkBuildSHA256": "3a5da76b1774068bee33baaad4bee05d2b6b4c43c6dcaff735edb11b7e47befa",
+  "olderForkNativeBuildPassed": true,
+  "olderForkRollout": {
+    "ready": false,
+    "podMTUsChanged": false,
+    "watchFailures": [
+      "kubernetesadminnetworkpolicies",
+      "kubernetesbaselineadminnetworkpolicies"
+    ],
+    "originalDaemonSetRestored": true,
+    "originalDaemonSetReadyPods": 2
+  },
+  "nativeWindowsBuildPassed": true,
+  "binarySHA256": "ba7b21009fbb787e2fb260d85208a53512671a5e2ad48bfcbc8365c3704dee0e"
+}

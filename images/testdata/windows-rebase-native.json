@@ -1,0 +1,208 @@
+{
+  "original": [
+    {
+      "schemaVersion": 2,
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "config": {
+        "mediaType": "application/vnd.docker.container.image.v1+json",
+        "size": 636,
+        "digest": "sha256:903cd697133287523b9362733a8c418afe23de6e233d26b5c3fa934b6fe7e6bc"
+      },
+      "layers": [
+        {
+          "mediaType": "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+          "size": 3369313985,
+          "digest": "sha256:f37a87e739eeffd6c27527fb0e5d98084bf4959576096972506ac66c94f3d738",
+          "urls": [
+            "https://mcr.microsoft.com/v2/windows/server/blobs/sha256:f37a87e739eeffd6c27527fb0e5d98084bf4959576096972506ac66c94f3d738"
+          ]
+        },
+        {
+          "mediaType": "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+          "size": 916978815,
+          "digest": "sha256:560eb7d80abcc8a70656fb6c73009e5e1df53eeda711f617e60af815fa07095d",
+          "urls": [
+            "https://mcr.microsoft.com/v2/windows/server/blobs/sha256:560eb7d80abcc8a70656fb6c73009e5e1df53eeda711f617e60af815fa07095d"
+          ]
+        },
+        {
+          "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+          "size": 32363667,
+          "digest": "sha256:90540dd7acf55f9747f8d9d47ddbacc07efc0634b34ff624d73e554cf0296c47"
+        }
+      ]
+    },
+    {
+      "architecture": "amd64",
+      "created": "2023-02-07T11:27:35.838907Z",
+      "history": [
+        {
+          "created": "2023-01-06T23:58:54.5433325Z",
+          "created_by": "Apply image 10.0.20348.1487"
+        },
+        {
+          "created": "2023-02-07T11:27:35.838907Z",
+          "created_by": "Install update 10.0.20348.1547"
+        },
+        {
+          "created": "0001-01-01T00:00:00Z"
+        }
+      ],
+      "os": "windows",
+      "rootfs": {
+        "type": "layers",
+        "diff_ids": [
+          "sha256:d02b9fd331dc258366c613c2ce8a43ae8627bb30053a531139f9cbdc18ee1bfb",
+          "sha256:c654dc4e314feecdfeb27dd1c7d70e302268e9e01e30c9fb9108ae6d91e9cf21",
+          "sha256:e5cde8f3b681efb364bd060a6cbd5610c5f884375d972bd8b73d5f1070cfb628"
+        ]
+      },
+      "config": {
+        "Entrypoint": [
+          "C:\\ffmpeg.exe"
+        ]
+      },
+      "os.version": "10.0.20348.1547"
+    }
+  ],
+  "old": [
+    {
+      "schemaVersion": 2,
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "config": {
+        "mediaType": "application/vnd.docker.container.image.v1+json",
+        "size": 786,
+        "digest": "sha256:668a3f272e964ce0919d8290392caa5431be5d22e0fb09d5531aa0e939c33468"
+      },
+      "layers": [
+        {
+          "mediaType": "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+          "size": 3369313985,
+          "digest": "sha256:f37a87e739eeffd6c27527fb0e5d98084bf4959576096972506ac66c94f3d738",
+          "urls": [
+            "https://mcr.microsoft.com/v2/windows/server/blobs/sha256:f37a87e739eeffd6c27527fb0e5d98084bf4959576096972506ac66c94f3d738"
+          ]
+        },
+        {
+          "mediaType": "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+          "size": 916978815,
+          "digest": "sha256:560eb7d80abcc8a70656fb6c73009e5e1df53eeda711f617e60af815fa07095d",
+          "urls": [
+            "https://mcr.microsoft.com/v2/windows/server/blobs/sha256:560eb7d80abcc8a70656fb6c73009e5e1df53eeda711f617e60af815fa07095d"
+          ]
+        }
+      ]
+    },
+    {
+      "architecture": "amd64",
+      "config": {
+        "Hostname": "",
+        "Domainname": "",
+        "User": "",
+        "AttachStdin": false,
+        "AttachStdout": false,
+        "AttachStderr": false,
+        "Tty": false,
+        "OpenStdin": false,
+        "StdinOnce": false,
+        "Env": null,
+        "Cmd": [
+          "c:\\windows\\system32\\cmd.exe"
+        ],
+        "Image": "",
+        "Volumes": null,
+        "WorkingDir": "",
+        "Entrypoint": null,
+        "OnBuild": null,
+        "Labels": null
+      },
+      "created": "2023-02-07T11:27:35.838907Z",
+      "history": [
+        {
+          "created": "2023-01-06T23:58:54.5433325Z",
+          "created_by": "Apply image 10.0.20348.1487"
+        },
+        {
+          "created": "2023-02-07T11:27:35.838907Z",
+          "created_by": "Install update 10.0.20348.1547"
+        }
+      ],
+      "os": "windows",
+      "os.version": "10.0.20348.1547",
+      "rootfs": {
+        "type": "layers",
+        "diff_ids": [
+          "sha256:d02b9fd331dc258366c613c2ce8a43ae8627bb30053a531139f9cbdc18ee1bfb",
+          "sha256:c654dc4e314feecdfeb27dd1c7d70e302268e9e01e30c9fb9108ae6d91e9cf21"
+        ]
+      }
+    }
+  ],
+  "new": [
+    {
+      "schemaVersion": 2,
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "config": {
+        "mediaType": "application/vnd.docker.container.image.v1+json",
+        "size": 791,
+        "digest": "sha256:462aeed31aec4a06020384972efa00fd231a423713f5f1ce1c1a19f2a40b99cf"
+      },
+      "layers": [
+        {
+          "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+          "size": 4481593239,
+          "digest": "sha256:e5dcf3bc996337655b83ea98c2e05a33a75e36a0357b01d7d433dbabcd1509a7"
+        },
+        {
+          "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+          "size": 2131846101,
+          "digest": "sha256:004bfb52fd56104c078e59e2ee4b583f65f02d4421394e42964903c6b3021af8"
+        }
+      ]
+    },
+    {
+      "architecture": "amd64",
+      "config": {
+        "Hostname": "",
+        "Domainname": "",
+        "User": "",
+        "AttachStdin": false,
+        "AttachStdout": false,
+        "AttachStderr": false,
+        "Tty": false,
+        "OpenStdin": false,
+        "StdinOnce": false,
+        "Env": null,
+        "Cmd": [
+          "c:\\windows\\system32\\cmd.exe"
+        ],
+        "Image": "",
+        "Volumes": null,
+        "WorkingDir": "",
+        "Entrypoint": null,
+        "OnBuild": null,
+        "Labels": null
+      },
+      "created": "2026-08-09T09:07:50.9458987Z",
+      "history": [
+        {
+          "created": "2026-01-11T09:59:14.6792166Z",
+          "created_by": "Apply image 10.0.26100.32230"
+        },
+        {
+          "created": "2026-08-09T09:07:50.9458987Z",
+          "created_by": "Install update 10.0.26100.33296"
+        }
+      ],
+      "os": "windows",
+      "os.version": "10.0.26100.33296",
+      "rootfs": {
+        "type": "layers",
+        "diff_ids": [
+          "sha256:7dd5847c8729728bf9037115c47152e0dbb67e2349b82aabde1f0d7d0387f1bc",
+          "sha256:23be81b2aa7a614d9cabab4060534fcf87f7b93161b0dae71e892f0546352fee"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "result": "passed",
+  "scope": "First sole-site-endpoint NIC-cut row only; other rows in the twelve-row campaign are not covered",
+  "profile": "k0s v1.36.2+k0s.0 / containerd 2.3.2 / bundled kube-router v2.10.0-iptables1.8.13-k0s.0",
+  "rig": "single-NIC KVM guests with serial QGA management in isolated runner",
+  "placement": "one-worker",
+  "victim": "w1",
+  "mode": "cut",
+  "passes": [
+    {
+      "phase": "placement",
+      "time": "2026-09-09T00:21:45.669364457Z",
+      "series": 1,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.399049958s"
+    },
+    {
+      "phase": "outage-baseline",
+      "time": "2026-09-09T00:21:51.223267855Z",
+      "series": 2,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.55176399s"
+    },
+    {
+      "phase": "survivors-during-cut",
+      "time": "2026-09-09T00:23:27.007215945Z",
+      "series": 3,
+      "attempt": 1,
+      "total": 102,
+      "passed": 52,
+      "failed": 0,
+      "notRequired": 50,
+      "elapsed": "1.701712142s"
+    },
+    {
+      "phase": "restored",
+      "time": "2026-09-09T00:23:54.545551038Z",
+      "series": 4,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "7.576914253s"
+    }
+  ],
+  "requiredSurvivorKinds": {
+    "dns": 4,
+    "external": 6,
+    "pod": 14,
+    "service": 14,
+    "transfer": 14
+  },
+  "allowedIsolation": "Cross-site/remote paths and remote cluster DNS while the sole site endpoint is down; direct remote-to-remote and external paths remain required",
+  "serialManagement": {
+    "passed": true,
+    "physicalNICs": [
+      "ens2"
+    ],
+    "soleNICAdministrativelyDown": true,
+    "observedUTC": "2026-09-09T00:22:58.808750+00:00"
+  },
+  "harnessBinarySHA256": "9dc9a4e672fac29d2d39213fe81693eb866ba3573d0cbc905eaf812a832d281d",
+  "retainedCluster": {
+    "readyNodes": 13,
+    "UIDsUnchanged": true,
+    "hostRoutesUnchanged": true
+  },
+  "limitations": [
+    "No uninterrupted-packet-loss guarantee: outage matrices measure survivor convergence after a 90-second notice interval.",
+    "This row does not establish reboot, other placement, AWS, Windows or GPU qualification.",
+    "No completed pass failed in this row; failure-detail retention is covered by the separate regression tests."
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "state": "native-aws-passed",
+  "purpose": "Collect complete Linux native survivor logs independently of Kubernetes exec and SSM inline output limits",
+  "native": {
+    "passed": true,
+    "containerID": "containerd://9872f1494a7b8b5b7744d3f3459f1ebbe8d949a4db86c8e49352904fe3f863f2",
+    "nodeUID": "234868ac-c22e-4546-8657-4ed0a1bfa4e8",
+    "compressedBytes": 218219,
+    "rawBytes": 1937775,
+    "rawSHA256": "f15235c10522cd97a6509c0c38b6260fb49bb6f3ad14ea8333b37455c13b88d8",
+    "matchesOriginalSamplerEvidence": true,
+    "transport": "SSM host Python + exact-container CRI; bounded base64 responses"
+  },
+  "commandID": "8049f1cf-e9b5-4d8e-ad37-fdb986b98482",
+  "comparisonEvidenceArchiveSHA256": "6215e2a2216cbdec3c009db84f321577b3f5303ea9cf6597e9b439c0d6cac82b",
+  "tests": {
+    "survivorObserverTests": 34,
+    "passed": 34,
+    "pythonOrchestrationStatements": 40,
+    "pythonOrchestrationCoveredStatements": 40,
+    "cases": [
+      "Real host Python transports binary output above the SSM inline limit",
+      "Reject process failures and inline-limit responses",
+      "Reject changed offset, total size, digest and file contents",
+      "Reject truncated, corrupt and invalid base64 chunks",
+      "Reject unsupported OS, incomplete container identity and unbounded sizes"
+    ]
+  },
+  "limitations": [
+    "Linux host Python adapter only",
+    "Embedded remote Python program executed by native and local tests but not separately instrumented by coverage.py"
+  ],
+  "placementCollectorValidation": {
+    "state": "passed; correctly preserved a failed traffic qualification",
+    "report": "microk8s-tunnel-placement-results.json",
+    "lanesCollected": 6,
+    "allRawLogsIndependentlyRevalidatedLocally": true,
+    "evidenceArchiveSHA256": "d885ad01381f64d44bfd9c5617a73e92292b4f2005bfd82b41b2564fe5713e80"
+  }
+}

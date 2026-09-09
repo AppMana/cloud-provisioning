@@ -1,0 +1,45 @@
+{
+  "scope": "First-application guard regression using the native Windows inventory containing a misplaced Linux NFD Pod",
+  "fixture": "harness/e2e/observe/testdata/windows-startup-misplaced-nfd.json",
+  "nativeRejection": {
+    "passed": false,
+    "checks": {
+      "sameNode": true,
+      "windowsNode": true,
+      "nodeReady": true,
+      "noPriorOrdinaryContainers": false
+    },
+    "nodeUID": "e67cbbe1-08f2-4268-b579-41654d10bd38",
+    "ordinaryContainers": [
+      {
+        "pod": "gpu-operator-node-feature-discovery-worker-7qsf4",
+        "podUID": "98e4122f-cf1a-4f74-90a2-f26d0ad5268c",
+        "container": "worker",
+        "kind": "containers",
+        "phase": "Pending"
+      }
+    ],
+    "scope": "Pre-application Kubernetes snapshot; does not establish absence of deleted Pods or out-of-band containers"
+  },
+  "tests": {
+    "startupTests": 5,
+    "observerSuiteTests": 51,
+    "passed": true
+  },
+  "coverage": {
+    "moduleStatementPercent": 53,
+    "evaluateStatements": "All evaluator statements covered; CLI lines excluded from measured unit execution",
+    "scope": "windows_startup.py only"
+  },
+  "sourceHistory": "New file without HEAD history; replaces private experiment checks that classified whole Pods by any HostProcess container. The shared guard inspects every regular, init and ephemeral container.",
+  "limitations": [
+    "Snapshot cannot observe deleted Pods or out-of-band container execution",
+    "Does not itself provision VMs, submit applications, or qualify GPU execution"
+  ],
+  "liveFreshNodeCheck": {
+    "source": "windows-first-gpu-correct-profile-2025-results.json",
+    "passed": true,
+    "nodeUID": "e5f2fca5-5a8a-43c2-8aed-231afee2d4f4",
+    "scope": "Retained pre-application snapshot from fresh Windows 2025 GPU-first run"
+  }
+}

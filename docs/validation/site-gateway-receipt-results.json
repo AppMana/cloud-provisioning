@@ -1,0 +1,80 @@
+{
+  "observedAt": "2026-09-07T08:19:11.741699897Z",
+  "results": [
+    {
+      "node": "cp",
+      "nodeUID": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+      "ready": true,
+      "receipt": {
+        "nodeUID": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+        "publicKey": "AHCG8KQpoiNKhJpMaKmS3wt6Fnhcn9HwBxqLs+1tixU=",
+        "hash": "4599e8b0b498c5ba89ac02733e7fbf4f710bdf36f15b19b26a306933b3b04687",
+        "role": "transit",
+        "transitHash": "8fd9ece10b0b8e69319d72f538a2c1f65ad72f20d4ef280d53bfc95da2a2a40e"
+      }
+    },
+    {
+      "node": "cp2",
+      "nodeUID": "947de62f-0920-408c-aa31-ac80a2344128",
+      "ready": true,
+      "receipt": {
+        "nodeUID": "947de62f-0920-408c-aa31-ac80a2344128",
+        "publicKey": "OgIXpq5DSyQ5ArQlDNSVxe/5H3z9pjZgeaUIl+i2+i0=",
+        "hash": "4599e8b0b498c5ba89ac02733e7fbf4f710bdf36f15b19b26a306933b3b04687",
+        "role": "transit",
+        "transitHash": "8fd9ece10b0b8e69319d72f538a2c1f65ad72f20d4ef280d53bfc95da2a2a40e"
+      }
+    },
+    {
+      "node": "cp3",
+      "nodeUID": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+      "ready": true,
+      "receipt": {
+        "nodeUID": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+        "publicKey": "T495sv5sExYRsKGR+okL12UN/wLBE/N2g9S4sZomkT8=",
+        "hash": "4599e8b0b498c5ba89ac02733e7fbf4f710bdf36f15b19b26a306933b3b04687",
+        "role": "transit",
+        "transitHash": "8fd9ece10b0b8e69319d72f538a2c1f65ad72f20d4ef280d53bfc95da2a2a40e"
+      }
+    },
+    {
+      "node": "w1",
+      "nodeUID": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "ready": true,
+      "receipt": {
+        "nodeUID": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+        "publicKey": "iawhJX+3BwVJIFPi/hXAWXjIWdwaJDyZbuiOIQ6MAE4=",
+        "hash": "4599e8b0b498c5ba89ac02733e7fbf4f710bdf36f15b19b26a306933b3b04687",
+        "role": "direct"
+      }
+    },
+    {
+      "node": "w2",
+      "nodeUID": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+      "ready": true,
+      "receipt": {
+        "nodeUID": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+        "publicKey": "+ewxGqTjR0fYF3SvU+4tIq7NFzlU3qC3c5BTqM5VT14=",
+        "hash": "4599e8b0b498c5ba89ac02733e7fbf4f710bdf36f15b19b26a306933b3b04687",
+        "role": "direct"
+      }
+    }
+  ],
+  "scope": "Native site receipt validation on five single-NIC VMs: two direct endpoints and three non-endpoint transit consumers; no active gateway projection or packet/CAPI lifecycle qualification",
+  "dialerImage": "cldt-dialer:gateway-receipts-v2",
+  "imageID": "sha256:19cd138296fc41797f78e5f3ef2fd6f8132da80e6057df008fcdc400390ee36d",
+  "sourceSHA256": {
+    "controller/cmd/dialer/main.go": "cdbc6833f4c5c63992c4cb0d48aaaee6129057fe38b9ad55fceb15949984f928",
+    "controller/cmd/dialer/site_ack.go": "d2e2a6c427aa41aa84cd1e42875108fcb255cbcda2a8753dcb35269f3ded7ee7",
+    "controller/pkg/tunnel/site_peers.go": "b84c19903fc14f8c4259b6e53ee2d26ba1a6719a3ebe087e3a029c8219e95588"
+  },
+  "remaining": [
+    "Live retained-endpoint receipt test",
+    "Full attachment controller registration",
+    "Combined gateway publication and CNI transition",
+    "Packet and CAPI VM removal/replacement matrix"
+  ],
+  "remoteRollout": "converged on original image after restoring gateway image cache",
+  "siteRollout": "five updated pods available",
+  "nodesReady": 10
+}

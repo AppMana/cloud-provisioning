@@ -1,0 +1,291 @@
+{
+  "observedAt": "2026-09-07T20:12:01.342220+00:00",
+  "scope": "Windows 2022 standalone builder cache preparation and containerd restart; no image clone qualification",
+  "windowsBuild": 20348,
+  "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+  "duringUnpack": {
+    "passed": false,
+    "checks": {
+      "expectedWindowsBuild": true,
+      "workerMatches": true,
+      "runtimeMatches": true,
+      "k0sRuntimeStore": true,
+      "cacheServiceRunning": true,
+      "noWorkerServiceOrKnownIdentity": true,
+      "noWorkloadContainersOrTasks": true,
+      "exactImagesRegistered": true,
+      "allImagesDownloadedAndUnpacked": false
+    },
+    "observedAt": "2026-09-07T19:52:19.7819247Z",
+    "images": [
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ],
+    "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+  },
+  "afterUnpack": {
+    "passed": true,
+    "checks": {
+      "expectedWindowsBuild": true,
+      "workerMatches": true,
+      "runtimeMatches": true,
+      "k0sRuntimeStore": true,
+      "cacheServiceRunning": true,
+      "noWorkerServiceOrKnownIdentity": true,
+      "noWorkloadContainersOrTasks": true,
+      "exactImagesRegistered": true,
+      "allImagesDownloadedAndUnpacked": true
+    },
+    "observedAt": "2026-09-07T19:56:28.6554147Z",
+    "images": [
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ],
+    "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+  },
+  "afterRuntimeRestart": {
+    "passed": true,
+    "checks": {
+      "expectedWindowsBuild": true,
+      "workerMatches": true,
+      "runtimeMatches": true,
+      "k0sRuntimeStore": true,
+      "cacheServiceRunning": true,
+      "noWorkerServiceOrKnownIdentity": true,
+      "noWorkloadContainersOrTasks": true,
+      "exactImagesRegistered": true,
+      "allImagesDownloadedAndUnpacked": true
+    },
+    "observedAt": "2026-09-07T19:58:34.1795244Z",
+    "images": [
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ],
+    "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+  },
+  "pull": {
+    "wallSeconds": 845.3916774,
+    "nativeLogUnpackSeconds": 786.960455,
+    "stderrEmpty": true,
+    "originalWrapperExitCode": null,
+    "originalWrapperStatus": "failed",
+    "interpretation": "Wrapper result was inconclusive; independent containerd readiness checks establish downloaded and unpacked content. No pull retry was submitted."
+  },
+  "processExitCodeProbe": [
+    {
+      "expected": 0,
+      "actual": 0,
+      "matches": true
+    },
+    {
+      "expected": 7,
+      "actual": 7,
+      "matches": true
+    }
+  ],
+  "coverage": {
+    "unitTests": 5,
+    "unitStatementPercent": 56,
+    "unitPlusNativeSnapshotCLIStatementPercent": 100
+  },
+  "limitations": [
+    "Both OS cache images require corrected rebuilds and untouched fresh CAPI clone validation",
+    "Cache reuse passed only on a diagnostically repaired Windows 2022 clone",
+    "Lifecycle/network qualification remains incomplete"
+  ],
+  "serviceShutdown": {
+    "contentRootPresent": true,
+    "observedAt": "2026-09-07T19:59:22.8607499Z",
+    "workerServicePresent": false,
+    "cacheServicePresent": false,
+    "runtimeProcessPresent": false
+  },
+  "cacheRecipeSHA256": "524293f856239066e2aa1a4417b92e4a9f14bb36b5c48c54f07608e6c91ce07f",
+  "nativeImagePreparationAfterVMRestart": {
+    "passed": true,
+    "preparedAt": "2026-09-07T20:09:02.943523+00:00",
+    "serviceStopped": true,
+    "cacheServiceRemoved": true,
+    "diagnosticStateRemoved": true,
+    "driverVersion": "582.53"
+  },
+  "revision": {
+    "previousImageID": "ami-06e07b0ee0ea75491",
+    "oldGPUImageRetained": true,
+    "cpuImageRetained": "ami-09af413882370ed0b",
+    "otherOSGPUImageRetained": "ami-0ff49b8716df45d1b",
+    "generalizeRequestedAt": "2026-09-07T20:09:58.314015+00:00",
+    "imageID": "ami-0651d6fdbda2cdb63",
+    "imageState": "pending",
+    "builderState": "stopped",
+    "snapshot": {
+      "id": "snap-0e679dd99d7a18bb5",
+      "state": "pending",
+      "progress": "85%",
+      "observedAt": "2026-09-07T20:33:48.123579+00:00",
+      "encrypted": true
+    }
+  },
+  "sharedRecipeCoverage": {
+    "unitTests": 7,
+    "sharedRecipeUnitStatementPercent": 76,
+    "sharedRecipeUnitPlusCLIPercent": 100,
+    "sharedRecipeAndObserverCombinedUnitPlusCLIPercent": 98
+  },
+  "windows2025": {
+    "preflight": {
+      "processExitCodes": [
+        {
+          "expected": 0,
+          "actual": 0
+        },
+        {
+          "expected": 7,
+          "actual": 7
+        }
+      ],
+      "workerServicePresent": false,
+      "scripts": [
+        {
+          "errors": 0,
+          "name": "prepare-cache.ps1"
+        },
+        {
+          "errors": 0,
+          "name": "cache-runtime.ps1"
+        },
+        {
+          "errors": 0,
+          "name": "inspect-cache.ps1"
+        },
+        {
+          "errors": 0,
+          "name": "verify-cache.ps1"
+        }
+      ],
+      "bootTime": "2026-09-07T20:26:54.6955110Z",
+      "windowsBuild": 26100,
+      "runtimeDataPresent": false
+    },
+    "recipeSHA256": "65c47a82b204defe5987987587a277fda4ed592202e7d7652ef19c95ac99a4bf",
+    "bundle": {
+      "sha256": "e0fa3d659f26432793f3ba86b81a512b58a34fe7e74d3542948ae1e5d22aa58c",
+      "bytes": 24625578
+    },
+    "preparationStatus": "running",
+    "startedAt": "2026-09-07T20:30:35.3276683Z",
+    "executionTimeoutSeconds": 2999,
+    "cacheReady": false
+  },
+  "latestObservedAt": "2026-09-07T21:40:08.079816+00:00",
+  "windows2025SharedPreparation": {
+    "serviceStopped": true,
+    "finishedAt": "2026-09-07T20:43:20.4162412Z",
+    "startedAt": "2026-09-07T20:30:35.3276683Z",
+    "cacheServiceRemoved": true,
+    "status": "prepared",
+    "pulls": [
+      {
+        "exitCode": 0,
+        "elapsedSeconds": 759.35613,
+        "image": "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+      }
+    ]
+  },
+  "cacheCandidates": {
+    "2022": {
+      "imageID": "ami-0651d6fdbda2cdb63",
+      "state": "available",
+      "qualification": "Rejected: protected data-directory ACL blocks Traefik"
+    },
+    "2025": {
+      "imageID": "ami-0bbec27427250dfca",
+      "state": "available",
+      "qualification": "Unqualified; built with the same protected data-directory ACL"
+    }
+  },
+  "permissionsEvidence": "windows-cache-permissions-results.json",
+  "diagnosticCloneReuse": {
+    "windowsBuild": 20348,
+    "nodeUID": "a2f58e47-c9d9-4c37-9f45-f397167876c1",
+    "podUID": "65926e76-a666-45fc-90cf-cc814106fd2e",
+    "imageAlreadyPresent": true,
+    "containerCreateToStartSeconds": 33,
+    "hardwareRenderAndEncode": {
+      "encoder": "h264_nvenc",
+      "containerWindowsBuild": 20348,
+      "decodedFrames": 30,
+      "render": {
+        "api": "Direct3D11",
+        "vendorID": 4318,
+        "deviceID": 10168,
+        "frames": 30,
+        "pixelsPerFrame": 4096,
+        "greenPixels": 1152,
+        "bluePixels": 2944,
+        "hardwareOnly": true
+      },
+      "encodedBytes": 3936
+    },
+    "scope": "Clone after two targeted ACL repairs; original image does not qualify"
+  },
+  "correctedCacheCaptures": {
+    "observedAt": "2026-09-07T21:53:52.469945+00:00",
+    "images": {
+      "2022": {
+        "imageID": "ami-0f5c22e0cb0ec6f50",
+        "imageState": "pending",
+        "snapshotIDs": [
+          "snap-0f9134e2e88ba55ff"
+        ],
+        "generalizeRequestedAt": "2026-09-07T21:47:01.552717+00:00",
+        "cacheVerification": {
+          "passed": true,
+          "checks": {
+            "expectedWindowsBuild": true,
+            "workerMatches": true,
+            "runtimeMatches": true,
+            "k0sRuntimeStore": true,
+            "cacheServiceRunning": true,
+            "noWorkerServiceOrKnownIdentity": true,
+            "noWorkloadContainersOrTasks": true,
+            "exactImagesRegistered": true,
+            "allImagesDownloadedAndUnpacked": true,
+            "dataDirectoryInheritsPermissions": true
+          },
+          "observedAt": "2026-09-07T21:46:25.5353686Z",
+          "images": [
+            "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+          ],
+          "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+        }
+      },
+      "2025": {
+        "imageID": "ami-0b5bfc5a6d0e2007c",
+        "imageState": "pending",
+        "snapshotIDs": [
+          "snap-0b35250d2ad72024e"
+        ],
+        "generalizeRequestedAt": "2026-09-07T21:49:24.947002+00:00",
+        "cacheVerification": {
+          "passed": true,
+          "checks": {
+            "expectedWindowsBuild": true,
+            "workerMatches": true,
+            "runtimeMatches": true,
+            "k0sRuntimeStore": true,
+            "cacheServiceRunning": true,
+            "noWorkerServiceOrKnownIdentity": true,
+            "noWorkloadContainersOrTasks": true,
+            "exactImagesRegistered": true,
+            "allImagesDownloadedAndUnpacked": true,
+            "dataDirectoryInheritsPermissions": true
+          },
+          "observedAt": "2026-09-07T21:48:55.5494251Z",
+          "images": [
+            "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+          ],
+          "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+        }
+      }
+    },
+    "scope": "Builder verification and capture request, not fresh-clone qualification"
+  }
+}

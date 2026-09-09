@@ -1,0 +1,190 @@
+{
+  "original": "index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+  "oldBase": "mcr.microsoft.com/windows/server@sha256:99e777ead9061f5568a2280cc91787c9494e64e8d40f6af8035b73c86de3bbcd",
+  "newBase": "mcr.microsoft.com/windows/server@sha256:ae8fc56c2e7c05c9621d5fe85be49c07466ce5defb9bb5ddeed07941851644a1",
+  "imageDigest": "sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+  "platform": {
+    "os": "windows",
+    "architecture": "amd64",
+    "os.version": "10.0.26100.33296"
+  },
+  "applicationLayers": [
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "size": 32363667,
+      "digest": "sha256:90540dd7acf55f9747f8d9d47ddbacc07efc0634b34ff624d73e554cf0296c47"
+    }
+  ],
+  "applicationRuntimeConfigPreserved": true,
+  "allLayerBytesVerified": true,
+  "scope": "OCI construction, private publication, native builder-cache preparation and one fresh GPU execution; see linked trial for scheduling, log-read and removal failures",
+  "observedAt": "2026-09-08T03:57:32.896118+00:00",
+  "status": "AMI available; one fresh Windows 2025 GPU workload completed and verified on later log read",
+  "initialBuildFailure": {
+    "terminal": true,
+    "cause": "Registry connection reset during Windows base-layer download over IPv6",
+    "preservedWorkDirectory": "refreshed-workload-v1/2025",
+    "retryWorkDirectory": "refreshed-workload-v1/2025-v2"
+  },
+  "validation": {
+    "windowsObserverTests": 50,
+    "rebaseInvariantTests": 4,
+    "replacementFunctionCoveredStatements": 22,
+    "replacementFunctionStatements": 22,
+    "rebaseModuleUnitCoveragePercent": 46,
+    "note": "Metadata-unit coverage; no runtime coverage claimed for the native image build.",
+    "publisherTests": 7,
+    "publisherUnitCoveredStatements": 73,
+    "publisherUnitStatements": 79,
+    "cleanupVerificationTests": 4,
+    "claimTests": 12,
+    "windowsImageTests": 19,
+    "targetedTestTotal": 90,
+    "targetedTests": 96
+  },
+  "references": [
+    "https://learn.microsoft.com/en-us/virtualization/windowscontainers/manage-containers/container-base-images",
+    "https://learn.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/version-compatibility"
+  ],
+  "sourceHistory": "The new generic Windows rebaser preserves whole application layers instead of replacing a single executable. images/rebase_windows.py and the existing derive_windows.py are untracked; no HEAD blame or historical supersession is claimed.",
+  "nextSteps": [
+    "Repeat fresh-VM GPU startup using the capacity readiness gate.",
+    "Investigate first log-read timeout and credential-dependent removal recovery.",
+    "Retain old-base failures; one refreshed-base success does not prove causality or repeatability."
+  ],
+  "artifactSHA256": {
+    "2025-v2/build.json": "07233031d95201dab274ae805a5bcddea3dd704813c112161e4fa41d7c3f77b9",
+    "2025-v2/layout/index.json": "e2cc7cddbfa030adb39f50e37951e2bd20247cb1a4c6357f01b2b33bebeaa770",
+    "rebase-coverage.json": "8b4c8f2d0a625fb6f82c4a7cdcd243d11914d3b82c624878eff59c0e682a652f",
+    "cache-recipe-2025.json": "7c742064fd45451fbca40ea72ef706530c13107b41db9df50003ea69c76f9194",
+    "original-preparation-result.json": "638f84737a8eef3ddeb3c7c30e0c727d7936804e106586e677b31322e78dcefd",
+    "independent-image-preparation.json": "afc95be49eb678ed48a2b400913ae922857f2125270d992fc111169e1c9c9d46",
+    "publisher.coverage": "6d2ec95e44955435aac2eab8e8385784f9f0f2a7ee871fc9753bb95be52de9f5"
+  },
+  "publication": {
+    "observedAt": "2026-09-08T04:08:44.679678+00:00",
+    "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+    "component": "windows-gpu-probe",
+    "registryDigestMatchesLocal": true,
+    "pullAccess": "Repository-only derived session",
+    "cleanupInventoryRecorded": true
+  },
+  "cachePreparation": {
+    "builderInstanceID": "i-0acfb426380c8333f",
+    "recipeSHA256": "5af5af21dd3be79f8f124841185d0c50b699f1edea1441eb471105a1f6e881c5",
+    "workerRuntimeAndDriverUnchanged": true,
+    "rootVolumeGiB": 100,
+    "originalRootVolumeGiB": 60,
+    "preservedFailures": [
+      {
+        "stage": "disk-preflight",
+        "reason": "20.35 GiB free; required 40 GiB before adding full Server cache",
+        "pullStarted": false,
+        "registryCredentialsRemoved": true
+      },
+      {
+        "stage": "SSM execution wrapper",
+        "ssmCommandID": "9d8b657d-207e-4f13-91c9-d5ffb776c8b5",
+        "reason": "Remote execution deadline was incorrectly set to 60 seconds",
+        "ssmStatus": "TimedOut",
+        "originalChildSurvived": true,
+        "duplicatePullStarted": false,
+        "originalPreparationScriptSurvived": true,
+        "redundantRecoveryObserverStopped": true
+      }
+    ],
+    "status": "Original preparation completed successfully",
+    "receipt": {
+      "snapshot": {
+        "workerServicePresent": false,
+        "identityPathsPresent": [],
+        "pipe": "\\\\.\\pipe\\cldt-image-cache",
+        "containers": [],
+        "registeredImages": [
+          "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+          "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+        ],
+        "namespace": "k8s.io",
+        "cacheService": "Running",
+        "root": "C:\\var\\lib\\k0s\\containerd",
+        "snapshotter": "windows",
+        "dataDirectoryInheritsPermissions": true,
+        "readyImages": [
+          "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+          "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+        ],
+        "tasks": [],
+        "observedAt": "2026-09-08T04:37:39.1522670Z",
+        "shimSHA256": "adb8e4d990da4bde04956441fcd569a2b13a298d89758ace0896b1bc3389c1ae",
+        "windowsBuild": 26100,
+        "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+        "containerdSHA256": "92fe1b334ef6ee9477fd22c88012bda605b52952fe4964705ada1a49ae0f2030"
+      },
+      "serviceStopped": true,
+      "finishedAt": "2026-09-08T04:37:41.4579295Z",
+      "startedAt": "2026-09-08T04:11:36.3531475Z",
+      "cacheServiceRemoved": true,
+      "recipeSHA256": "5af5af21dd3be79f8f124841185d0c50b699f1edea1441eb471105a1f6e881c5",
+      "registryCredentialsRemoved": true,
+      "exitCode": 0,
+      "status": "prepared"
+    },
+    "verification": {
+      "passed": true,
+      "checks": {
+        "expectedWindowsBuild": true,
+        "workerMatches": true,
+        "runtimeMatches": true,
+        "k0sRuntimeStore": true,
+        "cacheServiceRunning": true,
+        "noWorkerServiceOrKnownIdentity": true,
+        "noWorkloadContainersOrTasks": true,
+        "exactImagesRegistered": true,
+        "allImagesDownloadedAndUnpacked": true,
+        "dataDirectoryInheritsPermissions": true
+      },
+      "observedAt": "2026-09-08T04:37:39.1522670Z",
+      "images": [
+        "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+        "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+      ],
+      "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+    }
+  },
+  "capture": {
+    "imageID": "ami-0e924eecc6692176b",
+    "snapshotID": "snap-0f9d69dcfd202f8de",
+    "rootVolumeGiB": 100,
+    "builderStoppedAfterSysprep": true,
+    "lastObservedImageState": "available",
+    "lastObservedSnapshotProgress": "100%",
+    "freshGPUVMCreated": true
+  },
+  "volumePolicySimulation": {
+    "observedAt": "2026-09-08T04:47:34.185409+00:00",
+    "scope": "IAM custom-policy simulation; policy was not attached or used for the earlier resize",
+    "results": [
+      {
+        "action": "ec2:ModifyVolume",
+        "resource": "arn:aws:ec2:us-west-2:270666084746:volume/vol-0dca38de9b52cded5",
+        "decision": "allowed"
+      },
+      {
+        "action": "ec2:ModifyVolume",
+        "resource": "arn:aws:ec2:us-west-2:270666084746:volume/vol-00000000000000000",
+        "decision": "implicitDeny"
+      },
+      {
+        "action": "ec2:DeleteVolume",
+        "resource": "arn:aws:ec2:us-west-2:270666084746:volume/vol-0dca38de9b52cded5",
+        "decision": "implicitDeny"
+      },
+      {
+        "action": "ec2:DeleteVolume",
+        "resource": "arn:aws:ec2:us-west-2:270666084746:volume/vol-00000000000000000",
+        "decision": "implicitDeny"
+      }
+    ]
+  },
+  "freshGPUTrial": "windows-first-gpu-refreshed-2025-results.json"
+}

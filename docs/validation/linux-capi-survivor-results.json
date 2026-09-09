@@ -1,0 +1,309 @@
+{
+  "scope": "Real Linux CAPA add/remove on existing k0s 1.36.2 Calico site, with Linux/Windows 2022/Windows 2025 survivor UDP observed through QEMU serial and EC2 SSM CRI",
+  "operation": {
+    "claim": "aws-linux-survivor-v1",
+    "startedAt": "2026-09-08T07:49:16.581685+00:00",
+    "scope": "Real CAPA Linux worker addition and removal with existing survivor probes running out of band",
+    "additionFinishedAt": "2026-09-08T07:56:32.932039+00:00",
+    "removalStartedAt": "2026-09-08T07:56:32.932081+00:00",
+    "finishedAt": "2026-09-08T07:58:22.591628+00:00",
+    "passed": true
+  },
+  "binding": [
+    {
+      "eniCount": 1,
+      "instanceID": "i-0e632d1e39ce6b5b2",
+      "machine": "aws-linux-survivor-v1",
+      "node": "ip-172-29-0-124",
+      "nodeUID": "f2777aaf-ae68-4127-9b2e-40365a0ee257",
+      "physicalNIC": "ens5",
+      "providerID": "aws:///us-west-2a/i-0e632d1e39ce6b5b2"
+    }
+  ],
+  "adoption": {
+    "ip-172-29-0-124": {
+      "containers": [
+        {
+          "name": "dialer",
+          "state": {
+            "running": {
+              "startedAt": "2026-09-08T07:55:13Z"
+            }
+          },
+          "lastState": {},
+          "ready": true,
+          "restartCount": 0,
+          "image": "docker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45",
+          "imageID": "sha256:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45",
+          "containerID": "containerd://50e584ba50ee6829f9dbb44990846528437add9fcdaf734f21bd00b35d30618b",
+          "started": true,
+          "resources": {},
+          "volumeMounts": [
+            {
+              "name": "wg-dialer-config",
+              "mountPath": "/etc/wg-dialer"
+            },
+            {
+              "name": "host-bin",
+              "mountPath": "/host-bin"
+            },
+            {
+              "name": "kube-api-access-h2gqz",
+              "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+              "readOnly": true,
+              "recursiveReadOnly": "Disabled"
+            }
+          ],
+          "user": {
+            "linux": {
+              "uid": 0,
+              "gid": 0,
+              "supplementalGroups": [
+                0
+              ]
+            }
+          }
+        }
+      ],
+      "daemonSetUID": "8ac08e53-64c6-4494-af15-ae1851bcb0c6",
+      "machine": "aws-linux-survivor-v1",
+      "peerReceipt": {
+        "secretUID": "076e428a-8f54-4149-bc2f-a070f349fd59",
+        "resourceVersion": "990519",
+        "desiredSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+        "appliedSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c"
+      },
+      "podUID": "525f7314-2c9e-4422-813d-2173452dcefe"
+    }
+  },
+  "matrix": {
+    "passed": 102,
+    "failed": 0,
+    "total": 102,
+    "profile": {
+      "Distro": "k0s",
+      "Network": "calico",
+      "BuilderNetwork": "calico",
+      "Bundled": true,
+      "Encapsulation": 2
+    },
+    "criEndpoint": "unix:///run/k0s/containerd.sock"
+  },
+  "removal": {
+    "claim": "aws-linux-survivor-v1",
+    "instanceID": "i-0e632d1e39ce6b5b2",
+    "node": "ip-172-29-0-124",
+    "nodeUID": "f2777aaf-ae68-4127-9b2e-40365a0ee257",
+    "observedAt": "2026-09-08T07:58:22.589080006Z",
+    "productCleanup": true,
+    "providerID": "aws:///us-west-2a/i-0e632d1e39ce6b5b2",
+    "terminated": true
+  },
+  "survivorTraffic": {
+    "finishedAt": "2026-09-08T07:58:41.882696+00:00",
+    "elapsedSeconds": 570.9171272109961,
+    "scope": "Concurrent sampled 64-byte UDP echoes; excludes delivery between attempts and fragmented UDP qualification",
+    "executor": "OutOfBand",
+    "maxAllowedGapSeconds": 30.0,
+    "intervalSeconds": 1.0,
+    "identitiesStable": true,
+    "identityError": null,
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 1.2638739719986916,
+        "attempts": 493,
+        "passed": 493,
+        "maxGapSeconds": 1.002168248000089,
+        "maxAttemptSeconds": 0.2634674090077169,
+        "ok": true
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 1.2795130630256608,
+        "attempts": 494,
+        "passed": 494,
+        "maxGapSeconds": 1.0010112749878317,
+        "maxAttemptSeconds": 0.2792018409818411,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 6.472250628983602,
+        "attempts": 121,
+        "passed": 121,
+        "maxGapSeconds": 1.0003374780062586,
+        "maxAttemptSeconds": 5.471961572999135,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 6.425132245989516,
+        "attempts": 119,
+        "passed": 119,
+        "maxGapSeconds": 1.000490456004627,
+        "maxAttemptSeconds": 5.424641789984889,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 6.354287810972892,
+        "attempts": 114,
+        "passed": 114,
+        "maxGapSeconds": 1.000392757996451,
+        "maxAttemptSeconds": 5.353972923010588,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 6.349649099051021,
+        "attempts": 114,
+        "passed": 114,
+        "maxGapSeconds": 1.0004692210350186,
+        "maxAttemptSeconds": 5.349406136025209,
+        "ok": true
+      }
+    ],
+    "stopRequested": true,
+    "ready": true,
+    "ok": true
+  },
+  "window": {
+    "startedAt": "2026-09-08T07:49:16.581685+00:00",
+    "finishedAt": "2026-09-08T07:58:22.591628+00:00",
+    "lanesBracketWindow": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "lanesPassed": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ok": true,
+    "scope": "Successful sampled survivor probes bracket the operation; gaps and latency remain in the observer report"
+  },
+  "survivorIdentities": {
+    "baseline": "Previous verified OOB cp2 reboot recovery, before this trial",
+    "sameOriginalNodesReady": true,
+    "nodeCount": 13,
+    "nodes": {
+      "aws-win2022-gpu": {
+        "uid": "dd54061d-491a-4b12-95a7-27393e847780",
+        "ready": true
+      },
+      "aws-win2022-v3": {
+        "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ready": true
+      },
+      "aws-win2025": {
+        "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+        "ready": true
+      },
+      "aws-win2025-gpu": {
+        "uid": "258d7b62-e774-48bc-94dc-e31ff042f585",
+        "ready": true
+      },
+      "aws-win2025-v3": {
+        "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ready": true
+      },
+      "cp": {
+        "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+        "ready": true
+      },
+      "cp2": {
+        "uid": "947de62f-0920-408c-aa31-ac80a2344128",
+        "ready": true
+      },
+      "cp3": {
+        "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+        "ready": true
+      },
+      "ip-172-29-0-9": {
+        "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+        "ready": true
+      },
+      "remote1": {
+        "uid": "8935dd28-de93-44be-a887-73110fe88c51",
+        "ready": true
+      },
+      "remote2": {
+        "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+        "ready": true
+      },
+      "w1": {
+        "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+        "ready": true
+      },
+      "w2": {
+        "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+        "ready": true
+      }
+    }
+  },
+  "configurationRepair": {
+    "reason": "Controller rejected expired Linux artifact URL and withheld bootstrap Secret before instance launch",
+    "evidence": {
+      "artifactSHA256": "05afa06e4cf9f68574e0b0a8e07295c4b3bd27b530476d735ab840fe36dfe3a1",
+      "sameObjectVerified": true,
+      "updatedAt": "2026-09-08T07:52:11.678419+00:00",
+      "expiresAt": "2026-09-08T11:52:10+00:00",
+      "claimRecreated": false
+    },
+    "qualification": "URL repaired during this trial; existing claim continued without recreation. This is not a no-intervention setup pass."
+  },
+  "cleanup": {
+    "template": {
+      "name": "aws-linux-survivor-v1",
+      "uid": "48fee509-f5dc-42ab-b2f4-cc58782058b3",
+      "removed": true
+    },
+    "temporaryWindowsTools": [
+      {
+        "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ownedExecutableRemoved": true,
+        "ownedDirectoryRemoved": true,
+        "noOwnedCRIProcesses": true
+      },
+      {
+        "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ownedExecutableRemoved": true,
+        "ownedDirectoryRemoved": true,
+        "noOwnedCRIProcesses": true
+      }
+    ],
+    "probeNamespaces": "awsrow uses an owned unique namespace and deferred cleanup; no namespaces created during the operation remain"
+  },
+  "remaining": [
+    "Windows worker addition/removal with the OOB survivor observer",
+    "Continuous in-guest probing for tighter sampling intervals",
+    "Fragmented UDP and broader distro/provider/GPU matrix qualification",
+    "Unpromoted Linux empty-peer candidate rollout and validation"
+  ],
+  "artifactSHA256": {
+    "operation.json": "df123c3be7b3893ce70def633a50cb47ff5cd0f0178ec7207db60bace3a42549",
+    "addition/matrix.json": "cc1b70e2c400da6872b29afe0f5756ae1de27a4ebfaf267d027910056925834d",
+    "addition/adoption.json": "63f4291382493a2d73acfd4b4f0693cbacce4046466e023cf4ab7303c8a3f78d",
+    "addition/bindings.json": "6e6f4796d314e8a3f3d59f4577f8eda04d36bd14b604188fbe0254f676fd13be",
+    "removal.json": "aad1c14b3e99123409c8338df6db60a8253a568083f8857024ec6fc4c0c8e33e",
+    "traffic/result.json": "3909421d0d718a6ec1378210e0e00955ff1089f2eb6fe1e56c3b04aa6deabf52",
+    "window.json": "3e37b7edf1acf32b48b565dca7d195e913ec222eaa530136a3e43524cc4b7f51",
+    "addition-exit.json": "e50ef36dc62a69c448011fc5afbce16ffa74208c4fa9b36f83474ce5aa87a0fb",
+    "removal-exit.json": "5909aa30f8a7eef75c6cc9e1173ff6ff5118a4066874f68ad133bd8f1e449aa2"
+  },
+  "replacementQualification": "linux-capi-replacement-results.json"
+}

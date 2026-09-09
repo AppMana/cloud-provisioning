@@ -1,0 +1,168 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Observe",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:Describe*",
+        "ssm:DescribeInstanceInformation",
+        "ssm:GetCommandInvocation",
+        "ssm:ListCommandInvocations"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}"
+        }
+      }
+    },
+    {
+      "Sid": "UseApprovedLaunchResources",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:RunInstances"
+      ],
+      "Resource": [
+        "arn:aws:ec2:${AWS_REGION}::image/${AMI_ID}",
+        "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:subnet/${SUBNET_ID}",
+        "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:security-group/${SECURITY_GROUP_ID}"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTaggedRunner",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:RunInstances"
+      ],
+      "Resource": [
+        "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:instance/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "aws:RequestTag/cloud-provisioning-test": "${RUN_ID}",
+          "ec2:InstanceType": "${RUNNER_INSTANCE_TYPE}"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTaggedRunnerStorageAndNetwork",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:RunInstances"
+      ],
+      "Resource": [
+        "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:volume/*",
+        "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:network-interface/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "aws:RequestTag/cloud-provisioning-test": "${RUN_ID}"
+        }
+      }
+    },
+    {
+      "Sid": "TagNewMachines",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateTags"
+      ],
+      "Resource": [
+        "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:instance/*",
+        "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:volume/*",
+        "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:network-interface/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ec2:CreateAction": "RunInstances",
+          "aws:RequestTag/cloud-provisioning-test": "${RUN_ID}"
+        }
+      }
+    },
+    {
+      "Sid": "TerminateOwnedRunner",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:TerminateInstances"
+      ],
+      "Resource": [
+        "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:instance/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ec2:ResourceTag/cloud-provisioning-test": "${RUN_ID}"
+        }
+      }
+    },
+    {
+      "Sid": "PassWorkerRole",
+      "Effect": "Allow",
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Resource": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${NODE_ROLE_NAME}",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "ec2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "ReadWorkerProfile",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetInstanceProfile"
+      ],
+      "Resource": "arn:aws:iam::${AWS_ACCOUNT_ID}:instance-profile/${INSTANCE_PROFILE_NAME}"
+    },
+    {
+      "Sid": "UseGuestCommandDocuments",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:SendCommand"
+      ],
+      "Resource": [
+        "arn:aws:ssm:${AWS_REGION}::document/AWS-RunShellScript"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}"
+        }
+      }
+    },
+    {
+      "Sid": "RunCommandsOnOwnedInstances",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:SendCommand"
+      ],
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ssm:resourceTag/cloud-provisioning-test": "${RUN_ID}"
+        }
+      }
+    },
+    {
+      "Sid": "TransferRunnerArtifacts",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:AbortMultipartUpload"
+      ],
+      "Resource": "arn:aws:s3:::${ASSET_BUCKET}/runners/${RUN_ID}/*"
+    }
+  ]
+}

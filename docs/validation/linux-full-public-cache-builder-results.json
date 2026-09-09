@@ -1,0 +1,506 @@
+{
+  "observedAt": "2026-09-08T23:19:04.866515+00:00",
+  "scope": "Complete Linux GPU image recipe built by the public helper on a retained unjoined single-NIC AWS CPU VM",
+  "instanceID": "i-001bd2820cad55bec",
+  "instanceType": "t3.large",
+  "recipe": {
+    "schemaVersion": 1,
+    "machineOS": "linux",
+    "architecture": "amd64",
+    "distribution": "k0s",
+    "version": "v1.36.2+k0s.0",
+    "cni": "calico",
+    "gpu": "T4",
+    "workerSHA256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+    "owners": [
+      {
+        "namespace": "gpu-operator",
+        "name": "gpu-feature-discovery",
+        "uid": "0795cbbf-09e2-49fc-a634-e6009cd6a41a"
+      },
+      {
+        "namespace": "gpu-operator",
+        "name": "gpu-operator-node-feature-discovery-worker",
+        "uid": "4acaf2cc-c347-4a99-8eb2-0f3a4bd225e0"
+      },
+      {
+        "namespace": "gpu-operator",
+        "name": "nvidia-container-toolkit-daemonset",
+        "uid": "d3d616a3-e810-4882-9ffd-e6aa1530a541"
+      },
+      {
+        "namespace": "gpu-operator",
+        "name": "nvidia-dcgm-exporter",
+        "uid": "3b80f7b9-8eef-4df1-bf7b-38024eded3c0"
+      },
+      {
+        "namespace": "gpu-operator",
+        "name": "nvidia-device-plugin-daemonset",
+        "uid": "5e52aea7-c47b-41b6-aaab-ccf3b113dd24"
+      },
+      {
+        "namespace": "gpu-operator",
+        "name": "nvidia-operator-validator",
+        "uid": "ffce1a79-0378-4977-adda-54e0ff99e2f1"
+      },
+      {
+        "namespace": "kube-system",
+        "name": "calico-node",
+        "uid": "31c23a91-8da8-4251-b346-af418731b4f4"
+      },
+      {
+        "namespace": "kube-system",
+        "name": "cldt-konnectivity-default-route-linux",
+        "uid": "43c21e55-7d8d-4cb3-aeda-550204d93f44"
+      },
+      {
+        "namespace": "kube-system",
+        "name": "konnectivity-agent",
+        "uid": "544e40a4-e869-4e57-8cdd-39316aa4a176"
+      },
+      {
+        "namespace": "kube-system",
+        "name": "kube-proxy",
+        "uid": "2e830afd-7653-4e46-bdea-027d325c015f"
+      }
+    ],
+    "images": [
+      {
+        "reference": "nvcr.io/nvidia/gpu-operator:v26.3.3",
+        "pullReference": "nvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7",
+        "digest": "sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7",
+        "aliases": [
+          "nvcr.io/nvidia/gpu-operator:v26.3.3",
+          "nvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7"
+        ],
+        "usedBy": [
+          "gpu-operator/gpu-feature-discovery/initContainers/toolkit-validation",
+          "gpu-operator/nvidia-container-toolkit-daemonset/initContainers/driver-validation",
+          "gpu-operator/nvidia-dcgm-exporter/initContainers/toolkit-validation",
+          "gpu-operator/nvidia-device-plugin-daemonset/initContainers/toolkit-validation",
+          "gpu-operator/nvidia-operator-validator/initContainers/driver-validation",
+          "gpu-operator/nvidia-operator-validator/initContainers/toolkit-validation",
+          "gpu-operator/nvidia-operator-validator/initContainers/cuda-validation",
+          "gpu-operator/nvidia-operator-validator/initContainers/plugin-validation",
+          "gpu-operator/nvidia-operator-validator/containers/nvidia-operator-validator"
+        ]
+      },
+      {
+        "reference": "nvcr.io/nvidia/k8s-device-plugin:v0.19.3",
+        "pullReference": "nvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77",
+        "digest": "sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77",
+        "aliases": [
+          "nvcr.io/nvidia/k8s-device-plugin:v0.19.3",
+          "nvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77"
+        ],
+        "usedBy": [
+          "gpu-operator/gpu-feature-discovery/containers/gpu-feature-discovery",
+          "gpu-operator/nvidia-device-plugin-daemonset/containers/nvidia-device-plugin"
+        ]
+      },
+      {
+        "reference": "nvcr.io/nvidia/k8s/container-toolkit:v1.19.1",
+        "pullReference": "nvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c",
+        "digest": "sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c",
+        "aliases": [
+          "nvcr.io/nvidia/k8s/container-toolkit:v1.19.1",
+          "nvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c"
+        ],
+        "usedBy": [
+          "gpu-operator/nvidia-container-toolkit-daemonset/containers/nvidia-container-toolkit-ctr"
+        ]
+      },
+      {
+        "reference": "nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless",
+        "pullReference": "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc",
+        "digest": "sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc",
+        "aliases": [
+          "nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless",
+          "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc"
+        ],
+        "usedBy": [
+          "gpu-operator/nvidia-dcgm-exporter/containers/nvidia-dcgm-exporter"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+        "pullReference": "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+        "digest": "sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+        "aliases": [
+          "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+          "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1"
+        ],
+        "usedBy": [
+          "kube-system/cldt-konnectivity-default-route-linux/containers/konnectivity-agent",
+          "kube-system/konnectivity-agent/containers/konnectivity-agent"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/calico-cni:v3.32.0-0",
+        "pullReference": "quay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9",
+        "digest": "sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9",
+        "aliases": [
+          "quay.io/k0sproject/calico-cni:v3.32.0-0",
+          "quay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9"
+        ],
+        "usedBy": [
+          "kube-system/calico-node/initContainers/install-cni"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/calico-node:v3.32.0-0",
+        "pullReference": "quay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5",
+        "digest": "sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5",
+        "aliases": [
+          "quay.io/k0sproject/calico-node:v3.32.0-0",
+          "quay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5"
+        ],
+        "usedBy": [
+          "kube-system/calico-node/containers/calico-node"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/kube-proxy:v1.36.2",
+        "pullReference": "quay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b",
+        "digest": "sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b",
+        "aliases": [
+          "quay.io/k0sproject/kube-proxy:v1.36.2",
+          "quay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b"
+        ],
+        "usedBy": [
+          "kube-system/kube-proxy/containers/kube-proxy"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/pause:3.10.2-0",
+        "pullReference": "quay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243",
+        "digest": "sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243",
+        "aliases": [
+          "quay.io/k0sproject/pause:3.10.2-0",
+          "quay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243"
+        ],
+        "usedBy": [
+          "k0s sandbox image observed on QEMU worker"
+        ]
+      },
+      {
+        "reference": "registry.k8s.io/nfd/node-feature-discovery:v0.18.3",
+        "pullReference": "registry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862",
+        "digest": "sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862",
+        "aliases": [
+          "registry.k8s.io/nfd/node-feature-discovery:v0.18.3",
+          "registry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862"
+        ],
+        "usedBy": [
+          "gpu-operator/gpu-operator-node-feature-discovery-worker/containers/worker"
+        ]
+      },
+      {
+        "reference": "docker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45",
+        "digest": "sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794",
+        "archive": "remote-dialer.tar",
+        "archiveSHA256": "9c7588c91e8cd8f8714117609823f15cdf4ca2dbb84a02c704f4c1fa3885ef77",
+        "aliases": [
+          "docker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45"
+        ],
+        "usedBy": [
+          "remote worker dialer"
+        ]
+      },
+      {
+        "reference": "docker.io/cloud-provisioning/gpu-probe:linux-v3",
+        "digest": "sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0",
+        "archive": "gpu-probe.tar",
+        "archiveSHA256": "ca8bc23e83b79d31f8f40c11de8d3aceba44c049fbd525194ede1cbf9a665d77",
+        "aliases": [
+          "docker.io/cloud-provisioning/gpu-probe:linux-v3",
+          "docker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0"
+        ],
+        "usedBy": [
+          "first Vulkan/NVENC workload"
+        ]
+      }
+    ],
+    "excluded": [
+      "Windows workloads",
+      "MIG manager: absent from the tested worker",
+      "MPS daemon: absent from the tested worker"
+    ],
+    "qualified": false
+  },
+  "liveProfile": {
+    "at": "2026-09-08T23:13:59.046815+00:00",
+    "allSelectedReferencesCovered": true,
+    "containers": [
+      {
+        "owner": "gpu-feature-discovery",
+        "namespace": "gpu-operator",
+        "kind": "containers",
+        "name": "gpu-feature-discovery",
+        "image": "nvcr.io/nvidia/k8s-device-plugin:v0.19.3"
+      },
+      {
+        "owner": "gpu-feature-discovery",
+        "namespace": "gpu-operator",
+        "kind": "initContainers",
+        "name": "toolkit-validation",
+        "image": "nvcr.io/nvidia/gpu-operator:v26.3.3"
+      },
+      {
+        "owner": "gpu-operator-node-feature-discovery-worker",
+        "namespace": "gpu-operator",
+        "kind": "containers",
+        "name": "worker",
+        "image": "registry.k8s.io/nfd/node-feature-discovery:v0.18.3"
+      },
+      {
+        "owner": "nvidia-container-toolkit-daemonset",
+        "namespace": "gpu-operator",
+        "kind": "containers",
+        "name": "nvidia-container-toolkit-ctr",
+        "image": "nvcr.io/nvidia/k8s/container-toolkit:v1.19.1"
+      },
+      {
+        "owner": "nvidia-container-toolkit-daemonset",
+        "namespace": "gpu-operator",
+        "kind": "initContainers",
+        "name": "driver-validation",
+        "image": "nvcr.io/nvidia/gpu-operator:v26.3.3"
+      },
+      {
+        "owner": "nvidia-dcgm-exporter",
+        "namespace": "gpu-operator",
+        "kind": "containers",
+        "name": "nvidia-dcgm-exporter",
+        "image": "nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless"
+      },
+      {
+        "owner": "nvidia-dcgm-exporter",
+        "namespace": "gpu-operator",
+        "kind": "initContainers",
+        "name": "toolkit-validation",
+        "image": "nvcr.io/nvidia/gpu-operator:v26.3.3"
+      },
+      {
+        "owner": "nvidia-device-plugin-daemonset",
+        "namespace": "gpu-operator",
+        "kind": "containers",
+        "name": "nvidia-device-plugin",
+        "image": "nvcr.io/nvidia/k8s-device-plugin:v0.19.3"
+      },
+      {
+        "owner": "nvidia-device-plugin-daemonset",
+        "namespace": "gpu-operator",
+        "kind": "initContainers",
+        "name": "toolkit-validation",
+        "image": "nvcr.io/nvidia/gpu-operator:v26.3.3"
+      },
+      {
+        "owner": "nvidia-operator-validator",
+        "namespace": "gpu-operator",
+        "kind": "containers",
+        "name": "nvidia-operator-validator",
+        "image": "nvcr.io/nvidia/gpu-operator:v26.3.3"
+      },
+      {
+        "owner": "nvidia-operator-validator",
+        "namespace": "gpu-operator",
+        "kind": "initContainers",
+        "name": "driver-validation",
+        "image": "nvcr.io/nvidia/gpu-operator:v26.3.3"
+      },
+      {
+        "owner": "nvidia-operator-validator",
+        "namespace": "gpu-operator",
+        "kind": "initContainers",
+        "name": "toolkit-validation",
+        "image": "nvcr.io/nvidia/gpu-operator:v26.3.3"
+      },
+      {
+        "owner": "nvidia-operator-validator",
+        "namespace": "gpu-operator",
+        "kind": "initContainers",
+        "name": "cuda-validation",
+        "image": "nvcr.io/nvidia/gpu-operator:v26.3.3"
+      },
+      {
+        "owner": "nvidia-operator-validator",
+        "namespace": "gpu-operator",
+        "kind": "initContainers",
+        "name": "plugin-validation",
+        "image": "nvcr.io/nvidia/gpu-operator:v26.3.3"
+      },
+      {
+        "owner": "calico-node",
+        "namespace": "kube-system",
+        "kind": "containers",
+        "name": "calico-node",
+        "image": "quay.io/k0sproject/calico-node:v3.32.0-0"
+      },
+      {
+        "owner": "calico-node",
+        "namespace": "kube-system",
+        "kind": "initContainers",
+        "name": "install-cni",
+        "image": "quay.io/k0sproject/calico-cni:v3.32.0-0"
+      },
+      {
+        "owner": "cldt-konnectivity-default-route-linux",
+        "namespace": "kube-system",
+        "kind": "containers",
+        "name": "konnectivity-agent",
+        "image": "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0"
+      },
+      {
+        "owner": "konnectivity-agent",
+        "namespace": "kube-system",
+        "kind": "containers",
+        "name": "konnectivity-agent",
+        "image": "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0"
+      },
+      {
+        "owner": "kube-proxy",
+        "namespace": "kube-system",
+        "kind": "containers",
+        "name": "kube-proxy",
+        "image": "quay.io/k0sproject/kube-proxy:v1.36.2"
+      }
+    ]
+  },
+  "nativeResult": {
+    "recipeSHA256": "e70fe12c2eea3dbed7b6808f82a0110b169e0e49281f9b3869b632b61ff0deea",
+    "cacheRoot": "/var/tmp/cldt-full-cache-build-v1/cache",
+    "references": 23,
+    "originalRuntimeProcessesExited": true,
+    "readyBeforeAndAfterRestart": true,
+    "qualificationEligible": false,
+    "scope": "Builder cache; independent verification and fresh-clone validation required"
+  },
+  "independentValidation": {
+    "passed": true,
+    "phases": {
+      "before": {
+        "inventoryMatches": true,
+        "digestsMatch": true,
+        "contentComplete": true,
+        "unpacked": true,
+        "quietAgrees": true
+      },
+      "after": {
+        "inventoryMatches": true,
+        "digestsMatch": true,
+        "contentComplete": true,
+        "unpacked": true,
+        "quietAgrees": true
+      }
+    },
+    "checks": {
+      "originalRuntimesStopped": true,
+      "temporaryStateRemoved": true
+    },
+    "references": 23,
+    "qualificationEligible": false,
+    "scope": "Builder cache only; capture and fresh-clone startup remain separate gates"
+  },
+  "originalCacheAcceptance": {
+    "passed": true,
+    "phases": {
+      "before": {
+        "inventoryMatches": true,
+        "digestsMatch": true,
+        "contentComplete": true,
+        "unpacked": true,
+        "quietAgrees": true
+      },
+      "after": {
+        "inventoryMatches": true,
+        "digestsMatch": true,
+        "contentComplete": true,
+        "unpacked": true,
+        "quietAgrees": true
+      }
+    },
+    "checks": {
+      "originalRuntimesStopped": true,
+      "temporaryStateRemoved": true
+    },
+    "references": 23,
+    "qualificationEligible": false,
+    "scope": "Builder cache only; capture and fresh-clone startup remain separate gates"
+  },
+  "audit": {
+    "noRuntimeProcesses": true,
+    "scriptSHA256": "401095af8087d7c5b3f47ffbc9f70e0962859f67b7ee2eebdb556127ca7c0b5b",
+    "runtimeReceiptSHA256": "4232059dc2b20912d4987231e9a975ea035c573feee9c8586538e937e8a56868",
+    "evidenceArchiveSHA256": "c633f579c37e48f2216ec5ebfadca68508542eaea51a2b4fd876b3bc7250bf78",
+    "bytes": 64942
+  },
+  "cleanup": {
+    "ownedScratchRemoved": true,
+    "noRuntimeProcesses": true,
+    "originalCacheStillPresent": true
+  },
+  "builderRestored": {
+    "instanceID": "i-001bd2820cad55bec",
+    "state": "stopped",
+    "at": "2026-09-08T23:19:04.538976+00:00"
+  },
+  "baseline": {
+    "nodes": 13,
+    "allReady": true,
+    "identitiesStable": true
+  },
+  "qualificationEligible": false,
+  "validation": {
+    "regressionTests": 8,
+    "passed": true,
+    "fixture": "harness/e2e/observe/testdata/linux-public-full-cache-native.json",
+    "validatorStatementCoverage": {
+      "covered_lines": 56,
+      "num_statements": 70,
+      "percent_covered": 80.0,
+      "percent_covered_display": "80",
+      "missing_lines": 14,
+      "excluded_lines": 0
+    },
+    "nativeBuilderStatementCoverage": {
+      "covered_lines": 151,
+      "num_statements": 154,
+      "percent_covered": 98.05194805194805,
+      "percent_covered_display": "98",
+      "missing_lines": 3,
+      "excluded_lines": 0
+    },
+    "nativeCoverageMethod": "Standard-library trace in the original build process, mapped to identical source SHA256; selected Python statements only"
+  },
+  "findings": [
+    "All twelve image inputs and twenty-three declared references are complete and unpacked across a containerd restart.",
+    "Ten digest-pinned registry inputs and two hash-verified local OCI archives exercise both construction paths in the same fresh build.",
+    "The recipe covers all nineteen selected live DaemonSet container and init-container references, plus the distribution sandbox image, remote dialer and first GPU workload.",
+    "An independent check reopened the original retained cache twice and verified all twenty-three references. The original runtime receipt hash is unchanged.",
+    "All original temporary runtime processes are terminal; owned scratch data and staged archives were removed and the retained builder returned to stopped state."
+  ],
+  "limitations": [
+    "The full fresh build uses a separate scratch store, not the default k0s runtime root in a newly captured image.",
+    "This CPU builder validates image preparation, not GPU hardware, licensing, GPU allocation, fresh-clone cache reuse or startup cost.",
+    "No AMI was captured or promoted, and no CAPI worker lifecycle operation was performed.",
+    "Windows UDP failures, other distribution matrices and full GPU replacement/isolation qualification remain open.",
+    "Native helper statement coverage and selected validator unit coverage are separate from whole-repository and CAPI runtime coverage."
+  ],
+  "sourceSHA256": {
+    "../../images/linux/prepare_cache.py": "401095af8087d7c5b3f47ffbc9f70e0962859f67b7ee2eebdb556127ca7c0b5b",
+    "observe/linux_cache.py": "76276b38851278dc8597fe820cdae6a52cfe8aaf9b703f70734a61f51d1aba8a",
+    "observe/linux_cache_native.py": "c74fa97d0000c1c1bf469af40ed5bbe651de6c0ac8cdf0cafeaecd90b5b1d440",
+    "observe/test_linux_cache.py": "7e5d38227207a016c3cf3d069a1fd2e22d249dd766162a4f8a888bc90f54ab6d",
+    "observe/testdata/linux-public-full-cache-native.json": "c734b07d0e423ad4b41ba5ee88b019b9039d63ff1b33f27ebb6d7e62da21335f"
+  },
+  "evidenceSHA256": {
+    "live-image-profile.json": "d963afe659ccda21bb97dadf6910589b5e76dd581657abe86e2273b84a2241a2",
+    "native-result.json": "878aefb6b8058800a73bdd8c3f9722a15b73396c4d7586f75dbc8bd1f4ced3cd",
+    "independent-validation.json": "a48f7433bb4033bdbd42d9b2328b27ec079af14e7841d1eeac0010c568d1e39b",
+    "original-cache-acceptance.json": "a48f7433bb4033bdbd42d9b2328b27ec079af14e7841d1eeac0010c568d1e39b",
+    "native-operations.tar.gz": "c633f579c37e48f2216ec5ebfadca68508542eaea51a2b4fd876b3bc7250bf78",
+    "final-audit.json": "73cbbc7af82c4ec65b9b38d46d8264d5c1430316d0b96576738577fe9776a320",
+    "guest-cleanup.json": "6cca6535484c1440d31d8c15a9c909e3be907399538ed4328aed56cfc0277c58"
+  }
+}

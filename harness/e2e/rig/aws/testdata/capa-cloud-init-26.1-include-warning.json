@@ -1,0 +1,38 @@
+{
+  "status": "done",
+  "extended_status": "degraded done",
+  "errors": [],
+  "recoverable_errors": {
+    "WARNING": [
+      "[Errno 2] No such file or directory: '/etc/secret-userdata.txt' for url: file:///etc/secret-userdata.txt"
+    ]
+  },
+  "init-local": {
+    "errors": [],
+    "finished": 27.74,
+    "recoverable_errors": {},
+    "start": 24.04
+  },
+  "init": {
+    "errors": [],
+    "finished": 44.36,
+    "recoverable_errors": {
+      "WARNING": [
+        "[Errno 2] No such file or directory: '/etc/secret-userdata.txt' for url: file:///etc/secret-userdata.txt"
+      ]
+    },
+    "start": 41.52
+  },
+  "modules-config": {
+    "errors": [],
+    "finished": 46.36,
+    "recoverable_errors": {},
+    "start": 45.48
+  },
+  "modules-final": {
+    "errors": [],
+    "finished": 249.08,
+    "recoverable_errors": {},
+    "start": 50.97
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "scope": "Native Windows 2022 gateway API ingress diagnosis, conditional Ready observation and clean controller withdrawal; not full packet/lifecycle qualification",
+  "observedAt": "2026-09-07T09:18:28.046134+00:00",
+  "windowsVersion": "2022",
+  "preparedRoutes": 7,
+  "preparedIngressRules": 8,
+  "reached": "Ready while temporary TCP ingress was present",
+  "finding": "Gateway ingress needed TCP API traffic from the native worker address in addition to UDP CNI traffic",
+  "recovery": "Controller withdrew projection and CNI ownership, all consumers acknowledged, and AWS resources returned to baseline without manual route repair",
+  "routesMatchBaseline": true,
+  "ingressMatchesBaseline": true,
+  "sourceDestCheckRestored": true,
+  "phase": "Complete",
+  "activeProjectionAbsent": true,
+  "nativeCNIOwnershipAbsent": true,
+  "nodesReady": 10,
+  "fix": "Managed ingress now supports protocol-separated TCP/UDP leases; runtime adds worker /32 TCP permission for the configured API port",
+  "fixDeployed": false,
+  "apiBackends": [
+    {
+      "exitCode": 0,
+      "code": "401",
+      "address": "10.10.0.10"
+    },
+    {
+      "exitCode": 0,
+      "code": "401",
+      "address": "10.10.0.13"
+    },
+    {
+      "exitCode": 0,
+      "code": "401",
+      "address": "10.10.0.14"
+    }
+  ],
+  "packetPathBothDirections": true,
+  "temporaryRuleRemoved": true,
+  "controllerImage": "cldt/controller-windows:v7",
+  "remaining": [
+    "Deploy managed TCP API ingress implementation",
+    "Repeat two-worker packet matrix and gateway failover",
+    "CAPI removal/replacement and fresh image boots",
+    "Broader distro/GPU/image workstream"
+  ]
+}

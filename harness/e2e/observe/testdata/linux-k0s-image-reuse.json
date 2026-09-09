@@ -1,0 +1,41 @@
+{
+  "candidate": {
+    "candidateAMIID": "ami-03d6fada2ec266b4f",
+    "preparation": {
+      "schemaVersion": 1,
+      "version": "v1.36.2+k0s.0",
+      "sha256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+      "executable": "/usr/local/bin/k0s",
+      "scope": "Executable only; no runtime or workload cache",
+      "preparedAt": "2026-09-08T18:41:02.701626+00:00"
+    }
+  },
+  "binding": {
+    "machine": "aws-linux-k0s-baked-v1",
+    "machineUID": "8faceb4b-0907-4968-8987-494a107ddf33",
+    "node": "ip-172-29-0-90",
+    "nodeUID": "c44d66f3-c65e-41fe-af15-ee3c047b0f1b",
+    "instanceID": "i-01a2e608391e4b2c9",
+    "imageID": "ami-03d6fada2ec266b4f",
+    "eniCount": 1,
+    "launchTime": "2026-09-08T18:53:34+00:00",
+    "nodeReady": true
+  },
+  "observation": {
+    "receipt": {
+      "schemaVersion": 1,
+      "version": "v1.36.2+k0s.0",
+      "sha256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+      "executable": "/usr/local/bin/k0s",
+      "scope": "Executable only; no runtime or workload cache",
+      "preparedAt": "2026-09-08T18:41:02.701626+00:00"
+    },
+    "sha256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+    "mtime": 1788892860.6245635,
+    "version": "v1.36.2+k0s.0",
+    "containerd": "Client:\n  Version:  2.3.2\n  Revision: fff62f14765df376e5fc36f5a8f8e795b5670f61\n  Go version: go1.26.4\n\nServer:\n  Version:  2.3.2\n  Revision: fff62f14765df376e5fc36f5a8f8e795b5670f61\n  UUID: 9d473b77-382d-4151-883d-135fb4a42e72\n",
+    "physicalNICs": [
+      "ens5"
+    ]
+  }
+}

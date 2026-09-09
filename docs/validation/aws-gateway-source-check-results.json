@@ -1,0 +1,80 @@
+{
+  "scope": "Shared EC2 gateway source/destination-check leases for live Windows Server 2022 and 2025 CAPI identities; no CNI publication or VM removal qualification",
+  "native": {
+    "allObservedEniAttributesRestored": true,
+    "cleanupErrors": null,
+    "expectedModificationSequence": true,
+    "finishedAt": "2026-09-07T07:19:02.490613684Z",
+    "firstLeaseReleasePreservedForwardingSetting": true,
+    "modifications": [
+      false,
+      true
+    ],
+    "original": true,
+    "scope": "Real EC2 source/destination-check sharing for two CAPI worker leases; no route, CNI or VM removal claim",
+    "startedAt": "2026-09-07T07:18:50.927687583Z",
+    "target": {
+      "interfaceID": "eni-00401d5aafd52f51c",
+      "instanceID": "i-0c31429bc71403d5b"
+    }
+  },
+  "journalAfterCleanup": {
+    "phase": "Restored",
+    "leaseCount": 0
+  },
+  "iamDryRun": {
+    "disable": "allowed",
+    "restore": "allowed",
+    "description": "denied"
+  },
+  "tests": {
+    "unitAndIsolatedAPI": "passed",
+    "isolatedAPIVersion": "1.35.0",
+    "cases": [
+      "first lease retains forwarding; final lease restores original setting",
+      "pre-existing disabled setting preserved",
+      "journal persists original value before mutation",
+      "lost API responses resolved by read-back",
+      "restart after cloud mutation before journal commit",
+      "drift repair preserves original baseline",
+      "deleted ENI retirement and reassignment rejection",
+      "real API deletion finalizer retained through shared lease release"
+    ]
+  },
+  "coverage": {
+    "awsPackageUnitAndAPI": {
+      "coveredStatements": 295,
+      "totalStatements": 376,
+      "percent": 78.5
+    },
+    "sourceCheckUnitAndAPI": {
+      "coveredStatements": 97,
+      "totalStatements": 122,
+      "percent": 79.5
+    },
+    "awsPackageNative": {
+      "coveredStatements": 87,
+      "totalStatements": 376,
+      "percent": 23.1
+    },
+    "sourceCheckNative": {
+      "coveredStatements": 87,
+      "totalStatements": 122,
+      "percent": 71.3
+    },
+    "note": "Native test uses a private file journal; ConfigMap journal coverage comes from isolated Kubernetes API tests."
+  },
+  "sourceSHA256": {
+    "controller/pkg/attachment/aws/source_check.go": "8980c21d1c2773f79b25c5d30dcdbeb8b977f8f7d4010d7e9fc7c586d0c55a38",
+    "controller/pkg/attachment/aws/check_journal.go": "be835cff5dde45fc72a4561fb7da040e441489ddf3fbe0884972e2c1f97dc33a",
+    "controller/pkg/attachment/aws/source_check_test.go": "eb545a529271823fd758911051f2a30958861a0cfa9506541125b7dba5b1388c",
+    "controller/pkg/attachment/aws/check_journal_envtest_test.go": "e94c3f61438ffffb87cab82be1c4bb563268b57aa926c0378f262253f92dcda5",
+    "docs/iam/gateway-source-check.json": "9ce1dc376622af94212471c18a9ebee97fc652175c8dc3c3cee9e30012d64c5b"
+  },
+  "remaining": [
+    "Security-group rule ownership",
+    "Composed forwarding and consumer publication adapters",
+    "Elected controller registration",
+    "CAPI gateway/worker deletion and replacement matrix"
+  ]
+}

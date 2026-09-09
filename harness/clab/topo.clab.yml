@@ -32,14 +32,21 @@
 # segment addresses only.
 name: cldt
 
-mgmt:
-  network: cldt-mgmt
-  ipv4-subnet: 172.30.30.0/24
-
 topology:
   kinds:
     linux:
       image: kindest/node:v1.34.0
+      # No management network. containerlab attaches every node to one by
+      # default, which joins the site and both clouds on a single L2: a
+      # remote then reaches the control plane whatever the routers say,
+      # and the isolation this topology exists to model is not real. It
+      # also hands each node a second address to register, which a real
+      # instance does not have, so kubelet chose the wrong one.
+      #
+      # A node here has the interfaces its segments give it and nothing
+      # else. The harness drives them with docker exec, which needs no
+      # address at all.
+      network-mode: none
 
   nodes:
     cldt-lan:
@@ -60,24 +67,72 @@ topology:
     edge-b:
       kind: linux
 
-    # The cluster, all of it, at the site.
+    # How the site is reached and provisioned, and the only thing that
+    # reaches it. An operator's jump host on the office network: it
+    # holds the kubeconfig, runs kubectl, and once the nodes are VMs it
+    # is what carries a serial or ssh session to a machine whose single
+    # NIC is on a network nothing outside can address. Modelling it is
+    # closer to how the site gets built than reaching in from the host.
+    bastion:
+      kind: linux
+
+    # The cluster, all of it, at the site. Three control planes,
+    # because two is worse than one: stacked etcd needs a majority, and
+    # a majority of two is two, so either death halts the cluster. With
+    # three, any single node may die and the cluster keeps its quorum,
+    # which is what the outage rows exist to prove.
     cp:
       kind: linux
+      binds:
+        - var/cp:/var/lib/containerd
+        - var-k0s/cp:/var/lib/k0s
+        - var-rancher/cp:/var/lib/rancher
+    cp2:
+      kind: linux
+      binds:
+        - var/cp2:/var/lib/containerd
+        - var-k0s/cp2:/var/lib/k0s
+        - var-rancher/cp2:/var/lib/rancher
+    cp3:
+      kind: linux
+      binds:
+        - var/cp3:/var/lib/containerd
+        - var-k0s/cp3:/var/lib/k0s
+        - var-rancher/cp3:/var/lib/rancher
     w1:
       kind: linux
+      binds:
+        - var/w1:/var/lib/containerd
+        - var-k0s/w1:/var/lib/k0s
+        - var-rancher/w1:/var/lib/rancher
     w2:
       kind: linux
+      binds:
+        - var/w2:/var/lib/containerd
+        - var-k0s/w2:/var/lib/k0s
+        - var-rancher/w2:/var/lib/rancher
 
     # One node in each cloud, so that they are in different clouds.
     remote1:
       kind: linux
+      binds:
+        - var/remote1:/var/lib/containerd
+        - var-k0s/remote1:/var/lib/k0s
+        - var-rancher/remote1:/var/lib/rancher
     remote2:
       kind: linux
+      binds:
+        - var/remote2:/var/lib/containerd
+        - var-k0s/remote2:/var/lib/k0s
+        - var-rancher/remote2:/var/lib/rancher
 
   links:
     # the site
     - endpoints: ["router:eth1", "cldt-lan:lan-router"]
+    - endpoints: ["bastion:eth1", "cldt-lan:lan-bastion"]
     - endpoints: ["cp:eth1", "cldt-lan:lan-cp"]
+    - endpoints: ["cp2:eth1", "cldt-lan:lan-cp2"]
+    - endpoints: ["cp3:eth1", "cldt-lan:lan-cp3"]
     - endpoints: ["w1:eth1", "cldt-lan:lan-w1"]
     - endpoints: ["w2:eth1", "cldt-lan:lan-w2"]
 

@@ -1,0 +1,82 @@
+{
+  "scope": "Gateway feasibility on real single-NIC CAPI VMs with native Calico VXLAN: small ordinary-pod HTTP echo both directions only. Endpoint-controller reconciliation was temporarily paused; network changes were experimental and restored. Not integrated gateway support or release qualification.",
+  "observedAt": "2026-09-07T06:02:57.072223+00:00",
+  "gateway": {
+    "instanceID": "i-0c31429bc71403d5b",
+    "machine": "aws-relay1",
+    "node": "ip-172-29-0-9",
+    "privateIP": "172.29.0.9",
+    "instanceType": "t3.small",
+    "k0sVersion": "v1.36.2+k0s.0",
+    "containerdVersion": "2.3.2"
+  },
+  "siteTransportAddresses": [
+    "10.10.0.11",
+    "10.100.0.1"
+  ],
+  "networkChanges": [
+    "Preserve Windows Ethernet/HNS CNI address",
+    "Route Windows private /32 through gateway WireGuard peer",
+    "Disable EC2 source/destination check on relay during forwarding",
+    "VPC return /32 routes for both observed site transport addresses",
+    "Scoped private UDP 4789 ingress",
+    "Temporarily remove matching Windows host tunnel routes"
+  ],
+  "results": [
+    {
+      "windowsVersion": "2022",
+      "observedAt": "2026-09-07T05:53:21.912507+00:00",
+      "checks": [
+        {
+          "direction": "linux-to-windows",
+          "ok": true,
+          "exitCode": 0,
+          "detail": "ok"
+        },
+        {
+          "direction": "windows-to-linux",
+          "ok": true,
+          "exitCode": 0,
+          "detail": "ok"
+        }
+      ],
+      "restored": true,
+      "relayCaptureSHA256": "35a7024191fd179344d9866dfc842e2249df9dd6e05109667a3f81a6763154d1"
+    },
+    {
+      "windowsVersion": "2025",
+      "observedAt": "2026-09-07T05:57:47.680871+00:00",
+      "checks": [
+        {
+          "direction": "linux-to-windows",
+          "ok": true,
+          "exitCode": 0,
+          "detail": "ok"
+        },
+        {
+          "direction": "windows-to-linux",
+          "ok": true,
+          "exitCode": 0,
+          "detail": "ok"
+        }
+      ],
+      "restored": true,
+      "relayCaptureSHA256": "756553ad693249cdc1d82e060b53ee25927cb0c87b34a3e756649910ded0caad"
+    }
+  ],
+  "awsRestoration": {
+    "observedAt": "2026-09-07T06:00:10.876464+00:00",
+    "checks": {
+      "temporaryReturnRoutesAbsent": true,
+      "originalSecurityGroupRestored": true,
+      "sourceDestCheckRestored": true
+    }
+  },
+  "remaining": [
+    "Integrated network attachment model and provider route ownership",
+    "Continuous controller reconciliation",
+    "Services, DNS, large transfers and NetworkPolicy",
+    "Gateway and worker removal/replacement/failover",
+    "Fresh Windows boots through final topology"
+  ]
+}

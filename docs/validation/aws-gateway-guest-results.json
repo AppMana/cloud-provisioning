@@ -1,0 +1,227 @@
+{
+  "observedAt": "2026-09-07T07:45:30.752508259Z",
+  "results": [
+    {
+      "binding": {
+        "lease": "resolver-validation-2022/read-only/observation",
+        "scope": {
+          "Account": "270666084746",
+          "Region": "us-west-2",
+          "VPCID": "vpc-08bba2b9e5f0ffd46",
+          "SubnetID": "subnet-04b17e2d6751fde09",
+          "RouteTableID": "rtb-056f82e7d734e4d21",
+          "OwnerTag": "cloud-provisioning-test",
+          "OwnerValue": "cldt-windows-v2"
+        },
+        "gateway": {
+          "interfaceID": "eni-00401d5aafd52f51c",
+          "instanceID": "i-0c31429bc71403d5b"
+        },
+        "routes": [
+          {
+            "destination": "10.10.0.10/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          },
+          {
+            "destination": "10.10.0.11/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          },
+          {
+            "destination": "10.10.0.12/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          },
+          {
+            "destination": "10.10.0.13/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          },
+          {
+            "destination": "10.10.0.14/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          },
+          {
+            "destination": "10.100.0.1/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          },
+          {
+            "destination": "10.100.0.2/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          }
+        ],
+        "ingress": [
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.10.0.10/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.10.0.11/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.10.0.12/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.10.0.13/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.10.0.14/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.100.0.1/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.100.0.2/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "172.29.0.21/32",
+            "port": 4789
+          }
+        ]
+      },
+      "guestForwardingReady": true,
+      "windowsVersion": "2022"
+    },
+    {
+      "binding": {
+        "lease": "resolver-validation-2025/read-only/observation",
+        "scope": {
+          "Account": "270666084746",
+          "Region": "us-west-2",
+          "VPCID": "vpc-08bba2b9e5f0ffd46",
+          "SubnetID": "subnet-04b17e2d6751fde09",
+          "RouteTableID": "rtb-056f82e7d734e4d21",
+          "OwnerTag": "cloud-provisioning-test",
+          "OwnerValue": "cldt-windows-v2"
+        },
+        "gateway": {
+          "interfaceID": "eni-00401d5aafd52f51c",
+          "instanceID": "i-0c31429bc71403d5b"
+        },
+        "routes": [
+          {
+            "destination": "10.10.0.10/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          },
+          {
+            "destination": "10.10.0.11/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          },
+          {
+            "destination": "10.10.0.12/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          },
+          {
+            "destination": "10.10.0.13/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          },
+          {
+            "destination": "10.10.0.14/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          },
+          {
+            "destination": "10.100.0.1/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          },
+          {
+            "destination": "10.100.0.2/32",
+            "interfaceID": "eni-00401d5aafd52f51c",
+            "instanceID": "i-0c31429bc71403d5b"
+          }
+        ],
+        "ingress": [
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.10.0.10/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.10.0.11/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.10.0.12/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.10.0.13/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.10.0.14/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.100.0.1/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "10.100.0.2/32",
+            "port": 4789
+          },
+          {
+            "groupID": "sg-079cc1ad238659c86",
+            "source": "172.29.0.13/32",
+            "port": 4789
+          }
+        ]
+      },
+      "guestForwardingReady": true,
+      "windowsVersion": "2025"
+    }
+  ],
+  "scope": "Read-only live CAPI/EC2 resolution plus native Linux forwarding and route lookups for both Windows workers; no packet or CAPI removal qualification",
+  "coverage": {
+    "guestNativeStatements": {
+      "covered": 15,
+      "total": 26,
+      "percent": 57.7
+    },
+    "awsPackageUnitAndAPIStatementsPercent": 78.0
+  },
+  "sourceSHA256": {
+    "controller/pkg/attachment/aws/linux_guest.go": "b0b75ea2a82a9433b7b27ea41bdaefaedab182c060d8442c71fcd5c374521a1e"
+  },
+  "blame": {
+    "existingTransitMasquerade": [
+      "3ac724cc",
+      "ff1b9b4a"
+    ],
+    "conclusion": "Existing masquerade capability is separate; observation requires no new guest mutations."
+  },
+  "remaining": [
+    "Consumer publication and controller registration",
+    "Combined forwarding and packet matrix",
+    "CAPI removal and replacement"
+  ]
+}

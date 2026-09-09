@@ -1,0 +1,786 @@
+{
+  "observedAt": "2026-09-07T13:30:16.748304+00:00",
+  "tcp": {
+    "observedAt": "2026-09-07T13:28:05.162266+00:00",
+    "scope": "18 ordinary-pod TCP HTTP echoes: 1 KiB, 16 KiB and 1 MiB; exact expected body hashes including the Windows PowerShell terminal CRLF",
+    "results": [
+      {
+        "pod": "net-aws-win2022-v3",
+        "podUID": "a8570b76-b69a-40e2-922b-3c9fe40e0408",
+        "node": "aws-win2022-v3",
+        "podIP": "10.244.114.4",
+        "checks": [
+          {
+            "expectedSHA256": "ef73724e83b986a57db36f8f15fe9188e6303a2dda9e5fe24682bbba69d85602",
+            "exitCode": 0,
+            "payloadBytes": 1024,
+            "expectedBytes": 1026,
+            "ok": true,
+            "receivedSHA256": "ef73724e83b986a57db36f8f15fe9188e6303a2dda9e5fe24682bbba69d85602",
+            "receivedBytes": 1026,
+            "protocol": "tcp",
+            "to": "net-aws-win2025-v3"
+          },
+          {
+            "expectedSHA256": "e8982e823dcb4cd9d01fd11eb6624ff2ce4675a655d4d4ed312880947cb818b4",
+            "exitCode": 0,
+            "payloadBytes": 16384,
+            "expectedBytes": 16386,
+            "ok": true,
+            "receivedSHA256": "e8982e823dcb4cd9d01fd11eb6624ff2ce4675a655d4d4ed312880947cb818b4",
+            "receivedBytes": 16386,
+            "protocol": "tcp",
+            "to": "net-aws-win2025-v3"
+          },
+          {
+            "expectedSHA256": "c5e610dd6950af5923ecde5163b6c46194cda5c403127682ff7b09bcdefae719",
+            "exitCode": 0,
+            "payloadBytes": 1048576,
+            "expectedBytes": 1048578,
+            "ok": true,
+            "receivedSHA256": "c5e610dd6950af5923ecde5163b6c46194cda5c403127682ff7b09bcdefae719",
+            "receivedBytes": 1048578,
+            "protocol": "tcp",
+            "to": "net-aws-win2025-v3"
+          },
+          {
+            "expectedSHA256": "ef73724e83b986a57db36f8f15fe9188e6303a2dda9e5fe24682bbba69d85602",
+            "exitCode": 0,
+            "payloadBytes": 1024,
+            "expectedBytes": 1026,
+            "ok": true,
+            "receivedSHA256": "ef73724e83b986a57db36f8f15fe9188e6303a2dda9e5fe24682bbba69d85602",
+            "receivedBytes": 1026,
+            "protocol": "tcp",
+            "to": "net-w1"
+          },
+          {
+            "expectedSHA256": "e8982e823dcb4cd9d01fd11eb6624ff2ce4675a655d4d4ed312880947cb818b4",
+            "exitCode": 0,
+            "payloadBytes": 16384,
+            "expectedBytes": 16386,
+            "ok": true,
+            "receivedSHA256": "e8982e823dcb4cd9d01fd11eb6624ff2ce4675a655d4d4ed312880947cb818b4",
+            "receivedBytes": 16386,
+            "protocol": "tcp",
+            "to": "net-w1"
+          },
+          {
+            "expectedSHA256": "c5e610dd6950af5923ecde5163b6c46194cda5c403127682ff7b09bcdefae719",
+            "exitCode": 0,
+            "payloadBytes": 1048576,
+            "expectedBytes": 1048578,
+            "ok": true,
+            "receivedSHA256": "c5e610dd6950af5923ecde5163b6c46194cda5c403127682ff7b09bcdefae719",
+            "receivedBytes": 1048578,
+            "protocol": "tcp",
+            "to": "net-w1"
+          }
+        ],
+        "transport": "SSM/CRI; Windows PowerShell observed body includes one CRLF"
+      },
+      {
+        "pod": "net-aws-win2025-v3",
+        "podUID": "ce8b457c-a013-4622-b0cb-408c091753a5",
+        "node": "aws-win2025-v3",
+        "podIP": "10.244.42.4",
+        "checks": [
+          {
+            "expectedSHA256": "ef73724e83b986a57db36f8f15fe9188e6303a2dda9e5fe24682bbba69d85602",
+            "exitCode": 0,
+            "payloadBytes": 1024,
+            "expectedBytes": 1026,
+            "ok": true,
+            "receivedSHA256": "ef73724e83b986a57db36f8f15fe9188e6303a2dda9e5fe24682bbba69d85602",
+            "receivedBytes": 1026,
+            "protocol": "tcp",
+            "to": "net-aws-win2022-v3"
+          },
+          {
+            "expectedSHA256": "e8982e823dcb4cd9d01fd11eb6624ff2ce4675a655d4d4ed312880947cb818b4",
+            "exitCode": 0,
+            "payloadBytes": 16384,
+            "expectedBytes": 16386,
+            "ok": true,
+            "receivedSHA256": "e8982e823dcb4cd9d01fd11eb6624ff2ce4675a655d4d4ed312880947cb818b4",
+            "receivedBytes": 16386,
+            "protocol": "tcp",
+            "to": "net-aws-win2022-v3"
+          },
+          {
+            "expectedSHA256": "c5e610dd6950af5923ecde5163b6c46194cda5c403127682ff7b09bcdefae719",
+            "exitCode": 0,
+            "payloadBytes": 1048576,
+            "expectedBytes": 1048578,
+            "ok": true,
+            "receivedSHA256": "c5e610dd6950af5923ecde5163b6c46194cda5c403127682ff7b09bcdefae719",
+            "receivedBytes": 1048578,
+            "protocol": "tcp",
+            "to": "net-aws-win2022-v3"
+          },
+          {
+            "expectedSHA256": "ef73724e83b986a57db36f8f15fe9188e6303a2dda9e5fe24682bbba69d85602",
+            "exitCode": 0,
+            "payloadBytes": 1024,
+            "expectedBytes": 1026,
+            "ok": true,
+            "receivedSHA256": "ef73724e83b986a57db36f8f15fe9188e6303a2dda9e5fe24682bbba69d85602",
+            "receivedBytes": 1026,
+            "protocol": "tcp",
+            "to": "net-w1"
+          },
+          {
+            "expectedSHA256": "e8982e823dcb4cd9d01fd11eb6624ff2ce4675a655d4d4ed312880947cb818b4",
+            "exitCode": 0,
+            "payloadBytes": 16384,
+            "expectedBytes": 16386,
+            "ok": true,
+            "receivedSHA256": "e8982e823dcb4cd9d01fd11eb6624ff2ce4675a655d4d4ed312880947cb818b4",
+            "receivedBytes": 16386,
+            "protocol": "tcp",
+            "to": "net-w1"
+          },
+          {
+            "expectedSHA256": "c5e610dd6950af5923ecde5163b6c46194cda5c403127682ff7b09bcdefae719",
+            "exitCode": 0,
+            "payloadBytes": 1048576,
+            "expectedBytes": 1048578,
+            "ok": true,
+            "receivedSHA256": "c5e610dd6950af5923ecde5163b6c46194cda5c403127682ff7b09bcdefae719",
+            "receivedBytes": 1048578,
+            "protocol": "tcp",
+            "to": "net-w1"
+          }
+        ],
+        "transport": "SSM/CRI; Windows PowerShell observed body includes one CRLF"
+      },
+      {
+        "pod": "net-w1",
+        "podUID": "5982bf45-2e0e-40c4-bd40-4b407742dc66",
+        "node": "w1",
+        "podIP": "10.244.190.81",
+        "checks": [
+          {
+            "protocol": "tcp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 1024,
+            "receivedBytes": 1024,
+            "expectedSHA256": "49abd65bbf7f7e40c7055093ed2e3fd75f2f602f2c5fcf955c213e3135eb03f7",
+            "receivedSHA256": "49abd65bbf7f7e40c7055093ed2e3fd75f2f602f2c5fcf955c213e3135eb03f7",
+            "ok": true,
+            "exitCode": 0
+          },
+          {
+            "protocol": "tcp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 16384,
+            "receivedBytes": 16384,
+            "expectedSHA256": "1536c422c31cc98834759d7085cda394a3510a03d78188248986a6b1a7207d03",
+            "receivedSHA256": "1536c422c31cc98834759d7085cda394a3510a03d78188248986a6b1a7207d03",
+            "ok": true,
+            "exitCode": 0
+          },
+          {
+            "protocol": "tcp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 1048576,
+            "receivedBytes": 1048576,
+            "expectedSHA256": "8f990ba0b577b51cf009ea049368c16bbda1b21e1b93be07a824758bb253c39b",
+            "receivedSHA256": "8f990ba0b577b51cf009ea049368c16bbda1b21e1b93be07a824758bb253c39b",
+            "ok": true,
+            "exitCode": 0
+          },
+          {
+            "protocol": "tcp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 1024,
+            "receivedBytes": 1024,
+            "expectedSHA256": "49abd65bbf7f7e40c7055093ed2e3fd75f2f602f2c5fcf955c213e3135eb03f7",
+            "receivedSHA256": "49abd65bbf7f7e40c7055093ed2e3fd75f2f602f2c5fcf955c213e3135eb03f7",
+            "ok": true,
+            "exitCode": 0
+          },
+          {
+            "protocol": "tcp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 16384,
+            "receivedBytes": 16384,
+            "expectedSHA256": "1536c422c31cc98834759d7085cda394a3510a03d78188248986a6b1a7207d03",
+            "receivedSHA256": "1536c422c31cc98834759d7085cda394a3510a03d78188248986a6b1a7207d03",
+            "ok": true,
+            "exitCode": 0
+          },
+          {
+            "protocol": "tcp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 1048576,
+            "receivedBytes": 1048576,
+            "expectedSHA256": "8f990ba0b577b51cf009ea049368c16bbda1b21e1b93be07a824758bb253c39b",
+            "receivedSHA256": "8f990ba0b577b51cf009ea049368c16bbda1b21e1b93be07a824758bb253c39b",
+            "ok": true,
+            "exitCode": 0
+          }
+        ]
+      }
+    ]
+  },
+  "udp": {
+    "observedAt": "2026-09-07T13:27:15.378578+00:00",
+    "scope": "30 ordinary-pod UDP cases, ten exact echoes each, at 512/1200/1340/1400/1800 bytes; reported responses do not infer missing wire packets",
+    "results": [
+      {
+        "pod": "net-aws-win2022-v3",
+        "podUID": "a8570b76-b69a-40e2-922b-3c9fe40e0408",
+        "node": "aws-win2022-v3",
+        "podIP": "10.244.114.4",
+        "checks": [
+          {
+            "protocol": "udp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 512,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 1200,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 1340,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 1400,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 1800,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-w1",
+            "payloadBytes": 512,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-w1",
+            "payloadBytes": 1200,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-w1",
+            "payloadBytes": 1340,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-w1",
+            "payloadBytes": 1400,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-w1",
+            "payloadBytes": 1800,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          }
+        ],
+        "transport": "SSM/CRI; Windows PowerShell echo adds CRLF and Out-String adds CRLF"
+      },
+      {
+        "pod": "net-aws-win2025-v3",
+        "podUID": "ce8b457c-a013-4622-b0cb-408c091753a5",
+        "node": "aws-win2025-v3",
+        "podIP": "10.244.42.4",
+        "checks": [
+          {
+            "protocol": "udp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 512,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 1200,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 1340,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 1400,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 1800,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-w1",
+            "payloadBytes": 512,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-w1",
+            "payloadBytes": 1200,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-w1",
+            "payloadBytes": 1340,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-w1",
+            "payloadBytes": 1400,
+            "exitCode": 0,
+            "ok": false,
+            "expectedResponses": 10,
+            "reportedResponses": 9,
+            "exactResponses": 9,
+            "responsesPresent": true,
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.42.4:50477->10.244.190.81:8081: i/o timeout'"
+            ],
+            "commandExitCode": 0
+          },
+          {
+            "protocol": "udp",
+            "to": "net-w1",
+            "payloadBytes": 1800,
+            "exitCode": 0,
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0
+          }
+        ],
+        "transport": "SSM/CRI; Windows PowerShell echo adds CRLF and Out-String adds CRLF"
+      },
+      {
+        "pod": "net-w1",
+        "podUID": "5982bf45-2e0e-40c4-bd40-4b407742dc66",
+        "node": "w1",
+        "podIP": "10.244.190.81",
+        "checks": [
+          {
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0,
+            "protocol": "udp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 512
+          },
+          {
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0,
+            "protocol": "udp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 1200
+          },
+          {
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0,
+            "protocol": "udp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 1340
+          },
+          {
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0,
+            "protocol": "udp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 1400
+          },
+          {
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0,
+            "protocol": "udp",
+            "to": "net-aws-win2022-v3",
+            "payloadBytes": 1800
+          },
+          {
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0,
+            "protocol": "udp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 512
+          },
+          {
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0,
+            "protocol": "udp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 1200
+          },
+          {
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0,
+            "protocol": "udp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 1340
+          },
+          {
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0,
+            "protocol": "udp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 1400
+          },
+          {
+            "ok": true,
+            "expectedResponses": 10,
+            "reportedResponses": 10,
+            "exactResponses": 10,
+            "responsesPresent": true,
+            "errors": [],
+            "commandExitCode": 0,
+            "protocol": "udp",
+            "to": "net-aws-win2025-v3",
+            "payloadBytes": 1800
+          }
+        ]
+      }
+    ]
+  },
+  "serviceDNS": {
+    "observedAt": "2026-09-07T13:29:18.727426+00:00",
+    "scope": "Distinct-node Service ClusterIP and DNS-name HTTP hostname checks; excludes own-pod hairpin",
+    "results": [
+      {
+        "fromPod": "net-aws-win2022-v3",
+        "podUID": "a8570b76-b69a-40e2-922b-3c9fe40e0408",
+        "checks": [
+          {
+            "body": "net-aws-win2025-v3",
+            "exitCode": 0,
+            "to": "net-aws-win2025-v3",
+            "ok": true,
+            "kind": "clusterIP",
+            "address": "10.99.76.215"
+          },
+          {
+            "body": "net-aws-win2025-v3",
+            "exitCode": 0,
+            "to": "net-aws-win2025-v3",
+            "ok": true,
+            "kind": "dns",
+            "address": "net-aws-win2025-v3.cldt-windows-v3-net.svc.cluster.local"
+          },
+          {
+            "body": "net-w1",
+            "exitCode": 0,
+            "to": "net-w1",
+            "ok": true,
+            "kind": "clusterIP",
+            "address": "10.96.85.157"
+          },
+          {
+            "body": "net-w1",
+            "exitCode": 0,
+            "to": "net-w1",
+            "ok": true,
+            "kind": "dns",
+            "address": "net-w1.cldt-windows-v3-net.svc.cluster.local"
+          }
+        ]
+      },
+      {
+        "fromPod": "net-aws-win2025-v3",
+        "podUID": "ce8b457c-a013-4622-b0cb-408c091753a5",
+        "checks": [
+          {
+            "body": "net-aws-win2022-v3",
+            "exitCode": 0,
+            "to": "net-aws-win2022-v3",
+            "ok": true,
+            "kind": "clusterIP",
+            "address": "10.98.160.233"
+          },
+          {
+            "body": "net-aws-win2022-v3",
+            "exitCode": 0,
+            "to": "net-aws-win2022-v3",
+            "ok": true,
+            "kind": "dns",
+            "address": "net-aws-win2022-v3.cldt-windows-v3-net.svc.cluster.local"
+          },
+          {
+            "body": "net-w1",
+            "exitCode": 0,
+            "to": "net-w1",
+            "ok": true,
+            "kind": "clusterIP",
+            "address": "10.96.85.157"
+          },
+          {
+            "body": "net-w1",
+            "exitCode": 0,
+            "to": "net-w1",
+            "ok": true,
+            "kind": "dns",
+            "address": "net-w1.cldt-windows-v3-net.svc.cluster.local"
+          }
+        ]
+      },
+      {
+        "fromPod": "net-w1",
+        "podUID": "5982bf45-2e0e-40c4-bd40-4b407742dc66",
+        "checks": [
+          {
+            "to": "net-aws-win2022-v3",
+            "kind": "clusterIP",
+            "address": "10.98.160.233",
+            "exitCode": 0,
+            "ok": true,
+            "body": "net-aws-win2022-v3"
+          },
+          {
+            "to": "net-aws-win2022-v3",
+            "kind": "dns",
+            "address": "net-aws-win2022-v3.cldt-windows-v3-net.svc.cluster.local",
+            "exitCode": 0,
+            "ok": true,
+            "body": "net-aws-win2022-v3"
+          },
+          {
+            "to": "net-aws-win2025-v3",
+            "kind": "clusterIP",
+            "address": "10.99.76.215",
+            "exitCode": 0,
+            "ok": true,
+            "body": "net-aws-win2025-v3"
+          },
+          {
+            "to": "net-aws-win2025-v3",
+            "kind": "dns",
+            "address": "net-aws-win2025-v3.cldt-windows-v3-net.svc.cluster.local",
+            "exitCode": 0,
+            "ok": true,
+            "body": "net-aws-win2025-v3"
+          }
+        ]
+      }
+    ]
+  },
+  "kubeletExec": {
+    "observedAt": "2026-09-07T13:27:35.868761+00:00",
+    "scope": "API-server-to-kubelet exec reachability; curl targets pod loopback only",
+    "results": [
+      {
+        "windowsVersion": "2022",
+        "pod": "net-aws-win2022-v3",
+        "exitCode": 1,
+        "ok": false,
+        "stderr": "Error from server: error dialing backend: dial tcp 172.29.0.54:10250: i/o timeout"
+      },
+      {
+        "windowsVersion": "2025",
+        "pod": "net-aws-win2025-v3",
+        "exitCode": 1,
+        "ok": false,
+        "stderr": "Error from server: error dialing backend: dial tcp 172.29.0.25:10250: i/o timeout"
+      }
+    ]
+  },
+  "limitations": [
+    "Windows commands run through SSM and CRI because API-server-to-kubelet exec fails.",
+    "The initial TCP checker incorrectly expected two terminal CRLFs; excluded, corrected to the observed one CRLF and rerun for all 18 checks.",
+    "No UDP reliability, NetworkPolicy, GPU, removal/replacement or gateway failover qualification."
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "state": "qualified replacement with fixed all-nodes endpoint placement",
+  "date": "2026-09-09",
+  "scope": "Single-NIC AWS MicroK8s/Calico worker replacement through normal CAPI; six continuous survivor lanes among one site VM and two retained AWS workers. Does not qualify endpoint handovers or other distributions.",
+  "commandID": "e9b1648d-4088-456c-92e2-1e3c22710fef",
+  "archiveSHA256": "11fd47d8ebb5d9118a5ac60684ea72a1c2383080bc8a1b1fe45c25652398608d",
+  "window": {
+    "startedAt": "2026-09-09T14:13:09.669317+00:00",
+    "finishedAt": "2026-09-09T14:19:11.025300+00:00",
+    "steps": [
+      {
+        "step": "remove",
+        "startedAt": "2026-09-09T14:13:09.669576+00:00",
+        "finishedAt": "2026-09-09T14:14:16.190704+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "claim",
+        "startedAt": "2026-09-09T14:14:16.191008+00:00",
+        "finishedAt": "2026-09-09T14:14:17.334250+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "replacement-row",
+        "startedAt": "2026-09-09T14:14:17.334654+00:00",
+        "finishedAt": "2026-09-09T14:19:10.935853+00:00",
+        "exitCode": 0
+      }
+    ],
+    "error": null
+  },
+  "replacedInstance": "i-05334f67644e29922",
+  "replacement": {
+    "eniCount": 1,
+    "imageID": "ami-095b7537ef1237e91",
+    "instanceID": "i-076ca300194af45d9",
+    "machine": "aws-microk8s-remote2",
+    "node": "ip-172-29-0-6",
+    "nodeUID": "f69598a1-53ab-45bb-8980-5f1b95cea234",
+    "physicalNIC": "ens5",
+    "providerID": "aws:///us-west-2a/i-076ca300194af45d9"
+  },
+  "replacementKubeletAddress": "10.100.0.161",
+  "identity": {
+    "sameNodeCount": true,
+    "survivorsStable": true,
+    "allReady": true,
+    "freshInstance": true,
+    "freshNodeUID": true
+  },
+  "network": {
+    "passed": 184,
+    "total": 184,
+    "attempts": 1
+  },
+  "management": {
+    "passed": 48,
+    "total": 48,
+    "controlPlanes": [
+      "https://10.10.0.10:16443",
+      "https://10.10.0.13:16443",
+      "https://10.10.0.14:16443"
+    ]
+  },
+  "survivors": {
+    "passed": 23576,
+    "attempts": 23576,
+    "lanes": [
+      {
+        "source": "site",
+        "target": "remote1",
+        "attempts": 3926,
+        "passed": 3926,
+        "maxStartIntervalSeconds": 0.21226992300000802,
+        "samplesSHA256": "3ddd58dd450608b117fef5e1a55f5ffd7f542957bc07498818a333941819d81b",
+        "ok": true
+      },
+      {
+        "source": "site",
+        "target": "remote2",
+        "attempts": 3917,
+        "passed": 3917,
+        "maxStartIntervalSeconds": 0.17129217500001914,
+        "samplesSHA256": "23f0b6b6b10301ca68917b43e8abfec6ad1e2563dd4d5996786b3f49307e958d",
+        "ok": true
+      },
+      {
+        "source": "remote1",
+        "target": "site",
+        "attempts": 3927,
+        "passed": 3927,
+        "maxStartIntervalSeconds": 0.260523132000003,
+        "samplesSHA256": "022fe1f85f2e4afd5c29568b15504201ab224e986e4dd8b36e033e81c77dfeec",
+        "ok": true
+      },
+      {
+        "source": "remote1",
+        "target": "remote2",
+        "attempts": 3951,
+        "passed": 3951,
+        "maxStartIntervalSeconds": 0.13672553899999684,
+        "samplesSHA256": "b3488ca8adc5c407b4a033bb382fc6e3f928ee2aee249c1830fcfca616a20d23",
+        "ok": true
+      },
+      {
+        "source": "remote2",
+        "target": "site",
+        "attempts": 3910,
+        "passed": 3910,
+        "maxStartIntervalSeconds": 0.1834769619999861,
+        "samplesSHA256": "336ec4e51d76a293a2198b5d843e641e4a7d0c2f0b2382a07b233f5bb43d7744",
+        "ok": true
+      },
+      {
+        "source": "remote2",
+        "target": "remote1",
+        "attempts": 3945,
+        "passed": 3945,
+        "maxStartIntervalSeconds": 0.16668154100000265,
+        "samplesSHA256": "c02344b50b5caf908f6e239103c1f812e4dabc1dbb86d5cfd8c5b77fc9e8c930",
+        "ok": true
+      }
+    ],
+    "rawLogsIndependentlyValidated": true,
+    "allStopsAfterOperation": true,
+    "identitiesStable": true,
+    "qualificationEligible": true
+  },
+  "vmManagementGate": {
+    "fleet": "seven retained single-NIC KubeRouter VMs",
+    "passed": 42,
+    "total": 42,
+    "nativeGateCoveragePercent": 75,
+    "unitGateCoveragePercent": 100,
+    "raceTests": "cmd/lab and check passed",
+    "scope": "Current management.go and report.go copied byte-for-byte into a bounded native helper; full cmd/lab lifecycle not rerun."
+  },
+  "retainedFleets": {
+    "originalNodes": 13,
+    "kuberouterNodes": 7,
+    "exactUIDsAndReadinessPreserved": true,
+    "checkedAt": "2026-09-09T14:23:56.131895+00:00"
+  },
+  "releaseQualified": false,
+  "remaining": "Endpoint handover continuity remains unqualified; broader Windows/GPU/OKD and VM NAT parity work remains."
+}

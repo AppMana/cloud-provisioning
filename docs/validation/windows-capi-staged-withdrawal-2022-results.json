@@ -1,0 +1,621 @@
+{
+  "schemaVersion": 1,
+  "scope": "Real single-NIC Windows2022 CPU CAPI lifecycle with staged gateway withdrawal and six original native survivor lanes",
+  "binding": {
+    "claim": "aws-win2022-staged-v1",
+    "machineUID": "4bc1d6d0-c675-4da9-8f05-1bdd08b937c4",
+    "node": "aws-win2022-staged-v1",
+    "nodeUID": "c7adc6d4-e6e6-4e15-86e1-977ef152e9f1",
+    "providerID": "aws:///us-west-2a/i-038faa2a9f030d87b"
+  },
+  "imageID": "ami-09af413882370ed0b",
+  "joinChecks": {
+    "expectedWindowsBuild": true,
+    "onePhysicalNIC": true,
+    "k0sWorkerRunning": true,
+    "tunnelRunning": true,
+    "bootstrapInstalled": true,
+    "capiAssociation": true,
+    "windowsNode": true,
+    "matchesSiteKubelet": true,
+    "containerd2": true,
+    "cloudWorkerLabel": true,
+    "internetFacingTaint": true,
+    "nodeReady": true,
+    "publisherReady": true,
+    "expectedWorkerVersion": true,
+    "expectedWorkerHash": true,
+    "expectedTunnelHash": true,
+    "expectedRunningTunnelHash": true,
+    "peerDelivery": true,
+    "gatewayAttachmentReady": true
+  },
+  "matrixChecks": 72,
+  "matrixPassed": true,
+  "matrixIdentitiesStable": true,
+  "originalTrialExit": {
+    "exitCode": 1,
+    "finishedAt": "2026-09-08T14:33:46.155348+00:00"
+  },
+  "operation": {
+    "claim": "aws-win2022-staged-v1",
+    "startedAt": "2026-09-08T14:13:20.654575+00:00",
+    "finishedAt": "2026-09-08T14:39:20.454147+00:00",
+    "passed": false,
+    "removalPassed": true,
+    "cleanupAfterFailedTrial": true
+  },
+  "removal": {
+    "passed": true,
+    "checks": {
+      "instanceTerminated": true,
+      "productCleanup": true,
+      "targetMachineAbsent": true,
+      "survivorMachineIdentities": true,
+      "exactSurvivorSet": true,
+      "survivorIdentitiesAndReadiness": true,
+      "targetGatewayLeasesComplete": true,
+      "otherGatewayLeasesPreserved": true
+    },
+    "survivorCount": 13,
+    "retiredGatewayLeaseCount": 1,
+    "preservedGatewayLeaseCount": 5,
+    "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+  },
+  "withdrawalObservation": {
+    "passed": true,
+    "checks": {
+      "sameMesh": true,
+      "sameWorkerSecret": true,
+      "stagingObserved": true,
+      "globalWithdrawalObserved": true,
+      "changedDocument": true,
+      "newDocumentPendingThenAcknowledged": true,
+      "workerAcknowledgedBeforeGlobalWithdrawal": true,
+      "ackObservedWhileProjectionStable": true,
+      "nodeReadyThroughTransition": true,
+      "withdrawalIrreversible": true,
+      "originalMachineEventuallyAbsent": true
+    },
+    "originalDocumentSHA256": "a010a77db58f7499cbe37ff94cf7bae0a29d58f54f2da1f2eb2fd5cc1cbc27bc",
+    "withdrawnDocumentSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+    "firstNewDocumentAt": "2026-09-08T14:34:20.540298+00:00",
+    "firstNewAcknowledgementAt": "2026-09-08T14:34:27.563089+00:00",
+    "globalWithdrawalAt": "2026-09-08T14:34:53.097929+00:00",
+    "samples": 258,
+    "scope": "Observed changed-document acknowledgement before global withdrawal; requires separate native traffic and provider-cleanup evidence"
+  },
+  "survivor": {
+    "transport": "native-oob",
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "attempts": 12879,
+        "passed": 12877,
+        "maxStartIntervalSeconds": 5.1024761269999885,
+        "samplesSHA256": "7dde8e7ab0ee90b3985732dffb07afb0a4b9b9bbb1b508ae374d0030281e8b63",
+        "ok": false
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "attempts": 12971,
+        "passed": 12971,
+        "maxStartIntervalSeconds": 0.17348860199990668,
+        "samplesSHA256": "fb1dba787df7dc91694ad5d89f2c495be1a64850d4f96c16e272af6b1a7704fa",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "attempts": 12754,
+        "passed": 12752,
+        "maxStartIntervalSeconds": 5.102218400000083,
+        "samplesSHA256": "c4ee2142cdc610dc2763a177098deceebe5e7bea9611c2ea35d6bcd7b13e60d4",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "attempts": 15559,
+        "passed": 15558,
+        "maxStartIntervalSeconds": 5.102840000000015,
+        "samplesSHA256": "06ea73ba365140d63f4a0fa12892671984ff17439a04630569c8a0eba6d5e1ee",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "attempts": 12823,
+        "passed": 12822,
+        "maxStartIntervalSeconds": 5.10174219999999,
+        "samplesSHA256": "ce40e61c61c79a3e4c1b037464cb704cdd2b3d2ba36193a07ab7403bc2e52803",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "attempts": 15508,
+        "passed": 15504,
+        "maxStartIntervalSeconds": 5.124228299999913,
+        "samplesSHA256": "5a86a77d69634eadb2869741718df3c81d60774fc23a6a73d9a7bd9d56bc0c43",
+        "ok": false
+      }
+    ],
+    "identitiesStable": true,
+    "window": {
+      "lanesBracketWindow": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "ok": true,
+      "scope": "Host OOB control ordering only; requires independent terminal logs and identity validation"
+    },
+    "ok": false
+  },
+  "failedSamples": [
+    {
+      "sourcePod": "net-w1",
+      "targetPod": "net-aws-win2022-v3",
+      "sequence": 2090,
+      "source": "10.244.190.81:44506",
+      "startedAt": "2026-09-08T14:16:39.407189866Z",
+      "finishedAt": "2026-09-08T14:16:44.409341574Z",
+      "ok": false,
+      "error": "read udp 10.244.190.81:44506->10.244.114.4:8081: i/o timeout",
+      "nonce": "b75a02405a897432103e6f887178e594",
+      "pid": 175048,
+      "startOffsetSeconds": 261.535924148,
+      "finishOffsetSeconds": 266.53810988,
+      "attempts": 2091,
+      "passed": 2090,
+      "maxStartIntervalSeconds": 0.185842543,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-w1",
+      "targetPod": "net-aws-win2022-v3",
+      "sequence": 7837,
+      "source": "10.244.190.81:43449",
+      "startedAt": "2026-09-08T14:28:43.747484847Z",
+      "finishedAt": "2026-09-08T14:28:48.748182472Z",
+      "ok": false,
+      "error": "read udp 10.244.190.81:43449->10.244.114.4:8081: i/o timeout",
+      "nonce": "b75a02405a897432103e6f887178e594",
+      "pid": 175048,
+      "startOffsetSeconds": 985.876224148,
+      "finishOffsetSeconds": 990.876954135,
+      "attempts": 7838,
+      "passed": 7836,
+      "maxStartIntervalSeconds": 5.102476127,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2022-v3",
+      "targetPod": "net-w1",
+      "sequence": 4631,
+      "source": "10.244.114.4:53216",
+      "startedAt": "2026-09-08T14:22:05.2318134Z",
+      "finishedAt": "2026-09-08T14:22:10.2330362Z",
+      "ok": false,
+      "error": "read udp 10.244.114.4:53216->10.244.190.81:8081: i/o timeout",
+      "nonce": "be0d65bb36f6f78201b39bdd025d2883",
+      "pid": 6904,
+      "startOffsetSeconds": 584.6480006,
+      "finishOffsetSeconds": 589.6492234,
+      "attempts": 4632,
+      "passed": 4631,
+      "maxStartIntervalSeconds": 0.2099966,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2022-v3",
+      "targetPod": "net-w1",
+      "sequence": 11651,
+      "source": "10.244.114.4:52463",
+      "startedAt": "2026-09-08T14:36:58.6624502Z",
+      "finishedAt": "2026-09-08T14:37:03.6637654Z",
+      "ok": false,
+      "error": "read udp 10.244.114.4:52463->10.244.190.81:8081: i/o timeout",
+      "nonce": "be0d65bb36f6f78201b39bdd025d2883",
+      "pid": 6904,
+      "startOffsetSeconds": 1478.0786374,
+      "finishOffsetSeconds": 1483.0799526,
+      "attempts": 11652,
+      "passed": 11650,
+      "maxStartIntervalSeconds": 5.1017519,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2022-v3",
+      "targetPod": "net-aws-win2025-v3",
+      "sequence": 13024,
+      "source": "10.244.114.4:50400",
+      "startedAt": "2026-09-08T14:34:58.18124Z",
+      "finishedAt": "2026-09-08T14:35:03.1820639Z",
+      "ok": false,
+      "error": "read udp 10.244.114.4:50400->10.244.42.6:8081: i/o timeout",
+      "nonce": "5b98234ea53585e7cd5f08986326a4e8",
+      "pid": 6640,
+      "startOffsetSeconds": 1353.1549065,
+      "finishOffsetSeconds": 1358.1557304,
+      "attempts": 13025,
+      "passed": 13024,
+      "maxStartIntervalSeconds": 0.1778929,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2025-v3",
+      "targetPod": "net-w1",
+      "sequence": 2479,
+      "source": "10.244.42.6:54268",
+      "startedAt": "2026-09-08T14:17:40.8862974Z",
+      "finishedAt": "2026-09-08T14:17:45.8872405Z",
+      "ok": false,
+      "error": "read udp 10.244.42.6:54268->10.244.190.81:8081: i/o timeout",
+      "nonce": "01a3c7e8d41f05c7c9a08289ea8e62ff",
+      "pid": 5508,
+      "startOffsetSeconds": 312.0838834,
+      "finishOffsetSeconds": 317.0848265,
+      "attempts": 2480,
+      "passed": 2479,
+      "maxStartIntervalSeconds": 0.1770908,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2025-v3",
+      "targetPod": "net-aws-win2022-v3",
+      "sequence": 1022,
+      "source": "10.244.42.6:50734",
+      "startedAt": "2026-09-08T14:14:18.2364977Z",
+      "finishedAt": "2026-09-08T14:14:23.2373887Z",
+      "ok": false,
+      "error": "read udp 10.244.42.6:50734->10.244.114.4:8081: i/o timeout",
+      "nonce": "1dde97e99f4b35f6fe55a98a31371c5d",
+      "pid": 1812,
+      "startOffsetSeconds": 105.870542,
+      "finishOffsetSeconds": 110.871433,
+      "attempts": 1023,
+      "passed": 1022,
+      "maxStartIntervalSeconds": 0.1535559,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2025-v3",
+      "targetPod": "net-aws-win2022-v3",
+      "sequence": 10081,
+      "source": "10.244.42.6:50830",
+      "startedAt": "2026-09-08T14:29:57.7774683Z",
+      "finishedAt": "2026-09-08T14:30:02.7776583Z",
+      "ok": false,
+      "error": "read udp 10.244.42.6:50830->10.244.114.4:8081: i/o timeout",
+      "nonce": "1dde97e99f4b35f6fe55a98a31371c5d",
+      "pid": 1812,
+      "startOffsetSeconds": 1045.4115126,
+      "finishOffsetSeconds": 1050.4117026,
+      "attempts": 10082,
+      "passed": 10080,
+      "maxStartIntervalSeconds": 5.1013105,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2025-v3",
+      "targetPod": "net-aws-win2022-v3",
+      "sequence": 10770,
+      "source": "10.244.42.6:52118",
+      "startedAt": "2026-09-08T14:31:13.7292389Z",
+      "finishedAt": "2026-09-08T14:31:18.7305262Z",
+      "ok": false,
+      "error": "read udp 10.244.42.6:52118->10.244.114.4:8081: i/o timeout",
+      "nonce": "1dde97e99f4b35f6fe55a98a31371c5d",
+      "pid": 1812,
+      "startOffsetSeconds": 1121.3632832,
+      "finishOffsetSeconds": 1126.3645705,
+      "attempts": 10771,
+      "passed": 10768,
+      "maxStartIntervalSeconds": 5.1013105,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2025-v3",
+      "targetPod": "net-aws-win2022-v3",
+      "sequence": 13469,
+      "source": "10.244.42.6:57125",
+      "startedAt": "2026-09-08T14:35:57.7354039Z",
+      "finishedAt": "2026-09-08T14:36:02.7364453Z",
+      "ok": false,
+      "error": "read udp 10.244.42.6:57125->10.244.114.4:8081: i/o timeout",
+      "nonce": "1dde97e99f4b35f6fe55a98a31371c5d",
+      "pid": 1812,
+      "startOffsetSeconds": 1405.3694482,
+      "finishOffsetSeconds": 1410.3704896,
+      "attempts": 13470,
+      "passed": 13466,
+      "maxStartIntervalSeconds": 5.1242283,
+      "healthy": false,
+      "stopBoundary": false
+    }
+  ],
+  "finalCluster": {
+    "at": "2026-09-08T14:41:01.346207+00:00",
+    "nodeUIDs": {
+      "aws-win2022-gpu": "dd54061d-491a-4b12-95a7-27393e847780",
+      "aws-win2022-v3": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "aws-win2025": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+      "aws-win2025-gpu": "258d7b62-e774-48bc-94dc-e31ff042f585",
+      "aws-win2025-v3": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "cp": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+      "cp2": "947de62f-0920-408c-aa31-ac80a2344128",
+      "cp3": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+      "ip-172-29-0-9": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+      "remote1": "8935dd28-de93-44be-a887-73110fe88c51",
+      "remote2": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+      "w1": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "w2": "4bcf04f8-ec26-4db7-bacb-85681c0145da"
+    },
+    "allReady": true
+  },
+  "limitations": [
+    "This CPU row does not qualify GPU workloads, fragmented UDP, other distribution/CNI combinations, or repeated lifecycle reliability.",
+    "Native survivor failures remain failures even when bounded matrix checks and product cleanup pass."
+  ],
+  "ownedResourceCleanup": {
+    "allAbsent": true,
+    "resources": [
+      {
+        "kind": "pod",
+        "name": "net-aws-win2022-staged-v1",
+        "absent": true
+      },
+      {
+        "kind": "service",
+        "name": "net-aws-win2022-staged-v1",
+        "uid": "6dfbc728-9963-4361-8487-76d991291da4",
+        "deleteAccepted": true
+      },
+      {
+        "kind": "awsmachinetemplate",
+        "name": "aws-win2022-staged-v1",
+        "uid": "ddd18818-f202-4f1e-b298-8df2386cec5d",
+        "deleteAccepted": true
+      },
+      {
+        "kind": "configmap",
+        "name": "gateway-aws-win2022-staged-v1",
+        "absent": true
+      }
+    ]
+  },
+  "reusableWithdrawalCapture": {
+    "passed": true,
+    "checks": {
+      "sameMesh": true,
+      "sameWorkerSecret": true,
+      "stagingObserved": true,
+      "globalWithdrawalObserved": true,
+      "changedDocument": true,
+      "newDocumentPendingThenAcknowledged": true,
+      "workerAcknowledgedBeforeGlobalWithdrawal": true,
+      "ackObservedWhileProjectionStable": true,
+      "nodeReadyThroughTransition": true,
+      "withdrawalIrreversible": true,
+      "originalMachineEventuallyAbsent": true
+    },
+    "originalDocumentSHA256": "a010a77db58f7499cbe37ff94cf7bae0a29d58f54f2da1f2eb2fd5cc1cbc27bc",
+    "withdrawnDocumentSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+    "firstNewDocumentAt": "2026-09-08T14:34:20.425901+00:00",
+    "firstNewAcknowledgementAt": "2026-09-08T14:34:27.464720+00:00",
+    "globalWithdrawalAt": "2026-09-08T14:34:53.095936+00:00",
+    "samples": 303,
+    "scope": "Observed changed-document acknowledgement before global withdrawal; requires separate native traffic and provider-cleanup evidence"
+  },
+  "passed": false,
+  "evidenceSHA256": {
+    "trial/join.json": "d8a845cf35c94e36a5b6813a438757e883fb94acc705ff45000db717ad66087e",
+    "survivor-result.json": "a165617557564152de58ed3d20aa53aaf818830cdf77858993c2df59c8aa3109",
+    "removal.json": "b722d2a1926d38a5af5875086a5bfa341ac01359d8cfdb812991516bee6ff78c",
+    "after-removal.json": "a4f585077247100e6b669b1cecd6ad1e7dc3eba9a134413c83db60b39e27d36f",
+    "withdrawal-sequence.jsonl": "b1b02b42fa8eb11232c2c2d889d552aadcd917b95e90384934090a655d136b65",
+    "withdrawal-ordering-result.json": "116bd67b4dd6885303b39f063703ee4b68aa3165b5621ab5e7a8cccd66aab629",
+    "final-cluster.json": "0d49d0e5ff67e1bc78192abd43b1bb4ede4436d5f73c4b279474346a453e5527",
+    "reusable-withdrawal/result.json": "475c684d9af0e2a01c6abc126a6309f84648473d50ece3a8455d470c974ad7fd",
+    "reusable-withdrawal/samples.jsonl": "8eb0704c85326724aa910a7021653cde3f4f3ec9f9fdea6a35e3e38a61690130",
+    "trial/matrix.json": "ebe87ff7050aec4c99085fee2a9610faa0e8ded0a0ae52d642c1229b9bca94c3",
+    "felix-failure-correlation.json": "7876d49894b9357ad8114df9c0701fe5013697cfd2c3b89c0e5d64155f136fc8"
+  },
+  "removalRuntimeCoverage": {
+    "collected": false,
+    "binarySHA256": "d2b5c7a0dab2d35057062b908f9938824515f32bca47d362b7f9c1f74113b0f8",
+    "reason": "The reused awsremove binary was not coverage-instrumented; setting GOCOVERDIR did not produce counters. No runtime coverage is claimed for this removal."
+  },
+  "felixLogCorrelation": {
+    "scope": "Read-only Felix log correlation around each failed echo, with one-second margins; log coverage is not packet tracing",
+    "observations": [
+      {
+        "node": "aws-win2022-v3",
+        "failureStartedAt": "2026-09-08T14:16:39.407189866Z",
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 0,
+        "logLines": 23
+      },
+      {
+        "node": "aws-win2022-v3",
+        "failureStartedAt": "2026-09-08T14:28:43.747484847Z",
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 0,
+        "logLines": 15
+      },
+      {
+        "node": "aws-win2022-v3",
+        "failureStartedAt": "2026-09-08T14:22:05.2318134Z",
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 0,
+        "logLines": 20
+      },
+      {
+        "node": "aws-win2022-v3",
+        "failureStartedAt": "2026-09-08T14:36:58.6624502Z",
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 3,
+        "logLines": 39
+      },
+      {
+        "node": "aws-win2022-v3",
+        "failureStartedAt": "2026-09-08T14:34:58.18124Z",
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 2,
+        "logLines": 29
+      },
+      {
+        "node": "aws-win2022-v3",
+        "failureStartedAt": "2026-09-08T14:14:18.2364977Z",
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "coveredByOverlappingLogSnapshots": false,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 0,
+        "logLines": 0
+      },
+      {
+        "node": "aws-win2022-v3",
+        "failureStartedAt": "2026-09-08T14:29:57.7774683Z",
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 2,
+        "logLines": 31
+      },
+      {
+        "node": "aws-win2022-v3",
+        "failureStartedAt": "2026-09-08T14:31:13.7292389Z",
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 0,
+        "logLines": 29
+      },
+      {
+        "node": "aws-win2022-v3",
+        "failureStartedAt": "2026-09-08T14:35:57.7354039Z",
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 2,
+        "logLines": 26
+      },
+      {
+        "node": "aws-win2025-v3",
+        "failureStartedAt": "2026-09-08T14:34:58.18124Z",
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 1,
+        "logLines": 38
+      },
+      {
+        "node": "aws-win2025-v3",
+        "failureStartedAt": "2026-09-08T14:17:40.8862974Z",
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 0,
+        "logLines": 18
+      },
+      {
+        "node": "aws-win2025-v3",
+        "failureStartedAt": "2026-09-08T14:14:18.2364977Z",
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 0,
+        "logLines": 16
+      },
+      {
+        "node": "aws-win2025-v3",
+        "failureStartedAt": "2026-09-08T14:29:57.7774683Z",
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 2,
+        "logLines": 37
+      },
+      {
+        "node": "aws-win2025-v3",
+        "failureStartedAt": "2026-09-08T14:31:13.7292389Z",
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 0,
+        "logLines": 27
+      },
+      {
+        "node": "aws-win2025-v3",
+        "failureStartedAt": "2026-09-08T14:35:57.7354039Z",
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "coveredByOverlappingLogSnapshots": true,
+        "endpointPolicyApplications": 0,
+        "hostAddressChanges": 0,
+        "completedVxlanReconciliations": 2,
+        "logLines": 33
+      }
+    ],
+    "limitations": [
+      "Unlogged kernel behavior is not observed. Absence of ACL application messages does not identify the VFP failure cause.",
+      "VXLAN reconciliation success messages do not identify whether network policies were added or removed.",
+      "The Windows2022 log rotated; uncovered windows are explicitly unqualified."
+    ],
+    "originalContainerIdentitiesVerified": true
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "archiveSHA256": "bb8ee2f76ae9f655b6807eea21e0cd1f0f014a8ee4bff344c77d0173b14be269",
+  "bytes": 99148,
+  "matrix": {
+    "passed": 140,
+    "failed": 0,
+    "total": 140
+  },
+  "nativeCoverage": {
+    "covered": 764,
+    "total": 2314,
+    "percent": 33.0
+  },
+  "scope": "Two real CAPA workers, five single-NIC site VMs, one final network matrix",
+  "allFirstAttempt": "not recorded by this AWS row",
+  "commandID": "d934b70e-62a2-460f-9434-238976e1e9a4",
+  "result": "passed"
+}

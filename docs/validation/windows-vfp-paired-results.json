@@ -1,0 +1,469 @@
+{
+  "observedAt": "2026-09-09T01:39:16.823392+00:00",
+  "scope": "Paired VFP/Packet Monitor diagnostic on retained single-NIC Windows VMs with six ordinary-Pod UDP lanes; export delays compromised simultaneous capture coverage.",
+  "qualificationEligible": false,
+  "hosts": [
+    {
+      "windowsServer": "2022",
+      "vfp": {
+        "build": 20348,
+        "session": "cldt-vfp-2ec3803119ed4090bea0df2bb2e4ef49",
+        "startedAt": "2026-09-09T01:21:39.7009224Z",
+        "stoppedAt": "2026-09-09T01:22:40.3144214Z",
+        "requestedSeconds": 60,
+        "traceStopped": true,
+        "traceFilteringUnchanged": true,
+        "eventCount": 176616,
+        "counts": {
+          "Microsoft-Windows-Hyper-V-VfpExt/110/0": 16223,
+          "Microsoft-Windows-Hyper-V-VfpExt/106/0": 15970,
+          "Microsoft-Windows-Hyper-V-VfpExt/352/0": 12215,
+          "Microsoft-Windows-Hyper-V-VfpExt/115/0": 20120,
+          "Microsoft-Windows-Hyper-V-VfpExt/2/0": 1,
+          "Microsoft-Windows-Hyper-V-VfpExt/600/0": 19894,
+          "Microsoft-Windows-Hyper-V-VfpExt/51/0": 1,
+          "Microsoft-Windows-Hyper-V-VfpExt/327/0": 3989,
+          "/0/2": 1,
+          "Microsoft-Windows-Hyper-V-VfpExt/1/0": 1,
+          "Microsoft-Windows-Hyper-V-VfpExt/354/0": 99,
+          "Microsoft-Windows-Hyper-V-VfpExt/608/0": 38,
+          "Microsoft-Windows-Hyper-V-VfpExt/156/0": 4009,
+          "Microsoft-Windows-Hyper-V-VfpExt/604/0": 319,
+          "Microsoft-Windows-Hyper-V-VfpExt/101/0": 59732,
+          "Microsoft-Windows-Hyper-V-VfpExt/155/0": 8019,
+          "Microsoft-Windows-Hyper-V-VfpExt/353/0": 2,
+          "Microsoft-Windows-Hyper-V-VfpExt/52/0": 1,
+          "Microsoft-Windows-Hyper-V-VfpExt/154/0": 8025,
+          "Microsoft-Windows-Hyper-V-VfpExt/314/0": 7957
+        },
+        "artifacts": [
+          {
+            "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+            "name": "provider.json",
+            "bytes": 311964
+          },
+          {
+            "sha256": "8cbd10d0bcd059d841d30cd51d25fd955eeac6da812d5973fac8bcf2f355b060",
+            "name": "vfp.etl",
+            "bytes": 67108864
+          },
+          {
+            "sha256": "d2c9856945ba997f84aae55f1af80eb91c546dca587433a9029f4c994bac210d",
+            "name": "events.jsonl.gz",
+            "bytes": 12857257
+          }
+        ],
+        "qualificationEligible": false,
+        "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation."
+      },
+      "packetMonitor": {
+        "firstPacket": "2026-09-09T01:23:03.439958Z",
+        "lastPacket": "2026-09-09T01:26:16.503560Z",
+        "packetCount": 917481
+      },
+      "originalSSMStatus": "TimedOut",
+      "originalSSMResponseCode": -1,
+      "originalExportersSubsequentlyObservedAbsent": true,
+      "artifacts": [
+        {
+          "sha256": "5857b4a15cc060a65e7334e309376e7fc553c0cd58669f3875cc2c1423420520",
+          "name": "capture.etl",
+          "bytes": 21018757
+        },
+        {
+          "sha256": "0b8c50e2cc1e205ec025e24fcd43457b10a2bb9fa407149db81546da561faf00",
+          "name": "capture.pcapng",
+          "bytes": 160697916
+        },
+        {
+          "sha256": "2a84fd8b41f41089c2d1d104ce68d54bc506a65975e2b4168f919b17f8389fb5",
+          "name": "capture.txt.gz",
+          "bytes": 19663128
+        },
+        {
+          "sha256": "d2c9856945ba997f84aae55f1af80eb91c546dca587433a9029f4c994bac210d",
+          "name": "vfp\\events.jsonl.gz",
+          "bytes": 12857257
+        },
+        {
+          "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+          "name": "vfp\\provider.json",
+          "bytes": 311964
+        },
+        {
+          "sha256": "bcd01474a06d16a274af3969281ecace32fb0d3b99882b4e7892c0c2fcc6782d",
+          "name": "vfp\\result.json",
+          "bytes": 1656
+        },
+        {
+          "sha256": "8cbd10d0bcd059d841d30cd51d25fd955eeac6da812d5973fac8bcf2f355b060",
+          "name": "vfp\\vfp.etl",
+          "bytes": 67108864
+        }
+      ],
+      "artifactsDownloadedAndHashVerified": true,
+      "guestArtifactsRemoved": true
+    },
+    {
+      "windowsServer": "2025",
+      "vfp": {
+        "build": 26100,
+        "session": "cldt-vfp-f1f61e4e6fb148638ed3ba571c3f74cf",
+        "startedAt": "2026-09-09T01:21:40.1521910Z",
+        "stoppedAt": "2026-09-09T01:22:40.7394828Z",
+        "requestedSeconds": 60,
+        "traceStopped": true,
+        "traceFilteringUnchanged": true,
+        "eventCount": 168864,
+        "counts": {
+          "Microsoft-Windows-Hyper-V-VfpExt/110/0": 14565,
+          "Microsoft-Windows-Hyper-V-VfpExt/106/0": 14354,
+          "Microsoft-Windows-Hyper-V-VfpExt/352/0": 10961,
+          "Microsoft-Windows-Hyper-V-VfpExt/115/0": 18194,
+          "Microsoft-Windows-Hyper-V-VfpExt/2/0": 1,
+          "Microsoft-Windows-Hyper-V-VfpExt/600/0": 17915,
+          "Microsoft-Windows-Hyper-V-VfpExt/51/0": 1,
+          "Microsoft-Windows-Hyper-V-VfpExt/327/0": 3594,
+          "Microsoft-Windows-Hyper-V-VfpExt/155/0": 7204,
+          "Microsoft-Windows-Hyper-V-VfpExt/1/0": 1,
+          "Microsoft-Windows-Hyper-V-VfpExt/354/0": 83,
+          "Microsoft-Windows-Hyper-V-VfpExt/608/0": 9978,
+          "Microsoft-Windows-Hyper-V-VfpExt/156/0": 3601,
+          "Microsoft-Windows-Hyper-V-VfpExt/604/0": 237,
+          "Microsoft-Windows-Hyper-V-VfpExt/101/0": 53795,
+          "/0/2": 1,
+          "Microsoft-Windows-Hyper-V-VfpExt/52/0": 1,
+          "Microsoft-Windows-Hyper-V-VfpExt/154/0": 7208,
+          "Microsoft-Windows-Hyper-V-VfpExt/314/0": 7170
+        },
+        "artifacts": [
+          {
+            "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+            "name": "provider.json",
+            "bytes": 327652
+          },
+          {
+            "sha256": "d9d14018850ba1c484e105bb468cd888428c840b696dee1c45be87a8026db3ea",
+            "name": "vfp.etl",
+            "bytes": 67108864
+          },
+          {
+            "sha256": "2689b25e1449768bb5dc444008df074091c0d4edba7c9f26c199d2930518e3c8",
+            "name": "events.jsonl.gz",
+            "bytes": 12365785
+          }
+        ],
+        "qualificationEligible": false,
+        "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation."
+      },
+      "packetMonitor": {
+        "firstPacket": "2026-09-09T01:22:23.942711Z",
+        "lastPacket": "2026-09-09T01:25:46.298104Z",
+        "packetCount": 910927
+      },
+      "originalSSMStatus": "TimedOut",
+      "originalSSMResponseCode": -1,
+      "originalExportersSubsequentlyObservedAbsent": true,
+      "artifacts": [
+        {
+          "sha256": "d7e758c3dbaf1e0eb50a12a26182a972a50e049b60d66cc1fb33700f0cb76306",
+          "name": "capture.etl",
+          "bytes": 22963263
+        },
+        {
+          "sha256": "e256ef545cbc647fe86a1b6adbe4d9283ea7f157033db8e3047e6cecb3fc5255",
+          "name": "capture.pcapng",
+          "bytes": 159453820
+        },
+        {
+          "sha256": "da453c595f8d209a4b1eddca9f44a700885ede27ec5ec2174c36fbadf36033b2",
+          "name": "capture.txt.gz",
+          "bytes": 20434985
+        },
+        {
+          "sha256": "2689b25e1449768bb5dc444008df074091c0d4edba7c9f26c199d2930518e3c8",
+          "name": "vfp\\events.jsonl.gz",
+          "bytes": 12365785
+        },
+        {
+          "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+          "name": "vfp\\provider.json",
+          "bytes": 327652
+        },
+        {
+          "sha256": "f39ace653216dac95391804165750a0686427336cc7e0e1230a5b80091cf69ce",
+          "name": "vfp\\result.json",
+          "bytes": 1615
+        },
+        {
+          "sha256": "d9d14018850ba1c484e105bb468cd888428c840b696dee1c45be87a8026db3ea",
+          "name": "vfp\\vfp.etl",
+          "bytes": 67108864
+        }
+      ],
+      "artifactsDownloadedAndHashVerified": true,
+      "guestArtifactsRemoved": true
+    }
+  ],
+  "traffic": {
+    "attempts": 90326,
+    "failed": 27,
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "attempts": 11483,
+        "passed": 11482,
+        "maxStartIntervalSeconds": 5.010535100999995,
+        "samplesSHA256": "b2a31221e705412dde8d220b7d4030ecd04da55db5c23f526a348a5a39c1ce6e",
+        "ok": false
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "attempts": 11693,
+        "passed": 11689,
+        "maxStartIntervalSeconds": 5.014424593000001,
+        "samplesSHA256": "b04b0a09b283c26712b496bc5aeb53b45c9c6620cf3c7a60d11ef6621762ea69",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "attempts": 10281,
+        "passed": 10277,
+        "maxStartIntervalSeconds": 5.025501399999996,
+        "samplesSHA256": "f452aac646c02e50c0e241c9378170337f7f2dc80fb2cf8435651e00ab82ada4",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "attempts": 22514,
+        "passed": 22505,
+        "maxStartIntervalSeconds": 5.0581502,
+        "samplesSHA256": "5c17378b7fd2617400182f86f60d163d7fd1b7e657495b160893bc58bbcc28e7",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "attempts": 11494,
+        "passed": 11493,
+        "maxStartIntervalSeconds": 5.011702900000046,
+        "samplesSHA256": "c57b5867344c91040aeaadd1bb7a43e3057f6cd088b4df13c8e857b2134b7ad9",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "attempts": 22861,
+        "passed": 22853,
+        "maxStartIntervalSeconds": 5.012230000000017,
+        "samplesSHA256": "e4ad721b62a3d7c1b11aa6d1f99b203ef870b0542479c89fec4a47ce15cbc7b7",
+        "ok": false
+      }
+    ],
+    "identitiesStable": true,
+    "hostControlWindowVerified": true
+  },
+  "nativeDrops": [
+    {
+      "receiverWindowsVersion": "2022",
+      "direction": "reply",
+      "clientSocket": "10.244.114.4:59071",
+      "sampleStartedAt": "2026-09-09T01:23:49.3705712Z",
+      "drop": {
+        "timestamp": "2026-09-09 01:23:49.384807800",
+        "group": 98898,
+        "packet": 1,
+        "component": 74,
+        "componentInfo": {
+          "driver": "tcpip.sys",
+          "name": "TCP/IPv4 - L3/L4"
+        },
+        "reason": "Not locally destined",
+        "location": "0xE0004136",
+        "ipID": 42100,
+        "fragmentOffsetBytes": 0,
+        "header": "[00]133C.1B30::2026-09-09 01:23:49.384807800 [Microsoft-Windows-PktMon] Drop: PktGroupId 98898, PktNumber 1, Appearance 17, Direction Rx , Type IP , Component 74, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 142, LoggedSize 142 ",
+        "trafficClassesBeforeDrop": [
+          0
+        ],
+        "trafficClassAtDrop": 0,
+        "trafficClassChanged": false
+      },
+      "withinVFPCaptureWindow": false
+    },
+    {
+      "receiverWindowsVersion": "2025",
+      "direction": "request",
+      "clientSocket": "10.244.114.4:59353",
+      "sampleStartedAt": "2026-09-09T01:23:56.6524991Z",
+      "drop": {
+        "timestamp": "2026-09-09 01:23:57.027755500",
+        "group": 1708439,
+        "packet": 1,
+        "component": 93,
+        "componentInfo": {
+          "driver": "vfpext.sys",
+          "name": "VFP Extension"
+        },
+        "reason": "Invalid Packet",
+        "location": "0xE0006096",
+        "ipID": 52069,
+        "fragmentOffsetBytes": 0,
+        "header": "[00]09B0.1FCC::2026-09-09 01:23:57.027755500 [Microsoft-Windows-PktMon] Drop: PktGroupId 1708439, PktNumber 1, Appearance 0, Direction Tx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 161, LoggedSize 161 ",
+        "trafficClassesBeforeDrop": [
+          0
+        ],
+        "trafficClassAtDrop": 0,
+        "trafficClassChanged": false
+      },
+      "withinVFPCaptureWindow": false
+    },
+    {
+      "receiverWindowsVersion": "2025",
+      "direction": "request",
+      "clientSocket": "10.244.114.4:61302",
+      "sampleStartedAt": "2026-09-09T01:24:24.0398168Z",
+      "drop": {
+        "timestamp": "2026-09-09 01:24:24.415595600",
+        "group": 1828688,
+        "packet": 1,
+        "component": 73,
+        "componentInfo": {
+          "driver": "tcpip.sys",
+          "name": "TCP/IPv4 - L3/L4"
+        },
+        "reason": "Not locally destined",
+        "location": "0xE0004136",
+        "ipID": 54731,
+        "fragmentOffsetBytes": 0,
+        "header": "[00]1040.1024::2026-09-09 01:24:24.415595600 [Microsoft-Windows-PktMon] Drop: PktGroupId 1828688, PktNumber 1, Appearance 0, Direction Rx , Type IP , Component 73, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 147, LoggedSize 147 ",
+        "trafficClassesBeforeDrop": [
+          0
+        ],
+        "trafficClassAtDrop": 0,
+        "trafficClassChanged": false
+      },
+      "withinVFPCaptureWindow": false
+    },
+    {
+      "receiverWindowsVersion": "2025",
+      "direction": "request",
+      "clientSocket": "10.244.114.4:63584",
+      "sampleStartedAt": "2026-09-09T01:24:56.6320799Z",
+      "drop": {
+        "timestamp": "2026-09-09 01:24:57.011878700",
+        "group": 1967465,
+        "packet": 1,
+        "component": 73,
+        "componentInfo": {
+          "driver": "tcpip.sys",
+          "name": "TCP/IPv4 - L3/L4"
+        },
+        "reason": "Not locally destined",
+        "location": "0xE0004136",
+        "ipID": 57816,
+        "fragmentOffsetBytes": 0,
+        "header": "[00]09B0.1078::2026-09-09 01:24:57.011878700 [Microsoft-Windows-PktMon] Drop: PktGroupId 1967465, PktNumber 1, Appearance 0, Direction Rx , Type IP , Component 73, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 147, LoggedSize 147 ",
+        "trafficClassesBeforeDrop": [
+          0
+        ],
+        "trafficClassAtDrop": 0,
+        "trafficClassChanged": false
+      },
+      "withinVFPCaptureWindow": false
+    },
+    {
+      "receiverWindowsVersion": "2025",
+      "direction": "request",
+      "clientSocket": "10.244.114.4:49219",
+      "sampleStartedAt": "2026-09-09T01:25:24.0491718Z",
+      "drop": {
+        "timestamp": "2026-09-09 01:25:24.429083200",
+        "group": 2091887,
+        "packet": 1,
+        "component": 73,
+        "componentInfo": {
+          "driver": "tcpip.sys",
+          "name": "TCP/IPv4 - L3/L4"
+        },
+        "reason": "Not locally destined",
+        "location": "0xE0004136",
+        "ipID": 60763,
+        "fragmentOffsetBytes": 0,
+        "header": "[00]1040.1024::2026-09-09 01:25:24.429083200 [Microsoft-Windows-PktMon] Drop: PktGroupId 2091887, PktNumber 1, Appearance 0, Direction Rx , Type IP , Component 73, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 147, LoggedSize 147 ",
+        "trafficClassesBeforeDrop": [
+          0
+        ],
+        "trafficClassAtDrop": 0,
+        "trafficClassChanged": false
+      },
+      "withinVFPCaptureWindow": false
+    },
+    {
+      "receiverWindowsVersion": "2025",
+      "direction": "reply",
+      "clientSocket": "10.244.42.6:59338",
+      "sampleStartedAt": "2026-09-09T01:25:24.4233693Z",
+      "drop": {
+        "timestamp": "2026-09-09 01:25:24.429151300",
+        "group": 2091904,
+        "packet": 1,
+        "component": 73,
+        "componentInfo": {
+          "driver": "tcpip.sys",
+          "name": "TCP/IPv4 - L3/L4"
+        },
+        "reason": "Not locally destined",
+        "location": "0xE0004136",
+        "ipID": 60764,
+        "fragmentOffsetBytes": 0,
+        "header": "[00]1040.1024::2026-09-09 01:25:24.429151300 [Microsoft-Windows-PktMon] Drop: PktGroupId 2091904, PktNumber 1, Appearance 0, Direction Rx , Type IP , Component 73, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 142, LoggedSize 142 ",
+        "trafficClassesBeforeDrop": [
+          0
+        ],
+        "trafficClassAtDrop": 0,
+        "trafficClassChanged": false
+      },
+      "withinVFPCaptureWindow": false
+    }
+  ],
+  "findings": [
+    "Five TCP/IP Not locally destined drops and one unfragmented VFP Invalid Packet drop were correlated with failed samples.",
+    "The VFP drop has traffic class 0 before and at drop, so a traffic-class change is not required for this VFP drop reason.",
+    "All six correlated drops occurred after VFP tracing stopped; absent nearby VFP events cannot diagnose those drops.",
+    "Bulk XML export delayed Packet Monitor shutdown. Its circular log overwrote earlier packets: Windows 2022 has no retained overlap; Windows 2025 retains approximately 17 seconds of overlap.",
+    "One failed flow in the remaining Windows 2025 overlap has VFP creation/deletion context, including VXLAN VNI 4096. This is not a packet identity or causal diagnosis."
+  ],
+  "limits": [
+    "21 failed exchanges have no correlated native drop in the retained receiver data; absence does not locate their losses.",
+    "ETW event loss was not independently audited. Original Packet Monitor stop output was not recovered.",
+    "The 27 failures span complete sampler lifetimes, including periods before and after the VFP capture window.",
+    "No image promotion, driver/CNI mitigation, lifecycle qualification or release."
+  ],
+  "fixtures": {
+    "windows2025-vfp-unchanged-class-drop.txt": "d4e3de7a295d5d34962adcf20c6d32c849895b9694006b0a8c1952dd4ca9252e",
+    "windows2025-vfp-vxlan-flow.jsonl": "f743f62db00c20405b5f37b9e9a05a0ca7a53b555b59420cb5885c17bdc77ccc"
+  },
+  "cleanup": {
+    "originalNodesReady": 13,
+    "originalNodeUIDsUnchanged": true,
+    "originalSamplersTerminalAndCollected": true,
+    "podSamplerFilesRemoved": true,
+    "hostCRIToolsRemoved": true,
+    "allCapturesStopped": true,
+    "allCaptureArtifactsRemovedFromGuests": true
+  },
+  "next": "Use the revised default collector in a short paired capture; stop both captures before conversion, then query VFP context for failed samples within the retained overlap.",
+  "validation": {
+    "testsPassed": 22,
+    "pktmonStatementsCovered": 62,
+    "pktmonStatements": 64,
+    "vfpDecoderStatementsCovered": 37,
+    "vfpDecoderStatements": 37,
+    "scope": "Selected Python observer packages only; PowerShell covered by native checks, no whole-project coverage claim."
+  }
+}

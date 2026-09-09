@@ -1,0 +1,67 @@
+{
+  "podUID": "8dfedb47-4499-42d5-9b25-aecb3279d31b",
+  "node": "aws-win2025-gpu",
+  "containerID": "851e61a80af98490c183154dc62c704e8aa669a31cf574ad56ac3c87d55c94c5",
+  "terminalReason": "StartError",
+  "stages": [
+    {
+      "at": "2026-09-07T23:05:06.412246+00:00",
+      "stage": "createSystem",
+      "result": "0xc0370103",
+      "operationPending": true
+    },
+    {
+      "at": "2026-09-07T23:05:16.378575+00:00",
+      "stage": "startSystem",
+      "result": "0xc0370103",
+      "operationPending": true
+    },
+    {
+      "at": "2026-09-07T23:05:52.810365+00:00",
+      "stage": "containerStarted",
+      "result": null,
+      "operationPending": false
+    },
+    {
+      "at": "2026-09-07T23:05:52.916509+00:00",
+      "stage": "createProcess",
+      "result": "0x800706ba",
+      "operationPending": false
+    },
+    {
+      "at": "2026-09-07T23:05:52.920060+00:00",
+      "stage": "terminateSystem",
+      "result": "0xc0370103",
+      "operationPending": true
+    },
+    {
+      "at": "2026-09-07T23:05:53.031653+00:00",
+      "stage": "terminateSystem",
+      "result": "0xc0370103",
+      "operationPending": true
+    }
+  ],
+  "scope": "Identity-bound HCS startup timeline; no root-cause or GPU-success inference",
+  "instanceID": "i-0449d9b5d0719f8be",
+  "findings": [
+    "The same container emitted a silo-start event before its first application process failed with RPC unavailable.",
+    "Operation-pending results are asynchronous lifecycle markers, not proof of hypervisor failure.",
+    "Fresh bounded Application and HCS Admin queries returned no matching events; the System query reached its 40-event cap, so it is not an exhaustive absence check.",
+    "System events include LocalService and NetworkService registry-hive initialization entries; no causal connection to the RPC failure is established."
+  ],
+  "diagnostics": {
+    "broadCommand": "9f6b8a89-eec9-4c32-a8a4-a50ac50d4849",
+    "broadCommandTerminalStatus": "TimedOut",
+    "boundedDirectoryRead": "Success",
+    "boundedEventRead": "Success"
+  },
+  "upstreamReference": "https://github.com/microsoft/hcsshim/blob/main/internal/hcs/errors.go",
+  "rootCause": "unresolved",
+  "nextExperiment": "Capture HCS operational events and containerd/shim diagnostics from before the first ordinary GPU application on a fresh VM; compare process-start timing and service-profile initialization against a successful fresh control. Preserve the first attempt and do not warm the image before measurement.",
+  "artifactSHA256": {
+    "pod.json": "c447472806880151cab258b889a34b26078eb1e3d8ea1b9b68af8abe59ebc8f7",
+    "bounded-events.jsonl": "2087ae387c89d18ba793c409989989c795a8e6f3995c8f95aa849ecaac3a7e9b",
+    "bounded-files.json": "61d4d03d36d7ab0985b619d848fb722d8a6b712d4a345822422e74f45a687629",
+    "invocation.json": "25b6c2c6e31a7e0cef7b69b478e041b028fe2459bb1c84ad18beafeecbf7e3f4"
+  }
+}

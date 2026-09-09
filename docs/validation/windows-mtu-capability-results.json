@@ -1,0 +1,432 @@
+{
+  "scope": "Windows MTU configuration capability tests on isolated ordinary-pod interfaces; no persistent rollout or UDP qualification",
+  "liveUpdate2022": {
+    "afterInterfaces": "[{\"InterfaceIndex\":37,\"CompartmentId\":7,\"NlMtu\":1450},{\"InterfaceIndex\":36,\"CompartmentId\":7,\"NlMtu\":4294967295},{\"InterfaceIndex\":32,\"CompartmentId\":6,\"NlMtu\":1450},{\"InterfaceIndex\":31,\"CompartmentId\":6,\"NlMtu\":4294967295},{\"InterfaceIndex\":27,\"CompartmentId\":5,\"NlMtu\":1450},{\"InterfaceIndex\":26,\"CompartmentId\":5,\"NlMtu\":4294967295},{\"InterfaceIndex\":25,\"CompartmentId\":4,\"NlMtu\":1450},{\"InterfaceIndex\":24,\"CompartmentId\":4,\"NlMtu\":4294967295},{\"InterfaceIndex\":23,\"CompartmentId\":3,\"NlMtu\":1450},{\"InterfaceIndex\":22,\"CompartmentId\":3,\"NlMtu\":4294967295},{\"InterfaceIndex\":18,\"CompartmentId\":2,\"NlMtu\":1450},{\"InterfaceIndex\":17,\"CompartmentId\":2,\"NlMtu\":4294967295},{\"InterfaceIndex\":9,\"CompartmentId\":1,\"NlMtu\":1450},{\"InterfaceIndex\":11,\"CompartmentId\":1,\"NlMtu\":1420},{\"InterfaceIndex\":1,\"CompartmentId\":1,\"NlMtu\":4294967295}]\r\n",
+    "before": [
+      {
+        "Type": "EncapOverhead",
+        "Settings": {
+          "Overhead": 50
+        }
+      }
+    ],
+    "beforeInterfaces": "[{\"InterfaceIndex\":37,\"CompartmentId\":7,\"NlMtu\":1450},{\"InterfaceIndex\":36,\"CompartmentId\":7,\"NlMtu\":4294967295},{\"InterfaceIndex\":32,\"CompartmentId\":6,\"NlMtu\":1450},{\"InterfaceIndex\":31,\"CompartmentId\":6,\"NlMtu\":4294967295},{\"InterfaceIndex\":27,\"CompartmentId\":5,\"NlMtu\":1450},{\"InterfaceIndex\":26,\"CompartmentId\":5,\"NlMtu\":4294967295},{\"InterfaceIndex\":25,\"CompartmentId\":4,\"NlMtu\":1450},{\"InterfaceIndex\":24,\"CompartmentId\":4,\"NlMtu\":4294967295},{\"InterfaceIndex\":23,\"CompartmentId\":3,\"NlMtu\":1450},{\"InterfaceIndex\":22,\"CompartmentId\":3,\"NlMtu\":4294967295},{\"InterfaceIndex\":18,\"CompartmentId\":2,\"NlMtu\":1450},{\"InterfaceIndex\":17,\"CompartmentId\":2,\"NlMtu\":4294967295},{\"InterfaceIndex\":9,\"CompartmentId\":1,\"NlMtu\":1450},{\"InterfaceIndex\":11,\"CompartmentId\":1,\"NlMtu\":1420},{\"InterfaceIndex\":1,\"CompartmentId\":1,\"NlMtu\":4294967295}]\r\n",
+    "endpointID": "13b0d3c9-9f20-4377-901c-8368342d43b3",
+    "restored": {
+      "Type": "EncapOverhead",
+      "Settings": {
+        "Overhead": 50
+      }
+    },
+    "restoredInterfaces": "[{\"InterfaceIndex\":37,\"CompartmentId\":7,\"NlMtu\":1450},{\"InterfaceIndex\":36,\"CompartmentId\":7,\"NlMtu\":4294967295},{\"InterfaceIndex\":32,\"CompartmentId\":6,\"NlMtu\":1450},{\"InterfaceIndex\":31,\"CompartmentId\":6,\"NlMtu\":4294967295},{\"InterfaceIndex\":27,\"CompartmentId\":5,\"NlMtu\":1450},{\"InterfaceIndex\":26,\"CompartmentId\":5,\"NlMtu\":4294967295},{\"InterfaceIndex\":25,\"CompartmentId\":4,\"NlMtu\":1450},{\"InterfaceIndex\":24,\"CompartmentId\":4,\"NlMtu\":4294967295},{\"InterfaceIndex\":23,\"CompartmentId\":3,\"NlMtu\":1450},{\"InterfaceIndex\":22,\"CompartmentId\":3,\"NlMtu\":4294967295},{\"InterfaceIndex\":18,\"CompartmentId\":2,\"NlMtu\":1450},{\"InterfaceIndex\":17,\"CompartmentId\":2,\"NlMtu\":4294967295},{\"InterfaceIndex\":9,\"CompartmentId\":1,\"NlMtu\":1450},{\"InterfaceIndex\":11,\"CompartmentId\":1,\"NlMtu\":1420},{\"InterfaceIndex\":1,\"CompartmentId\":1,\"NlMtu\":4294967295}]\r\n",
+    "updated": {
+      "Type": "EncapOverhead",
+      "Settings": {
+        "Overhead": 50
+      }
+    }
+  },
+  "freshPodOverheadPolicy": {
+    "2022": {
+      "podReady": true,
+      "podIP": "10.244.167.134",
+      "conditions": [
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T09:49:33Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "PodReadyToStartContainers"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T09:49:28Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "Initialized"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T09:49:35Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "Ready"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T09:49:35Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "ContainersReady"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T09:49:28Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "PodScheduled"
+        }
+      ],
+      "interfaces": [
+        {
+          "InterfaceIndex": 42,
+          "CompartmentId": 8,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 41,
+          "CompartmentId": 8,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 37,
+          "CompartmentId": 7,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 36,
+          "CompartmentId": 7,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 32,
+          "CompartmentId": 6,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 31,
+          "CompartmentId": 6,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 27,
+          "CompartmentId": 5,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 26,
+          "CompartmentId": 5,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 25,
+          "CompartmentId": 4,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 24,
+          "CompartmentId": 4,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 23,
+          "CompartmentId": 3,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 22,
+          "CompartmentId": 3,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 18,
+          "CompartmentId": 2,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 17,
+          "CompartmentId": 2,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 9,
+          "CompartmentId": 1,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 11,
+          "CompartmentId": 1,
+          "NlMtu": 1420
+        },
+        {
+          "InterfaceIndex": 1,
+          "CompartmentId": 1,
+          "NlMtu": 4294967295
+        }
+      ],
+      "configRestoration": "restored"
+    },
+    "2025": {
+      "podReady": true,
+      "podIP": "10.244.233.134",
+      "conditions": [
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T09:50:09Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "PodReadyToStartContainers"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T09:50:05Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "Initialized"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T09:50:11Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "Ready"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T09:50:11Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "ContainersReady"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T09:50:05Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "PodScheduled"
+        }
+      ],
+      "interfaces": [
+        {
+          "InterfaceIndex": 41,
+          "CompartmentId": 8,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 40,
+          "CompartmentId": 8,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 36,
+          "CompartmentId": 7,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 35,
+          "CompartmentId": 7,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 31,
+          "CompartmentId": 6,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 30,
+          "CompartmentId": 6,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 26,
+          "CompartmentId": 5,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 25,
+          "CompartmentId": 5,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 24,
+          "CompartmentId": 4,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 23,
+          "CompartmentId": 4,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 22,
+          "CompartmentId": 3,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 21,
+          "CompartmentId": 3,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 17,
+          "CompartmentId": 2,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 16,
+          "CompartmentId": 2,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 8,
+          "CompartmentId": 1,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 10,
+          "CompartmentId": 1,
+          "NlMtu": 1420
+        },
+        {
+          "InterfaceIndex": 1,
+          "CompartmentId": 1,
+          "NlMtu": 4294967295
+        }
+      ],
+      "configRestoration": "restored"
+    }
+  },
+  "directInterfaceChange": [
+    {
+      "windowsVersion": "2022",
+      "exitCode": 0,
+      "result": {
+        "compartment": 7,
+        "after": 1370,
+        "before": 1450,
+        "restored": 1450,
+        "index": 37
+      }
+    },
+    {
+      "windowsVersion": "2025",
+      "exitCode": 0,
+      "result": {
+        "compartment": 7,
+        "after": 1370,
+        "before": 1450,
+        "restored": 1450,
+        "index": 36
+      }
+    }
+  ],
+  "nativeCNIHelper": [
+    {
+      "windowsVersion": "2022",
+      "exitCode": 0,
+      "result": {
+        "native": {
+          "ok": true
+        },
+        "compartment": 7,
+        "restored": 1450,
+        "after": 1370,
+        "index": 37,
+        "before": 1450
+      }
+    },
+    {
+      "windowsVersion": "2025",
+      "exitCode": 0,
+      "result": {
+        "native": {
+          "ok": true
+        },
+        "compartment": 7,
+        "restored": 1450,
+        "after": 1370,
+        "index": 36,
+        "before": 1450
+      }
+    }
+  ],
+  "portableTests": {
+    "command": "go test ./libcalico-go/lib/winmtu -coverprofile=/var/tmp/winmtu-coverage.out",
+    "passed": true,
+    "portableStatementCoveragePercent": 100,
+    "scope": "Portable target validation and script generation only; native execution is separately observed, not instrumented."
+  },
+  "configurationObservations": {
+    "windowsCNIImage": "docker.io/calico/cni-windows:v3.32.0",
+    "mtu": 1450,
+    "mode": "vxlan",
+    "windows_loopback_DSR": true,
+    "windows_use_single_network": true
+  },
+  "freshCNIAddAttempt": {
+    "bothPodsReady": false,
+    "restoration": {
+      "2022": [
+        "C:\\etc\\cni\\net.d\\10-calico.conflist",
+        "C:\\opt\\cni\\bin\\calico.exe"
+      ],
+      "2025": [
+        "C:\\etc\\cni\\net.d\\10-calico.conflist",
+        "C:\\opt\\cni\\bin\\calico.exe"
+      ]
+    },
+    "events": {
+      "2022": [
+        {
+          "reason": "FailedCreatePodSandBox",
+          "message": "Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"6086a51ab1b329b827abf7c805fcab41823bf2a0ec1641005f54db7c5db73066\": plugin type=\"calico\" name=\"Calico\" failed (add): MTU requires an isolated endpoint compartment and addresses"
+        },
+        {
+          "reason": "FailedCreatePodSandBox",
+          "message": "Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"fa5f8df21a8edc5cc2f2635966cb3fb25be9f8b90e1088725e15f73fe23564fd\": plugin type=\"calico\" name=\"Calico\" failed (add): MTU requires an isolated endpoint compartment and addresses"
+        },
+        {
+          "reason": "FailedCreatePodSandBox",
+          "message": "Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"6bb5370f93bf23ec04ffdc5c88b8cf6cfb6b8ab259cd0395ded76cf0b625d6c1\": plugin type=\"calico\" name=\"Calico\" failed (add): MTU requires an isolated endpoint compartment and addresses"
+        },
+        {
+          "reason": "FailedCreatePodSandBox",
+          "message": "Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"bdb116a44a08bd23f27bff7935e7e015a0c6217cc2011e53b157d35536c476a2\": plugin type=\"calico\" name=\"Calico\" failed (add): MTU requires an isolated endpoint compartment and addresses"
+        },
+        {
+          "reason": "FailedCreatePodSandBox",
+          "message": "Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"dd35c5a7f0df5b7277967ebdd846b64485ecabfee7d2eb2fafa10051aef60172\": plugin type=\"calico\" name=\"Calico\" failed (add): MTU requires an isolated endpoint compartment and addresses"
+        },
+        {
+          "reason": "FailedCreatePodSandBox",
+          "message": "Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"874d9fdd19d011adf9b499c127ac25b161fa58dcf2bcacbad071e020fb9e82e3\": plugin type=\"calico\" name=\"Calico\" failed (add): MTU requires an isolated endpoint compartment and addresses"
+        }
+      ],
+      "2025": [
+        {
+          "reason": "FailedCreatePodSandBox",
+          "message": "Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"ab48b65b2d7adb43de978628503149d4ebedbb2fafed6dbc2d595e50a046ad94\": plugin type=\"calico\" name=\"Calico\" failed (add): MTU requires an isolated endpoint compartment and addresses"
+        },
+        {
+          "reason": "FailedCreatePodSandBox",
+          "message": "Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"5e2058f884c6e6217419897ca2564226ffe5a43c2fa6448ef18bacbcda3f6589\": plugin type=\"calico\" name=\"Calico\" failed (add): MTU requires an isolated endpoint compartment and addresses"
+        },
+        {
+          "reason": "FailedCreatePodSandBox",
+          "message": "Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"92452262fc72a5293018780a5c8a39a927509fde3218a6ca1789291cbf1f6b89\": plugin type=\"calico\" name=\"Calico\" failed (add): MTU requires an isolated endpoint compartment and addresses"
+        },
+        {
+          "reason": "FailedCreatePodSandBox",
+          "message": "Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"4eac519ad8781d862a97828c1bfcf2fdfac35e75a25d53f91d5de2a758775ca4\": plugin type=\"calico\" name=\"Calico\" failed (add): MTU requires an isolated endpoint compartment and addresses"
+        },
+        {
+          "reason": "FailedCreatePodSandBox",
+          "message": "Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"76e47f1803b287200654435d44d996e4b236550041b3dc6f8045b65bd1a963e9\": plugin type=\"calico\" name=\"Calico\" failed (add): MTU requires an isolated endpoint compartment and addresses"
+        },
+        {
+          "reason": "FailedCreatePodSandBox",
+          "message": "Failed to create pod sandbox: rpc error: code = Unknown desc = failed to setup network for sandbox \"2655e159ca8665a438348eb65b8d32aba78cf1387b619c511957e43db20c762d\": plugin type=\"calico\" name=\"Calico\" failed (add): MTU requires an isolated endpoint compartment and addresses"
+        }
+      ]
+    },
+    "hookRemoved": true
+  },
+  "helperPackage": "libcalico-go/lib/winmtu",
+  "helperPortableStatementCoveragePercent": 100,
+  "helperNativeCoverageInstrumented": false,
+  "remaining": "Integrate after isolated compartment creation; validate policy ordering, fresh pods, large UDP, persistent distro MTU and restart/drift handling",
+  "restoredCNIRecovery": {
+    "freshPodsReady": true,
+    "probePodsRemoved": true
+  }
+}

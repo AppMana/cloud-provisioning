@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "scope": "AWS Windows 2025 GPU builder cache qualification with repaired preparation; fresh declared-reference reuse is recorded separately",
+  "windowsBuild": 26100,
+  "instanceID": "i-0acfb426380c8333f",
+  "physicalNICs": 1,
+  "recipeSHA256": "427eae57990fd0dc2d4d83baad3e73977c0ac83ede257937303ceeae0c2f7c56",
+  "pinnedReferences": 10,
+  "tagAliases": 4,
+  "attempts": [
+    {
+      "name": "bare-platform-pull",
+      "status": "failed",
+      "error": "Expected images and aliases are not fully unpacked",
+      "registered": 14,
+      "ready": 10,
+      "unready": [
+        "docker.io/calico/cni-windows:v3.32.0",
+        "docker.io/calico/cni-windows@sha256:100e8fc64d1ef6784498e2eb626b6a8830a7d8be04ad37c5d00fcef7a2a9a0fa",
+        "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+        "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1"
+      ],
+      "pullExitCodes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "serviceStopped": true,
+      "cacheServiceRemoved": true,
+      "registryCredentialsRemoved": true
+    },
+    {
+      "name": "host-default-local-pull",
+      "status": "failed",
+      "error": "Repaired images are not ready",
+      "registered": 14,
+      "ready": 12,
+      "unready": [
+        "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+        "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1"
+      ],
+      "pullExitCodes": [
+        0,
+        0
+      ],
+      "serviceStopped": true,
+      "cacheServiceRemoved": true,
+      "registryCredentialsRemoved": true
+    },
+    {
+      "name": "native-default-unpack",
+      "status": "prepared",
+      "error": null,
+      "registered": 14,
+      "ready": 14,
+      "unready": [],
+      "pullExitCodes": [],
+      "serviceStopped": true,
+      "cacheServiceRemoved": true,
+      "registryCredentialsRemoved": true
+    }
+  ],
+  "nativeVerification": {
+    "passed": true,
+    "checks": {
+      "expectedWindowsBuild": true,
+      "workerMatches": true,
+      "runtimeMatches": true,
+      "k0sRuntimeStore": true,
+      "cacheServiceRunning": true,
+      "noWorkerServiceOrKnownIdentity": true,
+      "noWorkloadContainersOrTasks": true,
+      "exactImagesRegistered": true,
+      "allImagesDownloadedAndUnpacked": true,
+      "exactImageTargets": true,
+      "dataDirectoryInheritsPermissions": true
+    },
+    "observedAt": "2026-09-08T10:31:17.2269759Z",
+    "images": [
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-device-plugin@sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-publisher@sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326",
+      "docker.io/calico/cni-windows@sha256:100e8fc64d1ef6784498e2eb626b6a8830a7d8be04ad37c5d00fcef7a2a9a0fa",
+      "docker.io/sigwindowstools/kube-proxy@sha256:8aa3fb7fcc5d91b9d3fb98fad5cec735e4e1d59723cb06df191e388f56a83d56",
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+      "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+      "quay.io/k0sproject/traefik@sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d"
+    ],
+    "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+  },
+  "coverage": {
+    "pythonCacheValidator": {
+      "statements": 94,
+      "missed": 18,
+      "percent": 81,
+      "tests": 17
+    },
+    "unpackHelperLinuxUnitPercent": 7.7,
+    "limitations": "Native VM execution is not included in statement coverage."
+  },
+  "sources": {
+    "images/windows/cache.py": "3c110eab6fc55f31a76fede30ff775870e4c31441c8d8f932592fc30cd82ea89",
+    "images/windows/prepare-cache.ps1": "7abc3418eb151cf72041c0fca0a229a7224f6fd7886f680e3b335c75e0311ce7",
+    "images/windows/inspect-cache.ps1": "1eb82701e6c7515d231c105e0ff94fae50cd35b53b0f7e55835de45e5b469939",
+    "images/windows/cache-unpack/main.go": "c80f04ace376dfd6402fb8942fd7807346a363a0c665c1292a150db115682698",
+    "images/windows/cache-unpack/go.mod": "b71162866e559d4b986d772cf414f5fac4c8b2eadf428be6146718557fb51719",
+    "images/windows/cache-unpack/go.sum": "18bd44e4599b56b38723297507a861611ba855c03786c7fbe77c5270f7491426"
+  },
+  "unpackHelperSHA256": "e8f60009da59c8d3320e39d3778ac532142ff903569fd162985fd85d84837c3a",
+  "sourceReferences": [
+    "https://github.com/containerd/containerd/blob/v2.3.2/cmd/ctr/commands/images/pull.go",
+    "https://github.com/containerd/platforms/blob/v1.0.0-rc.4/defaults_windows.go",
+    "https://github.com/containerd/platforms/blob/v1.0.0-rc.4/platforms.go"
+  ],
+  "sourceHashScope": "Hashes at the native build snapshot; final combined prepare-cache.ps1 integration had syntax validation only. Follow-up unit validation records the later helper refactor separately.",
+  "independentPreparation": {
+    "preparedAt": "2026-09-08T10:32:40.350954+00:00",
+    "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+    "workerVersion": "v1.36.2+k0s.0.appmana.1",
+    "tunnelSHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+    "cacheVerification": {
+      "passed": true,
+      "checks": {
+        "expectedWindowsBuild": true,
+        "workerMatches": true,
+        "runtimeMatches": true,
+        "k0sRuntimeStore": true,
+        "cacheServiceRunning": true,
+        "noWorkerServiceOrKnownIdentity": true,
+        "noWorkloadContainersOrTasks": true,
+        "exactImagesRegistered": true,
+        "allImagesDownloadedAndUnpacked": true,
+        "exactImageTargets": true,
+        "dataDirectoryInheritsPermissions": true
+      },
+      "observedAt": "2026-09-08T10:32:38.3248968Z",
+      "images": [
+        "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+        "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+        "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-device-plugin@sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+        "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+        "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-publisher@sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326",
+        "docker.io/calico/cni-windows@sha256:100e8fc64d1ef6784498e2eb626b6a8830a7d8be04ad37c5d00fcef7a2a9a0fa",
+        "docker.io/sigwindowstools/kube-proxy@sha256:8aa3fb7fcc5d91b9d3fb98fad5cec735e4e1d59723cb06df191e388f56a83d56",
+        "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+        "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+        "quay.io/k0sproject/traefik@sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d"
+      ],
+      "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+    }
+  },
+  "generalizeRequestedAt": "2026-09-08T10:33:39.541120+00:00",
+  "capture": {
+    "imageID": "ami-09c23a0ab99f32968",
+    "state": "available",
+    "builderState": "stopped",
+    "previousImageRetained": "ami-0e924eecc6692176b",
+    "freshCloneVerified": true,
+    "authorizedForPrivateCAPITest": true,
+    "freshCloneVerificationScope": "Declared references only; runtime pause image was absent from the baked recipe",
+    "completeStartupCacheVerified": false
+  },
+  "limitations": [
+    "Preparation required two recorded failed attempts and native recovery.",
+    "The final combined prepare-cache.ps1 flow has syntax validation; the native helper and independent verification ran on the retained builder.",
+    "The recovered cache may retain snapshot chains unpacked for other Windows versions during the failed attempts.",
+    "Fresh declared Pod-image reuse passed; full startup cache remains incomplete because pause was not baked. Startup performance remains a separate gate."
+  ],
+  "followUpUnitValidation": {
+    "helperLinuxStatementPercent": 54.8,
+    "tests": [
+      "pinned references",
+      "successful unpack with missing native snapshot is rejected",
+      "all metadata targets checked before any unpack",
+      "native unpack and readback errors propagated"
+    ],
+    "scope": "Injected image-store I/O models observed native failure/success; production native Windows platform matcher unchanged. Refactored executable crossbuild passed, native execution still refers to the original recorded SHA.",
+    "sourceSHA256": {
+      "images/windows/cache-unpack/main.go": "9d9eacf39c8cc75c61612cc9c02b228031ffd9f37e7c2f7be734cb7f6e37a416",
+      "images/windows/cache-unpack/main_test.go": "1bda4265af850ae2d838f7b3213a2df1961dd259b49bb749f5b6c40c1f16c059",
+      "images/windows/cache-unpack/go.mod": "f5981df963fd64a4d37575c1b0b30fd23f36f293deeca48ce60c99c1e33bdda1",
+      "images/windows/cache-unpack/go.sum": "18bd44e4599b56b38723297507a861611ba855c03786c7fbe77c5270f7491426"
+    }
+  },
+  "freshCloneEvidence": "windows-cache-reuse-results.json"
+}

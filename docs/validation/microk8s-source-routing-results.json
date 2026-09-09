@@ -1,0 +1,654 @@
+{
+  "schemaVersion": 1,
+  "state": "source-routing-fixed-handover-continuity-unqualified",
+  "scope": "MicroK8s Calico VXLAN source routing during endpoint retirement",
+  "baseline": {
+    "commandID": "2b1ee78d-2f09-4e16-9a5c-f61d0c4e5bc2",
+    "archiveSHA256": "6d725e4ffcd6b708b198a199237c8dbfb144e510e95ae3eb2b2dcb6f5aea0c21",
+    "window": {
+      "startedAt": "2026-09-09T13:13:04.735741+00:00",
+      "finishedAt": "2026-09-09T13:22:25.244654+00:00",
+      "rows": [
+        {
+          "placement": "control-plane",
+          "startedAt": "2026-09-09T13:13:04.736306+00:00",
+          "finishedAt": "2026-09-09T13:19:16.870833+00:00",
+          "exitCode": 0
+        },
+        {
+          "placement": "all-nodes",
+          "startedAt": "2026-09-09T13:19:16.871290+00:00",
+          "finishedAt": "2026-09-09T13:22:25.244402+00:00",
+          "exitCode": 0
+        }
+      ]
+    },
+    "lanes": [
+      {
+        "attempts": 3874,
+        "passed": 3838,
+        "maxStartIntervalSeconds": 5.104853870999989,
+        "samplesSHA256": "beff514caaeada4e9c850841a13ce48cf9506df283a1d4b2f5c0504c55c2deb2",
+        "ok": false,
+        "source": "site",
+        "target": "remote1",
+        "failedGroups": [
+          {
+            "firstSequence": 1098,
+            "lastSequence": 1130,
+            "count": 33,
+            "firstStartOffsetSeconds": 111.704394025,
+            "lastStartOffsetSeconds": 274.994343947
+          },
+          {
+            "firstSequence": 2981,
+            "lastSequence": 2983,
+            "count": 3,
+            "firstStartOffsetSeconds": 471.731050391,
+            "lastStartOffsetSeconds": 481.936845686
+          }
+        ]
+      },
+      {
+        "attempts": 3881,
+        "passed": 3845,
+        "maxStartIntervalSeconds": 5.104689726000004,
+        "samplesSHA256": "205ca6f02faa604107202e1bf6958a5f42e069cc7ab27f0babe8e1885e11658d",
+        "ok": false,
+        "source": "remote1",
+        "target": "site",
+        "failedGroups": [
+          {
+            "firstSequence": 1082,
+            "lastSequence": 1114,
+            "count": 33,
+            "firstStartOffsetSeconds": 110.106103212,
+            "lastStartOffsetSeconds": 273.395605418
+          },
+          {
+            "firstSequence": 2970,
+            "lastSequence": 2972,
+            "count": 3,
+            "firstStartOffsetSeconds": 470.143075789,
+            "lastStartOffsetSeconds": 480.348236809
+          }
+        ]
+      }
+    ],
+    "attempts": 7755,
+    "passed": 7683,
+    "failed": 72,
+    "rawLogsIndependentlyValidated": true,
+    "identitiesStable": true,
+    "networkChecksPassed": 280,
+    "managementChecksPassed": 84
+  },
+  "observations": {
+    "sitePhysicalSource": "10.10.0.11",
+    "siteTunnelSource": "10.100.0.1",
+    "remoteTunnelDestination": "10.100.0.160",
+    "retirementRouteAt": "2026-09-09T13:16:49.234114Z",
+    "physicalSourceRoute": {
+      "device": "cldt1775f69e",
+      "table": 517
+    },
+    "appliedPeerDocumentAt": "2026-09-09T13:16:52.439381Z",
+    "remoteAcknowledgedCurrentDocument": true,
+    "retainedW1AllowedIPs": [
+      "10.100.0.1/32"
+    ],
+    "physicalSourceOwner": "cp relay",
+    "vxlanSourceConfiguration": "10.10.0.11 on ens2, UDP 4789",
+    "postRetirementRawCaptureAt": "2026-09-09T13:17:48.419821Z",
+    "postRetirementHeaders": {
+      "outgoingPhysicalSourceVXLAN": 586,
+      "incomingRemoteSourceVXLAN": 586,
+      "interface": "ens2"
+    },
+    "limits": [
+      "Unqualified UDP requests have a five-second receive deadline; a failed sample does not measure a five-second network outage.",
+      "The post-retirement raw header capture is a successful relay-path observation, not a packet capture of the earlier loss.",
+      "The supplementary ownership JSONL contains interleaved routing samples; distinguish records by their explicit adoptions or stdout field."
+    ]
+  },
+  "candidate": {
+    "binarySHA256": "dde06f85c0cb5f83d01e61a9fee540fe7fb81e8e56aeeae7649c02969fbd7518",
+    "sourceSHA256": "756d1ac4044fcecffb76af65039f6ce5e348ed841eb19c0d3549d62944b42d1b",
+    "image": "cldt-dialer:source-routes-v1",
+    "baseImage": "cldt-dialer:feaef057bb3326a26fe07552b1b28bb648485570f8ca2fcaaacb2c6325391d2b"
+  },
+  "superseded": {
+    "commit": "271ee50a",
+    "function": "egressViaRelay",
+    "reason": "Destination in the tunnel subnet does not imply a tunnel source; retain direct routing only for the exact local tunnel source."
+  },
+  "validation": {
+    "isolatedKernel": [
+      "IPv4 physical source follows relay",
+      "IPv4 explicit tunnel source stays direct",
+      "IPv6 physical source follows relay",
+      "IPv6 explicit tunnel source stays direct",
+      "idempotent source rules",
+      "promotion cleanup",
+      "marked packet exemption",
+      "CNI main-table isolation",
+      "invalid source plans rejected before kernel access"
+    ],
+    "raceTests": "go test -race ./cmd/dialer passed",
+    "nativeCandidate": {
+      "commandID": "cc292fa1-5bcd-4a4f-be59-c4ef535024d6",
+      "state": "terminal; converged checks passed, uninterrupted traffic failed",
+      "observedPhysicalSourceRoute": {
+        "gateway": "10.10.0.10",
+        "device": "ens2",
+        "table": 517
+      },
+      "observedTunnelSourceRoute": {
+        "device": "cldt1775f69e",
+        "table": 66053
+      },
+      "observedAt": "2026-09-09T13:37:39.555867Z",
+      "scope": "Exact source routes and VXLAN packet headers observed while w1 remains retained; full placement result pending",
+      "convergedChecks": {
+        "placements": 4,
+        "networkPassed": 560,
+        "managementPassed": 168
+      },
+      "archiveSHA256": "e705e49105555ce69fd10000d4a90d80ead69ea915cbd306812cd8749573f802",
+      "archiveBytes": 3267217,
+      "operationWindow": {
+        "startedAt": "2026-09-09T13:34:32.231214+00:00",
+        "finishedAt": "2026-09-09T13:53:15.319685+00:00",
+        "rows": [
+          {
+            "placement": "control-plane",
+            "startedAt": "2026-09-09T13:34:32.231707+00:00",
+            "finishedAt": "2026-09-09T13:40:42.242468+00:00",
+            "exitCode": 0
+          },
+          {
+            "placement": "one-worker",
+            "startedAt": "2026-09-09T13:40:42.242799+00:00",
+            "finishedAt": "2026-09-09T13:46:40.293890+00:00",
+            "exitCode": 0
+          },
+          {
+            "placement": "two-workers",
+            "startedAt": "2026-09-09T13:46:40.294231+00:00",
+            "finishedAt": "2026-09-09T13:49:48.270827+00:00",
+            "exitCode": 0
+          },
+          {
+            "placement": "all-nodes",
+            "startedAt": "2026-09-09T13:49:48.271210+00:00",
+            "finishedAt": "2026-09-09T13:53:15.319433+00:00",
+            "exitCode": 0
+          }
+        ]
+      },
+      "rows": [
+        {
+          "placement": "control-plane",
+          "startedAt": "2026-09-09T13:34:32.231707+00:00",
+          "finishedAt": "2026-09-09T13:40:42.242468+00:00",
+          "exitCode": 0,
+          "networkPassed": 140,
+          "managementPassed": 42,
+          "matrixAttempts": 1,
+          "matrixElapsed": "33.717416908s",
+          "harnessCoverage": {
+            "coveredStatements": 846,
+            "totalStatements": 2372,
+            "percent": 35.7
+          }
+        },
+        {
+          "placement": "one-worker",
+          "startedAt": "2026-09-09T13:40:42.242799+00:00",
+          "finishedAt": "2026-09-09T13:46:40.293890+00:00",
+          "exitCode": 0,
+          "networkPassed": 140,
+          "managementPassed": 42,
+          "matrixAttempts": 1,
+          "matrixElapsed": "35.548926488s",
+          "harnessCoverage": {
+            "coveredStatements": 844,
+            "totalStatements": 2372,
+            "percent": 35.6
+          }
+        },
+        {
+          "placement": "two-workers",
+          "startedAt": "2026-09-09T13:46:40.294231+00:00",
+          "finishedAt": "2026-09-09T13:49:48.270827+00:00",
+          "exitCode": 0,
+          "networkPassed": 140,
+          "managementPassed": 42,
+          "matrixAttempts": 1,
+          "matrixElapsed": "33.925604541s",
+          "harnessCoverage": {
+            "coveredStatements": 846,
+            "totalStatements": 2372,
+            "percent": 35.7
+          }
+        },
+        {
+          "placement": "all-nodes",
+          "startedAt": "2026-09-09T13:49:48.271210+00:00",
+          "finishedAt": "2026-09-09T13:53:15.319433+00:00",
+          "exitCode": 0,
+          "networkPassed": 140,
+          "managementPassed": 42,
+          "matrixAttempts": 1,
+          "matrixElapsed": "32.98380334s",
+          "harnessCoverage": {
+            "coveredStatements": 849,
+            "totalStatements": 2372,
+            "percent": 35.8
+          }
+        }
+      ],
+      "lanes": [
+        {
+          "attempts": 11080,
+          "passed": 11073,
+          "maxStartIntervalSeconds": 5.104564186999994,
+          "samplesSHA256": "89443704e1f901a68e1b02f6f985fdd637fddd2314d7c3af7f5051bec269d4a5",
+          "ok": false,
+          "source": "site",
+          "target": "remote1",
+          "failedGroups": [
+            {
+              "firstSequence": 1510,
+              "lastSequence": 1515,
+              "count": 6,
+              "firstStartUTCBounds": [
+                "2026-09-09T13:36:21.039130+00:00",
+                "2026-09-09T13:36:21.196092+00:00"
+              ],
+              "lastStartUTCBounds": [
+                "2026-09-09T13:36:46.548357+00:00",
+                "2026-09-09T13:36:46.705319+00:00"
+              ],
+              "placementCandidates": [
+                "control-plane"
+              ]
+            },
+            {
+              "firstSequence": 4717,
+              "lastSequence": 4717,
+              "count": 1,
+              "firstStartUTCBounds": [
+                "2026-09-09T13:42:20.859369+00:00",
+                "2026-09-09T13:42:21.016331+00:00"
+              ],
+              "lastStartUTCBounds": [
+                "2026-09-09T13:42:20.859369+00:00",
+                "2026-09-09T13:42:21.016331+00:00"
+              ],
+              "placementCandidates": [
+                "one-worker"
+              ]
+            }
+          ]
+        },
+        {
+          "attempts": 11050,
+          "passed": 11043,
+          "maxStartIntervalSeconds": 5.104352779999999,
+          "samplesSHA256": "b73b1d30808f51473ea7fc88893bb1eed04ea245443875161cb9fc47903bcd97",
+          "ok": false,
+          "source": "site",
+          "target": "remote2",
+          "failedGroups": [
+            {
+              "firstSequence": 1235,
+              "lastSequence": 1240,
+              "count": 6,
+              "firstStartUTCBounds": [
+                "2026-09-09T13:35:53.391107+00:00",
+                "2026-09-09T13:35:53.565324+00:00"
+              ],
+              "lastStartUTCBounds": [
+                "2026-09-09T13:36:18.909198+00:00",
+                "2026-09-09T13:36:19.083415+00:00"
+              ],
+              "placementCandidates": [
+                "control-plane"
+              ]
+            },
+            {
+              "firstSequence": 4703,
+              "lastSequence": 4703,
+              "count": 1,
+              "firstStartUTCBounds": [
+                "2026-09-09T13:42:20.894806+00:00",
+                "2026-09-09T13:42:21.069023+00:00"
+              ],
+              "lastStartUTCBounds": [
+                "2026-09-09T13:42:20.894806+00:00",
+                "2026-09-09T13:42:21.069023+00:00"
+              ],
+              "placementCandidates": [
+                "one-worker"
+              ]
+            }
+          ]
+        },
+        {
+          "attempts": 11083,
+          "passed": 11076,
+          "maxStartIntervalSeconds": 5.104693555000011,
+          "samplesSHA256": "c500bca7536f4b34fd2f65f3effefd64a9cb11ff945087cedcebdac6447ff935",
+          "ok": false,
+          "source": "remote1",
+          "target": "site",
+          "failedGroups": [
+            {
+              "firstSequence": 1493,
+              "lastSequence": 1498,
+              "count": 6,
+              "firstStartUTCBounds": [
+                "2026-09-09T13:36:19.571887+00:00",
+                "2026-09-09T13:36:22.756894+00:00"
+              ],
+              "lastStartUTCBounds": [
+                "2026-09-09T13:36:45.092849+00:00",
+                "2026-09-09T13:36:48.277856+00:00"
+              ],
+              "placementCandidates": [
+                "control-plane"
+              ]
+            },
+            {
+              "firstSequence": 4700,
+              "lastSequence": 4700,
+              "count": 1,
+              "firstStartUTCBounds": [
+                "2026-09-09T13:42:19.391641+00:00",
+                "2026-09-09T13:42:22.576648+00:00"
+              ],
+              "lastStartUTCBounds": [
+                "2026-09-09T13:42:19.391641+00:00",
+                "2026-09-09T13:42:22.576648+00:00"
+              ],
+              "placementCandidates": [
+                "one-worker"
+              ]
+            }
+          ]
+        },
+        {
+          "attempts": 11531,
+          "passed": 11531,
+          "maxStartIntervalSeconds": 0.22709934199997406,
+          "samplesSHA256": "86d7d9b043e319ca52da751385272432fd9ce2e1b079f0489bed36d403df3095",
+          "ok": true,
+          "source": "remote1",
+          "target": "remote2",
+          "failedGroups": []
+        },
+        {
+          "attempts": 11041,
+          "passed": 11034,
+          "maxStartIntervalSeconds": 5.106322808000002,
+          "samplesSHA256": "6666b1bdac4ba730049171b74e2f0486c87a93bfd84104af0dea3f0554957f37",
+          "ok": false,
+          "source": "remote2",
+          "target": "site",
+          "failedGroups": [
+            {
+              "firstSequence": 1155,
+              "lastSequence": 1160,
+              "count": 6,
+              "firstStartUTCBounds": [
+                "2026-09-09T13:35:51.865307+00:00",
+                "2026-09-09T13:35:54.961646+00:00"
+              ],
+              "lastStartUTCBounds": [
+                "2026-09-09T13:36:17.388203+00:00",
+                "2026-09-09T13:36:20.484542+00:00"
+              ],
+              "placementCandidates": [
+                "control-plane"
+              ]
+            },
+            {
+              "firstSequence": 4619,
+              "lastSequence": 4619,
+              "count": 1,
+              "firstStartUTCBounds": [
+                "2026-09-09T13:42:19.423944+00:00",
+                "2026-09-09T13:42:22.520283+00:00"
+              ],
+              "lastStartUTCBounds": [
+                "2026-09-09T13:42:19.423944+00:00",
+                "2026-09-09T13:42:22.520283+00:00"
+              ],
+              "placementCandidates": [
+                "one-worker"
+              ]
+            }
+          ]
+        },
+        {
+          "attempts": 11515,
+          "passed": 11515,
+          "maxStartIntervalSeconds": 0.23227168199991866,
+          "samplesSHA256": "c9e4a0ad84c6e20ef8507951acdca676f1d7e3d7a897c54d94c330375b0ad0c0",
+          "ok": true,
+          "source": "remote2",
+          "target": "remote1",
+          "failedGroups": []
+        }
+      ],
+      "attempts": 67300,
+      "passed": 67272,
+      "failed": 28,
+      "identitiesStable": true,
+      "window": {
+        "lanesBracketWindow": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "ok": true,
+        "scope": "Host OOB control ordering only; requires independent terminal logs and identity validation"
+      },
+      "rawLogsIndependentlyValidated": true,
+      "qualificationEligible": true,
+      "ok": false,
+      "nativeQualificationPassed": false,
+      "scopeLimit": "Scoped MicroK8s/Calico IPv4 cluster trial; isolated IPv6 kernel routing tests do not qualify cluster dual stack, Windows or GPU behavior."
+    },
+    "sourceRoutingCoverage": {
+      "coveredStatements": 58,
+      "totalStatements": 73,
+      "percent": 79.5,
+      "scope": "source_routes.go, isolated kernel and unsafe-plan checks; excludes unrelated dialer code"
+    },
+    "nativeKernel": {
+      "commandID": "0194f861-7e04-4358-b30b-82094d5774eb",
+      "scope": "QEMU cp2 VM, isolated network namespace, all four kernel/validation tests passed",
+      "sourceRoutingCoverage": {
+        "coveredStatements": 58,
+        "totalStatements": 73,
+        "percent": 79.5
+      }
+    },
+    "appliedDocumentHistory": {
+      "rawSHA256": "ab5230a3203dc53422e460553295c41b27aaef922c7e7f74417ad7cc712e8600",
+      "samples": 299,
+      "uniquePeerDocuments": 6,
+      "sameSourceOwnerWithDifferentWholeDocumentSamples": 37,
+      "events": [
+        {
+          "at": "2026-09-09T13:41:35.146442+00:00",
+          "machine": "aws-microk8s-remote1-tunnel-peers",
+          "currentSourceOwner": "cp",
+          "appliedSourceOwner": "cp",
+          "currentDocumentAcknowledged": true,
+          "currentSHA256": "8dc02ec9f386d48a40990b7b0dce8747e0d9b486f19d02a23656b9fcb471d6f7",
+          "appliedSHA256": "8dc02ec9f386d48a40990b7b0dce8747e0d9b486f19d02a23656b9fcb471d6f7"
+        },
+        {
+          "at": "2026-09-09T13:41:35.146442+00:00",
+          "machine": "aws-microk8s-tunnel-v1-tunnel-peers",
+          "currentSourceOwner": "cp",
+          "appliedSourceOwner": "cp",
+          "currentDocumentAcknowledged": true,
+          "currentSHA256": "da35d00691f48ac7b0a7c3e82aeb61015830e73d60fcd208ede6b7cd05515735",
+          "appliedSHA256": "da35d00691f48ac7b0a7c3e82aeb61015830e73d60fcd208ede6b7cd05515735"
+        },
+        {
+          "at": "2026-09-09T13:42:00.513953+00:00",
+          "machine": "aws-microk8s-remote1-tunnel-peers",
+          "currentSourceOwner": "w1",
+          "appliedSourceOwner": "cp",
+          "currentDocumentAcknowledged": false,
+          "currentSHA256": "923dbb864e580b3d884ac59a6340f000996da2b97d2bd58ce2a91f29366c8a05",
+          "appliedSHA256": "8dc02ec9f386d48a40990b7b0dce8747e0d9b486f19d02a23656b9fcb471d6f7"
+        },
+        {
+          "at": "2026-09-09T13:42:00.513953+00:00",
+          "machine": "aws-microk8s-tunnel-v1-tunnel-peers",
+          "currentSourceOwner": "w1",
+          "appliedSourceOwner": "cp",
+          "currentDocumentAcknowledged": false,
+          "currentSHA256": "60f6a9a2b236bc524102cdfcc5e0024303ff7d8d9ccf3cdcdd8619ca65fba44e",
+          "appliedSHA256": "da35d00691f48ac7b0a7c3e82aeb61015830e73d60fcd208ede6b7cd05515735"
+        },
+        {
+          "at": "2026-09-09T13:42:22.185710+00:00",
+          "machine": "aws-microk8s-remote1-tunnel-peers",
+          "currentSourceOwner": "w1",
+          "appliedSourceOwner": "w1",
+          "currentDocumentAcknowledged": true,
+          "currentSHA256": "923dbb864e580b3d884ac59a6340f000996da2b97d2bd58ce2a91f29366c8a05",
+          "appliedSHA256": "923dbb864e580b3d884ac59a6340f000996da2b97d2bd58ce2a91f29366c8a05"
+        },
+        {
+          "at": "2026-09-09T13:42:24.423435+00:00",
+          "machine": "aws-microk8s-tunnel-v1-tunnel-peers",
+          "currentSourceOwner": "w1",
+          "appliedSourceOwner": "w1",
+          "currentDocumentAcknowledged": true,
+          "currentSHA256": "60f6a9a2b236bc524102cdfcc5e0024303ff7d8d9ccf3cdcdd8619ca65fba44e",
+          "appliedSHA256": "60f6a9a2b236bc524102cdfcc5e0024303ff7d8d9ccf3cdcdd8619ca65fba44e"
+        },
+        {
+          "at": "2026-09-09T13:45:00.778575+00:00",
+          "machine": "aws-microk8s-remote1-tunnel-peers",
+          "currentSourceOwner": "w1",
+          "appliedSourceOwner": "w1",
+          "currentDocumentAcknowledged": false,
+          "currentSHA256": "c2f0b3c25a6418b777f2514612db38943f7e751d74ae773498323bba545d8f37",
+          "appliedSHA256": "923dbb864e580b3d884ac59a6340f000996da2b97d2bd58ce2a91f29366c8a05"
+        },
+        {
+          "at": "2026-09-09T13:45:01.998977+00:00",
+          "machine": "aws-microk8s-tunnel-v1-tunnel-peers",
+          "currentSourceOwner": "w1",
+          "appliedSourceOwner": "w1",
+          "currentDocumentAcknowledged": false,
+          "currentSHA256": "edfb2472c83c4ccbc96e255c990177450f2d738318372e43ad422a0b8bd98be6",
+          "appliedSHA256": "60f6a9a2b236bc524102cdfcc5e0024303ff7d8d9ccf3cdcdd8619ca65fba44e"
+        },
+        {
+          "at": "2026-09-09T13:45:21.797878+00:00",
+          "machine": "aws-microk8s-remote1-tunnel-peers",
+          "currentSourceOwner": "w1",
+          "appliedSourceOwner": "w1",
+          "currentDocumentAcknowledged": true,
+          "currentSHA256": "c2f0b3c25a6418b777f2514612db38943f7e751d74ae773498323bba545d8f37",
+          "appliedSHA256": "c2f0b3c25a6418b777f2514612db38943f7e751d74ae773498323bba545d8f37"
+        },
+        {
+          "at": "2026-09-09T13:45:24.158776+00:00",
+          "machine": "aws-microk8s-tunnel-v1-tunnel-peers",
+          "currentSourceOwner": "w1",
+          "appliedSourceOwner": "w1",
+          "currentDocumentAcknowledged": true,
+          "currentSHA256": "edfb2472c83c4ccbc96e255c990177450f2d738318372e43ad422a0b8bd98be6",
+          "appliedSHA256": "edfb2472c83c4ccbc96e255c990177450f2d738318372e43ad422a0b8bd98be6"
+        }
+      ],
+      "limitation": "Applier acknowledgment is not a simultaneous kernel capture; hash lookup uses documents observed within this bounded history."
+    },
+    "finalNodeAudit": {
+      "at": "2026-09-09T13:57:36.099351+00:00",
+      "nodesReady": 10,
+      "nodeUIDsStable": true,
+      "sourceRules": {
+        "cp": "companion rule absent after all-nodes restoration",
+        "cp2": "companion rule absent after all-nodes restoration",
+        "cp3": "companion rule absent after all-nodes restoration",
+        "w1": "companion rule absent after all-nodes restoration",
+        "w2": "companion rule absent after all-nodes restoration"
+      },
+      "rows": [
+        {
+          "placement": "control-plane",
+          "network": 140,
+          "management": 42,
+          "coverage": "total:\t\t\t\t\t\t\t\t\t\t\t(statements)\t\t\t35.7%"
+        },
+        {
+          "placement": "one-worker",
+          "network": 140,
+          "management": 42,
+          "coverage": "total:\t\t\t\t\t\t\t\t\t\t\t(statements)\t\t\t35.6%"
+        },
+        {
+          "placement": "two-workers",
+          "network": 140,
+          "management": 42,
+          "coverage": "total:\t\t\t\t\t\t\t\t\t\t\t(statements)\t\t\t35.7%"
+        },
+        {
+          "placement": "all-nodes",
+          "network": 140,
+          "management": 42,
+          "coverage": "total:\t\t\t\t\t\t\t\t\t\t\t(statements)\t\t\t35.8%"
+        }
+      ]
+    },
+    "candidateImageID": "sha256:cfe57a8dff568856e3f1d1f64298458044d908811d296f5c3eefd2fa559ce437",
+    "credentialRefresh": {
+      "scope": "Derived CAPA and harness credentials refreshed on runner after the operation window closed; no routing repair during the window",
+      "commandID": "2d45e09b-0dff-44d5-9157-a565971a283a"
+    }
+  },
+  "remainingInvestigation": {
+    "symptom": "Full candidate run: 24 withdrawal failures (six on each site/AWS lane) and four promotion failures (one on each site/AWS lane); AWS-to-AWS lanes had zero failures.",
+    "hypothesis": "Applied document and site polling timing; full-document acknowledgment can lag the relevant source-ownership transition.",
+    "historyToPreserve": [
+      "ca6e69b9 gates relay egress on remote application to avoid stranding the remote API path",
+      "ea1c7a17 requires DocRelaysNode; a merely fresh acknowledgment is insufficient"
+    ],
+    "doNotInfer": "A false current-document hash comparison does not prove that the kernel still owns the physical source on the old peer."
+  },
+  "profile": {
+    "distro": "MicroK8s v1.34.9",
+    "snapRevision": "9063",
+    "cni": "bundled Calico v3.29.3",
+    "containerd": "1.7.29",
+    "workerImageID": "ami-095b7537ef1237e91"
+  },
+  "preservedFleets": {
+    "at": "2026-09-09T14:01:53.883771+00:00",
+    "fleets": {
+      "original": {
+        "nodes": 13,
+        "exactBaselineIdentitiesAndReadiness": true
+      },
+      "kuberouter": {
+        "nodes": 7,
+        "exactBaselineIdentitiesAndReadiness": true
+      }
+    }
+  }
+}

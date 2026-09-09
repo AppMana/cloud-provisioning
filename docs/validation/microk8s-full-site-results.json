@@ -1,0 +1,82 @@
+{
+  "result": "fresh-five-node-site-ready-first-attempt-chart-install-failed",
+  "observedAt": "2026-09-09T06:25:45.481966+00:00",
+  "profile": "microk8s/calico",
+  "version": "v1.34.9",
+  "snapRevision": "9063",
+  "runtime": "containerd://1.7.29",
+  "siteNodes": [
+    {
+      "name": "cp",
+      "uid": "d8729944-754b-48df-aed5-28959d9e9682",
+      "controlPlane": true,
+      "ready": "True",
+      "kubelet": "v1.34.9",
+      "runtime": "containerd://1.7.29"
+    },
+    {
+      "name": "cp2",
+      "uid": "b19d280a-da59-434c-abfd-a2e21ed5c075",
+      "controlPlane": true,
+      "ready": "True",
+      "kubelet": "v1.34.9",
+      "runtime": "containerd://1.7.29"
+    },
+    {
+      "name": "cp3",
+      "uid": "09568eb5-652c-429a-b278-70fa97116bd1",
+      "controlPlane": true,
+      "ready": "True",
+      "kubelet": "v1.34.9",
+      "runtime": "containerd://1.7.29"
+    },
+    {
+      "name": "w1",
+      "uid": "7c61a736-617c-401e-8bb2-d525a640c650",
+      "controlPlane": false,
+      "ready": "True",
+      "kubelet": "v1.34.9",
+      "runtime": "containerd://1.7.29"
+    },
+    {
+      "name": "w2",
+      "uid": "fad978c8-68f1-4a04-a0c6-6aa686eb470c",
+      "controlPlane": false,
+      "ready": "True",
+      "kubelet": "v1.34.9",
+      "runtime": "containerd://1.7.29"
+    }
+  ],
+  "nativeHighAvailability": true,
+  "datastoreMasterNodes": [
+    "10.10.0.10:19001",
+    "10.10.0.13:19001",
+    "10.10.0.14:19001"
+  ],
+  "hardwareProof": {
+    "singleNICAndKVM": "passed for all seven topology VMs",
+    "management": "virtio-serial"
+  },
+  "initialNetworkIsolationProof": "passed",
+  "kubeletActiveLocalAPIChecks": "passed on all five site nodes",
+  "coverage": {
+    "coveredStatements": 793,
+    "totalStatements": 3209,
+    "scope": "first-attempt native harness counters"
+  },
+  "pending": [],
+  "evidenceSHA256": {
+    "siteObservation": "e53ff52a664ac9aed8a02dadde8e83f7c25d50cc86eab41e257f8fc1d6e3c809",
+    "siteProgress": "0c0fe0e659b3ffba7b3ea42a329f8c26dd4494c8d2296214a43c79fc4e71a4a2"
+  },
+  "retainedFleets": {
+    "originalReady": 13,
+    "kuberouterReady": 7,
+    "UIDsUnchanged": true
+  },
+  "campaignOutcome": {
+    "nativeExitCode": 1,
+    "failure": "missing locked Helm dependency",
+    "retryReport": "microk8s-lifecycle-results.json"
+  }
+}

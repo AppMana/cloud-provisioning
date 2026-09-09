@@ -1,0 +1,289 @@
+{
+  "observedAt": "2026-09-08T19:25:40.145195+00:00",
+  "scope": "Bounded 10ms native UDP streams on retained single-NIC VMs; Windows2022 Packet Monitor capture",
+  "configuration": {
+    "purpose": "Bounded native-stream high-rate reproduction with Windows2022 Packet Monitor",
+    "intervalSeconds": 0.01,
+    "maxObservationSeconds": 120,
+    "stopOnFirstObservedLoss": true,
+    "hostSettingsChanged": false
+  },
+  "window": {
+    "startedAt": "2026-09-08T19:11:11.001911+00:00",
+    "finishedAt": "2026-09-08T19:11:25.084188+00:00",
+    "observedLoss": true
+  },
+  "requestUDPDataBytes": 69,
+  "echoResponseBytes": 64,
+  "survivors": {
+    "attempts": 14280,
+    "failed": 3,
+    "identitiesStable": true,
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "attempts": 1585,
+        "passed": 1584,
+        "maxStartIntervalSeconds": 5.014263768999996,
+        "samplesSHA256": "bc2c40231b74bbec349274c6d569638d4642199438e8b9c0d24c482cd3ce6d3d",
+        "ok": false
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "attempts": 1776,
+        "passed": 1776,
+        "maxStartIntervalSeconds": 0.06557930299999981,
+        "samplesSHA256": "1eb4733e21bffbb851cdbf23997bc4a65bb09248c7fe8aaa02fb3eae80fc5f03",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "attempts": 1632,
+        "passed": 1632,
+        "maxStartIntervalSeconds": 0.15820109999999943,
+        "samplesSHA256": "62c5428edbf234d74e6587449650b922f32a9033f73320a19819fa09fdf2d87d",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "attempts": 3697,
+        "passed": 3696,
+        "maxStartIntervalSeconds": 5.011317000000002,
+        "samplesSHA256": "5f543b1cd5c1466574bb7f281496fbbde1060634a79d1a5de7979eeeca5d6314",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "attempts": 1690,
+        "passed": 1690,
+        "maxStartIntervalSeconds": 0.09793570000000074,
+        "samplesSHA256": "85b0cce43d6e7a41f80ef6caf3225a9273434bb27897fe36c77e6184a45ed831",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "attempts": 3900,
+        "passed": 3899,
+        "maxStartIntervalSeconds": 5.0112764,
+        "samplesSHA256": "39f13a875f8da09e111c9a52f64a7003c99727e7a0278cc1f13f60d960428b7f",
+        "ok": false
+      }
+    ],
+    "qualificationEligible": false,
+    "passed": false
+  },
+  "failedSamples": [
+    {
+      "lane": 0,
+      "target": "10.244.114.4",
+      "sample": {
+        "sequence": 1007,
+        "source": "10.244.190.81:43734",
+        "startedAt": "2026-09-08T19:10:59.615906579Z",
+        "finishedAt": "2026-09-08T19:11:04.619505017Z",
+        "ok": false,
+        "error": "read udp 10.244.190.81:43734->10.244.114.4:8081: i/o timeout",
+        "nonce": "222f060561a493f2ed4b81823075ae42",
+        "pid": 176216,
+        "startOffsetSeconds": 35.894782364,
+        "finishOffsetSeconds": 40.898406731,
+        "attempts": 1008,
+        "passed": 1007,
+        "maxStartIntervalSeconds": 0.11739243,
+        "healthy": false,
+        "stopBoundary": false
+      }
+    },
+    {
+      "lane": 3,
+      "target": "10.244.42.6",
+      "sample": {
+        "sequence": 1751,
+        "source": "10.244.114.4:57668",
+        "startedAt": "2026-09-08T19:10:56.6439825Z",
+        "finishedAt": "2026-09-08T19:11:01.6447698Z",
+        "ok": false,
+        "error": "read udp 10.244.114.4:57668->10.244.42.6:8081: i/o timeout",
+        "nonce": "ae7265241a2e14af242801ac47e3851e",
+        "pid": 6672,
+        "startOffsetSeconds": 25.4135608,
+        "finishOffsetSeconds": 30.4144637,
+        "attempts": 1752,
+        "passed": 1751,
+        "maxStartIntervalSeconds": 0.1416662,
+        "healthy": false,
+        "stopBoundary": false
+      }
+    },
+    {
+      "lane": 5,
+      "target": "10.244.114.4",
+      "sample": {
+        "sequence": 1489,
+        "source": "10.244.42.6:55823",
+        "startedAt": "2026-09-08T19:10:59.3362718Z",
+        "finishedAt": "2026-09-08T19:11:04.337011Z",
+        "ok": false,
+        "error": "read udp 10.244.42.6:55823->10.244.114.4:8081: i/o timeout",
+        "nonce": "a7881a8990fab53a827bb4594816aebb",
+        "pid": 6388,
+        "startOffsetSeconds": 20.8028472,
+        "finishOffsetSeconds": 25.8035864,
+        "attempts": 1490,
+        "passed": 1489,
+        "maxStartIntervalSeconds": 0.1176577,
+        "healthy": false,
+        "stopBoundary": false
+      }
+    }
+  ],
+  "correlations": [
+    {
+      "source": "10.244.42.6",
+      "sourcePort": 55823,
+      "destination": "10.244.114.4",
+      "destinationPort": 8081,
+      "flowObserved": true,
+      "correlationWindowSeconds": 0.1,
+      "drops": [
+        {
+          "timestamp": "2026-09-08 19:10:59.026587000",
+          "group": 29374,
+          "packet": 1,
+          "component": 93,
+          "componentInfo": {
+            "driver": "vfpext.sys",
+            "name": "VFP Extension"
+          },
+          "reason": "Invalid Packet",
+          "location": "0xE0006096",
+          "ipID": 8882,
+          "fragmentOffsetBytes": 0,
+          "header": "[00]06D8.0DE4::2026-09-08 19:10:59.026587000 [Microsoft-Windows-PktMon] Drop: PktGroupId 29374, PktNumber 1, Appearance 11, Direction Tx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 161, LoggedSize 161 ",
+          "trafficClassesBeforeDrop": [
+            0
+          ],
+          "trafficClassAtDrop": 116,
+          "trafficClassChanged": true
+        }
+      ]
+    },
+    {
+      "source": "10.244.190.81",
+      "sourcePort": 43734,
+      "destination": "10.244.114.4",
+      "destinationPort": 8081,
+      "flowObserved": true,
+      "correlationWindowSeconds": 0.1,
+      "drops": [
+        {
+          "timestamp": "2026-09-08 19:10:59.026271100",
+          "group": 29373,
+          "packet": 1,
+          "component": 74,
+          "componentInfo": {
+            "driver": "tcpip.sys",
+            "name": "TCP/IPv4 - L3/L4"
+          },
+          "reason": "Not locally destined",
+          "location": "0xE0004136",
+          "ipID": 31791,
+          "fragmentOffsetBytes": 0,
+          "header": "[00]1264.0C14::2026-09-08 19:10:59.026271100 [Microsoft-Windows-PktMon] Drop: PktGroupId 29373, PktNumber 1, Appearance 17, Direction Rx , Type IP , Component 74, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 147, LoggedSize 147 ",
+          "trafficClassesBeforeDrop": [
+            0
+          ],
+          "trafficClassAtDrop": 0,
+          "trafficClassChanged": false
+        }
+      ]
+    }
+  ],
+  "headerComparison": {
+    "originalAppearances": 10,
+    "comparedLayer": "VXLAN UDP payload including encapsulated Ethernet/IPv4/UDP",
+    "bytes": 119,
+    "differingBytes": [
+      {
+        "offset": 23,
+        "before": 0,
+        "after": 116
+      },
+      {
+        "offset": 33,
+        "before": 232,
+        "after": 116
+      }
+    ],
+    "innerTrafficClassBefore": 0,
+    "innerTrafficClassAtDrop": 116,
+    "innerTTLBefore": 127,
+    "innerTTLAtDrop": 127,
+    "udpApplicationPayloadUnchanged": true,
+    "beforeSHA256": "d9b8506f4e190fca50d587cd2c3a31762250e1ea44c86b315651fbd61b391d70",
+    "atDropSHA256": "a3247fba949baedc10df9309c598949038a514e3405c0f419117b657b5b54d0d",
+    "rootCauseEstablished": false,
+    "checksums": {
+      "before": {
+        "ipv4Valid": true,
+        "udpValid": true,
+        "ipv4Checksum": "66e8"
+      },
+      "atDrop": {
+        "ipv4Valid": true,
+        "udpValid": true,
+        "ipv4Checksum": "6674"
+      }
+    }
+  },
+  "activeHostQosPolicies": [],
+  "cleanup": {
+    "guestCapture": {
+      "archivedHashesVerified": true,
+      "monitorStopped": true,
+      "removed": true
+    },
+    "ownedPodToolsRemoved": true,
+    "ownedWindowsCRIClientsRemoved": true,
+    "all13RetainedNodesReady": true
+  },
+  "unitTestsPassed": 7,
+  "unitCoverage": {
+    "covered_lines": 62,
+    "num_statements": 64,
+    "percent_covered": 96.875,
+    "percent_covered_display": "97",
+    "missing_lines": 2,
+    "excluded_lines": 0
+  },
+  "nativeRuntimeCoverageCollected": false,
+  "evidenceSHA256": {
+    "aws-win2022-v3.etl": "bee955fc355c9fe4294ff3717a5fe7d6a4e092daf0f0edc7bf620c8eae47aeb8",
+    "aws-win2022-v3.pcapng": "4fc3d0a23305e7eb326fdaf2e774d0ed7805d942f30921cebf1b7934797e8750",
+    "aws-win2022-v3.drops.txt": "b274795c464e6ca6292acb180c3e8a9c398222f7db3b04b1f729f90d835ca044",
+    "drops.pcapng": "4dbb1df60e293bc33ff01d6543a13a0cd7e777ae3a1faf7f1b3abf7e6c6efcf3",
+    "drop-window.txt": "4bb12b1a106872aa188920ac874569927f4b2d0c9a290e5de0ce2c37a8ef07dd",
+    "survivor-result.json": "26d79b9a892d03d6966cf8b1be9348856377d1f300ed6732a1ed3c16671c549f",
+    "header-comparison.json": "ed98cbaa26161756ba33fc92a4746ffb293f20a460f80bf3c2c44740453a7b9f",
+    "host-ip-state.json": "4405b4939a662a8108ba232d1636aea16220dea67e9ba5cd989ab56a05028341"
+  },
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/pktmon-etl2pcap"
+  ],
+  "rootCauseEstablished": false,
+  "networkFailureResolved": false,
+  "limitations": [
+    "Higher-rate diagnostic traffic; no CAPI lifecycle or release qualification in this run",
+    "Only Windows2022 was captured: the Windows2022-to-Windows2025 timeout has no receiver-side capture here",
+    "A packet header change does not establish why VFP rejected it; the earlier VFP drop had no such traffic-class change",
+    "Packet Monitor drop events and ordinary appearances must be retained separately; cross-VM wall clocks are not used to assert packet transit times",
+    "An empty Get-NetQosPolicy result does not rule out VFP-specific marking rules or metadata",
+    "Selected parser unit coverage only; kernel, CNI and drivers are not coverage-instrumented"
+  ]
+}

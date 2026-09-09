@@ -1,0 +1,236 @@
+{
+  "schemaVersion": 1,
+  "scope": "Native fixed-cadence fresh-socket diagnostic in existing ordinary pods on one Linux VM and Windows Server 2022/2025 AWS VMs",
+  "qualificationEligible": false,
+  "configuration": {
+    "payloadBytes": 96,
+    "intervalMilliseconds": 20,
+    "scheduledPerLane": 4500,
+    "inFlightLimit": 512,
+    "receiveDeadlineSeconds": 5
+  },
+  "lanes": [
+    {
+      "lane": 0,
+      "source": "net-w1",
+      "target": "net-aws-win2022-v3",
+      "sourceOS": "linux",
+      "scheduled": 4500,
+      "transmitted": 4500,
+      "passed": 4500,
+      "failedReplies": 0,
+      "skipped": 0,
+      "firstScheduledAt": "2026-09-09T05:15:16.940630389Z",
+      "lastFinishedAt": "2026-09-09T05:16:46.945376626Z",
+      "medianSendStartIntervalSeconds": 0.020003,
+      "maxSendStartIntervalSeconds": 0.023365,
+      "sha256": "20c9fe3479875bf5c166a06cb3861fd1fec408c05c7438b5c120309155589f57"
+    },
+    {
+      "lane": 1,
+      "source": "net-w1",
+      "target": "net-aws-win2025-v3",
+      "sourceOS": "linux",
+      "scheduled": 4500,
+      "transmitted": 4500,
+      "passed": 4500,
+      "failedReplies": 0,
+      "skipped": 0,
+      "firstScheduledAt": "2026-09-09T05:15:16.948541538Z",
+      "lastFinishedAt": "2026-09-09T05:16:46.953599361Z",
+      "medianSendStartIntervalSeconds": 0.019999,
+      "maxSendStartIntervalSeconds": 0.023409,
+      "sha256": "6f62895bbfbedd43fa4a4b5bfb9a27bbc09f1aae6eab98614469eb1a4d93ad3f"
+    },
+    {
+      "lane": 2,
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "sourceOS": "windows",
+      "scheduled": 4500,
+      "transmitted": 4493,
+      "passed": 4490,
+      "failedReplies": 3,
+      "skipped": 7,
+      "firstScheduledAt": "2026-09-09T05:11:40.5253884Z",
+      "lastFinishedAt": "2026-09-09T05:13:10.5309975Z",
+      "medianSendStartIntervalSeconds": 0.0200025,
+      "maxSendStartIntervalSeconds": 0.05441,
+      "sha256": "8e2bf99fa3e0608b8ef6185d886938421f1df09af1ecc017abc8687703b952a4"
+    },
+    {
+      "lane": 3,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "sourceOS": "windows",
+      "scheduled": 4500,
+      "transmitted": 4482,
+      "passed": 4480,
+      "failedReplies": 2,
+      "skipped": 18,
+      "firstScheduledAt": "2026-09-09T05:11:40.5324794Z",
+      "lastFinishedAt": "2026-09-09T05:13:10.513837Z",
+      "medianSendStartIntervalSeconds": 0.019995,
+      "maxSendStartIntervalSeconds": 0.051431,
+      "sha256": "bbd5efcc2b0b20b9a12c6ded52ab5f9996ccf9b5bc4d041d15d174fba2204a6e"
+    },
+    {
+      "lane": 4,
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "sourceOS": "windows",
+      "scheduled": 4500,
+      "transmitted": 4490,
+      "passed": 4489,
+      "failedReplies": 1,
+      "skipped": 10,
+      "firstScheduledAt": "2026-09-09T05:11:40.5791825Z",
+      "lastFinishedAt": "2026-09-09T05:13:10.5838383Z",
+      "medianSendStartIntervalSeconds": 0.019996,
+      "maxSendStartIntervalSeconds": 0.048924,
+      "sha256": "dbba3ac69a1b6948e3f95ba6e4d9354ef97eda867834f0bbda44ba7ac4fd1741"
+    },
+    {
+      "lane": 5,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "sourceOS": "windows",
+      "scheduled": 4500,
+      "transmitted": 4494,
+      "passed": 4493,
+      "failedReplies": 1,
+      "skipped": 6,
+      "firstScheduledAt": "2026-09-09T05:11:40.5765585Z",
+      "lastFinishedAt": "2026-09-09T05:13:10.5579137Z",
+      "medianSendStartIntervalSeconds": 0.019998,
+      "maxSendStartIntervalSeconds": 0.044732,
+      "sha256": "91c78c63d3190d7cf42b1d98151dbdeba6eaef8c94bf4a7bed67a33a6045baf9"
+    }
+  ],
+  "windowsProgressAfterMissingReplies": [
+    {
+      "lane": 2,
+      "examples": [
+        {
+          "sequence": 1848,
+          "followingSuccessfulSequence": 1849,
+          "nextSendSeconds": 0.0162,
+          "followingReplyBeforeMissingTimeout": true
+        },
+        {
+          "sequence": 2475,
+          "followingSuccessfulSequence": 2476,
+          "nextSendSeconds": 0.019375,
+          "followingReplyBeforeMissingTimeout": true
+        },
+        {
+          "sequence": 3142,
+          "followingSuccessfulSequence": 3143,
+          "nextSendSeconds": 0.020319,
+          "followingReplyBeforeMissingTimeout": true
+        }
+      ]
+    },
+    {
+      "lane": 3,
+      "examples": [
+        {
+          "sequence": 933,
+          "followingSuccessfulSequence": 934,
+          "nextSendSeconds": 0.023773,
+          "followingReplyBeforeMissingTimeout": true
+        },
+        {
+          "sequence": 2282,
+          "followingSuccessfulSequence": 2283,
+          "nextSendSeconds": 0.015928,
+          "followingReplyBeforeMissingTimeout": true
+        }
+      ]
+    },
+    {
+      "lane": 4,
+      "examples": [
+        {
+          "sequence": 2299,
+          "followingSuccessfulSequence": 2300,
+          "nextSendSeconds": 0.019937,
+          "followingReplyBeforeMissingTimeout": true
+        }
+      ]
+    },
+    {
+      "lane": 5,
+      "examples": [
+        {
+          "sequence": 2494,
+          "followingSuccessfulSequence": 2495,
+          "nextSendSeconds": 0.019852,
+          "followingReplyBeforeMissingTimeout": true
+        }
+      ]
+    }
+  ],
+  "identitiesStable": true,
+  "separateObservationWindows": true,
+  "initialExecutionFailure": {
+    "lanes": [
+      0,
+      1
+    ],
+    "beforeSending": true,
+    "cause": "Dynamically linked Linux binary requires /lib64/ld-linux-x86-64.so.2, absent in the probe container",
+    "recovery": "Only the two terminal failed Linux lanes were rerun using CGO_ENABLED=0; original empty reports and exit evidence retained"
+  },
+  "validation": {
+    "raceTestsPassed": true,
+    "invalidModesRejected": true,
+    "cadenceStatements": 37,
+    "cadenceCovered": 35
+  },
+  "codeSHA256": {
+    "main.go": "c53d5ef4f705fd9eac24670d17cd87a64c57113d7bdcc543274e691c7ae43c0b",
+    "cadence.go": "0d3c784f2936e1bfdf8934d74d6dee4f30284d16cbdd32537d9fa09d248e472d",
+    "cadence_test.go": "36395b757ffd0534c3b3e92709c3c6b1a78fddce4800f649d367763b2fbc8df0"
+  },
+  "limitations": [
+    "Packet loss remains a failure; this diagnostic does not replace the sequential survivor acceptance gate.",
+    "Successful following replies disprove a continuous five-second outage for those observations, but do not locate drops or measure every interruption.",
+    "No paired HNS/VFP trace, lifecycle change or policy-isolation qualification in this run.",
+    "Linux recovery and Windows captures are separate windows; their rates are not a controlled host-to-host comparison."
+  ],
+  "cleanup": {
+    "podFiles": [
+      {
+        "nodeUID": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+        "hashVerifiedFilesRemoved": 6
+      },
+      {
+        "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "hashVerifiedFilesRemoved": 3
+      },
+      {
+        "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "hashVerifiedFilesRemoved": 3
+      }
+    ],
+    "hostClients": [
+      {
+        "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ownedExecutableRemoved": true,
+        "ownedDirectoryRemoved": true,
+        "noOwnedCRIProcesses": true
+      },
+      {
+        "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ownedExecutableRemoved": true,
+        "ownedDirectoryRemoved": true,
+        "noOwnedCRIProcesses": true
+      }
+    ]
+  },
+  "binarySHA256": {
+    "udpprobe-static": "087377f54a234223c1687610cf2a90701c141f887740b0791426123617585162",
+    "udpprobe.exe": "f7ae90e077a117009f8ba6d64642cc4e3a09550c85509bf547ccfd15cf4387cc"
+  }
+}

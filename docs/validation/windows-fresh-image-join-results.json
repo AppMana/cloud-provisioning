@@ -1,0 +1,144 @@
+{
+  "scope": "Fresh single-NIC CAPA Windows first boots with baked patched k0s worker, join and peer delivery; traffic and lifecycle assessed separately",
+  "results": [
+    {
+      "observedAt": "2026-09-07T13:21:45.080854+00:00",
+      "machine": "aws-win2022-v3",
+      "machineUID": "2c9f9236-2fb6-41b4-8081-2797b8c65ba4",
+      "instanceID": "i-0a258f92654d33817",
+      "eniID": "eni-03409b2e4c7ec56ef",
+      "imageID": "ami-09af413882370ed0b",
+      "instanceLaunchTime": "2026-09-07T13:07:07+00:00",
+      "machineCreatedAt": "2026-09-07T13:07:04Z",
+      "windowsVersion": "2022",
+      "checks": {
+        "expectedWindowsBuild": true,
+        "onePhysicalNIC": true,
+        "k0sWorkerRunning": true,
+        "tunnelRunning": true,
+        "bootstrapInstalled": true,
+        "capiAssociation": true,
+        "windowsNode": true,
+        "matchesSiteKubelet": true,
+        "containerd2": true,
+        "cloudWorkerLabel": true,
+        "internetFacingTaint": true,
+        "nodeReady": true,
+        "publisherReady": true,
+        "expectedWorkerVersion": true,
+        "expectedWorkerHash": true,
+        "expectedTunnelHash": true,
+        "peerDelivery": true
+      },
+      "nodeUID": "5da46e69-f779-46ad-8ce0-8e2775de38bd",
+      "nodeInfo": {
+        "architecture": "amd64",
+        "bootID": "660",
+        "containerRuntimeVersion": "containerd://2.3.2",
+        "kernelVersion": "10.0.20348.5499",
+        "kubeProxyVersion": "",
+        "kubeletVersion": "v1.36.2+k0s",
+        "machineID": "EC2AMAZ-K912KG6",
+        "operatingSystem": "windows",
+        "osImage": "Windows Server 2022 Datacenter",
+        "systemUUID": "EC2A5C1A-795A-0E4B-C213-E344D022EFCE"
+      },
+      "workerVersion": "v1.36.2+k0s.0.appmana.1",
+      "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "tunnelSHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+      "physicalNICs": [
+        {
+          "name": "Ethernet 3",
+          "status": "Up"
+        }
+      ],
+      "bootTime": "2026-09-07T13:11:24.5111650Z"
+    },
+    {
+      "observedAt": "2026-09-07T13:21:46.299959+00:00",
+      "machine": "aws-win2025-v3",
+      "machineUID": "e5070003-dd3b-4a4f-bac9-f5923a46b3ff",
+      "instanceID": "i-0dc2c8deb3a92b613",
+      "eniID": "eni-0329390537ec48b87",
+      "imageID": "ami-0a6405fa364804901",
+      "instanceLaunchTime": "2026-09-07T13:07:08+00:00",
+      "machineCreatedAt": "2026-09-07T13:07:05Z",
+      "windowsVersion": "2025",
+      "checks": {
+        "expectedWindowsBuild": true,
+        "onePhysicalNIC": true,
+        "k0sWorkerRunning": true,
+        "tunnelRunning": true,
+        "bootstrapInstalled": true,
+        "capiAssociation": true,
+        "windowsNode": true,
+        "matchesSiteKubelet": true,
+        "containerd2": true,
+        "cloudWorkerLabel": true,
+        "internetFacingTaint": true,
+        "nodeReady": true,
+        "publisherReady": true,
+        "expectedWorkerVersion": true,
+        "expectedWorkerHash": true,
+        "expectedTunnelHash": true,
+        "peerDelivery": true
+      },
+      "nodeUID": "90f3d1eb-5127-4e0a-b2d8-19b9f9fad9b7",
+      "nodeInfo": {
+        "architecture": "amd64",
+        "bootID": "116",
+        "containerRuntimeVersion": "containerd://2.3.2",
+        "kernelVersion": "10.0.26100.33296",
+        "kubeProxyVersion": "",
+        "kubeletVersion": "v1.36.2+k0s",
+        "machineID": "EC2AMAZ-A672S80",
+        "operatingSystem": "windows",
+        "osImage": "Windows Server 2025 Datacenter",
+        "systemUUID": "EC299A80-8F01-6380-358C-0BAA6383DE87"
+      },
+      "workerVersion": "v1.36.2+k0s.0.appmana.1",
+      "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "tunnelSHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+      "physicalNICs": [
+        {
+          "name": "Ethernet",
+          "status": "Up"
+        }
+      ],
+      "bootTime": "2026-09-07T13:10:56.1802290Z"
+    }
+  ],
+  "bootstrapSecretCleanup": [
+    {
+      "windowsVersion": "2022",
+      "instanceID": "i-0a258f92654d33817",
+      "observedAt": "2026-09-07T13:19:37.085573+00:00",
+      "chunks": [
+        {
+          "index": 0,
+          "absent": true
+        }
+      ],
+      "allChunksAbsent": true,
+      "userdataDetached": false
+    },
+    {
+      "windowsVersion": "2025",
+      "instanceID": "i-0dc2c8deb3a92b613",
+      "observedAt": "2026-09-07T13:19:38.720929+00:00",
+      "chunks": [
+        {
+          "index": 0,
+          "absent": true
+        }
+      ],
+      "allChunksAbsent": true,
+      "userdataDetached": false
+    }
+  ],
+  "gatewayAttachmentsReady": true,
+  "limitations": [
+    "The current fresh claims used inline userdata; detached CAPA wrapper was deployed afterward and needs a new launch test.",
+    "No GPU, removal/replacement, gateway failover or UDP reliability qualification."
+  ]
+}

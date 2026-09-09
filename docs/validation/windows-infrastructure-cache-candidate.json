@@ -1,0 +1,133 @@
+{
+  "scope": "Observed k0s 1.36.2 / Calico 3.32 Windows 2025 GPU infrastructure inputs; candidate only, not baked or validated for cache reuse",
+  "nodeUID": "aeebdb45-2fbb-4f13-82e0-677423fe19f5",
+  "records": [
+    {
+      "pod": "windows-wddm-device-plugin-runtime-mounts-t4k48",
+      "podUID": "cd52cb52-8891-42be-ba87-44eaae9c4517",
+      "container": "plugin",
+      "kind": "containers",
+      "requestedImage": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-device-plugin@sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+      "resolvedImage": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-device-plugin@sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+      "imagePullPolicy": "IfNotPresent",
+      "referenceMatchesResolved": true
+    },
+    {
+      "pod": "cloud-provisioning-dialer-remote-windows-htvdc",
+      "podUID": "938cc2f4-f41e-4e89-b482-74b980d9f141",
+      "container": "peer-publisher",
+      "kind": "containers",
+      "requestedImage": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-publisher@sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326",
+      "resolvedImage": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-publisher@sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326",
+      "imagePullPolicy": "IfNotPresent",
+      "referenceMatchesResolved": true
+    },
+    {
+      "pod": "calico-node-windows-rbq2m",
+      "podUID": "c72e0659-89d9-44c2-9257-329007a02344",
+      "container": "uninstall-calico",
+      "kind": "initContainers",
+      "requestedImage": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "resolvedImage": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "imagePullPolicy": "IfNotPresent",
+      "referenceMatchesResolved": false
+    },
+    {
+      "pod": "calico-node-windows-rbq2m",
+      "podUID": "c72e0659-89d9-44c2-9257-329007a02344",
+      "container": "install-cni",
+      "kind": "initContainers",
+      "requestedImage": "docker.io/calico/cni-windows:v3.32.0",
+      "resolvedImage": "docker.io/calico/cni-windows@sha256:100e8fc64d1ef6784498e2eb626b6a8830a7d8be04ad37c5d00fcef7a2a9a0fa",
+      "imagePullPolicy": "IfNotPresent",
+      "referenceMatchesResolved": false
+    },
+    {
+      "pod": "calico-node-windows-rbq2m",
+      "podUID": "c72e0659-89d9-44c2-9257-329007a02344",
+      "container": "felix",
+      "kind": "containers",
+      "requestedImage": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "resolvedImage": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "imagePullPolicy": "IfNotPresent",
+      "referenceMatchesResolved": false
+    },
+    {
+      "pod": "calico-node-windows-rbq2m",
+      "podUID": "c72e0659-89d9-44c2-9257-329007a02344",
+      "container": "node",
+      "kind": "containers",
+      "requestedImage": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "resolvedImage": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "imagePullPolicy": "IfNotPresent",
+      "referenceMatchesResolved": false
+    },
+    {
+      "pod": "konnectivity-agent-lkjrr",
+      "podUID": "f3256cff-bc87-444a-b721-273a962fd840",
+      "container": "konnectivity-agent",
+      "kind": "containers",
+      "requestedImage": "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+      "resolvedImage": "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+      "imagePullPolicy": "IfNotPresent",
+      "referenceMatchesResolved": false
+    },
+    {
+      "pod": "kube-proxy-windows-kvxnl",
+      "podUID": "87b95f3c-8f5f-4ab7-bb7c-c23441eb8922",
+      "container": "kube-proxy",
+      "kind": "containers",
+      "requestedImage": "docker.io/sigwindowstools/kube-proxy:v1.36.2-calico-hostprocess",
+      "resolvedImage": "docker.io/sigwindowstools/kube-proxy@sha256:8aa3fb7fcc5d91b9d3fb98fad5cec735e4e1d59723cb06df191e388f56a83d56",
+      "imagePullPolicy": "IfNotPresent",
+      "referenceMatchesResolved": false
+    },
+    {
+      "pod": "nllb-aws-win2025-gpu-gated-v1",
+      "podUID": "a5ed271f-f2cd-47bd-a6d2-e3473bc97513",
+      "container": "nllb",
+      "kind": "containers",
+      "requestedImage": "quay.io/k0sproject/traefik:v3.7.5-k0s.0",
+      "resolvedImage": "quay.io/k0sproject/traefik@sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d",
+      "imagePullPolicy": "IfNotPresent",
+      "referenceMatchesResolved": false
+    }
+  ],
+  "recipe": {
+    "schemaVersion": 2,
+    "windowsBuild": 26100,
+    "dataDirectoryPermissions": "inherit-parent",
+    "images": [
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-device-plugin@sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-publisher@sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326",
+      "docker.io/calico/cni-windows@sha256:100e8fc64d1ef6784498e2eb626b6a8830a7d8be04ad37c5d00fcef7a2a9a0fa",
+      "docker.io/sigwindowstools/kube-proxy@sha256:8aa3fb7fcc5d91b9d3fb98fad5cec735e4e1d59723cb06df191e388f56a83d56",
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+      "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+      "quay.io/k0sproject/traefik@sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d"
+    ],
+    "runtime": {
+      "schemaVersion": 1,
+      "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "components": [
+        {
+          "name": "containerd-shim-runhcs-v1.exe",
+          "sha256": "adb8e4d990da4bde04956441fcd569a2b13a298d89758ace0896b1bc3389c1ae"
+        },
+        {
+          "name": "containerd.exe",
+          "sha256": "92fe1b334ef6ee9477fd22c88012bda605b52952fe4964705ada1a49ae0f2030"
+        }
+      ]
+    },
+    "sha256": "0a1066a8139d75a69136b9ecd99030a3627ad33e4a4faa83d97b9a041bcc43a4"
+  },
+  "remainingRequirements": [
+    "Preserve exact requested reference aliases, or pin the workload manifests to the selected digests; caching digest names alone does not prove tag-reference reuse.",
+    "Verify imagePullPolicy semantics and fresh-VM events; Always still needs registry resolution.",
+    "Resolve build-compatible images separately for Windows 2022 and other distro/CNI profiles.",
+    "Prepare with build-only repository credentials, remove those credentials, Sysprep, capture, and measure a fresh clone before adoption."
+  ]
+}

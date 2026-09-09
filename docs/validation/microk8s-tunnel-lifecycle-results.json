@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "state": "passed",
+  "scope": "One real CAPA MicroK8s removal and replacement at all-nodes endpoint placement; six continuous UDP lanes across two site VMs and a surviving CAPA worker",
+  "profile": {
+    "microk8s": "v1.34.9",
+    "snapRevision": "9063",
+    "calico": "v3.29.3",
+    "containerd": "1.7.29",
+    "machineType": "t3.medium",
+    "imageID": "ami-095b7537ef1237e91"
+  },
+  "commandID": "2060aaae-5564-450f-b730-cdfce963a2a7",
+  "operationWindow": {
+    "startedAt": "2026-09-09T12:03:40.289677+00:00",
+    "finishedAt": "2026-09-09T12:12:08.919642+00:00",
+    "steps": [
+      {
+        "step": "remove",
+        "startedAt": "2026-09-09T12:03:40.290017+00:00",
+        "finishedAt": "2026-09-09T12:05:07.583884+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "claim",
+        "startedAt": "2026-09-09T12:05:07.584249+00:00",
+        "finishedAt": "2026-09-09T12:05:08.706917+00:00",
+        "exitCode": 0
+      },
+      {
+        "step": "replacement-row",
+        "startedAt": "2026-09-09T12:05:08.707317+00:00",
+        "finishedAt": "2026-09-09T12:12:08.325175+00:00",
+        "exitCode": 0
+      }
+    ],
+    "error": null
+  },
+  "identity": {
+    "sameNodeCount": true,
+    "survivorsStable": true,
+    "allReady": true,
+    "freshInstance": true,
+    "freshNodeUID": true
+  },
+  "bindings": [
+    {
+      "eniCount": 1,
+      "imageID": "ami-095b7537ef1237e91",
+      "instanceID": "i-03d79c1ca4c6b4113",
+      "machine": "aws-microk8s-remote1",
+      "node": "ip-172-29-0-37",
+      "nodeUID": "22c79da2-80bb-49fd-8f91-2fba3a9233ce",
+      "physicalNIC": "ens5",
+      "providerID": "aws:///us-west-2a/i-03d79c1ca4c6b4113"
+    },
+    {
+      "eniCount": 1,
+      "imageID": "ami-095b7537ef1237e91",
+      "instanceID": "i-08c0d5185533dabe2",
+      "machine": "aws-microk8s-tunnel-v1",
+      "node": "ip-172-29-0-64",
+      "nodeUID": "234868ac-c22e-4546-8657-4ed0a1bfa4e8",
+      "physicalNIC": "ens5",
+      "providerID": "aws:///us-west-2a/i-08c0d5185533dabe2"
+    }
+  ],
+  "network": {
+    "passed": 140,
+    "failed": 0,
+    "attempts": 1,
+    "elapsed": "33.548371097s"
+  },
+  "management": {
+    "checks": 42,
+    "passed": 42,
+    "controlPlanes": 3,
+    "measuredNodes": 7
+  },
+  "survivors": {
+    "transport": "native-oob",
+    "lanes": [
+      {
+        "source": "site1",
+        "target": "site2",
+        "attempts": 5215,
+        "passed": 5215,
+        "maxStartIntervalSeconds": 0.22684539100009715,
+        "samplesSHA256": "1329bac3a0d076395cd6c62273b355dc928525e6aebda3dc69312f3df0440d54",
+        "ok": true
+      },
+      {
+        "source": "site1",
+        "target": "canary",
+        "attempts": 5198,
+        "passed": 5198,
+        "maxStartIntervalSeconds": 0.22689942199997404,
+        "samplesSHA256": "660f10bdc8beeb1f383761d38414ae4297f3d9c2704f650fe916add841828937",
+        "ok": true
+      },
+      {
+        "source": "site2",
+        "target": "site1",
+        "attempts": 5215,
+        "passed": 5215,
+        "maxStartIntervalSeconds": 0.25638257799994335,
+        "samplesSHA256": "289f460b7155c6d059f44b4888f93d22055a9992906bba09de505fa317f8b0fb",
+        "ok": true
+      },
+      {
+        "source": "site2",
+        "target": "canary",
+        "attempts": 5197,
+        "passed": 5197,
+        "maxStartIntervalSeconds": 0.22653939899998932,
+        "samplesSHA256": "54617da003dc7558d28bacb56093d06df94ed9aa639fa9125c758a8855d80c7c",
+        "ok": true
+      },
+      {
+        "source": "canary",
+        "target": "site1",
+        "attempts": 5188,
+        "passed": 5188,
+        "maxStartIntervalSeconds": 0.2266429200000175,
+        "samplesSHA256": "f15235c10522cd97a6509c0c38b6260fb49bb6f3ad14ea8333b37455c13b88d8",
+        "ok": true
+      },
+      {
+        "source": "canary",
+        "target": "site2",
+        "attempts": 5189,
+        "passed": 5189,
+        "maxStartIntervalSeconds": 0.19760006199999225,
+        "samplesSHA256": "6866f6be1bb17a018dc8ad86b1c0db09e014a898641d2fdd8cb8c28e5b494612",
+        "ok": true
+      }
+    ],
+    "identitiesStable": true,
+    "window": {
+      "lanesBracketWindow": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "ok": true,
+      "scope": "Host OOB control ordering only; requires independent terminal logs and identity validation"
+    },
+    "diagnosticReason": null,
+    "qualificationEligible": true,
+    "ok": true
+  },
+  "udpSummary": {
+    "attempts": 31202,
+    "passed": 31202,
+    "nominalIntervalSeconds": 0.1,
+    "payloadBytes": 64,
+    "maxStartIntervalSeconds": 0.25638257799994335,
+    "configuredMaxGapSeconds": 10,
+    "operationDurationSeconds": 508.629965
+  },
+  "nativeCoveragePercent": {
+    "removal": 13.5,
+    "replacementRow": 35.2,
+    "managementAddressLoop": 100,
+    "managementProbeLoop": 88.9
+  },
+  "evidenceArchive": {
+    "sha256": "6215e2a2216cbdec3c009db84f321577b3f5303ea9cf6597e9b439c0d6cac82b",
+    "bytes": 1425535,
+    "downloadHashVerified": true,
+    "private": true
+  },
+  "limitations": [
+    "One removal victim, one replacement and all-nodes placement only",
+    "UDP survivor sources are two site VMs and one existing CAPA worker; the removed worker is excluded",
+    "Other placements, distributions and Windows/GPU workers require their own qualification",
+    "The old remote2 worker retains its private kubelet address and is not a measured AWS target in this row"
+  ]
+}

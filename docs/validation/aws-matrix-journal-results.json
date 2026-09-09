@@ -1,0 +1,33 @@
+{
+  "updatedAt": "2026-09-09T11:24:10.863885+00:00",
+  "result": "unit-and-native-replacement-verified",
+  "behavior": [
+    "Preserve every completed matrix pass including failures and excluded checks",
+    "Stop the row when an attempt cannot be written",
+    "Use the same matrix serialization for VM and AWS rows"
+  ],
+  "unitRaceTestsPassed": true,
+  "unitFunctionCoveragePercent": {
+    "recordedMatrix": 100,
+    "Matrix.Details": 100
+  },
+  "nativeCommandID": "36ccf33e-65c3-4846-b5c4-a3101d7633f0",
+  "sourceSHA256": {
+    "harness/e2e/check/report.go": "9dc3f65fbcbe02e1f36bd4a5eb8e5dfd12618a6e0d6e8a502ddea0c230787afb",
+    "harness/e2e/cmd/lab/report.go": "59c69ce17e7936504a62260d95defa75da5a56b67cfe49cccb6b3ee43c7021bd",
+    "harness/e2e/cmd/awsrow/main.go": "9e822a143c451aa8d35cdc355281574131d2cb1e845c7920236a578d4b75d0c1",
+    "harness/e2e/cmd/awsrow/report.go": "9b6547e41f2dd432f04ac91411e423b67c61ac61adea3e1e31e4edd959705770",
+    "harness/e2e/cmd/awsrow/report_test.go": "ac7c4416990e29162151c51f2723d3cdcf31e48b1aa4cab2250236fc24b142e3"
+  },
+  "limits": [
+    "Earlier baseline and survivor AWS rows retained final-only reports; their first-attempt success is unknown.",
+    "One native replacement matrix exercised the journal; continuous availability is a separate measurement."
+  ],
+  "nativeEvidence": "microk8s-capa-lifecycle-results.json",
+  "nativeReplacement": {
+    "attempts": 1,
+    "passed": 140,
+    "failed": 0,
+    "archiveSHA256": "c9d073429bebe45a956c1fc7e50048406489b327a3ef25c83b84ebf19b70904a"
+  }
+}

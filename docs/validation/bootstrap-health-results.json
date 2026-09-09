@@ -1,0 +1,226 @@
+{
+  "result": "unit-and-native-transport-validated-registration-integration-pending",
+  "updatedAt": "2026-09-09T09:43:33.355940+00:00",
+  "observedFailureSource": "microk8s-adoption-fix-results.json",
+  "contract": {
+    "status": "error",
+    "source": "cloud-init status --format json",
+    "nonzeroGuestExitPreservesJSON": true,
+    "transportFailureIsInconclusive": true,
+    "sensitivePayloadPrinted": false,
+    "capiProvisioningStatusChanged": false
+  },
+  "adapters": {
+    "UbuntuVM": "serial",
+    "LinuxAWS": "SSM",
+    "WindowsAWS": "does not dispatch Linux cloud-init observer"
+  },
+  "raceTestsPassed": [
+    "rig",
+    "rig/aws",
+    "rig/vm",
+    "provider",
+    "cmd/awsrow",
+    "cmd/lab"
+  ],
+  "assertions": [
+    "Observed terminal cloud-init failure stops registration waiting.",
+    "First-party guest transports preserve cloud-init status despite exit 1.",
+    "No terminal failure is inferred from missing, truncated or nonterminal status.",
+    "Windows does not execute Linux status commands."
+  ],
+  "evidenceSHA256": {
+    "coverage": "591cd01b53f1ae1c71d9a92ea152f25cf144e219ace72ffc32964aa8d4c41900",
+    "rig/bootstrap_health.go": "6ac43438982364b5892f468dc3f054936e024479630af73e12933dbca92cbbe9",
+    "rig/bootstrap_health_test.go": "bfa86f6723d4ea2e51d0c923cc6b0f26e22f256f4bfef6e2a4494c64a141385a",
+    "rig/aws/bootstrap_health_test.go": "92ea762eea0920562c65a6f8d3f3dbf39e8ac6cdede8a9c3e5f40a8f95781d63",
+    "rig/vm/bootstrap_health_test.go": "25fc6281ade557872ba6afb5aeeaffa6ba9b5ba281c225babb9557de0f92d421",
+    "provider/bootstrap_health_test.go": "cbcff48670bf99e410f1439a9c4cdf87c28a7b6d4dd1cdc756e5f0624f2daccc"
+  },
+  "limits": [
+    "The live transport checks cover disabled/done states; terminal-error classification uses the observed failure fixture and nonzero-exit transport tests.",
+    "Current native snap-retry-v5 binary predates these observer additions.",
+    "No Windows native first-boot terminal-status support is claimed."
+  ],
+  "unitCoveragePercent": {
+    "CloudInitFailure": 100,
+    "VM wrapper": 100,
+    "AWS wrapper and command dispatch": 100,
+    "AdoptNodes": 73.9
+  },
+  "native": {
+    "observations": [
+      {
+        "cloudInitStatus": "disabled",
+        "terminalFailureReported": false,
+        "transport": "retained-site-serial"
+      },
+      {
+        "cloudInitStatus": "done",
+        "terminalFailureReported": false,
+        "transport": "AWS-runner-SSM"
+      }
+    ],
+    "terminalExitCode": 0,
+    "coverageSHA256": "734dbc1bb7dfc3a482591b24393219f5406749248510b44eed6cd943f175d9f1",
+    "outputSHA256": "7fc3f8136f483ffb28a4311d5a451d93e4d0407ac851fcf13f4ef14367e0adee",
+    "initialDriverFailure": {
+      "directory": "bootstrap-health-native-v1",
+      "cause": "Driver required done; retained site cloud-init is disabled. Observer correctly returned no terminal failure.",
+      "preserved": true
+    }
+  },
+  "harnessBuildAllPackagesPassed": true,
+  "superseded": {
+    "commit": "ef815636",
+    "behavior": "Missing Node always continued polling without checking a known terminal bootstrap failure.",
+    "replacement": "Machine-adapter opt-in bootstrap observation stops the row while retaining the instance provisioning semantics."
+  },
+  "completionGate": {
+    "source": "rig.BootstrapCompletion",
+    "requirements": [
+      "cloud-init status done with zero exit",
+      "CAPI bootstrap success sentinel exists"
+    ],
+    "missingObserverPasses": false,
+    "disabledStatusPasses": false,
+    "WindowsLinuxProbeDispatched": false,
+    "unitRaceTestsPassed": true,
+    "nativeFreshClaimValidation": {
+      "observedAt": "2026-09-09T09:43:33.355940+00:00",
+      "commandID": "780cd726-c174-4af7-aa88-3595f8dbb706",
+      "evidenceSHA256": "249dc676c11c6525c61877a3c882888684936379f0f4c62b1a184a7d069c7478",
+      "freshClaims": 2,
+      "verified": true,
+      "observations": [
+        {
+          "node": "remote1",
+          "nodeUIDBefore": "d2e51ead-0378-4418-9094-579c50e17c01",
+          "nodeUIDAfter": "d2e51ead-0378-4418-9094-579c50e17c01",
+          "stableNodeIdentity": true,
+          "guestExecExitCode": 0,
+          "guest": {
+            "bootID": "461ccf8a-d736-40a7-a177-c22632298107",
+            "stableBoot": true,
+            "cloudInitStatus": "done",
+            "cloudInitExitCode": 0,
+            "bootstrapSuccessSentinel": true,
+            "nativeWorkerMarker": true,
+            "localKubeletHealthPassed": true,
+            "helperSHA256": {
+              "/usr/local/sbin/cldt-wait-microk8s-worker": "1e36c98d2dce08ab6d941c8c7d0d2052cca38e9e2b93bf23614ed201a0317826",
+              "/usr/local/sbin/cldt-install-microk8s": "9ce134a8d0f18766fa85208230d3f84a54501b035420adfb78e74efc27d7445a"
+            }
+          }
+        },
+        {
+          "node": "remote2",
+          "nodeUIDBefore": "3534409f-3cc2-43e3-96c5-d106136f99a5",
+          "nodeUIDAfter": "3534409f-3cc2-43e3-96c5-d106136f99a5",
+          "stableNodeIdentity": true,
+          "guestExecExitCode": 0,
+          "guest": {
+            "bootID": "d53af00f-3e48-49f0-930a-a7fb21539533",
+            "stableBoot": true,
+            "cloudInitStatus": "done",
+            "cloudInitExitCode": 0,
+            "bootstrapSuccessSentinel": true,
+            "nativeWorkerMarker": true,
+            "localKubeletHealthPassed": true,
+            "helperSHA256": {
+              "/usr/local/sbin/cldt-wait-microk8s-worker": "1e36c98d2dce08ab6d941c8c7d0d2052cca38e9e2b93bf23614ed201a0317826",
+              "/usr/local/sbin/cldt-install-microk8s": "9ce134a8d0f18766fa85208230d3f84a54501b035420adfb78e74efc27d7445a"
+            }
+          }
+        }
+      ]
+    },
+    "coverageSHA256": "a76fe3c968772e5f35ed5e0d17c6a4f6c79be0cec6f025b36daef877da5ad080",
+    "functionCoveragePercent": {
+      "CloudInitComplete": 100,
+      "WaitBootstrap": 100,
+      "cloudInitStatus": 100,
+      "VM completion wrapper": 100,
+      "AWS completion dispatch": 100
+    },
+    "coreOSDoesNotInheritCloudInitObserver": true,
+    "coreOSAdapterRaceTestPassed": true,
+    "coreOSTestSHA256": "507cf22403dd58befa45d9534fdd0f715593b5dbce286165d0a2c7a5d7916dd3"
+  },
+  "nativeCompletedBootstrapCampaign": {
+    "verifiedAt": "2026-09-09T10:30:27.118394+00:00",
+    "archive": {
+      "sha256": "b2ab82f51a1a9a64af94bbd88dd1923d6cefcbc1675cd6cc2b2e40d1fad8f419",
+      "bytes": 42017
+    },
+    "nativeExit": 0,
+    "matrices": 21,
+    "checks": {
+      "total": 2636,
+      "passed": 2636,
+      "failed": 0,
+      "notRequired": 0
+    },
+    "allFirstAttempt": false,
+    "bootstrapCompletions": 10,
+    "replacements": 8,
+    "placements": [
+      "control-plane",
+      "one-worker",
+      "two-workers",
+      "all-nodes"
+    ],
+    "nativeCoverage": {
+      "covered": 1357,
+      "total": 3418,
+      "percent": 39.7
+    },
+    "convergence": {
+      "observedPasses": 23,
+      "failedPasses": 2,
+      "retrySeries": [
+        {
+          "time": "2026-09-09T09:53:04.630728283Z",
+          "stage": "remove and re-add: remote2",
+          "summary": {
+            "total": 102,
+            "passed": 84,
+            "failed": 18,
+            "notRequired": 0,
+            "series": 4,
+            "attempt": 1,
+            "elapsed": "43.271884647s"
+          }
+        },
+        {
+          "time": "2026-09-09T09:53:36.065445044Z",
+          "stage": "remove and re-add: remote2",
+          "summary": {
+            "total": 102,
+            "passed": 97,
+            "failed": 5,
+            "notRequired": 0,
+            "series": 4,
+            "attempt": 2,
+            "elapsed": "1m14.706698509s"
+          }
+        },
+        {
+          "time": "2026-09-09T09:53:58.332651906Z",
+          "stage": "remove and re-add: remote2",
+          "summary": {
+            "total": 102,
+            "passed": 102,
+            "failed": 0,
+            "notRequired": 0,
+            "series": 4,
+            "attempt": 3,
+            "elapsed": "1m36.973941254s"
+          }
+        }
+      ]
+    }
+  },
+  "windowsCompletionContractEvidence": "windows-bootstrap-contract-results.json",
+  "capaLinuxCompletionEvidence": "capa-cloud-init-completion-results.json"
+}

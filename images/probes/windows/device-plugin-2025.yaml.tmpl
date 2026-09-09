@@ -1,0 +1,39 @@
+# Render with the candidate image digest and pull Secret. See README.md.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: windows-wddm-device-plugin-runtime-mounts
+  namespace: cldt-windows-gpu
+spec:
+  selector:
+    matchLabels:
+      app: windows-wddm-device-plugin-runtime-mounts
+  template:
+    metadata:
+      labels:
+        app: windows-wddm-device-plugin-runtime-mounts
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/os: windows
+        kubernetes.io/arch: amd64
+        node.kubernetes.io/windows-build: 10.0.26100
+        cloud-provisioning.appmana.com/gpu-test: 'true'
+      tolerations:
+      - key: cloud-provisioning.appmana.com/internet-facing
+        operator: Exists
+        effect: NoSchedule
+      hostNetwork: true
+      securityContext:
+        windowsOptions:
+          hostProcess: true
+          runAsUserName: NT AUTHORITY\SYSTEM
+      containers:
+      - name: plugin
+        image: ${WINDOWS_GPU_PLUGIN_IMAGE}
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: WDDM_DEVICE_PLUGIN_SKIP_RUNTIME_MOUNTS
+          value: 'true'
+      imagePullSecrets:
+      - name: ${WINDOWS_GPU_PLUGIN_PULL_SECRET}

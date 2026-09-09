@@ -1,0 +1,192 @@
+{
+  "observedAt": "2026-09-08T16:03:26.477831+00:00",
+  "scope": "Native Windows Server 2022 GPU builder startup-cache preparation; fresh-clone reuse and workload execution are separate gates",
+  "windowsVersion": "2022",
+  "builderInstanceID": "i-0ef087e088efa32c7",
+  "previousImageID": "ami-0f5c22e0cb0ec6f50",
+  "recipe": {
+    "schemaVersion": 3,
+    "windowsBuild": 20348,
+    "dataDirectoryPermissions": "inherit-parent",
+    "images": [
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-device-plugin@sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:bd6062bd2510d8afdb42575e3f8b80b92e30529ad3c3ea07f598a512ff0aa542",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-publisher@sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326",
+      "docker.io/calico/cni-windows@sha256:100e8fc64d1ef6784498e2eb626b6a8830a7d8be04ad37c5d00fcef7a2a9a0fa",
+      "docker.io/sigwindowstools/kube-proxy@sha256:8aa3fb7fcc5d91b9d3fb98fad5cec735e4e1d59723cb06df191e388f56a83d56",
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+      "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+      "quay.io/k0sproject/traefik@sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d",
+      "registry.k8s.io/pause@sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c"
+    ],
+    "runtime": {
+      "schemaVersion": 1,
+      "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "components": [
+        {
+          "name": "containerd-shim-runhcs-v1.exe",
+          "sha256": "adb8e4d990da4bde04956441fcd569a2b13a298d89758ace0896b1bc3389c1ae"
+        },
+        {
+          "name": "containerd.exe",
+          "sha256": "92fe1b334ef6ee9477fd22c88012bda605b52952fe4964705ada1a49ae0f2030"
+        }
+      ]
+    },
+    "aliases": [
+      {
+        "reference": "docker.io/calico/cni-windows:v3.32.0",
+        "image": "docker.io/calico/cni-windows@sha256:100e8fc64d1ef6784498e2eb626b6a8830a7d8be04ad37c5d00fcef7a2a9a0fa"
+      },
+      {
+        "reference": "docker.io/sigwindowstools/kube-proxy:v1.36.2-calico-hostprocess",
+        "image": "docker.io/sigwindowstools/kube-proxy@sha256:8aa3fb7fcc5d91b9d3fb98fad5cec735e4e1d59723cb06df191e388f56a83d56"
+      },
+      {
+        "reference": "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+        "image": "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1"
+      },
+      {
+        "reference": "quay.io/k0sproject/traefik:v3.7.5-k0s.0",
+        "image": "quay.io/k0sproject/traefik@sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d"
+      },
+      {
+        "reference": "registry.k8s.io/pause:3.10.1",
+        "image": "registry.k8s.io/pause@sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c"
+      }
+    ],
+    "sha256": "74051c8882678a48906be1f7b614f2c1b352cc5ec816bbe24f467641c23ad1a4"
+  },
+  "verification": {
+    "passed": true,
+    "checks": {
+      "expectedWindowsBuild": true,
+      "workerMatches": true,
+      "runtimeMatches": true,
+      "k0sRuntimeStore": true,
+      "cacheServiceRunning": true,
+      "noWorkerServiceOrKnownIdentity": true,
+      "noWorkloadContainersOrTasks": true,
+      "exactImagesRegistered": true,
+      "allImagesDownloadedAndUnpacked": true,
+      "exactImageTargets": true,
+      "dataDirectoryInheritsPermissions": true
+    },
+    "observedAt": "2026-09-08T15:36:16.5506129Z",
+    "images": [
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-device-plugin@sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:bd6062bd2510d8afdb42575e3f8b80b92e30529ad3c3ea07f598a512ff0aa542",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-publisher@sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326",
+      "docker.io/calico/cni-windows@sha256:100e8fc64d1ef6784498e2eb626b6a8830a7d8be04ad37c5d00fcef7a2a9a0fa",
+      "docker.io/sigwindowstools/kube-proxy@sha256:8aa3fb7fcc5d91b9d3fb98fad5cec735e4e1d59723cb06df191e388f56a83d56",
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+      "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+      "quay.io/k0sproject/traefik@sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d",
+      "registry.k8s.io/pause@sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c"
+    ],
+    "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+  },
+  "preparation": {
+    "status": "prepared",
+    "startedAt": "2026-09-08T15:21:16.5675642Z",
+    "finishedAt": "2026-09-08T15:36:18.6891761Z",
+    "pulls": [
+      {
+        "exitCode": 0,
+        "elapsedSeconds": 819.9239318,
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:bd6062bd2510d8afdb42575e3f8b80b92e30529ad3c3ea07f598a512ff0aa542"
+      },
+      {
+        "exitCode": 0,
+        "elapsedSeconds": 2.0190403999999997,
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-publisher@sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326"
+      },
+      {
+        "exitCode": 0,
+        "elapsedSeconds": 5.0422714,
+        "image": "docker.io/calico/cni-windows@sha256:100e8fc64d1ef6784498e2eb626b6a8830a7d8be04ad37c5d00fcef7a2a9a0fa"
+      },
+      {
+        "exitCode": 0,
+        "elapsedSeconds": 3.0115504,
+        "image": "docker.io/sigwindowstools/kube-proxy@sha256:8aa3fb7fcc5d91b9d3fb98fad5cec735e4e1d59723cb06df191e388f56a83d56"
+      },
+      {
+        "exitCode": 0,
+        "elapsedSeconds": 33.6445872,
+        "image": "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1"
+      },
+      {
+        "exitCode": 0,
+        "elapsedSeconds": 6.0207377,
+        "image": "quay.io/k0sproject/traefik@sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d"
+      },
+      {
+        "exitCode": 0,
+        "elapsedSeconds": 26.5336096,
+        "image": "registry.k8s.io/pause@sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c"
+      }
+    ],
+    "serviceStopped": true,
+    "cacheServiceRemoved": true,
+    "registryCredentialsRemoved": true,
+    "unpackHelperSHA256": "2113c1dabf9f55c25cf3e48a154acf6115eca0539543e4b347695e5c4844c7af"
+  },
+  "nativeReceiptSHA256": "940970a29b2fc352dfa07c9c2bbea5eeb80e75c98f8e7bcb5afd5287e325a909",
+  "referenceCount": 16,
+  "qualification": {
+    "nativeBuilderCache": true,
+    "imageCapture": true,
+    "freshCloneReuse": false,
+    "firstGPUWorkload": true,
+    "lifecycleReliability": false
+  },
+  "limitations": [
+    "The earlier wrong-release cache attempt failed and was cleaned before this preparation; it is not a passing test.",
+    "Builder readiness does not prove no registry access, startup savings, or first-attempt GPU workload success.",
+    "Windows UDP reliability remains unqualified."
+  ],
+  "regressionTests": {
+    "command": "PYTHONPATH=observe:../.. python3 -m unittest observe/test_windows_cache.py",
+    "testsPassed": 18,
+    "nativeFixture": "harness/e2e/observe/testdata/windows-cache-complete-ready-2022.json",
+    "scope": "Shared cache recipe/readiness validator; native Windows execution itself is not instrumented",
+    "coverage": {
+      "covered_lines": 76,
+      "num_statements": 94,
+      "percent_covered": 81.203007518797,
+      "percent_covered_display": "81",
+      "missing_lines": 18,
+      "excluded_lines": 0,
+      "num_branches": 39,
+      "num_partial_branches": 1,
+      "covered_branches": 32,
+      "missing_branches": 7
+    }
+  },
+  "imageCapture": {
+    "imageID": "ami-0bc985a2f6b3ac4d7",
+    "imageState": "available",
+    "builderState": "stopped",
+    "rootVolumeGiB": 100,
+    "generalizeRequestedAt": "2026-09-08T15:38:17.155044+00:00",
+    "preparedAt": "2026-09-08T15:37:54.441720+00:00",
+    "private": true,
+    "authorized": true,
+    "scope": "Private candidate available and authorized for harness trials; fresh-clone qualification remains separate"
+  },
+  "freshVMTrial": {
+    "report": "windows-capi-gpu-startup-cache-2022-results.json",
+    "firstOrdinaryGPUWorkloadPassed": true,
+    "licenseActivationPassed": true,
+    "completeStartupCache": false,
+    "cacheHitContainerEntries": 9,
+    "missingProfileImage": "index.docker.io/tensorworks/wddm-device-plugin@sha256:47f97c76c16ad24490caf1d344b4a9bc0ccc05fe787e2b68fe5a1051818ce9ec",
+    "removalPassed": true,
+    "lifecycleReliability": false
+  }
+}

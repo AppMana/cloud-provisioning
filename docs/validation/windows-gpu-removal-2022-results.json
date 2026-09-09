@@ -1,0 +1,76 @@
+{
+  "observedAt": "2026-09-07T21:07:26.908013+00:00",
+  "scope": "Windows 2022 GPU CAPI removal and cache-image replacement launch; fresh workload/cache reuse still pending",
+  "removal": {
+    "claim": "aws-win2022-gpu",
+    "instanceID": "i-06183ddba1bd2c36e",
+    "node": "aws-win2022-gpu",
+    "nodeUID": "827bc785-b23e-43d6-a054-e5ac98ed7a97",
+    "observedAt": "2026-09-07T20:46:35.902231809Z",
+    "productCleanup": true,
+    "providerID": "aws:///us-west-2a/i-06183ddba1bd2c36e",
+    "terminated": true
+  },
+  "identityAndLeaseGuard": {
+    "passed": true,
+    "checks": {
+      "instanceTerminated": true,
+      "productCleanup": true,
+      "targetMachineAbsent": true,
+      "survivorMachineIdentities": true,
+      "exactSurvivorSet": true,
+      "survivorIdentitiesAndReadiness": true,
+      "targetGatewayLeasesComplete": true,
+      "otherGatewayLeasesPreserved": true
+    },
+    "survivorCount": 12,
+    "retiredGatewayLeaseCount": 1,
+    "preservedGatewayLeaseCount": 4,
+    "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+  },
+  "survivorGPU": {
+    "beforePassed": true,
+    "afterPassed": true
+  },
+  "survivorNetwork": {
+    "passed": false,
+    "identitiesStable": true,
+    "checks": 60,
+    "passedChecks": 59,
+    "failures": [
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "kind": "udp",
+        "payloadBytes": 64,
+        "expectedResponses": 10,
+        "exactResponses": 9,
+        "startedAt": "2026-09-07T20:49:26.447349+00:00",
+        "finishedAt": "2026-09-07T20:49:31.938900+00:00"
+      }
+    ],
+    "interpretation": "The failed 64-byte UDP case is below the tested fragmentation threshold. Its cause is unproven. It occurred between a Publishing-lease snapshot and the next Ready-lease snapshot; that timing does not establish causality."
+  },
+  "replacement": {
+    "InstanceId": "i-0e40cc5c0c9b0e687",
+    "ImageId": "ami-0651d6fdbda2cdb63",
+    "PrivateIpAddress": "172.29.0.21",
+    "PublicIpAddress": "54.244.199.184",
+    "LaunchTime": "2026-09-07T20:52:39+00:00",
+    "State": {
+      "Code": 16,
+      "Name": "running"
+    },
+    "InstanceType": "g6f.large",
+    "eniCount": 1,
+    "observedAt": "2026-09-07T20:56:19.947319+00:00"
+  },
+  "diagnosticReplacementValidation": {
+    "observedAt": "2026-09-07T21:40:08.079816+00:00",
+    "nodeUID": "a2f58e47-c9d9-4c37-9f45-f397167876c1",
+    "joinChecksPassed": 17,
+    "gpuPassed": true,
+    "evidence": "windows-cache-permissions-results.json",
+    "scope": "Replacement needed scoped ACL repairs; original cache AMI rejected for new claims"
+  }
+}

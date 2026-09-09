@@ -1,0 +1,358 @@
+{
+  "scope": "Same-name Linux ProvisionedNodeClaim deletion/recreation on k0s 1.36.2 Calico with one-ENI AWS workers; survivor ordinary-pod UDP through QEMU serial and Windows 2022/2025 SSM CRI",
+  "operation": {
+    "claim": "aws-linux-replacement-v1",
+    "startedAt": "2026-09-08T08:05:20.606353+00:00",
+    "replacementStartedAt": "2026-09-08T08:09:59.988013+00:00",
+    "replacementFinishedAt": "2026-09-08T08:15:58.645654+00:00",
+    "finishedAt": "2026-09-08T08:17:48.340787+00:00",
+    "passed": true
+  },
+  "before": {
+    "eniCount": 1,
+    "instanceID": "i-05f1a3ac66b544862",
+    "machine": "aws-linux-replacement-v1",
+    "node": "ip-172-29-0-14",
+    "nodeUID": "8f06e00a-85f3-4cbc-b0c5-bb161759ac95",
+    "physicalNIC": "ens5",
+    "providerID": "aws:///us-west-2a/i-05f1a3ac66b544862",
+    "claim": "aws-linux-replacement-v1",
+    "claimUID": "e08426e1-5096-4e71-b3e2-a4bd716da1d5",
+    "machineUID": "e936f352-0b66-42c4-bd16-530e8142f39d",
+    "infrastructureUID": "f79cef20-05ab-46a7-8967-296c6d531dff",
+    "templateUID": "c4fd6366-bada-40f9-b922-372690ac507e",
+    "bootstrapSecretUID": "8d95bfc0-998e-47a0-82a8-e26df486a884",
+    "adoptionSecretUID": "817735cb-e1df-4e7c-8473-ec9856169177",
+    "adoptionPodUID": "389b3610-2912-4c59-96a4-e4d5a18693eb",
+    "desiredPeerSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+    "appliedPeerSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+    "publicKeySHA256": "5d3a0dd355823af7246338ba24f4e5585636370e16bb0dd382add89b3c669c39"
+  },
+  "after": {
+    "eniCount": 1,
+    "instanceID": "i-01cd63f53c877bded",
+    "machine": "aws-linux-replacement-v1",
+    "node": "ip-172-29-0-12",
+    "nodeUID": "5f0183ba-75cb-4a8d-9da8-1858b515f342",
+    "physicalNIC": "ens5",
+    "providerID": "aws:///us-west-2a/i-01cd63f53c877bded",
+    "claim": "aws-linux-replacement-v1",
+    "claimUID": "0c4c91eb-f28d-40c6-846a-2c43869cb93b",
+    "machineUID": "2c170c8c-9ef1-4d2b-9cf2-f4bf3e578ceb",
+    "infrastructureUID": "a5abeedd-5921-44b7-bc33-b907c08c4d69",
+    "templateUID": "c4fd6366-bada-40f9-b922-372690ac507e",
+    "bootstrapSecretUID": "63a65d32-7a46-48c2-b2dc-fd3aad37e560",
+    "adoptionSecretUID": "8718f716-8ab5-4699-bce4-ae35b42cbc13",
+    "adoptionPodUID": "fa62320a-0c73-48a3-ba4b-3a11a66b4d9a",
+    "desiredPeerSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+    "appliedPeerSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+    "publicKeySHA256": "3609940494e14b1b3b1fcef1157a6dfdae4f149601582ada45343d4bd521befa"
+  },
+  "identityChecks": {
+    "passed": true,
+    "checks": {
+      "sameClaimName": true,
+      "sameTemplate": true,
+      "retiredInstanceTerminated": true,
+      "retirementMatchesOriginal": true,
+      "singleNIC": true,
+      "freshClaimUID": true,
+      "freshMachineUID": true,
+      "freshInfrastructureUID": true,
+      "freshNodeUID": true,
+      "freshInstanceID": true,
+      "freshProviderID": true,
+      "freshBootstrapSecretUID": true,
+      "freshAdoptionSecretUID": true,
+      "freshAdoptionPodUID": true,
+      "freshPublicKeySHA256": true,
+      "originalAppliedPeers": true,
+      "replacementAppliedPeers": true
+    },
+    "scope": "Deleted/recreated claim identity, retired-instance receipt and applied-peer snapshots; survivor traffic requires a separately bracketed observation window"
+  },
+  "matrices": {
+    "original": {
+      "criEndpoint": "unix:///run/k0s/containerd.sock",
+      "failed": 0,
+      "passed": 102,
+      "profile": {
+        "Distro": "k0s",
+        "Network": "calico",
+        "BuilderNetwork": "calico",
+        "Bundled": true,
+        "Encapsulation": 2
+      },
+      "total": 102
+    },
+    "replacement": {
+      "criEndpoint": "unix:///run/k0s/containerd.sock",
+      "failed": 0,
+      "passed": 102,
+      "profile": {
+        "Distro": "k0s",
+        "Network": "calico",
+        "BuilderNetwork": "calico",
+        "Bundled": true,
+        "Encapsulation": 2
+      },
+      "total": 102
+    }
+  },
+  "removals": {
+    "original": {
+      "claim": "aws-linux-replacement-v1",
+      "instanceID": "i-05f1a3ac66b544862",
+      "node": "ip-172-29-0-14",
+      "nodeUID": "8f06e00a-85f3-4cbc-b0c5-bb161759ac95",
+      "observedAt": "2026-09-08T08:11:49.699282276Z",
+      "productCleanup": true,
+      "providerID": "aws:///us-west-2a/i-05f1a3ac66b544862",
+      "terminated": true
+    },
+    "replacement": {
+      "claim": "aws-linux-replacement-v1",
+      "instanceID": "i-01cd63f53c877bded",
+      "node": "ip-172-29-0-12",
+      "nodeUID": "5f0183ba-75cb-4a8d-9da8-1858b515f342",
+      "observedAt": "2026-09-08T08:17:48.337959655Z",
+      "productCleanup": true,
+      "providerID": "aws:///us-west-2a/i-01cd63f53c877bded",
+      "terminated": true
+    }
+  },
+  "survivorTraffic": {
+    "finishedAt": "2026-09-08T08:18:07.846159+00:00",
+    "elapsedSeconds": 773.0289587479783,
+    "scope": "Concurrent sampled 64-byte UDP echoes; excludes delivery between attempts and fragmented UDP qualification",
+    "executor": "OutOfBand",
+    "maxAllowedGapSeconds": 30.0,
+    "intervalSeconds": 1.0,
+    "identitiesStable": true,
+    "identityError": null,
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 1.3430301049957052,
+        "attempts": 667,
+        "passed": 667,
+        "maxGapSeconds": 1.0008041399996728,
+        "maxAttemptSeconds": 0.34278981800889596,
+        "ok": true
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 1.2661278199520893,
+        "attempts": 669,
+        "passed": 669,
+        "maxGapSeconds": 1.0009001480066217,
+        "maxAttemptSeconds": 0.2657707409816794,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 7.982111427991185,
+        "attempts": 160,
+        "passed": 160,
+        "maxGapSeconds": 1.0003527160151862,
+        "maxAttemptSeconds": 6.981851607968565,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 7.953907280985732,
+        "attempts": 160,
+        "passed": 160,
+        "maxGapSeconds": 1.0004803329939023,
+        "maxAttemptSeconds": 6.953631931974087,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 6.501661956019234,
+        "attempts": 155,
+        "passed": 155,
+        "maxGapSeconds": 1.0004355949931778,
+        "maxAttemptSeconds": 5.5014022889663465,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 6.467410347016994,
+        "attempts": 155,
+        "passed": 155,
+        "maxGapSeconds": 1.000584418012295,
+        "maxAttemptSeconds": 5.467155700025614,
+        "ok": true
+      }
+    ],
+    "stopRequested": true,
+    "ready": true,
+    "ok": true
+  },
+  "replacementWindow": {
+    "startedAt": "2026-09-08T08:09:59.988013+00:00",
+    "finishedAt": "2026-09-08T08:15:58.645654+00:00",
+    "lanesBracketWindow": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "lanesPassed": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ok": true,
+    "scope": "Successful sampled survivor probes bracket the operation; gaps and latency remain in the observer report"
+  },
+  "fullLifecycleWindow": {
+    "startedAt": "2026-09-08T08:05:20.606353+00:00",
+    "finishedAt": "2026-09-08T08:17:48.340787+00:00",
+    "lanesBracketWindow": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "lanesPassed": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ok": true,
+    "scope": "Successful sampled survivor probes bracket the operation; gaps and latency remain in the observer report"
+  },
+  "survivorIdentities": {
+    "same13OriginalNodesReady": true,
+    "nodes": {
+      "aws-win2022-gpu": {
+        "uid": "dd54061d-491a-4b12-95a7-27393e847780",
+        "ready": true
+      },
+      "aws-win2022-v3": {
+        "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ready": true
+      },
+      "aws-win2025": {
+        "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+        "ready": true
+      },
+      "aws-win2025-gpu": {
+        "uid": "258d7b62-e774-48bc-94dc-e31ff042f585",
+        "ready": true
+      },
+      "aws-win2025-v3": {
+        "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ready": true
+      },
+      "cp": {
+        "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+        "ready": true
+      },
+      "cp2": {
+        "uid": "947de62f-0920-408c-aa31-ac80a2344128",
+        "ready": true
+      },
+      "cp3": {
+        "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+        "ready": true
+      },
+      "ip-172-29-0-9": {
+        "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+        "ready": true
+      },
+      "remote1": {
+        "uid": "8935dd28-de93-44be-a887-73110fe88c51",
+        "ready": true
+      },
+      "remote2": {
+        "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+        "ready": true
+      },
+      "w1": {
+        "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+        "ready": true
+      },
+      "w2": {
+        "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+        "ready": true
+      }
+    },
+    "baseline": "Verified prior CAPI survivor trial, before replacement trial"
+  },
+  "cleanup": {
+    "template": {
+      "name": "aws-linux-replacement-v1",
+      "uid": "c4fd6366-bada-40f9-b922-372690ac507e",
+      "removed": true
+    },
+    "temporaryWindowsTools": [
+      {
+        "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ownedExecutableRemoved": true,
+        "ownedDirectoryRemoved": true,
+        "noOwnedCRIProcesses": true
+      },
+      {
+        "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ownedExecutableRemoved": true,
+        "ownedDirectoryRemoved": true,
+        "noOwnedCRIProcesses": true
+      }
+    ]
+  },
+  "setup": {
+    "artifactRenewal": {
+      "sha256": "05afa06e4cf9f68574e0b0a8e07295c4b3bd27b530476d735ab840fe36dfe3a1",
+      "sameObjectVerified": true,
+      "updatedAt": "2026-09-08T08:04:33.782785+00:00",
+      "expiresAt": "2026-09-08T12:04:32+00:00"
+    },
+    "repairDuringOperation": false,
+    "qualification": "First URL preflight rejected a Deployment version change during a prior rollout; stable preflight succeeded and both controller rollouts completed before operation start. No configuration renewal or controller restart during the recorded lifecycle."
+  },
+  "observation": "Desired remote-peer content is identical across generations because the remote endpoints are unchanged. Fresh Secret UID and matching applied hash qualify the new receipt; a changed content hash is not required. Public WireGuard identity does change.",
+  "tests": {
+    "replacementUnitTestsPassed": 5,
+    "nativeSnapshotCLIReplayStatementCoveragePercent": 100,
+    "scope": "replacement.py evaluator/CLI replay only, not whole-project or native-code coverage"
+  },
+  "limitations": [
+    "Claim deletion/recreation, not automatic Machine repair retaining the existing claim UID",
+    "Sampled 64-byte echoes only; packet delivery between samples and fragmented UDP are not qualified",
+    "Existing awsrow harness imports the currently deployed dialer images to each new VM before adoption; fully preloaded image startup remains separate",
+    "Current deployed Linux dialer used; unpromoted empty-peer candidate not rolled out",
+    "Windows/GPU lifecycle replacement and other distro/provider matrix rows remain outstanding"
+  ],
+  "artifactSHA256": {
+    "original-identity.json": "558cf737febb40445b97aa1c6bf795f2d22e332b5b19cd6b097b48bdfa8ab6fd",
+    "replacement-identity.json": "de4844f7639f8c1099bd1b0a92a0443f1d44e971db6d29e4db65db332bcfac7b",
+    "original-removal.json": "81ba3e93711dfcfc693c40bf4a3e2f53d3a5c0beef2e1962febe72b56b9e33c7",
+    "replacement-removal.json": "d905f94700bc4433400bf703f39b10325cf39119894db99d4ce8edeaff2d98e7",
+    "identity-check.json": "fbd457840eed51cd54661000a63111a9dff3d1dd75c6d29bb8747fdf3be9adc4",
+    "traffic/result.json": "f0f1c8cd267b92afe1a1447284bcf9ac47420b1fa2da4ec2696592819d9726c1",
+    "replacement-traffic-check.json": "7b55cbc876c9eda89cabe96a1828eae9f26202ba84d8359c60eff716aea60199",
+    "lifecycle-traffic-check.json": "1addafc558796d42f4d748a4cec084c623415ca43371e923768104a82426e1cd",
+    "original-row/matrix.json": "2e4777a9cd0b9a4b10e32308f256ff633dc4f4208f8df984267f95430bd77a9d",
+    "replacement-row/matrix.json": "d4aa01f8e29dc0b3d72063c3642318a08b74563f031906e5fb70ca15dbfba485",
+    "operation.json": "fcfde5204be8cc311f24a3c2a12b67cf7340576b21a8da5551706dbc6603a1ea"
+  }
+}

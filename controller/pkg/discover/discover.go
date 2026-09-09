@@ -19,8 +19,11 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
 	"sort"
 	"strings"
+
+	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -31,6 +34,51 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// APIEndpoint returns the cluster's own stated API endpoint: the
+// server URL in the cluster-info ConfigMap in kube-public, which
+// exists exactly to tell joining nodes where to dial (kubeadm token
+// joins bootstrap from it). On an HA cluster this is the stable
+// endpoint (a VIP or load balancer) that outlives any one control
+// plane, where the endpoint list below names the members themselves.
+// A cluster without cluster-info returns "", not an error: the caller
+// falls back to the member list, which is all such a cluster has.
+func APIEndpoint(ctx context.Context, c client.Client) (string, error) {
+	cm := &corev1.ConfigMap{}
+	if err := c.Get(ctx, client.ObjectKey{Namespace: "kube-public", Name: "cluster-info"}, cm); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", fmt.Errorf("reading kube-public/cluster-info: %w", err)
+	}
+	var doc struct {
+		Clusters []struct {
+			Cluster struct {
+				Server string `yaml:"server"`
+			} `yaml:"cluster"`
+		} `yaml:"clusters"`
+	}
+	if err := yaml.Unmarshal([]byte(cm.Data["kubeconfig"]), &doc); err != nil {
+		return "", fmt.Errorf("parsing cluster-info's kubeconfig: %w", err)
+	}
+	if len(doc.Clusters) == 0 || doc.Clusters[0].Cluster.Server == "" {
+		return "", nil
+	}
+	server := doc.Clusters[0].Cluster.Server
+	// A loopback endpoint is a statement about every node, not an
+	// address anyone else can dial: the cluster balances node-locally
+	// (k0s nllb, and this operator's own loopback balancer), so for
+	// anything rendered off-cluster the member list is the answer.
+	if u, err := url.Parse(server); err == nil {
+		if ip := net.ParseIP(u.Hostname()); ip != nil && ip.IsLoopback() {
+			return "", nil
+		}
+		if u.Hostname() == "localhost" {
+			return "", nil
+		}
+	}
+	return server, nil
+}
 
 // APIServers returns every control-plane API address, as host:port.
 //

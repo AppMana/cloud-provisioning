@@ -1,0 +1,35 @@
+{
+  "observedAt": "2026-09-08T18:34:24.315465+00:00",
+  "scope": "Linux AWS image capture SSM resume guards; mocked AWS unit execution only",
+  "unitTestsPassed": 12,
+  "unitCoverage": {
+    "covered_lines": 159,
+    "num_statements": 189,
+    "percent_covered": 84.12698412698413,
+    "percent_covered_display": "84",
+    "missing_lines": 30,
+    "excluded_lines": 0
+  },
+  "nativeCaptureExecuted": false,
+  "behavior": [
+    "Observation timeout retains and resumes the original SSM command",
+    "Successful verification survives a host interruption before stopping the builder",
+    "Failed verification and inconsistent success/nonzero exit cannot create an image",
+    "Unknown submission outcome is not replayed",
+    "Builder and command hashes must match; unbound legacy commands require reconciliation",
+    "Replacement image requires a new verification; previous receipt is retained",
+    "Unavailable builder replacement archives stale command bindings",
+    "Linux promotion preserves authorized Windows image permissions"
+  ],
+  "sourceSHA256": {
+    "harness/e2e/aws/bake.py": "d5f6e2d2684909f423596316851cd11eb0cbf1f89203e931629d65e37ddb1a91",
+    "harness/e2e/aws/test_bake.py": "29190d82029c05748b2d9e0755c3ab5b5db463e63f3912d2ea4bda4b621e6167",
+    "harness/e2e/aws/test_bake_capture.py": "fc322e672ef7cb40ce0f1355341abf3f4860c408d513656cb2110dfc409e9494"
+  },
+  "limitations": [
+    "No EC2 instances created or modified for these tests",
+    "No native SSM capture run or fresh CAPI worker bootstrap performed for this change",
+    "Selected Python line coverage only; not integration or repository-wide coverage",
+    "Lost CreateImage response still requires AMI reconciliation; concurrent inventory writers are unsupported"
+  ]
+}

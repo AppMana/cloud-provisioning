@@ -1,0 +1,3 @@
+<Events>
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Host-Network-Service' Guid='{0c885e0d-6eb6-476c-a048-2457eed3a5c1}'/><EventID>0</EventID><Version>0</Version><Level>5</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x0</Keywords><TimeCreated SystemTime='2026-09-09T02:58:16.7552215Z'/><EventRecordID>305</EventRecordID><Correlation/><Execution ProcessID='1304' ThreadID='4888'/><Channel></Channel><Computer>EC2AMAZ-AESC6KN</Computer><Security/></System><ProcessingErrorData><ErrorCode>15003</ErrorCode><DataItemName></DataItemName><EventPayload></EventPayload></ProcessingErrorData></Event>
+</Events>

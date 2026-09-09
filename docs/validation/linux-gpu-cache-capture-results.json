@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "imageID": "ami-064a5989721eca266",
+  "parent": {
+    "imageID": "ami-007650e971dd51a9d",
+    "rootDeviceName": "/dev/sda1",
+    "rootVolumeGiB": 20
+  },
+  "nativeVerification": {
+    "CommandId": "f48dd7c7-c4bb-48f2-a1c5-eac01900b4c7",
+    "InstanceId": "i-001bd2820cad55bec",
+    "Status": "Success",
+    "ResponseCode": 0
+  },
+  "binding": {
+    "instanceID": "i-001bd2820cad55bec",
+    "commandSHA256": "969c06a3c5748c3eee715dbfe4f0743a27075209bb46ef4a4cdac5fadf31d215",
+    "status": "Success",
+    "commandID": "f48dd7c7-c4bb-48f2-a1c5-eac01900b4c7",
+    "responseCode": 0,
+    "capturedImageID": "ami-064a5989721eca266",
+    "parent": {
+      "imageID": "ami-007650e971dd51a9d",
+      "rootDeviceName": "/dev/sda1",
+      "rootVolumeGiB": 20
+    }
+  },
+  "captureCheck": {
+    "instanceID": "i-001bd2820cad55bec",
+    "sha256": "680dba3558adf9dedbdb99fd46c87fb77d195c3a23fbfc0ecc6bb6f6a7429bf1",
+    "file": "capture-check-680dba3558adf9dedbdb99fd46c87fb77d195c3a23fbfc0ecc6bb6f6a7429bf1.sh"
+  },
+  "runtimeAndDriverVerified": true,
+  "cacheReferences": 23,
+  "nativeCacheRestartPassed": true,
+  "buildStagingRemoved": true,
+  "tests": {
+    "passed": 24,
+    "coverage": {
+      "covered_lines": 200,
+      "num_statements": 245,
+      "percent_covered": 81.63265306122449,
+      "percent_covered_display": "82",
+      "missing_lines": 45,
+      "excluded_lines": 0
+    },
+    "scope": "aws/bake.py tests with mocked AWS; native capture recorded separately"
+  },
+  "qualificationEligible": false,
+  "remaining": [
+    "Cached-image worker replacement, dual-stack and isolation acceptance",
+    "Resolve Windows survivor UDP failures before release qualification",
+    "Consolidate native collection and cache-build prototypes"
+  ],
+  "imageState": "available",
+  "authorizedForIsolatedCAPA": true,
+  "defaultImageUnchanged": true,
+  "freshWorkerEvidence": "linux-gpu-cache-capi-results.json"
+}

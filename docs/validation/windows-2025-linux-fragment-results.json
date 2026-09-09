@@ -1,0 +1,171 @@
+{
+  "observedAt": "2026-09-07T22:44:10.791174+00:00",
+  "scope": "Native Windows 2025 / Linux w1 ordinary-pod fragmentation diagnostic after w1 stored-address canary",
+  "identitiesStable": true,
+  "expectedResponses": 600,
+  "exactResponses": 599,
+  "payloadBytes": 1340,
+  "correlation": [
+    {
+      "case": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "responses": 100,
+      "expected": 100,
+      "hashCollisionDeltas": {
+        "aws-win2025-v3": [
+          0,
+          0
+        ]
+      },
+      "failures": []
+    },
+    {
+      "case": 1,
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "responses": 100,
+      "expected": 100,
+      "hashCollisionDeltas": {
+        "aws-win2025-v3": [
+          0,
+          0
+        ]
+      },
+      "failures": []
+    },
+    {
+      "case": 2,
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "responses": 99,
+      "expected": 100,
+      "hashCollisionDeltas": {
+        "aws-win2025-v3": [
+          1,
+          0
+        ]
+      },
+      "failures": [
+        {
+          "error": "reading from udp connection failed. err:'read udp 10.244.42.5:63561->10.244.190.81:8081: i/o timeout'",
+          "observations": {
+            "aws-win2025-v3": {
+              "request": {
+                "source": "10.244.42.5",
+                "sourcePort": 63561,
+                "destination": "10.244.190.81",
+                "destinationPort": 8081,
+                "flowObserved": true,
+                "correlationWindowSeconds": 0.1,
+                "drops": [
+                  {
+                    "timestamp": "2026-09-07 22:43:43.723783900",
+                    "group": 79564,
+                    "packet": 1,
+                    "component": 93,
+                    "componentInfo": {
+                      "driver": "vfpext.sys",
+                      "name": "VFP Extension"
+                    },
+                    "reason": "Invalid Packet",
+                    "location": "0xE0006096",
+                    "ipID": 11087,
+                    "fragmentOffsetBytes": 0,
+                    "header": "[00]18A4.0B28::2026-09-07 22:43:43.723783900 [Microsoft-Windows-PktMon] Drop: PktGroupId 79564, PktNumber 1, Appearance 0, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 1378, LoggedSize 192 "
+                  },
+                  {
+                    "timestamp": "2026-09-07 22:43:43.723784300",
+                    "group": 79564,
+                    "packet": 2,
+                    "component": 93,
+                    "componentInfo": {
+                      "driver": "vfpext.sys",
+                      "name": "VFP Extension"
+                    },
+                    "reason": "Invalid Packet",
+                    "location": "0xE0006096",
+                    "ipID": 11087,
+                    "fragmentOffsetBytes": 1344,
+                    "header": "[00]18A4.0B28::2026-09-07 22:43:43.723784300 [Microsoft-Windows-PktMon] Drop: PktGroupId 79564, PktNumber 2, Appearance 0, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 43, LoggedSize 43 "
+                  }
+                ]
+              },
+              "response": {
+                "source": "10.244.190.81",
+                "sourcePort": 8081,
+                "destination": "10.244.42.5",
+                "destinationPort": 63561,
+                "flowObserved": false,
+                "correlationWindowSeconds": 0.1,
+                "drops": []
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case": 3,
+      "source": "net-w1",
+      "target": "net-aws-win2025-v3",
+      "responses": 100,
+      "expected": 100,
+      "hashCollisionDeltas": {
+        "aws-win2025-v3": [
+          0,
+          0
+        ]
+      },
+      "failures": []
+    },
+    {
+      "case": 4,
+      "source": "net-w1",
+      "target": "net-aws-win2025-v3",
+      "responses": 100,
+      "expected": 100,
+      "hashCollisionDeltas": {
+        "aws-win2025-v3": [
+          0,
+          0
+        ]
+      },
+      "failures": []
+    },
+    {
+      "case": 5,
+      "source": "net-w1",
+      "target": "net-aws-win2025-v3",
+      "responses": 100,
+      "expected": 100,
+      "hashCollisionDeltas": {
+        "aws-win2025-v3": [
+          0,
+          0
+        ]
+      },
+      "failures": []
+    }
+  ],
+  "captureCleanup": {
+    "stopped": "Flushing logs...\r\nMerging metadata...\r\nLog file: C:\\ProgramData\\CloudProvisioning\\diagnostics\\udp-canary-w2025-v1\\capture.etl (No events lost)\r\n",
+    "beforeStop": "\r\nCollected Data:\r\n    Packet counters, packet capture\r\n\r\nCapture Type:\r\n    All packets\r\n\r\nMonitored Components:\r\n    All\r\n\r\nPacket Filters:\r\n     # Name                 Protocol \r\n     - ----                 -------- \r\n     1 cldt-canary-w2025-v1 UDP      \r\n\r\nLogger Parameters:\r\n    Logger name:        PktMon\r\n    Logging mode:       Circular\r\n    Log file:           C:\\ProgramData\\CloudProvisioning\\diagnostics\\udp-canary-w2025-v1\\capture.etl\r\n    Max file size:      128 MB\r\n    Memory used:        64 MB\r\n    Events lost:        0\r\n\r\nEvent Providers:\r\n    ID                       Level Keywords \r\n    --                       ----- -------- \r\n    Microsoft-Windows-PktMon     4     0x32 \r\n",
+    "filters": "Packet Filters:\r\n    None\r\n",
+    "afterStop": "\r\nPacket Monitor is not running.\r\n"
+  },
+  "traceSHA256": "99ee3bb8582c532f48c3b24f74561e7f6ed813ea5a35483e1f482bbcce61f964",
+  "limitations": [
+    "One Windows host captured; Linux packet capture was not collected",
+    "No fragmentation mitigation applied or qualified",
+    "This does not explain the separate 64-byte UDP failures"
+  ],
+  "nativePortSettings": {
+    "fragmentSize": 1400,
+    "reorderedFragmentSupport": false,
+    "allowVxlanFragmentation": false,
+    "ipFragmentsProcessedThroughHairpinLayer": true,
+    "flowHashUsesEntireFlowID": true,
+    "scope": "Read-only vfpctrl observation after capture; no settings changed"
+  }
+}

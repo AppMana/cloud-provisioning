@@ -1,0 +1,142 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "DaemonSet",
+  "metadata": {
+    "name": "calico-node",
+    "namespace": "kube-system"
+  },
+  "spec": {
+    "updateStrategy": {
+      "rollingUpdate": {
+        "maxSurge": 0,
+        "maxUnavailable": 1
+      },
+      "type": "RollingUpdate"
+    },
+    "template": {
+      "spec": {
+        "containers": [
+          {
+            "name": "calico-node",
+            "image": "quay.io/k0sproject/calico-node:v3.32.0-0",
+            "env": [
+              {
+                "name": "DATASTORE_TYPE",
+                "value": "kubernetes"
+              },
+              {
+                "name": "WAIT_FOR_DATASTORE",
+                "value": "true"
+              },
+              {
+                "name": "NODENAME",
+                "valueFrom": {
+                  "fieldRef": {
+                    "apiVersion": "v1",
+                    "fieldPath": "spec.nodeName"
+                  }
+                }
+              },
+              {
+                "name": "CALICO_NETWORKING_BACKEND",
+                "value": "vxlan"
+              },
+              {
+                "name": "CLUSTER_TYPE",
+                "value": "k8s"
+              },
+              {
+                "name": "IP",
+                "value": "autodetect"
+              },
+              {
+                "name": "FELIX_IPTABLESBACKEND",
+                "value": "auto"
+              },
+              {
+                "name": "CALICO_IPV4POOL_IPIP",
+                "value": "Never"
+              },
+              {
+                "name": "CALICO_IPV4POOL_VXLAN",
+                "value": "Always"
+              },
+              {
+                "name": "CALICO_IPV6POOL_VXLAN",
+                "value": "Never"
+              },
+              {
+                "name": "FELIX_VXLANPORT",
+                "value": "4789"
+              },
+              {
+                "name": "FELIX_VXLANVNI",
+                "value": "4096"
+              },
+              {
+                "name": "FELIX_IPINIPMTU",
+                "value": "1370"
+              },
+              {
+                "name": "FELIX_VXLANMTU",
+                "value": "1370"
+              },
+              {
+                "name": "FELIX_WIREGUARDMTU",
+                "value": "1370"
+              },
+              {
+                "name": "CALICO_IPV4POOL_CIDR",
+                "value": "10.244.0.0/16"
+              },
+              {
+                "name": "CALICO_DISABLE_FILE_LOGGING",
+                "value": "true"
+              },
+              {
+                "name": "FELIX_DEFAULTENDPOINTTOHOSTACTION",
+                "value": "ACCEPT"
+              },
+              {
+                "name": "FELIX_IPV6SUPPORT",
+                "value": "false"
+              },
+              {
+                "name": "FELIX_LOGSEVERITYSCREEN",
+                "value": "info"
+              },
+              {
+                "name": "FELIX_HEALTHENABLED",
+                "value": "true"
+              },
+              {
+                "name": "FELIX_PROMETHEUSMETRICSENABLED",
+                "value": "true"
+              },
+              {
+                "name": "FELIX_BPFENABLED",
+                "value": "false"
+              },
+              {
+                "name": "FELIX_BPFCONNECTTIMELOADBALANCING",
+                "value": "Disabled"
+              },
+              {
+                "name": "FELIX_BPFHOSTNETWORKEDNATWITHOUTCTLB",
+                "value": "Disabled"
+              },
+              {
+                "name": "FELIX_DebugSkipCTLBCleanup",
+                "value": "true"
+              },
+              {
+                "name": "FELIX_FEATUREDETECTOVERRIDE",
+                "value": "ChecksumOffloadBroken=true"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

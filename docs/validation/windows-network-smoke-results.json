@@ -1,0 +1,227 @@
+{
+  "observedAt": "2026-09-07T05:07:43.202525+00:00",
+  "scope": "Initial ordinary-pod TCP echo and DNS/Service smoke checks; no transfer, policy or lifecycle claim",
+  "namespace": "cldt-windows-network-v1",
+  "image": "registry.k8s.io/e2e-test-images/agnhost@sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+  "results": [
+    {
+      "node": "aws-win2022",
+      "checks": [
+        {
+          "detail": "ok",
+          "exitCode": 0,
+          "to": "aws-win2022",
+          "ok": true,
+          "kind": "pod",
+          "seconds": 0.16797299999999998
+        },
+        {
+          "detail": "crictl.exe : curl: (28) Connection timed out after 8004 milliseconds",
+          "exitCode": 1,
+          "to": "aws-win2022",
+          "ok": false,
+          "kind": "service",
+          "seconds": 8.2690211
+        },
+        {
+          "detail": "crictl.exe : curl: (28) Connection timed out after 8012 milliseconds",
+          "exitCode": 1,
+          "to": "aws-win2025",
+          "ok": false,
+          "kind": "pod",
+          "seconds": 8.1646488
+        },
+        {
+          "detail": "crictl.exe : curl: (28) Connection timed out after 8011 milliseconds",
+          "exitCode": 1,
+          "to": "aws-win2025",
+          "ok": false,
+          "kind": "service",
+          "seconds": 8.1365835
+        },
+        {
+          "detail": "crictl.exe : curl: (28) Connection timed out after 8015 milliseconds",
+          "exitCode": 1,
+          "to": "w1",
+          "ok": false,
+          "kind": "pod",
+          "seconds": 8.156807299999999
+        },
+        {
+          "detail": "crictl.exe : curl: (28) Connection timed out after 8002 milliseconds",
+          "exitCode": 1,
+          "to": "w1",
+          "ok": false,
+          "kind": "service",
+          "seconds": 8.1347011
+        },
+        {
+          "detail": "crictl.exe : curl: (28) Resolving timed out after 8009 milliseconds",
+          "exitCode": 1,
+          "to": "w1",
+          "ok": false,
+          "kind": "dns-service",
+          "seconds": 8.1401716
+        }
+      ]
+    },
+    {
+      "node": "aws-win2025",
+      "checks": [
+        {
+          "detail": "crictl.exe : curl: (28) Connection timed out after 8003 milliseconds",
+          "exitCode": 1,
+          "to": "aws-win2022",
+          "ok": false,
+          "kind": "pod",
+          "seconds": 8.198846399999999
+        },
+        {
+          "detail": "crictl.exe : curl: (28) Connection timed out after 8007 milliseconds",
+          "exitCode": 1,
+          "to": "aws-win2022",
+          "ok": false,
+          "kind": "service",
+          "seconds": 8.115667499999999
+        },
+        {
+          "detail": "ok",
+          "exitCode": 0,
+          "to": "aws-win2025",
+          "ok": true,
+          "kind": "pod",
+          "seconds": 0.0822979
+        },
+        {
+          "detail": "crictl.exe : curl: (28) Connection timed out after 8017 milliseconds",
+          "exitCode": 1,
+          "to": "aws-win2025",
+          "ok": false,
+          "kind": "service",
+          "seconds": 8.124944
+        },
+        {
+          "detail": "crictl.exe : curl: (28) Connection timed out after 8002 milliseconds",
+          "exitCode": 1,
+          "to": "w1",
+          "ok": false,
+          "kind": "pod",
+          "seconds": 8.111326499999999
+        },
+        {
+          "detail": "crictl.exe : curl: (28) Connection timed out after 8002 milliseconds",
+          "exitCode": 1,
+          "to": "w1",
+          "ok": false,
+          "kind": "service",
+          "seconds": 8.1104013
+        },
+        {
+          "detail": "crictl.exe : curl: (28) Resolving timed out after 8007 milliseconds",
+          "exitCode": 1,
+          "to": "w1",
+          "ok": false,
+          "kind": "dns-service",
+          "seconds": 8.1151932
+        }
+      ]
+    },
+    {
+      "node": "w1",
+      "checks": [
+        {
+          "kind": "pod",
+          "to": "aws-win2022",
+          "ok": false,
+          "exitCode": 28,
+          "detail": "curl: (28) Connection timed out after 8002 milliseconds",
+          "seconds": 8.115443217000575
+        },
+        {
+          "kind": "service",
+          "to": "aws-win2022",
+          "ok": false,
+          "exitCode": 28,
+          "detail": "curl: (28) Connection timed out after 8002 milliseconds",
+          "seconds": 8.153296599000896
+        },
+        {
+          "kind": "pod",
+          "to": "aws-win2025",
+          "ok": false,
+          "exitCode": 28,
+          "detail": "curl: (28) Connection timed out after 8002 milliseconds",
+          "seconds": 8.142984320002142
+        },
+        {
+          "kind": "service",
+          "to": "aws-win2025",
+          "ok": false,
+          "exitCode": 28,
+          "detail": "curl: (28) Connection timed out after 8002 milliseconds",
+          "seconds": 8.128044737997698
+        },
+        {
+          "kind": "pod",
+          "to": "w1",
+          "ok": true,
+          "exitCode": 0,
+          "detail": "ok",
+          "seconds": 0.12588029600010486
+        },
+        {
+          "kind": "service",
+          "to": "w1",
+          "ok": true,
+          "exitCode": 0,
+          "detail": "ok",
+          "seconds": 0.11837883999760379
+        },
+        {
+          "kind": "dns-service",
+          "to": "w1",
+          "ok": true,
+          "exitCode": 0,
+          "detail": "ok",
+          "seconds": 0.1142534569989948
+        }
+      ]
+    }
+  ],
+  "passed": 5,
+  "total": 21,
+  "hnsObservation": {
+    "2022": {
+      "meshAddress": "10.100.0.133",
+      "overlayManagementIP": "172.29.0.21"
+    },
+    "2025": {
+      "meshAddress": "10.100.0.134",
+      "overlayManagementIP": "172.29.0.13"
+    }
+  },
+  "diagnosis": "Observed mismatch between Calico advertised node mesh IP and HNS overlay ManagementIP; causal fix not established. Linux packet capture showed VXLAN SYNs leaving WireGuard toward mesh IPs with no responses in the captured attempts.",
+  "execution": "Linux QGA with native ctr; Windows SSM with checksum-verified crictl v1.36.0 and native containerd named pipe. No kubelet exec transport.",
+  "followup": {
+    "observedAt": "2026-09-07T05:16:34.061024+00:00",
+    "windowsVersion": "2022",
+    "packetMonitor": {
+      "vxlanDeliveredToWireGuard": true,
+      "dropReason": "INET: transport endpoint was not found",
+      "destination": "10.100.0.133:4789",
+      "vni": 4096
+    },
+    "scopedFirewallAllowRestoredTraffic": false,
+    "firewallDiagnosticRemoved": true,
+    "wireGuardAdapter": {
+      "interfaceType": 53,
+      "mediaType": "IP"
+    },
+    "explicitHNSOverlayBinding": {
+      "adapter": "cldt1775f69e",
+      "result": "An adapter was not found",
+      "diagnosticNetworkRemoved": true
+    },
+    "scope": "Observed native HNS/WireGuard adapter incompatibility on this build; gateway alternative unverified"
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "scope": "Result-checker qualification against raw ordinary-pod agnhost output, not full dataplane acceptance",
+  "observedAt": "2026-09-07T12:06:59.237759+00:00",
+  "positive": [
+    {
+      "source": "aws-win2022",
+      "destination": "aws-win2025",
+      "podUID": "92632e76-ec08-4915-af61-3745937373ec",
+      "result": {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0
+      },
+      "checkerExitCode": 0
+    },
+    {
+      "source": "aws-win2025",
+      "destination": "aws-win2022",
+      "podUID": "608019e0-4a09-4f9e-998d-2cf9a771ad88",
+      "result": {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0
+      },
+      "checkerExitCode": 0
+    },
+    {
+      "source": "w1",
+      "destination": "aws-win2022",
+      "podUID": "2861c032-814f-4924-b1fe-fc4543ab2df6",
+      "result": {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0
+      },
+      "checkerExitCode": 0
+    }
+  ],
+  "negative": [
+    {
+      "source": "aws-win2022",
+      "destination": "aws-win2025",
+      "podUID": "92632e76-ec08-4915-af61-3745937373ec",
+      "result": {
+        "ok": false,
+        "expectedResponses": 1,
+        "reportedResponses": 0,
+        "exactResponses": 0,
+        "responsesPresent": false,
+        "errors": [
+          "reading from udp connection failed. err:'read udp 10.244.167.145:57939->10.244.233.145:8082: i/o timeout'"
+        ],
+        "commandExitCode": 0
+      },
+      "checkerExitCode": 1
+    }
+  ],
+  "negativeMethod": "Windows 2022 source pod dialed the Windows 2025 peer at unused UDP port 8082, one attempt with a 1400-byte expected echo. Curl exited zero; the result gate exited one. No listener, policy or adapter was changed.",
+  "coverage": {
+    "module": "harness/e2e/observe/udp.py",
+    "statements": 55,
+    "covered": 54,
+    "unitTests": 7,
+    "uncovered": "CLI __main__ entry line; native invocations exercised it outside coverage instrumentation"
+  },
+  "limitations": [
+    "Three positive directions at 1400 bytes, ten echoes each, are a checker smoke test and do not supersede the failed concurrent UDP matrix.",
+    "The saved negative fixture validates result handling and does not simulate VFP internals.",
+    "The existing Linux busybox probe remains in use; this opt-in agnhost checker does not automatically extend the lifecycle matrix."
+  ],
+  "rawBodySHA256": {
+    "udp-checker-native/aws-win2022.json": "c4ae7181aa167cfc60d9e0ece4a0c197631763d31d58a9c1c15fa21c1f08cc0b",
+    "udp-checker-native/aws-win2025.json": "c4ae7181aa167cfc60d9e0ece4a0c197631763d31d58a9c1c15fa21c1f08cc0b",
+    "udp-checker-native-negative/aws-win2022.json": "212589bded7a9384c12a15df050e8c355df58ab21c15df4751945b1e894132e9"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "k0s": "v1.36.2+k0s.0",
+  "containerd": "2.3.2",
+  "calico": "v3.32.0-0",
+  "rig": "single-NIC QEMU VMs",
+  "capiMode": "imported",
+  "remotes": [
+    "remote1",
+    "remote2"
+  ],
+  "matrices": [
+    {
+      "time": "2026-09-06T20:22:30.572650498Z",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "cancelled": false
+    },
+    {
+      "time": "2026-09-06T20:22:57.482962758Z",
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "cancelled": false
+    },
+    {
+      "time": "2026-09-06T20:25:33.191795465Z",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "cancelled": false
+    },
+    {
+      "time": "2026-09-06T20:26:00.065047864Z",
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "cancelled": false
+    },
+    {
+      "time": "2026-09-06T20:28:43.45289885Z",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "cancelled": false
+    },
+    {
+      "time": "2026-09-06T20:28:54.782574958Z",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "cancelled": false
+    }
+  ],
+  "checksPassed": 764,
+  "eventsSHA256": "6d0449cf427c160545be4740af658bca4aa2dbf24be3f3aefeff5574a527015e",
+  "scope": "baseline, two remove/survivor/re-add cycles and final matrix; no new-version placement, outage, GPU or Windows networking claim"
+}

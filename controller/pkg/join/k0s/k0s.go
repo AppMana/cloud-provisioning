@@ -21,6 +21,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 	"strings"
 	"time"
@@ -38,6 +45,8 @@ const tokenChars = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 // Provider implements join.ClusterJoinProvider for k0s.
 type Provider struct {
+	// Reader observes k0s Autopilot resources without SSH or an external API.
+	Reader client.Reader
 	Client kubernetes.Interface
 	// APIAddress is this cluster's own API server address as reached
 	// from a newly-joining node (e.g. "https://10.101.0.1:6443"), the
@@ -75,6 +84,16 @@ const defaultGitHubReleasesAPI = "https://api.github.com/repos/k0sproject/k0s/re
 
 // JoinValues implements join.ClusterJoinProvider.
 func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
+	caCert, err := p.clusterCACert(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("reading cluster CA: %w", err)
+	}
+
+	k0sVersion, err := p.introspectK0sVersion(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("introspecting k0s version: %w", err)
+	}
+
 	tokenID, err := randomToken(6)
 	if err != nil {
 		return nil, fmt.Errorf("generating token id: %w", err)
@@ -101,16 +120,6 @@ func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
 	}
 	if _, err := p.Client.CoreV1().Secrets(metav1.NamespaceSystem).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("creating bootstrap-token secret: %w", err)
-	}
-
-	caCert, err := p.clusterCACert(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("reading cluster CA: %w", err)
-	}
-
-	k0sVersion, err := p.introspectK0sVersion(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("introspecting k0s version: %w", err)
 	}
 
 	kubeconfig, err := buildKubeconfig(p.APIAddress, caCert, tokenID+"."+tokenSecret)
@@ -173,6 +182,29 @@ func (p *Provider) clusterCACert(ctx context.Context) ([]byte, error) {
 // release tag/asset name k0s publishes (e.g. "v1.36.2+k0s.0");
 // resolveK0sReleaseTag turns it into the real, download-able tag.
 func (p *Provider) introspectK0sVersion(ctx context.Context) (string, error) {
+	if p.Reader != nil {
+		controls := &unstructured.UnstructuredList{}
+		controls.SetGroupVersionKind(schema.GroupVersionKind{Group: "autopilot.k0sproject.io", Version: "v1beta2", Kind: "ControlNodeList"})
+		err := p.Reader.List(ctx, controls)
+		if err != nil && !apierrors.IsNotFound(err) && !meta.IsNoMatchError(err) {
+			return "", fmt.Errorf("reading k0s control node versions: %w", err)
+		}
+		if err == nil && len(controls.Items) > 0 {
+			selected := ""
+			for _, control := range controls.Items {
+				value, _, _ := unstructured.NestedString(control.Object, "status", "k0sVersion")
+				if !regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?\+k0s\.[0-9]+$`).MatchString(value) {
+					return "", fmt.Errorf("control node %s reports invalid k0sVersion %q", control.GetName(), value)
+				}
+				if selected != "" && selected != value {
+					return "", fmt.Errorf("control nodes report mixed k0s versions %s and %s; cannot choose an exact worker release", selected, value)
+				}
+				selected = value
+			}
+			return selected, nil
+		}
+	}
+
 	nodes, err := p.Client.CoreV1().Nodes().List(ctx, metav1.ListOptions{Limit: 1})
 	if err != nil {
 		return "", err

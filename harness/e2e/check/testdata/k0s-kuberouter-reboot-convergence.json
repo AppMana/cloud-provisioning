@@ -1,0 +1,132 @@
+{
+  "profile": "k0s 1.36.2 / bundled kube-router 2.10.0",
+  "stage": "two-worker placement, returned matrix after w1 reboot",
+  "scope": "Replay observed probe outcomes; synthetic test addresses are selectors, not a network model",
+  "normalization": "Container IDs and transport wrapper text removed; failure messages are verbatim substrings of native errors",
+  "nodes": [
+    "cp",
+    "cp2",
+    "cp3",
+    "w1",
+    "w2",
+    "remote1",
+    "remote2"
+  ],
+  "passes": [
+    {
+      "time": "2026-09-09T00:46:45.951073246Z",
+      "elapsed": "38.230864613s",
+      "expected": {
+        "total": 140,
+        "passed": 125,
+        "failed": 15,
+        "notRequired": 0
+      },
+      "failures": [
+        {
+          "from": "cp3",
+          "to": "remote1",
+          "kind": "service",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "cp3",
+          "to": "remote1",
+          "kind": "transfer",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "cp3",
+          "to": "remote2",
+          "kind": "pod",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "cp3",
+          "to": "remote2",
+          "kind": "service",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "cp3",
+          "to": "remote2",
+          "kind": "transfer",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "remote1",
+          "to": "cp",
+          "kind": "transfer",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "remote1",
+          "to": "cp2",
+          "kind": "pod",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "remote1",
+          "to": "cp2",
+          "kind": "service",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "remote1",
+          "to": "cp2",
+          "kind": "transfer",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "remote1",
+          "to": "cp3",
+          "kind": "pod",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "remote1",
+          "to": "cp3",
+          "kind": "service",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "remote1",
+          "to": "cp3",
+          "kind": "transfer",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "remote1",
+          "to": "w1",
+          "kind": "pod",
+          "message": "wget: download timed out"
+        },
+        {
+          "from": "remote2",
+          "to": "",
+          "kind": "dns",
+          "message": "command terminated with exit code 1"
+        },
+        {
+          "from": "remote2",
+          "to": "cp",
+          "kind": "pod",
+          "message": "wget: download timed out"
+        }
+      ],
+      "nativeEventSHA256": "0b8bb2f4e96916c1baf2a9653085827e2e789cff7856ad559897bafd92fc2ac7"
+    },
+    {
+      "time": "2026-09-09T00:47:01.181490772Z",
+      "elapsed": "53.461436922s",
+      "expected": {
+        "total": 140,
+        "passed": 140,
+        "failed": 0,
+        "notRequired": 0
+      },
+      "failures": [],
+      "nativeEventSHA256": "5d67924a463fa3d96e94fdd1f7f274d6196db56486c47785fc58ea75ab4687d6"
+    }
+  ]
+}

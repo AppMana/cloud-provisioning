@@ -1,0 +1,281 @@
+{
+  "observedAt": "2026-09-07T22:13:31.458753+00:00",
+  "scope": "Native baseline and one-node stored-address canary; remaining UDP loss prevents qualification",
+  "node": "w1",
+  "linuxCalicoPod": "calico-node-r55nb",
+  "windowsCalicoPod": "calico-node-windows-fr2cw",
+  "linuxEnvironment": {
+    "IP": "autodetect",
+    "IP_AUTODETECTION_METHOD": "unset (first-found)"
+  },
+  "observedLinuxAutodetection": "WireGuard cldt1775f69e, 10.100.0.1/24, once per minute; original stored IP 10.10.0.11",
+  "windowsVTEPUpdates": [
+    {
+      "at": "2026-09-07T22:00:26.599631900Z",
+      "parentDeviceIP": "10.100.0.1"
+    },
+    {
+      "at": "2026-09-07T22:00:27.293416200Z",
+      "parentDeviceIP": "10.10.0.11"
+    },
+    {
+      "at": "2026-09-07T22:01:26.599493800Z",
+      "parentDeviceIP": "10.100.0.1"
+    },
+    {
+      "at": "2026-09-07T22:01:27.433401800Z",
+      "parentDeviceIP": "10.10.0.11"
+    },
+    {
+      "at": "2026-09-07T22:02:26.606087200Z",
+      "parentDeviceIP": "10.100.0.1"
+    },
+    {
+      "at": "2026-09-07T22:02:27.316666400Z",
+      "parentDeviceIP": "10.10.0.11"
+    },
+    {
+      "at": "2026-09-07T22:03:26.605011600Z",
+      "parentDeviceIP": "10.100.0.1"
+    },
+    {
+      "at": "2026-09-07T22:03:27.318332400Z",
+      "parentDeviceIP": "10.10.0.11"
+    },
+    {
+      "at": "2026-09-07T22:04:26.599495500Z",
+      "parentDeviceIP": "10.100.0.1"
+    },
+    {
+      "at": "2026-09-07T22:04:27.279629900Z",
+      "parentDeviceIP": "10.10.0.11"
+    },
+    {
+      "at": "2026-09-07T22:05:26.594180900Z",
+      "parentDeviceIP": "10.100.0.1"
+    },
+    {
+      "at": "2026-09-07T22:05:27.404319100Z",
+      "parentDeviceIP": "10.10.0.11"
+    },
+    {
+      "at": "2026-09-07T22:06:26.597892300Z",
+      "parentDeviceIP": "10.100.0.1"
+    },
+    {
+      "at": "2026-09-07T22:06:27.322216900Z",
+      "parentDeviceIP": "10.10.0.11"
+    },
+    {
+      "at": "2026-09-07T22:07:26.590625900Z",
+      "parentDeviceIP": "10.100.0.1"
+    },
+    {
+      "at": "2026-09-07T22:07:27.352434600Z",
+      "parentDeviceIP": "10.10.0.11"
+    }
+  ],
+  "udpExperiment": {
+    "startedAt": "2026-09-07T22:01:01.628123+00:00",
+    "rounds": 120,
+    "intervalSeconds": 2,
+    "triesPerDirection": 20,
+    "payloadBytes": 64,
+    "scope": "Bounded repeated diagnostic during one removal/replacement; retain every outcome, no retry-to-green",
+    "finishedAt": "2026-09-07T22:10:52.046534+00:00",
+    "failedRounds": 7
+  },
+  "source": "https://docs.tigera.io/calico/latest/networking/ipam/ip-autodetection",
+  "documentedConfiguration": "With IP unset and an existing Node address, Calico uses that stored address; avoid competing autodetection and controller writes",
+  "limitations": [
+    "The canary stopped observed w1 address oscillation, but two small-UDP echoes still timed out",
+    "No causal attribution for the remaining losses or resolution of separate VFP fragmentation collisions",
+    "Only w1 Calico was restarted; other Linux nodes retain their existing environment"
+  ],
+  "udpTotals": {
+    "rounds": 120,
+    "cases": 240,
+    "expectedResponses": 4800,
+    "exactResponses": 4793,
+    "failedCases": 7,
+    "allIdentitiesStable": true
+  },
+  "udpFailures": [
+    {
+      "ok": false,
+      "expectedResponses": 20,
+      "reportedResponses": 19,
+      "exactResponses": 19,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.190.81:36523->10.244.114.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-w1",
+      "target": "net-aws-win2022-v3",
+      "kind": "udp",
+      "payloadBytes": 64,
+      "startedAt": "2026-09-07T22:01:26.505462+00:00",
+      "finishedAt": "2026-09-07T22:01:32.117254+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 20,
+      "reportedResponses": 19,
+      "exactResponses": 19,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.114.4:55398->10.244.190.81:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "kind": "udp",
+      "payloadBytes": 64,
+      "startedAt": "2026-09-07T22:02:26.528433+00:00",
+      "finishedAt": "2026-09-07T22:02:32.244303+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 20,
+      "reportedResponses": 19,
+      "exactResponses": 19,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.114.4:55638->10.244.190.81:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "kind": "udp",
+      "payloadBytes": 64,
+      "startedAt": "2026-09-07T22:03:27.146250+00:00",
+      "finishedAt": "2026-09-07T22:03:32.882718+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 20,
+      "reportedResponses": 19,
+      "exactResponses": 19,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.114.4:55878->10.244.190.81:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "kind": "udp",
+      "payloadBytes": 64,
+      "startedAt": "2026-09-07T22:04:27.865143+00:00",
+      "finishedAt": "2026-09-07T22:04:33.591687+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 20,
+      "reportedResponses": 19,
+      "exactResponses": 19,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.190.81:50172->10.244.114.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-w1",
+      "target": "net-aws-win2022-v3",
+      "kind": "udp",
+      "payloadBytes": 64,
+      "startedAt": "2026-09-07T22:08:26.203202+00:00",
+      "finishedAt": "2026-09-07T22:08:31.826270+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 20,
+      "reportedResponses": 19,
+      "exactResponses": 19,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.190.81:39569->10.244.114.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-w1",
+      "target": "net-aws-win2022-v3",
+      "kind": "udp",
+      "payloadBytes": 64,
+      "startedAt": "2026-09-07T22:09:26.547791+00:00",
+      "finishedAt": "2026-09-07T22:09:32.159016+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 20,
+      "reportedResponses": 19,
+      "exactResponses": 19,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.114.4:57363->10.244.190.81:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "kind": "udp",
+      "payloadBytes": 64,
+      "startedAt": "2026-09-07T22:10:26.391407+00:00",
+      "finishedAt": "2026-09-07T22:10:32.121725+00:00"
+    }
+  ],
+  "canary": {
+    "observedAt": "2026-09-07T22:41:40.344700+00:00",
+    "experiment": {
+      "startedAt": "2026-09-07T22:27:20.906941+00:00",
+      "rounds": 120,
+      "intervalSeconds": 2,
+      "triesPerDirection": 20,
+      "payloadBytes": 64,
+      "scope": "Controlled post-canary diagnostic with IP unset only on w1 Calico; retain every outcome, no retry-to-green",
+      "finishedAt": "2026-09-07T22:36:43.559559+00:00",
+      "failedRounds": 2
+    },
+    "linuxCalicoPod": "calico-node-zhbqj",
+    "cases": 240,
+    "expectedResponses": 4800,
+    "exactResponses": 4798,
+    "allIdentitiesStable": true,
+    "failures": [
+      {
+        "ok": false,
+        "expectedResponses": 20,
+        "reportedResponses": 19,
+        "exactResponses": 19,
+        "responsesPresent": true,
+        "errors": [
+          "reading from udp connection failed. err:'read udp 10.244.190.81:49481->10.244.114.4:8081: i/o timeout'"
+        ],
+        "commandExitCode": 0,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "kind": "udp",
+        "payloadBytes": 64,
+        "startedAt": "2026-09-07T22:35:23.135526+00:00",
+        "finishedAt": "2026-09-07T22:35:28.754111+00:00"
+      },
+      {
+        "ok": false,
+        "expectedResponses": 20,
+        "reportedResponses": 19,
+        "exactResponses": 19,
+        "responsesPresent": true,
+        "errors": [
+          "reading from udp connection failed. err:'read udp 10.244.114.4:59667->10.244.190.81:8081: i/o timeout'"
+        ],
+        "commandExitCode": 0,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "kind": "udp",
+        "payloadBytes": 64,
+        "startedAt": "2026-09-07T22:35:54.992063+00:00",
+        "finishedAt": "2026-09-07T22:36:00.747099+00:00"
+      }
+    ],
+    "linuxAutodetectionEventsAfterRestart": 0,
+    "windowsW1VTEPUpdatesInCollectedWindow": 0,
+    "rollout": "Held at one-node canary; static controller candidates validated but not installed"
+  }
+}

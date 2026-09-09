@@ -1,0 +1,118 @@
+{
+  "scope": "Native background sampler qualification; all launch/status/stop controls over VM OOB; no CAPI lifecycle operation",
+  "identitiesStable": true,
+  "results": [
+    {
+      "source": "net-w1",
+      "target": "net-aws-win2022-v3",
+      "nonce": "c7c82326b0709eedad675adf19149f23",
+      "pid": 174251,
+      "attempts": 575,
+      "passed": 575,
+      "maxStartIntervalSeconds": 0.204179055,
+      "stopAcknowledged": true,
+      "ok": true,
+      "samplesSHA256": "093e9d35cd2ea1c8c505c27abaa80b0b52af670c746a8f60d0f0e8329ffbd1f0"
+    },
+    {
+      "source": "net-w1",
+      "target": "net-aws-win2025-v3",
+      "nonce": "3ba235208f1b4756cb5e4bdccbdbc06b",
+      "pid": 174266,
+      "attempts": 580,
+      "passed": 580,
+      "maxStartIntervalSeconds": 0.161587576,
+      "stopAcknowledged": true,
+      "ok": true,
+      "samplesSHA256": "124030b2fcfd6bfd3bb12fc06f69e64fb86805aa88f53488e7f2909d0c04a8dd"
+    },
+    {
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "nonce": "25f110432510c733ccf60bf983292fd2",
+      "pid": 6108,
+      "attempts": 565,
+      "passed": 565,
+      "maxStartIntervalSeconds": 0.1891917,
+      "stopAcknowledged": true,
+      "ok": true,
+      "samplesSHA256": "7921c379e501bdf740e3c739226624b514f6efcbbbba2f551018d2f7d85abc4c"
+    },
+    {
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "nonce": "fce57034e795935a219436844583f6dc",
+      "pid": 7128,
+      "attempts": 638,
+      "passed": 637,
+      "maxStartIntervalSeconds": 5.101462,
+      "stopAcknowledged": true,
+      "ok": false,
+      "samplesSHA256": "12b4ebdf26707f3d2b8af36f80a2fbc4f8e2fb2c586f39c13167015ea2603436"
+    },
+    {
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "nonce": "af60273d5902e0b2d4d3113061ab0e4e",
+      "pid": 3240,
+      "attempts": 561,
+      "passed": 561,
+      "maxStartIntervalSeconds": 0.1561665,
+      "stopAcknowledged": true,
+      "ok": true,
+      "samplesSHA256": "84924ea8bc71c8a953ab562c7f737801ac280dc3a4752a031ca48fcd50f11da9"
+    },
+    {
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "nonce": "3fb7e544fdf9caa38fafa8dda1dd9425",
+      "pid": 6556,
+      "attempts": 685,
+      "passed": 685,
+      "maxStartIntervalSeconds": 0.162344,
+      "stopAcknowledged": true,
+      "ok": true,
+      "samplesSHA256": "7039a9bb50417b4f63bec21d96af50359ead7effd29b1c909846d73b1094164d"
+    }
+  ],
+  "ok": false,
+  "temporaryPodFilesRemoved": true,
+  "hostCleanup": [
+    {
+      "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "exitCode": 0
+    },
+    {
+      "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "exitCode": 0
+    }
+  ],
+  "payloadBytes": 64,
+  "maxAllowedStartIntervalSeconds": 10,
+  "readinessPassed": false,
+  "lifecycleStarted": false,
+  "failedSamples": [
+    {
+      "sequence": 164,
+      "source": "10.244.114.4:49636",
+      "startedAt": "2026-09-08T11:50:58.1988741Z",
+      "finishedAt": "2026-09-08T11:51:03.1994599Z",
+      "ok": false,
+      "error": "read udp 10.244.114.4:49636->10.244.42.6:8081: i/o timeout",
+      "nonce": "fce57034e795935a219436844583f6dc",
+      "pid": 7128,
+      "startOffsetSeconds": 17.4730988,
+      "finishOffsetSeconds": 22.4736846,
+      "attempts": 165,
+      "passed": 164,
+      "maxStartIntervalSeconds": 0.1990611,
+      "healthy": false,
+      "stopBoundary": false
+    }
+  ],
+  "limitations": [
+    "No packet capture; timeout does not locate the dropped request or response.",
+    "No CAPI lifecycle operation started because native readiness failed.",
+    "Does not supersede the earlier fragmented UDP failures."
+  ]
+}

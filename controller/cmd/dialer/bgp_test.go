@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
+	api "github.com/osrg/gobgp/v3/api"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -60,13 +62,13 @@ func TestReconcileTransit_TellsTheNodesThatAreNotInTheMesh(t *testing.T) {
 	if speaker.peers["172.21.0.17"] {
 		t.Error("the speaker peered with itself")
 	}
-	if !speaker.advertised["10.100.0.128/32"] {
+	if _, ok := speaker.advertised["10.100.0.128/32"]; !ok {
 		t.Error("the remote node address was not advertised")
 	}
 	// The block has to be carried too. The site learns the node address
 	// over BGP, and a BGP next hop is not resolved by another BGP route,
 	// so the block the remote advertises directly stays unreachable.
-	if !speaker.advertised["10.244.123.128/26"] {
+	if _, ok := speaker.advertised["10.244.123.128/26"]; !ok {
 		t.Error("the remote pod block was not advertised, so the site cannot resolve it")
 	}
 }
@@ -121,4 +123,70 @@ func TestTransitSpeaker_RefusesANonAddress(t *testing.T) {
 	if got, err := blockRoute("10.244.123.128/26", 3); err != nil || got.prefix != "10.244.123.128/26" || got.med != 3 {
 		t.Fatalf("blockRoute = %+v, %v; want the masked prefix carrying its preference", got, err)
 	}
+}
+
+// The preference is derived from the mesh and the mesh changes: an
+// endpoint joins or retires and every endpoint's rank shifts at once.
+// An advertisement left at its old preference states an ordering no
+// other endpoint is stating, and the site's choice then differs per
+// prefix by nothing but when each prefix was first spoken. The remote
+// honours relayed sources through exactly one endpoint, so two site
+// nodes disagreeing on which one is a silent bidirectional drop, not a
+// detour.
+func TestTransitSpeaker_AChangedPreferenceIsSpokenAgain(t *testing.T) {
+	ctx := context.Background()
+	speaker, err := startTransitSpeaker(ctx, 17901, 64512, "172.21.0.17")
+	if err != nil {
+		t.Fatalf("startTransitSpeaker: %v", err)
+	}
+	defer speaker.stop(ctx)
+
+	route := func(med uint32) []transitRoute {
+		return []transitRoute{{prefix: "10.244.123.128/26", med: med}}
+	}
+	if err := speaker.reconcile(ctx, nil, route(1)); err != nil {
+		t.Fatalf("reconcile with the first preference: %v", err)
+	}
+	if err := speaker.reconcile(ctx, nil, route(0)); err != nil {
+		t.Fatalf("reconcile with the changed preference: %v", err)
+	}
+
+	got, err := advertisedMED(ctx, speaker, "10.244.123.128/26")
+	if err != nil {
+		t.Fatalf("reading the advertised path back: %v", err)
+	}
+	if got != 0 {
+		t.Errorf("the advertisement still carries MED %d after the preference changed to 0", got)
+	}
+}
+
+// advertisedMED reads one prefix's path back out of the speaker's own
+// table and returns the MED it carries.
+func advertisedMED(ctx context.Context, t *transitSpeaker, prefix string) (uint32, error) {
+	med := uint32(0)
+	found := false
+	err := t.server.ListPath(ctx, &api.ListPathRequest{
+		TableType: api.TableType_GLOBAL,
+		Family:    &api.Family{Afi: api.Family_AFI_IP, Safi: api.Family_SAFI_UNICAST},
+	}, func(d *api.Destination) {
+		if d.Prefix != prefix {
+			return
+		}
+		for _, p := range d.Paths {
+			for _, attr := range p.Pattrs {
+				m := &api.MultiExitDiscAttribute{}
+				if err := attr.UnmarshalTo(m); err == nil {
+					med = m.Med
+					found = true
+				}
+			}
+		}
+	})
+	if err != nil {
+		return 0, err
+	}
+	if !found {
+		return 0, fmt.Errorf("no path for %s in the speaker's table", prefix)
+	}
+	return med, nil
 }

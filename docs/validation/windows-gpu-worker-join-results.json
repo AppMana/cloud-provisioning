@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 2,
+  "observedAt": "2026-09-07T18:28:37.473316+00:00",
+  "scope": "Fresh single-NIC AWS CAPI GPU worker joining and ordinary-container Direct3D11 render / NVENC smoke tests",
+  "rows": [
+    {
+      "windowsVersion": "2022",
+      "instanceType": "g6f.large",
+      "physicalNICCount": 1,
+      "joinChecks": {
+        "expectedWindowsBuild": true,
+        "onePhysicalNIC": true,
+        "k0sWorkerRunning": true,
+        "tunnelRunning": true,
+        "bootstrapInstalled": true,
+        "capiAssociation": true,
+        "windowsNode": true,
+        "matchesSiteKubelet": true,
+        "containerd2": true,
+        "cloudWorkerLabel": true,
+        "internetFacingTaint": true,
+        "nodeReady": true,
+        "publisherReady": true,
+        "expectedWorkerVersion": true,
+        "expectedWorkerHash": true,
+        "expectedTunnelHash": true,
+        "peerDelivery": true
+      },
+      "hostNodeInfo": {
+        "architecture": "amd64",
+        "containerRuntimeVersion": "containerd://2.3.2",
+        "kernelVersion": "10.0.20348.5499",
+        "kubeProxyVersion": "",
+        "kubeletVersion": "v1.36.2+k0s",
+        "operatingSystem": "windows",
+        "osImage": "Windows Server 2022 Datacenter"
+      },
+      "application": {
+        "passed": true,
+        "checks": {
+          "podSucceeded": true,
+          "jobComplete": true,
+          "containerExitedZero": true,
+          "containerIdentityPresent": true,
+          "hardwareRenderAndEncode": true
+        },
+        "receipt": {
+          "encoder": "h264_nvenc",
+          "containerWindowsBuild": 20348,
+          "decodedFrames": 30,
+          "render": {
+            "api": "Direct3D11",
+            "vendorID": 4318,
+            "deviceID": 10168,
+            "frames": 30,
+            "pixelsPerFrame": 4096,
+            "greenPixels": 1152,
+            "bluePixels": 2944,
+            "hardwareOnly": true
+          },
+          "encodedBytes": 3936
+        },
+        "image": "index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+        "podUID": "37452d8c-ae84-4131-9124-5369582640aa",
+        "nodeUID": "827bc785-b23e-43d6-a054-e5ac98ed7a97",
+        "jobUID": "67fb6483-20dc-4669-8cfb-6cdc6b02c127",
+        "probeIdentity": {
+          "configMapName": "windows-gpu-probe-v3",
+          "configMapUID": "e812a41a-aac2-4fd6-b028-61401144bc35",
+          "binarySHA256": "c3bd523139eac3615577f4e0b3dfb395e58083defe5e58e9fc7419df43b22e77",
+          "scriptSHA256": "5db856f0ff73ad6c9329a89493091b00999cc41473e14fe5f3f53d184f06169c"
+        }
+      },
+      "plugin": {
+        "mode": "upstream pinned 0.0.1",
+        "sourceCommit": null
+      }
+    },
+    {
+      "windowsVersion": "2025",
+      "instanceType": "g6f.large",
+      "physicalNICCount": 1,
+      "joinChecks": {
+        "expectedWindowsBuild": true,
+        "onePhysicalNIC": true,
+        "k0sWorkerRunning": true,
+        "tunnelRunning": true,
+        "bootstrapInstalled": true,
+        "capiAssociation": true,
+        "windowsNode": true,
+        "matchesSiteKubelet": true,
+        "containerd2": true,
+        "cloudWorkerLabel": true,
+        "internetFacingTaint": true,
+        "nodeReady": true,
+        "publisherReady": true,
+        "expectedWorkerVersion": true,
+        "expectedWorkerHash": true,
+        "expectedTunnelHash": true,
+        "peerDelivery": true
+      },
+      "hostNodeInfo": {
+        "architecture": "amd64",
+        "containerRuntimeVersion": "containerd://2.3.2",
+        "kernelVersion": "10.0.26100.33296",
+        "kubeProxyVersion": "",
+        "kubeletVersion": "v1.36.2+k0s",
+        "operatingSystem": "windows",
+        "osImage": "Windows Server 2025 Datacenter"
+      },
+      "application": {
+        "passed": true,
+        "checks": {
+          "podSucceeded": true,
+          "jobComplete": true,
+          "containerExitedZero": true,
+          "containerIdentityPresent": true,
+          "hardwareRenderAndEncode": true
+        },
+        "receipt": {
+          "encoder": "h264_nvenc",
+          "containerWindowsBuild": 20348,
+          "decodedFrames": 30,
+          "render": {
+            "api": "Direct3D11",
+            "vendorID": 4318,
+            "deviceID": 10168,
+            "frames": 30,
+            "pixelsPerFrame": 4096,
+            "greenPixels": 1152,
+            "bluePixels": 2944,
+            "hardwareOnly": true
+          },
+          "encodedBytes": 3936
+        },
+        "image": "index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+        "podUID": "1c2a8251-2fd3-4c9a-a90e-c02bd34b8877",
+        "nodeUID": "4b517f86-d9a2-41a9-b865-bf780f166487",
+        "jobUID": "e13fb70d-6a47-460d-a852-57761e84e382",
+        "probeIdentity": {
+          "configMapName": "windows-gpu-probe-v3",
+          "configMapUID": "e812a41a-aac2-4fd6-b028-61401144bc35",
+          "binarySHA256": "c3bd523139eac3615577f4e0b3dfb395e58083defe5e58e9fc7419df43b22e77",
+          "scriptSHA256": "5db856f0ff73ad6c9329a89493091b00999cc41473e14fe5f3f53d184f06169c"
+        }
+      },
+      "plugin": {
+        "mode": "packaged candidate, SkipRuntimeMounts=true",
+        "sourceCommit": "b21f59eb5dedf8ae9dc621dfecef61e54785b9e2",
+        "imageDigest": "sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+        "binarySHA256": "539bbd055f50ef3732da17d90cb89ea9d6e8efc982ad70072715c871e67d64d6",
+        "baseImage": "index.docker.io/tensorworks/wddm-device-plugin@sha256:47f97c76c16ad24490caf1d344b4a9bc0ccc05fe787e2b68fe5a1051818ce9ec"
+      }
+    }
+  ],
+  "existingNodeGuard": {
+    "checks": 60,
+    "passed": 60,
+    "identitiesStable": true,
+    "limitation": "One passing run does not resolve previously demonstrated intermittent fragmented UDP loss."
+  },
+  "failedAttemptsPreserved": [
+    {
+      "windowsVersion": "2025",
+      "result": "HCS StartError: PCI assignment with explicit nvcuda.dll mount rejected; same PCI assignment without driver mounts passed native render and encode"
+    },
+    {
+      "windowsVersion": "2022",
+      "result": "Projected ConfigMap executable could not launch; local hash-verified copy corrected probe execution"
+    },
+    {
+      "windowsVersion": "2022",
+      "result": "NVENC rejected 64x64 frame dimensions; checked rendered frames scaled to 256x256"
+    }
+  ],
+  "coverage": {
+    "observerUnitPercent": 52,
+    "observerUnitAndNativeReadOnlyPercent": 92,
+    "pluginUnitPackagePercent": 23.8,
+    "pluginAllocatePercent": 100,
+    "pluginTestsExecutedOn": "Windows Server 2025 VM"
+  },
+  "limitations": [
+    "No multi-GPU device or tenant isolation qualification",
+    "Fresh/replacement GPU worker application tests remain open",
+    "Cold application image pull/unpack is not baked or startup-qualified",
+    "Intermittent fragmented UDP loss remains unresolved",
+    "No release qualification"
+  ],
+  "diagnosticCleanup": {
+    "runtimeContainersAbsent": true,
+    "uploadedDiagnosticDirectoryAbsent": true
+  }
+}

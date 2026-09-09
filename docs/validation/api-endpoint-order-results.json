@@ -1,0 +1,33 @@
+{
+  "scope": "Observed endpoint permutation reproduced in a regression; patched controller deployed to isolated VM harness with live convergence verification",
+  "observedAt": "2026-09-07T06:17:17.153781+00:00",
+  "before": [
+    "10.10.0.14:6443",
+    "10.10.0.13:6443",
+    "10.10.0.10:6443",
+    "10.10.0.10:6443"
+  ],
+  "after": [
+    "10.10.0.13:6443",
+    "10.10.0.10:6443",
+    "10.10.0.14:6443",
+    "10.10.0.10:6443"
+  ],
+  "sameEndpointMembership": true,
+  "regressionBeforeFix": "FAIL: unchanged API membership rewrote the peer payload and invalidated its acknowledgement",
+  "regressionAfterFix": "PASS, including genuine endpoint removal",
+  "originCommit": "682f981b",
+  "coverage": {
+    "canonicalAPIHostsStatementsPercent": 100.0,
+    "ensureAdoptionConfigStatementsPercent": 83.9
+  },
+  "controllerImage": "cldt/controller-windows:v4",
+  "controllerImageID": "sha256:9624ab731f94cd13f8facf8992dffb08bc87b54bde2da5936377a61069c6271d",
+  "live": {
+    "observedAt": "2026-09-07T06:18:41.523472+00:00",
+    "samples": 7,
+    "minimumWindowSeconds": 30,
+    "bothWindowsPeerPayloadsStable": true,
+    "apiBackendsSortedAndUnique": true
+  }
+}

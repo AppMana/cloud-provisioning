@@ -1,0 +1,11 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadPinnedWindowsGridPackage",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::ec2-windows-nvidia-drivers/grid-19.5/582.53_grid_win10_win11_server2022_server2025_dch_64bit_international_aws_swl.exe"
+    }
+  ]
+}

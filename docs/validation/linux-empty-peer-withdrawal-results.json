@@ -1,0 +1,217 @@
+{
+  "scope": "Real Linux dialer reconcile and WireGuard kernel state in a fresh network namespace inside the single-NIC cp2 QEMU guest; running mesh binaries unchanged",
+  "before": {
+    "exitCode": 1,
+    "scope": "Real reconciler and WireGuard kernel state inside isolated network namespace in single-NIC QEMU guest"
+  },
+  "beforeFailures": [
+    "Explicit empty bootstrap peer array returned no peers configured",
+    "Explicit empty cached peer array retained the previous native peer"
+  ],
+  "after": {
+    "exitCode": 0,
+    "binarySHA256": "3aa5cc21e093adc27282d54432cc013e50f0aa326035909505c1558e981a24f3",
+    "scope": "Native peer and route withdrawal plus kernel interface reconstruction from durable state; not a VM reboot"
+  },
+  "checks": [
+    "Initial native WireGuard peer and exact host route exist",
+    "Explicit empty bootstrap list removes peer and route",
+    "Explicit empty cached list removes peer and route",
+    "Recreating the kernel interface from durable input does not resurrect the peer"
+  ],
+  "cleanup": "Fresh network namespace destroyed after each process; created test executables and coverage file removed from guest",
+  "nativeCoverage": {
+    "dialerPackagePercent": 25.9,
+    "reconcilePercent": 41.2,
+    "bootPeerListPercent": 85.7,
+    "installRoutesPercent": 51.9,
+    "scope": "This isolated native canary only; Kubernetes adoption and producer paths not exercised"
+  },
+  "sourceHistory": {
+    "earlyEmptyGuard": "4ccd8990 (2026-07-22)",
+    "differentialPeerRemoval": "5204aab2 (2026-08-03)",
+    "interpretation": "Older empty-list rejection prevented later differential removal from receiving an explicit empty desired set; retain the absent/null distinction instead of removing input checks wholesale"
+  },
+  "remaining": [
+    "Validate deployed worker Role, Pod-projected token rotation and concurrent replacement during active traffic.",
+    "Validate CAPI worker addition/removal and reboot with deployed peer delivery; isolated full VM cache reboot passed separately.",
+    "Validate survivor traffic continuity before deploying this candidate to the live mesh."
+  ],
+  "artifactSHA256": {
+    "native-before.stdout": "84388bb67a9f230a27b5a4b1aa26324def5567e29148187ce052360b2135ce36",
+    "native-final.stdout": "c441b442e7bc9b1a3b83e823eab9cc88ccd173fade15740bf3dd142004611f0f",
+    "native.coverage": "5f2da27d69445fdc3b38fa524aee0010c52fdeb021a3e5af6bc545a72cd5ffd1",
+    "native-before-exit.json": "02c3b7463be9ac5258ca8363a91c3fd3549a3390923e8d9261430fe756fc8e03",
+    "native-final-exit.json": "2e9969b26b6c550b22a8c6da86702d3028c75b8ac156303cae5f7c51421761da",
+    "native-site.stdout": "b387786f02437eec05219c6bb6c51e9bea5a13d64f9f73f079d62c5f35e40450",
+    "native-site.coverage": "c41e7631f9a88e50974c30e49e2508e1eb4ce623a43ce509f0ee876ad8e0483f",
+    "native-site-exit.json": "ba46c613754b8fbc9c72fe34c62ff984838aedd2e6f842db66563cc1d6a6929f",
+    "cache-before.stdout": "9e653759d91bc7d4e1048cf6ae8b06e3e3ef85bee0f16552eeed84b6d158c03b",
+    "cache-after.stdout": "b28ae5054eaf0da591e25e559ec5be3c1b5197fc5af477abe792abbbefccda30",
+    "cache-unit.coverage": "6a98506a1c85f31d7df13c1d55a870bc807a0e4fc76cfb2ad95f329f25571631",
+    "adoption-http.stdout": "25e1e9a2f0a37b66f744dbdf02dd4e60a3d5f3eb5d7f4d9df4ad29d0c008a329",
+    "adoption-http.stderr": "cc60cf048d17da2d235c449409c84c31a9173e621f67faa362df2458a7accf71",
+    "adoption-http-exit.json": "106a53d0c376207c57aefed340672b36fc00896b8e7d11d5d847cf32d0e743b7",
+    "ack-race/api-observation.json": "1be607fa9dadb6dc71ea95fe20dab34f52826f577cb0db5d6f0122157395db14",
+    "ack-race/recreation-observation.json": "67427fe08c6fbe64f0857d78d194020d4a5ba274195395b8f0e7390363b7851b",
+    "adoption-race.stdout": "5f6140bea939c7952a2971c547ac89081cd0e6af0d79ab01a95151668fb31b29",
+    "adoption-race.stderr": "b56599c800eb12b197704d79fa44a35221df3e8040288273fc9b3712cc789bb2",
+    "real-api.stdout": "5aca80f435e513649537a5ab4a8dc6959368b6c84aa9175a6e1407f81c5a979e",
+    "real-api-diagnostic.stderr": "7f367a6c61230335352f6bc7182ec92e58cf5a001d406067b0b3ce019e7b9d06",
+    "real-api-addressed.stdout": "40bd861ff3159f880a938e97f42737219f7ff86164810ee104ec6b38fe3ea60b",
+    "real-api-addressed-exit.json": "32bd625e179ee8e047a14f6dc8b6de32f0c77d4c8ded4bb28a7b52d348d77460",
+    "real-api-cleanup.json": "eb7d3e5886b2e90107ae8b6e1a9273fd37955b007ebad04005ddb5d559ccb457",
+    "real-api-sa.stdout": "24965854917c958b846da9ae7e3babaf1cccb7e308030988754c1ee712e37d9e",
+    "real-api-sa-exit.json": "f4ae0fa47aeed2ab75c22a891c5ea58ac9e97a4964f85dab610036797a13f8e7",
+    "real-api-sa-cleanup.json": "5dea0539f5fc79c88cb3ec2310b94dd9f518b662c228015d02e3bc7d180c9aa1",
+    "real-api-site.stdout": "6d88204aa1e7f4ccf0b127781b7431284eb86ee50a6488fa7a66166a0c51d4dd",
+    "real-api-site-exit.json": "f4ae0fa47aeed2ab75c22a891c5ea58ac9e97a4964f85dab610036797a13f8e7",
+    "real-api-site-cleanup.json": "5dea0539f5fc79c88cb3ec2310b94dd9f518b662c228015d02e3bc7d180c9aa1"
+  },
+  "siteRenderer": {
+    "result": {
+      "exitCode": 0,
+      "scope": "Real site renderer and native kernel reconciliation in isolated QEMU namespace; no Kubernetes Secret transport or VM reboot"
+    },
+    "behavior": "Successfully read site state containing no custom workers renders peers:[] rather than peers:null; the site endpoint can withdraw its last worker while retaining its interface for later joins.",
+    "remoteLastPathProtection": "Unchanged: RemotePeerDocument emits no document when no remote path is available; endpoint-controller tests intentionally retain the last endpoint during migration or unready bootstrap.",
+    "sourceHistory": "site_peers.go is untracked and absent from HEAD, so no git blame attribution exists for this helper.",
+    "tests": "pkg/tunnel, pkg/attachment, cmd/dialer and cmd/endpoint-controller passed",
+    "nativeCombinedPackageCoveragePercent": 20.1,
+    "scope": "Native renderer and kernel state in a QEMU network namespace; Kubernetes delivery is not exercised"
+  },
+  "cacheCorruption": {
+    "before": {
+      "exitCode": 1,
+      "scope": "Isolated network namespace in single-NIC QEMU guest; real WireGuard kernel state"
+    },
+    "beforeFailure": "Malformed durable cache accepted after withdrawal",
+    "after": {
+      "exitCode": 0,
+      "scope": "Isolated network namespace in single-NIC QEMU guest; real WireGuard kernel state"
+    },
+    "nativeCases": [
+      "malformed JSON",
+      "missing peers field",
+      "null peers field"
+    ],
+    "behavior": "Existing invalid cache fails reconciliation without bootstrap peer resurrection. Missing cache permits first boot. A current explicit adoption list can supersede a corrupt cache; live API recovery is not covered by this canary.",
+    "apiBackends": "Invalid durable state does not fall back to bootstrap backends; the running proxy retains its current list on an empty read.",
+    "unitCoverage": {
+      "bootPeerListPercent": 100,
+      "readCachedPeersPercent": 90.9,
+      "apiProxyBackendsFromFilesPercent": 85.7,
+      "wholeDialerPackagePercent": 29.8
+    },
+    "cleanup": "Canary namespace destroyed and transferred executables removed from guest"
+  },
+  "adoptionHTTP": {
+    "result": {
+      "exitCode": 0,
+      "scope": "Isolated network namespace in single-NIC QEMU guest; real WireGuard kernel state"
+    },
+    "checks": [
+      "Current explicit-empty update repairs malformed cache",
+      "Acknowledgement follows expected native peer count",
+      "Simulated API 503 retains cached withdrawal",
+      "Later nonempty update restores peer with unchanged native private key",
+      "Exact delivered public-document hash is acknowledged"
+    ],
+    "scope": "Real Kubernetes Go client HTTP requests and real WireGuard kernel state in isolated QEMU namespace; API responses are a controlled test server, not Kubernetes. No live RBAC, watch transport, concurrent Secret replacement, or VM reboot qualification.",
+    "cleanup": "Canary network namespace destroyed; transferred executable removed"
+  },
+  "adoptionAcknowledgementRace": {
+    "apiUpdate": {
+      "scope": "Real isolated Kubernetes API Secret update race; no worker or mesh Secret touched",
+      "unconditionalStaleAcknowledgementAccepted": true,
+      "staleUIDAndResourceVersionPatchRejected": true,
+      "oldUID": "6cd81218-9f3d-4255-8db9-82b263ee19c1",
+      "oldResourceVersion": "962564",
+      "updatedResourceVersion": "962565",
+      "rejection": "Error from server (Conflict): Operation cannot be fulfilled on secrets \"adoption\": the object has been modified; please apply your changes to the latest version and try again",
+      "namespaceUID": "d74e4c0f-f0fe-4d99-815f-169b59e17d52",
+      "namespaceDeletionRequested": true
+    },
+    "apiRecreation": {
+      "scope": "Real Kubernetes API merge patch identity semantics in isolated namespace",
+      "matchingUIDAndVersionAccepted": true,
+      "oldUIDWithCurrentVersionRejectedAfterRecreation": true,
+      "replacementNotAcknowledged": true,
+      "rejection": "The Secret \"adoption\" is invalid: metadata.uid: Invalid value: \"5db736e1-ab6e-44d7-b472-1131cb94fe20\": field is immutable"
+    },
+    "nativeReplay": {
+      "exitCode": 0,
+      "scope": "Isolated network namespace in single-NIC QEMU guest; real WireGuard kernel state"
+    },
+    "implementation": "Acknowledgement metadata includes the UID and resourceVersion of the Secret read before native application. A conflict leaves the newer Secret unacknowledged; the next reconcile reads and applies the current document.",
+    "scope": "Real Kubernetes API precondition semantics plus controlled-HTTP/native-kernel reconciler replay. A live cluster worker race and workload continuity are not exercised.",
+    "cleanup": "Temporary API namespaces absent; QEMU canary executable and namespace removed"
+  },
+  "realAPIInVM": {
+    "result": {
+      "exitCode": 0,
+      "scope": "Real API/etcd 1.35.0 with certificate-authenticated least-privilege User and native WireGuard in isolated QEMU network namespace"
+    },
+    "apiServerVersion": "1.35.0",
+    "etcdVersion": "3.6.6",
+    "checks": [
+      "Certificate-authenticated User can get/patch only the named adoption Secret",
+      "Unrelated Secret GET is forbidden",
+      "Current update repairs malformed cache",
+      "Peer re-addition and withdrawal reach native WireGuard",
+      "Private WireGuard identity remains unchanged",
+      "Durable cache and actual API applied-document hash match each state"
+    ],
+    "retainedSetupFailure": "API server could not infer an advertised address in an isolated namespace without a default route. Explicit advertise-address=10.253.253.1 uses the canary interface; no NIC or default route added.",
+    "cleanup": {
+      "ownedProcessesRemaining": [],
+      "transferredFilesRemoved": true,
+      "scope": "Owned copied executable paths checked in guest /proc before cleanup"
+    },
+    "scope": "Real API server, etcd, RBAC and native Linux kernel in one QEMU guest namespace. Certificate User authentication; projected ServiceAccount-token behavior, full distribution control plane, network outage, and VM reboot are not exercised."
+  },
+  "serviceAccountAPIInVM": {
+    "result": {
+      "exitCode": 0,
+      "scope": "Real API/etcd 1.35.0 plus ServiceAccount TokenRequest and native WireGuard in isolated QEMU namespace"
+    },
+    "authentication": "TokenRequest-issued ServiceAccount bearer token; audience https://cldt-native-api; requested lifetime 600 seconds. Worker client contains API trust and this token, without setup client certificate credentials.",
+    "authorization": "Namespaced Role permits get/patch only on Secret adoption; unrelated Secret GET is forbidden.",
+    "checks": [
+      "Malformed durable cache repaired from current Secret",
+      "Native peer re-added then withdrawn",
+      "WireGuard private key unchanged",
+      "Cache and actual API applied-document hash match each state"
+    ],
+    "cleanup": {
+      "ownedProcessesRemaining": [],
+      "transferredFilesRemoved": true
+    },
+    "scope": "Real API/etcd 1.35.0 in isolated QEMU network namespace. Direct TokenRequest authentication; no kubelet-projected token volume, token rotation, full distribution rollout or VM reboot."
+  },
+  "siteReceiptAPIInVM": {
+    "result": {
+      "exitCode": 0,
+      "scope": "Real API/etcd 1.35.0 plus ServiceAccount TokenRequest and native WireGuard in isolated QEMU namespace"
+    },
+    "checks": [
+      "Real mesh Secret updates drive add/remove/re-add/remove through the site reconciler",
+      "SiteConverged validates the applied receipt against the actual API Node UID and current peer render",
+      "Native WireGuard peer and host-route counts match each membership state",
+      "WireGuard private key remains unchanged",
+      "Receipt for old Node UID is rejected after API Node recreation under the same name",
+      "Next reconciliation produces a receipt for the replacement Node UID"
+    ],
+    "authorization": "ServiceAccount uses named-Secret get/patch permissions plus read-only get/list Nodes for the site receipt path. Setup client performs fixture creation and membership edits.",
+    "cleanup": {
+      "ownedProcessesRemaining": [],
+      "transferredFilesRemoved": true
+    },
+    "scope": "Real API/etcd 1.35.0, RBAC and native Linux kernel inside isolated single-NIC QEMU guest namespace. Node recreation is an API identity test, not CAPI provisioning, VM replacement, reboot, or traffic continuity."
+  },
+  "fullVMReboot": {
+    "result": "passed",
+    "report": "linux-empty-peer-reboot-results.json",
+    "scope": "Disposable single-NIC QEMU, systemd service and local cache; peer re-addition and withdrawal also passed after reboot. No CAPI or workload traffic."
+  }
+}

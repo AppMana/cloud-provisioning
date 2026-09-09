@@ -1,0 +1,360 @@
+{
+  "baseline": [
+    {
+      "from": "aws-win2022",
+      "checks": [
+        {
+          "receivedBytes": 1026,
+          "expectedBytes": 1026,
+          "to": "aws-win2025",
+          "seconds": 0.2315728,
+          "ok": true,
+          "detail": "200 1026",
+          "payloadBytes": 1024
+        },
+        {
+          "receivedBytes": 16386,
+          "expectedBytes": 16386,
+          "to": "aws-win2025",
+          "seconds": 0.16841979999999998,
+          "ok": true,
+          "detail": "200 16386",
+          "payloadBytes": 16384
+        },
+        {
+          "receivedBytes": 1048578,
+          "expectedBytes": 1048578,
+          "to": "aws-win2025",
+          "seconds": 0.24502749999999998,
+          "ok": true,
+          "detail": "200 1048578",
+          "payloadBytes": 1048576
+        },
+        {
+          "receivedBytes": 1026,
+          "expectedBytes": 1026,
+          "to": "w1",
+          "seconds": 0.2061731,
+          "ok": true,
+          "detail": "200 1026",
+          "payloadBytes": 1024
+        },
+        {
+          "receivedBytes": 0,
+          "expectedBytes": 16386,
+          "to": "w1",
+          "seconds": 25.1769343,
+          "ok": false,
+          "detail": "crictl.exe : curl: (28) Operation timed out after 25016 milliseconds with 0 bytes received\r\nAt line:1 char:380\r\n+ ... ($payload | & C:\\ProgramData\\CloudProvisioning\\diagnostics\\crictl.exe ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : ",
+          "payloadBytes": 16384
+        },
+        {
+          "receivedBytes": 0,
+          "expectedBytes": 1048578,
+          "to": "w1",
+          "seconds": 25.1498028,
+          "ok": false,
+          "detail": "crictl.exe : curl: (28) Operation timed out after 25000 milliseconds with 0 bytes received\r\nAt line:1 char:380\r\n+ ... ($payload | & C:\\ProgramData\\CloudProvisioning\\diagnostics\\crictl.exe ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : ",
+          "payloadBytes": 1048576
+        }
+      ]
+    },
+    {
+      "from": "aws-win2025",
+      "checks": [
+        {
+          "receivedBytes": 1026,
+          "expectedBytes": 1026,
+          "to": "aws-win2022",
+          "seconds": 0.1666473,
+          "ok": true,
+          "detail": "200 1026",
+          "payloadBytes": 1024
+        },
+        {
+          "receivedBytes": 16386,
+          "expectedBytes": 16386,
+          "to": "aws-win2022",
+          "seconds": 0.0846354,
+          "ok": true,
+          "detail": "200 16386",
+          "payloadBytes": 16384
+        },
+        {
+          "receivedBytes": 1048578,
+          "expectedBytes": 1048578,
+          "to": "aws-win2022",
+          "seconds": 0.20257019999999998,
+          "ok": true,
+          "detail": "200 1048578",
+          "payloadBytes": 1048576
+        },
+        {
+          "receivedBytes": 1026,
+          "expectedBytes": 1026,
+          "to": "w1",
+          "seconds": 0.14992329999999998,
+          "ok": true,
+          "detail": "200 1026",
+          "payloadBytes": 1024
+        },
+        {
+          "receivedBytes": 0,
+          "expectedBytes": 16386,
+          "to": "w1",
+          "seconds": 25.183428499999998,
+          "ok": false,
+          "detail": "crictl.exe : curl: (28) Operation timed out after 25000 milliseconds with 0 bytes received\r\nAt line:1 char:380\r\n+ ... ($payload | & C:\\ProgramData\\CloudProvisioning\\diagnostics\\crictl.exe ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : ",
+          "payloadBytes": 16384
+        },
+        {
+          "receivedBytes": 0,
+          "expectedBytes": 1048578,
+          "to": "w1",
+          "seconds": 25.1481162,
+          "ok": false,
+          "detail": "crictl.exe : curl: (28) Operation timed out after 25016 milliseconds with 0 bytes received\r\nAt line:1 char:380\r\n+ ... ($payload | & C:\\ProgramData\\CloudProvisioning\\diagnostics\\crictl.exe ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : ",
+          "payloadBytes": 1048576
+        }
+      ]
+    },
+    {
+      "from": "w1",
+      "checks": [
+        {
+          "to": "aws-win2022",
+          "payloadBytes": 1024,
+          "expectedBytes": 1024,
+          "receivedBytes": 1024,
+          "ok": true,
+          "seconds": 0.1839428270031931,
+          "detail": "200 1024"
+        },
+        {
+          "to": "aws-win2022",
+          "payloadBytes": 16384,
+          "expectedBytes": 16384,
+          "receivedBytes": 0,
+          "ok": false,
+          "seconds": 25.139338952998514,
+          "detail": "000 0curl: (28) Operation timed out after 25002 milliseconds with 0 bytes received\n"
+        },
+        {
+          "to": "aws-win2022",
+          "payloadBytes": 1048576,
+          "expectedBytes": 1048576,
+          "receivedBytes": 0,
+          "ok": false,
+          "seconds": 25.14774789900548,
+          "detail": "100 0curl: (28) Operation timed out after 25002 milliseconds with 0 bytes received\n"
+        },
+        {
+          "to": "aws-win2025",
+          "payloadBytes": 1024,
+          "expectedBytes": 1024,
+          "receivedBytes": 1024,
+          "ok": true,
+          "seconds": 0.1800718800004688,
+          "detail": "200 1024"
+        },
+        {
+          "to": "aws-win2025",
+          "payloadBytes": 16384,
+          "expectedBytes": 16384,
+          "receivedBytes": 0,
+          "ok": false,
+          "seconds": 25.13743636199797,
+          "detail": "000 0curl: (28) Operation timed out after 25002 milliseconds with 0 bytes received\n"
+        },
+        {
+          "to": "aws-win2025",
+          "payloadBytes": 1048576,
+          "expectedBytes": 1048576,
+          "receivedBytes": 0,
+          "ok": false,
+          "seconds": 25.15288678900106,
+          "detail": "100 0curl: (28) Operation timed out after 25002 milliseconds with 0 bytes received\n"
+        }
+      ]
+    }
+  ],
+  "reducedMTU": [
+    {
+      "from": "aws-win2022",
+      "checks": [
+        {
+          "receivedBytes": 1026,
+          "expectedBytes": 1026,
+          "to": "aws-win2025",
+          "seconds": 0.16458689999999998,
+          "ok": true,
+          "detail": "200 1026",
+          "payloadBytes": 1024
+        },
+        {
+          "receivedBytes": 16386,
+          "expectedBytes": 16386,
+          "to": "aws-win2025",
+          "seconds": 0.1422387,
+          "ok": true,
+          "detail": "200 16386",
+          "payloadBytes": 16384
+        },
+        {
+          "receivedBytes": 1048578,
+          "expectedBytes": 1048578,
+          "to": "aws-win2025",
+          "seconds": 0.31118049999999997,
+          "ok": true,
+          "detail": "200 1048578",
+          "payloadBytes": 1048576
+        },
+        {
+          "receivedBytes": 1026,
+          "expectedBytes": 1026,
+          "to": "w1",
+          "seconds": 0.1718479,
+          "ok": true,
+          "detail": "200 1026",
+          "payloadBytes": 1024
+        },
+        {
+          "receivedBytes": 16386,
+          "expectedBytes": 16386,
+          "to": "w1",
+          "seconds": 0.1996788,
+          "ok": true,
+          "detail": "200 16386",
+          "payloadBytes": 16384
+        },
+        {
+          "receivedBytes": 1048578,
+          "expectedBytes": 1048578,
+          "to": "w1",
+          "seconds": 0.6349353999999999,
+          "ok": true,
+          "detail": "200 1048578",
+          "payloadBytes": 1048576
+        }
+      ]
+    },
+    {
+      "from": "aws-win2025",
+      "checks": [
+        {
+          "receivedBytes": 1026,
+          "expectedBytes": 1026,
+          "to": "aws-win2022",
+          "seconds": 0.1479219,
+          "ok": true,
+          "detail": "200 1026",
+          "payloadBytes": 1024
+        },
+        {
+          "receivedBytes": 16386,
+          "expectedBytes": 16386,
+          "to": "aws-win2022",
+          "seconds": 0.08713989999999999,
+          "ok": true,
+          "detail": "200 16386",
+          "payloadBytes": 16384
+        },
+        {
+          "receivedBytes": 1048578,
+          "expectedBytes": 1048578,
+          "to": "aws-win2022",
+          "seconds": 0.27078009999999997,
+          "ok": true,
+          "detail": "200 1048578",
+          "payloadBytes": 1048576
+        },
+        {
+          "receivedBytes": 1026,
+          "expectedBytes": 1026,
+          "to": "w1",
+          "seconds": 0.20294679999999998,
+          "ok": true,
+          "detail": "200 1026",
+          "payloadBytes": 1024
+        },
+        {
+          "receivedBytes": 16386,
+          "expectedBytes": 16386,
+          "to": "w1",
+          "seconds": 0.1765744,
+          "ok": true,
+          "detail": "200 16386",
+          "payloadBytes": 16384
+        },
+        {
+          "receivedBytes": 1048578,
+          "expectedBytes": 1048578,
+          "to": "w1",
+          "seconds": 0.6462973,
+          "ok": true,
+          "detail": "200 1048578",
+          "payloadBytes": 1048576
+        }
+      ]
+    },
+    {
+      "from": "w1",
+      "checks": [
+        {
+          "to": "aws-win2022",
+          "payloadBytes": 1024,
+          "expectedBytes": 1024,
+          "receivedBytes": 1024,
+          "ok": true,
+          "seconds": 0.17814425400138134,
+          "detail": "200 1024"
+        },
+        {
+          "to": "aws-win2022",
+          "payloadBytes": 16384,
+          "expectedBytes": 16384,
+          "receivedBytes": 16384,
+          "ok": true,
+          "seconds": 0.22679892099404242,
+          "detail": "200 16384"
+        },
+        {
+          "to": "aws-win2022",
+          "payloadBytes": 1048576,
+          "expectedBytes": 1048576,
+          "receivedBytes": 1048576,
+          "ok": true,
+          "seconds": 0.5913451949963928,
+          "detail": "200 1048576"
+        },
+        {
+          "to": "aws-win2025",
+          "payloadBytes": 1024,
+          "expectedBytes": 1024,
+          "receivedBytes": 1024,
+          "ok": true,
+          "seconds": 0.16532468399964273,
+          "detail": "200 1024"
+        },
+        {
+          "to": "aws-win2025",
+          "payloadBytes": 16384,
+          "expectedBytes": 16384,
+          "receivedBytes": 16384,
+          "ok": true,
+          "seconds": 0.21361177600192605,
+          "detail": "200 16384"
+        },
+        {
+          "to": "aws-win2025",
+          "payloadBytes": 1048576,
+          "expectedBytes": 1048576,
+          "receivedBytes": 1048576,
+          "ok": true,
+          "seconds": 0.6394867839990184,
+          "detail": "200 1048576"
+        }
+      ]
+    }
+  ]
+}

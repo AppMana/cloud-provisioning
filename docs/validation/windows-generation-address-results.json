@@ -1,0 +1,146 @@
+{
+  "state": "Windows address verification, repair and duplicate-owner guard verified; generation address sharing unqualified",
+  "date": "2026-09-09",
+  "results": {
+    "2022": {
+      "instanceID": "i-0ddaed6f030330992",
+      "commandID": "b285bba8-dd69-48c4-9800-ba30b2546963",
+      "binarySHA256": "1d10a075373422b0c5d1ee6d80587ec5f6a36c93bf36491bbdc069cac7d38ecb",
+      "version": "10.0.20348.0",
+      "nativeExitCode": 0,
+      "nativeTests": [
+        "TestNativeApplyLifecycle"
+      ],
+      "verified": [
+        "native apply",
+        "missing identity address is rejected by Verify",
+        "Apply repairs missing identity address",
+        "duplicate address owner rejected before configuring peers",
+        "existing owner remains valid after rejection",
+        "route drift repair",
+        "immutable address",
+        "peer and route retirement"
+      ],
+      "cleanup": {
+        "OwnedAdaptersChecked": 2,
+        "RemainingAdapters": [],
+        "RemainingNativeProcesses": []
+      },
+      "coverage": {
+        "coveredStatements": 150,
+        "statements": 184,
+        "percent": 81.5,
+        "scope": "Windows build of controller/pkg/tunneldevice; one native lifecycle test, not whole-project coverage"
+      },
+      "rawSHA256": {
+        "stdout.txt": "77a4750f4551727dd72f8a622e454e89425100325525b90c3c133313d57744b5",
+        "stderr.txt": "7ce7cf76ae4f06dc23be4e1bcf7af32f72b891dc40c8499690f7f7516f6d8735",
+        "native.cover": "de60295034fb253f02e656bfd090458a9652b2290ccf0ecbb72f8af52d689af1",
+        "process.json": "6861524548510c497c37705e9ab241a7ac7787342e8547090773050cc99f4f41",
+        "exit-code.txt": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+      },
+      "overlapExperiment": {
+        "state": "failed on original backend and DAD candidate; shared address ownership remains unqualified",
+        "firstAdapterPreferred": true,
+        "secondAdapterMissingAddress": true,
+        "families": [
+          "IPv4",
+          "IPv6"
+        ],
+        "evidence": "raw-v4-2022-stdout.txt",
+        "sha256": "a5d33af18e6cddcfe41ac79df044206ee935982afda85c1becbfab71f0548277"
+      }
+    },
+    "2025": {
+      "instanceID": "i-07c9859f5ce8ed42b",
+      "commandID": "b18d869a-50b7-4eeb-93f9-95dfd4d8ebc9",
+      "binarySHA256": "1d10a075373422b0c5d1ee6d80587ec5f6a36c93bf36491bbdc069cac7d38ecb",
+      "version": "10.0.26100.0",
+      "nativeExitCode": 0,
+      "nativeTests": [
+        "TestNativeApplyLifecycle"
+      ],
+      "verified": [
+        "native apply",
+        "missing identity address is rejected by Verify",
+        "Apply repairs missing identity address",
+        "duplicate address owner rejected before configuring peers",
+        "existing owner remains valid after rejection",
+        "route drift repair",
+        "immutable address",
+        "peer and route retirement"
+      ],
+      "cleanup": {
+        "OwnedAdaptersChecked": 2,
+        "RemainingAdapters": [],
+        "RemainingNativeProcesses": []
+      },
+      "coverage": {
+        "coveredStatements": 150,
+        "statements": 184,
+        "percent": 81.5,
+        "scope": "Windows build of controller/pkg/tunneldevice; one native lifecycle test, not whole-project coverage"
+      },
+      "rawSHA256": {
+        "stdout.txt": "e65cce4019a1bd2cae1445619cc478576e1c352d7b1ba687cb5e0bdd10aad654",
+        "stderr.txt": "20d70758054f77fb8c77e672be69a72c887cc12cd67eabe22f3c4d882160732d",
+        "native.cover": "de60295034fb253f02e656bfd090458a9652b2290ccf0ecbb72f8af52d689af1",
+        "process.json": "b5d3d87e6063ddf40a80bc6702c5dce58aadd7139f77ce06d5392941495b40d0",
+        "exit-code.txt": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+      },
+      "overlapExperiment": {
+        "state": "failed on original backend and DAD candidate; shared address ownership remains unqualified",
+        "firstAdapterPreferred": true,
+        "secondAdapterMissingAddress": true,
+        "families": [
+          "IPv4",
+          "IPv6"
+        ],
+        "evidence": "raw-v4-2025-stdout.txt",
+        "sha256": "a4fa14f6746f3583a68cb7195093208568d71689897da1bf64ac5f289ef11f0e"
+      }
+    }
+  },
+  "sourceSHA256": {
+    "device_windows.go": "45bee16f131333df750cad5f39448b28c7873aac685ed4918cdc0808fba2abbe",
+    "apply_windows_test.go": "740f3d229f17c5f5dde88ae54d5ec2c308c361eec4cebfa88ceee62ae0ad0aa9",
+    "generation_address_windows_test.go": "e0e2266040f0e5d69b3b7466800a5da773eee87969c8f4d4a08d03a86252e9d6"
+  },
+  "archiveSHA256": "52641546549e9490d5af992f1c4fef122ee0908718aab06eb67632e587006ac6",
+  "upstreamReference": {
+    "module": "golang.zx2c4.com/wireguard/windows@v1.0.1",
+    "path": "tunnel/addressconfig.go",
+    "behavior": "DadTransmits=0 for static WireGuard configuration"
+  },
+  "changes": [
+    "Configure interface DAD settings before adding identity address",
+    "Treat cached identity only as an immutability guard",
+    "Repair missing OS address on reapply",
+    "Require actual preferred OS address in Verify",
+    "Reject an address owned by another interface before peer configuration"
+  ],
+  "failedAttemptsPreserved": [
+    "v1: invalid temporary adapter name; native test exited; post-test wrapper timed out",
+    "v2: incorrect physical ENA inference from IP-bound .NET interface enumeration; test not launched",
+    "v3/v4: native shared-address experiment failed; post-test wrappers timed out; raw files recovered by independent SSM commands",
+    "v5: lifecycle/address repair passed; shared-address experiment failed; cleanup verified"
+  ],
+  "limitations": [
+    "No workload or baked-image rollout of the backend fix",
+    "No Windows dual-generation packet delivery qualification",
+    "A stable address owner independent of generation devices is still required",
+    "Linux egress proof does not qualify production controller/dialer protocol or all CNI distributions"
+  ],
+  "retainedFleets": {
+    "original": {
+      "count": 13,
+      "exactUIDsAndReadinessPreserved": true
+    },
+    "kuberouter": {
+      "count": 7,
+      "exactUIDsAndReadinessPreserved": true
+    }
+  },
+  "releaseQualified": false,
+  "retainedFleetsCheckedAt": "2026-09-09T15:36:00.138318+00:00"
+}

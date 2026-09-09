@@ -1,0 +1,10 @@
+[01]16AC.1E3C::2026-09-07 15:57:26.378000600 [Microsoft-Windows-PktMon] Component 93, Type Filter , Name vfpext.sys, VFP Extension 
+[01]18A4.05C4::2026-09-07 15:56:33.540181300 [Microsoft-Windows-PktMon] PktGroupId 281474976723423, PktNumber 1, Appearance 0, Direction Tx , Type Ethernet , Component 116, Edge 1, Filter 1, OriginalSize 1378, LoggedSize 192 
+	0E-2A-0A-F4-2A-05 > 00-15-5D-2E-C0-7B, ethertype IPv4 (0x0800), length 1378: (tos 0x0, ttl 128, id 16430, offset 0, flags [+], proto UDP (17), length 1364)
+    10.244.42.5.8081 > 10.244.114.4.61651: UDP, bad length 1400 > 1336
+[01]18A4.05C4::2026-09-07 15:56:33.540219100 [Microsoft-Windows-PktMon] Drop: PktGroupId 281474976723429, PktNumber 1, Appearance 0, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 1378, LoggedSize 192 
+	Drop: 0E-2A-0A-F4-2A-05 > 00-15-5D-2E-C0-7B, ethertype IPv4 (0x0800), length 1378: (tos 0x0, ttl 128, id 16430, offset 0, flags [+], proto UDP (17), length 1364)
+    10.244.42.5.37151 > 10.244.114.4.54256: UDP, bad length 1400 > 1336
+[01]18A4.05C4::2026-09-07 15:56:33.540219600 [Microsoft-Windows-PktMon] Drop: PktGroupId 281474976723429, PktNumber 2, Appearance 0, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 98, LoggedSize 98 
+	Drop: 0E-2A-0A-F4-2A-05 > 00-15-5D-2E-C0-7B, ethertype IPv4 (0x0800), length 98: (tos 0x0, ttl 128, id 16430, offset 1344, flags [none], proto UDP (17), length 84)
+    10.244.42.5 > 10.244.114.4: ip-proto-17

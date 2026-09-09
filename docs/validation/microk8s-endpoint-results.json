@@ -1,0 +1,86 @@
+{
+  "result": "native-endpoint-contract-and-regressions-passed",
+  "observedAt": "2026-09-09T07:07:15.813645+00:00",
+  "profile": "microk8s/calico",
+  "observed": {
+    "nativeServingPort": 16443,
+    "infrastructureEndpoint": {
+      "host": "10.10.0.10",
+      "port": 6443
+    },
+    "associationWorkedThrough": "https://kubernetes.default.svc:443",
+    "evidenceSHA256": "b3fb4da85544c46def8e9c10c5e246ede402af694eef65f0e21531e3691e179d"
+  },
+  "change": "Share the configured API serving port between kubectl access and infrastructure endpoint publication, retaining the 6443 default.",
+  "tests": {
+    "raceEnabledClaimAndKubeSuites": "passed",
+    "claimPublishesNativeMicroK8sPort": "passed",
+    "defaultPortPreserved": "passed"
+  },
+  "coverage": {
+    "kube": {
+      "covered": 19,
+      "total": 59
+    },
+    "claim": {
+      "covered": 50,
+      "total": 122
+    }
+  },
+  "history": {
+    "hardcodedClaimEndpoint": "ef815636",
+    "obsoleteAssociationComment": "16b6d074",
+    "superseded": "Fixed-port assumption and comment that the harness supplies no workload connection; imported control-plane mode supplies that connection and checks real CAPI association."
+  },
+  "limits": [
+    "The running chart-v2 lifecycle campaign predates this endpoint fix.",
+    "The native endpoint contract check supplements the Claim regression; it does not rerun complete provisioning with the updated binary."
+  ],
+  "sourceSHA256": {
+    "harness/e2e/kube/kube.go": "b56252bd23d2db0a5c61eb23ed242abf6878d767cf908e95c22474b3e5d71a45",
+    "harness/e2e/claim/claim.go": "79bad182f9911f6ca7107a8875fe1fb9ced7de0f4e63b945a08b2ffa3f9a0790",
+    "harness/e2e/claim/endpoint_test.go": "56b4642eeb4525c20232c6c270cf8f3594e2133f986959340cd8400e71394217"
+  },
+  "nativeValidation": {
+    "status": "Success",
+    "exitCode": 0,
+    "commandID": "15db58e6-2938-4eea-94ea-0c69ca1aec0a",
+    "scope": "Authenticated MicroK8s API access and provider endpoint publication in isolated namespace; no Machines created.",
+    "temporaryNamespaceRemoved": true,
+    "evidenceSHA256": "1472e71c8507de273b77d60dbbf6fb41c3445a15d60c119edf1aabee24b921de",
+    "binarySHA256": "142b3defec0e22f8eeeeb3eb467e9d8670cb24cfdbf9470917c5ab18fb09ffec",
+    "coverage": {
+      "kube": {
+        "covered": 21,
+        "total": 59
+      },
+      "provider": {
+        "covered": 7,
+        "total": 223
+      },
+      "temporaryDriver": {
+        "covered": 24,
+        "total": 35
+      }
+    },
+    "profileSHA256": "6b775c672cb8a1b20713dd8b326adaa71c49d29f4a0a1efd52cd169f73e30cd5",
+    "coverageProfileVerifiedLocally": true
+  },
+  "nativeCoverageAttempts": [
+    {
+      "attempt": 1,
+      "functionalResult": "passed",
+      "coverageResult": "empty profile; main package excluded from instrumentation"
+    },
+    {
+      "attempt": 2,
+      "functionalResult": "passed",
+      "coverageResult": "empty profile; explicit dependency paths still excluded main"
+    },
+    {
+      "attempt": 3,
+      "functionalResult": "passed",
+      "coverageResult": "main package included for coverage registration; counters exported"
+    }
+  ]
+}

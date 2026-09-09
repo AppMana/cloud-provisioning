@@ -1,0 +1,232 @@
+{
+  "observedAt": "2026-09-08T17:18:59.914165+00:00",
+  "scope": "Native baseline failure and cleanup before Windows2022 GPU candidate provisioning",
+  "candidateImageID": "ami-08a4979d1e1bc73f7",
+  "candidateReferenceCount": 18,
+  "noClaimSubmitted": true,
+  "freshCloneTestExecuted": false,
+  "passed": false,
+  "survivor": {
+    "transport": "native-oob",
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "attempts": 1278,
+        "passed": 1278,
+        "maxStartIntervalSeconds": 0.17834728799999944,
+        "samplesSHA256": "eb93775722de4cf8575761c13bd576ea60d1bc7c04bc6262038781f5206b5bb8",
+        "ok": true
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "attempts": 1241,
+        "passed": 1240,
+        "maxStartIntervalSeconds": 5.100591801000004,
+        "samplesSHA256": "e6ae8c384f0092b8344ce6db743901def45e96fb0bd47658040b262969cfa990",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "attempts": 1261,
+        "passed": 1261,
+        "maxStartIntervalSeconds": 0.19983860000000053,
+        "samplesSHA256": "3ad4ae1ce05329408c8c3263b699119adfcad9fed9d0f182f7cbf32327b26a0d",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "attempts": 1518,
+        "passed": 1518,
+        "maxStartIntervalSeconds": 0.17817819999999074,
+        "samplesSHA256": "8d997e1ba4f7a22d0ccbdf34e974908dca14fa17635541fd98bf67adf90e2759",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "attempts": 1258,
+        "passed": 1258,
+        "maxStartIntervalSeconds": 0.14961240000000942,
+        "samplesSHA256": "3a643d1a18521176b9fa31db98aa3ac738c36b8a1486d46b5f319293b4efdf1f",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "attempts": 1483,
+        "passed": 1482,
+        "maxStartIntervalSeconds": 5.101475100000002,
+        "samplesSHA256": "a61628925b54989ee9f8286bb0a0870aafc0b3cfe5b60cb251a5c74e524188c5",
+        "ok": false
+      }
+    ],
+    "identitiesStable": true,
+    "window": {
+      "ok": false,
+      "scope": "No qualified operation window"
+    },
+    "preflightFailed": true,
+    "reason": "Original survivor UDP loss before claim submission",
+    "ok": false
+  },
+  "failedSamples": [
+    {
+      "sourcePod": "net-w1",
+      "targetPod": "net-aws-win2025-v3",
+      "sequence": 232,
+      "source": "10.244.190.81:38451",
+      "startedAt": "2026-09-08T17:14:43.369589358Z",
+      "finishedAt": "2026-09-08T17:14:48.369786625Z",
+      "ok": false,
+      "error": "read udp 10.244.190.81:38451->10.244.42.6:8081: i/o timeout",
+      "nonce": "54af46ebc6ecf70b8378953dd238efdb",
+      "pid": 175491,
+      "startOffsetSeconds": 28.918146286,
+      "finishOffsetSeconds": 33.918416751,
+      "attempts": 233,
+      "passed": 232,
+      "maxStartIntervalSeconds": 0.154022676,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    {
+      "sourcePod": "net-aws-win2025-v3",
+      "targetPod": "net-aws-win2022-v3",
+      "sequence": 1079,
+      "source": "10.244.42.6:58099",
+      "startedAt": "2026-09-08T17:16:19.8724662Z",
+      "finishedAt": "2026-09-08T17:16:24.8730549Z",
+      "ok": false,
+      "error": "read udp 10.244.42.6:58099->10.244.114.4:8081: i/o timeout",
+      "nonce": "253728d45c2ab65863934e86d407cb05",
+      "pid": 844,
+      "startOffsetSeconds": 111.2595754,
+      "finishOffsetSeconds": 116.2601641,
+      "attempts": 1080,
+      "passed": 1079,
+      "maxStartIntervalSeconds": 0.1337251,
+      "healthy": false,
+      "stopBoundary": false
+    }
+  ],
+  "cleanup": {
+    "passed": true,
+    "originalNodeCount": 13,
+    "allReady": true,
+    "nodeIdentities": {
+      "aws-win2022-gpu": "dd54061d-491a-4b12-95a7-27393e847780",
+      "aws-win2022-v3": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "aws-win2025": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+      "aws-win2025-gpu": "258d7b62-e774-48bc-94dc-e31ff042f585",
+      "aws-win2025-v3": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "cp": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+      "cp2": "947de62f-0920-408c-aa31-ac80a2344128",
+      "cp3": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+      "ip-172-29-0-9": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+      "remote1": "8935dd28-de93-44be-a887-73110fe88c51",
+      "remote2": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+      "w1": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "w2": "4bcf04f8-ec26-4db7-bacb-85681c0145da"
+    },
+    "podTools": [
+      {
+        "directory": "/uploads/upload3639283501-stream-0",
+        "removed": true
+      },
+      {
+        "directory": "/uploads/upload3639283501-stream-1",
+        "removed": true
+      },
+      {
+        "directory": "C:\\uploads\\upload2590475336.exe-stream-2",
+        "removed": true
+      },
+      {
+        "directory": "C:\\uploads\\upload2590475336.exe-stream-3",
+        "removed": true
+      },
+      {
+        "directory": "C:\\uploads\\upload2489092046.exe-stream-4",
+        "removed": true
+      },
+      {
+        "directory": "C:\\uploads\\upload2489092046.exe-stream-5",
+        "removed": true
+      }
+    ],
+    "hostTools": [
+      {
+        "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ownedExecutableRemoved": true,
+        "ownedDirectoryRemoved": true,
+        "noOwnedCRIProcesses": true
+      },
+      {
+        "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ownedExecutableRemoved": true,
+        "ownedDirectoryRemoved": true,
+        "noOwnedCRIProcesses": true
+      }
+    ]
+  },
+  "selectedUnitTests": {
+    "passed": 14,
+    "coverage": {
+      "covered_lines": 152,
+      "num_statements": 187,
+      "percent_covered": 81.28342245989305,
+      "percent_covered_display": "81",
+      "missing_lines": 35,
+      "excluded_lines": 0
+    },
+    "files": {
+      "observe/survivor_native.py": {
+        "covered_lines": 113,
+        "num_statements": 146,
+        "percent_covered": 77.3972602739726,
+        "percent_covered_display": "77",
+        "missing_lines": 33,
+        "excluded_lines": 0
+      },
+      "observe/survivor_stream.py": {
+        "covered_lines": 39,
+        "num_statements": 41,
+        "percent_covered": 95.1219512195122,
+        "percent_covered_display": "95",
+        "missing_lines": 2,
+        "excluded_lines": 0
+      }
+    },
+    "scope": "Selected Python sampler and raw-log validators only"
+  },
+  "runtimeCoverage": {
+    "collected": false,
+    "reason": "No claim was submitted and no CAPI removal was executed"
+  },
+  "sourceSHA256": {
+    "observe/survivor_native.py": "e0352dbfc46b426867aab9029ed4e9f81177e49ec47f3c326845f64bc3fcaecd",
+    "observe/survivor_stream.py": "4aa2f39edac91e2f0011d8f2f1b86dbd1c5706e271c3e9299c8275ea6a8fdf81"
+  },
+  "limitations": [
+    "Baseline losses do not establish the packet-path cause; no synchronized packet capture was performed.",
+    "The candidate AMI remains available and authorized, but this attempt does not qualify fresh-clone cache reuse.",
+    "Stopping and cleaning diagnostic samplers does not qualify CAPI worker removal."
+  ],
+  "evidenceSHA256": {
+    "survivor-result.json": "a5b2a6aa5c0778dc2a18fc43a3a99715bd58c25252271c65a0915d9284e2444d",
+    "preflight-abort-intent.json": "9b7f9490084d17c56e88e6674118d7dc031c452d396152e8ad9daf34f32fc8b4",
+    "pod-tool-cleanup.json": "d731348be18c9d0c99855413747dd7accf0a0453e5623a74bdedbb550473a7fb",
+    "survivor-oob-cleanup.json": "a5d89cf7f6c968068b94449cf22dfe6326c55c5d7af02615e0f86528d0d7f45a",
+    "final-baseline.json": "93dc7a93c2dde236ff773aa481ba2c94dbda2cc6d14112673d7e718a183a937f",
+    "session/lane-00.jsonl.gz": "ad5b54a2d7262d81b72b0e68acbaf14bd7c8acf1628d42bad65f68585e2137c9",
+    "session/lane-01.jsonl.gz": "c8ab992437a7ee30fea9ef87dc3dbee1f35499c44c12833383892c4de8d947b4",
+    "session/lane-02.jsonl.gz": "4baa03a1a8dd3cf51f112f44b9c34ee092480528a6cc98b45d14df7f27a34b7c",
+    "session/lane-03.jsonl.gz": "da9e2f47dee41a7959f6b6fc5838419436824e565ebe8cc5078e39fea8b775eb",
+    "session/lane-04.jsonl.gz": "c5253d10dd0ebc4feda70d9c0f0e753b1100720add675c2967da73cb069e60a4",
+    "session/lane-05.jsonl.gz": "b2edbf08735f6e7ffa93c07ac5606cf9444c880917a4d7479344d7021f2a5043"
+  }
+}

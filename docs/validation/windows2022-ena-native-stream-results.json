@@ -1,0 +1,1190 @@
+{
+  "observedAt": "2026-09-08T19:44:13.042563+00:00",
+  "scope": "Native continuous-stream ENA UDP IPv4 receive-checksum A/B/A on one retained Windows Server 2022 single-NIC AWS worker",
+  "instanceID": "i-0ddaed6f030330992",
+  "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+  "driverVersion": "2.11.0.0",
+  "probe": {
+    "intervalMilliseconds": 10,
+    "replyBytes": 64,
+    "requestBytes": 69,
+    "lanes": 6,
+    "sameOriginalProcessesAcrossPhases": true,
+    "freshNoncePerAttempt": true,
+    "phaseCountsValidatedAgainstOriginalTerminalLogs": true
+  },
+  "phases": {
+    "original": {
+      "startedAt": "2026-09-08T19:33:53.720645+00:00",
+      "finishedAt": "2026-09-08T19:36:21.614004+00:00",
+      "lanes": [
+        {
+          "lane": 0,
+          "firstSequence": 3002,
+          "lastSequenceExclusive": 7104,
+          "attempts": 4102,
+          "failed": 1,
+          "failedSamples": [
+            {
+              "sequence": 3730,
+              "source": "10.244.190.81:37878",
+              "startedAt": "2026-09-08T19:34:03.078372774Z",
+              "finishedAt": "2026-09-08T19:34:08.079503138Z",
+              "ok": false,
+              "error": "read udp 10.244.190.81:37878->10.244.114.4:8081: i/o timeout",
+              "nonce": "53f0898fa7eb10543cd5f70da7ed1142",
+              "pid": 176386,
+              "startOffsetSeconds": 133.625106624,
+              "finishOffsetSeconds": 138.626268196,
+              "attempts": 3731,
+              "passed": 3730,
+              "maxStartIntervalSeconds": 0.131752937,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-w1",
+          "target": "net-aws-win2022-v3"
+        },
+        {
+          "lane": 1,
+          "firstSequence": 2780,
+          "lastSequenceExclusive": 7103,
+          "attempts": 4323,
+          "failed": 0,
+          "failedSamples": [],
+          "source": "net-w1",
+          "target": "net-aws-win2025-v3"
+        },
+        {
+          "lane": 2,
+          "firstSequence": 2754,
+          "lastSequenceExclusive": 6393,
+          "attempts": 3639,
+          "failed": 3,
+          "failedSamples": [
+            {
+              "sequence": 2934,
+              "source": "10.244.114.4:54228",
+              "startedAt": "2026-09-08T19:33:45.9918924Z",
+              "finishedAt": "2026-09-08T19:33:50.9929088Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:54228->10.244.190.81:8081: i/o timeout",
+              "nonce": "4ffb172cf757c0022d66bb6df38ecf02",
+              "pid": 6300,
+              "startOffsetSeconds": 113.8226912,
+              "finishOffsetSeconds": 118.8237076,
+              "attempts": 2935,
+              "passed": 2933,
+              "maxStartIntervalSeconds": 5.0113657,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 4394,
+              "source": "10.244.114.4:59353",
+              "startedAt": "2026-09-08T19:34:46.0212778Z",
+              "finishedAt": "2026-09-08T19:34:51.0217487Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:59353->10.244.190.81:8081: i/o timeout",
+              "nonce": "4ffb172cf757c0022d66bb6df38ecf02",
+              "pid": 6300,
+              "startOffsetSeconds": 173.8520766,
+              "finishOffsetSeconds": 178.85254750000001,
+              "attempts": 4395,
+              "passed": 4392,
+              "maxStartIntervalSeconds": 5.0126016,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 5736,
+              "source": "10.244.114.4:63848",
+              "startedAt": "2026-09-08T19:35:40.7316971Z",
+              "finishedAt": "2026-09-08T19:35:45.7342828Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:63848->10.244.190.81:8081: i/o timeout",
+              "nonce": "4ffb172cf757c0022d66bb6df38ecf02",
+              "pid": 6300,
+              "startOffsetSeconds": 228.5624959,
+              "finishOffsetSeconds": 233.5650816,
+              "attempts": 5737,
+              "passed": 5733,
+              "maxStartIntervalSeconds": 5.0126016,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-aws-win2022-v3",
+          "target": "net-w1"
+        },
+        {
+          "lane": 3,
+          "firstSequence": 7063,
+          "lastSequenceExclusive": 15996,
+          "attempts": 8933,
+          "failed": 4,
+          "failedSamples": [
+            {
+              "sequence": 7900,
+              "source": "10.244.114.4:55042",
+              "startedAt": "2026-09-08T19:33:56.7205469Z",
+              "finishedAt": "2026-09-08T19:34:01.7229553Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:55042->10.244.42.6:8081: i/o timeout",
+              "nonce": "baf2d47343f965e73b0a5678873f303f",
+              "pid": 1372,
+              "startOffsetSeconds": 119.1594371,
+              "finishOffsetSeconds": 124.1618455,
+              "attempts": 7901,
+              "passed": 7899,
+              "maxStartIntervalSeconds": 5.016779,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 11669,
+              "source": "10.244.114.4:60269",
+              "startedAt": "2026-09-08T19:34:56.655004Z",
+              "finishedAt": "2026-09-08T19:35:01.6656205Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:60269->10.244.42.6:8081: i/o timeout",
+              "nonce": "baf2d47343f965e73b0a5678873f303f",
+              "pid": 1372,
+              "startOffsetSeconds": 179.0938942,
+              "finishOffsetSeconds": 184.1045107,
+              "attempts": 11670,
+              "passed": 11667,
+              "maxStartIntervalSeconds": 5.016779,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 13030,
+              "source": "10.244.114.4:62281",
+              "startedAt": "2026-09-08T19:35:20.8022699Z",
+              "finishedAt": "2026-09-08T19:35:25.8038922Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:62281->10.244.42.6:8081: i/o timeout",
+              "nonce": "baf2d47343f965e73b0a5678873f303f",
+              "pid": 1372,
+              "startOffsetSeconds": 203.2411601,
+              "finishOffsetSeconds": 208.2427824,
+              "attempts": 13031,
+              "passed": 13027,
+              "maxStartIntervalSeconds": 5.0210765,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 15200,
+              "source": "10.244.114.4:65283",
+              "startedAt": "2026-09-08T19:35:56.6157551Z",
+              "finishedAt": "2026-09-08T19:36:01.6193879Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:65283->10.244.42.6:8081: i/o timeout",
+              "nonce": "baf2d47343f965e73b0a5678873f303f",
+              "pid": 1372,
+              "startOffsetSeconds": 239.0546453,
+              "finishOffsetSeconds": 244.0582781,
+              "attempts": 15201,
+              "passed": 15196,
+              "maxStartIntervalSeconds": 5.0210765,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-aws-win2022-v3",
+          "target": "net-aws-win2025-v3"
+        },
+        {
+          "lane": 4,
+          "firstSequence": 2793,
+          "lastSequenceExclusive": 6855,
+          "attempts": 4062,
+          "failed": 0,
+          "failedSamples": [],
+          "source": "net-aws-win2025-v3",
+          "target": "net-w1"
+        },
+        {
+          "lane": 5,
+          "firstSequence": 6960,
+          "lastSequenceExclusive": 16717,
+          "attempts": 9757,
+          "failed": 3,
+          "failedSamples": [
+            {
+              "sequence": 10906,
+              "source": "10.244.42.6:58191",
+              "startedAt": "2026-09-08T19:34:46.3610081Z",
+              "finishedAt": "2026-09-08T19:34:51.3619267Z",
+              "ok": false,
+              "error": "read udp 10.244.42.6:58191->10.244.114.4:8081: i/o timeout",
+              "nonce": "cdce8c085ef3ce80901fa37b481d37b8",
+              "pid": 6780,
+              "startOffsetSeconds": 158.4357488,
+              "finishOffsetSeconds": 163.4366674,
+              "attempts": 10907,
+              "passed": 10904,
+              "maxStartIntervalSeconds": 5.034924,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 14999,
+              "source": "10.244.42.6:63971",
+              "startedAt": "2026-09-08T19:35:46.3808856Z",
+              "finishedAt": "2026-09-08T19:35:51.3817152Z",
+              "ok": false,
+              "error": "read udp 10.244.42.6:63971->10.244.114.4:8081: i/o timeout",
+              "nonce": "cdce8c085ef3ce80901fa37b481d37b8",
+              "pid": 6780,
+              "startOffsetSeconds": 218.4556263,
+              "finishOffsetSeconds": 223.4564559,
+              "attempts": 15000,
+              "passed": 14996,
+              "maxStartIntervalSeconds": 5.034924,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 15592,
+              "source": "10.244.42.6:64941",
+              "startedAt": "2026-09-08T19:35:59.4721202Z",
+              "finishedAt": "2026-09-08T19:36:04.4728401Z",
+              "ok": false,
+              "error": "read udp 10.244.42.6:64941->10.244.114.4:8081: i/o timeout",
+              "nonce": "cdce8c085ef3ce80901fa37b481d37b8",
+              "pid": 6780,
+              "startOffsetSeconds": 231.5468609,
+              "finishOffsetSeconds": 236.5475808,
+              "attempts": 15593,
+              "passed": 15588,
+              "maxStartIntervalSeconds": 5.034924,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-aws-win2025-v3",
+          "target": "net-aws-win2022-v3"
+        }
+      ],
+      "attempts": 34816,
+      "failed": 11
+    },
+    "rx-disabled": {
+      "startedAt": "2026-09-08T19:37:13.647416+00:00",
+      "finishedAt": "2026-09-08T19:39:45.245022+00:00",
+      "lanes": [
+        {
+          "lane": 0,
+          "firstSequence": 8336,
+          "lastSequenceExclusive": 12577,
+          "attempts": 4241,
+          "failed": 1,
+          "failedSamples": [
+            {
+              "sequence": 11450,
+              "source": "10.244.190.81:35633",
+              "startedAt": "2026-09-08T19:38:46.736054495Z",
+              "finishedAt": "2026-09-08T19:38:51.736319231Z",
+              "ok": false,
+              "error": "read udp 10.244.190.81:35633->10.244.114.4:8081: i/o timeout",
+              "nonce": "53f0898fa7eb10543cd5f70da7ed1142",
+              "pid": 176386,
+              "startOffsetSeconds": 417.282789277,
+              "finishOffsetSeconds": 422.283087596,
+              "attempts": 11451,
+              "passed": 11448,
+              "maxStartIntervalSeconds": 5.014409729,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-w1",
+          "target": "net-aws-win2022-v3"
+        },
+        {
+          "lane": 1,
+          "firstSequence": 8553,
+          "lastSequenceExclusive": 12720,
+          "attempts": 4167,
+          "failed": 2,
+          "failedSamples": [
+            {
+              "sequence": 8852,
+              "source": "10.244.190.81:58336",
+              "startedAt": "2026-09-08T19:37:08.366605252Z",
+              "finishedAt": "2026-09-08T19:37:13.366841985Z",
+              "ok": false,
+              "error": "read udp 10.244.190.81:58336->10.244.42.6:8081: i/o timeout",
+              "nonce": "fe3414f25f22bb245368e3a0f5096cd9",
+              "pid": 176402,
+              "startOffsetSeconds": 318.770035752,
+              "finishOffsetSeconds": 323.770340352,
+              "attempts": 8853,
+              "passed": 8850,
+              "maxStartIntervalSeconds": 5.013248428,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 10833,
+              "source": "10.244.190.81:54919",
+              "startedAt": "2026-09-08T19:38:21.438553043Z",
+              "finishedAt": "2026-09-08T19:38:26.438765564Z",
+              "ok": false,
+              "error": "read udp 10.244.190.81:54919->10.244.42.6:8081: i/o timeout",
+              "nonce": "fe3414f25f22bb245368e3a0f5096cd9",
+              "pid": 176402,
+              "startOffsetSeconds": 391.84200348,
+              "finishOffsetSeconds": 396.842253733,
+              "attempts": 10834,
+              "passed": 10830,
+              "maxStartIntervalSeconds": 5.013248428,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-w1",
+          "target": "net-aws-win2025-v3"
+        },
+        {
+          "lane": 2,
+          "firstSequence": 7428,
+          "lastSequenceExclusive": 11480,
+          "attempts": 4052,
+          "failed": 1,
+          "failedSamples": [
+            {
+              "sequence": 9043,
+              "source": "10.244.114.4:59433",
+              "startedAt": "2026-09-08T19:37:59.1644066Z",
+              "finishedAt": "2026-09-08T19:38:04.1666399Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:59433->10.244.190.81:8081: i/o timeout",
+              "nonce": "4ffb172cf757c0022d66bb6df38ecf02",
+              "pid": 6300,
+              "startOffsetSeconds": 366.9952054,
+              "finishOffsetSeconds": 371.9974387,
+              "attempts": 9044,
+              "passed": 9037,
+              "maxStartIntervalSeconds": 5.0359387,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-aws-win2022-v3",
+          "target": "net-w1"
+        },
+        {
+          "lane": 3,
+          "firstSequence": 18991,
+          "lastSequenceExclusive": 28686,
+          "attempts": 9695,
+          "failed": 3,
+          "failedSamples": [
+            {
+              "sequence": 22717,
+              "source": "10.244.114.4:59362",
+              "startedAt": "2026-09-08T19:37:56.625259Z",
+              "finishedAt": "2026-09-08T19:38:01.6265174Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:59362->10.244.42.6:8081: i/o timeout",
+              "nonce": "baf2d47343f965e73b0a5678873f303f",
+              "pid": 1372,
+              "startOffsetSeconds": 359.0640208,
+              "finishOffsetSeconds": 364.0654076,
+              "attempts": 22718,
+              "passed": 22711,
+              "maxStartIntervalSeconds": 5.0210765,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 24038,
+              "source": "10.244.114.4:61207",
+              "startedAt": "2026-09-08T19:38:20.8372324Z",
+              "finishedAt": "2026-09-08T19:38:25.8384309Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:61207->10.244.42.6:8081: i/o timeout",
+              "nonce": "baf2d47343f965e73b0a5678873f303f",
+              "pid": 1372,
+              "startOffsetSeconds": 383.2761226,
+              "finishOffsetSeconds": 388.2773211,
+              "attempts": 24039,
+              "passed": 24031,
+              "maxStartIntervalSeconds": 5.0210765,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 26374,
+              "source": "10.244.114.4:55977",
+              "startedAt": "2026-09-08T19:38:58.2722394Z",
+              "finishedAt": "2026-09-08T19:39:03.2736604Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:55977->10.244.42.6:8081: i/o timeout",
+              "nonce": "baf2d47343f965e73b0a5678873f303f",
+              "pid": 1372,
+              "startOffsetSeconds": 420.7111296,
+              "finishOffsetSeconds": 425.7125506,
+              "attempts": 26375,
+              "passed": 26366,
+              "maxStartIntervalSeconds": 5.0210765,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-aws-win2022-v3",
+          "target": "net-aws-win2025-v3"
+        },
+        {
+          "lane": 4,
+          "firstSequence": 8277,
+          "lastSequenceExclusive": 12435,
+          "attempts": 4158,
+          "failed": 1,
+          "failedSamples": [
+            {
+              "sequence": 8311,
+              "source": "10.244.42.6:54292",
+              "startedAt": "2026-09-08T19:37:09.6961956Z",
+              "finishedAt": "2026-09-08T19:37:14.6968915Z",
+              "ok": false,
+              "error": "read udp 10.244.42.6:54292->10.244.190.81:8081: i/o timeout",
+              "nonce": "0770651e1fd79e56afef8a16c1c3ee44",
+              "pid": 4076,
+              "startOffsetSeconds": 307.2211894,
+              "finishOffsetSeconds": 312.2218853,
+              "attempts": 8312,
+              "passed": 8309,
+              "maxStartIntervalSeconds": 5.0114547,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-aws-win2025-v3",
+          "target": "net-w1"
+        },
+        {
+          "lane": 5,
+          "firstSequence": 19679,
+          "lastSequenceExclusive": 30179,
+          "attempts": 10500,
+          "failed": 2,
+          "failedSamples": [
+            {
+              "sequence": 22207,
+              "source": "10.244.42.6:57908",
+              "startedAt": "2026-09-08T19:37:46.4243847Z",
+              "finishedAt": "2026-09-08T19:37:51.4260406Z",
+              "ok": false,
+              "error": "read udp 10.244.42.6:57908->10.244.114.4:8081: i/o timeout",
+              "nonce": "cdce8c085ef3ce80901fa37b481d37b8",
+              "pid": 6780,
+              "startOffsetSeconds": 338.4991254,
+              "finishOffsetSeconds": 343.5007813,
+              "attempts": 22208,
+              "passed": 22200,
+              "maxStartIntervalSeconds": 5.034924,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 26409,
+              "source": "10.244.42.6:63816",
+              "startedAt": "2026-09-08T19:38:46.4475852Z",
+              "finishedAt": "2026-09-08T19:38:51.4508391Z",
+              "ok": false,
+              "error": "read udp 10.244.42.6:63816->10.244.114.4:8081: i/o timeout",
+              "nonce": "cdce8c085ef3ce80901fa37b481d37b8",
+              "pid": 6780,
+              "startOffsetSeconds": 398.5223259,
+              "finishOffsetSeconds": 403.5255798,
+              "attempts": 26410,
+              "passed": 26401,
+              "maxStartIntervalSeconds": 5.034924,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-aws-win2025-v3",
+          "target": "net-aws-win2022-v3"
+        }
+      ],
+      "attempts": 36813,
+      "failed": 10
+    },
+    "restored": {
+      "startedAt": "2026-09-08T19:40:35.384352+00:00",
+      "finishedAt": "2026-09-08T19:43:07.589443+00:00",
+      "lanes": [
+        {
+          "lane": 0,
+          "firstSequence": 13798,
+          "lastSequenceExclusive": 17815,
+          "attempts": 4017,
+          "failed": 1,
+          "failedSamples": [
+            {
+              "sequence": 16259,
+              "source": "10.244.190.81:52843",
+              "startedAt": "2026-09-08T19:41:46.83589864Z",
+              "finishedAt": "2026-09-08T19:41:51.836560939Z",
+              "ok": false,
+              "error": "read udp 10.244.190.81:52843->10.244.114.4:8081: i/o timeout",
+              "nonce": "53f0898fa7eb10543cd5f70da7ed1142",
+              "pid": 176386,
+              "startOffsetSeconds": 597.382636508,
+              "finishOffsetSeconds": 602.383333031,
+              "attempts": 16260,
+              "passed": 16255,
+              "maxStartIntervalSeconds": 5.014409729,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-w1",
+          "target": "net-aws-win2022-v3"
+        },
+        {
+          "lane": 1,
+          "firstSequence": 14139,
+          "lastSequenceExclusive": 18250,
+          "attempts": 4111,
+          "failed": 2,
+          "failedSamples": [
+            {
+              "sequence": 15218,
+              "source": "10.244.190.81:44478",
+              "startedAt": "2026-09-08T19:40:57.225847532Z",
+              "finishedAt": "2026-09-08T19:41:02.227494887Z",
+              "ok": false,
+              "error": "read udp 10.244.190.81:44478->10.244.42.6:8081: i/o timeout",
+              "nonce": "fe3414f25f22bb245368e3a0f5096cd9",
+              "pid": 176402,
+              "startOffsetSeconds": 547.629300875,
+              "finishOffsetSeconds": 552.630977966,
+              "attempts": 15219,
+              "passed": 15214,
+              "maxStartIntervalSeconds": 5.013248428,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 15240,
+              "source": "10.244.190.81:53329",
+              "startedAt": "2026-09-08T19:41:02.971769523Z",
+              "finishedAt": "2026-09-08T19:41:07.97551274Z",
+              "ok": false,
+              "error": "read udp 10.244.190.81:53329->10.244.42.6:8081: i/o timeout",
+              "nonce": "fe3414f25f22bb245368e3a0f5096cd9",
+              "pid": 176402,
+              "startOffsetSeconds": 553.375221784,
+              "finishOffsetSeconds": 558.378997082,
+              "attempts": 15241,
+              "passed": 15235,
+              "maxStartIntervalSeconds": 5.013248428,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-w1",
+          "target": "net-aws-win2025-v3"
+        },
+        {
+          "lane": 2,
+          "firstSequence": 12621,
+          "lastSequenceExclusive": 16321,
+          "attempts": 3700,
+          "failed": 3,
+          "failedSamples": [
+            {
+              "sequence": 14467,
+              "source": "10.244.114.4:52273",
+              "startedAt": "2026-09-08T19:41:29.6533004Z",
+              "finishedAt": "2026-09-08T19:41:34.6553661Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:52273->10.244.190.81:8081: i/o timeout",
+              "nonce": "4ffb172cf757c0022d66bb6df38ecf02",
+              "pid": 6300,
+              "startOffsetSeconds": 577.4840992,
+              "finishOffsetSeconds": 582.4861649,
+              "attempts": 14468,
+              "passed": 14459,
+              "maxStartIntervalSeconds": 5.0359387,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 14772,
+              "source": "10.244.114.4:53703",
+              "startedAt": "2026-09-08T19:41:46.2045498Z",
+              "finishedAt": "2026-09-08T19:41:51.2069434Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:53703->10.244.190.81:8081: i/o timeout",
+              "nonce": "4ffb172cf757c0022d66bb6df38ecf02",
+              "pid": 6300,
+              "startOffsetSeconds": 594.0353486,
+              "finishOffsetSeconds": 599.0377422,
+              "attempts": 14773,
+              "passed": 14763,
+              "maxStartIntervalSeconds": 5.0359387,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 14937,
+              "source": "10.244.114.4:54641",
+              "startedAt": "2026-09-08T19:41:57.0395828Z",
+              "finishedAt": "2026-09-08T19:42:02.0429546Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:54641->10.244.190.81:8081: i/o timeout",
+              "nonce": "4ffb172cf757c0022d66bb6df38ecf02",
+              "pid": 6300,
+              "startOffsetSeconds": 604.8703816,
+              "finishOffsetSeconds": 609.8737534,
+              "attempts": 14938,
+              "passed": 14927,
+              "maxStartIntervalSeconds": 5.04663,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-aws-win2022-v3",
+          "target": "net-w1"
+        },
+        {
+          "lane": 3,
+          "firstSequence": 31296,
+          "lastSequenceExclusive": 40478,
+          "attempts": 9182,
+          "failed": 4,
+          "failedSamples": [
+            {
+              "sequence": 33470,
+              "source": "10.244.114.4:49719",
+              "startedAt": "2026-09-08T19:40:56.6303757Z",
+              "finishedAt": "2026-09-08T19:41:01.6307284Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:49719->10.244.42.6:8081: i/o timeout",
+              "nonce": "baf2d47343f965e73b0a5678873f303f",
+              "pid": 1372,
+              "startOffsetSeconds": 539.0692659,
+              "finishOffsetSeconds": 544.0696186,
+              "attempts": 33471,
+              "passed": 33459,
+              "maxStartIntervalSeconds": 5.0210765,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 34845,
+              "source": "10.244.114.4:51749",
+              "startedAt": "2026-09-08T19:41:20.8780889Z",
+              "finishedAt": "2026-09-08T19:41:25.8806151Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:51749->10.244.42.6:8081: i/o timeout",
+              "nonce": "baf2d47343f965e73b0a5678873f303f",
+              "pid": 1372,
+              "startOffsetSeconds": 563.3169791,
+              "finishOffsetSeconds": 568.3195053,
+              "attempts": 34846,
+              "passed": 34833,
+              "maxStartIntervalSeconds": 5.0210765,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 37020,
+              "source": "10.244.114.4:54629",
+              "startedAt": "2026-09-08T19:41:56.6265797Z",
+              "finishedAt": "2026-09-08T19:42:01.6303271Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:54629->10.244.42.6:8081: i/o timeout",
+              "nonce": "baf2d47343f965e73b0a5678873f303f",
+              "pid": 1372,
+              "startOffsetSeconds": 599.0654699,
+              "finishOffsetSeconds": 604.0692173,
+              "attempts": 37021,
+              "passed": 37007,
+              "maxStartIntervalSeconds": 5.0210765,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 40080,
+              "source": "10.244.114.4:54604",
+              "startedAt": "2026-09-08T19:42:46.2364945Z",
+              "finishedAt": "2026-09-08T19:42:51.2376059Z",
+              "ok": false,
+              "error": "read udp 10.244.114.4:54604->10.244.42.6:8081: i/o timeout",
+              "nonce": "baf2d47343f965e73b0a5678873f303f",
+              "pid": 1372,
+              "startOffsetSeconds": 648.6753847,
+              "finishOffsetSeconds": 653.6764961,
+              "attempts": 40081,
+              "passed": 40066,
+              "maxStartIntervalSeconds": 5.0210765,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-aws-win2022-v3",
+          "target": "net-aws-win2025-v3"
+        },
+        {
+          "lane": 4,
+          "firstSequence": 13863,
+          "lastSequenceExclusive": 17895,
+          "attempts": 4032,
+          "failed": 2,
+          "failedSamples": [
+            {
+              "sequence": 15289,
+              "source": "10.244.42.6:61638",
+              "startedAt": "2026-09-08T19:41:21.1749489Z",
+              "finishedAt": "2026-09-08T19:41:26.1752967Z",
+              "ok": false,
+              "error": "read udp 10.244.42.6:61638->10.244.190.81:8081: i/o timeout",
+              "nonce": "0770651e1fd79e56afef8a16c1c3ee44",
+              "pid": 4076,
+              "startOffsetSeconds": 558.6999427,
+              "finishOffsetSeconds": 563.7002905,
+              "attempts": 15290,
+              "passed": 15286,
+              "maxStartIntervalSeconds": 5.0115189,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 16161,
+              "source": "10.244.42.6:64813",
+              "startedAt": "2026-09-08T19:41:56.924699Z",
+              "finishedAt": "2026-09-08T19:42:01.9353717Z",
+              "ok": false,
+              "error": "read udp 10.244.42.6:64813->10.244.190.81:8081: i/o timeout",
+              "nonce": "0770651e1fd79e56afef8a16c1c3ee44",
+              "pid": 4076,
+              "startOffsetSeconds": 594.4496928,
+              "finishOffsetSeconds": 599.4603655,
+              "attempts": 16162,
+              "passed": 16157,
+              "maxStartIntervalSeconds": 5.0115189,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-aws-win2025-v3",
+          "target": "net-w1"
+        },
+        {
+          "lane": 5,
+          "firstSequence": 33424,
+          "lastSequenceExclusive": 43175,
+          "attempts": 9751,
+          "failed": 4,
+          "failedSamples": [
+            {
+              "sequence": 34370,
+              "source": "10.244.42.6:58782",
+              "startedAt": "2026-09-08T19:40:46.5215647Z",
+              "finishedAt": "2026-09-08T19:40:51.5226969Z",
+              "ok": false,
+              "error": "read udp 10.244.42.6:58782->10.244.114.4:8081: i/o timeout",
+              "nonce": "cdce8c085ef3ce80901fa37b481d37b8",
+              "pid": 6780,
+              "startOffsetSeconds": 518.5963054,
+              "finishOffsetSeconds": 523.5974376,
+              "attempts": 34371,
+              "passed": 34360,
+              "maxStartIntervalSeconds": 5.034924,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 34792,
+              "source": "10.244.42.6:59506",
+              "startedAt": "2026-09-08T19:40:56.9455455Z",
+              "finishedAt": "2026-09-08T19:41:01.9551486Z",
+              "ok": false,
+              "error": "read udp 10.244.42.6:59506->10.244.114.4:8081: i/o timeout",
+              "nonce": "cdce8c085ef3ce80901fa37b481d37b8",
+              "pid": 6780,
+              "startOffsetSeconds": 529.0202862,
+              "finishOffsetSeconds": 534.0298893,
+              "attempts": 34793,
+              "passed": 34781,
+              "maxStartIntervalSeconds": 5.034924,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 38118,
+              "source": "10.244.42.6:64089",
+              "startedAt": "2026-09-08T19:41:46.5445615Z",
+              "finishedAt": "2026-09-08T19:41:51.5456002Z",
+              "ok": false,
+              "error": "read udp 10.244.42.6:64089->10.244.114.4:8081: i/o timeout",
+              "nonce": "cdce8c085ef3ce80901fa37b481d37b8",
+              "pid": 6780,
+              "startOffsetSeconds": 578.6193022,
+              "finishOffsetSeconds": 583.6203409,
+              "attempts": 38119,
+              "passed": 38106,
+              "maxStartIntervalSeconds": 5.034924,
+              "healthy": false,
+              "stopBoundary": false
+            },
+            {
+              "sequence": 42188,
+              "source": "10.244.42.6:53345",
+              "startedAt": "2026-09-08T19:42:46.5718295Z",
+              "finishedAt": "2026-09-08T19:42:51.5725214Z",
+              "ok": false,
+              "error": "read udp 10.244.42.6:53345->10.244.114.4:8081: i/o timeout",
+              "nonce": "cdce8c085ef3ce80901fa37b481d37b8",
+              "pid": 6780,
+              "startOffsetSeconds": 638.6465702,
+              "finishOffsetSeconds": 643.6472621,
+              "attempts": 42189,
+              "passed": 42175,
+              "maxStartIntervalSeconds": 5.034924,
+              "healthy": false,
+              "stopBoundary": false
+            }
+          ],
+          "source": "net-aws-win2025-v3",
+          "target": "net-aws-win2022-v3"
+        }
+      ],
+      "attempts": 34793,
+      "failed": 16
+    }
+  },
+  "adapter": {
+    "before": {
+      "mtu": [
+        {
+          "InterfaceIndex": 1,
+          "CompartmentId": 1,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 9,
+          "CompartmentId": 1,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 11,
+          "CompartmentId": 1,
+          "NlMtu": 1420
+        },
+        {
+          "InterfaceIndex": 17,
+          "CompartmentId": 2,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 18,
+          "CompartmentId": 2,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 22,
+          "CompartmentId": 3,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 23,
+          "CompartmentId": 3,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 24,
+          "CompartmentId": 4,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 25,
+          "CompartmentId": 4,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 31,
+          "CompartmentId": 6,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 32,
+          "CompartmentId": 6,
+          "NlMtu": 1370
+        }
+      ],
+      "guid": "{EFDCC438-1368-4889-B23E-1841C6D0BDB5}",
+      "status": "Up",
+      "checksum": {
+        "TcpIPv4Enabled": 3,
+        "TcpIPv6Enabled": 3,
+        "IpIPv4Enabled": 3,
+        "UdpIPv4Enabled": 3,
+        "UdpIPv6Enabled": 3
+      },
+      "at": "2026-09-08T19:36:35.2973500Z"
+    },
+    "changed": {
+      "mtu": [
+        {
+          "InterfaceIndex": 1,
+          "CompartmentId": 1,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 9,
+          "CompartmentId": 1,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 11,
+          "CompartmentId": 1,
+          "NlMtu": 1420
+        },
+        {
+          "InterfaceIndex": 17,
+          "CompartmentId": 2,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 18,
+          "CompartmentId": 2,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 22,
+          "CompartmentId": 3,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 23,
+          "CompartmentId": 3,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 24,
+          "CompartmentId": 4,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 25,
+          "CompartmentId": 4,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 31,
+          "CompartmentId": 6,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 32,
+          "CompartmentId": 6,
+          "NlMtu": 1370
+        }
+      ],
+      "guid": "{EFDCC438-1368-4889-B23E-1841C6D0BDB5}",
+      "status": "Up",
+      "checksum": {
+        "TcpIPv4Enabled": 3,
+        "TcpIPv6Enabled": 3,
+        "IpIPv4Enabled": 3,
+        "UdpIPv4Enabled": 1,
+        "UdpIPv6Enabled": 3
+      },
+      "at": "2026-09-08T19:36:53.2163832Z"
+    },
+    "restored": {
+      "mtu": [
+        {
+          "InterfaceIndex": 1,
+          "CompartmentId": 1,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 9,
+          "CompartmentId": 1,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 11,
+          "CompartmentId": 1,
+          "NlMtu": 1420
+        },
+        {
+          "InterfaceIndex": 17,
+          "CompartmentId": 2,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 18,
+          "CompartmentId": 2,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 22,
+          "CompartmentId": 3,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 23,
+          "CompartmentId": 3,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 24,
+          "CompartmentId": 4,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 25,
+          "CompartmentId": 4,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 31,
+          "CompartmentId": 6,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 32,
+          "CompartmentId": 6,
+          "NlMtu": 1370
+        }
+      ],
+      "guid": "{EFDCC438-1368-4889-B23E-1841C6D0BDB5}",
+      "status": "Up",
+      "checksum": {
+        "TcpIPv4Enabled": 3,
+        "TcpIPv6Enabled": 3,
+        "IpIPv4Enabled": 3,
+        "UdpIPv4Enabled": 3,
+        "UdpIPv6Enabled": 3
+      },
+      "at": "2026-09-08T19:40:09.0304151Z"
+    },
+    "allRecordedMTUsStable": true
+  },
+  "wholeSession": {
+    "transport": "native-oob",
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "attempts": 18102,
+        "passed": 18095,
+        "maxStartIntervalSeconds": 5.014409729000022,
+        "samplesSHA256": "2b2cc27dca1af03a6ab2da429f6f060327652cbccb6e7145f2aa4999ecb17c65",
+        "ok": false
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "attempts": 18572,
+        "passed": 18565,
+        "maxStartIntervalSeconds": 5.014009095999995,
+        "samplesSHA256": "bb064a9f598bb4cc4d7f4ce7940ef71928d9d803d16146aa7351c7370f36a2a1",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "attempts": 16742,
+        "passed": 16731,
+        "maxStartIntervalSeconds": 5.0466299999999364,
+        "samplesSHA256": "97bdca071b66cae1079dfb0a05fa26669a20971c93ddc74883252f115018f979",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "attempts": 41177,
+        "passed": 41161,
+        "maxStartIntervalSeconds": 5.021076499999992,
+        "samplesSHA256": "180c38668211457038382855db8d7905c9636e2a6748735f1838c23914d49380",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "attempts": 18277,
+        "passed": 18272,
+        "maxStartIntervalSeconds": 5.023018900000011,
+        "samplesSHA256": "b9a434fa43d6e6e4f8a4a5e4e2d97a8067dfdeee5742a411f7db4ab43cb0efd5",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "attempts": 44163,
+        "passed": 44149,
+        "maxStartIntervalSeconds": 5.034924000000004,
+        "samplesSHA256": "f624966f78ac2ec8d0a909548cc54fdb93c9e9e44bde7b6b838c02d3f4841c3a",
+        "ok": false
+      }
+    ],
+    "identitiesStable": true,
+    "window": {
+      "lanesBracketWindow": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "ok": true,
+      "scope": "Host OOB control ordering only; requires independent terminal logs and identity validation"
+    },
+    "diagnosticReason": "Windows2022 ENA receive-checksum A/B/A using original 10ms native streams; not release qualification",
+    "qualificationEligible": false,
+    "ok": false
+  },
+  "cleanup": {
+    "all13OriginalNodesReady": true,
+    "podIdentitiesStable": true,
+    "ownedObserverToolsRemoved": true,
+    "settingsRestored": true,
+    "settingsUntouched": false
+  },
+  "mitigationQualified": false,
+  "qualificationEligible": false,
+  "findings": [
+    "Both original-setting controls reproduced packet loss. Disabling physical ENA UDP IPv4 receive-checksum offload did not eliminate loss, including lanes involving the changed worker.",
+    "The experiment does not identify the dropping component or establish whether offload affects the failure rate.",
+    "Original settings were restored and owned observer tools removed; no worker image or bootstrap configuration was changed."
+  ],
+  "limitations": [
+    "One worker and one bounded A/B/A; phase losses are correlated observations, not independent statistical trials.",
+    "Steady phases use sequence boundaries; complete original logs retain adapter-restart transitions and preflight traffic.",
+    "No simultaneous packet capture or packet-level offload metadata; earlier VFP/TCP-IP captures cannot attribute these individual timeouts.",
+    "Small UDP only; no fragmented UDP, GPU execution, CAPI add/remove or replacement qualification."
+  ],
+  "evidenceSHA256": {
+    "run.py": "b0ae715001ec1add4a29689b1662c0b97d5e19f5562ee3fa1570d44965a9d449",
+    "experiment.ps1": "d1a466cb15051520af98458eb6c084b6bdcb46e5b2a79f2f597fae793c8a27fc",
+    "original-validated.json": "25e20f690c29335f0165d475bd78c1e5dbe8883134766b16f1654c2e4ccb0679",
+    "rx-disabled-validated.json": "d31f94aefc571cd1a7c34d3969b23271561a06ac5d6709c2f9951d3d4424043b",
+    "restored-validated.json": "da224cdf1df955895587628b673635a0f8076398ef64dcb0b637b6788ca2298a",
+    "before-settings.json": "d778849cb908e353651950b93de3a16e69bd9d2cf61aad5723a019025bf86981",
+    "changed-settings.json": "1b1c1e8eb11440b4a99168eaab8fee91de816a8eb040413564059a4b14a56977",
+    "restored-settings.json": "23f3640992843c52c946d208453566773c60af40f48550c860af3ac0ff6b02d0",
+    "cleanup.json": "c7a705a384cf387ebd5177c266a789ebf7bfb72e2139379056e860ec62d86992",
+    "survivor-result.json": "f3751dec48a740e869d6301277995c0d4903d5de23fd35b094d2dafcc042b830",
+    "session/lane-00.jsonl.gz": "7ffbdedbc20f539868cb0dce94ad682077393dfd743426f0f28e26e2c7276fd5",
+    "session/lane-01.jsonl.gz": "20c7e2868efeaa7b7b0d17631f75675bda34496db1ccb876c6c8f5d993282b35",
+    "session/lane-02.jsonl.gz": "f81bef8d4b249881912b870bd0f794a783abac962b159a118e5b9745167f21a1",
+    "session/lane-03.jsonl.gz": "4e44a9839684ed494baeaa7f0846b1b98f79afff4d64d77b7ee2992b66710ffa",
+    "session/lane-04.jsonl.gz": "28dc2f00511485b646bc53f2caec9c78a6f54d83843f4651d1bbf910382d2702",
+    "session/lane-05.jsonl.gz": "ccfc7f18d86d40b1ad18e5b25c6dbe6b30b7c5c245423fafbf24ea80ba151047"
+  }
+}

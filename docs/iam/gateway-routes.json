@@ -1,0 +1,24 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ObserveGatewayRoutesAndInterfaces",
+      "Effect": "Allow",
+      "Action": ["ec2:DescribeRouteTables", "ec2:DescribeNetworkInterfaces"],
+      "Resource": "*",
+      "Condition": {"StringEquals": {"aws:RequestedRegion": "${AWS_REGION}"}}
+    },
+    {
+      "Sid": "ManageOwnedGatewayReturnRoutes",
+      "Effect": "Allow",
+      "Action": ["ec2:CreateRoute", "ec2:DeleteRoute"],
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:route-table/${ROUTE_TABLE_ID}",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ec2:ResourceTag/cloud-provisioning-test": "${RUN_ID}"
+        }
+      }
+    }
+  ]
+}

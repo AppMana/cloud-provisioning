@@ -113,10 +113,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return r.fail(ctx, claim, fmt.Errorf("no registered provider fulfills clusters of infrastructure kind %q", infraKind))
 	}
 
-	if _, err := nodeRequest(claim); err != nil {
-		return r.fail(ctx, claim, err)
-	}
-
 	ownerRef := metav1.OwnerReference{
 		APIVersion: v1alpha1.GroupVersion.String(),
 		Kind:       "ProvisionedNodeClaim",
@@ -139,7 +135,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 		infraMachine.SetName(claim.Name)
 		infraMachine.SetNamespace(claim.Namespace)
-		infraMachine.SetLabels(map[string]string{clusterNameLabel: cluster.GetName()})
+		labels := infraMachine.GetLabels()
+		if labels == nil {
+			labels = map[string]string{}
+		}
+		labels[clusterNameLabel] = cluster.GetName()
+		infraMachine.SetLabels(labels)
 		infraMachine.SetOwnerReferences([]metav1.OwnerReference{ownerRef})
 		if err := r.Create(ctx, infraMachine); err != nil {
 			return r.fail(ctx, claim, fmt.Errorf("creating %s: %w", provisioner.GVK().Kind, err))
@@ -263,17 +264,22 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, claim *v1alpha1.Provis
 	machine.SetGroupVersionKind(machineGVK)
 	switch err := r.Reader.Get(ctx, key, machine); {
 	case err == nil:
-		remaining++
 		if machine.GetDeletionTimestamp().IsZero() {
 			if err := r.Delete(ctx, machine); err != nil && !apierrors.IsNotFound(err) {
 				return ctrl.Result{}, fmt.Errorf("deleting Machine %s: %w", key, err)
 			}
 			log.Info("deleting Machine for claim teardown", "machine", key)
 		}
+		// CAPI owns drain, deletion hooks and infrastructure termination. Do
+		// not delete the provider object while its Machine still exists: that
+		// would terminate the guest before CAPI's lifecycle gates finish.
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	case !apierrors.IsNotFound(err):
 		return ctrl.Result{}, fmt.Errorf("checking Machine during teardown: %w", err)
 	}
 
+	// Only clean up orphaned provider objects after the Machine is absent,
+	// including a partial creation that never produced a Machine.
 	for _, p := range r.Provisioners {
 		infraMachine := &unstructured.Unstructured{}
 		infraMachine.SetGroupVersionKind(p.GVK())
@@ -515,20 +521,24 @@ func machineFromTemplate(ctx context.Context, reader client.Reader, claim *v1alp
 		return nil, fmt.Errorf("%s %q has no spec.template.spec", ref.Kind, ref.Name)
 	}
 	machine := &unstructured.Unstructured{Object: map[string]any{"spec": spec}}
+	// Guest OS and image recipe metadata belong to the machine template.
+	// Copy only labels/annotations; identity and ownership remain controller-owned.
+	labels, _, err := unstructured.NestedStringMap(template.Object, "spec", "template", "metadata", "labels")
+	if err != nil {
+		return nil, fmt.Errorf("invalid template labels: %w", err)
+	}
+	annotations, _, err := unstructured.NestedStringMap(template.Object, "spec", "template", "metadata", "annotations")
+	if err != nil {
+		return nil, fmt.Errorf("invalid template annotations: %w", err)
+	}
+	machine.SetLabels(labels)
+	machine.SetAnnotations(annotations)
 	machine.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   group,
 		Version: infraTemplateVersion,
 		Kind:    strings.TrimSuffix(ref.Kind, "Template"),
 	})
 	return machine, nil
-}
-
-func nodeRequest(claim *v1alpha1.ProvisionedNodeClaim) (join.NodeRequest, error) {
-	req := join.NodeRequest{InternetFacing: true}
-	if claim.Spec.InternetFacing != nil {
-		req.InternetFacing = *claim.Spec.InternetFacing
-	}
-	return req, nil
 }
 
 func externalIPOf(machine *unstructured.Unstructured) string {

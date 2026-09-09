@@ -1,6 +1,6 @@
 // Package join defines the abstractions a bootstrap-provisioning
 // reconciler composes to turn a bare Machine into a rendered,
-// ready-to-apply cloud-init bootstrap Secret, without assuming any
+// native guest bootstrap Secret, without assuming any
 // particular cluster technology or infrastructure provider. k0s and
 // AWS are the first concrete implementations, not the only ones this
 // is designed for.
@@ -54,24 +54,8 @@ type InfraProvider interface {
 	InfraValues(ctx context.Context, machine *unstructured.Unstructured) (map[string]any, error)
 }
 
-// NodeRequest is the provider-agnostic ask a ProvisionedNodeClaim
-// boils down to: how much compute, which architecture, whether the
-// node is internet-facing. It carries no cloud-specific field: which
-// cloud fulfills it, and with what instance type, is the fulfilling
-// provider's business.
-type NodeRequest struct {
-	CPUMillis      int64
-	MemoryBytes    int64
-	Arch           string
-	InternetFacing bool
-}
-
-// MachineProvisioner is the capability a provider implements to
-// fulfill ProvisionedNodeClaims: resolving a NodeRequest to one of
-// its own instance types (smallest fit from its own catalog; this is
-// not a scheduler), and rendering the provider-specific machine object
-// from its cluster-level config. Providers that only support
-// pre-authored Machines (test doubles) do not implement it.
+// MachineProvisioner identifies the infrastructure cluster kind a provider
+// supports. Machine shape comes from the claim's infrastructure template.
 type MachineProvisioner interface {
 	InfraProvider
 
@@ -101,4 +85,43 @@ type MachineProvisioner interface {
 // needing RBAC this identity does not have.
 type Validator interface {
 	Validate(ctx context.Context, c client.Reader, infraMachine *unstructured.Unstructured) error
+}
+
+// NodeLocalBalancer is an optional capability a ClusterJoinProvider
+// implements when its distribution ships no node-local balancing of
+// its own, so a joining worker needs the operator's loopback balancer
+// (wg-apiproxy) to avoid depending on any single control plane.
+//
+// This is the one place the who-balances decision lives in code; the
+// table in join-patterns/README.md is its record. kubeadm implements
+// it (kubelet would otherwise dial the join endpoint forever); k0s
+// (nllb), k3s and RKE2 (the agent's client-side balancer) do not, and
+// their absence here is what keeps apiProxyPort zero in their renders,
+// so the shared pattern blocks emit no balancer unit at all. A second
+// balancer stacked on a distribution's own is not redundancy, it is
+// two owners for one address.
+type NodeLocalBalancer interface {
+	NeedsAPIProxy() bool
+}
+
+// AddressObserver is an optional capability an InfraProvider
+// implements when it observes machines that already exist, so it
+// knows where one is before that machine is bootstrapped.
+//
+// It decides whether rendering may proceed without an address. A
+// provider that creates the instance cannot know it: CAPA does not
+// call RunInstances until the bootstrap Secret exists, so waiting for
+// an address there deadlocks, and the instance has to ask its own
+// metadata service once it is running. A provider that adopts a
+// machine already has the answer, and rendering before it arrives
+// bakes a document that tells the node nothing — the same failure as
+// baking an empty peer list, and for the same reason: userdata is
+// read once.
+//
+// The cost of getting it wrong is not a failed join. The node comes
+// up, chooses an address for itself, and picks the wrong one wherever
+// it has more than one; it then joins, goes Ready, and carries an
+// identity nothing is looking for.
+type AddressObserver interface {
+	ObservesAddresses() bool
 }

@@ -1,112 +1,104 @@
 #cloud-config
-# kubeadm-worker join pattern: download the pinned dialer binary, bring
-# up the WireGuard tunnel, gate on the cluster's API VIP becoming
-# reachable through it, then join as a plain kubeadm worker using a
-# pre-minted bootstrap token + CA-hash pin. Set directly as
+{{- template "ssh-authorized-keys" . }}
+# kubeadm-worker join pattern: bring up the tunnel and the node-local
+# API balancer (the shared blocks in _shared.tmpl), gate on the API
+# through them, then join as a plain kubeadm worker using a pre-minted
+# bootstrap token + CA-hash pin. Set directly as
 # Machine.spec.bootstrap.dataSecretName content, with no bootstrap
-# provider. kubeadm is one join implementation (kind's control plane is
-# kubeadm); k0s-worker.cloud-config.tmpl is another, same contract.
+# provider; the other patterns are the same contract.
 #
 # Only write_files and runcmd belong here: CAPD (this pattern's first
 # consumer) interprets cloud-config with its own parser, and any other
 # top-level module lands in its "unknown" handler, which parses the
 # block as JSON and fails on plain YAML. See
 # cluster-api/test/infrastructure/docker/internal/provisioning/
-# cloudinit/{adapter,unknown}.go. SSH keys, if a kubeadm-over-WAN
-# deployment ever needs them, belong in a write_files/runcmd step of a
-# dedicated pattern variant, not an ssh_authorized_keys module.
+# cloudinit/{adapter,unknown}.go.
+#
+# kubeadm is the one distribution that ships no node-local balancing
+# of its own (join-patterns/README.md tracks who balances where), so
+# its provider declares the need (join.NodeLocalBalancer) and the
+# reconciler sets apiProxyPort; the shared blocks then render the
+# wg-apiproxy unit, a lifecycle deliberately separate from the
+# dialer's, because kubelet depends on this path before any pod can
+# run and must not lose it to the dialer's restarts.
 write_files:
-  # Same hardened dialer, same separation of concerns as the k0s
-  # pattern: pod/service CIDRs only ever enter WireGuard's cryptokey
-  # accept-list; kernel routes are /32-/128 host routes to peer nodes,
-  # enforced at parse time. This file is the BOOTSTRAP snapshot; the
-  # wg-dialer-cloud DaemonSet supplies the live peer list post-join
-  # (--machine-name-file resolves this machine's adoption Secret).
-  - path: /etc/wg-dialer/peers.json
-    permissions: '0600'
-    content: |
-      {{ .peersFileJSON }}
-  - path: /etc/wg-dialer/machine-name
-    permissions: '0644'
-    content: |
-      {{ .machineName }}
-  - path: /etc/systemd/system/wg-dialer.service
-    permissions: '0644'
-    content: |
-      [Unit]
-      Description=wg-dialer (listener role)
-      After=network-online.target
-      Wants=network-online.target
-
-      [Service]
-      ExecStart=/usr/local/bin/wg-dialer \
-        --iface={{ .interfaceName }} \
-        --peers-file=/etc/wg-dialer/peers.json \
-        --listen-port={{ .wireguardListenPort }} \ \ \
-        --keepalive-seconds=15 \
-        --mtu=1420 \
-        --poll-interval=30s
-      Restart=always
-      # Re-exec hourly so the unit converges onto whatever binary is at
-      # the path: after the node joins, the wg-dialer-cloud DaemonSet
-      # installs its own (image-carried, digest-pinned) binary there,
-      # which is how upgrades reach this floor without a download host
-      # or any per-node action. Restart is <1s and the tunnel config is
-      # idempotent, so the re-exec is not a disruption.
-      RuntimeMaxSec=1h
-      AmbientCapabilities=CAP_NET_ADMIN
-
-      [Install]
-      WantedBy=multi-user.target
+{{- template "wg-dialer-files" . }}
+{{- template "wg-dialer-unit" . }}
+{{- template "wg-apiproxy-unit" . }}
   # kubelet extra args (role label + internet-facing taint) via the
-  # standard systemd drop-in environment file kubeadm's kubelet unit
-  # already sources. This keeps the generic kubeletExtraArgs contract
-  # without translating it into JoinConfiguration structure.
+  # environment file kubeadm's kubelet drop-in already sources. Both
+  # families' paths, because they differ and only one is read:
+  # /etc/default/kubelet on Debian-family, /etc/sysconfig/kubelet on
+  # RPM-family (RHEL, Fedora, Amazon Linux). Writing one path silently
+  # drops the args on the other family: the node joins, looks healthy,
+  # and is missing exactly the label and taint that make it a cloud
+  # worker. This keeps the generic kubeletExtraArgs contract without
+  # translating it into JoinConfiguration structure.
   - path: /etc/default/kubelet
     permissions: '0644'
     content: |
-      KUBELET_EXTRA_ARGS={{ .kubeletExtraArgs }}
+      KUBELET_EXTRA_ARGS={{ .kubeletExtraArgs }}{{ if .providerID }} --provider-id={{ .providerID }}{{ end }}
+  - path: /etc/sysconfig/kubelet
+    permissions: '0644'
+    content: |
+      KUBELET_EXTRA_ARGS={{ .kubeletExtraArgs }}{{ if .providerID }} --provider-id={{ .providerID }}{{ end }}
 runcmd:
-  # Pinned-digest binary delivery, identical to the k0s pattern: a
-  # mismatch halts the join rather than running unverified code.
-  # Download to a temp path and rename into place: a re-run of this
-  # bootstrap (cloud-init reruns, an infrastructure provider retrying)
-  # would otherwise try to write a binary that is already executing,
-  # and the kernel refuses that (ETXTBSY), which curl reports as an
-  # opaque write failure. Rename replaces the directory entry and
-  # works regardless.
+{{- template "dialer-install" . }}
+  # Which of its own addresses this node registers with.
+  #
+  # Appended to the same environment files, and before the join,
+  # because kubeadm starts the kubelet and the kubelet reads them
+  # then. Without it the node chooses for itself and chooses wrong
+  # wherever it has more than one address: measured on a machine with
+  # an out-of-band interface, the kubelet registered 10.0.0.15 — the
+  # address every machine in that fleet shares — while the provider
+  # had published the other one, so nothing ever bound the Machine to
+  # the Node.
   - |
     set -e
-    case "$(uname -m)" in
-      aarch64|arm64) url='{{ .dialerBinaryURLArm64 }}'; sha='{{ .dialerBinarySHA256Arm64 }}' ;;
-      x86_64|amd64)  url='{{ .dialerBinaryURLAmd64 }}'; sha='{{ .dialerBinarySHA256Amd64 }}' ;;
-      *) echo "no wg-dialer build for $(uname -m)" >&2; exit 1 ;;
-    esac
-    [ -n "$url" ] || { echo "no wg-dialer URL configured for $(uname -m)" >&2; exit 1; }
-    curl -fsSL -o /usr/local/bin/.wg-dialer.new "$url"
-    echo "$sha  /usr/local/bin/.wg-dialer.new" | sha256sum -c -
-    chmod 0755 /usr/local/bin/.wg-dialer.new
-    mv -f /usr/local/bin/.wg-dialer.new /usr/local/bin/wg-dialer
-  - systemctl daemon-reload
-  - systemctl enable --now wg-dialer.service
-  # Gate on the API's TCP port rather than ICMP: minimal cloud images
-  # ship no ping at all (kindest/node: exit 127) and cloud firewalls
-  # routinely drop ICMP while allowing the API port, so a ping gate
-  # either loops forever or reports the wrong thing. curl is already a
-  # hard dependency of this pattern. Any HTTP response, including
-  # 401/403, proves reachability, so no -f here.
+{{- template "node-ip-arg" . }}
+{{- if index . "providerIdentityScript" }}
+    for f in /etc/default/kubelet /etc/sysconfig/kubelet; do
+      [ ! -f "$f" ] || sed -i "s|^KUBELET_EXTRA_ARGS=.*|& $PROVIDER_ID_ARG|" "$f"
+    done
+{{- end }}
+    if [ -n "$NODE_IP_ARG" ]; then
+      for f in /etc/default/kubelet /etc/sysconfig/kubelet; do
+        if [ -f "$f" ]; then
+          sed -i "s|^KUBELET_EXTRA_ARGS=.*|& $NODE_IP_ARG|" "$f"
+        fi
+      done
+    fi
+  # Gate on the API becoming reachable through the tunnel before
+  # joining. TCP rather than ICMP: minimal cloud images ship no ping at
+  # all (kindest/node: exit 127) and cloud firewalls routinely drop
+  # ICMP while allowing the API port. curl is already a hard dependency
+  # of this pattern. Any HTTP response, including 401/403, proves
+  # reachability, so no -f here.
+  #
+  # With a balancer port set, both the gate and the join dial the
+  # node's own loopback, which wg-apiproxy serves: one probe proves the
+  # tunnel, the balancer, and a live control plane, and kubelet.conf
+  # points at the loopback forever after, so the node depends on the
+  # set of control planes rather than the one that minted its token.
+  # That requires the loopback address in the API servers' certificate
+  # SANs (kubeadm: certSANs). Port zero is for a kubeadm cluster that
+  # terminates its API behind an external load balancer: the join
+  # dials the endpoint directly, kubelet inheriting whatever that
+  # balancer does about member deaths.
+{{- if .apiProxyPort }}
+  - until curl -sk --max-time 3 -o /dev/null https://127.0.0.1:{{ .apiProxyPort }}/livez; do sleep 2; done
+  - |
+    kubeadm join 127.0.0.1:{{ .apiProxyPort }} \
+      --token {{ .joinToken }} \
+      --discovery-token-ca-cert-hash {{ .caCertHash }} \
+      --node-name "$(hostname)"
+{{- else }}
   - until curl -sk --max-time 3 -o /dev/null https://{{ .apiEndpoint }}/livez; do sleep 2; done
   - |
     kubeadm join {{ .joinEndpoint }} \
       --token {{ .joinToken }} \
       --discovery-token-ca-cert-hash {{ .caCertHash }} \
       --node-name "$(hostname)"
-  # CAPI's bootstrap-success sentinel. Every conformant bootstrap
-  # provider writes it and infrastructure providers poll for it to
-  # decide the machine is bootstrapped; without it CAPD re-executes
-  # this whole userdata forever (a second kubeadm join on an
-  # already-joined node then fails, so the Machine never gets its
-  # addresses and the endpoint is never mirrored). This pattern IS the
-  # bootstrap provider here, so honoring the contract is on us.
-  - mkdir -p /run/cluster-api
-  - touch /run/cluster-api/bootstrap-success.complete
+{{- end }}
+{{- template "bootstrap-sentinel" . }}

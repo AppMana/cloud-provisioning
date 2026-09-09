@@ -1,0 +1,60 @@
+{
+  "scope": "Real EC2 return-route lease lifecycle for two CAPI worker identities; no VM deletion, CNI publication, security-group changes or gateway forwarding qualification",
+  "observedAt": "2026-09-07T07:04:32.026418+00:00",
+  "native": {
+    "cleanupErrors": null,
+    "finishedAt": "2026-09-07T07:02:07.19666238Z",
+    "firstRemovalPreservedSharedRoute": true,
+    "mutations": [
+      "create-route",
+      "delete-route"
+    ],
+    "oneCreateOneDelete": true,
+    "originalRoutesRestored": true,
+    "routeTableID": "rtb-056f82e7d734e4d21",
+    "scope": "Real EC2 shared route leases for two live CAPI worker identities; no CNI publication or end-to-end gateway claim",
+    "startedAt": "2026-09-07T07:01:49.636944722Z",
+    "target": {
+      "destination": "10.10.0.11/32",
+      "interfaceID": "eni-00401d5aafd52f51c",
+      "instanceID": "i-0c31429bc71403d5b"
+    }
+  },
+  "recovery": {
+    "scope": "Idempotent recovery after a completed check, not a forced process crash",
+    "targetRouteAbsent": true,
+    "additionalMutations": null
+  },
+  "tests": {
+    "unitAndIsolatedAPI": "passed",
+    "isolatedAPIVersion": "1.35.0",
+    "cases": [
+      "shared lease retention",
+      "final lease deletion after gateway removal",
+      "stale lease release does not remove replacement",
+      "persistent intent before cloud mutation",
+      "uncertain create response resolved by exact read-back",
+      "foreign route/table rejection",
+      "VPC local-route protection",
+      "ENI reassignment rejection",
+      "real API finalizer retention through first lease release"
+    ]
+  },
+  "coverage": {
+    "awsPackageUnitAndAPIStatementsPercent": 78.0,
+    "awsPackageNativeStatementsPercent": 51.7,
+    "routeCheckNativeStatementsPercent": 71.7
+  },
+  "sourceSHA256": {
+    "controller/pkg/attachment/aws/routes.go": "7f3f31c511970121d8cc1e21cc61753c983a01897b3b6d53245d3c8f9e23dc61",
+    "controller/pkg/attachment/aws/journal.go": "707bf622416b618d641e698dee489c162aa2793d14e400ca29ec72990bb3cc5e",
+    "docs/iam/gateway-routes.json": "7f4a25a34f6934022bdb29112610fc76fa5ff76e75bf2a6867b3b36dfb820414"
+  },
+  "remaining": [
+    "Security-group rule ownership",
+    "Source/destination-check ownership",
+    "Full forwarding and publication adapters",
+    "Elected controller registration",
+    "CAPI gateway/worker deletion and replacement matrix"
+  ]
+}

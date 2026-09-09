@@ -9,13 +9,24 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"text/template"
 )
+
+// SharedName is the file of named blocks every pattern may reference
+// (the dialer unit, the balancer unit, the install steps), parsed
+// alongside whichever pattern is rendered so those blocks exist
+// exactly once. The leading underscore keeps it from ever being a
+// pattern itself: the chart derives pattern paths from provider
+// names, and no provider is called "_shared".
+const SharedName = "_shared.tmpl"
 
 // Pattern renders a join-pattern template file against a values map.
 // Option("missingkey=error") means a template referencing a value the
 // caller forgot to supply fails loudly instead of silently emitting
-// "<no value>".
+// "<no value>". A _shared.tmpl beside the pattern is parsed with it;
+// its absence is only an error for a pattern that references one of
+// its blocks, which the execute then reports by name.
 func Pattern(templatePath string, values map[string]any) (string, error) {
 	tmplBytes, err := os.ReadFile(templatePath)
 	if err != nil {
@@ -24,6 +35,12 @@ func Pattern(templatePath string, values map[string]any) (string, error) {
 	tmpl, err := template.New("pattern").Option("missingkey=error").Parse(string(tmplBytes))
 	if err != nil {
 		return "", fmt.Errorf("parsing template %s: %w", templatePath, err)
+	}
+	sharedPath := filepath.Join(filepath.Dir(templatePath), SharedName)
+	if sharedBytes, err := os.ReadFile(sharedPath); err == nil {
+		if _, err := tmpl.Parse(string(sharedBytes)); err != nil {
+			return "", fmt.Errorf("parsing %s: %w", sharedPath, err)
+		}
 	}
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, values); err != nil {

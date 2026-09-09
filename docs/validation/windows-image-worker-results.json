@@ -1,0 +1,143 @@
+{
+  "scope": "Unjoined Windows image preparation with a pinned patched worker; no fresh CAPI boot qualified yet",
+  "observedAt": "2026-09-07T13:05:15.976927+00:00",
+  "preparation": {
+    "2022": {
+      "joined": false,
+      "containersInstalled": true,
+      "k0sSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "k0s": "v1.36.2+k0s.0.appmana.1",
+      "windowsBuild": 20348,
+      "pendingReboot": false,
+      "tunnelSHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+      "diagnosticStateRemoved": true,
+      "awsToolsVersion": "5.0.268"
+    },
+    "2025": {
+      "joined": false,
+      "containersInstalled": true,
+      "k0sSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "k0s": "v1.36.2+k0s.0.appmana.1",
+      "windowsBuild": 26100,
+      "pendingReboot": false,
+      "tunnelSHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+      "diagnosticStateRemoved": true,
+      "awsToolsVersion": "5.0.268"
+    }
+  },
+  "joinedWorkerGuards": [
+    {
+      "accepted": false,
+      "unchanged": true,
+      "reason": "Cannot bake an installed worker",
+      "sha256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "node": "aws-win2022"
+    },
+    {
+      "accepted": false,
+      "unchanged": true,
+      "reason": "Cannot bake an installed worker",
+      "sha256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "node": "aws-win2025"
+    }
+  ],
+  "bootstrapPreflight": [
+    {
+      "workerInstalled": false,
+      "tests": [
+        {
+          "accepted": true,
+          "name": "correct",
+          "reason": ""
+        },
+        {
+          "accepted": false,
+          "name": "old-version",
+          "reason": "Baked k0s version differs from expected worker version"
+        },
+        {
+          "accepted": false,
+          "name": "wrong-hash",
+          "reason": "Baked k0s executable checksum mismatch"
+        }
+      ],
+      "identityCreated": false,
+      "windows": "2022"
+    },
+    {
+      "workerInstalled": false,
+      "tests": [
+        {
+          "accepted": true,
+          "name": "correct",
+          "reason": ""
+        },
+        {
+          "accepted": false,
+          "name": "old-version",
+          "reason": "Baked k0s version differs from expected worker version"
+        },
+        {
+          "accepted": false,
+          "name": "wrong-hash",
+          "reason": "Baked k0s executable checksum mismatch"
+        }
+      ],
+      "identityCreated": false,
+      "windows": "2025"
+    }
+  ],
+  "controller": {
+    "image": "cldt/controller-windows:v9",
+    "imageID": "sha256:0af56fc93e75878879bd6f6003a51b7e292fa2b676da0e6897886622b6e67640",
+    "workerVersion": "v1.36.2+k0s.0.appmana.1",
+    "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+    "tunnelSHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+    "rolloutReady": true,
+    "activeGatewayAttachmentsReady": 2
+  },
+  "coverage": {
+    "imageRecipeModule": 100,
+    "imageAdapterPythonUnitCoverage": 56,
+    "windowsBootstrapRendererGoCoverage": 78,
+    "k0sJoinGoPackageCoverage": 77.2,
+    "nativeWindowsInstrumented": false
+  },
+  "limitations": [
+    "Bootstrap-prefix validation stops before node identity creation; it is not a Kubernetes join test.",
+    "Common image recipes are shared across providers, but native validation here uses owned AWS builders only.",
+    "Calico image cache preloading, fresh CAPI lifecycle, GPU workers and the UDP reliability gate remain open."
+  ],
+  "captures": {
+    "2022": {
+      "revisionOf": "ami-04ab5b7f1cc0de9c4",
+      "preparedAt": "2026-09-07T12:47:55.092763+00:00",
+      "tunnelSHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+      "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "workerVersion": "v1.36.2+k0s.0.appmana.1",
+      "generalizeRequestedAt": "2026-09-07T12:53:23.110885+00:00",
+      "imageID": "ami-09af413882370ed0b",
+      "imageState": "available",
+      "snapshotIDs": [
+        "snap-08bd8ab0f78e55772"
+      ]
+    },
+    "2025": {
+      "revisionOf": "ami-069f4419cf2752ec0",
+      "preparedAt": "2026-09-07T12:50:19.949098+00:00",
+      "tunnelSHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+      "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "workerVersion": "v1.36.2+k0s.0.appmana.1",
+      "generalizeRequestedAt": "2026-09-07T12:53:27.988716+00:00",
+      "imageID": "ami-0a6405fa364804901",
+      "imageState": "pending",
+      "snapshotIDs": [
+        "snap-0a7b46f523c735946"
+      ]
+    }
+  },
+  "existingClusterReadyNodes": 10,
+  "publisherPullSessionExpiresAt": "2026-09-07T14:00:31+00:00",
+  "calicoWindowsPullSessionExpiresAt": "2026-09-07T14:00:37+00:00",
+  "subsequentFreshBootEvidence": "windows-fresh-image-join-results.json"
+}

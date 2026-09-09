@@ -1,0 +1,49 @@
+# Workload autoscaling on capacity provisioned with individual node claims.
+# Replace the image, command, and metric with your queue worker implementation.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: render-workers
+  namespace: cloud-provisioning
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: render-workers
+  template:
+    metadata:
+      labels:
+        app: render-workers
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+        cloud-provisioning.appmana.com/role: cloud-worker
+      tolerations:
+        - key: cloud-provisioning.appmana.com/internet-facing
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: worker
+          image: registry.example.com/render-worker:replace-me
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: render-workers
+  namespace: cloud-provisioning
+spec:
+  scaleTargetRef:
+    name: render-workers
+  minReplicaCount: 0
+  maxReplicaCount: 40
+  cooldownPeriod: 300
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.monitoring.svc:9090
+        query: sum(render_jobs_pending)
+        threshold: "1"

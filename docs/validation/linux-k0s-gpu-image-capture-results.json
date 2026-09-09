@@ -1,0 +1,76 @@
+{
+  "observedAt": "2026-09-08T20:07:48.312889+00:00",
+  "scope": "Composed Linux k0s and NVIDIA driver image: native builder reboot, host acceptance, private AWS capture and builder cleanup",
+  "provider": "AWS",
+  "builderInstanceID": "i-033de761b45a0bddc",
+  "parentImageID": "ami-03d6fada2ec266b4f",
+  "imageID": "ami-007650e971dd51a9d",
+  "instanceType": "g4dn.xlarge",
+  "eniCount": 1,
+  "os": "Ubuntu 24.04",
+  "kernel": "7.0.0-1012-aws",
+  "k0s": "v1.36.2+k0s.0",
+  "gpu": "Tesla T4",
+  "driver": "580.173.02",
+  "hostNVENCFrames": 30,
+  "explicitRebootVerified": true,
+  "k0sLayer": {
+    "binarySHA256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+    "receiptSHA256": "39c1f051a0711fd6cbdf963c41258601e8d44a64bf1da6a419e390c68b18837e",
+    "binaryMtimeNs": 1788892860624563503,
+    "binaryReceiptAndMtimeUnchanged": true,
+    "noK0sServiceInstalled": true
+  },
+  "capture": {
+    "imageID": "ami-007650e971dd51a9d",
+    "verification": {
+      "instanceID": "i-033de761b45a0bddc",
+      "commandSHA256": "6bebed56abc968b6162a28507a568d179384b4cb73e8217e5420e7b1eb26fb74",
+      "status": "Success",
+      "commandID": "03e8c048-45c0-4fad-82e9-8a5288a45a5b",
+      "responseCode": 0,
+      "capturedImageID": "ami-007650e971dd51a9d",
+      "parent": {
+        "imageID": "ami-03d6fada2ec266b4f",
+        "rootDeviceName": "/dev/sda1",
+        "rootVolumeGiB": 20
+      }
+    },
+    "builderParent": {
+      "imageID": "ami-03d6fada2ec266b4f",
+      "rootDeviceName": "/dev/sda1",
+      "rootVolumeGiB": 20
+    }
+  },
+  "cleanup": {
+    "instanceID": "i-033de761b45a0bddc",
+    "state": "terminated",
+    "all13OriginalNodesReady": true,
+    "originalNodeUIDsPreserved": true
+  },
+  "workerDefaultsChanged": false,
+  "imagePrivateAndAvailable": true,
+  "qualified": false,
+  "limitations": [
+    "Host NVENC checks do not prove container device/library injection, graphics execution or scheduled workloads.",
+    "Fresh CAPI bootstrap, add/remove/replacement, survivor networking and GPU workload tests against this image remain pending.",
+    "NVIDIA toolkit and runtime/workload cache are not prebaked.",
+    "T4 Ubuntu server-driver evidence does not qualify fractional GRID GPUs, Windows or other cloud providers."
+  ],
+  "evidenceSHA256": {
+    "advance.py": "fd3709cecccebb83d6840b6d79f699440018f4b38c4d966fee626f515d1d17e5",
+    "prepare.sh": "069099dd2cf8599c391dd37dfca5b33781df23712950992cdd2402280a863efd",
+    "verify.sh": "383e210a305aa30fb7670cf4f79d17870f7367c5ef1681837cad3d93c0732368",
+    "pre-reboot.json": "9b8bc8a05aa075d5b5be6c1694d2fe2072bd97d60ef1e4712672f94169232fda",
+    "post-reboot.json": "57757fe5dfddf5be0a72fbbd96115c42c85b1f4d1cdaa0d55e0a65fec64533a6",
+    "reboot.intent.json": "7a059b799a32580c280cc0aab8dd86492d43674d2a7371f54c857dfbb4d9424b",
+    "reboot.exit.json": "ff8ae5796bcef71911ff9c5c3eaea341819c471f669549e252b830106edd4305",
+    "native-acceptance.json": "5a0c64d31c57f8dcc44cae668950ff33d2fb63185a1689e23c07a2ad9fc1e30d",
+    "capture-result.json": "e78458f81f5fb3ee22141cb1093ac6a631019d937f113ce062987437ff4538e3",
+    "available-image.json": "36fa91acc0ad835fed59eada8246d3dfca06253c4edb5d163e7e37f20a873127",
+    "builder-cleanup.json": "f0bc03b56bbf7f5684ef8b214db99e62dde495a29f70b3d19c853c0cec581caa",
+    "authorize.stdout": "30ab471312b36bce44df9141bc02a692e335bf1a231a6213ba1e88c04c0d42cd"
+  },
+  "authorizedForIsolatedCAPI": true,
+  "authorizationQualification": false
+}

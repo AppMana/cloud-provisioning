@@ -1,0 +1,18 @@
+{
+  "scope": "SDK HTTP protocol tests; no new live AWS gateway or lifecycle validation",
+  "observedAt": "2026-09-07T08:34:55.012099+00:00",
+  "operations": 9,
+  "transportStatements": 30,
+  "transportCoveredStatements": 28,
+  "transportCoveragePercent": 93.3,
+  "attachmentSuite": "passed including Kubernetes API/etcd tests",
+  "attachmentPackageCoveragePercent": 67.8,
+  "awsAttachmentPackageCoveragePercent": 78.4,
+  "controllerBuild": "passed",
+  "remaining": [
+    "Runtime credentials and controller registration",
+    "Machine-bound SSM guest reader",
+    "Combined native gateway and CNI transition",
+    "Windows packet and CAPI removal/replacement matrix"
+  ]
+}

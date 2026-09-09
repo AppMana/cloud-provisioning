@@ -1,0 +1,593 @@
+{
+  "node": {
+    "apiVersion": "v1",
+    "kind": "Node",
+    "metadata": {
+      "annotations": {
+        "cloud-provisioning.appmana.com/claim": "cloud-provisioning/aws-win2022-gpu",
+        "cloud-provisioning.appmana.com/native-transport": "{\"Lease\":\"cloud-provisioning/gateway-aws-win2022-gpu/4e009fd2-b0eb-4b45-821d-a22d54cdd931/E43ZW5OWBOGMK2DGVNRVOMIKLE/4f76d6762abe7410b737ac749cb8aedec2765063cf10a8daed99c5c43a03baca\",\"NodeUID\":\"827bc785-b23e-43d6-a054-e5ac98ed7a97\",\"ProviderID\":\"aws:///us-west-2a/i-06183ddba1bd2c36e\",\"Original\":\"10.100.0.142/32\",\"Native\":\"172.29.0.77\",\"HadOriginal\":true}",
+        "cluster.x-k8s.io/annotations-from-machine": "",
+        "cluster.x-k8s.io/cluster-name": "cldt-windows-v2",
+        "cluster.x-k8s.io/cluster-namespace": "cloud-provisioning",
+        "cluster.x-k8s.io/labels-from-machine": "",
+        "cluster.x-k8s.io/machine": "aws-win2022-gpu",
+        "node.alpha.kubernetes.io/ttl": "0",
+        "projectcalico.org/IPv4Address": "172.29.0.77/25",
+        "projectcalico.org/IPv4VXLANTunnelAddr": "10.244.126.1",
+        "projectcalico.org/Interfaces": "[{\"name\":\"cldt1775f69e\",\"addresses\":[\"10.100.0.142\"]},{\"name\":\"vEthernet (Ethernet 2)\",\"addresses\":[\"172.29.0.77\"]}]",
+        "projectcalico.org/VXLANTunnelMACAddr": "00:15:5d:a4:85:bc",
+        "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+      },
+      "creationTimestamp": "2026-09-07T17:39:36Z",
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/os": "windows",
+        "cloud-provisioning.appmana.com/gpu-test": "true",
+        "cloud-provisioning.appmana.com/role": "cloud-worker",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "aws-win2022-gpu",
+        "kubernetes.io/os": "windows",
+        "node.kubernetes.io/windows-build": "10.0.20348"
+      },
+      "name": "aws-win2022-gpu",
+      "resourceVersion": "594637",
+      "uid": "827bc785-b23e-43d6-a054-e5ac98ed7a97"
+    },
+    "spec": {
+      "podCIDR": "10.244.18.0/24",
+      "podCIDRs": [
+        "10.244.18.0/24"
+      ],
+      "providerID": "aws:///us-west-2a/i-06183ddba1bd2c36e",
+      "taints": [
+        {
+          "effect": "NoSchedule",
+          "key": "cloud-provisioning.appmana.com/internet-facing"
+        }
+      ]
+    },
+    "status": {
+      "addresses": [
+        {
+          "address": "172.29.0.77",
+          "type": "InternalIP"
+        },
+        {
+          "address": "aws-win2022-gpu",
+          "type": "Hostname"
+        }
+      ],
+      "allocatable": {
+        "cpu": "2",
+        "directx.microsoft.com/display": "1",
+        "ephemeral-storage": "57980167277",
+        "memory": "7536144Ki",
+        "pods": "110"
+      },
+      "capacity": {
+        "cpu": "2",
+        "directx.microsoft.com/display": "1",
+        "ephemeral-storage": "62912508Ki",
+        "memory": "8048144Ki",
+        "pods": "110"
+      },
+      "conditions": [
+        {
+          "lastHeartbeatTime": "2026-09-07T17:42:01Z",
+          "lastTransitionTime": "2026-09-07T17:42:01Z",
+          "message": "Calico is running on this node",
+          "reason": "CalicoIsUp",
+          "status": "False",
+          "type": "NetworkUnavailable"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-07T18:13:14Z",
+          "lastTransitionTime": "2026-09-07T17:39:36Z",
+          "message": "kubelet has sufficient memory available",
+          "reason": "KubeletHasSufficientMemory",
+          "status": "False",
+          "type": "MemoryPressure"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-07T18:13:14Z",
+          "lastTransitionTime": "2026-09-07T17:39:36Z",
+          "message": "kubelet has no disk pressure",
+          "reason": "KubeletHasNoDiskPressure",
+          "status": "False",
+          "type": "DiskPressure"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-07T18:13:14Z",
+          "lastTransitionTime": "2026-09-07T17:39:36Z",
+          "message": "kubelet has sufficient PID available",
+          "reason": "KubeletHasSufficientPID",
+          "status": "False",
+          "type": "PIDPressure"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-07T18:13:14Z",
+          "lastTransitionTime": "2026-09-07T17:41:39Z",
+          "message": "kubelet is posting ready status",
+          "reason": "KubeletReady",
+          "status": "True",
+          "type": "Ready"
+        },
+        {
+          "lastHeartbeatTime": null,
+          "lastTransitionTime": "2026-09-07T17:39:37Z",
+          "message": "No containerd deprecation warnings detected",
+          "reason": "NoDeprecations",
+          "status": "True",
+          "type": "ContainerdHasNoDeprecations"
+        }
+      ],
+      "daemonEndpoints": {
+        "kubeletEndpoint": {
+          "Port": 10250
+        }
+      },
+      "declaredFeatures": [
+        "ExtendWebSocketsToKubelet",
+        "InPlacePodLevelResourcesVerticalScaling",
+        "InPlacePodVerticalScalingInitContainers",
+        "RestartAllContainersOnContainerExits"
+      ],
+      "features": {
+        "supplementalGroupsPolicy": true
+      },
+      "images": [
+        {
+          "names": [
+            "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+          ],
+          "sizeBytes": 4318658146
+        },
+        {
+          "names": [
+            "registry.k8s.io/pause@sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c",
+            "registry.k8s.io/pause:3.10.1"
+          ],
+          "sizeBytes": 304989083
+        },
+        {
+          "names": [
+            "docker.io/calico/cni-windows@sha256:100e8fc64d1ef6784498e2eb626b6a8830a7d8be04ad37c5d00fcef7a2a9a0fa",
+            "docker.io/calico/cni-windows:v3.32.0"
+          ],
+          "sizeBytes": 219291250
+        },
+        {
+          "names": [
+            "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918"
+          ],
+          "sizeBytes": 196608265
+        },
+        {
+          "names": [
+            "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+            "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0"
+          ],
+          "sizeBytes": 138204370
+        },
+        {
+          "names": [
+            "docker.io/tensorworks/wddm-device-plugin@sha256:47f97c76c16ad24490caf1d344b4a9bc0ccc05fe787e2b68fe5a1051818ce9ec"
+          ],
+          "sizeBytes": 123539914
+        },
+        {
+          "names": [
+            "quay.io/k0sproject/traefik@sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d",
+            "quay.io/k0sproject/traefik:v3.7.5-k0s.0"
+          ],
+          "sizeBytes": 49136255
+        },
+        {
+          "names": [
+            "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-publisher@sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326"
+          ],
+          "sizeBytes": 17230612
+        },
+        {
+          "names": [
+            "docker.io/sigwindowstools/kube-proxy@sha256:8aa3fb7fcc5d91b9d3fb98fad5cec735e4e1d59723cb06df191e388f56a83d56",
+            "docker.io/sigwindowstools/kube-proxy:v1.36.2-calico-hostprocess"
+          ],
+          "sizeBytes": 14473369
+        }
+      ],
+      "nodeInfo": {
+        "architecture": "amd64",
+        "bootID": "663",
+        "containerRuntimeVersion": "containerd://2.3.2",
+        "kernelVersion": "10.0.20348.5499",
+        "kubeProxyVersion": "",
+        "kubeletVersion": "v1.36.2+k0s",
+        "machineID": "EC2AMAZ-R5FQCAE",
+        "operatingSystem": "windows",
+        "osImage": "Windows Server 2022 Datacenter",
+        "systemUUID": "EC2D1DDB-4FB3-272C-2373-066AF22E473E"
+      },
+      "runtimeHandlers": [
+        {
+          "features": {
+            "recursiveReadOnlyMounts": false,
+            "userNamespaces": false
+          },
+          "name": ""
+        },
+        {
+          "features": {
+            "recursiveReadOnlyMounts": false,
+            "userNamespaces": false
+          },
+          "name": "runhcs-wcow-hypervisor"
+        },
+        {
+          "features": {
+            "recursiveReadOnlyMounts": false,
+            "userNamespaces": false
+          },
+          "name": "runhcs-wcow-process"
+        }
+      ]
+    }
+  },
+  "pod": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+      "annotations": {
+        "cni.projectcalico.org/containerID": "ef52bc8a1cf740ea8021c89109a8ca926f3817ef743252935e6b281ecd6a6684",
+        "cni.projectcalico.org/podIP": "",
+        "cni.projectcalico.org/podIPs": ""
+      },
+      "creationTimestamp": "2026-09-07T18:15:09Z",
+      "generateName": "windows-render-nvenc-2022-v3-",
+      "generation": 1,
+      "labels": {
+        "batch.kubernetes.io/controller-uid": "67fb6483-20dc-4669-8cfb-6cdc6b02c127",
+        "batch.kubernetes.io/job-name": "windows-render-nvenc-2022-v3",
+        "controller-uid": "67fb6483-20dc-4669-8cfb-6cdc6b02c127",
+        "job-name": "windows-render-nvenc-2022-v3"
+      },
+      "name": "windows-render-nvenc-2022-v3-6xns7",
+      "namespace": "cldt-windows-gpu",
+      "ownerReferences": [
+        {
+          "apiVersion": "batch/v1",
+          "blockOwnerDeletion": true,
+          "controller": true,
+          "kind": "Job",
+          "name": "windows-render-nvenc-2022-v3",
+          "uid": "67fb6483-20dc-4669-8cfb-6cdc6b02c127"
+        }
+      ],
+      "resourceVersion": "595754",
+      "uid": "37452d8c-ae84-4131-9124-5369582640aa"
+    },
+    "spec": {
+      "automountServiceAccountToken": false,
+      "containers": [
+        {
+          "command": [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "C:\\gpu-probe\\run.ps1"
+          ],
+          "image": "index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+          "imagePullPolicy": "IfNotPresent",
+          "name": "render-nvenc",
+          "resources": {
+            "limits": {
+              "directx.microsoft.com/display": "1"
+            },
+            "requests": {
+              "directx.microsoft.com/display": "1"
+            }
+          },
+          "terminationMessagePath": "/dev/termination-log",
+          "terminationMessagePolicy": "File",
+          "volumeMounts": [
+            {
+              "mountPath": "C:\\gpu-probe",
+              "name": "probe",
+              "readOnly": true
+            }
+          ]
+        }
+      ],
+      "dnsPolicy": "ClusterFirst",
+      "enableServiceLinks": true,
+      "nodeName": "aws-win2022-gpu",
+      "nodeSelector": {
+        "cloud-provisioning.appmana.com/gpu-test": "true",
+        "kubernetes.io/hostname": "aws-win2022-gpu",
+        "kubernetes.io/os": "windows"
+      },
+      "preemptionPolicy": "PreemptLowerPriority",
+      "priority": 0,
+      "restartPolicy": "Never",
+      "schedulerName": "default-scheduler",
+      "securityContext": {},
+      "serviceAccount": "default",
+      "serviceAccountName": "default",
+      "terminationGracePeriodSeconds": 30,
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cloud-provisioning.appmana.com/internet-facing",
+          "operator": "Exists"
+        },
+        {
+          "effect": "NoExecute",
+          "key": "node.kubernetes.io/not-ready",
+          "operator": "Exists",
+          "tolerationSeconds": 300
+        },
+        {
+          "effect": "NoExecute",
+          "key": "node.kubernetes.io/unreachable",
+          "operator": "Exists",
+          "tolerationSeconds": 300
+        }
+      ],
+      "volumes": [
+        {
+          "configMap": {
+            "defaultMode": 420,
+            "name": "windows-gpu-probe-v3"
+          },
+          "name": "probe"
+        }
+      ]
+    },
+    "status": {
+      "allocatedResources": {
+        "directx.microsoft.com/display": "1"
+      },
+      "conditions": [
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T18:15:27Z",
+          "observedGeneration": 1,
+          "status": "False",
+          "type": "PodReadyToStartContainers"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T18:15:10Z",
+          "observedGeneration": 1,
+          "reason": "PodCompleted",
+          "status": "True",
+          "type": "Initialized"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T18:15:24Z",
+          "observedGeneration": 1,
+          "reason": "PodCompleted",
+          "status": "False",
+          "type": "Ready"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T18:15:24Z",
+          "observedGeneration": 1,
+          "reason": "PodCompleted",
+          "status": "False",
+          "type": "ContainersReady"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T18:15:09Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "PodScheduled"
+        }
+      ],
+      "containerStatuses": [
+        {
+          "allocatedResources": {
+            "directx.microsoft.com/display": "1"
+          },
+          "allocatedResourcesStatus": [
+            {
+              "name": "directx.microsoft.com/display",
+              "resources": [
+                {
+                  "health": "Healthy",
+                  "resourceID": "PCI\\VEN_10DE&DEV_27B8&SUBSYS_173310DE&REV_A1\\4&EE1B678&0&0000\\0"
+                }
+              ]
+            }
+          ],
+          "containerID": "containerd://73ea04c223b7ae6ba857c340200a25c91fc3ad528cf088f157b310e6ea685735",
+          "image": "sha256:903cd697133287523b9362733a8c418afe23de6e233d26b5c3fa934b6fe7e6bc",
+          "imageID": "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+          "lastState": {},
+          "name": "render-nvenc",
+          "ready": false,
+          "resources": {
+            "limits": {
+              "directx.microsoft.com/display": "1"
+            },
+            "requests": {
+              "directx.microsoft.com/display": "1"
+            }
+          },
+          "restartCount": 0,
+          "started": false,
+          "state": {
+            "terminated": {
+              "containerID": "containerd://73ea04c223b7ae6ba857c340200a25c91fc3ad528cf088f157b310e6ea685735",
+              "exitCode": 0,
+              "finishedAt": "2026-09-07T18:15:23Z",
+              "reason": "Completed",
+              "startedAt": "2026-09-07T18:15:16Z"
+            }
+          },
+          "volumeMounts": [
+            {
+              "mountPath": "C:\\gpu-probe",
+              "name": "probe",
+              "readOnly": true,
+              "recursiveReadOnly": "Disabled"
+            }
+          ]
+        }
+      ],
+      "hostIP": "172.29.0.77",
+      "hostIPs": [
+        {
+          "ip": "172.29.0.77"
+        }
+      ],
+      "observedGeneration": 1,
+      "phase": "Succeeded",
+      "podIP": "10.244.126.6",
+      "podIPs": [
+        {
+          "ip": "10.244.126.6"
+        }
+      ],
+      "qosClass": "BestEffort",
+      "resources": {},
+      "startTime": "2026-09-07T18:15:10Z"
+    }
+  },
+  "job": {
+    "apiVersion": "batch/v1",
+    "kind": "Job",
+    "metadata": {
+      "creationTimestamp": "2026-09-07T18:15:09Z",
+      "generation": 1,
+      "labels": {
+        "batch.kubernetes.io/controller-uid": "67fb6483-20dc-4669-8cfb-6cdc6b02c127",
+        "batch.kubernetes.io/job-name": "windows-render-nvenc-2022-v3",
+        "controller-uid": "67fb6483-20dc-4669-8cfb-6cdc6b02c127",
+        "job-name": "windows-render-nvenc-2022-v3"
+      },
+      "name": "windows-render-nvenc-2022-v3",
+      "namespace": "cldt-windows-gpu",
+      "resourceVersion": "595755",
+      "uid": "67fb6483-20dc-4669-8cfb-6cdc6b02c127"
+    },
+    "spec": {
+      "activeDeadlineSeconds": 600,
+      "backoffLimit": 0,
+      "completionMode": "NonIndexed",
+      "completions": 1,
+      "manualSelector": false,
+      "parallelism": 1,
+      "podReplacementPolicy": "TerminatingOrFailed",
+      "selector": {
+        "matchLabels": {
+          "batch.kubernetes.io/controller-uid": "67fb6483-20dc-4669-8cfb-6cdc6b02c127"
+        }
+      },
+      "suspend": false,
+      "template": {
+        "metadata": {
+          "labels": {
+            "batch.kubernetes.io/controller-uid": "67fb6483-20dc-4669-8cfb-6cdc6b02c127",
+            "batch.kubernetes.io/job-name": "windows-render-nvenc-2022-v3",
+            "controller-uid": "67fb6483-20dc-4669-8cfb-6cdc6b02c127",
+            "job-name": "windows-render-nvenc-2022-v3"
+          }
+        },
+        "spec": {
+          "automountServiceAccountToken": false,
+          "containers": [
+            {
+              "command": [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "C:\\gpu-probe\\run.ps1"
+              ],
+              "image": "index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "render-nvenc",
+              "resources": {
+                "limits": {
+                  "directx.microsoft.com/display": "1"
+                }
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "C:\\gpu-probe",
+                  "name": "probe",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "nodeSelector": {
+            "cloud-provisioning.appmana.com/gpu-test": "true",
+            "kubernetes.io/hostname": "aws-win2022-gpu",
+            "kubernetes.io/os": "windows"
+          },
+          "restartPolicy": "Never",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cloud-provisioning.appmana.com/internet-facing",
+              "operator": "Exists"
+            }
+          ],
+          "volumes": [
+            {
+              "configMap": {
+                "defaultMode": 420,
+                "name": "windows-gpu-probe-v3"
+              },
+              "name": "probe"
+            }
+          ]
+        }
+      }
+    },
+    "status": {
+      "completionTime": "2026-09-07T18:15:28Z",
+      "conditions": [
+        {
+          "lastProbeTime": "2026-09-07T18:15:28Z",
+          "lastTransitionTime": "2026-09-07T18:15:28Z",
+          "message": "Reached expected number of succeeded pods",
+          "reason": "CompletionsReached",
+          "status": "True",
+          "type": "SuccessCriteriaMet"
+        },
+        {
+          "lastProbeTime": "2026-09-07T18:15:28Z",
+          "lastTransitionTime": "2026-09-07T18:15:28Z",
+          "message": "Reached expected number of succeeded pods",
+          "reason": "CompletionsReached",
+          "status": "True",
+          "type": "Complete"
+        }
+      ],
+      "ready": 0,
+      "startTime": "2026-09-07T18:15:09Z",
+      "succeeded": 1,
+      "terminating": 0,
+      "uncountedTerminatedPods": {}
+    }
+  },
+  "logs": "{\"encoder\":\"h264_nvenc\",\"containerWindowsBuild\":20348,\"decodedFrames\":30,\"render\":{\"api\":\"Direct3D11\",\"vendorID\":4318,\"deviceID\":10168,\"frames\":30,\"pixelsPerFrame\":4096,\"greenPixels\":1152,\"bluePixels\":2944,\"hardwareOnly\":true},\"encodedBytes\":3936}\n",
+  "probeName": "windows-gpu-probe-v3"
+}

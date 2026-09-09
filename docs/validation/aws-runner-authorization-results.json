@@ -1,0 +1,54 @@
+{
+  "result": "dedicated-runner-launched-host-and-artifacts-verified",
+  "observedAt": "2026-09-09T06:15:27.650724+00:00",
+  "instanceID": "i-0d9d6ce15d3de4363",
+  "instanceType": "r7i.2xlarge",
+  "region": "us-west-2",
+  "authorization": {
+    "approved": "DryRunOperation",
+    "wrong-instance-type": "UnauthorizedOperation",
+    "wrong-ownership": "UnauthorizedOperation"
+  },
+  "policySHA256": "b5acde6287cef4b58db40f92765e9c3510d12f86b8f6e8c812b340182a7b3aba",
+  "renderedPolicySHA256": "66f2861b773ce9b9c756c0bb4795b1704603a2ee602fd2af47870e447159cbbf",
+  "host": {
+    "nestedVirtualization": "enabled",
+    "networkInterfaces": 1,
+    "kvmDevicePresent": true,
+    "vmxPresent": true,
+    "dockerActive": true,
+    "memoryAvailableApproxGiB": 60,
+    "shutdownTimer": "2026-09-09 18:05:56 UTC",
+    "instanceInitiatedShutdownBehavior": "terminate"
+  },
+  "artifacts": [
+    {
+      "name": "images.tar",
+      "bytes": 3242143232,
+      "sha256": "b1e95224bbc63b774a9c038c3e31a43480e65f3ac6d4bc9e2bdb98016d958155"
+    },
+    {
+      "name": "workspace.tar.gz",
+      "bytes": 1819405,
+      "sha256": "9c85c2bfbc22f6cf243d872f60777641c0a460bba96142331d90d5bd83ca2ff0"
+    },
+    {
+      "name": "platform-node.qcow2",
+      "bytes": 2174878208,
+      "sha256": "b5b41bba740328cc2c83d59c63b9e84603424b53cca3d023f371440eab528c20"
+    }
+  ],
+  "artifactVerification": "All downloaded SHA256 values verified by host before image load and extraction.",
+  "qualification": "Host readiness only. Isolated runner setup and full MicroK8s matrix remain in progress or pending.",
+  "limits": [
+    "A KVM device on the host does not yet prove successful nested guest execution.",
+    "Compute quotation excludes storage and networking.",
+    "The role reuses an explicitly approved existing worker instance profile; it does not create a new runtime profile."
+  ],
+  "cleanup": {
+    "instanceRetainedForCampaign": true,
+    "roleRetainedForCampaign": true,
+    "artifactObjectsRetainedForCampaign": true,
+    "retainedOriginalFleetsNotModified": true
+  }
+}

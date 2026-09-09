@@ -1,0 +1,1748 @@
+{
+  "candidate_image": "ami-064a5989721eca266",
+  "recipe": {
+    "schemaVersion": 1,
+    "machineOS": "linux",
+    "architecture": "amd64",
+    "images": [
+      {
+        "reference": "nvcr.io/nvidia/gpu-operator:v26.3.3",
+        "pullReference": "nvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7",
+        "digest": "sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7",
+        "aliases": [
+          "nvcr.io/nvidia/gpu-operator:v26.3.3",
+          "nvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7"
+        ],
+        "usedBy": [
+          "gpu-operator/gpu-feature-discovery/initContainers/toolkit-validation",
+          "gpu-operator/nvidia-container-toolkit-daemonset/initContainers/driver-validation",
+          "gpu-operator/nvidia-dcgm-exporter/initContainers/toolkit-validation",
+          "gpu-operator/nvidia-device-plugin-daemonset/initContainers/toolkit-validation",
+          "gpu-operator/nvidia-operator-validator/initContainers/driver-validation",
+          "gpu-operator/nvidia-operator-validator/initContainers/toolkit-validation",
+          "gpu-operator/nvidia-operator-validator/initContainers/cuda-validation",
+          "gpu-operator/nvidia-operator-validator/initContainers/plugin-validation",
+          "gpu-operator/nvidia-operator-validator/containers/nvidia-operator-validator"
+        ]
+      },
+      {
+        "reference": "nvcr.io/nvidia/k8s-device-plugin:v0.19.3",
+        "pullReference": "nvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77",
+        "digest": "sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77",
+        "aliases": [
+          "nvcr.io/nvidia/k8s-device-plugin:v0.19.3",
+          "nvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77"
+        ],
+        "usedBy": [
+          "gpu-operator/gpu-feature-discovery/containers/gpu-feature-discovery",
+          "gpu-operator/nvidia-device-plugin-daemonset/containers/nvidia-device-plugin"
+        ]
+      },
+      {
+        "reference": "nvcr.io/nvidia/k8s/container-toolkit:v1.19.1",
+        "pullReference": "nvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c",
+        "digest": "sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c",
+        "aliases": [
+          "nvcr.io/nvidia/k8s/container-toolkit:v1.19.1",
+          "nvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c"
+        ],
+        "usedBy": [
+          "gpu-operator/nvidia-container-toolkit-daemonset/containers/nvidia-container-toolkit-ctr"
+        ]
+      },
+      {
+        "reference": "nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless",
+        "pullReference": "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc",
+        "digest": "sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc",
+        "aliases": [
+          "nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless",
+          "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc"
+        ],
+        "usedBy": [
+          "gpu-operator/nvidia-dcgm-exporter/containers/nvidia-dcgm-exporter"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+        "pullReference": "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+        "digest": "sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+        "aliases": [
+          "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+          "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1"
+        ],
+        "usedBy": [
+          "kube-system/cldt-konnectivity-default-route-linux/containers/konnectivity-agent",
+          "kube-system/konnectivity-agent/containers/konnectivity-agent"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/calico-cni:v3.32.0-0",
+        "pullReference": "quay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9",
+        "digest": "sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9",
+        "aliases": [
+          "quay.io/k0sproject/calico-cni:v3.32.0-0",
+          "quay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9"
+        ],
+        "usedBy": [
+          "kube-system/calico-node/initContainers/install-cni"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/calico-node:v3.32.0-0",
+        "pullReference": "quay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5",
+        "digest": "sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5",
+        "aliases": [
+          "quay.io/k0sproject/calico-node:v3.32.0-0",
+          "quay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5"
+        ],
+        "usedBy": [
+          "kube-system/calico-node/containers/calico-node"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/kube-proxy:v1.36.2",
+        "pullReference": "quay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b",
+        "digest": "sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b",
+        "aliases": [
+          "quay.io/k0sproject/kube-proxy:v1.36.2",
+          "quay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b"
+        ],
+        "usedBy": [
+          "kube-system/kube-proxy/containers/kube-proxy"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/pause:3.10.2-0",
+        "pullReference": "quay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243",
+        "digest": "sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243",
+        "aliases": [
+          "quay.io/k0sproject/pause:3.10.2-0",
+          "quay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243"
+        ],
+        "usedBy": [
+          "k0s sandbox image observed on QEMU worker"
+        ]
+      },
+      {
+        "reference": "registry.k8s.io/nfd/node-feature-discovery:v0.18.3",
+        "pullReference": "registry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862",
+        "digest": "sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862",
+        "aliases": [
+          "registry.k8s.io/nfd/node-feature-discovery:v0.18.3",
+          "registry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862"
+        ],
+        "usedBy": [
+          "gpu-operator/gpu-operator-node-feature-discovery-worker/containers/worker"
+        ]
+      },
+      {
+        "reference": "docker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45",
+        "digest": "sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794",
+        "archive": "remote-dialer.tar",
+        "archiveSHA256": "9c7588c91e8cd8f8714117609823f15cdf4ca2dbb84a02c704f4c1fa3885ef77",
+        "aliases": [
+          "docker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45"
+        ],
+        "usedBy": [
+          "remote worker dialer"
+        ]
+      },
+      {
+        "reference": "docker.io/cloud-provisioning/gpu-probe:linux-v3",
+        "digest": "sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0",
+        "archive": "gpu-probe.tar",
+        "archiveSHA256": "ca8bc23e83b79d31f8f40c11de8d3aceba44c049fbd525194ede1cbf9a665d77",
+        "aliases": [
+          "docker.io/cloud-provisioning/gpu-probe:linux-v3",
+          "docker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0"
+        ],
+        "usedBy": [
+          "first Vulkan/NVENC workload"
+        ]
+      }
+    ]
+  },
+  "binding": {
+    "machine": "aws-linux-cache-gpu-v1",
+    "machineUID": "9e3bb2dc-c5a7-4bbb-a8e8-07bb69c0d687",
+    "node": "ip-172-29-0-41",
+    "nodeUID": "fb1bb618-4e44-448a-bcb4-9a0da56117b4",
+    "instanceID": "i-0c2abf6287634e3cb",
+    "imageID": "ami-064a5989721eca266",
+    "eniCount": 1,
+    "launchTime": "2026-09-08T21:36:20+00:00",
+    "nodeReady": true
+  },
+  "contracts": {
+    "sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7": {
+      "requiredBlobs": [
+        "sha256:00178db943e30e3c688e29745e5bccbae7143c30459912563e3528362b5aafbb",
+        "sha256:0570aab0870b5d34eb951713dc3485b4c8b24d75ce7591ce837ead7ff416918a",
+        "sha256:0f357f2ea461b4624eca6bfbdf4c8d3ab4382e3e0f6c868d010a583c628854cb",
+        "sha256:1f03cd2cc3f0e5971d7989c3ab483c4dbe6f6b16f7b5f5c43f9e309103d044e8",
+        "sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a",
+        "sha256:2a2123b11dcc1cbe518a588e606e6bd8d2c3e28cae99b056d48b65caaff10f01",
+        "sha256:3591bc7761ca219601e4f7c7990aa83359b20e728089fbbd0a3f20b3930665eb",
+        "sha256:451760f5b9aee7aaa71106ee000bcd7e33dc21df91fffe6d637daff40fa91761",
+        "sha256:452763cb830df267b0341ba476e1ce6ebfe151d269df9b944ddf9a689086611c",
+        "sha256:4aa0ea1413d37a58615488592a0b827ea4b2e48fa5a77cf707d0e35f025e613f",
+        "sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296",
+        "sha256:62dcc4ffeec1ca97f1bdf889d30aefe90f99fc421accec1b6b155c0cde57f093",
+        "sha256:656047634ac8a3c8224d0cc079a101a6c511f51d94dd64074a0762e3641f6ffc",
+        "sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7",
+        "sha256:67dfe34b83a0027979e5ba9a20f2dc03e0f359e323f031ac84aaabb7dbfada13",
+        "sha256:6b781cb407c072236583d09fb221fe95aeeed1ab75572eb1a7ab3d3d289890f6",
+        "sha256:6c29fa69851d31d83c4dd6fc945a71ac4db00aa194e411c7f4474f0411771ed2",
+        "sha256:732facdc005cfcdfa22244b1a1a17c7ebbf310387b7a835f389e6556073fb6ac",
+        "sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212",
+        "sha256:7c79a0fe4ac4c97d58feaeb9a46f0d9a6f7cfa7831fe43014d6158f8e9587afc",
+        "sha256:7da3ee2cd2c877a4b98137de061ad8ed4bd424567a8e83dd38b14bb5e30482d3",
+        "sha256:7ef4a311f073709777f77e00bfcd1787bc3b908c6f25e616ff17e788770e73f1",
+        "sha256:84df6e26f91dd194ea21bae0607a62d0d4f77fa5ae8310401fe340cb267cd17a",
+        "sha256:876dde1cadf43aca5a267e454c69f2d38ae4c03e24cedc89c53c1a2149459e2d",
+        "sha256:88d59a2387a1a041db96185febb689ba8e2810b0f2acb1e0f1f690441257cb84",
+        "sha256:aa796dec1a378b52ab2d74d160eb49180e43db68bff18fb75b1201f9fa3fd9bb",
+        "sha256:aacadc33b937cd7788b14f5c242177e22b9261d6691b7735ea8564777d9b0ab7",
+        "sha256:b2a1cbc9a7e323d76ad5e85ae567a60ea8792d6467e9842d2126daaf5d035cb7",
+        "sha256:b2bc61a89d041dcb2ffaa19e51ddcdd002c71d33c8ff0d2a16ee35a4e7428c2a",
+        "sha256:b312e236bb2df0d2acf89b8be7ef9c49b3802042b8074156122b4780739b221b",
+        "sha256:ba90b5242ed5bece3239fecfebf94b89b39de21cf7cb2238429ab52d643ea10c",
+        "sha256:bd75be222a33c062b634798526403fda171839a960187cafbd20684340faae61",
+        "sha256:bdfd7f7e5bf6fc27e70b59101db21c3d8284d283884419dd5fe7020583bb79ca",
+        "sha256:c6a6de9802f42f4f702883b0435259eadae02fc38cbc9a24aa6549fb6405ee0a",
+        "sha256:c96959d01e22f9ff0caee83a99ff65471887680fa5d6654464c28ff574f91fdb",
+        "sha256:ca6cbd45e11779164aa89fa9d20517bce4717b9a772f168a3c492075aad0abfe",
+        "sha256:ccf8914610dd72a7d7deb336ff4d098b6a077583ce77887239da5948a57f44e2",
+        "sha256:d120d894c81ac38b182880595faf8c3e5dbc3a23db2d862c72b367cb64469240",
+        "sha256:d18daeda73ad27ef237b1a21faf2d7e5265aa276044a9153ed3ef60d36e938ae",
+        "sha256:d346af46627fd1e866892447238c7c7a727a9b63c37094a58708e81f7e5ade31",
+        "sha256:d6576f586a2696d58b335a0b1a8faf3fd140e01439830e25ba9ad4355e95016f",
+        "sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112",
+        "sha256:e9e9b451286a5bd62df9f1ee93873b431bcece5439be9d48bc14629fbe1cde3f",
+        "sha256:ea7eec6ab1225acac6b249e4ca8356054e0d1cbd527835cfd3648d3b5cad50aa",
+        "sha256:ebddc55facdc6b1f7e0f30816a5fc7cc62f38abdf76c0a8b0a0ce52085754795"
+      ],
+      "chainID": "sha256:6bea9798fe069808518413500c14876ccd096affa02ea945bda9c463d0651f99"
+    },
+    "sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0": {
+      "requiredBlobs": [
+        "sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0",
+        "sha256:34e3b4150c8bf95f0239198461f20b9296bd10b4e2ffafcf0f60fcbc72e426f6",
+        "sha256:3a9e8f518c92f60365542e43d420fc28a1c2293ad1442c59230bce90fd203a57",
+        "sha256:5aff4d1a46147773d33a5fb78bda3c9f58a1b271b15f4894a30db0d9bcac09a2",
+        "sha256:e82807dff4155a52320b2d1eb3f86c3b61bc4a11b02512fd1ad2f48a7338872d",
+        "sha256:e8bce0aabd687e9ee90e0bada33884f40b277196f72aac9934357472863a80ae"
+      ],
+      "chainID": "sha256:952e7b28da2aa3d80ea29f52172aa66055131d0970c46a691eb1668137e308e6"
+    },
+    "sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1": {
+      "requiredBlobs": [
+        "sha256:0f522f547ff98c4ac90835847a34e5f2638cce82aaa69fbb271dd1e61ed33531",
+        "sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a",
+        "sha256:3214acf345c0cc6bbdb56b698a41ccdefc624a09d6beb0d38b5de0b2303ecaf4",
+        "sha256:3ecfdef3a04114c3564c83e148ed408e5514960ceb6980a2f0014ba2bfdc0b10",
+        "sha256:47de5dd0b812c573630914955e26abda537e09b5286a824c96e22e3854d4dd53",
+        "sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296",
+        "sha256:642ffa30aad974a2c3f8b67758cf05ecb6f512582f48e4f707528a51b61abaa1",
+        "sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212",
+        "sha256:99515e7b4d35e0652d3b0fde571b6ec269222ecacc506f026e1758d6261e9109",
+        "sha256:99ba982a9142213c751a1709dcf088e63d8601f03b3f211bae037be698fef270",
+        "sha256:b839dfae01f66e15c6a8b63520557ed315bdfe036342fa7a0c537259f10d7a9a",
+        "sha256:bdfd7f7e5bf6fc27e70b59101db21c3d8284d283884419dd5fe7020583bb79ca",
+        "sha256:c172f21841dff4c8cf45cde46589c1c2616cefe7e819965e92e6d3475c428aa0",
+        "sha256:d6b1b89eccacc15c2420b2776d72c1dae334a00805ed9af54bf2f71e4d536f28",
+        "sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112",
+        "sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+        "sha256:ebddc55facdc6b1f7e0f30816a5fc7cc62f38abdf76c0a8b0a0ce52085754795"
+      ],
+      "chainID": "sha256:9f4941464f3137b2e970928ef870242641677ede84d4f5ed41c06f90d3e939d8"
+    },
+    "sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5": {
+      "requiredBlobs": [
+        "sha256:02a335f58e1c835a2c912e8e24ebac846744f4b7cd5b04524c40362531a3e63f",
+        "sha256:0750af45ecafe903e0797df3c6eeb38bc1cc9bcfbacaf2443f54b9e302e937f9",
+        "sha256:0d272d1662a82c4f43f00a1ea7f961694397f8a99924b082a94492d6695c1564",
+        "sha256:1692e4b23d9cd3946ae43726a5f0d9f2ae46845cf867612d2e888f5b44234807",
+        "sha256:2c20a61d954bd59c5f3712007054e736b107d0e05d5d64ce83c393f44486730b",
+        "sha256:319cf08cffe6e39fa0ccb2a175ee11ccd9c983343f1a36940c1fcb5e2b56714e",
+        "sha256:35e013f08210f09ecfdb3d1125048405a30b098dd5c1cbcbe96bd2175387e8f6",
+        "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+        "sha256:55bf8ab12eb2eff3ea2826141c692b2bfb1f5eb5b448cc42d2a5811e8682e967",
+        "sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb",
+        "sha256:6e87e371a0673d505992870fc16d0f98dbd7d422408c685e92847b5ee65398de",
+        "sha256:90d3be9877bc8c9f27235717674b259f565c9ce20856b4012081b01ccb2e2bfc",
+        "sha256:b7a1a38d2c466c39c8048dc18f98728c04f206b3f7e2248500063720354b613f",
+        "sha256:cbfd3390970a7f654677c461fdb10c7657b51382ee86573cacf2627e3afcf723",
+        "sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5",
+        "sha256:f4f18dc5446b1931467af81c459ff3ae5fc5f7a31d641b0668ce60f2ee070d7f"
+      ],
+      "chainID": "sha256:e31a3f8a1d2e489f8120606672f597185793f62f54c8b530b734ee50e9030863"
+    },
+    "sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc": {
+      "requiredBlobs": [
+        "sha256:00178db943e30e3c688e29745e5bccbae7143c30459912563e3528362b5aafbb",
+        "sha256:0c06e950bfcedf034044d8bd73d2ffa87711f8a587f53258416980f0b815f4f8",
+        "sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a",
+        "sha256:3591bc7761ca219601e4f7c7990aa83359b20e728089fbbd0a3f20b3930665eb",
+        "sha256:38a083c55e64982775f72c1d07e2d17ac75c904edf624c8735bcfcc1888dd00d",
+        "sha256:41a77ca62b1d582e885e879abfb5fbf7b514032f9c4fa6886976878fef477b5d",
+        "sha256:44ad63d16045b298e3e809c633da88100168113ee964fdec5794dc9dc3467338",
+        "sha256:4aa0ea1413d37a58615488592a0b827ea4b2e48fa5a77cf707d0e35f025e613f",
+        "sha256:4b8efca003b623720f9f52607a75b216429222a933072504a23f806d81ff2701",
+        "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+        "sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296",
+        "sha256:567a150b26d80458e71284962952c67354a6142efc69244ac8a71542e2a2d4ff",
+        "sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc",
+        "sha256:656047634ac8a3c8224d0cc079a101a6c511f51d94dd64074a0762e3641f6ffc",
+        "sha256:6c29fa69851d31d83c4dd6fc945a71ac4db00aa194e411c7f4474f0411771ed2",
+        "sha256:732b22103900aedb18ebd2f43f00b602479998b22e4989a05de118005a3daa99",
+        "sha256:764e8f47f389d51107a9d6e28946180820f7353f6f3bb7d659450d84e4316f43",
+        "sha256:7847804386a79aff56c360a3fec7a899c950882cb4877755633a6e4a004e4401",
+        "sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212",
+        "sha256:7e10e267c01e9c10411ec5f1ad0e96e1256ae7ec6d2bea086942a538474e4458",
+        "sha256:84df6e26f91dd194ea21bae0607a62d0d4f77fa5ae8310401fe340cb267cd17a",
+        "sha256:88d59a2387a1a041db96185febb689ba8e2810b0f2acb1e0f1f690441257cb84",
+        "sha256:8a8172fbd17d835eee35fd1add3afeac5c7262621664b9690ee1607310c48c03",
+        "sha256:8ee51972df1401e47204e1b29265f01a9b3a47fa5db438c42d9f6bfe62d76d2d",
+        "sha256:92b5d64f51a47f11255029ef83b0661682c705883218a4a50405446d884b0a50",
+        "sha256:94ce02cf40107b6c939bd27b2ed6b1be725256b8f2b99f9e1d1d688ab86d6905",
+        "sha256:94dab43e65616ca565cdda0efa92a0998ae12073c82b0c8840d367f32aa71d07",
+        "sha256:977a58c36378206178a49228cca9556040644a751f0f83bcee2e57b6cba17b61",
+        "sha256:9bc2f44c67f3d8e804f22f26d76920999a99348a6fa6488b2af4a2bf6dd77118",
+        "sha256:9dde75eda47ee1947f587da0d236bdf8a3f8bb570213cf1074922791455de868",
+        "sha256:aa796dec1a378b52ab2d74d160eb49180e43db68bff18fb75b1201f9fa3fd9bb",
+        "sha256:b312e236bb2df0d2acf89b8be7ef9c49b3802042b8074156122b4780739b221b",
+        "sha256:bdfd7f7e5bf6fc27e70b59101db21c3d8284d283884419dd5fe7020583bb79ca",
+        "sha256:c1e00181697d22d899cd71771ca9674ef3cf9067b8815cafe788f69902c8d28f",
+        "sha256:c96959d01e22f9ff0caee83a99ff65471887680fa5d6654464c28ff574f91fdb",
+        "sha256:ccf8914610dd72a7d7deb336ff4d098b6a077583ce77887239da5948a57f44e2",
+        "sha256:d18daeda73ad27ef237b1a21faf2d7e5265aa276044a9153ed3ef60d36e938ae",
+        "sha256:d346af46627fd1e866892447238c7c7a727a9b63c37094a58708e81f7e5ade31",
+        "sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112",
+        "sha256:e3ae876a0cd178c64700d793c2b3fda6ea457e5def23a98ee3974ba4648140bd",
+        "sha256:e9030b4fca0c8f110032f3b151b030e7e9db56604b407cf79631e1a3218b35e0",
+        "sha256:ebddc55facdc6b1f7e0f30816a5fc7cc62f38abdf76c0a8b0a0ce52085754795",
+        "sha256:f422915cef04a8afa13b4a877ad37bacb4bab001906bebece5d41bbc4d9c5400",
+        "sha256:fd0b18d29e5971e2a5daf9cc13998f2c2d162af1e5f738257691265c80b26dce"
+      ],
+      "chainID": "sha256:a0b331a119730760a921dfa13b2d451d876a3f50dc4927ee5c5ce762fdf34ef5"
+    },
+    "sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c": {
+      "requiredBlobs": [
+        "sha256:00178db943e30e3c688e29745e5bccbae7143c30459912563e3528362b5aafbb",
+        "sha256:05308cb0f8ad06f82f70d6f64321b3c99ab4836bb28fe50bb5d0cd0e79e7afba",
+        "sha256:12d7e5853d6f05043e11b4b62349fb9941b12aced16a5884b39119c5f56638fb",
+        "sha256:13fd44393d7bcfb872da097628eeefc3188aa94d09c36f2ca976d88c44962283",
+        "sha256:23afed95fd214181687198460aafc8c17c7a3a16434037f2d7e07f0f30fabf16",
+        "sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a",
+        "sha256:3591bc7761ca219601e4f7c7990aa83359b20e728089fbbd0a3f20b3930665eb",
+        "sha256:4aa0ea1413d37a58615488592a0b827ea4b2e48fa5a77cf707d0e35f025e613f",
+        "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+        "sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296",
+        "sha256:62dcc4ffeec1ca97f1bdf889d30aefe90f99fc421accec1b6b155c0cde57f093",
+        "sha256:656047634ac8a3c8224d0cc079a101a6c511f51d94dd64074a0762e3641f6ffc",
+        "sha256:67dfe34b83a0027979e5ba9a20f2dc03e0f359e323f031ac84aaabb7dbfada13",
+        "sha256:6c29fa69851d31d83c4dd6fc945a71ac4db00aa194e411c7f4474f0411771ed2",
+        "sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212",
+        "sha256:7c2e2233a1bddbfd499cfe0e61aa37e1af310e5e839b9730bc4c1b04775528c2",
+        "sha256:88d59a2387a1a041db96185febb689ba8e2810b0f2acb1e0f1f690441257cb84",
+        "sha256:97e65210406f9716251b469085641e5aaa2a9145fbbdd3981ef0f86734b0ac7b",
+        "sha256:aa796dec1a378b52ab2d74d160eb49180e43db68bff18fb75b1201f9fa3fd9bb",
+        "sha256:bd75be222a33c062b634798526403fda171839a960187cafbd20684340faae61",
+        "sha256:bdfd7f7e5bf6fc27e70b59101db21c3d8284d283884419dd5fe7020583bb79ca",
+        "sha256:c35daf314dabfdb6ed1d34b78c80c190a5bd4d6b73de95ee52461686fdf02ab2",
+        "sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c",
+        "sha256:c96959d01e22f9ff0caee83a99ff65471887680fa5d6654464c28ff574f91fdb",
+        "sha256:cd38b3760498345d6130b47bbbbe83648a82f38eaff9a4d61bb9aef8a28dc338",
+        "sha256:d346af46627fd1e866892447238c7c7a727a9b63c37094a58708e81f7e5ade31",
+        "sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112",
+        "sha256:e14400b9291d063a4a67dc9453132ce37976f8f518b1bff711411998170ec5fa",
+        "sha256:e1c191f802606b7445265d4b6c1b1c250581f29f19a81ee073e462e8ecdfed51",
+        "sha256:e923194d09ba50b4fbc247744c04007e492fd508435b15e37edb299783b1df0e",
+        "sha256:ea16d04f9da71099312d7d72d2f12e4e5ca9abca70e92033fede7b0e4a90d9fb",
+        "sha256:ea7eec6ab1225acac6b249e4ca8356054e0d1cbd527835cfd3648d3b5cad50aa",
+        "sha256:ebddc55facdc6b1f7e0f30816a5fc7cc62f38abdf76c0a8b0a0ce52085754795",
+        "sha256:f24bcd6a4a7ae48d15942821d63b9f69a756b287f7507aa8183b073cc688c562",
+        "sha256:f3cb7adbca6f8ee6141f2c600b436872dc382a347d0a67d852a06706172ca697"
+      ],
+      "chainID": "sha256:c9e71fa0be40664bf5fa0343df9628f64c6d17b69a6ddeb24f4a186ccadfaf3f"
+    },
+    "sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9": {
+      "requiredBlobs": [
+        "sha256:0ada0bcf27db702d0a26799dec1644ecfb43e629f4c93ce8d8995e2095501f9a",
+        "sha256:4e56f9987bb1330c7ff2cd10aa72c68acde38d043e78e5825705fa205c551cfe",
+        "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+        "sha256:6d1771723d138f51099147346c43655ab71a68c7404c35c21dbeef95aed2276f",
+        "sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9",
+        "sha256:7e0bac9878f0f2cf653bc5dac0db9616980ff347054fbdc8a94c47e1dfe56b1b",
+        "sha256:961f6a7c610db066de9d1337fdfa03d6dc23f7008af43456c4063f63e4772f6f"
+      ],
+      "chainID": "sha256:fe3d59a60a0f73baea0aae9667eb9309302d72f402f5ed2259d4077bcc8bb0d6"
+    },
+    "sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77": {
+      "requiredBlobs": [
+        "sha256:00178db943e30e3c688e29745e5bccbae7143c30459912563e3528362b5aafbb",
+        "sha256:049f47c4b0a06d0075ffe9e87c39efd08f7b3365a863a7507fcb15ff20506f87",
+        "sha256:0570aab0870b5d34eb951713dc3485b4c8b24d75ce7591ce837ead7ff416918a",
+        "sha256:1661826dc0d96f8310ff597f3d9550da1ea96a266ea0a771359f8a22b26c0d9c",
+        "sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77",
+        "sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a",
+        "sha256:3591bc7761ca219601e4f7c7990aa83359b20e728089fbbd0a3f20b3930665eb",
+        "sha256:3dfc93b1e12cdffc4e3ab6dfd44bce1400cb10216a1fec33ae0ad96459362712",
+        "sha256:3e29310549ee2eece203aa17032de97d83c9f31bfeb939796feafdca038c7d92",
+        "sha256:452763cb830df267b0341ba476e1ce6ebfe151d269df9b944ddf9a689086611c",
+        "sha256:4aa0ea1413d37a58615488592a0b827ea4b2e48fa5a77cf707d0e35f025e613f",
+        "sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296",
+        "sha256:62dcc4ffeec1ca97f1bdf889d30aefe90f99fc421accec1b6b155c0cde57f093",
+        "sha256:656047634ac8a3c8224d0cc079a101a6c511f51d94dd64074a0762e3641f6ffc",
+        "sha256:67dfe34b83a0027979e5ba9a20f2dc03e0f359e323f031ac84aaabb7dbfada13",
+        "sha256:6c29fa69851d31d83c4dd6fc945a71ac4db00aa194e411c7f4474f0411771ed2",
+        "sha256:732facdc005cfcdfa22244b1a1a17c7ebbf310387b7a835f389e6556073fb6ac",
+        "sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212",
+        "sha256:7da3ee2cd2c877a4b98137de061ad8ed4bd424567a8e83dd38b14bb5e30482d3",
+        "sha256:859cf1635ef4e05caef7718dda3a4e34287e98045a955bf52690d8ae9c707f15",
+        "sha256:876dde1cadf43aca5a267e454c69f2d38ae4c03e24cedc89c53c1a2149459e2d",
+        "sha256:88d59a2387a1a041db96185febb689ba8e2810b0f2acb1e0f1f690441257cb84",
+        "sha256:a041cb410f3247c9db1ad8921051a70637b6c85f109e668417f10b611f252706",
+        "sha256:aa796dec1a378b52ab2d74d160eb49180e43db68bff18fb75b1201f9fa3fd9bb",
+        "sha256:ae256886704663a1aeead9727e53610bb23897533f5cc59694a84709c03ae22f",
+        "sha256:bd75be222a33c062b634798526403fda171839a960187cafbd20684340faae61",
+        "sha256:bdfd7f7e5bf6fc27e70b59101db21c3d8284d283884419dd5fe7020583bb79ca",
+        "sha256:c96959d01e22f9ff0caee83a99ff65471887680fa5d6654464c28ff574f91fdb",
+        "sha256:d120d894c81ac38b182880595faf8c3e5dbc3a23db2d862c72b367cb64469240",
+        "sha256:d346af46627fd1e866892447238c7c7a727a9b63c37094a58708e81f7e5ade31",
+        "sha256:d6c456ffe537914357240e6641a40dfb5540822f9d3bee52788da5ec0646c551",
+        "sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112",
+        "sha256:ea7eec6ab1225acac6b249e4ca8356054e0d1cbd527835cfd3648d3b5cad50aa",
+        "sha256:ebddc55facdc6b1f7e0f30816a5fc7cc62f38abdf76c0a8b0a0ce52085754795"
+      ],
+      "chainID": "sha256:30f64288871edd69ac51f9751b89a43766e676a4828f9d64828e985687d7d014"
+    },
+    "sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b": {
+      "requiredBlobs": [
+        "sha256:8b8263c6c4e7e7dca1723f65d7d7d87f8de666883e1cffd79a98fd9d1f737255",
+        "sha256:91eea494b6646fdea891ba28451e879555215a8bdfa8eb44731fdc7bec54cf2d",
+        "sha256:967777cdd482703c0bbafe07721f97b741edb18190cc1a5527c3f366653878e0",
+        "sha256:e1678089f6b49f461d27691eac8b755f530b90e2972efe3ed57fc6c247753919",
+        "sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b"
+      ],
+      "chainID": "sha256:450742f597c99085ee96abc41ca37c9b8ed4f6e783fd6c9f0432886d2788fe08"
+    },
+    "sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243": {
+      "requiredBlobs": [
+        "sha256:1035a898348d517b8581c716ea1be35744a05ab952123ec0af7d8495c8998efb",
+        "sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243",
+        "sha256:3fd84d58de3c3c61df545c1597fb76427a014a60778538225776e619214e8e90",
+        "sha256:c1fbb08b8ff09c82f20f8d75507cea220c35d5bb3fda26da7cd73f1dfa61124d"
+      ],
+      "chainID": "sha256:625c458dc021be297697894f3a1a48c5769c126524901a8b9dbca7621e028bbc"
+    },
+    "sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862": {
+      "requiredBlobs": [
+        "sha256:5119e2c5e70cadf33facb1c9480cf6af780de5fae09172bea2084e9a94557bfc",
+        "sha256:7a9c4d658013e250d166704b81122e53a6b139f83de36be15a96884e8bcf7977",
+        "sha256:9c8198745d4e076dfefc26c722c2c40c77a79de560db7fc0995ffcf07a2152aa",
+        "sha256:dba4f05024765d2cd8f62652ccf31ac0bc7aece28c5cd13afbf0e495675dde85",
+        "sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862"
+      ],
+      "chainID": "sha256:8a5e077b4ec06f778543fadb29280bf0e39fc89dfa82da7fe47c41830ba66297"
+    },
+    "sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794": {
+      "requiredBlobs": [
+        "sha256:114dde0fefebbca13165d0da9c500a66190e497a82a53dcaabc3172d630be1e9",
+        "sha256:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45",
+        "sha256:35b5ba6e08cdd034b8d1920f9c7203e5d66f258e1915f164a01de0af14f34710",
+        "sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794",
+        "sha256:4cde6b0bb6f50a5f255eef7b2a42162c661cf776b803225dcac9a659e396bb6b",
+        "sha256:4d049f83d9cf21d1f5cc0e11deaf36df02790d0e60c1a3829538fb4b61685368",
+        "sha256:5904c32f457c96a16c8c68f5ccdf518c8138cd9e5971de9ce6d564fc481af222",
+        "sha256:6e7fbcf090d09b73a4aa85f9dce690d0ace73877c150b7c56955487b6e7a822a",
+        "sha256:6f1cdceb6a3146f0ccb986521156bef8a422cdbb0863396f7f751f575ba308f4",
+        "sha256:71d99605abc8bbd85ff33c5a04ab9f1965d032a1fdfc1a3e6e2e40ea0ae89bf1",
+        "sha256:7223ea1323e8c1159ec17f07d35acc27bdd1cc2bc3ed425b44ef21dac9915db0",
+        "sha256:8fa10c0194df9b7c054c90dbe482585f768a54428fc90a5b78a0066a123b1bba",
+        "sha256:ad51d0769d16ba578106a177987dfe3d2e02c1668c852b795b2f6b024068242a",
+        "sha256:af5aa97ebe6ce1604747ec1e21af7136ded391bcabe4acef882e718a87c86bcc",
+        "sha256:bd3cdfae1d3fdd83a2231d608969b38b82349777c2fff9a7c12d54f8ac5c9b38"
+      ],
+      "chainID": "sha256:86d2c6868bf7c9ae4f221559c6258f1bff0fc490e6ff8706431ac952288a6051"
+    }
+  },
+  "observation": {
+    "at": "2026-09-08T21:42:54.870998+00:00",
+    "captureReceipt": {
+      "schemaVersion": 1,
+      "validation": {
+        "passed": true,
+        "phases": {
+          "before": {
+            "inventoryMatches": true,
+            "digestsMatch": true,
+            "contentComplete": true,
+            "unpacked": true,
+            "quietAgrees": true
+          },
+          "after": {
+            "inventoryMatches": true,
+            "digestsMatch": true,
+            "contentComplete": true,
+            "unpacked": true,
+            "quietAgrees": true
+          }
+        },
+        "checks": {
+          "originalRuntimesStopped": true,
+          "temporaryStateRemoved": true
+        },
+        "references": 23,
+        "qualificationEligible": false,
+        "scope": "Builder cache only; capture and fresh-clone startup remain separate gates"
+      },
+      "observation": {
+        "stops": [
+          {
+            "exitCode": 0,
+            "originalProcessExited": true
+          },
+          {
+            "exitCode": 0,
+            "originalProcessExited": true
+          }
+        ],
+        "before": "REF                                                                                                                      TYPE                                                      DIGEST                                                                  STATUS           SIZE                UNPACKED \ndocker.io/cloud-provisioning/gpu-probe:linux-v3                                                                          application/vnd.oci.image.manifest.v1+json                sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0 complete (5/5)   515.0 MiB/515.0 MiB true\ndocker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0           application/vnd.oci.image.manifest.v1+json                sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0 complete (5/5)   515.0 MiB/515.0 MiB true\ndocker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45                           application/vnd.oci.image.manifest.v1+json                sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794 complete (14/14) 74.2 MiB/74.2 MiB   true\nnvcr.io/nvidia/gpu-operator:v26.3.3                                                                                      application/vnd.docker.distribution.manifest.list.v2+json sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7 complete (43/43) 131.9 MiB/131.9 MiB true\nnvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7                      application/vnd.docker.distribution.manifest.list.v2+json sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7 complete (43/43) 131.9 MiB/131.9 MiB true\nnvcr.io/nvidia/k8s-device-plugin:v0.19.3                                                                                 application/vnd.docker.distribution.manifest.list.v2+json sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77 complete (32/32) 53.4 MiB/53.4 MiB   true\nnvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77                 application/vnd.docker.distribution.manifest.list.v2+json sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77 complete (32/32) 53.4 MiB/53.4 MiB   true\nnvcr.io/nvidia/k8s/container-toolkit:v1.19.1                                                                             application/vnd.docker.distribution.manifest.list.v2+json sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c complete (33/33) 54.3 MiB/54.3 MiB   true\nnvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c             application/vnd.docker.distribution.manifest.list.v2+json sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c complete (33/33) 54.3 MiB/54.3 MiB   true\nnvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless                                                                  application/vnd.oci.image.index.v1+json                   sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc complete (42/42) 56.8 MiB/56.8 MiB   true\nnvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc                 application/vnd.oci.image.index.v1+json                   sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc complete (42/42) 56.8 MiB/56.8 MiB   true\nquay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0                                                           application/vnd.oci.image.index.v1+json                   sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 complete (15/15) 14.8 MiB/14.8 MiB   true\nquay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 application/vnd.oci.image.index.v1+json                   sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 complete (15/15) 14.8 MiB/14.8 MiB   true\nquay.io/k0sproject/calico-cni:v3.32.0-0                                                                                  application/vnd.oci.image.index.v1+json                   sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9 complete (5/5)   74.4 MiB/74.4 MiB   true\nquay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9                    application/vnd.oci.image.index.v1+json                   sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9 complete (5/5)   74.4 MiB/74.4 MiB   true\nquay.io/k0sproject/calico-node:v3.32.0-0                                                                                 application/vnd.oci.image.index.v1+json                   sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5 complete (14/14) 47.8 MiB/47.8 MiB   true\nquay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5                   application/vnd.oci.image.index.v1+json                   sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5 complete (14/14) 47.8 MiB/47.8 MiB   true\nquay.io/k0sproject/kube-proxy:v1.36.2                                                                                    application/vnd.oci.image.index.v1+json                   sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b complete (3/3)   19.7 MiB/19.7 MiB   true\nquay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b                    application/vnd.oci.image.index.v1+json                   sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b complete (3/3)   19.7 MiB/19.7 MiB   true\nquay.io/k0sproject/pause:3.10.2-0                                                                                        application/vnd.oci.image.index.v1+json                   sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243 complete (2/2)   14.3 KiB/14.3 KiB   true\nquay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243                         application/vnd.oci.image.index.v1+json                   sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243 complete (2/2)   14.3 KiB/14.3 KiB   true\nregistry.k8s.io/nfd/node-feature-discovery:v0.18.3                                                                       application/vnd.oci.image.index.v1+json                   sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862 complete (3/3)   79.9 MiB/79.9 MiB   true\nregistry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862       application/vnd.oci.image.index.v1+json                   sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862 complete (3/3)   79.9 MiB/79.9 MiB   true\n",
+        "readyBefore": "docker.io/cloud-provisioning/gpu-probe:linux-v3\ndocker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0\ndocker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45\nnvcr.io/nvidia/gpu-operator:v26.3.3\nnvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7\nnvcr.io/nvidia/k8s-device-plugin:v0.19.3\nnvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77\nnvcr.io/nvidia/k8s/container-toolkit:v1.19.1\nnvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c\nnvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless\nnvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc\nquay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0\nquay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1\nquay.io/k0sproject/calico-cni:v3.32.0-0\nquay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9\nquay.io/k0sproject/calico-node:v3.32.0-0\nquay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5\nquay.io/k0sproject/kube-proxy:v1.36.2\nquay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b\nquay.io/k0sproject/pause:3.10.2-0\nquay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243\nregistry.k8s.io/nfd/node-feature-discovery:v0.18.3\nregistry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862\n",
+        "after": "REF                                                                                                                      TYPE                                                      DIGEST                                                                  STATUS           SIZE                UNPACKED \ndocker.io/cloud-provisioning/gpu-probe:linux-v3                                                                          application/vnd.oci.image.manifest.v1+json                sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0 complete (5/5)   515.0 MiB/515.0 MiB true\ndocker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0           application/vnd.oci.image.manifest.v1+json                sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0 complete (5/5)   515.0 MiB/515.0 MiB true\ndocker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45                           application/vnd.oci.image.manifest.v1+json                sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794 complete (14/14) 74.2 MiB/74.2 MiB   true\nnvcr.io/nvidia/gpu-operator:v26.3.3                                                                                      application/vnd.docker.distribution.manifest.list.v2+json sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7 complete (43/43) 131.9 MiB/131.9 MiB true\nnvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7                      application/vnd.docker.distribution.manifest.list.v2+json sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7 complete (43/43) 131.9 MiB/131.9 MiB true\nnvcr.io/nvidia/k8s-device-plugin:v0.19.3                                                                                 application/vnd.docker.distribution.manifest.list.v2+json sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77 complete (32/32) 53.4 MiB/53.4 MiB   true\nnvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77                 application/vnd.docker.distribution.manifest.list.v2+json sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77 complete (32/32) 53.4 MiB/53.4 MiB   true\nnvcr.io/nvidia/k8s/container-toolkit:v1.19.1                                                                             application/vnd.docker.distribution.manifest.list.v2+json sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c complete (33/33) 54.3 MiB/54.3 MiB   true\nnvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c             application/vnd.docker.distribution.manifest.list.v2+json sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c complete (33/33) 54.3 MiB/54.3 MiB   true\nnvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless                                                                  application/vnd.oci.image.index.v1+json                   sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc complete (42/42) 56.8 MiB/56.8 MiB   true\nnvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc                 application/vnd.oci.image.index.v1+json                   sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc complete (42/42) 56.8 MiB/56.8 MiB   true\nquay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0                                                           application/vnd.oci.image.index.v1+json                   sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 complete (15/15) 14.8 MiB/14.8 MiB   true\nquay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 application/vnd.oci.image.index.v1+json                   sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 complete (15/15) 14.8 MiB/14.8 MiB   true\nquay.io/k0sproject/calico-cni:v3.32.0-0                                                                                  application/vnd.oci.image.index.v1+json                   sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9 complete (5/5)   74.4 MiB/74.4 MiB   true\nquay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9                    application/vnd.oci.image.index.v1+json                   sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9 complete (5/5)   74.4 MiB/74.4 MiB   true\nquay.io/k0sproject/calico-node:v3.32.0-0                                                                                 application/vnd.oci.image.index.v1+json                   sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5 complete (14/14) 47.8 MiB/47.8 MiB   true\nquay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5                   application/vnd.oci.image.index.v1+json                   sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5 complete (14/14) 47.8 MiB/47.8 MiB   true\nquay.io/k0sproject/kube-proxy:v1.36.2                                                                                    application/vnd.oci.image.index.v1+json                   sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b complete (3/3)   19.7 MiB/19.7 MiB   true\nquay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b                    application/vnd.oci.image.index.v1+json                   sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b complete (3/3)   19.7 MiB/19.7 MiB   true\nquay.io/k0sproject/pause:3.10.2-0                                                                                        application/vnd.oci.image.index.v1+json                   sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243 complete (2/2)   14.3 KiB/14.3 KiB   true\nquay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243                         application/vnd.oci.image.index.v1+json                   sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243 complete (2/2)   14.3 KiB/14.3 KiB   true\nregistry.k8s.io/nfd/node-feature-discovery:v0.18.3                                                                       application/vnd.oci.image.index.v1+json                   sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862 complete (3/3)   79.9 MiB/79.9 MiB   true\nregistry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862       application/vnd.oci.image.index.v1+json                   sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862 complete (3/3)   79.9 MiB/79.9 MiB   true\n",
+        "readyAfter": "docker.io/cloud-provisioning/gpu-probe:linux-v3\ndocker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0\ndocker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45\nnvcr.io/nvidia/gpu-operator:v26.3.3\nnvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7\nnvcr.io/nvidia/k8s-device-plugin:v0.19.3\nnvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77\nnvcr.io/nvidia/k8s/container-toolkit:v1.19.1\nnvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c\nnvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless\nnvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc\nquay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0\nquay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1\nquay.io/k0sproject/calico-cni:v3.32.0-0\nquay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9\nquay.io/k0sproject/calico-node:v3.32.0-0\nquay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5\nquay.io/k0sproject/kube-proxy:v1.36.2\nquay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b\nquay.io/k0sproject/pause:3.10.2-0\nquay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243\nregistry.k8s.io/nfd/node-feature-discovery:v0.18.3\nregistry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862\n",
+        "temporaryStateRemoved": true
+      },
+      "fileIdentities": {
+        "/usr/local/bin/k0s": {
+          "sha256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+          "inode": 2892,
+          "ctimeNs": 1788892862700463289,
+          "mtimeNs": 1788892860624563503
+        },
+        "/var/lib/k0s/bin/containerd": {
+          "sha256": "371a3cd3e3a2d9582f7a93f9f1d50d7b2881419dfeecfc779f7d29592e14e27f",
+          "inode": 303781,
+          "ctimeNs": 1788900269526475164,
+          "mtimeNs": 1788892860624563503
+        },
+        "/var/lib/k0s/bin/containerd-shim-runc-v2": {
+          "sha256": "0a7a4030019277c18f144a09c4b2df0444abd17f4954f73781c1cb5ef02b3706",
+          "inode": 303782,
+          "ctimeNs": 1788900269556474958,
+          "mtimeNs": 1788892860624563503
+        },
+        "/var/lib/k0s/bin/runc": {
+          "sha256": "0aba40a290392c85a11fb5532ce7035c830a1eba1ecfda7d7c400a28ec52e459",
+          "inode": 303783,
+          "ctimeNs": 1788900269599474664,
+          "mtimeNs": 1788892860624563503
+        }
+      },
+      "qualificationEligible": false
+    },
+    "images": {
+      "nvcr.io/nvidia/gpu-operator:v26.3.3": "sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7",
+      "nvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7": "sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7",
+      "nvcr.io/nvidia/k8s-device-plugin:v0.19.3": "sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77",
+      "nvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77": "sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77",
+      "nvcr.io/nvidia/k8s/container-toolkit:v1.19.1": "sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c",
+      "nvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c": "sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c",
+      "nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless": "sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc",
+      "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc": "sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc",
+      "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0": "sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+      "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1": "sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+      "quay.io/k0sproject/calico-cni:v3.32.0-0": "sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9",
+      "quay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9": "sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9",
+      "quay.io/k0sproject/calico-node:v3.32.0-0": "sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5",
+      "quay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5": "sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5",
+      "quay.io/k0sproject/kube-proxy:v1.36.2": "sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b",
+      "quay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b": "sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b",
+      "quay.io/k0sproject/pause:3.10.2-0": "sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243",
+      "quay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243": "sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243",
+      "registry.k8s.io/nfd/node-feature-discovery:v0.18.3": "sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862",
+      "registry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862": "sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862",
+      "docker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45": "sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794",
+      "docker.io/cloud-provisioning/gpu-probe:linux-v3": "sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0",
+      "docker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0": "sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0"
+    },
+    "blobs": {
+      "sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243": {
+        "bytes": 3136,
+        "ctimeNs": 1788900954199197983,
+        "mtimeNs": 1788900954199469955,
+        "inode": 303938
+      },
+      "sha256:3fd84d58de3c3c61df545c1597fb76427a014a60778538225776e619214e8e90": {
+        "bytes": 479,
+        "ctimeNs": 1788900954461196397,
+        "mtimeNs": 1788900954461463721,
+        "inode": 303959
+      },
+      "sha256:1035a898348d517b8581c716ea1be35744a05ab952123ec0af7d8495c8998efb": {
+        "bytes": 1124,
+        "ctimeNs": 1788900955016193038,
+        "mtimeNs": 1788900955016438299,
+        "inode": 303985
+      },
+      "sha256:c1fbb08b8ff09c82f20f8d75507cea220c35d5bb3fda26da7cd73f1dfa61124d": {
+        "bytes": 13481,
+        "ctimeNs": 1788900955526189951,
+        "mtimeNs": 1788900955527093212,
+        "inode": 303995
+      },
+      "sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77": {
+        "bytes": 743,
+        "ctimeNs": 1788901549616611146,
+        "mtimeNs": 1788901549617684056,
+        "inode": 306447
+      },
+      "sha256:d6c456ffe537914357240e6641a40dfb5540822f9d3bee52788da5ec0646c551": {
+        "bytes": 6379,
+        "ctimeNs": 1788901549735610525,
+        "mtimeNs": 1788901549736559501,
+        "inode": 306454
+      },
+      "sha256:3dfc93b1e12cdffc4e3ab6dfd44bce1400cb10216a1fec33ae0ad96459362712": {
+        "bytes": 7977,
+        "ctimeNs": 1788901549797610201,
+        "mtimeNs": 1788901549797270232,
+        "inode": 306456
+      },
+      "sha256:bd75be222a33c062b634798526403fda171839a960187cafbd20684340faae61": {
+        "bytes": 106039,
+        "ctimeNs": 1788901537169678178,
+        "mtimeNs": 1788901537171151640,
+        "inode": 304354
+      },
+      "sha256:d346af46627fd1e866892447238c7c7a727a9b63c37094a58708e81f7e5ade31": {
+        "bytes": 13632,
+        "ctimeNs": 1788901536486682328,
+        "mtimeNs": 1788901536487864396,
+        "inode": 304120
+      },
+      "sha256:67dfe34b83a0027979e5ba9a20f2dc03e0f359e323f031ac84aaabb7dbfada13": {
+        "bytes": 336297,
+        "ctimeNs": 1788901536461682480,
+        "mtimeNs": 1788901536462785206,
+        "inode": 304105
+      },
+      "sha256:6c29fa69851d31d83c4dd6fc945a71ac4db00aa194e411c7f4474f0411771ed2": {
+        "bytes": 34903,
+        "ctimeNs": 1788901536500682243,
+        "mtimeNs": 1788901536501603486,
+        "inode": 304126
+      },
+      "sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a": {
+        "bytes": 67,
+        "ctimeNs": 1788901536505682212,
+        "mtimeNs": 1788901536507226819,
+        "inode": 304132
+      },
+      "sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212": {
+        "bytes": 188,
+        "ctimeNs": 1788901536531682054,
+        "mtimeNs": 1788901536532811699,
+        "inode": 304138
+      },
+      "sha256:aa796dec1a378b52ab2d74d160eb49180e43db68bff18fb75b1201f9fa3fd9bb": {
+        "bytes": 93,
+        "ctimeNs": 1788901536602681623,
+        "mtimeNs": 1788901536603818119,
+        "inode": 304144
+      },
+      "sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296": {
+        "bytes": 162,
+        "ctimeNs": 1788901536753680706,
+        "mtimeNs": 1788901536754423186,
+        "inode": 304150
+      },
+      "sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112": {
+        "bytes": 80,
+        "ctimeNs": 1788901536778680554,
+        "mtimeNs": 1788901536777761339,
+        "inode": 304156
+      },
+      "sha256:4aa0ea1413d37a58615488592a0b827ea4b2e48fa5a77cf707d0e35f025e613f": {
+        "bytes": 385,
+        "ctimeNs": 1788901536791680475,
+        "mtimeNs": 1788901536792448691,
+        "inode": 304162
+      },
+      "sha256:ebddc55facdc6b1f7e0f30816a5fc7cc62f38abdf76c0a8b0a0ce52085754795": {
+        "bytes": 311,
+        "ctimeNs": 1788901536806680384,
+        "mtimeNs": 1788901536807787792,
+        "inode": 304168
+      },
+      "sha256:bdfd7f7e5bf6fc27e70b59101db21c3d8284d283884419dd5fe7020583bb79ca": {
+        "bytes": 136993,
+        "ctimeNs": 1788901536854680092,
+        "mtimeNs": 1788901536855295358,
+        "inode": 304174
+      },
+      "sha256:ea7eec6ab1225acac6b249e4ca8356054e0d1cbd527835cfd3648d3b5cad50aa": {
+        "bytes": 636334,
+        "ctimeNs": 1788901536879679940,
+        "mtimeNs": 1788901536876711004,
+        "inode": 304180
+      },
+      "sha256:62dcc4ffeec1ca97f1bdf889d30aefe90f99fc421accec1b6b155c0cde57f093": {
+        "bytes": 5960967,
+        "ctimeNs": 1788901536892679861,
+        "mtimeNs": 1788901536894067544,
+        "inode": 304186
+      },
+      "sha256:d120d894c81ac38b182880595faf8c3e5dbc3a23db2d862c72b367cb64469240": {
+        "bytes": 3489538,
+        "ctimeNs": 1788901536889679879,
+        "mtimeNs": 1788901536891110586,
+        "inode": 304192
+      },
+      "sha256:3591bc7761ca219601e4f7c7990aa83359b20e728089fbbd0a3f20b3930665eb": {
+        "bytes": 420502,
+        "ctimeNs": 1788901536883679916,
+        "mtimeNs": 1788901536884777131,
+        "inode": 304198
+      },
+      "sha256:c96959d01e22f9ff0caee83a99ff65471887680fa5d6654464c28ff574f91fdb": {
+        "bytes": 108727,
+        "ctimeNs": 1788901536897679831,
+        "mtimeNs": 1788901536899070970,
+        "inode": 304204
+      },
+      "sha256:876dde1cadf43aca5a267e454c69f2d38ae4c03e24cedc89c53c1a2149459e2d": {
+        "bytes": 1476380,
+        "ctimeNs": 1788901537038678974,
+        "mtimeNs": 1788901537039852069,
+        "inode": 304234
+      },
+      "sha256:0570aab0870b5d34eb951713dc3485b4c8b24d75ce7591ce837ead7ff416918a": {
+        "bytes": 923,
+        "ctimeNs": 1788901537033679005,
+        "mtimeNs": 1788901537019416354,
+        "inode": 304240
+      },
+      "sha256:7da3ee2cd2c877a4b98137de061ad8ed4bd424567a8e83dd38b14bb5e30482d3": {
+        "bytes": 863328,
+        "ctimeNs": 1788901537049678907,
+        "mtimeNs": 1788901537049292974,
+        "inode": 304246
+      },
+      "sha256:452763cb830df267b0341ba476e1ce6ebfe151d269df9b944ddf9a689086611c": {
+        "bytes": 711800,
+        "ctimeNs": 1788901537074678756,
+        "mtimeNs": 1788901537075604332,
+        "inode": 304252
+      },
+      "sha256:88d59a2387a1a041db96185febb689ba8e2810b0f2acb1e0f1f690441257cb84": {
+        "bytes": 151,
+        "ctimeNs": 1788901537069678786,
+        "mtimeNs": 1788901537065994393,
+        "inode": 304258
+      },
+      "sha256:00178db943e30e3c688e29745e5bccbae7143c30459912563e3528362b5aafbb": {
+        "bytes": 102,
+        "ctimeNs": 1788901537079678725,
+        "mtimeNs": 1788901537079229055,
+        "inode": 304264
+      },
+      "sha256:656047634ac8a3c8224d0cc079a101a6c511f51d94dd64074a0762e3641f6ffc": {
+        "bytes": 127,
+        "ctimeNs": 1788901537082678707,
+        "mtimeNs": 1788901537082823216,
+        "inode": 304270
+      },
+      "sha256:732facdc005cfcdfa22244b1a1a17c7ebbf310387b7a835f389e6556073fb6ac": {
+        "bytes": 1663943,
+        "ctimeNs": 1788901537085678689,
+        "mtimeNs": 1788901537087206242,
+        "inode": 304276
+      },
+      "sha256:3e29310549ee2eece203aa17032de97d83c9f31bfeb939796feafdca038c7d92": {
+        "bytes": 162,
+        "ctimeNs": 1788901549981609239,
+        "mtimeNs": 1788901549983016052,
+        "inode": 306467
+      },
+      "sha256:049f47c4b0a06d0075ffe9e87c39efd08f7b3365a863a7507fcb15ff20506f87": {
+        "bytes": 4062,
+        "ctimeNs": 1788901550040608931,
+        "mtimeNs": 1788901550041792064,
+        "inode": 306473
+      },
+      "sha256:859cf1635ef4e05caef7718dda3a4e34287e98045a955bf52690d8ae9c707f15": {
+        "bytes": 11825895,
+        "ctimeNs": 1788901550207601287,
+        "mtimeNs": 1788901550207654790,
+        "inode": 306479
+      },
+      "sha256:1661826dc0d96f8310ff597f3d9550da1ea96a266ea0a771359f8a22b26c0d9c": {
+        "bytes": 13929642,
+        "ctimeNs": 1788901550530606370,
+        "mtimeNs": 1788901550530826918,
+        "inode": 306485
+      },
+      "sha256:ae256886704663a1aeead9727e53610bb23897533f5cc59694a84709c03ae22f": {
+        "bytes": 6834540,
+        "ctimeNs": 1788901550138608419,
+        "mtimeNs": 1788901550139773325,
+        "inode": 306461
+      },
+      "sha256:a041cb410f3247c9db1ad8921051a70637b6c85f109e668417f10b611f252706": {
+        "bytes": 7404261,
+        "ctimeNs": 1788901550033608967,
+        "mtimeNs": 1788901550033651148,
+        "inode": 306452
+      },
+      "sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0": {
+        "bytes": 858,
+        "ctimeNs": 1788901606359270884,
+        "mtimeNs": 1788901606359595592,
+        "inode": 321581
+      },
+      "sha256:e82807dff4155a52320b2d1eb3f86c3b61bc4a11b02512fd1ad2f48a7338872d": {
+        "bytes": 2204,
+        "ctimeNs": 1788901621237181930,
+        "mtimeNs": 1788901621237390904,
+        "inode": 323102
+      },
+      "sha256:e8bce0aabd687e9ee90e0bada33884f40b277196f72aac9934357472863a80ae": {
+        "bytes": 80635392,
+        "ctimeNs": 1788901623676167208,
+        "mtimeNs": 1788901623676095683,
+        "inode": 323103
+      },
+      "sha256:34e3b4150c8bf95f0239198461f20b9296bd10b4e2ffafcf0f60fcbc72e426f6": {
+        "bytes": 459315200,
+        "ctimeNs": 1788901621187182232,
+        "mtimeNs": 1788901621186651160,
+        "inode": 321583
+      },
+      "sha256:5aff4d1a46147773d33a5fb78bda3c9f58a1b271b15f4894a30db0d9bcac09a2": {
+        "bytes": 29184,
+        "ctimeNs": 1788901621212182081,
+        "mtimeNs": 1788901621212754882,
+        "inode": 323100
+      },
+      "sha256:3a9e8f518c92f60365542e43d420fc28a1c2293ad1442c59230bce90fd203a57": {
+        "bytes": 3584,
+        "ctimeNs": 1788901621198182165,
+        "mtimeNs": 1788901621198658970,
+        "inode": 323099
+      },
+      "sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794": {
+        "bytes": 2212,
+        "ctimeNs": 1788901598671316858,
+        "mtimeNs": 1788901598671355692,
+        "inode": 321560
+      },
+      "sha256:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45": {
+        "bytes": 2629,
+        "ctimeNs": 1788901598544317618,
+        "mtimeNs": 1788901598544788419,
+        "inode": 321556
+      },
+      "sha256:7223ea1323e8c1159ec17f07d35acc27bdd1cc2bc3ed425b44ef21dac9915db0": {
+        "bytes": 327680,
+        "ctimeNs": 1788901600970303106,
+        "mtimeNs": 1788901600970970270,
+        "inode": 321570
+      },
+      "sha256:8fa10c0194df9b7c054c90dbe482585f768a54428fc90a5b78a0066a123b1bba": {
+        "bytes": 40960,
+        "ctimeNs": 1788901601060302568,
+        "mtimeNs": 1788901601060409778,
+        "inode": 321575
+      },
+      "sha256:35b5ba6e08cdd034b8d1920f9c7203e5d66f258e1915f164a01de0af14f34710": {
+        "bytes": 2416640,
+        "ctimeNs": 1788901598657316942,
+        "mtimeNs": 1788901598658357260,
+        "inode": 321559
+      },
+      "sha256:114dde0fefebbca13165d0da9c500a66190e497a82a53dcaabc3172d630be1e9": {
+        "bytes": 102400,
+        "ctimeNs": 1788901598522317749,
+        "mtimeNs": 1788901598523276353,
+        "inode": 321545
+      },
+      "sha256:4d049f83d9cf21d1f5cc0e11deaf36df02790d0e60c1a3829538fb4b61685368": {
+        "bytes": 1536,
+        "ctimeNs": 1788901598708316637,
+        "mtimeNs": 1788901598708776098,
+        "inode": 321563
+      },
+      "sha256:af5aa97ebe6ce1604747ec1e21af7136ded391bcabe4acef882e718a87c86bcc": {
+        "bytes": 2560,
+        "ctimeNs": 1788901601113302251,
+        "mtimeNs": 1788901601114287274,
+        "inode": 321578
+      },
+      "sha256:6f1cdceb6a3146f0ccb986521156bef8a422cdbb0863396f7f751f575ba308f4": {
+        "bytes": 2560,
+        "ctimeNs": 1788901598772316254,
+        "mtimeNs": 1788901598772451572,
+        "inode": 321568
+      },
+      "sha256:bd3cdfae1d3fdd83a2231d608969b38b82349777c2fff9a7c12d54f8ac5c9b38": {
+        "bytes": 2560,
+        "ctimeNs": 1788901601132302137,
+        "mtimeNs": 1788901601131388988,
+        "inode": 321579
+      },
+      "sha256:4cde6b0bb6f50a5f255eef7b2a42162c661cf776b803225dcac9a659e396bb6b": {
+        "bytes": 1536,
+        "ctimeNs": 1788901598695316714,
+        "mtimeNs": 1788901598695779330,
+        "inode": 321562
+      },
+      "sha256:ad51d0769d16ba578106a177987dfe3d2e02c1668c852b795b2f6b024068242a": {
+        "bytes": 2048,
+        "ctimeNs": 1788901601093302371,
+        "mtimeNs": 1788901601092675046,
+        "inode": 321577
+      },
+      "sha256:6e7fbcf090d09b73a4aa85f9dce690d0ace73877c150b7c56955487b6e7a822a": {
+        "bytes": 3072,
+        "ctimeNs": 1788901598760316326,
+        "mtimeNs": 1788901598760715229,
+        "inode": 321567
+      },
+      "sha256:5904c32f457c96a16c8c68f5ccdf518c8138cd9e5971de9ce6d564fc481af222": {
+        "bytes": 276480,
+        "ctimeNs": 1788901598736316469,
+        "mtimeNs": 1788901598736825315,
+        "inode": 321565
+      },
+      "sha256:71d99605abc8bbd85ff33c5a04ab9f1965d032a1fdfc1a3e6e2e40ea0ae89bf1": {
+        "bytes": 74672640,
+        "ctimeNs": 1788901600940303285,
+        "mtimeNs": 1788901600936334102,
+        "inode": 321569
+      },
+      "sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc": {
+        "bytes": 1609,
+        "ctimeNs": 1788901560080549419,
+        "mtimeNs": 1788901560080867073,
+        "inode": 307682
+      },
+      "sha256:e9030b4fca0c8f110032f3b151b030e7e9db56604b407cf79631e1a3218b35e0": {
+        "bytes": 8067,
+        "ctimeNs": 1788901560224548549,
+        "mtimeNs": 1788901560224918089,
+        "inode": 307689
+      },
+      "sha256:9dde75eda47ee1947f587da0d236bdf8a3f8bb570213cf1074922791455de868": {
+        "bytes": 9772,
+        "ctimeNs": 1788901560320547969,
+        "mtimeNs": 1788901560320431229,
+        "inode": 307705
+      },
+      "sha256:732b22103900aedb18ebd2f43f00b602479998b22e4989a05de118005a3daa99": {
+        "bytes": 106014,
+        "ctimeNs": 1788901560665545884,
+        "mtimeNs": 1788901560665809489,
+        "inode": 307696
+      },
+      "sha256:567a150b26d80458e71284962952c67354a6142efc69244ac8a71542e2a2d4ff": {
+        "bytes": 336171,
+        "ctimeNs": 1788901560767545268,
+        "mtimeNs": 1788901560767400756,
+        "inode": 307730
+      },
+      "sha256:977a58c36378206178a49228cca9556040644a751f0f83bcee2e57b6cba17b61": {
+        "bytes": 5955499,
+        "ctimeNs": 1788901560881544579,
+        "mtimeNs": 1788901560881072121,
+        "inode": 307754
+      },
+      "sha256:f422915cef04a8afa13b4a877ad37bacb4bab001906bebece5d41bbc4d9c5400": {
+        "bytes": 3485176,
+        "ctimeNs": 1788901560836544851,
+        "mtimeNs": 1788901560837194758,
+        "inode": 307760
+      },
+      "sha256:b312e236bb2df0d2acf89b8be7ef9c49b3802042b8074156122b4780739b221b": {
+        "bytes": 179295,
+        "ctimeNs": 1788901536902679801,
+        "mtimeNs": 1788901536903296616,
+        "inode": 304210
+      },
+      "sha256:d18daeda73ad27ef237b1a21faf2d7e5265aa276044a9153ed3ef60d36e938ae": {
+        "bytes": 1063151,
+        "ctimeNs": 1788901536915679722,
+        "mtimeNs": 1788901536916312036,
+        "inode": 304216
+      },
+      "sha256:84df6e26f91dd194ea21bae0607a62d0d4f77fa5ae8310401fe340cb267cd17a": {
+        "bytes": 95235,
+        "ctimeNs": 1788901536940679570,
+        "mtimeNs": 1788901536941629113,
+        "inode": 304222
+      },
+      "sha256:ccf8914610dd72a7d7deb336ff4d098b6a077583ce77887239da5948a57f44e2": {
+        "bytes": 58150,
+        "ctimeNs": 1788901537008679157,
+        "mtimeNs": 1788901537008206007,
+        "inode": 304228
+      },
+      "sha256:c1e00181697d22d899cd71771ca9674ef3cf9067b8815cafe788f69902c8d28f": {
+        "bytes": 1471653,
+        "ctimeNs": 1788901560698545685,
+        "mtimeNs": 1788901560699223790,
+        "inode": 307687
+      },
+      "sha256:8a8172fbd17d835eee35fd1add3afeac5c7262621664b9690ee1607310c48c03": {
+        "bytes": 924,
+        "ctimeNs": 1788901560854544742,
+        "mtimeNs": 1788901560854449050,
+        "inode": 307778
+      },
+      "sha256:7847804386a79aff56c360a3fec7a899c950882cb4877755633a6e4a004e4401": {
+        "bytes": 863029,
+        "ctimeNs": 1788901560939544228,
+        "mtimeNs": 1788901560939786489,
+        "inode": 307784
+      },
+      "sha256:38a083c55e64982775f72c1d07e2d17ac75c904edf624c8735bcfcc1888dd00d": {
+        "bytes": 711134,
+        "ctimeNs": 1788901560953544144,
+        "mtimeNs": 1788901560953975621,
+        "inode": 307790
+      },
+      "sha256:41a77ca62b1d582e885e879abfb5fbf7b514032f9c4fa6886976878fef477b5d": {
+        "bytes": 4078,
+        "ctimeNs": 1788901560947544180,
+        "mtimeNs": 1788901560947703106,
+        "inode": 307796
+      },
+      "sha256:94dab43e65616ca565cdda0efa92a0998ae12073c82b0c8840d367f32aa71d07": {
+        "bytes": 30354851,
+        "ctimeNs": 1788901561229542476,
+        "mtimeNs": 1788901561229443959,
+        "inode": 307802
+      },
+      "sha256:92b5d64f51a47f11255029ef83b0661682c705883218a4a50405446d884b0a50": {
+        "bytes": 2631,
+        "ctimeNs": 1788901560990543920,
+        "mtimeNs": 1788901560989645625,
+        "inode": 307808
+      },
+      "sha256:44ad63d16045b298e3e809c633da88100168113ee964fdec5794dc9dc3467338": {
+        "bytes": 12518507,
+        "ctimeNs": 1788901561048543569,
+        "mtimeNs": 1788901561048599904,
+        "inode": 307814
+      },
+      "sha256:7e10e267c01e9c10411ec5f1ad0e96e1256ae7ec6d2bea086942a538474e4458": {
+        "bytes": 286,
+        "ctimeNs": 1788901560684545769,
+        "mtimeNs": 1788901560684384032,
+        "inode": 307706
+      },
+      "sha256:4b8efca003b623720f9f52607a75b216429222a933072504a23f806d81ff2701": {
+        "bytes": 63122,
+        "ctimeNs": 1788901560723545533,
+        "mtimeNs": 1788901560720234500,
+        "inode": 307712
+      },
+      "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1": {
+        "bytes": 32,
+        "ctimeNs": 1788901555331578113,
+        "mtimeNs": 1788901555332700299,
+        "inode": 307040
+      },
+      "sha256:e3ae876a0cd178c64700d793c2b3fda6ea457e5def23a98ee3974ba4648140bd": {
+        "bytes": 372553,
+        "ctimeNs": 1788901560745545401,
+        "mtimeNs": 1788901560745273102,
+        "inode": 307718
+      },
+      "sha256:764e8f47f389d51107a9d6e28946180820f7353f6f3bb7d659450d84e4316f43": {
+        "bytes": 4282,
+        "ctimeNs": 1788901560752545358,
+        "mtimeNs": 1788901560752608564,
+        "inode": 307724
+      },
+      "sha256:0c06e950bfcedf034044d8bd73d2ffa87711f8a587f53258416980f0b815f4f8": {
+        "bytes": 18429,
+        "ctimeNs": 1788901560775545219,
+        "mtimeNs": 1788901560775946614,
+        "inode": 307736
+      },
+      "sha256:94ce02cf40107b6c939bd27b2ed6b1be725256b8f2b99f9e1d1d688ab86d6905": {
+        "bytes": 685211,
+        "ctimeNs": 1788901560782545177,
+        "mtimeNs": 1788901560781290753,
+        "inode": 307742
+      },
+      "sha256:fd0b18d29e5971e2a5daf9cc13998f2c2d162af1e5f738257691265c80b26dce": {
+        "bytes": 528521,
+        "ctimeNs": 1788901560799545074,
+        "mtimeNs": 1788901560796800637,
+        "inode": 307748
+      },
+      "sha256:9bc2f44c67f3d8e804f22f26d76920999a99348a6fa6488b2af4a2bf6dd77118": {
+        "bytes": 506,
+        "ctimeNs": 1788901560817544966,
+        "mtimeNs": 1788901560817503770,
+        "inode": 307766
+      },
+      "sha256:8ee51972df1401e47204e1b29265f01a9b3a47fa5db438c42d9f6bfe62d76d2d": {
+        "bytes": 404,
+        "ctimeNs": 1788901560869544651,
+        "mtimeNs": 1788901560870046393,
+        "inode": 307772
+      },
+      "sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7": {
+        "bytes": 743,
+        "ctimeNs": 1788901535545688044,
+        "mtimeNs": 1788901535547076096,
+        "inode": 304100
+      },
+      "sha256:ca6cbd45e11779164aa89fa9d20517bce4717b9a772f168a3c492075aad0abfe": {
+        "bytes": 8537,
+        "ctimeNs": 1788901535689687169,
+        "mtimeNs": 1788901535687756708,
+        "inode": 304107
+      },
+      "sha256:d6576f586a2696d58b335a0b1a8faf3fd140e01439830e25ba9ad4355e95016f": {
+        "bytes": 9775,
+        "ctimeNs": 1788901535780686617,
+        "mtimeNs": 1788901535782046351,
+        "inode": 304109
+      },
+      "sha256:c6a6de9802f42f4f702883b0435259eadae02fc38cbc9a24aa6549fb6405ee0a": {
+        "bytes": 17172083,
+        "ctimeNs": 1788901537105678567,
+        "mtimeNs": 1788901537106199818,
+        "inode": 304282
+      },
+      "sha256:ba90b5242ed5bece3239fecfebf94b89b39de21cf7cb2238429ab52d643ea10c": {
+        "bytes": 12125295,
+        "ctimeNs": 1788901537089678664,
+        "mtimeNs": 1788901537090885037,
+        "inode": 304288
+      },
+      "sha256:7ef4a311f073709777f77e00bfcd1787bc3b908c6f25e616ff17e788770e73f1": {
+        "bytes": 13986893,
+        "ctimeNs": 1788901537164678209,
+        "mtimeNs": 1788901537165288166,
+        "inode": 304294
+      },
+      "sha256:e9e9b451286a5bd62df9f1ee93873b431bcece5439be9d48bc14629fbe1cde3f": {
+        "bytes": 331685,
+        "ctimeNs": 1788901537093678640,
+        "mtimeNs": 1788901537094468571,
+        "inode": 304300
+      },
+      "sha256:2a2123b11dcc1cbe518a588e606e6bd8d2c3e28cae99b056d48b65caaff10f01": {
+        "bytes": 77240364,
+        "ctimeNs": 1788901537826674187,
+        "mtimeNs": 1788901537826855753,
+        "inode": 304306
+      },
+      "sha256:aacadc33b937cd7788b14f5c242177e22b9261d6691b7735ea8564777d9b0ab7": {
+        "bytes": 27506,
+        "ctimeNs": 1788901537109678543,
+        "mtimeNs": 1788901537110876125,
+        "inode": 304312
+      },
+      "sha256:0f357f2ea461b4624eca6bfbdf4c8d3ab4382e3e0f6c868d010a583c628854cb": {
+        "bytes": 5887,
+        "ctimeNs": 1788901537097678616,
+        "mtimeNs": 1788901537099223697,
+        "inode": 304318
+      },
+      "sha256:7c79a0fe4ac4c97d58feaeb9a46f0d9a6f7cfa7831fe43014d6158f8e9587afc": {
+        "bytes": 801,
+        "ctimeNs": 1788901537116678500,
+        "mtimeNs": 1788901537117698752,
+        "inode": 304324
+      },
+      "sha256:b2a1cbc9a7e323d76ad5e85ae567a60ea8792d6467e9842d2126daaf5d035cb7": {
+        "bytes": 2927,
+        "ctimeNs": 1788901537125678446,
+        "mtimeNs": 1788901537126356486,
+        "inode": 304330
+      },
+      "sha256:451760f5b9aee7aaa71106ee000bcd7e33dc21df91fffe6d637daff40fa91761": {
+        "bytes": 14510,
+        "ctimeNs": 1788901537138678367,
+        "mtimeNs": 1788901537140018433,
+        "inode": 304336
+      },
+      "sha256:6b781cb407c072236583d09fb221fe95aeeed1ab75572eb1a7ab3d3d289890f6": {
+        "bytes": 9033,
+        "ctimeNs": 1788901537151678288,
+        "mtimeNs": 1788901537152261429,
+        "inode": 304342
+      },
+      "sha256:1f03cd2cc3f0e5971d7989c3ab483c4dbe6f6b16f7b5f5c43f9e309103d044e8": {
+        "bytes": 3813,
+        "ctimeNs": 1788901537158678245,
+        "mtimeNs": 1788901537159600064,
+        "inode": 304348
+      },
+      "sha256:b2bc61a89d041dcb2ffaa19e51ddcdd002c71d33c8ff0d2a16ee35a4e7428c2a": {
+        "bytes": 4061,
+        "ctimeNs": 1788901536494682279,
+        "mtimeNs": 1788901536495584626,
+        "inode": 304114
+      },
+      "sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9": {
+        "bytes": 3140,
+        "ctimeNs": 1788901572115476687,
+        "mtimeNs": 1788901572115741899,
+        "inode": 310589
+      },
+      "sha256:961f6a7c610db066de9d1337fdfa03d6dc23f7008af43456c4063f63e4772f6f": {
+        "bytes": 1394,
+        "ctimeNs": 1788901572517474258,
+        "mtimeNs": 1788901572518318898,
+        "inode": 310608
+      },
+      "sha256:0ada0bcf27db702d0a26799dec1644ecfb43e629f4c93ce8d8995e2095501f9a": {
+        "bytes": 1692,
+        "ctimeNs": 1788901573495468347,
+        "mtimeNs": 1788901573495862063,
+        "inode": 310636
+      },
+      "sha256:7e0bac9878f0f2cf653bc5dac0db9616980ff347054fbdc8a94c47e1dfe56b1b": {
+        "bytes": 51944128,
+        "ctimeNs": 1788901575301457431,
+        "mtimeNs": 1788901575302139906,
+        "inode": 310641
+      },
+      "sha256:6d1771723d138f51099147346c43655ab71a68c7404c35c21dbeef95aed2276f": {
+        "bytes": 1243389,
+        "ctimeNs": 1788901574190464146,
+        "mtimeNs": 1788901574190604798,
+        "inode": 310594
+      },
+      "sha256:4e56f9987bb1330c7ff2cd10aa72c68acde38d043e78e5825705fa205c551cfe": {
+        "bytes": 24865875,
+        "ctimeNs": 1788901574547461989,
+        "mtimeNs": 1788901574547895486,
+        "inode": 310601
+      },
+      "sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c": {
+        "bytes": 743,
+        "ctimeNs": 1788901554758581578,
+        "mtimeNs": 1788901554759601723,
+        "inode": 306972
+      },
+      "sha256:05308cb0f8ad06f82f70d6f64321b3c99ab4836bb28fe50bb5d0cd0e79e7afba": {
+        "bytes": 6568,
+        "ctimeNs": 1788901554876580864,
+        "mtimeNs": 1788901554875449947,
+        "inode": 306979
+      },
+      "sha256:97e65210406f9716251b469085641e5aaa2a9145fbbdd3981ef0f86734b0ac7b": {
+        "bytes": 7642,
+        "ctimeNs": 1788901554942580464,
+        "mtimeNs": 1788901554942965555,
+        "inode": 306981
+      },
+      "sha256:12d7e5853d6f05043e11b4b62349fb9941b12aced16a5884b39119c5f56638fb": {
+        "bytes": 3493192,
+        "ctimeNs": 1788901555093579552,
+        "mtimeNs": 1788901555094123561,
+        "inode": 306977
+      },
+      "sha256:e923194d09ba50b4fbc247744c04007e492fd508435b15e37edb299783b1df0e": {
+        "bytes": 1475937,
+        "ctimeNs": 1788901555113579431,
+        "mtimeNs": 1788901555115232485,
+        "inode": 306986
+      },
+      "sha256:13fd44393d7bcfb872da097628eeefc3188aa94d09c36f2ca976d88c44962283": {
+        "bytes": 922,
+        "ctimeNs": 1788901555103579491,
+        "mtimeNs": 1788901555103923426,
+        "inode": 306992
+      },
+      "sha256:c35daf314dabfdb6ed1d34b78c80c190a5bd4d6b73de95ee52461686fdf02ab2": {
+        "bytes": 863328,
+        "ctimeNs": 1788901555171579080,
+        "mtimeNs": 1788901555172477354,
+        "inode": 306998
+      },
+      "sha256:e1c191f802606b7445265d4b6c1b1c250581f29f19a81ee073e462e8ecdfed51": {
+        "bytes": 711801,
+        "ctimeNs": 1788901555135579298,
+        "mtimeNs": 1788901555135688537,
+        "inode": 307004
+      },
+      "sha256:f24bcd6a4a7ae48d15942821d63b9f69a756b287f7507aa8183b073cc688c562": {
+        "bytes": 1663333,
+        "ctimeNs": 1788901555253578585,
+        "mtimeNs": 1788901555254316799,
+        "inode": 307022
+      },
+      "sha256:f3cb7adbca6f8ee6141f2c600b436872dc382a347d0a67d852a06706172ca697": {
+        "bytes": 164,
+        "ctimeNs": 1788901555263578524,
+        "mtimeNs": 1788901555265150601,
+        "inode": 307028
+      },
+      "sha256:cd38b3760498345d6130b47bbbbe83648a82f38eaff9a4d61bb9aef8a28dc338": {
+        "bytes": 18295352,
+        "ctimeNs": 1788901555569576675,
+        "mtimeNs": 1788901555570259834,
+        "inode": 307034
+      },
+      "sha256:23afed95fd214181687198460aafc8c17c7a3a16434037f2d7e07f0f30fabf16": {
+        "bytes": 18208901,
+        "ctimeNs": 1788901555446901354,
+        "mtimeNs": 1788901555434611889,
+        "inode": 307016
+      },
+      "sha256:e14400b9291d063a4a67dc9453132ce37976f8f518b1bff711411998170ec5fa": {
+        "bytes": 4508977,
+        "ctimeNs": 1788901555468577286,
+        "mtimeNs": 1788901555469607487,
+        "inode": 307046
+      },
+      "sha256:ea16d04f9da71099312d7d72d2f12e4e5ca9abca70e92033fede7b0e4a90d9fb": {
+        "bytes": 4061,
+        "ctimeNs": 1788901555452577382,
+        "mtimeNs": 1788901555453307664,
+        "inode": 307052
+      },
+      "sha256:7c2e2233a1bddbfd499cfe0e61aa37e1af310e5e839b9730bc4c1b04775528c2": {
+        "bytes": 146,
+        "ctimeNs": 1788901555153579189,
+        "mtimeNs": 1788901555155282392,
+        "inode": 307010
+      },
+      "sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1": {
+        "bytes": 5526,
+        "ctimeNs": 1788901565565516272,
+        "mtimeNs": 1788901565565334933,
+        "inode": 309058
+      },
+      "sha256:3ecfdef3a04114c3564c83e148ed408e5514960ceb6980a2f0014ba2bfdc0b10": {
+        "bytes": 3024,
+        "ctimeNs": 1788901565845514581,
+        "mtimeNs": 1788901565845266574,
+        "inode": 309065
+      },
+      "sha256:0f522f547ff98c4ac90835847a34e5f2638cce82aaa69fbb271dd1e61ed33531": {
+        "bytes": 3745,
+        "ctimeNs": 1788901566833508608,
+        "mtimeNs": 1788901566833359675,
+        "inode": 309139
+      },
+      "sha256:47de5dd0b812c573630914955e26abda537e09b5286a824c96e22e3854d4dd53": {
+        "bytes": 85845,
+        "ctimeNs": 1788901568188500419,
+        "mtimeNs": 1788901568189240267,
+        "inode": 309192
+      },
+      "sha256:c172f21841dff4c8cf45cde46589c1c2616cefe7e819965e92e6d3475c428aa0": {
+        "bytes": 12675,
+        "ctimeNs": 1788901567921502033,
+        "mtimeNs": 1788901567922011798,
+        "inode": 309162
+      },
+      "sha256:99515e7b4d35e0652d3b0fde571b6ec269222ecacc506f026e1758d6261e9109": {
+        "bytes": 288536,
+        "ctimeNs": 1788901567756503030,
+        "mtimeNs": 1788901567757239651,
+        "inode": 309063
+      },
+      "sha256:99ba982a9142213c751a1709dcf088e63d8601f03b3f211bae037be698fef270": {
+        "bytes": 254453,
+        "ctimeNs": 1788901567944501894,
+        "mtimeNs": 1788901567945287625,
+        "inode": 309168
+      },
+      "sha256:d6b1b89eccacc15c2420b2776d72c1dae334a00805ed9af54bf2f71e4d536f28": {
+        "bytes": 32093,
+        "ctimeNs": 1788901568049501260,
+        "mtimeNs": 1788901568049984082,
+        "inode": 309174
+      },
+      "sha256:3214acf345c0cc6bbdb56b698a41ccdefc624a09d6beb0d38b5de0b2303ecaf4": {
+        "bytes": 123,
+        "ctimeNs": 1788901568070501132,
+        "mtimeNs": 1788901568070609165,
+        "inode": 309180
+      },
+      "sha256:b839dfae01f66e15c6a8b63520557ed315bdfe036342fa7a0c537259f10d7a9a": {
+        "bytes": 351,
+        "ctimeNs": 1788901568125500800,
+        "mtimeNs": 1788901568126256731,
+        "inode": 309186
+      },
+      "sha256:642ffa30aad974a2c3f8b67758cf05ecb6f512582f48e4f707528a51b61abaa1": {
+        "bytes": 14710755,
+        "ctimeNs": 1788901568018501447,
+        "mtimeNs": 1788901568017803802,
+        "inode": 309156
+      },
+      "sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5": {
+        "bytes": 3140,
+        "ctimeNs": 1788901580324427078,
+        "mtimeNs": 1788901580324361946,
+        "inode": 310663
+      },
+      "sha256:319cf08cffe6e39fa0ccb2a175ee11ccd9c983343f1a36940c1fcb5e2b56714e": {
+        "bytes": 3786,
+        "ctimeNs": 1788901580806424166,
+        "mtimeNs": 1788901580806829965,
+        "inode": 310682
+      },
+      "sha256:55bf8ab12eb2eff3ea2826141c692b2bfb1f5eb5b448cc42d2a5811e8682e967": {
+        "bytes": 4319,
+        "ctimeNs": 1788901581334420972,
+        "mtimeNs": 1788901581334446899,
+        "inode": 310710
+      },
+      "sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb": {
+        "bytes": 3864189,
+        "ctimeNs": 1788901581897417569,
+        "mtimeNs": 1788901581897686749,
+        "inode": 310668
+      },
+      "sha256:cbfd3390970a7f654677c461fdb10c7657b51382ee86573cacf2627e3afcf723": {
+        "bytes": 2680915,
+        "ctimeNs": 1788901581954417225,
+        "mtimeNs": 1788901581954989661,
+        "inode": 310721
+      },
+      "sha256:1692e4b23d9cd3946ae43726a5f0d9f2ae46845cf867612d2e888f5b44234807": {
+        "bytes": 33767520,
+        "ctimeNs": 1788901582405591576,
+        "mtimeNs": 1788901582404542832,
+        "inode": 310727
+      },
+      "sha256:0d272d1662a82c4f43f00a1ea7f961694397f8a99924b082a94492d6695c1564": {
+        "bytes": 724842,
+        "ctimeNs": 1788901582270667265,
+        "mtimeNs": 1788901582270383847,
+        "inode": 310733
+      },
+      "sha256:2c20a61d954bd59c5f3712007054e736b107d0e05d5d64ce83c393f44486730b": {
+        "bytes": 102911,
+        "ctimeNs": 1788901582395414560,
+        "mtimeNs": 1788901582395847613,
+        "inode": 310739
+      },
+      "sha256:f4f18dc5446b1931467af81c459ff3ae5fc5f7a31d641b0668ce60f2ee070d7f": {
+        "bytes": 11601,
+        "ctimeNs": 1788901582450414228,
+        "mtimeNs": 1788901582451286612,
+        "inode": 310745
+      },
+      "sha256:90d3be9877bc8c9f27235717674b259f565c9ce20856b4012081b01ccb2e2bfc": {
+        "bytes": 2566,
+        "ctimeNs": 1788901582525413774,
+        "mtimeNs": 1788901582525698465,
+        "inode": 310751
+      },
+      "sha256:b7a1a38d2c466c39c8048dc18f98728c04f206b3f7e2248500063720354b613f": {
+        "bytes": 4128,
+        "ctimeNs": 1788901582564413539,
+        "mtimeNs": 1788901582565106653,
+        "inode": 310757
+      },
+      "sha256:02a335f58e1c835a2c912e8e24ebac846744f4b7cd5b04524c40362531a3e63f": {
+        "bytes": 614203,
+        "ctimeNs": 1788901582823411973,
+        "mtimeNs": 1788901582823814215,
+        "inode": 310763
+      },
+      "sha256:6e87e371a0673d505992870fc16d0f98dbd7d422408c685e92847b5ee65398de": {
+        "bytes": 7351991,
+        "ctimeNs": 1788901582851411804,
+        "mtimeNs": 1788901582852069250,
+        "inode": 310769
+      },
+      "sha256:0750af45ecafe903e0797df3c6eeb38bc1cc9bcfbacaf2443f54b9e302e937f9": {
+        "bytes": 1010391,
+        "ctimeNs": 1788901581839417920,
+        "mtimeNs": 1788901581839948031,
+        "inode": 310715
+      },
+      "sha256:35e013f08210f09ecfdb3d1125048405a30b098dd5c1cbcbe96bd2175387e8f6": {
+        "bytes": 154,
+        "ctimeNs": 1788901581694418796,
+        "mtimeNs": 1788901581694672342,
+        "inode": 310675
+      },
+      "sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b": {
+        "bytes": 3136,
+        "ctimeNs": 1788901586416390263,
+        "mtimeNs": 1788901586417301973,
+        "inode": 320721
+      },
+      "sha256:e1678089f6b49f461d27691eac8b755f530b90e2972efe3ed57fc6c247753919": {
+        "bytes": 844,
+        "ctimeNs": 1788901586925387185,
+        "mtimeNs": 1788901586925508669,
+        "inode": 320746
+      },
+      "sha256:91eea494b6646fdea891ba28451e879555215a8bdfa8eb44731fdc7bec54cf2d": {
+        "bytes": 1200,
+        "ctimeNs": 1788901588001380684,
+        "mtimeNs": 1788901588001581679,
+        "inode": 320770
+      },
+      "sha256:967777cdd482703c0bbafe07721f97b741edb18190cc1a5527c3f366653878e0": {
+        "bytes": 6142653,
+        "ctimeNs": 1788901588563377323,
+        "mtimeNs": 1788901588564017484,
+        "inode": 320726
+      },
+      "sha256:8b8263c6c4e7e7dca1723f65d7d7d87f8de666883e1cffd79a98fd9d1f737255": {
+        "bytes": 14521361,
+        "ctimeNs": 1788901589075374260,
+        "mtimeNs": 1788901589075358117,
+        "inode": 320733
+      },
+      "sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862": {
+        "bytes": 3113,
+        "ctimeNs": 1788901591888357431,
+        "mtimeNs": 1788901591888317752,
+        "inode": 321504
+      },
+      "sha256:7a9c4d658013e250d166704b81122e53a6b139f83de36be15a96884e8bcf7977": {
+        "bytes": 671,
+        "ctimeNs": 1788901592151355860,
+        "mtimeNs": 1788901592151831719,
+        "inode": 321523
+      },
+      "sha256:9c8198745d4e076dfefc26c722c2c40c77a79de560db7fc0995ffcf07a2152aa": {
+        "bytes": 1075,
+        "ctimeNs": 1788901592435354161,
+        "mtimeNs": 1788901592435422162,
+        "inode": 321551
+      },
+      "sha256:dba4f05024765d2cd8f62652ccf31ac0bc7aece28c5cd13afbf0e495675dde85": {
+        "bytes": 1947,
+        "ctimeNs": 1788901592605353144,
+        "mtimeNs": 1788901592605627908,
+        "inode": 321516
+      },
+      "sha256:5119e2c5e70cadf33facb1c9480cf6af780de5fae09172bea2084e9a94557bfc": {
+        "bytes": 83810412,
+        "ctimeNs": 1788901593496347814,
+        "mtimeNs": 1788901593497178598,
+        "inode": 321509
+      }
+    },
+    "snapshots": {
+      "sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243": {
+        "chainID": "sha256:625c458dc021be297697894f3a1a48c5769c126524901a8b9dbca7621e028bbc",
+        "info": {
+          "Kind": "Committed",
+          "Name": "sha256:625c458dc021be297697894f3a1a48c5769c126524901a8b9dbca7621e028bbc",
+          "Labels": {
+            "containerd.io/snapshot.ref": "sha256:625c458dc021be297697894f3a1a48c5769c126524901a8b9dbca7621e028bbc",
+            "containerd.io/snapshot/diff-id": "sha256:625c458dc021be297697894f3a1a48c5769c126524901a8b9dbca7621e028bbc"
+          },
+          "Created": "2026-09-08T20:55:55.533929373Z",
+          "Updated": "2026-09-08T20:55:55.533929373Z"
+        }
+      },
+      "sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77": {
+        "chainID": "sha256:30f64288871edd69ac51f9751b89a43766e676a4828f9d64828e985687d7d014",
+        "info": {
+          "Kind": "Committed",
+          "Name": "sha256:30f64288871edd69ac51f9751b89a43766e676a4828f9d64828e985687d7d014",
+          "Parent": "sha256:134f2d30b4761eb0a883141b93b6af44f4ea647053db7d3b45bc63382781d2ac",
+          "Labels": {
+            "containerd.io/snapshot.ref": "sha256:30f64288871edd69ac51f9751b89a43766e676a4828f9d64828e985687d7d014",
+            "containerd.io/snapshot/diff-id": "sha256:d8822caecf75875729d1e17a51eb9334a3eaea4672c3ce3f6af4196b936219b2",
+            "containerd.io/snapshot/parent-chain-id": "sha256:134f2d30b4761eb0a883141b93b6af44f4ea647053db7d3b45bc63382781d2ac"
+          },
+          "Created": "2026-09-08T21:05:53.310166219Z",
+          "Updated": "2026-09-08T21:05:53.310166219Z"
+        }
+      },
+      "sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0": {
+        "chainID": "sha256:952e7b28da2aa3d80ea29f52172aa66055131d0970c46a691eb1668137e308e6",
+        "info": {
+          "Kind": "Committed",
+          "Name": "sha256:952e7b28da2aa3d80ea29f52172aa66055131d0970c46a691eb1668137e308e6",
+          "Parent": "sha256:ad39d6f9ae5dadd8c42e406b5a2bb965d84ae4e59c32f7c6fe11d774897a95cc",
+          "Labels": {
+            "containerd.io/snapshot.ref": "sha256:952e7b28da2aa3d80ea29f52172aa66055131d0970c46a691eb1668137e308e6",
+            "containerd.io/snapshot/diff-id": "sha256:3a9e8f518c92f60365542e43d420fc28a1c2293ad1442c59230bce90fd203a57",
+            "containerd.io/snapshot/parent-chain-id": "sha256:ad39d6f9ae5dadd8c42e406b5a2bb965d84ae4e59c32f7c6fe11d774897a95cc"
+          },
+          "Created": "2026-09-08T21:07:07.938720354Z",
+          "Updated": "2026-09-08T21:07:07.938720354Z"
+        }
+      },
+      "sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794": {
+        "chainID": "sha256:86d2c6868bf7c9ae4f221559c6258f1bff0fc490e6ff8706431ac952288a6051",
+        "info": {
+          "Kind": "Committed",
+          "Name": "sha256:86d2c6868bf7c9ae4f221559c6258f1bff0fc490e6ff8706431ac952288a6051",
+          "Parent": "sha256:5e555e7975e2202f21fb93d460d701a340ade876f3afccb70d702f1dc5ab80db",
+          "Labels": {
+            "containerd.io/snapshot.ref": "sha256:86d2c6868bf7c9ae4f221559c6258f1bff0fc490e6ff8706431ac952288a6051",
+            "containerd.io/snapshot/diff-id": "sha256:71d99605abc8bbd85ff33c5a04ab9f1965d032a1fdfc1a3e6e2e40ea0ae89bf1",
+            "containerd.io/snapshot/parent-chain-id": "sha256:5e555e7975e2202f21fb93d460d701a340ade876f3afccb70d702f1dc5ab80db"
+          },
+          "Created": "2026-09-08T21:06:42.273120517Z",
+          "Updated": "2026-09-08T21:06:42.273120517Z"
+        }
+      },
+      "sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc": {
+        "chainID": "sha256:a0b331a119730760a921dfa13b2d451d876a3f50dc4927ee5c5ce762fdf34ef5",
+        "info": {
+          "Kind": "Committed",
+          "Name": "sha256:a0b331a119730760a921dfa13b2d451d876a3f50dc4927ee5c5ce762fdf34ef5",
+          "Parent": "sha256:c94415c091c0b11891adf1899f5df99545c4779b06463b27595a5f01a0721715",
+          "Labels": {
+            "containerd.io/snapshot.ref": "sha256:a0b331a119730760a921dfa13b2d451d876a3f50dc4927ee5c5ce762fdf34ef5",
+            "containerd.io/snapshot/diff-id": "sha256:b8f53dc7203b4ebf6fa20f88e6fab3d77fd37a7bf5c60e533986393acebcfaa2",
+            "containerd.io/snapshot/parent-chain-id": "sha256:c94415c091c0b11891adf1899f5df99545c4779b06463b27595a5f01a0721715"
+          },
+          "Created": "2026-09-08T21:06:04.101641444Z",
+          "Updated": "2026-09-08T21:06:04.101641444Z"
+        }
+      },
+      "sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7": {
+        "chainID": "sha256:6bea9798fe069808518413500c14876ccd096affa02ea945bda9c463d0651f99",
+        "info": {
+          "Kind": "Committed",
+          "Name": "sha256:6bea9798fe069808518413500c14876ccd096affa02ea945bda9c463d0651f99",
+          "Parent": "sha256:623dbbfc730bbb924cecf648aa0c3fdd1ea2fc84653a1e67e4dcad5b0bc6dc6a",
+          "Labels": {
+            "containerd.io/snapshot.ref": "sha256:6bea9798fe069808518413500c14876ccd096affa02ea945bda9c463d0651f99",
+            "containerd.io/snapshot/diff-id": "sha256:8141dc4502b0916a6787bf716aa693e3b0e33ad7f7ede779a0de4d75a977fd0c",
+            "containerd.io/snapshot/parent-chain-id": "sha256:623dbbfc730bbb924cecf648aa0c3fdd1ea2fc84653a1e67e4dcad5b0bc6dc6a"
+          },
+          "Created": "2026-09-08T21:05:48.197605383Z",
+          "Updated": "2026-09-08T21:05:48.197605383Z"
+        }
+      },
+      "sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9": {
+        "chainID": "sha256:fe3d59a60a0f73baea0aae9667eb9309302d72f402f5ed2259d4077bcc8bb0d6",
+        "info": {
+          "Kind": "Committed",
+          "Name": "sha256:fe3d59a60a0f73baea0aae9667eb9309302d72f402f5ed2259d4077bcc8bb0d6",
+          "Parent": "sha256:6a07f1b24dcf41117d01c099d0674d22a7360c18de41eac15294474f1aee1e33",
+          "Labels": {
+            "containerd.io/snapshot.ref": "sha256:fe3d59a60a0f73baea0aae9667eb9309302d72f402f5ed2259d4077bcc8bb0d6",
+            "containerd.io/snapshot/diff-id": "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+            "containerd.io/snapshot/parent-chain-id": "sha256:6a07f1b24dcf41117d01c099d0674d22a7360c18de41eac15294474f1aee1e33"
+          },
+          "Created": "2026-09-08T21:06:18.70285675Z",
+          "Updated": "2026-09-08T21:06:18.70285675Z"
+        }
+      },
+      "sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c": {
+        "chainID": "sha256:c9e71fa0be40664bf5fa0343df9628f64c6d17b69a6ddeb24f4a186ccadfaf3f",
+        "info": {
+          "Kind": "Committed",
+          "Name": "sha256:c9e71fa0be40664bf5fa0343df9628f64c6d17b69a6ddeb24f4a186ccadfaf3f",
+          "Parent": "sha256:ed16e544d3dc5b8dff40d43005aae2899ed9065c20131570456f5bea9b5d488a",
+          "Labels": {
+            "containerd.io/snapshot.ref": "sha256:c9e71fa0be40664bf5fa0343df9628f64c6d17b69a6ddeb24f4a186ccadfaf3f",
+            "containerd.io/snapshot/diff-id": "sha256:619a92966ef0190d2aa8831a2a60b8988654668bb5a8c4940e36cf8504349405",
+            "containerd.io/snapshot/parent-chain-id": "sha256:ed16e544d3dc5b8dff40d43005aae2899ed9065c20131570456f5bea9b5d488a"
+          },
+          "Created": "2026-09-08T21:05:58.618616377Z",
+          "Updated": "2026-09-08T21:05:58.618616377Z"
+        }
+      },
+      "sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1": {
+        "chainID": "sha256:9f4941464f3137b2e970928ef870242641677ede84d4f5ed41c06f90d3e939d8",
+        "info": {
+          "Kind": "Committed",
+          "Name": "sha256:9f4941464f3137b2e970928ef870242641677ede84d4f5ed41c06f90d3e939d8",
+          "Parent": "sha256:ed770f65937a4bbde81883d6a1d297a3dd46d5296903f9405a71898b904b92f9",
+          "Labels": {
+            "containerd.io/snapshot.ref": "sha256:9f4941464f3137b2e970928ef870242641677ede84d4f5ed41c06f90d3e939d8",
+            "containerd.io/snapshot/diff-id": "sha256:a4c0bfcb346d63df9b15b4bb8b2245afddb5c9968e863e3154a804ab80c9e741",
+            "containerd.io/snapshot/parent-chain-id": "sha256:ed770f65937a4bbde81883d6a1d297a3dd46d5296903f9405a71898b904b92f9"
+          },
+          "Created": "2026-09-08T21:06:10.652477189Z",
+          "Updated": "2026-09-08T21:06:10.652477189Z"
+        }
+      },
+      "sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5": {
+        "chainID": "sha256:e31a3f8a1d2e489f8120606672f597185793f62f54c8b530b734ee50e9030863",
+        "info": {
+          "Kind": "Committed",
+          "Name": "sha256:e31a3f8a1d2e489f8120606672f597185793f62f54c8b530b734ee50e9030863",
+          "Parent": "sha256:c5b5bcbea723952ae6994c0138abbb8e740fb81bef7f55db632512b49a0f918d",
+          "Labels": {
+            "containerd.io/snapshot.ref": "sha256:e31a3f8a1d2e489f8120606672f597185793f62f54c8b530b734ee50e9030863",
+            "containerd.io/snapshot/diff-id": "sha256:36d074b0f5722c5d74705bf9b12b98848021b662a0a83dfb34fed37ae784d892",
+            "containerd.io/snapshot/parent-chain-id": "sha256:c5b5bcbea723952ae6994c0138abbb8e740fb81bef7f55db632512b49a0f918d"
+          },
+          "Created": "2026-09-08T21:06:24.772832105Z",
+          "Updated": "2026-09-08T21:06:24.772832105Z"
+        }
+      },
+      "sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b": {
+        "chainID": "sha256:450742f597c99085ee96abc41ca37c9b8ed4f6e783fd6c9f0432886d2788fe08",
+        "info": {
+          "Kind": "Committed",
+          "Name": "sha256:450742f597c99085ee96abc41ca37c9b8ed4f6e783fd6c9f0432886d2788fe08",
+          "Parent": "sha256:27c850ccf36b4127d64c32e490e9f8edbcc40c60c1a01c8b63c928c55ae863f4",
+          "Labels": {
+            "containerd.io/snapshot.ref": "sha256:450742f597c99085ee96abc41ca37c9b8ed4f6e783fd6c9f0432886d2788fe08",
+            "containerd.io/snapshot/diff-id": "sha256:c717fecb7f67f8655fc0377957f549809f459865b419f3a768e5f1e8397c887f",
+            "containerd.io/snapshot/parent-chain-id": "sha256:27c850ccf36b4127d64c32e490e9f8edbcc40c60c1a01c8b63c928c55ae863f4"
+          },
+          "Created": "2026-09-08T21:06:29.665486911Z",
+          "Updated": "2026-09-08T21:06:29.665486911Z"
+        }
+      },
+      "sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862": {
+        "chainID": "sha256:8a5e077b4ec06f778543fadb29280bf0e39fc89dfa82da7fe47c41830ba66297",
+        "info": {
+          "Kind": "Committed",
+          "Name": "sha256:8a5e077b4ec06f778543fadb29280bf0e39fc89dfa82da7fe47c41830ba66297",
+          "Parent": "sha256:1da927a0edc7d1e9eece923f9fa51c32265ebf862ea57807e3972e3a6799c8ec",
+          "Labels": {
+            "containerd.io/snapshot.ref": "sha256:8a5e077b4ec06f778543fadb29280bf0e39fc89dfa82da7fe47c41830ba66297",
+            "containerd.io/snapshot/diff-id": "sha256:e1b5a6fd4997cfe7bbe10e625b46dc3966be61003a967bed74c88e7160a39142",
+            "containerd.io/snapshot/parent-chain-id": "sha256:1da927a0edc7d1e9eece923f9fa51c32265ebf862ea57807e3972e3a6799c8ec"
+          },
+          "Created": "2026-09-08T21:06:37.136110167Z",
+          "Updated": "2026-09-08T21:06:37.136110167Z"
+        }
+      }
+    },
+    "fileIdentities": {
+      "/usr/local/bin/k0s": {
+        "sha256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+        "inode": 2892,
+        "ctimeNs": 1788892862700463289,
+        "mtimeNs": 1788892860624563503
+      },
+      "/var/lib/k0s/bin/containerd": {
+        "sha256": "371a3cd3e3a2d9582f7a93f9f1d50d7b2881419dfeecfc779f7d29592e14e27f",
+        "inode": 303781,
+        "ctimeNs": 1788900269526475164,
+        "mtimeNs": 1788892860624563503
+      },
+      "/var/lib/k0s/bin/containerd-shim-runc-v2": {
+        "sha256": "0a7a4030019277c18f144a09c4b2df0444abd17f4954f73781c1cb5ef02b3706",
+        "inode": 303782,
+        "ctimeNs": 1788900269556474958,
+        "mtimeNs": 1788892860624563503
+      },
+      "/var/lib/k0s/bin/runc": {
+        "sha256": "0aba40a290392c85a11fb5532ce7035c830a1eba1ecfda7d7c400a28ec52e459",
+        "inode": 303783,
+        "ctimeNs": 1788900269599474664,
+        "mtimeNs": 1788892860624563503
+      }
+    },
+    "imagesCheck": "REF                                                                                                                      TYPE                                                      DIGEST                                                                  STATUS           SIZE                UNPACKED \ndocker.io/cloud-provisioning/gpu-probe:linux-v3                                                                          application/vnd.oci.image.manifest.v1+json                sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0 complete (5/5)   515.0 MiB/515.0 MiB true\ndocker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0           application/vnd.oci.image.manifest.v1+json                sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0 complete (5/5)   515.0 MiB/515.0 MiB true\ndocker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45                           application/vnd.oci.image.manifest.v1+json                sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794 complete (14/14) 74.2 MiB/74.2 MiB   true\nnvcr.io/nvidia/gpu-operator:v26.3.3                                                                                      application/vnd.docker.distribution.manifest.list.v2+json sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7 complete (43/43) 131.9 MiB/131.9 MiB true\nnvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7                      application/vnd.docker.distribution.manifest.list.v2+json sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7 complete (43/43) 131.9 MiB/131.9 MiB true\nnvcr.io/nvidia/k8s-device-plugin:v0.19.3                                                                                 application/vnd.docker.distribution.manifest.list.v2+json sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77 complete (32/32) 53.4 MiB/53.4 MiB   true\nnvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77                 application/vnd.docker.distribution.manifest.list.v2+json sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77 complete (32/32) 53.4 MiB/53.4 MiB   true\nnvcr.io/nvidia/k8s/container-toolkit:v1.19.1                                                                             application/vnd.docker.distribution.manifest.list.v2+json sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c complete (33/33) 54.3 MiB/54.3 MiB   true\nnvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c             application/vnd.docker.distribution.manifest.list.v2+json sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c complete (33/33) 54.3 MiB/54.3 MiB   true\nnvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless                                                                  application/vnd.oci.image.index.v1+json                   sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc complete (42/42) 56.8 MiB/56.8 MiB   true\nnvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc                 application/vnd.oci.image.index.v1+json                   sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc complete (42/42) 56.8 MiB/56.8 MiB   true\nquay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0                                                           application/vnd.oci.image.index.v1+json                   sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 complete (15/15) 14.8 MiB/14.8 MiB   true\nquay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 application/vnd.oci.image.index.v1+json                   sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 complete (15/15) 14.8 MiB/14.8 MiB   true\nquay.io/k0sproject/calico-cni:v3.32.0-0                                                                                  application/vnd.oci.image.index.v1+json                   sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9 complete (5/5)   74.4 MiB/74.4 MiB   true\nquay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9                    application/vnd.oci.image.index.v1+json                   sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9 complete (5/5)   74.4 MiB/74.4 MiB   true\nquay.io/k0sproject/calico-node:v3.32.0-0                                                                                 application/vnd.oci.image.index.v1+json                   sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5 complete (14/14) 47.8 MiB/47.8 MiB   true\nquay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5                   application/vnd.oci.image.index.v1+json                   sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5 complete (14/14) 47.8 MiB/47.8 MiB   true\nquay.io/k0sproject/kube-proxy:v1.36.2                                                                                    application/vnd.oci.image.index.v1+json                   sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b complete (3/3)   19.7 MiB/19.7 MiB   true\nquay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b                    application/vnd.oci.image.index.v1+json                   sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b complete (3/3)   19.7 MiB/19.7 MiB   true\nquay.io/k0sproject/pause:3.10.2-0                                                                                        application/vnd.oci.image.index.v1+json                   sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243 complete (2/2)   14.3 KiB/14.3 KiB   true\nquay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243                         application/vnd.oci.image.index.v1+json                   sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243 complete (2/2)   14.3 KiB/14.3 KiB   true\nquay.io/k0sproject/traefik:v3.7.5-k0s.0                                                                                  application/vnd.oci.image.index.v1+json                   sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d complete (15/15) 47.1 MiB/47.1 MiB   true\nquay.io/k0sproject/traefik@sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d                       application/vnd.oci.image.index.v1+json                   sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d complete (15/15) 47.1 MiB/47.1 MiB   true\nregistry.k8s.io/nfd/node-feature-discovery:v0.18.3                                                                       application/vnd.oci.image.index.v1+json                   sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862 complete (3/3)   79.9 MiB/79.9 MiB   true\nregistry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862       application/vnd.oci.image.index.v1+json                   sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862 complete (3/3)   79.9 MiB/79.9 MiB   true\nsha256:039978880167c62cb62b7d239ec137dbdf91649f4f3d77440ed8f60946427a45                                                  application/vnd.oci.image.index.v1+json                   sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d complete (15/15) 47.1 MiB/47.1 MiB   true\nsha256:0ada0bcf27db702d0a26799dec1644ecfb43e629f4c93ce8d8995e2095501f9a                                                  application/vnd.oci.image.index.v1+json                   sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9 complete (5/5)   74.4 MiB/74.4 MiB   true\nsha256:0f522f547ff98c4ac90835847a34e5f2638cce82aaa69fbb271dd1e61ed33531                                                  application/vnd.oci.image.index.v1+json                   sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 complete (15/15) 14.8 MiB/14.8 MiB   true\nsha256:1035a898348d517b8581c716ea1be35744a05ab952123ec0af7d8495c8998efb                                                  application/vnd.oci.image.index.v1+json                   sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243 complete (2/2)   14.3 KiB/14.3 KiB   true\nsha256:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45                                                  application/vnd.oci.image.manifest.v1+json                sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794 complete (14/14) 74.2 MiB/74.2 MiB   true\nsha256:3dfc93b1e12cdffc4e3ab6dfd44bce1400cb10216a1fec33ae0ad96459362712                                                  application/vnd.docker.distribution.manifest.list.v2+json sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77 complete (32/32) 53.4 MiB/53.4 MiB   true\nsha256:55bf8ab12eb2eff3ea2826141c692b2bfb1f5eb5b448cc42d2a5811e8682e967                                                  application/vnd.oci.image.index.v1+json                   sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5 complete (14/14) 47.8 MiB/47.8 MiB   true\nsha256:91eea494b6646fdea891ba28451e879555215a8bdfa8eb44731fdc7bec54cf2d                                                  application/vnd.oci.image.index.v1+json                   sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b complete (3/3)   19.7 MiB/19.7 MiB   true\nsha256:97e65210406f9716251b469085641e5aaa2a9145fbbdd3981ef0f86734b0ac7b                                                  application/vnd.docker.distribution.manifest.list.v2+json sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c complete (33/33) 54.3 MiB/54.3 MiB   true\nsha256:9c8198745d4e076dfefc26c722c2c40c77a79de560db7fc0995ffcf07a2152aa                                                  application/vnd.oci.image.index.v1+json                   sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862 complete (3/3)   79.9 MiB/79.9 MiB   true\nsha256:9dde75eda47ee1947f587da0d236bdf8a3f8bb570213cf1074922791455de868                                                  application/vnd.oci.image.index.v1+json                   sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc complete (42/42) 56.8 MiB/56.8 MiB   true\nsha256:d6576f586a2696d58b335a0b1a8faf3fd140e01439830e25ba9ad4355e95016f                                                  application/vnd.docker.distribution.manifest.list.v2+json sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7 complete (43/43) 131.9 MiB/131.9 MiB true\nsha256:e82807dff4155a52320b2d1eb3f86c3b61bc4a11b02512fd1ad2f48a7338872d                                                  application/vnd.oci.image.manifest.v1+json                sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0 complete (5/5)   515.0 MiB/515.0 MiB true\n",
+    "ready": "docker.io/cloud-provisioning/gpu-probe:linux-v3\ndocker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0\ndocker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45\nnvcr.io/nvidia/gpu-operator:v26.3.3\nnvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7\nnvcr.io/nvidia/k8s-device-plugin:v0.19.3\nnvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77\nnvcr.io/nvidia/k8s/container-toolkit:v1.19.1\nnvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c\nnvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless\nnvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc\nquay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0\nquay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1\nquay.io/k0sproject/calico-cni:v3.32.0-0\nquay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9\nquay.io/k0sproject/calico-node:v3.32.0-0\nquay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5\nquay.io/k0sproject/kube-proxy:v1.36.2\nquay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b\nquay.io/k0sproject/pause:3.10.2-0\nquay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243\nquay.io/k0sproject/traefik:v3.7.5-k0s.0\nquay.io/k0sproject/traefik@sha256:b4d50e740a36d9cbf123a32792104fb7e8d0dc8f5df4415f70b23474bb7dbf6d\nregistry.k8s.io/nfd/node-feature-discovery:v0.18.3\nregistry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862\nsha256:039978880167c62cb62b7d239ec137dbdf91649f4f3d77440ed8f60946427a45\nsha256:0ada0bcf27db702d0a26799dec1644ecfb43e629f4c93ce8d8995e2095501f9a\nsha256:0f522f547ff98c4ac90835847a34e5f2638cce82aaa69fbb271dd1e61ed33531\nsha256:1035a898348d517b8581c716ea1be35744a05ab952123ec0af7d8495c8998efb\nsha256:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45\nsha256:3dfc93b1e12cdffc4e3ab6dfd44bce1400cb10216a1fec33ae0ad96459362712\nsha256:55bf8ab12eb2eff3ea2826141c692b2bfb1f5eb5b448cc42d2a5811e8682e967\nsha256:91eea494b6646fdea891ba28451e879555215a8bdfa8eb44731fdc7bec54cf2d\nsha256:97e65210406f9716251b469085641e5aaa2a9145fbbdd3981ef0f86734b0ac7b\nsha256:9c8198745d4e076dfefc26c722c2c40c77a79de560db7fc0995ffcf07a2152aa\nsha256:9dde75eda47ee1947f587da0d236bdf8a3f8bb570213cf1074922791455de868\nsha256:d6576f586a2696d58b335a0b1a8faf3fd140e01439830e25ba9ad4355e95016f\nsha256:e82807dff4155a52320b2d1eb3f86c3b61bc4a11b02512fd1ad2f48a7338872d\n"
+  }
+}

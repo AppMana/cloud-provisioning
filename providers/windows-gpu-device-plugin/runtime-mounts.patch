@@ -1,0 +1,117 @@
+diff --git a/plugins/internal/plugin/device_plugin.go b/plugins/internal/plugin/device_plugin.go
+index e6882bf..d27f22d 100644
+--- a/plugins/internal/plugin/device_plugin.go
++++ b/plugins/internal/plugin/device_plugin.go
+@@ -388,9 +388,13 @@ func (p *DevicePlugin) Allocate(ctx context.Context, request *pluginapi.Allocate
+ 		}
+ 
+ 		// Generate the device specs and runtime file mounts for the requested devices, appending the container response to our overall response
++		var runtimeMounts []*pluginapi.Mount
++		if !p.config.SkipRuntimeMounts {
++			runtimeMounts = mount.MountsForDevices(devices)
++		}
+ 		response.ContainerResponses = append(response.ContainerResponses, &pluginapi.ContainerAllocateResponse{
+ 			Devices: mount.SpecsForDevices(devices),
+-			Mounts:  mount.MountsForDevices(devices),
++			Mounts:  runtimeMounts,
+ 		})
+ 	}
+ 
+diff --git a/plugins/internal/plugin/plugin_configuration.go b/plugins/internal/plugin/plugin_configuration.go
+index 47ae4ea..2e2e784 100644
+--- a/plugins/internal/plugin/plugin_configuration.go
++++ b/plugins/internal/plugin/plugin_configuration.go
+@@ -23,6 +23,10 @@ type PluginConfig struct {
+ 	// The number of containers that can access each device simultaneously (set this to 1 for exclusive access)
+ 	Multitenancy uint32
+ 
++	// Skip explicit driver-file mounts only on combinations qualified to provide
++	// these files through Windows GPU assignment itself. Device IDs are unchanged.
++	SkipRuntimeMounts bool
++
+ 	// Specifies whether we advertise integrated devices (i.e. integrated GPUs)
+ 	IncludeIntegrated bool
+ 
+@@ -75,6 +79,7 @@ func LoadConfig(pluginName string, logger *zap.SugaredLogger) (*PluginConfig, er
+ 	// Set our default configuration values
+ 	v := viper.New()
+ 	v.SetDefault("multitenancy", 0)
++	v.SetDefault("skipRuntimeMounts", false)
+ 	v.SetDefault("includeIntegrated", false)
+ 	v.SetDefault("includeDetachable", false)
+ 	v.SetDefault("additionalMounts", make(map[string][]*discovery.RuntimeFile))
+@@ -83,6 +88,7 @@ func LoadConfig(pluginName string, logger *zap.SugaredLogger) (*PluginConfig, er
+ 	// The names of our environment variables reflect the plugin name
+ 	envPrefix := fmt.Sprint(strings.ToUpper(pluginName), "_DEVICE_PLUGIN_")
+ 	v.BindEnv("multitenancy", fmt.Sprint(envPrefix, "MULTITENANCY"))
++	v.BindEnv("skipRuntimeMounts", fmt.Sprint(envPrefix, "SKIP_RUNTIME_MOUNTS"))
+ 	v.BindEnv("includeIntegrated", fmt.Sprint(envPrefix, "INCLUDE_INTEGRATED"))
+ 	v.BindEnv("includeDetachable", fmt.Sprint(envPrefix, "INCLUDE_DETACHABLE"))
+ 
+diff --git a/plugins/internal/plugin/runtime_mounts_test.go b/plugins/internal/plugin/runtime_mounts_test.go
+new file mode 100644
+index 0000000..3dd5223
+--- /dev/null
++++ b/plugins/internal/plugin/runtime_mounts_test.go
+@@ -0,0 +1,61 @@
++//go:build windows
++
++package plugin
++
++import (
++	"context"
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/tensorworks/directx-device-plugins/plugins/internal/discovery"
++	"go.uber.org/zap"
++	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
++)
++
++// The native Server 2025 GRID 582.53 reproduction fails HCS creation with
++// PCI assignment plus nvcuda.dll, but renders and encodes with PCI alone.
++// Disabling mounts must preserve the selected device and reject unknown IDs.
++func TestRuntimeMountModePreservesDeviceSelection(t *testing.T) {
++	dir := t.TempDir()
++	if err := os.WriteFile(filepath.Join(dir, "nvcuda_loader64.dll"), []byte("fixture"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	device := &discovery.Device{ID: `PCI\VEN_10DE&DEV_27B8\DEVICE`, LocationPath: "PCIROOT(30)#PCI(0000)#PCI(0000)", DriverStorePath: dir,
++		RuntimeFiles: []*discovery.RuntimeFile{{SourcePath: "nvcuda_loader64.dll", DestinationFilename: "nvcuda.dll"}}}
++	for _, skip := range []bool{false, true} {
++		p := &DevicePlugin{config: &PluginConfig{SkipRuntimeMounts: skip}, currentDevices: []*discovery.Device{device}, logger: zap.NewNop().Sugar()}
++		request := &pluginapi.AllocateRequest{ContainerRequests: []*pluginapi.ContainerAllocateRequest{{DevicesIDs: []string{device.ID + `\0`}}}}
++		response, err := p.Allocate(context.Background(), request)
++		if err != nil {
++			t.Fatal(err)
++		}
++		allocation := response.ContainerResponses[0]
++		if len(allocation.Devices) != 1 || allocation.Devices[0].HostPath != "vpci-location-path://"+device.LocationPath {
++			t.Fatalf("device selection changed: %+v", allocation.Devices)
++		}
++		if skip && len(allocation.Mounts) != 0 {
++			t.Fatal("explicit runtime mounts remain")
++		}
++		if !skip && (len(allocation.Mounts) != 1 || allocation.Mounts[0].ContainerPath != `C:\Windows\System32\nvcuda.dll` || !allocation.Mounts[0].ReadOnly) {
++			t.Fatalf("default mount changed: %+v", allocation.Mounts)
++		}
++		request.ContainerRequests[0].DevicesIDs = []string{`PCI\UNKNOWN\0`}
++		if _, err := p.Allocate(context.Background(), request); err == nil {
++			t.Fatal("unknown device accepted")
++		}
++	}
++}
++
++func TestRuntimeMountConfigOptIn(t *testing.T) {
++	for _, value := range []string{"false", "true"} {
++		t.Setenv("WDDM_DEVICE_PLUGIN_SKIP_RUNTIME_MOUNTS", value)
++		c, err := LoadConfig("wddm", zap.NewNop().Sugar())
++		if err != nil {
++			t.Fatal(err)
++		}
++		if c.SkipRuntimeMounts != (value == "true") {
++			t.Fatalf("env option %q was ignored", value)
++		}
++	}
++}

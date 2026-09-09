@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "provider": "aws",
+  "licenseScope": "aws",
+  "licenseSource": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvidia-GRID-driver.html",
+  "driverVersion": "582.53",
+  "gridVersion": "19.5",
+  "sourceBucket": "ec2-windows-nvidia-drivers",
+  "sourceKey": "grid-19.5/582.53_grid_win10_win11_server2022_server2025_dch_64bit_international_aws_swl.exe",
+  "packageSHA256": "1fe09ef6cc93124d2800c453d663e3a14c020ead68feb1001d6b93cb19bbcc12",
+  "windowsBuilds": [
+    20348,
+    26100
+  ],
+  "initialTestInstanceType": "g6f.large",
+  "region": "us-west-2",
+  "onDemandWindowsHourlyUSD": "0.294",
+  "priceOperation": "RunInstances:0002",
+  "priceObservedAt": "2026-09-07",
+  "validated": false
+}

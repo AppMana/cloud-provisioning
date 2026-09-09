@@ -23,6 +23,9 @@ kind: ClusterRole
 metadata:
   name: {{ include "cloud-provisioning.controllerName" . }}
 rules:
+  - apiGroups: ["autopilot.k0sproject.io"]
+    resources: ["controlnodes"]
+    verbs: ["get", "list"]
   # Watch/annotate Machines (join + mesh reconcilers); the claim
   # reconciler also creates them.
   - apiGroups: ["cluster.x-k8s.io"]
@@ -61,6 +64,13 @@ rules:
   - apiGroups: ["infrastructure.cluster.x-k8s.io"]
     resources: ["awsclusters/status", "dockerclusters/status"]
     verbs: ["get", "patch"]
+  # A machine kind this operator adopts rather than creates, for a lab
+  # topology that owns its own containers. The wildcard covers the
+  # cluster's status subresource too, which the claim reconciler patches
+  # for a Cluster marked managed-by external.
+  - apiGroups: ["containernet.appmana.com"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # The claim CRD itself.
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodeclaims"]
@@ -99,12 +109,15 @@ rules:
   - apiGroups: ["cilium.io"]
     resources: ["ciliumnodes"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["operator.openshift.io"]
+    resources: ["networks"]
+    verbs: ["get"]
   - apiGroups: ["apps"]
     resources: ["daemonsets"]
     verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["configmaps"]
-    verbs: ["get"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["nodes"]
     # patch: a provisioned node is told which address the CNI should
@@ -113,7 +126,7 @@ rules:
     # will (a cluster-scoped Node cannot be owned by a namespaced
     # claim, and Cluster API only removes nodes for clusters it
     # manages).
-    verbs: ["get", "list", "watch", "patch", "delete"]
+    verbs: ["get", "list", "watch", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -138,18 +151,60 @@ metadata:
   name: {{ include "cloud-provisioning.controllerName" . }}
   namespace: {{ .Release.Namespace }}
 rules:
+  # A mesh-scoped Lease serializes controllers, including overlapping releases.
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "create", "patch"]
+    verbs: ["get", "create", "update", "patch", "delete"]
+  # CAPI lifetime guards delete their UID-bound attachment request to start
+  # withdrawal. This permission remains confined to the release namespace.
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # The dialer Role's resourceNames are maintained at runtime
+  # (ensureDialerRole derives them from the machine list): one Role,
+  # by name, and nothing else in the RBAC group. The chart renders the
+  # Role's floor, so the controller never creates one, and it cannot
+  # touch bindings or its own grants: the dialer's scope is maintained
+  # by a different identity than the one it confines, and this
+  # identity's scope is maintained by nobody but the chart.
+  # Kubernetes' escalation check bounds the mechanism anyway: an
+  # account can only ever grant what it holds, the secrets access
+  # above.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles"]
+    verbs: ["get", "update"]
+    resourceNames:
+      - {{ include "cloud-provisioning.name" . }}
+  # The two Linux dialer DaemonSets, which this operator creates and owns at
+  # runtime. Get/update are pinned to their names; create cannot be,
+  # because RBAC evaluates create before the object has a name.
   - apiGroups: ["apps"]
     resources: ["daemonsets"]
-    verbs: ["get", "create", "update"]
-  # Its own Deployment: everything the controller creates at runtime is
-  # owned by it, so uninstalling the release collects those objects
-  # instead of leaving DaemonSets running with nothing behind them.
+    verbs: ["get", "update"]
+    resourceNames:
+      - {{ include "cloud-provisioning.name" . }}-dialer
+      - {{ include "cloud-provisioning.name" . }}-dialer-remote
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["create"]
+  # The Windows publisher reconciles its spec with a merge patch.
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "patch"]
+    resourceNames:
+      - {{ include "cloud-provisioning.name" . }}-dialer-remote-windows
+  # Its own Deployment, by name: everything the controller creates at
+  # runtime is owned by it, so uninstalling the release collects those
+  # objects instead of leaving DaemonSets running with nothing behind
+  # them.
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get"]
+    resourceNames:
+      - {{ include "cloud-provisioning.controllerName" . }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -225,9 +280,14 @@ subjects:
     namespace: {{ .Release.Namespace }}
 ---
 # The dialer pods' own access: the peer Secret (read the mesh state,
-# merge-patch their self-published public key) and, on the cloud node,
-# the per-machine adoption Secret (read-only; its name is derived from
-# /etc/wg-dialer/machine-name, so this cannot be resourceName-scoped).
+# merge-patch their self-published public key) and the per-machine
+# adoption Secrets (get everywhere, because a relay reads every
+# remote's applied-list acknowledgment; patch, because a remote stamps
+# its own). The chart cannot name the adoption Secrets, because
+# machines come and go after install, so this is the floor: the
+# controller keeps the resourceNames current from its machine list
+# (ensureDialerRole), and an upgrade that resets this Role to the
+# floor is repaired by the controller's first pass after restart.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -237,6 +297,8 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "patch"]
+    resourceNames:
+      - {{ include "cloud-provisioning.name" . }}-peers
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

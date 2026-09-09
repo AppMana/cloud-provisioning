@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 2,
+  "observedAt": "2026-09-07T17:39:00.059656+00:00",
+  "scope": "Shared Windows GPU image preparation, capture and isolated CAPI candidate authorization",
+  "cases": [
+    {
+      "windowsVersion": "2022",
+      "builderState": "stopped",
+      "preparation": {
+        "joined": false,
+        "containersInstalled": true,
+        "k0sSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+        "k0s": "v1.36.2+k0s.0.appmana.1",
+        "windowsBuild": 20348,
+        "pendingReboot": false,
+        "gpu": {
+          "licenseActivationValidated": false,
+          "licenseScope": "aws",
+          "packageSHA256": "1fe09ef6cc93124d2800c453d663e3a14c020ead68feb1001d6b93cb19bbcc12",
+          "windowsBuild": 20348,
+          "bootTime": "2026-09-07T17:06:41.5000000Z",
+          "driverVersion": "582.53",
+          "workloadValidated": false,
+          "verifiedAfterReboot": true,
+          "gpuCount": 1,
+          "licenseSource": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvidia-GRID-driver.html",
+          "gpus": [
+            {
+              "driverVersion": "582.53",
+              "driverModel": "WDDM",
+              "name": "NVIDIA L4-3Q"
+            }
+          ]
+        },
+        "tunnelSHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+        "diagnosticStateRemoved": true,
+        "awsToolsVersion": "5.0.268"
+      },
+      "generalizeRequestedAt": "2026-09-07T17:11:49.986524+00:00",
+      "candidateImageState": "available",
+      "captureRequested": true,
+      "candidatePrivate": true,
+      "capaAuthorization": {
+        "exactCandidateAuthorized": true,
+        "existingCandidatesRetained": true,
+        "nativeIAMReadbackMatched": false
+      }
+    },
+    {
+      "windowsVersion": "2025",
+      "builderState": "stopped",
+      "preparation": {
+        "joined": false,
+        "containersInstalled": true,
+        "k0sSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+        "k0s": "v1.36.2+k0s.0.appmana.1",
+        "windowsBuild": 26100,
+        "pendingReboot": false,
+        "gpu": {
+          "licenseActivationValidated": false,
+          "licenseScope": "aws",
+          "packageSHA256": "1fe09ef6cc93124d2800c453d663e3a14c020ead68feb1001d6b93cb19bbcc12",
+          "windowsBuild": 26100,
+          "bootTime": "2026-09-07T16:48:22.0484130Z",
+          "driverVersion": "582.53",
+          "workloadValidated": false,
+          "verifiedAfterReboot": true,
+          "gpuCount": 1,
+          "licenseSource": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvidia-GRID-driver.html",
+          "gpus": [
+            {
+              "driverVersion": "582.53",
+              "driverModel": "WDDM",
+              "name": "NVIDIA L4-3Q"
+            }
+          ]
+        },
+        "tunnelSHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+        "diagnosticStateRemoved": true,
+        "awsToolsVersion": "5.0.268"
+      },
+      "generalizeRequestedAt": "2026-09-07T16:50:48.932715+00:00",
+      "candidateImageState": "available",
+      "captureRequested": true,
+      "candidatePrivate": true,
+      "capaAuthorization": {
+        "exactCandidateAuthorized": true,
+        "existingCpuCandidatesRetained": true,
+        "nativeIAMReadbackMatched": true
+      },
+      "freshCAPIWorker": {
+        "instanceType": "g6f.large",
+        "eniCount": 1,
+        "ec2State": "running",
+        "machinePhase": "Running",
+        "nodeRegistered": true
+      }
+    }
+  ],
+  "tests": {
+    "awsHelperTests": 48,
+    "passed": true,
+    "coverageScope": "Image helper unit tests; subprocess capture execution is not included in coverage",
+    "imageRecipePercent": 96,
+    "windowsImageHelperPercent": 48
+  },
+  "limitations": [
+    "Windows 2022 fresh CAPI worker joining remains pending",
+    "WDDM plugin registered on Windows 2025; ordinary application rendering and NVENC execution are still pending",
+    "GPU tenant isolation and image preloading remain unqualified"
+  ]
+}

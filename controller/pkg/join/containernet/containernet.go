@@ -1,101 +1,100 @@
-// Package containernet implements join.InfraProvider backed by a real
-// Docker container standing in for a "machine", used to integration
-// test the join.Reconciler locally, without AWS/CAPA.
-//
-// This is a different shape of InfraProvider from aws.Provider:
-// AWSMachine's creation is CAPA's job (a separate operator this
-// reconciler only reads, tolerating its CRD not being installed yet;
-// see isMissingCRD in pkg/join/reconciler.go). There is no equivalent
-// containernet operator watching a ContainernetMachine CRD in a real
-// cluster, so this package's CreateMachine/DestroyMachine do the
-// provisioning themselves, driven by a test or harness caller: the
-// same role CAPA plays for AWS, invoked synchronously instead of via
-// its own reconcile loop.
+// Package containernet supplies infrastructure values for the lab's CAPI
+// contract. The harness/e2e/provider controller owns compute provisioning
+// through its VM or legacy container rig; this package reads the resulting
+// address and provider identity for product bootstrap templates.
 package containernet
 
 import (
 	"context"
-	"fmt"
-	"os/exec"
-	"strconv"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var gvk = schema.GroupVersionKind{Group: "containernet.appmana.com", Version: "v1", Kind: "ContainernetMachine"}
+// gvk matches the pinned lab infrastructure contract installed by the harness.
+var gvk = schema.GroupVersionKind{Group: "containernet.appmana.com", Version: "v1beta2", Kind: "ContainernetMachine"}
 
-// containerNameAnnotation lets a ContainernetMachine reference a
-// container whose name differs from the Kubernetes object's own name
-// (Docker container names and Kubernetes object names don't share a
-// charset). It falls back to the object's own name when absent.
-const containerNameAnnotation = "containernet.appmana.com/container-name"
+// clusterGVK is what a claim's CAPI Cluster points at for this provider
+// to be the one that fulfils it.
+var clusterGVK = schema.GroupVersionKind{Group: "containernet.appmana.com", Version: "v1beta2", Kind: "ContainernetCluster"}
 
-// Provider implements join.InfraProvider for a Docker-container-backed
-// test double.
+// Provider implements join.InfraProvider for lab machines.
 type Provider struct{}
 
 // GVK implements join.InfraProvider.
 func (Provider) GVK() schema.GroupVersionKind { return gvk }
 
-// Running reports whether a real Docker container by this machine's
-// name is running, checked via `docker inspect` rather than an
-// in-memory flag. This is a test helper; the reconciler does not gate
-// on infrastructure readiness, because userdata has to exist before
-// the compute launches (see pkg/join/reconciler.go).
-func (Provider) Running(ctx context.Context, machine *unstructured.Unstructured) (bool, error) {
-	name := containerName(machine)
-	out, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{.State.Running}}", name).CombinedOutput()
-	if err != nil {
-		if strings.Contains(strings.ToLower(string(out)), "no such object") {
-			return false, nil
-		}
-		return false, fmt.Errorf("docker inspect %s: %w: %s", name, err, strings.TrimSpace(string(out)))
-	}
-	running, err := strconv.ParseBool(strings.TrimSpace(string(out)))
-	if err != nil {
-		return false, fmt.Errorf("parsing docker inspect output %q: %w", out, err)
-	}
-	return running, nil
-}
+// ClusterGVK implements join.MachineProvisioner. Without it this is not
+// a provisioner at all and the claim reconciler refuses every claim
+// routed to it, which is the only reason a claim can name it.
+func (Provider) ClusterGVK() schema.GroupVersionKind { return clusterGVK }
 
-// InfraValues implements join.InfraProvider. It contributes nothing
-// extra today, mirroring aws.Provider's contract, and is kept as a
-// real method so the interface still shows what a provider can
-// contribute.
+// ObservesAddresses implements join.AddressObserver: this provider
+// adopts machines that already exist, so where one is is known before
+// it is bootstrapped, and there is no reason to render a document
+// that cannot say.
+func (Provider) ObservesAddresses() bool { return true }
+
+// InfraValues implements join.InfraProvider: it tells the machine
+// which of its addresses is the one this provider reports.
+//
+// A node left to choose gets it wrong wherever there is more than one
+// address to choose from. On a machine with an out-of-band interface
+// beside its real one the kubelet registered the out-of-band address
+// — the same on every machine, and part of no network the cluster
+// models — while the mesh had already published the other one. The
+// node joined, went Ready, and carried an identity nothing was
+// looking for, so it was never adopted.
+//
+// This is not a guess: it is the address this provider reports to
+// Cluster API and the address the peer list is built from, so a
+// kubelet pinned to it agrees with everything that already believes
+// it. Where none has been reported yet, nothing is said, and the
+// distribution works it out however it normally would.
 func (Provider) InfraValues(ctx context.Context, machine *unstructured.Unstructured) (map[string]any, error) {
-	return map[string]any{}, nil
+	values := map[string]any{}
+	if addr := reportedAddress(machine); addr != "" {
+		values["nodeAddress"] = addr
+	}
+	// And the identity Cluster API binds a Machine to a Node by.
+	//
+	// Some distributions assign one themselves — k3s gives every node
+	// k3s://<name> as it registers, RKE2 the same — so a node that is
+	// not told otherwise carries an identity the Machine does not
+	// have. nodeRef is then never set, the controller that publishes
+	// the remote's pod block never finds a node, and the remote joins,
+	// goes Ready and is unreachable from the site with everything
+	// reporting healthy.
+	if id, found, err := unstructured.NestedString(machine.Object, "spec", "providerID"); err == nil && found && id != "" {
+		values["providerID"] = id
+	}
+	return values, nil
 }
 
-// CreateMachine actually provisions the compute a ContainernetMachine
-// represents: a running, detached Docker container. Unlike AWS, where
-// CAPA does this outside the reconciler, there is no separate operator
-// for containernet-backed machines, so a test or harness caller
-// invokes this directly, playing CAPA's role synchronously.
-func CreateMachine(ctx context.Context, name, image string) error {
-	out, err := exec.CommandContext(ctx, "docker", "run", "-d", "--name", name, "--network", "none", image, "sleep", "infinity").CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("docker run %s (%s): %w: %s", name, image, err, strings.TrimSpace(string(out)))
+// reportedAddress is the address this provider published for the
+// machine. InternalIP first: that is the address a node is reached by
+// from inside the cluster, which is what a kubelet is registering.
+func reportedAddress(machine *unstructured.Unstructured) string {
+	addresses, found, err := unstructured.NestedSlice(machine.Object, "status", "addresses")
+	if err != nil || !found {
+		return ""
 	}
-	return nil
-}
-
-// DestroyMachine tears down a container CreateMachine started, e.g.
-// via a test's defer. Ignores "already gone" so cleanup after a test
-// that already destroyed it (or never fully created it) isn't itself
-// a spurious failure.
-func DestroyMachine(ctx context.Context, name string) error {
-	out, err := exec.CommandContext(ctx, "docker", "rm", "-f", name).CombinedOutput()
-	if err != nil && !strings.Contains(strings.ToLower(string(out)), "no such container") {
-		return fmt.Errorf("docker rm -f %s: %w: %s", name, err, strings.TrimSpace(string(out)))
+	var fallback string
+	for _, entry := range addresses {
+		item, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		address, _ := item["address"].(string)
+		if address == "" {
+			continue
+		}
+		if item["type"] == "InternalIP" {
+			return address
+		}
+		if fallback == "" {
+			fallback = address
+		}
 	}
-	return nil
-}
-
-func containerName(machine *unstructured.Unstructured) string {
-	if n := machine.GetAnnotations()[containerNameAnnotation]; n != "" {
-		return n
-	}
-	return machine.GetName()
+	return fallback
 }

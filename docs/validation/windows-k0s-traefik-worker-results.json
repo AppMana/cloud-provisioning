@@ -1,0 +1,1221 @@
+{
+  "scope": "Full patched k0s Windows worker build and native existing-worker rollout; fresh machine images remain separate",
+  "observedAt": "2026-09-07T12:35:18.751307+00:00",
+  "build": {
+    "version": "v1.36.2+k0s.0.appmana.1",
+    "sourceCommit": "bdf1c22c23a5af23ec6a1ff764179f6a6cf6f7dc",
+    "sourcePatchSHA256": "9587d15bc387ca5ebed2d45da952bba704c73d05139f54467923673a2c0e52fa",
+    "buildCommand": [
+      "make",
+      "DOCKER=",
+      "GO=go",
+      "GO_ENV_REQUISITES=",
+      "EMBEDDED_BINS_BUILDMODE=none",
+      "VERSION=v1.36.2+k0s.0.appmana.1",
+      "k0s.exe"
+    ],
+    "package": {
+      "bareSHA256": "b4a460eaa13b9c20fe6ae9c5265cf5df8956c9df6920f8ae587ceef6b7a591c7",
+      "upstreamSHA256": "81d05aec71b1d34a8d8ae73641293c8b2f45abf9aaa2d55e332ed41103654c65",
+      "payloadSHA256": "f6e1c0b14058deafb380b45a7063564e18412a430e28ab8c14daa89db61ba222",
+      "binarySHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "embeddedSHA256": {
+        "containerd-shim-runhcs-v1.exe": "adb8e4d990da4bde04956441fcd569a2b13a298d89758ace0896b1bc3389c1ae",
+        "containerd.exe": "92fe1b334ef6ee9477fd22c88012bda605b52952fe4964705ada1a49ae0f2030",
+        "kubelet.exe": "d6cfd3add5bf79d019bd4ef27b7c9b31ab7a9b52f7b372b272a708eeab707805"
+      }
+    }
+  },
+  "before": [
+    {
+      "executablePath": "C:\\ProgramData\\CloudProvisioning\\k0s.exe",
+      "currentSHA256": "81d05aec71b1d34a8d8ae73641293c8b2f45abf9aaa2d55e332ed41103654c65",
+      "newSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "routingFiles": [
+        {
+          "FullName": "C:\\var\\lib\\k0s\\nllb\\traefik\\routing.yaml",
+          "Attributes": 33
+        }
+      ],
+      "serviceState": "Running",
+      "newVersion": "v1.36.2+k0s.0.appmana.1",
+      "servicePID": 648,
+      "node": "aws-win2022"
+    },
+    {
+      "executablePath": "C:\\ProgramData\\CloudProvisioning\\k0s.exe",
+      "currentSHA256": "81d05aec71b1d34a8d8ae73641293c8b2f45abf9aaa2d55e332ed41103654c65",
+      "newSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "routingFiles": [
+        {
+          "FullName": "C:\\var\\lib\\k0s\\nllb\\traefik\\routing.yaml",
+          "Attributes": 33
+        }
+      ],
+      "serviceState": "Running",
+      "newVersion": "v1.36.2+k0s.0.appmana.1",
+      "servicePID": 1968,
+      "node": "aws-win2025"
+    }
+  ],
+  "running": [
+    {
+      "currentSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "installConfig": "entryPoints:\n  apiserver:\n    address: '[::1]:7443'\n  konnectivity:\n    address: '[::1]:7132'\nglobal:\n  checkNewVersion: false\n  sendAnonymousUsage: false\nlog:\n  level: INFO\n  noColor: true\nproviders:\n  file:\n    filename: \\etc\\traefik\\routing.yaml\n    watch: true\n",
+      "executablePath": "C:\\ProgramData\\CloudProvisioning\\k0s.exe",
+      "routingConfig": "tcp:\n  routers:\n    apiserver:\n      entryPoints:\n      - apiserver\n      rule: HostSNI(`*`)\n      service: apiserver\n    konnectivity:\n      entryPoints:\n      - konnectivity\n      rule: HostSNI(`*`)\n      service: konnectivity\n  services:\n    apiserver:\n      loadBalancer:\n        servers:\n        - address: 10.10.0.10:6443\n        - address: 10.10.0.13:6443\n        - address: 10.10.0.14:6443\n    konnectivity:\n      loadBalancer:\n        servers:\n        - address: 10.10.0.10:8132\n        - address: 10.10.0.13:8132\n        - address: 10.10.0.14:8132\n",
+      "servicePID": 7440,
+      "routingFiles": [
+        {
+          "FullName": "C:\\var\\lib\\k0s\\nllb\\traefik\\routing.yaml",
+          "Attributes": 32
+        }
+      ],
+      "serviceState": "Running",
+      "newVersion": "v1.36.2+k0s.0.appmana.1",
+      "newSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "node": "aws-win2022"
+    },
+    {
+      "currentSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "installConfig": "entryPoints:\n  apiserver:\n    address: '[::1]:7443'\n  konnectivity:\n    address: '[::1]:7132'\nglobal:\n  checkNewVersion: false\n  sendAnonymousUsage: false\nlog:\n  level: INFO\n  noColor: true\nproviders:\n  file:\n    filename: \\etc\\traefik\\routing.yaml\n    watch: true\n",
+      "executablePath": "C:\\ProgramData\\CloudProvisioning\\k0s.exe",
+      "routingConfig": "tcp:\n  routers:\n    apiserver:\n      entryPoints:\n      - apiserver\n      rule: HostSNI(`*`)\n      service: apiserver\n    konnectivity:\n      entryPoints:\n      - konnectivity\n      rule: HostSNI(`*`)\n      service: konnectivity\n  services:\n    apiserver:\n      loadBalancer:\n        servers:\n        - address: 10.10.0.10:6443\n        - address: 10.10.0.13:6443\n        - address: 10.10.0.14:6443\n    konnectivity:\n      loadBalancer:\n        servers:\n        - address: 10.10.0.10:8132\n        - address: 10.10.0.13:8132\n        - address: 10.10.0.14:8132\n",
+      "servicePID": 4580,
+      "routingFiles": [
+        {
+          "FullName": "C:\\var\\lib\\k0s\\nllb\\traefik\\routing.yaml",
+          "Attributes": 32
+        }
+      ],
+      "serviceState": "Running",
+      "newVersion": "v1.36.2+k0s.0.appmana.1",
+      "newSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "node": "aws-win2025"
+    }
+  ],
+  "windows2022RolloutReadback": {
+    "before": {
+      "executablePath": "C:\\ProgramData\\CloudProvisioning\\k0s.exe",
+      "currentSHA256": "81d05aec71b1d34a8d8ae73641293c8b2f45abf9aaa2d55e332ed41103654c65",
+      "newSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "routingFiles": [
+        {
+          "FullName": "C:\\var\\lib\\k0s\\nllb\\traefik\\routing.yaml",
+          "Attributes": 33
+        }
+      ],
+      "serviceState": "Running",
+      "newVersion": "v1.36.2+k0s.0.appmana.1",
+      "servicePID": 648,
+      "node": "aws-win2022"
+    },
+    "after": {
+      "executablePath": "C:\\ProgramData\\CloudProvisioning\\k0s.exe",
+      "currentSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "newSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+      "routingFiles": [
+        {
+          "FullName": "C:\\var\\lib\\k0s\\nllb\\traefik\\routing.yaml",
+          "Attributes": 32
+        }
+      ],
+      "serviceState": "Running",
+      "newVersion": "v1.36.2+k0s.0.appmana.1",
+      "servicePID": 7440,
+      "node": "aws-win2022"
+    },
+    "nodeReady": true,
+    "recorderIssue": "First rollout stdout JSON parsing failed; read-only service/hash inspection established success. Update was not repeated.",
+    "observedAt": "2026-09-07T12:28:37.796983+00:00"
+  },
+  "windows2025Rollout": [
+    {
+      "node": "aws-win2025",
+      "nodeUID": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+      "nodeReady": true,
+      "worker": {
+        "version": "v1.36.2+k0s.0.appmana.1",
+        "seconds": 10.1948593,
+        "state": "Running",
+        "backupSHA256": "81d05aec71b1d34a8d8ae73641293c8b2f45abf9aaa2d55e332ed41103654c65",
+        "executablePath": "C:\\ProgramData\\CloudProvisioning\\k0s.exe",
+        "currentPID": 4580,
+        "beforePID": 1968,
+        "sha256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e"
+      },
+      "observedAt": "2026-09-07T12:28:53.244995+00:00"
+    }
+  ],
+  "validation": {
+    "packageUnitTests": 2,
+    "packagePythonStatementCoverage": 84,
+    "linuxFocusedNLLBPackageCoverage": 7.6,
+    "linuxWriteConfigFileCoverage": 57.1,
+    "windowsNativeInstrumented": false
+  },
+  "limitations": [
+    "No fresh CAPI worker boot or VM image rebake is qualified by this rollout.",
+    "Rebuilt binary is a private test artifact, not an upstream signed release.",
+    "Kubelet NodeInfo version still reflects the unchanged official embedded kubelet; worker executable hash/version identify the patch.",
+    "One transition readiness request failed on Server2025. Error details were not retained, so this evidence does not identify whether the failure was proxy transport or API readiness.",
+    "Post-rollout UDP smoke passed30/30 but does not supersede the failed300-echo fragmentation matrix on the same cluster."
+  ],
+  "failover": {
+    "startedAt": "2026-09-07T12:33:58.997252+00:00",
+    "baseline": [
+      {
+        "readOnly": false,
+        "workerState": "Running",
+        "workerPID": 7440,
+        "probes": [
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.5517755999999999,
+            "at": "2026-09-07T12:34:02.3616963Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.4066546,
+            "at": "2026-09-07T12:34:03.4431232Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2839717,
+            "at": "2026-09-07T12:34:04.2451134Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.21206239999999998,
+            "at": "2026-09-07T12:34:04.9623395Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2226485,
+            "at": "2026-09-07T12:34:05.6862081Z"
+          }
+        ],
+        "apiBackends": [
+          "10.10.0.10:6443",
+          "10.10.0.13:6443",
+          "10.10.0.14:6443"
+        ],
+        "node": "aws-win2022"
+      },
+      {
+        "readOnly": false,
+        "workerState": "Running",
+        "workerPID": 4580,
+        "probes": [
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2885424,
+            "at": "2026-09-07T12:34:01.9649049Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2962585,
+            "at": "2026-09-07T12:34:02.8414420Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2344672,
+            "at": "2026-09-07T12:34:03.5829569Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.19108719999999998,
+            "at": "2026-09-07T12:34:04.2762398Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.19804549999999999,
+            "at": "2026-09-07T12:34:04.9874506Z"
+          }
+        ],
+        "apiBackends": [
+          "10.10.0.10:6443",
+          "10.10.0.13:6443",
+          "10.10.0.14:6443"
+        ],
+        "node": "aws-win2025"
+      }
+    ],
+    "stopRequestedAt": "2026-09-07T12:34:07.835404+00:00",
+    "reducedProfile": [
+      "10.10.0.10:6443",
+      "10.10.0.13:6443"
+    ],
+    "transition": [
+      {
+        "readOnly": false,
+        "workerState": "Running",
+        "workerPID": 7440,
+        "probes": [
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.3356634,
+            "at": "2026-09-07T12:34:10.6922765Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2435955,
+            "at": "2026-09-07T12:34:11.5329987Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2224112,
+            "at": "2026-09-07T12:34:12.2554720Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.49768029999999996,
+            "at": "2026-09-07T12:34:13.2549472Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.230291,
+            "at": "2026-09-07T12:34:13.9834583Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2205597,
+            "at": "2026-09-07T12:34:14.7185940Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2184141,
+            "at": "2026-09-07T12:34:15.4398686Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2095666,
+            "at": "2026-09-07T12:34:16.1600418Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.21731119999999998,
+            "at": "2026-09-07T12:34:16.8934666Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.4050992,
+            "at": "2026-09-07T12:34:17.7630511Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.5419317,
+            "at": "2026-09-07T12:34:18.8434936Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.21378899999999998,
+            "at": "2026-09-07T12:34:19.5530654Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2142352,
+            "at": "2026-09-07T12:34:20.2652305Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2247913,
+            "at": "2026-09-07T12:34:20.9966705Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2181294,
+            "at": "2026-09-07T12:34:21.7231121Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.214601,
+            "at": "2026-09-07T12:34:22.4431993Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.6033425,
+            "at": "2026-09-07T12:34:23.5681824Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2146976,
+            "at": "2026-09-07T12:34:24.2935068Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.21319919999999998,
+            "at": "2026-09-07T12:34:25.0217328Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.3652028,
+            "at": "2026-09-07T12:34:25.8970981Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2112691,
+            "at": "2026-09-07T12:34:26.6139198Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2492865,
+            "at": "2026-09-07T12:34:27.3755914Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.8580135,
+            "at": "2026-09-07T12:34:28.7730857Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.6008704,
+            "at": "2026-09-07T12:34:30.0130403Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.9719342,
+            "at": "2026-09-07T12:34:31.4946438Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 3.7133455,
+            "at": "2026-09-07T12:34:35.7326618Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2819879,
+            "at": "2026-09-07T12:34:36.5077454Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.6681559,
+            "at": "2026-09-07T12:34:37.6830571Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 2.7681278,
+            "at": "2026-09-07T12:34:40.9798297Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2630811,
+            "at": "2026-09-07T12:34:41.7383879Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.277343,
+            "at": "2026-09-07T12:34:42.5131891Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.29733339999999997,
+            "at": "2026-09-07T12:34:43.3145721Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.3173126,
+            "at": "2026-09-07T12:34:44.1134136Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.5559685999999999,
+            "at": "2026-09-07T12:34:45.1981738Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.9333697,
+            "at": "2026-09-07T12:34:46.6336456Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.5299425,
+            "at": "2026-09-07T12:34:47.6666717Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 2.1972082,
+            "at": "2026-09-07T12:34:50.4240347Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2807428,
+            "at": "2026-09-07T12:34:51.2072256Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.21895699999999998,
+            "at": "2026-09-07T12:34:51.9284287Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.21408739999999998,
+            "at": "2026-09-07T12:34:52.6471972Z"
+          }
+        ],
+        "apiBackends": [
+          "10.10.0.10:6443",
+          "10.10.0.13:6443"
+        ],
+        "node": "aws-win2022"
+      },
+      {
+        "readOnly": false,
+        "workerState": "Running",
+        "workerPID": 4580,
+        "probes": [
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.33867159999999996,
+            "at": "2026-09-07T12:34:10.4618624Z"
+          },
+          {
+            "ok": false,
+            "exitCode": 1,
+            "seconds": 2.2728507,
+            "at": "2026-09-07T12:34:13.3223026Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2400462,
+            "at": "2026-09-07T12:34:14.0645624Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.21081319999999998,
+            "at": "2026-09-07T12:34:14.7832604Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2328747,
+            "at": "2026-09-07T12:34:15.5260849Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2062495,
+            "at": "2026-09-07T12:34:16.2409486Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.23255869999999998,
+            "at": "2026-09-07T12:34:16.9898022Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.9800749999999999,
+            "at": "2026-09-07T12:34:18.4745606Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.7616058,
+            "at": "2026-09-07T12:34:19.7698171Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2004732,
+            "at": "2026-09-07T12:34:20.4802611Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.415726,
+            "at": "2026-09-07T12:34:21.4048737Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.21327739999999998,
+            "at": "2026-09-07T12:34:22.1286315Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2580813,
+            "at": "2026-09-07T12:34:22.8887442Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2084421,
+            "at": "2026-09-07T12:34:23.6126826Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.22519,
+            "at": "2026-09-07T12:34:24.3506470Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.19548359999999998,
+            "at": "2026-09-07T12:34:25.0570025Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.22890329999999998,
+            "at": "2026-09-07T12:34:25.7977999Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.1958453,
+            "at": "2026-09-07T12:34:26.5026508Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.1966702,
+            "at": "2026-09-07T12:34:27.1984187Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 1.2716714,
+            "at": "2026-09-07T12:34:28.9962946Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.4252392,
+            "at": "2026-09-07T12:34:29.9299711Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 1.8402216999999998,
+            "at": "2026-09-07T12:34:32.2848707Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 1.3684053999999999,
+            "at": "2026-09-07T12:34:34.1650709Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.3269555,
+            "at": "2026-09-07T12:34:35.0048687Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2672387,
+            "at": "2026-09-07T12:34:35.7772184Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2756751,
+            "at": "2026-09-07T12:34:36.5603159Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2012184,
+            "at": "2026-09-07T12:34:37.2692734Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2886512,
+            "at": "2026-09-07T12:34:38.0581681Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.19704829999999998,
+            "at": "2026-09-07T12:34:38.7575982Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2022211,
+            "at": "2026-09-07T12:34:39.4606640Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2044241,
+            "at": "2026-09-07T12:34:40.1663753Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.3439719,
+            "at": "2026-09-07T12:34:41.0138921Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.20395069999999998,
+            "at": "2026-09-07T12:34:41.7175645Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.20642529999999998,
+            "at": "2026-09-07T12:34:42.4321892Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.28093029999999997,
+            "at": "2026-09-07T12:34:43.2146287Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.1983237,
+            "at": "2026-09-07T12:34:43.9212224Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2872433,
+            "at": "2026-09-07T12:34:44.7156608Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.1988013,
+            "at": "2026-09-07T12:34:45.4247648Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.1998627,
+            "at": "2026-09-07T12:34:46.1374837Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.19210729999999998,
+            "at": "2026-09-07T12:34:46.8325420Z"
+          }
+        ],
+        "apiBackends": [
+          "10.10.0.10:6443",
+          "10.10.0.13:6443"
+        ],
+        "node": "aws-win2025"
+      }
+    ],
+    "withoutCP3": [
+      {
+        "readOnly": false,
+        "workerState": "Running",
+        "workerPID": 7440,
+        "probes": [
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.6115469,
+            "at": "2026-09-07T12:34:59.0162672Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2984542,
+            "at": "2026-09-07T12:34:59.9612393Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.3650601,
+            "at": "2026-09-07T12:35:00.8328168Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.4150106,
+            "at": "2026-09-07T12:35:01.7459126Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2710317,
+            "at": "2026-09-07T12:35:02.5184873Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.3250973,
+            "at": "2026-09-07T12:35:03.3422093Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2412107,
+            "at": "2026-09-07T12:35:04.0880394Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.21176599999999998,
+            "at": "2026-09-07T12:35:04.8023700Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2013964,
+            "at": "2026-09-07T12:35:05.5073011Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2451478,
+            "at": "2026-09-07T12:35:06.2320866Z"
+          }
+        ],
+        "apiBackends": [
+          "10.10.0.10:6443",
+          "10.10.0.13:6443"
+        ],
+        "node": "aws-win2022"
+      },
+      {
+        "readOnly": false,
+        "workerState": "Running",
+        "workerPID": 4580,
+        "probes": [
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.43703169999999997,
+            "at": "2026-09-07T12:34:58.5050370Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2041733,
+            "at": "2026-09-07T12:34:59.3252880Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.21984769999999998,
+            "at": "2026-09-07T12:35:00.0485642Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2001007,
+            "at": "2026-09-07T12:35:00.7495518Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2083362,
+            "at": "2026-09-07T12:35:01.4662173Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2057524,
+            "at": "2026-09-07T12:35:02.1718802Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2813535,
+            "at": "2026-09-07T12:35:02.9545731Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2005479,
+            "at": "2026-09-07T12:35:03.6590003Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.20825459999999998,
+            "at": "2026-09-07T12:35:04.3728241Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2005899,
+            "at": "2026-09-07T12:35:05.0902030Z"
+          }
+        ],
+        "apiBackends": [
+          "10.10.0.10:6443",
+          "10.10.0.13:6443"
+        ],
+        "node": "aws-win2025"
+      }
+    ],
+    "restoredProfile": [
+      "10.10.0.10:6443",
+      "10.10.0.13:6443",
+      "10.10.0.14:6443"
+    ],
+    "restored": [
+      {
+        "readOnly": false,
+        "workerState": "Running",
+        "workerPID": 7440,
+        "probes": [
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.33705579999999996,
+            "at": "2026-09-07T12:35:19.2649470Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.22205149999999999,
+            "at": "2026-09-07T12:35:20.1010084Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2063291,
+            "at": "2026-09-07T12:35:20.8124292Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.3648201,
+            "at": "2026-09-07T12:35:21.6771903Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2985545,
+            "at": "2026-09-07T12:35:22.4741059Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.6328384,
+            "at": "2026-09-07T12:35:23.6176332Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2889503,
+            "at": "2026-09-07T12:35:24.4219221Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.3180423,
+            "at": "2026-09-07T12:35:25.2486229Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2843444,
+            "at": "2026-09-07T12:35:26.0343065Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.34912289999999996,
+            "at": "2026-09-07T12:35:26.8875677Z"
+          }
+        ],
+        "apiBackends": [
+          "10.10.0.10:6443",
+          "10.10.0.13:6443",
+          "10.10.0.14:6443"
+        ],
+        "node": "aws-win2022"
+      },
+      {
+        "readOnly": false,
+        "workerState": "Running",
+        "workerPID": 4580,
+        "probes": [
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.6591653,
+            "at": "2026-09-07T12:35:19.8040114Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.2292913,
+            "at": "2026-09-07T12:35:20.6850683Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.24597709999999998,
+            "at": "2026-09-07T12:35:21.4320144Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.30489079999999996,
+            "at": "2026-09-07T12:35:22.2383173Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.5265582,
+            "at": "2026-09-07T12:35:23.2760790Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.36315519999999996,
+            "at": "2026-09-07T12:35:24.1435420Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.367272,
+            "at": "2026-09-07T12:35:25.0251417Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.27523749999999997,
+            "at": "2026-09-07T12:35:25.8155462Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.1995767,
+            "at": "2026-09-07T12:35:26.5314638Z"
+          },
+          {
+            "ok": true,
+            "exitCode": 0,
+            "seconds": 0.34319269999999996,
+            "at": "2026-09-07T12:35:27.3794642Z"
+          }
+        ],
+        "apiBackends": [
+          "10.10.0.10:6443",
+          "10.10.0.13:6443",
+          "10.10.0.14:6443"
+        ],
+        "node": "aws-win2025"
+      }
+    ],
+    "finishedAt": "2026-09-07T12:35:30.223119+00:00"
+  },
+  "failoverProbe": "k0s kubectl with existing node kubeconfig, --server=https://[::1]:7443 --tls-server-name=kubernetes --request-timeout=4s get --raw=/readyz",
+  "abortedUnauthenticatedBaseline": {
+    "startedAt": "2026-09-07T12:32:25.372866+00:00",
+    "baseline": [
+      {
+        "readOnly": false,
+        "workerState": "Running",
+        "workerPID": 7440,
+        "probes": [
+          {
+            "ok": false,
+            "exitCode": 0,
+            "seconds": 0.2076428,
+            "at": "2026-09-07T12:32:30.1774481Z"
+          },
+          {
+            "ok": false,
+            "exitCode": 0,
+            "seconds": 0.0949223,
+            "at": "2026-09-07T12:32:30.8667695Z"
+          },
+          {
+            "ok": false,
+            "exitCode": 0,
+            "seconds": 0.09504839999999999,
+            "at": "2026-09-07T12:32:31.4730643Z"
+          },
+          {
+            "ok": false,
+            "exitCode": 0,
+            "seconds": 0.12321069999999999,
+            "at": "2026-09-07T12:32:32.1030939Z"
+          },
+          {
+            "ok": false,
+            "exitCode": 0,
+            "seconds": 0.190298,
+            "at": "2026-09-07T12:32:32.8244778Z"
+          }
+        ],
+        "apiBackends": [
+          "10.10.0.10:6443",
+          "10.10.0.13:6443",
+          "10.10.0.14:6443"
+        ],
+        "node": "aws-win2022"
+      },
+      {
+        "readOnly": false,
+        "workerState": "Running",
+        "workerPID": 4580,
+        "probes": [
+          {
+            "ok": false,
+            "exitCode": 0,
+            "seconds": 0.1871232,
+            "at": "2026-09-07T12:32:30.0184891Z"
+          },
+          {
+            "ok": false,
+            "exitCode": 0,
+            "seconds": 0.0976509,
+            "at": "2026-09-07T12:32:30.6987042Z"
+          },
+          {
+            "ok": false,
+            "exitCode": 0,
+            "seconds": 0.09738619999999999,
+            "at": "2026-09-07T12:32:31.3113354Z"
+          },
+          {
+            "ok": false,
+            "exitCode": 0,
+            "seconds": 0.1034648,
+            "at": "2026-09-07T12:32:31.9172740Z"
+          },
+          {
+            "ok": false,
+            "exitCode": 0,
+            "seconds": 0.1497181,
+            "at": "2026-09-07T12:32:32.5753284Z"
+          }
+        ],
+        "apiBackends": [
+          "10.10.0.10:6443",
+          "10.10.0.13:6443",
+          "10.10.0.14:6443"
+        ],
+        "node": "aws-win2025"
+      }
+    ],
+    "abortedReason": "Unauthenticated readiness requests returned HTTP401; no controller was stopped. Replacement probe uses the node kubeconfig and verifies the TLS server name."
+  },
+  "restoration": {
+    "nodesReady": 10,
+    "totalNodes": 10,
+    "cordonedNodes": [],
+    "activeGatewayAttachmentsReady": 2
+  },
+  "postRestorationTCP": {
+    "checks": 18,
+    "passed": 18,
+    "sizes": [
+      1024,
+      16384,
+      1048576
+    ]
+  },
+  "postRestorationUDPSmoke": [
+    {
+      "source": "aws-win2022",
+      "destination": "aws-win2025",
+      "podUID": "92632e76-ec08-4915-af61-3745937373ec",
+      "result": {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0
+      },
+      "checkerExitCode": 0
+    },
+    {
+      "source": "aws-win2025",
+      "destination": "aws-win2022",
+      "podUID": "608019e0-4a09-4f9e-998d-2cf9a771ad88",
+      "result": {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0
+      },
+      "checkerExitCode": 0
+    },
+    {
+      "source": "w1",
+      "destination": "aws-win2022",
+      "podUID": "2861c032-814f-4924-b1fe-fc4543ab2df6",
+      "result": {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0
+      },
+      "checkerExitCode": 0
+    }
+  ]
+}

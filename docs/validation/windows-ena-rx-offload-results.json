@@ -1,0 +1,450 @@
+{
+  "observedAt": "2026-09-08T17:31:22.860307+00:00",
+  "scope": "Bounded diagnostic A/B/A on retained Windows2025 single-NIC EC2 worker",
+  "instanceID": "i-07c9859f5ce8ed42b",
+  "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+  "phases": {
+    "original": {
+      "startedAt": "2026-09-08T17:23:25.669712+00:00",
+      "finishedAt": "2026-09-08T17:25:32.669497+00:00",
+      "attempts": 6000,
+      "failed": 0,
+      "lanes": [
+        {
+          "source": "net-w1",
+          "target": "net-aws-win2022-v3",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-w1",
+          "target": "net-aws-win2025-v3",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-aws-win2022-v3",
+          "target": "net-w1",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-aws-win2022-v3",
+          "target": "net-aws-win2025-v3",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-aws-win2025-v3",
+          "target": "net-w1",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-aws-win2025-v3",
+          "target": "net-aws-win2022-v3",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        }
+      ]
+    },
+    "rx-disabled": {
+      "startedAt": "2026-09-08T17:26:07.036970+00:00",
+      "finishedAt": "2026-09-08T17:28:13.455332+00:00",
+      "attempts": 6000,
+      "failed": 0,
+      "lanes": [
+        {
+          "source": "net-w1",
+          "target": "net-aws-win2022-v3",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-w1",
+          "target": "net-aws-win2025-v3",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-aws-win2022-v3",
+          "target": "net-w1",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-aws-win2022-v3",
+          "target": "net-aws-win2025-v3",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-aws-win2025-v3",
+          "target": "net-w1",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-aws-win2025-v3",
+          "target": "net-aws-win2022-v3",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        }
+      ]
+    },
+    "restored": {
+      "startedAt": "2026-09-08T17:28:41.185977+00:00",
+      "finishedAt": "2026-09-08T17:30:48.118514+00:00",
+      "attempts": 6000,
+      "failed": 0,
+      "lanes": [
+        {
+          "source": "net-w1",
+          "target": "net-aws-win2022-v3",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-w1",
+          "target": "net-aws-win2025-v3",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-aws-win2022-v3",
+          "target": "net-w1",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-aws-win2022-v3",
+          "target": "net-aws-win2025-v3",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-aws-win2025-v3",
+          "target": "net-w1",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        },
+        {
+          "source": "net-aws-win2025-v3",
+          "target": "net-aws-win2022-v3",
+          "attempts": 1000,
+          "passed": 1000,
+          "failedSamples": []
+        }
+      ]
+    }
+  },
+  "adapter": {
+    "before": {
+      "mtu": [
+        {
+          "InterfaceIndex": 1,
+          "CompartmentId": 1,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 8,
+          "CompartmentId": 1,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 10,
+          "CompartmentId": 1,
+          "NlMtu": 1420
+        },
+        {
+          "InterfaceIndex": 16,
+          "CompartmentId": 2,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 17,
+          "CompartmentId": 2,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 21,
+          "CompartmentId": 3,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 22,
+          "CompartmentId": 3,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 23,
+          "CompartmentId": 4,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 24,
+          "CompartmentId": 4,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 25,
+          "CompartmentId": 5,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 26,
+          "CompartmentId": 5,
+          "NlMtu": 1370
+        }
+      ],
+      "guid": "{D93A70E7-D733-42D6-8411-51C0958D48B1}",
+      "status": "Up",
+      "checksum": {
+        "TcpIPv4Enabled": 3,
+        "TcpIPv6Enabled": 3,
+        "IpIPv4Enabled": 3,
+        "UdpIPv4Enabled": 3,
+        "UdpIPv6Enabled": 3
+      },
+      "at": "2026-09-08T17:25:45.7066485Z"
+    },
+    "changed": {
+      "mtu": [
+        {
+          "InterfaceIndex": 1,
+          "CompartmentId": 1,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 8,
+          "CompartmentId": 1,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 10,
+          "CompartmentId": 1,
+          "NlMtu": 1420
+        },
+        {
+          "InterfaceIndex": 16,
+          "CompartmentId": 2,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 17,
+          "CompartmentId": 2,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 21,
+          "CompartmentId": 3,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 22,
+          "CompartmentId": 3,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 23,
+          "CompartmentId": 4,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 24,
+          "CompartmentId": 4,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 25,
+          "CompartmentId": 5,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 26,
+          "CompartmentId": 5,
+          "NlMtu": 1370
+        }
+      ],
+      "guid": "{D93A70E7-D733-42D6-8411-51C0958D48B1}",
+      "status": "Up",
+      "checksum": {
+        "TcpIPv4Enabled": 3,
+        "TcpIPv6Enabled": 3,
+        "IpIPv4Enabled": 3,
+        "UdpIPv4Enabled": 1,
+        "UdpIPv6Enabled": 3
+      },
+      "at": "2026-09-08T17:26:03.0172732Z"
+    },
+    "restored": {
+      "mtu": [
+        {
+          "InterfaceIndex": 1,
+          "CompartmentId": 1,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 8,
+          "CompartmentId": 1,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 10,
+          "CompartmentId": 1,
+          "NlMtu": 1420
+        },
+        {
+          "InterfaceIndex": 16,
+          "CompartmentId": 2,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 17,
+          "CompartmentId": 2,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 21,
+          "CompartmentId": 3,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 22,
+          "CompartmentId": 3,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 23,
+          "CompartmentId": 4,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 24,
+          "CompartmentId": 4,
+          "NlMtu": 1450
+        },
+        {
+          "InterfaceIndex": 25,
+          "CompartmentId": 5,
+          "NlMtu": 4294967295
+        },
+        {
+          "InterfaceIndex": 26,
+          "CompartmentId": 5,
+          "NlMtu": 1370
+        }
+      ],
+      "guid": "{D93A70E7-D733-42D6-8411-51C0958D48B1}",
+      "status": "Up",
+      "checksum": {
+        "TcpIPv4Enabled": 3,
+        "TcpIPv6Enabled": 3,
+        "IpIPv4Enabled": 3,
+        "UdpIPv4Enabled": 3,
+        "UdpIPv6Enabled": 3
+      },
+      "at": "2026-09-08T17:28:32.1664303Z"
+    },
+    "allRecordedMTUsStable": true
+  },
+  "cleanup": {
+    "podToolsRemoved": true,
+    "guestDirectoryRemoved": true,
+    "originalPodIdentitiesStable": true,
+    "originalNodesReady": 13,
+    "originalNodeIdentities": {
+      "aws-win2022-gpu": "dd54061d-491a-4b12-95a7-27393e847780",
+      "aws-win2022-v3": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "aws-win2025": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+      "aws-win2025-gpu": "258d7b62-e774-48bc-94dc-e31ff042f585",
+      "aws-win2025-v3": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "cp": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+      "cp2": "947de62f-0920-408c-aa31-ac80a2344128",
+      "cp3": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+      "ip-172-29-0-9": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+      "remote1": "8935dd28-de93-44be-a887-73110fe88c51",
+      "remote2": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+      "w1": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "w2": "4bcf04f8-ec26-4db7-bacb-85681c0145da"
+    }
+  },
+  "mitigationQualified": false,
+  "findings": [
+    "All three phases passed 6,000 echoes each. Neither control reproduced the intermittent baseline loss, so the experiment is inconclusive.",
+    "The changed phase had no failed echoes involving the changed worker; finite observations do not establish a mitigation.",
+    "Original settings were restored; no image or startup configuration was changed."
+  ],
+  "limitations": [
+    "Diagnostic only; no claim creation or GPU image modification.",
+    "Finite phases cannot establish reliability or packet-path causality.",
+    "An adapter restart may affect networking; compare recorded MTUs and exact Pod identities.",
+    "Set-NetAdapterChecksumOffload was invoked without NoRestart and the adapter reported Up afterward; packet-level offload metadata was not captured.",
+    "Only one Windows2025 physical adapter was changed; this does not qualify Windows2022 or fragmented UDP.",
+    "No GPU or CAPI lifecycle operation was performed.",
+    "This finite-probe comparison does not exactly replay the failed native streaming workload; reproduce with that original stream before ruling out an intermittent mechanism."
+  ],
+  "evidenceSHA256": {
+    "original/lane-0.json": "18eab19f6d19725cc9f19c75a3332bfa66e568a745d90d841c5f6e80e0b436fa",
+    "original/lane-1.json": "4733affc1be31961b81e3d2e0c33998128aba4e5956dab90167b1559b43e2ce9",
+    "original/lane-2.json": "2ce732b61d31ff00fa225cf241ed81d817dccd2027732730f102d27392651582",
+    "original/lane-3.json": "3fce94646fbc0738685c1cc892ff8254ee65b2f763494bb7ee6c1a589d678703",
+    "original/lane-4.json": "ae00b54f7e79e2828195f546081e5ec81f1a2f6e4e0ffafe7181b0767a50c62f",
+    "original/lane-5.json": "b7483192f1320f7bacb6eba87e22bd47419660d58bcb8f336827ad395c7bab00",
+    "rx-disabled/lane-0.json": "0e3aba89bc7a56581e6769b8f24a774baf06c6a354cfa3a06d609dc1427f77ac",
+    "rx-disabled/lane-1.json": "5faffcacd49fdb49ca0d776962f751031ac7a40cf57e173f31d1b2893c4bccb9",
+    "rx-disabled/lane-2.json": "a462a4c2f5dd5b516a9c7360935d68b470b13360f99aafd3514da48d0b148fbb",
+    "rx-disabled/lane-3.json": "636c3a40c0b5dc53fda3c2760335a83cadd9a5b5111b2125c6c019880d4ad480",
+    "rx-disabled/lane-4.json": "b5a57b3da40bf966317f4a76062c4e4a89d4a96e6ab7ec73c016e5504fd8e571",
+    "rx-disabled/lane-5.json": "c0cab298674d7d80e0abb7fe1e57168c28fc800dc462640ee5ecef0ba3e40ab4",
+    "restored/lane-0.json": "783378183cece2fdc1d585162f93eb16b27ff77cc9b001db08f923b7d22f18a1",
+    "restored/lane-1.json": "266a252e57643231a31123344aaf6fdde841b8f3b31cebc790507e811723a581",
+    "restored/lane-2.json": "612c7574a57cf5164380c343228fbdf64c5bc6ae919eac97e7cef0fb70bc17b0",
+    "restored/lane-3.json": "8f84928566a8050806b7db7a1028acc67692e58150a2b3a47624c4de44a43052",
+    "restored/lane-4.json": "0134b81f9b514c910f1f11fa0e2c932ae60f4ec3849017bdc39208faecebf7a1",
+    "restored/lane-5.json": "21f846c8e14bdc8d4474f2e5f722b8b233d4195f61dc7a5e5e8c318033b58c49",
+    "before-read.stdout": "5325c414679558bff24ebcacf26b51d292abb6052fd7b26e88069f0ce6cdb968",
+    "changed.json": "894586f87cdc219bc9dfe7aa641e39770b7ef49438cec1fee6c49eeaeef99efe",
+    "restored.json": "0fd90e65f2a2c007f8ab3a68bb55ae0edc89b19028c43ddb08b764f78e1ef7f3",
+    "cleanup.json": "8f7c034b997a944220ec3f177670ba4b8197d50cfdd3dce69f2f56b3aad35dd5",
+    "experiment.ps1": "d1a466cb15051520af98458eb6c084b6bdcb46e5b2a79f2f597fae793c8a27fc",
+    "run.py": "beda9a5c751b6f7632a5a83b8e35d1284c20fb8774e5b04eee06adc7edb0b803",
+    "intent.json": "f5a8f6292631fdb879eb8f97034718f78d01b26c920aa551a0039222de1cd43a"
+  },
+  "sources": [
+    "https://learn.microsoft.com/en-us/powershell/module/netadapter/set-netadapterchecksumoffload?view=windowsserver2025-ps",
+    "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ena-driver-releases-windows.html"
+  ],
+  "initialReadOnlyPreflight": {
+    "hyperVManagementCmdletAvailable": false,
+    "initialInspectionExitCode": 1,
+    "correctedInspectionExitCode": 0,
+    "meaning": "Get-VMSwitch is absent on the worker. The corrected read-only inspection omitted that optional command; no management tools were installed."
+  },
+  "probeImplementation": {
+    "entrypoint": "cmd/udpprobe/main.go:probe",
+    "phaseInvocation": "1000 finite attempts per lane with fresh sockets and 100ms delay",
+    "differenceFromFailedStream": "stream.go calls probe with one attempt repeatedly, generating a fresh payload nonce each time. Finite probes retain one nonce for the batch. Both use the same UDP socket/send/read implementation.",
+    "sourceSHA256": {
+      "cmd/udpprobe/main.go": "486e8ad54035cbdc8d92aba54c3758e7d210c83c5891953d745e5bd6e776d637",
+      "cmd/udpprobe/stream.go": "e737421b22c1c5f94e88a2f922b3e08754eb9cb692c66f9e07bfe26371ed9857"
+    }
+  }
+}

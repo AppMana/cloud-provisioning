@@ -1,0 +1,65 @@
+{
+  "result": "native-prerequisites-passed-private-ami-available-authorized-for-test",
+  "observedAt": "2026-09-09T07:42:34.666128+00:00",
+  "runID": "cldt-microk8s-capa-v1",
+  "region": "us-west-2",
+  "baseAMIID": "ami-04678417fc39d7171",
+  "builder": {
+    "instanceID": "i-0c8634a0dcd78c42c",
+    "instanceType": "t3.small",
+    "physicalNICs": 1
+  },
+  "recipeSHA256": {
+    "prepareSHA256": "274c2e71d1e5cf961bf0892e5b049fb8042d9c0c2e5c426bced21b2c548aeb78",
+    "verifySHA256": "811d21ec13561a751cabce0a2c9f1dad60a37d4fc46c27dbecadfa0148c3ff2d"
+  },
+  "nativeVerification": {
+    "status": "Success",
+    "responseCode": 0,
+    "commandID": "51180b4b-d328-4550-9b28-588c960430d8",
+    "evidenceSHA256": "ac4b926d7a9d926a79958e9a4c1ecb750f7ab69d8a69055bddf4009a9e75c455",
+    "checks": [
+      "AWS CLI available before secure CAPA bootstrap",
+      "cloud-init include handling compatible with CAPA",
+      "snapd package installed",
+      "Python 3 available",
+      "no MicroK8s snap state",
+      "no MicroK8s join configuration",
+      "no kubelet kubeconfig",
+      "cloud-init identity cleaned before capture"
+    ],
+    "captureReceiptMatchesImage": true
+  },
+  "pricing": {
+    "instanceType": "t3.small",
+    "region": "us-west-2",
+    "computeUSDPerHour": "0.0208000000",
+    "observedAt": "2026-09-09T07:28:33.066565+00:00",
+    "excludes": [
+      "EBS",
+      "public IPv4",
+      "data transfer"
+    ]
+  },
+  "limits": [
+    "No CAPA worker has been launched in this run.",
+    "Image preparation does not qualify worker joining, networking or lifecycle.",
+    "MicroK8s snap/runtime downloads still occur during first boot."
+  ],
+  "candidateAMIID": "ami-095b7537ef1237e91",
+  "software": {
+    "cloudInit": "26.1-0ubuntu1~24.04.1",
+    "awsCLI": "2.36.33",
+    "python": "3.12.3",
+    "builderKernel": "7.0.0-1012-aws"
+  },
+  "capture": {
+    "builderStoppedBeforeSnapshot": true,
+    "verificationCommandID": "51180b4b-d328-4550-9b28-588c960430d8",
+    "helperExitCode": 0
+  },
+  "imageState": "available",
+  "public": false,
+  "testPolicyDefaultAMIID": "ami-095b7537ef1237e91",
+  "imageObservationSHA256": "7141b02c25e492a36aad8ef22b0b22d41cb1d888fc8ffbee10009fcbdf5961f2"
+}

@@ -1,0 +1,36 @@
+# Build render.exe from render.cpp and provide it with run.ps1 in the
+# windows-gpu-probe ConfigMap. Choose the exact test node when applying.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: windows-render-nvenc
+  namespace: cldt-windows-gpu
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/os: windows
+        cloud-provisioning.appmana.com/gpu-test: 'true'
+      tolerations:
+        - key: cloud-provisioning.appmana.com/internet-facing
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: render-nvenc
+          image: index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe
+          command: [powershell.exe, -NoProfile, -NonInteractive, -ExecutionPolicy, Bypass, -File, 'C:\gpu-probe\run.ps1']
+          resources:
+            limits:
+              directx.microsoft.com/display: 1
+          volumeMounts:
+            - name: probe
+              mountPath: 'C:\gpu-probe'
+              readOnly: true
+      volumes:
+        - name: probe
+          configMap:
+            name: windows-gpu-probe

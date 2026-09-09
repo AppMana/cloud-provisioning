@@ -1,0 +1,28 @@
+{
+  "startedAt": "2026-09-09T14:27:46.661876+00:00",
+  "finishedAt": "2026-09-09T14:27:47.059384+00:00",
+  "binarySHA256": "2429bce0264d5664e83cc6f1fbaa750e10f7cfd0a093a7dd3d3cb0a7d5dfe318",
+  "exitCode": 0,
+  "vm": "KubeRouter cp2",
+  "execution": "QEMU guest serial QGA; unshare -n",
+  "state": "kernel ownership constraint verified; continuity protocol not implemented",
+  "source": "controller/pkg/tunneldevice/ownership_linux_test.go",
+  "sourceSHA256": "ec6cb29115d0d4a01e4e1ebb97cb07f892cca63be8c73a189902edcdd43bf35e",
+  "logSHA256": "6c2fd914c38769f2c8bce90ef75e2fbec1c1cb6806285522c41e4640cf7ba9d8",
+  "prefixes": [
+    "10.10.0.11/32",
+    "10.1.190.64/26",
+    "fd10::11/128",
+    "fd20:1::/64"
+  ],
+  "observations": [
+    "Assigning equal prefixes to a second peer transfers ownership, including repeated application and reversal.",
+    "Separate devices retain independent owners for equal prefixes."
+  ],
+  "limits": [
+    "No packet delivery measurement.",
+    "No Windows kernel observation.",
+    "Does not qualify dual-generation address assignment, routing, security, or lifecycle."
+  ],
+  "raceTests": "go test -race ./pkg/tunneldevice passed; native test separately executed in VM"
+}

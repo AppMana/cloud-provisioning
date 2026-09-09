@@ -1,0 +1,116 @@
+{
+  "startedAt": "2026-09-07T12:08:52.883442+00:00",
+  "settingsIntent": "Test exact compartment/interface ByName MTU application followed by disposable vNIC restart with original offloads preserved",
+  "phases": {},
+  "controlledMTU": 1370,
+  "method": "Exact isolated pod interface: Set-NetIPInterface by InterfaceIndex, AddressFamily, CompartmentId and IncludeAllCompartments; then explicit Restart-NetAdapter; read MTU before manual restoration.",
+  "before": [
+    {
+      "guid": "{3B5B6B53-5272-4DBF-80C9-62A1AEEBDFCC}",
+      "adapterStatus": "Up",
+      "after": 3,
+      "before": 3,
+      "mtu": 1370,
+      "otherOffloads": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "compartment": 12,
+      "mtuAfterAdapterRestart": 1370,
+      "node": "aws-win2022"
+    },
+    {
+      "guid": "{AB1BDF9D-556E-4C93-B402-CB4809765DE5}",
+      "adapterStatus": "Up",
+      "after": 3,
+      "before": 3,
+      "mtu": 1370,
+      "otherOffloads": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "compartment": 8,
+      "mtuAfterAdapterRestart": 1370,
+      "node": "aws-win2025"
+    }
+  ],
+  "byNameThenRestart": [
+    {
+      "guid": "{3B5B6B53-5272-4DBF-80C9-62A1AEEBDFCC}",
+      "adapterStatus": "Up",
+      "after": 3,
+      "before": 3,
+      "mtu": 1370,
+      "otherOffloads": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "compartment": 12,
+      "mtuAfterAdapterRestart": 1500,
+      "node": "aws-win2022"
+    },
+    {
+      "guid": "{AB1BDF9D-556E-4C93-B402-CB4809765DE5}",
+      "adapterStatus": "Up",
+      "after": 3,
+      "before": 3,
+      "mtu": 1370,
+      "otherOffloads": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "compartment": 8,
+      "mtuAfterAdapterRestart": 1500,
+      "node": "aws-win2025"
+    }
+  ],
+  "afterRestoration": [
+    {
+      "guid": "{3B5B6B53-5272-4DBF-80C9-62A1AEEBDFCC}",
+      "adapterStatus": "Up",
+      "after": 3,
+      "before": 3,
+      "mtu": 1370,
+      "otherOffloads": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "compartment": 12,
+      "mtuAfterAdapterRestart": 1370,
+      "node": "aws-win2022"
+    },
+    {
+      "guid": "{AB1BDF9D-556E-4C93-B402-CB4809765DE5}",
+      "adapterStatus": "Up",
+      "after": 3,
+      "before": 3,
+      "mtu": 1370,
+      "otherOffloads": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "compartment": 8,
+      "mtuAfterAdapterRestart": 1370,
+      "node": "aws-win2025"
+    }
+  ],
+  "finishedAt": "2026-09-07T12:09:08.524099+00:00",
+  "conclusion": "ByName application also resets to MTU1500 after an explicit adapter restart on both Windows versions; a different PowerShell parameter set does not solve persistence.",
+  "limitations": [
+    "Initial same-value checksum-offload command did not establish that a restart occurred and cannot prove persistence.",
+    "Only the two disposable IPv4 probe vNICs were restarted; no physical interface was changed.",
+    "Both probe MTUs were manually restored to1370; periodic repair is not yet deployed."
+  ]
+}

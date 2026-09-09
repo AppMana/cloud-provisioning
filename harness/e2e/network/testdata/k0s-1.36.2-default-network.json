@@ -1,0 +1,9 @@
+{
+  "version": "v1.36.2+k0s.0",
+  "source": "native k0s config create through retained VM serial transport",
+  "sourceSHA256": "173756529c3a03f851f0e2c27af0d70d38bb8d61fb2427d4e395b2b63d3a6c30",
+  "provider": "kuberouter",
+  "dualStack": {
+    "enabled": false
+  }
+}

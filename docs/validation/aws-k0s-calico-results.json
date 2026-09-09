@@ -1,0 +1,356 @@
+{
+  "runID": "cldt-k0s-20260906-v1",
+  "region": "us-west-2",
+  "versions": {
+    "k0s": "v1.34.1+k0s.0",
+    "calico": "v3.29.6-0",
+    "capa": "v2.12.1",
+    "capi": "v1.11.1"
+  },
+  "network": "bundled Calico, default VXLAN",
+  "observedImages": {
+    "calico-node": "quay.io/k0sproject/calico-node:v3.29.6-0",
+    "capa-controller-manager": "registry.k8s.io/cluster-api-aws/cluster-api-aws-controller:v2.12.1",
+    "capi-controller-manager": "registry.k8s.io/cluster-api/cluster-api-controller:v1.11.1"
+  },
+  "topology": {
+    "siteVMs": 5,
+    "awsWorkers": 2,
+    "physicalNICsPerMachine": 1
+  },
+  "baseAMIID": "ami-07b3d2f97d89e29a4",
+  "preparedAMIID": "ami-03f16bd623af9ca4f",
+  "gates": 9,
+  "checksPassed": 1184,
+  "rows": [
+    {
+      "row": "20260906T081713Z",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "matrixSHA256": "ced46dc438e9e877c8ffc120723d71f257e10b62fa88a72774c26f4828d9990d",
+      "bindings": [
+        {
+          "eniCount": 1,
+          "instanceID": "i-0a74543a3eb1dae40",
+          "machine": "aws-k0s-1",
+          "node": "ip-172-29-0-71",
+          "nodeUID": "e8f894e2-2096-46a3-88ee-cb2e798cd497",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-0a74543a3eb1dae40"
+        },
+        {
+          "eniCount": 1,
+          "instanceID": "i-035c493d9939663cb",
+          "machine": "aws-k0s-2",
+          "node": "ip-172-29-0-105",
+          "nodeUID": "bd36dcd0-8d27-44f9-a330-ae7a70b8ff41",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-035c493d9939663cb"
+        }
+      ]
+    },
+    {
+      "row": "survivor-1",
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "matrixSHA256": "b7c79debc64beb186e343eb3b5cdbda00244fbd87e29fa146523d4eb5384bd77",
+      "bindings": [
+        {
+          "eniCount": 1,
+          "instanceID": "i-035c493d9939663cb",
+          "machine": "aws-k0s-2",
+          "node": "ip-172-29-0-105",
+          "nodeUID": "bd36dcd0-8d27-44f9-a330-ae7a70b8ff41",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-035c493d9939663cb"
+        }
+      ]
+    },
+    {
+      "row": "readded-1",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "matrixSHA256": "55d8383b315b6a11d2a1fd35f02585818fb8dfc1bac61d8c4044c5f2f43c3b46",
+      "bindings": [
+        {
+          "eniCount": 1,
+          "instanceID": "i-04bcace9b94fcd697",
+          "machine": "aws-k0s-1",
+          "node": "ip-172-29-0-68",
+          "nodeUID": "b963ff1f-379e-464d-b245-1e68018bb91c",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-04bcace9b94fcd697"
+        },
+        {
+          "eniCount": 1,
+          "instanceID": "i-035c493d9939663cb",
+          "machine": "aws-k0s-2",
+          "node": "ip-172-29-0-105",
+          "nodeUID": "bd36dcd0-8d27-44f9-a330-ae7a70b8ff41",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-035c493d9939663cb"
+        }
+      ]
+    },
+    {
+      "row": "survivor-2",
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "matrixSHA256": "f6cea51f2bd0571a876b48da39e2a40b6c014c703fa76ce9dc90e0f0713f0e2c",
+      "bindings": [
+        {
+          "eniCount": 1,
+          "instanceID": "i-04bcace9b94fcd697",
+          "machine": "aws-k0s-1",
+          "node": "ip-172-29-0-68",
+          "nodeUID": "b963ff1f-379e-464d-b245-1e68018bb91c",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-04bcace9b94fcd697"
+        }
+      ]
+    },
+    {
+      "row": "readded-2",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "matrixSHA256": "be64400dffedb24ac85f9cb0db633e6d1a9a2d0cfa7cda359a37d23df4c24c9d",
+      "bindings": [
+        {
+          "eniCount": 1,
+          "instanceID": "i-04bcace9b94fcd697",
+          "machine": "aws-k0s-1",
+          "node": "ip-172-29-0-68",
+          "nodeUID": "b963ff1f-379e-464d-b245-1e68018bb91c",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-04bcace9b94fcd697"
+        },
+        {
+          "eniCount": 1,
+          "instanceID": "i-0c77e39883f1e8eff",
+          "machine": "aws-k0s-2",
+          "node": "ip-172-29-0-53",
+          "nodeUID": "b0aeb206-adfd-423a-ab8d-9b9e8f96c15a",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-0c77e39883f1e8eff"
+        }
+      ]
+    },
+    {
+      "row": "placement-control-plane",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "matrixSHA256": "be64400dffedb24ac85f9cb0db633e6d1a9a2d0cfa7cda359a37d23df4c24c9d",
+      "bindings": [
+        {
+          "eniCount": 1,
+          "instanceID": "i-04bcace9b94fcd697",
+          "machine": "aws-k0s-1",
+          "node": "ip-172-29-0-68",
+          "nodeUID": "b963ff1f-379e-464d-b245-1e68018bb91c",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-04bcace9b94fcd697"
+        },
+        {
+          "eniCount": 1,
+          "instanceID": "i-0c77e39883f1e8eff",
+          "machine": "aws-k0s-2",
+          "node": "ip-172-29-0-53",
+          "nodeUID": "b0aeb206-adfd-423a-ab8d-9b9e8f96c15a",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-0c77e39883f1e8eff"
+        }
+      ],
+      "placement": "control-plane"
+    },
+    {
+      "row": "placement-one-worker",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "matrixSHA256": "be64400dffedb24ac85f9cb0db633e6d1a9a2d0cfa7cda359a37d23df4c24c9d",
+      "bindings": [
+        {
+          "eniCount": 1,
+          "instanceID": "i-04bcace9b94fcd697",
+          "machine": "aws-k0s-1",
+          "node": "ip-172-29-0-68",
+          "nodeUID": "b963ff1f-379e-464d-b245-1e68018bb91c",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-04bcace9b94fcd697"
+        },
+        {
+          "eniCount": 1,
+          "instanceID": "i-0c77e39883f1e8eff",
+          "machine": "aws-k0s-2",
+          "node": "ip-172-29-0-53",
+          "nodeUID": "b0aeb206-adfd-423a-ab8d-9b9e8f96c15a",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-0c77e39883f1e8eff"
+        }
+      ],
+      "placement": "one-worker"
+    },
+    {
+      "row": "placement-two-workers",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "matrixSHA256": "be64400dffedb24ac85f9cb0db633e6d1a9a2d0cfa7cda359a37d23df4c24c9d",
+      "bindings": [
+        {
+          "eniCount": 1,
+          "instanceID": "i-04bcace9b94fcd697",
+          "machine": "aws-k0s-1",
+          "node": "ip-172-29-0-68",
+          "nodeUID": "b963ff1f-379e-464d-b245-1e68018bb91c",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-04bcace9b94fcd697"
+        },
+        {
+          "eniCount": 1,
+          "instanceID": "i-0c77e39883f1e8eff",
+          "machine": "aws-k0s-2",
+          "node": "ip-172-29-0-53",
+          "nodeUID": "b0aeb206-adfd-423a-ab8d-9b9e8f96c15a",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-0c77e39883f1e8eff"
+        }
+      ],
+      "placement": "two-workers"
+    },
+    {
+      "row": "placement-all-nodes",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "matrixSHA256": "be64400dffedb24ac85f9cb0db633e6d1a9a2d0cfa7cda359a37d23df4c24c9d",
+      "bindings": [
+        {
+          "eniCount": 1,
+          "instanceID": "i-04bcace9b94fcd697",
+          "machine": "aws-k0s-1",
+          "node": "ip-172-29-0-68",
+          "nodeUID": "b963ff1f-379e-464d-b245-1e68018bb91c",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-04bcace9b94fcd697"
+        },
+        {
+          "eniCount": 1,
+          "instanceID": "i-0c77e39883f1e8eff",
+          "machine": "aws-k0s-2",
+          "node": "ip-172-29-0-53",
+          "nodeUID": "b0aeb206-adfd-423a-ab8d-9b9e8f96c15a",
+          "physicalNIC": "ens5",
+          "providerID": "aws:///us-west-2a/i-0c77e39883f1e8eff"
+        }
+      ],
+      "placement": "all-nodes"
+    }
+  ],
+  "replacements": [
+    {
+      "claim": "aws-k0s-1",
+      "before": {
+        "eniCount": 1,
+        "instanceID": "i-0a74543a3eb1dae40",
+        "machine": "aws-k0s-1",
+        "node": "ip-172-29-0-71",
+        "nodeUID": "e8f894e2-2096-46a3-88ee-cb2e798cd497",
+        "physicalNIC": "ens5",
+        "providerID": "aws:///us-west-2a/i-0a74543a3eb1dae40"
+      },
+      "after": {
+        "eniCount": 1,
+        "instanceID": "i-04bcace9b94fcd697",
+        "machine": "aws-k0s-1",
+        "node": "ip-172-29-0-68",
+        "nodeUID": "b963ff1f-379e-464d-b245-1e68018bb91c",
+        "physicalNIC": "ens5",
+        "providerID": "aws:///us-west-2a/i-04bcace9b94fcd697"
+      },
+      "removal": {
+        "claim": "aws-k0s-1",
+        "instanceID": "i-0a74543a3eb1dae40",
+        "node": "ip-172-29-0-71",
+        "nodeUID": "e8f894e2-2096-46a3-88ee-cb2e798cd497",
+        "observedAt": "2026-09-06T08:26:44.211677352Z",
+        "productCleanup": true,
+        "providerID": "aws:///us-west-2a/i-0a74543a3eb1dae40",
+        "terminated": true
+      }
+    },
+    {
+      "claim": "aws-k0s-2",
+      "before": {
+        "eniCount": 1,
+        "instanceID": "i-035c493d9939663cb",
+        "machine": "aws-k0s-2",
+        "node": "ip-172-29-0-105",
+        "nodeUID": "bd36dcd0-8d27-44f9-a330-ae7a70b8ff41",
+        "physicalNIC": "ens5",
+        "providerID": "aws:///us-west-2a/i-035c493d9939663cb"
+      },
+      "after": {
+        "eniCount": 1,
+        "instanceID": "i-0c77e39883f1e8eff",
+        "machine": "aws-k0s-2",
+        "node": "ip-172-29-0-53",
+        "nodeUID": "b0aeb206-adfd-423a-ab8d-9b9e8f96c15a",
+        "physicalNIC": "ens5",
+        "providerID": "aws:///us-west-2a/i-0c77e39883f1e8eff"
+      },
+      "removal": {
+        "claim": "aws-k0s-2",
+        "instanceID": "i-035c493d9939663cb",
+        "node": "ip-172-29-0-105",
+        "nodeUID": "bd36dcd0-8d27-44f9-a330-ae7a70b8ff41",
+        "observedAt": "2026-09-06T08:34:07.91602278Z",
+        "productCleanup": true,
+        "providerID": "aws:///us-west-2a/i-035c493d9939663cb",
+        "terminated": true
+      }
+    }
+  ],
+  "scope": "AWS add/remove/readd and listed endpoint placements; no EC2 power or physical-NIC outage claim",
+  "resourcesCleanedUp": true,
+  "cleanupVerification": {
+    "observedAt": "2026-09-06T08:59:01.242981+00:00",
+    "allInstancesTerminated": true,
+    "vpcAbsent": true,
+    "recordedImagesAndSnapshotsAbsent": true,
+    "rolesAndProfileAbsent": true,
+    "assetBucketAbsent": true
+  },
+  "coverage": {
+    "unitStatementPercent": {
+      "harness": 26.0,
+      "controller": 51.0
+    },
+    "runtimeStatementPercent": {
+      "check": 74.6,
+      "claim": 19.7,
+      "cloudinit": 0.0,
+      "cluster": 15.9,
+      "cluster/k0s": 7.9,
+      "cmd/awsremove": 69.4,
+      "cmd/awsrow": 74.6,
+      "install": 17.3,
+      "kube": 60.3,
+      "lab": 25.6,
+      "observe": 85.4,
+      "provider": 0.0,
+      "rig": 21.4,
+      "rig/aws": 68.1,
+      "rig/container": 10.2,
+      "rig/vm": 10.5,
+      "wait": 57.7
+    }
+  },
+  "dialerBinarySHA256": "05afa06e4cf9f68574e0b0a8e07295c4b3bd27b530476d735ab840fe36dfe3a1"
+}

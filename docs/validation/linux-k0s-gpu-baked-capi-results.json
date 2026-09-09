@@ -1,0 +1,330 @@
+{
+  "observedAt": "2026-09-08T20:29:53.500946+00:00",
+  "scope": "Fresh single-NIC CAPA Linux worker from the composed k0s/GPU image: baked-layer reuse, scheduled Vulkan/NVENC, network matrix and removal with diagnostic original survivor streams",
+  "operation": {
+    "startedAt": "2026-09-08T20:14:54.840441+00:00",
+    "claim": "aws-linux-k0s-gpu-baked-v1",
+    "diagnostic": true,
+    "removalStartedAt": "2026-09-08T20:19:54.721046+00:00",
+    "finishedAt": "2026-09-08T20:27:33.534225+00:00",
+    "removalPassed": true,
+    "rowPassed": true,
+    "bakedExecutableReusePassed": true,
+    "gpuPassed": true,
+    "passed": false,
+    "survivorPassed": false
+  },
+  "binding": {
+    "machine": "aws-linux-k0s-gpu-baked-v1",
+    "machineUID": "c899efac-3c00-426e-9f5c-a41173f8fba6",
+    "node": "ip-172-29-0-21",
+    "nodeUID": "fc3d8a16-9659-45a3-8df8-317d9a37a024",
+    "instanceID": "i-08927c4e2c1d57330",
+    "imageID": "ami-007650e971dd51a9d",
+    "eniCount": 1,
+    "launchTime": "2026-09-08T20:14:58+00:00",
+    "nodeReady": true
+  },
+  "instanceType": "g4dn.xlarge",
+  "bakedExecutableReuse": {
+    "passed": true,
+    "checks": {
+      "candidateImageMatches": true,
+      "nodeReady": true,
+      "oneENI": true,
+      "originalReceiptUnchanged": true,
+      "binaryHashMatches": true,
+      "versionMatches": true,
+      "executableMtimePredatesLaunch": true,
+      "oneGuestPhysicalNIC": true,
+      "containerdServer2": true
+    },
+    "containerdVersions": {
+      "Client": "2.3.2",
+      "Server": "2.3.2"
+    },
+    "binding": {
+      "machine": "aws-linux-k0s-gpu-baked-v1",
+      "machineUID": "c899efac-3c00-426e-9f5c-a41173f8fba6",
+      "node": "ip-172-29-0-21",
+      "nodeUID": "fc3d8a16-9659-45a3-8df8-317d9a37a024",
+      "instanceID": "i-08927c4e2c1d57330",
+      "imageID": "ami-007650e971dd51a9d",
+      "eniCount": 1,
+      "launchTime": "2026-09-08T20:14:58+00:00",
+      "nodeReady": true
+    },
+    "scope": "Baked executable reuse; not runtime/workload cache or lifecycle qualification"
+  },
+  "driverReuse": {
+    "modulePath": "/lib/modules/7.0.0-1012-aws/updates/dkms/nvidia.ko.zst",
+    "moduleSHA256": "8ac333634d6529982c6bdf37813fb37b82a4c7dcaaf93d30078a01fc886baa28",
+    "moduleMtime": 1788897302.1357546,
+    "packageReceiptMtime": 1788897359.7567878,
+    "driverPackages": [
+      "nvidia-driver-580-server=580.173.02-0ubuntu0.24.04.1"
+    ],
+    "kernel": "7.0.0-1012-aws",
+    "moduleMtimePredatesLaunch": true,
+    "packageReceiptPredatesLaunch": true
+  },
+  "gpuWorkload": {
+    "binding": {
+      "machine": "aws-linux-k0s-gpu-baked-v1",
+      "machineUID": "c899efac-3c00-426e-9f5c-a41173f8fba6",
+      "node": "ip-172-29-0-21",
+      "nodeUID": "fc3d8a16-9659-45a3-8df8-317d9a37a024",
+      "instanceID": "i-08927c4e2c1d57330",
+      "imageID": "ami-007650e971dd51a9d",
+      "eniCount": 1,
+      "launchTime": "2026-09-08T20:14:58+00:00",
+      "nodeReady": true
+    },
+    "image": "docker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0",
+    "manualProbeImport": true,
+    "bakedProbeCacheQualified": false,
+    "checks": {
+      "podSucceeded": true,
+      "exitZero": true,
+      "vulkanPixelsVerified": true,
+      "nvencFrames": true,
+      "driverModuleUnchanged": true,
+      "driverVersionUnchanged": true,
+      "k0sReceiptUnchanged": true
+    },
+    "passed": true,
+    "renderResult": {
+      "vulkanPixelsVerified": 4096,
+      "nvencFrames": 30
+    },
+    "driverBefore": {
+      "at": "2026-09-08T20:17:55.457306+00:00",
+      "modulePath": "/lib/modules/7.0.0-1012-aws/updates/dkms/nvidia.ko.zst",
+      "moduleSHA256": "8ac333634d6529982c6bdf37813fb37b82a4c7dcaaf93d30078a01fc886baa28",
+      "gpus": "Tesla T4, 580.173.02, 15360 MiB",
+      "k0sReceipt": {
+        "schemaVersion": 1,
+        "version": "v1.36.2+k0s.0",
+        "sha256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+        "executable": "/usr/local/bin/k0s",
+        "scope": "Executable only; no runtime or workload cache",
+        "preparedAt": "2026-09-08T18:41:02.701626+00:00"
+      },
+      "kernel": "7.0.0-1012-aws"
+    },
+    "driverAfter": {
+      "at": "2026-09-08T20:19:45.890298+00:00",
+      "modulePath": "/lib/modules/7.0.0-1012-aws/updates/dkms/nvidia.ko.zst",
+      "moduleSHA256": "8ac333634d6529982c6bdf37813fb37b82a4c7dcaaf93d30078a01fc886baa28",
+      "gpus": "Tesla T4, 580.173.02, 15360 MiB",
+      "k0sReceipt": {
+        "schemaVersion": 1,
+        "version": "v1.36.2+k0s.0",
+        "sha256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+        "executable": "/usr/local/bin/k0s",
+        "scope": "Executable only; no runtime or workload cache",
+        "preparedAt": "2026-09-08T18:41:02.701626+00:00"
+      },
+      "kernel": "7.0.0-1012-aws"
+    },
+    "driverObservationScope": "First measurement after Node Ready; does not precede every initial Operator reconciliation",
+    "podUID": "ede3b682-4503-485a-b6af-20579cd8e0b6"
+  },
+  "matrix": {
+    "total": 102,
+    "passed": 102,
+    "failed": 0,
+    "profile": {
+      "Distro": "k0s",
+      "Network": "calico",
+      "BuilderNetwork": "calico",
+      "Bundled": true,
+      "Encapsulation": 2
+    },
+    "kinds": [
+      "dns",
+      "external",
+      "pod",
+      "service",
+      "transfer"
+    ]
+  },
+  "survivor": {
+    "result": {
+      "transport": "native-oob",
+      "lanes": [
+        {
+          "source": "net-w1",
+          "target": "net-aws-win2022-v3",
+          "attempts": 7042,
+          "passed": 7041,
+          "maxStartIntervalSeconds": 5.103384004999953,
+          "samplesSHA256": "81dc1f4180f5a02270ad8c551e81b2e62248cd39056121254d160d905a865564",
+          "ok": false
+        },
+        {
+          "source": "net-w1",
+          "target": "net-aws-win2025-v3",
+          "attempts": 7053,
+          "passed": 7052,
+          "maxStartIntervalSeconds": 5.103602883000008,
+          "samplesSHA256": "78ce7cf552bf479a9907692e9e5e2ec78e8cdebebe253b0c16b092bc5a285d43",
+          "ok": false
+        },
+        {
+          "source": "net-aws-win2022-v3",
+          "target": "net-w1",
+          "attempts": 7008,
+          "passed": 7008,
+          "maxStartIntervalSeconds": 0.3091583000000009,
+          "samplesSHA256": "35ca1242012af9ef59cc032a6d808677e6b5cca73031c4e26a508d859bbc951d",
+          "ok": true
+        },
+        {
+          "source": "net-aws-win2022-v3",
+          "target": "net-aws-win2025-v3",
+          "attempts": 8473,
+          "passed": 8472,
+          "maxStartIntervalSeconds": 5.101593600000001,
+          "samplesSHA256": "66da2321789f13adb099c1fcd5f63630543866c21cfa1889643b61cf41eb4ae2",
+          "ok": false
+        },
+        {
+          "source": "net-aws-win2025-v3",
+          "target": "net-w1",
+          "attempts": 6988,
+          "passed": 6987,
+          "maxStartIntervalSeconds": 5.101930799999991,
+          "samplesSHA256": "50181910896b425f954e7f7449cf3fbd903ee7b794ce68064c0c0ba516131293",
+          "ok": false
+        },
+        {
+          "source": "net-aws-win2025-v3",
+          "target": "net-aws-win2022-v3",
+          "attempts": 8477,
+          "passed": 8475,
+          "maxStartIntervalSeconds": 5.1027676999999585,
+          "samplesSHA256": "e2862717ec1893381a965a3dad38337f21d9774a1ad1350f707e2359abd106b3",
+          "ok": false
+        }
+      ],
+      "identitiesStable": true,
+      "window": {
+        "lanesBracketWindow": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "ok": true,
+        "scope": "Host OOB control ordering only; requires independent terminal logs and identity validation"
+      },
+      "diagnosticReason": "Fresh Linux baked-k0s/GPU CAPI diagnosis with known unresolved Windows survivor UDP loss; not a release qualification",
+      "qualificationEligible": false,
+      "ok": false
+    },
+    "totalAttempts": 45041,
+    "failedAttempts": 6,
+    "maxStartIntervalSeconds": 5.103602883000008
+  },
+  "removal": {
+    "claim": "aws-linux-k0s-gpu-baked-v1",
+    "instanceID": "i-08927c4e2c1d57330",
+    "node": "ip-172-29-0-21",
+    "nodeUID": "fc3d8a16-9659-45a3-8df8-317d9a37a024",
+    "observedAt": "2026-09-08T20:27:33.408288715Z",
+    "productCleanup": true,
+    "providerID": "aws:///us-west-2a/i-08927c4e2c1d57330",
+    "terminated": true
+  },
+  "cleanup": {
+    "originalNodes": {
+      "nodeUIDs": {
+        "aws-win2022-gpu": "dd54061d-491a-4b12-95a7-27393e847780",
+        "aws-win2022-v3": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "aws-win2025": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+        "aws-win2025-gpu": "258d7b62-e774-48bc-94dc-e31ff042f585",
+        "aws-win2025-v3": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "cp": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+        "cp2": "947de62f-0920-408c-aa31-ac80a2344128",
+        "cp3": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+        "ip-172-29-0-9": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+        "remote1": "8935dd28-de93-44be-a887-73110fe88c51",
+        "remote2": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+        "w1": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+        "w2": "4bcf04f8-ec26-4db7-bacb-85681c0145da"
+      },
+      "allReady": true
+    },
+    "ownedPodSamplerToolsRemoved": true,
+    "ownedWindowsCRIClientsRemoved": true,
+    "ownedGPUProbeAndArchiveRemoved": true,
+    "ownedMachineTemplateRemoved": true
+  },
+  "unitTests": {
+    "passed": 4,
+    "scope": "observe/linux_image_reuse.py against CPU and composed-GPU native fixtures",
+    "coveredStatements": 17,
+    "statements": 31,
+    "percent": 54.83870967741935
+  },
+  "runtimeCoverage": {
+    "row": {
+      "statements": 2176,
+      "covered": 688,
+      "percent": 31.61764705882353
+    },
+    "removal": {
+      "statements": 1416,
+      "covered": 201,
+      "percent": 14.194915254237289
+    }
+  },
+  "binarySHA256": {
+    "row": "cffdfdfa117f8284a7df06ac53a6feb553de70143f9fa4900d222df5021a84e3",
+    "removal": "d948661ba3553a22b42566f7e285b346a701c98484b723cfec5d00d3eb8bdb9d"
+  },
+  "evidenceSHA256": {
+    "operation.json": "d5a36ba1d53988bc756037088eccddc5853d0aea57b329b157865d0dcde96e22",
+    "instance-binding.json": "2b33d3b16e98931b89505d750adeb0773e9905634b592452e73f3da87d6ef3bc",
+    "reuse-result.json": "f70fc3982a1f10e3f0003d3e4c981cd4bed10fb1cde25665eeaecfe0c0d4c055",
+    "reuse-validated.json": "249a037fb36c18f2d0cb2e5917713c061b03040536ea2d50f0873e0114f217cc",
+    "reuse-contract.json": "6bccd09d24dba2cb84d97e3228d5071b3efe24448195335b50c4de04feabe39d",
+    "gpu-result.json": "ffcf7368cb0bd652be82ba64355d7e57eb0fa3e59a10ab3785c714b21966fe1a",
+    "driver-reuse.json": "6b5aca2b74c981f4878ca2db5d2e83f138c5435a4ebb9b890c0ac4bf562fa91a",
+    "gpu-pod-terminal.json": "5840b9f525344c1962998cc82fa3c91a6b4513a8ddb92b0509d13635b2fa2499",
+    "gpu-pod.log": "d8c7fa77ac1d779150a5d879ba6ecb9ef8b26b25975ac8cf482a1fdd2e572127",
+    "gpu-pod-events.json": "65cf906fa723d2c7f8c5de41c33651e96dc8928fedd68d226a0951ad8f6ddef3",
+    "row/matrix.json": "0b465ac49a7922c4269a17b2be6d52711503791740c7d8cfd3894c108bd8ea57",
+    "survivor-result.json": "adb4be9ed1d87c8427ee5019f962e38b782c3c61bc4f9fba29f6fe14f099045b",
+    "removal.json": "c0b5c363f859625c640dbf7010970c4443839906c165bcf4d112940a4f673361",
+    "final-baseline.json": "0b6234088bda023553fa4501b7dbcb51fcd957a61dc9b057bede34e7e23ace15",
+    "pod-tool-cleanup.json": "244e137482e359ee05d11ff181e2b9dd761b7ed90733300a75205ca1d88b6309",
+    "survivor-oob-cleanup.json": "a5d89cf7f6c968068b94449cf22dfe6326c55c5d7af02615e0f86528d0d7f45a",
+    "launch.py": "41af3207588a8ea132870778ac1f99a518718f22544101650591094225f46761",
+    "gpu.py": "9b583e696c3eb36b56ce9a16c2cdbc9424e76ea1c6d6f5ffe92f8fc4f9c34ce6",
+    "finish.py": "42a95da15c749d25bb4ed758cd8805645f6a1000ab7a65337b9fa6c3cadf1ff6",
+    "session/lane-00.jsonl.gz": "c0cac281d1763d2051efec35761b7cff0cef11a989fff8921e67c8bf4f26ee13",
+    "session/lane-01.jsonl.gz": "50ca6c30fc038b9c115f4e629fe33d6809d0da251278ecedf01e3432780ceae4",
+    "session/lane-02.jsonl.gz": "dfa65c7f4761808767a1af0eb51d8481ee54445cf01f997a4189c696165d8593",
+    "session/lane-03.jsonl.gz": "dd3d510fa1d14b1bfaf4925ae536b93c0f3d828c0e80338fdf794cfbb85ee58d",
+    "session/lane-04.jsonl.gz": "19bc8a4769e84e9568a7352884f01b5e9fe7c2fd96413a9ad20de4ab619dec2d",
+    "session/lane-05.jsonl.gz": "1de6462e347beecad9ec8015492e18d6a22d9a9c89241d59fcbb3a2e75756d25"
+  },
+  "limitations": [
+    "The original six survivor streams retained six failed small UDP echoes. Diagnostic mode was selected before sampler startup and is never release-eligible.",
+    "The six losses are original-stream totals, including preflight and collection boundaries; they do not establish that the new worker or its removal caused loss.",
+    "Probe image was manually imported after boot. NVIDIA toolkit and runtime/workload startup caches are not qualified by this run.",
+    "Driver module timestamps predate launch and its hash was unchanged across the workload. The first hash observation did not prove it preceded every initial Operator reconciliation.",
+    "The optional toolkit log read raced with removal and returned a kubelet dial timeout; workload logs were successfully collected before deletion. No host-toolkit installation claim is based on the failed log read.",
+    "No GPU replacement, fragmented UDP on the new worker, dual-stack isolation, Unity streaming or other distro/provider qualification.",
+    "Default worker AMI remains unchanged; candidate authorization is not promotion."
+  ],
+  "sourceSHA256": {
+    "harness/e2e/observe/linux_image_reuse.py": "b5686feaabe7ad6e957c99f76128f340b36aa43154a721280b63e3c8fa13c3bd",
+    "harness/e2e/observe/test_linux_image_reuse.py": "426fa049cefde3b10a6aa811ce9a3d2bd4917adf4e0cc0f4e9e2b0715f1154c1",
+    "harness/e2e/observe/testdata/linux-k0s-gpu-image-reuse.json": "fc2f3df5e3e72cae0c4bb8637392c95e21a9c6b5668c46510309a6fbf77809e3"
+  }
+}

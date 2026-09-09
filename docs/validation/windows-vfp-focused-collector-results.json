@@ -1,0 +1,138 @@
+{
+  "scope": "Native focused VFP collector smoke test; background traffic only, raw ETL export.",
+  "qualificationEligible": false,
+  "collectorSHA256": "e47529d27eda9350d75cdaa7c822ed242d0274074144ef4c1f6e6868f1f478cb",
+  "observeUnitTestsPassed": 192,
+  "hosts": [
+    {
+      "windowsServer": "2022",
+      "result": {
+        "build": 20348,
+        "session": "cldt-vfp-2581de6b72ca46eca2c457fb19d69b05",
+        "startedAt": "2026-09-09T03:07:46.5105299Z",
+        "stoppedAt": "2026-09-09T03:07:48.7194056Z",
+        "requestedSeconds": 2,
+        "traceStopped": true,
+        "traceFilteringUnchanged": true,
+        "keywordMask": "0xc80000",
+        "includesControl": false,
+        "includesControlValidation": true,
+        "flowControlOnly": true,
+        "maxFileMiB": 16,
+        "xmlExported": false,
+        "xmlEventLimit": 10000,
+        "xmlEventLimitReached": false,
+        "eventCount": 0,
+        "counts": {},
+        "artifacts": [
+          {
+            "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+            "name": "provider.json",
+            "bytes": 311964
+          },
+          {
+            "sha256": "bbc094da704bdd3d94f338c0221da9458902d883f436629128d4cd635f45a37c",
+            "name": "vfp.etl",
+            "bytes": 65536
+          }
+        ],
+        "qualificationEligible": false,
+        "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation."
+      },
+      "nativeKeywords": {
+        "UnifiedFlow": 524288,
+        "Flow": 8388608,
+        "ControlValidation": 4194304
+      },
+      "artifacts": [
+        {
+          "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+          "name": "vfp\\provider.json",
+          "bytes": 311964
+        },
+        {
+          "sha256": "bbc094da704bdd3d94f338c0221da9458902d883f436629128d4cd635f45a37c",
+          "name": "vfp\\vfp.etl",
+          "bytes": 65536
+        },
+        {
+          "name": "vfp\\result.json",
+          "bytes": 857,
+          "sha256": "b670079c7ac3f13d186aa4ec9943f6cb850d7ccdbd263695daf724499cb3221d"
+        }
+      ],
+      "cleanup": {
+        "traceAbsent": true,
+        "traceFiltering": "Trace filtering is Disabled\r\nCommand get-trace-filtering-state succeeded!\r\n",
+        "directoryAbsent": true
+      }
+    },
+    {
+      "windowsServer": "2025",
+      "result": {
+        "build": 26100,
+        "session": "cldt-vfp-ef684132499c43f7a4a9ab506c184fcc",
+        "startedAt": "2026-09-09T03:07:46.2133148Z",
+        "stoppedAt": "2026-09-09T03:07:48.4407906Z",
+        "requestedSeconds": 2,
+        "traceStopped": true,
+        "traceFilteringUnchanged": true,
+        "keywordMask": "0xc80000",
+        "includesControl": false,
+        "includesControlValidation": true,
+        "flowControlOnly": true,
+        "maxFileMiB": 16,
+        "xmlExported": false,
+        "xmlEventLimit": 10000,
+        "xmlEventLimitReached": false,
+        "eventCount": 0,
+        "counts": {},
+        "artifacts": [
+          {
+            "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+            "name": "provider.json",
+            "bytes": 327652
+          },
+          {
+            "sha256": "90bd59ff20d99778d2363e07e1b0ecf0479b7d46e74533a4def42d560c19aa69",
+            "name": "vfp.etl",
+            "bytes": 196608
+          }
+        ],
+        "qualificationEligible": false,
+        "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation."
+      },
+      "nativeKeywords": {
+        "UnifiedFlow": 524288,
+        "Flow": 8388608,
+        "ControlValidation": 4194304
+      },
+      "artifacts": [
+        {
+          "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+          "name": "vfp\\provider.json",
+          "bytes": 327652
+        },
+        {
+          "sha256": "90bd59ff20d99778d2363e07e1b0ecf0479b7d46e74533a4def42d560c19aa69",
+          "name": "vfp\\vfp.etl",
+          "bytes": 196608
+        },
+        {
+          "name": "vfp\\result.json",
+          "bytes": 858,
+          "sha256": "164e456a812fae0798122a5e7a9fb332fd9a1ba4f5c9672995e248d1b4f09d1f"
+        }
+      ],
+      "cleanup": {
+        "traceAbsent": true,
+        "traceFiltering": "Trace filtering is Disabled\r\nCommand get-trace-filtering-state succeeded!\r\n",
+        "directoryAbsent": true
+      }
+    }
+  ],
+  "limitations": [
+    "Validates native keyword mapping, session start/stop and unchanged trace filtering. Does not measure retention improvement or qualify network behavior.",
+    "Raw ETL was collected without XML export; zero exported events does not mean an empty trace."
+  ]
+}

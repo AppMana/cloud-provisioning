@@ -1,0 +1,224 @@
+{
+  "observedAt": "2026-09-08T00:14:47.528651+00:00",
+  "scope": "Fresh AWS CAPI Windows 2025 single-NIC GPU VM; full GPU probe as first ordinary application, no warmup or guest repair",
+  "instance": {
+    "InstanceId": "i-0395f56956508deb2",
+    "ImageId": "ami-0b5bfc5a6d0e2007c",
+    "InstanceType": "g6f.large",
+    "LaunchTime": "2026-09-08T00:00:06+00:00",
+    "PrivateIpAddress": "172.29.0.125",
+    "State": {
+      "Code": 16,
+      "Name": "running"
+    },
+    "eniCount": 1,
+    "eniID": "eni-0bb0d7b9bb50174b1"
+  },
+  "machineUID": "5ea578ce-fbd2-47a8-8282-56f5eed9ea3c",
+  "nodeUID": "e5f2fca5-5a8a-43c2-8aed-231afee2d4f4",
+  "joinChecks": {
+    "expectedWindowsBuild": true,
+    "onePhysicalNIC": true,
+    "k0sWorkerRunning": true,
+    "tunnelRunning": true,
+    "bootstrapInstalled": true,
+    "capiAssociation": true,
+    "windowsNode": true,
+    "matchesSiteKubelet": true,
+    "containerd2": true,
+    "cloudWorkerLabel": true,
+    "internetFacingTaint": true,
+    "nodeReady": true,
+    "publisherReady": true,
+    "expectedWorkerVersion": true,
+    "expectedWorkerHash": true,
+    "expectedTunnelHash": true,
+    "expectedRunningTunnelHash": true,
+    "peerDelivery": true
+  },
+  "firstApplicationGuard": {
+    "passed": true,
+    "checks": {
+      "sameNode": true,
+      "windowsNode": true,
+      "nodeReady": true,
+      "noPriorOrdinaryContainers": true
+    },
+    "nodeUID": "e5f2fca5-5a8a-43c2-8aed-231afee2d4f4",
+    "ordinaryContainers": [],
+    "scope": "Pre-application Kubernetes snapshot; does not establish absence of deleted Pods or out-of-band containers"
+  },
+  "podSnapshotsBeforeApplication": 19,
+  "pluginPlacement": {
+    "passed": true,
+    "checks": {
+      "profilesPresent": true,
+      "buildSelectors": true,
+      "windows2025RuntimeMountsSkipped": true,
+      "supportedNodesPresent": true,
+      "oneReadyPluginPerNode": true
+    },
+    "assignments": [
+      {
+        "node": "aws-win2022-gpu",
+        "nodeUID": "dd54061d-491a-4b12-95a7-27393e847780",
+        "build": "10.0.20348",
+        "expectedProfile": "windows-wddm-device-plugin",
+        "pods": [
+          "windows-wddm-device-plugin-tf959"
+        ],
+        "passed": true
+      },
+      {
+        "node": "aws-win2025-gpu",
+        "nodeUID": "258d7b62-e774-48bc-94dc-e31ff042f585",
+        "build": "10.0.26100",
+        "expectedProfile": "windows-wddm-device-plugin-runtime-mounts",
+        "pods": [
+          "windows-wddm-device-plugin-runtime-mounts-cql6g"
+        ],
+        "passed": true
+      },
+      {
+        "node": "aws-win2025-gpu-first-v1",
+        "nodeUID": "e5f2fca5-5a8a-43c2-8aed-231afee2d4f4",
+        "build": "10.0.26100",
+        "expectedProfile": "windows-wddm-device-plugin-runtime-mounts",
+        "pods": [
+          "windows-wddm-device-plugin-runtime-mounts-dqgz8"
+        ],
+        "passed": true
+      }
+    ],
+    "scope": "Test plugin placement and profile contract; GPU execution is a separate gate"
+  },
+  "gpuObservation": {
+    "passed": true,
+    "checks": {
+      "podSucceeded": true,
+      "jobComplete": true,
+      "containerExitedZero": true,
+      "containerIdentityPresent": true,
+      "hardwareRenderAndEncode": true
+    },
+    "receipt": {
+      "encoder": "h264_nvenc",
+      "containerWindowsBuild": 20348,
+      "decodedFrames": 30,
+      "render": {
+        "api": "Direct3D11",
+        "vendorID": 4318,
+        "deviceID": 10168,
+        "frames": 30,
+        "pixelsPerFrame": 4096,
+        "greenPixels": 1152,
+        "bluePixels": 2944,
+        "hardwareOnly": true
+      },
+      "encodedBytes": 3936
+    },
+    "podUID": "84bf4b54-0809-4570-b2b7-23c622a50378",
+    "nodeUID": "e5f2fca5-5a8a-43c2-8aed-231afee2d4f4",
+    "jobUID": "7589793e-6c13-4bbb-b52e-490ee90cc7c1",
+    "observedAt": "2026-09-08T00:13:29.839575+00:00"
+  },
+  "nativeGPU": {
+    "gpu": "NVIDIA L4-3Q, 582.53, WDDM",
+    "physicalNICs": [
+      {
+        "Name": "Ethernet 2",
+        "Status": "Up"
+      }
+    ],
+    "gpuStagePresent": false,
+    "dataDirectoryInheritsPermissions": true,
+    "at": "2026-09-08T00:13:56.6529101Z"
+  },
+  "timing": {
+    "instanceLaunch": "2026-09-08T00:00:06+00:00",
+    "guestBoot": "2026-09-08T00:03:51.6791390Z",
+    "jobCreated": "2026-09-08T00:11:30Z",
+    "container": {
+      "containerID": "containerd://442748e7b9ef69a9fc08dbeeffc49c7ce1e156f4edd1e045efd06299a90f06f8",
+      "exitCode": 0,
+      "finishedAt": "2026-09-08T00:13:18Z",
+      "reason": "Completed",
+      "startedAt": "2026-09-08T00:12:40Z"
+    },
+    "launchToApplicationStartSeconds": 754.0,
+    "launchToApplicationFinishSeconds": 792.0
+  },
+  "cacheEvidence": [
+    {
+      "reason": "Pulled",
+      "message": "Container image \"index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe\" already present on machine and can be accessed by the pod"
+    }
+  ],
+  "priorFailure": "windows-cache-v2-replacement-2025-results.json retains the earlier correct-profile first-GPU HCS RPC failure; this passing sample does not resolve its cause",
+  "limitations": [
+    "One fresh GPU-first success; not a reliability or release qualification",
+    "Sampled Kubernetes inventories cannot prove absence of deleted Pods or out-of-band containers",
+    "No streaming, GPU isolation, network-loss or other-provider qualification"
+  ],
+  "cleanup": {
+    "receipt": {
+      "claim": "aws-win2025-gpu-first-v1",
+      "instanceID": "i-0395f56956508deb2",
+      "node": "aws-win2025-gpu-first-v1",
+      "nodeUID": "e5f2fca5-5a8a-43c2-8aed-231afee2d4f4",
+      "observedAt": "2026-09-08T00:19:43.337439453Z",
+      "productCleanup": true,
+      "providerID": "aws:///us-west-2a/i-0395f56956508deb2",
+      "terminated": true
+    },
+    "initialGuard": {
+      "passed": false,
+      "checks": {
+        "instanceTerminated": true,
+        "productCleanup": true,
+        "targetMachineAbsent": true,
+        "survivorMachineIdentities": true,
+        "exactSurvivorSet": true,
+        "survivorIdentitiesAndReadiness": true,
+        "targetGatewayLeasesComplete": false,
+        "otherGatewayLeasesPreserved": false
+      },
+      "survivorCount": 13,
+      "retiredGatewayLeaseCount": 0,
+      "preservedGatewayLeaseCount": 5,
+      "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+    },
+    "limitation": "Target attachment was Publishing in the baseline; this is not the standard Ready-attachment removal qualification. Preserve the failed standard guard.",
+    "convergedObservation": {
+      "passed": false,
+      "checks": {
+        "instanceTerminated": true,
+        "productCleanup": true,
+        "targetMachineAbsent": true,
+        "survivorMachineIdentities": true,
+        "exactSurvivorSet": true,
+        "survivorIdentitiesAndReadiness": true,
+        "targetGatewayLeasesComplete": false,
+        "otherGatewayLeasesPreserved": true
+      },
+      "survivorCount": 13,
+      "retiredGatewayLeaseCount": 0,
+      "preservedGatewayLeaseCount": 5,
+      "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate",
+      "targetPublishingWithdrawal": [
+        {
+          "name": "network-attachment-f4980b114d6a8602d13d8a813c6a7075",
+          "initialPhase": "Publishing",
+          "finalPhase": "Complete",
+          "identityPreserved": true
+        }
+      ]
+    },
+    "status": "EC2 terminated and product objects removed; 13 survivors retain identities and readiness, all five other gateway leases Ready; target Publishing attachment became Complete. Standard Ready-baseline guard remains false."
+  },
+  "observerValidation": {
+    "testsPassed": 52,
+    "reportOverwriteRejected": true,
+    "scope": "Observer regression suite, including retention of failed startup evidence"
+  }
+}

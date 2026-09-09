@@ -1,0 +1,434 @@
+{
+  "schemaVersion": 1,
+  "overallPassed": false,
+  "scope": "One fresh single-NIC Windows2025 GPU CAPI add/first-application/network/removal trial; failures retained, no release qualification",
+  "imageID": "ami-09c23a0ab99f32968",
+  "instanceID": "i-0b9db5072f12ec297",
+  "instanceTerminated": true,
+  "binding": {
+    "instanceID": "i-0b9db5072f12ec297",
+    "machineUID": "8173b47f-812a-46db-9b6c-e46abedcd7cc",
+    "nodeUID": "110db0b1-bb4f-4a4c-bcbf-238d7eba029c",
+    "node": "aws-win2025-gpu-cache-v1"
+  },
+  "operation": {
+    "startedAt": "2026-09-08T10:47:38.931349+00:00",
+    "name": "aws-win2025-gpu-cache-v1",
+    "imageID": "ami-09c23a0ab99f32968",
+    "survivorTargets": [
+      "net-w1=584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "net-aws-win2022-v3=3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "net-aws-win2025-v3=2ce1fc67-02f4-4b75-9f38-1af9fbc43128"
+    ],
+    "removalStartedAt": "2026-09-08T11:09:51.668601+00:00",
+    "finishedAt": "2026-09-08T11:17:05.075910+00:00",
+    "removalPassed": true,
+    "networkMatrixPassed": false,
+    "gpuPassed": true,
+    "passed": false
+  },
+  "gpu": {
+    "passed": true,
+    "receipt": {
+      "encoder": "h264_nvenc",
+      "containerWindowsBuild": 26100,
+      "decodedFrames": 30,
+      "render": {
+        "api": "Direct3D11",
+        "vendorID": 4318,
+        "deviceID": 10168,
+        "frames": 30,
+        "pixelsPerFrame": 4096,
+        "greenPixels": 1152,
+        "bluePixels": 2944,
+        "hardwareOnly": true
+      },
+      "encodedBytes": 3936
+    },
+    "podUID": "f67703ef-3369-41a0-985a-1c7db9c9f64d",
+    "jobUID": "e2fcdb39-95a3-4d09-a6eb-45b924154adb",
+    "podPhase": "Succeeded"
+  },
+  "nativeJoin": {
+    "passed": true,
+    "checks": {
+      "expectedWindowsBuild": true,
+      "onePhysicalNIC": true,
+      "k0sWorkerRunning": true,
+      "tunnelRunning": true,
+      "bootstrapInstalled": true,
+      "capiAssociation": true,
+      "windowsNode": true,
+      "matchesSiteKubelet": true,
+      "containerd2": true,
+      "cloudWorkerLabel": true,
+      "internetFacingTaint": true,
+      "nodeReady": true,
+      "publisherReady": true,
+      "expectedWorkerVersion": true,
+      "expectedWorkerHash": true,
+      "expectedTunnelHash": true,
+      "expectedRunningTunnelHash": true,
+      "peerDelivery": true,
+      "gatewayAttachmentReady": true
+    }
+  },
+  "matrix": {
+    "passed": false,
+    "identitiesStable": true,
+    "passedChecks": 119,
+    "totalChecks": 120,
+    "failures": [
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "kind": "udp",
+        "payloadBytes": 1400,
+        "exactResponses": 19,
+        "expectedResponses": 20,
+        "commandExitCode": 0,
+        "errors": [
+          "reading from udp connection failed. err:'read udp 10.244.114.4:64751->10.244.190.81:8081: i/o timeout'"
+        ]
+      }
+    ],
+    "classification": "One missing reply out of 20 for 1,400-byte UDP from existing Windows2022 survivor to Linux; all checks involving the new GPU worker passed."
+  },
+  "cache": {
+    "declaredCacheReused": true,
+    "completeStartupCache": false,
+    "checks": {
+      "sameWindowsNode": true,
+      "nativeIdentity": true,
+      "declaredReferencesReady": true,
+      "declaredReferenceTargets": true,
+      "podIdentityBindings": true,
+      "declared": true,
+      "ifNotPresent": true,
+      "resolvedTargetMatches": true,
+      "cacheHitEvent": true,
+      "noObservedPodImagePulls": true
+    },
+    "containers": [
+      {
+        "pod": "windows-render-nvenc-2025-cache-v1-jtwsw",
+        "podUID": "f67703ef-3369-41a0-985a-1c7db9c9f64d",
+        "container": "render-nvenc",
+        "kind": "containers",
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "windows-wddm-device-plugin-runtime-mounts-h7s9c",
+        "podUID": "0bba90a7-3551-451f-bbfe-586f651459d4",
+        "container": "plugin",
+        "kind": "containers",
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-device-plugin@sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "cloud-provisioning-dialer-remote-windows-ggw62",
+        "podUID": "03e6ad5f-061a-4712-8087-c0818ac740bc",
+        "container": "peer-publisher",
+        "kind": "containers",
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-publisher@sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "calico-node-windows-cgmz2",
+        "podUID": "d69bacb2-75d0-4f54-a7df-d131e486b223",
+        "container": "uninstall-calico",
+        "kind": "initContainers",
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "calico-node-windows-cgmz2",
+        "podUID": "d69bacb2-75d0-4f54-a7df-d131e486b223",
+        "container": "install-cni",
+        "kind": "initContainers",
+        "image": "docker.io/calico/cni-windows:v3.32.0",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "calico-node-windows-cgmz2",
+        "podUID": "d69bacb2-75d0-4f54-a7df-d131e486b223",
+        "container": "felix",
+        "kind": "containers",
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "calico-node-windows-cgmz2",
+        "podUID": "d69bacb2-75d0-4f54-a7df-d131e486b223",
+        "container": "node",
+        "kind": "containers",
+        "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "konnectivity-agent-lnwkx",
+        "podUID": "610aee8c-d0cd-4ebd-b911-797d56166fb5",
+        "container": "konnectivity-agent",
+        "kind": "containers",
+        "image": "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "kube-proxy-windows-tkvcx",
+        "podUID": "c7d78ac6-dac5-4342-b766-9f1c8bbd1bb5",
+        "container": "kube-proxy",
+        "kind": "containers",
+        "image": "docker.io/sigwindowstools/kube-proxy:v1.36.2-calico-hostprocess",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      },
+      {
+        "pod": "nllb-aws-win2025-gpu-cache-v1",
+        "podUID": "73f6b3b5-cb16-455c-b357-375082e0c679",
+        "container": "nllb",
+        "kind": "containers",
+        "image": "quay.io/k0sproject/traefik:v3.7.5-k0s.0",
+        "declared": true,
+        "ifNotPresent": true,
+        "resolvedTargetMatches": true,
+        "cacheHitEvent": true,
+        "pullingEvent": false
+      }
+    ],
+    "undeclaredRuntimeImageTargets": [
+      "sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c"
+    ],
+    "additionalReferences": [
+      "registry.k8s.io/pause:3.10.1",
+      "registry.k8s.io/pause@sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c",
+      "sha256:1b8ac963b0f026266f7146c4aa924dae0677b1c1238c3e30ac91205ad67b484e"
+    ],
+    "scope": "Observed Pod image cache reuse and native runtime inventory; not proof of zero registry access or startup performance"
+  },
+  "removal": {
+    "passed": true,
+    "checks": {
+      "instanceTerminated": true,
+      "productCleanup": true,
+      "targetMachineAbsent": true,
+      "survivorMachineIdentities": true,
+      "exactSurvivorSet": true,
+      "survivorIdentitiesAndReadiness": true,
+      "targetGatewayLeasesComplete": true,
+      "otherGatewayLeasesPreserved": true
+    },
+    "survivorCount": 13,
+    "retiredGatewayLeaseCount": 1,
+    "preservedGatewayLeaseCount": 5,
+    "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+  },
+  "survivorTraffic": {
+    "finishedAt": "2026-09-08T11:17:26.063869+00:00",
+    "elapsedSeconds": 1831.034286901995,
+    "scope": "Concurrent sampled 64-byte UDP echoes; excludes delivery between attempts and fragmented UDP qualification",
+    "executor": "OutOfBand",
+    "maxAllowedGapSeconds": 10.0,
+    "intervalSeconds": 0.1,
+    "identitiesStable": true,
+    "identityError": null,
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 0.45782362000318244,
+        "attempts": 7048,
+        "passed": 7048,
+        "maxGapSeconds": 0.10345136997057125,
+        "maxAttemptSeconds": 0.3575030399952084,
+        "ok": true
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 0.3847452330519445,
+        "attempts": 7280,
+        "passed": 7280,
+        "maxGapSeconds": 0.10232446400914341,
+        "maxAttemptSeconds": 0.2844807470100932,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 5.763973252964206,
+        "attempts": 372,
+        "passed": 372,
+        "maxGapSeconds": 0.10136460699141026,
+        "maxAttemptSeconds": 5.663710082008038,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 5.6332609439850785,
+        "attempts": 374,
+        "passed": 374,
+        "maxGapSeconds": 0.10305557399988174,
+        "maxAttemptSeconds": 5.533003254036885,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 10.442849382990971,
+        "attempts": 426,
+        "passed": 426,
+        "maxGapSeconds": 0.10120891797123477,
+        "maxAttemptSeconds": 10.342581515957136,
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 7.115490107040387,
+        "attempts": 428,
+        "passed": 428,
+        "maxGapSeconds": 0.10118616704130545,
+        "maxAttemptSeconds": 7.015229904034641,
+        "ok": true
+      }
+    ],
+    "stopRequested": true,
+    "ready": true,
+    "ok": false
+  },
+  "survivorWindow": {
+    "startedAt": "2026-09-08T10:47:38.931349+00:00",
+    "finishedAt": "2026-09-08T11:17:05.075910+00:00",
+    "lanesBracketWindow": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "lanesPassed": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      true
+    ],
+    "ok": false,
+    "scope": "Successful sampled survivor probes bracket the operation; gaps and latency remain in the observer report"
+  },
+  "cadenceFailure": {
+    "previousStartedAt": "2026-09-08T11:01:37.541346+00:00",
+    "previousFinishedAt": "2026-09-08T11:01:47.883915+00:00",
+    "nextStartedAt": "2026-09-08T11:01:47.984195+00:00",
+    "intervalSeconds": 10.442849382990971,
+    "previousSequence": 210,
+    "bothProbesPassed": true,
+    "source": "net-aws-win2025-v3",
+    "target": "net-w1"
+  },
+  "cleanup": [
+    {
+      "kind": "jobs",
+      "name": "windows-render-nvenc-2025-cache-v1",
+      "uid": "e2fcdb39-95a3-4d09-a6eb-45b924154adb",
+      "removed": true
+    },
+    {
+      "kind": "pods",
+      "name": "net-aws-win2025-gpu-cache-v1",
+      "alreadyAbsent": true
+    },
+    {
+      "kind": "services",
+      "name": "net-aws-win2025-gpu-cache-v1",
+      "uid": "a815c22e-757e-4a81-9ced-9f4faa961417",
+      "removed": true
+    },
+    {
+      "kind": "awsmachinetemplates",
+      "name": "aws-win2025-gpu-cache-v1",
+      "uid": "86c4141e-93c8-48ab-b8bf-eabf015020a9",
+      "removed": true
+    },
+    {
+      "kind": "configmaps",
+      "name": "gateway-aws-win2025-gpu-cache-v1",
+      "alreadyAbsent": true
+    }
+  ],
+  "oobCleanup": [
+    {
+      "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "ownedExecutableRemoved": true,
+      "ownedDirectoryRemoved": true,
+      "noOwnedCRIProcesses": true
+    },
+    {
+      "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "ownedExecutableRemoved": true,
+      "ownedDirectoryRemoved": true,
+      "noOwnedCRIProcesses": true
+    }
+  ],
+  "timing": {
+    "instanceLaunchTime": "2026-09-08T10:47:42+00:00",
+    "firstGPUProcessStartedAt": "2026-09-08T11:01:43Z",
+    "gpuFinishedAt": "2026-09-08T11:02:24Z",
+    "launchToFirstGPUProcessSeconds": 841.0,
+    "scope": "Includes Windows boot, CAPI, networking/gateway readiness gate and diagnostic observation; not a controlled cache performance comparison"
+  },
+  "remaining": [
+    "Bake the runtime pause image and verify complete startup cache on a fresh VM.",
+    "Fix the recorded 1400-byte fragmented UDP loss on the existing Windows2022-to-Linux path.",
+    "Move survivor sampling into a persistent guest process to avoid per-sample SSM round-trip cadence gaps; retain the current failed 10-second gate."
+  ],
+  "artifactSHA256": {
+    "gpu-observation.json": "c0a7ca4b024de8d44b4be3ca3c668f8fce393a0585b488327e5b92eec34ecd8a",
+    "join-observation.json": "144506a21bdb6f6d1c8c32730307be1e816630e0e8d6a49a6dda74926e44005c",
+    "matrix-full.json": "0585e74c48cb227f4766f1bea3f043f8da7972ee9b5b19e6d4200f656b7ce68c",
+    "cache-native.json": "ad6638a9c9be969ed596d3d5ab2efe157f9a6e0492fd98209ad0416392cd7e24",
+    "traffic/result.json": "a080d68bb5fa82eafe79630b481b14aeefe0f38e276c4a72168ce3d72cb5ea73",
+    "window.json": "e7c1fc3c0c6398408894af166167f857a5fbb8f627dc4bbbd345d259f221d316",
+    "removal.json": "a861dc081183d8e6be9eb9138520eea0ab148acdc4f3e8154502ee2c396e5b4b",
+    "after-removal.json": "7f37f2490df8862dc92e41e5d949b88416c87f0336f7de37a29d564c76609237"
+  }
+}

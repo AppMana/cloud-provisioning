@@ -1,0 +1,34 @@
+{
+  "observedAt": "2026-09-07T04:22:45.266469+00:00",
+  "scope": "Real CAPI pre-launch defects and their regressions; full Windows CAPI joining remains unverified",
+  "initialClaims": {
+    "bootstrapPublished": false,
+    "workerInstancesLaunched": false,
+    "failedClaimsAndTemplatesRemoved": true
+  },
+  "bareRouteContract": {
+    "preFixTestFailed": true,
+    "postFixTestPassed": true,
+    "deviceStatementCoveragePercent": 100,
+    "realWindowsServiceProbe": "windows-bare-route-results.json",
+    "longstandingContractCommit": "3ac724cc"
+  },
+  "chartRBAC": {
+    "preFixImpersonatedServiceAccountPatch": "Forbidden",
+    "postFixImpersonatedServiceAccountPatch": "Allowed",
+    "liveIsolatedServiceAccountPatchAllowed": true,
+    "testRendersActualChart": true
+  },
+  "controller": "cldt/controller-windows:v2",
+  "revisedImages": {
+    "2022": "ami-04ab5b7f1cc0de9c4",
+    "2025": "ami-069f4419cf2752ec0"
+  },
+  "remaining": [
+    "revised AMI availability",
+    "fresh real CAPA Windows first boot",
+    "CAPI Node association and readiness",
+    "actual HostProcess delivery",
+    "CNI/lifecycle/isolation matrix"
+  ]
+}

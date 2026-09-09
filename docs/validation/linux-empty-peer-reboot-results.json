@@ -1,0 +1,56 @@
+{
+  "passed": true,
+  "checks": [
+    "single physical NIC before and after reboot",
+    "guest boot ID changed",
+    "enabled service reconstructed native WireGuard interface",
+    "withdrawn peer and route stayed absent",
+    "public key and private identity file hash unchanged",
+    "explicit empty cache survived reboot"
+  ],
+  "binarySHA256": "2de02368a809b79f18c3922e4a6bae89495c5d1f22e606c269f644663f51e94e",
+  "scope": "Disposable single-NIC QEMU VM full reboot; local durable peer cache and systemd service. No CAPI, API transport, distribution join or workload traffic.",
+  "postRebootReadditionAndWithdrawal": true,
+  "beforeReboot": {
+    "bootID": "4c1dad8d-36ab-47b1-a34b-40248866059b",
+    "interface": "cldtreboot",
+    "peerCount": 0,
+    "publicKey": "QXy1Z0YsCdqHkGBcQw7FvvRbWyhCswio/+dV0foa2XI=",
+    "routeCount": 0,
+    "hashes": "778ca33d3daed2dab7aeb255971646d7dd69978319f26a07bba01de3fef6351c",
+    "physicalNICs": [
+      "ens2"
+    ],
+    "serviceActive": "active"
+  },
+  "afterReboot": {
+    "bootID": "c44fd8fc-ed8e-4845-baab-08cd4bb1116a",
+    "interface": "cldtreboot",
+    "peerCount": 0,
+    "publicKey": "QXy1Z0YsCdqHkGBcQw7FvvRbWyhCswio/+dV0foa2XI=",
+    "routeCount": 0,
+    "hashes": "778ca33d3daed2dab7aeb255971646d7dd69978319f26a07bba01de3fef6351c",
+    "physicalNICs": [
+      "ens2"
+    ],
+    "serviceActive": "active"
+  },
+  "management": "Existing serial guest agent; no SSH, default route or second guest NIC. Container wrapper runs QEMU.",
+  "validation": "go test ./cmd/dialer ./pkg/tunnel ./pkg/attachment ./cmd/endpoint-controller passed; native tests are separately opted in.",
+  "artifactSHA256": {
+    "prepare.go": "11333aec06bda1a6364d0ac5d8d0a9f1a4febd93d6c3ec3ca388dc689d1d2a50",
+    "probe.go": "bd036e1ae85509c72dba5e4497ab99d8f8c17c40781bb84c8a0dee086aad72f8",
+    "run.py": "4d24fbee84cc3e6e2778d735d66278ac1195d9a8d38e0b4134bcfc139738ddac",
+    "run.stdout": "fffb4772ca78d8079327d157eaae6651ef083a77fc031252b17621256b2a37b9",
+    "peer-added.json": "22a90db4356d4ab485308346f5f25cfb73ea65c9cc5aee9e035db1f9658915a4",
+    "peer-withdrawn.json": "33e1c8ace6dd25d18c1251eb569db20d3b00a168c29fa011d5876af9e02f7c7d",
+    "post-reboot.json": "f3bfa528dacb21c585a6845265db9448bb691e537ec0df136659cb9e6c79309d",
+    "result.json": "e23cb396e57ba5de4b5267e5270fe2e5bda72086d542a2f8bc6e2ba80507c0cd",
+    "readd.py": "514b9fbc3f064b6d6462762bafef509359e00e5baaed05f8e9e564ec121b93bc",
+    "post-reboot-readd-withdraw.json": "5d6ad040ff098448b2af0407817e9e6c6190f9560a98d884f37ae217bc9fc442"
+  },
+  "cleanup": {
+    "ownedVMRemoved": true,
+    "ownedBridgeRemoved": true
+  }
+}

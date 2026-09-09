@@ -1,0 +1,26 @@
+{
+  "observedAt": "2026-09-07T05:42:04.800903+00:00",
+  "sourceVersion": "v1.36.2+k0s.0",
+  "sourceCommit": "bdf1c22c23a5af23ec6a1ff764179f6a6cf6f7dc",
+  "patch": "providers/k0s/windows-traefik.patch",
+  "patchSHA256": "9587d15bc387ca5ebed2d45da952bba704c73d05139f54467923673a2c0e52fa",
+  "originalNativeWindowsTest": "failed replacing readonly routing.yaml: Access is denied",
+  "patchedWindowsTests": [
+    {
+      "windowsVersion": "2022",
+      "nativeTestExitCode": 0,
+      "existingReadonlyFileReplaced": true,
+      "subsequentReplacementPassed": true,
+      "configurationRenderingPassed": true
+    },
+    {
+      "windowsVersion": "2025",
+      "nativeTestExitCode": 0,
+      "existingReadonlyFileReplaced": true,
+      "subsequentReplacementPassed": true,
+      "configurationRenderingPassed": true
+    }
+  ],
+  "linuxFocusedTestsPassed": true,
+  "scope": "Native package tests only. Running workers still use distribution binaries; rebuilt-worker API backend updates, failover and fresh image boot remain unverified."
+}

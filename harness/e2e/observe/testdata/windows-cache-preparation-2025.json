@@ -1,0 +1,40 @@
+{
+  "snapshot": {
+    "cacheService": "Running",
+    "containers": [],
+    "windowsBuild": 26100,
+    "readyImages": [
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ],
+    "namespace": "k8s.io",
+    "snapshotter": "windows",
+    "pipe": "\\\\.\\pipe\\cldt-image-cache",
+    "observedAt": "2026-09-07T20:43:17.4241303Z",
+    "workerServicePresent": false,
+    "registeredImages": [
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ],
+    "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+    "shimSHA256": "adb8e4d990da4bde04956441fcd569a2b13a298d89758ace0896b1bc3389c1ae",
+    "root": "C:\\var\\lib\\k0s\\containerd",
+    "identityPathsPresent": [],
+    "containerdSHA256": "92fe1b334ef6ee9477fd22c88012bda605b52952fe4964705ada1a49ae0f2030",
+    "tasks": []
+  },
+  "serviceStopped": true,
+  "finishedAt": "2026-09-07T20:43:20.4162412Z",
+  "startedAt": "2026-09-07T20:30:35.3276683Z",
+  "images": [
+    "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+  ],
+  "recipeSHA256": "65c47a82b204defe5987987587a277fda4ed592202e7d7652ef19c95ac99a4bf",
+  "cacheServiceRemoved": true,
+  "status": "prepared",
+  "pulls": [
+    {
+      "exitCode": 0,
+      "elapsedSeconds": 759.35613,
+      "image": "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    }
+  ]
+}

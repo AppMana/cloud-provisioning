@@ -1,0 +1,80 @@
+{
+  "result": "passed",
+  "verifiedAt": "2026-09-09T11:23:18.457958+00:00",
+  "archiveSHA256": "c9d073429bebe45a956c1fc7e50048406489b327a3ef25c83b84ebf19b70904a",
+  "archiveBytes": 173748,
+  "summary": {
+    "removal": {
+      "claim": "aws-microk8s-remote1",
+      "instanceID": "i-066846bed5329ceda",
+      "node": "ip-172-29-0-101",
+      "nodeUID": "f8032c76-2f7e-4249-879f-8fdaf95c7421",
+      "observedAt": "2026-09-09T11:09:22.054953597Z",
+      "productCleanup": true,
+      "providerID": "aws:///us-west-2a/i-066846bed5329ceda",
+      "terminated": true
+    },
+    "replacement": {
+      "eniCount": 1,
+      "imageID": "ami-095b7537ef1237e91",
+      "instanceID": "i-04cd3c2f402a8e83f",
+      "machine": "aws-microk8s-remote1",
+      "node": "ip-172-29-0-45",
+      "nodeUID": "13344348-c853-4182-89ce-0e7a7b2215c5",
+      "physicalNIC": "ens5",
+      "providerID": "aws:///us-west-2a/i-04cd3c2f402a8e83f"
+    },
+    "sameSurvivorUIDs": true,
+    "allNineNodesReady": true,
+    "matrices": {
+      "microk8s-capa-survivor-row-v1": {
+        "total": 102,
+        "passed": 102,
+        "failed": 0
+      },
+      "microk8s-capa-replacement-v1": {
+        "total": 140,
+        "passed": 140,
+        "failed": 0
+      }
+    },
+    "replacementAttempts": [
+      {
+        "attempt": 1,
+        "failed": 0,
+        "passed": 140,
+        "elapsed": "1m10.584897245s",
+        "cancelled": false
+      }
+    ]
+  },
+  "nativeCoverage": {
+    "microk8s-capa-remove-remote1-v1": {
+      "covered": 202,
+      "total": 1492,
+      "percent": 13.5
+    },
+    "microk8s-capa-survivor-row-v1": {
+      "covered": 752,
+      "total": 2314,
+      "percent": 32.5
+    },
+    "microk8s-capa-replacement-v1": {
+      "covered": 807,
+      "total": 2339,
+      "percent": 34.5
+    }
+  },
+  "sourceSHA256": {
+    "check/report.go": "9dc3f65fbcbe02e1f36bd4a5eb8e5dfd12618a6e0d6e8a502ddea0c230787afb",
+    "cmd/awsrow/report.go": "9b6547e41f2dd432f04ac91411e423b67c61ac61adea3e1e31e4edd959705770",
+    "cmd/awsrow/main.go": "9e822a143c451aa8d35cdc355281574131d2cb1e845c7920236a578d4b75d0c1"
+  },
+  "replacementFirstAttemptPassed": true,
+  "limits": [
+    "One real CAPA removal/replacement cycle at the retained all-nodes placement; other placements remain unqualified for this AWS profile.",
+    "Survivor matrix covers five site VMs and the surviving AWS worker; snapshots also preserved the other two fake-CAPI VM workers.",
+    "Baseline and survivor AWS rows retained final results only; their first-attempt success is unknown. The replacement has a per-attempt journal.",
+    "These are bounded matrix and identity checks, not continuous survivor availability or an outage SLA."
+  ]
+}

@@ -1,0 +1,804 @@
+{
+  "scope": "Native UDP fragmentation boundary on single-underlay-NIC Windows Server 2022 and 2025 replacement EC2 workers",
+  "observedAt": "2026-09-07T15:24:05.048673+00:00",
+  "interfaces": [
+    {
+      "node": "aws-win2022-v3",
+      "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "podUID": "536d831a-e33d-4cd3-840c-f7bd2bddb920",
+      "podIP": "10.244.114.4",
+      "kernel": "10.0.20348.5499",
+      "observation": {
+        "compartment": 6,
+        "mtu": 1370,
+        "ip": "10.244.114.4",
+        "interface": 32,
+        "adapter": [
+          {
+            "Name": "vEthernet (f158e55431408cc223e062913ac11b0dbfb03abd9337b432fbb9e182e2c5eee8_Calico)",
+            "InterfaceGuid": "{06FC0179-A030-404A-B3EB-9F69901D85B0}",
+            "InterfaceDescription": "Hyper-V Virtual Ethernet Container Adapter #2",
+            "HardwareInterface": false
+          }
+        ]
+      }
+    },
+    {
+      "node": "aws-win2025-v3",
+      "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "podUID": "c0215252-d058-47c2-b789-52fb9940d694",
+      "podIP": "10.244.42.4",
+      "kernel": "10.0.26100.33296",
+      "observation": {
+        "compartment": 6,
+        "mtu": 1370,
+        "ip": "10.244.42.4",
+        "interface": 31,
+        "adapter": [
+          {
+            "Name": "vEthernet (3860211e6dd4221540d37f8da4b9558ff6e780eb0ef77284c56d004ec85c0761_Calico)",
+            "InterfaceGuid": "{B3B94AC8-71D9-4216-B6A4-8BB32A873C8B}",
+            "InterfaceDescription": "Hyper-V Virtual Ethernet Container Adapter #3",
+            "HardwareInterface": false
+          }
+        ]
+      }
+    }
+  ],
+  "identitiesStableDuringBoundaryTest": true,
+  "checks": [
+    {
+      "ok": true,
+      "expectedResponses": 100,
+      "reportedResponses": 100,
+      "exactResponses": 100,
+      "responsesPresent": true,
+      "errors": [],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "payloadBytes": 1280,
+      "startedAt": "2026-09-07T15:22:53.226807+00:00",
+      "finishedAt": "2026-09-07T15:22:53.597950+00:00"
+    },
+    {
+      "ok": true,
+      "expectedResponses": 100,
+      "reportedResponses": 100,
+      "exactResponses": 100,
+      "responsesPresent": true,
+      "errors": [],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "payloadBytes": 1337,
+      "startedAt": "2026-09-07T15:22:53.598745+00:00",
+      "finishedAt": "2026-09-07T15:22:54.013131+00:00"
+    },
+    {
+      "ok": true,
+      "expectedResponses": 100,
+      "reportedResponses": 100,
+      "exactResponses": 100,
+      "responsesPresent": true,
+      "errors": [],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "payloadBytes": 1338,
+      "startedAt": "2026-09-07T15:22:54.016566+00:00",
+      "finishedAt": "2026-09-07T15:22:54.444499+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 99,
+      "exactResponses": 99,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.114.4:60235->10.244.42.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "payloadBytes": 1340,
+      "startedAt": "2026-09-07T15:22:54.448420+00:00",
+      "finishedAt": "2026-09-07T15:22:59.893328+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 99,
+      "exactResponses": 99,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.114.4:60356->10.244.42.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "payloadBytes": 1400,
+      "startedAt": "2026-09-07T15:22:59.898839+00:00",
+      "finishedAt": "2026-09-07T15:23:05.325948+00:00"
+    },
+    {
+      "ok": true,
+      "expectedResponses": 100,
+      "reportedResponses": 100,
+      "exactResponses": 100,
+      "responsesPresent": true,
+      "errors": [],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "payloadBytes": 1800,
+      "startedAt": "2026-09-07T15:23:05.332112+00:00",
+      "finishedAt": "2026-09-07T15:23:05.756758+00:00"
+    },
+    {
+      "ok": true,
+      "expectedResponses": 100,
+      "reportedResponses": 100,
+      "exactResponses": 100,
+      "responsesPresent": true,
+      "errors": [],
+      "commandExitCode": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "payloadBytes": 1280,
+      "startedAt": "2026-09-07T15:23:05.764702+00:00",
+      "finishedAt": "2026-09-07T15:23:06.135362+00:00"
+    },
+    {
+      "ok": true,
+      "expectedResponses": 100,
+      "reportedResponses": 100,
+      "exactResponses": 100,
+      "responsesPresent": true,
+      "errors": [],
+      "commandExitCode": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "payloadBytes": 1337,
+      "startedAt": "2026-09-07T15:23:06.144243+00:00",
+      "finishedAt": "2026-09-07T15:23:06.555152+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 99,
+      "exactResponses": 99,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.42.4:61546->10.244.114.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "payloadBytes": 1338,
+      "startedAt": "2026-09-07T15:23:06.566023+00:00",
+      "finishedAt": "2026-09-07T15:23:12.128766+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 99,
+      "exactResponses": 99,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.42.4:61655->10.244.114.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "payloadBytes": 1340,
+      "startedAt": "2026-09-07T15:23:12.140002+00:00",
+      "finishedAt": "2026-09-07T15:23:17.780737+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 99,
+      "exactResponses": 99,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.42.4:61772->10.244.114.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "payloadBytes": 1400,
+      "startedAt": "2026-09-07T15:23:17.792174+00:00",
+      "finishedAt": "2026-09-07T15:23:23.151200+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 99,
+      "exactResponses": 99,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.42.4:61881->10.244.114.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "payloadBytes": 1800,
+      "startedAt": "2026-09-07T15:23:23.162148+00:00",
+      "finishedAt": "2026-09-07T15:23:28.564289+00:00"
+    }
+  ],
+  "summary": {
+    "unfragmented": {
+      "exactResponses": 400,
+      "attempts": 400,
+      "payloadBytes": [
+        1280,
+        1337
+      ]
+    },
+    "fragmented": {
+      "exactResponses": 794,
+      "attempts": 800,
+      "payloadBytes": [
+        1338,
+        1340,
+        1400,
+        1800
+      ]
+    },
+    "requestOverheadBytes": 33,
+    "workloadMTU": 1370
+  },
+  "correlatedFailures": [
+    {
+      "sourceNode": "aws-win2022-v3",
+      "targetNode": "aws-win2025-v3",
+      "payloadBytes": 1340,
+      "error": "reading from udp connection failed. err:'read udp 10.244.114.4:60235->10.244.42.4:8081: i/o timeout'",
+      "observations": {
+        "aws-win2022-v3": {
+          "source": "10.244.114.4",
+          "sourcePort": 60235,
+          "destination": "10.244.42.4",
+          "destinationPort": 8081,
+          "flowObserved": true,
+          "correlationWindowSeconds": 0.1,
+          "drops": [
+            {
+              "timestamp": "2026-09-07 15:22:54.661076000",
+              "group": 281474976710862,
+              "packet": 1,
+              "component": 93,
+              "componentInfo": {
+                "driver": "vfpext.sys",
+                "name": "VFP Extension"
+              },
+              "reason": "Invalid Packet",
+              "location": "0xE0006096",
+              "ipID": 31372,
+              "fragmentOffsetBytes": 0,
+              "header": "[01]11D4.1024::2026-09-07 15:22:54.661076000 [Microsoft-Windows-PktMon] Drop: PktGroupId 281474976710862, PktNumber 1, Appearance 7, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 1378, LoggedSize 192 "
+            },
+            {
+              "timestamp": "2026-09-07 15:22:54.661076400",
+              "group": 281474976710862,
+              "packet": 2,
+              "component": 93,
+              "componentInfo": {
+                "driver": "vfpext.sys",
+                "name": "VFP Extension"
+              },
+              "reason": "Invalid Packet",
+              "location": "0xE0006096",
+              "ipID": 31372,
+              "fragmentOffsetBytes": 1344,
+              "header": "[01]11D4.1024::2026-09-07 15:22:54.661076400 [Microsoft-Windows-PktMon] Drop: PktGroupId 281474976710862, PktNumber 2, Appearance 7, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 43, LoggedSize 43 "
+            }
+          ]
+        },
+        "aws-win2025-v3": {
+          "source": "10.244.114.4",
+          "sourcePort": 60235,
+          "destination": "10.244.42.4",
+          "destinationPort": 8081,
+          "flowObserved": false,
+          "correlationWindowSeconds": 0.1,
+          "drops": []
+        }
+      }
+    },
+    {
+      "sourceNode": "aws-win2022-v3",
+      "targetNode": "aws-win2025-v3",
+      "payloadBytes": 1400,
+      "error": "reading from udp connection failed. err:'read udp 10.244.114.4:60356->10.244.42.4:8081: i/o timeout'",
+      "observations": {
+        "aws-win2022-v3": {
+          "source": "10.244.114.4",
+          "sourcePort": 60356,
+          "destination": "10.244.42.4",
+          "destinationPort": 8081,
+          "flowObserved": true,
+          "correlationWindowSeconds": 0.1,
+          "drops": [
+            {
+              "timestamp": "2026-09-07 15:23:00.175469700",
+              "group": 638,
+              "packet": 1,
+              "component": 93,
+              "componentInfo": {
+                "driver": "vfpext.sys",
+                "name": "VFP Extension"
+              },
+              "reason": "Invalid Packet",
+              "location": "0xE0006096",
+              "ipID": 31493,
+              "fragmentOffsetBytes": 0,
+              "header": "[00]11D4.1024::2026-09-07 15:23:00.175469700 [Microsoft-Windows-PktMon] Drop: PktGroupId 638, PktNumber 1, Appearance 7, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 1378, LoggedSize 192 "
+            },
+            {
+              "timestamp": "2026-09-07 15:23:00.175470400",
+              "group": 638,
+              "packet": 2,
+              "component": 93,
+              "componentInfo": {
+                "driver": "vfpext.sys",
+                "name": "VFP Extension"
+              },
+              "reason": "Invalid Packet",
+              "location": "0xE0006096",
+              "ipID": 31493,
+              "fragmentOffsetBytes": 1344,
+              "header": "[00]11D4.1024::2026-09-07 15:23:00.175470400 [Microsoft-Windows-PktMon] Drop: PktGroupId 638, PktNumber 2, Appearance 7, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 103, LoggedSize 103 "
+            }
+          ]
+        },
+        "aws-win2025-v3": {
+          "source": "10.244.114.4",
+          "sourcePort": 60356,
+          "destination": "10.244.42.4",
+          "destinationPort": 8081,
+          "flowObserved": false,
+          "correlationWindowSeconds": 0.1,
+          "drops": []
+        }
+      }
+    },
+    {
+      "sourceNode": "aws-win2025-v3",
+      "targetNode": "aws-win2022-v3",
+      "payloadBytes": 1338,
+      "error": "reading from udp connection failed. err:'read udp 10.244.42.4:61546->10.244.114.4:8081: i/o timeout'",
+      "observations": {
+        "aws-win2025-v3": {
+          "source": "10.244.42.4",
+          "sourcePort": 61546,
+          "destination": "10.244.114.4",
+          "destinationPort": 8081,
+          "flowObserved": true,
+          "correlationWindowSeconds": 0.1,
+          "drops": [
+            {
+              "timestamp": "2026-09-07 15:23:06.844980800",
+              "group": 27799,
+              "packet": 1,
+              "component": 93,
+              "componentInfo": {
+                "driver": "vfpext.sys",
+                "name": "VFP Extension"
+              },
+              "reason": "Invalid Packet",
+              "location": "0xE0006096",
+              "ipID": 26344,
+              "fragmentOffsetBytes": 0,
+              "header": "[00]0BCC.0C14::2026-09-07 15:23:06.844980800 [Microsoft-Windows-PktMon] Drop: PktGroupId 27799, PktNumber 1, Appearance 0, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 1378, LoggedSize 192 "
+            },
+            {
+              "timestamp": "2026-09-07 15:23:06.844981300",
+              "group": 27799,
+              "packet": 2,
+              "component": 93,
+              "componentInfo": {
+                "driver": "vfpext.sys",
+                "name": "VFP Extension"
+              },
+              "reason": "Invalid Packet",
+              "location": "0xE0006096",
+              "ipID": 26344,
+              "fragmentOffsetBytes": 1344,
+              "header": "[00]0BCC.0C14::2026-09-07 15:23:06.844981300 [Microsoft-Windows-PktMon] Drop: PktGroupId 27799, PktNumber 2, Appearance 0, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 41, LoggedSize 41 "
+            }
+          ]
+        },
+        "aws-win2022-v3": {
+          "source": "10.244.42.4",
+          "sourcePort": 61546,
+          "destination": "10.244.114.4",
+          "destinationPort": 8081,
+          "flowObserved": false,
+          "correlationWindowSeconds": 0.1,
+          "drops": []
+        }
+      }
+    },
+    {
+      "sourceNode": "aws-win2025-v3",
+      "targetNode": "aws-win2022-v3",
+      "payloadBytes": 1340,
+      "error": "reading from udp connection failed. err:'read udp 10.244.42.4:61655->10.244.114.4:8081: i/o timeout'",
+      "observations": {
+        "aws-win2025-v3": {
+          "source": "10.244.42.4",
+          "sourcePort": 61655,
+          "destination": "10.244.114.4",
+          "destinationPort": 8081,
+          "flowObserved": true,
+          "correlationWindowSeconds": 0.1,
+          "drops": [
+            {
+              "timestamp": "2026-09-07 15:23:12.414348300",
+              "group": 281474976720295,
+              "packet": 1,
+              "component": 93,
+              "componentInfo": {
+                "driver": "vfpext.sys",
+                "name": "VFP Extension"
+              },
+              "reason": "Invalid Packet",
+              "location": "0xE0006096",
+              "ipID": 26453,
+              "fragmentOffsetBytes": 0,
+              "header": "[01]0BCC.0C14::2026-09-07 15:23:12.414348300 [Microsoft-Windows-PktMon] Drop: PktGroupId 281474976720295, PktNumber 1, Appearance 0, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 1378, LoggedSize 192 "
+            },
+            {
+              "timestamp": "2026-09-07 15:23:12.414349100",
+              "group": 281474976720295,
+              "packet": 2,
+              "component": 93,
+              "componentInfo": {
+                "driver": "vfpext.sys",
+                "name": "VFP Extension"
+              },
+              "reason": "Invalid Packet",
+              "location": "0xE0006096",
+              "ipID": 26453,
+              "fragmentOffsetBytes": 1344,
+              "header": "[01]0BCC.0C14::2026-09-07 15:23:12.414349100 [Microsoft-Windows-PktMon] Drop: PktGroupId 281474976720295, PktNumber 2, Appearance 0, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 43, LoggedSize 43 "
+            }
+          ]
+        },
+        "aws-win2022-v3": {
+          "source": "10.244.42.4",
+          "sourcePort": 61655,
+          "destination": "10.244.114.4",
+          "destinationPort": 8081,
+          "flowObserved": false,
+          "correlationWindowSeconds": 0.1,
+          "drops": []
+        }
+      }
+    },
+    {
+      "sourceNode": "aws-win2025-v3",
+      "targetNode": "aws-win2022-v3",
+      "payloadBytes": 1400,
+      "error": "reading from udp connection failed. err:'read udp 10.244.42.4:61772->10.244.114.4:8081: i/o timeout'",
+      "observations": {
+        "aws-win2025-v3": {
+          "source": "10.244.42.4",
+          "sourcePort": 61772,
+          "destination": "10.244.114.4",
+          "destinationPort": 8081,
+          "flowObserved": true,
+          "correlationWindowSeconds": 0.1,
+          "drops": [
+            {
+              "timestamp": "2026-09-07 15:23:18.041220800",
+              "group": 281474976721246,
+              "packet": 1,
+              "component": 93,
+              "componentInfo": {
+                "driver": "vfpext.sys",
+                "name": "VFP Extension"
+              },
+              "reason": "Invalid Packet",
+              "location": "0xE0006096",
+              "ipID": 26570,
+              "fragmentOffsetBytes": 0,
+              "header": "[01]0BCC.1A6C::2026-09-07 15:23:18.041220800 [Microsoft-Windows-PktMon] Drop: PktGroupId 281474976721246, PktNumber 1, Appearance 0, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 1378, LoggedSize 192 "
+            },
+            {
+              "timestamp": "2026-09-07 15:23:18.041221500",
+              "group": 281474976721246,
+              "packet": 2,
+              "component": 93,
+              "componentInfo": {
+                "driver": "vfpext.sys",
+                "name": "VFP Extension"
+              },
+              "reason": "Invalid Packet",
+              "location": "0xE0006096",
+              "ipID": 26570,
+              "fragmentOffsetBytes": 1344,
+              "header": "[01]0BCC.1A6C::2026-09-07 15:23:18.041221500 [Microsoft-Windows-PktMon] Drop: PktGroupId 281474976721246, PktNumber 2, Appearance 0, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 103, LoggedSize 103 "
+            }
+          ]
+        },
+        "aws-win2022-v3": {
+          "source": "10.244.42.4",
+          "sourcePort": 61772,
+          "destination": "10.244.114.4",
+          "destinationPort": 8081,
+          "flowObserved": false,
+          "correlationWindowSeconds": 0.1,
+          "drops": []
+        }
+      }
+    },
+    {
+      "sourceNode": "aws-win2025-v3",
+      "targetNode": "aws-win2022-v3",
+      "payloadBytes": 1800,
+      "error": "reading from udp connection failed. err:'read udp 10.244.42.4:61881->10.244.114.4:8081: i/o timeout'",
+      "observations": {
+        "aws-win2025-v3": {
+          "source": "10.244.42.4",
+          "sourcePort": 61881,
+          "destination": "10.244.114.4",
+          "destinationPort": 8081,
+          "flowObserved": true,
+          "correlationWindowSeconds": 0.1,
+          "drops": [
+            {
+              "timestamp": "2026-09-07 15:23:23.451910800",
+              "group": 40914,
+              "packet": 1,
+              "component": 93,
+              "componentInfo": {
+                "driver": "vfpext.sys",
+                "name": "VFP Extension"
+              },
+              "reason": "Invalid Packet",
+              "location": "0xE0006096",
+              "ipID": 26679,
+              "fragmentOffsetBytes": 0,
+              "header": "[00]0BCC.1578::2026-09-07 15:23:23.451910800 [Microsoft-Windows-PktMon] Drop: PktGroupId 40914, PktNumber 1, Appearance 0, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 1378, LoggedSize 192 "
+            },
+            {
+              "timestamp": "2026-09-07 15:23:23.451911100",
+              "group": 40914,
+              "packet": 2,
+              "component": 93,
+              "componentInfo": {
+                "driver": "vfpext.sys",
+                "name": "VFP Extension"
+              },
+              "reason": "Invalid Packet",
+              "location": "0xE0006096",
+              "ipID": 26679,
+              "fragmentOffsetBytes": 1344,
+              "header": "[00]0BCC.1578::2026-09-07 15:23:23.451911100 [Microsoft-Windows-PktMon] Drop: PktGroupId 40914, PktNumber 2, Appearance 0, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 503, LoggedSize 192 "
+            }
+          ]
+        },
+        "aws-win2022-v3": {
+          "source": "10.244.42.4",
+          "sourcePort": 61881,
+          "destination": "10.244.114.4",
+          "destinationPort": 8081,
+          "flowObserved": false,
+          "correlationWindowSeconds": 0.1,
+          "drops": []
+        }
+      }
+    }
+  ],
+  "ipIDReuseInspection": [
+    {
+      "node": "aws-win2022-v3",
+      "payloadBytes": 1340,
+      "failedPort": 60235,
+      "identifications": [
+        31372
+      ],
+      "flows": [
+        {
+          "ipID": 31372,
+          "port": 60235,
+          "first": "2026-09-07 15:22:54.661035600",
+          "last": "2026-09-07 15:22:54.661047200",
+          "appearances": 6
+        }
+      ]
+    },
+    {
+      "node": "aws-win2022-v3",
+      "payloadBytes": 1400,
+      "failedPort": 60356,
+      "identifications": [
+        31493
+      ],
+      "flows": [
+        {
+          "ipID": 31493,
+          "port": 60356,
+          "first": "2026-09-07 15:23:00.175431000",
+          "last": "2026-09-07 15:23:00.175442700",
+          "appearances": 6
+        }
+      ]
+    },
+    {
+      "node": "aws-win2025-v3",
+      "payloadBytes": 1338,
+      "failedPort": 61546,
+      "identifications": [
+        26344
+      ],
+      "flows": [
+        {
+          "ipID": 26344,
+          "port": 61546,
+          "first": "2026-09-07 15:23:06.844932200",
+          "last": "2026-09-07 15:23:06.844947000",
+          "appearances": 6
+        }
+      ]
+    },
+    {
+      "node": "aws-win2025-v3",
+      "payloadBytes": 1340,
+      "failedPort": 61655,
+      "identifications": [
+        26453
+      ],
+      "flows": [
+        {
+          "ipID": 26453,
+          "port": 61655,
+          "first": "2026-09-07 15:23:12.414305200",
+          "last": "2026-09-07 15:23:12.414319200",
+          "appearances": 6
+        }
+      ]
+    },
+    {
+      "node": "aws-win2025-v3",
+      "payloadBytes": 1400,
+      "failedPort": 61772,
+      "identifications": [
+        26570
+      ],
+      "flows": [
+        {
+          "ipID": 26570,
+          "port": 61772,
+          "first": "2026-09-07 15:23:18.041179100",
+          "last": "2026-09-07 15:23:18.041192200",
+          "appearances": 6
+        }
+      ]
+    },
+    {
+      "node": "aws-win2025-v3",
+      "payloadBytes": 1800,
+      "failedPort": 61881,
+      "identifications": [
+        26679
+      ],
+      "flows": [
+        {
+          "ipID": 26679,
+          "port": 61881,
+          "first": "2026-09-07 15:23:23.451879700",
+          "last": "2026-09-07 15:23:23.451890200",
+          "appearances": 6
+        }
+      ]
+    }
+  ],
+  "finding": "All six missing echoes correlate with source-side vfpext.sys Invalid Packet drops at 0xE0006096 for both request fragments. The corresponding flow was not observed in the receiver capture. This identifies the observed discard, not its internal cause.",
+  "diagnosticExperiment": {
+    "trafficSampled": false,
+    "validABTest": false,
+    "reason": "The native vfpctrl positional setter unexpectedly changed two background-rule flags in addition to reordered-fragment support. Subsequent restoration commands failed with exit 87.",
+    "recovery": "Deleted the exact disposable Windows 2025 probe UID and recreated it. The old VFP port is absent; the new port flow-settings output exactly matches the saved baseline.",
+    "oldPodUID": "c0215252-d058-47c2-b789-52fb9940d694",
+    "newPodUID": "77696fb9-44a9-4075-bf83-e8993bf84230",
+    "newPodIP": "10.244.42.5",
+    "newPort": "F0E745EA-2DBA-4718-BB9A-52F48C650A7B",
+    "newWorkloadMTU": 1370
+  },
+  "privateArtifactHashes": {
+    "results.json": {
+      "sha256": "7b7d45d0efd4a67a5c4da9c4880aeb5a0f87e939178478487d6f5b4afc8a013b",
+      "bytes": 1705934
+    },
+    "correlation.json": {
+      "sha256": "5e6ddd4275fd1d6bf71b54f93848a6b5277837cb47dcfa744f27cb87a5697997",
+      "bytes": 13441
+    },
+    "aws-win2022-v3.txt": {
+      "sha256": "7c9570a9f95f4de7ad2df3dd2b7e6bdd64b391f424e6d0cc988641430cba9d3e",
+      "bytes": 77201976
+    },
+    "aws-win2025-v3.txt": {
+      "sha256": "ba5009ffdd8b4e95dd62f311b1d559aa760060602aea15512292d95522ea1078",
+      "bytes": 77167934
+    },
+    "reorder-before.txt": {
+      "sha256": "7ee101f43f72590ad74e3af8671ee3cf57b2fe14ebc0d9a4241a60ded41bedce",
+      "bytes": 2195
+    },
+    "flow-settings-after-reset.txt": {
+      "sha256": "7ee101f43f72590ad74e3af8671ee3cf57b2fe14ebc0d9a4241a60ded41bedce",
+      "bytes": 2195
+    }
+  },
+  "limitations": [
+    "Finite sample does not establish reliability below the threshold.",
+    "No mitigation or internal VFP root cause proven.",
+    "No repeated IPv4 ID under another source port observed for the failed flows within this capture; earlier collisions are not excluded.",
+    "The aborted settings experiment is not evidence for or against reordered-fragment support.",
+    "Windows networking remains unqualified for release."
+  ],
+  "postResetMatrix": {
+    "observedAt": "2026-09-07T15:38:49.398106+00:00",
+    "passed": 58,
+    "checks": 60,
+    "identitiesStable": true,
+    "failedChecks": [
+      {
+        "ok": false,
+        "expectedResponses": 10,
+        "reportedResponses": 9,
+        "exactResponses": 9,
+        "responsesPresent": true,
+        "errors": [
+          "reading from udp connection failed. err:'read udp 10.244.114.4:60553->10.244.190.81:8081: i/o timeout'"
+        ],
+        "commandExitCode": 0,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "kind": "udp",
+        "payloadBytes": 1400
+      },
+      {
+        "ok": false,
+        "expectedResponses": 10,
+        "reportedResponses": 9,
+        "exactResponses": 9,
+        "responsesPresent": true,
+        "errors": [
+          "reading from udp connection failed. err:'read udp 10.244.42.5:60763->10.244.114.4:8081: i/o timeout'"
+        ],
+        "commandExitCode": 0,
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "kind": "udp",
+        "payloadBytes": 1400
+      }
+    ],
+    "limitation": "No packet capture during this recovery check; these two timeouts are not localized by the earlier capture."
+  },
+  "postResetHealth": {
+    "nodes": {
+      "aws-win2022-v3": true,
+      "aws-win2025": true,
+      "aws-win2025-v3": true,
+      "cp": true,
+      "cp2": true,
+      "cp3": true,
+      "ip-172-29-0-9": true,
+      "remote1": true,
+      "remote2": true,
+      "w1": true,
+      "w2": true
+    }
+  },
+  "observerUnitTests": {
+    "passed": 16,
+    "command": "python3 -m unittest discover -s observe -p 'test_*.py'"
+  }
+}

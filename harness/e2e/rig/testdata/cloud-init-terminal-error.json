@@ -1,0 +1,8 @@
+{
+  "status": "error",
+  "extended_status": "error - done",
+  "sourceSHA256": "a92b059b919ceaaff1765a7a02f14e1c332e5dfd983fe6361501e09e22d8c6da",
+  "errors": [
+    "<redacted cloud-init error>"
+  ]
+}

@@ -1,0 +1,647 @@
+{
+  "observedAt": "2026-09-08T22:58:28.021132+00:00",
+  "scope": "Read-only HNS and VFP configuration inspection on retained single-NIC Windows 2022 and 2025 workers, after the three-host capture",
+  "hostSettingsChanged": false,
+  "trafficQualificationPerformed": false,
+  "qualificationEligible": false,
+  "hosts": {
+    "aws-win2022-v3": {
+      "at": "2026-09-08T22:52:44.2844928Z",
+      "switchCmdletAvailable": false,
+      "networks": [
+        {
+          "ID": "0782A040-B640-4E75-A4DE-20B2B1F38A70",
+          "Name": "External",
+          "Type": "Overlay",
+          "Policies": []
+        },
+        {
+          "ID": "2309541D-F748-41C0-BB76-D267848B4215",
+          "Name": "Calico",
+          "Type": "Overlay",
+          "Policies": [
+            {
+              "Type": "HostRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.121.64/26",
+              "DistributedRouterMacAddress": "66-4c-dd-f0-1a-88",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.13",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.155.0/26",
+              "DistributedRouterMacAddress": "66-39-d4-05-d2-c1",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.14",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.242.64/26",
+              "DistributedRouterMacAddress": "66-3f-81-e9-1d-69",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.10",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.233.128/26",
+              "DistributedRouterMacAddress": "00-15-5d-be-3f-de",
+              "IsolationId": 4096,
+              "ProviderAddress": "172.29.0.13",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.159.0/26",
+              "DistributedRouterMacAddress": "66-b0-da-90-d4-09",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.100.0.130",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.133.0/26",
+              "DistributedRouterMacAddress": "66-d2-d0-3f-bf-57",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.100.0.131",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.205.0/26",
+              "DistributedRouterMacAddress": "66-a9-c5-7c-6e-bc",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.100.0.136",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.42.0/26",
+              "DistributedRouterMacAddress": "00-15-5d-2e-c0-7b",
+              "IsolationId": 4096,
+              "ProviderAddress": "172.29.0.68",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.190.64/26",
+              "DistributedRouterMacAddress": "66-29-27-b4-64-9c",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.11",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.126.0/26",
+              "DistributedRouterMacAddress": "00-15-5d-c3-aa-d9",
+              "IsolationId": 4096,
+              "ProviderAddress": "172.29.0.91",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.177.0/26",
+              "DistributedRouterMacAddress": "00-15-5d-a0-48-90",
+              "IsolationId": 4096,
+              "ProviderAddress": "172.29.0.86",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.80.192/26",
+              "DistributedRouterMacAddress": "66-78-c3-7e-d1-a9",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.12",
+              "Type": "RemoteSubnetRoute"
+            }
+          ]
+        }
+      ],
+      "ports": [
+        {
+          "port": {
+            "id": "E4EF8B64-5524-4E68-9A84-30AC71E0CB3E",
+            "name": "ExternalPort"
+          },
+          "queries": {
+            "/get-port-parser-settings": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  PORT PARSER SETTINGS\r\n    ParseVxlan - True\r\n    ParseEncryptedVxlan - False\r\n    VxlanSrcPortRange - 0-65535\r\n    IgnoreGlobalSettings - False\r\n    ParseRdma - False\r\n    RdmaDestPort - 0\r\n    MirrorVxlanDestPort - 0\r\n    MirrorVxlanSrcPort - 0\r\n    ParseErspanPacket - False\r\n    ParseIcmpMessage - True\r\n\r\nCommand get-port-parser-settings succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-address-info": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nADDRESS INFO\r\n\r\n  Provider IP : 0.0.0.0\r\n  Provider IPv6 : ::\r\n  Customer IPv4 : 0.0.0.0\r\n  Customer IPv6 : ::\r\n  MAC address : 00-00-00-00-00-00\r\n  Fake MAC address : 00-00-00-00-00-00\r\n  Flags : 0\r\nCommand get-address-info succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-port-state": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nPORT STATE\r\n  Enabled : FALSE\r\n  Blocked : FALSE\r\n  BlockedOnRestore : TRUE\r\n  BlockedLayerCreation : FALSE\r\n  No Encapsulation Offloads Enabled\r\n  Preserving Vlan : FALSE\r\n  VM Context Set : FALSE\r\n\r\nCommand get-port-state succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-local-ipv4-addr": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLOCAL IPv4 ADDRESS LIST\r\n\r\nCommand get-local-ipv4-addr succeeded!\r\n",
+              "exit": 0
+            },
+            "/list-layer": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nCommand list-layer succeeded!\r\n",
+              "exit": 0
+            }
+          }
+        },
+        {
+          "port": {
+            "id": "1CC457C8-89FA-43A8-B29B-47A083AA784F",
+            "name": "Container NIC a3667fb2"
+          },
+          "queries": {
+            "/get-port-parser-settings": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  PORT PARSER SETTINGS\r\n    ParseVxlan - True\r\n    ParseEncryptedVxlan - False\r\n    VxlanSrcPortRange - 0-65535\r\n    IgnoreGlobalSettings - False\r\n    ParseRdma - False\r\n    RdmaDestPort - 0\r\n    MirrorVxlanDestPort - 0\r\n    MirrorVxlanSrcPort - 0\r\n    ParseErspanPacket - False\r\n    ParseIcmpMessage - True\r\n\r\nCommand get-port-parser-settings succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-address-info": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nADDRESS INFO\r\n\r\n  Provider IP : 172.29.0.24\r\n  Provider IPv6 : ::\r\n  Customer IPv4 : 172.29.0.24\r\n  Customer IPv6 : ::\r\n  MAC address : 00-00-00-00-00-00\r\n  Fake MAC address : 02-FF-F6-B6-D8-ED\r\n  Flags : 0\r\nCommand get-address-info succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-port-state": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nPORT STATE\r\n  Enabled : TRUE\r\n  Blocked : FALSE\r\n  BlockedOnRestore : TRUE\r\n  BlockedLayerCreation : FALSE\r\n  No Encapsulation Offloads Enabled\r\n  Preserving Vlan : FALSE\r\n  VM Context Set : FALSE\r\n\r\nCommand get-port-state succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-local-ipv4-addr": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLOCAL IPv4 ADDRESS LIST\r\n\r\nCommand get-local-ipv4-addr succeeded!\r\n",
+              "exit": 0
+            },
+            "/list-layer": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLAYER : LB\r\n    Friendly name : LB\r\n    Flags : 0x1 Default Allow \r\n    Priority : 300\r\n\r\nLAYER : ENCAP\r\n    Friendly name : ENCAP\r\n    Flags : 0x1, Default Allow \r\n    Priority : 500\r\n\r\nLAYER : DECAP_IN\r\n    Friendly name : DECAP_IN\r\n    Flags : 0x1, Default Allow \r\n    Priority : 600\r\n\r\nLAYER : SLB_LB_LAYER\r\n    Friendly name : SLB_LB_LAYER\r\n    Flags : 0x1, Default Allow \r\n    Priority : 700\r\n\r\nLAYER : VNET_PA_ROUTE_LAYER\r\n    Friendly name : VNET_PA_ROUTE_LAYER\r\n    Flags : 0x1, Default Allow \r\n    Priority : 2000\r\n\r\nLAYER : SLB_HAIRPIN_LAYER\r\n    Friendly name : SLB_HAIRPIN_LAYER\r\n    Flags : 0x3 Hairpin Layer, Default Allow \r\n    Priority : 101\r\n\r\nCommand list-layer succeeded!\r\n",
+              "exit": 0
+            }
+          }
+        },
+        {
+          "port": {
+            "id": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+            "name": "Container NIC 070372ba"
+          },
+          "queries": {
+            "/get-port-parser-settings": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  PORT PARSER SETTINGS\r\n    ParseVxlan - True\r\n    ParseEncryptedVxlan - False\r\n    VxlanSrcPortRange - 0-65535\r\n    IgnoreGlobalSettings - False\r\n    ParseRdma - False\r\n    RdmaDestPort - 0\r\n    MirrorVxlanDestPort - 0\r\n    MirrorVxlanSrcPort - 0\r\n    ParseErspanPacket - False\r\n    ParseIcmpMessage - True\r\n\r\nCommand get-port-parser-settings succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-address-info": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nADDRESS INFO\r\n\r\n  Provider IP : 172.29.0.24\r\n  Provider IPv6 : ::\r\n  Customer IPv4 : 0.0.0.0\r\n  Customer IPv6 : ::\r\n  MAC address : 00-00-00-00-00-00\r\n  Fake MAC address : 02-FF-F6-B6-D8-ED\r\n  Flags : 336\r\nCommand get-address-info succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-port-state": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nPORT STATE\r\n  Enabled : TRUE\r\n  Blocked : FALSE\r\n  BlockedOnRestore : TRUE\r\n  BlockedLayerCreation : FALSE\r\n  No Encapsulation Offloads Enabled\r\n  Preserving Vlan : FALSE\r\n  VM Context Set : FALSE\r\n\r\nCommand get-port-state succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-local-ipv4-addr": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLOCAL IPv4 ADDRESS LIST\r\n\r\nCommand get-local-ipv4-addr succeeded!\r\n",
+              "exit": 0
+            },
+            "/list-layer": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLAYER : VNET_ENCAP_LAYER\r\n    Friendly name : VNET_ENCAP_LAYER\r\n    Flags : 0x4 Clear TNI \r\n    Priority : 40\r\n\r\nLAYER : VNET_PA_ROUTE_LAYER\r\n    Friendly name : VNET_PA_ROUTE_LAYER\r\n    Flags : 0x1, Default Allow \r\n    Priority : 2000\r\n\r\nLAYER : REMOTESUBNETROUTE_HAIRPIN_LAYER\r\n    Friendly name : REMOTESUBNETROUTE_HAIRPIN_LAYER\r\n    Flags : 0x3 Hairpin Layer, Default Allow \r\n    Priority : 35\r\n\r\nCommand list-layer succeeded!\r\n",
+              "exit": 0
+            }
+          }
+        },
+        {
+          "port": {
+            "id": "51E72482-CE0D-4296-80D1-EF60EC906ED0",
+            "name": "BD6C1803-5537-4838-A8FB-77165B50F1EA"
+          },
+          "queries": {
+            "/get-port-parser-settings": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  PORT PARSER SETTINGS\r\n    ParseVxlan - True\r\n    ParseEncryptedVxlan - False\r\n    VxlanSrcPortRange - 0-65535\r\n    IgnoreGlobalSettings - False\r\n    ParseRdma - False\r\n    RdmaDestPort - 0\r\n    MirrorVxlanDestPort - 0\r\n    MirrorVxlanSrcPort - 0\r\n    ParseErspanPacket - False\r\n    ParseIcmpMessage - True\r\n\r\nCommand get-port-parser-settings succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-address-info": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nADDRESS INFO\r\n\r\n  Provider IP : 172.29.0.24\r\n  Provider IPv6 : ::\r\n  Customer IPv4 : 0.0.0.0\r\n  Customer IPv6 : ::\r\n  MAC address : 00-00-00-00-00-00\r\n  Fake MAC address : 02-FF-F6-B6-D8-ED\r\n  Flags : 336\r\nCommand get-address-info succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-port-state": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nPORT STATE\r\n  Enabled : TRUE\r\n  Blocked : FALSE\r\n  BlockedOnRestore : TRUE\r\n  BlockedLayerCreation : FALSE\r\n  No Encapsulation Offloads Enabled\r\n  Preserving Vlan : FALSE\r\n  VM Context Set : FALSE\r\n\r\nCommand get-port-state succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-local-ipv4-addr": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLOCAL IPv4 ADDRESS LIST\r\n\r\nCommand get-local-ipv4-addr succeeded!\r\n",
+              "exit": 0
+            },
+            "/list-layer": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLAYER : LB_DSR\r\n    Friendly name : LB_DSR\r\n    Flags : 0x1 Default Allow \r\n    Priority : 7\r\n\r\nLAYER : ACL_ENDPOINT_LAYER\r\n    Friendly name : ACL_ENDPOINT_LAYER\r\n    Priority : 15\r\n\r\nLAYER : VNET_ENCAP_LAYER\r\n    Friendly name : VNET_ENCAP_LAYER\r\n    Flags : 0x4, Clear TNI \r\n    Priority : 40\r\n\r\nLAYER : SLB_NAT_LAYER\r\n    Friendly name : SLB_NAT_LAYER\r\n    Flags : 0x9, Default Allow , Update flows on address change \r\n    Priority : 50\r\n\r\nLAYER : SLB_DECAP_LAYER_STATEFUL\r\n    Friendly name : SLB_DECAP_LAYER_STATEFUL\r\n    Flags : 0x9, Default Allow , Update flows on address change \r\n    Priority : 100\r\n\r\nLAYER : VNET_PA_ROUTE_LAYER\r\n    Friendly name : VNET_PA_ROUTE_LAYER\r\n    Flags : 0x1, Default Allow \r\n    Priority : 2000\r\n\r\nCommand list-layer succeeded!\r\n",
+              "exit": 0
+            }
+          }
+        }
+      ],
+      "drGroupsAndCounters": {
+        "VNET_PA_ROUTE_LAYER/list-group": {
+          "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  GROUP : VNET_GROUP_PA_ROUTE_IPV4_OUT\r\n      Friendly name : VNET_GROUP_PA_ROUTE_IPV4_OUT\r\n      Priority : 200\r\n      Direction : OUT\r\n      Type : IPv4\r\n        Conditions:\r\n            <none>\r\n      Match type : Priority-based match\r\n\r\n  GROUP : VNET_GROUP_PA_ROUTE_IPV6_OUT\r\n      Friendly name : VNET_GROUP_PA_ROUTE_IPV6_OUT\r\n      Priority : 200\r\n      Direction : OUT\r\n      Type : IPv6\r\n        Conditions:\r\n            <none>\r\n      Match type : Priority-based match\r\n\r\nCommand list-group succeeded!\r\n",
+          "exit": 0
+        },
+        "VNET_PA_ROUTE_LAYER/get-layer-counter": {
+          "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLAYER : VNET_PA_ROUTE_LAYER\r\n    Friendly name : VNET_PA_ROUTE_LAYER\r\n    Flags : 0x1 Default Allow \r\n    Priority : 2000\r\n\r\n  LAYER COUNTER\r\n    Direction - OUT\r\n      Flow match count : 0\r\n      Flow drop count : 0\r\n      Flow pending count : 0\r\n      Pending drop count : 0\r\n      Rule match count : 672090\r\n      Rule drop count : 0\r\n      Rule pending count : 0\r\n      Rule unified flow drop count : 0\r\n      No match count : 0\r\n      Frag cache match count : 0\r\n      Frag cache drop count : 0\r\n      Frag cache no match count : 0\r\n\r\n    Direction - IN\r\n      Flow match count : 0\r\n      Flow drop count : 0\r\n      Flow pending count : 0\r\n      Pending drop count : 0\r\n      Rule match count : 0\r\n      Rule drop count : 0\r\n      Rule pending count : 0\r\n      Rule unified flow drop count : 0\r\n      No match count : 672159\r\n      Frag cache match count : 4961\r\n      Frag cache drop count : 0\r\n      Frag cache no match count : 0\r\n\r\nCommand get-layer-counter succeeded!\r\n",
+          "exit": 0
+        },
+        "REMOTESUBNETROUTE_HAIRPIN_LAYER/get-layer-counter": {
+          "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLAYER : REMOTESUBNETROUTE_HAIRPIN_LAYER\r\n    Friendly name : REMOTESUBNETROUTE_HAIRPIN_LAYER\r\n    Flags : 0x3 Hairpin Layer, Default Allow \r\n    Priority : 35\r\n\r\n  LAYER COUNTER\r\n    Direction - OUT\r\n      Flow match count : 0\r\n      Flow drop count : 0\r\n      Flow pending count : 0\r\n      Pending drop count : 0\r\n      Rule match count : 0\r\n      Rule drop count : 0\r\n      Rule pending count : 0\r\n      Rule unified flow drop count : 0\r\n      No match count : 20\r\n      Frag cache match count : 0\r\n      Frag cache drop count : 0\r\n      Frag cache no match count : 0\r\n\r\n    Direction - IN\r\n      Flow match count : 0\r\n      Flow drop count : 0\r\n      Flow pending count : 0\r\n      Pending drop count : 0\r\n      Rule match count : 751485\r\n      Rule drop count : 0\r\n      Rule pending count : 0\r\n      Rule unified flow drop count : 0\r\n      No match count : 61\r\n      Frag cache match count : 4961\r\n      Frag cache drop count : 0\r\n      Frag cache no match count : 0\r\n\r\nCommand get-layer-counter succeeded!\r\n",
+          "exit": 0
+        },
+        "VNET_ENCAP_LAYER/list-group": {
+          "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  GROUP : VNET_GROUP_ENCAP_IPV4_OUT\r\n      Friendly name : VNET_GROUP_ENCAP_IPV4_OUT\r\n      Priority : 100\r\n      Direction : OUT\r\n      Type : IPv4\r\n        Conditions:\r\n            <none>\r\n      Match type : Longest prefix match on Destination IP\r\n\r\n  GROUP : VNET_GROUP_ENCAP_IPV4_IN\r\n      Friendly name : VNET_GROUP_ENCAP_IPV4_IN\r\n      Priority : 100\r\n      Direction : IN\r\n      Type : IPv4\r\n        Conditions:\r\n            <none>\r\n      Match type : Longest prefix match on Destination IP\r\n\r\nCommand list-group succeeded!\r\n",
+          "exit": 0
+        },
+        "REMOTESUBNETROUTE_HAIRPIN_LAYER/list-group": {
+          "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  GROUP : REMOTESUBNETROUTE_HAIRPIN_GROUP\r\n      Friendly name : REMOTESUBNETROUTE_HAIRPIN_GROUP\r\n      Priority : 100\r\n      Direction : IN\r\n      Type : IPv4\r\n        Conditions:\r\n            <none>\r\n      Match type : Longest prefix match on Destination IP\r\n\r\nCommand list-group succeeded!\r\n",
+          "exit": 0
+        },
+        "VNET_ENCAP_LAYER/get-layer-counter": {
+          "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLAYER : VNET_ENCAP_LAYER\r\n    Friendly name : VNET_ENCAP_LAYER\r\n    Flags : 0x4 Clear TNI \r\n    Priority : 40\r\n\r\n  LAYER COUNTER\r\n    Direction - OUT\r\n      Flow match count : 0\r\n      Flow drop count : 0\r\n      Flow pending count : 0\r\n      Pending drop count : 0\r\n      Rule match count : 0\r\n      Rule drop count : 0\r\n      Rule pending count : 0\r\n      Rule unified flow drop count : 0\r\n      No match count : 0\r\n      Frag cache match count : 0\r\n      Frag cache drop count : 0\r\n      Frag cache no match count : 0\r\n\r\n    Direction - IN\r\n      Flow match count : 0\r\n      Flow drop count : 0\r\n      Flow pending count : 0\r\n      Pending drop count : 0\r\n      Rule match count : 0\r\n      Rule drop count : 0\r\n      Rule pending count : 0\r\n      Rule unified flow drop count : 0\r\n      No match count : 0\r\n      Frag cache match count : 0\r\n      Frag cache drop count : 0\r\n      Frag cache no match count : 0\r\n\r\nCommand get-layer-counter succeeded!\r\n",
+          "exit": 0
+        }
+      },
+      "drInboundDecapsulation": {
+        "text": "\r\n ITEM LIST\r\n===========\r\n\r\n    RULE : \r\n        Priority : 45534\r\n        Flags : 769 terminating \r\n        Type : decap\r\n        Conditions:\r\n            Protocols : 252\r\n        Flow TTL: 0\r\n        Preserve MAC\r\n        Push TNI as VSID\r\n        FlagsEx : 0 \r\n\r\nCommand list-rule succeeded!\r\n",
+        "exit": 0
+      }
+    },
+    "aws-win2025-v3": {
+      "at": "2026-09-08T22:52:53.3016696Z",
+      "switchCmdletAvailable": false,
+      "networks": [
+        {
+          "ID": "51C5BE6A-89E0-4B23-919B-E3E6E65867D0",
+          "Name": "Calico",
+          "Type": "Overlay",
+          "Policies": [
+            {
+              "Type": "HostRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.133.0/26",
+              "DistributedRouterMacAddress": "66-d2-d0-3f-bf-57",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.100.0.131",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.121.64/26",
+              "DistributedRouterMacAddress": "66-4c-dd-f0-1a-88",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.13",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.155.0/26",
+              "DistributedRouterMacAddress": "66-39-d4-05-d2-c1",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.14",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.159.0/26",
+              "DistributedRouterMacAddress": "66-b0-da-90-d4-09",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.100.0.130",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.242.64/26",
+              "DistributedRouterMacAddress": "66-3f-81-e9-1d-69",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.10",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.114.0/26",
+              "DistributedRouterMacAddress": "00-15-5d-3a-31-08",
+              "IsolationId": 4096,
+              "ProviderAddress": "172.29.0.24",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.233.128/26",
+              "DistributedRouterMacAddress": "00-15-5d-be-3f-de",
+              "IsolationId": 4096,
+              "ProviderAddress": "172.29.0.13",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.205.0/26",
+              "DistributedRouterMacAddress": "66-a9-c5-7c-6e-bc",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.100.0.136",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.190.64/26",
+              "DistributedRouterMacAddress": "66-29-27-b4-64-9c",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.11",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.126.0/26",
+              "DistributedRouterMacAddress": "00-15-5d-c3-aa-d9",
+              "IsolationId": 4096,
+              "ProviderAddress": "172.29.0.91",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.177.0/26",
+              "DistributedRouterMacAddress": "00-15-5d-a0-48-90",
+              "IsolationId": 4096,
+              "ProviderAddress": "172.29.0.86",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.80.192/26",
+              "DistributedRouterMacAddress": "66-78-c3-7e-d1-a9",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.12",
+              "Type": "RemoteSubnetRoute"
+            }
+          ]
+        },
+        {
+          "ID": "DEE50E26-3CCE-4963-8007-8D2AB9683F41",
+          "Name": "External",
+          "Type": "Overlay",
+          "Policies": []
+        }
+      ],
+      "ports": [
+        {
+          "port": {
+            "id": "DDEDE667-7354-11F0-941E-806E6F6E6963",
+            "name": "ExternalPort"
+          },
+          "queries": {
+            "/get-port-parser-settings": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  PORT PARSER SETTINGS\r\n    ParseVxlan - True\r\n    ParseEncryptedVxlan - False\r\n    VxlanSrcPortRange - 0-65535\r\n    IgnoreGlobalSettings - False\r\n    ParseRdma - False\r\n    RdmaDestPort - 0\r\n    MirrorVxlanDestPort - 0\r\n    MirrorVxlanSrcPort - 0\r\n    ParseErspanPacket - False\r\n    ParseIcmpMessage - True\r\n\r\nCommand get-port-parser-settings succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-address-info": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nADDRESS INFO\r\n\r\n  Provider IP : 0.0.0.0\r\n  Provider IPv6 : ::\r\n  Customer IPv4 : 0.0.0.0\r\n  Customer IPv6 : ::\r\n  MAC address : 00-00-00-00-00-00\r\n  Fake MAC address : 00-00-00-00-00-00\r\n  Flags : 0\r\nCommand get-address-info succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-port-state": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nPORT STATE\r\n  Enabled : FALSE\r\n  Blocked : FALSE\r\n  BlockedOnRestore : TRUE\r\n  BlockedLayerCreation : FALSE\r\n  No Encapsulation Offloads Enabled\r\n  Preserving Vlan : FALSE\r\n  VM Context Set : FALSE\r\n\r\nCommand get-port-state succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-local-ipv4-addr": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLOCAL IPv4 ADDRESS LIST\r\n\r\nCommand get-local-ipv4-addr succeeded!\r\n",
+              "exit": 0
+            },
+            "/list-layer": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nCommand list-layer succeeded!\r\n",
+              "exit": 0
+            }
+          }
+        },
+        {
+          "port": {
+            "id": "51C5BE6A-89E0-4B23-919B-E3E6E65867D1",
+            "name": "Host Vnic 51C5BE6A-89E0-4B23-919B-E3E6E65867D0"
+          },
+          "queries": {
+            "/get-port-parser-settings": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  PORT PARSER SETTINGS\r\n    ParseVxlan - True\r\n    ParseEncryptedVxlan - False\r\n    VxlanSrcPortRange - 0-65535\r\n    IgnoreGlobalSettings - False\r\n    ParseRdma - False\r\n    RdmaDestPort - 0\r\n    MirrorVxlanDestPort - 0\r\n    MirrorVxlanSrcPort - 0\r\n    ParseErspanPacket - False\r\n    ParseIcmpMessage - True\r\n\r\nCommand get-port-parser-settings succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-address-info": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nADDRESS INFO\r\n\r\n  Provider IP : 172.29.0.68\r\n  Provider IPv6 : ::\r\n  Customer IPv4 : 172.29.0.68\r\n  Customer IPv6 : ::\r\n  MAC address : 00-00-00-00-00-00\r\n  Fake MAC address : 02-FF-C0-FA-46-77\r\n  Flags : 0\r\nCommand get-address-info succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-port-state": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nPORT STATE\r\n  Enabled : TRUE\r\n  Blocked : FALSE\r\n  BlockedOnRestore : TRUE\r\n  BlockedLayerCreation : FALSE\r\n  No Encapsulation Offloads Enabled\r\n  Preserving Vlan : FALSE\r\n  VM Context Set : FALSE\r\n\r\nCommand get-port-state succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-local-ipv4-addr": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLOCAL IPv4 ADDRESS LIST\r\n\r\nCommand get-local-ipv4-addr succeeded!\r\n",
+              "exit": 0
+            },
+            "/list-layer": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLAYER : LB\r\n    Friendly name : LB\r\n    Flags : 0x1 Default Allow \r\n    Priority : 300\r\n\r\nLAYER : ENCAP\r\n    Friendly name : ENCAP\r\n    Flags : 0x1, Default Allow \r\n    Priority : 500\r\n\r\nLAYER : DECAP_IN\r\n    Friendly name : DECAP_IN\r\n    Flags : 0x1, Default Allow \r\n    Priority : 600\r\n\r\nLAYER : SLB_LB_LAYER\r\n    Friendly name : SLB_LB_LAYER\r\n    Flags : 0x1, Default Allow \r\n    Priority : 700\r\n\r\nLAYER : VNET_PA_ROUTE_LAYER\r\n    Friendly name : VNET_PA_ROUTE_LAYER\r\n    Flags : 0x1, Default Allow \r\n    Priority : 2000\r\n\r\nLAYER : SLB_HAIRPIN_LAYER\r\n    Friendly name : SLB_HAIRPIN_LAYER\r\n    Flags : 0x3 Hairpin Layer, Default Allow \r\n    Priority : 101\r\n\r\nCommand list-layer succeeded!\r\n",
+              "exit": 0
+            }
+          }
+        },
+        {
+          "port": {
+            "id": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+            "name": "DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0"
+          },
+          "queries": {
+            "/get-port-parser-settings": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  PORT PARSER SETTINGS\r\n    ParseVxlan - True\r\n    ParseEncryptedVxlan - False\r\n    VxlanSrcPortRange - 0-65535\r\n    IgnoreGlobalSettings - False\r\n    ParseRdma - False\r\n    RdmaDestPort - 0\r\n    MirrorVxlanDestPort - 0\r\n    MirrorVxlanSrcPort - 0\r\n    ParseErspanPacket - False\r\n    ParseIcmpMessage - True\r\n\r\nCommand get-port-parser-settings succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-address-info": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nADDRESS INFO\r\n\r\n  Provider IP : 172.29.0.68\r\n  Provider IPv6 : ::\r\n  Customer IPv4 : 0.0.0.0\r\n  Customer IPv6 : ::\r\n  MAC address : 00-00-00-00-00-00\r\n  Fake MAC address : 02-FF-C0-FA-46-77\r\n  Flags : 4432\r\nCommand get-address-info succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-port-state": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nPORT STATE\r\n  Enabled : TRUE\r\n  Blocked : FALSE\r\n  BlockedOnRestore : TRUE\r\n  BlockedLayerCreation : FALSE\r\n  No Encapsulation Offloads Enabled\r\n  Preserving Vlan : FALSE\r\n  VM Context Set : FALSE\r\n\r\nCommand get-port-state succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-local-ipv4-addr": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLOCAL IPv4 ADDRESS LIST\r\n\r\nCommand get-local-ipv4-addr succeeded!\r\n",
+              "exit": 0
+            },
+            "/list-layer": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLAYER : VNET_ENCAP_LAYER\r\n    Friendly name : VNET_ENCAP_LAYER\r\n    Flags : 0x4 Clear TNI \r\n    Priority : 40\r\n\r\nLAYER : VNET_PA_ROUTE_LAYER\r\n    Friendly name : VNET_PA_ROUTE_LAYER\r\n    Flags : 0x1, Default Allow \r\n    Priority : 2000\r\n\r\nLAYER : REMOTESUBNETROUTE_HAIRPIN_LAYER\r\n    Friendly name : REMOTESUBNETROUTE_HAIRPIN_LAYER\r\n    Flags : 0x3 Hairpin Layer, Default Allow \r\n    Priority : 35\r\n\r\nCommand list-layer succeeded!\r\n",
+              "exit": 0
+            }
+          }
+        },
+        {
+          "port": {
+            "id": "D3E45244-AE89-4B92-9087-7E95435655CD",
+            "name": "D3E45244-AE89-4B92-9087-7E95435655CD"
+          },
+          "queries": {
+            "/get-port-parser-settings": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  PORT PARSER SETTINGS\r\n    ParseVxlan - True\r\n    ParseEncryptedVxlan - False\r\n    VxlanSrcPortRange - 0-65535\r\n    IgnoreGlobalSettings - False\r\n    ParseRdma - False\r\n    RdmaDestPort - 0\r\n    MirrorVxlanDestPort - 0\r\n    MirrorVxlanSrcPort - 0\r\n    ParseErspanPacket - False\r\n    ParseIcmpMessage - True\r\n\r\nCommand get-port-parser-settings succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-address-info": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nADDRESS INFO\r\n\r\n  Provider IP : 172.29.0.68\r\n  Provider IPv6 : ::\r\n  Customer IPv4 : 0.0.0.0\r\n  Customer IPv6 : ::\r\n  MAC address : 00-00-00-00-00-00\r\n  Fake MAC address : 02-FF-C0-FA-46-77\r\n  Flags : 4432\r\nCommand get-address-info succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-port-state": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nPORT STATE\r\n  Enabled : TRUE\r\n  Blocked : FALSE\r\n  BlockedOnRestore : TRUE\r\n  BlockedLayerCreation : FALSE\r\n  No Encapsulation Offloads Enabled\r\n  Preserving Vlan : FALSE\r\n  VM Context Set : FALSE\r\n\r\nCommand get-port-state succeeded!\r\n",
+              "exit": 0
+            },
+            "/get-local-ipv4-addr": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLOCAL IPv4 ADDRESS LIST\r\n\r\nCommand get-local-ipv4-addr succeeded!\r\n",
+              "exit": 0
+            },
+            "/list-layer": {
+              "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLAYER : LB_DSR\r\n    Friendly name : LB_DSR\r\n    Flags : 0x1 Default Allow \r\n    Priority : 7\r\n\r\nLAYER : ACL_ENDPOINT_LAYER\r\n    Friendly name : ACL_ENDPOINT_LAYER\r\n    Priority : 15\r\n\r\nLAYER : VNET_ENCAP_LAYER\r\n    Friendly name : VNET_ENCAP_LAYER\r\n    Flags : 0x4, Clear TNI \r\n    Priority : 40\r\n\r\nLAYER : SLB_NAT_LAYER\r\n    Friendly name : SLB_NAT_LAYER\r\n    Flags : 0x9, Default Allow , Update flows on address change \r\n    Priority : 50\r\n\r\nLAYER : SLB_DECAP_LAYER_STATEFUL\r\n    Friendly name : SLB_DECAP_LAYER_STATEFUL\r\n    Flags : 0x9, Default Allow , Update flows on address change \r\n    Priority : 100\r\n\r\nLAYER : VNET_PA_ROUTE_LAYER\r\n    Friendly name : VNET_PA_ROUTE_LAYER\r\n    Flags : 0x1, Default Allow \r\n    Priority : 2000\r\n\r\nCommand list-layer succeeded!\r\n",
+              "exit": 0
+            }
+          }
+        }
+      ],
+      "drGroupsAndCounters": {
+        "VNET_PA_ROUTE_LAYER/list-group": {
+          "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  GROUP : VNET_GROUP_PA_ROUTE_IPV4_OUT\r\n      Friendly name : VNET_GROUP_PA_ROUTE_IPV4_OUT\r\n      Priority : 200\r\n      Direction : OUT\r\n      Type : IPv4\r\n        Conditions:\r\n            <none>\r\n      Match type : Priority-based match\r\n\r\n  GROUP : VNET_GROUP_PA_ROUTE_IPV6_OUT\r\n      Friendly name : VNET_GROUP_PA_ROUTE_IPV6_OUT\r\n      Priority : 200\r\n      Direction : OUT\r\n      Type : IPv6\r\n        Conditions:\r\n            <none>\r\n      Match type : Priority-based match\r\n\r\nCommand list-group succeeded!\r\n",
+          "exit": 0
+        },
+        "VNET_PA_ROUTE_LAYER/get-layer-counter": {
+          "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLAYER : VNET_PA_ROUTE_LAYER\r\n    Friendly name : VNET_PA_ROUTE_LAYER\r\n    Flags : 0x1 Default Allow \r\n    Priority : 2000\r\n\r\n  LAYER COUNTER\r\n    Direction - OUT\r\n      Flow match count : 0\r\n      Flow drop count : 0\r\n      Flow pending count : 0\r\n      Pending drop count : 0\r\n      Rule match count : 661931\r\n      Rule drop count : 0\r\n      Rule pending count : 0\r\n      Rule unified flow drop count : 0\r\n      No match count : 0\r\n      Frag cache match count : 0\r\n      Frag cache drop count : 0\r\n      Frag cache no match count : 0\r\n\r\n    Direction - IN\r\n      Flow match count : 0\r\n      Flow drop count : 0\r\n      Flow pending count : 0\r\n      Pending drop count : 0\r\n      Rule match count : 0\r\n      Rule drop count : 0\r\n      Rule pending count : 0\r\n      Rule unified flow drop count : 0\r\n      No match count : 662004\r\n      Frag cache match count : 5516\r\n      Frag cache drop count : 0\r\n      Frag cache no match count : 0\r\n\r\nCommand get-layer-counter succeeded!\r\n",
+          "exit": 0
+        },
+        "REMOTESUBNETROUTE_HAIRPIN_LAYER/get-layer-counter": {
+          "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLAYER : REMOTESUBNETROUTE_HAIRPIN_LAYER\r\n    Friendly name : REMOTESUBNETROUTE_HAIRPIN_LAYER\r\n    Flags : 0x3 Hairpin Layer, Default Allow \r\n    Priority : 35\r\n\r\n  LAYER COUNTER\r\n    Direction - OUT\r\n      Flow match count : 0\r\n      Flow drop count : 0\r\n      Flow pending count : 0\r\n      Pending drop count : 0\r\n      Rule match count : 0\r\n      Rule drop count : 0\r\n      Rule pending count : 0\r\n      Rule unified flow drop count : 0\r\n      No match count : 24\r\n      Frag cache match count : 0\r\n      Frag cache drop count : 0\r\n      Frag cache no match count : 0\r\n\r\n    Direction - IN\r\n      Flow match count : 0\r\n      Flow drop count : 0\r\n      Flow pending count : 0\r\n      Pending drop count : 0\r\n      Rule match count : 322847\r\n      Rule drop count : 0\r\n      Rule pending count : 0\r\n      Rule unified flow drop count : 0\r\n      No match count : 32\r\n      Frag cache match count : 299\r\n      Frag cache drop count : 0\r\n      Frag cache no match count : 0\r\n\r\nCommand get-layer-counter succeeded!\r\n",
+          "exit": 0
+        },
+        "VNET_ENCAP_LAYER/list-group": {
+          "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  GROUP : VNET_GROUP_ENCAP_IPV4_OUT\r\n      Friendly name : VNET_GROUP_ENCAP_IPV4_OUT\r\n      Priority : 100\r\n      Direction : OUT\r\n      Type : IPv4\r\n        Conditions:\r\n            <none>\r\n      Match type : Longest prefix match on Destination IP\r\n\r\n  GROUP : VNET_GROUP_ENCAP_IPV4_IN\r\n      Friendly name : VNET_GROUP_ENCAP_IPV4_IN\r\n      Priority : 100\r\n      Direction : IN\r\n      Type : IPv4\r\n        Conditions:\r\n            <none>\r\n      Match type : Longest prefix match on Destination IP\r\n\r\nCommand list-group succeeded!\r\n",
+          "exit": 0
+        },
+        "REMOTESUBNETROUTE_HAIRPIN_LAYER/list-group": {
+          "text": "\r\n ITEM LIST\r\n===========\r\n\r\n  GROUP : REMOTESUBNETROUTE_HAIRPIN_GROUP\r\n      Friendly name : REMOTESUBNETROUTE_HAIRPIN_GROUP\r\n      Priority : 100\r\n      Direction : IN\r\n      Type : IPv4\r\n        Conditions:\r\n            <none>\r\n      Match type : Longest prefix match on Destination IP\r\n\r\nCommand list-group succeeded!\r\n",
+          "exit": 0
+        },
+        "VNET_ENCAP_LAYER/get-layer-counter": {
+          "text": "\r\n ITEM LIST\r\n===========\r\n\r\nLAYER : VNET_ENCAP_LAYER\r\n    Friendly name : VNET_ENCAP_LAYER\r\n    Flags : 0x4 Clear TNI \r\n    Priority : 40\r\n\r\n  LAYER COUNTER\r\n    Direction - OUT\r\n      Flow match count : 0\r\n      Flow drop count : 0\r\n      Flow pending count : 0\r\n      Pending drop count : 0\r\n      Rule match count : 0\r\n      Rule drop count : 0\r\n      Rule pending count : 0\r\n      Rule unified flow drop count : 0\r\n      No match count : 0\r\n      Frag cache match count : 0\r\n      Frag cache drop count : 0\r\n      Frag cache no match count : 0\r\n\r\n    Direction - IN\r\n      Flow match count : 0\r\n      Flow drop count : 0\r\n      Flow pending count : 0\r\n      Pending drop count : 0\r\n      Rule match count : 0\r\n      Rule drop count : 0\r\n      Rule pending count : 0\r\n      Rule unified flow drop count : 0\r\n      No match count : 0\r\n      Frag cache match count : 0\r\n      Frag cache drop count : 0\r\n      Frag cache no match count : 0\r\n\r\nCommand get-layer-counter succeeded!\r\n",
+          "exit": 0
+        }
+      },
+      "drInboundDecapsulation": {
+        "text": "\r\n ITEM LIST\r\n===========\r\n\r\n    RULE : \r\n        Priority : 45534\r\n        Flags : 769 terminating \r\n        Type : decap\r\n        Conditions:\r\n            Protocols : 252\r\n        Flow TTL: 0\r\n        Preserve MAC\r\n        Push TNI as VSID\r\n        FlagsEx : 0 \r\n\r\nCommand list-rule succeeded!\r\n",
+        "exit": 0
+      }
+    }
+  },
+  "pluginContainers": [
+    {
+      "name": "calico-node-windows-fr2cw",
+      "uid": "079f76d3-ee91-44aa-af5b-faaa383baee9",
+      "node": "aws-win2022-v3",
+      "createdAt": "2026-09-07T13:50:53Z",
+      "containers": [
+        {
+          "name": "felix",
+          "restartCount": 0,
+          "state": {
+            "running": {
+              "startedAt": "2026-09-07T13:53:15Z"
+            }
+          }
+        },
+        {
+          "name": "node",
+          "restartCount": 0,
+          "state": {
+            "running": {
+              "startedAt": "2026-09-07T13:53:18Z"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "calico-node-windows-vn9c6",
+      "uid": "fafff698-bbe8-43f3-8b71-fd232427a6c7",
+      "node": "aws-win2025-v3",
+      "createdAt": "2026-09-07T14:33:35Z",
+      "containers": [
+        {
+          "name": "felix",
+          "restartCount": 0,
+          "state": {
+            "running": {
+              "startedAt": "2026-09-07T14:36:51Z"
+            }
+          }
+        },
+        {
+          "name": "node",
+          "restartCount": 0,
+          "state": {
+            "running": {
+              "startedAt": "2026-09-07T14:36:53Z"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "kube-proxy-windows-ljr5p",
+      "uid": "6455d0e1-aaa0-42bf-9f89-95571fe65d8b",
+      "node": "aws-win2022-v3",
+      "createdAt": "2026-09-07T13:50:53Z",
+      "containers": [
+        {
+          "name": "kube-proxy",
+          "restartCount": 0,
+          "state": {
+            "running": {
+              "startedAt": "2026-09-07T13:52:01Z"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "kube-proxy-windows-ws7vw",
+      "uid": "9f440692-4d95-4791-ba78-668e3734d3f8",
+      "node": "aws-win2025-v3",
+      "createdAt": "2026-09-07T14:33:35Z",
+      "containers": [
+        {
+          "name": "kube-proxy",
+          "restartCount": 0,
+          "state": {
+            "running": {
+              "startedAt": "2026-09-07T14:34:08Z"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "baseline": {
+    "at": "2026-09-08T22:57:37.074854+00:00",
+    "nodes": 13,
+    "allReady": true,
+    "identitiesStable": true
+  },
+  "findings": [
+    "All eight inspected VFP ports are enabled and unblocked, with ParseVxlan true and VxlanSrcPortRange 0-65535. This snapshot does not expose an obvious static parser exclusion for the failed packets.",
+    "Both Calico HNS networks retain the remote subnet route to the other worker with IsolationId 4096, matching peer provider address and distributed-router MAC. External overlays have no RemoteSubnetRoute policies in this observation.",
+    "Both DR ports have VNET_ENCAP_LAYER inbound decap rules with Protocols 252, Preserve MAC and Push TNI as VSID. These are native rendered rule fields; this report does not infer the internal packet classifier state during a previous drop.",
+    "Calico and kube-proxy containers have zero restarts and current start times preceding the original capture. The fork watchdog restarts its container on failure; those reported drops do not coincide with such a container restart.",
+    "No Hyper-V Get-VMSwitch command was available. Microsoft documents software RSC as TCP coalescing; no RSC setting was changed for this UDP investigation."
+  ],
+  "limitations": [
+    "Static configuration inspection does not identify transient VFP metadata, classifier or forwarding behavior at the failed packet.",
+    "No network, port, route, layer, service or instance was deleted or replaced. Presence of the External overlay is not evidence of obsolete functionality.",
+    "The separate site-path timeout and Windows request/reply drops remain unresolved; no mitigation or release is qualified."
+  ],
+  "history": {
+    "calicoVXLANManager": "felix/dataplane/windows/vxlan_mgr.go selects the named network and reconciles RemoteSubnetRoute policies; blame is bounded by the locally available history.",
+    "kubeProxyWatchdog": {
+      "repository": "forks-kube-proxy-calico-hostprocess-ipv6",
+      "commit": "b54cd3f1",
+      "path": "hostprocess/calico/kube-proxy/start.ps1",
+      "behavior": "Five consecutive health-check failures terminate the child and exit for kubelet restart."
+    },
+    "calicoHistoryBoundary": {
+      "shallow": true,
+      "boundary": "eb1cf57823",
+      "inspectedHEAD": "0ed229c8cf0bae2acb7de31033cfb51745dfbe74",
+      "localChangesToVXLANManager": false
+    }
+  },
+  "references": [
+    "https://learn.microsoft.com/en-us/windows-server/networking/technologies/hpn/rsc-in-the-vswitch"
+  ],
+  "evidenceSHA256": {
+    "aws-win2022-v3.json": "dd0b209095ec161b8b805fce901e1b1dfbc770cff4e84a382d1fd191d8ca1ec8",
+    "aws-win2025-v3.json": "447742d023f633f1fce33ef1b2ff2100bbfbccfa7a8cc5b383e46abdca3ab7fc",
+    "aws-win2022-v3.ports.bindings.json": "19fb9a49644bb0e5f1a4bb81cbbe56178e9770f64a9eb3b4cd8c66966722039a",
+    "aws-win2025-v3.ports.bindings.json": "719dede46751bd1663a13cb2b7c68dfb62ac6e831dd763e38c0d5022e5d287eb",
+    "aws-win2025-v3.port-details.json": "0f2416450c4459016e20f84c7b90bd3ea96774b57d537bb746914f8dbce2433f",
+    "aws-win2022-v3.port-details.json": "02bebae93b7bbffe5c665ac3c0ae10f289085410a6623963682fe1058c2dc97b",
+    "aws-win2022-v3.dr-rules.json": "218dc72d9d11df26903bc985dce1ba5c9a3acedbf560e810d2b6e67f25581323",
+    "aws-win2025-v3.dr-rules.json": "85b421c1c33800bad7e95ee7b3b50e073d9b8f3356571929e1065514cd5fb6c6",
+    "aws-win2025-v3.decap-rules.json": "e9d62fe8541614f1c9afdabf228ce87c8b741e80f97fba94229a50949c632a5d",
+    "aws-win2022-v3.decap-rules.json": "e9d62fe8541614f1c9afdabf228ce87c8b741e80f97fba94229a50949c632a5d",
+    "plugin-processes.json": "430a64ce9f0cb81aead64f8433ed14e6350192361dede79e60214977aca7ccf6",
+    "baseline-after.json": "6289df73e4bd82d1087e1867602635dd086b13204c30ecf678c0947f0ed4be40"
+  }
+}

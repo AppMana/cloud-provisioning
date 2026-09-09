@@ -1,0 +1,256 @@
+{
+  "observedAt": "2026-09-07T15:42:49.985559+00:00",
+  "scope": "Distinct-node ordinary-pod UDP sweep through Kubernetes exec; excludes policy and failover",
+  "parameters": {
+    "udpTries": 100,
+    "udpPayloadBytes": [
+      1280,
+      1337,
+      1338,
+      1340,
+      1400,
+      1800
+    ],
+    "udpOnly": true
+  },
+  "targets": [
+    {
+      "pod": "net-aws-win2022-v3",
+      "podUID": "536d831a-e33d-4cd3-840c-f7bd2bddb920",
+      "node": "aws-win2022-v3",
+      "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "os": "windows",
+      "container": "serve",
+      "containerID": "containerd://b9bf8094c22348d5bb0d2006fb4883c2834bd51789b1c653eb50f524dfa4aa26",
+      "podIP": "10.244.114.4",
+      "serviceUID": "3c9309bd-53ad-4c2b-a134-aa811391ec19",
+      "serviceIP": "10.98.160.233"
+    },
+    {
+      "pod": "net-aws-win2025-v3",
+      "podUID": "77696fb9-44a9-4075-bf83-e8993bf84230",
+      "node": "aws-win2025-v3",
+      "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "os": "windows",
+      "container": "serve",
+      "containerID": "containerd://b87960054e7f87c7e7f53a5419937746dc1be0893ef7b5eb16c4949ce8bdab9d",
+      "podIP": "10.244.42.5",
+      "serviceUID": "475a88d2-cc49-4739-8db6-f521dcac28c4",
+      "serviceIP": "10.99.76.215"
+    }
+  ],
+  "identitiesStable": true,
+  "identityError": null,
+  "ok": false,
+  "checks": [
+    {
+      "ok": true,
+      "expectedResponses": 100,
+      "reportedResponses": 100,
+      "exactResponses": 100,
+      "responsesPresent": true,
+      "errors": [],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "kind": "udp",
+      "payloadBytes": 1280,
+      "startedAt": "2026-09-07T15:42:04.521712+00:00",
+      "finishedAt": "2026-09-07T15:42:05.006396+00:00"
+    },
+    {
+      "ok": true,
+      "expectedResponses": 100,
+      "reportedResponses": 100,
+      "exactResponses": 100,
+      "responsesPresent": true,
+      "errors": [],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "kind": "udp",
+      "payloadBytes": 1337,
+      "startedAt": "2026-09-07T15:42:05.006478+00:00",
+      "finishedAt": "2026-09-07T15:42:05.389643+00:00"
+    },
+    {
+      "ok": true,
+      "expectedResponses": 100,
+      "reportedResponses": 100,
+      "exactResponses": 100,
+      "responsesPresent": true,
+      "errors": [],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "kind": "udp",
+      "payloadBytes": 1338,
+      "startedAt": "2026-09-07T15:42:05.389706+00:00",
+      "finishedAt": "2026-09-07T15:42:05.863740+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 99,
+      "exactResponses": 99,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.114.4:60939->10.244.42.5:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "kind": "udp",
+      "payloadBytes": 1340,
+      "startedAt": "2026-09-07T15:42:05.863824+00:00",
+      "finishedAt": "2026-09-07T15:42:11.267082+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 99,
+      "exactResponses": 99,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.114.4:61056->10.244.42.5:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "kind": "udp",
+      "payloadBytes": 1400,
+      "startedAt": "2026-09-07T15:42:11.267137+00:00",
+      "finishedAt": "2026-09-07T15:42:16.702141+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 99,
+      "exactResponses": 99,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.114.4:61193->10.244.42.5:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "kind": "udp",
+      "payloadBytes": 1800,
+      "startedAt": "2026-09-07T15:42:16.702210+00:00",
+      "finishedAt": "2026-09-07T15:42:22.103406+00:00"
+    },
+    {
+      "ok": true,
+      "expectedResponses": 100,
+      "reportedResponses": 100,
+      "exactResponses": 100,
+      "responsesPresent": true,
+      "errors": [],
+      "commandExitCode": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "kind": "udp",
+      "payloadBytes": 1280,
+      "startedAt": "2026-09-07T15:42:22.103567+00:00",
+      "finishedAt": "2026-09-07T15:42:22.514066+00:00"
+    },
+    {
+      "ok": true,
+      "expectedResponses": 100,
+      "reportedResponses": 100,
+      "exactResponses": 100,
+      "responsesPresent": true,
+      "errors": [],
+      "commandExitCode": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "kind": "udp",
+      "payloadBytes": 1337,
+      "startedAt": "2026-09-07T15:42:22.514139+00:00",
+      "finishedAt": "2026-09-07T15:42:22.926218+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 99,
+      "exactResponses": 99,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.42.5:60979->10.244.114.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "kind": "udp",
+      "payloadBytes": 1338,
+      "startedAt": "2026-09-07T15:42:22.926281+00:00",
+      "finishedAt": "2026-09-07T15:42:28.274186+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 99,
+      "exactResponses": 99,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.42.5:61087->10.244.114.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "kind": "udp",
+      "payloadBytes": 1340,
+      "startedAt": "2026-09-07T15:42:28.274266+00:00",
+      "finishedAt": "2026-09-07T15:42:33.643422+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 98,
+      "exactResponses": 98,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.42.5:62172->10.244.114.4:8081: i/o timeout'",
+        "reading from udp connection failed. err:'read udp 10.244.42.5:62177->10.244.114.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "kind": "udp",
+      "payloadBytes": 1400,
+      "startedAt": "2026-09-07T15:42:33.643499+00:00",
+      "finishedAt": "2026-09-07T15:42:44.006418+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 100,
+      "reportedResponses": 99,
+      "exactResponses": 99,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.42.5:62289->10.244.114.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "kind": "udp",
+      "payloadBytes": 1800,
+      "startedAt": "2026-09-07T15:42:44.006478+00:00",
+      "finishedAt": "2026-09-07T15:42:49.389488+00:00"
+    }
+  ],
+  "unitTests": {
+    "passed": 18,
+    "coveragePercent": {
+      "pod_matrix": 65,
+      "udp": 98,
+      "pktmon": 96,
+      "combined": 81
+    }
+  },
+  "limitations": [
+    "This run did not collect packet captures and cannot localize its individual missing responses.",
+    "Earlier six source-side VFP drop correlations remain separate evidence.",
+    "Finite successes do not qualify sustained reliability."
+  ]
+}

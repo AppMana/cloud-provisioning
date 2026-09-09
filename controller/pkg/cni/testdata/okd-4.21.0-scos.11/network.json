@@ -1,0 +1,50 @@
+{
+  "apiVersion": "operator.openshift.io/v1",
+  "kind": "Network",
+  "metadata": {
+    "name": "cluster"
+  },
+  "spec": {
+    "clusterNetwork": [
+      {
+        "cidr": "10.244.0.0/16",
+        "hostPrefix": 23
+      }
+    ],
+    "defaultNetwork": {
+      "ovnKubernetesConfig": {
+        "egressIPConfig": {},
+        "gatewayConfig": {
+          "ipv4": {},
+          "ipv6": {},
+          "routingViaHost": false
+        },
+        "genevePort": 6081,
+        "ipsecConfig": {
+          "mode": "Disabled"
+        },
+        "mtu": 1400,
+        "policyAuditConfig": {
+          "destination": "null",
+          "maxFileSize": 50,
+          "maxLogFiles": 5,
+          "rateLimit": 20,
+          "syslogFacility": "local0"
+        }
+      },
+      "type": "OVNKubernetes"
+    },
+    "deployKubeProxy": false,
+    "disableMultiNetwork": false,
+    "disableNetworkDiagnostics": false,
+    "logLevel": "Normal",
+    "managementState": "Managed",
+    "observedConfig": null,
+    "operatorLogLevel": "Normal",
+    "serviceNetwork": [
+      "10.96.0.0/16"
+    ],
+    "unsupportedConfigOverrides": null,
+    "useMultiNetworkPolicy": false
+  }
+}

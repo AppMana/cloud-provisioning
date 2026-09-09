@@ -1,0 +1,54 @@
+diff --git a/controllers/awsmachine_controller.go b/controllers/awsmachine_controller.go
+index 51aab48..c911840 100644
+--- a/controllers/awsmachine_controller.go
++++ b/controllers/awsmachine_controller.go
+@@ -795,8 +795,15 @@ func (r *AWSMachineReconciler) resolveUserData(ctx context.Context, machineScope
+ 		return nil, "", err
+ 	}
+ 
++	if userDataFormat == "powershell" {
++		backend := machineScope.SecureSecretsBackend()
++		if !machineScope.UseSecretsManager(userDataFormat) || (backend != "" && backend != infrav1.SecretBackendSecretsManager) {
++			return nil, "", errors.New("PowerShell bootstrap requires the Secrets Manager backend")
++		}
++	}
++
+ 	if machineScope.UseSecretsManager(userDataFormat) {
+-		userData, err = r.cloudInitUserData(machineScope, clusterScope, userData)
++		userData, err = r.cloudInitUserData(machineScope, clusterScope, userData, userDataFormat)
+ 	}
+ 
+ 	if machineScope.UseIgnition(userDataFormat) {
+@@ -820,7 +827,7 @@ func (r *AWSMachineReconciler) resolveUserData(ctx context.Context, machineScope
+ 	return userData, userDataFormat, err
+ }
+ 
+-func (r *AWSMachineReconciler) cloudInitUserData(machineScope *scope.MachineScope, clusterScope cloud.ClusterScoper, userData []byte) ([]byte, error) {
++func (r *AWSMachineReconciler) cloudInitUserData(machineScope *scope.MachineScope, clusterScope cloud.ClusterScoper, userData []byte, userDataFormat string) ([]byte, error) {
+ 	secretSvc, secretBackendErr := r.getSecretService(machineScope, clusterScope)
+ 	if secretBackendErr != nil {
+ 		machineScope.Error(secretBackendErr, "unable to reconcile machine")
+@@ -846,6 +853,9 @@ func (r *AWSMachineReconciler) cloudInitUserData(machineScope *scope.MachineScop
+ 		machineScope.Error(serviceErr, "Failed to create AWS Secret entry", "secretPrefix", prefix)
+ 		return nil, serviceErr
+ 	}
++	if userDataFormat == "powershell" {
++		return userdata.WindowsSecretsManagerUserData(machineScope.GetSecretPrefix(), machineScope.GetSecretCount(), machineScope.InfraCluster.Region())
++	}
+ 	encryptedCloudInit, err := secretSvc.UserData(machineScope.GetSecretPrefix(), machineScope.GetSecretCount(), machineScope.InfraCluster.Region())
+ 	if err != nil {
+ 		r.Recorder.Eventf(machineScope.AWSMachine, corev1.EventTypeWarning, "FailedGenerateAWSSecretsCloudInit", err.Error())
+diff --git a/pkg/cloud/scope/machine.go b/pkg/cloud/scope/machine.go
+index c0a8d81..fa01735 100644
+--- a/pkg/cloud/scope/machine.go
++++ b/pkg/cloud/scope/machine.go
+@@ -221,6 +221,9 @@ func (m *MachineScope) SecureSecretsBackend() infrav1.SecretBackend {
+ // CompressUserData returns the computed value of whether or not
+ // userdata should be compressed using gzip.
+ func (m *MachineScope) CompressUserData(userDataFormat string) bool {
++	if userDataFormat == "powershell" {
++		return false
++	}
+ 	if m.UseIgnition(userDataFormat) {
+ 		return false
+ 	}

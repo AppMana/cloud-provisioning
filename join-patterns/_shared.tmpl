@@ -1,0 +1,196 @@
+{{/*
+The blocks every join pattern shares, defined once. The renderer
+(pkg/render) parses this file alongside whichever pattern it renders,
+so a pattern references these by name and carries only what its
+distribution actually does differently: how it joins.
+
+The balancer question lives here in exactly one place: the
+wg-apiproxy unit and its enable line render only when apiProxyPort is
+set, and the reconciler sets it only for providers that declare they
+need it (join.NodeLocalBalancer). A distribution that balances for
+itself renders no trace of it, and the render tests pin that.
+*/}}
+
+{{/* The bootstrap identity and peer snapshot, plus the machine name
+the adoption path resolves this node's own Secret from. */}}
+{{- /*
+ssh-authorized-keys: the logins --join-ssh-authorized-keys asks for.
+
+That flag says "on every new node", and the reconciler renders its
+value into every pattern, but for a long time only k0s read it: an
+operator who set the flag and ran kubeadm, k3s or RKE2 got no keys and
+no error. Shared here so a pattern cannot be written that quietly
+drops it.
+
+Rendered only when there are keys. A bare "ssh_authorized_keys:" with
+nothing under it is a null, not an empty list, and the default is no
+keys, so emitting the key unconditionally would put a null into every
+document that never asked for one.
+*/}}
+{{- define "ssh-authorized-keys" }}
+{{- if .sshAuthorizedKeys }}
+ssh_authorized_keys:
+{{- range .sshAuthorizedKeys }}
+  - {{ . }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- define "wg-dialer-files" }}
+  - path: /etc/wg-dialer/peers.json
+    permissions: '0600'
+    content: |
+      {{ .peersFileJSON }}
+  - path: /etc/wg-dialer/machine-name
+    permissions: '0644'
+    content: |
+      {{ .machineName }}
+{{- with index . "providerIdentityScript" }}
+  - path: /usr/local/bin/cloud-provider-identity
+    permissions: '0755'
+    encoding: b64
+    content: {{ . }}
+{{- end }}
+{{- end }}
+
+{{/* The tunnel's host unit. It carries no balancer: the tunnel is
+kernel state that survives this process, and the API path must not
+share this unit's lifecycle (crashes, upgrades, the hourly re-exec),
+which is the whole reason wg-apiproxy is a separate unit. */}}
+{{- define "wg-dialer-unit" }}
+  - path: /etc/systemd/system/wg-dialer.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=wg-dialer (listener role)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      ExecStart=/usr/local/bin/wg-dialer \
+        --iface={{ .interfaceName }} \
+        --peers-file=/etc/wg-dialer/peers.json \
+        --listen-port={{ .wireguardListenPort }} \
+        --keepalive-seconds=15 \
+        --mtu=1420 \
+        --poll-interval=30s
+      Restart=always
+      # Re-exec hourly so the unit converges onto whatever binary is at
+      # the path: after the node joins, the wg-dialer-cloud DaemonSet
+      # installs its own (image-carried, digest-pinned) binary there,
+      # which is how upgrades reach this floor without a download host
+      # or any per-node action. The tunnel itself is kernel state and
+      # does not blink when this process does.
+      RuntimeMaxSec=1h
+      AmbientCapabilities=CAP_NET_ADMIN
+
+      [Install]
+      WantedBy=multi-user.target
+{{- end }}
+
+{{/* The node-local API balancer, for distributions that ship none of
+their own (the README's who-balances table). Its own unit, its own
+lifecycle: kubelet depends on this path before any pod can run, so it
+must not die with the dialer, whose process restarts hourly by design
+and crash-loops when its own configuration is bad. This unit runs the
+same verified binary in a mode that touches no kernel state and needs
+no capability: a small TCP splicer whose only job is to be up, which
+is the property k0s buys with envoy, bought here without a second
+supply chain. Backends come from the same files the dialer maintains:
+the adoption cache when the DaemonSet has written one, the bootstrap
+snapshot until then. */}}
+{{- define "wg-apiproxy-unit" }}
+{{- if .apiProxyPort }}
+  - path: /etc/systemd/system/wg-apiproxy.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=wg-apiproxy (node-local API balancer)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      ExecStart=/usr/local/bin/wg-dialer \
+        --api-proxy-only \
+        --api-proxy-port={{ .apiProxyPort }} \
+        --iface={{ .interfaceName }} \
+        --peers-file=/etc/wg-dialer/peers.json \
+        --poll-interval=30s
+      Restart=always
+      RestartSec=1
+      # Daily, not hourly: this is the upgrade-convergence re-exec
+      # (see wg-dialer.service), and each one costs kubelet its open
+      # API connections, which it re-establishes in seconds. The
+      # proxy's code changes rarely; once a day is convergence enough
+      # for a component whose reason to exist is being up.
+      RuntimeMaxSec=24h
+
+      [Install]
+      WantedBy=multi-user.target
+{{- end }}
+{{- end }}
+
+{{/* Pinned-digest binary delivery. A mismatch halts the join rather
+than running unverified code. Download to a temp path and rename into
+place: a re-run of this bootstrap would otherwise try to write a
+binary that is already executing, and the kernel refuses that
+(ETXTBSY), which curl reports as an opaque write failure. */}}
+{{- define "dialer-install" }}
+  - |
+    set -e
+    case "$(uname -m)" in
+      aarch64|arm64) url='{{ .dialerBinaryURLArm64 }}'; sha='{{ .dialerBinarySHA256Arm64 }}' ;;
+      x86_64|amd64)  url='{{ .dialerBinaryURLAmd64 }}'; sha='{{ .dialerBinarySHA256Amd64 }}' ;;
+      *) echo "no wg-dialer build for $(uname -m)" >&2; exit 1 ;;
+    esac
+    [ -n "$url" ] || { echo "no wg-dialer URL configured for $(uname -m)" >&2; exit 1; }
+    curl -fsSL -o /usr/local/bin/.wg-dialer.new "$url"
+    echo "$sha  /usr/local/bin/.wg-dialer.new" | sha256sum -c -
+    chmod 0755 /usr/local/bin/.wg-dialer.new
+    mv -f /usr/local/bin/.wg-dialer.new /usr/local/bin/wg-dialer
+  - systemctl daemon-reload
+  - systemctl enable --now wg-dialer.service
+{{- if .apiProxyPort }}
+  - systemctl enable --now wg-apiproxy.service
+{{- end }}
+{{- end }}
+
+{{/* CAPI's bootstrap-success sentinel. Every conformant bootstrap
+provider writes it and infrastructure providers poll for it to decide
+the machine is bootstrapped; these patterns take the bootstrap
+provider's place, so they honor the same contract. */}}
+{{- define "bootstrap-sentinel" }}
+  - mkdir -p /run/cluster-api
+  - touch /run/cluster-api/bootstrap-success.complete
+{{- end }}
+
+{{/* Provider identity is independent of the kubelet's advertised address.
+The ID can be supplied before creation or obtained from the machine's native
+identity helper during bootstrap. */}}
+{{- define "provider-id-arg" }}
+    PROVIDER_ID_ARG=""
+{{- if .providerID }}
+    PROVIDER_ID_ARG="--provider-id={{ .providerID }}"
+{{- else if index . "providerIdentityScript" }}
+    PROVIDER_ID_ARG="--provider-id=$(/usr/local/bin/cloud-provider-identity)"
+{{- end }}
+{{- end }}
+{{/* The physical-address policy is used by distributions that select it.
+Prefer the provider's known address, otherwise try bounded EC2 IMDSv2 lookups.
+An empty result leaves address selection to the distribution. MicroK8s instead
+uses its allocated tunnel address so control planes can reach its kubelet. */}}
+{{- define "node-ip-arg" }}
+{{- template "provider-id-arg" . }}
+    NODE_IP_ARG=""
+{{- if .nodeAddress }}
+    NODE_IP_ARG="--node-ip={{ .nodeAddress }}"
+{{- else }}
+    IMDS_TOKEN=$(curl -sf -m 2 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
+    if [ -n "$IMDS_TOKEN" ]; then
+      NODE_IPV4=$(curl -sf -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4 || true)
+      NODE_IPV6=$(curl -sf -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/ipv6 || true)
+      [ -n "$NODE_IPV4" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4"
+      [ -n "$NODE_IPV6" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4,$NODE_IPV6"
+    fi
+{{- end }}
+{{- end }}

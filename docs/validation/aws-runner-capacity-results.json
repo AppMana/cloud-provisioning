@@ -1,0 +1,70 @@
+{
+  "result": "nested-runner-capacity-found-launch-permission-gap",
+  "observedAt": "2026-09-09T06:01:17.526011+00:00",
+  "region": "us-west-2",
+  "candidate": {
+    "instanceType": "r7i.2xlarge",
+    "vcpu": 8,
+    "memoryMiB": 65536,
+    "nestedVirtualizationSupported": true,
+    "linuxSharedOnDemandUSDPerHour": "0.5292",
+    "sixHourComputeUSD": "3.1752"
+  },
+  "comparedPrices": [
+    {
+      "instanceType": "r7i.2xlarge",
+      "USDPerHour": "0.5292000000",
+      "sku": "Q655356BQGG9Q9CK"
+    },
+    {
+      "instanceType": "r8i-flex.2xlarge",
+      "USDPerHour": "0.5278800000",
+      "sku": "AB64XY4EXSBUAWH9"
+    },
+    {
+      "instanceType": "m7i-flex.4xlarge",
+      "USDPerHour": "0.7660800000",
+      "sku": "4QYHG7NVQF73FYKA"
+    }
+  ],
+  "priceLimits": [
+    "Compute only; EBS, public IPv4, transfer and taxes excluded.",
+    "Three candidates compared; not a global cheapest-provider claim.",
+    "Spot availability and interruption behavior not qualified."
+  ],
+  "budgetEvidence": {
+    "allocationTagStatus": "Inactive",
+    "taggedZeroIsUsable": false,
+    "accountUsageStart": "2026-09-06",
+    "accountUsageExclusiveEnd": "2026-09-09",
+    "accountUnblendedUsageUSD": "35.4336181004",
+    "recordTypes": [
+      "Usage"
+    ],
+    "estimated": true,
+    "limits": [
+      "Account-wide total, not attributed project spend.",
+      "Current UTC day and reporting lag excluded.",
+      "This is not a complete remaining-budget calculation."
+    ]
+  },
+  "launchDryRun": {
+    "role": "existing CAPA test role",
+    "authorized": false,
+    "reason": "Base AMI not in the role image allowlist",
+    "instanceCreated": false,
+    "nextAction": "Use a separately scoped runner role for the exact base AMI, existing subnet/security group, node profile and a runner-specific ownership tag; preserve worker AMI allowlists."
+  },
+  "sources": [
+    "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/amazon-ec2-nested-virtualization.html"
+  ],
+  "evidenceSHA256": {
+    "nested-types.stdout": "f5f04fba7b0aa47659f78cce4231cf79c5bbe84ef2455168c93a022a0b52c628",
+    "prices.json": "a41613f5028a8d43a94c2fee726577fb03a5107fd06a6f9ac10a6a3303246ae9",
+    "allocation-tags.stdout": "f106fd91bc65192baaf67a3b28c2011c1e6305ea60994fc2c6f42f37c94c685e",
+    "account-cost.stdout": "ea7e1f472747a74a37fd8f854347f3a0219705651963ad21c810d0e350835021",
+    "cost-by-record.stdout": "fde7bd420ebecb77236083d3a84a737c826569eb9fa6113a3b7b23cd58da619c",
+    "dryrun-result.json": "9c6d4663a5ebec5712f55b50fee33f40f41aacae26a9583644e5bf96af6e55d2"
+  },
+  "qualification": "No nested EC2 VM or full MicroK8s matrix was run."
+}

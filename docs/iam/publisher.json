@@ -1,0 +1,41 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RegistryAuthentication",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "ManageRunPublisherRepository",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:CreateRepository",
+        "ecr:TagResource",
+        "ecr:ListTagsForResource",
+        "ecr:DescribeRepositories",
+        "ecr:DeleteRepository",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutImage",
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer"
+      ],
+      "Resource": [
+        "arn:aws:ecr:${AWS_REGION}:${AWS_ACCOUNT_ID}:repository/${RUN_ID}/windows-publisher",
+        "arn:aws:ecr:${AWS_REGION}:${AWS_ACCOUNT_ID}:repository/${RUN_ID}/calico-node-windows",
+        "arn:aws:ecr:${AWS_REGION}:${AWS_ACCOUNT_ID}:repository/${RUN_ID}/windows-gpu-device-plugin",
+        "arn:aws:ecr:${AWS_REGION}:${AWS_ACCOUNT_ID}:repository/${RUN_ID}/windows-gpu-probe"
+      ]
+    },
+    {
+      "Sid": "CreateRestrictedPullSession",
+      "Effect": "Allow",
+      "Action": "sts:GetFederationToken",
+      "Resource": "arn:aws:sts::${AWS_ACCOUNT_ID}:federated-user/cldt-publisher-pull"
+    }
+  ]
+}

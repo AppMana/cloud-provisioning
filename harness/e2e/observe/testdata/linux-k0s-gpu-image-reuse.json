@@ -1,0 +1,46 @@
+{
+  "candidate": {
+    "candidateAMIID": "ami-007650e971dd51a9d",
+    "preparation": {
+      "schemaVersion": 1,
+      "version": "v1.36.2+k0s.0",
+      "sha256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+      "executable": "/usr/local/bin/k0s",
+      "scope": "Executable only; no runtime or workload cache",
+      "preparedAt": "2026-09-08T18:41:02.701626+00:00"
+    },
+    "parentImageID": "ami-03d6fada2ec266b4f",
+    "sourceEvidenceSHA256": {
+      "linux-k0s-image-capture-results.json": "c63620fc52f494de7c1cf614defbf33bf6440a380bebbc803a5fdbfeed8e25a5",
+      "linux-k0s-gpu-image-capture-results.json": "8f2ba19a348f09ce5942be836a0a1f6325829c5a4faf1f64d0a7d749150fd69a"
+    }
+  },
+  "binding": {
+    "machine": "aws-linux-k0s-gpu-baked-v1",
+    "machineUID": "c899efac-3c00-426e-9f5c-a41173f8fba6",
+    "node": "ip-172-29-0-21",
+    "nodeUID": "fc3d8a16-9659-45a3-8df8-317d9a37a024",
+    "instanceID": "i-08927c4e2c1d57330",
+    "imageID": "ami-007650e971dd51a9d",
+    "eniCount": 1,
+    "launchTime": "2026-09-08T20:14:58+00:00",
+    "nodeReady": true
+  },
+  "observation": {
+    "receipt": {
+      "schemaVersion": 1,
+      "version": "v1.36.2+k0s.0",
+      "sha256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+      "executable": "/usr/local/bin/k0s",
+      "scope": "Executable only; no runtime or workload cache",
+      "preparedAt": "2026-09-08T18:41:02.701626+00:00"
+    },
+    "sha256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+    "mtime": 1788892860.6245635,
+    "version": "v1.36.2+k0s.0",
+    "containerd": "Client:\n  Version:  2.3.2\n  Revision: fff62f14765df376e5fc36f5a8f8e795b5670f61\n  Go version: go1.26.4\n\nServer:\n  Version:  2.3.2\n  Revision: fff62f14765df376e5fc36f5a8f8e795b5670f61\n  UUID: ae8c627c-9375-4f48-907f-197906043e6b\n",
+    "physicalNICs": [
+      "ens5"
+    ]
+  }
+}

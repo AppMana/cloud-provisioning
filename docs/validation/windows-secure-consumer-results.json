@@ -1,0 +1,51 @@
+{
+  "scope": "Windows consumer of CAPA-shaped encrypted Secrets Manager chunks, invoked via SSM on existing VMs; not a native CAPI launch or Kubernetes join",
+  "payloadChunksPerVM": 2,
+  "windowsBuilds": {
+    "2022": 20348,
+    "2025": 26100
+  },
+  "unicodePayloadPreserved": true,
+  "temporaryScriptRemoved": true,
+  "bootstrapDirectoryACLProtected": true,
+  "secretCleanup": {
+    "observedAt": "2026-09-07T01:48:41.498655+00:00",
+    "chunks": [
+      {
+        "absent": true,
+        "deletionScheduled": false
+      },
+      {
+        "absent": true,
+        "deletionScheduled": false
+      },
+      {
+        "absent": true,
+        "deletionScheduled": false
+      },
+      {
+        "absent": true,
+        "deletionScheduled": false
+      },
+      {
+        "absent": true,
+        "deletionScheduled": false
+      },
+      {
+        "absent": true,
+        "deletionScheduled": false
+      }
+    ]
+  },
+  "rendererStatementCoveragePercent": 100.0,
+  "capaVersion": "v2.12.1",
+  "capaPatchAppliedToCleanCheckout": true,
+  "modifiedControllerCompiled": true,
+  "finalConsumerModules": {
+    "2022": "AWS.Tools.SecretsManager 5.0.268",
+    "2025": "AWS.Tools.SecretsManager 5.0.268"
+  },
+  "capaControllerRegressionTestsPassed": true,
+  "consumerSHA256": "e5110b0d8079801330b94e12059115ffb908475c251d93718b6186d1cf95e947",
+  "patchSHA256": "549e4e1903177e2ad867d7c20cb3eee66d94d9bc0c80557e8a2db08c3a7cd271"
+}

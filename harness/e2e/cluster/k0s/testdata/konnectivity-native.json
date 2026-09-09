@@ -1,0 +1,145 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "DaemonSet",
+  "metadata": {
+    "name": "konnectivity-agent",
+    "namespace": "kube-system"
+  },
+  "spec": {
+    "revisionHistoryLimit": 10,
+    "selector": {
+      "matchLabels": {
+        "k8s-app": "konnectivity-agent"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "k8s-app": "konnectivity-agent"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "args": [
+              "--logtostderr=true",
+              "--ca-cert=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+              "--proxy-server-host=localhost",
+              "--proxy-server-port=7132",
+              "--service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token",
+              "--agent-identifiers=host=$(NODE_IP)",
+              "--agent-id=$(NODE_IP)"
+            ],
+            "env": [
+              {
+                "name": "K0S_CONTROLLER_COUNT",
+                "value": "3"
+              },
+              {
+                "name": "NODE_IP",
+                "valueFrom": {
+                  "fieldRef": {
+                    "apiVersion": "v1",
+                    "fieldPath": "status.hostIP"
+                  }
+                }
+              }
+            ],
+            "image": "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+            "imagePullPolicy": "IfNotPresent",
+            "livenessProbe": {
+              "failureThreshold": 3,
+              "httpGet": {
+                "path": "/healthz",
+                "port": 8093,
+                "scheme": "HTTP"
+              },
+              "initialDelaySeconds": 15,
+              "periodSeconds": 10,
+              "successThreshold": 1,
+              "timeoutSeconds": 15
+            },
+            "name": "konnectivity-agent",
+            "readinessProbe": {
+              "failureThreshold": 3,
+              "httpGet": {
+                "path": "/readyz",
+                "port": 8093,
+                "scheme": "HTTP"
+              },
+              "initialDelaySeconds": 15,
+              "periodSeconds": 10,
+              "successThreshold": 1,
+              "timeoutSeconds": 15
+            },
+            "resources": {},
+            "securityContext": {
+              "allowPrivilegeEscalation": false,
+              "capabilities": {
+                "drop": [
+                  "all"
+                ]
+              },
+              "readOnlyRootFilesystem": true
+            },
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File",
+            "volumeMounts": [
+              {
+                "mountPath": "/var/run/secrets/tokens",
+                "name": "konnectivity-agent-token"
+              }
+            ]
+          }
+        ],
+        "dnsPolicy": "ClusterFirst",
+        "hostNetwork": true,
+        "priorityClassName": "system-cluster-critical",
+        "restartPolicy": "Always",
+        "schedulerName": "default-scheduler",
+        "securityContext": {
+          "runAsNonRoot": true,
+          "supplementalGroups": [
+            0
+          ],
+          "windowsOptions": {
+            "hostProcess": true,
+            "runAsUserName": "NT AUTHORITY\\Local service"
+          }
+        },
+        "serviceAccount": "konnectivity-agent",
+        "serviceAccountName": "konnectivity-agent",
+        "terminationGracePeriodSeconds": 30,
+        "tolerations": [
+          {
+            "operator": "Exists"
+          }
+        ],
+        "volumes": [
+          {
+            "name": "konnectivity-agent-token",
+            "projected": {
+              "defaultMode": 420,
+              "sources": [
+                {
+                  "serviceAccountToken": {
+                    "audience": "system:konnectivity-server",
+                    "expirationSeconds": 3600,
+                    "path": "konnectivity-agent-token"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "updateStrategy": {
+      "rollingUpdate": {
+        "maxSurge": 0,
+        "maxUnavailable": 1
+      },
+      "type": "RollingUpdate"
+    }
+  }
+}

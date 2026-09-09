@@ -1,0 +1,52 @@
+{
+  "observedAt": "2026-09-07T13:24:19.340279+00:00",
+  "image": "cldt/capa-windows:v2.12.1-detached",
+  "imageID": "sha256:0a718a8ccbb3ee8dd74285bf642ac625edb58bc4b3064c7ee8fcb6ca34deedeb",
+  "podUID": "18d04e39-e3fb-49a9-9c1a-3b4c48cb94b8",
+  "deploymentUID": "4838b7ab-fa36-4757-8010-5ef3650e3784",
+  "ready": true,
+  "rendererCoverage": 100,
+  "userdataPackageCoverage": 17.2,
+  "nativeDetachedLaunchTest": true,
+  "scope": "Isolated CAPA rollout and first-boot observations: SSM reachable before worker installation on Windows 2022 and Windows 2025 replacements",
+  "nativeWindows2022": {
+    "envelope": {
+      "observedAt": "2026-09-07T13:45:05.663703+00:00",
+      "instanceID": "i-0ddaed6f030330992",
+      "userdataSHA256": "9e1c7a56377ec3e63b065fc24278aa24d7540ce80b874ff74b2f34e6c7df3e15",
+      "checks": {
+        "detached": true,
+        "oneShot": true,
+        "secureConsumer": true
+      }
+    },
+    "earlyGuest": {
+      "launchAgentStatus": "agent ran successfully",
+      "services": [],
+      "installed": [],
+      "at": "2026-09-07T13:46:57.3101409Z"
+    },
+    "ssmBeforeWorkerInstallation": true
+  },
+  "nativeWindows2025": {
+    "envelope": {
+      "observedAt": "2026-09-07T14:24:57.141364+00:00",
+      "instanceID": "i-07c9859f5ce8ed42b",
+      "detached": true,
+      "oneShot": true,
+      "secretsManagerConsumer": true
+    },
+    "earlyGuest": {
+      "launchAgentStatus": "agent ran successfully",
+      "services": [],
+      "installed": [],
+      "at": "2026-09-07T14:29:12.7511913Z"
+    },
+    "ssmBeforeWorkerInstallation": true
+  },
+  "replacementScope": "Both replacement join checkpoints passed, including peer delivery; full lifecycle network qualification remains incomplete",
+  "replacementJoinCheckpoints": {
+    "windows2022": true,
+    "windows2025": true
+  }
+}

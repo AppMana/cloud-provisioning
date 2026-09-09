@@ -1,0 +1,239 @@
+{
+  "scope": "Windows 2022 attachment withdrawal, same-name claim removal and CAPI deletion-contract findings; replacement qualification pending",
+  "withdrawal": {
+    "observedAt": "2026-09-07T13:35:37.462853+00:00",
+    "phase": "Complete",
+    "requestAbsent": true,
+    "sharedResources": [
+      {
+        "name": "aws-ingress-29cd8969b361810a021f97f0267a50c6",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-ingress-51eb6d155ac7aa4953adc00a49067355",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-ingress-54c6ca87b81da31f2b0f24f8484d92cd",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-ingress-72e5eb9c4ea33eff91f97b46796f3bec",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-ingress-bf1cc68110136166862d0aa3a2ca9388",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-ingress-e58ebc4e77cb9016de13e57b8fb5bd17",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-ingress-f31fe2160282401a4209c9ed9dc05445",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-149b21c0498d6851649b019c42088239",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-30707c6810d3aa8e57bde68432cca63b",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-4635f5e76254405559840451d4353878",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-60923e25c5a222850ccc475e96fbc38d",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-a8787a1f9a7a0b12816d1a244be55c6a",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-cf6fa5388f4ffa1845ffe507e3fef0e4",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-d31cc12f9195d5150f5df24cdc48d283",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-source-check-79ca0fcd00a6ad9dc8c95bedc90da555",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      }
+    ],
+    "removedExclusiveIngressRules": [
+      "sgr-09b2a57f820d409ea",
+      "sgr-06a099ed4cb3128f0"
+    ],
+    "allRoutesUnchanged": true,
+    "onlyExclusiveIngressRemoved": true,
+    "gatewaySourceDestCheckRemainsDisabled": true,
+    "nativeTransportOwnershipRemoved": true,
+    "otherReadyAttachments": 3,
+    "workerStillExists": true
+  },
+  "survivor": {
+    "observedAt": "2026-09-07T13:34:29.203384+00:00",
+    "scope": "Surviving Windows 2025 pod to Linux during Windows 2022 attachment withdrawal",
+    "podUID": "ce8b457c-a013-4622-b0cb-408c091753a5",
+    "checks": [
+      {
+        "ok": true,
+        "exitCode": 0,
+        "at": "2026-09-07T13:33:25.9061311Z"
+      },
+      {
+        "ok": true,
+        "exitCode": 0,
+        "at": "2026-09-07T13:33:31.0653506Z"
+      },
+      {
+        "ok": true,
+        "exitCode": 0,
+        "at": "2026-09-07T13:33:36.2126788Z"
+      },
+      {
+        "ok": true,
+        "exitCode": 0,
+        "at": "2026-09-07T13:33:41.3671424Z"
+      },
+      {
+        "ok": true,
+        "exitCode": 0,
+        "at": "2026-09-07T13:33:46.5298321Z"
+      },
+      {
+        "ok": true,
+        "exitCode": 0,
+        "at": "2026-09-07T13:33:51.7045597Z"
+      },
+      {
+        "ok": true,
+        "exitCode": 0,
+        "at": "2026-09-07T13:33:56.8737614Z"
+      },
+      {
+        "ok": true,
+        "exitCode": 0,
+        "at": "2026-09-07T13:34:02.0390688Z"
+      },
+      {
+        "ok": true,
+        "exitCode": 0,
+        "at": "2026-09-07T13:34:07.2026613Z"
+      },
+      {
+        "ok": true,
+        "exitCode": 0,
+        "at": "2026-09-07T13:34:12.3486121Z"
+      },
+      {
+        "ok": true,
+        "exitCode": 0,
+        "at": "2026-09-07T13:34:17.4967854Z"
+      },
+      {
+        "ok": true,
+        "exitCode": 0,
+        "at": "2026-09-07T13:34:22.7889490Z"
+      }
+    ]
+  },
+  "deleted": {
+    "observedAt": "2026-09-07T13:41:03.555759+00:00",
+    "absent": {
+      "machine": true,
+      "awsmachine": true,
+      "provisionednodeclaim": true,
+      "node": true
+    },
+    "ec2State": "terminated",
+    "instanceID": "i-0a258f92654d33817",
+    "preDrainHookHeld": false,
+    "capiSkipEvidence": [
+      "I0907 13:37:29.347797       1 machine_controller.go:449] \"Skipping deletion of Kubernetes Node associated with Machine as it is not allowed\" controller=\"machine\" controllerGroup=\"cluster.x-k8s.io\" controllerKind=\"Machine\" Machine=\"cloud-provisioning/aws-win2022-v3\" namespace=\"cloud-provisioning\" name=\"aws-win2022-v3\" reconcileID=\"c2672119-534f-4c2e-8aee-7b28d215c48b\" Cluster=\"cloud-provisioning/cldt-windows-v2\" ProvisionedNodeClaim=\"cloud-provisioning/aws-win2022-v3\" Cluster=\"cloud-provisioning/cldt-windows-v2\" Node=\"aws-win2022-v3\" cause=\"no control plane members\""
+    ]
+  },
+  "claimTeardown": {
+    "fix": "Wait for CAPI Machine absence before orphan infrastructure cleanup",
+    "supersedesCommit": "b31e8a0b",
+    "controllerImage": "cldt/controller-windows:v10",
+    "controllerImageID": "sha256:878e1dbe8a5842744c9d44e41f742e113e7b0c80a33bb046b04b6ca45de022a5",
+    "unitPackageCoverage": 69.9,
+    "deleteFunctionCoverage": 81.2
+  },
+  "importedControlPlane": {
+    "finding": "CAPI 1.11.1 logged no control plane members and skipped the pre-drain hook",
+    "fix": "Publish status.externalManagedControlPlane=true for imported sites",
+    "published": true,
+    "unitImportFunctionCoverage": 68.8,
+    "nativeHookRevalidation": false
+  },
+  "replacement": {
+    "scope": "Same-name reprovisioning and native join; other attachment consumer retirement is incomplete",
+    "machine": "aws-win2022-v3",
+    "oldMachineUID": "2c9f9236-2fb6-41b4-8081-2797b8c65ba4",
+    "newMachineUID": "797d3edd-a961-4003-ae43-ee418c238dd4",
+    "oldNodeUID": "5da46e69-f779-46ad-8ce0-8e2775de38bd",
+    "newNodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+    "oldInstanceID": "i-0a258f92654d33817",
+    "newInstanceID": "i-0ddaed6f030330992",
+    "newENIID": "eni-0509bfd9d100550e6",
+    "checks": {
+      "expectedWindowsBuild": true,
+      "onePhysicalNIC": true,
+      "k0sWorkerRunning": true,
+      "tunnelRunning": true,
+      "bootstrapInstalled": true,
+      "capiAssociation": true,
+      "windowsNode": true,
+      "matchesSiteKubelet": true,
+      "containerd2": true,
+      "cloudWorkerLabel": true,
+      "internetFacingTaint": true,
+      "nodeReady": true,
+      "publisherReady": true,
+      "expectedWorkerVersion": true,
+      "expectedWorkerHash": true,
+      "expectedTunnelHash": true,
+      "peerDelivery": true
+    },
+    "managedKonnectivity": {
+      "observedAt": "2026-09-07T14:00:59.459099+00:00",
+      "scope": "Controller-managed Konnectivity TCP ingress with new native agent connection after pod replacement",
+      "oldAgentUID": "f3a4edf2-272c-4a65-8bb1-54966d7e7451",
+      "newAgentUID": "b37c1889-88ae-4d00-838b-e8ff2d18df25",
+      "newAgentReady": true,
+      "worker": "aws-win2022-v3",
+      "nativeWorker": "172.29.0.24",
+      "ruleID": "sgr-0e9d3899817e11144",
+      "port": 8132,
+      "controllerOwnedRule": true,
+      "kubeletExec": {
+        "ok": true,
+        "exitCode": 0,
+        "stderr": ""
+      }
+    }
+  }
+}

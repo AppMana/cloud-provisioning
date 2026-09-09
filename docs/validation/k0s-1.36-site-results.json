@@ -1,0 +1,42 @@
+{
+  "k0s": "v1.36.2+k0s.0",
+  "source": "fresh single-NIC VM site",
+  "nodes": [
+    {
+      "name": "cp",
+      "kubelet": "v1.36.2+k0s",
+      "runtime": "containerd://2.3.2",
+      "ready": true
+    },
+    {
+      "name": "cp2",
+      "kubelet": "v1.36.2+k0s",
+      "runtime": "containerd://2.3.2",
+      "ready": true
+    },
+    {
+      "name": "cp3",
+      "kubelet": "v1.36.2+k0s",
+      "runtime": "containerd://2.3.2",
+      "ready": true
+    },
+    {
+      "name": "w1",
+      "kubelet": "v1.36.2+k0s",
+      "runtime": "containerd://2.3.2",
+      "ready": true
+    },
+    {
+      "name": "w2",
+      "kubelet": "v1.36.2+k0s",
+      "runtime": "containerd://2.3.2",
+      "ready": true
+    }
+  ],
+  "calicoImages": [
+    "quay.io/k0sproject/calico-node:v3.32.0-0"
+  ],
+  "cdiEnabled": true,
+  "nriEnabled": true,
+  "scope": "site bringup, node readiness and observed runtime configuration; no GPU worker or lifecycle claim"
+}

@@ -1,0 +1,168 @@
+{
+  "observedAt": "2026-09-08T19:11:53.078721+00:00",
+  "scope": "Read-only full-PCAP comparison of the previously captured 64-byte Windows2022 VFP drop",
+  "captureSHA256": "00ffdf96997b191fdb993ab46a36f1f5b8de8d4b8c90a1253b14d39f021b238c",
+  "captureDurationSeconds": 298.181726,
+  "targetOuterIPID": "0x0ebc",
+  "targetInnerIPID": "0x3382",
+  "matchingOuterTupleHeaderGroups": 1,
+  "matchingOuterTupleAppearances": 10,
+  "matchingAppearancesSpanSeconds": 3.695487976074219e-05,
+  "groups": [
+    {
+      "sourceIPs": [
+        "172.29.0.24",
+        "10.244.114.4"
+      ],
+      "destinationIPs": [
+        "172.29.0.68",
+        "10.244.42.6"
+      ],
+      "ipIDs": [
+        "0x0ebc",
+        "0x0dbc"
+      ],
+      "dontFragment": [
+        "True",
+        "False"
+      ],
+      "moreFragments": [
+        "False",
+        "False"
+      ],
+      "fragmentOffsets": [
+        "0",
+        "0"
+      ],
+      "sourcePorts": [
+        "39041",
+        "57483"
+      ],
+      "destinationPorts": [
+        "4789",
+        "8081"
+      ],
+      "frameLength": 161,
+      "vni": "4096",
+      "appearances": 10,
+      "firstEpoch": 1788869425.789574,
+      "lastEpoch": 1788869425.789594
+    },
+    {
+      "sourceIPs": [
+        "10.244.114.4"
+      ],
+      "destinationIPs": [
+        "10.244.42.6"
+      ],
+      "ipIDs": [
+        "0x0ebc"
+      ],
+      "dontFragment": [
+        "False"
+      ],
+      "moreFragments": [
+        "False"
+      ],
+      "fragmentOffsets": [
+        "0"
+      ],
+      "sourcePorts": [
+        "57716"
+      ],
+      "destinationPorts": [
+        "8081"
+      ],
+      "frameLength": 111,
+      "vni": "",
+      "appearances": 6,
+      "firstEpoch": 1788869439.035064,
+      "lastEpoch": 1788869439.035084
+    },
+    {
+      "sourceIPs": [
+        "172.29.0.24",
+        "10.244.114.4"
+      ],
+      "destinationIPs": [
+        "172.29.0.68",
+        "10.244.42.6"
+      ],
+      "ipIDs": [
+        "0x0fbc",
+        "0x0ebc"
+      ],
+      "dontFragment": [
+        "True",
+        "False"
+      ],
+      "moreFragments": [
+        "False",
+        "False"
+      ],
+      "fragmentOffsets": [
+        "0",
+        "0"
+      ],
+      "sourcePorts": [
+        "39041",
+        "57716"
+      ],
+      "destinationPorts": [
+        "4789",
+        "8081"
+      ],
+      "frameLength": 161,
+      "vni": "4096",
+      "appearances": 10,
+      "firstEpoch": 1788869439.035146,
+      "lastEpoch": 1788869439.035165
+    },
+    {
+      "sourceIPs": [
+        "10.10.0.11",
+        "10.244.190.81"
+      ],
+      "destinationIPs": [
+        "172.29.0.24",
+        "10.244.114.4"
+      ],
+      "ipIDs": [
+        "0x0ebc",
+        "0x3382"
+      ],
+      "dontFragment": [
+        "False",
+        "True"
+      ],
+      "moreFragments": [
+        "False",
+        "False"
+      ],
+      "fragmentOffsets": [
+        "0",
+        "0"
+      ],
+      "sourcePorts": [
+        "57117",
+        "8081"
+      ],
+      "destinationPorts": [
+        "4789",
+        "58049"
+      ],
+      "frameLength": 156,
+      "vni": "4096",
+      "appearances": 10,
+      "firstEpoch": 1788869458.020243,
+      "lastEpoch": 1788869458.02028
+    }
+  ],
+  "rootCauseEstablished": false,
+  "networkFailureResolved": false,
+  "limitations": [
+    "Multiple Packet Monitor appearances of the same datagram are not repeated IP-ID use",
+    "Matching IDs on different IP tuples or different encapsulation layers do not establish an IP-ID collision",
+    "The capture cannot exclude pre-capture state, VFP hash collisions, or NBL/offload metadata errors"
+  ]
+}

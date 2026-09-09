@@ -1,0 +1,125 @@
+{
+  "node": {
+    "metadata": {
+      "name": "aws-win2025-process-control-v1",
+      "uid": "3327a41c-82ae-4dba-ba26-b8f5d2aa9940",
+      "labels": {
+        "kubernetes.io/os": "windows"
+      }
+    }
+  },
+  "pod": {
+    "metadata": {
+      "uid": "c4e01539-eeb7-450b-a088-79ed6b9dadfd",
+      "ownerReferences": [
+        {
+          "apiVersion": "batch/v1",
+          "blockOwnerDeletion": true,
+          "controller": true,
+          "kind": "Job",
+          "name": "windows-process-no-gpu-2025-v1",
+          "uid": "bb8387db-8c81-4f58-bf65-53b01a115eef"
+        }
+      ]
+    },
+    "spec": {
+      "containers": [
+        {
+          "command": [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "C:\\gpu-probe\\run.ps1"
+          ],
+          "image": "index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+          "imagePullPolicy": "IfNotPresent",
+          "name": "render-nvenc",
+          "resources": {},
+          "terminationMessagePath": "/dev/termination-log",
+          "terminationMessagePolicy": "File",
+          "volumeMounts": [
+            {
+              "mountPath": "C:\\gpu-probe",
+              "name": "probe",
+              "readOnly": true
+            }
+          ]
+        }
+      ],
+      "nodeName": "aws-win2025-process-control-v1"
+    },
+    "status": {
+      "containerStatuses": [
+        {
+          "containerID": "containerd://391ca5cfa1245c74c9a6cff241b3d8aed68cff2036e5b08bcb69a6a8b68b4bc5",
+          "image": "sha256:903cd697133287523b9362733a8c418afe23de6e233d26b5c3fa934b6fe7e6bc",
+          "imageID": "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+          "lastState": {},
+          "name": "render-nvenc",
+          "ready": false,
+          "resources": {},
+          "restartCount": 0,
+          "started": false,
+          "state": {
+            "terminated": {
+              "containerID": "containerd://391ca5cfa1245c74c9a6cff241b3d8aed68cff2036e5b08bcb69a6a8b68b4bc5",
+              "exitCode": 1,
+              "finishedAt": "2026-09-08T03:27:49Z",
+              "reason": "Error",
+              "startedAt": "2026-09-08T03:27:27Z"
+            }
+          },
+          "volumeMounts": [
+            {
+              "mountPath": "C:\\gpu-probe",
+              "name": "probe",
+              "readOnly": true,
+              "recursiveReadOnly": "Disabled"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "job": {
+    "metadata": {
+      "name": "windows-process-no-gpu-2025-v1",
+      "uid": "bb8387db-8c81-4f58-bf65-53b01a115eef"
+    }
+  },
+  "events": [
+    {
+      "message": "[391ca5cfa1245c74c9a6cff241b3d8aed68cff2036e5b08bcb69a6a8b68b4bc5] Create process, [parameters omitted], result 0x00000000, process ID 2872",
+      "recordID": 19,
+      "id": 2500,
+      "at": "2026-09-08T03:27:27.2592211Z"
+    },
+    {
+      "message": "[391ca5cfa1245c74c9a6cff241b3d8aed68cff2036e5b08bcb69a6a8b68b4bc5] Container started with Silo Container ID '058D703B-AB34-11F1-949C-CA98ACAC0BF9', Device Path '\\Device\\VhdHardDisk{45cf8eb3-1c5c-41d0-b555-76ff36c7297c}'",
+      "recordID": 16,
+      "id": 2022,
+      "at": "2026-09-08T03:27:21.3727020Z"
+    },
+    {
+      "message": "[391ca5cfa1245c74c9a6cff241b3d8aed68cff2036e5b08bcb69a6a8b68b4bc5] Start compute system, result 0xC0370103",
+      "recordID": 15,
+      "id": 2001,
+      "at": "2026-09-08T03:26:44.9186771Z"
+    },
+    {
+      "message": "[391ca5cfa1245c74c9a6cff241b3d8aed68cff2036e5b08bcb69a6a8b68b4bc5] Create compute system, result 0xC0370103",
+      "recordID": 12,
+      "id": 2000,
+      "at": "2026-09-08T03:26:36.9592984Z"
+    },
+    {
+      "message": "[391ca5cfa1245c74c9a6cff241b3d8aed68cff2036e5b08bcb69a6a8b68b4bc5] Create Container, type 'Silo Container', settings '{\"Container\": {\"AssignedDevices\": []}}'",
+      "recordID": 11,
+      "id": 2010,
+      "at": "2026-09-08T03:26:36.9590415Z"
+    }
+  ]
+}

@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 1,
+  "execution": {
+    "labBinarySHA256": "42c0c9ac92937154612b8fffd9e092e56c88df1324c700a60ea9c2c529cc8f81",
+    "runnerBaseImage": "sha256:1815da72f95bf4fd3c35212f3b6563ca9a29d9083429ac3e05a648da5a0dde51",
+    "portableHelmSHA256": "ea22096683b9b61005584501e36168a1eadc5b6883a89df299f5a55e4e2dd283",
+    "liveRunnerCorrections": [
+      "containerlab executable mode",
+      "git safe.directory /workspace",
+      "portable Helm 3.19.4"
+    ]
+  },
+  "completedUTC": "2026-09-09T00:09:54.120480+00:00",
+  "result": "passed",
+  "scope": "Verified existing single-NIC KVM site: two CAPI remote joins, removal/recreation, survivor convergence, four endpoint placements",
+  "freshSiteReport": "k0s-1.36-kuberouter-site-results.json",
+  "k0sVersion": "v1.36.2+k0s.0",
+  "containerdVersion": "2.3.2",
+  "kubeRouterVersion": "v2.10.0-iptables1.8.13-k0s.0",
+  "capiVersion": "v1.11.1",
+  "matrices": [
+    {
+      "stage": "the reachability matrix",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.793477051s",
+      "kinds": {
+        "dns": 7,
+        "external": 7,
+        "pod": 42,
+        "service": 42,
+        "transfer": 42
+      }
+    },
+    {
+      "stage": "remove and re-add: remote1",
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "3.763875291s",
+      "kinds": {
+        "dns": 6,
+        "external": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      }
+    },
+    {
+      "stage": "bootstrapping remote1",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.374854055s",
+      "kinds": {
+        "dns": 7,
+        "external": 7,
+        "pod": 42,
+        "service": 42,
+        "transfer": 42
+      }
+    },
+    {
+      "stage": "remove and re-add: remote2",
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "3.59851608s",
+      "kinds": {
+        "dns": 6,
+        "external": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      }
+    },
+    {
+      "stage": "bootstrapping remote2",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "6.067127381s",
+      "kinds": {
+        "dns": 7,
+        "external": 7,
+        "pod": 42,
+        "service": 42,
+        "transfer": 42
+      }
+    },
+    {
+      "stage": "placement: control-plane (node-role.kubernetes.io/control-plane,kubernetes.io/hostname=cp)",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.759410116s",
+      "kinds": {
+        "dns": 7,
+        "external": 7,
+        "pod": 42,
+        "service": 42,
+        "transfer": 42
+      }
+    },
+    {
+      "stage": "placement: one-worker (kubernetes.io/hostname=w1)",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "1m23.880819583s",
+      "kinds": {
+        "dns": 7,
+        "external": 7,
+        "pod": 42,
+        "service": 42,
+        "transfer": 42
+      }
+    },
+    {
+      "stage": "placement: two-workers (kubernetes.io/hostname in (w1,w2))",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "6.194685085s",
+      "kinds": {
+        "dns": 7,
+        "external": 7,
+        "pod": 42,
+        "service": 42,
+        "transfer": 42
+      }
+    },
+    {
+      "stage": "placement: all-nodes (all)",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "6.187848638s",
+      "kinds": {
+        "dns": 7,
+        "external": 7,
+        "pod": 42,
+        "service": 42,
+        "transfer": 42
+      }
+    },
+    {
+      "stage": "final seven-node matrix",
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "6.418558643s",
+      "kinds": {
+        "dns": 7,
+        "external": 7,
+        "pod": 42,
+        "service": 42,
+        "transfer": 42
+      }
+    }
+  ],
+  "totalConvergedChecks": 1324,
+  "removed": [
+    {
+      "node": "remote1",
+      "oldNodeUID": "91c48139-8ae2-4845-b3e3-4fd02355c2de"
+    },
+    {
+      "node": "remote2",
+      "oldNodeUID": "1ae1f4d7-5cfe-46e6-9b84-bc216c65f9be"
+    }
+  ],
+  "recreated": [
+    {
+      "newNodeUID": "d393d458-0ec2-40bb-983b-77668602198b",
+      "node": "remote1",
+      "oldNodeUID": "91c48139-8ae2-4845-b3e3-4fd02355c2de"
+    },
+    {
+      "newNodeUID": "a7307db4-995a-44b0-8d5c-0ad597b2028d",
+      "node": "remote2",
+      "oldNodeUID": "1ae1f4d7-5cfe-46e6-9b84-bc216c65f9be"
+    }
+  ],
+  "placements": [
+    "placement: control-plane (node-role.kubernetes.io/control-plane,kubernetes.io/hostname=cp)",
+    "placement: one-worker (kubernetes.io/hostname=w1)",
+    "placement: two-workers (kubernetes.io/hostname in (w1,w2))",
+    "placement: all-nodes (all)"
+  ],
+  "placementAssertions": [
+    "Published active endpoints match requested membership",
+    "Kernel WireGuard device presence matches requested membership before traffic checks"
+  ],
+  "finalReadyNodes": 7,
+  "siteNodeUIDsUnchanged": true,
+  "bothRemoteNodeUIDsChanged": true,
+  "capiNodeNamesAndProviderIDsMatch": true,
+  "retainedOriginalCluster": {
+    "readyNodes": 13,
+    "nodeUIDsUnchanged": true,
+    "hostRoutesUnchanged": true
+  },
+  "nativeCoverage": {
+    "scope": "Instrumented cmd/lab linked harness packages, resumed run only",
+    "covered": 1199,
+    "total": 3192,
+    "percent": 37.56
+  },
+  "retention": "Owned isolated runner and seven-node VM site retained; original cluster retained",
+  "limitations": [
+    "Matrices report convergence, not continuous packet-loss measurements; per-pass intermediate results are not retained by this harness version.",
+    "This invocation did not run cut/reboot outages; those remain separate validation work.",
+    "No Windows, GPU, AWS, IPv6 or release qualification is established by this row."
+  ]
+}

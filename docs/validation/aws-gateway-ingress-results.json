@@ -1,0 +1,49 @@
+{
+  "scope": "Real EC2 ingress rule sharing for Windows 2022 and 2025 CAPI identity leases; not CAPI deletion or CNI qualification",
+  "native": {
+    "allOriginalRulesRestored": true,
+    "cleanupErrors": null,
+    "expectedModificationSequence": true,
+    "finishedAt": "2026-09-07T07:32:21.259253826Z",
+    "firstLeaseReleasePreservedRule": true,
+    "modifications": [
+      "authorize-security-group-ingress",
+      "revoke-security-group-ingress"
+    ],
+    "scope": "Real EC2 ingress rule sharing for two CAPI worker leases; no route, CNI or VM removal claim",
+    "startedAt": "2026-09-07T07:32:03.245665774Z",
+    "target": {
+      "groupID": "sg-079cc1ad238659c86",
+      "source": "10.10.0.11/32",
+      "port": 4789
+    }
+  },
+  "journalAfterCleanup": {
+    "phase": "Absent",
+    "leaseCount": 0
+  },
+  "coverage": {
+    "ingressAdapterNative": {
+      "coveredStatements": 134,
+      "totalStatements": 194,
+      "percent": 69.1
+    },
+    "awsPackageNative": {
+      "coveredStatements": 134,
+      "totalStatements": 619,
+      "percent": 21.6
+    },
+    "note": "Native check used a private file journal; ConfigMap finalizers are covered by the isolated API contract tests."
+  },
+  "sourceSHA256": {
+    "controller/pkg/attachment/aws/ingress.go": "9daf6c3d4b043a6bee8e852e02e89a03f26adbfd677a2271a858011d42ffe690",
+    "controller/pkg/attachment/aws/ingress_journal.go": "8e16450353042c341d6556dddf5f19689233d0db54fed1f4516b29f4c574700b",
+    "docs/iam/gateway-ingress.json": "97142f89d75431146558914c60a2d18e537313f102e089af46a46255bbf15bb9"
+  },
+  "remaining": [
+    "Compose forwarding resources",
+    "Consumer publication and elected controller registration",
+    "CAPI worker/gateway deletion and replacement",
+    "Full Windows networking matrix"
+  ]
+}

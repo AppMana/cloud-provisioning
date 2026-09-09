@@ -1,0 +1,229 @@
+{
+  "campaign": "defaults-campaign-v4",
+  "baseRevision": "acade1891c36d4a0f94a8a8dd9805ddceba8620f",
+  "sourceSnapshot": "harness/e2e/.state/defaults-campaign-v4/source-at-first-install.json",
+  "rig": "single-NIC KVM; virtio-serial QGA management",
+  "capiMode": "imported",
+  "placements": [
+    "control-plane",
+    "one-worker",
+    "two-workers",
+    "all-nodes"
+  ],
+  "outages": [
+    "remote1:cut",
+    "remote1:reboot"
+  ],
+  "limitations": [
+    "OKD remote joining is not included.",
+    "Outage coverage is remote1 under each placement, not every possible victim.",
+    "Runtime coverage measures harness code, not Kubernetes/CNI binaries."
+  ],
+  "rows": [
+    {
+      "profile": "k0s/calico",
+      "bundledCNI": true,
+      "status": "passed",
+      "started": "2026-09-05T22:35:59.588478577Z",
+      "finished": "2026-09-05T23:31:46.01142069Z",
+      "passedMatrixGates": 34,
+      "passedOutageCases": 8,
+      "capiAssociations": [
+        {
+          "machine": "remote1",
+          "node": "remote1"
+        },
+        {
+          "machine": "remote2",
+          "node": "remote2"
+        },
+        {
+          "machine": "remote1",
+          "node": "remote1"
+        },
+        {
+          "machine": "remote2",
+          "node": "remote2"
+        }
+      ],
+      "replacements": [
+        {
+          "newNodeUID": "2684e3e1-d796-480f-96d8-ac29c3324859",
+          "node": "remote1",
+          "oldNodeUID": "09053d0d-9eb6-441e-b47b-fc75d16b7c1c"
+        },
+        {
+          "newNodeUID": "12999a03-73e1-40fe-9bb5-899bc0768226",
+          "node": "remote2",
+          "oldNodeUID": "952b92b3-8001-4aea-baac-3079fabc89f7"
+        }
+      ],
+      "eventsPath": "harness/e2e/.state/defaults-campaign-v4/00-k0s-calico/events.jsonl",
+      "eventsSHA256": "9c87881238b3b6bdd2547ac778866e2e108248ad5957c8b97dad5f4b75622474"
+    },
+    {
+      "profile": "k0s/kube-router",
+      "bundledCNI": true,
+      "status": "passed",
+      "started": "2026-09-05T23:31:46.012900167Z",
+      "finished": "2026-09-06T00:18:42.36825164Z",
+      "passedMatrixGates": 34,
+      "passedOutageCases": 8,
+      "capiAssociations": [
+        {
+          "machine": "remote1",
+          "node": "remote1"
+        },
+        {
+          "machine": "remote2",
+          "node": "remote2"
+        },
+        {
+          "machine": "remote1",
+          "node": "remote1"
+        },
+        {
+          "machine": "remote2",
+          "node": "remote2"
+        }
+      ],
+      "replacements": [
+        {
+          "newNodeUID": "33ab3073-6d93-4a43-8a61-9012a2620d5d",
+          "node": "remote1",
+          "oldNodeUID": "43b4f1a2-9da0-4725-a52b-7825210e5652"
+        },
+        {
+          "newNodeUID": "fde8825b-0cce-4460-83f0-242a0d0a7cdd",
+          "node": "remote2",
+          "oldNodeUID": "25b7530a-9f63-479d-9e93-d5c230e813ec"
+        }
+      ],
+      "eventsPath": "harness/e2e/.state/defaults-campaign-v4/01-k0s-kube-router/events.jsonl",
+      "eventsSHA256": "a8d9bbc34b25fe7c4db7997151145cb709429af5d471b9aa364a03d41f588565"
+    },
+    {
+      "profile": "k3s/flannel",
+      "bundledCNI": true,
+      "status": "passed",
+      "started": "2026-09-06T00:18:42.369647243Z",
+      "finished": "2026-09-06T01:03:57.08309618Z",
+      "passedMatrixGates": 34,
+      "passedOutageCases": 8,
+      "capiAssociations": [
+        {
+          "machine": "remote1",
+          "node": "remote1"
+        },
+        {
+          "machine": "remote2",
+          "node": "remote2"
+        },
+        {
+          "machine": "remote1",
+          "node": "remote1"
+        },
+        {
+          "machine": "remote2",
+          "node": "remote2"
+        }
+      ],
+      "replacements": [
+        {
+          "newNodeUID": "fccb6f8f-08b9-4baf-95bd-5f3edc2692b1",
+          "node": "remote1",
+          "oldNodeUID": "4027aa66-b9a8-45b6-8188-b3ae672bad9d"
+        },
+        {
+          "newNodeUID": "675be94c-673e-41a4-9c5e-4197dd2a368a",
+          "node": "remote2",
+          "oldNodeUID": "bee18b8d-e512-4ebc-b809-db6c40f25b39"
+        }
+      ],
+      "eventsPath": "harness/e2e/.state/defaults-campaign-v4/02-k3s-flannel/events.jsonl",
+      "eventsSHA256": "67cf2cfd167fa11be628073c543c45895e017e7312699e4a879e98512d0b740f"
+    },
+    {
+      "profile": "rke2/canal",
+      "bundledCNI": true,
+      "status": "passed",
+      "started": "2026-09-06T01:03:57.085575161Z",
+      "finished": "2026-09-06T01:54:13.040697551Z",
+      "passedMatrixGates": 34,
+      "passedOutageCases": 8,
+      "capiAssociations": [
+        {
+          "machine": "remote1",
+          "node": "remote1"
+        },
+        {
+          "machine": "remote2",
+          "node": "remote2"
+        },
+        {
+          "machine": "remote1",
+          "node": "remote1"
+        },
+        {
+          "machine": "remote2",
+          "node": "remote2"
+        }
+      ],
+      "replacements": [
+        {
+          "newNodeUID": "1e601a00-08a6-490e-814d-e8f9f346661b",
+          "node": "remote1",
+          "oldNodeUID": "3275d028-94d8-4761-84f3-dfb198e3fd79"
+        },
+        {
+          "newNodeUID": "0468fef3-4949-4ade-8ed5-135b7bc08073",
+          "node": "remote2",
+          "oldNodeUID": "263d3965-d823-47fd-bbd4-53755f682923"
+        }
+      ],
+      "eventsPath": "harness/e2e/.state/defaults-campaign-v4/03-rke2-canal/events.jsonl",
+      "eventsSHA256": "170287d80e6f16fbb2e1f516c7b6c3336cff0b405de3ccb2ac947ba8ef7d6011"
+    },
+    {
+      "profile": "kubeadm/calico",
+      "bundledCNI": false,
+      "status": "passed",
+      "started": "2026-09-06T01:54:13.042571746Z",
+      "finished": "2026-09-06T02:49:52.180675066Z",
+      "passedMatrixGates": 34,
+      "passedOutageCases": 8,
+      "capiAssociations": [
+        {
+          "machine": "remote1",
+          "node": "remote1"
+        },
+        {
+          "machine": "remote2",
+          "node": "remote2"
+        },
+        {
+          "machine": "remote1",
+          "node": "remote1"
+        },
+        {
+          "machine": "remote2",
+          "node": "remote2"
+        }
+      ],
+      "replacements": [
+        {
+          "newNodeUID": "07c8bf76-a2f7-4451-83b7-08c23577a5fb",
+          "node": "remote1",
+          "oldNodeUID": "b2be5391-865e-4e66-9f55-439dd393a2ec"
+        },
+        {
+          "newNodeUID": "86ef03c8-75f2-4756-88b9-7004a5559de4",
+          "node": "remote2",
+          "oldNodeUID": "3d09eb46-ee2f-4d5d-a50c-dc72ce861729"
+        }
+      ],
+      "eventsPath": "harness/e2e/.state/defaults-campaign-v4/04-kubeadm-calico/events.jsonl",
+      "eventsSHA256": "8eb33bb639311acc021f20507a2a63d580fac751500e64c5dd4d012b98535bba"
+    }
+  ]
+}

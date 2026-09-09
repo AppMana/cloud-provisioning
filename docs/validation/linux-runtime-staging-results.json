@@ -1,0 +1,58 @@
+{
+  "observedAt": "2026-09-08T20:07:03.568153+00:00",
+  "scope": "Shared OS-profile runtime extraction and comparison with installed binaries on a single-NIC QEMU Linux worker",
+  "runtime": {
+    "schemaVersion": 1,
+    "workerSHA256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+    "runtimeArchiveSHA256": "7fce5150d1aacf1cda1cd2c04abb9a9ced6a3b13147ae3d577249c09b4d5af13",
+    "components": [
+      {
+        "name": "containerd",
+        "bytes": 43534104,
+        "sha256": "371a3cd3e3a2d9582f7a93f9f1d50d7b2881419dfeecfc779f7d29592e14e27f"
+      },
+      {
+        "name": "containerd-shim-runc-v2",
+        "bytes": 8458402,
+        "sha256": "0a7a4030019277c18f144a09c4b2df0444abd17f4954f73781c1cb5ef02b3706"
+      },
+      {
+        "name": "runc",
+        "bytes": 12369784,
+        "sha256": "0aba40a290392c85a11fb5532ce7035c830a1eba1ecfda7d7c400a28ec52e459"
+      }
+    ],
+    "scope": "Exact embedded runtime bytes only; image cache and clone startup not qualified"
+  },
+  "installedQEMUHashes": {
+    "containerd": "371a3cd3e3a2d9582f7a93f9f1d50d7b2881419dfeecfc779f7d29592e14e27f",
+    "containerd-shim-runc-v2": "0a7a4030019277c18f144a09c4b2df0444abd17f4954f73781c1cb5ef02b3706",
+    "runc": "0aba40a290392c85a11fb5532ce7035c830a1eba1ecfda7d7c400a28ec52e459"
+  },
+  "allComponentsMatch": true,
+  "unitTests": {
+    "passed": 7,
+    "coverageScope": [
+      "images/runtime_payload.py",
+      "images/windows/stage_k0s_runtime.py"
+    ],
+    "coveredStatements": 46,
+    "statements": 54,
+    "percent": 85.18518518518519
+  },
+  "limitations": [
+    "Build-host extraction and guest binary hashes only; no runtime was started or changed by this validation.",
+    "No Linux cache import/unpack or clone startup qualification.",
+    "Linux entrypoint executed against the pinned native artifact; selected unit coverage includes the shared extractor and Windows compatibility entrypoint.",
+    "Windows regression tests preserve profile behavior; this refactor did not repeat Windows image capture."
+  ],
+  "evidenceSHA256": {
+    "qemu-runtime-sha256.txt": "9c83c378d9dae984382855fafa98bff70b2a33b822892f64d11c39dcce72ed3f"
+  },
+  "sourceSHA256": {
+    "images/runtime_payload.py": "9e7fc09ad16caa142b564dddcddb4b1853f8737bd43c647d1686184601979c9d",
+    "images/linux/stage_k0s_runtime.py": "25381f33a424cd1ce9cfe76408cdb67172ef22db8d582dffbfa295276cef2a34",
+    "images/windows/stage_k0s_runtime.py": "3730c82df212489bcde8a00f61d003f3a1946973c31efe11bc960c5ff623b3e8",
+    "images/test_runtime_payload.py": "dc9ca8a149f6ef347d0596dd8a5bfb7fdd8aea4025d825bd2a53245e3fa020b5"
+  }
+}

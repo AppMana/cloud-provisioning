@@ -1,0 +1,163 @@
+# Lab platform resources consumed by the product and real CAPI controllers.
+# The lab provider owns VM lifecycle and reports infrastructure observations.
+# ImportedControlPlane observes the existing site's API; CAPI itself writes
+# Cluster initialization and Machine Node associations.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: containernetclusters.containernet.appmana.com
+  # Cluster API reads this to learn which of a provider's API
+  # versions satisfies which of its contracts. Without it, its
+  # conversion webhook cannot resolve the kind at all and every
+  # Cluster stays Provisioning while every Machine stays Pending,
+  # with the reason only in Cluster API's own log:
+  # "cannot find any versions matching contract versions".
+  #
+  # A provider that is never run against Cluster API can omit this and
+  # look correct, which is exactly what happened here.
+  labels:
+    cluster.x-k8s.io/v1beta1: v1beta2
+    cluster.x-k8s.io/v1beta2: v1beta2
+spec:
+  group: containernet.appmana.com
+  scope: Namespaced
+  names:
+    kind: ContainernetCluster
+    listKind: ContainernetClusterList
+    plural: containernetclusters
+    singular: containernetcluster
+  versions:
+    - name: v1beta2
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: containernetmachines.containernet.appmana.com
+  # Cluster API reads this to learn which of a provider's API
+  # versions satisfies which of its contracts. Without it, its
+  # conversion webhook cannot resolve the kind at all and every
+  # Cluster stays Provisioning while every Machine stays Pending,
+  # with the reason only in Cluster API's own log:
+  # "cannot find any versions matching contract versions".
+  #
+  # A provider that is never run against Cluster API can omit this and
+  # look correct, which is exactly what happened here.
+  labels:
+    cluster.x-k8s.io/v1beta1: v1beta2
+    cluster.x-k8s.io/v1beta2: v1beta2
+spec:
+  group: containernet.appmana.com
+  scope: Namespaced
+  names:
+    kind: ContainernetMachine
+    listKind: ContainernetMachineList
+    plural: containernetmachines
+    singular: containernetmachine
+  versions:
+    - name: v1beta2
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+      additionalPrinterColumns:
+        # The container this machine stands for, which is the whole
+        # point of the kind: the object is named by the claim and the
+        # container by whoever created it, and they rarely agree.
+        - name: Container
+          type: string
+          jsonPath: .metadata.annotations.containernet\.appmana\.com/container-name
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: containernetmachinetemplates.containernet.appmana.com
+  # Cluster API reads this to learn which of a provider's API
+  # versions satisfies which of its contracts. Without it, its
+  # conversion webhook cannot resolve the kind at all and every
+  # Cluster stays Provisioning while every Machine stays Pending,
+  # with the reason only in Cluster API's own log:
+  # "cannot find any versions matching contract versions".
+  #
+  # A provider that is never run against Cluster API can omit this and
+  # look correct, which is exactly what happened here.
+  labels:
+    cluster.x-k8s.io/v1beta1: v1beta2
+    cluster.x-k8s.io/v1beta2: v1beta2
+spec:
+  group: containernet.appmana.com
+  scope: Namespaced
+  names:
+    kind: ContainernetMachineTemplate
+    listKind: ContainernetMachineTemplateList
+    plural: containernetmachinetemplates
+    singular: containernetmachinetemplate
+  versions:
+    - name: v1beta2
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+---
+# Cluster API's manager reads and writes a provider's own kinds, and
+# its ClusterRole is an aggregate: a provider grants those permissions
+# by shipping a role labelled to aggregate into it. Without this the
+# manager lists nothing and every Cluster and Machine stays in an
+# empty phase, with the reason only in Cluster API's own log
+# ("is forbidden: User ... cannot list resource").
+#
+# A provider that is never run against Cluster API can omit this and
+# look entirely correct, which is what happened here.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: importedcontrolplanes.containernet.appmana.com
+  labels:
+    cluster.x-k8s.io/v1beta2: v1beta2
+spec:
+  group: containernet.appmana.com
+  scope: Namespaced
+  names:
+    kind: ImportedControlPlane
+    listKind: ImportedControlPlaneList
+    plural: importedcontrolplanes
+    singular: importedcontrolplane
+  versions:
+    - name: v1beta2
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: capi-aggregate-containernet
+  labels:
+    cluster.x-k8s.io/aggregate-to-manager: "true"
+rules:
+  - apiGroups: ["containernet.appmana.com"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

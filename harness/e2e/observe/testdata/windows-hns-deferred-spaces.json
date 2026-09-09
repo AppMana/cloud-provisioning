@@ -1,0 +1,17 @@
+{
+  "source": "windows-external-stable-aba-v1/2022-hns-tracerpt.xml.gz",
+  "sourceSHA256": "614b588445dad12b2fc9414905d14fc69149009cbe1ee96f8822c875c2a46f64",
+  "fixtureSHA256": "7977857d3c6cf154e3f104d570ebce19733a856d23db37618fba25867780e2d1",
+  "nativeEventElements": 15,
+  "apiRemoval": {
+    "removedAt": "2026-09-09T04:18:23.0618018Z",
+    "localEndpointIDs": [
+      "69e6f341-ec0a-402d-80f7-c525a6b1be58",
+      "bd6c1803-5537-4838-a8fb-77165b50f1ea"
+    ],
+    "id": "0782A040-B640-4E75-A4DE-20B2B1F38A70",
+    "calicoId": "2309541D-F748-41C0-BB76-D267848B4215"
+  },
+  "dropAt": "2026-09-09T04:19:00.030298300+00:00",
+  "note": "Selected native event elements unchanged; Events wrapper added. Removal records do not prove steady-state convergence."
+}

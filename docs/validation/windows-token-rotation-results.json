@@ -1,0 +1,51 @@
+{
+  "scope": "Native SSM observation of projected token rotation and fresh publisher acknowledgement on both Windows builds, guarded against concurrent payload/identity changes; no CNI/lifecycle claim",
+  "observer": "harness/e2e/aws/windows_token.py",
+  "controllerImage": "cldt/controller-windows:v4",
+  "results": [
+    {
+      "scope": "Projected-token rotation and fresh authenticated publisher acknowledgement; no CNI or lifecycle claim",
+      "node": "aws-win2022",
+      "podUID": "95450321-6c87-4c3a-9b24-e98fba725451",
+      "requestedLifetimeSeconds": 3600,
+      "publisherStartedAt": "2026-09-07T04:55:43Z",
+      "tokenMetadata": {
+        "expiresAt": 1788763548,
+        "issuedAt": 1788759948
+      },
+      "observedAt": "2026-09-07T06:18:08.679545+00:00",
+      "tokenRotated": true,
+      "freshAuthenticatedAcknowledgement": true,
+      "restarts": 0
+    },
+    {
+      "scope": "Projected-token rotation and fresh authenticated publisher acknowledgement; no CNI or lifecycle claim",
+      "node": "aws-win2025",
+      "podUID": "0421df29-6ed9-4d5d-838c-2b2f9a3b970a",
+      "requestedLifetimeSeconds": 3600,
+      "publisherStartedAt": "2026-09-07T04:55:45Z",
+      "tokenMetadata": {
+        "expiresAt": 1788763645,
+        "issuedAt": 1788760045
+      },
+      "observedAt": "2026-09-07T06:18:10.765880+00:00",
+      "tokenRotated": true,
+      "freshAuthenticatedAcknowledgement": true,
+      "restarts": 0
+    }
+  ],
+  "nativeObserverCoverage": {
+    "scope": "One real Server 2022 success run; excludes unit coverage and unexecuted error paths",
+    "covered_lines": 82,
+    "num_statements": 94,
+    "percent_covered": 77.20588235294117,
+    "percent_covered_display": "77",
+    "missing_lines": 12,
+    "excluded_lines": 0,
+    "num_branches": 42,
+    "num_partial_branches": 19,
+    "covered_branches": 23,
+    "missing_branches": 19
+  },
+  "awsHelperUnitTestsPassed": 32
+}

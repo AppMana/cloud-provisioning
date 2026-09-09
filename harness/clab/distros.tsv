@@ -1,0 +1,54 @@
+> The distribution and network dimensions. Each row rebuilds the whole
+> lab as that distribution with that container network and runs its
+> suite: the named placement rows from scenarios.tsv, the named outage
+> rows from outages.tsv, and then mechanism.sh asserts who balances
+> the API path on the live remotes. "full" in a column means every row
+> in that file. A row's key for ONLY_DISTRO and its logs is
+> "<distro>-<cni>"; a bare distro name matches all of that
+> distribution's rows.
+>
+> The cni column names an installer under cni.d/, or "default" for the
+> network the distribution itself ships (k0s: kuberouter, k3s:
+> embedded flannel, RKE2: canal; kubeadm ships none, so it has no
+> default row). Native-routing networks (calico, kube-router) put pod
+> addresses on the tunnel, so the mesh's accept lists carry each
+> node's blocks; encapsulating networks (flannel vxlan, cilium tunnel,
+> canal) address the tunnel's packets to nodes, and the controller's
+> cni package models the difference from each network's own resources.
+>
+> The suite is deliberately not the full cross product. What varies by
+> distribution is how the site is built, how a remote joins, and who
+> balances the API path; what varies by network is who owns which
+> prefix and whether the tunnel carries pod or node addresses. The
+> all-nodes-two-clouds row (every pair, 112 checks) proves each combo's
+> mesh whole; the outage rows re-prove recovery only where the
+> distribution's mechanics differ, which is why the calico rows carry
+> them and the other networks lean on the placement rows first.
+>
+> rke2 runs cp-dies' outage as reboots only, by recorded decision, not
+> oversight: a sustained partition of an RKE2 server node wedges that
+> node's etcd beyond the distribution's own recovery. rke2-server
+> fatals on "leaderelection lost" (by design, expecting a clean
+> restart), its containerd dies with it while the pod shims survive,
+> and the orphaned etcd, its log consumer gone, keeps heartbeating
+> raft while its serving paths block on a full stderr pipe; every
+> restart then dies reading the datastore, forever, even after the
+> partition heals. Measured here, recovered only by killing the
+> orphaned etcd by hand (~3 minutes to Ready afterwards); known
+> upstream (rancher/rke2 issues 4510, 4479, 7155). k3s embeds etcd in
+> process, restarts it with itself, and passes the same row; power
+> loss orphans nothing, so the reboot rows stand for rke2.
+distro	cni	placement	outages
+kubeadm	calico	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
+kubeadm	flannel	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
+kubeadm	kube-router	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
+kubeadm	cilium	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
+k0s	calico	full	full
+k0s	default	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
+k0s	cilium	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
+k3s	calico	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
+k3s	default	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
+k3s	cilium	control-plane all-nodes-two-clouds	cp-dies reboot-remote reboot-cp
+rke2	calico	control-plane all-nodes-two-clouds	reboot-remote reboot-cp
+rke2	default	control-plane all-nodes-two-clouds	reboot-remote reboot-cp
+rke2	cilium	control-plane all-nodes-two-clouds	reboot-remote reboot-cp

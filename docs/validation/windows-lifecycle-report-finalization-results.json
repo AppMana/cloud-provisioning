@@ -1,0 +1,55 @@
+{
+  "observedAt": "2026-09-08T17:42:21.778361+00:00",
+  "scope": "Combined Windows lifecycle report must wait for independently validated survivor evidence",
+  "testsPassed": 30,
+  "coverage": {
+    "covered_lines": 334,
+    "num_statements": 403,
+    "percent_covered": 82.87841191066998,
+    "percent_covered_display": "83",
+    "missing_lines": 69,
+    "excluded_lines": 0
+  },
+  "coverageFiles": {
+    "aws/windows_lifecycle.py": {
+      "covered_lines": 173,
+      "num_statements": 208,
+      "percent_covered": 83.17307692307692,
+      "percent_covered_display": "83",
+      "missing_lines": 35,
+      "excluded_lines": 0
+    },
+    "observe/survivor_native.py": {
+      "covered_lines": 122,
+      "num_statements": 154,
+      "percent_covered": 79.22077922077922,
+      "percent_covered_display": "79",
+      "missing_lines": 32,
+      "excluded_lines": 0
+    },
+    "observe/survivor_stream.py": {
+      "covered_lines": 39,
+      "num_statements": 41,
+      "percent_covered": 95.1219512195122,
+      "percent_covered_display": "95",
+      "missing_lines": 2,
+      "excluded_lines": 0
+    }
+  },
+  "checks": {
+    "nativeFailureKeepsCombinedPassedFalse": true,
+    "legacyPendingKeepsCombinedPassedFalse": true,
+    "completeNativeSuccessRequired": true,
+    "preCollectionWindowNotMarkedPassed": true
+  },
+  "sourceSHA256": {
+    "aws/windows_lifecycle.py": "f8ad9408c08d7195f1f9bfa84f347e411550d1cf90a39ab883359ad59a81aff3",
+    "aws/test_windows_lifecycle.py": "114a8efb177a1d638d0918b005660c493230a4a893079b1edd4e98c6e1d1c56a"
+  },
+  "nativeFixture": "windows-native-preflight-cleanup-results.json",
+  "limitations": [
+    "Selected unit-test coverage; the existing native fixture supplies failed traffic evidence.",
+    "This shared-runner finalization change has not yet been exercised through a new full public CLI lifecycle invocation.",
+    "The concurrently running GPU diagnostic uses its own explicit failed combined-result path and is not proof of this public CLI finalization."
+  ]
+}

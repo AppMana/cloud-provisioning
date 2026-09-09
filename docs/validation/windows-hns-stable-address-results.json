@@ -1,0 +1,250 @@
+{
+  "schemaVersion": 1,
+  "scope": "Paired Windows Server 2022/2025 native traces after replacing only w2 Linux Calico pod",
+  "qualificationEligible": false,
+  "traffic": {
+    "attempts": 41735,
+    "failed": 18,
+    "identitiesStable": true
+  },
+  "hnsRemoteSubnetRouteModifications": {
+    "2022": 0,
+    "2025": 0
+  },
+  "layerRebuilds": {
+    "2022": [
+      {
+        "activity": "{00000000-0000-0000-0000-000000000000}",
+        "port": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+        "layer": "VNET_ENCAP_LAYER",
+        "removedAt": "2026-09-09T04:08:59.743223100+00:00",
+        "addedAt": "2026-09-09T04:08:59.780942900+00:00",
+        "durationMicroseconds": 37719,
+        "complete": true
+      },
+      {
+        "activity": "{2c8ea0d1-3ecf-0001-44ba-dd2ccf3edd01}",
+        "port": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+        "layer": "VNET_ENCAP_LAYER",
+        "removedAt": "2026-09-09T04:09:00.120535100+00:00",
+        "addedAt": "2026-09-09T04:09:00.120917600+00:00",
+        "durationMicroseconds": 382,
+        "complete": true
+      }
+    ],
+    "2025": [
+      {
+        "activity": "{171ad083-3ed5-0001-5ed7-1a17d53edd01}",
+        "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+        "layer": "VNET_ENCAP_LAYER",
+        "removedAt": "2026-09-09T04:08:58.913444700+00:00",
+        "addedAt": "2026-09-09T04:08:58.930819100+00:00",
+        "durationMicroseconds": 17375,
+        "complete": true
+      },
+      {
+        "activity": "{171ad083-3ed5-0001-db37-1b17d53edd01}",
+        "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+        "layer": "VNET_ENCAP_LAYER",
+        "removedAt": "2026-09-09T04:09:25.974526900+00:00",
+        "addedAt": "2026-09-09T04:09:25.988899700+00:00",
+        "durationMicroseconds": 14373,
+        "complete": true
+      }
+    ]
+  },
+  "correlatedDrops": [
+    {
+      "hostVersion": "2022",
+      "source": "10.244.114.4:64118",
+      "at": "2026-09-09 04:08:59.780570400",
+      "reason": "Not locally destined",
+      "rebuilds": [
+        {
+          "activity": "{00000000-0000-0000-0000-000000000000}",
+          "port": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+          "layer": "VNET_ENCAP_LAYER",
+          "removedAt": "2026-09-09T04:08:59.743223100+00:00",
+          "addedAt": "2026-09-09T04:08:59.780942900+00:00",
+          "durationMicroseconds": 37719,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "hostVersion": "2025",
+      "source": "10.244.114.4:64083",
+      "at": "2026-09-09 04:08:58.930618800",
+      "reason": "Not locally destined",
+      "rebuilds": [
+        {
+          "activity": "{171ad083-3ed5-0001-5ed7-1a17d53edd01}",
+          "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+          "layer": "VNET_ENCAP_LAYER",
+          "removedAt": "2026-09-09T04:08:58.913444700+00:00",
+          "addedAt": "2026-09-09T04:08:58.930819100+00:00",
+          "durationMicroseconds": 17375,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "hostVersion": "2025",
+      "source": "10.244.114.4:49959",
+      "at": "2026-09-09 04:09:25.988692200",
+      "reason": "Not locally destined",
+      "rebuilds": [
+        {
+          "activity": "{171ad083-3ed5-0001-db37-1b17d53edd01}",
+          "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+          "layer": "VNET_ENCAP_LAYER",
+          "removedAt": "2026-09-09T04:09:25.974526900+00:00",
+          "addedAt": "2026-09-09T04:09:25.988899700+00:00",
+          "durationMicroseconds": 14373,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "hostVersion": "2025",
+      "source": "10.244.42.6:65114",
+      "at": "2026-09-09 04:09:25.989060000",
+      "reason": "Invalid Packet",
+      "rebuilds": []
+    },
+    {
+      "hostVersion": "2025",
+      "source": "10.244.42.6:62620",
+      "at": "2026-09-09 04:08:58.930529900",
+      "reason": "Not locally destined",
+      "rebuilds": [
+        {
+          "activity": "{171ad083-3ed5-0001-5ed7-1a17d53edd01}",
+          "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+          "layer": "VNET_ENCAP_LAYER",
+          "removedAt": "2026-09-09T04:08:58.913444700+00:00",
+          "addedAt": "2026-09-09T04:08:58.930819100+00:00",
+          "durationMicroseconds": 17375,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "hostVersion": "2025",
+      "source": "10.244.42.6:65116",
+      "at": "2026-09-09 04:09:25.988598400",
+      "reason": "Not locally destined",
+      "rebuilds": [
+        {
+          "activity": "{171ad083-3ed5-0001-db37-1b17d53edd01}",
+          "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+          "layer": "VNET_ENCAP_LAYER",
+          "removedAt": "2026-09-09T04:09:25.974526900+00:00",
+          "addedAt": "2026-09-09T04:09:25.988899700+00:00",
+          "durationMicroseconds": 14373,
+          "complete": true
+        }
+      ]
+    }
+  ],
+  "vfpCreationMatches": [
+    {
+      "hostVersion": "2022",
+      "tuple": [
+        "10.244.190.81",
+        8081,
+        "10.244.114.4",
+        64118
+      ],
+      "events": []
+    },
+    {
+      "hostVersion": "2025",
+      "tuple": [
+        "10.244.114.4",
+        64083,
+        "10.244.42.6",
+        8081
+      ],
+      "events": [
+        {
+          "at": "2026-09-09T04:08:58.9306033Z",
+          "encapsulationAction": "Ignore"
+        }
+      ]
+    },
+    {
+      "hostVersion": "2025",
+      "tuple": [
+        "10.244.114.4",
+        49959,
+        "10.244.42.6",
+        8081
+      ],
+      "events": [
+        {
+          "at": "2026-09-09T04:09:25.9886758Z",
+          "encapsulationAction": "Ignore"
+        }
+      ]
+    },
+    {
+      "hostVersion": "2025",
+      "tuple": [
+        "10.244.114.4",
+        8081,
+        "10.244.42.6",
+        62620
+      ],
+      "events": [
+        {
+          "at": "2026-09-09T04:08:58.9304670Z",
+          "encapsulationAction": "Ignore"
+        }
+      ]
+    },
+    {
+      "hostVersion": "2025",
+      "tuple": [
+        "10.244.114.4",
+        8081,
+        "10.244.42.6",
+        65116
+      ],
+      "events": [
+        {
+          "at": "2026-09-09T04:09:25.9884970Z",
+          "encapsulationAction": "Ignore"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    "The address oscillation stopped, but five TCPIP Not locally destined drops remain inside native HNS layer rebuild intervals.",
+    "Four Windows 2025 failed tuples have matching inbound VFP creation events with Ignore. The selected Windows 2022 query has no matching creation event.",
+    "One correlated Invalid Packet drop occurs outside the measured layer removal/addition intervals.",
+    "Adjacent GoalStateDriverCallBack records name both the Calico and External networks. This adjacency does not establish causality."
+  ],
+  "limitations": [
+    "Six correlated drops do not explain all eighteen failed samples.",
+    "No complete ETL event-loss or circular-buffer retention audit.",
+    "No lifecycle or isolation qualification."
+  ],
+  "evidenceSHA256": {
+    "survivor-result.json": "dd309c76a258cb59a1dceefecbecf83d16e9d0ab7f85af5dc24de16a89b6ce4e",
+    "packet-drops.json": "fd0fa5bf43838e85e2d4b33704a44c801940152792796528b3433ceb26622e9b",
+    "drop-layer-context.json": "d861d6ab8f82e04ef0a59cad784495f2e7619e1ba46d4292e2cc33fc6aa275ff",
+    "vfp-drop-context.json": "2ef835d67edac5c18be1db041cc8ac8b2f7544f49f8e06cc4631744f0128e2ea",
+    "2022-capture.stdout": "3d77e67bbb44ec2d36bd85c36608c8acb9557a3d8368f640b57c3a15a9e182ee",
+    "2025-capture.stdout": "4a6ff8a648e34c215cc9d8b1721f8ee0d9b75d6d8dc3dcbc3e1395be190cee6e"
+  },
+  "cleanup": {
+    "verifiedArtifacts": {
+      "2022": 14,
+      "2025": 17
+    },
+    "ownedTraceSessionsAbsent": true,
+    "guestArtifactDirectoriesAbsent": true,
+    "samplersAndOwnedToolsRemoved": true
+  }
+}

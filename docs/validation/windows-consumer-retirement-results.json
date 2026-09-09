@@ -1,0 +1,53 @@
+{
+  "observedAt": "2026-09-07T14:01:46.079944+00:00",
+  "attachment": "gateway-aws-win2025-v3",
+  "phase": "Publishing",
+  "publication": "gateway-publication-9e3ea11dc81da7256f0462b743ef8a6a",
+  "retainedNodeUID": "5da46e69-f779-46ad-8ce0-8e2775de38bd",
+  "currentNodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+  "retainedSecretUID": "9437855d-a14b-4765-8801-dfda07e17a3b",
+  "currentSecretUID": "9f56b934-9d19-4060-8989-b4751a458915",
+  "retiredPublicKeyAbsentFromCurrentMesh": true,
+  "requiredWork": "Verify Windows 2025 removal and replacement with native CAPI hooks; complete network and GPU matrices",
+  "nativeValidation": {
+    "observedAt": "2026-09-07T14:18:36.424953+00:00",
+    "controllerImage": "cldt/controller-windows:v12",
+    "controllerImageID": "sha256:8e85339fb37a76cec6cdf54dc71bd6c145b8b229d904fcb784b3046f80b073fb",
+    "phase": "Ready",
+    "recipientHistoryCount": 13,
+    "retiredIdentityPreserved": true,
+    "replacementIdentityAppended": true,
+    "readyNodeCount": 12,
+    "activeAttachments": [
+      {
+        "name": "network-attachment-157078f2ab5e8687be57aace685946aa",
+        "phase": "Ready"
+      },
+      {
+        "name": "network-attachment-1d6c83fcfa8240fb07b5f31a6f5cb02d",
+        "phase": "Ready"
+      },
+      {
+        "name": "network-attachment-231de8204fc1cbe590fc5461dbc86827",
+        "phase": "Ready"
+      },
+      {
+        "name": "network-attachment-b9665a3a0cf8f46a0806d528033cc990",
+        "phase": "Ready"
+      }
+    ],
+    "tests": [
+      "TestAPIPublicationRetainsRecipientsUntilRetirement",
+      "TestMembership*",
+      "TestRemoteRetirement*"
+    ],
+    "scope": "Publication recovery after Windows 2022 same-name replacement; does not establish Windows 2025 removal or full network matrix",
+    "coverage": {
+      "attachment": 77.4,
+      "attachmentRuntime": 50.8,
+      "attachmentAWS": 77.1,
+      "combined": 76.3
+    },
+    "blame": "Attachment package is untracked in the existing worktree; no HEAD history exists for git blame. Existing claim deletion ordering was traced separately to b31e8a0b."
+  }
+}

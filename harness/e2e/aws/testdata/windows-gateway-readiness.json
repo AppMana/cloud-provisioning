@@ -1,0 +1,21 @@
+{
+  "before": {
+    "items": []
+  },
+  "after": {
+    "items": [
+      {
+        "metadata": {
+          "name": "network-attachment-observed"
+        },
+        "data": {
+          "record.json": "{\"phase\": \"Ready\", \"plan\": {\"worker\": {\"uid\": \"observed-machine\", \"nodeUID\": \"observed-node\"}}}"
+        }
+      }
+    ]
+  },
+  "provenance": {
+    "scope": "Selected attachment fields from native Windows 2025 trial, with identities replaced by labels. routing-diagnostic.json observed no target attachment after join; before-removal.json observed a Ready attachment for the same Machine and Node. This fixture replays the readiness gate, not native forwarding.",
+    "samePodUDPAfterAttachment": true
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "templateSHA256": "cfbbf644c7c29fb384f6f1bf2f4c5451ce38c2782412adbfac488fd33f9aa9e1",
+  "findings": [],
+  "sessionPolicy": "descriptive Sids omitted; permissions unchanged",
+  "observedSTS": "original compressed policy rejected at 101%; policy without Sids issued successfully",
+  "scope": "AWS IAM Access Analyzer and real STS issuance for two SSM command documents"
+}

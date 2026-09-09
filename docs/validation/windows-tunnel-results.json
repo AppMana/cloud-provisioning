@@ -1,0 +1,117 @@
+{
+  "scope": "Single-NIC AWS Windows VMs; native WireGuard backend and k0s image preparation, not CAPI joining or CNI isolation",
+  "windowsBuilds": {
+    "2022": 20348,
+    "2025": 26100
+  },
+  "k0s": "v1.36.2+k0s.0",
+  "imagePreparation": {
+    "containersFeatureInstalled": true,
+    "rebootComplete": true,
+    "joined": false
+  },
+  "wireguardNT": "1.1",
+  "driverSHA256": "b1b85e072c45d81358be29d94c599dc76652f912be8c0f0a41e2d5d89a6461d3",
+  "families": {
+    "ipv4": {
+      "family": "ipv4",
+      "scope": "native Windows WireGuard backend; no CAPI or CNI claim",
+      "singleNICPreflight": true,
+      "probeSHA256": "a4cb819fd10493fbf55d353d1020f53744689c054db86a7ca4ab8680e3a5a000",
+      "driverSHA256": "b1b85e072c45d81358be29d94c599dc76652f912be8c0f0a41e2d5d89a6461d3",
+      "results": {
+        "2025": {
+          "initialConnections": 5,
+          "initialKernelRoutes": [
+            "10.254.254.1/32",
+            "10.254.254.2/32",
+            "224.0.0.0/4",
+            "255.255.255.255/32",
+            "fe80::/64",
+            "fe80::611c:eb88:d36f:b4b3/128",
+            "ff00::/8"
+          ],
+          "kernelRouteRemovalAndReaddVerified": true,
+          "localAddress": "10.254.254.2/32",
+          "observedAt": "2026-09-07T01:24:25.1851201Z",
+          "readdedPeerConnected": true,
+          "removedPeerBlocked": true,
+          "scope": "native WireGuard backend; not CAPI, Kubernetes or CNI validation"
+        },
+        "2022": {
+          "initialConnections": 5,
+          "initialKernelRoutes": [
+            "10.254.254.1/32",
+            "10.254.254.2/32",
+            "224.0.0.0/4",
+            "255.255.255.255/32",
+            "fe80::/64",
+            "fe80::e4af:473c:d84b:691b/128",
+            "ff00::/8"
+          ],
+          "kernelRouteRemovalAndReaddVerified": true,
+          "localAddress": "10.254.254.1/32",
+          "observedAt": "2026-09-07T01:24:27.1836722Z",
+          "readdedPeerConnected": true,
+          "removedPeerBlocked": true,
+          "scope": "native WireGuard backend; not CAPI, Kubernetes or CNI validation"
+        }
+      },
+      "failures": {},
+      "evidenceSHA256": "2c51b9ed24ffefa7d9bd2869bc334d9bff767b0abf09d13755c5a2685274752b"
+    },
+    "ipv6": {
+      "family": "ipv6",
+      "scope": "native Windows WireGuard backend; no CAPI or CNI claim",
+      "singleNICPreflight": true,
+      "probeSHA256": "1d3817ea096e1ba194279a4f45fdf3af2df6d920e1870a4ac2833a5889ff8eb8",
+      "driverSHA256": "b1b85e072c45d81358be29d94c599dc76652f912be8c0f0a41e2d5d89a6461d3",
+      "results": {
+        "2025": {
+          "initialConnections": 5,
+          "initialKernelRoutes": [
+            "224.0.0.0/4",
+            "255.255.255.255/32",
+            "fd00:c1d7::1/128",
+            "fd00:c1d7::2/128",
+            "fe80::/64",
+            "fe80::611c:eb88:d36f:b4b3/128",
+            "ff00::/8"
+          ],
+          "kernelRouteRemovalAndReaddVerified": true,
+          "localAddress": "fd00:c1d7::2/128",
+          "observedAt": "2026-09-07T01:27:09.0268324Z",
+          "readdedPeerConnected": true,
+          "removedPeerBlocked": true,
+          "scope": "native WireGuard backend; not CAPI, Kubernetes or CNI validation"
+        },
+        "2022": {
+          "initialConnections": 5,
+          "initialKernelRoutes": [
+            "224.0.0.0/4",
+            "255.255.255.255/32",
+            "fd00:c1d7::1/128",
+            "fd00:c1d7::2/128",
+            "fe80::/64",
+            "fe80::133d:5e3f:dfa7:7a15/128",
+            "ff00::/8"
+          ],
+          "kernelRouteRemovalAndReaddVerified": true,
+          "localAddress": "fd00:c1d7::1/128",
+          "observedAt": "2026-09-07T01:27:08.605548Z",
+          "readdedPeerConnected": true,
+          "removedPeerBlocked": true,
+          "scope": "native WireGuard backend; not CAPI, Kubernetes or CNI validation"
+        }
+      },
+      "failures": {},
+      "evidenceSHA256": "017208cab039efec11c9674b67cf1e0402970d81bdce0645c2cb9cbd9fdc9573"
+    }
+  },
+  "coverage": {
+    "linuxUnitPeerPlanPercent": 97.7,
+    "windowsLiveTunnelDevicePercent": 79.2,
+    "windowsLiveProbePercent": 76.8,
+    "scope": "Windows runtime coverage from IPv6 removal/re-add run on both OS builds; Linux unit coverage excludes Windows-only files"
+  }
+}

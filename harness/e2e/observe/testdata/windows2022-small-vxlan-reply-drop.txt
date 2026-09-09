@@ -1,0 +1,56 @@
+[00]0518.0C30::2026-09-08 12:10:58.020243900 [Microsoft-Windows-PktMon] PktGroupId 15946, PktNumber 1, Appearance 1, Direction Rx , Type Ethernet , Component 5, Edge 1, Filter 1, OriginalSize 156, LoggedSize 156 
+	02-FF-D6-32-CE-F1 > 02-FF-F6-B6-D8-ED, ethertype IPv4 (0x0800), length 156: (tos 0x0, ttl 63, id 3772, offset 0, flags [none], proto UDP (17), length 142)
+    10.10.0.11.57117 > 172.29.0.24.4789: VXLAN, flags [I] (0x08), vni 4096
+	66-29-27-B4-64-9C > 00-15-5D-3A-31-08, ethertype IPv4 (0x0800), length 106: (tos 0x0, ttl 63, id 13186, offset 0, flags [DF], proto UDP (17), length 92)
+    10.244.190.81.8081 > 10.244.114.4.58049: UDP, length 64
+[00]0518.0C30::2026-09-08 12:10:58.020246700 [Microsoft-Windows-PktMon] PktGroupId 15946, PktNumber 1, Appearance 2, Direction Rx , Type Ethernet , Component 47, Edge 1, Filter 1, OriginalSize 156, LoggedSize 156 
+	02-FF-D6-32-CE-F1 > 02-FF-F6-B6-D8-ED, ethertype IPv4 (0x0800), length 156: (tos 0x0, ttl 63, id 3772, offset 0, flags [none], proto UDP (17), length 142)
+    10.10.0.11.57117 > 172.29.0.24.4789: VXLAN, flags [I] (0x08), vni 4096
+	66-29-27-B4-64-9C > 00-15-5D-3A-31-08, ethertype IPv4 (0x0800), length 106: (tos 0x0, ttl 63, id 13186, offset 0, flags [DF], proto UDP (17), length 92)
+    10.244.190.81.8081 > 10.244.114.4.58049: UDP, length 64
+[00]0518.0C30::2026-09-08 12:10:58.020257200 [Microsoft-Windows-PktMon] PktGroupId 15946, PktNumber 1, Appearance 3, Direction Tx , Type Ethernet , Component 49, Edge 1, Filter 1, OriginalSize 156, LoggedSize 156 
+	02-FF-D6-32-CE-F1 > 02-FF-F6-B6-D8-ED, ethertype IPv4 (0x0800), length 156: (tos 0x0, ttl 63, id 3772, offset 0, flags [none], proto UDP (17), length 142)
+    10.10.0.11.57117 > 172.29.0.24.4789: VXLAN, flags [I] (0x08), vni 4096
+	66-29-27-B4-64-9C > 00-15-5D-3A-31-08, ethertype IPv4 (0x0800), length 106: (tos 0x0, ttl 63, id 13186, offset 0, flags [DF], proto UDP (17), length 92)
+    10.244.190.81.8081 > 10.244.114.4.58049: UDP, length 64
+[00]0518.0C30::2026-09-08 12:10:58.020259500 [Microsoft-Windows-PktMon] PktGroupId 15946, PktNumber 1, Appearance 4, Direction Tx , Type Ethernet , Component 22, Edge 1, Filter 1, OriginalSize 156, LoggedSize 156 
+	02-FF-D6-32-CE-F1 > 02-FF-F6-B6-D8-ED, ethertype IPv4 (0x0800), length 156: (tos 0x0, ttl 63, id 3772, offset 0, flags [none], proto UDP (17), length 142)
+    10.10.0.11.57117 > 172.29.0.24.4789: VXLAN, flags [I] (0x08), vni 4096
+	66-29-27-B4-64-9C > 00-15-5D-3A-31-08, ethertype IPv4 (0x0800), length 106: (tos 0x0, ttl 63, id 13186, offset 0, flags [DF], proto UDP (17), length 92)
+    10.244.190.81.8081 > 10.244.114.4.58049: UDP, length 64
+[00]0518.0C30::2026-09-08 12:10:58.020265900 [Microsoft-Windows-PktMon] PktGroupId 15946, PktNumber 1, Appearance 5, Direction Tx , Type Ethernet , Component 22, Edge 2, Filter 1, OriginalSize 156, LoggedSize 156 
+	02-FF-D6-32-CE-F1 > 02-FF-F6-B6-D8-ED, ethertype IPv4 (0x0800), length 156: (tos 0x0, ttl 63, id 3772, offset 0, flags [none], proto UDP (17), length 142)
+    10.10.0.11.57117 > 172.29.0.24.4789: VXLAN, flags [I] (0x08), vni 4096
+	66-29-27-B4-64-9C > 00-15-5D-3A-31-08, ethertype IPv4 (0x0800), length 106: (tos 0x0, ttl 63, id 13186, offset 0, flags [DF], proto UDP (17), length 92)
+    10.244.190.81.8081 > 10.244.114.4.58049: UDP, length 64
+[00]0518.0C30::2026-09-08 12:10:58.020267300 [Microsoft-Windows-PktMon] PktGroupId 15946, PktNumber 1, Appearance 6, Direction Tx , Type Ethernet , Component 17, Edge 1, Filter 1, OriginalSize 156, LoggedSize 156 
+	02-FF-D6-32-CE-F1 > 02-FF-F6-B6-D8-ED, ethertype IPv4 (0x0800), length 156: (tos 0x0, ttl 63, id 3772, offset 0, flags [none], proto UDP (17), length 142)
+    10.10.0.11.57117 > 172.29.0.24.4789: VXLAN, flags [I] (0x08), vni 4096
+	66-29-27-B4-64-9C > 00-15-5D-3A-31-08, ethertype IPv4 (0x0800), length 106: (tos 0x0, ttl 63, id 13186, offset 0, flags [DF], proto UDP (17), length 92)
+    10.244.190.81.8081 > 10.244.114.4.58049: UDP, length 64
+[00]0518.0C30::2026-09-08 12:10:58.020276300 [Microsoft-Windows-PktMon] PktGroupId 15946, PktNumber 1, Appearance 7, Direction Tx , Type Ethernet , Component 17, Edge 2, Filter 1, OriginalSize 156, LoggedSize 156 
+	02-FF-D6-32-CE-F1 > 02-FF-F6-B6-D8-ED, ethertype IPv4 (0x0800), length 156: (tos 0x0, ttl 63, id 3772, offset 0, flags [none], proto UDP (17), length 142)
+    10.10.0.11.57117 > 172.29.0.24.4789: VXLAN, flags [I] (0x08), vni 4096
+	66-29-27-B4-64-9C > 00-15-5D-3A-31-08, ethertype IPv4 (0x0800), length 106: (tos 0x0, ttl 63, id 13186, offset 0, flags [DF], proto UDP (17), length 92)
+    10.244.190.81.8081 > 10.244.114.4.58049: UDP, length 64
+[00]0518.0C30::2026-09-08 12:10:58.020277900 [Microsoft-Windows-PktMon] PktGroupId 15946, PktNumber 1, Appearance 8, Direction Tx , Type Ethernet , Component 6, Edge 1, Filter 1, OriginalSize 156, LoggedSize 156 
+	02-FF-D6-32-CE-F1 > 02-FF-F6-B6-D8-ED, ethertype IPv4 (0x0800), length 156: (tos 0x0, ttl 63, id 3772, offset 0, flags [none], proto UDP (17), length 142)
+    10.10.0.11.57117 > 172.29.0.24.4789: VXLAN, flags [I] (0x08), vni 4096
+	66-29-27-B4-64-9C > 00-15-5D-3A-31-08, ethertype IPv4 (0x0800), length 106: (tos 0x0, ttl 63, id 13186, offset 0, flags [DF], proto UDP (17), length 92)
+    10.244.190.81.8081 > 10.244.114.4.58049: UDP, length 64
+[00]0518.0C30::2026-09-08 12:10:58.020279900 [Microsoft-Windows-PktMon] PktGroupId 15946, PktNumber 1, Appearance 9, Direction Rx , Type Ethernet , Component 6, Edge 1, Filter 1, OriginalSize 156, LoggedSize 156 
+	02-FF-D6-32-CE-F1 > 02-FF-F6-B6-D8-ED, ethertype IPv4 (0x0800), length 156: (tos 0x0, ttl 63, id 3772, offset 0, flags [none], proto UDP (17), length 142)
+    10.10.0.11.57117 > 172.29.0.24.4789: VXLAN, flags [I] (0x08), vni 4096
+	66-29-27-B4-64-9C > 00-15-5D-3A-31-08, ethertype IPv4 (0x0800), length 106: (tos 0x0, ttl 63, id 13186, offset 0, flags [DF], proto UDP (17), length 92)
+    10.244.190.81.8081 > 10.244.114.4.58049: UDP, length 64
+[00]0518.0C30::2026-09-08 12:10:58.020280800 [Microsoft-Windows-PktMon] PktGroupId 15946, PktNumber 1, Appearance 10, Direction Rx , Type Ethernet , Component 17, Edge 2, Filter 1, OriginalSize 156, LoggedSize 156 
+	02-FF-D6-32-CE-F1 > 02-FF-F6-B6-D8-ED, ethertype IPv4 (0x0800), length 156: (tos 0x0, ttl 63, id 3772, offset 0, flags [none], proto UDP (17), length 142)
+    10.10.0.11.57117 > 172.29.0.24.4789: VXLAN, flags [I] (0x08), vni 4096
+	66-29-27-B4-64-9C > 00-15-5D-3A-31-08, ethertype IPv4 (0x0800), length 106: (tos 0x0, ttl 63, id 13186, offset 0, flags [DF], proto UDP (17), length 92)
+    10.244.190.81.8081 > 10.244.114.4.58049: UDP, length 64
+[00]0518.0C30::2026-09-08 12:10:58.020317700 [Microsoft-Windows-PktMon] Drop: PktGroupId 15946, PktNumber 1, Appearance 11, Direction Tx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 156, LoggedSize 156 
+	Drop: 02-FF-D6-32-CE-F1 > 02-FF-F6-B6-D8-ED, ethertype IPv4 (0x0800), length 156: (tos 0x0, ttl 63, id 3772, offset 0, flags [none], proto UDP (17), length 142)
+    10.10.0.11.57117 > 172.29.0.24.4789: VXLAN, flags [I] (0x08), vni 4096
+	66-29-27-B4-64-9C > 00-15-5D-3A-31-08, ethertype IPv4 (0x0800), length 106: (tos 0x0, ttl 63, id 13186, offset 0, flags [DF], proto UDP (17), length 92)
+    10.244.190.81.8081 > 10.244.114.4.58049: UDP, length 64
+[00]1B7C.0C28::2026-09-08 12:12:57.141085100 [Microsoft-Windows-PktMon] Component 93, Type Filter , Name vfpext.sys, VFP Extension 

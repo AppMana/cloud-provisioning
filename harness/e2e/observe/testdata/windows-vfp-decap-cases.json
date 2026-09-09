@@ -1,0 +1,161 @@
+{
+  "cases": [
+    {
+      "windowsServer": "2022",
+      "dropIndex": 0,
+      "kind": "drop",
+      "source": "10.244.190.81",
+      "sourcePort": 8081,
+      "destination": "10.244.114.4",
+      "destinationPort": 49977,
+      "portName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+      "expectedAction": "Ignore",
+      "events": [
+        {
+          "xml": "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Hyper-V-VfpExt' Guid='{9f2660ea-cfe7-428f-9850-aeca612619b0}'/><EventID>600</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x8000000000080000</Keywords><TimeCreated SystemTime='2026-09-09T01:43:49.6395205Z'/><EventRecordID>70132</EventRecordID><Correlation/><Execution ProcessID='2476' ThreadID='1524'/><Channel></Channel><Computer>EC2AMAZ-AESC6KN</Computer><Security/></System><EventData><Data Name='PortId'>3</Data><Data Name='Direction'>1</Data><Data Name='IsMain'>1</Data><Data Name='IsPending'>0</Data><Data Name='TNI'>0</Data><Data Name='VLAN'>0</Data><Data Name='NumEncaps'>1</Data><Data Name='EncapType0'>VXLAN</Data><Data Name='EncapSrcMacAddr0'>02-FF-D6-32-CE-F1</Data><Data Name='EncapDestMacAddr0'>02-FF-F6-B6-D8-ED</Data><Data Name='EncapSrcIpv4Addr0'>184551946</Data><Data Name='EncapDstIpv4Addr0'>402660780</Data><Data Name='TenantId0'>4096</Data><Data Name='EncryptVxlanId0'>0</Data><Data Name='EncapType1'>None</Data><Data Name='EncapSrcMacAddr1'></Data><Data Name='EncapDestMacAddr1'></Data><Data Name='EncapSrcIpv4Addr1'>0</Data><Data Name='EncapDstIpv4Addr1'>0</Data><Data Name='TenantId1'>0</Data><Data Name='EncryptVxlanId1'>0</Data><Data Name='IpProtocol'>17</Data><Data Name='SrcMacAddr'>66-29-27-B4-64-9C</Data><Data Name='DestMacAddr'>00-15-5D-3A-31-08</Data><Data Name='SrcIpv4Addr'>1371468810</Data><Data Name='DstIpv4Addr'>74642442</Data><Data Name='SrcPort'>37151</Data><Data Name='DstPort'>14787</Data><Data Name='IsTcpSyn'>false</Data><Data Name='EncapTransposition0'>MacHeaderAction=Ignore, IpHeaderAction=Ignore, EncapHeaderAction=Ignore</Data><Data Name='EncapTransposition1'>NULL</Data><Data Name='Transposition'>TniAction=Ignore, VlanIdAction=Ignore, MssDeltaAction=Ignore, MacHeaderAction=Ignore, IpHeaderAction=Ignore, TransportHeaderAction=Ignore</Data><Data Name='PortName'>7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data><Data Name='PortFriendlyName'>Container NIC 070372ba</Data><Data Name='UnifiedFlow'>18446622631717706728</Data><Data Name='IsSecondary'>0</Data><Data Name='IsMirror'>0</Data><Data Name='IsHairpin'>0</Data><Data Name='HairpinChecked'>0</Data><Data Name='OriginalInbound'>0</Data></EventData></Event>"
+        }
+      ],
+      "sourceArtifactSHA256": "9e434625933ccd4ba2cc2332d5cad7727af16e4c00413dc11228e30e66a08278"
+    },
+    {
+      "windowsServer": "2022",
+      "dropIndex": 0,
+      "kind": "before",
+      "source": "10.244.190.81",
+      "sourcePort": 8081,
+      "destination": "10.244.114.4",
+      "destinationPort": 49973,
+      "portName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+      "expectedAction": "Pop",
+      "events": [
+        {
+          "xml": "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Hyper-V-VfpExt' Guid='{9f2660ea-cfe7-428f-9850-aeca612619b0}'/><EventID>600</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x8000000000080000</Keywords><TimeCreated SystemTime='2026-09-09T01:43:49.5709136Z'/><EventRecordID>58854</EventRecordID><Correlation/><Execution ProcessID='4564' ThreadID='4992'/><Channel></Channel><Computer>EC2AMAZ-AESC6KN</Computer><Security/></System><EventData><Data Name='PortId'>3</Data><Data Name='Direction'>1</Data><Data Name='IsMain'>1</Data><Data Name='IsPending'>0</Data><Data Name='TNI'>0</Data><Data Name='VLAN'>0</Data><Data Name='NumEncaps'>1</Data><Data Name='EncapType0'>VXLAN</Data><Data Name='EncapSrcMacAddr0'>02-FF-D6-32-CE-F1</Data><Data Name='EncapDestMacAddr0'>02-FF-F6-B6-D8-ED</Data><Data Name='EncapSrcIpv4Addr0'>184551946</Data><Data Name='EncapDstIpv4Addr0'>402660780</Data><Data Name='TenantId0'>4096</Data><Data Name='EncryptVxlanId0'>0</Data><Data Name='EncapType1'>None</Data><Data Name='EncapSrcMacAddr1'></Data><Data Name='EncapDestMacAddr1'></Data><Data Name='EncapSrcIpv4Addr1'>0</Data><Data Name='EncapDstIpv4Addr1'>0</Data><Data Name='TenantId1'>0</Data><Data Name='EncryptVxlanId1'>0</Data><Data Name='IpProtocol'>17</Data><Data Name='SrcMacAddr'>66-29-27-B4-64-9C</Data><Data Name='DestMacAddr'>00-15-5D-3A-31-08</Data><Data Name='SrcIpv4Addr'>1371468810</Data><Data Name='DstIpv4Addr'>74642442</Data><Data Name='SrcPort'>37151</Data><Data Name='DstPort'>13763</Data><Data Name='IsTcpSyn'>false</Data><Data Name='EncapTransposition0'>MacHeaderAction=Pop, IpHeaderAction=Pop, EncapHeaderAction=Pop (PushTni=True)</Data><Data Name='EncapTransposition1'>NULL</Data><Data Name='Transposition'>TniAction=Ignore, VlanIdAction=Ignore, MssDeltaAction=Ignore, MacHeaderAction=Ignore, IpHeaderAction=Ignore, TransportHeaderAction=Ignore</Data><Data Name='PortName'>7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data><Data Name='PortFriendlyName'>Container NIC 070372ba</Data><Data Name='UnifiedFlow'>18446622631820214600</Data><Data Name='IsSecondary'>0</Data><Data Name='IsMirror'>0</Data><Data Name='IsHairpin'>0</Data><Data Name='HairpinChecked'>0</Data><Data Name='OriginalInbound'>0</Data></EventData></Event>"
+        }
+      ],
+      "sourceArtifactSHA256": "04cbf14528191b80e732f507c001f0b2d99a74c449aa23712df04a7ca1c7f31a"
+    },
+    {
+      "windowsServer": "2022",
+      "dropIndex": 0,
+      "kind": "after",
+      "source": "10.244.190.81",
+      "sourcePort": 8081,
+      "destination": "10.244.114.4",
+      "destinationPort": 50340,
+      "portName": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+      "expectedAction": "Pop",
+      "events": [
+        {
+          "xml": "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Hyper-V-VfpExt' Guid='{9f2660ea-cfe7-428f-9850-aeca612619b0}'/><EventID>600</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x8000000000080000</Keywords><TimeCreated SystemTime='2026-09-09T01:43:54.6189530Z'/><EventRecordID>86311</EventRecordID><Correlation/><Execution ProcessID='356' ThreadID='6812'/><Channel></Channel><Computer>EC2AMAZ-AESC6KN</Computer><Security/></System><EventData><Data Name='PortId'>3</Data><Data Name='Direction'>1</Data><Data Name='IsMain'>1</Data><Data Name='IsPending'>0</Data><Data Name='TNI'>0</Data><Data Name='VLAN'>0</Data><Data Name='NumEncaps'>1</Data><Data Name='EncapType0'>VXLAN</Data><Data Name='EncapSrcMacAddr0'>02-FF-D6-32-CE-F1</Data><Data Name='EncapDestMacAddr0'>02-FF-F6-B6-D8-ED</Data><Data Name='EncapSrcIpv4Addr0'>184551946</Data><Data Name='EncapDstIpv4Addr0'>402660780</Data><Data Name='TenantId0'>4096</Data><Data Name='EncryptVxlanId0'>0</Data><Data Name='EncapType1'>None</Data><Data Name='EncapSrcMacAddr1'></Data><Data Name='EncapDestMacAddr1'></Data><Data Name='EncapSrcIpv4Addr1'>0</Data><Data Name='EncapDstIpv4Addr1'>0</Data><Data Name='TenantId1'>0</Data><Data Name='EncryptVxlanId1'>0</Data><Data Name='IpProtocol'>17</Data><Data Name='SrcMacAddr'>66-29-27-B4-64-9C</Data><Data Name='DestMacAddr'>00-15-5D-3A-31-08</Data><Data Name='SrcIpv4Addr'>1371468810</Data><Data Name='DstIpv4Addr'>74642442</Data><Data Name='SrcPort'>37151</Data><Data Name='DstPort'>42180</Data><Data Name='IsTcpSyn'>false</Data><Data Name='EncapTransposition0'>MacHeaderAction=Pop, IpHeaderAction=Pop, EncapHeaderAction=Pop (PushTni=True)</Data><Data Name='EncapTransposition1'>NULL</Data><Data Name='Transposition'>TniAction=Ignore, VlanIdAction=Ignore, MssDeltaAction=Ignore, MacHeaderAction=Ignore, IpHeaderAction=Ignore, TransportHeaderAction=Ignore</Data><Data Name='PortName'>7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data><Data Name='PortFriendlyName'>Container NIC 070372ba</Data><Data Name='UnifiedFlow'>18446622631789254376</Data><Data Name='IsSecondary'>0</Data><Data Name='IsMirror'>0</Data><Data Name='IsHairpin'>0</Data><Data Name='HairpinChecked'>0</Data><Data Name='OriginalInbound'>0</Data></EventData></Event>"
+        }
+      ],
+      "sourceArtifactSHA256": "cf51cbacf19d2e3f738281f535abba6555a59097228e3fdc6aafcceec83fd7b7"
+    },
+    {
+      "windowsServer": "2025",
+      "dropIndex": 1,
+      "kind": "drop",
+      "source": "10.244.114.4",
+      "sourcePort": 50543,
+      "destination": "10.244.42.6",
+      "destinationPort": 8081,
+      "portName": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+      "expectedAction": "Ignore",
+      "events": [
+        {
+          "xml": "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Hyper-V-VfpExt' Guid='{9f2660ea-cfe7-428f-9850-aeca612619b0}'/><EventID>600</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x8000000000080000</Keywords><TimeCreated SystemTime='2026-09-09T01:43:56.9686451Z'/><EventRecordID>107517</EventRecordID><Correlation/><Execution ProcessID='2480' ThreadID='6184'/><Channel></Channel><Computer>EC2AMAZ-83E5T32</Computer><Security/></System><EventData><Data Name='PortId'>3</Data><Data Name='Direction'>1</Data><Data Name='IsMain'>1</Data><Data Name='IsPending'>0</Data><Data Name='TNI'>0</Data><Data Name='VLAN'>0</Data><Data Name='NumEncaps'>1</Data><Data Name='EncapType0'>VXLAN</Data><Data Name='EncapSrcMacAddr0'>02-FF-F6-B6-D8-ED</Data><Data Name='EncapDestMacAddr0'>02-FF-C0-FA-46-77</Data><Data Name='EncapSrcIpv4Addr0'>402660780</Data><Data Name='EncapDstIpv4Addr0'>1140858284</Data><Data Name='TenantId0'>4096</Data><Data Name='EncryptVxlanId0'>0</Data><Data Name='EncapType1'>None</Data><Data Name='EncapSrcMacAddr1'></Data><Data Name='EncapDestMacAddr1'></Data><Data Name='EncapSrcIpv4Addr1'>0</Data><Data Name='EncapDstIpv4Addr1'>0</Data><Data Name='TenantId1'>0</Data><Data Name='EncryptVxlanId1'>0</Data><Data Name='IpProtocol'>17</Data><Data Name='SrcMacAddr'>0E-2A-0A-F4-72-04</Data><Data Name='DestMacAddr'>00-15-5D-2E-C0-7B</Data><Data Name='SrcIpv4Addr'>74642442</Data><Data Name='DstIpv4Addr'>103478282</Data><Data Name='SrcPort'>28613</Data><Data Name='DstPort'>37151</Data><Data Name='IsTcpSyn'>false</Data><Data Name='EncapTransposition0'>MacHeaderAction=Ignore, IpHeaderAction=Ignore, EncapHeaderAction=Ignore</Data><Data Name='EncapTransposition1'>NULL</Data><Data Name='Transposition'>TniAction=Ignore, VlanIdAction=Ignore, MssDeltaAction=Ignore, MacHeaderAction=Ignore, IpHeaderAction=Ignore, TransportHeaderAction=Ignore</Data><Data Name='PortName'>1903CA54-D200-479E-B7F3-A3EC18AE1313</Data><Data Name='PortFriendlyName'>DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0</Data><Data Name='UnifiedFlow'>18446669868010191640</Data><Data Name='IsSecondary'>0</Data><Data Name='IsMirror'>0</Data><Data Name='IsHairpin'>0</Data><Data Name='HairpinChecked'>0</Data><Data Name='OriginalInbound'>0</Data></EventData></Event>"
+        }
+      ],
+      "sourceArtifactSHA256": "70389ec6d1a651ce52d85d5d3788782f5e3b6577cf94912048d27c8993bc8c2c"
+    },
+    {
+      "windowsServer": "2025",
+      "dropIndex": 1,
+      "kind": "before",
+      "source": "10.244.114.4",
+      "sourcePort": 50542,
+      "destination": "10.244.42.6",
+      "destinationPort": 8081,
+      "portName": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+      "expectedAction": "Pop",
+      "events": [
+        {
+          "xml": "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Hyper-V-VfpExt' Guid='{9f2660ea-cfe7-428f-9850-aeca612619b0}'/><EventID>600</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x8000000000080000</Keywords><TimeCreated SystemTime='2026-09-09T01:43:56.9472183Z'/><EventRecordID>97506</EventRecordID><Correlation/><Execution ProcessID='2480' ThreadID='6184'/><Channel></Channel><Computer>EC2AMAZ-83E5T32</Computer><Security/></System><EventData><Data Name='PortId'>3</Data><Data Name='Direction'>1</Data><Data Name='IsMain'>1</Data><Data Name='IsPending'>0</Data><Data Name='TNI'>0</Data><Data Name='VLAN'>0</Data><Data Name='NumEncaps'>1</Data><Data Name='EncapType0'>VXLAN</Data><Data Name='EncapSrcMacAddr0'>02-FF-F6-B6-D8-ED</Data><Data Name='EncapDestMacAddr0'>02-FF-C0-FA-46-77</Data><Data Name='EncapSrcIpv4Addr0'>402660780</Data><Data Name='EncapDstIpv4Addr0'>1140858284</Data><Data Name='TenantId0'>4096</Data><Data Name='EncryptVxlanId0'>0</Data><Data Name='EncapType1'>None</Data><Data Name='EncapSrcMacAddr1'></Data><Data Name='EncapDestMacAddr1'></Data><Data Name='EncapSrcIpv4Addr1'>0</Data><Data Name='EncapDstIpv4Addr1'>0</Data><Data Name='TenantId1'>0</Data><Data Name='EncryptVxlanId1'>0</Data><Data Name='IpProtocol'>17</Data><Data Name='SrcMacAddr'>0E-2A-0A-F4-72-04</Data><Data Name='DestMacAddr'>00-15-5D-2E-C0-7B</Data><Data Name='SrcIpv4Addr'>74642442</Data><Data Name='DstIpv4Addr'>103478282</Data><Data Name='SrcPort'>28357</Data><Data Name='DstPort'>37151</Data><Data Name='IsTcpSyn'>false</Data><Data Name='EncapTransposition0'>MacHeaderAction=Pop, IpHeaderAction=Pop, EncapHeaderAction=Pop (PushTni=True)</Data><Data Name='EncapTransposition1'>NULL</Data><Data Name='Transposition'>TniAction=Ignore, VlanIdAction=Ignore, MssDeltaAction=Ignore, MacHeaderAction=Ignore, IpHeaderAction=Ignore, TransportHeaderAction=Ignore</Data><Data Name='PortName'>1903CA54-D200-479E-B7F3-A3EC18AE1313</Data><Data Name='PortFriendlyName'>DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0</Data><Data Name='UnifiedFlow'>18446669868247094520</Data><Data Name='IsSecondary'>0</Data><Data Name='IsMirror'>0</Data><Data Name='IsHairpin'>0</Data><Data Name='HairpinChecked'>0</Data><Data Name='OriginalInbound'>0</Data></EventData></Event>"
+        }
+      ],
+      "sourceArtifactSHA256": "87e98cbbf6f5eeb93501a9fe954c2c0cb95c9b9a03fc2f116609ee62a0a6e813"
+    },
+    {
+      "windowsServer": "2025",
+      "dropIndex": 1,
+      "kind": "after",
+      "source": "10.244.114.4",
+      "sourcePort": 50680,
+      "destination": "10.244.42.6",
+      "destinationPort": 8081,
+      "portName": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+      "expectedAction": "Pop",
+      "events": [
+        {
+          "xml": "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Hyper-V-VfpExt' Guid='{9f2660ea-cfe7-428f-9850-aeca612619b0}'/><EventID>600</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x8000000000080000</Keywords><TimeCreated SystemTime='2026-09-09T01:44:01.9693355Z'/><EventRecordID>130663</EventRecordID><Correlation/><Execution ProcessID='5928' ThreadID='6708'/><Channel></Channel><Computer>EC2AMAZ-83E5T32</Computer><Security/></System><EventData><Data Name='PortId'>3</Data><Data Name='Direction'>1</Data><Data Name='IsMain'>1</Data><Data Name='IsPending'>0</Data><Data Name='TNI'>0</Data><Data Name='VLAN'>0</Data><Data Name='NumEncaps'>1</Data><Data Name='EncapType0'>VXLAN</Data><Data Name='EncapSrcMacAddr0'>02-FF-F6-B6-D8-ED</Data><Data Name='EncapDestMacAddr0'>02-FF-C0-FA-46-77</Data><Data Name='EncapSrcIpv4Addr0'>402660780</Data><Data Name='EncapDstIpv4Addr0'>1140858284</Data><Data Name='TenantId0'>4096</Data><Data Name='EncryptVxlanId0'>0</Data><Data Name='EncapType1'>None</Data><Data Name='EncapSrcMacAddr1'></Data><Data Name='EncapDestMacAddr1'></Data><Data Name='EncapSrcIpv4Addr1'>0</Data><Data Name='EncapDstIpv4Addr1'>0</Data><Data Name='TenantId1'>0</Data><Data Name='EncryptVxlanId1'>0</Data><Data Name='IpProtocol'>17</Data><Data Name='SrcMacAddr'>0E-2A-0A-F4-72-04</Data><Data Name='DestMacAddr'>00-15-5D-2E-C0-7B</Data><Data Name='SrcIpv4Addr'>74642442</Data><Data Name='DstIpv4Addr'>103478282</Data><Data Name='SrcPort'>63685</Data><Data Name='DstPort'>37151</Data><Data Name='IsTcpSyn'>false</Data><Data Name='EncapTransposition0'>MacHeaderAction=Pop, IpHeaderAction=Pop, EncapHeaderAction=Pop (PushTni=True)</Data><Data Name='EncapTransposition1'>NULL</Data><Data Name='Transposition'>TniAction=Ignore, VlanIdAction=Ignore, MssDeltaAction=Ignore, MacHeaderAction=Ignore, IpHeaderAction=Ignore, TransportHeaderAction=Ignore</Data><Data Name='PortName'>1903CA54-D200-479E-B7F3-A3EC18AE1313</Data><Data Name='PortFriendlyName'>DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0</Data><Data Name='UnifiedFlow'>18446669868218776488</Data><Data Name='IsSecondary'>0</Data><Data Name='IsMirror'>0</Data><Data Name='IsHairpin'>0</Data><Data Name='HairpinChecked'>0</Data><Data Name='OriginalInbound'>0</Data></EventData></Event>"
+        }
+      ],
+      "sourceArtifactSHA256": "aff020caaf0aa432c2ef49ac112c1ed4bfe463b003b08517db3054207c524923"
+    },
+    {
+      "windowsServer": "2025",
+      "dropIndex": 2,
+      "kind": "drop",
+      "source": "10.244.190.81",
+      "sourcePort": 8081,
+      "destination": "10.244.42.6",
+      "destinationPort": 60801,
+      "portName": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+      "expectedAction": "Ignore",
+      "events": [
+        {
+          "xml": "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Hyper-V-VfpExt' Guid='{9f2660ea-cfe7-428f-9850-aeca612619b0}'/><EventID>600</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x8000000000080000</Keywords><TimeCreated SystemTime='2026-09-09T01:43:56.9684597Z'/><EventRecordID>107509</EventRecordID><Correlation/><Execution ProcessID='2480' ThreadID='6184'/><Channel></Channel><Computer>EC2AMAZ-83E5T32</Computer><Security/></System><EventData><Data Name='PortId'>3</Data><Data Name='Direction'>1</Data><Data Name='IsMain'>1</Data><Data Name='IsPending'>0</Data><Data Name='TNI'>0</Data><Data Name='VLAN'>0</Data><Data Name='NumEncaps'>1</Data><Data Name='EncapType0'>VXLAN</Data><Data Name='EncapSrcMacAddr0'>02-FF-D6-32-CE-F1</Data><Data Name='EncapDestMacAddr0'>02-FF-C0-FA-46-77</Data><Data Name='EncapSrcIpv4Addr0'>184551946</Data><Data Name='EncapDstIpv4Addr0'>1140858284</Data><Data Name='TenantId0'>4096</Data><Data Name='EncryptVxlanId0'>0</Data><Data Name='EncapType1'>None</Data><Data Name='EncapSrcMacAddr1'></Data><Data Name='EncapDestMacAddr1'></Data><Data Name='EncapSrcIpv4Addr1'>0</Data><Data Name='EncapDstIpv4Addr1'>0</Data><Data Name='TenantId1'>0</Data><Data Name='EncryptVxlanId1'>0</Data><Data Name='IpProtocol'>17</Data><Data Name='SrcMacAddr'>66-29-27-B4-64-9C</Data><Data Name='DestMacAddr'>00-15-5D-2E-C0-7B</Data><Data Name='SrcIpv4Addr'>1371468810</Data><Data Name='DstIpv4Addr'>103478282</Data><Data Name='SrcPort'>37151</Data><Data Name='DstPort'>33261</Data><Data Name='IsTcpSyn'>false</Data><Data Name='EncapTransposition0'>MacHeaderAction=Ignore, IpHeaderAction=Ignore, EncapHeaderAction=Ignore</Data><Data Name='EncapTransposition1'>NULL</Data><Data Name='Transposition'>TniAction=Ignore, VlanIdAction=Ignore, MssDeltaAction=Ignore, MacHeaderAction=Ignore, IpHeaderAction=Ignore, TransportHeaderAction=Ignore</Data><Data Name='PortName'>1903CA54-D200-479E-B7F3-A3EC18AE1313</Data><Data Name='PortFriendlyName'>DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0</Data><Data Name='UnifiedFlow'>18446669868211802760</Data><Data Name='IsSecondary'>0</Data><Data Name='IsMirror'>0</Data><Data Name='IsHairpin'>0</Data><Data Name='HairpinChecked'>0</Data><Data Name='OriginalInbound'>0</Data></EventData></Event>"
+        }
+      ],
+      "sourceArtifactSHA256": "70389ec6d1a651ce52d85d5d3788782f5e3b6577cf94912048d27c8993bc8c2c"
+    },
+    {
+      "windowsServer": "2025",
+      "dropIndex": 2,
+      "kind": "before",
+      "source": "10.244.190.81",
+      "sourcePort": 8081,
+      "destination": "10.244.42.6",
+      "destinationPort": 60797,
+      "portName": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+      "expectedAction": "Pop",
+      "events": [
+        {
+          "xml": "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Hyper-V-VfpExt' Guid='{9f2660ea-cfe7-428f-9850-aeca612619b0}'/><EventID>600</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x8000000000080000</Keywords><TimeCreated SystemTime='2026-09-09T01:43:56.9228352Z'/><EventRecordID>97286</EventRecordID><Correlation/><Execution ProcessID='2480' ThreadID='6184'/><Channel></Channel><Computer>EC2AMAZ-83E5T32</Computer><Security/></System><EventData><Data Name='PortId'>3</Data><Data Name='Direction'>1</Data><Data Name='IsMain'>1</Data><Data Name='IsPending'>0</Data><Data Name='TNI'>0</Data><Data Name='VLAN'>0</Data><Data Name='NumEncaps'>1</Data><Data Name='EncapType0'>VXLAN</Data><Data Name='EncapSrcMacAddr0'>02-FF-D6-32-CE-F1</Data><Data Name='EncapDestMacAddr0'>02-FF-C0-FA-46-77</Data><Data Name='EncapSrcIpv4Addr0'>184551946</Data><Data Name='EncapDstIpv4Addr0'>1140858284</Data><Data Name='TenantId0'>4096</Data><Data Name='EncryptVxlanId0'>0</Data><Data Name='EncapType1'>None</Data><Data Name='EncapSrcMacAddr1'></Data><Data Name='EncapDestMacAddr1'></Data><Data Name='EncapSrcIpv4Addr1'>0</Data><Data Name='EncapDstIpv4Addr1'>0</Data><Data Name='TenantId1'>0</Data><Data Name='EncryptVxlanId1'>0</Data><Data Name='IpProtocol'>17</Data><Data Name='SrcMacAddr'>66-29-27-B4-64-9C</Data><Data Name='DestMacAddr'>00-15-5D-2E-C0-7B</Data><Data Name='SrcIpv4Addr'>1371468810</Data><Data Name='DstIpv4Addr'>103478282</Data><Data Name='SrcPort'>37151</Data><Data Name='DstPort'>32237</Data><Data Name='IsTcpSyn'>false</Data><Data Name='EncapTransposition0'>MacHeaderAction=Pop, IpHeaderAction=Pop, EncapHeaderAction=Pop (PushTni=True)</Data><Data Name='EncapTransposition1'>NULL</Data><Data Name='Transposition'>TniAction=Ignore, VlanIdAction=Ignore, MssDeltaAction=Ignore, MacHeaderAction=Ignore, IpHeaderAction=Ignore, TransportHeaderAction=Ignore</Data><Data Name='PortName'>1903CA54-D200-479E-B7F3-A3EC18AE1313</Data><Data Name='PortFriendlyName'>DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0</Data><Data Name='UnifiedFlow'>18446669868247102728</Data><Data Name='IsSecondary'>0</Data><Data Name='IsMirror'>0</Data><Data Name='IsHairpin'>0</Data><Data Name='HairpinChecked'>0</Data><Data Name='OriginalInbound'>0</Data></EventData></Event>"
+        }
+      ],
+      "sourceArtifactSHA256": "6b9e0e60a69615f4dd58ae010baeb87a9116942b9c61b9e12efb63b5042e868b"
+    },
+    {
+      "windowsServer": "2025",
+      "dropIndex": 2,
+      "kind": "after",
+      "source": "10.244.190.81",
+      "sourcePort": 8081,
+      "destination": "10.244.42.6",
+      "destinationPort": 61178,
+      "portName": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+      "expectedAction": "Pop",
+      "events": [
+        {
+          "xml": "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Hyper-V-VfpExt' Guid='{9f2660ea-cfe7-428f-9850-aeca612619b0}'/><EventID>600</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x8000000000080000</Keywords><TimeCreated SystemTime='2026-09-09T01:44:01.9747084Z'/><EventRecordID>130751</EventRecordID><Correlation/><Execution ProcessID='0' ThreadID='0'/><Channel></Channel><Computer>EC2AMAZ-83E5T32</Computer><Security/></System><EventData><Data Name='PortId'>3</Data><Data Name='Direction'>1</Data><Data Name='IsMain'>1</Data><Data Name='IsPending'>0</Data><Data Name='TNI'>0</Data><Data Name='VLAN'>0</Data><Data Name='NumEncaps'>1</Data><Data Name='EncapType0'>VXLAN</Data><Data Name='EncapSrcMacAddr0'>02-FF-D6-32-CE-F1</Data><Data Name='EncapDestMacAddr0'>02-FF-C0-FA-46-77</Data><Data Name='EncapSrcIpv4Addr0'>184551946</Data><Data Name='EncapDstIpv4Addr0'>1140858284</Data><Data Name='TenantId0'>4096</Data><Data Name='EncryptVxlanId0'>0</Data><Data Name='EncapType1'>None</Data><Data Name='EncapSrcMacAddr1'></Data><Data Name='EncapDestMacAddr1'></Data><Data Name='EncapSrcIpv4Addr1'>0</Data><Data Name='EncapDstIpv4Addr1'>0</Data><Data Name='TenantId1'>0</Data><Data Name='EncryptVxlanId1'>0</Data><Data Name='IpProtocol'>17</Data><Data Name='SrcMacAddr'>66-29-27-B4-64-9C</Data><Data Name='DestMacAddr'>00-15-5D-2E-C0-7B</Data><Data Name='SrcIpv4Addr'>1371468810</Data><Data Name='DstIpv4Addr'>103478282</Data><Data Name='SrcPort'>37151</Data><Data Name='DstPort'>64238</Data><Data Name='IsTcpSyn'>false</Data><Data Name='EncapTransposition0'>MacHeaderAction=Pop, IpHeaderAction=Pop, EncapHeaderAction=Pop (PushTni=True)</Data><Data Name='EncapTransposition1'>NULL</Data><Data Name='Transposition'>TniAction=Ignore, VlanIdAction=Ignore, MssDeltaAction=Ignore, MacHeaderAction=Ignore, IpHeaderAction=Ignore, TransportHeaderAction=Ignore</Data><Data Name='PortName'>1903CA54-D200-479E-B7F3-A3EC18AE1313</Data><Data Name='PortFriendlyName'>DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0</Data><Data Name='UnifiedFlow'>18446669868076713336</Data><Data Name='IsSecondary'>0</Data><Data Name='IsMirror'>0</Data><Data Name='IsHairpin'>0</Data><Data Name='HairpinChecked'>0</Data><Data Name='OriginalInbound'>0</Data></EventData></Event>"
+        }
+      ],
+      "sourceArtifactSHA256": "8978f12d376552e793fa819ce573072265b155c02fd2ece5a117bf5839c67db1"
+    }
+  ],
+  "encapsulationSelectorEvent": {
+    "xml": "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Hyper-V-VfpExt' Guid='{9f2660ea-cfe7-428f-9850-aeca612619b0}'/><EventID>115</EventID><Version>0</Version><Level>4</Level><Task>0</Task><Opcode>0</Opcode><Keywords>0x8000000000000004</Keywords><TimeCreated SystemTime='2026-09-09T01:43:49.6394686Z'/><EventRecordID>70128</EventRecordID><Correlation/><Execution ProcessID='2476' ThreadID='1524'/><Channel></Channel><Computer>EC2AMAZ-AESC6KN</Computer><Security/></System><EventData><Data Name='PortId'>3</Data><Data Name='Direction'>1</Data><Data Name='LayerId'>VNET_PA_ROUTE_LAYER</Data><Data Name='SrcIpv4Addr'>184551946</Data><Data Name='DstIpv4Addr'>402660780</Data><Data Name='SrcPort'>0</Data><Data Name='DstPort'>4096</Data><Data Name='IpProtocol'>252</Data><Data Name='IsTcpSyn'>false</Data><Data Name='PortName'>7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data><Data Name='PortFriendlyName'>Container NIC 070372ba</Data><Data Name='GftFlags'>0</Data></EventData></Event>"
+  },
+  "scope": "Unchanged native event XML from three failed and six neighboring successful ordinary-Pod exchanges; context, not a causal or packet identity model."
+}

@@ -1,0 +1,602 @@
+{
+  "scope": "Native Packet Monitor capture during concurrent TCP and UDP probes on one-underlay-NIC Windows Server 2022/2025 VMs",
+  "observedAt": "2026-09-07T11:43:27.397624+00:00",
+  "capture": {
+    "startedAt": "2026-09-07T11:31:33.521577+00:00",
+    "probes": [
+      {
+        "probe": "tcp",
+        "exitCode": 0,
+        "summary": "aws-win2022 6 / 6  []\naws-win2025 6 / 6  []\nw1 6 / 6  []\n"
+      },
+      {
+        "probe": "udp",
+        "exitCode": 0,
+        "summary": "aws-win2022 9 / 10 \naws-win2025 9 / 10 \nw1 10 / 10 \n"
+      }
+    ],
+    "finishedAt": "2026-09-07T11:34:16.669865+00:00"
+  },
+  "captureStops": {
+    "aws-win2022": {
+      "stopped": "Flushing logs...\r\nMerging metadata...\r\nLog file: C:\\ProgramData\\CloudProvisioning\\diagnostics\\udp-trace-v1\\capture.etl (No events lost)\r\n",
+      "files": [
+        {
+          "bytes": 2480048,
+          "name": "capture.etl"
+        },
+        {
+          "bytes": 17432320,
+          "name": "capture.pcapng"
+        },
+        {
+          "bytes": 109014888,
+          "name": "capture.txt"
+        }
+      ],
+      "status": "\r\nPacket Monitor is not running.\r\n"
+    },
+    "aws-win2025": {
+      "stopped": "Flushing logs...\r\nMerging metadata...\r\nLog file: C:\\ProgramData\\CloudProvisioning\\diagnostics\\udp-trace-v1\\capture.etl (No events lost)\r\n",
+      "files": [
+        {
+          "bytes": 2387020,
+          "name": "capture.etl"
+        },
+        {
+          "bytes": 17460640,
+          "name": "capture.pcapng"
+        },
+        {
+          "bytes": 109279874,
+          "name": "capture.txt"
+        }
+      ],
+      "status": "\r\nPacket Monitor is not running.\r\n"
+    }
+  },
+  "privateCaptureHashes": {
+    "aws-win2022.pcapng": {
+      "bytes": 17432320,
+      "sha256": "48c55a89bb94e0958a15846533c0256e76baa902f235d54158aef7e252c922ea"
+    },
+    "aws-win2022.txt": {
+      "bytes": 109014888,
+      "sha256": "cb0a702c60a55d57ec4bf90e56fbe71cee1a79e3165088a38c72e1d36a3cdf9d"
+    },
+    "aws-win2025.pcapng": {
+      "bytes": 17460640,
+      "sha256": "8dc1c210bd10a02335a89639338d55cd97d871a4b917db609e4998e7252c0daa"
+    },
+    "aws-win2025.txt": {
+      "bytes": 109279874,
+      "sha256": "0696e4cc8b1367eb2c6c16d9d270e08bf76277554c3e2d241de0795eafc585da"
+    }
+  },
+  "tcp": {
+    "cases": 18,
+    "passed": 18
+  },
+  "udp": {
+    "cases": 30,
+    "passed": 28,
+    "responses": 298,
+    "expectedResponses": 300,
+    "measurements": {
+      "scope": "Ordinary-pod UDP echo via loopback agnhost dial, exact lowercase payload comparison, sizes below its 2048-byte buffer",
+      "observedAt": "2026-09-07T11:31:50.878716+00:00",
+      "results": [
+        {
+          "from": "aws-win2022",
+          "checks": [
+            {
+              "expectedResponses": 10,
+              "responseBytes": 512,
+              "to": "aws-win2025",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 512
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1200,
+              "to": "aws-win2025",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1200
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1340,
+              "to": "aws-win2025",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1340
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1400,
+              "to": "aws-win2025",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1400
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1800,
+              "to": "aws-win2025",
+              "errors": [
+                "reading from udp connection failed. err:'read udp 10.244.167.145:63113->10.244.233.145:8081: i/o timeout'"
+              ],
+              "ok": false,
+              "responsesReceived": 9,
+              "payloadBytes": 1800
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 512,
+              "to": "w1",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 512
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1200,
+              "to": "w1",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1200
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1340,
+              "to": "w1",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1340
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1400,
+              "to": "w1",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1400
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1800,
+              "to": "w1",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1800
+            }
+          ]
+        },
+        {
+          "from": "aws-win2025",
+          "checks": [
+            {
+              "expectedResponses": 10,
+              "responseBytes": 512,
+              "to": "aws-win2022",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 512
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1200,
+              "to": "aws-win2022",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1200
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1340,
+              "to": "aws-win2022",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1340
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1400,
+              "to": "aws-win2022",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1400
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1800,
+              "to": "aws-win2022",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1800
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 512,
+              "to": "w1",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 512
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1200,
+              "to": "w1",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1200
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1340,
+              "to": "w1",
+              "errors": [
+                "reading from udp connection failed. err:'read udp 10.244.233.145:51665->10.244.190.80:8081: i/o timeout'"
+              ],
+              "ok": false,
+              "responsesReceived": 9,
+              "payloadBytes": 1340
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1400,
+              "to": "w1",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1400
+            },
+            {
+              "expectedResponses": 10,
+              "responseBytes": 1800,
+              "to": "w1",
+              "errors": [
+                null
+              ],
+              "ok": true,
+              "responsesReceived": 10,
+              "payloadBytes": 1800
+            }
+          ]
+        },
+        {
+          "from": "w1",
+          "checks": [
+            {
+              "to": "aws-win2022",
+              "payloadBytes": 512,
+              "ok": true,
+              "responsesReceived": 10,
+              "expectedResponses": 10,
+              "responseBytes": 512,
+              "errors": []
+            },
+            {
+              "to": "aws-win2022",
+              "payloadBytes": 1200,
+              "ok": true,
+              "responsesReceived": 10,
+              "expectedResponses": 10,
+              "responseBytes": 1200,
+              "errors": []
+            },
+            {
+              "to": "aws-win2022",
+              "payloadBytes": 1340,
+              "ok": true,
+              "responsesReceived": 10,
+              "expectedResponses": 10,
+              "responseBytes": 1340,
+              "errors": []
+            },
+            {
+              "to": "aws-win2022",
+              "payloadBytes": 1400,
+              "ok": true,
+              "responsesReceived": 10,
+              "expectedResponses": 10,
+              "responseBytes": 1400,
+              "errors": []
+            },
+            {
+              "to": "aws-win2022",
+              "payloadBytes": 1800,
+              "ok": true,
+              "responsesReceived": 10,
+              "expectedResponses": 10,
+              "responseBytes": 1800,
+              "errors": []
+            },
+            {
+              "to": "aws-win2025",
+              "payloadBytes": 512,
+              "ok": true,
+              "responsesReceived": 10,
+              "expectedResponses": 10,
+              "responseBytes": 512,
+              "errors": []
+            },
+            {
+              "to": "aws-win2025",
+              "payloadBytes": 1200,
+              "ok": true,
+              "responsesReceived": 10,
+              "expectedResponses": 10,
+              "responseBytes": 1200,
+              "errors": []
+            },
+            {
+              "to": "aws-win2025",
+              "payloadBytes": 1340,
+              "ok": true,
+              "responsesReceived": 10,
+              "expectedResponses": 10,
+              "responseBytes": 1340,
+              "errors": []
+            },
+            {
+              "to": "aws-win2025",
+              "payloadBytes": 1400,
+              "ok": true,
+              "responsesReceived": 10,
+              "expectedResponses": 10,
+              "responseBytes": 1400,
+              "errors": []
+            },
+            {
+              "to": "aws-win2025",
+              "payloadBytes": 1800,
+              "ok": true,
+              "responsesReceived": 10,
+              "expectedResponses": 10,
+              "responseBytes": 1800,
+              "errors": []
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "correlatedDrops": [
+    {
+      "source": "10.244.167.145",
+      "sourcePort": 63113,
+      "destination": "10.244.233.145",
+      "destinationPort": 8081,
+      "flowObserved": true,
+      "correlationWindowSeconds": 0.1,
+      "drops": [
+        {
+          "timestamp": "2026-09-07 11:31:43.212519600",
+          "group": 2882,
+          "packet": 1,
+          "component": 93,
+          "componentInfo": {
+            "driver": "vfpext.sys",
+            "name": "VFP Extension"
+          },
+          "reason": "Invalid Packet",
+          "location": "0xE0006096",
+          "ipID": 28730,
+          "fragmentOffsetBytes": 0,
+          "header": "[00]2024.2200::2026-09-07 11:31:43.212519600 [Microsoft-Windows-PktMon] Drop: PktGroupId 2882, PktNumber 1, Appearance 7, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 1378, LoggedSize 192 "
+        },
+        {
+          "timestamp": "2026-09-07 11:31:43.212520100",
+          "group": 2882,
+          "packet": 2,
+          "component": 93,
+          "componentInfo": {
+            "driver": "vfpext.sys",
+            "name": "VFP Extension"
+          },
+          "reason": "Invalid Packet",
+          "location": "0xE0006096",
+          "ipID": 28730,
+          "fragmentOffsetBytes": 1344,
+          "header": "[00]2024.2200::2026-09-07 11:31:43.212520100 [Microsoft-Windows-PktMon] Drop: PktGroupId 2882, PktNumber 2, Appearance 7, Direction Rx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 503, LoggedSize 192 "
+        }
+      ]
+    },
+    {
+      "source": "10.244.233.145",
+      "sourcePort": 51665,
+      "destination": "10.244.190.80",
+      "destinationPort": 8081,
+      "flowObserved": true,
+      "correlationWindowSeconds": 0.1,
+      "drops": [
+        {
+          "timestamp": "2026-09-07 11:31:43.802997400",
+          "group": 75905,
+          "packet": 1,
+          "component": 125,
+          "componentInfo": {
+            "driver": "vfpext.sys",
+            "name": "VFP Extension"
+          },
+          "reason": "Invalid Packet",
+          "location": "0xE0006096",
+          "ipID": 35611,
+          "fragmentOffsetBytes": 0,
+          "header": "[00]27D4.2374::2026-09-07 11:31:43.802997400 [Microsoft-Windows-PktMon] Drop: PktGroupId 75905, PktNumber 1, Appearance 0, Direction Rx , Type Ethernet , Component 125, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 1378, LoggedSize 192 "
+        },
+        {
+          "timestamp": "2026-09-07 11:31:43.802997800",
+          "group": 75905,
+          "packet": 2,
+          "component": 125,
+          "componentInfo": {
+            "driver": "vfpext.sys",
+            "name": "VFP Extension"
+          },
+          "reason": "Invalid Packet",
+          "location": "0xE0006096",
+          "ipID": 35611,
+          "fragmentOffsetBytes": 1344,
+          "header": "[00]27D4.2374::2026-09-07 11:31:43.802997800 [Microsoft-Windows-PktMon] Drop: PktGroupId 75905, PktNumber 2, Appearance 0, Direction Rx , Type Ethernet , Component 125, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 43, LoggedSize 43 "
+        }
+      ]
+    }
+  ],
+  "finding": "Both captured timed-out requests have local VFP Extension Invalid Packet drop records for their IPv4 fragments before VXLAN transmission. This locates the observed discard, not the internal reason for it.",
+  "offloadAndCleanupObservation": [
+    {
+      "node": "aws-win2022",
+      "podIP": "10.244.167.145",
+      "podUID": "92632e76-ec08-4915-af61-3745937373ec",
+      "observation": {
+        "filters": "Packet Filters:\r\n    None\r\n",
+        "physicalNICs": 1,
+        "mtu": [
+          {
+            "NlMtu": 1370,
+            "CompartmentId": 12
+          }
+        ],
+        "interfaceIndex": 42,
+        "adapters": [
+          {
+            "Name": "vEthernet (80476a7c330215ae539d139f83be5b286d776351f21bcc7c18a98a145ece3343_Calico)",
+            "InterfaceIndex": 42,
+            "InterfaceDescription": "Hyper-V Virtual Ethernet Container Adapter #4",
+            "InterfaceGuid": "{3B5B6B53-5272-4DBF-80C9-62A1AEEBDFCC}"
+          }
+        ],
+        "monitor": "\r\nPacket Monitor is not running.\r\n",
+        "offload": [
+          {
+            "Name": "vEthernet (80476a7c330215ae539d139f83be5b286d776351f21bcc7c18a98a145ece3343_Calico)",
+            "IpIPv4Enabled": 3,
+            "TcpIPv4Enabled": 3,
+            "UdpIPv4Enabled": 3,
+            "UdpIPv6Enabled": 3
+          }
+        ]
+      }
+    },
+    {
+      "node": "aws-win2025",
+      "podIP": "10.244.233.145",
+      "podUID": "608019e0-4a09-4f9e-998d-2cf9a771ad88",
+      "observation": {
+        "filters": "Packet Filters:\r\n    None\r\n",
+        "physicalNICs": 1,
+        "mtu": [
+          {
+            "NlMtu": 1370,
+            "CompartmentId": 8
+          }
+        ],
+        "interfaceIndex": 41,
+        "adapters": [
+          {
+            "Name": "vEthernet (00a59a6124ffb9b73571076176854fe8c034e5e906677c2ab4c17c5fee7b98e9_Calico)",
+            "InterfaceIndex": 41,
+            "InterfaceDescription": "Hyper-V Virtual Ethernet Container Adapter #5",
+            "InterfaceGuid": "{AB1BDF9D-556E-4C93-B402-CB4809765DE5}"
+          }
+        ],
+        "monitor": "\r\nPacket Monitor is not running.\r\n",
+        "offload": [
+          {
+            "Name": "vEthernet (00a59a6124ffb9b73571076176854fe8c034e5e906677c2ab4c17c5fee7b98e9_Calico)",
+            "IpIPv4Enabled": 3,
+            "TcpIPv4Enabled": 3,
+            "UdpIPv4Enabled": 3,
+            "UdpIPv6Enabled": 3
+          }
+        ]
+      }
+    }
+  ],
+  "settingsChanged": false,
+  "parserTests": {
+    "passed": 4,
+    "statementCoveragePercent": 96,
+    "source": "harness/e2e/observe/pktmon.py",
+    "nativeFixtures": "harness/e2e/observe/testdata"
+  },
+  "health": {
+    "readyNodes": [
+      "aws-win2022",
+      "aws-win2025",
+      "cp",
+      "cp2",
+      "cp3",
+      "ip-172-29-0-9",
+      "remote1",
+      "remote2",
+      "w1",
+      "w2"
+    ],
+    "attachments": {
+      "network-attachment-231de8204fc1cbe590fc5461dbc86827": "Ready",
+      "network-attachment-b9665a3a0cf8f46a0806d528033cc990": "Ready"
+    }
+  },
+  "limitations": [
+    "No mitigation tested in this capture run. Checksum offload is enabled on the exact test vNICs; causality remains unproven.",
+    "Drop records are correlated by earlier flow observation, IPv4 ID, addresses, protocol and a bounded timestamp window; drop-rendered ports and packet-group IDs are not assumed stable.",
+    "The decoder bad-length text on a first IPv4 fragment is not itself a malformed-packet diagnosis.",
+    "The two captures do not retrospectively locate the three missing echoes from earlier runs.",
+    "Full CAPI replacement, VM image preloading, GPU and release qualification remain open."
+  ]
+}

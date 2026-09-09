@@ -1,0 +1,55 @@
+{
+  "pod": {
+    "metadata": {
+      "uid": "8dfedb47-4499-42d5-9b25-aecb3279d31b"
+    },
+    "spec": {
+      "nodeName": "aws-win2025-gpu"
+    },
+    "status": {
+      "containerStatuses": [
+        {
+          "name": "render-nvenc",
+          "containerID": "containerd://851e61a80af98490c183154dc62c704e8aa669a31cf574ad56ac3c87d55c94c5",
+          "state": {
+            "terminated": {
+              "reason": "StartError"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "events": [
+    {
+      "message": "[851e61a80af98490c183154dc62c704e8aa669a31cf574ad56ac3c87d55c94c5] Terminate compute system, result 0xC0370103",
+      "id": 2003,
+      "at": "2026-09-07T23:05:53.0316537Z"
+    },
+    {
+      "message": "[851e61a80af98490c183154dc62c704e8aa669a31cf574ad56ac3c87d55c94c5] Terminate compute system, result 0xC0370103",
+      "id": 2003,
+      "at": "2026-09-07T23:05:52.9200606Z"
+    },
+    {
+      "message": "[851e61a80af98490c183154dc62c704e8aa669a31cf574ad56ac3c87d55c94c5] Create process, [parameters omitted], result 0x800706BA, process ID 0",
+      "id": 2500,
+      "at": "2026-09-07T23:05:52.9165092Z"
+    },
+    {
+      "message": "[851e61a80af98490c183154dc62c704e8aa669a31cf574ad56ac3c87d55c94c5] Container started with Silo Container ID '7B3319BD-AB0F-11F1-949C-F5A17F5A987E', Device Path '\\Device\\VhdHardDisk{1757fa63-cc65-469a-9f7e-6e7691461bf2}'",
+      "id": 2022,
+      "at": "2026-09-07T23:05:52.8103657Z"
+    },
+    {
+      "message": "[851e61a80af98490c183154dc62c704e8aa669a31cf574ad56ac3c87d55c94c5] Start compute system, result 0xC0370103",
+      "id": 2001,
+      "at": "2026-09-07T23:05:16.3785753Z"
+    },
+    {
+      "message": "[851e61a80af98490c183154dc62c704e8aa669a31cf574ad56ac3c87d55c94c5] Create compute system, result 0xC0370103",
+      "id": 2000,
+      "at": "2026-09-07T23:05:06.4122464Z"
+    }
+  ]
+}

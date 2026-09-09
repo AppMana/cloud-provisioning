@@ -1,0 +1,423 @@
+{
+  "startedAt": "2026-09-07T11:49:16.594608+00:00",
+  "finishedAt": "2026-09-07T11:51:24.837571+00:00",
+  "settingsIntent": "Temporarily disable IPv4 UDP TX checksum offload only on the two exact disposable probe vNICs; keep RX enabled; restore original settings",
+  "controlledMTU": 1370,
+  "method": "After each offload-triggered vNIC restart, restore the exact isolated interface MTU to 1370 before measuring traffic",
+  "before": [
+    {
+      "guid": "{3B5B6B53-5272-4DBF-80C9-62A1AEEBDFCC}",
+      "adapterStatus": "Up",
+      "after": 3,
+      "before": 3,
+      "mtu": 1370,
+      "otherOffloads": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "compartment": 12,
+      "mtuAfterAdapterRestart": 1370,
+      "node": "aws-win2022"
+    },
+    {
+      "guid": "{AB1BDF9D-556E-4C93-B402-CB4809765DE5}",
+      "adapterStatus": "Up",
+      "after": 3,
+      "before": 3,
+      "mtu": 1370,
+      "otherOffloads": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "compartment": 8,
+      "mtuAfterAdapterRestart": 1370,
+      "node": "aws-win2025"
+    }
+  ],
+  "changed": [
+    {
+      "guid": "{3B5B6B53-5272-4DBF-80C9-62A1AEEBDFCC}",
+      "adapterStatus": "Up",
+      "after": 2,
+      "before": 3,
+      "mtu": 1370,
+      "otherOffloads": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "compartment": 12,
+      "mtuAfterAdapterRestart": 1500,
+      "node": "aws-win2022"
+    },
+    {
+      "guid": "{AB1BDF9D-556E-4C93-B402-CB4809765DE5}",
+      "adapterStatus": "Up",
+      "after": 2,
+      "before": 3,
+      "mtu": 1370,
+      "otherOffloads": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "compartment": 8,
+      "mtuAfterAdapterRestart": 1500,
+      "node": "aws-win2025"
+    }
+  ],
+  "restored": [
+    {
+      "guid": "{3B5B6B53-5272-4DBF-80C9-62A1AEEBDFCC}",
+      "adapterStatus": "Up",
+      "after": 3,
+      "before": 2,
+      "mtu": 1370,
+      "otherOffloads": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "compartment": 12,
+      "mtuAfterAdapterRestart": 1500,
+      "node": "aws-win2022"
+    },
+    {
+      "guid": "{AB1BDF9D-556E-4C93-B402-CB4809765DE5}",
+      "adapterStatus": "Up",
+      "after": 3,
+      "before": 2,
+      "mtu": 1370,
+      "otherOffloads": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "compartment": 8,
+      "mtuAfterAdapterRestart": 1500,
+      "node": "aws-win2025"
+    }
+  ],
+  "scope": "Disposable ordinary-pod vNICs on one-underlay-NIC Windows Server 2022 and 2025 AWS VMs; concurrent pod TCP and UDP traffic with a Linux site worker",
+  "phases": {
+    "original": {
+      "tcp": {
+        "checks": 18,
+        "passed": 18
+      },
+      "udp": {
+        "checks": 30,
+        "passed": 24,
+        "expectedResponses": 1500,
+        "reportedResponses": 1493,
+        "failures": [
+          {
+            "source": "aws-win2022",
+            "expectedResponses": 50,
+            "responseBytes": 1400,
+            "to": "aws-win2025",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.167.145:57924->10.244.233.145:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 49,
+            "payloadBytes": 1400
+          },
+          {
+            "source": "aws-win2022",
+            "expectedResponses": 50,
+            "responseBytes": 1800,
+            "to": "w1",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.167.145:58244->10.244.190.80:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 49,
+            "payloadBytes": 1800
+          },
+          {
+            "source": "aws-win2025",
+            "expectedResponses": 50,
+            "responseBytes": 1400,
+            "to": "aws-win2022",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.233.145:59358->10.244.167.145:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 49,
+            "payloadBytes": 1400
+          },
+          {
+            "source": "aws-win2025",
+            "expectedResponses": 50,
+            "responseBytes": 1800,
+            "to": "w1",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.233.145:59668->10.244.190.80:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 49,
+            "payloadBytes": 1800
+          },
+          {
+            "source": "w1",
+            "to": "aws-win2022",
+            "payloadBytes": 1340,
+            "ok": false,
+            "responsesReceived": 49,
+            "expectedResponses": 50,
+            "responseBytes": 1340,
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.190.80:36826->10.244.167.145:8081: i/o timeout'"
+            ]
+          },
+          {
+            "source": "w1",
+            "to": "aws-win2022",
+            "payloadBytes": 1400,
+            "ok": false,
+            "responsesReceived": 48,
+            "expectedResponses": 50,
+            "responseBytes": 1400,
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.190.80:37676->10.244.167.145:8081: i/o timeout'",
+              "reading from udp connection failed. err:'read udp 10.244.190.80:39776->10.244.167.145:8081: i/o timeout'"
+            ]
+          }
+        ]
+      }
+    },
+    "tx-disabled": {
+      "tcp": {
+        "checks": 18,
+        "passed": 18
+      },
+      "udp": {
+        "checks": 30,
+        "passed": 22,
+        "expectedResponses": 1500,
+        "reportedResponses": 1488,
+        "failures": [
+          {
+            "source": "aws-win2022",
+            "expectedResponses": 50,
+            "responseBytes": 1400,
+            "to": "aws-win2025",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.167.145:65354->10.244.233.145:8081: i/o timeout'",
+              "reading from udp connection failed. err:'read udp 10.244.167.145:65386->10.244.233.145:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 48,
+            "payloadBytes": 1400
+          },
+          {
+            "source": "aws-win2022",
+            "expectedResponses": 50,
+            "responseBytes": 1800,
+            "to": "aws-win2025",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.167.145:65406->10.244.233.145:8081: i/o timeout'",
+              "reading from udp connection failed. err:'read udp 10.244.167.145:65437->10.244.233.145:8081: i/o timeout'",
+              "reading from udp connection failed. err:'read udp 10.244.167.145:65440->10.244.233.145:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 47,
+            "payloadBytes": 1800
+          },
+          {
+            "source": "aws-win2022",
+            "expectedResponses": 50,
+            "responseBytes": 1800,
+            "to": "w1",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.167.145:49274->10.244.190.80:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 49,
+            "payloadBytes": 1800
+          },
+          {
+            "source": "aws-win2025",
+            "expectedResponses": 50,
+            "responseBytes": 1340,
+            "to": "w1",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.233.145:62332->10.244.190.80:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 49,
+            "payloadBytes": 1340
+          },
+          {
+            "source": "aws-win2025",
+            "expectedResponses": 50,
+            "responseBytes": 1400,
+            "to": "w1",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.233.145:62398->10.244.190.80:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 49,
+            "payloadBytes": 1400
+          },
+          {
+            "source": "w1",
+            "to": "aws-win2022",
+            "payloadBytes": 1800,
+            "ok": false,
+            "responsesReceived": 49,
+            "expectedResponses": 50,
+            "responseBytes": 1800,
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.190.80:51880->10.244.167.145:8081: i/o timeout'"
+            ]
+          },
+          {
+            "source": "w1",
+            "to": "aws-win2025",
+            "payloadBytes": 1400,
+            "ok": false,
+            "responsesReceived": 49,
+            "expectedResponses": 50,
+            "responseBytes": 1400,
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.190.80:55790->10.244.233.145:8081: i/o timeout'"
+            ]
+          },
+          {
+            "source": "w1",
+            "to": "aws-win2025",
+            "payloadBytes": 1800,
+            "ok": false,
+            "responsesReceived": 48,
+            "expectedResponses": 50,
+            "responseBytes": 1800,
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.190.80:50206->10.244.233.145:8081: i/o timeout'",
+              "reading from udp connection failed. err:'read udp 10.244.190.80:35067->10.244.233.145:8081: i/o timeout'"
+            ]
+          }
+        ]
+      }
+    },
+    "restored": {
+      "tcp": {
+        "checks": 18,
+        "passed": 18
+      },
+      "udp": {
+        "checks": 30,
+        "passed": 23,
+        "expectedResponses": 1500,
+        "reportedResponses": 1490,
+        "failures": [
+          {
+            "source": "aws-win2022",
+            "expectedResponses": 50,
+            "responseBytes": 1400,
+            "to": "aws-win2025",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.167.145:57583->10.244.233.145:8081: i/o timeout'",
+              "reading from udp connection failed. err:'read udp 10.244.167.145:57591->10.244.233.145:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 48,
+            "payloadBytes": 1400
+          },
+          {
+            "source": "aws-win2022",
+            "expectedResponses": 50,
+            "responseBytes": 1800,
+            "to": "aws-win2025",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.167.145:57631->10.244.233.145:8081: i/o timeout'",
+              "reading from udp connection failed. err:'read udp 10.244.167.145:57667->10.244.233.145:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 48,
+            "payloadBytes": 1800
+          },
+          {
+            "source": "aws-win2025",
+            "expectedResponses": 50,
+            "responseBytes": 1400,
+            "to": "aws-win2022",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.233.145:54228->10.244.167.145:8081: i/o timeout'",
+              "reading from udp connection failed. err:'read udp 10.244.233.145:54232->10.244.167.145:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 48,
+            "payloadBytes": 1400
+          },
+          {
+            "source": "aws-win2025",
+            "expectedResponses": 50,
+            "responseBytes": 1800,
+            "to": "aws-win2022",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.233.145:54296->10.244.167.145:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 49,
+            "payloadBytes": 1800
+          },
+          {
+            "source": "aws-win2025",
+            "expectedResponses": 50,
+            "responseBytes": 1340,
+            "to": "w1",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.233.145:54427->10.244.190.80:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 49,
+            "payloadBytes": 1340
+          },
+          {
+            "source": "aws-win2025",
+            "expectedResponses": 50,
+            "responseBytes": 1800,
+            "to": "w1",
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.233.145:54544->10.244.190.80:8081: i/o timeout'"
+            ],
+            "ok": false,
+            "responsesReceived": 49,
+            "payloadBytes": 1800
+          },
+          {
+            "source": "w1",
+            "to": "aws-win2022",
+            "payloadBytes": 1800,
+            "ok": false,
+            "responsesReceived": 49,
+            "expectedResponses": 50,
+            "responseBytes": 1800,
+            "errors": [
+              "reading from udp connection failed. err:'read udp 10.244.190.80:43888->10.244.167.145:8081: i/o timeout'"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "conclusion": "Disabling IPv4 UDP TX checksum offload on the two exact pod vNICs did not eliminate timeouts. No mitigation is qualified by this experiment.",
+  "limitations": [
+    "Sequential original/changed/restored phases are not a randomized performance study.",
+    "No packet capture was taken during this comparison; prior VFP drop localization does not locate every timeout here.",
+    "Reported echoes are application results, not exact wire packet loss counts.",
+    "Offload-triggered vNIC restarts reset MTU to 1500 on both versions; each phase restored MTU 1370 before traffic. Automatic drift repair remains unimplemented.",
+    "Full fresh CAPI worker lifecycle, replacement and gateway failover remain unqualified."
+  ],
+  "privateSourceSHA256": "e2f31219afdc3213c8b061fc7531dcca87b476a1c8b2292ae736e11105d91a0a"
+}

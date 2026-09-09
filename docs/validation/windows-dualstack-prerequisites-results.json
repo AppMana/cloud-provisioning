@@ -1,0 +1,146 @@
+{
+  "result": "dedicated-dualstack-cluster-required",
+  "observedAt": "2026-09-09T09:44:42.661850+00:00",
+  "scope": "Retained 13-node Calico/Windows test fleet; read-only observation.",
+  "nodes": [
+    {
+      "name": "aws-win2022-gpu",
+      "uid": "dd54061d-491a-4b12-95a7-27393e847780",
+      "os": "windows",
+      "kernel": "10.0.20348.5499",
+      "podCIDRs": [
+        "10.244.21.0/24"
+      ]
+    },
+    {
+      "name": "aws-win2022-v3",
+      "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "os": "windows",
+      "kernel": "10.0.20348.5499",
+      "podCIDRs": [
+        "10.244.14.0/24"
+      ]
+    },
+    {
+      "name": "aws-win2025",
+      "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+      "os": "windows",
+      "kernel": "10.0.26100.33296",
+      "podCIDRs": [
+        "10.244.5.0/24"
+      ]
+    },
+    {
+      "name": "aws-win2025-gpu",
+      "uid": "258d7b62-e774-48bc-94dc-e31ff042f585",
+      "os": "windows",
+      "kernel": "10.0.26100.33296",
+      "podCIDRs": [
+        "10.244.22.0/24"
+      ]
+    },
+    {
+      "name": "aws-win2025-v3",
+      "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "os": "windows",
+      "kernel": "10.0.26100.33296",
+      "podCIDRs": [
+        "10.244.15.0/24"
+      ]
+    },
+    {
+      "name": "cp",
+      "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+      "os": "linux",
+      "kernel": "5.15.0-181-generic",
+      "podCIDRs": [
+        "10.244.0.0/24"
+      ]
+    },
+    {
+      "name": "cp2",
+      "uid": "947de62f-0920-408c-aa31-ac80a2344128",
+      "os": "linux",
+      "kernel": "5.15.0-191-generic",
+      "podCIDRs": [
+        "10.244.1.0/24"
+      ]
+    },
+    {
+      "name": "cp3",
+      "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+      "os": "linux",
+      "kernel": "5.15.0-181-generic",
+      "podCIDRs": [
+        "10.244.2.0/24"
+      ]
+    },
+    {
+      "name": "ip-172-29-0-9",
+      "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+      "os": "linux",
+      "kernel": "7.0.0-1012-aws",
+      "podCIDRs": [
+        "10.244.9.0/24"
+      ]
+    },
+    {
+      "name": "remote1",
+      "uid": "8935dd28-de93-44be-a887-73110fe88c51",
+      "os": "linux",
+      "kernel": "5.15.0-181-generic",
+      "podCIDRs": [
+        "10.244.7.0/24"
+      ]
+    },
+    {
+      "name": "remote2",
+      "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+      "os": "linux",
+      "kernel": "5.15.0-181-generic",
+      "podCIDRs": [
+        "10.244.8.0/24"
+      ]
+    },
+    {
+      "name": "w1",
+      "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "os": "linux",
+      "kernel": "5.15.0-181-generic",
+      "podCIDRs": [
+        "10.244.3.0/24"
+      ]
+    },
+    {
+      "name": "w2",
+      "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+      "os": "linux",
+      "kernel": "5.15.0-181-generic",
+      "podCIDRs": [
+        "10.244.4.0/24"
+      ]
+    }
+  ],
+  "pools": [
+    {
+      "name": "default-ipv4-ippool",
+      "cidr": "10.244.0.0/16",
+      "disabled": false,
+      "vxlanMode": "Always"
+    }
+  ],
+  "ipv6NodePodCIDRPresent": false,
+  "activeIPv6PoolPresent": false,
+  "mutationsPerformed": false,
+  "nativeIPv6PolicyQualified": false,
+  "nextGate": "Provision a separate dual-stack VM site and native Windows 2022/2025 workers before running the source-identity isolation checker.",
+  "limits": [
+    "IPv4 lifecycle and policy tests do not qualify IPv6 Service or NetworkPolicy behavior.",
+    "Do not reconfigure retained test fleets to manufacture dual-stack evidence.",
+    "The fork policy-compiler regressions are unit evidence; native IPv6 Service isolation remains open."
+  ],
+  "evidenceSHA256": {
+    "nodes": "399fad3559a671539d1ac3a5448be1f86fa371963147f7f906ec760f5d3baabe",
+    "pools": "d69c39a79c2e942641a405978defe82bd44ae6fca336f16b987eed9524e036f1"
+  }
+}

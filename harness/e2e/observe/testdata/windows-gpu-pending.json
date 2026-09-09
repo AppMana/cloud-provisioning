@@ -1,0 +1,261 @@
+{
+  "node": {
+    "metadata": {
+      "uid": "4b517f86-d9a2-41a9-b865-bf780f166487",
+      "name": "aws-win2025-gpu",
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/os": "windows",
+        "cloud-provisioning.appmana.com/gpu-test": "true",
+        "cloud-provisioning.appmana.com/role": "cloud-worker",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "aws-win2025-gpu",
+        "kubernetes.io/os": "windows",
+        "node.kubernetes.io/windows-build": "10.0.26100"
+      }
+    },
+    "status": {
+      "nodeInfo": {
+        "architecture": "amd64",
+        "bootID": "122",
+        "containerRuntimeVersion": "containerd://2.3.2",
+        "kernelVersion": "10.0.26100.33296",
+        "kubeProxyVersion": "",
+        "kubeletVersion": "v1.36.2+k0s",
+        "machineID": "EC2AMAZ-J18VMBS",
+        "operatingSystem": "windows",
+        "osImage": "Windows Server 2025 Datacenter",
+        "systemUUID": "EC2C3E11-6310-01DB-7FD6-1B67D19ACA77"
+      }
+    }
+  },
+  "pod": {
+    "metadata": {
+      "uid": "dfe83a2f-b53a-4fe0-ba92-43cacd356611",
+      "name": "windows-render-nvenc-2025-k97x5",
+      "ownerReferences": [
+        {
+          "apiVersion": "batch/v1",
+          "blockOwnerDeletion": true,
+          "controller": true,
+          "kind": "Job",
+          "name": "windows-render-nvenc-2025",
+          "uid": "86607780-2b0e-4489-aa4c-86bd0e5c9a8c"
+        }
+      ]
+    },
+    "spec": {
+      "automountServiceAccountToken": false,
+      "containers": [
+        {
+          "command": [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "C:\\gpu-probe\\run.ps1"
+          ],
+          "image": "index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+          "imagePullPolicy": "IfNotPresent",
+          "name": "render-nvenc",
+          "resources": {
+            "limits": {
+              "directx.microsoft.com/display": "1"
+            },
+            "requests": {
+              "directx.microsoft.com/display": "1"
+            }
+          },
+          "terminationMessagePath": "/dev/termination-log",
+          "terminationMessagePolicy": "File",
+          "volumeMounts": [
+            {
+              "mountPath": "C:\\gpu-probe",
+              "name": "probe",
+              "readOnly": true
+            }
+          ]
+        }
+      ],
+      "dnsPolicy": "ClusterFirst",
+      "enableServiceLinks": true,
+      "nodeName": "aws-win2025-gpu",
+      "nodeSelector": {
+        "cloud-provisioning.appmana.com/gpu-test": "true",
+        "kubernetes.io/hostname": "aws-win2025-gpu",
+        "kubernetes.io/os": "windows"
+      },
+      "preemptionPolicy": "PreemptLowerPriority",
+      "priority": 0,
+      "restartPolicy": "Never",
+      "schedulerName": "default-scheduler",
+      "securityContext": {},
+      "serviceAccount": "default",
+      "serviceAccountName": "default",
+      "terminationGracePeriodSeconds": 30,
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "cloud-provisioning.appmana.com/internet-facing",
+          "operator": "Exists"
+        },
+        {
+          "effect": "NoExecute",
+          "key": "node.kubernetes.io/not-ready",
+          "operator": "Exists",
+          "tolerationSeconds": 300
+        },
+        {
+          "effect": "NoExecute",
+          "key": "node.kubernetes.io/unreachable",
+          "operator": "Exists",
+          "tolerationSeconds": 300
+        }
+      ],
+      "volumes": [
+        {
+          "configMap": {
+            "defaultMode": 420,
+            "name": "windows-gpu-probe"
+          },
+          "name": "probe"
+        }
+      ]
+    },
+    "status": {
+      "allocatedResources": {
+        "directx.microsoft.com/display": "1"
+      },
+      "conditions": [
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T17:25:51Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "PodReadyToStartContainers"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T17:25:48Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "Initialized"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T17:25:48Z",
+          "observedGeneration": 1,
+          "reason": "PodFailed",
+          "status": "False",
+          "type": "Ready"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T17:25:48Z",
+          "observedGeneration": 1,
+          "reason": "PodFailed",
+          "status": "False",
+          "type": "ContainersReady"
+        },
+        {
+          "lastProbeTime": null,
+          "lastTransitionTime": "2026-09-07T17:25:48Z",
+          "observedGeneration": 1,
+          "status": "True",
+          "type": "PodScheduled"
+        }
+      ],
+      "containerStatuses": [
+        {
+          "allocatedResources": {
+            "directx.microsoft.com/display": "1"
+          },
+          "allocatedResourcesStatus": [
+            {
+              "name": "directx.microsoft.com/display",
+              "resources": [
+                {
+                  "health": "Healthy",
+                  "resourceID": "PCI\\VEN_10DE&DEV_27B8&SUBSYS_173310DE&REV_A1\\4&EE1B678&0&0000\\0"
+                }
+              ]
+            }
+          ],
+          "containerID": "containerd://8aaa167676a325303de2537563647c2d143f8614d2ef835c16c878772a95acc6",
+          "image": "sha256:903cd697133287523b9362733a8c418afe23de6e233d26b5c3fa934b6fe7e6bc",
+          "imageID": "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+          "lastState": {},
+          "name": "render-nvenc",
+          "ready": false,
+          "resources": {
+            "limits": {
+              "directx.microsoft.com/display": "1"
+            },
+            "requests": {
+              "directx.microsoft.com/display": "1"
+            }
+          },
+          "restartCount": 0,
+          "started": false,
+          "state": {
+            "terminated": {
+              "containerID": "containerd://8aaa167676a325303de2537563647c2d143f8614d2ef835c16c878772a95acc6",
+              "exitCode": 128,
+              "finishedAt": "2026-09-07T17:47:32Z",
+              "message": "failed to create containerd task: failed to create shim task: hcs::CreateComputeSystem 8aaa167676a325303de2537563647c2d143f8614d2ef835c16c878772a95acc6: The parameter is incorrect.",
+              "reason": "StartError",
+              "startedAt": "1970-01-01T00:00:00Z"
+            }
+          },
+          "volumeMounts": [
+            {
+              "mountPath": "C:\\gpu-probe",
+              "name": "probe",
+              "readOnly": true,
+              "recursiveReadOnly": "Disabled"
+            }
+          ]
+        }
+      ],
+      "hostIP": "172.29.0.109",
+      "hostIPs": [
+        {
+          "ip": "172.29.0.109"
+        }
+      ],
+      "observedGeneration": 1,
+      "phase": "Pending",
+      "podIP": "10.244.177.4",
+      "podIPs": [
+        {
+          "ip": "10.244.177.4"
+        }
+      ],
+      "qosClass": "BestEffort",
+      "resources": {
+        "limits": {
+          "directx.microsoft.com/display": "1"
+        },
+        "requests": {
+          "directx.microsoft.com/display": "1"
+        }
+      },
+      "startTime": "2026-09-07T17:25:48Z"
+    }
+  },
+  "job": {
+    "metadata": {
+      "uid": "86607780-2b0e-4489-aa4c-86bd0e5c9a8c",
+      "name": "windows-render-nvenc-2025"
+    },
+    "status": {
+      "active": 1,
+      "ready": 0,
+      "startTime": "2026-09-07T17:25:48Z",
+      "terminating": 0,
+      "uncountedTerminatedPods": {}
+    }
+  }
+}

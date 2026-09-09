@@ -1,0 +1,147 @@
+{
+  "observedAt": "2026-09-08T20:48:05.852216+00:00",
+  "scope": "Native preparation and repeat of Linux runtime binaries on an unjoined single-ENI CPU builder based on the verified GPU image",
+  "native": {
+    "instanceID": "i-001bd2820cad55bec",
+    "parentImageID": "ami-007650e971dd51a9d",
+    "builderType": "t3.large",
+    "preparation": {
+      "schemaVersion": 1,
+      "workerSHA256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+      "workerMtimeNs": 1788892860624563503,
+      "runtimeArchiveSHA256": "7fce5150d1aacf1cda1cd2c04abb9a9ced6a3b13147ae3d577249c09b4d5af13",
+      "components": [
+        {
+          "name": "containerd",
+          "bytes": 43534104,
+          "sha256": "371a3cd3e3a2d9582f7a93f9f1d50d7b2881419dfeecfc779f7d29592e14e27f"
+        },
+        {
+          "name": "containerd-shim-runc-v2",
+          "bytes": 8458402,
+          "sha256": "0a7a4030019277c18f144a09c4b2df0444abd17f4954f73781c1cb5ef02b3706"
+        },
+        {
+          "name": "runc",
+          "bytes": 12369784,
+          "sha256": "0aba40a290392c85a11fb5532ce7035c830a1eba1ecfda7d7c400a28ec52e459"
+        }
+      ],
+      "binaryDirectory": "/var/lib/k0s/bin",
+      "fileMode": "0750",
+      "scope": "Runtime executable staging only; no service, runtime store or image cache",
+      "containerdVersion": "containerd github.com/containerd/containerd/v2 2.3.2 fff62f14765df376e5fc36f5a8f8e795b5670f61",
+      "preparedAt": "2026-09-08T20:44:29.618772+00:00"
+    },
+    "after": {
+      "workerSHA256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+      "workerMtimeNs": 1788892860624563503,
+      "workerReceiptSHA256": "39c1f051a0711fd6cbdf963c41258601e8d44a64bf1da6a419e390c68b18837e",
+      "driverSHA256": "8ac333634d6529982c6bdf37813fb37b82a4c7dcaaf93d30078a01fc886baa28",
+      "physicalNICs": [
+        "ens5"
+      ],
+      "runtime": [
+        {
+          "name": "containerd",
+          "sha256": "371a3cd3e3a2d9582f7a93f9f1d50d7b2881419dfeecfc779f7d29592e14e27f",
+          "mtimeNs": 1788892860624563503,
+          "mode": "0o750",
+          "inode": 303781
+        },
+        {
+          "name": "containerd-shim-runc-v2",
+          "sha256": "0a7a4030019277c18f144a09c4b2df0444abd17f4954f73781c1cb5ef02b3706",
+          "mtimeNs": 1788892860624563503,
+          "mode": "0o750",
+          "inode": 303782
+        },
+        {
+          "name": "runc",
+          "sha256": "0aba40a290392c85a11fb5532ce7035c830a1eba1ecfda7d7c400a28ec52e459",
+          "mtimeNs": 1788892860624563503,
+          "mode": "0o750",
+          "inode": 303783
+        }
+      ]
+    },
+    "repeatReceiptAndInodesUnchanged": true,
+    "inheritedWorkerAndDriverUnchanged": true,
+    "stagedInputsRemoved": true,
+    "containerRuntimeStarted": false,
+    "cacheQualified": false
+  },
+  "fileIdentities": [
+    {
+      "name": "containerd",
+      "inode": 303781,
+      "ctimeNs": 1788900269526475164,
+      "mtimeNs": 1788892860624563503,
+      "sha256": "371a3cd3e3a2d9582f7a93f9f1d50d7b2881419dfeecfc779f7d29592e14e27f"
+    },
+    {
+      "name": "containerd-shim-runc-v2",
+      "inode": 303782,
+      "ctimeNs": 1788900269556474958,
+      "mtimeNs": 1788892860624563503,
+      "sha256": "0a7a4030019277c18f144a09c4b2df0444abd17f4954f73781c1cb5ef02b3706"
+    },
+    {
+      "name": "runc",
+      "inode": 303783,
+      "ctimeNs": 1788900269599474664,
+      "mtimeNs": 1788892860624563503,
+      "sha256": "0aba40a290392c85a11fb5532ce7035c830a1eba1ecfda7d7c400a28ec52e459"
+    }
+  ],
+  "unitTests": {
+    "passed": 7,
+    "scope": "images/linux/prepare_runtime.py",
+    "coveredStatements": 93,
+    "statements": 109,
+    "percent": 85.3211009174312
+  },
+  "relatedTests": {
+    "linuxPreparation": 11,
+    "awsBake": 21
+  },
+  "retainedCluster": {
+    "originalNodeUIDsPreserved": true,
+    "all13OriginalNodesReady": true
+  },
+  "builderRetained": true,
+  "cacheQualified": false,
+  "sourceSHA256": {
+    "images/linux/prepare_runtime.py": "0bc1ec7351d1178a1e926f3c9eea90f7bf2e8fc6f6acfd8a90147262863e59c7",
+    "images/linux/test_prepare_runtime.py": "3542be83a3b8648d7b2e3c5861ea4b6754af1597a6036e2a377dac0a2dce0ffd",
+    "harness/e2e/aws/bake.py": "3402977f46bf0b41775d727a8ea4c3edf0199bdd64a62e251ac12d834b812e98",
+    "harness/e2e/aws/test_bake.py": "87db41e3f01c771119a61686ddd3842067388b68e5d7a6a6120bb19f424b8cd5"
+  },
+  "evidenceSHA256": {
+    "result.json": "f7ec5f6546ccb0bd8a59ff70ff707d0cf428390f9c509d717717fb854fd0f936",
+    "before.json": "5c3bd9a640b3e3c05c0c7dd2efc1d679cbaea9b8555228f7e67b23fa800a9ea0",
+    "after.json": "e413dd40df8d8ecfdee7993fce3a1be00881d1668b08d0766c0aaf201bc11f22",
+    "preparation.json": "4232059dc2b20912d4987231e9a975ea035c573feee9c8586538e937e8a56868",
+    "transfers.json": "7dbe36e0cc82dce282f7953a5022649976e6697505aa80051245b473decd2854",
+    "file-identities.stdout": "a1a8edfce024da676ca3fd07fe39f1a34999aa1f5488d4fd5d25564a4e132d60",
+    "independent-verification.stdout": "339ca8e9cafc710cabaa389f553079bd2f1b55cd7a7ae856a124c8f330481edd",
+    "prepare-native.py": "37963dad625f598c091fa203d7e0d9caed0f552ddc032b736bb0863226d92c8c"
+  },
+  "limitations": [
+    "No container runtime service was started; only containerd --version was executed.",
+    "No container image cache, image capture, fresh clone or CAPI lifecycle qualification in this preparation test.",
+    "The inherited GPU driver file was preserved on a CPU builder; no GPU hardware execution was attempted here.",
+    "k0s also sets runtime mtimes during extraction, so matching timestamps alone cannot prove a future clone skipped extraction. Preserve inode/ctime evidence and inspect native startup behavior.",
+    "CPU builder remains running for the next cache-preparation phase."
+  ],
+  "bakeUnitTests": {
+    "passed": 24,
+    "scope": [
+      "harness/e2e/aws/bake.py",
+      "harness/e2e/aws/image_policy.py"
+    ],
+    "coveredStatements": 211,
+    "statements": 241,
+    "percent": 87.55186721991701
+  }
+}

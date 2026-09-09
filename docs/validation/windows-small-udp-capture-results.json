@@ -1,0 +1,116 @@
+{
+  "scope": "Sequential native fresh-socket 64-byte UDP echo, 100ms delay, two Windows ordinary Pods; both VM Packet Monitor captures; no lifecycle operation",
+  "identitiesStable": true,
+  "results": [
+    {
+      "node": "aws-win2022-v3",
+      "attempts": 1000,
+      "passed": 1000,
+      "exitCode": 0
+    },
+    {
+      "node": "aws-win2025-v3",
+      "attempts": 1000,
+      "passed": 1000,
+      "exitCode": 0
+    }
+  ],
+  "failures": [],
+  "captures": {
+    "aws-win2022-v3": {
+      "sha256": {
+        "txt": "ed1b33649c473a6ef57a921e33c281f089ef18f7396c4eb5d847d439685e9c8f",
+        "pcapng": "e2acba6839b32fce979fcccadd0382b77a0d270cd123e17e05808cedee857c7c"
+      },
+      "noEventsLost": true,
+      "stopped": true,
+      "files": [
+        {
+          "bytes": 1436718,
+          "name": "capture.etl"
+        },
+        {
+          "bytes": 12982248,
+          "name": "capture.pcapng"
+        },
+        {
+          "bytes": 87573432,
+          "name": "capture.txt"
+        }
+      ]
+    },
+    "aws-win2025-v3": {
+      "sha256": {
+        "txt": "394c9cc6cdcb58ede9ca81c640b6994e35c95da33615020c8f06afd65949df78",
+        "pcapng": "c7dbf2dfaa852be77786a22dd9c5a302631e0eb629f1dd11c77af67a3cc338c8"
+      },
+      "noEventsLost": true,
+      "stopped": true,
+      "files": [
+        {
+          "bytes": 1596839,
+          "name": "capture.etl"
+        },
+        {
+          "bytes": 13008720,
+          "name": "capture.pcapng"
+        },
+        {
+          "bytes": 87942696,
+          "name": "capture.txt"
+        }
+      ]
+    }
+  },
+  "priorFailureResolved": false,
+  "ok": true,
+  "guestCleanup": [
+    {
+      "node": "aws-win2022-v3",
+      "removed": true,
+      "filters": "Packet Filters:\r\n    None\r\n"
+    },
+    {
+      "node": "aws-win2025-v3",
+      "removed": true,
+      "filters": "Packet Filters:\r\n    None\r\n"
+    }
+  ],
+  "probeCleanup": [
+    {
+      "pod": "net-aws-win2022-v3",
+      "exit": 0
+    },
+    {
+      "pod": "net-aws-win2025-v3",
+      "exit": 0
+    }
+  ],
+  "captureBoundaries": [
+    {
+      "node": "aws-win2022-v3",
+      "matchingPacketAppearances": 72000,
+      "eachDirectionFirstAndLastRequestObserved": [
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "node": "aws-win2025-v3",
+      "matchingPacketAppearances": 72000,
+      "eachDirectionFirstAndLastRequestObserved": [
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  ],
+  "limitations": [
+    "Sequential two-direction diagnostic differs from the original concurrent six-lane failure.",
+    "No failed echo reproduced; captures cannot locate the previous timeout.",
+    "Not a lifecycle, fragmented UDP, or sustained reliability qualification."
+  ]
+}

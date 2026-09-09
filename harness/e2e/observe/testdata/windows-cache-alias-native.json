@@ -1,0 +1,25 @@
+{
+  "scope": "Native metadata alias creation/removal on existing Windows VMs; not builder preparation, Sysprep, fresh-clone cache reuse or pull-policy qualification.",
+  "versions": {
+    "2022": {
+      "windowsBuild": 20348,
+      "source": "registry.k8s.io/e2e-test-images/agnhost@sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "alias": "registry.k8s.io/e2e-test-images/agnhost:cldt-cache-alias-native-v1",
+      "sourceTarget": "sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "aliasTarget": "sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "sourceUnchanged": true,
+      "aliasRemoved": true,
+      "runtime": "containerd github.com/containerd/containerd/v2 2.3.2 fff62f14765df376e5fc36f5a8f8e795b5670f61"
+    },
+    "2025": {
+      "windowsBuild": 26100,
+      "source": "registry.k8s.io/e2e-test-images/agnhost@sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "alias": "registry.k8s.io/e2e-test-images/agnhost:cldt-cache-alias-native-v1",
+      "sourceTarget": "sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "aliasTarget": "sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "sourceUnchanged": true,
+      "aliasRemoved": true,
+      "runtime": "containerd github.com/containerd/containerd/v2 2.3.2 fff62f14765df376e5fc36f5a8f8e795b5670f61"
+    }
+  }
+}

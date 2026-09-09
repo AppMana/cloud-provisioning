@@ -1,0 +1,60 @@
+> A node goes dark, and the claim is about everyone else.
+>
+> Columns, tab separated:
+>
+>   name       what to call the row
+>   endpoints  tunnel placement to establish first, as in scenarios.tsv
+>   victim     the node whose only NIC goes down. Never cp: this lab has
+>              one control plane, and a cluster with no API server is
+>              not a scenario, it is the end of observation.
+>
+> Each row establishes its placement, proves the full matrix green as a
+> baseline, then takes the victim's link down. The survivors must pass
+> every pair among themselves within the health check's convergence
+> window: losing one node may cost that node's pods and nothing else.
+> Then the link comes back, and the whole cluster must return to green,
+> which is the returning-endpoint path exercised against a kernel
+> rather than a unit test.
+>
+> The victim keeps running the whole time. Its kubelet, dialer, and
+> containerd never stop; what stops is the network, which is what a
+> power event looks like from everywhere else, and the part the product
+> is responsible for surviving.
+>
+> The two-endpoint rows differ in who dies. The site's transit for a
+> node with no tunnel goes through one elected endpoint, so losing that
+> endpoint strands cp unless the election moves, while losing the other
+> costs only the direct tunnels it terminated.
+>
+> With three control planes, a control plane is a legitimate victim:
+> stacked etcd keeps quorum at two of three, and there is no address
+> that moves between nodes to save anyone. Every node holds all three
+> members and balances through its own loopback (site nodes via a
+> static-pod forwarder, remotes via the dialer's balancer), so a
+> member's death must cost nothing but that member. cp is the
+> strongest of them: the init member, first in every upstream list,
+> the address every join bootstrapped through. remote-dies turns the
+> question around: the site must not sweep a node that went silent,
+> because silence is what NotReady looks like, and a machine that
+> returns must still be a member.
+>
+> The mode column separates two deaths. link takes the NIC and leaves
+> everything running against it: a pulled cable, seen from everywhere
+> else as silence. reboot takes the machine, SIGKILL, and brings it
+> back with only what the platform would provide (a NIC, an address, a
+> gateway): the tunnel, the routes, and the membership must be rebuilt
+> by what the node itself runs at boot. reboot-remote is the
+> invariant's proof: the host unit must raise the tunnel from its
+> cached list with the cluster unreachable, because the cluster is on
+> the far side of the tunnel it is raising.
+>
+name	endpoints	victim	mode
+relay-dies-with-spare	w1,w2	w1	link
+spare-dies	w1,w2	w2	link
+endpoint-dies-under-all	all	w2	link
+cp-dies	w1,w2	cp	link
+cp-follower-dies	w1,w2	cp3	link
+remote-dies	w1,w2	remote1	link
+reboot-endpoint	w1,w2	w1	reboot
+reboot-remote	w1,w2	remote1	reboot
+reboot-cp	w1,w2	cp	reboot

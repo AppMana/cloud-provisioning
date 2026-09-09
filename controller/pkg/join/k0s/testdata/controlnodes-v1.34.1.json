@@ -1,0 +1,37 @@
+{
+  "apiVersion": "v1",
+  "items": [
+    {
+      "apiVersion": "autopilot.k0sproject.io/v1beta2",
+      "kind": "ControlNode",
+      "metadata": {
+        "name": "cp"
+      },
+      "status": {
+        "k0sVersion": "v1.34.1+k0s.0"
+      }
+    },
+    {
+      "apiVersion": "autopilot.k0sproject.io/v1beta2",
+      "kind": "ControlNode",
+      "metadata": {
+        "name": "cp2"
+      },
+      "status": {
+        "k0sVersion": "v1.34.1+k0s.0"
+      }
+    },
+    {
+      "apiVersion": "autopilot.k0sproject.io/v1beta2",
+      "kind": "ControlNode",
+      "metadata": {
+        "name": "cp3"
+      },
+      "status": {
+        "k0sVersion": "v1.34.1+k0s.0"
+      }
+    }
+  ],
+  "kind": "List",
+  "metadata": {}
+}

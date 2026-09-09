@@ -1,0 +1,156 @@
+{
+  "scope": "Fresh Windows 2025 VM startup-order control: same cached application image without GPU first, then full GPU render probe",
+  "instance": {
+    "InstanceId": "i-079b7a931134dc68d",
+    "ImageId": "ami-0b5bfc5a6d0e2007c",
+    "InstanceType": "g6f.large",
+    "LaunchTime": "2026-09-07T23:14:45+00:00",
+    "PrivateIpAddress": "172.29.0.72",
+    "State": {
+      "Code": 16,
+      "Name": "running"
+    },
+    "eniID": "eni-0ec8306c8484cbc82",
+    "eniCount": 1
+  },
+  "machineUID": "b251e334-558b-40b8-9a94-02874eb888dc",
+  "nodeUID": "e67cbbe1-08f2-4268-b579-41654d10bd38",
+  "startupOrderInterruption": {
+    "reason": "Linux NFD pod scheduled onto Windows, never started because image has no matching platform",
+    "podUID": "98e4122f-cf1a-4f74-90a2-f26d0ad5268c",
+    "correction": "NFD worker linux nodeSelector persisted with Helm same chart version",
+    "firstCachedApplicationSubmitted": false
+  },
+  "firstApplication": {
+    "podUID": "7fb4b6a6-4702-434b-8bc4-4def074f51d2",
+    "phase": "Succeeded",
+    "containerStatus": {
+      "containerID": "containerd://822c5d585f76ba2f97f7bc1c77480aa097ac8b2bc8d70e55c17df0f51087d1bf",
+      "image": "sha256:903cd697133287523b9362733a8c418afe23de6e233d26b5c3fa934b6fe7e6bc",
+      "imageID": "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+      "lastState": {},
+      "name": "control",
+      "ready": false,
+      "resources": {},
+      "restartCount": 0,
+      "started": false,
+      "state": {
+        "terminated": {
+          "containerID": "containerd://822c5d585f76ba2f97f7bc1c77480aa097ac8b2bc8d70e55c17df0f51087d1bf",
+          "exitCode": 0,
+          "finishedAt": "2026-09-07T23:31:19Z",
+          "reason": "Completed",
+          "startedAt": "2026-09-07T23:31:02Z"
+        }
+      }
+    },
+    "logs": "cached-image-process-started\n"
+  },
+  "gpuJob": "windows-render-nvenc-2025-after-cpu-control",
+  "gpuStatus": "Passed after correcting live plugin build selection; previous wrong-profile failure retained",
+  "limitations": [
+    "Does not qualify GPU-first cold startup; the prior first-GPU failure is retained",
+    "NFD OS scheduling corrected before application submission; failed NFD pod never started",
+    "No guest repairs or restarts performed",
+    "This GPU failure cannot establish whether CPU-first startup fixes the corrected Windows 2025 profile"
+  ],
+  "gpuObservation": {
+    "passed": false,
+    "checks": {
+      "podSucceeded": false,
+      "jobComplete": false,
+      "containerExitedZero": false,
+      "containerIdentityPresent": true,
+      "hardwareRenderAndEncode": false
+    },
+    "podUID": "26b720e8-2157-4334-96a1-72114b366a1f",
+    "nodeUID": "e67cbbe1-08f2-4268-b579-41654d10bd38",
+    "jobUID": "aa40c95c-d52f-4bea-b585-09116e1f30f9",
+    "containerStatus": {
+      "allocatedResources": {
+        "directx.microsoft.com/display": "1"
+      },
+      "allocatedResourcesStatus": [
+        {
+          "name": "directx.microsoft.com/display",
+          "resources": [
+            {
+              "health": "Healthy",
+              "resourceID": "PCI\\VEN_10DE&DEV_27B8&SUBSYS_173310DE&REV_A1\\4&EE1B678&0&0000\\0"
+            }
+          ]
+        }
+      ],
+      "containerID": "containerd://4bfcc04b10e1287ab68ad6fa0956a1f3b0ba65a8a1e5cf24b459e23da46af3aa",
+      "image": "sha256:903cd697133287523b9362733a8c418afe23de6e233d26b5c3fa934b6fe7e6bc",
+      "imageID": "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+      "lastState": {},
+      "name": "render-nvenc",
+      "ready": false,
+      "resources": {
+        "limits": {
+          "directx.microsoft.com/display": "1"
+        },
+        "requests": {
+          "directx.microsoft.com/display": "1"
+        }
+      },
+      "restartCount": 0,
+      "started": false,
+      "state": {
+        "terminated": {
+          "containerID": "containerd://4bfcc04b10e1287ab68ad6fa0956a1f3b0ba65a8a1e5cf24b459e23da46af3aa",
+          "exitCode": 128,
+          "finishedAt": "2026-09-07T23:32:39Z",
+          "message": "failed to create containerd task: failed to create shim task: hcs::CreateComputeSystem 4bfcc04b10e1287ab68ad6fa0956a1f3b0ba65a8a1e5cf24b459e23da46af3aa: The parameter is incorrect.",
+          "reason": "StartError",
+          "startedAt": "1970-01-01T00:00:00Z"
+        }
+      },
+      "volumeMounts": [
+        {
+          "mountPath": "C:\\gpu-probe",
+          "name": "probe",
+          "readOnly": true,
+          "recursiveReadOnly": "Disabled"
+        }
+      ]
+    }
+  },
+  "placementFinding": {
+    "upstreamPlugin": "Selected all Windows GPU nodes except the old hardcoded aws-win2025-gpu hostname",
+    "forkedPlugin": "Selected only aws-win2025-gpu by hostname",
+    "effect": "Fresh Windows 2025 control node received upstream runtime DLL mounts and failed HCS CreateComputeSystem with invalid parameter",
+    "sourceTemplates": "Repository manifests already use disjoint Windows build selectors; live diagnostics had not adopted them"
+  },
+  "correctedProfileGPU": {
+    "passed": true,
+    "checks": {
+      "podSucceeded": true,
+      "jobComplete": true,
+      "containerExitedZero": true,
+      "containerIdentityPresent": true,
+      "hardwareRenderAndEncode": true
+    },
+    "receipt": {
+      "encoder": "h264_nvenc",
+      "containerWindowsBuild": 20348,
+      "decodedFrames": 30,
+      "render": {
+        "api": "Direct3D11",
+        "vendorID": 4318,
+        "deviceID": 10168,
+        "frames": 30,
+        "pixelsPerFrame": 4096,
+        "greenPixels": 1152,
+        "bluePixels": 2944,
+        "hardwareOnly": true
+      },
+      "encodedBytes": 3936
+    },
+    "podUID": "fc871628-dd8a-48c6-87dc-8e6d7f85ce04",
+    "nodeUID": "e67cbbe1-08f2-4268-b579-41654d10bd38",
+    "jobUID": "88470d88-1308-4e42-92e3-f6d379100cbb",
+    "observedAt": "2026-09-07T23:41:28.956599+00:00"
+  }
+}

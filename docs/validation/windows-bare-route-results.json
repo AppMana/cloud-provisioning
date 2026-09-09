@@ -1,0 +1,46 @@
+{
+  "scope": "Windows SCM and native tunnel host lifecycle; no CAPI or CNI claim",
+  "serviceSHA256": "6c7d18a361e424862ce5c9be96969b9f6e0a2723af1b246e5878acf80ad7bb07",
+  "results": {
+    "2025": {
+      "identityUnchanged": true,
+      "windowsBuild": 26100,
+      "invalidNativeRequestNotAcknowledged": true,
+      "receiptRemovedOnStop": true,
+      "apiBackendUpdate": true,
+      "apiBackendFailover": true,
+      "serviceStartStop": true,
+      "exactDeliveryReceipt": true,
+      "invalidUpdateRejected": true,
+      "removedPeerRoute": true,
+      "readdedPeerRoute": true,
+      "adapterRemovedOnStop": true,
+      "restartRetainedRemoval": true,
+      "apiServiceIndependent": true,
+      "singlePhysicalNIC": true,
+      "serviceAndGuestArtifactsRemoved": true
+    },
+    "2022": {
+      "identityUnchanged": true,
+      "windowsBuild": 20348,
+      "invalidNativeRequestNotAcknowledged": true,
+      "receiptRemovedOnStop": true,
+      "apiBackendUpdate": true,
+      "apiBackendFailover": true,
+      "serviceStartStop": true,
+      "exactDeliveryReceipt": true,
+      "invalidUpdateRejected": true,
+      "removedPeerRoute": true,
+      "readdedPeerRoute": true,
+      "adapterRemovedOnStop": true,
+      "restartRetainedRemoval": true,
+      "apiServiceIndependent": true,
+      "singlePhysicalNIC": true,
+      "serviceAndGuestArtifactsRemoved": true
+    }
+  },
+  "failures": {},
+  "observedAt": "2026-09-07T04:19:24.933833+00:00",
+  "routeHostFormat": "bare IP addresses, matching live RemotePeers publication",
+  "limitations": "Native service probe, not a CAPI join, CNI or GPU test"
+}

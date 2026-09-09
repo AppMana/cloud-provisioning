@@ -1,0 +1,47 @@
+{
+  "source": "10.244.114.4:58049",
+  "target": "10.244.190.81:8081",
+  "requestAppearances": 6,
+  "encapsulatedReplyAppearances": 10,
+  "allReplyPayloadsMatch": true,
+  "firstReplyAfterRequestMilliseconds": 23.871898651123047,
+  "decapsulatedReplyAppearances": 0,
+  "scope": "Captured unfragmented 64-byte UDP echo reply dropped by Windows2022 VFP during native survivor sampling",
+  "pcapSHA256": "00ffdf96997b191fdb993ab46a36f1f5b8de8d4b8c90a1253b14d39f021b238c",
+  "correlation": {
+    "source": "10.244.190.81",
+    "sourcePort": 8081,
+    "destination": "10.244.114.4",
+    "destinationPort": 58049,
+    "flowObserved": true,
+    "correlationWindowSeconds": 0.1,
+    "drops": [
+      {
+        "timestamp": "2026-09-08 12:10:58.020317700",
+        "group": 15946,
+        "packet": 1,
+        "component": 93,
+        "componentInfo": {
+          "driver": "vfpext.sys",
+          "name": "VFP Extension"
+        },
+        "reason": "Invalid Packet",
+        "location": "0xE0006096",
+        "ipID": 13186,
+        "fragmentOffsetBytes": 0,
+        "header": "[00]0518.0C30::2026-09-08 12:10:58.020317700 [Microsoft-Windows-PktMon] Drop: PktGroupId 15946, PktNumber 1, Appearance 11, Direction Tx , Type Ethernet , Component 93, Filter 1, DropReason Invalid Packet , DropLocation 0xE0006096, OriginalSize 156, LoggedSize 156 "
+      }
+    ]
+  },
+  "fixtureSHA256": "38965aeca43f365b82d761ffaddb6ec1008572be11569bc16774dd555891eff7",
+  "rootCauseEstablished": false,
+  "networkFailureResolved": false,
+  "checksumValidation": {
+    "tool": "tshark with ip.check_checksum and udp.check_checksum enabled",
+    "replyAppearances": 10,
+    "outerIPv4": "Good",
+    "innerIPv4": "Good",
+    "outerUDP": "Good",
+    "innerUDP": "Good"
+  }
+}

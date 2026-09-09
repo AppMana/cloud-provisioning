@@ -1,0 +1,1437 @@
+{
+  "observedAt": "2026-09-08T22:50:00.809726+00:00",
+  "scope": "Three-host retained single-NIC VM capture with native 10ms ordinary-Pod UDP streams; no CAPI lifecycle mutation or host setting change",
+  "qualificationEligible": false,
+  "ok": false,
+  "configuration": {
+    "purpose": "Capture Linux site packet paths plus Windows Packet Monitor and TCPIP interface context",
+    "hostSettingsChanged": false,
+    "packetIntervalSeconds": 0.01,
+    "boundedObservationSeconds": 120,
+    "qualificationEligible": false
+  },
+  "window": {
+    "startedAt": "2026-09-08T22:26:41.039428+00:00",
+    "finishedAt": "2026-09-08T22:26:55.034000+00:00",
+    "observedLoss": true
+  },
+  "survivors": {
+    "attempts": 13106,
+    "failed": 5,
+    "identitiesStable": true,
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "attempts": 1612,
+        "passed": 1612,
+        "maxStartIntervalSeconds": 0.1203602090000011,
+        "samplesSHA256": "5defa20c15d725cf19ea3e3e1abac0c1f2157f1d18feb26c7b9664733e04ce6e",
+        "ok": true
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "attempts": 1651,
+        "passed": 1651,
+        "maxStartIntervalSeconds": 0.0687310440000033,
+        "samplesSHA256": "00ad34fd31dc2c0ba37909e01e09405e57ecf8d77278c7f83ae3ecc5a3d923f6",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "attempts": 1407,
+        "passed": 1406,
+        "maxStartIntervalSeconds": 5.017773600000002,
+        "samplesSHA256": "356475ed908d3ac703b4d4e8605a89d03f38ee27f30371f9480fec3c59afa239",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "attempts": 3448,
+        "passed": 3446,
+        "maxStartIntervalSeconds": 5.012552399999997,
+        "samplesSHA256": "e08bac2e8a1eb5c72dc6cf2da11509ae8da936c9963ccb6cf2630f21ce481234",
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "attempts": 1584,
+        "passed": 1584,
+        "maxStartIntervalSeconds": 0.0957904000000056,
+        "samplesSHA256": "066674cdb0b301169e6858f99fef8861e4baa2932eca656c0106aba15b96cbd7",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "attempts": 3404,
+        "passed": 3402,
+        "maxStartIntervalSeconds": 5.016559800000003,
+        "samplesSHA256": "be821f7d60229dca29d92f6c336ae3fc45732cc5160abc3ecaa3ba710d2ee4e4",
+        "ok": false
+      }
+    ]
+  },
+  "failedSamples": [
+    {
+      "source": "10.244.114.4",
+      "sourceNode": "aws-win2022-v3",
+      "sourcePort": 63564,
+      "destination": "10.244.190.81",
+      "destinationNode": "w1",
+      "sample": {
+        "sequence": 757,
+        "source": "10.244.114.4:63564",
+        "startedAt": "2026-09-08T22:26:27.7298936Z",
+        "finishedAt": "2026-09-08T22:26:32.7350219Z",
+        "ok": false,
+        "error": "read udp 10.244.114.4:63564->10.244.190.81:8081: i/o timeout",
+        "nonce": "160b4e067d064b150a763ab381a29f0c",
+        "pid": 6764,
+        "startOffsetSeconds": 28.0430868,
+        "finishOffsetSeconds": 33.0482151,
+        "attempts": 758,
+        "passed": 757,
+        "maxStartIntervalSeconds": 0.1236088,
+        "healthy": false,
+        "stopBoundary": false
+      },
+      "captures": {
+        "aws-win2022-v3": {
+          "exchange": {
+            "source": "10.244.114.4",
+            "sourcePort": 63564,
+            "destination": "10.244.190.81",
+            "destinationPort": 8081,
+            "request": {
+              "appearances": 16,
+              "ipIDs": [
+                "0xa739"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "3a8823500462b6012f3988247a039a62123f36b871eee77f482095e1e6d8b902"
+              ],
+              "frames": [
+                155713,
+                155714,
+                155715,
+                155716,
+                155717,
+                155718,
+                155719,
+                155720,
+                155721,
+                155722,
+                155723,
+                155724,
+                155725,
+                155726,
+                155727,
+                155728
+              ]
+            },
+            "reply": {
+              "appearances": 0,
+              "ipIDs": [],
+              "trafficClasses": [],
+              "payloadSHA256": [],
+              "frames": []
+            },
+            "scope": "Decoded appearances in one capture; absence is not proof of non-delivery and timestamps are not compared across hosts"
+          },
+          "drops": {
+            "request": [],
+            "reply": []
+          }
+        },
+        "aws-win2025-v3": {
+          "exchange": {
+            "source": "10.244.114.4",
+            "sourcePort": 63564,
+            "destination": "10.244.190.81",
+            "destinationPort": 8081,
+            "request": {
+              "appearances": 0,
+              "ipIDs": [],
+              "trafficClasses": [],
+              "payloadSHA256": [],
+              "frames": []
+            },
+            "reply": {
+              "appearances": 0,
+              "ipIDs": [],
+              "trafficClasses": [],
+              "payloadSHA256": [],
+              "frames": []
+            },
+            "scope": "Decoded appearances in one capture; absence is not proof of non-delivery and timestamps are not compared across hosts"
+          },
+          "drops": {
+            "request": [],
+            "reply": []
+          }
+        },
+        "w1": {
+          "exchange": {
+            "source": "10.244.114.4",
+            "sourcePort": 63564,
+            "destination": "10.244.190.81",
+            "destinationPort": 8081,
+            "request": {
+              "appearances": 0,
+              "ipIDs": [],
+              "trafficClasses": [],
+              "payloadSHA256": [],
+              "frames": []
+            },
+            "reply": {
+              "appearances": 0,
+              "ipIDs": [],
+              "trafficClasses": [],
+              "payloadSHA256": [],
+              "frames": []
+            },
+            "scope": "Decoded appearances in one capture; absence is not proof of non-delivery and timestamps are not compared across hosts"
+          },
+          "positiveControls": [
+            {
+              "sequence": 756,
+              "source": "10.244.114.4:63561",
+              "ok": true
+            },
+            {
+              "sequence": 757,
+              "source": "10.244.114.4:63564",
+              "ok": false
+            },
+            {
+              "sequence": 758,
+              "source": "10.244.114.4:63916",
+              "ok": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "source": "10.244.114.4",
+      "sourceNode": "aws-win2022-v3",
+      "sourcePort": 65348,
+      "destination": "10.244.42.6",
+      "destinationNode": "aws-win2025-v3",
+      "sample": {
+        "sequence": 3111,
+        "source": "10.244.114.4:65348",
+        "startedAt": "2026-09-08T22:26:47.7567248Z",
+        "finishedAt": "2026-09-08T22:26:52.7577307Z",
+        "ok": false,
+        "error": "read udp 10.244.114.4:65348->10.244.42.6:8081: i/o timeout",
+        "nonce": "5de4c39a6368c0bc264c9c2ab908047b",
+        "pid": 5472,
+        "startOffsetSeconds": 44.9405919,
+        "finishOffsetSeconds": 49.9415978,
+        "attempts": 3112,
+        "passed": 3111,
+        "maxStartIntervalSeconds": 0.1200409,
+        "healthy": false,
+        "stopBoundary": false
+      },
+      "captures": {
+        "aws-win2022-v3": {
+          "exchange": {
+            "source": "10.244.114.4",
+            "sourcePort": 65348,
+            "destination": "10.244.42.6",
+            "destinationPort": 8081,
+            "request": {
+              "appearances": 16,
+              "ipIDs": [
+                "0x73d9"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "2777745ad096644e63ff2eb4bf0136dbd46d59e202458d660ad2fde06b136d45"
+              ],
+              "frames": [
+                292469,
+                292470,
+                292471,
+                292472,
+                292473,
+                292474,
+                292475,
+                292476,
+                292477,
+                292478,
+                292479,
+                292480,
+                292481,
+                292482,
+                292483,
+                292484
+              ]
+            },
+            "reply": {
+              "appearances": 16,
+              "ipIDs": [
+                "0x4dc7"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "a90232f43ef4e59f63652c45699fbea7ed23a23d80a8690b0a7750e93803a0cb"
+              ],
+              "frames": [
+                292501,
+                292502,
+                292503,
+                292504,
+                292505,
+                292506,
+                292507,
+                292508,
+                292509,
+                292510,
+                292511,
+                292512,
+                292513,
+                292514,
+                292515,
+                292516
+              ]
+            },
+            "scope": "Decoded appearances in one capture; absence is not proof of non-delivery and timestamps are not compared across hosts"
+          },
+          "drops": {
+            "request": [],
+            "reply": [
+              {
+                "timestamp": "2026-09-08 22:26:47.763171600",
+                "group": 64168,
+                "packet": 1,
+                "component": 74,
+                "componentInfo": {
+                  "driver": "tcpip.sys",
+                  "name": "TCP/IPv4 - L3/L4"
+                },
+                "reason": "Not locally destined",
+                "location": "0xE0004136",
+                "ipID": 19911,
+                "fragmentOffsetBytes": 0,
+                "header": "[00]1560.1A0C::2026-09-08 22:26:47.763171600 [Microsoft-Windows-PktMon] Drop: PktGroupId 64168, PktNumber 1, Appearance 17, Direction Rx , Type IP , Component 74, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 142, LoggedSize 142 ",
+                "trafficClassesBeforeDrop": [
+                  0
+                ],
+                "trafficClassAtDrop": 0,
+                "trafficClassChanged": false,
+                "tcpipContext": {
+                  "candidates": [
+                    {
+                      "eventID": 1215,
+                      "version": 1,
+                      "timestamp": "2026-09-08T22:26:47.7631708Z",
+                      "source": "172.29.0.68",
+                      "destination": "172.29.0.24",
+                      "interfaceIndex": 18,
+                      "reason": 2,
+                      "transportProtocol": 0,
+                      "pathDirection": 1,
+                      "packetCount": 1,
+                      "precedingMicroseconds": 1.0,
+                      "interfaces": [
+                        {
+                          "InterfaceAlias": "vEthernet (Container NIC 070372ba)",
+                          "InterfaceIndex": 18,
+                          "CompartmentId": 2,
+                          "WeakHostReceive": 0,
+                          "WeakHostSend": 0,
+                          "Forwarding": 0,
+                          "NlMtu": 1450
+                        }
+                      ],
+                      "addresses": [
+                        {
+                          "InterfaceAlias": "vEthernet (Container NIC 070372ba)",
+                          "InterfaceIndex": 18,
+                          "CompartmentId": null,
+                          "IPAddress": "169.254.168.160",
+                          "PrefixLength": 16
+                        }
+                      ]
+                    }
+                  ],
+                  "uniqueCandidate": true,
+                  "windowMicroseconds": 10,
+                  "scope": "Same-host outer-address/time candidates; no packet identity or causal proof. Interface metadata is a separate snapshot."
+                }
+              }
+            ]
+          }
+        },
+        "aws-win2025-v3": {
+          "exchange": {
+            "source": "10.244.114.4",
+            "sourcePort": 65348,
+            "destination": "10.244.42.6",
+            "destinationPort": 8081,
+            "request": {
+              "appearances": 20,
+              "ipIDs": [
+                "0x73d9"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "2777745ad096644e63ff2eb4bf0136dbd46d59e202458d660ad2fde06b136d45"
+              ],
+              "frames": [
+                293281,
+                293282,
+                293283,
+                293284,
+                293285,
+                293286,
+                293287,
+                293288,
+                293289,
+                293290,
+                293291,
+                293292,
+                293293,
+                293294,
+                293295,
+                293296,
+                293297,
+                293298,
+                293299,
+                293300
+              ]
+            },
+            "reply": {
+              "appearances": 16,
+              "ipIDs": [
+                "0x4dc7"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "a90232f43ef4e59f63652c45699fbea7ed23a23d80a8690b0a7750e93803a0cb"
+              ],
+              "frames": [
+                293301,
+                293302,
+                293303,
+                293304,
+                293305,
+                293306,
+                293307,
+                293308,
+                293309,
+                293310,
+                293311,
+                293312,
+                293313,
+                293314,
+                293315,
+                293316
+              ]
+            },
+            "scope": "Decoded appearances in one capture; absence is not proof of non-delivery and timestamps are not compared across hosts"
+          },
+          "drops": {
+            "request": [],
+            "reply": []
+          }
+        }
+      }
+    },
+    {
+      "source": "10.244.114.4",
+      "sourceNode": "aws-win2022-v3",
+      "sourcePort": 49550,
+      "destination": "10.244.42.6",
+      "destinationNode": "aws-win2025-v3",
+      "sample": {
+        "sequence": 3446,
+        "source": "10.244.114.4:49550",
+        "startedAt": "2026-09-08T22:26:58.1608601Z",
+        "finishedAt": "2026-09-08T22:27:03.1609834Z",
+        "ok": false,
+        "error": "read udp 10.244.114.4:49550->10.244.42.6:8081: i/o timeout",
+        "nonce": "5de4c39a6368c0bc264c9c2ab908047b",
+        "pid": 5472,
+        "startOffsetSeconds": 55.3447272,
+        "finishOffsetSeconds": 60.3448505,
+        "attempts": 3447,
+        "passed": 3445,
+        "maxStartIntervalSeconds": 5.0121384,
+        "healthy": false,
+        "stopBoundary": false
+      },
+      "captures": {
+        "aws-win2022-v3": {
+          "exchange": {
+            "source": "10.244.114.4",
+            "sourcePort": 49550,
+            "destination": "10.244.42.6",
+            "destinationPort": 8081,
+            "request": {
+              "appearances": 16,
+              "ipIDs": [
+                "0x7680"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "4fa3803a7f6fc4a31b9df20ab8f8194a3a821cc5a3a82d2483a73ba607b7ad6d"
+              ],
+              "frames": [
+                332865,
+                332866,
+                332867,
+                332868,
+                332869,
+                332870,
+                332871,
+                332872,
+                332873,
+                332874,
+                332875,
+                332876,
+                332877,
+                332878,
+                332879,
+                332880
+              ]
+            },
+            "reply": {
+              "appearances": 0,
+              "ipIDs": [],
+              "trafficClasses": [],
+              "payloadSHA256": [],
+              "frames": []
+            },
+            "scope": "Decoded appearances in one capture; absence is not proof of non-delivery and timestamps are not compared across hosts"
+          },
+          "drops": {
+            "request": [],
+            "reply": []
+          }
+        },
+        "aws-win2025-v3": {
+          "exchange": {
+            "source": "10.244.114.4",
+            "sourcePort": 49550,
+            "destination": "10.244.42.6",
+            "destinationPort": 8081,
+            "request": {
+              "appearances": 16,
+              "ipIDs": [
+                "0x7680"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "4fa3803a7f6fc4a31b9df20ab8f8194a3a821cc5a3a82d2483a73ba607b7ad6d"
+              ],
+              "frames": [
+                335017,
+                335018,
+                335019,
+                335020,
+                335021,
+                335022,
+                335023,
+                335024,
+                335025,
+                335026,
+                335027,
+                335028,
+                335029,
+                335030,
+                335031,
+                335032
+              ]
+            },
+            "reply": {
+              "appearances": 0,
+              "ipIDs": [],
+              "trafficClasses": [],
+              "payloadSHA256": [],
+              "frames": []
+            },
+            "scope": "Decoded appearances in one capture; absence is not proof of non-delivery and timestamps are not compared across hosts"
+          },
+          "drops": {
+            "request": [
+              {
+                "timestamp": "2026-09-08 22:26:58.505725600",
+                "group": 1023785,
+                "packet": 1,
+                "component": 73,
+                "componentInfo": {
+                  "driver": "tcpip.sys",
+                  "name": "TCP/IPv4 - L3/L4"
+                },
+                "reason": "Not locally destined",
+                "location": "0xE0004136",
+                "ipID": 30336,
+                "fragmentOffsetBytes": 0,
+                "header": "[00]09B0.1FCC::2026-09-08 22:26:58.505725600 [Microsoft-Windows-PktMon] Drop: PktGroupId 1023785, PktNumber 1, Appearance 0, Direction Rx , Type IP , Component 73, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 147, LoggedSize 147 ",
+                "trafficClassesBeforeDrop": [
+                  0
+                ],
+                "trafficClassAtDrop": 0,
+                "trafficClassChanged": false,
+                "tcpipContext": {
+                  "candidates": [
+                    {
+                      "eventID": 1215,
+                      "version": 2,
+                      "timestamp": "2026-09-08T22:26:58.5057235Z",
+                      "source": "172.29.0.24",
+                      "destination": "172.29.0.68",
+                      "interfaceIndex": 17,
+                      "reason": 2,
+                      "transportProtocol": 0,
+                      "pathDirection": 1,
+                      "packetCount": 1,
+                      "precedingMicroseconds": 2.0,
+                      "interfaces": [
+                        {
+                          "InterfaceAlias": "vEthernet (DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0)",
+                          "InterfaceIndex": 17,
+                          "CompartmentId": 2,
+                          "WeakHostReceive": 0,
+                          "WeakHostSend": 0,
+                          "Forwarding": 0,
+                          "NlMtu": 1450
+                        }
+                      ],
+                      "addresses": [
+                        {
+                          "InterfaceAlias": "vEthernet (DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0)",
+                          "InterfaceIndex": 17,
+                          "CompartmentId": null,
+                          "IPAddress": "169.254.87.206",
+                          "PrefixLength": 16
+                        }
+                      ]
+                    }
+                  ],
+                  "uniqueCandidate": true,
+                  "windowMicroseconds": 10,
+                  "scope": "Same-host outer-address/time candidates; no packet identity or causal proof. Interface metadata is a separate snapshot."
+                }
+              }
+            ],
+            "reply": []
+          }
+        }
+      }
+    },
+    {
+      "source": "10.244.42.6",
+      "sourceNode": "aws-win2025-v3",
+      "sourcePort": 50030,
+      "destination": "10.244.114.4",
+      "destinationNode": "aws-win2022-v3",
+      "sample": {
+        "sequence": 945,
+        "source": "10.244.42.6:50030",
+        "startedAt": "2026-09-08T22:26:22.8529272Z",
+        "finishedAt": "2026-09-08T22:26:27.8537558Z",
+        "ok": false,
+        "error": "read udp 10.244.42.6:50030->10.244.114.4:8081: i/o timeout",
+        "nonce": "e29ec5bbdcb11d866598b2238a765157",
+        "pid": 412,
+        "startOffsetSeconds": 12.9840072,
+        "finishOffsetSeconds": 17.9848358,
+        "attempts": 946,
+        "passed": 945,
+        "maxStartIntervalSeconds": 0.0936383,
+        "healthy": false,
+        "stopBoundary": false
+      },
+      "captures": {
+        "aws-win2022-v3": {
+          "exchange": {
+            "source": "10.244.42.6",
+            "sourcePort": 50030,
+            "destination": "10.244.114.4",
+            "destinationPort": 8081,
+            "request": {
+              "appearances": 20,
+              "ipIDs": [
+                "0x412a"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "33aeb2a3775a79bd93aed3c4ca8a37568a292cf87871bbfaa3d3b9665b1b9f5e"
+              ],
+              "frames": [
+                130829,
+                130830,
+                130831,
+                130832,
+                130833,
+                130834,
+                130835,
+                130836,
+                130837,
+                130838,
+                130839,
+                130840,
+                130841,
+                130842,
+                130843,
+                130844,
+                130845,
+                130846,
+                130847,
+                130848
+              ]
+            },
+            "reply": {
+              "appearances": 16,
+              "ipIDs": [
+                "0x673d"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "387775efe930f11330ef5ce5eda2ff7b94a3dc249c2f714ede0077f5f87f8116"
+              ],
+              "frames": [
+                130849,
+                130850,
+                130851,
+                130852,
+                130853,
+                130854,
+                130855,
+                130856,
+                130857,
+                130858,
+                130859,
+                130860,
+                130861,
+                130862,
+                130863,
+                130864
+              ]
+            },
+            "scope": "Decoded appearances in one capture; absence is not proof of non-delivery and timestamps are not compared across hosts"
+          },
+          "drops": {
+            "request": [],
+            "reply": []
+          }
+        },
+        "aws-win2025-v3": {
+          "exchange": {
+            "source": "10.244.42.6",
+            "sourcePort": 50030,
+            "destination": "10.244.114.4",
+            "destinationPort": 8081,
+            "request": {
+              "appearances": 16,
+              "ipIDs": [
+                "0x412a"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "33aeb2a3775a79bd93aed3c4ca8a37568a292cf87871bbfaa3d3b9665b1b9f5e"
+              ],
+              "frames": [
+                125417,
+                125418,
+                125419,
+                125420,
+                125421,
+                125422,
+                125423,
+                125424,
+                125425,
+                125426,
+                125427,
+                125428,
+                125429,
+                125430,
+                125431,
+                125432
+              ]
+            },
+            "reply": {
+              "appearances": 16,
+              "ipIDs": [
+                "0x673d"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "387775efe930f11330ef5ce5eda2ff7b94a3dc249c2f714ede0077f5f87f8116"
+              ],
+              "frames": [
+                125433,
+                125434,
+                125435,
+                125436,
+                125437,
+                125438,
+                125439,
+                125440,
+                125441,
+                125442,
+                125443,
+                125444,
+                125445,
+                125446,
+                125447,
+                125448
+              ]
+            },
+            "scope": "Decoded appearances in one capture; absence is not proof of non-delivery and timestamps are not compared across hosts"
+          },
+          "drops": {
+            "request": [],
+            "reply": [
+              {
+                "timestamp": "2026-09-08 22:26:22.857088200",
+                "group": 864904,
+                "packet": 1,
+                "component": 73,
+                "componentInfo": {
+                  "driver": "tcpip.sys",
+                  "name": "TCP/IPv4 - L3/L4"
+                },
+                "reason": "Not locally destined",
+                "location": "0xE0004136",
+                "ipID": 26429,
+                "fragmentOffsetBytes": 0,
+                "header": "[00]0000.0000::2026-09-08 22:26:22.857088200 [Microsoft-Windows-PktMon] Drop: PktGroupId 864904, PktNumber 1, Appearance 0, Direction Rx , Type IP , Component 73, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 142, LoggedSize 142 ",
+                "trafficClassesBeforeDrop": [
+                  0
+                ],
+                "trafficClassAtDrop": 0,
+                "trafficClassChanged": false,
+                "tcpipContext": {
+                  "candidates": [
+                    {
+                      "eventID": 1215,
+                      "version": 2,
+                      "timestamp": "2026-09-08T22:26:22.8570854Z",
+                      "source": "172.29.0.24",
+                      "destination": "172.29.0.68",
+                      "interfaceIndex": 17,
+                      "reason": 2,
+                      "transportProtocol": 0,
+                      "pathDirection": 1,
+                      "packetCount": 1,
+                      "precedingMicroseconds": 3.0,
+                      "interfaces": [
+                        {
+                          "InterfaceAlias": "vEthernet (DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0)",
+                          "InterfaceIndex": 17,
+                          "CompartmentId": 2,
+                          "WeakHostReceive": 0,
+                          "WeakHostSend": 0,
+                          "Forwarding": 0,
+                          "NlMtu": 1450
+                        }
+                      ],
+                      "addresses": [
+                        {
+                          "InterfaceAlias": "vEthernet (DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0)",
+                          "InterfaceIndex": 17,
+                          "CompartmentId": null,
+                          "IPAddress": "169.254.87.206",
+                          "PrefixLength": 16
+                        }
+                      ]
+                    }
+                  ],
+                  "uniqueCandidate": true,
+                  "windowMicroseconds": 10,
+                  "scope": "Same-host outer-address/time candidates; no packet identity or causal proof. Interface metadata is a separate snapshot."
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "source": "10.244.42.6",
+      "sourceNode": "aws-win2025-v3",
+      "sourcePort": 52206,
+      "destination": "10.244.114.4",
+      "destinationNode": "aws-win2022-v3",
+      "sample": {
+        "sequence": 2417,
+        "source": "10.244.42.6:52206",
+        "startedAt": "2026-09-08T22:26:48.1008462Z",
+        "finishedAt": "2026-09-08T22:26:53.106706Z",
+        "ok": false,
+        "error": "read udp 10.244.42.6:52206->10.244.114.4:8081: i/o timeout",
+        "nonce": "e29ec5bbdcb11d866598b2238a765157",
+        "pid": 412,
+        "startOffsetSeconds": 38.2319262,
+        "finishOffsetSeconds": 43.237786,
+        "attempts": 2418,
+        "passed": 2416,
+        "maxStartIntervalSeconds": 5.0118002,
+        "healthy": false,
+        "stopBoundary": false
+      },
+      "captures": {
+        "aws-win2022-v3": {
+          "exchange": {
+            "source": "10.244.42.6",
+            "sourcePort": 52206,
+            "destination": "10.244.114.4",
+            "destinationPort": 8081,
+            "request": {
+              "appearances": 16,
+              "ipIDs": [
+                "0x4dc6"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "5e477981d754465144099f141e9972d044353358c715044dc1686bbff1d1ad39"
+              ],
+              "frames": [
+                292485,
+                292486,
+                292487,
+                292488,
+                292489,
+                292490,
+                292491,
+                292492,
+                292493,
+                292494,
+                292495,
+                292496,
+                292497,
+                292498,
+                292499,
+                292500
+              ]
+            },
+            "reply": {
+              "appearances": 0,
+              "ipIDs": [],
+              "trafficClasses": [],
+              "payloadSHA256": [],
+              "frames": []
+            },
+            "scope": "Decoded appearances in one capture; absence is not proof of non-delivery and timestamps are not compared across hosts"
+          },
+          "drops": {
+            "request": [
+              {
+                "timestamp": "2026-09-08 22:26:47.763100700",
+                "group": 64167,
+                "packet": 1,
+                "component": 74,
+                "componentInfo": {
+                  "driver": "tcpip.sys",
+                  "name": "TCP/IPv4 - L3/L4"
+                },
+                "reason": "Not locally destined",
+                "location": "0xE0004136",
+                "ipID": 19910,
+                "fragmentOffsetBytes": 0,
+                "header": "[00]1560.1A0C::2026-09-08 22:26:47.763100700 [Microsoft-Windows-PktMon] Drop: PktGroupId 64167, PktNumber 1, Appearance 17, Direction Rx , Type IP , Component 74, Filter 1, DropReason Not locally destined , DropLocation 0xE0004136, OriginalSize 147, LoggedSize 147 ",
+                "trafficClassesBeforeDrop": [
+                  0
+                ],
+                "trafficClassAtDrop": 0,
+                "trafficClassChanged": false,
+                "tcpipContext": {
+                  "candidates": [
+                    {
+                      "eventID": 1215,
+                      "version": 1,
+                      "timestamp": "2026-09-08T22:26:47.7630985Z",
+                      "source": "172.29.0.68",
+                      "destination": "172.29.0.24",
+                      "interfaceIndex": 18,
+                      "reason": 2,
+                      "transportProtocol": 0,
+                      "pathDirection": 1,
+                      "packetCount": 1,
+                      "precedingMicroseconds": 2.0,
+                      "interfaces": [
+                        {
+                          "InterfaceAlias": "vEthernet (Container NIC 070372ba)",
+                          "InterfaceIndex": 18,
+                          "CompartmentId": 2,
+                          "WeakHostReceive": 0,
+                          "WeakHostSend": 0,
+                          "Forwarding": 0,
+                          "NlMtu": 1450
+                        }
+                      ],
+                      "addresses": [
+                        {
+                          "InterfaceAlias": "vEthernet (Container NIC 070372ba)",
+                          "InterfaceIndex": 18,
+                          "CompartmentId": null,
+                          "IPAddress": "169.254.168.160",
+                          "PrefixLength": 16
+                        }
+                      ]
+                    }
+                  ],
+                  "uniqueCandidate": true,
+                  "windowMicroseconds": 10,
+                  "scope": "Same-host outer-address/time candidates; no packet identity or causal proof. Interface metadata is a separate snapshot."
+                }
+              }
+            ],
+            "reply": []
+          }
+        },
+        "aws-win2025-v3": {
+          "exchange": {
+            "source": "10.244.42.6",
+            "sourcePort": 52206,
+            "destination": "10.244.114.4",
+            "destinationPort": 8081,
+            "request": {
+              "appearances": 16,
+              "ipIDs": [
+                "0x4dc6"
+              ],
+              "trafficClasses": [
+                "0x00"
+              ],
+              "payloadSHA256": [
+                "5e477981d754465144099f141e9972d044353358c715044dc1686bbff1d1ad39"
+              ],
+              "frames": [
+                293265,
+                293266,
+                293267,
+                293268,
+                293269,
+                293270,
+                293271,
+                293272,
+                293273,
+                293274,
+                293275,
+                293276,
+                293277,
+                293278,
+                293279,
+                293280
+              ]
+            },
+            "reply": {
+              "appearances": 0,
+              "ipIDs": [],
+              "trafficClasses": [],
+              "payloadSHA256": [],
+              "frames": []
+            },
+            "scope": "Decoded appearances in one capture; absence is not proof of non-delivery and timestamps are not compared across hosts"
+          },
+          "drops": {
+            "request": [],
+            "reply": []
+          }
+        }
+      }
+    }
+  ],
+  "findings": [
+    "Four failed exchanges have correlated TCP/IP Not locally destined drops: two requests and two replies, across Windows 2022 and 2025. All have unchanged traffic class zero.",
+    "Each of these four drop events has one same-host TCP/IP Event 1215 outer-address/time candidate in the preceding ten microseconds. Native transportProtocol is zero, reason is 2. Snapshot mapping places Windows 2022 IfIndex 18 and Windows 2025 IfIndex 17 in compartment 2 on link-local adapters, distinct from the destination EC2 address adapters.",
+    "The Windows 2022 to w1 failed request has 16 sender appearances and no decoded request or reply in the site capture. The adjacent successful samples appear in the site capture. This brackets an observation gap; it does not locate a specific gateway, tunnel, or network loss.",
+    "The Windows 2025 original exporter completed after the SSM wrapper timed out. Source hashes verified all fourteen original Windows artifacts and both extracted text files before cleanup. No capture or sampler was replayed.",
+    "Post-capture Get-NetCompartment identifies compartment 2 as DR on both versions. HNS reports Calico and External overlay networks sharing a lower layer and DR MAC on each host. This is native mapping context, not evidence that the External network is obsolete or the cause of loss."
+  ],
+  "limitations": [
+    "Event 1215 has no packet ID; nearby events provide interface context and do not independently identify a packet or establish the cause.",
+    "Interface mappings are pre-capture snapshots; no claim is made that they prove every instantaneous state.",
+    "Windows 2025 original stop output was not recovered, so this report does not assert zero lost ETW events for that host. Linux tcpdump reported zero kernel drops.",
+    "PCAP appearances do not prove application delivery; absence is not proof of non-delivery. Cross-host wall clocks are not transit-latency measurements.",
+    "This diagnostic run cannot qualify Windows lifecycle support, a mitigation, image promotion, or a release."
+  ],
+  "artifacts": [
+    {
+      "node": "aws-win2022-v3",
+      "file": "aws-win2022-v3.pcapng",
+      "sha256": "6904ac7174fb8ebd9ae1f8421a85f49250a5497e8a7ad1fa59126143156452c8",
+      "name": "capture.pcapng",
+      "bytes": 62446120,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2022-v3",
+      "file": "aws-win2022-v3.etl",
+      "sha256": "350769e90bff690d757150625a63be120538c17ad13ff756d73118389d41b4ee",
+      "name": "capture.etl",
+      "bytes": 7570224,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2022-v3",
+      "file": "aws-win2022-v3.drops.txt",
+      "sha256": "350aae3d423e42634feda3770b7dec9a53fed0d45cda683219411d576b7243ed",
+      "name": "capture.drops.txt",
+      "bytes": 13295,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2022-v3",
+      "file": "aws-win2022-v3.drops.pcapng",
+      "sha256": "95e7c9dfe79f21b8c26329c8f11d3ad48b3564f56aab1ba6ba78312a41072dcc",
+      "name": "capture.drops.pcapng",
+      "bytes": 524,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2022-v3",
+      "file": "aws-win2022-v3.tcpip.etl",
+      "sha256": "39baa5149e64f007a6c89932051a04f7c6e67a505f20d6470c479aad74251d03",
+      "name": "tcpip.etl",
+      "bytes": 8880128,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2022-v3",
+      "file": "aws-win2022-v3.tcpip-events.jsonl",
+      "sha256": "91839459cfe90732c66fc1da538f51fc9181d11373f26266b5aabaf29135ae07",
+      "name": "tcpip-events.jsonl",
+      "bytes": 58263,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2022-v3",
+      "file": "aws-win2022-v3.ip-before.json",
+      "sha256": "ccecf392444754b684758a83120b8b5924477587dfc4f627fedb2c51d613440a",
+      "name": "ip-before.json",
+      "bytes": 8413,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2025-v3",
+      "file": "aws-win2025-v3.pcapng",
+      "sha256": "6482fa0ea685b171f0a63defb56e5d0628efc5b71a0571d6f1805afdc9c63561",
+      "name": "capture.pcapng",
+      "bytes": 63855288,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2025-v3",
+      "file": "aws-win2025-v3.etl",
+      "sha256": "db8ddfc372e730d96247a0aa9ce01461bfc20bbf21fb27a08743c8afe9a09e64",
+      "name": "capture.etl",
+      "bytes": 8558649,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2025-v3",
+      "file": "aws-win2025-v3.drops.txt",
+      "sha256": "7b76dada059e13c1df2c865922c2216f043387bca426792c48882a9c6597bcbe",
+      "name": "capture.drops.txt",
+      "bytes": 14263,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2025-v3",
+      "file": "aws-win2025-v3.drops.pcapng",
+      "sha256": "f5be5a53611ad5cc8a6ada4e28be7cbf03be914d654de7dfca7fcbd261915ebc",
+      "name": "capture.drops.pcapng",
+      "bytes": 524,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2025-v3",
+      "file": "aws-win2025-v3.tcpip.etl",
+      "sha256": "e3149c27ac07720f9a485f8ee1029a9dbacc8896e6d21d870ec784153402bc3f",
+      "name": "tcpip.etl",
+      "bytes": 13443072,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2025-v3",
+      "file": "aws-win2025-v3.tcpip-events.jsonl",
+      "sha256": "606359c7a33260fe4eb7b61493467ff51de35c46993f49ed90cb111a2181f8f3",
+      "name": "tcpip-events.jsonl",
+      "bytes": 55335,
+      "localMatchesGuest": true
+    },
+    {
+      "node": "aws-win2025-v3",
+      "file": "aws-win2025-v3.ip-before.json",
+      "sha256": "eaa0724b7cb3e04f5217d4ff8947e4e0e0dde6274cec935a5dc08b83f9bf0634",
+      "name": "ip-before.json",
+      "bytes": 8448,
+      "localMatchesGuest": true
+    }
+  ],
+  "linuxCapture": {
+    "files": [
+      {
+        "name": "capture.pcap0.gz",
+        "bytes": 901060,
+        "sha256": "9bbb326dbad67be8cf48088f56c4ba214fd251051047a0c615439e55008e0564"
+      }
+    ],
+    "result": {
+      "exitCode": 0,
+      "originalProcessExited": true,
+      "stopRequested": true,
+      "finishedAt": "2026-09-08T22:27:27.488233+00:00"
+    },
+    "stderr": "tcpdump: data link type LINUX_SLL2\ntcpdump: listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 192 bytes\n37594 packets captured\n37597 packets received by filter\n0 packets dropped by kernel\n"
+  },
+  "validation": {
+    "command": "PYTHONPATH=observe python3 -m unittest test_tcpip_context test_pktmon test_udp_capture",
+    "tests": 18,
+    "passed": true,
+    "scope": "Selected Python observer unit statement coverage only",
+    "coverage": {
+      "observe/pktmon.py": {
+        "covered_lines": 62,
+        "num_statements": 64,
+        "percent_covered": 96.875,
+        "percent_covered_display": "97",
+        "missing_lines": 2,
+        "excluded_lines": 0
+      },
+      "observe/tcpip_context.py": {
+        "covered_lines": 55,
+        "num_statements": 56,
+        "percent_covered": 98.21428571428571,
+        "percent_covered_display": "98",
+        "missing_lines": 1,
+        "excluded_lines": 0
+      },
+      "observe/udp_capture.py": {
+        "covered_lines": 20,
+        "num_statements": 20,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0
+      }
+    }
+  },
+  "cleanup": {
+    "aws-win2022-v3-capture-cleanup.json": {
+      "removed": true,
+      "sourceHashesVerifiedByOriginalSuccessfulCommand": true,
+      "originalCleanupStatus": "Success",
+      "filtersRemoved": true,
+      "monitorStopped": true,
+      "traceStopped": true,
+      "originalObserverOutputTruncated": true
+    },
+    "aws-win2025-v3-capture-cleanup.json": {
+      "filtersRemoved": true,
+      "monitorStopped": true,
+      "removed": true,
+      "sourceHashesVerified": true,
+      "traceStopped": true
+    },
+    "linux-capture-cleanup.json": {
+      "removed": true,
+      "originalProcessExited": true,
+      "sourceHashesVerified": true
+    },
+    "pod-tool-cleanup.json": [
+      {
+        "directory": "/uploads/upload2483089496-stream-0",
+        "removed": true
+      },
+      {
+        "directory": "/uploads/upload2483089496-stream-1",
+        "removed": true
+      },
+      {
+        "directory": "C:\\uploads\\upload3289678447.exe-stream-2",
+        "removed": true
+      },
+      {
+        "directory": "C:\\uploads\\upload3289678447.exe-stream-3",
+        "removed": true
+      },
+      {
+        "directory": "C:\\uploads\\upload346147602.exe-stream-4",
+        "removed": true
+      },
+      {
+        "directory": "C:\\uploads\\upload346147602.exe-stream-5",
+        "removed": true
+      }
+    ],
+    "survivor-oob-cleanup.json": [
+      {
+        "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ownedExecutableRemoved": true,
+        "ownedDirectoryRemoved": true,
+        "noOwnedCRIProcesses": true
+      },
+      {
+        "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ownedExecutableRemoved": true,
+        "ownedDirectoryRemoved": true,
+        "noOwnedCRIProcesses": true
+      }
+    ],
+    "baseline-after.json": {
+      "nodes": 13,
+      "allReady": true,
+      "identitiesStable": true
+    }
+  },
+  "sourceSHA256": {
+    "observe/tcpip_context.py": "033d6a589a7a5eebc42f1579f53251af2017cd6cc1b2c16181a384171e6743ba",
+    "observe/test_tcpip_context.py": "e87c8adba8779bacb7091c2b0c8583fdf4197cd5875464e68c2cff4f16bb6065",
+    "observe/pktmon.py": "90a37511f80ff7e2258b97c661f369a05c3a3a160c51da380de677cdb089d332",
+    "observe/udp_capture.py": "094bf20ea8e9b32dfe915323bf4a54dd45af251d354f2d4b27f23a81429bb2c2",
+    "observe/testdata/windows2022-tcpip-events.jsonl": "91839459cfe90732c66fc1da538f51fc9181d11373f26266b5aabaf29135ae07",
+    "observe/testdata/windows2022-tcpip-interfaces.json": "ccecf392444754b684758a83120b8b5924477587dfc4f627fedb2c51d613440a",
+    "observe/testdata/windows2022-tcpip-request-reply-drops.txt": "94fd16f2e2f824757df09c92e0e5fbd47107ec49a3e99229c59d1d76ac2aa76b",
+    "observe/testdata/windows2025-tcpip-events.jsonl": "606359c7a33260fe4eb7b61493467ff51de35c46993f49ed90cb111a2181f8f3",
+    "observe/testdata/windows2025-tcpip-interfaces.json": "eaa0724b7cb3e04f5217d4ff8947e4e0e0dde6274cec935a5dc08b83f9bf0634",
+    "observe/testdata/windows2025-tcpip-request-reply-drops.txt": "8255e79ee9f10e64097f8b771e8bf763102dd6abc9407a2e8ba775d307e05d77"
+  },
+  "evidenceSHA256": {
+    "survivor-result.json": "f28eb102b98f56b8ce45df1fa7856e7ee36fa22d1a391a4633772a559cc633eb",
+    "failed-samples.json": "e63ed7870c4b73c62b019152660da21bf5c8dac3caa592e9808ab5691ebfc138",
+    "linux.failed-flows.tsv": "e1abb083968904059a827111143f9ca9e28f7b9f2dcaa0922f1f6083d04cb9bf",
+    "linux-controls.tsv": "69b465a88d559be86e922bf2dbed652c4391a76dc3ee19a4fcbb5171dcdbccc0",
+    "aws-win2022-v3.failed-events.txt": "c1e8e88bfc88adf153b56cdb7e90dc79635132a5788abe0f8fd807aad62e5c14",
+    "aws-win2025-v3.failed-events.txt": "f9e6685973e198cd8f78fb30b276e2eae2eeb2a68c63c33f38bd5669c18e5a64",
+    "unit-coverage.json": "7df2392ec55c57b9a899fcf7f0d996978f9ed4da31c157b8f2610265817e3f4d",
+    "aws-win2022-v3-hns-context.json": "e214b7e085b20909b1389b0cd7ebc0eded34d7e75907e8df65e029072bd1751f",
+    "aws-win2025-v3-hns-context.json": "72edc5934e6bcfa459e08de59f5876f86af3e6d03f48f39222dcbb0417bf2583"
+  },
+  "hnsPostCaptureContext": {
+    "aws-win2022-v3": {
+      "at": "2026-09-08T22:50:20.6426564Z",
+      "compartments": [
+        {
+          "CompartmentId": 1,
+          "CompartmentDescription": "Default Compartment",
+          "CompartmentGuid": "{b1062982-2b18-4b4f-b3d5-a78ddb9cdd49}"
+        },
+        {
+          "CompartmentId": 2,
+          "CompartmentDescription": "DR",
+          "CompartmentGuid": "{3495c438-b6b6-4142-8c4a-f46752a6019f}"
+        },
+        {
+          "CompartmentId": 3,
+          "CompartmentDescription": "{0782A040-B640-4E75-A4DE-20B2B1F38A70}",
+          "CompartmentGuid": "{0782a040-b640-4e75-a4de-20b2b1f38a70}"
+        },
+        {
+          "CompartmentId": 4,
+          "CompartmentDescription": "{2309541D-F748-41C0-BB76-D267848B4215}",
+          "CompartmentGuid": "{2309541d-f748-41c0-bb76-d267848b4215}"
+        },
+        {
+          "CompartmentId": 6,
+          "CompartmentDescription": "HCN",
+          "CompartmentGuid": "{70ccb5ad-82f9-4e4c-a94d-e27f380da6fb}"
+        }
+      ],
+      "networks": [
+        {
+          "ID": "0782A040-B640-4E75-A4DE-20B2B1F38A70",
+          "Name": "External",
+          "Type": "Overlay",
+          "LayeredOn": "485278D0-E045-454F-809F-D3F6D4C60071",
+          "ManagementIP": "172.29.0.24",
+          "DrMacAddress": "00-15-5D-3A-31-08"
+        },
+        {
+          "ID": "2309541D-F748-41C0-BB76-D267848B4215",
+          "Name": "Calico",
+          "Type": "Overlay",
+          "LayeredOn": "485278D0-E045-454F-809F-D3F6D4C60071",
+          "ManagementIP": "172.29.0.24",
+          "DrMacAddress": "00-15-5D-3A-31-08"
+        }
+      ]
+    },
+    "aws-win2025-v3": {
+      "at": "2026-09-08T22:50:20.4884089Z",
+      "compartments": [
+        {
+          "CompartmentId": 1,
+          "CompartmentDescription": "Default Compartment",
+          "CompartmentGuid": "{b1062982-2b18-4b4f-b3d5-a78ddb9cdd49}"
+        },
+        {
+          "CompartmentId": 2,
+          "CompartmentDescription": "DR",
+          "CompartmentGuid": "{d9cb2dc9-b352-43f0-ab8f-8eeb0db21c03}"
+        },
+        {
+          "CompartmentId": 3,
+          "CompartmentDescription": "{51C5BE6A-89E0-4B23-919B-E3E6E65867D0}",
+          "CompartmentGuid": "{51c5be6a-89e0-4b23-919b-e3e6e65867d0}"
+        },
+        {
+          "CompartmentId": 4,
+          "CompartmentDescription": "{DEE50E26-3CCE-4963-8007-8D2AB9683F41}",
+          "CompartmentGuid": "{dee50e26-3cce-4963-8007-8d2ab9683f41}"
+        },
+        {
+          "CompartmentId": 5,
+          "CompartmentDescription": "HCN",
+          "CompartmentGuid": "{6cd662ad-70fd-4fe7-a5b2-e7d934c745a4}"
+        }
+      ],
+      "networks": [
+        {
+          "ID": "51C5BE6A-89E0-4B23-919B-E3E6E65867D0",
+          "Name": "Calico",
+          "Type": "Overlay",
+          "LayeredOn": "F46923C4-2726-4C50-B1FC-F209BE27553F",
+          "ManagementIP": "172.29.0.68",
+          "DrMacAddress": "00-15-5D-2E-C0-7B"
+        },
+        {
+          "ID": "DEE50E26-3CCE-4963-8007-8D2AB9683F41",
+          "Name": "External",
+          "Type": "Overlay",
+          "LayeredOn": "F46923C4-2726-4C50-B1FC-F209BE27553F",
+          "ManagementIP": "172.29.0.68",
+          "DrMacAddress": "00-15-5D-2E-C0-7B"
+        }
+      ]
+    }
+  }
+}

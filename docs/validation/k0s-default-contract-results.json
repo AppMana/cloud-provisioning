@@ -1,0 +1,70 @@
+{
+  "result": "native-config-contract-verified-default-selection-corrected",
+  "observedAt": "2026-09-09T09:51:15.309463+00:00",
+  "version": "v1.36.2+k0s.0",
+  "source": "native k0s config create and config validate over retained VM serial transport",
+  "nativeDefaultProvider": "kuberouter",
+  "nativeValidation": [
+    {
+      "case": "kuberouter-dualstack",
+      "exitCode": 0,
+      "expectedExitCode": 0,
+      "matchesExpectation": true,
+      "inputSHA256": "9a7e3434aecc224bb2c96009c9a7ded25e5fea5a1ea9668e76c18a45c84c0a4b"
+    },
+    {
+      "case": "calico-vxlan-dualstack",
+      "exitCode": 1,
+      "expectedExitCode": 1,
+      "matchesExpectation": true,
+      "inputSHA256": "3cb557d531e447b362f86449826f34c5db184cb93023bf1440a6a00d45de8038"
+    },
+    {
+      "case": "calico-bird-dualstack",
+      "exitCode": 0,
+      "expectedExitCode": 0,
+      "matchesExpectation": true,
+      "inputSHA256": "46f40749cce8e6d74403974d9dab4d416177d160ad11e2f164907a998256e892"
+    },
+    {
+      "case": "calico-vxlan-ipv4",
+      "exitCode": 0,
+      "expectedExitCode": 0,
+      "matchesExpectation": true,
+      "inputSHA256": "fccec803e6e667f18bed0159ffb24337e6fbdf1f3f21c5dfd4d00122eec9894f"
+    }
+  ],
+  "guestConfigurationChanged": false,
+  "regressionOrigin": {
+    "committedDefault": "dd77e815",
+    "regression": "Uncommitted bundled-profile selection chose the first profile (Calico).",
+    "correction": "Explicit defaults independent of supported-profile ordering; preserve explicit bundled Calico."
+  },
+  "sourceReferences": [
+    "https://github.com/k0sproject/k0s/blob/v1.36.2%2Bk0s.0/pkg/apis/k0s/v1beta1/network.go",
+    "https://github.com/k0sproject/k0s/blob/v1.36.2%2Bk0s.0/docs/dual-stack.md"
+  ],
+  "unitRaceTestsPassed": [
+    "network",
+    "cluster/k0s",
+    "cmd/lab",
+    "cmd/awsrow"
+  ],
+  "functionCoveragePercent": {
+    "Select": 100,
+    "networkProvider": 100,
+    "calicoConfig": 100,
+    "config": 86.7
+  },
+  "evidenceSHA256": {
+    "defaults.txt": "173756529c3a03f851f0e2c27af0d70d38bb8d61fb2427d4e395b2b63d3a6c30",
+    "version.txt": "45f9b4b0f11a599a741dc3105ccae9ddf51dfe0fa26724f8c1e8c86d94e7109d",
+    "validation.json": "0812824e9475af148e03c6e827d8fb63b51fecf8c9770558da6297251449398b",
+    "unit.cover": "494f641e47ddeae05e6d342f43f60f2443d0369bab24aa0c286a00298fe6593f"
+  },
+  "limits": [
+    "Native config validation is not a dual-stack dataplane or Windows support test.",
+    "Do not switch the Windows VXLAN test to BIRD merely to pass configuration validation.",
+    "The running MicroK8s v6 campaign keeps its recorded source and explicit Calico profile."
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "status": {
+    "latest": {
+      "sequence": 280,
+      "source": "10.244.190.81:57270",
+      "startedAt": "2026-09-08T17:14:54.308690162Z",
+      "finishedAt": "2026-09-08T17:14:54.331601654Z",
+      "ok": true,
+      "nonce": "54af46ebc6ecf70b8378953dd238efdb",
+      "pid": 175491,
+      "startOffsetSeconds": 39.857265314,
+      "finishOffsetSeconds": 39.880217763,
+      "attempts": 281,
+      "passed": 280,
+      "maxStartIntervalSeconds": 5.100591801,
+      "healthy": false,
+      "stopBoundary": false
+    },
+    "terminal": false
+  },
+  "receipt": {
+    "directory": "/uploads/upload3639283501-stream-1",
+    "nonce": "54af46ebc6ecf70b8378953dd238efdb",
+    "pid": 175491,
+    "startedAt": "2026-09-08T17:14:14.449623459Z"
+  },
+  "lane": {
+    "source": {
+      "pod": "net-w1",
+      "podUID": "5982bf45-2e0e-40c4-bd40-4b407742dc66",
+      "node": "w1",
+      "nodeUID": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "os": "linux",
+      "container": "serve",
+      "containerID": "containerd://ebb3abd4f0ed02e9122f5eced7fec62cf30d2266567dc39d676745eb415c2535",
+      "podIP": "10.244.190.81",
+      "serviceUID": "0d250803-853a-49a2-937b-5c9c2c0e49fb",
+      "serviceIP": "10.96.85.157"
+    },
+    "target": {
+      "pod": "net-aws-win2025-v3",
+      "podUID": "75637776-7d30-4065-916c-d27f46a9b7a8",
+      "node": "aws-win2025-v3",
+      "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "os": "windows",
+      "container": "serve",
+      "containerID": "containerd://d14528932a8ceba3ee2c87898e57cb09c47d28e95588e8aa353521a70c8f5d23",
+      "podIP": "10.244.42.6",
+      "serviceUID": "475a88d2-cc49-4739-8db6-f521dcac28c4",
+      "serviceIP": "10.99.76.215"
+    },
+    "executable": "/uploads/upload3639283501",
+    "directory": "/uploads/upload3639283501-stream-1"
+  },
+  "maxGap": 10,
+  "nativeEvidenceSHA256": "4abaee7d0a6e1572bd34c01f61757e81b59de837d8090c372d267da1fd5aa515"
+}

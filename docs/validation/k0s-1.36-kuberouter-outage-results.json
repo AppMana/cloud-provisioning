@@ -1,0 +1,1059 @@
+{
+  "schemaVersion": 1,
+  "completedUTC": "2026-09-09T00:59:38.501691+00:00",
+  "result": "passed",
+  "scope": "Twelve single-NIC VM cut/reboot rows for w1, remote1 and remote2 under one-worker and two-worker placements",
+  "versions": {
+    "k0s": "v1.36.2+k0s.0",
+    "containerd": "2.3.2",
+    "kubeRouter": "v2.10.0-iptables1.8.13-k0s.0",
+    "capi": "v1.11.1"
+  },
+  "harnessBinarySHA256": "9dc9a4e672fac29d2d39213fe81693eb866ba3573d0cbc905eaf812a832d281d",
+  "rows": [
+    {
+      "placement": "one-worker",
+      "victim": "w1",
+      "mode": "cut",
+      "result": "passed",
+      "matrices": [
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.55176399s",
+          "placement": "one-worker",
+          "phase": "baseline"
+        },
+        {
+          "total": 102,
+          "passed": 52,
+          "failed": 0,
+          "notRequired": 50,
+          "elapsed": "1.701712142s",
+          "placement": "one-worker",
+          "phase": "survivors"
+        },
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "7.576914253s",
+          "placement": "one-worker",
+          "phase": "returned"
+        }
+      ]
+    },
+    {
+      "placement": "one-worker",
+      "victim": "w1",
+      "mode": "reboot",
+      "result": "passed",
+      "matrices": [
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.335658277s",
+          "placement": "one-worker",
+          "phase": "baseline"
+        },
+        {
+          "total": 102,
+          "passed": 52,
+          "failed": 0,
+          "notRequired": 50,
+          "elapsed": "1.887197163s",
+          "placement": "one-worker",
+          "phase": "survivors"
+        },
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.663683467s",
+          "placement": "one-worker",
+          "phase": "returned"
+        }
+      ]
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote1",
+      "mode": "cut",
+      "result": "passed",
+      "matrices": [
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.322696237s",
+          "placement": "one-worker",
+          "phase": "baseline"
+        },
+        {
+          "total": 102,
+          "passed": 102,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "3.762843054s",
+          "placement": "one-worker",
+          "phase": "survivors"
+        },
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.198182306s",
+          "placement": "one-worker",
+          "phase": "returned"
+        }
+      ]
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote1",
+      "mode": "reboot",
+      "result": "passed",
+      "matrices": [
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.19895387s",
+          "placement": "one-worker",
+          "phase": "baseline"
+        },
+        {
+          "total": 102,
+          "passed": 102,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "3.573376249s",
+          "placement": "one-worker",
+          "phase": "survivors"
+        },
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.921258976s",
+          "placement": "one-worker",
+          "phase": "returned"
+        }
+      ]
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote2",
+      "mode": "cut",
+      "result": "passed",
+      "matrices": [
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.068478563s",
+          "placement": "one-worker",
+          "phase": "baseline"
+        },
+        {
+          "total": 102,
+          "passed": 102,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "3.575085752s",
+          "placement": "one-worker",
+          "phase": "survivors"
+        },
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.364962242s",
+          "placement": "one-worker",
+          "phase": "returned"
+        }
+      ]
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote2",
+      "mode": "reboot",
+      "result": "passed",
+      "matrices": [
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.04206329s",
+          "placement": "one-worker",
+          "phase": "baseline"
+        },
+        {
+          "total": 102,
+          "passed": 102,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "3.763278771s",
+          "placement": "one-worker",
+          "phase": "survivors"
+        },
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "6.02953018s",
+          "placement": "one-worker",
+          "phase": "returned"
+        }
+      ]
+    },
+    {
+      "placement": "two-workers",
+      "victim": "w1",
+      "mode": "cut",
+      "result": "passed",
+      "matrices": [
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.488743787s",
+          "placement": "two-workers",
+          "phase": "baseline"
+        },
+        {
+          "total": 102,
+          "passed": 102,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "3.844424358s",
+          "placement": "two-workers",
+          "phase": "survivors"
+        },
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "18.101677048s",
+          "placement": "two-workers",
+          "phase": "returned"
+        }
+      ]
+    },
+    {
+      "placement": "two-workers",
+      "victim": "w1",
+      "mode": "reboot",
+      "result": "passed",
+      "matrices": [
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.060257802s",
+          "placement": "two-workers",
+          "phase": "baseline"
+        },
+        {
+          "total": 102,
+          "passed": 102,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "3.800594405s",
+          "placement": "two-workers",
+          "phase": "survivors"
+        },
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "53.461436922s",
+          "placement": "two-workers",
+          "phase": "returned"
+        }
+      ]
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote1",
+      "mode": "cut",
+      "result": "passed",
+      "matrices": [
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "4.933538874s",
+          "placement": "two-workers",
+          "phase": "baseline"
+        },
+        {
+          "total": 102,
+          "passed": 102,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "3.522329113s",
+          "placement": "two-workers",
+          "phase": "survivors"
+        },
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.7955171s",
+          "placement": "two-workers",
+          "phase": "returned"
+        }
+      ]
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote1",
+      "mode": "reboot",
+      "result": "passed",
+      "matrices": [
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.066507022s",
+          "placement": "two-workers",
+          "phase": "baseline"
+        },
+        {
+          "total": 102,
+          "passed": 102,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "3.625712571s",
+          "placement": "two-workers",
+          "phase": "survivors"
+        },
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.884590125s",
+          "placement": "two-workers",
+          "phase": "returned"
+        }
+      ]
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote2",
+      "mode": "cut",
+      "result": "passed",
+      "matrices": [
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.027669235s",
+          "placement": "two-workers",
+          "phase": "baseline"
+        },
+        {
+          "total": 102,
+          "passed": 102,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "3.635660267s",
+          "placement": "two-workers",
+          "phase": "survivors"
+        },
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "4.954078739s",
+          "placement": "two-workers",
+          "phase": "returned"
+        }
+      ]
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote2",
+      "mode": "reboot",
+      "result": "passed",
+      "matrices": [
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "5.538013008s",
+          "placement": "two-workers",
+          "phase": "baseline"
+        },
+        {
+          "total": 102,
+          "passed": 102,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "3.751591312s",
+          "placement": "two-workers",
+          "phase": "survivors"
+        },
+        {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "6.116191534s",
+          "placement": "two-workers",
+          "phase": "returned"
+        }
+      ]
+    }
+  ],
+  "matrixCount": 39,
+  "requiredChecksPassedAtConvergence": 4904,
+  "notRequiredAtConvergence": 100,
+  "passCount": 40,
+  "failedIntermediatePasses": [
+    {
+      "placement": "two-workers",
+      "victim": "w1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:46:45.951073246Z",
+      "series": 26,
+      "attempt": 1,
+      "total": 140,
+      "passed": 125,
+      "failed": 15,
+      "notRequired": 0,
+      "elapsed": "38.230864613s"
+    }
+  ],
+  "missingFailureSnapshots": [],
+  "passes": [
+    {
+      "placement": "one-worker",
+      "victim": null,
+      "mode": null,
+      "time": "2026-09-09T00:21:45.669364457Z",
+      "series": 1,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.399049958s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "w1",
+      "mode": "cut",
+      "time": "2026-09-09T00:21:51.223267855Z",
+      "series": 2,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.55176399s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "w1",
+      "mode": "cut",
+      "time": "2026-09-09T00:23:27.007215945Z",
+      "series": 3,
+      "attempt": 1,
+      "total": 102,
+      "passed": 52,
+      "failed": 0,
+      "notRequired": 50,
+      "elapsed": "1.701712142s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "w1",
+      "mode": "cut",
+      "time": "2026-09-09T00:23:54.545551038Z",
+      "series": 4,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "7.576914253s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "w1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:24:06.782824708Z",
+      "series": 5,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.335658277s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "w1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:25:45.049548344Z",
+      "series": 6,
+      "attempt": 1,
+      "total": 102,
+      "passed": 52,
+      "failed": 0,
+      "notRequired": 50,
+      "elapsed": "1.887197163s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "w1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:27:12.88031558Z",
+      "series": 7,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.663683467s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote1",
+      "mode": "cut",
+      "time": "2026-09-09T00:27:25.22776068Z",
+      "series": 8,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.322696237s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote1",
+      "mode": "cut",
+      "time": "2026-09-09T00:29:04.974611352Z",
+      "series": 9,
+      "attempt": 1,
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "3.762843054s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote1",
+      "mode": "cut",
+      "time": "2026-09-09T00:29:22.596741112Z",
+      "series": 10,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.198182306s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:29:34.677392963Z",
+      "series": 11,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.19895387s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:31:16.037657781Z",
+      "series": 12,
+      "attempt": 1,
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "3.573376249s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:32:46.3517002Z",
+      "series": 13,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.921258976s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote2",
+      "mode": "cut",
+      "time": "2026-09-09T00:32:58.098852112Z",
+      "series": 14,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.068478563s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote2",
+      "mode": "cut",
+      "time": "2026-09-09T00:34:37.657902659Z",
+      "series": 15,
+      "attempt": 1,
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "3.575085752s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote2",
+      "mode": "cut",
+      "time": "2026-09-09T00:34:56.240257991Z",
+      "series": 16,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.364962242s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote2",
+      "mode": "reboot",
+      "time": "2026-09-09T00:35:07.749982328Z",
+      "series": 17,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.04206329s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote2",
+      "mode": "reboot",
+      "time": "2026-09-09T00:36:49.32915934Z",
+      "series": 18,
+      "attempt": 1,
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "3.763278771s"
+    },
+    {
+      "placement": "one-worker",
+      "victim": "remote2",
+      "mode": "reboot",
+      "time": "2026-09-09T00:38:16.265218518Z",
+      "series": 19,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "6.02953018s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": null,
+      "mode": null,
+      "time": "2026-09-09T00:39:17.525203223Z",
+      "series": 20,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.374453536s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "w1",
+      "mode": "cut",
+      "time": "2026-09-09T00:39:23.016173881Z",
+      "series": 21,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.488743787s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "w1",
+      "mode": "cut",
+      "time": "2026-09-09T00:41:37.075626221Z",
+      "series": 22,
+      "attempt": 1,
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "3.844424358s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "w1",
+      "mode": "cut",
+      "time": "2026-09-09T00:42:07.678982406Z",
+      "series": 23,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "18.101677048s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "w1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:42:19.18942879Z",
+      "series": 24,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.060257802s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "w1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:45:16.125055251Z",
+      "series": 25,
+      "attempt": 1,
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "3.800594405s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "w1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:46:45.951073246Z",
+      "series": 26,
+      "attempt": 1,
+      "total": 140,
+      "passed": 125,
+      "failed": 15,
+      "notRequired": 0,
+      "elapsed": "38.230864613s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "w1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:47:01.181490772Z",
+      "series": 26,
+      "attempt": 2,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "53.461436922s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote1",
+      "mode": "cut",
+      "time": "2026-09-09T00:47:13.091762986Z",
+      "series": 27,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "4.933538874s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote1",
+      "mode": "cut",
+      "time": "2026-09-09T00:48:52.565169571Z",
+      "series": 28,
+      "attempt": 1,
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "3.522329113s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote1",
+      "mode": "cut",
+      "time": "2026-09-09T00:49:10.832385961Z",
+      "series": 29,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.7955171s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:49:22.476949619Z",
+      "series": 30,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.066507022s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:51:03.562069943Z",
+      "series": 31,
+      "attempt": 1,
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "3.625712571s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote1",
+      "mode": "reboot",
+      "time": "2026-09-09T00:52:33.644754682Z",
+      "series": 32,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.884590125s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote2",
+      "mode": "cut",
+      "time": "2026-09-09T00:52:45.171708448Z",
+      "series": 33,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.027669235s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote2",
+      "mode": "cut",
+      "time": "2026-09-09T00:54:24.702023103Z",
+      "series": 34,
+      "attempt": 1,
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "3.635660267s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote2",
+      "mode": "cut",
+      "time": "2026-09-09T00:54:42.637776971Z",
+      "series": 35,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "4.954078739s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote2",
+      "mode": "reboot",
+      "time": "2026-09-09T00:54:54.843924872Z",
+      "series": 36,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.538013008s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote2",
+      "mode": "reboot",
+      "time": "2026-09-09T00:56:36.13456464Z",
+      "series": 37,
+      "attempt": 1,
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "3.751591312s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote2",
+      "mode": "reboot",
+      "time": "2026-09-09T00:58:01.899938473Z",
+      "series": 38,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "6.116191534s"
+    },
+    {
+      "placement": "two-workers",
+      "victim": "remote2",
+      "mode": "reboot",
+      "time": "2026-09-09T00:58:14.115060596Z",
+      "series": 39,
+      "attempt": 1,
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "5.090977688s"
+    }
+  ],
+  "finalState": {
+    "isolatedReadyNodes": 7,
+    "originalReadyNodes": 13,
+    "allNodeUIDsUnchanged": true,
+    "hostRoutesUnchanged": true,
+    "bothCAPIMachinesRunningWithMatchingProviderIDs": true
+  },
+  "nativeCoverage": {
+    "scope": "Instrumented cmd/lab linked harness packages, outage invocation only",
+    "covered": 1198,
+    "total": 3202,
+    "percent": 37.41
+  },
+  "cleanup": {
+    "temporaryObserverFilesRemovedOnGuests": 7,
+    "hashesVerifiedBeforeRemoval": true,
+    "observerTemporaryDirectoriesRemaining": 0,
+    "primaryAndWatcherTerminal": true,
+    "isolatedVMFleetRetained": true,
+    "probeNamespacesRemoved": true
+  },
+  "limitations": [
+    "Convergence after a 90-second failure-notice interval does not prove uninterrupted packet delivery.",
+    "Only the named victims and placements were exercised; other node/placement combinations remain separate validation work.",
+    "No Windows, GPU, AWS or IPv6 qualification is established by this Linux VM row.",
+    "Failure-triggered snapshots are taken after a completed pass, not simultaneously with each failed packet."
+  ],
+  "intermediateFailureObservation": {
+    "series": 26,
+    "attempt": 1,
+    "failedChecks": 15,
+    "snapshotStartedSecondsAfterPass": 0.884,
+    "captureCommands": 28,
+    "captureCommandFailures": 0,
+    "interfaces": {
+      "cp": {
+        "present": false,
+        "peerCounts": []
+      },
+      "cp2": {
+        "present": false,
+        "peerCounts": []
+      },
+      "cp3": {
+        "present": false,
+        "peerCounts": []
+      },
+      "w1": {
+        "present": true,
+        "peerCounts": [
+          2
+        ]
+      },
+      "w2": {
+        "present": true,
+        "peerCounts": [
+          2
+        ]
+      },
+      "remote1": {
+        "present": true,
+        "peerCounts": [
+          3
+        ]
+      },
+      "remote2": {
+        "present": true,
+        "peerCounts": [
+          3
+        ]
+      }
+    },
+    "snapshotSHA256": "1ea6cc44934e19e796e35eb172a018d9f47dfb319329ab564da5ac0aea246c45",
+    "interpretation": "A later passing retry establishes convergence. The post-pass snapshot does not prove the cause of the transient failures."
+  },
+  "regressionReplay": {
+    "fixture": "harness/e2e/check/testdata/k0s-kuberouter-reboot-convergence.json",
+    "command": "go test ./check -run TestObservedRebootFailuresRemainVisibleAfterConvergence -count=1 -coverprofile=<private>/reboot-replay.cover",
+    "result": "passed",
+    "selectedCheckPackageStatementCoveragePercent": 49.1,
+    "scope": "Replay the observed 125/140 then 140/140 probe outcomes; no simulation of native timing or cause"
+  }
+}

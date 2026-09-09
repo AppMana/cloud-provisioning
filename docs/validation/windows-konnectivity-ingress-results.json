@@ -1,0 +1,115 @@
+{
+  "startedAt": "2026-09-07T13:49:36.979103+00:00",
+  "tcp": [
+    {
+      "port": 8132,
+      "ok": true,
+      "address": "10.10.0.10"
+    },
+    {
+      "port": 8132,
+      "ok": true,
+      "address": "10.10.0.13"
+    },
+    {
+      "port": 8132,
+      "ok": true,
+      "address": "10.10.0.14"
+    }
+  ],
+  "agent": [
+    {
+      "at": "2026-09-07T13:49:41.528324+00:00",
+      "podUID": "c91766ea-5d89-4393-8239-4e0e5517f822",
+      "ready": false
+    },
+    {
+      "at": "2026-09-07T13:49:46.631344+00:00",
+      "podUID": "c91766ea-5d89-4393-8239-4e0e5517f822",
+      "ready": true
+    }
+  ],
+  "kubeletExec": {
+    "exitCode": 0,
+    "ok": true,
+    "stderr": ""
+  },
+  "ingressRestored": true,
+  "finishedAt": "2026-09-07T13:49:49.555188+00:00",
+  "scope": "Native Windows 2025 Konnectivity port A/B test with exact worker /32 temporary ingress; original AWS rules restored",
+  "baseline": [
+    {
+      "port": 6443,
+      "ok": true,
+      "address": "10.10.0.10"
+    },
+    {
+      "port": 8132,
+      "ok": false,
+      "address": "10.10.0.10"
+    },
+    {
+      "port": 6443,
+      "ok": true,
+      "address": "10.10.0.13"
+    },
+    {
+      "port": 8132,
+      "ok": false,
+      "address": "10.10.0.13"
+    },
+    {
+      "port": 6443,
+      "ok": true,
+      "address": "10.10.0.14"
+    },
+    {
+      "port": 8132,
+      "ok": false,
+      "address": "10.10.0.14"
+    },
+    {
+      "port": 6443,
+      "ok": false,
+      "address": "10.100.0.1"
+    },
+    {
+      "port": 8132,
+      "ok": false,
+      "address": "10.100.0.1"
+    }
+  ],
+  "controllerChange": {
+    "requestField": "tcpPorts",
+    "k0sExample": [
+      8132
+    ],
+    "distributionSpecific": true,
+    "planChangeCreatesNewLease": true,
+    "unitAttachmentCoverage": 68.0,
+    "unitAWSCoverage": 77.1,
+    "unitRuntimeCoverage": 50.8,
+    "managedValidationPending": false
+  },
+  "managedWindows2022": {
+    "observedAt": "2026-09-07T14:00:59.459099+00:00",
+    "scope": "Controller-managed Konnectivity TCP ingress with new native agent connection after pod replacement",
+    "oldAgentUID": "f3a4edf2-272c-4a65-8bb1-54966d7e7451",
+    "newAgentUID": "b37c1889-88ae-4d00-838b-e8ff2d18df25",
+    "newAgentReady": true,
+    "worker": "aws-win2022-v3",
+    "nativeWorker": "172.29.0.24",
+    "ruleID": "sgr-0e9d3899817e11144",
+    "port": 8132,
+    "controllerOwnedRule": true,
+    "kubeletExec": {
+      "ok": true,
+      "exitCode": 0,
+      "stderr": ""
+    }
+  },
+  "limitations": [
+    "Permanent ingress and a fresh agent connection were validated on Windows 2022; the Windows 2025 test used a temporary rule.",
+    "UDP loss and consumer retirement remain unresolved."
+  ]
+}

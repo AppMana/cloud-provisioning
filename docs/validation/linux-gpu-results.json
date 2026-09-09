@@ -1,0 +1,60 @@
+{
+  "observedAt": "2026-09-06T20:50:01Z",
+  "provider": "AWS CAPA",
+  "instanceType": "g4dn.xlarge",
+  "gpu": "NVIDIA Tesla T4",
+  "os": "Ubuntu 24.04",
+  "kernel": "7.0.0-1012-aws",
+  "k0s": "v1.36.2+k0s.0",
+  "containerd": "2.3.2",
+  "calico": "v3.32.0-0",
+  "gpuOperator": "v26.3.3",
+  "containerToolkit": "v1.19.1",
+  "driver": "580.173.02",
+  "driverManagedByOperator": false,
+  "driverModuleSHA256BeforeAndAfter": "d135f74fc2e2fe3d5f57187d27e697b7f6024814a883fbdad210c29f66c8d0c5",
+  "runtimeInjection": "CDI/NRI",
+  "singleNIC": true,
+  "networkChecks": {
+    "total": 102,
+    "passed": 102
+  },
+  "scheduledProbe": {
+    "image": "docker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0",
+    "phase": "Succeeded",
+    "exitCode": 0,
+    "result": {
+      "vulkanPixelsVerified": 4096,
+      "nvencFrames": 30
+    },
+    "gpuLimit": 1,
+    "imagePreloaded": true,
+    "evidenceSHA256": "31fb88250ccf0ddaa7b60a5e564fa618690f3a4d2e4f6edd78bdda17ee34fa7d"
+  },
+  "limitations": [
+    "No Unity or end-to-end streaming validation",
+    "No fractional GPU or Windows GPU validation",
+    "No GPU replacement workload rerun",
+    "No full dual-stack policy gate",
+    "k0s and toolkit were not prebaked; startup optimization incomplete"
+  ],
+  "runtimeCoverage": {
+    "source": "instrumented awsrow integration binary",
+    "rigAWSPercent": 48.0,
+    "note": "Package statement coverage for this integration run only; not repository-wide coverage."
+  },
+  "capiRemoval": {
+    "observedAt": "2026-09-06T20:57:02.73646589Z",
+    "productCleanup": true,
+    "terminated": true,
+    "evidenceSHA256": "14649567d0ef43d8cd384fe5ba4fdf38f17e1e800d3b12b09722224a6021b42c"
+  },
+  "awsCleanup": {
+    "observedAt": "2026-09-06T20:58:01.186993+00:00",
+    "allInstancesTerminated": true,
+    "vpcAbsent": true,
+    "recordedImagesAndSnapshotsAbsent": true,
+    "rolesAndProfileAbsent": true,
+    "assetBucketAbsent": true
+  }
+}

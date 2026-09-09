@@ -1,0 +1,16 @@
+{
+  "observedAt": "2026-09-07T03:17:18.180979+00:00",
+  "manifestDigest": "sha256:dcb0e3c1feccdeb36cae436bc7dee38273d4f4191f2ffd99d308516180ce0326",
+  "platform": "windows/amd64",
+  "entrypoint": [
+    "peer-publisher.exe"
+  ],
+  "compressedLayerBytes": 17229269,
+  "executableSHA256": "b4094bf2c4445bd522147256c53235ca9a49abbb3d844e579dfaec813bd035b6",
+  "buildPassed": true,
+  "kubernetesAdmission": "DaemonSet and Pod accepted by isolated Kubernetes 1.35 API",
+  "helmLintPassed": true,
+  "helmValueRendered": "windowsPublisher.image",
+  "liveHostProcessRollout": false,
+  "limitation": "Native bootstrap, joined-node credential rotation and CAPI lifecycle remain unverified"
+}

@@ -1,0 +1,60 @@
+{
+  "scope": "Live elected gateway controller registration with no attachment requests; no packet/lifecycle qualification",
+  "observedAt": "2026-09-07T08:49:16.008679+00:00",
+  "image": "cldt/controller-windows:v6",
+  "imageID": "sha256:06ee7288cdce632550d54d66d375dd68377192d18dfc8b2583081c77795e7b19",
+  "podUID": "8d4fb75f-b6f4-48db-b82d-e7be445e86f4",
+  "leaseHolder": "cloud-provisioning-endpoint-controller-6b7ff84969-hjczs_8167661d-8aef-4d0d-9180-a41f4214d823",
+  "renewTime": "2026-09-07T08:49:15.317388Z",
+  "gatewayWorkerStarted": true,
+  "nodesReady": 10,
+  "siteReceiptsValidated": 5,
+  "credentials": "scoped observation session only; expires 2026-09-07T09:03:23Z",
+  "requestsSubmitted": 0,
+  "remaining": [
+    "Combined gateway mutation role and credential renewal",
+    "Combined gateway projection/CNI and packet matrix",
+    "CAPI pre-delete coordination and replacement",
+    "Remaining distro/GPU/image workstream"
+  ],
+  "windowsChecks": {
+    "2022": {
+      "expectedWindowsBuild": true,
+      "onePhysicalNIC": true,
+      "k0sWorkerRunning": true,
+      "tunnelRunning": true,
+      "bootstrapInstalled": true,
+      "capiAssociation": true,
+      "windowsNode": true,
+      "matchesSiteKubelet": true,
+      "containerd2": true,
+      "cloudWorkerLabel": true,
+      "internetFacingTaint": true,
+      "nodeReady": true,
+      "publisherReady": true,
+      "peerDelivery": true
+    },
+    "2025": {
+      "expectedWindowsBuild": true,
+      "onePhysicalNIC": true,
+      "k0sWorkerRunning": true,
+      "tunnelRunning": true,
+      "bootstrapInstalled": true,
+      "capiAssociation": true,
+      "windowsNode": true,
+      "matchesSiteKubelet": true,
+      "containerd2": true,
+      "cloudWorkerLabel": true,
+      "internetFacingTaint": true,
+      "nodeReady": true,
+      "publisherReady": true,
+      "peerDelivery": true
+    }
+  },
+  "isolatedAPI": {
+    "registeredControllerTest": "passed",
+    "requestNameReuse": "new UID-bound identity",
+    "cloudCallsForInvalidIdentity": 0,
+    "runtimePackageCoveragePercent": 79.3
+  }
+}

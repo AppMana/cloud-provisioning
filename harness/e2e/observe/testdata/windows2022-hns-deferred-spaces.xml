@@ -1,0 +1,362 @@
+<Events>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.030351500+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="spaceId">0782A040-B640-4E75-A4DE-20B2B1F38A70_V6</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingSpace</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.030489600+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="spaceId">0782A040-B640-4E75-A4DE-20B2B1F38A70</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingSpace</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.030651800+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.030824400+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.031752000+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="spaceId">2309541D-F748-41C0-BB76-D267848B4215</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingSpace</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.031882900+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="spaceId">2309541D-F748-41C0-BB76-D267848B4215_V6</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingSpace</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.032123000+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="spaceId">0782A040-B640-4E75-A4DE-20B2B1F38A70</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingSpace</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.032171300+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="spaceId">0782A040-B640-4E75-A4DE-20B2B1F38A70_V6</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingSpace</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.032204500+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="spaceId">2309541D-F748-41C0-BB76-D267848B4215</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingSpace</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.032318300+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="spaceId">2309541D-F748-41C0-BB76-D267848B4215_V6</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingSpace</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.032354700+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="spaceId">0782A040-B640-4E75-A4DE-20B2B1F38A70</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingSpace</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.032399400+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="spaceId">0782A040-B640-4E75-A4DE-20B2B1F38A70_V6</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingSpace</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.032451300+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.032616800+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="1" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">LB</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">300</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T04:19:00.033080800+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="6112" ProcessorID="0" KernelTime="90" UserTime="570" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">ENCAP</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">500</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+</Events>

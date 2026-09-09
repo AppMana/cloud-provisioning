@@ -1,0 +1,102 @@
+{
+  "observedAt": "2026-09-08T15:38:32.136766+00:00",
+  "scope": "Read-only inventory of retained Windows survivor workers; no adapter settings changed",
+  "workers": [
+    {
+      "windowsVersion": "2022",
+      "at": "2026-09-08T15:36:49.6302189Z",
+      "adapters": [
+        {
+          "Name": "Ethernet 3",
+          "InterfaceDescription": "Amazon Elastic Network Adapter",
+          "DriverVersion": "2.11.0.0",
+          "DriverDate": "2025-07-16",
+          "DriverFileName": "ena.sys",
+          "Status": "Up"
+        }
+      ],
+      "checksum": [
+        {
+          "Name": "Ethernet 3",
+          "IpIPv4Enabled": 3,
+          "TcpIPv4Enabled": 3,
+          "TcpIPv6Enabled": 3,
+          "UdpIPv4Enabled": 3,
+          "UdpIPv6Enabled": 3
+        },
+        {
+          "Name": "vEthernet (Ethernet 3)",
+          "IpIPv4Enabled": 3,
+          "TcpIPv4Enabled": 3,
+          "TcpIPv6Enabled": 3,
+          "UdpIPv4Enabled": 3,
+          "UdpIPv6Enabled": 3
+        },
+        {
+          "Name": "vEthernet (f158e55431408cc223e062913ac11b0dbfb03abd9337b432fbb9e182e2c5eee8_Calico)",
+          "IpIPv4Enabled": 3,
+          "TcpIPv4Enabled": 3,
+          "TcpIPv6Enabled": 3,
+          "UdpIPv4Enabled": 3,
+          "UdpIPv6Enabled": 3
+        }
+      ],
+      "evidenceSHA256": "6fdabfa347aad1fb2af2fd674148262e36a9853bc767a6f94edc287894a4a9d1"
+    },
+    {
+      "windowsVersion": "2025",
+      "at": "2026-09-08T15:36:56.7125606Z",
+      "adapters": [
+        {
+          "Name": "Ethernet",
+          "InterfaceDescription": "Amazon Elastic Network Adapter",
+          "DriverVersion": "2.11.0.0",
+          "DriverDate": "2025-07-16",
+          "DriverFileName": "ena.sys",
+          "Status": "Up"
+        }
+      ],
+      "checksum": [
+        {
+          "Name": "Ethernet",
+          "IpIPv4Enabled": 3,
+          "TcpIPv4Enabled": 3,
+          "TcpIPv6Enabled": 3,
+          "UdpIPv4Enabled": 3,
+          "UdpIPv6Enabled": 3
+        },
+        {
+          "Name": "vEthernet (DrPort 51C5BE6A-89E0-4B23-919B-E3E6E65867D0)",
+          "IpIPv4Enabled": 3,
+          "TcpIPv4Enabled": 3,
+          "TcpIPv6Enabled": 3,
+          "UdpIPv4Enabled": 3,
+          "UdpIPv6Enabled": 3
+        },
+        {
+          "Name": "vEthernet (Ethernet)",
+          "IpIPv4Enabled": 3,
+          "TcpIPv4Enabled": 3,
+          "TcpIPv6Enabled": 3,
+          "UdpIPv4Enabled": 3,
+          "UdpIPv6Enabled": 3
+        },
+        {
+          "Name": "vEthernet (29fcb3ef53a6aaee1ec1431203f38d88758c3e95c28cb563c2e8a38185167248_Calico)",
+          "IpIPv4Enabled": 3,
+          "TcpIPv4Enabled": 3,
+          "TcpIPv6Enabled": 3,
+          "UdpIPv4Enabled": 3,
+          "UdpIPv6Enabled": 3
+        }
+      ],
+      "evidenceSHA256": "33192cffe460f3a965496036318e4d3eec14edacf6ede0886711c108e226b2dc"
+    }
+  ],
+  "source": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ena-driver-releases-windows.html",
+  "finding": "Both physical ENA adapters report 2.11.0.0. AWS lists 2.11.0 above the historical offload fixes in 2.10.0 and 2.8.0.",
+  "limitations": [
+    "This does not identify the cause of the observed VFP drops.",
+    "No physical-adapter offload experiment or driver replacement was performed."
+  ]
+}

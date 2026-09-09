@@ -1,0 +1,617 @@
+{
+  "scope": "First ten actual baseline samples per directed lane; no outage injected",
+  "lanes": [
+    [
+      {
+        "ok": true,
+        "sequence": 0,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314291.66147373,
+        "finishMonotonic": 314291.880979473,
+        "startedAt": "2026-09-08T07:27:53.017537+00:00",
+        "finishedAt": "2026-09-08T07:27:53.237014+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 1,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314291.981234172,
+        "finishMonotonic": 314292.174619889,
+        "startedAt": "2026-09-08T07:27:53.337285+00:00",
+        "finishedAt": "2026-09-08T07:27:53.530656+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 2,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314292.274897371,
+        "finishMonotonic": 314292.456636652,
+        "startedAt": "2026-09-08T07:27:53.630948+00:00",
+        "finishedAt": "2026-09-08T07:27:53.812673+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 3,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314292.556880221,
+        "finishMonotonic": 314292.777134214,
+        "startedAt": "2026-09-08T07:27:53.912932+00:00",
+        "finishedAt": "2026-09-08T07:27:54.133167+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 4,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314292.877370619,
+        "finishMonotonic": 314293.052828658,
+        "startedAt": "2026-09-08T07:27:54.233422+00:00",
+        "finishedAt": "2026-09-08T07:27:54.408864+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 5,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314293.153175281,
+        "finishMonotonic": 314293.363519195,
+        "startedAt": "2026-09-08T07:27:54.509225+00:00",
+        "finishedAt": "2026-09-08T07:27:54.719559+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 6,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314293.463770037,
+        "finishMonotonic": 314293.688712317,
+        "startedAt": "2026-09-08T07:27:54.819820+00:00",
+        "finishedAt": "2026-09-08T07:27:55.044754+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 7,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314293.788875884,
+        "finishMonotonic": 314293.997179648,
+        "startedAt": "2026-09-08T07:27:55.144925+00:00",
+        "finishedAt": "2026-09-08T07:27:55.353215+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 8,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314294.097493449,
+        "finishMonotonic": 314294.272649858,
+        "startedAt": "2026-09-08T07:27:55.453545+00:00",
+        "finishedAt": "2026-09-08T07:27:55.628685+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 9,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314294.372904988,
+        "finishMonotonic": 314294.570607189,
+        "startedAt": "2026-09-08T07:27:55.728956+00:00",
+        "finishedAt": "2026-09-08T07:27:55.926647+00:00"
+      }
+    ],
+    [
+      {
+        "ok": true,
+        "sequence": 0,
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314291.661827467,
+        "finishMonotonic": 314291.883829089,
+        "startedAt": "2026-09-08T07:27:53.017877+00:00",
+        "finishedAt": "2026-09-08T07:27:53.239868+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 1,
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314291.984067318,
+        "finishMonotonic": 314292.165898733,
+        "startedAt": "2026-09-08T07:27:53.340117+00:00",
+        "finishedAt": "2026-09-08T07:27:53.521940+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 2,
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314292.266221981,
+        "finishMonotonic": 314292.454191068,
+        "startedAt": "2026-09-08T07:27:53.622275+00:00",
+        "finishedAt": "2026-09-08T07:27:53.810225+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 3,
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314292.554440908,
+        "finishMonotonic": 314292.769565694,
+        "startedAt": "2026-09-08T07:27:53.910492+00:00",
+        "finishedAt": "2026-09-08T07:27:54.125598+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 4,
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314292.86982956,
+        "finishMonotonic": 314293.070552651,
+        "startedAt": "2026-09-08T07:27:54.225880+00:00",
+        "finishedAt": "2026-09-08T07:27:54.426590+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 5,
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314293.170799385,
+        "finishMonotonic": 314293.376199832,
+        "startedAt": "2026-09-08T07:27:54.526851+00:00",
+        "finishedAt": "2026-09-08T07:27:54.732233+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 6,
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314293.476489387,
+        "finishMonotonic": 314293.688337019,
+        "startedAt": "2026-09-08T07:27:54.832541+00:00",
+        "finishedAt": "2026-09-08T07:27:55.044373+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 7,
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314293.788591147,
+        "finishMonotonic": 314293.977334643,
+        "startedAt": "2026-09-08T07:27:55.144642+00:00",
+        "finishedAt": "2026-09-08T07:27:55.333368+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 8,
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314294.077604391,
+        "finishMonotonic": 314294.252105303,
+        "startedAt": "2026-09-08T07:27:55.433656+00:00",
+        "finishedAt": "2026-09-08T07:27:55.608143+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 9,
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314294.352340084,
+        "finishMonotonic": 314294.560205632,
+        "startedAt": "2026-09-08T07:27:55.708391+00:00",
+        "finishedAt": "2026-09-08T07:27:55.916242+00:00"
+      }
+    ],
+    [
+      {
+        "ok": true,
+        "sequence": 0,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "startMonotonic": 314291.662135749,
+        "finishMonotonic": 314292.061451914,
+        "startedAt": "2026-09-08T07:27:53.018185+00:00",
+        "finishedAt": "2026-09-08T07:27:53.417475+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 1,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "startMonotonic": 314292.161698417,
+        "finishMonotonic": 314292.491100632,
+        "startedAt": "2026-09-08T07:27:53.517750+00:00",
+        "finishedAt": "2026-09-08T07:27:53.847135+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 2,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "startMonotonic": 314292.591389526,
+        "finishMonotonic": 314292.92849769,
+        "startedAt": "2026-09-08T07:27:53.947441+00:00",
+        "finishedAt": "2026-09-08T07:27:54.284533+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 3,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "startMonotonic": 314293.028732101,
+        "finishMonotonic": 314293.363270215,
+        "startedAt": "2026-09-08T07:27:54.384783+00:00",
+        "finishedAt": "2026-09-08T07:27:54.719306+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 4,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "startMonotonic": 314293.463535134,
+        "finishMonotonic": 314293.79976479,
+        "startedAt": "2026-09-08T07:27:54.819588+00:00",
+        "finishedAt": "2026-09-08T07:27:55.155795+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 5,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "startMonotonic": 314293.900084532,
+        "finishMonotonic": 314294.287417774,
+        "startedAt": "2026-09-08T07:27:55.256137+00:00",
+        "finishedAt": "2026-09-08T07:27:55.643454+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 6,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "startMonotonic": 314294.387653807,
+        "finishMonotonic": 314294.765279252,
+        "startedAt": "2026-09-08T07:27:55.743704+00:00",
+        "finishedAt": "2026-09-08T07:27:56.121312+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 7,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "startMonotonic": 314294.866085531,
+        "finishMonotonic": 314295.265182229,
+        "startedAt": "2026-09-08T07:27:56.222137+00:00",
+        "finishedAt": "2026-09-08T07:27:56.621181+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 8,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "startMonotonic": 314295.365432509,
+        "finishMonotonic": 314295.702312691,
+        "startedAt": "2026-09-08T07:27:56.721483+00:00",
+        "finishedAt": "2026-09-08T07:27:57.058348+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 9,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "startMonotonic": 314295.80254662,
+        "finishMonotonic": 314296.16173755,
+        "startedAt": "2026-09-08T07:27:57.158602+00:00",
+        "finishedAt": "2026-09-08T07:27:57.517773+00:00"
+      }
+    ],
+    [
+      {
+        "ok": true,
+        "sequence": 0,
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314291.662625674,
+        "finishMonotonic": 314292.062730175,
+        "startedAt": "2026-09-08T07:27:53.018674+00:00",
+        "finishedAt": "2026-09-08T07:27:53.418768+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 1,
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314292.163249143,
+        "finishMonotonic": 314292.493125893,
+        "startedAt": "2026-09-08T07:27:53.519300+00:00",
+        "finishedAt": "2026-09-08T07:27:53.849167+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 2,
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314292.593334335,
+        "finishMonotonic": 314292.929816358,
+        "startedAt": "2026-09-08T07:27:53.949385+00:00",
+        "finishedAt": "2026-09-08T07:27:54.285858+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 3,
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314293.029990866,
+        "finishMonotonic": 314293.362830235,
+        "startedAt": "2026-09-08T07:27:54.386041+00:00",
+        "finishedAt": "2026-09-08T07:27:54.718861+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 4,
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314293.463303837,
+        "finishMonotonic": 314293.803679476,
+        "startedAt": "2026-09-08T07:27:54.819356+00:00",
+        "finishedAt": "2026-09-08T07:27:55.159715+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 5,
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314293.903960475,
+        "finishMonotonic": 314294.289866414,
+        "startedAt": "2026-09-08T07:27:55.260011+00:00",
+        "finishedAt": "2026-09-08T07:27:55.645907+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 6,
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314294.39005057,
+        "finishMonotonic": 314294.767729996,
+        "startedAt": "2026-09-08T07:27:55.746100+00:00",
+        "finishedAt": "2026-09-08T07:27:56.123766+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 7,
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314294.867931965,
+        "finishMonotonic": 314295.266779462,
+        "startedAt": "2026-09-08T07:27:56.223982+00:00",
+        "finishedAt": "2026-09-08T07:27:56.622816+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 8,
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314295.367046154,
+        "finishMonotonic": 314295.688226142,
+        "startedAt": "2026-09-08T07:27:56.723097+00:00",
+        "finishedAt": "2026-09-08T07:27:57.044249+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 9,
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "startMonotonic": 314295.788531145,
+        "finishMonotonic": 314296.161362843,
+        "startedAt": "2026-09-08T07:27:57.144582+00:00",
+        "finishedAt": "2026-09-08T07:27:57.517400+00:00"
+      }
+    ],
+    [
+      {
+        "ok": true,
+        "sequence": 0,
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "startMonotonic": 314291.663627233,
+        "finishMonotonic": 314292.020703706,
+        "startedAt": "2026-09-08T07:27:53.019676+00:00",
+        "finishedAt": "2026-09-08T07:27:53.376741+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 1,
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "startMonotonic": 314292.120895176,
+        "finishMonotonic": 314292.410548599,
+        "startedAt": "2026-09-08T07:27:53.476946+00:00",
+        "finishedAt": "2026-09-08T07:27:53.766584+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 2,
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "startMonotonic": 314292.510788751,
+        "finishMonotonic": 314292.806258539,
+        "startedAt": "2026-09-08T07:27:53.866839+00:00",
+        "finishedAt": "2026-09-08T07:27:54.162292+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 3,
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "startMonotonic": 314292.906503109,
+        "finishMonotonic": 314293.189996478,
+        "startedAt": "2026-09-08T07:27:54.262554+00:00",
+        "finishedAt": "2026-09-08T07:27:54.546032+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 4,
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "startMonotonic": 314293.290323614,
+        "finishMonotonic": 314293.566462596,
+        "startedAt": "2026-09-08T07:27:54.646374+00:00",
+        "finishedAt": "2026-09-08T07:27:54.922498+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 5,
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "startMonotonic": 314293.666707426,
+        "finishMonotonic": 314293.932866157,
+        "startedAt": "2026-09-08T07:27:55.022758+00:00",
+        "finishedAt": "2026-09-08T07:27:55.288898+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 6,
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "startMonotonic": 314294.03309701,
+        "finishMonotonic": 314294.310012818,
+        "startedAt": "2026-09-08T07:27:55.389147+00:00",
+        "finishedAt": "2026-09-08T07:27:55.666043+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 7,
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "startMonotonic": 314294.41026416,
+        "finishMonotonic": 314294.683130286,
+        "startedAt": "2026-09-08T07:27:55.766316+00:00",
+        "finishedAt": "2026-09-08T07:27:56.039168+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 8,
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "startMonotonic": 314294.783373754,
+        "finishMonotonic": 314295.053105185,
+        "startedAt": "2026-09-08T07:27:56.139426+00:00",
+        "finishedAt": "2026-09-08T07:27:56.409142+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 9,
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "startMonotonic": 314295.15333713,
+        "finishMonotonic": 314295.440079319,
+        "startedAt": "2026-09-08T07:27:56.509388+00:00",
+        "finishedAt": "2026-09-08T07:27:56.796119+00:00"
+      }
+    ],
+    [
+      {
+        "ok": true,
+        "sequence": 0,
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314291.663546331,
+        "finishMonotonic": 314291.995531439,
+        "startedAt": "2026-09-08T07:27:53.019595+00:00",
+        "finishedAt": "2026-09-08T07:27:53.351567+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 1,
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314292.095727147,
+        "finishMonotonic": 314292.359282747,
+        "startedAt": "2026-09-08T07:27:53.451778+00:00",
+        "finishedAt": "2026-09-08T07:27:53.715318+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 2,
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314292.459510615,
+        "finishMonotonic": 314292.706282105,
+        "startedAt": "2026-09-08T07:27:53.815561+00:00",
+        "finishedAt": "2026-09-08T07:27:54.062312+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 3,
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314292.806512748,
+        "finishMonotonic": 314293.052509526,
+        "startedAt": "2026-09-08T07:27:54.162562+00:00",
+        "finishedAt": "2026-09-08T07:27:54.408545+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 4,
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314293.152762071,
+        "finishMonotonic": 314293.40918454,
+        "startedAt": "2026-09-08T07:27:54.508813+00:00",
+        "finishedAt": "2026-09-08T07:27:54.765221+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 5,
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314293.509433408,
+        "finishMonotonic": 314293.7698213,
+        "startedAt": "2026-09-08T07:27:54.865485+00:00",
+        "finishedAt": "2026-09-08T07:27:55.125855+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 6,
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314293.870128448,
+        "finishMonotonic": 314294.115415295,
+        "startedAt": "2026-09-08T07:27:55.226181+00:00",
+        "finishedAt": "2026-09-08T07:27:55.471453+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 7,
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314294.215684872,
+        "finishMonotonic": 314294.463827919,
+        "startedAt": "2026-09-08T07:27:55.571736+00:00",
+        "finishedAt": "2026-09-08T07:27:55.819862+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 8,
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314294.564082437,
+        "finishMonotonic": 314294.789847028,
+        "startedAt": "2026-09-08T07:27:55.920133+00:00",
+        "finishedAt": "2026-09-08T07:27:56.145885+00:00"
+      },
+      {
+        "ok": true,
+        "sequence": 9,
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "startMonotonic": 314294.890126954,
+        "finishMonotonic": 314295.142260821,
+        "startedAt": "2026-09-08T07:27:56.246178+00:00",
+        "finishedAt": "2026-09-08T07:27:56.498292+00:00"
+      }
+    ]
+  ]
+}

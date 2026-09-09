@@ -1,0 +1,42 @@
+{
+  "policyValidation": {
+    "capa": {
+      "templateSHA256": "4a2a75e2929a05e0f1260495e80769313d10a257023622db7b9431a6a2ffdf46",
+      "findings": []
+    },
+    "worker-bootstrap": {
+      "templateSHA256": "5a9c2ccb2fffa6e6b861f0ede72b17afe2f55272d0b4b7a6e003204634be9b36",
+      "findings": []
+    },
+    "harness": {
+      "templateSHA256": "25f4750b8da414caaae8d40f8f588868825ddef618d95c6b4bc70b67620ad8be",
+      "findings": []
+    },
+    "assets": {
+      "templateSHA256": "8d2e63c8483f0aca8d8451cbd3bc7f77185cca8ca15f377a79d730b1655d00cb",
+      "findings": []
+    }
+  },
+  "deleteSecretSimulation": [
+    {
+      "case": "matching ownership",
+      "decision": "allowed"
+    },
+    {
+      "case": "different ownership",
+      "decision": "implicitDeny"
+    },
+    {
+      "case": "missing ownership",
+      "decision": "allowed"
+    }
+  ],
+  "liveCAPA": {
+    "instanceLaunch": true,
+    "privateBootstrapRetrieval": true,
+    "claimDeletionAndInstanceTermination": true,
+    "nodeJoined": false,
+    "limitation": "CAPA v2.12.1 with cloud-init 26.1-0ubuntu1~24.04.1 did not execute the worker config after restarting cloud-init"
+  },
+  "awsResourcesCleanedUp": true
+}

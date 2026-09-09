@@ -1,0 +1,88 @@
+#cloud-config
+{{- template "ssh-authorized-keys" . }}
+# MicroK8s installs its bundled Calico and uses its native worker API proxy.
+write_files:
+{{- template "wg-dialer-files" . }}
+{{- template "wg-dialer-unit" . }}
+{{- template "wg-apiproxy-unit" . }}
+  - path: /usr/local/sbin/cldt-install-microk8s
+    permissions: '0755'
+    content: |
+      #!/bin/sh
+      set -eu
+      attempt=1
+      until snap install microk8s --classic --revision={{ .microk8sRevision }}; do
+        if [ "$attempt" -ge 5 ]; then
+          echo 'MicroK8s snap installation failed after 5 attempts' >&2
+          exit 1
+        fi
+        sleep 15
+        attempt=$((attempt + 1))
+      done
+  - path: /usr/local/sbin/cldt-wait-microk8s-worker
+    permissions: '0755'
+    content: |
+      #!/bin/sh
+      set -eu
+      # Cluster-wide status can start before native worker joining creates
+      # clustered.lock, then wait forever for control-plane resources.
+      until [ -f /var/snap/microk8s/current/var/lock/clustered.lock ] &&
+            curl -fsS --max-time 5 http://127.0.0.1:10248/healthz >/dev/null; do
+        sleep 2
+      done
+  - path: /etc/microk8s.yaml
+    permissions: '0600'
+    content: |
+      {"version":"0.2.0","join":{"url":{{ printf "%q" .microk8sJoinURL }},"worker":true}}
+  - path: /etc/cloud-provisioning/microk8s-kubelet-args
+    permissions: '0600'
+    content: |
+      {{ .kubeletExtraArgs }}
+{{- if .providerID }}
+      --provider-id={{ .providerID }}
+{{- end }}
+  - path: /etc/systemd/system/snap.microk8s.daemon-kubelite.service.d/10-cloud-provisioning.conf
+    permissions: '0644'
+    content: |
+      [Service]
+      ExecStartPre=/usr/local/sbin/cldt-microk8s-kubelet
+  - path: /usr/local/sbin/cldt-microk8s-kubelet
+    permissions: '0755'
+    content: |
+      #!/usr/bin/python3
+      import pathlib, shlex
+      desired = pathlib.Path('/etc/cloud-provisioning/microk8s-kubelet-args')
+      target = pathlib.Path('/var/snap/microk8s/current/args/kubelet')
+      if not target.exists():
+          raise SystemExit(0)
+      args = dict(arg.split('=', 1) for arg in shlex.split(desired.read_text()))
+      lines = target.read_text().splitlines()
+      # Preserve MicroK8s's own labels alongside the product's labels.
+      for line in lines:
+          if line.startswith('--node-labels=') and '--node-labels' in args:
+              labels = dict(x.split('=', 1) for x in line.split('=', 1)[1].split(',') if '=' in x)
+              labels.update(x.split('=', 1) for x in args['--node-labels'].split(',') if '=' in x)
+              args['--node-labels'] = ','.join(k+'='+v for k,v in labels.items())
+      lines = [line for line in lines if line.split('=', 1)[0] not in args]
+      lines.extend(k+'='+v for k,v in args.items())
+      target.write_text('\n'.join(lines)+'\n')
+runcmd:
+{{- template "dialer-install" . }}
+  - |
+    set -e
+    command -v snap >/dev/null || (apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y snapd)
+{{- template "provider-id-arg" . }}
+    # MicroK8s reaches kubelets directly. A cloud's private NIC address can
+    # be unreachable or overlap another cloud; advertise the allocated tunnel
+    # address while retaining the infrastructure provider's separate identity.
+    TUNNEL_NODE_ADDRESS={{ printf "%q" .wireguardAddress }}
+    NODE_IP_ARG="--node-ip=${TUNNEL_NODE_ADDRESS%/*}"
+{{- if index . "providerIdentityScript" }}
+    [ -z "$PROVIDER_ID_ARG" ] || printf '%s\n' "$PROVIDER_ID_ARG" >> /etc/cloud-provisioning/microk8s-kubelet-args
+{{- end }}
+    [ -z "$NODE_IP_ARG" ] || printf '%s\n' "$NODE_IP_ARG" >> /etc/cloud-provisioning/microk8s-kubelet-args
+    systemctl daemon-reload
+    /usr/local/sbin/cldt-install-microk8s
+    snap refresh --hold=24h microk8s
+    timeout 600 /usr/local/sbin/cldt-wait-microk8s-worker
+{{- template "bootstrap-sentinel" . }}

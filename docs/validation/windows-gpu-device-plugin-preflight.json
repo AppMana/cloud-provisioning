@@ -1,0 +1,13 @@
+{
+  "observedAt": "2026-09-07T17:03:55.522418+00:00",
+  "source": "https://github.com/Azure/Kubernetes-Windows-GPU-Device-Plugin",
+  "sourceCommit": "b21f59eb5dedf8ae9dc621dfecef61e54785b9e2",
+  "worker": "Windows Server 2022 k0s 1.36.2 single-NIC EC2 VM",
+  "socketProbe": {
+    "upstreamDevicePluginSocket": true,
+    "k0sDevicePluginSocket": false
+  },
+  "conclusion": "The live Windows worker exposes the upstream socket path; a k0s-specific socket-path fork is not justified by this observation.",
+  "pluginDeployed": false,
+  "resourceAllocationValidated": false
+}

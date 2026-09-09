@@ -1,0 +1,262 @@
+{
+  "result": "completed-bootstrap-and-lifecycle-passed-with-survivor-convergence",
+  "updatedAt": "2026-09-09T10:39:30.263801+00:00",
+  "profile": "microk8s/calico",
+  "revision": "9063",
+  "observations": {
+    "workerModeAndKubeletHealthPassed": true,
+    "cloudInitStillRunning": true,
+    "bootstrapSentinelAbsentOnInspectedWorker": true,
+    "clusterStatusProcess": {
+      "process": "MicroK8s status.py --wait-ready",
+      "pid": 3120,
+      "startEpoch": 1788945105.67,
+      "workerLockEpoch": 1788945110.8729982,
+      "startedBeforeWorkerLock": true
+    },
+    "waitStartedBeforeWorkerLockSeconds": 5.203
+  },
+  "nativeImplementation": {
+    "wrapper": "microk8s-status.wrapper",
+    "entryGuard": "clustered.lock is checked before status.py starts",
+    "waitLoop": "wait_for_ready repeatedly checks cluster resources without revisiting worker mode"
+  },
+  "change": {
+    "pattern": "join-patterns/microk8s-worker.cloud-config.tmpl",
+    "workerConditions": [
+      "native clustered.lock marker exists",
+      "HTTP success from local kubelet healthz at 127.0.0.1:10248"
+    ],
+    "deadlineSeconds": 600,
+    "nodeReadinessAndTrafficRemainSeparateGates": true
+  },
+  "validation": {
+    "allJoinPackageRaceTestsPassed": true,
+    "unitCases": [
+      "joined healthy worker succeeds",
+      "missing worker marker keeps waiting",
+      "unhealthy kubelet keeps waiting"
+    ],
+    "nativeCandidateExitCode": 0,
+    "nativeCandidateOnExistingWorkerOnly": true,
+    "nativeCandidateIdentity": {
+      "node": "remote1",
+      "nodeUID": "cee4b353-573c-44aa-be0c-8c62ab3dd621",
+      "bootID": "77c33eb7-a203-4ee0-8a77-2d47fe6ccec5",
+      "stableIdentity": true,
+      "workerGateExitCode": 0,
+      "elapsedSeconds": 0.475
+    },
+    "nativeTrials": [
+      {
+        "label": "test-micro-worker-wait-v1",
+        "exitCode": 124,
+        "identityPinned": false,
+        "overlappedActiveReplacement": true
+      },
+      {
+        "label": "test-micro-worker-wait-v2",
+        "exitCode": 0,
+        "identityPinned": true
+      }
+    ]
+  },
+  "evidenceSHA256": {
+    "micro-status-race-v5-result.json": "e1f72ca54469b421c40d3ebfe15ca05d079ce3a881b29ee4e893e0c922e23be8",
+    "micro-worker-ready-v5-2-result.json": "c64f2571543c8fe48f62031c903244593d35c2a023b85abb5210fc3cb8fa0dd7",
+    "micro-status-wrapper-v5-result.json": "4ab4021010b210229a079640285882a3e2d13d60e97afcd7611b8b52d818cda4",
+    "micro-status-source-more-v5-result.json": "1e1f9a08d281afb1d011b96eff83fc3e4661e58cf4995dc8d319cf4194b8c969",
+    "test-micro-worker-wait-v1-result.json": "a771421d334d49c14b588684bb55f6df1290657e72576378a1012965c0178cfd",
+    "micro-worker-wait-candidate.sh": "1e36c98d2dce08ab6d941c8c7d0d2052cca38e9e2b93bf23614ed201a0317826",
+    "test-micro-worker-wait-v2-result.json": "7c30be8bf187fe5b2774eb7d166b2b14a11bd886f34c909be45252ea340608d0"
+  },
+  "limits": [
+    "The campaign passed all final matrices, but two intermediate survivor probe passes failed after remote2 removal; convergence took 96.973941254 seconds. Continuous availability is not qualified.",
+    "The earlier native candidate timeout remains preserved and does not count as a pass.",
+    "Native coverage is scoped to the recorded campaign source, not subsequent local changes."
+  ],
+  "freshUserdataCampaign": {
+    "commandID": "0c49629f-1ad4-416a-a72b-174f25663b16",
+    "state": "completed",
+    "oldClaimsRemovedThroughProvider": true,
+    "completedBootstrapRequired": true,
+    "freshClaimPassObserved": true,
+    "sourceArtifact": {
+      "key": "runners/cldt-microk8s-runner-v1/bootstrap-completion-v6-source.tar.gz",
+      "sha256": "beb1c0cd3e2501e5124d7be11dc05c382559a06da8e24aad23716fae122f7822",
+      "sourceSHA256": {
+        "harness/e2e/rig/bootstrap_health.go": "31c89e9b2db3943901ea02fc032604ca258ec64dafe5bc842c0a3f393772b4dc",
+        "harness/e2e/rig/bootstrap_health_test.go": "bfa86f6723d4ea2e51d0c923cc6b0f26e22f256f4bfef6e2a4494c64a141385a",
+        "harness/e2e/rig/bootstrap_completion_test.go": "0b08c864f55524654169cef0ad0d49e94827b350f460ebfced43e80c2b3499b0",
+        "harness/e2e/rig/testdata/cloud-init-terminal-error.json": "9ac3ac0e2ae985e36d47bf45d62de4912b01a35e3326a6e5df231e3f6488824b",
+        "harness/e2e/rig/vm/vm.go": "84078e1aa6d701d73f4dccdefd1ceaec08154433be336d57ab320e06083b2b10",
+        "harness/e2e/rig/vm/bootstrap_health_test.go": "cb59d12ea093c2960a70591abcdefc19411e20c7108cd3c9c95bdf53043987b3",
+        "harness/e2e/rig/aws/node.go": "0afb24433b83b2ec0b2be8177320fa0adb956d2e7bc615f6f4170fdb5708f008",
+        "harness/e2e/rig/aws/commands.go": "ed0c816eff34ea3f8bc682198fc36a72f0918730f78b3723af463bc6de1b1a5c",
+        "harness/e2e/rig/aws/bootstrap_health_test.go": "1f26b50b5fe25f066a0acc8dea8e2dc63a6c7c3a6081f517a63b5cb7e37601b8",
+        "harness/e2e/provider/provider.go": "d7ba78c9c18dc501ae9089b80675d85e083d107561c7f077972c421cc0674224",
+        "harness/e2e/provider/bootstrap_health_test.go": "cbcff48670bf99e410f1439a9c4cdf87c28a7b6d4dd1cdc756e5f0624f2daccc",
+        "harness/e2e/cmd/lab/main.go": "a24eb3a613051a4f304a362e560367658cb2bcfaefa8186b7d95cb58b36fdf36",
+        "harness/e2e/cmd/awsrow/main.go": "303cd4af554484ee79494f1079e37f78b34f8f74fc4567b5750101d4a6ec5eb0",
+        "join-patterns/microk8s-worker.cloud-config.tmpl": "4384daec15df04afe1979a32bae198bd97cf52f7c0974fe513895aafc6c3ebca",
+        "controller/pkg/join/microk8s_ready_test.go": "7066dd72a572f2545ed3f01d29499577b0a2be2ac4b064fb021db0a4d174a4ae"
+      }
+    },
+    "freshClaimEvidence": {
+      "observedAt": "2026-09-09T09:43:33.355940+00:00",
+      "commandID": "780cd726-c174-4af7-aa88-3595f8dbb706",
+      "evidenceSHA256": "249dc676c11c6525c61877a3c882888684936379f0f4c62b1a184a7d069c7478",
+      "freshClaims": 2,
+      "verified": true,
+      "observations": [
+        {
+          "node": "remote1",
+          "nodeUIDBefore": "d2e51ead-0378-4418-9094-579c50e17c01",
+          "nodeUIDAfter": "d2e51ead-0378-4418-9094-579c50e17c01",
+          "stableNodeIdentity": true,
+          "guestExecExitCode": 0,
+          "guest": {
+            "bootID": "461ccf8a-d736-40a7-a177-c22632298107",
+            "stableBoot": true,
+            "cloudInitStatus": "done",
+            "cloudInitExitCode": 0,
+            "bootstrapSuccessSentinel": true,
+            "nativeWorkerMarker": true,
+            "localKubeletHealthPassed": true,
+            "helperSHA256": {
+              "/usr/local/sbin/cldt-wait-microk8s-worker": "1e36c98d2dce08ab6d941c8c7d0d2052cca38e9e2b93bf23614ed201a0317826",
+              "/usr/local/sbin/cldt-install-microk8s": "9ce134a8d0f18766fa85208230d3f84a54501b035420adfb78e74efc27d7445a"
+            }
+          }
+        },
+        {
+          "node": "remote2",
+          "nodeUIDBefore": "3534409f-3cc2-43e3-96c5-d106136f99a5",
+          "nodeUIDAfter": "3534409f-3cc2-43e3-96c5-d106136f99a5",
+          "stableNodeIdentity": true,
+          "guestExecExitCode": 0,
+          "guest": {
+            "bootID": "d53af00f-3e48-49f0-930a-a7fb21539533",
+            "stableBoot": true,
+            "cloudInitStatus": "done",
+            "cloudInitExitCode": 0,
+            "bootstrapSuccessSentinel": true,
+            "nativeWorkerMarker": true,
+            "localKubeletHealthPassed": true,
+            "helperSHA256": {
+              "/usr/local/sbin/cldt-wait-microk8s-worker": "1e36c98d2dce08ab6d941c8c7d0d2052cca38e9e2b93bf23614ed201a0317826",
+              "/usr/local/sbin/cldt-install-microk8s": "9ce134a8d0f18766fa85208230d3f84a54501b035420adfb78e74efc27d7445a"
+            }
+          }
+        }
+      ]
+    },
+    "latestReplacementEvidence": {
+      "bootstrap": {
+        "event": "remote-bootstrap-completed",
+        "time": "2026-09-09T09:50:21.402218145Z",
+        "value": {
+          "node": "remote1"
+        }
+      },
+      "hardware": {
+        "event": "replacement-hardware-proved",
+        "time": "2026-09-09T09:50:46.025118596Z",
+        "value": {
+          "newNodeUID": "1833bd5a-d71e-4dd6-b6bc-2ca4f3ca39e8",
+          "node": "remote1",
+          "placement": "control-plane"
+        }
+      },
+      "matrix": {
+        "event": "matrix-pass",
+        "time": "2026-09-09T09:51:15.675442293Z",
+        "value": {
+          "total": 140,
+          "passed": 140,
+          "failed": 0,
+          "notRequired": 0,
+          "elapsed": "14.415502847s",
+          "series": 3,
+          "attempt": 1
+        }
+      },
+      "sourceSHA256": "b8bfe0afe58f8f77b8e35804d7793bc25b3b854fea5ae8f981bd05be8da0c0a2"
+    },
+    "terminalEvidence": {
+      "verifiedAt": "2026-09-09T10:30:27.118394+00:00",
+      "archive": {
+        "sha256": "b2ab82f51a1a9a64af94bbd88dd1923d6cefcbc1675cd6cc2b2e40d1fad8f419",
+        "bytes": 42017
+      },
+      "nativeExit": 0,
+      "matrices": 21,
+      "checks": {
+        "total": 2636,
+        "passed": 2636,
+        "failed": 0,
+        "notRequired": 0
+      },
+      "allFirstAttempt": false,
+      "bootstrapCompletions": 10,
+      "replacements": 8,
+      "placements": [
+        "control-plane",
+        "one-worker",
+        "two-workers",
+        "all-nodes"
+      ],
+      "nativeCoverage": {
+        "covered": 1357,
+        "total": 3418,
+        "percent": 39.7
+      },
+      "convergence": {
+        "observedPasses": 23,
+        "failedPasses": 2,
+        "retrySeries": [
+          {
+            "time": "2026-09-09T09:53:04.630728283Z",
+            "stage": "remove and re-add: remote2",
+            "summary": {
+              "total": 102,
+              "passed": 84,
+              "failed": 18,
+              "notRequired": 0,
+              "series": 4,
+              "attempt": 1,
+              "elapsed": "43.271884647s"
+            }
+          },
+          {
+            "time": "2026-09-09T09:53:36.065445044Z",
+            "stage": "remove and re-add: remote2",
+            "summary": {
+              "total": 102,
+              "passed": 97,
+              "failed": 5,
+              "notRequired": 0,
+              "series": 4,
+              "attempt": 2,
+              "elapsed": "1m14.706698509s"
+            }
+          },
+          {
+            "time": "2026-09-09T09:53:58.332651906Z",
+            "stage": "remove and re-add: remote2",
+            "summary": {
+              "total": 102,
+              "passed": 102,
+              "failed": 0,
+              "notRequired": 0,
+              "series": 4,
+              "attempt": 3,
+              "elapsed": "1m36.973941254s"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "awsCAPIValidation": "microk8s-capa-lifecycle-results.json"
+}

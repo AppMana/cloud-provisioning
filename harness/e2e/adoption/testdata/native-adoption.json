@@ -1,0 +1,242 @@
+{
+  "source": "Native aws-linux-egress-v2: matrix passed while adoption image was missing; same Pod became Ready after importing the actual remote image",
+  "siteImage": "cldt-dialer:gateway-receipts-v2",
+  "node": "ip-172-29-0-17",
+  "daemonset": {
+    "metadata": {
+      "name": "cloud-provisioning-dialer-remote",
+      "namespace": "cloud-provisioning",
+      "uid": "8ac08e53-64c6-4494-af15-ae1851bcb0c6"
+    },
+    "spec": {
+      "template": {
+        "spec": {
+          "containers": [
+            {
+              "name": "dialer",
+              "image": "cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "pending": {
+    "items": [
+      {
+        "metadata": {
+          "name": "cloud-provisioning-dialer-remote-b52zj",
+          "namespace": "cloud-provisioning",
+          "uid": "c0866e4c-cbc4-488f-b3b7-b4e9df286367",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "DaemonSet",
+              "name": "cloud-provisioning-dialer-remote",
+              "uid": "8ac08e53-64c6-4494-af15-ae1851bcb0c6"
+            }
+          ]
+        },
+        "spec": {
+          "nodeName": "ip-172-29-0-17",
+          "containers": [
+            {
+              "name": "dialer",
+              "image": "cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45"
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-08T02:08:36Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-08T02:08:34Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-08T02:08:34Z",
+              "message": "containers with unready status: [dialer]",
+              "observedGeneration": 1,
+              "reason": "ContainersNotReady",
+              "status": "False",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-08T02:08:34Z",
+              "message": "containers with unready status: [dialer]",
+              "observedGeneration": 1,
+              "reason": "ContainersNotReady",
+              "status": "False",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-08T02:08:34Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "image": "cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45",
+              "imageID": "",
+              "lastState": {},
+              "name": "dialer",
+              "ready": false,
+              "restartCount": 0,
+              "started": false,
+              "state": {
+                "waiting": {
+                  "message": "Back-off pulling image \"cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45\": ErrImagePull: failed to pull and unpack image \"docker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45\": failed to resolve image: pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization failed",
+                  "reason": "ImagePullBackOff"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/etc/wg-dialer",
+                  "name": "wg-dialer-config"
+                },
+                {
+                  "mountPath": "/host-bin",
+                  "name": "host-bin"
+                },
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-lk4j4",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "ready": {
+    "items": [
+      {
+        "metadata": {
+          "name": "cloud-provisioning-dialer-remote-b52zj",
+          "namespace": "cloud-provisioning",
+          "uid": "c0866e4c-cbc4-488f-b3b7-b4e9df286367",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "DaemonSet",
+              "name": "cloud-provisioning-dialer-remote",
+              "uid": "8ac08e53-64c6-4494-af15-ae1851bcb0c6"
+            }
+          ]
+        },
+        "spec": {
+          "nodeName": "ip-172-29-0-17",
+          "containers": [
+            {
+              "name": "dialer",
+              "image": "cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45"
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-08T02:08:36Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-08T02:08:34Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-08T02:14:13Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-08T02:14:13Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-09-08T02:08:34Z",
+              "observedGeneration": 1,
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "containerd://b2210b8cc1680194daefe3123bbfb82dd1561d06360d79236ae9f2e92f915e59",
+              "image": "docker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45",
+              "imageID": "sha256:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45",
+              "lastState": {},
+              "name": "dialer",
+              "ready": true,
+              "resources": {},
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-09-08T02:14:13Z"
+                }
+              },
+              "user": {
+                "linux": {
+                  "gid": 0,
+                  "supplementalGroups": [
+                    0
+                  ],
+                  "uid": 0
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/etc/wg-dialer",
+                  "name": "wg-dialer-config"
+                },
+                {
+                  "mountPath": "/host-bin",
+                  "name": "host-bin"
+                },
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-lk4j4",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

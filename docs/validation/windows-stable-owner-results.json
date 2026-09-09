@@ -1,0 +1,303 @@
+{
+  "state": "unqualified: transport route isolation must be resolved before Windows stable-owner packet validation",
+  "date": "2026-09-09",
+  "runs": {
+    "1": {
+      "binarySHA256": "fdc79eaabf123d6cf06eedb0aef7cb8d7e7f7d6030d53db4ed1aea10d9b6388a",
+      "testSourceSHA256": "d063b3f49ea238f2d97d21345932ae1fb135c31eb89f8e1a5e439314e45e04d5",
+      "results": {
+        "2022": {
+          "instanceID": "i-0ddaed6f030330992",
+          "commandID": "14bd41b1-13e6-4596-82eb-a05cf3527714",
+          "nativeExitCode": 1,
+          "warmupRequests": 36,
+          "successfulWarmupRequests": 0,
+          "qualifiedPacketPhases": [],
+          "nativeRouteObservations": [
+            {
+              "at": "2026-09-09T16:07:11.0595941Z",
+              "bestSource": "198.19.251.22",
+              "kind": "route",
+              "luid": 14918723555033088,
+              "ownerLUID": 14918723538255872,
+              "selected": 0,
+              "source": "198.19.251.22",
+              "stage": "prepared"
+            }
+          ],
+          "coverage": {
+            "coveredStatements": 131,
+            "statements": 184,
+            "percent": 71.2,
+            "scope": "Windows controller/pkg/tunneldevice; failed diagnostic, not support qualification"
+          },
+          "rawSHA256": {
+            "raw-2022-stdout.txt": "2f80c40c5a19bdf476aad6a6631ca8407eb941db80ec52a8e8db6e923ce380e6",
+            "raw-2022-stderr.txt": "aa772221d8134893b3e9e75874f2577df16e24d4672e3ea41c6f45ff2c63b07f",
+            "raw-2022-exit-code.txt": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+            "raw-2022-process.json": "cd64728a288286e790316a42d6c91bd814d0e97e482ca52c54a51bcae46e6a3e",
+            "raw-2022-ready.json": "b2779593264563253663f34fbb3ba503e1f2c0752ff9967a46e0ea9f4b0f2fca",
+            "raw-2022-events.jsonl": "5f566c7b6206d2ae34aa32e24b11b74941932109cfae43e03b0e00f1c304fb3e",
+            "raw-2022-native.cover": "56a66d97e339223266902f11736485e11ece23bcc8839f4cffdb7e7a42a65da5"
+          }
+        },
+        "2025": {
+          "instanceID": "i-07c9859f5ce8ed42b",
+          "commandID": "30f33726-40e7-4789-884e-95ba9105745a",
+          "nativeExitCode": 1,
+          "warmupRequests": 35,
+          "successfulWarmupRequests": 0,
+          "qualifiedPacketPhases": [],
+          "nativeRouteObservations": [
+            {
+              "at": "2026-09-09T16:07:12.3429133Z",
+              "bestSource": "198.19.251.25",
+              "kind": "route",
+              "luid": 14918723555033088,
+              "ownerLUID": 14918723538255872,
+              "selected": 0,
+              "source": "198.19.251.25",
+              "stage": "prepared"
+            }
+          ],
+          "coverage": {
+            "coveredStatements": 131,
+            "statements": 184,
+            "percent": 71.2,
+            "scope": "Windows controller/pkg/tunneldevice; failed diagnostic, not support qualification"
+          },
+          "rawSHA256": {
+            "raw-2025-stdout.txt": "e30dfe391e458efdba487f08c933add481e1ae139e51ff9989f1cddcd57dd32f",
+            "raw-2025-stderr.txt": "b8d41f10ab935c095753d8dbf77339e121afb7491349dfddc21093d6b9352df0",
+            "raw-2025-exit-code.txt": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+            "raw-2025-process.json": "fe92ba8670b4061e12a8c1c56e54e34e05b790c6f47d54d5f1742382d61c1b94",
+            "raw-2025-ready.json": "2af233e03294cca0103bcff0066fa82183322a7484b62cc40db547a94fdff226",
+            "raw-2025-events.jsonl": "e4fa5cd2421ad7e789a2445cc9bb9583986009702e59968f1ab0b65721376525",
+            "raw-2025-native.cover": "56a66d97e339223266902f11736485e11ece23bcc8839f4cffdb7e7a42a65da5"
+          }
+        }
+      },
+      "outcome": "warmup failed; temporary adapters removed"
+    },
+    "2": {
+      "binarySHA256": "e9a0599025320d2766be9663a8201c637be1d298658431376c82a8de79f1eba6",
+      "testSourceSHA256": "85955b9e9b0dc25b40ff5a4318f842aa9299393d8fb3c4344b946bea8795c866",
+      "results": {
+        "2022": {
+          "instanceID": "i-0ddaed6f030330992",
+          "commandID": "ed45e628-b56b-41bf-8657-5ed40712c31f",
+          "nativeExitCode": 1,
+          "warmupRequests": 36,
+          "successfulWarmupRequests": 0,
+          "qualifiedPacketPhases": [],
+          "nativeRouteObservations": [
+            {
+              "at": "2026-09-09T16:11:02.1888198Z",
+              "bestSource": "198.19.251.22",
+              "kind": "route",
+              "luid": 14918723555033088,
+              "ownerLUID": 14918723538255872,
+              "selected": 0,
+              "source": "198.19.251.22",
+              "stage": "prepared"
+            }
+          ],
+          "coverage": {
+            "coveredStatements": 131,
+            "statements": 184,
+            "percent": 71.2,
+            "scope": "Windows controller/pkg/tunneldevice; failed diagnostic, not support qualification"
+          },
+          "rawSHA256": {
+            "raw-2022-stdout.txt": "0f08e0b068e7d3ef0354ae4be14affdda92f2a5aa7a65388afd3eec0c4281902",
+            "raw-2022-stderr.txt": "ce3a753e0e0c35eb5ac95abd38ba2025060e802083b62f8ebe213e5cb06888a5",
+            "raw-2022-exit-code.txt": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+            "raw-2022-process.json": "8be47c5f19d8d012e8e7c9bdb46549862f2198fa9f2c215f01aa7f05a021c545",
+            "raw-2022-ready.json": "4699c65a0e8e0d92d87419e53ecd56546f5997dfe3206e442b542f41a95a3477",
+            "raw-2022-events.jsonl": "e4e06bbaf9ecbcd2fbfed6aa25610c686578e3d88ca02474bed881037f0fdd2f",
+            "raw-2022-native.cover": "56a66d97e339223266902f11736485e11ece23bcc8839f4cffdb7e7a42a65da5",
+            "raw-2022-counters.json": "8c39d42e6cec8488d8a7239e9e2fbe7415f7e473e5f5cffd2d5d2577ac8ed954"
+          },
+          "nativeCounters": [
+            {
+              "generation": 0,
+              "lastHandshake": 0,
+              "luid": 14918723555033088,
+              "peerCount": 1,
+              "rxBytes": 0,
+              "txBytes": 1628
+            },
+            {
+              "generation": 1,
+              "lastHandshake": 0,
+              "luid": 14918723571810304,
+              "peerCount": 1,
+              "rxBytes": 0,
+              "txBytes": 1628
+            }
+          ]
+        },
+        "2025": {
+          "instanceID": "i-07c9859f5ce8ed42b",
+          "commandID": "6a17b906-2da8-4665-badf-8bca4553609c",
+          "nativeExitCode": 1,
+          "warmupRequests": 35,
+          "successfulWarmupRequests": 0,
+          "qualifiedPacketPhases": [],
+          "nativeRouteObservations": [
+            {
+              "at": "2026-09-09T16:11:03.4108491Z",
+              "bestSource": "198.19.251.25",
+              "kind": "route",
+              "luid": 14918723555033088,
+              "ownerLUID": 14918723538255872,
+              "selected": 0,
+              "source": "198.19.251.25",
+              "stage": "prepared"
+            }
+          ],
+          "coverage": {
+            "coveredStatements": 131,
+            "statements": 184,
+            "percent": 71.2,
+            "scope": "Windows controller/pkg/tunneldevice; failed diagnostic, not support qualification"
+          },
+          "rawSHA256": {
+            "raw-2025-stdout.txt": "bb21d3fff0aeb6f7042dc545bae167a34d2017b3a04b2abda16ccfaaf24a1e49",
+            "raw-2025-stderr.txt": "90a19d55bc87050b13eb0576ef3138de62ded6df83f9ca328c48adbd3c584b84",
+            "raw-2025-exit-code.txt": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+            "raw-2025-process.json": "7bd7125e7b58ce42476679fe4bb522e7b9b3c1897fc48c5e20506c2ef81d53e1",
+            "raw-2025-ready.json": "24d71865647f4eefae232b7130119aa88b0d03b8a67b94d06cac99952352243e",
+            "raw-2025-events.jsonl": "ba74da472668ba72d702e8f3a73c470b4e987c3012ea862342f63d07f2b9d9e5",
+            "raw-2025-native.cover": "56a66d97e339223266902f11736485e11ece23bcc8839f4cffdb7e7a42a65da5",
+            "raw-2025-counters.json": "8c39d42e6cec8488d8a7239e9e2fbe7415f7e473e5f5cffd2d5d2577ac8ed954"
+          },
+          "nativeCounters": [
+            {
+              "generation": 0,
+              "lastHandshake": 0,
+              "luid": 14918723555033088,
+              "peerCount": 1,
+              "rxBytes": 0,
+              "txBytes": 1628
+            },
+            {
+              "generation": 1,
+              "lastHandshake": 0,
+              "luid": 14918723571810304,
+              "peerCount": 1,
+              "rxBytes": 0,
+              "txBytes": 1628
+            }
+          ]
+        }
+      },
+      "outcome": "warmup failed; temporary adapters removed"
+    },
+    "3": {
+      "binarySHA256": "24024daa9fb1d6b3e791f7e57d16588150ea265c8ce387b822d02121c27a1c4c",
+      "testSourceSHA256": "de15a7c4793636469e929857a2db7323f2c32f8c40482634fa37f1ee6db87262",
+      "results": {
+        "2022": {
+          "instanceID": "i-0ddaed6f030330992",
+          "commandID": "840eefec-fe8b-42f5-b30f-f19d3da6627f",
+          "nativeExitCode": 1,
+          "warmupRequests": 0,
+          "successfulWarmupRequests": 0,
+          "qualifiedPacketPhases": [],
+          "nativeRouteObservations": [],
+          "coverage": {
+            "coveredStatements": 37,
+            "statements": 184,
+            "percent": 20.1,
+            "scope": "Windows controller/pkg/tunneldevice; failed diagnostic, not support qualification"
+          },
+          "rawSHA256": {
+            "raw-2022-stdout.txt": "b14eb923f822050e18853d9498f00a7be4f4f674321156a6f9be539382b1844f",
+            "raw-2022-stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "raw-2022-exit-code.txt": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+            "raw-2022-process.json": "92077f8c5cd6cb7146e63361097be2d9946de7351a490f3c97ff2815536ce4d7",
+            "raw-2022-native.cover": "3b952fa76418c9a06ad2a9f5cb87716076d784b4cb4f6c29d8a2ac365db5b369"
+          }
+        },
+        "2025": {
+          "instanceID": "i-07c9859f5ce8ed42b",
+          "commandID": "bbdb6b9e-cbc5-4fcd-bd44-8f2c28b780f5",
+          "nativeExitCode": 1,
+          "warmupRequests": 0,
+          "successfulWarmupRequests": 0,
+          "qualifiedPacketPhases": [],
+          "nativeRouteObservations": [],
+          "coverage": {
+            "coveredStatements": 37,
+            "statements": 184,
+            "percent": 20.1,
+            "scope": "Windows controller/pkg/tunneldevice; failed diagnostic, not support qualification"
+          },
+          "rawSHA256": {
+            "raw-2025-stdout.txt": "812760967b2ac58cbc16bd1630ffbf84c07c66f35c25486bc58246d7908e7fc6",
+            "raw-2025-stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "raw-2025-exit-code.txt": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+            "raw-2025-process.json": "1d22ea5f1e9bd0f0d21ca8e39b5c7b9d3e8322783c9d14a4e6d745a06d8916c2",
+            "raw-2025-native.cover": "3b952fa76418c9a06ad2a9f5cb87716076d784b4cb4f6c29d8a2ac365db5b369"
+          }
+        }
+      },
+      "outcome": "preflight rejects existing cluster tunnel before adapter creation on both Windows versions"
+    }
+  },
+  "productionChanges": false,
+  "releaseQualified": false,
+  "temporaryIngressRulesRemoved": 4,
+  "limitations": [
+    "IPv4 warmup never succeeded; no switch, rollback or retirement packet phase qualified",
+    "IPv6 and source-spoof rejection remain untested in this stable-owner experiment",
+    "Windows host experiment does not qualify CNI, HNS/VFP, GPU or production generation protocol",
+    "Native GetBestRoute2 reports the OS route; it does not trace the WireGuard driver packet path",
+    "Initial sampler changes routes between requests; a later continuity campaign needs an independent sampler"
+  ],
+  "observedTransportRoutes": {
+    "inspect-2022": {
+      "commandID": "a2ea7069-016a-4554-9344-908f60f352f7",
+      "status": "Success",
+      "output": "[{\"IPAddress\":\"10.100.0.139\",\"InterfaceAlias\":\"cldt1775f69e\",\"NextHop\":null,\"DestinationPrefix\":null},{\"IPAddress\":null,\"InterfaceAlias\":\"cldt1775f69e\",\"NextHop\":\"0.0.0.0\",\"DestinationPrefix\":\"172.29.0.68/32\"}]"
+    },
+    "inspect-2025": {
+      "commandID": "7dee5da4-fc68-4e0f-ba13-c0969431cdfd",
+      "status": "Success",
+      "output": "[{\"IPAddress\":\"10.100.0.140\",\"InterfaceAlias\":\"cldt1775f69e\",\"NextHop\":null,\"DestinationPrefix\":null},{\"IPAddress\":null,\"InterfaceAlias\":\"cldt1775f69e\",\"NextHop\":\"0.0.0.0\",\"DestinationPrefix\":\"172.29.0.24/32\"}]"
+    },
+    "public-route-2022": {
+      "commandID": "76aaec21-8f01-4f06-b75c-8249cc7cb04c",
+      "status": "Success",
+      "output": "[{\"IPAddress\":\"10.100.0.139\",\"InterfaceAlias\":\"cldt1775f69e\",\"NextHop\":null,\"DestinationPrefix\":null},{\"IPAddress\":null,\"InterfaceAlias\":\"cldt1775f69e\",\"NextHop\":\"0.0.0.0\",\"DestinationPrefix\":\"44.251.58.244/32\"}]"
+    },
+    "public-route-2025": {
+      "commandID": "22c522b0-a6ab-45c9-b4ec-1812a9d82ffb",
+      "status": "Success",
+      "output": "[{\"IPAddress\":\"10.100.0.140\",\"InterfaceAlias\":\"cldt1775f69e\",\"NextHop\":null,\"DestinationPrefix\":null},{\"IPAddress\":null,\"InterfaceAlias\":\"cldt1775f69e\",\"NextHop\":\"0.0.0.0\",\"DestinationPrefix\":\"44.255.96.143/32\"}]"
+    },
+    "gateway-route-2022": {
+      "commandID": "48da94b6-a754-42f9-af64-45f2dd6c5f5b",
+      "status": "Success",
+      "output": "[{\"IPAddress\":\"10.100.0.139\",\"InterfaceAlias\":\"cldt1775f69e\",\"NextHop\":null,\"DestinationPrefix\":null},{\"IPAddress\":null,\"InterfaceAlias\":\"cldt1775f69e\",\"NextHop\":\"0.0.0.0\",\"DestinationPrefix\":\"16.146.98.223/32\"}]"
+    },
+    "gateway-route-2025": {
+      "commandID": "bde213c2-1cdc-4a8b-9fd7-07dab8e23efc",
+      "status": "Success",
+      "output": "[{\"IPAddress\":\"10.100.0.140\",\"InterfaceAlias\":\"cldt1775f69e\",\"NextHop\":null,\"DestinationPrefix\":null},{\"IPAddress\":null,\"InterfaceAlias\":\"cldt1775f69e\",\"NextHop\":\"0.0.0.0\",\"DestinationPrefix\":\"16.146.98.223/32\"}]"
+    }
+  },
+  "retainedFleets": {
+    "original": {
+      "count": 13,
+      "exactUIDsAndReadinessPreserved": true
+    },
+    "kuberouter": {
+      "count": 7,
+      "exactUIDsAndReadinessPreserved": true
+    }
+  },
+  "checkedAt": "2026-09-09T16:17:48.899670+00:00",
+  "archiveSHA256": "8d0cb45060dec10a105404e9d29748e53744577b2227375aa4ee522fca0ae0f6"
+}

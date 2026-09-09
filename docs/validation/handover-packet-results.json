@@ -1,0 +1,236 @@
+{
+  "state": "Linux receive overlap verified across three single-NIC QEMU VMs",
+  "date": "2026-09-09",
+  "binarySHA256": "2ccea659171ccc4501ba076c2afdd3233e017e1a91672583f89cbc133f59dcb1",
+  "source": "controller/pkg/tunneldevice/testdata/handover-vm/main.go",
+  "sourceSHA256": "7a81a89f580cc9923495ef5781d004b6de21ae9a4a12e5743c040804edcdd299",
+  "vms": {
+    "cp2": {
+      "kernel": "5.15.0-181-generic",
+      "physicalNICs": [
+        "ens2"
+      ]
+    },
+    "w1": {
+      "kernel": "5.15.0-181-generic",
+      "physicalNICs": [
+        "ens2"
+      ]
+    },
+    "w2": {
+      "kernel": "5.15.0-181-generic",
+      "physicalNICs": [
+        "ens2"
+      ]
+    }
+  },
+  "operationTimes": {
+    "prepare-b-start": "2026-09-09T14:33:49.239460+00:00",
+    "prepare-b-finished": "2026-09-09T14:33:53.227128+00:00",
+    "retire-a-start": "2026-09-09T14:34:09.711422+00:00",
+    "retire-a-finished": "2026-09-09T14:34:10.002214+00:00"
+  },
+  "positiveRequestsPassed": 1840,
+  "expectedRejectionsPassed": 12,
+  "continuousRequestsPassed": 1600,
+  "serverEchoCounts": {
+    "server-a-4.jsonl": 460,
+    "server-a-6.jsonl": 460,
+    "server-b-4.jsonl": 460,
+    "server-b-6.jsonl": 460
+  },
+  "rawLogsIndependentlyValidated": true,
+  "allNativeProcessesTerminal": true,
+  "experimentNamespacesDeleted": true,
+  "streams": [
+    {
+      "file": "after-spoof-a-4.jsonl",
+      "attempts": 20,
+      "passed": 20,
+      "expectedRejection": false,
+      "maxStartIntervalSeconds": 0.021005,
+      "sha256": "88737ccd971dd0ab12d3ebfa409bcb4eafbf3f6bc46998f0107653189dda99de",
+      "bracketsOperation": false
+    },
+    {
+      "file": "after-spoof-a-6.jsonl",
+      "attempts": 20,
+      "passed": 20,
+      "expectedRejection": false,
+      "maxStartIntervalSeconds": 0.021059,
+      "sha256": "fa52cb46f6aa97df6c71c1b01e97bf44ca808249fd77a1cc06d9dd35929f0c5d",
+      "bracketsOperation": false
+    },
+    {
+      "file": "after-spoof-b-4.jsonl",
+      "attempts": 20,
+      "passed": 20,
+      "expectedRejection": false,
+      "maxStartIntervalSeconds": 0.021066,
+      "sha256": "0ef468c92d70af23a7db17506aa1fa5946dda21429dcc0ef0da499f69b34eb37",
+      "bracketsOperation": false
+    },
+    {
+      "file": "after-spoof-b-6.jsonl",
+      "attempts": 20,
+      "passed": 20,
+      "expectedRejection": false,
+      "maxStartIntervalSeconds": 0.02178,
+      "sha256": "765d75e12a945ef0a8c607ff89b36c202d456c479a96dd4b0b6821480c472e2c",
+      "bracketsOperation": false
+    },
+    {
+      "file": "new-during-retire-4.jsonl",
+      "attempts": 400,
+      "passed": 400,
+      "expectedRejection": false,
+      "maxStartIntervalSeconds": 0.022302,
+      "sha256": "631c1dda2c90875394243bb4174abde00d53be2cc35741fd32d88c9ddd4cd036",
+      "bracketsOperation": true
+    },
+    {
+      "file": "new-during-retire-6.jsonl",
+      "attempts": 400,
+      "passed": 400,
+      "expectedRejection": false,
+      "maxStartIntervalSeconds": 0.021989,
+      "sha256": "da2c352764567f5f49035167bfe322337ce5001a98cb1ad1fd0b3ebee8bab23d",
+      "bracketsOperation": true
+    },
+    {
+      "file": "old-during-prepare-4.jsonl",
+      "attempts": 400,
+      "passed": 400,
+      "expectedRejection": false,
+      "maxStartIntervalSeconds": 0.021531,
+      "sha256": "52ef021d6a3a36875a935cf34e45c691524c86062ddd514ead540cc6320fa8fa",
+      "bracketsOperation": true
+    },
+    {
+      "file": "old-during-prepare-6.jsonl",
+      "attempts": 400,
+      "passed": 400,
+      "expectedRejection": false,
+      "maxStartIntervalSeconds": 0.021225,
+      "sha256": "ef761956b2a3eed44419be144a15840ab9d2864d35f51e92f7ff762dc6fabf9b",
+      "bracketsOperation": true
+    },
+    {
+      "file": "reject-spoof-a-4.jsonl",
+      "attempts": 2,
+      "passed": 2,
+      "expectedRejection": true,
+      "maxStartIntervalSeconds": 1.000441,
+      "sha256": "747c2fc76c9c4257737d0f9214da19b328b07e3da7ef02621a57520b8f6ac9a9",
+      "bracketsOperation": false
+    },
+    {
+      "file": "reject-spoof-a-6.jsonl",
+      "attempts": 2,
+      "passed": 2,
+      "expectedRejection": true,
+      "maxStartIntervalSeconds": 1.00026,
+      "sha256": "773ead65d61099f07527a4f7ebae2374fca3346c0e731c2b6a683cac9c3b5ddc",
+      "bracketsOperation": false
+    },
+    {
+      "file": "reject-spoof-b-4.jsonl",
+      "attempts": 2,
+      "passed": 2,
+      "expectedRejection": true,
+      "maxStartIntervalSeconds": 1.000711,
+      "sha256": "fa88d05ce9b580ba373c72b91e32ab9dde7641654fcbc512738ffaf6dc6211ea",
+      "bracketsOperation": false
+    },
+    {
+      "file": "reject-spoof-b-6.jsonl",
+      "attempts": 2,
+      "passed": 2,
+      "expectedRejection": true,
+      "maxStartIntervalSeconds": 1.000317,
+      "sha256": "e47ac5a24c40b88034155882e9529ad0f0dc17e43d12bdb80dd60b8cc51121ae",
+      "bracketsOperation": false
+    },
+    {
+      "file": "retired-a-4.jsonl",
+      "attempts": 2,
+      "passed": 2,
+      "expectedRejection": true,
+      "maxStartIntervalSeconds": 1.000466,
+      "sha256": "dd058141cfc68990ad34cf148edd5450f702a71c81ccf9d01b09929cf606c322",
+      "bracketsOperation": false
+    },
+    {
+      "file": "retired-a-6.jsonl",
+      "attempts": 2,
+      "passed": 2,
+      "expectedRejection": true,
+      "maxStartIntervalSeconds": 1.000307,
+      "sha256": "6fc5c17d71e4172d885771c32cc2ca2f8760ac8f70114399e1a4bfd751431227",
+      "bracketsOperation": false
+    },
+    {
+      "file": "warmup-a-4.jsonl",
+      "attempts": 40,
+      "passed": 40,
+      "expectedRejection": false,
+      "maxStartIntervalSeconds": 0.021046,
+      "sha256": "613e6ea2260d5bd27da0f5cb6beae306dae2693f0e7cbdd59d52df1d82802a35",
+      "bracketsOperation": false
+    },
+    {
+      "file": "warmup-a-6.jsonl",
+      "attempts": 40,
+      "passed": 40,
+      "expectedRejection": false,
+      "maxStartIntervalSeconds": 0.021088,
+      "sha256": "370b5bdaa6d7c2de3990c4a70c6434e7b08d9b581e8ec0202b7f0800dc25abc5",
+      "bracketsOperation": false
+    },
+    {
+      "file": "warmup-b-4.jsonl",
+      "attempts": 40,
+      "passed": 40,
+      "expectedRejection": false,
+      "maxStartIntervalSeconds": 0.021059,
+      "sha256": "a5cacb1e94ac2b97d1350619056a3d953567426f064feb49a82b13e9394f4248",
+      "bracketsOperation": false
+    },
+    {
+      "file": "warmup-b-6.jsonl",
+      "attempts": 40,
+      "passed": 40,
+      "expectedRejection": false,
+      "maxStartIntervalSeconds": 0.021044,
+      "sha256": "214333f1f2b6ea97b8b2abfdd32b9184ca80b03f27b4241912b1749f06572043",
+      "bracketsOperation": false
+    }
+  ],
+  "limitations": [
+    "Linux only; Windows 2022/2025 not exercised.",
+    "Receive-path overlap experiment, not production controller/dialer integration.",
+    "Replies explicitly bound to the receiving generation; automatic production egress selection is not tested.",
+    "Same source addresses on two sender VMs model old/new source owners; no CNI workload migration or cloud tunnel crossing is tested.",
+    "No rollback, restart recovery, receipt protocol, or drain policy qualification."
+  ],
+  "qualificationEligibleForProductionHandover": false,
+  "publicRunnerValidation": {
+    "state": "passed with fresh namespace, executable and keys",
+    "finishedAt": "2026-09-09T14:37:34.318864+00:00",
+    "positiveRequests": 1840,
+    "continuousRequests": 1600,
+    "expectedRejections": 12,
+    "rawLogsIndependentlyValidated": true
+  },
+  "evidenceArchiveSHA256": "8abe55aa32a53a42f0a3e639264c3833ada3e183ea77b40b1a60f74f2c0c171c",
+  "retainedFleets": {
+    "original": {
+      "count": 13,
+      "exactUIDsAndReadinessPreserved": true
+    },
+    "kuberouter": {
+      "count": 7,
+      "exactUIDsAndReadinessPreserved": true
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "state": "Shared receipt-round binding implemented and unit/race validated; not integrated into runtime handover",
+  "checkedAt": "2026-09-09T17:21:10.230010+00:00",
+  "releaseQualified": false,
+  "runtimeIntegration": false,
+  "nativeVMExecutionThisChange": false,
+  "validation": {
+    "command": "go test -race -coverprofile=/tmp/cldt-handover-round.cover ./pkg/handover",
+    "workingDirectory": "controller",
+    "exitCode": 0,
+    "coverage": {
+      "coveredStatements": 76,
+      "statements": 79,
+      "percent": 96.2,
+      "scope": "controller/pkg/handover only"
+    }
+  },
+  "verified": [
+    "complete fresh receipt set",
+    "canonical membership order and UTC timestamps",
+    "restart from persisted round",
+    "strict persisted schema and no trailing documents",
+    "cluster, transition, graph, phase and generation binding",
+    "fresh attempt replay rejection",
+    "same-phase reverse-direction replay rejection",
+    "Node UID replacement and survivor membership replay rejection",
+    "global device-key uniqueness across both generations",
+    "missing, duplicate, unknown and unauthenticated receipts rejected",
+    "payload cannot populate authenticated node identity",
+    "both generation keys checked",
+    "future, pre-publication, stale and expired receipts rejected",
+    "caller membership remains immutable"
+  ],
+  "limitations": [
+    "Complete peer-graph validation remains external and is not yet supplied by this package",
+    "Transport authentication and native phase observation must be implemented by their owners",
+    "Durable phase-history enforcement, compare-and-swap integration, drain policy, rollback execution and recovery remain incomplete",
+    "Current tunnelhost and peerpublisher safeguards remain active"
+  ],
+  "existingSafeguards": [
+    "ea1c7a1",
+    "ca6e69b"
+  ],
+  "sourceSHA256": {
+    "controller/pkg/handover/round.go": "149c97e71f02d650d8bb98743bdad604cb158c610ac77b313519020d69526207",
+    "controller/pkg/handover/round_test.go": "103db02fdd67ae68d658ec7f8bf0abb58be79b0e6c7baa35bc471d3e9585ba48"
+  },
+  "archiveSHA256": "82cccc6b79be44a4dbef3053a6962cb39320ac2c7833363da2d77a9baf5bf209"
+}

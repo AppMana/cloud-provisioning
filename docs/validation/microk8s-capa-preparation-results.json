@@ -1,0 +1,107 @@
+{
+  "result": "bootstrap-network-and-one-removal-replacement-cycle-passed",
+  "updatedAt": "2026-09-09T11:24:10.863885+00:00",
+  "runID": "cldt-microk8s-capa-v1",
+  "region": "us-west-2",
+  "workerAMI": "ami-095b7537ef1237e91",
+  "bootstrapBinarySHA256": "fab1262560b448589bd0051069dda97dadad018a8fbe94f65a2dd7b3d09d951a",
+  "assetDelivery": {
+    "privateBucket": true,
+    "downloadPrefix": "downloads/",
+    "signer": "STS federation session restricted to GetObject",
+    "URLsPublished": false
+  },
+  "capa": {
+    "version": "v2.12.1",
+    "manifestSHA256": "3ab4c854f282938df9a3faae180246781bcc41ed7b4cde63baf785e6a1ee8175",
+    "prefetchedImageDigest": "sha256:8e0a86faf92a2bab8d278c8aae0e211f888cf44186af4e1554221afe8cb7e657",
+    "installed": true
+  },
+  "sessions": {
+    "capaExpiresAt": "2026-09-09T11:27:03+00:00",
+    "harnessExpiresAt": "2026-09-09T11:27:04+00:00",
+    "sourceCredentialsTransferred": false
+  },
+  "workerClaimsCreated": 2,
+  "limits": [
+    "Two real CAPA worker bootstraps and 382 final checks across baseline, survivor and replacement rows passed at the retained all-nodes placement. Other AWS placements remain open.",
+    "The original strict row rejected the documented CAPA include warning; the narrow provider-specific observer was validated without replaying userdata.",
+    "Only the replacement row recorded every probe attempt. Bounded matrices do not qualify continuous availability."
+  ],
+  "runner": {
+    "awsCLIVersion": "2.34.63",
+    "pythonVersion": "3.14.7",
+    "derivedHarnessSessionObservedPreparedAMI": true,
+    "awsRowBinary": "/work/awsrow-bootstrap-completion-v6",
+    "awsRowBuildSucceeded": true,
+    "completedBootstrapGateBuilt": true
+  },
+  "workerSizing": {
+    "selectedInstanceType": "t3.medium",
+    "pricing": {
+      "observedAt": "2026-09-09T09:39:34.265834+00:00",
+      "source": "AWS Price List GetProducts",
+      "quotes": [
+        {
+          "instanceType": "t3.medium",
+          "region": "us-west-2",
+          "os": "Linux",
+          "market": "on-demand",
+          "USDPerHour": "0.0416000000",
+          "vCPU": "2",
+          "memory": "4 GiB",
+          "effectiveDate": "2026-09-01T00:00:00Z"
+        },
+        {
+          "instanceType": "t3.large",
+          "region": "us-west-2",
+          "os": "Linux",
+          "market": "on-demand",
+          "USDPerHour": "0.0832000000",
+          "vCPU": "2",
+          "memory": "8 GiB",
+          "effectiveDate": "2026-09-01T00:00:00Z"
+        }
+      ],
+      "excluded": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "CPU surplus credits",
+        "image preparation"
+      ],
+      "capacityVerified": true
+    },
+    "reason": "Same 2 vCPU and 4 GiB as the VM worker; half the quoted base compute price of t3.large.",
+    "runtimeCapacityQualified": false
+  },
+  "nativeValidation": {
+    "state": "passed",
+    "commandID": "d934b70e-62a2-460f-9434-238976e1e9a4",
+    "claims": [
+      "aws-microk8s-remote1",
+      "aws-microk8s-remote2"
+    ],
+    "instances": [
+      "i-066846bed5329ceda",
+      "i-05334f67644e29922"
+    ],
+    "completedBootstrapRequired": true,
+    "originalStrictRow": {
+      "commandID": "780f2a06-93a1-4dc4-8d20-2cdb66004f9c",
+      "status": "Failed",
+      "exitCode": 1,
+      "reason": "documented CAPA include warning yielded cloud-init exit 2"
+    },
+    "completedBootstrapVerified": true,
+    "completionEvidence": "capa-cloud-init-completion-results.json",
+    "networkEvidence": "microk8s-capa-network-results.json"
+  },
+  "removalValidation": {
+    "state": "passed",
+    "claim": "aws-microk8s-remote1",
+    "commandID": "47517b24-ccfe-4c64-9c6b-c55ff4015923",
+    "lifecycleEvidence": "microk8s-capa-lifecycle-results.json",
+    "replacementCommandID": "36ccf33e-65c3-4846-b5c4-a3101d7633f0"
+  }
+}

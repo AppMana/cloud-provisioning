@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "result": "passed",
+  "scope": "Read-only Linux netlink observer on one existing single-NIC k0s remote; Windows cross-compilation only",
+  "linuxBinarySHA256": "f4887e9ffb1cbccb9c802c2a4883296273d4036ed7094d0f61b725bbbafb289c",
+  "windowsBuildSHA256": "b087a18831bd4588c85a6577eb5644678a68a86169a374e513e777abd2ac2282",
+  "native": {
+    "node": "remote2",
+    "samples": 2,
+    "peerCounts": [
+      2,
+      2
+    ],
+    "up": [
+      true,
+      true
+    ],
+    "format": "Existing hashed-peer/counter schema; lastHandshakeFiletime uses 100ns intervals since 1601 on both OS backends",
+    "wgCLIRequired": false,
+    "installedWorkerPackages": false
+  },
+  "tests": {
+    "command": "go test ./cmd/tunnelobserve -count=1 -coverprofile=<private>/tunnelobserve-unit.cover",
+    "passed": true,
+    "selectedPackageStatementCoveragePercent": 21.4,
+    "assertions": [
+      "Only hashed public identities and selected counters are serialized",
+      "Private/preshared/raw public keys are absent",
+      "FILETIME conversion and never-handshaken peers"
+    ]
+  },
+  "windows": {
+    "crossCompiled": true,
+    "nativeExecutionOfRefactoredBinary": false
+  },
+  "limitations": [
+    "Native diagnostic binary was not built with runtime coverage instrumentation.",
+    "This observer result does not qualify network reliability or Windows native behavior."
+  ],
+  "temporaryGuestFilesRemovedAfterCampaign": true,
+  "subsequentWindowsValidation": "tunnelobserve-windows-results.json"
+}

@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"encoding/base64"
 	"strings"
 	"testing"
 
@@ -19,19 +20,20 @@ import (
 // objects and do not touch real AWS or CAPA, which is a
 // live-cluster/e2e concern rather than a unit-test one.
 
-func TestInfraValues_NoInstanceType_ReturnsEmptyNonNilMap(t *testing.T) {
-	// Before CAPA (or the claim reconciler) has set spec.instanceType
-	// there is nothing to derive: the result is empty, not nil, and not
-	// an error.
-	values, err := Provider{}.InfraValues(context.Background(), &unstructured.Unstructured{Object: map[string]any{}})
+// Instance identity cannot exist before CAPA consumes the bootstrap Secret.
+// The AWS adapter supplies guest-side discovery independently of instance type.
+func TestInfraValuesSuppliesIdentityDiscoveryBeforeLaunch(t *testing.T) {
+	values, err := Provider{}.InfraValues(context.Background(), &unstructured.Unstructured{})
 	if err != nil {
-		t.Fatalf("InfraValues: %v", err)
+		t.Fatal(err)
 	}
-	if values == nil {
-		t.Error("InfraValues returned nil, want an empty-but-non-nil map")
+	encoded, ok := values["providerIdentityScript"].(string)
+	if !ok || encoded == "" {
+		t.Fatal("missing pre-launch identity discovery")
 	}
-	if len(values) != 0 {
-		t.Errorf("InfraValues = %v, want empty when spec.instanceType is unset", values)
+	raw, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil || string(raw) != BootstrapIdentityScript {
+		t.Fatal("invalid identity executable")
 	}
 }
 

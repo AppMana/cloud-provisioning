@@ -1,0 +1,40 @@
+{
+  "scope": "Simulated EC2 ingress ownership contract with isolated Kubernetes API finalizer validation; no real AWS ingress mutation or CNI qualification",
+  "tests": {
+    "status": "passed",
+    "isolatedAPIVersion": "1.35.0",
+    "cases": [
+      "two shared worker leases create one permission",
+      "first release retains shared permission; final release revokes exact ID",
+      "lost create/revoke responses resolved by observation",
+      "stale lease cannot remove replacement",
+      "foreign existing permission and changed rule rejection",
+      "persistent intent before mutation",
+      "restart after creation before journal commit",
+      "missing-rule repair",
+      "deleted group retirement without revoke",
+      "ConfigMap deletion retains leases until cleanup"
+    ]
+  },
+  "coverage": {
+    "awsPackageUnitAndAPIStatementsPercent": 78.0,
+    "ingressFilesStatements": {
+      "covered": 188,
+      "total": 243,
+      "percent": 77.4
+    },
+    "nativeAWS": "not yet run"
+  },
+  "sourceSHA256": {
+    "controller/pkg/attachment/aws/ingress.go": "9daf6c3d4b043a6bee8e852e02e89a03f26adbfd677a2271a858011d42ffe690",
+    "controller/pkg/attachment/aws/ingress_journal.go": "8e16450353042c341d6556dddf5f19689233d0db54fed1f4516b29f4c574700b",
+    "controller/pkg/attachment/aws/ingress_journal_envtest_test.go": "ae2432c7a736199ca983e3110c26d35c897249002fc609a474ddb7710b4d3406",
+    "controller/pkg/attachment/aws/ingress_test.go": "ac4c95a7b8508a5838fe450095c28771b907a9f6c3e3123a14d49defdc65e92f"
+  },
+  "remaining": [
+    "Scoped IAM policy and native AWS validation",
+    "Composed forwarding and consumer publication",
+    "Elected controller registration",
+    "CAPI removal/replacement and full Windows networking matrix"
+  ]
+}

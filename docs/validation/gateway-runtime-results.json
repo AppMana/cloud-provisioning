@@ -1,0 +1,28 @@
+{
+  "scope": "Opt-in AWS attachment runtime wiring and request lifecycle tests; not a live attachment rollout",
+  "observedAt": "2026-09-07T08:44:48.807258+00:00",
+  "requestChecks": [
+    "finalizer saved before preparation",
+    "UID-bound identity",
+    "label removal starts withdrawal",
+    "finalizer retained until Complete",
+    "deletion cleans up despite invalid desired JSON",
+    "invalid placement rejected before preparation",
+    "other mesh cannot withdraw owned request"
+  ],
+  "requestReconcileCoveragePercent": 79.5,
+  "runtimePackageCoveragePercent": 53.4,
+  "validation": [
+    "attachment and endpoint-controller tests passed",
+    "controller build passed",
+    "enabled Helm template rendered",
+    "git diff --check passed"
+  ],
+  "remaining": [
+    "Exercise manager registration with isolated API",
+    "Deploy opt-in controller against retained test scope",
+    "Combined projection/CNI and packet matrix",
+    "CAPI pre-delete coordination and replacement",
+    "Remaining distro/GPU/image workstream"
+  ]
+}

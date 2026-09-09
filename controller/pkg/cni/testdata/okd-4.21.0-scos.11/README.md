@@ -1,0 +1,1 @@
+Observed from the official OKD 4.21.0-okd-scos.11 agent installation on 2026-09-05. The network operator supplied Geneve port 6081 and MTU 1400, with kube-proxy disabled. Server metadata and transient rollout status were omitted. This fixture tests configuration interpretation; it does not establish remote OVN packet reachability.

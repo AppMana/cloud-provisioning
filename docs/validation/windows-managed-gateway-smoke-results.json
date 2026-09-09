@@ -1,0 +1,226 @@
+{
+  "scope": "Two live managed Windows gateway attachments with ordinary-pod TCP, Service and DNS smoke tests; no NetworkPolicy, transfer, failover or CAPI lifecycle qualification",
+  "observedAt": "2026-09-07T09:28:44.778012+00:00",
+  "controllerImage": "cldt/controller-windows:v8",
+  "controllerImageID": "sha256:2ae3b723cc1da8611869371f7d0bd2a6cefc2987c4953920ec6a75ffb4c9e2a6",
+  "readyAttachments": 2,
+  "sharedReturnRoutes": 7,
+  "leasesPerSharedReturnRoute": 2,
+  "sharedSiteIngressRules": 7,
+  "workerSpecificIngressRules": 4,
+  "sourceCheckLeases": 2,
+  "passed": 19,
+  "total": 21,
+  "previousBaselinePassed": 5,
+  "failures": [
+    {
+      "from": "aws-win2022",
+      "to": "aws-win2022",
+      "kind": "service"
+    },
+    {
+      "from": "aws-win2025",
+      "to": "aws-win2025",
+      "kind": "service"
+    }
+  ],
+  "windowsDSREnabled": true,
+  "matrix": {
+    "observedAt": "2026-09-07T09:25:52.074084+00:00",
+    "scope": "Ordinary-pod TCP echo and DNS/Service smoke checks with managed gateway attachments; no transfer, policy or CAPI lifecycle claim",
+    "namespace": "cldt-windows-network-v1",
+    "image": "registry.k8s.io/e2e-test-images/agnhost@sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+    "results": [
+      {
+        "node": "aws-win2022",
+        "checks": [
+          {
+            "detail": "ok",
+            "exitCode": 0,
+            "to": "aws-win2022",
+            "ok": true,
+            "kind": "pod",
+            "seconds": 0.3193637
+          },
+          {
+            "detail": "crictl.exe : curl: (28) Connection timed out after 8011 milliseconds\r\nAt line:1 char:1118\r\n+ ... Date;$body=(& C:\\ProgramData\\CloudProvisioning\\diagnostics\\crictl.exe ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : NotSpecified: (curl: (28) Conn...11 milliseconds:String) [], RemoteException\r\n    + FullyQualifiedErrorId : NativeCommandError\r\n \r\ntime=\"2026-09-07T09:25:47Z\" level=fatal msg=\"execing command in container \r\n07dbb9233d09cc",
+            "exitCode": 1,
+            "to": "aws-win2022",
+            "ok": false,
+            "kind": "service",
+            "seconds": 8.242743599999999
+          },
+          {
+            "detail": "ok",
+            "exitCode": 0,
+            "to": "aws-win2025",
+            "ok": true,
+            "kind": "pod",
+            "seconds": 0.1199398
+          },
+          {
+            "detail": "ok",
+            "exitCode": 0,
+            "to": "aws-win2025",
+            "ok": true,
+            "kind": "service",
+            "seconds": 0.13817659999999998
+          },
+          {
+            "detail": "ok",
+            "exitCode": 0,
+            "to": "w1",
+            "ok": true,
+            "kind": "pod",
+            "seconds": 0.1794439
+          },
+          {
+            "detail": "ok",
+            "exitCode": 0,
+            "to": "w1",
+            "ok": true,
+            "kind": "service",
+            "seconds": 0.1708728
+          },
+          {
+            "detail": "ok",
+            "exitCode": 0,
+            "to": "w1",
+            "ok": true,
+            "kind": "dns-service",
+            "seconds": 0.2165016
+          }
+        ]
+      },
+      {
+        "node": "aws-win2025",
+        "checks": [
+          {
+            "detail": "ok",
+            "exitCode": 0,
+            "to": "aws-win2022",
+            "ok": true,
+            "kind": "pod",
+            "seconds": 2.2309371
+          },
+          {
+            "detail": "ok",
+            "exitCode": 0,
+            "to": "aws-win2022",
+            "ok": true,
+            "kind": "service",
+            "seconds": 0.09851499999999999
+          },
+          {
+            "detail": "ok",
+            "exitCode": 0,
+            "to": "aws-win2025",
+            "ok": true,
+            "kind": "pod",
+            "seconds": 0.1037606
+          },
+          {
+            "detail": "crictl.exe : curl: (28) Connection timed out after 8001 milliseconds\r\nAt line:1 char:1118\r\n+ ... Date;$body=(& C:\\ProgramData\\CloudProvisioning\\diagnostics\\crictl.exe ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : NotSpecified: (curl: (28) Conn...01 milliseconds:String) [], RemoteException\r\n    + FullyQualifiedErrorId : NativeCommandError\r\n \r\ntime=\"2026-09-07T09:25:49Z\" level=fatal msg=\"execing command in container \r\nf4d794ae1d5734",
+            "exitCode": 1,
+            "to": "aws-win2025",
+            "ok": false,
+            "kind": "service",
+            "seconds": 8.2854
+          },
+          {
+            "detail": "ok",
+            "exitCode": 0,
+            "to": "w1",
+            "ok": true,
+            "kind": "pod",
+            "seconds": 0.1473476
+          },
+          {
+            "detail": "ok",
+            "exitCode": 0,
+            "to": "w1",
+            "ok": true,
+            "kind": "service",
+            "seconds": 0.1571786
+          },
+          {
+            "detail": "ok",
+            "exitCode": 0,
+            "to": "w1",
+            "ok": true,
+            "kind": "dns-service",
+            "seconds": 0.1856746
+          }
+        ]
+      },
+      {
+        "node": "w1",
+        "checks": [
+          {
+            "kind": "pod",
+            "to": "aws-win2022",
+            "ok": true,
+            "exitCode": 0,
+            "detail": "ok",
+            "seconds": 0.19071132500539534
+          },
+          {
+            "kind": "service",
+            "to": "aws-win2022",
+            "ok": true,
+            "exitCode": 0,
+            "detail": "ok",
+            "seconds": 0.1793911120039411
+          },
+          {
+            "kind": "pod",
+            "to": "aws-win2025",
+            "ok": true,
+            "exitCode": 0,
+            "detail": "ok",
+            "seconds": 0.1807548590004444
+          },
+          {
+            "kind": "service",
+            "to": "aws-win2025",
+            "ok": true,
+            "exitCode": 0,
+            "detail": "ok",
+            "seconds": 0.2014211029963917
+          },
+          {
+            "kind": "pod",
+            "to": "w1",
+            "ok": true,
+            "exitCode": 0,
+            "detail": "ok",
+            "seconds": 0.13769789400248555
+          },
+          {
+            "kind": "service",
+            "to": "w1",
+            "ok": true,
+            "exitCode": 0,
+            "detail": "ok",
+            "seconds": 0.11159991499880562
+          },
+          {
+            "kind": "dns-service",
+            "to": "w1",
+            "ok": true,
+            "exitCode": 0,
+            "detail": "ok",
+            "seconds": 0.1311926600028528
+          }
+        ]
+      }
+    ]
+  },
+  "remaining": [
+    "Diagnose same-pod local Service hairpin failures",
+    "Transfer sizes and NetworkPolicy matrix",
+    "Gateway failover and partial/final lease removal",
+    "CAPI deletion/replacement and fresh image boots",
+    "Broader distro/GPU/image workstream"
+  ]
+}

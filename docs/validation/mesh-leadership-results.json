@@ -1,0 +1,22 @@
+{
+  "scope": "Two real controller-runtime managers against isolated Kubernetes API/etcd; no production or native AWS writer failover claim",
+  "isolatedAPIVersion": "1.35.0",
+  "tests": {
+    "sameMeshLockIdentity": "passed",
+    "distinctMeshLockIdentity": "passed",
+    "singleActiveWriter": "passed",
+    "takeoverAfterLeaseExpiry": "passed",
+    "overlappingWritersObserved": 0,
+    "chartRender": "passed"
+  },
+  "sourceSHA256": {
+    "controller/cmd/endpoint-controller/leadership.go": "7e467d30a28042a1ea22bccdb6cebe5d44a244b3d33b8d2231cfe3ffb4d00102",
+    "controller/cmd/endpoint-controller/leadership_test.go": "2ee73955822b1c3ba295f1017f1c764798f888b8351a9ee01f9cb90bf6a26d27",
+    "charts/cloud-provisioning/templates/rbac.yaml": "ccd7248b11c71c8862108dc237096eb2dcadb67f5dba8fe1bb266ee00173f0cd"
+  },
+  "remaining": [
+    "Controller image and RBAC rollout",
+    "Attachment controller registration",
+    "Combined native lifecycle matrix"
+  ]
+}

@@ -1,0 +1,1105 @@
+{
+  "scope": "Single-underlay-NIC AWS Windows Server 2022/2025 and local Linux VMs: k0s-owned Calico patch persistence, native Felix restart MTU recovery, fresh ordinary pods and concurrent TCP/UDP",
+  "observedAt": "2026-09-07T10:59:35.284308+00:00",
+  "k0sVersion": "v1.36.2+k0s.0",
+  "calicoVersion": "v3.32.0",
+  "calicoSourceCommit": "eb1cf57823a1dd8d25c48b82fd023ea9e3e17996",
+  "binarySHA256": "ba7b21009fbb787e2fb260d85208a53512671a5e2ad48bfcbc8365c3704dee0e",
+  "configurationPatch": "providers/calico/k0s-mtu-validation-patch.json",
+  "revertedCommandBaseline": {
+    "cause": "k0s controller restart regenerated the bundled Windows DaemonSet, removing the direct command override while retaining FELIX_VXLANMTU=1370",
+    "observedFelixArgs": [
+      "$env:CONTAINER_SANDBOX_MOUNT_POINT/CalicoWindows/felix-service.ps1"
+    ],
+    "observedFelixCommand": null,
+    "restartExperiment": [
+      {
+        "windowsVersion": "2022",
+        "node": "aws-win2022",
+        "startedAt": "2026-09-07T10:50:29.009589+00:00",
+        "workloadPodUID": "a3b4c678-7e9d-44e8-939e-bac965790c12",
+        "podIP": "10.244.167.143",
+        "before": {
+          "compartment": 10,
+          "mtu": 1370,
+          "interfaceIndex": 42
+        },
+        "felixBefore": {
+          "podUID": "f79bcc98-03da-454a-8ea4-d773b5a49187",
+          "containerID": "9db79cb8211f6d9a723c11dbceffd2d4178cadb86d0f37b9b5d05e9878f9483e",
+          "restartCount": 0,
+          "ready": true
+        },
+        "raised": {
+          "compartment": 10,
+          "mtu": 1450,
+          "interfaceIndex": 42
+        },
+        "after": {
+          "compartment": 10,
+          "mtu": 1450,
+          "interfaceIndex": 42
+        },
+        "ok": false,
+        "error": "restart did not converge MTU",
+        "final": {
+          "compartment": 10,
+          "mtu": 1450,
+          "interfaceIndex": 42
+        },
+        "manualRestoration": {
+          "compartment": 10,
+          "mtu": 1370,
+          "interfaceIndex": 42
+        }
+      }
+    ],
+    "interpretation": "Retained workload MTU and successful traffic did not prove the patched Felix remained active. The failed probe was restored manually before applying the persistent configuration."
+  },
+  "configurations": [
+    {
+      "validated": true,
+      "originalSHA256": "59399e980a83a4396c061af9c3c92784d243a1b48a4929edde49f3f6b89375e5",
+      "configuredSHA256": "8e65a3d9d00164781fcc437be097811c01d930a534724b4b69f616d5da21dbce",
+      "node": "cp3"
+    },
+    {
+      "validated": true,
+      "originalSHA256": "f8eaaf09a3dc57b3d3014a6f7ff4e0573935bfa21292bc257a0ff7d5cf6d758d",
+      "configuredSHA256": "dd87debcb36a564a13ead6d1d2c47486f45bb31dd52a70087df96ecfbbfc2401",
+      "node": "cp2"
+    },
+    {
+      "validated": true,
+      "originalSHA256": "bba1fef9e42a09c0ea45948198f49d4121a7e8b1f1832e43a05d8c302bf7acf7",
+      "configuredSHA256": "e39fbbce1346e988c470bd55bcf141b66cb6f827133158519575abbc50c0e1b0",
+      "node": "cp"
+    }
+  ],
+  "controlPlaneRestarts": [
+    {
+      "node": "cp3",
+      "previousPID": "284431",
+      "currentPID": "290920",
+      "pidChanged": true,
+      "apiReady": true,
+      "nodeReady": true,
+      "seconds": 10.05,
+      "observedAt": "2026-09-07T10:53:47.084366+00:00"
+    },
+    {
+      "node": "cp2",
+      "previousPID": "284450",
+      "currentPID": "290926",
+      "pidChanged": true,
+      "apiReady": true,
+      "nodeReady": true,
+      "seconds": 7.81,
+      "observedAt": "2026-09-07T10:53:55.046683+00:00"
+    },
+    {
+      "node": "cp",
+      "previousPID": "511616",
+      "currentPID": "523718",
+      "pidChanged": true,
+      "apiReady": true,
+      "nodeReady": true,
+      "seconds": 8.31,
+      "observedAt": "2026-09-07T10:54:03.498271+00:00"
+    }
+  ],
+  "generatedDaemonSet": {
+    "commandMatchesConfiguredPatch": true,
+    "vxlanMTU": 1370,
+    "ready": 2,
+    "desired": 2,
+    "updated": 2,
+    "daemonSetUID": "a7132f6d-f36f-4bbe-928e-4349e0be9bb2",
+    "generation": 7,
+    "observedGeneration": 7
+  },
+  "felixRestarts": [
+    {
+      "windowsVersion": "2022",
+      "node": "aws-win2022",
+      "startedAt": "2026-09-07T10:55:40.995352+00:00",
+      "workloadPodUID": "a3b4c678-7e9d-44e8-939e-bac965790c12",
+      "podIP": "10.244.167.143",
+      "before": {
+        "compartment": 10,
+        "mtu": 1370,
+        "interfaceIndex": 42
+      },
+      "felixBefore": {
+        "podUID": "c10190f6-6f55-4618-89c4-2abe09cd4946",
+        "containerID": "35e2ba9301e35274291c303ed855fd0132ed3aa0a60ac58de9aac5cd28076269",
+        "restartCount": 0,
+        "ready": true
+      },
+      "raised": {
+        "compartment": 10,
+        "mtu": 1450,
+        "interfaceIndex": 42
+      },
+      "after": {
+        "compartment": 10,
+        "mtu": 1370,
+        "interfaceIndex": 42
+      },
+      "felixAfter": {
+        "podUID": "c10190f6-6f55-4618-89c4-2abe09cd4946",
+        "containerID": "01787be505e67e2a35f67f7d6221a9a1dceed92b56cefb76fb0efc032ef93e38",
+        "restartCount": 1,
+        "ready": true
+      },
+      "recoverySeconds": 17.73,
+      "workloadUnchanged": true,
+      "ok": true,
+      "final": {
+        "compartment": 10,
+        "mtu": 1370,
+        "interfaceIndex": 42
+      }
+    },
+    {
+      "windowsVersion": "2025",
+      "node": "aws-win2025",
+      "startedAt": "2026-09-07T10:56:19.343820+00:00",
+      "workloadPodUID": "aeebca27-d21c-422e-aa0e-e02e9c1e1e57",
+      "podIP": "10.244.233.143",
+      "before": {
+        "compartment": 8,
+        "mtu": 1370,
+        "interfaceIndex": 41
+      },
+      "felixBefore": {
+        "podUID": "136a3d73-15aa-45cb-af8b-6393e8ebad22",
+        "containerID": "4682846367475ec4e58fe96f40a235cbb0204c912b6ab8ec9cb5dacc5294a76d",
+        "restartCount": 0,
+        "ready": true
+      },
+      "raised": {
+        "compartment": 8,
+        "mtu": 1450,
+        "interfaceIndex": 41
+      },
+      "after": {
+        "compartment": 8,
+        "mtu": 1370,
+        "interfaceIndex": 41
+      },
+      "felixAfter": {
+        "podUID": "136a3d73-15aa-45cb-af8b-6393e8ebad22",
+        "containerID": "d628a113c693697630c19ccee40b4a1a70c61b3d7caacdef75adf314c89b5056",
+        "restartCount": 1,
+        "ready": true
+      },
+      "recoverySeconds": 16.19,
+      "workloadUnchanged": true,
+      "ok": true,
+      "final": {
+        "compartment": 8,
+        "mtu": 1370,
+        "interfaceIndex": 41
+      }
+    }
+  ],
+  "freshWindowsPods": [
+    {
+      "windowsVersion": "2022",
+      "name": "udp-net-aws-win2022",
+      "oldPodUID": "a3b4c678-7e9d-44e8-939e-bac965790c12",
+      "newPodUID": "728de2a9-a339-46d7-9928-a06b339cec27",
+      "podIP": "10.244.167.144",
+      "image": "registry.k8s.io/e2e-test-images/agnhost@sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "ready": true,
+      "observedAt": "2026-09-07T10:57:43.598943+00:00"
+    },
+    {
+      "windowsVersion": "2025",
+      "name": "udp-net-aws-win2025",
+      "oldPodUID": "aeebca27-d21c-422e-aa0e-e02e9c1e1e57",
+      "newPodUID": "adf61560-ed6b-43e2-9862-b4ac368dc5a8",
+      "podIP": "10.244.233.144",
+      "image": "registry.k8s.io/e2e-test-images/agnhost@sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+      "ready": true,
+      "observedAt": "2026-09-07T10:57:52.964606+00:00"
+    }
+  ],
+  "nativeBinaryAndMTU": [
+    {
+      "windowsVersion": "2022",
+      "felixPod": "calico-node-windows-k87nt",
+      "felixReady": true,
+      "observation": {
+        "binarySHA256": "BA7B21009FBB787E2FB260D85208A53512671A5E2AD48BFCBC8365C3704DEE0E",
+        "interfaces": [
+          {
+            "compartment": 7,
+            "mtu": 1370,
+            "pod": "client-aws-win2022"
+          },
+          {
+            "compartment": 6,
+            "mtu": 1370,
+            "pod": "net-aws-win2022"
+          },
+          {
+            "compartment": 11,
+            "mtu": 1370,
+            "pod": "udp-net-aws-win2022"
+          }
+        ],
+        "health": [
+          "+--------------------------+---------+----------------+-----------------+--------+",
+          "|        COMPONENT         | TIMEOUT |    LIVENESS    |    READINESS    | DETAIL |",
+          "+--------------------------+---------+----------------+-----------------+--------+",
+          "| CalculationGraph         | 30s     | reporting live | reporting ready |        |",
+          "| FelixStartup             | -       | reporting live | reporting ready |        |",
+          "| WindowsDataplaneMainLoop | 1m30s   | reporting live | reporting ready |        |",
+          "+--------------------------+---------+----------------+-----------------+--------+"
+        ]
+      }
+    },
+    {
+      "windowsVersion": "2025",
+      "felixPod": "calico-node-windows-2x8nj",
+      "felixReady": true,
+      "observation": {
+        "binarySHA256": "BA7B21009FBB787E2FB260D85208A53512671A5E2AD48BFCBC8365C3704DEE0E",
+        "interfaces": [
+          {
+            "compartment": 7,
+            "mtu": 1370,
+            "pod": "client-aws-win2025"
+          },
+          {
+            "compartment": 6,
+            "mtu": 1370,
+            "pod": "net-aws-win2025"
+          },
+          {
+            "compartment": 8,
+            "mtu": 1370,
+            "pod": "udp-net-aws-win2025"
+          }
+        ],
+        "health": [
+          "+--------------------------+---------+----------------+-----------------+--------+",
+          "|        COMPONENT         | TIMEOUT |    LIVENESS    |    READINESS    | DETAIL |",
+          "+--------------------------+---------+----------------+-----------------+--------+",
+          "| CalculationGraph         | 30s     | reporting live | reporting ready |        |",
+          "| FelixStartup             | -       | reporting live | reporting ready |        |",
+          "| WindowsDataplaneMainLoop | 1m30s   | reporting live | reporting ready |        |",
+          "+--------------------------+---------+----------------+-----------------+--------+"
+        ]
+      }
+    }
+  ],
+  "concurrentTCP": {
+    "scope": "Bidirectional HTTP POST echo with measured response bytes across ordinary Linux/Windows pods; Windows pipeline adds CRLF",
+    "observedAt": "2026-09-07T10:58:18.582010+00:00",
+    "results": [
+      {
+        "from": "aws-win2022",
+        "checks": [
+          {
+            "receivedBytes": 1026,
+            "expectedBytes": 1026,
+            "to": "aws-win2025",
+            "seconds": 0.780422,
+            "ok": true,
+            "detail": "200 1026",
+            "payloadBytes": 1024
+          },
+          {
+            "receivedBytes": 16386,
+            "expectedBytes": 16386,
+            "to": "aws-win2025",
+            "seconds": 0.4237292,
+            "ok": true,
+            "detail": "200 16386",
+            "payloadBytes": 16384
+          },
+          {
+            "receivedBytes": 1048578,
+            "expectedBytes": 1048578,
+            "to": "aws-win2025",
+            "seconds": 1.128145,
+            "ok": true,
+            "detail": "200 1048578",
+            "payloadBytes": 1048576
+          },
+          {
+            "receivedBytes": 1026,
+            "expectedBytes": 1026,
+            "to": "w1",
+            "seconds": 0.4368765,
+            "ok": true,
+            "detail": "200 1026",
+            "payloadBytes": 1024
+          },
+          {
+            "receivedBytes": 16386,
+            "expectedBytes": 16386,
+            "to": "w1",
+            "seconds": 0.458393,
+            "ok": true,
+            "detail": "200 16386",
+            "payloadBytes": 16384
+          },
+          {
+            "receivedBytes": 1048578,
+            "expectedBytes": 1048578,
+            "to": "w1",
+            "seconds": 0.8448426,
+            "ok": true,
+            "detail": "200 1048578",
+            "payloadBytes": 1048576
+          }
+        ]
+      },
+      {
+        "from": "aws-win2025",
+        "checks": [
+          {
+            "receivedBytes": 1026,
+            "expectedBytes": 1026,
+            "to": "aws-win2022",
+            "seconds": 1.3317198,
+            "ok": true,
+            "detail": "200 1026",
+            "payloadBytes": 1024
+          },
+          {
+            "receivedBytes": 16386,
+            "expectedBytes": 16386,
+            "to": "aws-win2022",
+            "seconds": 0.84992,
+            "ok": true,
+            "detail": "200 16386",
+            "payloadBytes": 16384
+          },
+          {
+            "receivedBytes": 1048578,
+            "expectedBytes": 1048578,
+            "to": "aws-win2022",
+            "seconds": 0.6268111,
+            "ok": true,
+            "detail": "200 1048578",
+            "payloadBytes": 1048576
+          },
+          {
+            "receivedBytes": 1026,
+            "expectedBytes": 1026,
+            "to": "w1",
+            "seconds": 0.2794345,
+            "ok": true,
+            "detail": "200 1026",
+            "payloadBytes": 1024
+          },
+          {
+            "receivedBytes": 16386,
+            "expectedBytes": 16386,
+            "to": "w1",
+            "seconds": 0.40605399999999997,
+            "ok": true,
+            "detail": "200 16386",
+            "payloadBytes": 16384
+          },
+          {
+            "receivedBytes": 1048578,
+            "expectedBytes": 1048578,
+            "to": "w1",
+            "seconds": 0.8111794,
+            "ok": true,
+            "detail": "200 1048578",
+            "payloadBytes": 1048576
+          }
+        ]
+      },
+      {
+        "from": "w1",
+        "checks": [
+          {
+            "to": "aws-win2022",
+            "payloadBytes": 1024,
+            "expectedBytes": 1024,
+            "receivedBytes": 1024,
+            "ok": true,
+            "seconds": 0.21477983899967512,
+            "detail": "200 1024"
+          },
+          {
+            "to": "aws-win2022",
+            "payloadBytes": 16384,
+            "expectedBytes": 16384,
+            "receivedBytes": 16384,
+            "ok": true,
+            "seconds": 0.22529253699758556,
+            "detail": "200 16384"
+          },
+          {
+            "to": "aws-win2022",
+            "payloadBytes": 1048576,
+            "expectedBytes": 1048576,
+            "receivedBytes": 1048576,
+            "ok": true,
+            "seconds": 0.6636643370002275,
+            "detail": "200 1048576"
+          },
+          {
+            "to": "aws-win2025",
+            "payloadBytes": 1024,
+            "expectedBytes": 1024,
+            "receivedBytes": 1024,
+            "ok": true,
+            "seconds": 0.21952768900519004,
+            "detail": "200 1024"
+          },
+          {
+            "to": "aws-win2025",
+            "payloadBytes": 16384,
+            "expectedBytes": 16384,
+            "receivedBytes": 16384,
+            "ok": true,
+            "seconds": 0.25342413500038674,
+            "detail": "200 16384"
+          },
+          {
+            "to": "aws-win2025",
+            "payloadBytes": 1048576,
+            "expectedBytes": 1048576,
+            "receivedBytes": 1048576,
+            "ok": true,
+            "seconds": 0.8464703960053157,
+            "detail": "200 1048576"
+          }
+        ]
+      }
+    ]
+  },
+  "concurrentUDP": {
+    "scope": "Ordinary-pod UDP echo via loopback agnhost dial, exact lowercase payload comparison, sizes below its 2048-byte buffer",
+    "observedAt": "2026-09-07T10:58:18.797360+00:00",
+    "results": [
+      {
+        "from": "aws-win2022",
+        "checks": [
+          {
+            "expectedResponses": 3,
+            "responseBytes": 512,
+            "to": "aws-win2025",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 512
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1200,
+            "to": "aws-win2025",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1200
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1340,
+            "to": "aws-win2025",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1340
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1400,
+            "to": "aws-win2025",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1400
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1800,
+            "to": "aws-win2025",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1800
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 512,
+            "to": "w1",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 512
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1200,
+            "to": "w1",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1200
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1340,
+            "to": "w1",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1340
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1400,
+            "to": "w1",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1400
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1800,
+            "to": "w1",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1800
+          }
+        ]
+      },
+      {
+        "from": "aws-win2025",
+        "checks": [
+          {
+            "expectedResponses": 3,
+            "responseBytes": 512,
+            "to": "aws-win2022",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 512
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1200,
+            "to": "aws-win2022",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1200
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1340,
+            "to": "aws-win2022",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1340
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1400,
+            "to": "aws-win2022",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1400
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1800,
+            "to": "aws-win2022",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1800
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 512,
+            "to": "w1",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 512
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1200,
+            "to": "w1",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1200
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1340,
+            "to": "w1",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1340
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1400,
+            "to": "w1",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1400
+          },
+          {
+            "expectedResponses": 3,
+            "responseBytes": 1800,
+            "to": "w1",
+            "errors": [
+              null
+            ],
+            "ok": true,
+            "responsesReceived": 3,
+            "payloadBytes": 1800
+          }
+        ]
+      },
+      {
+        "from": "w1",
+        "checks": [
+          {
+            "to": "aws-win2022",
+            "payloadBytes": 512,
+            "ok": true,
+            "responsesReceived": 3,
+            "expectedResponses": 3,
+            "responseBytes": 512,
+            "errors": []
+          },
+          {
+            "to": "aws-win2022",
+            "payloadBytes": 1200,
+            "ok": true,
+            "responsesReceived": 3,
+            "expectedResponses": 3,
+            "responseBytes": 1200,
+            "errors": []
+          },
+          {
+            "to": "aws-win2022",
+            "payloadBytes": 1340,
+            "ok": true,
+            "responsesReceived": 3,
+            "expectedResponses": 3,
+            "responseBytes": 1340,
+            "errors": []
+          },
+          {
+            "to": "aws-win2022",
+            "payloadBytes": 1400,
+            "ok": true,
+            "responsesReceived": 3,
+            "expectedResponses": 3,
+            "responseBytes": 1400,
+            "errors": []
+          },
+          {
+            "to": "aws-win2022",
+            "payloadBytes": 1800,
+            "ok": true,
+            "responsesReceived": 3,
+            "expectedResponses": 3,
+            "responseBytes": 1800,
+            "errors": []
+          },
+          {
+            "to": "aws-win2025",
+            "payloadBytes": 512,
+            "ok": true,
+            "responsesReceived": 3,
+            "expectedResponses": 3,
+            "responseBytes": 512,
+            "errors": []
+          },
+          {
+            "to": "aws-win2025",
+            "payloadBytes": 1200,
+            "ok": true,
+            "responsesReceived": 3,
+            "expectedResponses": 3,
+            "responseBytes": 1200,
+            "errors": []
+          },
+          {
+            "to": "aws-win2025",
+            "payloadBytes": 1340,
+            "ok": true,
+            "responsesReceived": 3,
+            "expectedResponses": 3,
+            "responseBytes": 1340,
+            "errors": []
+          },
+          {
+            "to": "aws-win2025",
+            "payloadBytes": 1400,
+            "ok": true,
+            "responsesReceived": 3,
+            "expectedResponses": 3,
+            "responseBytes": 1400,
+            "errors": []
+          },
+          {
+            "to": "aws-win2025",
+            "payloadBytes": 1800,
+            "ok": true,
+            "responsesReceived": 3,
+            "expectedResponses": 3,
+            "responseBytes": 1800,
+            "errors": []
+          }
+        ]
+      }
+    ]
+  },
+  "totals": {
+    "tcpCases": 18,
+    "tcpPassed": 18,
+    "udpCases": 30,
+    "udpPassed": 30,
+    "udpResponses": 90,
+    "udpExpectedResponses": 90
+  },
+  "health": {
+    "observedAt": "2026-09-07T10:59:35.284308+00:00",
+    "nodes": [
+      {
+        "name": "aws-win2022",
+        "uid": "817a65b2-fc50-41a9-af96-05eba64ce024",
+        "ready": true
+      },
+      {
+        "name": "aws-win2025",
+        "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+        "ready": true
+      },
+      {
+        "name": "cp",
+        "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+        "ready": true
+      },
+      {
+        "name": "cp2",
+        "uid": "947de62f-0920-408c-aa31-ac80a2344128",
+        "ready": true
+      },
+      {
+        "name": "cp3",
+        "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+        "ready": true
+      },
+      {
+        "name": "ip-172-29-0-9",
+        "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+        "ready": true
+      },
+      {
+        "name": "remote1",
+        "uid": "8935dd28-de93-44be-a887-73110fe88c51",
+        "ready": true
+      },
+      {
+        "name": "remote2",
+        "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+        "ready": true
+      },
+      {
+        "name": "w1",
+        "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+        "ready": true
+      },
+      {
+        "name": "w2",
+        "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+        "ready": true
+      }
+    ],
+    "attachments": [
+      {
+        "name": "network-attachment-231de8204fc1cbe590fc5461dbc86827",
+        "phase": "Ready"
+      },
+      {
+        "name": "network-attachment-b9665a3a0cf8f46a0806d528033cc990",
+        "phase": "Ready"
+      }
+    ]
+  },
+  "tests": {
+    "command": "go test ./felix/dataplane/windows ./libcalico-go/lib/winmtu -coverprofile=/var/tmp/felix-v332-mtu-coverage.out",
+    "passed": true,
+    "windowsDataplaneStatementCoveragePercent": 60.2,
+    "portableScriptGeneratorStatementCoveragePercent": 100,
+    "combinedStatementCoveragePercent": 61.3,
+    "nativeWindowsCoverageInstrumented": false
+  },
+  "limitations": [
+    "The startup command still requires a staged host executable; no prepared image or fresh CAPI worker boot qualification",
+    "Restart tests stop only Felix through CRI, not the VM or worker service",
+    "MTU restoration on restart does not establish periodic drift repair without reconciliation",
+    "TCP checks count response bytes rather than hashes; UDP compares exact echoed payloads with three attempts per case",
+    "No sustained throughput, full policy matrix, gateway failover or CAPI replacement qualification"
+  ],
+  "ingressPolicies": {
+    "2022": {
+      "scope": "Native Windows Calico ingress policy: Linux and same-node denied sources, allowed remote Windows source, unaffected target, then cleanup recovery",
+      "observedAt": "2026-09-07T10:59:49.484562+00:00",
+      "baseline": [
+        {
+          "source": "net-w1",
+          "target": "net-aws-win2022",
+          "connected": true
+        },
+        {
+          "source": "client-aws-win2022",
+          "target": "net-aws-win2022",
+          "connected": true
+        },
+        {
+          "source": "client-aws-win2025",
+          "target": "net-aws-win2022",
+          "connected": true
+        },
+        {
+          "source": "net-w1",
+          "target": "net-aws-win2025",
+          "connected": true
+        }
+      ],
+      "policyAttempts": [
+        [
+          {
+            "source": "net-w1",
+            "target": "net-aws-win2022",
+            "connected": true
+          },
+          {
+            "source": "client-aws-win2022",
+            "target": "net-aws-win2022",
+            "connected": false
+          },
+          {
+            "source": "client-aws-win2025",
+            "target": "net-aws-win2022",
+            "connected": true
+          },
+          {
+            "source": "net-w1",
+            "target": "net-aws-win2025",
+            "connected": true
+          }
+        ],
+        [
+          {
+            "source": "net-w1",
+            "target": "net-aws-win2022",
+            "connected": false
+          },
+          {
+            "source": "client-aws-win2022",
+            "target": "net-aws-win2022",
+            "connected": false
+          },
+          {
+            "source": "client-aws-win2025",
+            "target": "net-aws-win2022",
+            "connected": true
+          },
+          {
+            "source": "net-w1",
+            "target": "net-aws-win2025",
+            "connected": true
+          }
+        ]
+      ],
+      "enforced": true,
+      "recoveryAttempts": [
+        [
+          {
+            "source": "net-w1",
+            "target": "net-aws-win2022",
+            "connected": true
+          },
+          {
+            "source": "client-aws-win2022",
+            "target": "net-aws-win2022",
+            "connected": true
+          },
+          {
+            "source": "client-aws-win2025",
+            "target": "net-aws-win2022",
+            "connected": true
+          },
+          {
+            "source": "net-w1",
+            "target": "net-aws-win2025",
+            "connected": true
+          }
+        ]
+      ],
+      "recovered": true
+    },
+    "2025": {
+      "scope": "Native Windows Calico ingress policy: Linux and same-node denied sources, allowed remote Windows source, unaffected target, then cleanup recovery",
+      "observedAt": "2026-09-07T11:00:15.993801+00:00",
+      "baseline": [
+        {
+          "source": "net-w1",
+          "target": "net-aws-win2025",
+          "connected": true
+        },
+        {
+          "source": "client-aws-win2025",
+          "target": "net-aws-win2025",
+          "connected": true
+        },
+        {
+          "source": "client-aws-win2022",
+          "target": "net-aws-win2025",
+          "connected": true
+        },
+        {
+          "source": "net-w1",
+          "target": "net-aws-win2022",
+          "connected": true
+        }
+      ],
+      "policyAttempts": [
+        [
+          {
+            "source": "net-w1",
+            "target": "net-aws-win2025",
+            "connected": true
+          },
+          {
+            "source": "client-aws-win2025",
+            "target": "net-aws-win2025",
+            "connected": false
+          },
+          {
+            "source": "client-aws-win2022",
+            "target": "net-aws-win2025",
+            "connected": true
+          },
+          {
+            "source": "net-w1",
+            "target": "net-aws-win2022",
+            "connected": true
+          }
+        ],
+        [
+          {
+            "source": "net-w1",
+            "target": "net-aws-win2025",
+            "connected": false
+          },
+          {
+            "source": "client-aws-win2025",
+            "target": "net-aws-win2025",
+            "connected": false
+          },
+          {
+            "source": "client-aws-win2022",
+            "target": "net-aws-win2025",
+            "connected": true
+          },
+          {
+            "source": "net-w1",
+            "target": "net-aws-win2022",
+            "connected": true
+          }
+        ]
+      ],
+      "enforced": true,
+      "recoveryAttempts": [
+        [
+          {
+            "source": "net-w1",
+            "target": "net-aws-win2025",
+            "connected": true
+          },
+          {
+            "source": "client-aws-win2025",
+            "target": "net-aws-win2025",
+            "connected": true
+          },
+          {
+            "source": "client-aws-win2022",
+            "target": "net-aws-win2025",
+            "connected": true
+          },
+          {
+            "source": "net-w1",
+            "target": "net-aws-win2022",
+            "connected": true
+          }
+        ]
+      ],
+      "recovered": true
+    }
+  },
+  "cleanup": {
+    "testNetworkPoliciesRemaining": 0,
+    "sourceLabelsRemoved": true,
+    "allTenNodesReady": true,
+    "observedAt": "2026-09-07T11:01:42.460198+00:00"
+  }
+}

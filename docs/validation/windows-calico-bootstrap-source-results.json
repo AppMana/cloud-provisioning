@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "scope": "Read-only binding of running Windows Calico node-service script to staged source",
+  "podUID": "079f76d3-ee91-44aa-af5b-faaa383baee9",
+  "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+  "scriptSHA256": "a73ca717f41d702c79c54acf3ce4b1ac809ac563a53aabba5440a7d03d65808e",
+  "scriptBytes": 8393,
+  "stagedSourceMatches": true,
+  "stagedSource": ".state/calico-v3.32.0-mtu/node/windows-packaging/CalicoWindows/node/node-service.ps1",
+  "behavior": "The running script creates an External Overlay network with VSID 9999 for the VXLAN backend, and an L2Bridge placeholder for the other branch.",
+  "reviewedForkDifference": {
+    "path": "node/windows-packaging/CalicoWindows/node/node-service.ps1",
+    "commit": "b84aaa62d1a",
+    "behavior": "The reviewed fork uses guarded L2Bridge placeholder handling; it is not the same running script and is not established as a drop-in VXLAN bootstrap replacement."
+  },
+  "limits": [
+    "Script byte identity and its creation branch do not prove the historical creator of an existing network object.",
+    "No bootstrap patch or new image was deployed by this source review."
+  ]
+}

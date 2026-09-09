@@ -1,0 +1,147 @@
+{
+  "scope": "Current native VFP tuple simulation on retained single-NIC Windows Server 2022 and 2025 VMs using three previously failed tuples and three neighboring successful controls.",
+  "qualificationEligible": false,
+  "cases": [
+    {
+      "windowsServer": "2022",
+      "dropIndex": 0,
+      "kind": "drop",
+      "port": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+      "tuple": "encap 4 02-FF-D6-32-CE-F1 02-FF-F6-B6-D8-ED 10.10.0.11 172.29.0.24 4096 66-29-27-B4-64-9C 00-15-5D-3A-31-08 0 0 17 10.244.190.81 8081 10.244.114.4 49977 in 0",
+      "capturedAction": "Ignore",
+      "simulatedAction": "Pop",
+      "outputSHA256": "8bfd9ae33e4a269fb0242fb6ef890028510e447486b986e628b93e466be7e3e1"
+    },
+    {
+      "windowsServer": "2022",
+      "dropIndex": 0,
+      "kind": "before",
+      "port": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+      "tuple": "encap 4 02-FF-D6-32-CE-F1 02-FF-F6-B6-D8-ED 10.10.0.11 172.29.0.24 4096 66-29-27-B4-64-9C 00-15-5D-3A-31-08 0 0 17 10.244.190.81 8081 10.244.114.4 49973 in 0",
+      "capturedAction": "Pop",
+      "simulatedAction": "Pop",
+      "outputSHA256": "36c100c9e816f13c3edd8ccfa4b7b37d53edd4b8e8c175da42f8f878e34d399d"
+    },
+    {
+      "windowsServer": "2025",
+      "dropIndex": 1,
+      "kind": "drop",
+      "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+      "tuple": "encap 4 02-FF-F6-B6-D8-ED 02-FF-C0-FA-46-77 172.29.0.24 172.29.0.68 4096 0E-2A-0A-F4-72-04 00-15-5D-2E-C0-7B 0 0 17 10.244.114.4 50543 10.244.42.6 8081 in 0",
+      "capturedAction": "Ignore",
+      "simulatedAction": "Pop",
+      "outputSHA256": "8d9d669b4068d61ac53b30f98e3ff685237fcffe30f203f7f4dc992a621cb1d5"
+    },
+    {
+      "windowsServer": "2025",
+      "dropIndex": 1,
+      "kind": "before",
+      "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+      "tuple": "encap 4 02-FF-F6-B6-D8-ED 02-FF-C0-FA-46-77 172.29.0.24 172.29.0.68 4096 0E-2A-0A-F4-72-04 00-15-5D-2E-C0-7B 0 0 17 10.244.114.4 50542 10.244.42.6 8081 in 0",
+      "capturedAction": "Pop",
+      "simulatedAction": "Pop",
+      "outputSHA256": "fc27bbc62215fbe3e397fdf2664a64255cdff1409e753f92a01619ae82407769"
+    },
+    {
+      "windowsServer": "2025",
+      "dropIndex": 2,
+      "kind": "drop",
+      "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+      "tuple": "encap 4 02-FF-D6-32-CE-F1 02-FF-C0-FA-46-77 10.10.0.11 172.29.0.68 4096 66-29-27-B4-64-9C 00-15-5D-2E-C0-7B 0 0 17 10.244.190.81 8081 10.244.42.6 60801 in 0",
+      "capturedAction": "Ignore",
+      "simulatedAction": "Pop",
+      "outputSHA256": "06c29facbcae9be553b1b80ddeab2c3e7abd20ea20cc36ff1d25e0f5d1120fdc"
+    },
+    {
+      "windowsServer": "2025",
+      "dropIndex": 2,
+      "kind": "before",
+      "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+      "tuple": "encap 4 02-FF-D6-32-CE-F1 02-FF-C0-FA-46-77 10.10.0.11 172.29.0.68 4096 66-29-27-B4-64-9C 00-15-5D-2E-C0-7B 0 0 17 10.244.190.81 8081 10.244.42.6 60797 in 0",
+      "capturedAction": "Pop",
+      "simulatedAction": "Pop",
+      "outputSHA256": "19b208ac9134ec1b1f1430c46603c5533391ea2f053cb23526ae6b99b1216dad"
+    }
+  ],
+  "hosts": [
+    {
+      "windowsServer": "2022",
+      "layerListingUnchanged": true,
+      "artifacts": [
+        {
+          "sha256": "36c100c9e816f13c3edd8ccfa4b7b37d53edd4b8e8c175da42f8f878e34d399d",
+          "name": "before-00.txt",
+          "bytes": 1411
+        },
+        {
+          "sha256": "8bfd9ae33e4a269fb0242fb6ef890028510e447486b986e628b93e466be7e3e1",
+          "name": "drop-00.txt",
+          "bytes": 1411
+        },
+        {
+          "sha256": "a560d7f70727da6d86a684820f91b220311161433ced026af28ec19b917d81dd",
+          "name": "layers-after.txt",
+          "bytes": 461
+        },
+        {
+          "sha256": "a560d7f70727da6d86a684820f91b220311161433ced026af28ec19b917d81dd",
+          "name": "layers-before.txt",
+          "bytes": 461
+        }
+      ],
+      "artifactsCollectedAndHashVerified": true,
+      "guestArtifactsRemoved": true
+    },
+    {
+      "windowsServer": "2025",
+      "layerListingUnchanged": true,
+      "artifacts": [
+        {
+          "sha256": "fc27bbc62215fbe3e397fdf2664a64255cdff1409e753f92a01619ae82407769",
+          "name": "before-01.txt",
+          "bytes": 1410
+        },
+        {
+          "sha256": "19b208ac9134ec1b1f1430c46603c5533391ea2f053cb23526ae6b99b1216dad",
+          "name": "before-02.txt",
+          "bytes": 1410
+        },
+        {
+          "sha256": "8d9d669b4068d61ac53b30f98e3ff685237fcffe30f203f7f4dc992a621cb1d5",
+          "name": "drop-01.txt",
+          "bytes": 1410
+        },
+        {
+          "sha256": "06c29facbcae9be553b1b80ddeab2c3e7abd20ea20cc36ff1d25e0f5d1120fdc",
+          "name": "drop-02.txt",
+          "bytes": 1410
+        },
+        {
+          "sha256": "a560d7f70727da6d86a684820f91b220311161433ced026af28ec19b917d81dd",
+          "name": "layers-after.txt",
+          "bytes": 461
+        },
+        {
+          "sha256": "a560d7f70727da6d86a684820f91b220311161433ced026af28ec19b917d81dd",
+          "name": "layers-before.txt",
+          "bytes": 461
+        }
+      ],
+      "artifactsCollectedAndHashVerified": true,
+      "guestArtifactsRemoved": true
+    }
+  ],
+  "originalNodeUIDsUnchanged": true,
+  "originalNodesReady": 13,
+  "findings": [
+    "All six current simulations select the inbound decapsulation rule and produce Pop, including the three tuples whose earlier recorded flows had Ignore.",
+    "DR layer listings are unchanged before and after simulation.",
+    "Native VFP control metadata exposes IOCTL/object-processing events with caller/process fields for the next paired trace."
+  ],
+  "limits": [
+    "Simulation evaluates current rules; it does not reproduce the original packet metadata, timing or classifier state.",
+    "The worktree reconciliation code skips native Apply for unchanged documents with verified routes. This source review alone does not establish the running binary behavior or rule-change causality.",
+    "No packet injection, forwarding change, driver change or image promotion was requested. No mitigation or release is qualified."
+  ],
+  "next": "Capture native VFP control operations alongside packet and flow events during ordinary-Pod UDP failures."
+}

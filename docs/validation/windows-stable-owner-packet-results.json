@@ -1,0 +1,353 @@
+{
+  "state": "Windows host stable-owner packet experiment validated over independent relay transport; production handover unqualified",
+  "date": "2026-09-09",
+  "releaseQualified": false,
+  "productionChanges": false,
+  "results": {
+    "IPv4": {
+      "2022": {
+        "packets": 2174,
+        "failed": 0,
+        "phaseCounts": {
+          "baseline": 444,
+          "switch-b": 440,
+          "rollback-a": 437,
+          "reselect-b": 429,
+          "retire-a": 424
+        },
+        "maxStartGapSeconds": 0.09482502937316895,
+        "source": "198.19.251.22:54180",
+        "destination": "198.19.251.25:54900",
+        "eventsSHA256": "7c2dae27868aa4646b2984cf0aa68e3fc0a271875f8c9fc9129b06453a97a72c",
+        "instanceID": "i-0ddaed6f030330992",
+        "commandID": "946ca79d-c8cc-45e4-9de5-40155ec457c1",
+        "binarySHA256": "0037f06161f967581811ee2fac546815b0efb8f291afdbdbd68b7ebbe6a0207f",
+        "nativeCounters": [
+          {
+            "generation": 1,
+            "lastHandshake": 134334448929458812,
+            "luid": 14918723571810304,
+            "peerCount": 1,
+            "rxBytes": 336568,
+            "txBytes": 331816
+          }
+        ],
+        "coverage": {
+          "coveredStatements": 131,
+          "statements": 184,
+          "percent": 71.2,
+          "scope": "Windows controller/pkg/tunneldevice, not whole-project coverage"
+        },
+        "rawSHA256": {
+          "raw-2022-stdout.txt": "966520d8a97e74b353dfc7e4e9bd675bf41529aee3f25f13453047ad94bcece8",
+          "raw-2022-stderr.txt": "b939b505e76c9dbd4e5499461624d0cf3629983ed073ed495b12a4d586f01ddf",
+          "raw-2022-exit-code.txt": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "raw-2022-process.json": "050d85cbdd50b6774d88ab7fdc099bf635670c14b389f28194404673bc06f8c4",
+          "raw-2022-ready.json": "fa53721d33185c9411861e1aff928da797a2d9a0236b533e4878c418b3df737d",
+          "raw-2022-summary.json": "526b53e12f2787e09b94ca191be5cc004453bb5a8e4642b9a0e132e62e8f6760",
+          "raw-2022-events.jsonl": "7c2dae27868aa4646b2984cf0aa68e3fc0a271875f8c9fc9129b06453a97a72c",
+          "raw-2022-native.cover": "56a66d97e339223266902f11736485e11ece23bcc8839f4cffdb7e7a42a65da5",
+          "raw-2022-counters.json": "b2eb20f42b92f8805c3ef8553f7a5990d424e2fa1b3f8fb3b150524da4b55995"
+        }
+      },
+      "2025": {
+        "packets": 2208,
+        "failed": 0,
+        "phaseCounts": {
+          "baseline": 447,
+          "switch-b": 444,
+          "rollback-a": 445,
+          "reselect-b": 440,
+          "retire-a": 432
+        },
+        "maxStartGapSeconds": 0.09012889862060547,
+        "source": "198.19.251.25:63077",
+        "destination": "198.19.251.22:54900",
+        "eventsSHA256": "d893e406ae8306883e20401984f86e5c05abf15363bd8d0a6b2bbee0b7af95bc",
+        "instanceID": "i-07c9859f5ce8ed42b",
+        "commandID": "59c98b9b-802e-4cf3-9688-b117c950fda5",
+        "binarySHA256": "0037f06161f967581811ee2fac546815b0efb8f291afdbdbd68b7ebbe6a0207f",
+        "nativeCounters": [
+          {
+            "generation": 1,
+            "lastHandshake": 134334448934467003,
+            "luid": 14918723571810304,
+            "peerCount": 1,
+            "rxBytes": 331816,
+            "txBytes": 336716
+          }
+        ],
+        "coverage": {
+          "coveredStatements": 131,
+          "statements": 184,
+          "percent": 71.2,
+          "scope": "Windows controller/pkg/tunneldevice, not whole-project coverage"
+        },
+        "rawSHA256": {
+          "raw-2025-stdout.txt": "d93bbe5514711f27feaa05c522cb09d9b1e99cb1b240ad51429ff2d7248d6b60",
+          "raw-2025-stderr.txt": "40fd4b7e3529e9b788a528e651bbea0116a24c4cdfa21c58b103ae190584d0c3",
+          "raw-2025-exit-code.txt": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "raw-2025-process.json": "5d04fc03187e6f0f00887326886d1a7040adfb5d91e87190c75c03b5155d1624",
+          "raw-2025-ready.json": "dc1b1bfc8d5be6aaa0c191dc722e881904097c6b17382cef013e11db13cb16ec",
+          "raw-2025-summary.json": "20caa20699dca915bafff1e377f715df4863c283b230427d580e1b1cb378f12c",
+          "raw-2025-events.jsonl": "d893e406ae8306883e20401984f86e5c05abf15363bd8d0a6b2bbee0b7af95bc",
+          "raw-2025-native.cover": "56a66d97e339223266902f11736485e11ece23bcc8839f4cffdb7e7a42a65da5",
+          "raw-2025-counters.json": "a76effe700b5fbc7d11b1556b2acbe4ef147a9e88401b0c56bfe829bb7c3f26b"
+        }
+      }
+    },
+    "IPv6": {
+      "2022": {
+        "packets": 2188,
+        "failed": 0,
+        "phaseCounts": {
+          "baseline": 444,
+          "switch-b": 439,
+          "rollback-a": 437,
+          "reselect-b": 439,
+          "retire-a": 429
+        },
+        "maxStartGapSeconds": 0.10189414024353027,
+        "source": "[fd99:251::22]:62380",
+        "destination": "[fd99:251::25]:54900",
+        "eventsSHA256": "2c55e43b2d097dfb1dc57cd726a8c9801937f1a1dc9b489ff58ed8b07757ebb5",
+        "instanceID": "i-0ddaed6f030330992",
+        "commandID": "c11e70e4-6984-44cd-ab5e-9d80372b3fe9",
+        "binarySHA256": "0037f06161f967581811ee2fac546815b0efb8f291afdbdbd68b7ebbe6a0207f",
+        "nativeCounters": [
+          {
+            "generation": 1,
+            "lastHandshake": 134334450869111481,
+            "luid": 14918723571810304,
+            "peerCount": 1,
+            "rxBytes": 381880,
+            "txBytes": 377292
+          }
+        ],
+        "coverage": {
+          "coveredStatements": 129,
+          "statements": 184,
+          "percent": 70.1,
+          "scope": "Windows controller/pkg/tunneldevice, not whole-project coverage"
+        },
+        "rawSHA256": {
+          "raw-2022-stdout.txt": "0c898a87f9e870d1a0374169c861fdbe702c9d833c44db964e272878458412a5",
+          "raw-2022-stderr.txt": "1f3f5cdea1ecae0479f4eaf53354a829cce12f74bd504fdeb54193d91bb6ee31",
+          "raw-2022-exit-code.txt": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "raw-2022-process.json": "ef337230c2c9cd5673a13322620ecd2b0d5237585731bcccfdaccb77624d952e",
+          "raw-2022-ready.json": "ca5b1690721a942dd8620b359958f437914890298ad2d83d7c76b805e3e9083f",
+          "raw-2022-summary.json": "4842dd994ec5ca800b78b4d65ee8b9b208ee7116d073b064bf611380d693084c",
+          "raw-2022-events.jsonl": "2c55e43b2d097dfb1dc57cd726a8c9801937f1a1dc9b489ff58ed8b07757ebb5",
+          "raw-2022-native.cover": "6c4462149c20e7478154b56cb85fa97d306d552ea73e27a821999ca304376447",
+          "raw-2022-counters.json": "0b30911c4e0e940ebe898d544510acaac47a4ba4158d902bd7ca135f05de4205"
+        }
+      },
+      "2025": {
+        "packets": 2216,
+        "failed": 0,
+        "phaseCounts": {
+          "baseline": 449,
+          "switch-b": 443,
+          "rollback-a": 446,
+          "reselect-b": 445,
+          "retire-a": 433
+        },
+        "maxStartGapSeconds": 0.10181403160095215,
+        "source": "[fd99:251::25]:52641",
+        "destination": "[fd99:251::22]:54900",
+        "eventsSHA256": "1c86b87aad50f9468a25498f508e3628ee78634fb6664f5d908f888c6edf7597",
+        "instanceID": "i-07c9859f5ce8ed42b",
+        "commandID": "29fe3e01-5caa-46ce-b0b7-8ea1fd6f0908",
+        "binarySHA256": "0037f06161f967581811ee2fac546815b0efb8f291afdbdbd68b7ebbe6a0207f",
+        "nativeCounters": [
+          {
+            "generation": 1,
+            "lastHandshake": 134334450874117779,
+            "luid": 14918723571810304,
+            "peerCount": 1,
+            "rxBytes": 375464,
+            "txBytes": 383320
+          }
+        ],
+        "coverage": {
+          "coveredStatements": 129,
+          "statements": 184,
+          "percent": 70.1,
+          "scope": "Windows controller/pkg/tunneldevice, not whole-project coverage"
+        },
+        "rawSHA256": {
+          "raw-2025-stdout.txt": "7803f96e8c4dba1c60f9a4778d10576a39fb247448c9cb15d7e080034cdc4956",
+          "raw-2025-stderr.txt": "19a3a8fd90a5b787c5f4f1a72fdffbd0b62489fc5bdb118a885d2d54850db7c7",
+          "raw-2025-exit-code.txt": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "raw-2025-process.json": "3bbe69005c791d42f0ab62d7e4db9d75b524aecf43e36d1371f431cdc099067f",
+          "raw-2025-ready.json": "9c348d9f06a12d199dc82b05db8e032475a06e8f73ae9d708646811f25e19467",
+          "raw-2025-summary.json": "b4a3ea6ddc3eeb50e11fea11708d8fd49502cd51cd30f3d7c35c68b93d040c35",
+          "raw-2025-events.jsonl": "1c86b87aad50f9468a25498f508e3628ee78634fb6664f5d908f888c6edf7597",
+          "raw-2025-native.cover": "6c4462149c20e7478154b56cb85fa97d306d552ea73e27a821999ca304376447",
+          "raw-2025-counters.json": "b614a7dbf9cff8cf862764ec45f8af04f6df502e39ed045811194a6a5b3cd8ef"
+        }
+      }
+    }
+  },
+  "scope": {
+    "physicalNICsPerVM": 1,
+    "windowsVersions": [
+      "2022",
+      "2025"
+    ],
+    "families": [
+      "IPv4",
+      "IPv6"
+    ],
+    "phases": [
+      "baseline",
+      "switch-b",
+      "rollback-a",
+      "reselect-b",
+      "retire-a"
+    ],
+    "sampler": "independent goroutine, persistent source-bound UDP socket, 64-byte payload, 20ms pause between exchanges, one-second request timeout",
+    "teardownReceiveWindowSeconds": 3,
+    "relayInstanceID": "i-0d9d6ce15d3de4363",
+    "newInstances": 0
+  },
+  "limitations": [
+    "Source-spoof rejection remains untested in this Windows stable-owner topology",
+    "CNI workloads, HNS/VFP policy, Services and GPU workloads remain unqualified by this experiment",
+    "No production generation protocol, receipt or restart/recovery implementation qualified",
+    "The UDP relay topology does not qualify direct cloud mesh transport",
+    "Measured sample gaps are not a production SLA or proof of delivery between samples"
+  ],
+  "measuredExchanges": 8786,
+  "failedMeasuredExchanges": 0,
+  "maxStartGapSeconds": 0.10189414024353027,
+  "combinedExperimentCoverage": {
+    "coveredStatements": 133,
+    "statements": 184,
+    "percent": 72.3,
+    "scope": "Union of IPv4/IPv6 Windows controller/pkg/tunneldevice profiles against unchanged production source"
+  },
+  "preservedFailedAttempt": {
+    "run": "stable-owner-v4",
+    "independentSampler": false,
+    "teardownReceiveWindowSeconds": 0,
+    "results": {
+      "2022": {
+        "end": "2026-09-09T16:23:39.3802526Z",
+        "failures": 1,
+        "packets": 2165,
+        "phases": [
+          "baseline",
+          "switch-b",
+          "rollback-a",
+          "reselect-b",
+          "retire-a"
+        ],
+        "run": "stable-owner-v4",
+        "start": "2026-09-09T16:22:48.817594Z"
+      },
+      "2025": {
+        "end": "2026-09-09T16:23:38.8395859Z",
+        "failures": 0,
+        "packets": 2205,
+        "phases": [
+          "baseline",
+          "switch-b",
+          "rollback-a",
+          "reselect-b",
+          "retire-a"
+        ],
+        "run": "stable-owner-v4",
+        "start": "2026-09-09T16:22:48.817594Z"
+      }
+    },
+    "interpretation": "Server 2022 final exchange failed. Preserved as a failed run; not removed from history or reclassified as a successful campaign."
+  },
+  "earlierTransportAttempts": "windows-stable-owner-results.json",
+  "validatorRegressions": {
+    "failed exchange": "rejected",
+    "changed source": "rejected",
+    "missing sequence": "rejected",
+    "native failure": "rejected",
+    "cleanup failure": "rejected"
+  },
+  "cleanup": {
+    "nativeAndManagementCommandsTerminal": true,
+    "allOwnedWindowsAdaptersAndProcessesAbsent": true,
+    "allThreeRelayProcessesAbsent": true,
+    "temporarySecurityGroupRulesRemoved": 3,
+    "temporaryWindowsFirewallRulesRemoved": true,
+    "stagedPrivatePlansAndExecutablesRemovedFromS3": true
+  },
+  "retainedFleets": {
+    "original": {
+      "count": 13,
+      "exactUIDsAndReadinessPreserved": true
+    },
+    "kuberouter": {
+      "count": 7,
+      "exactUIDsAndReadinessPreserved": true
+    },
+    "microk8s": {
+      "count": 10,
+      "allReady": true,
+      "commandID": "bb224a7d-dbac-4d46-9dbe-3002c569ee7e",
+      "nodes": [
+        {
+          "name": "cp",
+          "uid": "adc82fda-09b4-4b91-974d-ec8c62d4ff6e"
+        },
+        {
+          "name": "cp2",
+          "uid": "97244420-d915-4f35-b596-1f3314ca30a9"
+        },
+        {
+          "name": "cp3",
+          "uid": "c0a2791b-c8f7-4229-a53c-9a35c72ac211"
+        },
+        {
+          "name": "ip-172-29-0-37",
+          "uid": "22c79da2-80bb-49fd-8f91-2fba3a9233ce"
+        },
+        {
+          "name": "ip-172-29-0-6",
+          "uid": "f69598a1-53ab-45bb-8980-5f1b95cea234"
+        },
+        {
+          "name": "ip-172-29-0-64",
+          "uid": "234868ac-c22e-4546-8657-4ed0a1bfa4e8"
+        },
+        {
+          "name": "remote1",
+          "uid": "b231782d-a1ce-4bd6-87e7-764132ef249b"
+        },
+        {
+          "name": "remote2",
+          "uid": "50ebb132-d400-41e2-a3e4-a1230a5c64df"
+        },
+        {
+          "name": "w1",
+          "uid": "0a6e69b4-810e-4494-b7e6-0a6d649fc593"
+        },
+        {
+          "name": "w2",
+          "uid": "4cc95c2d-6b4b-4e22-bf3d-89d7c9219c82"
+        }
+      ]
+    }
+  },
+  "checkedAt": "2026-09-09T16:34:22.733205+00:00",
+  "sourceSHA256": {
+    "controller/pkg/tunneldevice/stable_owner_windows_test.go": "4b93e596d6ed3f150cdc767a8043e7cd29962bb71e79116bd3dc1d5e8a22ed45",
+    "controller/pkg/tunneldevice/device_windows.go": "45bee16f131333df750cad5f39448b28c7873aac685ed4918cdc0808fba2abbe",
+    "controller/pkg/tunneldevice/testdata/stable-owner-windows/relay.py": "4c37f60039748e831809b9d968098f3b9dc0cb7116f89aa0b91954cf2d0d18f3",
+    "controller/pkg/tunneldevice/testdata/stable-owner-windows/validate.py": "a2650b85acf7c69ef5ff8c602b99ca7228b0d7be42ebea4ea6c8d48901017126"
+  },
+  "wireGuardNTRouteResolver": {
+    "tag": "1.1",
+    "tagCommit": "fef7bc4377a4f49ffa7c30841b48808fda578cad",
+    "source": "https://git.zx2c4.com/wireguard-nt/tree/driver/socket.c?h=1.1",
+    "sha256": "5507a7839bdfc73f5849a3afd74767eb47d50e554eff7e4b9c0648bec9123d25"
+  },
+  "archiveSHA256": "299beffe326d2050b8f508f6acbe05ee7bf84fa90fd05ea88cd5754cabb1527a"
+}

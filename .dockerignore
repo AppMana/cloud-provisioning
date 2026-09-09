@@ -1,0 +1,6 @@
+.git
+**/.state
+**/_work*
+**/__pycache__
+**/.coverage*
+**/clab-*

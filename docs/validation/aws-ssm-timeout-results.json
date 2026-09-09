@@ -1,0 +1,44 @@
+{
+  "observedAt": "2026-09-07T19:44:11.432428+00:00",
+  "scope": "AWS rig command deadlines, native Windows image-pull submission and execution beyond the previous cap",
+  "unitTests": {
+    "command": "go test -race -coverprofile=.state/windows-gpu-workers/runtime-cache/aws-rig.coverage ./rig/aws",
+    "passed": true,
+    "packageStatementCoveragePercent": 47.1,
+    "timeoutHelperStatementCoveragePercent": 90.9,
+    "cases": [
+      "Linux and Windows documents receive caller deadline",
+      "No-deadline default is 600 seconds",
+      "48-hour AWS limit clamps longer deadlines",
+      "Cancelled caller submits no command",
+      "Observation timeout preserves command ID and context error"
+    ]
+  },
+  "nativeWindowsSubmission": {
+    "DocumentName": "AWS-RunPowerShellScript",
+    "Status": "InProgress",
+    "executionTimeout": [
+      "3000"
+    ]
+  },
+  "limitations": [
+    "The original wrapper failed on a null PowerShell process exit code; independent containerd inspection establishes cache readiness",
+    "Local observation expiry does not cancel a remote command",
+    "This result does not qualify runtime cache reuse after Sysprep"
+  ],
+  "nativeWindowsBeyondPreviousLimit": {
+    "observedAt": "2026-09-07T19:52:37.804423+00:00",
+    "commandStartedAt": "2026-09-07T19:41:37.7965979Z",
+    "status": "InProgress",
+    "elapsedWallSeconds": 660.0,
+    "executionTimeoutSeconds": 3000
+  },
+  "nativeWindowsTerminal": {
+    "wrapperExitCode": 1,
+    "guestReceiptProcessExitCode": null,
+    "guestElapsedSeconds": 845.3916774,
+    "executionTimeout": false,
+    "independentCacheReadinessPassed": true,
+    "cacheEvidence": "windows-runtime-cache-results.json"
+  }
+}

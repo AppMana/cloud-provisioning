@@ -1,0 +1,41 @@
+{
+  "ignition": {
+    "version": "3.4.0"
+  },
+  "storage": {
+    "files": [
+      {
+        "path": "/etc/cldt/qemu-ga.conf",
+        "mode": 384,
+        "contents": {
+          "source": "data:;base64,W2dlbmVyYWxdCm1ldGhvZD12aXJ0aW8tc2VyaWFsCnBhdGg9L2Rldi92aXJ0aW8tcG9ydHMvb3JnLnFlbXUuZ3Vlc3RfYWdlbnQuMAphbGxvdy1ycGNzPWd1ZXN0LXN5bmMtZGVsaW1pdGVkLGd1ZXN0LXN5bmMsZ3Vlc3QtcGluZyxndWVzdC1pbmZvLGd1ZXN0LWV4ZWMsZ3Vlc3QtZXhlYy1zdGF0dXMsZ3Vlc3QtZmlsZS1vcGVuLGd1ZXN0LWZpbGUtd3JpdGUsZ3Vlc3QtZmlsZS1jbG9zZQo="
+        }
+      },
+      {
+        "path": "/etc/qemu-ga/fsfreeze-hook.d/cldt-exec",
+        "mode": 448,
+        "contents": {
+          "source": "data:;base64,IyEvYmluL3NoCmV4cG9ydCBQQVRIPS91c3IvbG9jYWwvc2JpbjovdXNyL2xvY2FsL2JpbjovdXNyL3NiaW46L3Vzci9iaW4KZXhlYyAiJEAiCg=="
+        }
+      }
+    ]
+  },
+  "systemd": {
+    "units": [
+      {
+        "name": "qemu-guest-agent.service",
+        "enabled": true,
+        "dropins": [
+          {
+            "name": "90-cldt-management.conf",
+            "contents": "[Unit]\nRequires=cldt-qga-policy.service\nAfter=cldt-qga-policy.service\n[Service]\nExecStart=\nExecStart=/usr/bin/qemu-ga --config=/etc/cldt/qemu-ga.conf\nEnvironment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin\n"
+          }
+        ]
+      },
+      {
+        "name": "cldt-qga-policy.service",
+        "contents": "[Unit]\nDescription=Lab serial management permissions\nBefore=qemu-guest-agent.service\n[Service]\nType=oneshot\nExecStart=/usr/sbin/setsebool virt_qemu_ga_run_unconfined on\nExecStart=/usr/sbin/restorecon -RF /etc/qemu-ga/fsfreeze-hook.d\nRemainAfterExit=yes\nStandardOutput=journal+console\nStandardError=journal+console\n"
+      }
+    ]
+  }
+}

@@ -1,0 +1,223 @@
+{
+  "observedAt": "2026-09-08T19:02:02.487985+00:00",
+  "scope": "Fresh CAPA Linux worker using a baked k0s executable on the k0s 1.36 bundled-Calico single-NIC VM site",
+  "operation": {
+    "startedAt": "2026-09-08T18:53:31.706779+00:00",
+    "claim": "aws-linux-k0s-baked-v1",
+    "diagnostic": true,
+    "removalStartedAt": "2026-09-08T18:57:41.840213+00:00",
+    "finishedAt": "2026-09-08T18:59:10.943362+00:00",
+    "removalPassed": true,
+    "rowPassed": true,
+    "bakedExecutableReusePassed": true,
+    "passed": false,
+    "survivorPassed": false
+  },
+  "binding": {
+    "machine": "aws-linux-k0s-baked-v1",
+    "machineUID": "8faceb4b-0907-4968-8987-494a107ddf33",
+    "node": "ip-172-29-0-90",
+    "nodeUID": "c44d66f3-c65e-41fe-af15-ee3c047b0f1b",
+    "instanceID": "i-01a2e608391e4b2c9",
+    "imageID": "ami-03d6fada2ec266b4f",
+    "eniCount": 1,
+    "launchTime": "2026-09-08T18:53:34+00:00",
+    "nodeReady": true
+  },
+  "imageAuthorization": {
+    "onlyCandidateImageARNAdded": true,
+    "existingLinuxAndWindowsPolicyUnchanged": true,
+    "defaultAMIIDUnchanged": true
+  },
+  "bakedExecutableReuse": {
+    "passed": true,
+    "checks": {
+      "candidateImageMatches": true,
+      "nodeReady": true,
+      "oneENI": true,
+      "originalReceiptUnchanged": true,
+      "binaryHashMatches": true,
+      "versionMatches": true,
+      "executableMtimePredatesLaunch": true,
+      "oneGuestPhysicalNIC": true,
+      "containerdServer2": true
+    },
+    "containerdVersions": {
+      "Client": "2.3.2",
+      "Server": "2.3.2"
+    },
+    "binding": {
+      "machine": "aws-linux-k0s-baked-v1",
+      "machineUID": "8faceb4b-0907-4968-8987-494a107ddf33",
+      "node": "ip-172-29-0-90",
+      "nodeUID": "c44d66f3-c65e-41fe-af15-ee3c047b0f1b",
+      "instanceID": "i-01a2e608391e4b2c9",
+      "imageID": "ami-03d6fada2ec266b4f",
+      "eniCount": 1,
+      "launchTime": "2026-09-08T18:53:34+00:00",
+      "nodeReady": true
+    },
+    "scope": "Baked executable reuse; not runtime/workload cache or lifecycle qualification"
+  },
+  "matrix": {
+    "passed": 102,
+    "failed": 0,
+    "total": 102,
+    "kinds": [
+      "dns",
+      "external",
+      "pod",
+      "service",
+      "transfer"
+    ],
+    "nodes": [
+      "cp",
+      "cp2",
+      "cp3",
+      "ip-172-29-0-90",
+      "w1",
+      "w2"
+    ],
+    "sourceSHA256": "b21ca1e6c80d8965986eb9b9d1df79e4db25a21f528ceaaf5cbba62b928949ac"
+  },
+  "survivor": {
+    "transport": "native-oob",
+    "attempts": 21324,
+    "failed": 0,
+    "maxStartIntervalSeconds": 0.18314490000000028,
+    "observedTrafficPassed": true,
+    "identitiesStable": true,
+    "qualificationEligible": false,
+    "qualified": false,
+    "diagnosticReason": "Fresh Linux baked-k0s CAPI diagnosis with known unresolved Windows survivor UDP loss; not a release qualification",
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "attempts": 3343,
+        "passed": 3343,
+        "maxStartIntervalSeconds": 0.18140813600000172,
+        "samplesSHA256": "3f82a9c9df6daa623ce48068ebf5ab3abbecdab0f16004690562d8e176fbd3f6",
+        "ok": true
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "attempts": 3347,
+        "passed": 3347,
+        "maxStartIntervalSeconds": 0.17541623800002526,
+        "samplesSHA256": "9fec5bc97114dca13bc1fecb7882401eaf77266081fe358ba48e8a43e4543968",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "attempts": 3306,
+        "passed": 3306,
+        "maxStartIntervalSeconds": 0.18314490000000028,
+        "samplesSHA256": "1190ac687035d1664659879b9d0f409304ee444fa2e6cd9157c6181094fad9db",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "attempts": 4001,
+        "passed": 4001,
+        "maxStartIntervalSeconds": 0.1812396999999919,
+        "samplesSHA256": "e373c98255f9205a0803f3bc2f610962230ae080fdaa0b0e2e76bd3f48b57fc6",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "attempts": 3307,
+        "passed": 3307,
+        "maxStartIntervalSeconds": 0.17770759999999086,
+        "samplesSHA256": "8cca83c749028ebf1462eeabc007f6fe6f3bf6ce96d1847ba6818bdc7b525acd",
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "attempts": 4020,
+        "passed": 4020,
+        "maxStartIntervalSeconds": 0.16792600000002267,
+        "samplesSHA256": "3f32672aef17123e3c739675156f69d9177389318537f736aa262d50b2919715",
+        "ok": true
+      }
+    ]
+  },
+  "removal": {
+    "claim": "aws-linux-k0s-baked-v1",
+    "instanceID": "i-01a2e608391e4b2c9",
+    "node": "ip-172-29-0-90",
+    "nodeUID": "c44d66f3-c65e-41fe-af15-ee3c047b0f1b",
+    "observedAt": "2026-09-08T18:59:10.814345217Z",
+    "productCleanup": true,
+    "providerID": "aws:///us-west-2a/i-01a2e608391e4b2c9",
+    "terminated": true
+  },
+  "cleanup": {
+    "all13OriginalNodesReady": true,
+    "ownedPodToolsRemoved": true,
+    "ownedWindowsCRIClientsRemoved": true,
+    "candidateAMIRetained": true,
+    "promoted": false
+  },
+  "unitTestsPassed": 60,
+  "unitCoverage": {
+    "covered_lines": 320,
+    "num_statements": 452,
+    "percent_covered": 70.79646017699115,
+    "percent_covered_display": "71",
+    "missing_lines": 132,
+    "excluded_lines": 0
+  },
+  "runtimeCoverage": {
+    "row": {
+      "coveredStatements": 689,
+      "totalStatements": 2176,
+      "percent": 31.66360294117647,
+      "metadataFiles": 1,
+      "counterFiles": 1
+    },
+    "removal": {
+      "coveredStatements": 201,
+      "totalStatements": 1416,
+      "percent": 14.194915254237289,
+      "metadataFiles": 1,
+      "counterFiles": 1
+    }
+  },
+  "sourceSHA256": {
+    "aws/bake.py": "de633af42f75a20bafb044a75e3e161cbcf99db8839a10ce65c9035a200e3caa",
+    "aws/claim.py": "343cc6b5dd444f63f94f877357fbb2b833953a7d396d06a9b5e04980a796e948",
+    "aws/windows_image.py": "c9b6d6831fc49ae92d56e9f4baca95671bc8d1e72fc15254e026473609871974",
+    "aws/image_policy.py": "54696a6766b47f57ca848eb99961c90b18b69b1acbdde48d0b94a9b4c002f8b4",
+    "cmd/awsrow/main.go": "3da401875c5b5e6bcd1417753277292c1bebde5f227ee3ca140a12dabb2ccd60",
+    "observe/linux_image_reuse.py": "b5686feaabe7ad6e957c99f76128f340b36aa43154a721280b63e3c8fa13c3bd",
+    "observe/testdata/linux-k0s-image-reuse.json": "d459ff3c2a94e948950337fed7662e414ee41e6895ed7593b483cdeaf6ac48a2"
+  },
+  "binarySHA256": {
+    "row": "cffdfdfa117f8284a7df06ac53a6feb553de70143f9fa4900d222df5021a84e3",
+    "removal": "d948661ba3553a22b42566f7e285b346a701c98484b723cfec5d00d3eb8bdb9d"
+  },
+  "evidenceSHA256": {
+    "operation.json": "26f514d83a5b8538a7a9679c0718af7c11ee30059e4e463d7af436f56e441f0a",
+    "reuse-result.json": "335ad3300c5f85194f07162ffbb153c5ac636484fdccabdc8f2274f7429626e8",
+    "reuse-validated.json": "a18c37f89869a42a804cfeae5946ae2d476ff0bcc7dd353cd60883198651795a",
+    "survivor-result.json": "0e835601f563250600edccf6a8f2c70e29552440a3d34de0bac07b3d60323449",
+    "removal.json": "a04e3da0a3fa800d2f1b71c18c094c4cdcfe1f8be45e0955d94c856a56e04e01",
+    "final-baseline.json": "0b6234088bda023553fa4501b7dbcb51fcd957a61dc9b057bede34e7e23ace15",
+    "policy-before.json": "1e0e517c954a00a18689685d9e000ed85e026f03ca8bb34a0c67b9450342152e",
+    "policy-after.json": "10dd55da7837e1be43c3353a1bfbcbc8d23b713a513e8c0b39e87612307bf299"
+  },
+  "limitations": [
+    "Diagnostic mode was selected before the samplers started, so zero observed loss cannot make this a release-qualified combined row",
+    "Earlier Windows small and fragmented UDP failures remain unresolved; this short observation does not establish their correction",
+    "The new worker matrix checks pod/Service HTTP, 1 MiB transfers, DNS and external paths; survivor UDP probes use 64-byte payloads on the three retained pods",
+    "One addition and one removal; no replacement of this candidate worker tested",
+    "No GPU, pre-unpacked runtime, NVIDIA toolkit or workload-cache qualification in this executable-only image test",
+    "Selected Python unit coverage and the two native instrumented Go programs are separate scopes, not repository-wide or kernel/CNI coverage"
+  ]
+}

@@ -1,0 +1,70 @@
+#cloud-config
+{{- template "ssh-authorized-keys" . }}
+# k3s-agent join pattern: bring up the tunnel (the shared blocks in
+# _shared.tmpl), gate on the cluster's API becoming reachable through
+# it, then join as a plain k3s agent using a pre-minted bootstrap
+# token in k3s's secure format (K10<CA-hash>::<id>.<secret>, see
+# pkg/join/k3s). Set directly as Machine.spec.bootstrap.dataSecretName
+# content, with no bootstrap provider; the other patterns are the same
+# contract.
+#
+# Only write_files and runcmd belong here, for the same reason as the
+# kubeadm pattern: CAPD-style interpreters parse any other top-level
+# module with an "unknown" handler that fails on plain YAML.
+#
+# No balancer here: the k3s agent carries its own client-side balancer
+# across every server it learns from the supervisor, so the k3s
+# provider does not implement join.NodeLocalBalancer, apiProxyPort
+# renders zero, and the shared blocks emit no wg-apiproxy unit
+# (join-patterns/README.md tracks who balances per distribution).
+write_files:
+{{- template "wg-dialer-files" . }}
+{{- template "wg-dialer-unit" . }}
+{{- template "wg-apiproxy-unit" . }}
+  # The token in a root-only file rather than on a command line, read
+  # by the agent through its own --token-file flag.
+  - path: /etc/rancher/k3s/join-token
+    permissions: '0600'
+    content: |
+      {{ .joinToken }}
+runcmd:
+{{- template "dialer-install" . }}
+  # Gate on the API's TCP port rather than ICMP: minimal cloud images
+  # may ship no ping at all, and cloud firewalls routinely drop ICMP
+  # while allowing the API port. curl is already a hard dependency of
+  # this pattern. Any HTTP response, including 401/403, proves
+  # reachability, so no -f here. For k3s this endpoint is also the
+  # supervisor the agent registers through: one probe proves the whole
+  # join path.
+  - until curl -sk --max-time 3 -o /dev/null https://{{ .apiEndpoint }}/livez; do sleep 2; done
+  # No CNI gap-fill block here (contrast k0s-worker): k3s bundles a
+  # multicall CNI binary that already provides bandwidth, portmap and
+  # the other chained plugins, so the gap that block fills for k0s does
+  # not exist on a k3s node.
+  #
+  # --node-ip from instance metadata where a metadata service exists
+  # (IMDSv2, AWS-specific), because k3s resolves node addresses by
+  # hostname lookup, which on AWS maps only to the private IPv4. Where
+  # there is no metadata service the probe fails fast and k3s's own
+  # address detection applies unchanged.
+  #
+  # kubeletExtraArgs arrive as one opaque string of --flag=value words
+  # (the generic contract), and k3s takes kubelet args one per
+  # --kubelet-arg, so the string is re-worded here. The values this
+  # operator renders (a role label, a taint) contain no whitespace, so
+  # word-splitting is the correct parser for them.
+  - |
+    set -e
+{{- template "node-ip-arg" . }}
+    KUBELET_ARGS=""
+    [ -z "$PROVIDER_ID_ARG" ] || KUBELET_ARGS="--kubelet-arg=${PROVIDER_ID_ARG#--}"
+    KEXTRA='{{ .kubeletExtraArgs }}'
+    for a in $KEXTRA; do
+      KUBELET_ARGS="$KUBELET_ARGS --kubelet-arg=${a#--}"
+    done
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION='{{ .k3sVersion }}' sh -s - agent \
+      --server '{{ .joinServerURL }}' \
+      --token-file /etc/rancher/k3s/join-token \
+      --node-name "$(hostname)" \
+      $NODE_IP_ARG $KUBELET_ARGS
+{{- template "bootstrap-sentinel" . }}

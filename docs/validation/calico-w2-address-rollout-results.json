@@ -1,0 +1,49 @@
+{
+  "samples": 127,
+  "start": "2026-09-09T04:04:33.548901+00:00",
+  "end": "2026-09-09T04:07:07.467939+00:00",
+  "addressStable": true,
+  "nodeIdentitiesStable": true,
+  "trafficIdentitiesStable": true,
+  "readyNodes": 13,
+  "replacement": {
+    "name": "calico-node-6qftb",
+    "uid": "507e57f7-5e60-4db4-9f93-170df086fc31",
+    "ready": true,
+    "ipEnv": []
+  },
+  "schemaVersion": 1,
+  "scope": "One-node adoption of existing k0s Calico managed-address template",
+  "qualificationEligible": false,
+  "daemonSetStrategy": "OnDelete",
+  "beforeUpdatedPods": 1,
+  "desiredPods": 8,
+  "beforePodEnvironment": {
+    "IP": "autodetect"
+  },
+  "beforeObservedDetection": "10.100.0.2/24 on cldt1775f69e, once per minute",
+  "afterAddress": "10.10.0.12/32",
+  "replacementPrecondition": "original Calico Pod UID",
+  "codeCoverage": {
+    "file": "harness/e2e/cluster/k0s/calico_config.go",
+    "statements": 12,
+    "covered": 12,
+    "scope": "existing configuration-rendering tests; not native traffic coverage"
+  },
+  "ownership": {
+    "prefixOnlyComparisonCommit": "2f1015f1",
+    "configurationPatch": "uncommitted existing work; no git blame origin",
+    "controllerAddressWriterCommit": "34095a32",
+    "siteAddressPinCommit": "3b8176a8"
+  },
+  "limitations": [
+    "One-second polling can miss shorter address changes.",
+    "Only w1 and w2 have adopted the template; six other Linux Calico pods still use the old environment.",
+    "Node Ready and stable identities do not qualify UDP traffic, policy isolation, replacement, or release."
+  ],
+  "evidenceSHA256": {
+    "samples.json": "fa5fa3ba8bbc66f9444138a89b7e0b3c4ecaebc36d81af75a00094832eea3fcd",
+    "before-autodetection.log": "6eb1fba73da36e96d318612d8597d2fd56ea74acc99b4632f0d52d251b6a7f2a",
+    "config-coverage.out": "c58caefe42400b97d7463b7239f3b5834adcffcadf4167dbdf72cd8e7b11d09e"
+  }
+}

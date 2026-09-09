@@ -1,0 +1,314 @@
+{
+  "schemaVersion": 1,
+  "scope": "Native AWS single-physical-NIC Windows Server 2022 k0s/Calico worker addition and CAPI removal using the reusable lifecycle runner and concurrent sampled Linux/Windows survivor traffic.",
+  "operation": {
+    "claim": "aws-win2022-survivor-v1",
+    "startedAt": "2026-09-08T09:21:45.785292+00:00",
+    "additionFinishedAt": "2026-09-08T09:42:24.806173+00:00",
+    "removalStartedAt": "2026-09-08T09:42:25.230686+00:00",
+    "finishedAt": "2026-09-08T09:48:51.396223+00:00",
+    "passed": true
+  },
+  "binding": {
+    "claim": "aws-win2022-survivor-v1",
+    "machineUID": "de9208c8-c7b8-4b2e-9386-a75451d41bda",
+    "node": "aws-win2022-survivor-v1",
+    "nodeUID": "e79102a4-da4f-407c-b6ec-2fda835d3f99",
+    "providerID": "aws:///us-west-2a/i-0813e1b514fb59bc8"
+  },
+  "image": {
+    "imageID": "ami-09af413882370ed0b",
+    "windowsVersion": "2022",
+    "eniCount": 1,
+    "siteKubeletVersions": [
+      "v1.36.2+k0s"
+    ]
+  },
+  "guest": {
+    "build": 20348,
+    "k0sVersion": "v1.36.2+k0s.0.appmana.1",
+    "k0sSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+    "containerdVersion": "containerd github.com/containerd/containerd/v2 2.3.2 fff62f14765df376e5fc36f5a8f8e795b5670f61",
+    "tunnelSHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+    "physicalNICs": [
+      {
+        "name": "Ethernet 3",
+        "status": "Up"
+      }
+    ],
+    "services": [
+      {
+        "name": "cloud-provisioning-cldt1775f69e",
+        "status": "Running"
+      },
+      {
+        "name": "k0sworker",
+        "status": "Running"
+      }
+    ]
+  },
+  "joinChecks": {
+    "expectedWindowsBuild": true,
+    "onePhysicalNIC": true,
+    "k0sWorkerRunning": true,
+    "tunnelRunning": true,
+    "bootstrapInstalled": true,
+    "capiAssociation": true,
+    "windowsNode": true,
+    "matchesSiteKubelet": true,
+    "containerd2": true,
+    "cloudWorkerLabel": true,
+    "internetFacingTaint": true,
+    "nodeReady": true,
+    "publisherReady": true,
+    "expectedWorkerVersion": true,
+    "expectedWorkerHash": true,
+    "expectedTunnelHash": true,
+    "expectedRunningTunnelHash": true,
+    "peerDelivery": true,
+    "gatewayAttachmentReady": true
+  },
+  "matrix": {
+    "passed": 72,
+    "total": 72,
+    "identitiesStable": true,
+    "ok": true,
+    "scope": "Twelve directed pairs: TCP 1 KiB/16 KiB/1 MiB, Service/DNS checks and twenty 64-byte UDP echoes per pair."
+  },
+  "workload": {
+    "podUID": "a293b70b-e6c2-4f91-b194-90edc86c1fa7",
+    "image": "registry.k8s.io/e2e-test-images/agnhost@sha256:a62f40481e05709988fe44e5035b2e0f553cd52bf0ae4e83614928255b00e8c1",
+    "createdOnce": true,
+    "imagePullStartedAt": "2026-09-08T09:40:05Z",
+    "imagePulledAt": "2026-09-08T09:41:27Z",
+    "containerStartedAt": "2026-09-08T09:41:38Z"
+  },
+  "removal": {
+    "claim": "aws-win2022-survivor-v1",
+    "instanceID": "i-0813e1b514fb59bc8",
+    "node": "aws-win2022-survivor-v1",
+    "nodeUID": "e79102a4-da4f-407c-b6ec-2fda835d3f99",
+    "observedAt": "2026-09-08T09:46:25.329677239Z",
+    "productCleanup": true,
+    "providerID": "aws:///us-west-2a/i-0813e1b514fb59bc8",
+    "terminated": true
+  },
+  "convergence": {
+    "passed": true,
+    "checks": {
+      "instanceTerminated": true,
+      "productCleanup": true,
+      "targetMachineAbsent": true,
+      "survivorMachineIdentities": true,
+      "exactSurvivorSet": true,
+      "survivorIdentitiesAndReadiness": true,
+      "targetGatewayLeasesComplete": true,
+      "otherGatewayLeasesPreserved": true
+    },
+    "survivorCount": 13,
+    "retiredGatewayLeaseCount": 1,
+    "preservedGatewayLeaseCount": 5,
+    "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+  },
+  "survivorTraffic": {
+    "finishedAt": "2026-09-08T09:49:12.902451+00:00",
+    "elapsedSeconds": 1667.3161613949924,
+    "scope": "Concurrent sampled 64-byte UDP echoes; excludes delivery between attempts and fragmented UDP qualification",
+    "executor": "OutOfBand",
+    "maxAllowedGapSeconds": 30.0,
+    "intervalSeconds": 1.0,
+    "identitiesStable": true,
+    "identityError": null,
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 1.36524053895846,
+        "attempts": 1445,
+        "passed": 1445,
+        "maxGapSeconds": 1.0029286420322023,
+        "maxAttemptSeconds": 0.3647951679886319,
+        "ok": true
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 1.3263103860081173,
+        "attempts": 1447,
+        "passed": 1447,
+        "maxGapSeconds": 1.010498852992896,
+        "maxAttemptSeconds": 0.3259844620479271,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 6.4489009190001525,
+        "attempts": 356,
+        "passed": 356,
+        "maxGapSeconds": 1.0013822030159645,
+        "maxAttemptSeconds": 5.44865401100833,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 7.78143589902902,
+        "attempts": 357,
+        "passed": 357,
+        "maxGapSeconds": 1.0071257449453697,
+        "maxAttemptSeconds": 6.781197756004985,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 6.4451634919969365,
+        "attempts": 333,
+        "passed": 333,
+        "maxGapSeconds": 1.0003742069820873,
+        "maxAttemptSeconds": 5.444908627949189,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 7.129583395959344,
+        "attempts": 333,
+        "passed": 333,
+        "maxGapSeconds": 1.0033576400019228,
+        "maxAttemptSeconds": 6.129342258966062,
+        "ok": true
+      }
+    ],
+    "stopRequested": true,
+    "ready": true,
+    "ok": true
+  },
+  "window": {
+    "startedAt": "2026-09-08T09:21:45.785292+00:00",
+    "finishedAt": "2026-09-08T09:48:51.396223+00:00",
+    "lanesBracketWindow": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "lanesPassed": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ok": true,
+    "scope": "Successful sampled survivor probes bracket the operation; gaps and latency remain in the observer report"
+  },
+  "cleanup": {
+    "resources": [
+      {
+        "kind": "pods",
+        "name": "net-aws-win2022-survivor-v1",
+        "alreadyAbsent": true
+      },
+      {
+        "kind": "services",
+        "name": "net-aws-win2022-survivor-v1",
+        "uid": "99dc1113-822c-497d-9109-83d80d5dd87e",
+        "removed": true
+      },
+      {
+        "kind": "awsmachinetemplates",
+        "name": "aws-win2022-survivor-v1",
+        "uid": "3b16d476-1837-4c20-a421-e2c59bc1dcf8",
+        "removed": true
+      },
+      {
+        "kind": "configmaps",
+        "name": "gateway-aws-win2022-survivor-v1",
+        "alreadyAbsent": true
+      }
+    ],
+    "temporaryWindowsTools": [
+      {
+        "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ownedExecutableRemoved": true,
+        "ownedDirectoryRemoved": true,
+        "noOwnedCRIProcesses": true
+      },
+      {
+        "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ownedExecutableRemoved": true,
+        "ownedDirectoryRemoved": true,
+        "noOwnedCRIProcesses": true
+      }
+    ]
+  },
+  "interventions": [],
+  "startupObservations": {
+    "bootstrap": "SSM became Online before k0sworker was installed. A read-only service query returned a missing-service error; subsequent observations found the worker, tunnel, containerd and kubelet running. This did not trigger a repair or repeated bootstrap.",
+    "gateway": "New and existing gateway leases converged before the native join checkpoint and before the single workload creation. All initially pending observations are retained.",
+    "preflight": "Derived credentials and image pull access were renewed and controller rollouts completed before the survivor observer and claim creation."
+  },
+  "stageResults": {
+    "create": {
+      "exitCode": 0,
+      "finishedAt": "2026-09-08T09:21:46.988516+00:00"
+    },
+    "gateway": {
+      "exitCode": 0,
+      "finishedAt": "2026-09-08T09:33:21.857169+00:00"
+    },
+    "join": {
+      "exitCode": 0,
+      "finishedAt": "2026-09-08T09:39:49.085687+00:00"
+    },
+    "probe-ready": {
+      "exitCode": 0,
+      "finishedAt": "2026-09-08T09:41:38.310270+00:00"
+    },
+    "matrix": {
+      "exitCode": 0,
+      "finishedAt": "2026-09-08T09:42:24.805908+00:00"
+    },
+    "removal": {
+      "exitCode": 0,
+      "finishedAt": "2026-09-08T09:46:25.331922+00:00"
+    }
+  },
+  "runner": {
+    "path": "aws/windows_lifecycle.py",
+    "sha256": "b6a208515c37178ec58e86671190710f93fbf9d07b7f39963210a179c0846fa4",
+    "scope": "Source retained during the original running trial; no lifecycle source edits since launch."
+  },
+  "harnessBinarySHA256": {
+    "awsnode": "ad63e23ff038f78f7c71f5bcd8e0a383d417789e06455599bb702957371e536f",
+    "awsremove": "d2b5c7a0dab2d35057062b908f9938824515f32bca47d362b7f9c1f74113b0f8"
+  },
+  "regressionTests": {
+    "lifecycleTests": 9,
+    "scope": "Regression tests plus this separate native trial; unit coverage does not measure native guest execution."
+  },
+  "limitations": [
+    "Sampled 64-byte UDP does not qualify fragmented UDP or delivery between samples.",
+    "This is one Windows 2022 CPU lifecycle trial, not repeated reliability or GPU qualification.",
+    "The image is not optimized to preload all infrastructure and application images.",
+    "Other distribution/CNI/provider combinations, GPU startup repeatability and release qualification remain separate gates."
+  ],
+  "artifactSHA256": {
+    "trial/operation.json": "1745daec3a03e0fd41fe176e61ca931f42bdb539ad030cc2b1a01030b2b75476",
+    "trial/binding.json": "1b8415f1c7243c62b94ff98280983b9670f973ff3da5e929584c912098be261b",
+    "trial/join.json": "b5cdad2c08cd33c6fa10065085a5d337836cd8c7cfabe13dc2c76c5990c13b77",
+    "trial/matrix.json": "192b00a1968fda672ee0f7c6b801c79b5a83b9fc9fa86f3b12c1d5f4d949bf90",
+    "trial/removal.json": "84a183a08a1abfe4e867a87b5a186cfb30273a2de053e8c25cfac4c036825ce9",
+    "traffic/result.json": "eeee83fd32c87401526a34e509e7dcad371ac56fe168b333289f472e1b44e576",
+    "window.json": "10dec756889bc84e293b21443077d3bc763f7a551c9519527c584dc7cc5938cb",
+    "resource-cleanup.json": "2435ba90129dc014e808e4691b0912e34a62b2e1befb4b8a258a8c3ea7bac2a1",
+    "survivor-oob-cleanup.json": "a5d89cf7f6c968068b94449cf22dfe6326c55c5d7af02615e0f86528d0d7f45a",
+    "runner-source-identity.json": "116ad3dde41be08f9e0cbfcb3b8274f51f862d5d9e7d6f5b916772a6300a4b24",
+    "probe-startup-events.json": "374eaca114d6b7c2410c520cd105fc399a016d6dc495c46c0e195cdc6bf7d427"
+  }
+}

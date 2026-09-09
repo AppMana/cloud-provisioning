@@ -1,0 +1,2007 @@
+<Events>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Guid="{9e814aad-3204-11d2-9a82-006008a86939}" />
+		<EventID>0</EventID>
+		<Version>2</Version>
+		<Level>0</Level>
+		<Task>0</Task>
+		<Opcode>80</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:16.517161100+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="6848" ThreadID="6564" ProcessorID="0" KernelTime="60" UserTime="15" />
+		<Channel />
+		<Computer />
+	</System>
+	<ProcessingErrorData>
+		<ErrorCode>15005</ErrorCode>
+		<DataItemName />
+		<EventPayload>000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000</EventPayload>
+	</ProcessingErrorData>
+	<RenderingInfo Culture="en-US">
+		<Opcode>PartitionInfoExtensionV2</Opcode>
+		<Provider>MSNT_SystemTrace</Provider>
+		<EventName xmlns="http://schemas.microsoft.com/win/2004/08/events/trace">EventTrace</EventName>
+	</RenderingInfo>
+	<ExtendedTracingInfo xmlns="http://schemas.microsoft.com/win/2004/08/events/trace">
+		<EventGuid>{68fdd900-4a3e-11d1-84f4-0000f80464e3}</EventGuid>
+	</ExtendedTracingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Guid="{9e814aad-3204-11d2-9a82-006008a86939}" />
+		<EventID>0</EventID>
+		<Version>2</Version>
+		<Level>0</Level>
+		<Task>0</Task>
+		<Opcode>80</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:16.657469300+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="3076" ThreadID="5476" ProcessorID="0" KernelTime="30" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<ProcessingErrorData>
+		<ErrorCode>15005</ErrorCode>
+		<DataItemName />
+		<EventPayload>000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000</EventPayload>
+	</ProcessingErrorData>
+	<RenderingInfo Culture="en-US">
+		<Opcode>PartitionInfoExtensionV2</Opcode>
+		<Provider>MSNT_SystemTrace</Provider>
+		<EventName xmlns="http://schemas.microsoft.com/win/2004/08/events/trace">EventTrace</EventName>
+	</RenderingInfo>
+	<ExtendedTracingInfo xmlns="http://schemas.microsoft.com/win/2004/08/events/trace">
+		<EventGuid>{68fdd900-4a3e-11d1-84f4-0000f80464e3}</EventGuid>
+	</ExtendedTracingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:22.575137300+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="1" KernelTime="43845" UserTime="1395240" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>TimerCallback</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:50.858363600+00:00" />
+		<Correlation ActivityID="{2c8ea0d1-3ecf-0000-fdd0-8e2ccf3edd01}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="0" KernelTime="43875" UserTime="1395345" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>TimerCallback</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:50.858970200+00:00" />
+		<Correlation ActivityID="{2c8ea0d1-3ecf-0000-fdd0-8e2ccf3edd01}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="0" KernelTime="43875" UserTime="1395345" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_DR_REDIRECTION_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:50.859164500+00:00" />
+		<Correlation ActivityID="{2c8ea0d1-3ecf-0000-fdd0-8e2ccf3edd01}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="1" KernelTime="43875" UserTime="1395345" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:50.891198800+00:00" />
+		<Correlation ActivityID="{2c8ea0d1-3ecf-0000-fdd0-8e2ccf3edd01}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="1" KernelTime="43905" UserTime="1395345" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:50.891454400+00:00" />
+		<Correlation ActivityID="{2c8ea0d1-3ecf-0000-fdd0-8e2ccf3edd01}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="1" KernelTime="43905" UserTime="1395345" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:50.892264200+00:00" />
+		<Correlation ActivityID="{2c8ea0d1-3ecf-0000-fdd0-8e2ccf3edd01}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="1" KernelTime="43905" UserTime="1395345" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:56.956495900+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="0" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>TimerCallback</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:56.957064300+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="0" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_DR_REDIRECTION_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:56.957092900+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="0" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:56.958110900+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="0" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:56.958319800+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="0" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:56.958693600+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="0" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">REMOTESUBNETROUTE_HAIRPIN_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">35</Data>
+		<Data Name="flags">3</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:56.959528800+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="1" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:56.959682300+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="1" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:56.960478600+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="1" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="layerId">REMOTESUBNETROUTE_HAIRPIN_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:56.960896400+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="1" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:56.961029900+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="1" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">REMOTESUBNETROUTE_HAIRPIN_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:56.961052600+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="1" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">ENCAP</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">500</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.066558300+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="1" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>TimerCallback</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.067044700+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="1" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_DR_REDIRECTION_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.067076500+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="1" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.067259000+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="1" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.067411100+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="1" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.068476200+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="5872" ProcessorID="1" KernelTime="225" UserTime="4935" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.742730600+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>TimerCallback</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.743359100+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_DR_REDIRECTION_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.743385300+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.744272000+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.744486900+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.744925900+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">REMOTESUBNETROUTE_HAIRPIN_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">35</Data>
+		<Data Name="flags">3</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.745612800+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.745759900+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.746656700+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="layerId">REMOTESUBNETROUTE_HAIRPIN_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.747080400+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.747210600+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">REMOTESUBNETROUTE_HAIRPIN_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.747551800+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">ENCAP</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">500</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.856111000+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>TimerCallback</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.856794500+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_DR_REDIRECTION_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.856821300+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.857017100+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.857246800+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:57.858405500+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.502648200+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="0" KernelTime="46545" UserTime="1513755" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>TimerCallback</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.503453400+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="0" KernelTime="46545" UserTime="1513755" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_DR_REDIRECTION_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.503478900+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="0" KernelTime="46545" UserTime="1513755" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.503965400+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="0" KernelTime="46545" UserTime="1513755" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.504128200+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="0" KernelTime="46545" UserTime="1513755" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.504552400+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="0" KernelTime="46545" UserTime="1513755" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">REMOTESUBNETROUTE_HAIRPIN_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">35</Data>
+		<Data Name="flags">3</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.505443200+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="0" KernelTime="46545" UserTime="1513755" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.505621200+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="0" KernelTime="46545" UserTime="1513755" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.506488200+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="0" KernelTime="46545" UserTime="1513755" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="layerId">REMOTESUBNETROUTE_HAIRPIN_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.506889900+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="0" KernelTime="46545" UserTime="1513755" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.507131900+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="0" KernelTime="46545" UserTime="1513755" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">REMOTESUBNETROUTE_HAIRPIN_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.507154500+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="0" KernelTime="46545" UserTime="1513755" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">ENCAP</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">500</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.627667400+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="0" KernelTime="43920" UserTime="1397400" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>TimerCallback</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.628114700+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="0" KernelTime="43920" UserTime="1397400" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_DR_REDIRECTION_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.628140300+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="0" KernelTime="43920" UserTime="1397400" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.628427900+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="0" KernelTime="43920" UserTime="1397400" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.628614800+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="0" KernelTime="43920" UserTime="1397400" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:58.629571700+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="3120" ProcessorID="0" KernelTime="43920" UserTime="1397400" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.210451500+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="1" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>TimerCallback</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.210881700+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="1" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_DR_REDIRECTION_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.210907700+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="1" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.211164700+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="1" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.211376100+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="1" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.211881200+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="1" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">REMOTESUBNETROUTE_HAIRPIN_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">35</Data>
+		<Data Name="flags">3</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.212531000+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="1" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.212674000+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="1" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.213497700+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="1" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">51E72482-CE0D-4296-80D1-EF60EC906ED0</Data>
+		<Data Name="layerId">REMOTESUBNETROUTE_HAIRPIN_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.213937600+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.214076800+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">REMOTESUBNETROUTE_HAIRPIN_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.214101700+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="7080" ProcessorID="0" KernelTime="0" UserTime="0" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">ENCAP</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">500</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.320266300+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="1" KernelTime="46560" UserTime="1514400" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>TimerCallback</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.320632500+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="1" KernelTime="46560" UserTime="1514400" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_DR_REDIRECTION_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.320651600+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="1" KernelTime="46560" UserTime="1514400" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>RemovingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.320816200+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="1" KernelTime="46560" UserTime="1514400" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.320933100+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="1" KernelTime="46560" UserTime="1514400" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">7D2CED1C-ED91-49F6-9FA0-0A2184B37676</Data>
+		<Data Name="layerId">VNET_ENCAP_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">40</Data>
+		<Data Name="flags">4</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:15:59.322348200+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="1" KernelTime="46560" UserTime="1514400" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+		<Data Name="portId">1CC457C8-89FA-43A8-B29B-47A083AA784F</Data>
+		<Data Name="layerId">VNET_PA_ROUTE_LAYER</Data>
+		<Data Name="statefull">0</Data>
+		<Data Name="priority">2000</Data>
+		<Data Name="flags">1</Data>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>AddingLayer</Task>
+	</RenderingInfo>
+</Event>
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+	<System>
+		<Provider Name="Microsoft-Windows-Host-Network-Service" Guid="{0c885e0d-6eb6-476c-a048-2457eed3a5c1}" />
+		<EventID>0</EventID>
+		<Version>0</Version>
+		<Level>5</Level>
+		<Task>0</Task>
+		<Opcode>0</Opcode>
+		<Keywords>0x0</Keywords>
+		<TimeCreated SystemTime="2026-09-09T03:16:03.588280400+00:00" />
+		<Correlation ActivityID="{00000000-0000-0000-0000-000000000000}" />
+		<Execution ProcessID="1304" ThreadID="4888" ProcessorID="1" KernelTime="46560" UserTime="1514430" />
+		<Channel />
+		<Computer />
+	</System>
+	<EventData>
+	</EventData>
+	<RenderingInfo Culture="en-US">
+		<Task>TimerCallback</Task>
+	</RenderingInfo>
+</Event>
+</Events>

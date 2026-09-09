@@ -17,19 +17,25 @@ all:
           ansible_host: 
     linux:
       hosts:
+        clab-cldt-bastion:
+          ansible_host: 
         clab-cldt-cp:
-          ansible_host: 172.30.30.8
+          ansible_host: 
+        clab-cldt-cp2:
+          ansible_host: 
+        clab-cldt-cp3:
+          ansible_host: 
         clab-cldt-edge-a:
-          ansible_host: 172.30.30.9
+          ansible_host: 
         clab-cldt-edge-b:
-          ansible_host: 172.30.30.6
+          ansible_host: 
         clab-cldt-remote1:
-          ansible_host: 172.30.30.3
+          ansible_host: 
         clab-cldt-remote2:
-          ansible_host: 172.30.30.5
+          ansible_host: 
         clab-cldt-router:
-          ansible_host: 172.30.30.4
+          ansible_host: 
         clab-cldt-w1:
-          ansible_host: 172.30.30.2
+          ansible_host: 
         clab-cldt-w2:
-          ansible_host: 172.30.30.7
+          ansible_host: 

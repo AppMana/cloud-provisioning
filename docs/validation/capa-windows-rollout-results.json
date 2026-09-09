@@ -1,0 +1,11 @@
+{
+  "observedAt": "2026-09-07T03:29:27.419667+00:00",
+  "scope": "patched CAPA controller rollout in isolated single-NIC VM site; no Windows CAPI join claim",
+  "apiServer": "https://10.10.0.10:6443",
+  "image": "cldt/capa-windows:v2.12.1-dev",
+  "imageID": "sha256:a01037477799283a0f19d3effd1563f7b9eae6a911e12a69cfbff9a47dc99d39",
+  "podReady": true,
+  "node": "cp",
+  "patchSHA256": "549e4e1903177e2ad867d7c20cb3eee66d94d9bc0c80557e8a2db08c3a7cd271",
+  "upstreamVersion": "v2.12.1"
+}

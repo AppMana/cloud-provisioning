@@ -9,14 +9,15 @@ image:
 # Image the operator renders into both dialer DaemonSets. Pin by digest
 # in production; a tag is fine when the image is preloaded on the node.
 dialerImage:
+  pullPolicy: IfNotPresent # Never requires images preloaded into each node runtime
   repository: ghcr.io/appmana/cloud-provisioning-dialer
   tag: ""            # defaults to .Chart.AppVersion
 
 imagePullSecrets: []
 
-# The remote node's DaemonSet. A remote cannot be preloaded and may
-# have no registry credential, so if the project image is not publicly
-# pullable its adoption DaemonSet ImagePullBackOffs and the node stays
+# The remote node's DaemonSet. Remotes without a preloaded image need
+# registry access. If the project image cannot be pulled, the adoption
+# DaemonSet ImagePullBackOffs and the node stays
 # on its frozen bootstrap peer list, and config changes do not reach
 # it. Setting a public base image here makes it execute the host binary
 # that cloud-init already installed and sha-verified. Leave empty when
@@ -26,7 +27,16 @@ dialerCloud:
   image: ""             # e.g. busybox:1.37
   hostBinary: /host-bin/wg-dialer
 
-# Every workload this chart owns is Linux-only. Without this, a mixed
+windowsBootstrap:
+  tunnelSHA256: ""  # enables the k0s prepared-image Windows bootstrap renderer
+  workerVersion: "" # optional patched build of the same base k0s release
+  workerSHA256: ""  # required with workerVersion; exact baked executable hash
+
+windowsPublisher:
+  apiServer: ""  # Windows host-reachable API URL; k0s Traefik commonly uses https://[::1]:7443
+  image: ""  # digest-pinned HostProcess image; opt-in while Windows joining is validated
+
+# The controller and Cluster API workloads are Linux-only. Without this, a mixed
 # cluster schedules a linux-only controller onto a Windows node and it
 # fails with "no match for platform in manifest". The same default is
 # pushed into the Cluster API subchart below.
@@ -64,6 +74,17 @@ tunnel:
   # cldt* interface.
   endpoints: ""
 
+  # How long a node that has left the selector goes on being an
+  # endpoint: its dialer stays scheduled, its entries stay published,
+  # its tunnel keeps carrying traffic. A remote reads its peer list from
+  # the API server and reaches the API server over the tunnel, so
+  # withdrawing the old endpoint in the same pass that names the new one
+  # removes the only path the new one's name could travel by. This is
+  # the time a remote is given to read it, so it is measured in the
+  # dialer's 30s poll interval, and not in anything about the departing
+  # node's health.
+  endpointRetention: 3m
+
 # The namespace an infrastructure provider's controller runs in, when
 # this controller needs to read a credentials Secret there to check a
 # cluster identity before provisioning. Empty grants no such access.
@@ -94,7 +115,8 @@ transit:
   bgpPort: 0        # e.g. 1790
   bgpASN: 64512
 
-# Which cluster technology mints join credentials (k0s | kubeadm).
+# Which cluster technology mints join credentials
+# (k0s | kubeadm | k3s | rke2 | microk8s).
 joinProvider: k0s
 
 # First-boot binary delivery. A remote node has no image puller before
@@ -165,3 +187,9 @@ cluster-api-operator:
   # Windows-node reason.
   bootstrap: {}
   controlPlane: {}
+
+# Opt-in Windows Calico subnet gateway reconciliation. The ConfigMap contains
+# scope.json; credentials are separate. Empty configMap disables registration.
+awsGateway:
+  configMap: ""
+  credentialsSecret: "" # optional AWS_* env keys; restart after credential rotation

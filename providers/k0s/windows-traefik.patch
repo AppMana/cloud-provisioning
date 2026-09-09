@@ -1,0 +1,59 @@
+diff --git a/pkg/component/worker/nllb/traefik.go b/pkg/component/worker/nllb/traefik.go
+index bfc0c75..e519168 100644
+--- a/pkg/component/worker/nllb/traefik.go
++++ b/pkg/component/worker/nllb/traefik.go
+@@ -10,6 +10,7 @@ import (
+ 	"net"
+ 	"os"
+ 	"path/filepath"
++	"runtime"
+ 	"strconv"
+ 
+ 	"github.com/k0sproject/k0s/internal/pkg/dir"
+@@ -197,8 +198,20 @@ func (t *traefik) stop() {
+ }
+ 
+ func (t *traefik) writeConfigFile(name string, content []byte) error {
+-	return file.AtomicWithTarget(filepath.Join(t.dir, name)).
+-		WithPermissions(0444).
++	path := filepath.Join(t.dir, name)
++	mode := os.FileMode(0444)
++	if runtime.GOOS == "windows" {
++		// POSIX read-only permissions set Windows' read-only file attribute.
++		// Rename cannot replace such a target. Clear the attribute on files
++		// written by earlier versions, and keep replacements writable. Their
++		// inherited Windows ACL still controls access to these public configs.
++		mode = 0644
++		if err := os.Chmod(path, mode); err != nil && !os.IsNotExist(err) {
++			return err
++		}
++	}
++	return file.AtomicWithTarget(path).
++		WithPermissions(mode).
+ 		WithSELinuxLabel(containerFileLabel).
+ 		Write(content)
+ }
+diff --git a/pkg/component/worker/nllb/traefik_test.go b/pkg/component/worker/nllb/traefik_test.go
+index c978a44..d3c850e 100644
+--- a/pkg/component/worker/nllb/traefik_test.go
++++ b/pkg/component/worker/nllb/traefik_test.go
+@@ -85,3 +85,19 @@ func TestWriteTraefikConfigFiles(t *testing.T) {
+ 		})
+ 	}
+ }
++
++// An existing routing.yaml is read-only in k0s 1.36.2. On Windows, the
++// replacement rename fails even though the process owns the directory.
++func TestTraefikReplacesExistingReadOnlyConfig(t *testing.T) {
++	directory := t.TempDir()
++	path := filepath.Join(directory, traefikRoutingConfigFileName)
++	require.NoError(t, os.WriteFile(path, []byte("old"), 0444))
++	t.Cleanup(func() { _ = os.Chmod(path, 0644) })
++	underTest := traefik{dir: directory}
++	for _, content := range []string{"new", "newer"} {
++		require.NoError(t, underTest.writeConfigFile(traefikRoutingConfigFileName, []byte(content)))
++		actual, err := os.ReadFile(path)
++		require.NoError(t, err)
++		require.Equal(t, content, string(actual))
++	}
++}

@@ -1,0 +1,699 @@
+{
+  "scope": "Single Linux default-route Konnectivity canary; no release qualification",
+  "versions": {
+    "k0s": "1.36.2+k0s.0",
+    "agent": "v0.36.0-k0s.0"
+  },
+  "canary": {
+    "namespace": "kube-system",
+    "deployment": "cldt-konnectivity-default-route",
+    "node": "cp2",
+    "agentID": "cldt-default-route-10.10.0.13",
+    "ready": true,
+    "serverConnections": 3,
+    "webhookServiceConnections": 3,
+    "nativeProcessPID": 538677,
+    "serverStrategies": [
+      "destHost",
+      "defaultRoute",
+      "default"
+    ]
+  },
+  "before": {
+    "checks": 10,
+    "passed": 10,
+    "maxSeconds": 1.6423493709880859,
+    "observations": [
+      {
+        "observedAt": "2026-09-08T01:13:49.483859+00:00",
+        "seconds": 1.6423493709880859,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:13:50.715964+00:00",
+        "seconds": 1.2320531950099394,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:13:51.288824+00:00",
+        "seconds": 0.5728234410053119,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:13:51.440043+00:00",
+        "seconds": 0.15128404699498788,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:13:51.584946+00:00",
+        "seconds": 0.1447882610373199,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:13:51.720585+00:00",
+        "seconds": 0.1356127499602735,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:13:51.874476+00:00",
+        "seconds": 0.15387509495485574,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:13:52.047980+00:00",
+        "seconds": 0.1734680500230752,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:13:52.195950+00:00",
+        "seconds": 0.1479508670163341,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:13:52.355783+00:00",
+        "seconds": 0.15981291700154543,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      }
+    ]
+  },
+  "after": {
+    "checks": 30,
+    "passed": 30,
+    "maxSeconds": 0.1577922660508193,
+    "observations": [
+      {
+        "observedAt": "2026-09-08T01:19:40.809977+00:00",
+        "seconds": 0.1577922660508193,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:40.937334+00:00",
+        "seconds": 0.12732388300355524,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:41.066043+00:00",
+        "seconds": 0.1287338329711929,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:41.203524+00:00",
+        "seconds": 0.13738605298567563,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:41.329204+00:00",
+        "seconds": 0.1256609060219489,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:41.455273+00:00",
+        "seconds": 0.12604803597787395,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:41.579083+00:00",
+        "seconds": 0.12378004798665643,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:41.707814+00:00",
+        "seconds": 0.12871120998170227,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:41.842362+00:00",
+        "seconds": 0.1345232329913415,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:41.972617+00:00",
+        "seconds": 0.13023001496912912,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:42.107444+00:00",
+        "seconds": 0.13479891302995384,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:42.242004+00:00",
+        "seconds": 0.13453978404868394,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:42.370024+00:00",
+        "seconds": 0.12800428603077307,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:42.501657+00:00",
+        "seconds": 0.1315951200085692,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:42.623910+00:00",
+        "seconds": 0.12222590704914182,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:42.751283+00:00",
+        "seconds": 0.12735371896997094,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:42.879420+00:00",
+        "seconds": 0.12811001599766314,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:43.004689+00:00",
+        "seconds": 0.12524940900038928,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:43.130575+00:00",
+        "seconds": 0.1258604419999756,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:43.247942+00:00",
+        "seconds": 0.1173399300314486,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:43.372608+00:00",
+        "seconds": 0.12464473897125572,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:43.500705+00:00",
+        "seconds": 0.12807382695609704,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:43.630075+00:00",
+        "seconds": 0.12935905199265108,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:43.759863+00:00",
+        "seconds": 0.1297503900132142,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:43.888826+00:00",
+        "seconds": 0.1289444490103051,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:44.015203+00:00",
+        "seconds": 0.1263597040087916,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:44.140480+00:00",
+        "seconds": 0.12525631295284256,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:44.264079+00:00",
+        "seconds": 0.12357802700717002,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:44.394095+00:00",
+        "seconds": 0.12997699697734788,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      },
+      {
+        "observedAt": "2026-09-08T01:19:44.517372+00:00",
+        "seconds": 0.1232578030321747,
+        "exitCode": 0,
+        "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+        "stderr": ""
+      }
+    ]
+  },
+  "allControllersAfter": {
+    "checks": 36,
+    "passed": 36,
+    "maxSeconds": 0.518306426005438,
+    "observations": [
+      {
+        "api": "10.10.0.10",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.13678864005487412,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.10",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.13711325300391763,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.10",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.1459124709945172,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.10",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.13714673602953553,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.10",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.15051934000803158,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.10",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.14952027500839904,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.10",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.135916945990175,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.10",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.12843564501963556,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.10",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.1350133319501765,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.10",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.12768094101920724,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.10",
+        "kind": "exec",
+        "windows": 2022,
+        "exitCode": 0,
+        "seconds": 0.5109160249703564,
+        "stdout": "konnectivity-check\n",
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.10",
+        "kind": "exec",
+        "windows": 2025,
+        "exitCode": 0,
+        "seconds": 0.3287254339666106,
+        "stdout": "konnectivity-check\n",
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.13",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.16901543800486252,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.13",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.1390171039965935,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.13",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.12958717602305114,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.13",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.11874346202239394,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.13",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.13246292003896087,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.13",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.16121771995676681,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.13",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.13379008398624137,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.13",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.13822063198313117,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.13",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.12340103799942881,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.13",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.12852761801332235,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.13",
+        "kind": "exec",
+        "windows": 2022,
+        "exitCode": 0,
+        "seconds": 0.518306426005438,
+        "stdout": "konnectivity-check\n",
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.13",
+        "kind": "exec",
+        "windows": 2025,
+        "exitCode": 0,
+        "seconds": 0.32927775697316974,
+        "stdout": "konnectivity-check\n",
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.14",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.1684919820399955,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.14",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.16940768901258707,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.14",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.14900038501946256,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.14",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.12968760600779206,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.14",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.1719712049816735,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.14",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.14088843297213316,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.14",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.14776072703534737,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.14",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.13578779296949506,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.14",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.14126598602160811,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.14",
+        "kind": "admission",
+        "exitCode": 0,
+        "seconds": 0.12537127401446924,
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.14",
+        "kind": "exec",
+        "windows": 2022,
+        "exitCode": 0,
+        "seconds": 0.4212729039718397,
+        "stdout": "konnectivity-check\n",
+        "stderr": ""
+      },
+      {
+        "api": "10.10.0.14",
+        "kind": "exec",
+        "windows": 2025,
+        "exitCode": 0,
+        "seconds": 0.31956937396898866,
+        "stdout": "konnectivity-check\n",
+        "stderr": ""
+      }
+    ]
+  },
+  "postAgentLogs": [
+    {
+      "pod": "konnectivity-agent-2sb8j",
+      "node": "aws-win2025-v3",
+      "exitCode": 0,
+      "matchingLines": [],
+      "stderr": ""
+    },
+    {
+      "pod": "konnectivity-agent-45xlj",
+      "node": "remote2",
+      "exitCode": 0,
+      "matchingLines": [],
+      "stderr": ""
+    },
+    {
+      "pod": "konnectivity-agent-46w6k",
+      "node": "aws-win2022-v3",
+      "exitCode": 0,
+      "matchingLines": [],
+      "stderr": ""
+    },
+    {
+      "pod": "konnectivity-agent-6f6lj",
+      "node": "aws-win2022-gpu",
+      "exitCode": 0,
+      "matchingLines": [],
+      "stderr": ""
+    },
+    {
+      "pod": "konnectivity-agent-7ht85",
+      "node": "cp3",
+      "exitCode": 0,
+      "matchingLines": [],
+      "stderr": ""
+    },
+    {
+      "pod": "konnectivity-agent-8t6c8",
+      "node": "cp",
+      "exitCode": 0,
+      "matchingLines": [],
+      "stderr": ""
+    },
+    {
+      "pod": "konnectivity-agent-96h6v",
+      "node": "cp2",
+      "exitCode": 0,
+      "matchingLines": [
+        "I0908 01:19:29.783207       1 client.go:400] \"close connection\" dialID=4925683475780293839 connectionID=39 dialAddress=\"10.103.207.61:443\""
+      ],
+      "stderr": ""
+    },
+    {
+      "pod": "konnectivity-agent-9xdjr",
+      "node": "aws-win2025",
+      "exitCode": 1,
+      "matchingLines": [],
+      "stderr": "Error from server: Get \"https://172.29.0.13:10250/containerLogs/kube-system/konnectivity-agent-9xdjr/konnectivity-agent?sinceTime=2026-09-08T03%3A19%3A23%2B02%3A00&tailLines=3000\": dial tcp 172.29.0.13:10250: i/o timeout\n"
+    },
+    {
+      "pod": "konnectivity-agent-lwb4w",
+      "node": "ip-172-29-0-9",
+      "exitCode": 0,
+      "matchingLines": [],
+      "stderr": ""
+    },
+    {
+      "pod": "konnectivity-agent-svdvw",
+      "node": "w1",
+      "exitCode": 0,
+      "matchingLines": [],
+      "stderr": ""
+    },
+    {
+      "pod": "konnectivity-agent-x7tgl",
+      "node": "remote1",
+      "exitCode": 0,
+      "matchingLines": [],
+      "stderr": ""
+    },
+    {
+      "pod": "konnectivity-agent-z4pm6",
+      "node": "w2",
+      "exitCode": 0,
+      "matchingLines": [],
+      "stderr": ""
+    },
+    {
+      "pod": "konnectivity-agent-z842b",
+      "node": "aws-win2025-gpu",
+      "exitCode": 0,
+      "matchingLines": [],
+      "stderr": ""
+    }
+  ],
+  "limitations": [
+    "The 10-probe immediate baseline already passed; these cohorts do not measure a before/after failure-rate reduction.",
+    "One Linux canary is not highly available. Existing connections can be reused; probe count is not independent tunnel dial count.",
+    "The old aws-win2025 agent log query failed with a kubelet dial timeout. No complete all-node logging or exec health claim.",
+    "No new Machine provisioning/deletion or canary-loss failover tested in this observation.",
+    "Windows VFP fragmentation and intermittent first GPU process startup remain unresolved."
+  ],
+  "evidenceSHA256": {
+    "admission-before.json": "baa3cc5b08a195f8f8e5a9f9073631cc606111b06f499c7ce80101b4f13aa60c",
+    "admission-after.json": "4ee25b2f0ce1a98d4b0c2336d0d58d900c5d2b7060d9ea6f1c311ba6d14a4e88",
+    "all-controllers-after.json": "545abde71ea5712f837ef6b1fb7af250f69d9f70fbfdcb67eaf03c8fb690df16",
+    "agent-errors.json": "0062de01a7cf53ff8e5389d450a1cc0d8de059ad8bb42e1d754635fee33afd80",
+    "agent-errors-after.json": "4d2d79ef6d990888608b2c569d3cd14a936359a84bc49df3f535c680f1fe37cd",
+    "canary-sockets.txt": "4f5931dcf2cc7dca93f7484c5c4c9151d0ed3dcbd1941277f700ef5e4ba699c1",
+    "canary-metrics-after.txt": "69fb747a34b942ada30525416a4e913d5d9f1ccc4acea995f3a4d5c2afe53983",
+    "default-route-canary.json": "fa5705c5891c8df4339c72b096bcbdb1719fed7282f2142a285dda3d81b84709"
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "scope": "Windows SCM and native tunnel host lifecycle; no CAPI or CNI claim",
+  "serviceSHA256": "13d6dff94f544e16344bc4685c962619b8426733f419a74792dbc9362db6b865",
+  "results": {
+    "2025": {
+      "identityUnchanged": true,
+      "windowsBuild": 26100,
+      "invalidNativeRequestNotAcknowledged": true,
+      "receiptRemovedOnStop": true,
+      "apiBackendUpdate": true,
+      "apiBackendFailover": true,
+      "serviceStartStop": true,
+      "exactDeliveryReceipt": true,
+      "invalidUpdateRejected": true,
+      "removedPeerRoute": true,
+      "readdedPeerRoute": true,
+      "adapterRemovedOnStop": true,
+      "restartRetainedRemoval": true,
+      "apiServiceIndependent": true,
+      "singlePhysicalNIC": true,
+      "runtimeCoverageCollected": true,
+      "serviceAndGuestArtifactsRemoved": true
+    },
+    "2022": {
+      "identityUnchanged": true,
+      "windowsBuild": 20348,
+      "invalidNativeRequestNotAcknowledged": true,
+      "receiptRemovedOnStop": true,
+      "apiBackendUpdate": true,
+      "apiBackendFailover": true,
+      "serviceStartStop": true,
+      "exactDeliveryReceipt": true,
+      "invalidUpdateRejected": true,
+      "removedPeerRoute": true,
+      "readdedPeerRoute": true,
+      "adapterRemovedOnStop": true,
+      "restartRetainedRemoval": true,
+      "apiServiceIndependent": true,
+      "singlePhysicalNIC": true,
+      "runtimeCoverageCollected": true,
+      "serviceAndGuestArtifactsRemoved": true
+    }
+  },
+  "failures": {},
+  "observedAt": "2026-09-07T03:09:18.869443+00:00",
+  "runtimeCoveragePercent": {
+    "windowsService": 78.5,
+    "apiProxy": 91.8,
+    "nativeDevice": 74.2,
+    "hostState": 64.2
+  },
+  "unitRaceTests": {
+    "packages": [
+      "pkg/tunnelhost",
+      "pkg/peerpublisher"
+    ],
+    "passed": true,
+    "hostStateCoveragePercent": 85.0,
+    "publisherCoveragePercent": 82.4
+  },
+  "apiConcurrencyTest": {
+    "passed": true,
+    "environment": "isolated envtest Kubernetes API/etcd 1.35.0",
+    "concurrentSecretUpdateRejected": true,
+    "currentVersionAcknowledged": true
+  },
+  "limitations": [
+    "Service restart tested; full guest reboot not covered by this run",
+    "API proxy uses local TCP backends; Kubernetes TLS and API traffic over WireGuard not covered",
+    "Windows host receipt protocol tested through SSM; publisher not yet deployed as a HostProcess pod",
+    "No Kubernetes join or CNI claim"
+  ],
+  "sourceSHA256": {
+    "controller/cmd/windows-tunnel/main_windows.go": "7f4f645e5bb28d09a6c6a94649417f96b7e5dc833b7536559ee6422566e97976",
+    "controller/pkg/tunnelhost/state.go": "29b540dd11e26b1299f1a55b49e74d16618bd6a9d256dd357afaf47d16d814bd",
+    "controller/pkg/tunnelhost/backends.go": "01824d90935d9913312866f4465d2722f9e5959f74a0c292e659459cc9d13219",
+    "controller/pkg/tunnelhost/delivery.go": "d0e414446078cbfc3b98f9978d02991ad59df6e5f1fcd1f106a00a742e48a555",
+    "controller/pkg/peerpublisher/publisher.go": "1aff20af7af90c960598acaaa7227876078b632630a9edbfba3a2ad64a2335ef",
+    "controller/pkg/apiproxy/apiproxy.go": "225e8a7e763328f3ccb8ac0f7ea7d22d94977ebfd1b52545841043ab0f04e766",
+    "harness/e2e/aws/windows_service.py": "e19bdd401b630630b94f182a94da18d046bea89888dec28b38dff357cbbb64b8"
+  }
+}

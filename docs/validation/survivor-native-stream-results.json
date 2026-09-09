@@ -1,0 +1,65 @@
+{
+  "scope": "Native bounded background UDP sampler on ordinary Linux, Windows Server 2022 and Windows Server 2025 Pods; Kubernetes exec setup/control; no lifecycle operation or OOB control qualification",
+  "payloadBytes": 64,
+  "intervalMilliseconds": 100,
+  "maxAllowedStartIntervalSeconds": 10,
+  "identitiesStable": true,
+  "temporaryGuestFilesRemoved": true,
+  "results": [
+    {
+      "source": "net-w1",
+      "target": "net-aws-win2022-v3",
+      "attempts": 214,
+      "passed": 214,
+      "maxStartIntervalSeconds": 0.24026664399999997,
+      "samplesSHA256": "8a7c101c4fa9b1ecf5afe49290eff0bfefbdb0b394b4ef2043fe0360dae19533",
+      "ok": true
+    },
+    {
+      "source": "net-w1",
+      "target": "net-aws-win2025-v3",
+      "attempts": 217,
+      "passed": 217,
+      "maxStartIntervalSeconds": 0.1366599510000004,
+      "samplesSHA256": "d93e2c4a3ac2916a3696748f7fc067d5a416ffffe3f4a2adf3d36019b948f612",
+      "ok": true
+    },
+    {
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "attempts": 200,
+      "passed": 200,
+      "maxStartIntervalSeconds": 0.1395117000000008,
+      "samplesSHA256": "a2b37bbf45df49f9f8366e4e30996a45abf61f185222633cb59963ab292656c0",
+      "ok": true
+    },
+    {
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "attempts": 244,
+      "passed": 244,
+      "maxStartIntervalSeconds": 0.13064160000000058,
+      "samplesSHA256": "c3557d0527d64b4016eaa1ac251ff6840ba04f9e8949d89a1971630f7f26af74",
+      "ok": true
+    },
+    {
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "attempts": 193,
+      "passed": 193,
+      "maxStartIntervalSeconds": 0.14807990000000082,
+      "samplesSHA256": "d6620fa125c9f086f1caf4142f556b68e4b8a43e076abd265a5f5bcfd6a7bf3e",
+      "ok": true
+    },
+    {
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "attempts": 235,
+      "passed": 235,
+      "maxStartIntervalSeconds": 0.13405799999999957,
+      "samplesSHA256": "55004271e12bc3ed8fb3fb5f10eea7d00e28e67d15298f93f6fd81b30d7c089e",
+      "ok": true
+    }
+  ],
+  "ok": true
+}

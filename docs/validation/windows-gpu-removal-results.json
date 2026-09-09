@@ -1,0 +1,172 @@
+{
+  "observedAt": "2026-09-07T19:24:58.802741+00:00",
+  "scope": "CAPI Windows2025 GPU removal and fresh replacement joining/render/encode; survivor UDP gate remains failed",
+  "removal": {
+    "claim": "aws-win2025-gpu",
+    "instanceID": "i-0c7786299087ff242",
+    "node": "aws-win2025-gpu",
+    "nodeUID": "4b517f86-d9a2-41a9-b865-bf780f166487",
+    "observedAt": "2026-09-07T18:36:44.001658956Z",
+    "productCleanup": true,
+    "providerID": "aws:///us-west-2a/i-0c7786299087ff242",
+    "terminated": true
+  },
+  "identityAndLeaseGuard": {
+    "passed": true,
+    "checks": {
+      "instanceTerminated": true,
+      "productCleanup": true,
+      "targetMachineAbsent": true,
+      "survivorMachineIdentities": true,
+      "exactSurvivorSet": true,
+      "survivorIdentitiesAndReadiness": true,
+      "targetGatewayLeasesComplete": true,
+      "otherGatewayLeasesPreserved": true
+    },
+    "survivorCount": 12,
+    "retiredGatewayLeaseCount": 1,
+    "preservedGatewayLeaseCount": 4,
+    "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+  },
+  "survivorGPU": {
+    "nodeUID": "827bc785-b23e-43d6-a054-e5ac98ed7a97",
+    "beforePassed": true,
+    "afterPassed": true,
+    "afterReceipt": {
+      "encoder": "h264_nvenc",
+      "containerWindowsBuild": 20348,
+      "decodedFrames": 30,
+      "render": {
+        "api": "Direct3D11",
+        "vendorID": 4318,
+        "deviceID": 10168,
+        "frames": 30,
+        "pixelsPerFrame": 4096,
+        "greenPixels": 1152,
+        "bluePixels": 2944,
+        "hardwareOnly": true
+      },
+      "encodedBytes": 3936
+    }
+  },
+  "survivorNetwork": {
+    "passed": false,
+    "checks": 60,
+    "passedChecks": 59,
+    "identitiesStable": true,
+    "failures": [
+      {
+        "ok": false,
+        "expectedResponses": 10,
+        "reportedResponses": 9,
+        "exactResponses": 9,
+        "responsesPresent": true,
+        "errors": [
+          "reading from udp connection failed. err:'read udp 10.244.42.5:63081->10.244.190.81:8081: i/o timeout'"
+        ],
+        "commandExitCode": 0,
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "kind": "udp",
+        "payloadBytes": 1340,
+        "startedAt": "2026-09-07T18:34:19.107787+00:00",
+        "finishedAt": "2026-09-07T18:34:24.566203+00:00"
+      }
+    ]
+  },
+  "replacement": {
+    "machineUID": "d421bc25-db65-45d9-9a82-09018f97ffff",
+    "instanceID": "i-0a0b16147b2137572",
+    "imageID": "ami-0ff49b8716df45d1b",
+    "ec2State": "running",
+    "eniCount": 1,
+    "instanceLaunchTime": "2026-09-07T18:40:19+00:00",
+    "nodeUID": "d50b4863-9add-4771-ac68-d0e16ec26b6f",
+    "joinChecks": {
+      "expectedWindowsBuild": true,
+      "onePhysicalNIC": true,
+      "k0sWorkerRunning": true,
+      "tunnelRunning": true,
+      "bootstrapInstalled": true,
+      "capiAssociation": true,
+      "windowsNode": true,
+      "matchesSiteKubelet": true,
+      "containerd2": true,
+      "cloudWorkerLabel": true,
+      "internetFacingTaint": true,
+      "nodeReady": true,
+      "publisherReady": true,
+      "expectedWorkerVersion": true,
+      "expectedWorkerHash": true,
+      "expectedTunnelHash": true,
+      "peerDelivery": true
+    },
+    "freshDriver": {
+      "license": [
+        "Licensed (Expiry: N/A)"
+      ],
+      "gpuStagePresent": false,
+      "driver": "582.53, WDDM, NVIDIA L4-3Q",
+      "driverReceiptPresent": true
+    },
+    "gatewayPhase": "Ready",
+    "pluginImage": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-device-plugin@sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+    "application": {
+      "passed": true,
+      "podUID": "446b1e2c-0cdc-452f-98fd-31bd8b755308",
+      "jobUID": "1905600c-253c-4065-a4f0-43764b247e9c",
+      "nodeUID": "d50b4863-9add-4771-ac68-d0e16ec26b6f",
+      "receipt": {
+        "encoder": "h264_nvenc",
+        "containerWindowsBuild": 20348,
+        "decodedFrames": 30,
+        "render": {
+          "api": "Direct3D11",
+          "vendorID": 4318,
+          "deviceID": 10168,
+          "frames": 30,
+          "pixelsPerFrame": 4096,
+          "greenPixels": 1152,
+          "bluePixels": 2944,
+          "hardwareOnly": true
+        },
+        "encodedBytes": 3936
+      },
+      "checks": {
+        "podSucceeded": true,
+        "jobComplete": true,
+        "containerExitedZero": true,
+        "containerIdentityPresent": true,
+        "hardwareRenderAndEncode": true
+      },
+      "allocation": {
+        "containerID": "5a7a9c735fb07674f5bc1340b49b98e543bb329c03dbbc1f3a5efc0d423db8fe",
+        "devices": [
+          {
+            "id": "PCIROOT(30)#PCI(0000)#PCI(0000)",
+            "idType": "vpci-location-path"
+          }
+        ],
+        "driverStoreMounts": []
+      },
+      "coldImagePreparationSeconds": 1240.099,
+      "imageBytes": 4318658146
+    }
+  },
+  "coverage": {
+    "removalObserverUnitPercent": 77,
+    "removalObserverUnitAndNativeSnapshotPercent": 94
+  },
+  "limitations": [
+    "Pre-unpacked runtime cache through Sysprep/fresh CAPI boot remains unqualified",
+    "The full survivor network gate failed: one of ten1340-byte UDP responses timed out",
+    "No attribution of the new timeout to removal or to the previously observed VFP collision without a paired packet capture",
+    "No release qualification"
+  ],
+  "gatewayRequestHelper": {
+    "nativeRequestCreated": true,
+    "sameBindingModelForLinuxAndWindows": true,
+    "unitCoveragePercent": 93,
+    "preservesFakeVMAndAWSUnderlayEndpoints": true
+  }
+}

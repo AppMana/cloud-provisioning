@@ -1,0 +1,311 @@
+{
+  "state": "isolated Linux unbound egress switching and rollback verified on three single-NIC QEMU VMs",
+  "date": "2026-09-09",
+  "binarySHA256": "2ccea659171ccc4501ba076c2afdd3233e017e1a91672583f89cbc133f59dcb1",
+  "sourceSHA256": {
+    "main.go": "7a81a89f580cc9923495ef5781d004b6de21ae9a4a12e5743c040804edcdd299",
+    "run.py": "9ad11480a1549dcfd5368add0db1f29bd57ca9d1d1fd29ae33bb32184eaf43f4",
+    "validate.py": "bf47318140c7a4a258ec0550b34da70464df16427773b87c73ffdf7dc6493b4b"
+  },
+  "archiveSHA256": "b87211832d5b2d38fc58efa4cc0ce72160fd5950ed8e338e21881e7ae9220746",
+  "vms": {
+    "cp2": {
+      "kernel": "5.15.0-181-generic",
+      "physicalNICs": [
+        "ens2"
+      ]
+    },
+    "w1": {
+      "kernel": "5.15.0-181-generic",
+      "physicalNICs": [
+        "ens2"
+      ]
+    },
+    "w2": {
+      "kernel": "5.15.0-181-generic",
+      "physicalNICs": [
+        "ens2"
+      ]
+    }
+  },
+  "operations": [
+    {
+      "at": "2026-09-09T14:41:34.990129+00:00",
+      "event": "prepare-b-start"
+    },
+    {
+      "at": "2026-09-09T14:41:38.970376+00:00",
+      "event": "prepare-b-finished"
+    },
+    {
+      "at": "2026-09-09T14:41:58.172506+00:00",
+      "event": "switch-b-start"
+    },
+    {
+      "at": "2026-09-09T14:41:58.941341+00:00",
+      "event": "switch-b-finished"
+    },
+    {
+      "at": "2026-09-09T14:42:07.310853+00:00",
+      "event": "rollback-a-start"
+    },
+    {
+      "at": "2026-09-09T14:42:08.065190+00:00",
+      "event": "rollback-a-finished"
+    },
+    {
+      "at": "2026-09-09T14:42:16.426027+00:00",
+      "event": "reswitch-b-start"
+    },
+    {
+      "at": "2026-09-09T14:42:17.186778+00:00",
+      "event": "reswitch-b-finished"
+    },
+    {
+      "at": "2026-09-09T14:42:26.707217+00:00",
+      "event": "retire-a-start"
+    },
+    {
+      "at": "2026-09-09T14:42:26.996715+00:00",
+      "event": "retire-a-finished"
+    },
+    {
+      "at": "2026-09-09T14:42:35.024836+00:00",
+      "event": "qualification-finished"
+    }
+  ],
+  "positiveRequests": 5040,
+  "continuousRequests": 4800,
+  "expectedRejections": 12,
+  "maxUnboundStartIntervalSeconds": 0.02228,
+  "rawLogsIndependentlyValidated": true,
+  "streams": [
+    {
+      "label": "warmup-a-4",
+      "attempts": 40,
+      "expectedRejection": false,
+      "continuous": false,
+      "maxStartIntervalSeconds": 0.021214,
+      "sha256": "7d49204827af786e7c71f23241e7b835a721a618da89e8ca11d3ea925eb7d508"
+    },
+    {
+      "label": "warmup-a-6",
+      "attempts": 40,
+      "expectedRejection": false,
+      "continuous": false,
+      "maxStartIntervalSeconds": 0.021096,
+      "sha256": "0e04799a2b2bf628542a6b742c0b4f6fcf1c14f2af6298e01688d04faa0adbee"
+    },
+    {
+      "label": "old-during-prepare-4",
+      "attempts": 400,
+      "expectedRejection": false,
+      "continuous": true,
+      "maxStartIntervalSeconds": 0.022846,
+      "sha256": "a286a1e2afaeae5a48112f0981c6abbed20b88fcf6a6b90ae7d79ed6f7c8694e"
+    },
+    {
+      "label": "old-during-prepare-6",
+      "attempts": 400,
+      "expectedRejection": false,
+      "continuous": true,
+      "maxStartIntervalSeconds": 0.021283,
+      "sha256": "4fe4b2734627a47a6883c4aadcfc5efcf23b33f552ed8c02834e444610539e3c"
+    },
+    {
+      "label": "warmup-b-4",
+      "attempts": 40,
+      "expectedRejection": false,
+      "continuous": false,
+      "maxStartIntervalSeconds": 0.021108,
+      "sha256": "bb8681492d6a6eb651edee6bf99bd5f71efc2361d4bbb634174e83938e13e9ba"
+    },
+    {
+      "label": "warmup-b-6",
+      "attempts": 40,
+      "expectedRejection": false,
+      "continuous": false,
+      "maxStartIntervalSeconds": 0.021072,
+      "sha256": "ae4e172ec89a4345925f8c5b2d27369037838d939e8f4f874580c90b4410095a"
+    },
+    {
+      "label": "reject-spoof-a-4",
+      "attempts": 2,
+      "expectedRejection": true,
+      "continuous": false,
+      "maxStartIntervalSeconds": 1.0005,
+      "sha256": "c54e1a0db5ab1ed67be95ad75ed8c29c3d26132897a6f6c6f30f422a42b863bb"
+    },
+    {
+      "label": "after-spoof-a-4",
+      "attempts": 20,
+      "expectedRejection": false,
+      "continuous": false,
+      "maxStartIntervalSeconds": 0.021034,
+      "sha256": "25db95d985a0bc7a885af19f8dcd731425ceee4da19e1385bd4a58cfd8c2dbd2"
+    },
+    {
+      "label": "reject-spoof-a-6",
+      "attempts": 2,
+      "expectedRejection": true,
+      "continuous": false,
+      "maxStartIntervalSeconds": 1.000267,
+      "sha256": "1e1d9390abc94cb9e4a34ea23574ffa0ce8e0164bf4225984acc2793a98c4c27"
+    },
+    {
+      "label": "after-spoof-a-6",
+      "attempts": 20,
+      "expectedRejection": false,
+      "continuous": false,
+      "maxStartIntervalSeconds": 0.021049,
+      "sha256": "bd8542a340e686e2ce7ff0cc0ce460a1fc9a3b5541dbb8a305da24fbb6094f2f"
+    },
+    {
+      "label": "reject-spoof-b-4",
+      "attempts": 2,
+      "expectedRejection": true,
+      "continuous": false,
+      "maxStartIntervalSeconds": 1.000277,
+      "sha256": "6711fe67c401464b01a021f83cd7f4a97bc1db04fb8b4fc64e6987d10bffa3fb"
+    },
+    {
+      "label": "after-spoof-b-4",
+      "attempts": 20,
+      "expectedRejection": false,
+      "continuous": false,
+      "maxStartIntervalSeconds": 0.021029,
+      "sha256": "763aaf8f2dea282ac434ae9e6ba72022859c45142bbf96f6bd6f2540a66761d7"
+    },
+    {
+      "label": "reject-spoof-b-6",
+      "attempts": 2,
+      "expectedRejection": true,
+      "continuous": false,
+      "maxStartIntervalSeconds": 1.00032,
+      "sha256": "225be96648ff8f4c4f7462735db154fa4dc4a2e68616bfdfd800447933b3550b"
+    },
+    {
+      "label": "after-spoof-b-6",
+      "attempts": 20,
+      "expectedRejection": false,
+      "continuous": false,
+      "maxStartIntervalSeconds": 0.021059,
+      "sha256": "6a8d6e884639559e85c4a124c3a416195f2d3bdb23e04f1d86fbc034db182a99"
+    },
+    {
+      "label": "unbound-switch-b-4",
+      "attempts": 400,
+      "expectedRejection": false,
+      "continuous": true,
+      "maxStartIntervalSeconds": 0.021316,
+      "sha256": "033089a9d4efcf61e56c2a3a99ec9bf84e1ee592b5e4ff0845842107817439f9"
+    },
+    {
+      "label": "unbound-switch-b-6",
+      "attempts": 400,
+      "expectedRejection": false,
+      "continuous": true,
+      "maxStartIntervalSeconds": 0.021807,
+      "sha256": "73414638ae58c723b4cfaf7e24909a2ba05012d9265b66ba1f293ac11b93e301"
+    },
+    {
+      "label": "unbound-rollback-a-4",
+      "attempts": 400,
+      "expectedRejection": false,
+      "continuous": true,
+      "maxStartIntervalSeconds": 0.021642,
+      "sha256": "94449685bb8d25812111b91774e423fe0e42fcb07522d29407b32a38d02821d4"
+    },
+    {
+      "label": "unbound-rollback-a-6",
+      "attempts": 400,
+      "expectedRejection": false,
+      "continuous": true,
+      "maxStartIntervalSeconds": 0.021207,
+      "sha256": "2ce0858d8b898b70c1e65264014c73b7d8a87cb2068c00d0f587fc9f706d48dd"
+    },
+    {
+      "label": "unbound-reswitch-b-4",
+      "attempts": 400,
+      "expectedRejection": false,
+      "continuous": true,
+      "maxStartIntervalSeconds": 0.021283,
+      "sha256": "a9c69d4e199e15ff7ae9f37fa34a2cfd1af3aa54a295c18612fb27d42a7c6a0d"
+    },
+    {
+      "label": "unbound-reswitch-b-6",
+      "attempts": 400,
+      "expectedRejection": false,
+      "continuous": true,
+      "maxStartIntervalSeconds": 0.02228,
+      "sha256": "dc4c095a741c24ebf97b1a635ceaffa4928e118baf3d8af142d4495e4c60cc9f"
+    },
+    {
+      "label": "new-during-retire-4",
+      "attempts": 400,
+      "expectedRejection": false,
+      "continuous": true,
+      "maxStartIntervalSeconds": 0.021703,
+      "sha256": "18b63da912e2aa9844e6fcd1a226202d7330b53a645449c1af820f0f05343a87"
+    },
+    {
+      "label": "new-during-retire-6",
+      "attempts": 400,
+      "expectedRejection": false,
+      "continuous": true,
+      "maxStartIntervalSeconds": 0.021614,
+      "sha256": "a345417ad5f2c24daa3aa482a52b8673f8babda74281050124b4524c1a4d5da3"
+    },
+    {
+      "label": "unbound-retire-a-4",
+      "attempts": 400,
+      "expectedRejection": false,
+      "continuous": true,
+      "maxStartIntervalSeconds": 0.021618,
+      "sha256": "26f0a91ce19817b42145d1e59da0f6b3b803f1618b6a08521f546df70022d0ec"
+    },
+    {
+      "label": "unbound-retire-a-6",
+      "attempts": 400,
+      "expectedRejection": false,
+      "continuous": true,
+      "maxStartIntervalSeconds": 0.021327,
+      "sha256": "d1ff39c35d8441a6c2db28e9412f948aef0ef5747641c756234eaf9ed0194fdb"
+    },
+    {
+      "label": "retired-a-4",
+      "attempts": 2,
+      "expectedRejection": true,
+      "continuous": false,
+      "maxStartIntervalSeconds": 1.000417,
+      "sha256": "4f57df3b5ee26579c1e56920e3ac7a4fb47f4bfd61fd3a4aa75e097cbadf9724"
+    },
+    {
+      "label": "retired-a-6",
+      "attempts": 2,
+      "expectedRejection": true,
+      "continuous": false,
+      "maxStartIntervalSeconds": 1.000211,
+      "sha256": "2ebca5b20826a254711f5167f77ea0e91aa063a15908b540d21ec273ca49f1d8"
+    }
+  ],
+  "retainedFleets": {
+    "original": {
+      "count": 13,
+      "exactUIDsAndReadinessPreserved": true
+    },
+    "kuberouter": {
+      "count": 7,
+      "exactUIDsAndReadinessPreserved": true
+    }
+  },
+  "allNativeProcessesTerminal": true,
+  "namespacesRemoved": true,
+  "productionProtocolQualified": false,
+  "limitations": [
+    "Linux namespace test routes, not integration with production policy routing, CNI or controller/dialer receipts.",
+    "No Windows packet qualification.",
+    "No restart, forced failure, arbitrary concurrent placement change, or drain-policy qualification.",
+    "Source-owner addresses are shared across two test VMs, not migrated workload Pods."
+  ]
+}

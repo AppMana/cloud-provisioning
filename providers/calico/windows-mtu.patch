@@ -1,0 +1,503 @@
+diff --git a/felix/dataplane/driver_windows.go b/felix/dataplane/driver_windows.go
+index b60c537b5a..83b3bb1d08 100644
+--- a/felix/dataplane/driver_windows.go
++++ b/felix/dataplane/driver_windows.go
+@@ -15,7 +15,9 @@
+ package dataplane
+ 
+ import (
++	"context"
+ 	"fmt"
++	"github.com/projectcalico/calico/libcalico-go/lib/winmtu"
+ 	"os/exec"
+ 
+ 	"github.com/prometheus/client_golang/prometheus"
+@@ -53,6 +55,17 @@ func StartDataplaneDriver(configParams *config.Config,
+ 		VXLANPort:    configParams.VXLANPort,
+ 	}
+ 
++	// Windows assigns an isolated compartment after CNI ADD. Enforce the
++	// explicit VXLAN MTU during endpoint policy reconciliation instead.
++	if dpConfig.VXLANEnabled && configParams.VXLANMTU > 0 {
++		mtu := configParams.VXLANMTU
++		if configParams.Ipv6Support && configParams.VXLANMTUV6 > 0 && configParams.VXLANMTUV6 < mtu {
++			mtu = configParams.VXLANMTUV6
++		}
++		dpConfig.EnsureEndpointMTU = func(endpointID string) error {
++			return winmtu.ApplyEndpointMTU(context.Background(), endpointID, mtu)
++		}
++	}
+ 	winDP := windataplane.NewWinDataplaneDriver(hns.API{}, dpConfig)
+ 	winDP.Start()
+ 
+diff --git a/felix/dataplane/windows/endpoint_mgr.go b/felix/dataplane/windows/endpoint_mgr.go
+index 7412bf6772..c2aa102c83 100644
+--- a/felix/dataplane/windows/endpoint_mgr.go
++++ b/felix/dataplane/windows/endpoint_mgr.go
+@@ -85,6 +85,37 @@ type endpointManager struct {
+ 	pendingHostAddrs []string
+ 	// hostAddrs contains the list of IPs detected on the host.
+ 	hostAddrs []string
++	// Verify endpoint MTU before publishing policy; nil retains platform defaults.
++	ensureEndpointMTU func(string) error
++	// A snapshot gives every active endpoint a turn without rechecking the
++	// whole node synchronously. Only the dataplane loop accesses this queue.
++	mtuRefreshQueue []types.WorkloadEndpointID
++}
++
++// queueMTURefresh schedules at most one active endpoint for reconciliation.
++// Adapter restarts can reset an isolated interface's MTU without a datastore
++// update. Reuse normal reconciliation so HNS identity and cached-policy checks
++// remain identical to a workload update. Never replace pending updates/deletes.
++func (m *endpointManager) queueMTURefresh() bool {
++	if m.ensureEndpointMTU == nil {
++		return false
++	}
++	if len(m.mtuRefreshQueue) == 0 {
++		for id := range m.activeWlEndpoints {
++			m.mtuRefreshQueue = append(m.mtuRefreshQueue, id)
++		}
++	}
++	for len(m.mtuRefreshQueue) > 0 {
++		id := m.mtuRefreshQueue[0]
++		m.mtuRefreshQueue = m.mtuRefreshQueue[1:]
++		workload, active := m.activeWlEndpoints[id]
++		_, pending := m.pendingWlEpUpdates[id]
++		if active && !pending {
++			m.pendingWlEpUpdates[id] = workload
++			return true
++		}
++	}
++	return false
+ }
+ 
+ type hnsInterface interface {
+@@ -343,6 +374,7 @@ func (m *endpointManager) CompleteDeferredWork() error {
+ 
+ 	// Loop through each pending update
+ 	var missingEndpoints bool
++	var mtuError error
+ 	for id, workload := range m.pendingWlEpUpdates {
+ 		logCxt := log.WithField("id", id)
+ 		var endpointId string
+@@ -365,6 +397,15 @@ func (m *endpointManager) CompleteDeferredWork() error {
+ 				continue
+ 			}
+ 
++			if m.ensureEndpointMTU != nil {
++				if err := m.ensureEndpointMTU(endpointId); err != nil {
++					logCxt.WithError(err).Warn("Deferring endpoint policy until MTU is verified")
++					mtuError = errors.Join(mtuError, err)
++					// Preserve initial ingress deny or existing rules and retain
++					// this update. Other endpoints must still make progress.
++					continue
++				}
++			}
+ 			logCxt.Info("Processing endpoint add/update")
+ 
+ 			// Figure out which tiers apply in the ingress/egress direction.  We skip any tiers that have no policies
+@@ -463,10 +504,13 @@ func (m *endpointManager) CompleteDeferredWork() error {
+ 
+ 	if missingEndpoints {
+ 		log.Warn("Failed to look up one or more HNS endpoints; will schedule a retry")
++		if mtuError != nil {
++			return errors.Join(ErrUnknownEndpoint, mtuError)
++		}
+ 		return ErrUnknownEndpoint
+ 	}
+ 
+-	return nil
++	return mtuError
+ }
+ 
+ // extractUnicastIPv4Addrs examines the raw input addresses and returns any IPv4 addresses found.
+diff --git a/felix/dataplane/windows/win_dataplane.go b/felix/dataplane/windows/win_dataplane.go
+index 96cb1e040e..157d690bf7 100644
+--- a/felix/dataplane/windows/win_dataplane.go
++++ b/felix/dataplane/windows/win_dataplane.go
+@@ -56,10 +56,11 @@ type Config struct {
+ 	// Currently set to maximum value.
+ 	MaxIPSetSize int
+ 
+-	Hostname     string
+-	VXLANEnabled bool
+-	VXLANID      int
+-	VXLANPort    int
++	Hostname          string
++	VXLANEnabled      bool
++	VXLANID           int
++	VXLANPort         int
++	EnsureEndpointMTU func(string) error
+ }
+ 
+ // winDataplane implements an in-process Felix dataplane driver capable of applying network policy
+@@ -181,6 +182,7 @@ func NewWinDataplaneDriver(hns hns.API, config Config) *WindowsDataplane {
+ 	dp.RegisterManager(dpsets.NewIPSetsManager("ipv4", ipSetsV4, config.MaxIPSetSize))
+ 	dp.RegisterManager(newPolicyManager(dp.policySets))
+ 	dp.endpointMgr = newEndpointManager(hns, dp.policySets)
++	dp.endpointMgr.ensureEndpointMTU = config.EnsureEndpointMTU
+ 	dp.RegisterManager(dp.endpointMgr)
+ 	ipSetsV4.SetCallback(dp.endpointMgr.OnIPSetsUpdate)
+ 	if config.VXLANEnabled {
+@@ -240,6 +242,15 @@ func (d *WindowsDataplane) loopUpdatingDataplane() {
+ 
+ 	healthTicks := time.NewTicker(healthInterval).C
+ 	d.reportHealth()
++	// Opt-in MTU enforcement also repairs drift after a workload vNIC restart.
++	// Limit periodic work to one endpoint per tick; a large node must not run
++	// a synchronous PowerShell sweep that starves policy updates and health.
++	var mtuTicks <-chan time.Time
++	if d.endpointMgr.ensureEndpointMTU != nil {
++		ticker := time.NewTicker(5 * time.Second)
++		defer ticker.Stop()
++		mtuTicks = ticker.C
++	}
+ 
+ 	// Fill the apply throttle leaky bucket.
+ 	throttleC := jitter.NewTicker(100*time.Millisecond, 10*time.Millisecond).Channel()
+@@ -287,6 +298,10 @@ func (d *WindowsDataplane) loopUpdatingDataplane() {
+ 			d.applyThrottle.Refill()
+ 		case <-healthTicks:
+ 			d.reportHealth()
++		case <-mtuTicks:
++			if d.endpointMgr.queueMTURefresh() {
++				d.dataplaneNeedsSync = true
++			}
+ 		case <-d.reschedC:
+ 			log.Debug("Reschedule kick received")
+ 			d.dataplaneNeedsSync = true
+diff --git a/felix/dataplane/windows/endpoint_mtu_test.go b/felix/dataplane/windows/endpoint_mtu_test.go
+new file mode 100644
+index 0000000000..492c3ef1c2
+--- /dev/null
++++ b/felix/dataplane/windows/endpoint_mtu_test.go
+@@ -0,0 +1,163 @@
++package windataplane
++
++import (
++	"errors"
++	"net"
++	"testing"
++
++	"github.com/projectcalico/calico/felix/dataplane/windows/hns"
++	"github.com/projectcalico/calico/felix/dataplane/windows/policysets"
++	"github.com/projectcalico/calico/felix/proto"
++	"github.com/projectcalico/calico/felix/types"
++)
++
++func TestMTUDefersPolicyWithoutStarvingOtherEndpoints(t *testing.T) {
++	api := &mtuHNS{Endpoints: []hns.HNSEndpoint{
++		{Id: "waiting", IPAddress: net.ParseIP("10.244.1.2"), VirtualNetworkName: "Calico", SharedContainers: []string{"a"}, State: hns.Attached},
++		{Id: "ready", IPAddress: net.ParseIP("10.244.1.3"), VirtualNetworkName: "Calico", SharedContainers: []string{"b"}, State: hns.Attached},
++	}}
++	m := newEndpointManager(api, &mtuPolicySets{})
++	waiting := types.WorkloadEndpointID{OrchestratorId: "k8s", WorkloadId: "ns/a", EndpointId: "eth0"}
++	ready := types.WorkloadEndpointID{OrchestratorId: "k8s", WorkloadId: "ns/b", EndpointId: "eth0"}
++	w := &proto.WorkloadEndpoint{Name: "a", Ipv4Nets: []string{"10.244.1.2/32"}}
++	m.pendingWlEpUpdates[waiting] = w
++	m.pendingWlEpUpdates[ready] = &proto.WorkloadEndpoint{Name: "b", Ipv4Nets: []string{"10.244.1.3/32"}}
++	notReady := errors.New("Windows has not assigned an isolated compartment")
++	allow := false
++	calls := map[string]int{}
++	m.ensureEndpointMTU = func(id string) error {
++		calls[id]++
++		if id == "waiting" && !allow {
++			return notReady
++		}
++		return nil
++	}
++	for i := 0; i < 8; i++ {
++		if err := m.CompleteDeferredWork(); !errors.Is(err, notReady) {
++			t.Fatalf("expected retryable MTU error, got %v", err)
++		}
++		if m.pendingWlEpUpdates[waiting] == nil || m.activeWlEndpoints[waiting] != nil || m.activeWlACLPolicies[waiting] != nil {
++			t.Fatal("unverified endpoint was dropped or its policy published")
++		}
++	}
++	if m.activeWlEndpoints[ready] == nil || m.pendingWlEpUpdates[ready] != nil {
++		t.Fatal("ready endpoint was starved")
++	}
++	allow = true
++	if err := m.CompleteDeferredWork(); err != nil {
++		t.Fatal(err)
++	}
++	if m.activeWlEndpoints[waiting] != w || m.pendingWlEpUpdates[waiting] != nil {
++		t.Fatal("verified endpoint did not converge")
++	}
++	// A policy refresh must still verify MTU even when the ACL cache matches.
++	allow = false
++	m.pendingWlEpUpdates[waiting] = w
++	if err := m.CompleteDeferredWork(); !errors.Is(err, notReady) {
++		t.Fatal("cached ACLs bypassed MTU verification")
++	}
++	m.pendingWlEpUpdates[waiting] = nil
++	before := calls["waiting"]
++	if err := m.CompleteDeferredWork(); err != nil {
++		t.Fatal(err)
++	}
++	if calls["waiting"] != before || m.activeWlEndpoints[waiting] != nil {
++		t.Fatal("deleted endpoint requires MTU or retains state")
++	}
++}
++
++func TestMTURefreshRepairsDriftWithoutAnEndpointUpdate(t *testing.T) {
++	api := &mtuHNS{Endpoints: []hns.HNSEndpoint{
++		{Id: "pod", IPAddress: net.ParseIP("10.244.1.2"), VirtualNetworkName: "Calico", SharedContainers: []string{"a"}, State: hns.Attached},
++	}}
++	m := newEndpointManager(api, &mtuPolicySets{})
++	id := types.WorkloadEndpointID{OrchestratorId: "k8s", WorkloadId: "ns/a", EndpointId: "eth0"}
++	m.pendingWlEpUpdates[id] = &proto.WorkloadEndpoint{Name: "a", Ipv4Nets: []string{"10.244.1.2/32"}}
++	mtu := 1500
++	m.ensureEndpointMTU = func(string) error { mtu = 1370; return nil }
++	if err := m.CompleteDeferredWork(); err != nil {
++		t.Fatal(err)
++	}
++	// Native adapter restarts reset MTU to 1500 while the workload is unchanged.
++	mtu = 1500
++	if !m.queueMTURefresh() {
++		t.Fatal("active endpoint was not queued")
++	}
++	if err := m.CompleteDeferredWork(); err != nil {
++		t.Fatal(err)
++	}
++	if mtu != 1370 {
++		t.Fatal("cached endpoint policy bypassed drift repair")
++	}
++}
++
++func TestMTURefreshIsBoundedFairAndPreservesPendingWork(t *testing.T) {
++	m := newEndpointManager(&mtuHNS{}, &mtuPolicySets{})
++	ids := []types.WorkloadEndpointID{{WorkloadId: "a"}, {WorkloadId: "b"}, {WorkloadId: "c"}}
++	for _, id := range ids {
++		m.activeWlEndpoints[id] = &proto.WorkloadEndpoint{Name: id.WorkloadId}
++	}
++	if m.queueMTURefresh() || len(m.pendingWlEpUpdates) != 0 {
++		t.Fatal("disabled MTU enforcement scheduled work")
++	}
++	m.ensureEndpointMTU = func(string) error { return nil }
++	seen := map[types.WorkloadEndpointID]bool{}
++	for range ids {
++		if !m.queueMTURefresh() || len(m.pendingWlEpUpdates) != 1 {
++			t.Fatal("expected one endpoint per tick")
++		}
++		for id := range m.pendingWlEpUpdates {
++			if seen[id] {
++				t.Fatal("refresh starved another endpoint")
++			}
++			seen[id] = true
++			delete(m.pendingWlEpUpdates, id)
++		}
++	}
++	update := &proto.WorkloadEndpoint{Name: "replacement"}
++	m.pendingWlEpUpdates[ids[0]] = nil // Pending deletion must not be resurrected.
++	m.pendingWlEpUpdates[ids[1]] = update
++	m.mtuRefreshQueue = append([]types.WorkloadEndpointID(nil), ids...)
++	delete(m.activeWlEndpoints, ids[2]) // Deleted since the queue snapshot.
++	if m.queueMTURefresh() || len(m.pendingWlEpUpdates) != 2 || m.pendingWlEpUpdates[ids[0]] != nil || m.pendingWlEpUpdates[ids[1]] != update {
++		t.Fatal("refresh replaced pending work or resurrected a deleted endpoint")
++	}
++}
++
++type mtuHNS struct{ Endpoints []hns.HNSEndpoint }
++
++func (m *mtuHNS) GetHNSSupportedFeatures() hns.HNSSupportedFeatures {
++	return hns.HNSSupportedFeatures{}
++}
++func (m *mtuHNS) HNSListEndpointRequest() ([]hns.HNSEndpoint, error) { return m.Endpoints, nil }
++
++type mtuPolicySets struct {
++	appliedRules map[string]bool
++}
++
++func (m *mtuPolicySets) AddOrReplacePolicySet(setId string, policy interface{}) {}
++func (m *mtuPolicySets) RemovePolicySet(setId string)                           {}
++func (m *mtuPolicySets) NewRule(isInbound bool, priority uint16) *hns.ACLPolicy {
++	return &hns.ACLPolicy{
++		Type:      hns.ACL,
++		Protocol:  256,
++		Action:    hns.Block,
++		Direction: hns.In,
++		RuleType:  hns.Switch,
++		Priority:  priority,
++	}
++}
++func (m *mtuPolicySets) GetPolicySetRules(setIds []string, isInbound, endOfTierDrop bool) []*hns.ACLPolicy {
++	return nil
++}
++func (m *mtuPolicySets) ProcessIpSetUpdate(ipSetId string) []string { return nil }
++func (m *mtuPolicySets) NewHostRule(isInbound bool) *hns.ACLPolicy {
++	return &hns.ACLPolicy{
++		Type:      hns.ACL,
++		Protocol:  256,
++		Action:    hns.Allow,
++		Direction: hns.In,
++		RuleType:  hns.Host,
++		Priority:  policysets.HostToEndpointRulePriority,
++	}
++}
+diff --git a/libcalico-go/lib/winmtu/mtu.go b/libcalico-go/lib/winmtu/mtu.go
+new file mode 100644
+index 0000000000..c8afe7d2d7
+--- /dev/null
++++ b/libcalico-go/lib/winmtu/mtu.go
+@@ -0,0 +1,53 @@
++package winmtu
++
++import (
++	"fmt"
++	"net/netip"
++	"strings"
++)
++
++// endpointMTUScript limits the MTU of an attached endpoint without raising a
++// smaller platform MTU. HCN's EncapOverhead policy does not apply a configurable
++// overlay MTU on the tested Windows Server 2022/2025 builds.
++func endpointMTUScript(compartment uint32, addresses []string, mtu int) (string, error) {
++	if compartment <= 1 || len(addresses) == 0 {
++		return "", fmt.Errorf("MTU requires an isolated endpoint compartment and addresses")
++	}
++	if mtu < 576 || mtu > 65535 {
++		return "", fmt.Errorf("invalid endpoint MTU %d", mtu)
++	}
++	var quoted []string
++	seen := map[netip.Addr]bool{}
++	for _, value := range addresses {
++		ip, err := netip.ParseAddr(value)
++		if err != nil || ip.Zone() != "" || ip.IsUnspecified() || ip.IsMulticast() || ip.IsLoopback() {
++			return "", fmt.Errorf("invalid endpoint address %q", value)
++		}
++		ip = ip.Unmap()
++		if ip.Is6() && mtu < 1280 {
++			return "", fmt.Errorf("IPv6 endpoint MTU must be at least 1280")
++		}
++		if !seen[ip] {
++			quoted = append(quoted, "'"+ip.String()+"'")
++			seen[ip] = true
++		}
++	}
++	return fmt.Sprintf(`$ErrorActionPreference='Stop'
++$addresses=@(%s);$compartment=%d;$limit=%d;$changes=@()
++foreach($ip in $addresses){
++  $a=@(Get-NetIPAddress -IncludeAllCompartments | Where-Object IPAddress -eq $ip)
++  if($a.Count -ne 1){throw 'MTU endpoint address absent or ambiguous'}
++  $rows=@(Get-NetIPInterface -IncludeAllCompartments | Where-Object { $_.InterfaceIndex -eq $a[0].InterfaceIndex -and $_.AddressFamily -eq $a[0].AddressFamily -and $_.CompartmentId -eq $compartment })
++  if($rows.Count -ne 1){throw 'MTU endpoint compartment mismatch'}
++  $row=$rows[0]
++  if($row.NlMtu -lt 576 -or $row.NlMtu -gt 65535){throw 'Invalid observed endpoint MTU'}
++  $changes+=@{Row=$row;Desired=[Math]::Min([int]$row.NlMtu,$limit)}
++}
++foreach($change in $changes){
++  if($change.Row.NlMtu -ne $change.Desired){$change.Row | Set-NetIPInterface -NlMtuBytes $change.Desired}
++  $row=$change.Row
++  $actual=@(Get-NetIPInterface -IncludeAllCompartments | Where-Object { $_.InterfaceIndex -eq $row.InterfaceIndex -and $_.AddressFamily -eq $row.AddressFamily -and $_.CompartmentId -eq $compartment })
++  if($actual.Count -ne 1 -or $actual[0].NlMtu -ne $change.Desired){throw 'Endpoint MTU read-back failed'}
++}
++`, strings.Join(quoted, ","), compartment, mtu), nil
++}
+diff --git a/libcalico-go/lib/winmtu/mtu_test.go b/libcalico-go/lib/winmtu/mtu_test.go
+new file mode 100644
+index 0000000000..878b2e8a78
+--- /dev/null
++++ b/libcalico-go/lib/winmtu/mtu_test.go
+@@ -0,0 +1,45 @@
++package winmtu
++
++import (
++	"strings"
++	"testing"
++)
++
++func TestEndpointMTURejectsUnsafeTargets(t *testing.T) {
++	for _, tc := range []struct {
++		name        string
++		compartment uint32
++		ips         []string
++		mtu         int
++	}{
++		{"host", 1, []string{"10.244.1.2"}, 1370},
++		{"unspecified compartment", 0, []string{"10.244.1.2"}, 1370},
++		{"missing address", 7, nil, 1370},
++		{"injection", 7, []string{"';throw 'bad"}, 1370},
++		{"loopback", 7, []string{"127.0.0.1"}, 1370},
++		{"multicast", 7, []string{"ff02::1"}, 1370},
++		{"unspecified", 7, []string{"0.0.0.0"}, 1370},
++		{"scoped address", 7, []string{"fe80::1%2"}, 1370},
++		{"too small", 7, []string{"10.244.1.2"}, 575},
++		{"IPv6 minimum", 7, []string{"fd00::2"}, 1279},
++		{"too large", 7, []string{"10.244.1.2"}, 65536},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			if _, err := endpointMTUScript(tc.compartment, tc.ips, tc.mtu); err == nil {
++				t.Fatal("unsafe MTU target accepted")
++			}
++		})
++	}
++}
++
++func TestEndpointMTUUsesObservedPodCompartmentAndReadBack(t *testing.T) {
++	script, err := endpointMTUScript(7, []string{"10.244.167.133", "fd00::2"}, 1370)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, required := range []string{"$compartment=7", "$limit=1370", "'10.244.167.133','fd00::2'", "CompartmentId -eq $compartment", "[Math]::Min", "Set-NetIPInterface -NlMtuBytes", "Endpoint MTU read-back failed"} {
++		if !strings.Contains(script, required) {
++			t.Errorf("missing %s", required)
++		}
++	}
++}
+diff --git a/libcalico-go/lib/winmtu/mtu_windows.go b/libcalico-go/lib/winmtu/mtu_windows.go
+new file mode 100644
+index 0000000000..72880ba2b3
+--- /dev/null
++++ b/libcalico-go/lib/winmtu/mtu_windows.go
+@@ -0,0 +1,50 @@
++package winmtu
++
++import (
++	"context"
++	"fmt"
++	"os/exec"
++	"reflect"
++	"time"
++
++	"github.com/Microsoft/hcsshim/hcn"
++)
++
++// ApplyEndpointMTU applies an upper bound once Windows has assigned the endpoint
++// an isolated compartment. CNI ADD is too early on the tested Windows builds.
++// Zero leaves platform defaults intact. No host interface is eligible.
++func ApplyEndpointMTU(ctx context.Context, endpointID string, mtu int) error {
++	if mtu == 0 {
++		return nil
++	}
++	ep, err := hcn.GetEndpointByID(endpointID)
++	if err != nil {
++		return fmt.Errorf("reading MTU endpoint: %w", err)
++	}
++	ns, err := hcn.GetNamespaceByID(ep.HostComputeNamespace)
++	if err != nil {
++		return fmt.Errorf("reading MTU endpoint namespace: %w", err)
++	}
++	var addresses []string
++	for _, ip := range ep.IpConfigurations {
++		addresses = append(addresses, ip.IpAddress)
++	}
++	script, err := endpointMTUScript(ns.NamespaceId, addresses, mtu)
++	if err != nil {
++		return err
++	}
++	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
++	defer cancel()
++	output, err := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
++	if err != nil {
++		return fmt.Errorf("applying endpoint MTU: %w: %s", err, output)
++	}
++	current, err := hcn.GetEndpointByID(endpointID)
++	if err != nil {
++		return fmt.Errorf("rechecking MTU endpoint: %w", err)
++	}
++	if current.HostComputeNamespace != ep.HostComputeNamespace || !reflect.DeepEqual(current.IpConfigurations, ep.IpConfigurations) {
++		return fmt.Errorf("endpoint identity changed during MTU application")
++	}
++	return nil
++}

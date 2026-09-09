@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "state": "fresh-aws-network-and-management-passed",
+  "scope": "MicroK8s 1.34.9 snap 9063, bundled Calico 3.29.3, containerd 1.7.29; fresh CAPA workers and one all-nodes removal/replacement, with per-check scope below",
+  "observedFailure": {
+    "workerPrivateAddress": "172.29.0.45",
+    "operation": "kubectl exec",
+    "error": "dial tcp 172.29.0.45:10250: connect: no route to host",
+    "ssmCommandID": "4f97076e-5bcd-4beb-8936-01144d94a3e5",
+    "tunnelProbe": {
+      "commandID": "73fcc22f-9251-4e0f-a28b-3ce9c7ed6909",
+      "paths": 6,
+      "expectedHTTPStatus": 401,
+      "interpretation": "Unauthenticated tunnel reachability only"
+    }
+  },
+  "fix": {
+    "kubeletAddress": "allocated WireGuard IPv4",
+    "providerIdentity": "unchanged native infrastructure identity",
+    "deploymentCommandID": "1926733a-3b0e-4c72-aa5e-e1b334ff281e",
+    "image": "cldt-controller:microk8s-tunnel-v1",
+    "blame": {
+      "physicalAddressPolicy": "e102974b",
+      "outOfBandOnlyAssumption": "dc083738",
+      "fakeProviderSharedAddress": "44af0e48"
+    }
+  },
+  "nativeManagement": {
+    "time": "2026-09-09T11:54:14.311582+00:00",
+    "claim": "aws-microk8s-tunnel-v1",
+    "providerID": "aws:///us-west-2a/i-08c0d5185533dabe2",
+    "node": "ip-172-29-0-64",
+    "nodeUID": "234868ac-c22e-4546-8657-4ed0a1bfa4e8",
+    "addresses": [
+      {
+        "address": "10.100.0.159",
+        "type": "InternalIP"
+      },
+      {
+        "address": "ip-172-29-0-64",
+        "type": "Hostname"
+      }
+    ],
+    "nodeUIDStable": true,
+    "results": [
+      {
+        "controlPlane": "10.10.0.10",
+        "operation": "exec",
+        "exitCode": 0,
+        "stdout": "tunnel-access-v1",
+        "stderr": "",
+        "passed": true
+      },
+      {
+        "controlPlane": "10.10.0.10",
+        "operation": "logs",
+        "exitCode": 0,
+        "stdout": "tunnel-access-v1\n",
+        "stderr": "",
+        "passed": true
+      },
+      {
+        "controlPlane": "10.10.0.13",
+        "operation": "exec",
+        "exitCode": 0,
+        "stdout": "tunnel-access-v1",
+        "stderr": "",
+        "passed": true
+      },
+      {
+        "controlPlane": "10.10.0.13",
+        "operation": "logs",
+        "exitCode": 0,
+        "stdout": "tunnel-access-v1\n",
+        "stderr": "",
+        "passed": true
+      },
+      {
+        "controlPlane": "10.10.0.14",
+        "operation": "exec",
+        "exitCode": 0,
+        "stdout": "tunnel-access-v1",
+        "stderr": "",
+        "passed": true
+      },
+      {
+        "controlPlane": "10.10.0.14",
+        "operation": "logs",
+        "exitCode": 0,
+        "stdout": "tunnel-access-v1\n",
+        "stderr": "",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  "nativeCommandID": "db2b7b9c-b512-4669-9576-c6b55940f96e",
+  "networkCommandID": "e4b46f24-9a8d-46cd-bae8-8be0c978a99b",
+  "tests": {
+    "joinRace": "passed",
+    "joinPackageStatementCoveragePercent": 83.8,
+    "managementRace": "passed",
+    "managementProbeUnitStatementCoveragePercent": 100,
+    "nativeHarnessManagementCoverage": "collected from complete AWS row",
+    "managementUnitStatementCoveragePercent": 100
+  },
+  "limitations": [
+    "One all-nodes removal/replacement passed its six-lane survivor window",
+    "All four endpoint placements pass converged network and management checks, but the placement walk has 170 failed UDP requests",
+    "Existing old remote2 retains its original private kubelet address and was not a measured target in the placement walk",
+    "Fake VM public/private address parity remains open"
+  ],
+  "network": {
+    "commandID": "e4b46f24-9a8d-46cd-bae8-8be0c978a99b",
+    "checks": 140,
+    "passed": 140,
+    "attempts": 1,
+    "elapsed": "32.302337736s",
+    "nativeStatementCoveragePercent": 34.4
+  },
+  "fullHarnessRow": {
+    "commandID": "be76d9cc-0de7-4032-9b97-72940a860b80",
+    "networkChecks": 102,
+    "networkPassed": 102,
+    "networkAttempts": 1,
+    "networkElapsed": "17.070946934s",
+    "managementChecks": 36,
+    "managementPassed": 36,
+    "scope": "five site VMs and one fresh CAPA worker, all three control-plane API endpoints",
+    "nativeStatementCoveragePercent": 33.7,
+    "nativeManagementCoveragePercent": {
+      "KubeletAccess": 100,
+      "kubeletAccess": 88.9
+    }
+  },
+  "coverageCaveat": "Standalone file-based probe binaries produced no usable native coverage; retained as functional evidence only. Native coverage above comes from the complete package-built AWS row.",
+  "evidenceArchive": {
+    "sha256": "9b0ee1b62085c7a71202257dc1ecd46047b9366122bf552b60c8a966cab5472d",
+    "bytes": 193587,
+    "downloadHashVerified": true,
+    "private": true,
+    "commandID": "3941c52c-2a8f-436a-b4e9-ac658c466363"
+  },
+  "lifecycle": {
+    "state": "passed",
+    "report": "microk8s-tunnel-lifecycle-results.json",
+    "commandID": "2060aaae-5564-450f-b730-cdfce963a2a7"
+  },
+  "placementValidation": {
+    "state": "all-four-converged-network-and-management-rows-passed-continuous-survivors-failed",
+    "report": "microk8s-tunnel-placement-results.json",
+    "networkChecksPassed": 560,
+    "managementChecksPassed": 168,
+    "udpFailed": 170
+  }
+}

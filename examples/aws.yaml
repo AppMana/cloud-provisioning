@@ -1,7 +1,13 @@
-# A complete example: the Cluster API objects, a machine template, and
+# AWS object relationships: the Cluster API objects, a machine template, and
 # a claim that references the template by name.
 #
 # The addresses and identifiers are documentation values. Replace them.
+# Prepare IAM, the instance profile, AMI and imported-cluster contract as
+# described in docs/aws.md before applying these objects.
+# This is the externally managed Cluster variant. It does not install the
+# ImportedControlPlane contract used by the validated VM/AWS harness, or create
+# the required my-cluster-kubeconfig connection Secret. See docs/aws.md.
+# For an already configured cluster, apply examples/aws-worker.yaml instead.
 
 # 1. The Cluster API objects, once per cluster.
 #
@@ -39,6 +45,12 @@ metadata:
     cluster.x-k8s.io/managed-by: external
 spec:
   region: us-west-2
+  network:
+    vpc:
+      id: vpc-0123456789abcdef0
+    subnets:
+      - id: subnet-0123456789abcdef0
+        isPublic: true
   identityRef:
     kind: AWSClusterStaticIdentity
     name: my-cluster
@@ -52,10 +64,12 @@ metadata:
   name: my-cluster
 spec:
   # Create this Secret yourself, in the AWS provider's own namespace,
-  # holding AccessKeyID and SecretAccessKey. It is the one input that
+  # holding AccessKeyID, SecretAccessKey and SessionToken for STS. This input
   # cannot live in git.
   secretRef: my-cluster-aws-credentials
-  allowedNamespaces: {}
+  allowedNamespaces:
+    list:
+      - cloud-provisioning
 ---
 # 2. The machine template: ordinary Cluster API, the same kind you
 # would write for any other machine.
@@ -72,7 +86,13 @@ metadata:
 spec:
   template:
     spec:
-      instanceType: t3.micro
+      instanceType: t3.large
+      iamInstanceProfile: cldt-example-node
+      sshKeyName: ""
+      additionalTags:
+        cloud-provisioning-test: cldt-example
+      cloudInit:
+        insecureSkipSecretsManager: false
       ami:
         id: ami-0123456789abcdef0
       subnet:
@@ -80,11 +100,15 @@ spec:
       additionalSecurityGroups:
         - id: sg-0123456789abcdef0
       publicIP: true
+      rootVolume:
+        size: 40
+        type: gp3
+        encrypted: true
 ---
 # 3. The claim, naming the template.
 #
-# This is the only object you touch afterwards. Deleting it destroys
-# the instance and removes the node.
+# One claim requests one instance. Multiple claims can share the template.
+# Deleting a claim destroys its instance and removes its node.
 apiVersion: cloud-provisioning.appmana.com/v1alpha1
 kind: ProvisionedNodeClaim
 metadata:

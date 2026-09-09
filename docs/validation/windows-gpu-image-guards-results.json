@@ -1,0 +1,37 @@
+{
+  "scope": "Native Windows image-layer parsing and joined-worker protection; not GPU installation validation",
+  "checks": [
+    {
+      "node": "aws-win2022-v3",
+      "script": "prepare-nvidia.ps1",
+      "output": "joined-worker guard passed"
+    },
+    {
+      "node": "aws-win2022-v3",
+      "script": "verify-nvidia.ps1",
+      "output": "syntax passed"
+    },
+    {
+      "node": "aws-win2025-v3",
+      "script": "prepare-nvidia.ps1",
+      "output": "joined-worker guard passed"
+    },
+    {
+      "node": "aws-win2025-v3",
+      "script": "verify-nvidia.ps1",
+      "output": "syntax passed"
+    }
+  ],
+  "scripts": {
+    "prepare-nvidia.ps1": {
+      "sha256": "cfbf406130dac89ff142e83d0b1de93a02779b9ec4c90edc0610760009912122"
+    },
+    "verify-nvidia.ps1": {
+      "sha256": "a901e62c17a71f2ae015e1f1bf943af68ff35156a8dd53218738ad349057fd4b"
+    }
+  },
+  "limitations": [
+    "Driver installation, reboot verification, licensing, capture and GPU workloads remain unverified.",
+    "The test invokes preparation on joined workers and expects rejection before package access or installation."
+  ]
+}

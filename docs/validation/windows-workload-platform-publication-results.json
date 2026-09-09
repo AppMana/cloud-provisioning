@@ -1,0 +1,151 @@
+{
+  "observedAt": "2026-09-08T15:22:49.844823+00:00",
+  "scope": "Windows-release-specific OCI workload admission, publication and pending cache-intent recovery; not native GPU workload qualification",
+  "build": {
+    "original": "index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+    "oldBase": "mcr.microsoft.com/windows/server@sha256:99e777ead9061f5568a2280cc91787c9494e64e8d40f6af8035b73c86de3bbcd",
+    "newBase": "mcr.microsoft.com/windows/server@sha256:fdcb94318aae661ee6c541d8795b0a1965e11a04f556a7b9c5363b6679cffa03",
+    "imageDigest": "sha256:bd6062bd2510d8afdb42575e3f8b80b92e30529ad3c3ea07f598a512ff0aa542",
+    "platform": {
+      "os": "windows",
+      "architecture": "amd64",
+      "os.version": "10.0.20348.5499"
+    },
+    "applicationLayers": [
+      {
+        "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+        "size": 32363667,
+        "digest": "sha256:90540dd7acf55f9747f8d9d47ddbacc07efc0634b34ff624d73e554cf0296c47"
+      }
+    ],
+    "applicationRuntimeConfigPreserved": true,
+    "allLayerBytesVerified": true,
+    "scope": "OCI construction only; native startup and GPU execution remain unqualified"
+  },
+  "published2022Image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:bd6062bd2510d8afdb42575e3f8b80b92e30529ad3c3ea07f598a512ff0aa542",
+  "preservedLegacy2025Image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+  "platformAdmission": {
+    "at": "2026-09-08T15:13:47.650306+00:00",
+    "wrong2025BuildRejected": true,
+    "rejection": "Workload OCI platform does not match the selected Windows release",
+    "accepted2022Platform": {
+      "os": "windows",
+      "architecture": "amd64",
+      "os.version": "10.0.20348.5499"
+    },
+    "scope": "Local digest-verified OCI metadata admission; native GPU execution still required"
+  },
+  "cacheIntentSupersession": {
+    "revisionOf": "ami-0f5c22e0cb0ec6f50",
+    "revisionRequestedAt": "2026-09-08T15:17:35.902696+00:00",
+    "requestedCacheSHA256": "74051c8882678a48906be1f7b614f2c1b352cc5ec816bbe24f467641c23ad1a4",
+    "supersededCacheSHA256": "fef33106136de67f24c17f85926692fb55b00d7480ad00e09288563ca37ad29d",
+    "prepared": false
+  },
+  "nativeRecovery": {
+    "passed": true,
+    "checks": {
+      "expectedWindowsBuild": true,
+      "workerMatches": true,
+      "runtimeMatches": true,
+      "k0sRuntimeStore": true,
+      "cacheServiceRunning": true,
+      "noWorkerServiceOrKnownIdentity": true,
+      "noWorkloadContainersOrTasks": true,
+      "exactImagesRegistered": true,
+      "allImagesDownloadedAndUnpacked": true,
+      "dataDirectoryInheritsPermissions": true
+    },
+    "observedAt": "2026-09-08T15:11:19.1113526Z",
+    "images": [
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-device-plugin@sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ],
+    "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+  },
+  "unitTests": {
+    "passed": true,
+    "count": 34,
+    "command": "PYTHONPATH=aws python3 -m unittest test_publisher test_windows_image"
+  },
+  "selectedCoverage": {
+    "totals": {
+      "covered_lines": 259,
+      "num_statements": 368,
+      "percent_covered": 66.66666666666667,
+      "percent_covered_display": "67",
+      "missing_lines": 109,
+      "excluded_lines": 0,
+      "num_branches": 139,
+      "num_partial_branches": 21,
+      "covered_branches": 79,
+      "missing_branches": 60
+    },
+    "files": {
+      "aws/image_recipe.py": {
+        "covered_lines": 28,
+        "num_statements": 41,
+        "percent_covered": 61.53846153846154,
+        "percent_covered_display": "62",
+        "missing_lines": 13,
+        "excluded_lines": 0,
+        "num_branches": 24,
+        "num_partial_branches": 5,
+        "covered_branches": 12,
+        "missing_branches": 12
+      },
+      "aws/publisher.py": {
+        "covered_lines": 99,
+        "num_statements": 104,
+        "percent_covered": 92.85714285714286,
+        "percent_covered_display": "93",
+        "missing_lines": 5,
+        "excluded_lines": 0,
+        "num_branches": 36,
+        "num_partial_branches": 5,
+        "covered_branches": 31,
+        "missing_branches": 5
+      },
+      "aws/windows_image.py": {
+        "covered_lines": 113,
+        "num_statements": 201,
+        "percent_covered": 52.76752767527675,
+        "percent_covered_display": "53",
+        "missing_lines": 88,
+        "excluded_lines": 0,
+        "num_branches": 70,
+        "num_partial_branches": 8,
+        "covered_branches": 30,
+        "missing_branches": 40
+      },
+      "aws/workload_platform.py": {
+        "covered_lines": 19,
+        "num_statements": 22,
+        "percent_covered": 80.64516129032258,
+        "percent_covered_display": "81",
+        "missing_lines": 3,
+        "excluded_lines": 0,
+        "num_branches": 9,
+        "num_partial_branches": 3,
+        "covered_branches": 6,
+        "missing_branches": 3
+      }
+    },
+    "scope": "In-process Python coverage only; subprocess-based tests and remote Windows execution are not instrumented"
+  },
+  "limitations": [
+    "The first cache attempt was explicitly cancelled after selecting an incompatible Windows2025 workload; its failure and native cleanup are retained.",
+    "The first base-image download failed with a connection reset. A new build directory retained the successful immutable-input retry.",
+    "Complete cache preparation, Sysprep and a fresh Windows2022 GPU workload remain separate gates."
+  ],
+  "sourceSHA256": {
+    "aws/image_recipe.py": "d9989794a53a4b803beb936c1be8b23c85cd10bfa363a50d3b8bee47d09d8945",
+    "aws/windows_image.py": "e26a3cc9617c979566aacafc3d49beef53a2692da55f571b10e654ef0cef1830",
+    "aws/publisher.py": "3b1abf45235d08642c2ca8d98e3ecca845d33c12ff76460c1ca31ab54781b4e7",
+    "aws/workload_platform.py": "0ca8f26184d8da753d9c210eacdb62a873d7bbb8c2fa98177543f6f0af02d9e3",
+    "aws/test_windows_image.py": "f44dfc23f80482c07bdf7a6c86034a6a8800cc9122396a1a350e83e8d80f6aa1",
+    "aws/test_publisher.py": "abe5f4b71c9641a77492a2fcde2a396dcfcf5b2c8ee1d20ff97e4410c837c02a"
+  }
+}

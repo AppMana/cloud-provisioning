@@ -1,0 +1,50 @@
+{
+  "cp": {
+    "sourceSHA256": "d3882d9ec5b2755900a7088d50ecbddc9f71f2eff523f44648f1936c9a67c344",
+    "config": {
+      "apiVersion": "v1",
+      "kind": "Config",
+      "current-context": "microk8s",
+      "clusters": [
+        {
+          "name": "microk8s-cluster",
+          "cluster": {
+            "server": "https://127.0.0.1:16443"
+          }
+        }
+      ],
+      "contexts": [
+        {
+          "name": "microk8s",
+          "context": {
+            "cluster": "microk8s-cluster"
+          }
+        }
+      ]
+    }
+  },
+  "worker": {
+    "sourceSHA256": "160d98f52c7536927858a90d69d697693023f64b4990a7ac6b7a5d943505c61d",
+    "config": {
+      "apiVersion": "v1",
+      "kind": "Config",
+      "current-context": "microk8s",
+      "clusters": [
+        {
+          "name": "microk8s-cluster",
+          "cluster": {
+            "server": "https://127.0.0.1:16443"
+          }
+        }
+      ],
+      "contexts": [
+        {
+          "name": "microk8s",
+          "context": {
+            "cluster": "microk8s-cluster"
+          }
+        }
+      ]
+    }
+  }
+}

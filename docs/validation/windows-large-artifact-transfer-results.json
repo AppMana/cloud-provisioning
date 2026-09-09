@@ -1,0 +1,30 @@
+{
+  "scope": "Native private S3 file staging through the AWS Windows rig on the Windows 2025 g6f.large image builder",
+  "packageBytes": 731511608,
+  "packageSHA256": "1fe09ef6cc93124d2800c453d663e3a14c020ead68feb1001d6b93cb19bbcc12",
+  "baseline": {
+    "CommandId": "0222f45d-1484-45f7-bbaa-dd0c0d534863",
+    "Status": "TimedOut",
+    "Elapsed": "PT10M0.055S",
+    "ResponseCode": -1
+  },
+  "progressSuppressedTransfer": {
+    "startedAt": "2026-09-07T16:22:03.830858+00:00",
+    "finishedAt": "2026-09-07T16:22:22.644028+00:00",
+    "elapsedSeconds": 18.813174,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "implementation": "harness/e2e/rig/aws/commands.go",
+  "change": "Suppress download progress only during Invoke-WebRequest and restore the prior PowerShell preference in finally. Existing private staging, ACL restrictions and S3 cleanup remain in use.",
+  "limitations": [
+    "One baseline and one retry on this VM; timings are observations, not a universal performance guarantee.",
+    "The driver installer is a separate operation and is not qualified by successful transfer."
+  ],
+  "tests": {
+    "command": "go test -race -coverprofile=.state/windows-gpu-images/aws-rig.cover ./rig/aws",
+    "passed": true,
+    "packageStatementCoveragePercent": 42.2
+  }
+}

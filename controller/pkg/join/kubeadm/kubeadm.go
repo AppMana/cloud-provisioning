@@ -172,3 +172,11 @@ func randomToken(n int) (string, error) {
 	}
 	return string(out), nil
 }
+
+// NeedsAPIProxy implements join.NodeLocalBalancer. kubeadm is the one
+// distribution that ships no node-local balancing of its own: a
+// worker's kubelet dials the join endpoint forever, so without the
+// operator's loopback balancer the control plane that minted the
+// token owns the node for life. k0s, k3s and RKE2 balance for
+// themselves and deliberately do not implement this.
+func (p *Provider) NeedsAPIProxy() bool { return true }

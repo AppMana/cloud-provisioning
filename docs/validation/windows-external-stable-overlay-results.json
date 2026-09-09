@@ -1,0 +1,355 @@
+{
+  "schemaVersion": 1,
+  "scope": "Native Windows Server 2022 bootstrap-overlay removal after w2 address stabilization; unchanged Windows Server 2025 control",
+  "qualificationEligible": false,
+  "result": "immediate-removal-loss-reproduced",
+  "traffic": {
+    "attempts": 44331,
+    "failed": 17,
+    "identitiesStable": true
+  },
+  "phases": {
+    "removedAt": "2026-09-09T04:18:23.061801+00:00",
+    "restoredAt": "2026-09-09T04:19:25.970161+00:00",
+    "captureStart": "2026-09-09T04:18:23.392143+00:00",
+    "captureEnd": "2026-09-09T04:19:23.602116+00:00",
+    "basis": "sample start timestamps; capture subset also included in externalAbsent counts",
+    "lanes": [
+      {
+        "lane": 0,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "counts": {
+          "beforeRemoval": {
+            "attempts": 1470,
+            "failed": 0
+          },
+          "externalAbsent": {
+            "attempts": 1614,
+            "failed": 1
+          },
+          "afterRestore": {
+            "attempts": 2025,
+            "failed": 1
+          },
+          "insideWin2022VFPWindow": {
+            "attempts": 1540,
+            "failed": 1
+          }
+        }
+      },
+      {
+        "lane": 1,
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "counts": {
+          "beforeRemoval": {
+            "attempts": 1511,
+            "failed": 0
+          },
+          "externalAbsent": {
+            "attempts": 1214,
+            "failed": 4
+          },
+          "afterRestore": {
+            "attempts": 2247,
+            "failed": 1
+          },
+          "insideWin2022VFPWindow": {
+            "attempts": 1138,
+            "failed": 4
+          }
+        }
+      },
+      {
+        "lane": 2,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "counts": {
+          "beforeRemoval": {
+            "attempts": 1344,
+            "failed": 0
+          },
+          "externalAbsent": {
+            "attempts": 1432,
+            "failed": 2
+          },
+          "afterRestore": {
+            "attempts": 2057,
+            "failed": 0
+          },
+          "insideWin2022VFPWindow": {
+            "attempts": 1366,
+            "failed": 2
+          }
+        }
+      },
+      {
+        "lane": 3,
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "counts": {
+          "beforeRemoval": {
+            "attempts": 3236,
+            "failed": 0
+          },
+          "externalAbsent": {
+            "attempts": 3907,
+            "failed": 2
+          },
+          "afterRestore": {
+            "attempts": 4761,
+            "failed": 1
+          },
+          "insideWin2022VFPWindow": {
+            "attempts": 3734,
+            "failed": 2
+          }
+        }
+      },
+      {
+        "lane": 4,
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "counts": {
+          "beforeRemoval": {
+            "attempts": 1152,
+            "failed": 0
+          },
+          "externalAbsent": {
+            "attempts": 1477,
+            "failed": 2
+          },
+          "afterRestore": {
+            "attempts": 2416,
+            "failed": 1
+          },
+          "insideWin2022VFPWindow": {
+            "attempts": 1402,
+            "failed": 2
+          }
+        }
+      },
+      {
+        "lane": 5,
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "counts": {
+          "beforeRemoval": {
+            "attempts": 2422,
+            "failed": 1
+          },
+          "externalAbsent": {
+            "attempts": 4882,
+            "failed": 0
+          },
+          "afterRestore": {
+            "attempts": 5164,
+            "failed": 1
+          },
+          "insideWin2022VFPWindow": {
+            "attempts": 4693,
+            "failed": 0
+          }
+        }
+      }
+    ]
+  },
+  "addressObservation": {
+    "node": "w2",
+    "samples": 128,
+    "address": "10.10.0.12/32",
+    "unchanged": true,
+    "start": "2026-09-09T04:17:00.450095+00:00",
+    "end": "2026-09-09T04:21:28.877933+00:00"
+  },
+  "hnsRemoteSubnetRouteModifications": {
+    "2022": 0,
+    "2025": 0
+  },
+  "correlatedDrops": [
+    {
+      "hostVersion": "2022",
+      "source": "10.244.114.4:64631",
+      "at": "2026-09-09 04:19:00.030298300",
+      "reason": "Not locally destined",
+      "rebuilds": [
+        {
+          "activity": "{00000000-0000-0000-0000-000000000000}",
+          "port": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+          "layer": "VNET_ENCAP_LAYER",
+          "removedAt": "2026-09-09T04:18:59.995027200+00:00",
+          "addedAt": "2026-09-09T04:19:00.030824400+00:00",
+          "durationMicroseconds": 35797,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "hostVersion": "2025",
+      "source": "10.244.114.4:61595",
+      "at": "2026-09-09 04:18:26.058560600",
+      "reason": "Not locally destined",
+      "rebuilds": [
+        {
+          "activity": "{171ad083-3ed5-0001-db37-1b17d53edd01}",
+          "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+          "layer": "VNET_ENCAP_LAYER",
+          "removedAt": "2026-09-09T04:18:26.045902200+00:00",
+          "addedAt": "2026-09-09T04:18:26.058873100+00:00",
+          "durationMicroseconds": 12971,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "hostVersion": "2025",
+      "source": "10.244.114.4:64599",
+      "at": "2026-09-09 04:18:59.050258600",
+      "reason": "Not locally destined",
+      "rebuilds": [
+        {
+          "activity": "{171ad083-3ed5-0001-5ed7-1a17d53edd01}",
+          "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+          "layer": "VNET_ENCAP_LAYER",
+          "removedAt": "2026-09-09T04:18:59.035630500+00:00",
+          "addedAt": "2026-09-09T04:18:59.050791900+00:00",
+          "durationMicroseconds": 15161,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "hostVersion": "2025",
+      "source": "10.244.42.6:63328",
+      "at": "2026-09-09 04:18:59.050339600",
+      "reason": "Not locally destined",
+      "rebuilds": [
+        {
+          "activity": "{171ad083-3ed5-0001-5ed7-1a17d53edd01}",
+          "port": "1903CA54-D200-479E-B7F3-A3EC18AE1313",
+          "layer": "VNET_ENCAP_LAYER",
+          "removedAt": "2026-09-09T04:18:59.035630500+00:00",
+          "addedAt": "2026-09-09T04:18:59.050791900+00:00",
+          "durationMicroseconds": 15161,
+          "complete": true
+        }
+      ]
+    }
+  ],
+  "win2022Flow": {
+    "at": "2026-09-09T04:19:00.0302301Z",
+    "source": "10.244.190.81:8081",
+    "destination": "10.244.114.4:64631",
+    "encapsulationAction": "Ignore",
+    "externalAbsent": true
+  },
+  "win2022TimerContext": [
+    {
+      "at": "2026-09-09T04:18:59.994589200+00:00",
+      "task": "TimerCallback",
+      "activity": {
+        "ActivityID": "{00000000-0000-0000-0000-000000000000}"
+      },
+      "fields": {}
+    },
+    {
+      "at": "2026-09-09T04:18:59.994594900+00:00",
+      "task": "GoalStateDriverCallBack",
+      "activity": {
+        "ActivityID": "{2c8ea0d1-3ecf-0001-fc43-de2ccf3edd01}"
+      },
+      "fields": {
+        "PartA_PrivTags": "0",
+        "startTime": "138797734",
+        "networkId": "{2309541d-f748-41c0-bb76-d267848b4215}"
+      }
+    },
+    {
+      "at": "2026-09-09T04:18:59.995003900+00:00",
+      "task": "RemovingLayer",
+      "activity": {
+        "ActivityID": "{00000000-0000-0000-0000-000000000000}"
+      },
+      "fields": {
+        "portId": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+        "layerId": "VNET_DR_REDIRECTION_LAYER"
+      }
+    },
+    {
+      "at": "2026-09-09T04:18:59.995027200+00:00",
+      "task": "RemovingLayer",
+      "activity": {
+        "ActivityID": "{00000000-0000-0000-0000-000000000000}"
+      },
+      "fields": {
+        "portId": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+        "layerId": "VNET_ENCAP_LAYER"
+      }
+    }
+  ],
+  "restoration": {
+    "localEndpointsUnchanged": true,
+    "restoredAt": "2026-09-09T04:19:25.9701619Z",
+    "restoredId": "0782A040-B640-4E75-A4DE-20B2B1F38A70",
+    "calicoId": "2309541D-F748-41C0-BB76-D267848B4215"
+  },
+  "fleetReadiness": {
+    "original": 13,
+    "isolatedKubeRouter": 7
+  },
+  "findings": [
+    "A Windows 2022 reply was dropped inside a 35797-microsecond HNS layer rebuild while the bootstrap External overlay was absent and w2 remained stable.",
+    "A matching inbound VFP flow records Ignore. Adjacent HNS GoalStateDriverCallBack names the remaining Calico network.",
+    "Four correlated TCPIP drops fall inside HNS rebuild intervals across the two hosts.",
+    "The bootstrap-overlay removal and address stabilization together do not eliminate the reproduced failure."
+  ],
+  "limitations": [
+    "Four correlated drops do not explain all seventeen failed samples.",
+    "Sample phase assignment uses wall-clock start timestamps.",
+    "No complete ETL retention/event-loss audit, lifecycle or policy-isolation qualification.",
+    "Matching flow tuple and adjacent callback context do not establish packet identity or the underlying HNS defect.",
+    "The measured removal interval includes deferred VFP cleanup: HNS removes the deleted External network spaces during the reproduced drop. This does not establish behavior after cleanup has settled."
+  ],
+  "evidenceSHA256": {
+    "survivor-result.json": "3e1b94b94e16a2a9e0951b0969b0d88b98a9f8137097203fe10572af6acb7edc",
+    "phase-results.json": "173863be13b2b4946e90a54b25e6a40d427e5b31371e49818615a5224cdc5edf",
+    "w2-address-samples.json": "7a61ea30f82d1db923a836ad65675a5562495ca01cd5c9d27d6aee60e977561a",
+    "packet-drops.json": "3d1472cde16cd0115bf84860f85534b2c9cb813d35a592944a812f9aabb6adf7",
+    "drop-layer-context.json": "d955548c31b9fc849876d269cbbb2c70900fd6dede1b775cb05d795072935093",
+    "2022-vfp-drop-context.json": "7eead78c33d79c50fd1ab0ce43392b4fe1e593d30a1d7fe8bb2df013d999d722",
+    "2022-capture.stdout": "be2a66c91ff56a33be547cb8e5b8c1641c6e704694d2d9bd0a08fc54399ebf83",
+    "2025-capture.stdout": "f084d16844f62510e848e25ae91a5d93e29e2f92a80f296968d6510fe350f9b6",
+    "2022-network-space-context.json": "6ab26bd84a1a0fd2721a3cec4f677b02330b531b0b086b97cfcc40b03b6dc4c0"
+  },
+  "cleanup": {
+    "verifiedArtifacts": {
+      "2022": 17,
+      "2025": 13
+    },
+    "guestArtifactDirectoriesAbsent": true,
+    "ownedTraceSessionsAbsent": true,
+    "packetMonitorStopped": true,
+    "packetFiltersAbsent": true,
+    "vfpTraceFilteringDisabled": true,
+    "samplersAndOwnedToolsRemoved": true
+  },
+  "deferredRemoval": [
+    {
+      "at": "2026-09-09T04:19:00.030351500+00:00",
+      "task": "RemovingSpace",
+      "fields": {
+        "portId": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+        "spaceId": "0782A040-B640-4E75-A4DE-20B2B1F38A70_V6"
+      }
+    },
+    {
+      "at": "2026-09-09T04:19:00.030489600+00:00",
+      "task": "RemovingSpace",
+      "fields": {
+        "portId": "7D2CED1C-ED91-49F6-9FA0-0A2184B37676",
+        "spaceId": "0782A040-B640-4E75-A4DE-20B2B1F38A70"
+      }
+    }
+  ]
+}

@@ -1,0 +1,243 @@
+{
+  "node": {
+    "metadata": {
+      "name": "aws-win2025-gpu-cold-control",
+      "uid": "e67cbbe1-08f2-4268-b579-41654d10bd38",
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/os": "windows",
+        "cloud-provisioning.appmana.com/role": "cloud-worker",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "aws-win2025-gpu-cold-control",
+        "kubernetes.io/os": "windows",
+        "node.kubernetes.io/windows-build": "10.0.26100"
+      }
+    },
+    "status": {
+      "conditions": [
+        {
+          "lastHeartbeatTime": "2026-09-07T23:26:12Z",
+          "lastTransitionTime": "2026-09-07T23:23:38Z",
+          "message": "kubelet has sufficient memory available",
+          "reason": "KubeletHasSufficientMemory",
+          "status": "False",
+          "type": "MemoryPressure"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-07T23:26:12Z",
+          "lastTransitionTime": "2026-09-07T23:23:38Z",
+          "message": "kubelet has no disk pressure",
+          "reason": "KubeletHasNoDiskPressure",
+          "status": "False",
+          "type": "DiskPressure"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-07T23:26:12Z",
+          "lastTransitionTime": "2026-09-07T23:23:38Z",
+          "message": "kubelet has sufficient PID available",
+          "reason": "KubeletHasSufficientPID",
+          "status": "False",
+          "type": "PIDPressure"
+        },
+        {
+          "lastHeartbeatTime": "2026-09-07T23:26:12Z",
+          "lastTransitionTime": "2026-09-07T23:26:12Z",
+          "message": "kubelet is posting ready status",
+          "reason": "KubeletReady",
+          "status": "True",
+          "type": "Ready"
+        },
+        {
+          "lastHeartbeatTime": null,
+          "lastTransitionTime": "2026-09-07T23:23:41Z",
+          "message": "No containerd deprecation warnings detected",
+          "reason": "NoDeprecations",
+          "status": "True",
+          "type": "ContainerdHasNoDeprecations"
+        }
+      ]
+    }
+  },
+  "pods": {
+    "items": [
+      {
+        "metadata": {
+          "name": "cloud-provisioning-dialer-remote-windows-bf8dk",
+          "uid": "b914892e-83b7-4bba-94ea-d935d417dc5f"
+        },
+        "spec": {
+          "nodeName": "aws-win2025-gpu-cold-control",
+          "securityContext": {
+            "windowsOptions": {
+              "hostProcess": true,
+              "runAsUserName": "NT AUTHORITY\\SYSTEM"
+            }
+          },
+          "containers": [
+            {
+              "name": "peer-publisher"
+            }
+          ]
+        },
+        "status": {
+          "phase": "Running"
+        }
+      },
+      {
+        "metadata": {
+          "name": "gpu-operator-node-feature-discovery-worker-7qsf4",
+          "uid": "98e4122f-cf1a-4f74-90a2-f26d0ad5268c"
+        },
+        "spec": {
+          "nodeName": "aws-win2025-gpu-cold-control",
+          "securityContext": {},
+          "containers": [
+            {
+              "name": "worker",
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "readOnlyRootFilesystem": true,
+                "runAsNonRoot": true
+              }
+            }
+          ]
+        },
+        "status": {
+          "phase": "Pending"
+        }
+      },
+      {
+        "metadata": {
+          "name": "calico-node-windows-pdxzt",
+          "uid": "888d67da-423a-4fe0-878b-11e03172c49f"
+        },
+        "spec": {
+          "nodeName": "aws-win2025-gpu-cold-control",
+          "securityContext": {
+            "windowsOptions": {
+              "hostProcess": true,
+              "runAsUserName": "NT AUTHORITY\\system"
+            }
+          },
+          "initContainers": [
+            {
+              "name": "uninstall-calico"
+            },
+            {
+              "name": "install-cni"
+            }
+          ],
+          "containers": [
+            {
+              "name": "felix"
+            },
+            {
+              "name": "node"
+            }
+          ]
+        },
+        "status": {
+          "phase": "Running"
+        }
+      },
+      {
+        "metadata": {
+          "name": "konnectivity-agent-ndrvz",
+          "uid": "a9526cc0-680f-49ea-b237-58ed42b9dbc4"
+        },
+        "spec": {
+          "nodeName": "aws-win2025-gpu-cold-control",
+          "securityContext": {
+            "runAsNonRoot": true,
+            "supplementalGroups": [
+              0
+            ],
+            "windowsOptions": {
+              "hostProcess": true,
+              "runAsUserName": "NT AUTHORITY\\Local service"
+            }
+          },
+          "containers": [
+            {
+              "name": "konnectivity-agent",
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "all"
+                  ]
+                },
+                "readOnlyRootFilesystem": true
+              }
+            }
+          ]
+        },
+        "status": {
+          "phase": "Running"
+        }
+      },
+      {
+        "metadata": {
+          "name": "kube-proxy-windows-nqlhm",
+          "uid": "31910e68-2607-4a01-8b24-071c3f6b5057"
+        },
+        "spec": {
+          "nodeName": "aws-win2025-gpu-cold-control",
+          "securityContext": {
+            "windowsOptions": {
+              "hostProcess": true,
+              "runAsUserName": "NT AUTHORITY\\system"
+            }
+          },
+          "containers": [
+            {
+              "name": "kube-proxy"
+            }
+          ]
+        },
+        "status": {
+          "phase": "Running"
+        }
+      },
+      {
+        "metadata": {
+          "name": "nllb-aws-win2025-gpu-cold-control",
+          "uid": "4381dc32-c5ed-4830-9f7a-f73829c2153d"
+        },
+        "spec": {
+          "nodeName": "aws-win2025-gpu-cold-control",
+          "securityContext": {
+            "runAsNonRoot": true,
+            "windowsOptions": {
+              "hostProcess": true,
+              "runAsUserName": "NT AUTHORITY\\Local service"
+            }
+          },
+          "containers": [
+            {
+              "name": "nllb",
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "privileged": false,
+                "readOnlyRootFilesystem": true
+              }
+            }
+          ]
+        },
+        "status": {
+          "phase": "Running"
+        }
+      }
+    ]
+  }
+}

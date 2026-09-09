@@ -1,0 +1,1309 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-06T19:56:50.770373+00:00",
+  "lifecycleMinutes": 20,
+  "requestedProviders": [
+    "aws",
+    "vultr"
+  ],
+  "requestedAWSRegions": [
+    "us-west-2",
+    "us-east-1",
+    "eu-north-1",
+    "eu-west-1"
+  ],
+  "requestedInstanceTypes": [
+    "g6f.large",
+    "g6f.xlarge",
+    "g4dn.xlarge",
+    "g5.xlarge"
+  ],
+  "errors": [],
+  "quotes": [
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "eu-north-1",
+      "zone": "eu-north-1a",
+      "machine": "g6f.large",
+      "os": "linux",
+      "hourlyUSD": "0.021400",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "graphics",
+            "ml-ai"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T16:00:00+00:00",
+      "sessionBaseUSD": "0.007133333333333333333333333333",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "eu-north-1",
+      "zone": "eu-north-1b",
+      "machine": "g6f.large",
+      "os": "linux",
+      "hourlyUSD": "0.021400",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "graphics",
+            "ml-ai"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T14:00:00+00:00",
+      "sessionBaseUSD": "0.007133333333333333333333333333",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-west-2",
+      "zone": "us-west-2d",
+      "machine": "g6f.large",
+      "os": "linux",
+      "hourlyUSD": "0.038200",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "graphics",
+            "ml-ai"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T16:00:00+00:00",
+      "sessionBaseUSD": "0.01273333333333333333333333333",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-east-1",
+      "zone": "us-east-1a",
+      "machine": "g6f.large",
+      "os": "linux",
+      "hourlyUSD": "0.043700",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "ml-ai",
+            "graphics"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T12:00:00+00:00",
+      "sessionBaseUSD": "0.01456666666666666666666666667",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-west-2",
+      "zone": "us-west-2b",
+      "machine": "g6f.large",
+      "os": "linux",
+      "hourlyUSD": "0.048000",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "graphics",
+            "ml-ai"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T18:00:00+00:00",
+      "sessionBaseUSD": "0.016000",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-west-2",
+      "zone": "us-west-2c",
+      "machine": "g6f.large",
+      "os": "linux",
+      "hourlyUSD": "0.051600",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "graphics",
+            "ml-ai"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T19:00:00+00:00",
+      "sessionBaseUSD": "0.017200",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-west-2",
+      "zone": "us-west-2a",
+      "machine": "g6f.large",
+      "os": "linux",
+      "hourlyUSD": "0.053000",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "graphics",
+            "ml-ai"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T13:00:00+00:00",
+      "sessionBaseUSD": "0.01766666666666666666666666667",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-east-1",
+      "zone": "us-east-1d",
+      "machine": "g6f.large",
+      "os": "linux",
+      "hourlyUSD": "0.067000",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "ml-ai",
+            "graphics"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T16:00:00+00:00",
+      "sessionBaseUSD": "0.02233333333333333333333333333",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "eu-north-1",
+      "zone": "eu-north-1a",
+      "machine": "g6f.large",
+      "os": "windows",
+      "hourlyUSD": "0.113400",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "graphics",
+            "ml-ai"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": true,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T14:00:00+00:00",
+      "sessionBaseUSD": "0.037800",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "eu-north-1",
+      "zone": "eu-north-1b",
+      "machine": "g6f.large",
+      "os": "windows",
+      "hourlyUSD": "0.113400",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "graphics",
+            "ml-ai"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": true,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T12:00:00+00:00",
+      "sessionBaseUSD": "0.037800",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-east-1",
+      "zone": "us-east-1a",
+      "machine": "g6f.large",
+      "os": "windows",
+      "hourlyUSD": "0.118000",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "ml-ai",
+            "graphics"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": true,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T11:00:00+00:00",
+      "sessionBaseUSD": "0.03933333333333333333333333333",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-east-1",
+      "zone": "us-east-1c",
+      "machine": "g6f.large",
+      "os": "linux",
+      "hourlyUSD": "0.119100",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "ml-ai",
+            "graphics"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T18:00:00+00:00",
+      "sessionBaseUSD": "0.039700",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-east-1",
+      "zone": "us-east-1d",
+      "machine": "g6f.large",
+      "os": "windows",
+      "hourlyUSD": "0.119600",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "ml-ai",
+            "graphics"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": true,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T19:00:00+00:00",
+      "sessionBaseUSD": "0.03986666666666666666666666667",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-west-2",
+      "zone": "us-west-2c",
+      "machine": "g6f.large",
+      "os": "windows",
+      "hourlyUSD": "0.120500",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "graphics",
+            "ml-ai"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": true,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T17:00:00+00:00",
+      "sessionBaseUSD": "0.04016666666666666666666666667",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-west-2",
+      "zone": "us-west-2d",
+      "machine": "g6f.large",
+      "os": "windows",
+      "hourlyUSD": "0.122100",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "graphics",
+            "ml-ai"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": true,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T11:00:00+00:00",
+      "sessionBaseUSD": "0.040700",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-west-2",
+      "zone": "us-west-2a",
+      "machine": "g6f.large",
+      "os": "windows",
+      "hourlyUSD": "0.128800",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "graphics",
+            "ml-ai"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": true,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T18:00:00+00:00",
+      "sessionBaseUSD": "0.04293333333333333333333333333",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-west-2",
+      "zone": "us-west-2b",
+      "machine": "g6f.large",
+      "os": "windows",
+      "hourlyUSD": "0.140100",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "graphics",
+            "ml-ai"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": true,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T18:00:00+00:00",
+      "sessionBaseUSD": "0.046700",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-east-1",
+      "zone": "us-east-1b",
+      "machine": "g6f.large",
+      "os": "linux",
+      "hourlyUSD": "0.144000",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "ml-ai",
+            "graphics"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T17:00:00+00:00",
+      "sessionBaseUSD": "0.048000",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "ewr",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "linux",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "ewr",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "windows",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "Windows license",
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "ord",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "linux",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "ord",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "windows",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "Windows license",
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "atl",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "linux",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "atl",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "windows",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "Windows license",
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "fra",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "linux",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "fra",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "windows",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "Windows license",
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "sjc",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "linux",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "sjc",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "windows",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "Windows license",
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "sgp",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "linux",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "sgp",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "windows",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "Windows license",
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "blr",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "linux",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "vultr",
+      "market": "on-demand",
+      "region": "blr",
+      "machine": "vcg-a16-2c-8g-2vram",
+      "os": "windows",
+      "hourlyUSD": "0.059",
+      "minimumSeconds": 3600,
+      "billingIncrementSeconds": 3600,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "diskGB": 50,
+      "gpu": "NVIDIA_A16",
+      "gpuMemoryMiB": 2048,
+      "gpuFraction": "1/8",
+      "windowsLicenseIncluded": false,
+      "excludedCosts": [
+        "Windows license",
+        "egress over allowance",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "sessionBaseUSD": "0.059",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-east-1",
+      "zone": "us-east-1c",
+      "machine": "g6f.large",
+      "os": "windows",
+      "hourlyUSD": "0.189400",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "ml-ai",
+            "graphics"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": true,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T19:00:00+00:00",
+      "sessionBaseUSD": "0.06313333333333333333333333333",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    },
+    {
+      "provider": "aws",
+      "market": "spot",
+      "region": "us-east-1",
+      "zone": "us-east-1b",
+      "machine": "g6f.large",
+      "os": "windows",
+      "hourlyUSD": "0.207900",
+      "minimumSeconds": 60,
+      "billingIncrementSeconds": 1,
+      "vcpus": 2,
+      "memoryMiB": 8192,
+      "gpu": [
+        {
+          "Name": "L4",
+          "Manufacturer": "NVIDIA",
+          "Count": 0,
+          "LogicalGpuCount": 1,
+          "GpuPartitionSize": 0.125,
+          "Workloads": [
+            "ml-ai",
+            "graphics"
+          ],
+          "MemoryInfo": {
+            "SizeInMiB": 2861
+          }
+        }
+      ],
+      "gpuMemoryMiB": 2861,
+      "logicalGPUs": 1,
+      "windowsLicenseIncluded": true,
+      "excludedCosts": [
+        "EBS",
+        "public IPv4",
+        "egress",
+        "snapshots",
+        "image builds",
+        "retries"
+      ],
+      "capacityVerified": false,
+      "imageValidated": false,
+      "effectiveAt": "2026-09-06T19:00:00+00:00",
+      "sessionBaseUSD": "0.069300",
+      "costScope": "base compute; excluded costs must be added before provider selection"
+    }
+  ]
+}

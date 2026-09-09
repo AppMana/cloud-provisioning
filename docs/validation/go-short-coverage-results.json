@@ -1,0 +1,35 @@
+{
+  "observedAt": "2026-09-08T09:27:28.242142+00:00",
+  "command": "make coverage STATE=.state/coverage-2026-09-08-v2",
+  "workingDirectory": "harness/e2e",
+  "goVersion": "go version go1.22.2 linux/amd64",
+  "head": "acade1891c36d4a0f94a8a8dd9805ddceba8620f",
+  "workingTree": "uncommitted changes included",
+  "passed": true,
+  "scope": "Go short tests with -mod=readonly -count=1 -covermode=atomic; controller CLDT_NETNS=0. Excludes skipped native VM/netns/envtest gates, Python observers, Kubernetes/CNI/CAPA binaries and sustained integration behavior.",
+  "modules": {
+    "harness": {
+      "statements": 5262,
+      "coveredStatements": 1491,
+      "statementPercent": 28.3,
+      "profileSHA256": "55a637acfd745a335f17af974ca5b292421998bf5d359fd4224733ed47a3b8dd"
+    },
+    "controller": {
+      "statements": 5771,
+      "coveredStatements": 3554,
+      "statementPercent": 61.6,
+      "profileSHA256": "afa01d2120e34d93c87a22c4581a5c78dca69639d0c439015eb4205212ecd2cc"
+    }
+  },
+  "initialFailure": {
+    "cause": "Harness module lacked AWS SDK dependency entries required by the controller attachment adapter imported by cmd/awsroutecheck.",
+    "fix": "go mod tidy added the already-selected controller AWS SDK versions and classified the directly imported apimachinery module correctly. No SDK version upgrade.",
+    "stderrSHA256": "ec72162b48eb349591ca1bbef69cafeb4eb44c9b0a08189ecae407c5e7679e09"
+  },
+  "moduleFilesSHA256": {
+    "harness/e2e/go.mod": "6573c89ca43625c82f79db6c4d6644f02879f5d05d67996ca1683dbc85672c4e",
+    "harness/e2e/go.sum": "80658baeaf041bba5a538936ab48b082e66cbf87b730880cd5f14b7bd40a5f82",
+    "controller/go.mod": "2efe81e99e39f75f44ab341eb5337d9172659dbd28b99b4d74cae6a08cd53f63",
+    "controller/go.sum": "f05534d3aa742164341020f08bb5e2fac20eead0866e08b6ad2f818c0bf77842"
+  }
+}

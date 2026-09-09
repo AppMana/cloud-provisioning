@@ -1,6 +1,10 @@
 .state/
 *.key
 controller/controller
+controller/_work/
+controller/harness/clab/out/
+harness/e2e/_workvm/
+__pycache__/
 harness/containernet/containernet/
 harness/vm-single-nic/bin/
 harness/vm-single-nic/logs/
@@ -12,3 +16,9 @@ harness/vm-single-nic/cfg/cloud-setup.sh
 # Vendored subchart archives: fetched by `helm dependency update` and
 # resolved by Chart.lock, not committed.
 charts/*/charts/*.tgz
+harness/clab/var/
+harness/clab/out/
+harness/clab/clab-cldt/
+
+# Local Python coverage database.
+.coverage

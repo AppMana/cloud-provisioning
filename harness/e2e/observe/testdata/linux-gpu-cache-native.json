@@ -1,0 +1,181 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "machineOS": "linux",
+    "architecture": "amd64",
+    "images": [
+      {
+        "reference": "nvcr.io/nvidia/gpu-operator:v26.3.3",
+        "pullReference": "nvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7",
+        "digest": "sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7",
+        "aliases": [
+          "nvcr.io/nvidia/gpu-operator:v26.3.3",
+          "nvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7"
+        ],
+        "usedBy": [
+          "gpu-operator/gpu-feature-discovery/initContainers/toolkit-validation",
+          "gpu-operator/nvidia-container-toolkit-daemonset/initContainers/driver-validation",
+          "gpu-operator/nvidia-dcgm-exporter/initContainers/toolkit-validation",
+          "gpu-operator/nvidia-device-plugin-daemonset/initContainers/toolkit-validation",
+          "gpu-operator/nvidia-operator-validator/initContainers/driver-validation",
+          "gpu-operator/nvidia-operator-validator/initContainers/toolkit-validation",
+          "gpu-operator/nvidia-operator-validator/initContainers/cuda-validation",
+          "gpu-operator/nvidia-operator-validator/initContainers/plugin-validation",
+          "gpu-operator/nvidia-operator-validator/containers/nvidia-operator-validator"
+        ]
+      },
+      {
+        "reference": "nvcr.io/nvidia/k8s-device-plugin:v0.19.3",
+        "pullReference": "nvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77",
+        "digest": "sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77",
+        "aliases": [
+          "nvcr.io/nvidia/k8s-device-plugin:v0.19.3",
+          "nvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77"
+        ],
+        "usedBy": [
+          "gpu-operator/gpu-feature-discovery/containers/gpu-feature-discovery",
+          "gpu-operator/nvidia-device-plugin-daemonset/containers/nvidia-device-plugin"
+        ]
+      },
+      {
+        "reference": "nvcr.io/nvidia/k8s/container-toolkit:v1.19.1",
+        "pullReference": "nvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c",
+        "digest": "sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c",
+        "aliases": [
+          "nvcr.io/nvidia/k8s/container-toolkit:v1.19.1",
+          "nvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c"
+        ],
+        "usedBy": [
+          "gpu-operator/nvidia-container-toolkit-daemonset/containers/nvidia-container-toolkit-ctr"
+        ]
+      },
+      {
+        "reference": "nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless",
+        "pullReference": "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc",
+        "digest": "sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc",
+        "aliases": [
+          "nvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless",
+          "nvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc"
+        ],
+        "usedBy": [
+          "gpu-operator/nvidia-dcgm-exporter/containers/nvidia-dcgm-exporter"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+        "pullReference": "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+        "digest": "sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1",
+        "aliases": [
+          "quay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0",
+          "quay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1"
+        ],
+        "usedBy": [
+          "kube-system/cldt-konnectivity-default-route-linux/containers/konnectivity-agent",
+          "kube-system/konnectivity-agent/containers/konnectivity-agent"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/calico-cni:v3.32.0-0",
+        "pullReference": "quay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9",
+        "digest": "sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9",
+        "aliases": [
+          "quay.io/k0sproject/calico-cni:v3.32.0-0",
+          "quay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9"
+        ],
+        "usedBy": [
+          "kube-system/calico-node/initContainers/install-cni"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/calico-node:v3.32.0-0",
+        "pullReference": "quay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5",
+        "digest": "sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5",
+        "aliases": [
+          "quay.io/k0sproject/calico-node:v3.32.0-0",
+          "quay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5"
+        ],
+        "usedBy": [
+          "kube-system/calico-node/containers/calico-node"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/kube-proxy:v1.36.2",
+        "pullReference": "quay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b",
+        "digest": "sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b",
+        "aliases": [
+          "quay.io/k0sproject/kube-proxy:v1.36.2",
+          "quay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b"
+        ],
+        "usedBy": [
+          "kube-system/kube-proxy/containers/kube-proxy"
+        ]
+      },
+      {
+        "reference": "quay.io/k0sproject/pause:3.10.2-0",
+        "pullReference": "quay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243",
+        "digest": "sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243",
+        "aliases": [
+          "quay.io/k0sproject/pause:3.10.2-0",
+          "quay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243"
+        ],
+        "usedBy": [
+          "k0s sandbox image observed on QEMU worker"
+        ]
+      },
+      {
+        "reference": "registry.k8s.io/nfd/node-feature-discovery:v0.18.3",
+        "pullReference": "registry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862",
+        "digest": "sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862",
+        "aliases": [
+          "registry.k8s.io/nfd/node-feature-discovery:v0.18.3",
+          "registry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862"
+        ],
+        "usedBy": [
+          "gpu-operator/gpu-operator-node-feature-discovery-worker/containers/worker"
+        ]
+      },
+      {
+        "reference": "docker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45",
+        "digest": "sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794",
+        "archive": "remote-dialer.tar",
+        "archiveSHA256": "9c7588c91e8cd8f8714117609823f15cdf4ca2dbb84a02c704f4c1fa3885ef77",
+        "aliases": [
+          "docker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45"
+        ],
+        "usedBy": [
+          "remote worker dialer"
+        ]
+      },
+      {
+        "reference": "docker.io/cloud-provisioning/gpu-probe:linux-v3",
+        "digest": "sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0",
+        "archive": "gpu-probe.tar",
+        "archiveSHA256": "ca8bc23e83b79d31f8f40c11de8d3aceba44c049fbd525194ede1cbf9a665d77",
+        "aliases": [
+          "docker.io/cloud-provisioning/gpu-probe:linux-v3",
+          "docker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0"
+        ],
+        "usedBy": [
+          "first Vulkan/NVENC workload"
+        ]
+      }
+    ]
+  },
+  "observation": {
+    "before": "REF                                                                                                                      TYPE                                                      DIGEST                                                                  STATUS           SIZE                UNPACKED \ndocker.io/cloud-provisioning/gpu-probe:linux-v3                                                                          application/vnd.oci.image.manifest.v1+json                sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0 complete (5/5)   515.0 MiB/515.0 MiB true\ndocker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0           application/vnd.oci.image.manifest.v1+json                sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0 complete (5/5)   515.0 MiB/515.0 MiB true\ndocker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45                           application/vnd.oci.image.manifest.v1+json                sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794 complete (14/14) 74.2 MiB/74.2 MiB   true\nnvcr.io/nvidia/gpu-operator:v26.3.3                                                                                      application/vnd.docker.distribution.manifest.list.v2+json sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7 complete (43/43) 131.9 MiB/131.9 MiB true\nnvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7                      application/vnd.docker.distribution.manifest.list.v2+json sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7 complete (43/43) 131.9 MiB/131.9 MiB true\nnvcr.io/nvidia/k8s-device-plugin:v0.19.3                                                                                 application/vnd.docker.distribution.manifest.list.v2+json sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77 complete (32/32) 53.4 MiB/53.4 MiB   true\nnvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77                 application/vnd.docker.distribution.manifest.list.v2+json sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77 complete (32/32) 53.4 MiB/53.4 MiB   true\nnvcr.io/nvidia/k8s/container-toolkit:v1.19.1                                                                             application/vnd.docker.distribution.manifest.list.v2+json sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c complete (33/33) 54.3 MiB/54.3 MiB   true\nnvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c             application/vnd.docker.distribution.manifest.list.v2+json sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c complete (33/33) 54.3 MiB/54.3 MiB   true\nnvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless                                                                  application/vnd.oci.image.index.v1+json                   sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc complete (42/42) 56.8 MiB/56.8 MiB   true\nnvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc                 application/vnd.oci.image.index.v1+json                   sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc complete (42/42) 56.8 MiB/56.8 MiB   true\nquay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0                                                           application/vnd.oci.image.index.v1+json                   sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 complete (15/15) 14.8 MiB/14.8 MiB   true\nquay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 application/vnd.oci.image.index.v1+json                   sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 complete (15/15) 14.8 MiB/14.8 MiB   true\nquay.io/k0sproject/calico-cni:v3.32.0-0                                                                                  application/vnd.oci.image.index.v1+json                   sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9 complete (5/5)   74.4 MiB/74.4 MiB   true\nquay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9                    application/vnd.oci.image.index.v1+json                   sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9 complete (5/5)   74.4 MiB/74.4 MiB   true\nquay.io/k0sproject/calico-node:v3.32.0-0                                                                                 application/vnd.oci.image.index.v1+json                   sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5 complete (14/14) 47.8 MiB/47.8 MiB   true\nquay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5                   application/vnd.oci.image.index.v1+json                   sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5 complete (14/14) 47.8 MiB/47.8 MiB   true\nquay.io/k0sproject/kube-proxy:v1.36.2                                                                                    application/vnd.oci.image.index.v1+json                   sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b complete (3/3)   19.7 MiB/19.7 MiB   true\nquay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b                    application/vnd.oci.image.index.v1+json                   sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b complete (3/3)   19.7 MiB/19.7 MiB   true\nquay.io/k0sproject/pause:3.10.2-0                                                                                        application/vnd.oci.image.index.v1+json                   sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243 complete (2/2)   14.3 KiB/14.3 KiB   true\nquay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243                         application/vnd.oci.image.index.v1+json                   sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243 complete (2/2)   14.3 KiB/14.3 KiB   true\nregistry.k8s.io/nfd/node-feature-discovery:v0.18.3                                                                       application/vnd.oci.image.index.v1+json                   sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862 complete (3/3)   79.9 MiB/79.9 MiB   true\nregistry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862       application/vnd.oci.image.index.v1+json                   sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862 complete (3/3)   79.9 MiB/79.9 MiB   true\n",
+    "after": "REF                                                                                                                      TYPE                                                      DIGEST                                                                  STATUS           SIZE                UNPACKED \ndocker.io/cloud-provisioning/gpu-probe:linux-v3                                                                          application/vnd.oci.image.manifest.v1+json                sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0 complete (5/5)   515.0 MiB/515.0 MiB true\ndocker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0           application/vnd.oci.image.manifest.v1+json                sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0 complete (5/5)   515.0 MiB/515.0 MiB true\ndocker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45                           application/vnd.oci.image.manifest.v1+json                sha256:3a6e9f942b43b067286c0f67adf49efa87b19c6f6ce5b659fa796865187c0794 complete (14/14) 74.2 MiB/74.2 MiB   true\nnvcr.io/nvidia/gpu-operator:v26.3.3                                                                                      application/vnd.docker.distribution.manifest.list.v2+json sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7 complete (43/43) 131.9 MiB/131.9 MiB true\nnvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7                      application/vnd.docker.distribution.manifest.list.v2+json sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7 complete (43/43) 131.9 MiB/131.9 MiB true\nnvcr.io/nvidia/k8s-device-plugin:v0.19.3                                                                                 application/vnd.docker.distribution.manifest.list.v2+json sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77 complete (32/32) 53.4 MiB/53.4 MiB   true\nnvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77                 application/vnd.docker.distribution.manifest.list.v2+json sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77 complete (32/32) 53.4 MiB/53.4 MiB   true\nnvcr.io/nvidia/k8s/container-toolkit:v1.19.1                                                                             application/vnd.docker.distribution.manifest.list.v2+json sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c complete (33/33) 54.3 MiB/54.3 MiB   true\nnvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c             application/vnd.docker.distribution.manifest.list.v2+json sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c complete (33/33) 54.3 MiB/54.3 MiB   true\nnvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless                                                                  application/vnd.oci.image.index.v1+json                   sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc complete (42/42) 56.8 MiB/56.8 MiB   true\nnvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc                 application/vnd.oci.image.index.v1+json                   sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc complete (42/42) 56.8 MiB/56.8 MiB   true\nquay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0                                                           application/vnd.oci.image.index.v1+json                   sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 complete (15/15) 14.8 MiB/14.8 MiB   true\nquay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 application/vnd.oci.image.index.v1+json                   sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1 complete (15/15) 14.8 MiB/14.8 MiB   true\nquay.io/k0sproject/calico-cni:v3.32.0-0                                                                                  application/vnd.oci.image.index.v1+json                   sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9 complete (5/5)   74.4 MiB/74.4 MiB   true\nquay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9                    application/vnd.oci.image.index.v1+json                   sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9 complete (5/5)   74.4 MiB/74.4 MiB   true\nquay.io/k0sproject/calico-node:v3.32.0-0                                                                                 application/vnd.oci.image.index.v1+json                   sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5 complete (14/14) 47.8 MiB/47.8 MiB   true\nquay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5                   application/vnd.oci.image.index.v1+json                   sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5 complete (14/14) 47.8 MiB/47.8 MiB   true\nquay.io/k0sproject/kube-proxy:v1.36.2                                                                                    application/vnd.oci.image.index.v1+json                   sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b complete (3/3)   19.7 MiB/19.7 MiB   true\nquay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b                    application/vnd.oci.image.index.v1+json                   sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b complete (3/3)   19.7 MiB/19.7 MiB   true\nquay.io/k0sproject/pause:3.10.2-0                                                                                        application/vnd.oci.image.index.v1+json                   sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243 complete (2/2)   14.3 KiB/14.3 KiB   true\nquay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243                         application/vnd.oci.image.index.v1+json                   sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243 complete (2/2)   14.3 KiB/14.3 KiB   true\nregistry.k8s.io/nfd/node-feature-discovery:v0.18.3                                                                       application/vnd.oci.image.index.v1+json                   sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862 complete (3/3)   79.9 MiB/79.9 MiB   true\nregistry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862       application/vnd.oci.image.index.v1+json                   sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862 complete (3/3)   79.9 MiB/79.9 MiB   true\n",
+    "readyBefore": "docker.io/cloud-provisioning/gpu-probe:linux-v3\ndocker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0\ndocker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45\nnvcr.io/nvidia/gpu-operator:v26.3.3\nnvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7\nnvcr.io/nvidia/k8s-device-plugin:v0.19.3\nnvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77\nnvcr.io/nvidia/k8s/container-toolkit:v1.19.1\nnvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c\nnvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless\nnvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc\nquay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0\nquay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1\nquay.io/k0sproject/calico-cni:v3.32.0-0\nquay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9\nquay.io/k0sproject/calico-node:v3.32.0-0\nquay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5\nquay.io/k0sproject/kube-proxy:v1.36.2\nquay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b\nquay.io/k0sproject/pause:3.10.2-0\nquay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243\nregistry.k8s.io/nfd/node-feature-discovery:v0.18.3\nregistry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862\n",
+    "readyAfter": "docker.io/cloud-provisioning/gpu-probe:linux-v3\ndocker.io/cloud-provisioning/gpu-probe@sha256:25e1b525ec2f57b4bcbc9f8eb63a73aea7f34796b377eb24998238075da31db0\ndocker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45\nnvcr.io/nvidia/gpu-operator:v26.3.3\nnvcr.io/nvidia/gpu-operator@sha256:6584c36f153d18cfce284f7e5bc477887ce3c1ac566dc795bd80c9af6c6488f7\nnvcr.io/nvidia/k8s-device-plugin:v0.19.3\nnvcr.io/nvidia/k8s-device-plugin@sha256:25cc340fe6fd53c101e16fc452f503e7a92c219c64a80ed5381784b522dbbf77\nnvcr.io/nvidia/k8s/container-toolkit:v1.19.1\nnvcr.io/nvidia/k8s/container-toolkit@sha256:c927adbc9b7755c5cb90022fdcc5c1295f5fe5fe1f38200a2dc65e85632b029c\nnvcr.io/nvidia/k8s/dcgm-exporter:4.5.3-4.8.2-distroless\nnvcr.io/nvidia/k8s/dcgm-exporter@sha256:60d3b00ac80b4ae77f94dae2f943685605585ad9e92fdccda3154d009ae317cc\nquay.io/k0sproject/apiserver-network-proxy-agent:v0.36.0-k0s.0\nquay.io/k0sproject/apiserver-network-proxy-agent@sha256:e3f7fb4f5bdac4bde79a9c402f7384c909bc779236fa804ea92282da6a1b55a1\nquay.io/k0sproject/calico-cni:v3.32.0-0\nquay.io/k0sproject/calico-cni@sha256:7bcdc0e75fb5566af72f987e9276d7e566b21cbfed3796932b36255d31983cd9\nquay.io/k0sproject/calico-node:v3.32.0-0\nquay.io/k0sproject/calico-node@sha256:ebfeea9e834b3dea54d67d166696772b25826fb5ef4d11eba153fe2f8d56a7c5\nquay.io/k0sproject/kube-proxy:v1.36.2\nquay.io/k0sproject/kube-proxy@sha256:eddbab27421c5ae60cfb548b62452bca05231cb7feeb32e328b22f9f8bd20f7b\nquay.io/k0sproject/pause:3.10.2-0\nquay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243\nregistry.k8s.io/nfd/node-feature-discovery:v0.18.3\nregistry.k8s.io/nfd/node-feature-discovery@sha256:f9ef2ebee55141a1758d3c0a87bb701f5db2adf6856f7218b11bc2bac7b63862\n",
+    "stops": [
+      {
+        "exitCode": 0,
+        "originalProcessExited": true
+      },
+      {
+        "exitCode": 0,
+        "originalProcessExited": true
+      }
+    ],
+    "temporaryStateRemoved": true
+  }
+}

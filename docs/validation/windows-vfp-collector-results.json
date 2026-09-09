@@ -1,0 +1,380 @@
+{
+  "scope": "Native VFP event collector smoke test on retained single-NIC AWS Windows VMs; background traffic only, no controlled UDP loss reproduction.",
+  "hosts": [
+    {
+      "windowsServer": "2022",
+      "build": 20348,
+      "session": "cldt-vfp-62eabd9c8a2648d58f133f6a8fb5ca56",
+      "startedAt": "2026-09-09T01:13:36.3452925Z",
+      "stoppedAt": "2026-09-09T01:13:46.8251117Z",
+      "requestedSeconds": 10,
+      "traceStopped": true,
+      "traceFilteringUnchanged": true,
+      "eventCount": 465,
+      "counts": {
+        "Microsoft-Windows-Hyper-V-VfpExt/604/0": 93,
+        "Microsoft-Windows-Hyper-V-VfpExt/101/0": 6,
+        "/0/2": 1,
+        "Microsoft-Windows-Hyper-V-VfpExt/352/0": 95,
+        "Microsoft-Windows-Hyper-V-VfpExt/354/0": 53,
+        "Microsoft-Windows-Hyper-V-VfpExt/314/0": 4,
+        "Microsoft-Windows-Hyper-V-VfpExt/608/0": 2,
+        "Microsoft-Windows-Hyper-V-VfpExt/115/0": 114,
+        "Microsoft-Windows-Hyper-V-VfpExt/110/0": 95,
+        "Microsoft-Windows-Hyper-V-VfpExt/600/0": 2
+      },
+      "artifacts": [
+        {
+          "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+          "name": "provider.json",
+          "bytes": 311964
+        },
+        {
+          "sha256": "bd38e89526b38c384a3bd929206ae1f00e35d2b77c68be8e1ec2b79bfc0ccd51",
+          "name": "vfp.etl",
+          "bytes": 262144
+        },
+        {
+          "sha256": "3239be2051bd4385135529ae2e35a6f52bd2ee5f22feb9d1032e29b8813900af",
+          "name": "events.jsonl.gz",
+          "bytes": 20547
+        }
+      ],
+      "qualificationEligible": false,
+      "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation.",
+      "artifactsCollectedAndHashVerified": true,
+      "guestArtifactsRemoved": true
+    },
+    {
+      "windowsServer": "2025",
+      "build": 26100,
+      "session": "cldt-vfp-8424e915506c4ab3a194930b7cf934bd",
+      "startedAt": "2026-09-09T01:13:36.2975152Z",
+      "stoppedAt": "2026-09-09T01:13:47.2933611Z",
+      "requestedSeconds": 10,
+      "traceStopped": true,
+      "traceFilteringUnchanged": true,
+      "eventCount": 441,
+      "counts": {
+        "Microsoft-Windows-Hyper-V-VfpExt/604/0": 82,
+        "Microsoft-Windows-Hyper-V-VfpExt/101/0": 17,
+        "/0/2": 1,
+        "Microsoft-Windows-Hyper-V-VfpExt/352/0": 84,
+        "Microsoft-Windows-Hyper-V-VfpExt/354/0": 49,
+        "Microsoft-Windows-Hyper-V-VfpExt/314/0": 3,
+        "Microsoft-Windows-Hyper-V-VfpExt/608/0": 2,
+        "Microsoft-Windows-Hyper-V-VfpExt/115/0": 117,
+        "Microsoft-Windows-Hyper-V-VfpExt/110/0": 84,
+        "Microsoft-Windows-Hyper-V-VfpExt/600/0": 2
+      },
+      "artifacts": [
+        {
+          "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+          "name": "provider.json",
+          "bytes": 327652
+        },
+        {
+          "sha256": "995405eb055152aa217d7d0098ae3174997739d316bb5471b83ae21e8a86d651",
+          "name": "vfp.etl",
+          "bytes": 262144
+        },
+        {
+          "sha256": "c759e1e5a74b7022aa8e865ee7080980613a5f8cb60009e471f09f3a7ebdbf6f",
+          "name": "events.jsonl.gz",
+          "bytes": 19721
+        }
+      ],
+      "qualificationEligible": false,
+      "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation.",
+      "artifactsCollectedAndHashVerified": true,
+      "guestArtifactsRemoved": true
+    }
+  ],
+  "collectorSHA256": "3b6a737e3959edfb4f78082849911f974439662ea02207f1780b848438589bda",
+  "baselineNodes": 13,
+  "baselineNodeUIDsUnchanged": true,
+  "baselineNodesReadyAfter": 13,
+  "instancesCreated": 0,
+  "driversInstalled": false,
+  "forwardingConfigurationChanged": false,
+  "qualificationEligible": false,
+  "validation": {
+    "command": "PYTHONPATH=observe python3 -m unittest observe/test_vfp_context.py observe/test_tcpip_context.py observe/test_pktmon.py",
+    "testsPassed": 20,
+    "vfpParserStatementsCovered": 37,
+    "vfpParserStatements": 37,
+    "coverageScope": "Selected Python VFP decoder only; no PowerShell or whole-project coverage claim."
+  },
+  "fixtures": {
+    "2022": {
+      "sourceSHA256": "3239be2051bd4385135529ae2e35a6f52bd2ee5f22feb9d1032e29b8813900af",
+      "fixtureSHA256": "faac1a78ce9c443c696ad91deadc2f8a0b6990c358434163901a5367e7fadc66",
+      "eventIDs": [
+        101,
+        110,
+        115,
+        354,
+        600,
+        604,
+        608
+      ],
+      "selection": "First event of each selected ID from native 10-second capture; XML unchanged."
+    },
+    "2025": {
+      "sourceSHA256": "c759e1e5a74b7022aa8e865ee7080980613a5f8cb60009e471f09f3a7ebdbf6f",
+      "fixtureSHA256": "1f65f44fa047c12a0c7320461378b02b40d9fd68e72b09957f7849078458f4d9",
+      "eventIDs": [
+        101,
+        110,
+        115,
+        354,
+        600,
+        604,
+        608
+      ],
+      "selection": "First event of each selected ID from native 10-second capture; XML unchanged."
+    }
+  },
+  "findings": [
+    "Native manifests identify IPv4 and port fields as network types; XML exposes integer storage, requiring explicit byte-order conversion.",
+    "Rule 101, processing 110, layer no-match 115 and unified-flow 600/604/608 events are available on both builds.",
+    "Event 354 reports fallback from inner to outer forwarding; it does not by itself establish a packet drop."
+  ],
+  "limits": [
+    "No packet identity or UDP root-cause conclusion from this smoke test.",
+    "Circular ETL may overwrite events; event loss was not independently audited.",
+    "No driver, CNI, worker image or release qualification."
+  ],
+  "next": "Pair VFP events with Packet Monitor and ordinary-Pod UDP samples on both Windows versions; retain all same-tuple candidates and correlate within each host.",
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/logman-create-trace",
+    "https://www.microsoft.com/en-us/research/wp-content/uploads/2017/03/vfp-nsdi-2017-final.pdf"
+  ],
+  "currentCollector": {
+    "sha256": "c6b6f63d0cb7979f2962ed700db667784e9eed4763f7c2905fdc7acb1a4aa432",
+    "defaultDefersXML": true,
+    "optionalXMLHasExplicitEventLimit": true,
+    "nativeHosts": [
+      {
+        "windowsServer": "2022",
+        "results": [
+          {
+            "build": 20348,
+            "session": "cldt-vfp-2561396165674059abd596de3a27b196",
+            "startedAt": "2026-09-09T01:33:24.1463025Z",
+            "stoppedAt": "2026-09-09T01:33:26.5131260Z",
+            "requestedSeconds": 2,
+            "traceStopped": true,
+            "traceFilteringUnchanged": true,
+            "xmlExported": false,
+            "xmlEventLimit": 10000,
+            "xmlEventLimitReached": false,
+            "eventCount": 0,
+            "counts": {},
+            "artifacts": [
+              {
+                "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+                "name": "provider.json",
+                "bytes": 311964
+              },
+              {
+                "sha256": "fcd51681505b10e19e1864a1fd3424472a72e84861a535691db1bf01afa94c48",
+                "name": "vfp.etl",
+                "bytes": 196608
+              }
+            ],
+            "qualificationEligible": false,
+            "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation."
+          },
+          {
+            "build": 20348,
+            "session": "cldt-vfp-9d6c69b67fef4ee7956822108af4a1bf",
+            "startedAt": "2026-09-09T01:33:26.8005351Z",
+            "stoppedAt": "2026-09-09T01:33:28.9704462Z",
+            "requestedSeconds": 2,
+            "traceStopped": true,
+            "traceFilteringUnchanged": true,
+            "xmlExported": true,
+            "xmlEventLimit": 3,
+            "xmlEventLimitReached": true,
+            "eventCount": 3,
+            "counts": {
+              "Microsoft-Windows-Hyper-V-VfpExt/354/0": 1,
+              "/0/2": 1,
+              "Microsoft-Windows-Hyper-V-VfpExt/352/0": 1
+            },
+            "artifacts": [
+              {
+                "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+                "name": "provider.json",
+                "bytes": 311964
+              },
+              {
+                "sha256": "f46ec95e15803703b8f502ef5fa26b6123898be4c8146d462ee085d8c7f6ed9f",
+                "name": "vfp.etl",
+                "bytes": 196608
+              },
+              {
+                "sha256": "b50c2fcfd2e0e797514300a7f6bacbbb499497f74338d74ea7daa19a8436d0aa",
+                "name": "events.jsonl.gz",
+                "bytes": 854
+              }
+            ],
+            "qualificationEligible": false,
+            "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation."
+          }
+        ],
+        "artifacts": [
+          {
+            "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+            "name": "default\\provider.json",
+            "bytes": 311964
+          },
+          {
+            "sha256": "cd6a153d298e800f47a15e8b345881e8ca451ac477e3b0e83ef9062489ec68d1",
+            "name": "default\\result.json",
+            "bytes": 737
+          },
+          {
+            "sha256": "fcd51681505b10e19e1864a1fd3424472a72e84861a535691db1bf01afa94c48",
+            "name": "default\\vfp.etl",
+            "bytes": 196608
+          },
+          {
+            "sha256": "b50c2fcfd2e0e797514300a7f6bacbbb499497f74338d74ea7daa19a8436d0aa",
+            "name": "limited\\events.jsonl.gz",
+            "bytes": 854
+          },
+          {
+            "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+            "name": "limited\\provider.json",
+            "bytes": 311964
+          },
+          {
+            "sha256": "79d7656d90479f85b4568d38139040c56f9056c330dd480c1723fef90e9ad833",
+            "name": "limited\\result.json",
+            "bytes": 940
+          },
+          {
+            "sha256": "f46ec95e15803703b8f502ef5fa26b6123898be4c8146d462ee085d8c7f6ed9f",
+            "name": "limited\\vfp.etl",
+            "bytes": 196608
+          }
+        ],
+        "artifactsCollectedAndHashVerified": true,
+        "guestArtifactsRemoved": true
+      },
+      {
+        "windowsServer": "2025",
+        "results": [
+          {
+            "build": 26100,
+            "session": "cldt-vfp-fff416b68feb4b32a2feeb7a2b67a529",
+            "startedAt": "2026-09-09T01:33:24.3325071Z",
+            "stoppedAt": "2026-09-09T01:33:26.9190168Z",
+            "requestedSeconds": 2,
+            "traceStopped": true,
+            "traceFilteringUnchanged": true,
+            "xmlExported": false,
+            "xmlEventLimit": 10000,
+            "xmlEventLimitReached": false,
+            "eventCount": 0,
+            "counts": {},
+            "artifacts": [
+              {
+                "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+                "name": "provider.json",
+                "bytes": 327652
+              },
+              {
+                "sha256": "2fad07dcd35641cc9b784aa540508e6c537dda9b9f1f7ca86107f0c28fb18e14",
+                "name": "vfp.etl",
+                "bytes": 196608
+              }
+            ],
+            "qualificationEligible": false,
+            "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation."
+          },
+          {
+            "build": 26100,
+            "session": "cldt-vfp-e77001bff06d4ef9b319f053718c740d",
+            "startedAt": "2026-09-09T01:33:27.3121716Z",
+            "stoppedAt": "2026-09-09T01:33:29.5995677Z",
+            "requestedSeconds": 2,
+            "traceStopped": true,
+            "traceFilteringUnchanged": true,
+            "xmlExported": true,
+            "xmlEventLimit": 3,
+            "xmlEventLimitReached": true,
+            "eventCount": 3,
+            "counts": {
+              "/0/2": 1,
+              "Microsoft-Windows-Hyper-V-VfpExt/115/0": 2
+            },
+            "artifacts": [
+              {
+                "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+                "name": "provider.json",
+                "bytes": 327652
+              },
+              {
+                "sha256": "cb0738400c46bb01b15b7c0a56c1b525c583e80a6277376399b45fcb5cbc9b63",
+                "name": "vfp.etl",
+                "bytes": 196608
+              },
+              {
+                "sha256": "3d86735445bcbb0fa52df6fb661d46f1720eb4569403fddb7570adeda367fbae",
+                "name": "events.jsonl.gz",
+                "bytes": 789
+              }
+            ],
+            "qualificationEligible": false,
+            "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation."
+          }
+        ],
+        "artifacts": [
+          {
+            "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+            "name": "default\\provider.json",
+            "bytes": 327652
+          },
+          {
+            "sha256": "5fa3ac98d7568727374eaf8eb651294c1056160d7eb49bda4a57c967a9c48b9b",
+            "name": "default\\result.json",
+            "bytes": 737
+          },
+          {
+            "sha256": "2fad07dcd35641cc9b784aa540508e6c537dda9b9f1f7ca86107f0c28fb18e14",
+            "name": "default\\vfp.etl",
+            "bytes": 196608
+          },
+          {
+            "sha256": "3d86735445bcbb0fa52df6fb661d46f1720eb4569403fddb7570adeda367fbae",
+            "name": "limited\\events.jsonl.gz",
+            "bytes": 789
+          },
+          {
+            "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+            "name": "limited\\provider.json",
+            "bytes": 327652
+          },
+          {
+            "sha256": "5a5001d7a0532db34fb529d5deccc6f5772413c5c6ed16e249ff179df7e84f9b",
+            "name": "limited\\result.json",
+            "bytes": 897
+          },
+          {
+            "sha256": "cb0738400c46bb01b15b7c0a56c1b525c583e80a6277376399b45fcb5cbc9b63",
+            "name": "limited\\vfp.etl",
+            "bytes": 196608
+          }
+        ],
+        "artifactsCollectedAndHashVerified": true,
+        "guestArtifactsRemoved": true
+      }
+    ],
+    "reason": "The paired 60-second capture showed bulk XML export can outlast its SSM observer and delay a companion capture. Default collection now returns raw ETL before XML conversion.",
+    "pairedEvidence": "windows-vfp-paired-results.json",
+    "scope": "Two-second native default and three-event-limited export checks on each Windows version; no UDP reliability qualification."
+  }
+}

@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/appmana/cloud-provisioning/controller/pkg/render"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
@@ -68,15 +67,20 @@ const crdRecheckInterval = 30 * time.Second
 var machineGVK = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"}
 
 // WireGuardAddrAnnotation records the WireGuard tunnel address
-// allocated to a cloud worker Machine, mirroring NodeVIPAnnotation.
+// reserved for a cloud worker Machine before publishing its bootstrap Secret.
 //
-// Each cloud Machine gets its own distinct address, allocated the same
-// way node VIPs are. A shared literal would give a second cloud
+// Each cloud Machine gets its own distinct address. A shared literal would
+// give a second cloud
 // Machine an identical WireGuard AllowedIPs entry and kernel
 // RouteHost, which is undefined for WireGuard cryptokey routing (two
 // peers cannot both claim the same AllowedIPs destination) and
 // ambiguous for the on-prem dialer's kernel route.
 const WireGuardAddrAnnotation = "cloud-provisioning.appmana.com/wireguard-addr4"
+
+// AddressWait is how long to leave between checks for a machine's
+// address. Short, because the machine already exists and its provider
+// is reconciling it: this is a handoff, not a provisioning wait.
+const AddressWait = 5 * time.Second
 
 // Reconciler provisions bootstrap Secrets for cloud-worker Machines.
 type Reconciler struct {
@@ -93,9 +97,9 @@ type Reconciler struct {
 	// branching this reconciler.
 	InfraProviders []InfraProvider
 
-	// TemplatePath is the join-pattern template to render (e.g.
-	// join-patterns/k0s-worker.cloud-config.tmpl).
-	TemplatePath string
+	// BootstrapRenderers maps explicit guest OS metadata to native payloads.
+	// An unregistered guest is rejected before minting bootstrap identity.
+	BootstrapRenderers map[string]BootstrapRenderer
 
 	// Static, cluster-topology values this reconciler contributes
 	// directly (not provider-specific): the API VIP reachable once the
@@ -104,6 +108,11 @@ type Reconciler struct {
 	APIVIP            string
 	KubeletExtraArgs  string
 	SSHAuthorizedKeys []string
+	// APIProxyPort is where the remote's own loopback API balancer
+	// listens (the dialer host unit serves it): the join gates on it
+	// and kubelet keeps dialing it, so the node depends on the set of
+	// control planes rather than any one of them.
+	APIProxyPort int
 
 	// WireGuardAddress is the base tunnel address (e.g.
 	// "10.100.0.2/24"). The first cloud Machine gets exactly this;
@@ -155,11 +164,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	machine := &unstructured.Unstructured{}
 	machine.SetGroupVersionKind(machineGVK)
-	if err := r.Get(ctx, req.NamespacedName, machine); err != nil {
+	if err := r.Reader.Get(ctx, req.NamespacedName, machine); err != nil {
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
+	}
+	if !machine.GetDeletionTimestamp().IsZero() {
+		return ctrl.Result{}, nil
 	}
 
 	bootstrapSecretName := fmt.Sprintf(r.BootstrapSecretNameFormat, machine.GetName())
@@ -222,6 +234,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 
+	renderer, err := r.bootstrapRenderer(infraMachine)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	log.Info("provisioning bootstrap secret", "machine", req.NamespacedName)
 
 	cloudPriv, err := wgtypes.GeneratePrivateKey()
@@ -235,9 +252,20 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("getting dialer peer secret: %w", err)
 	}
 
-	cloudWGAddress, err := r.allocateWireGuardAddress(ctx)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("allocating wireguard address: %w", err)
+	cloudWGAddress := machine.GetAnnotations()[WireGuardAddrAnnotation]
+	if cloudWGAddress == "" {
+		reserved := tunnel.SplitList(string(dialerSecret.Data[tunnel.RetiredTunnelAddressesKey]))
+		// Older publications may have reached the peer Secret but failed the
+		// subsequent Machine annotation. Their live routes still reserve the IP.
+		for key, value := range dialerSecret.Data {
+			if strings.HasPrefix(key, tunnel.PeerRouteHostsPrefix) {
+				reserved = append(reserved, tunnel.SplitList(string(value))...)
+			}
+		}
+		cloudWGAddress, err = r.allocateWireGuardAddress(ctx, reserved)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("allocating wireguard address: %w", err)
+		}
 	}
 	// The cloud node cannot read a cluster Secret before it joins, so
 	// its bootstrap peer list travels in cloud-init as a plain JSON
@@ -263,31 +291,77 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{RequeueAfter: crdRecheckInterval}, nil
 	}
 
+	joinValues, err := r.Join.JoinValues(ctx)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("getting cluster join values: %w", err)
+	}
+
+	// The control planes as dialable host:port, for the node's own
+	// loopback balancer. The hosts are the mesh's api-servers record
+	// (plain addresses, because they double as route hosts); the port
+	// is the one the join itself dials, read from the provider's
+	// apiEndpoint value rather than restated as configuration.
+	apiPort := "6443"
+	if ep, ok := joinValues["apiEndpoint"].(string); ok {
+		if _, p, err := net.SplitHostPort(ep); err == nil && p != "" {
+			apiPort = p
+		}
+	}
+	var apiServerEndpoints []string
+	for _, host := range r.apiServers(dialerSecret) {
+		apiServerEndpoints = append(apiServerEndpoints, net.JoinHostPort(host, apiPort))
+	}
+
 	peersFileJSON, err := json.Marshal(tunnel.PeersFileDoc{
 		PrivateKey:   cloudPriv.String(),
 		LocalAddress: cloudWGAddress,
 		Peers:        peers,
+		APIServers:   apiServerEndpoints,
 	})
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("marshaling cloud-side peers file: %w", err)
-	}
-
-	joinValues, err := r.Join.JoinValues(ctx)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("getting cluster join values: %w", err)
 	}
 	infraValues, err := infra.InfraValues(ctx, infraMachine)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("getting infra values: %w", err)
 	}
 
-	if err := r.validateDialerBinaries(); err != nil {
-		return ctrl.Result{}, err
+	// A provider that knows where its machines are is waited for.
+	//
+	// Userdata is read once, so a document rendered before the address
+	// arrives can never carry it, and the node then chooses for itself
+	// — choosing wrong wherever it has more than one address, then
+	// joining, going Ready, and carrying an identity nothing is
+	// looking for. This is the same reason an empty peer list is
+	// waited out rather than baked.
+	//
+	// Only for providers that observe machines that already exist. One
+	// that creates the instance cannot report an address before there
+	// is an instance, and CAPA will not make one until this Secret
+	// exists, so waiting there would deadlock; those render without an
+	// address and the instance asks its own metadata service.
+	if observer, ok := infra.(AddressObserver); ok && observer.ObservesAddresses() {
+		if address, _ := infraValues["nodeAddress"].(string); address == "" {
+			log.Info("waiting for the infrastructure provider to report where this machine is, "+
+				"rather than rendering userdata that cannot tell the node its own address",
+				"machine", machine.GetName())
+			return ctrl.Result{RequeueAfter: AddressWait}, nil
+		}
+	}
+
+	// The balancer port reaches a render only when the provider says
+	// its distribution needs one (join.NodeLocalBalancer): the
+	// who-balances decision is the provider's, made once, not
+	// restated per pattern. Zero renders no balancer unit at all.
+	apiProxyPort := 0
+	if b, ok := r.Join.(NodeLocalBalancer); ok && b.NeedsAPIProxy() {
+		apiProxyPort = r.APIProxyPort
 	}
 
 	values := map[string]any{
 		"sshAuthorizedKeys":       r.SSHAuthorizedKeys,
 		"apiVIP":                  r.APIVIP,
+		"apiProxyPort":            apiProxyPort,
 		"kubeletExtraArgs":        r.KubeletExtraArgs,
 		"wireguardAddress":        cloudWGAddress,
 		"wireguardListenPort":     r.WireGuardListenPort,
@@ -302,6 +376,15 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		"cniPluginsURLAmd64":      r.CNIPluginsURLAMD64,
 		"cniPluginsSHA256Amd64":   r.CNIPluginsSHA256AMD64,
 		"machineName":             machine.GetName(),
+		// Where the machine is, when the infrastructure provider knows.
+		// Empty by default, and a provider that reports an address
+		// overrides it below: an instance created before anyone knows
+		// its address has to ask the platform it is running on
+		// instead, and the pattern falls back to doing that.
+		"nodeAddress": "",
+		// The identity Cluster API binds a Machine to a Node by, when
+		// the infrastructure provider has assigned one.
+		"providerID": "",
 	}
 	for k, v := range joinValues {
 		values[k] = v
@@ -310,9 +393,18 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		values[k] = v
 	}
 
-	rendered, err := render.Pattern(r.TemplatePath, values)
+	rendered, err := renderer.Render(values)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("rendering join pattern: %w", err)
+	}
+
+	if rendered.Format == "cloud-config" {
+		if err := r.validateDialerBinaries(); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	if err := rendered.Validate(); err != nil {
+		return ctrl.Result{}, fmt.Errorf("invalid rendered bootstrap: %w", err)
 	}
 
 	// Owned by the Machine: `kubectl delete machine` (or a claim
@@ -333,12 +425,25 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		},
 		Type: "cluster.x-k8s.io/secret",
 		StringData: map[string]string{
-			"value":  rendered,
-			"format": "cloud-config",
+			"value":  string(rendered.Value),
+			"format": rendered.Format,
 		},
 	}
-	if err := r.Create(ctx, bootstrapSecret); err != nil {
-		return ctrl.Result{}, fmt.Errorf("creating bootstrap secret: %w", err)
+	// Reserve the address before publishing anything an infrastructure provider
+	// can boot. A transient admission error used to leave a bootstrap Secret
+	// without its Machine reservation; the next allocation reused that live IP.
+	// Retries read this reservation uncached and reuse it.
+	if machine.GetAnnotations()[WireGuardAddrAnnotation] != cloudWGAddress {
+		machinePatch := client.MergeFromWithOptions(machine.DeepCopy(), client.MergeFromWithOptimisticLock{})
+		annotations := machine.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[WireGuardAddrAnnotation] = cloudWGAddress
+		machine.SetAnnotations(annotations)
+		if err := r.Patch(ctx, machine, machinePatch); err != nil {
+			return ctrl.Result{}, fmt.Errorf("annotating machine with its allocated tunnel address: %w", err)
+		}
 	}
 
 	// Record the new node's peer entry so local dialers accept and
@@ -368,15 +473,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, fmt.Errorf("updating dialer peer secret: %w", err)
 	}
 
-	machinePatch := client.MergeFrom(machine.DeepCopy())
-	annotations := machine.GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
-	annotations[WireGuardAddrAnnotation] = cloudWGAddress
-	machine.SetAnnotations(annotations)
-	if err := r.Patch(ctx, machine, machinePatch); err != nil {
-		return ctrl.Result{}, fmt.Errorf("annotating machine with its allocated tunnel address: %w", err)
+	// The bootstrap Secret is the commit point: all dependencies already exist.
+	// Before this write succeeds a retry may safely regenerate the key pair,
+	// because no provider has received the corresponding immutable userdata.
+	if err := r.Create(ctx, bootstrapSecret); err != nil {
+		return ctrl.Result{}, fmt.Errorf("creating bootstrap secret: %w", err)
 	}
 
 	log.Info("bootstrap secret provisioned", "machine", req.NamespacedName, "tunnelAddress", cloudTunnelAddr)
@@ -433,6 +534,9 @@ func (r *Reconciler) validateDialerBinaries() error {
 		if p.url == "" || p.sha == "" {
 			return fmt.Errorf("dialer binary for %s needs both a URL and its sha256", p.arch)
 		}
+		if err := validateDownloadExpiry(p.url, time.Now()); err != nil {
+			return fmt.Errorf("dialer binary for %s: %w", p.arch, err)
+		}
 		configured++
 	}
 	if configured == 0 {
@@ -442,11 +546,9 @@ func (r *Reconciler) validateDialerBinaries() error {
 }
 
 // allocateWireGuardAddress finds the next free cloud tunnel address by
-// scanning existing cloud-worker Machines' WireGuardAddrAnnotation,
-// starting from r.WireGuardAddress (the base address). Mirrors
-// allocateNodeVIPIndex; see WireGuardAddrAnnotation's doc comment for
-// why each Machine needs a distinct address.
-func (r *Reconciler) allocateWireGuardAddress(ctx context.Context) (string, error) {
+// scanning uncached Machine reservations and active peer addresses, while
+// excluding retired allocations. It starts at r.WireGuardAddress.
+func (r *Reconciler) allocateWireGuardAddress(ctx context.Context, retired []string) (string, error) {
 	ip, ipNet, err := net.ParseCIDR(r.WireGuardAddress)
 	if err != nil {
 		return "", fmt.Errorf("parsing base WireGuardAddress %q: %w", r.WireGuardAddress, err)
@@ -461,7 +563,7 @@ func (r *Reconciler) allocateWireGuardAddress(ctx context.Context) (string, erro
 
 	list := &unstructured.UnstructuredList{}
 	list.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "MachineList"})
-	if err := r.List(ctx, list); err != nil {
+	if err := r.Reader.List(ctx, list); err != nil {
 		return "", err
 	}
 	maxIndex := startIndex - 1
@@ -481,6 +583,15 @@ func (r *Reconciler) allocateWireGuardAddress(ctx context.Context) (string, erro
 		if n := int(allocIP4[3]); n > maxIndex {
 			maxIndex = n
 		}
+	}
+	for _, addr := range retired {
+		ip4 := net.ParseIP(addr).To4()
+		if ip4 != nil && fmt.Sprintf("%d.%d.%d.", ip4[0], ip4[1], ip4[2]) == prefix && int(ip4[3]) > maxIndex {
+			maxIndex = int(ip4[3])
+		}
+	}
+	if maxIndex >= 254 {
+		return "", fmt.Errorf("WireGuard address range exhausted: %s", r.WireGuardAddress)
 	}
 	return fmt.Sprintf("%s%d/%d", prefix, maxIndex+1, prefixLen), nil
 }

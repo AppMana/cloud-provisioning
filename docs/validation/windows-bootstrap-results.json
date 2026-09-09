@@ -1,0 +1,28 @@
+{
+  "observedAt": "2026-09-06T20:37:01.523207185Z",
+  "results": [
+    {
+      "binaryPutPreserved": true,
+      "binaryStdinPreserved": true,
+      "build": "20348",
+      "image": "Windows_Server-2022-English-Full-Base-2026.08.12",
+      "nativeFailurePreserved": true,
+      "physicalNICs": 1,
+      "restrictedFileACL": true,
+      "userdataPreserved": true,
+      "windows": "2022"
+    },
+    {
+      "binaryPutPreserved": true,
+      "binaryStdinPreserved": true,
+      "build": "26100",
+      "image": "Windows_Server-2025-English-Full-Base-2026.08.12",
+      "nativeFailurePreserved": true,
+      "physicalNICs": 1,
+      "restrictedFileACL": true,
+      "userdataPreserved": true,
+      "windows": "2025"
+    }
+  ],
+  "scope": "native EC2Launch userdata and SSM transport only; no CAPI join, CNI or Windows GPU validation"
+}

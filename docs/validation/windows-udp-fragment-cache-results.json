@@ -1,0 +1,212 @@
+{
+  "before": [
+    {
+      "pod": "net-aws-win2022-v3",
+      "podUID": "536d831a-e33d-4cd3-840c-f7bd2bddb920",
+      "node": "aws-win2022-v3",
+      "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "os": "windows",
+      "container": "serve",
+      "containerID": "containerd://b9bf8094c22348d5bb0d2006fb4883c2834bd51789b1c653eb50f524dfa4aa26",
+      "podIP": "10.244.114.4",
+      "serviceUID": "3c9309bd-53ad-4c2b-a134-aa811391ec19",
+      "serviceIP": "10.98.160.233"
+    },
+    {
+      "pod": "net-aws-win2025-v3",
+      "podUID": "77696fb9-44a9-4075-bf83-e8993bf84230",
+      "node": "aws-win2025-v3",
+      "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "os": "windows",
+      "container": "serve",
+      "containerID": "containerd://b87960054e7f87c7e7f53a5419937746dc1be0893ef7b5eb16c4949ce8bdab9d",
+      "podIP": "10.244.42.5",
+      "serviceUID": "475a88d2-cc49-4739-8db6-f521dcac28c4",
+      "serviceIP": "10.99.76.215"
+    }
+  ],
+  "ports": {
+    "aws-win2022-v3": "51E72482-CE0D-4296-80D1-EF60EC906ED0",
+    "aws-win2025-v3": "F0E745EA-2DBA-4718-BB9A-52F48C650A7B"
+  },
+  "cases": [
+    {
+      "source": "aws-win2022-v3",
+      "target": "aws-win2025-v3",
+      "beforeCounters": {
+        "aws-win2022-v3": {
+          "raw": "\n ITEM LIST\n===========\n\n  FRAGMENT CACHE INFO\n    Direction - OUT\n      Cache entry count : 0\n      Peak entry count : 218\n      Entry creation count : 2833\n      Hash collision count : 6\n      Entry deletion count : 2833\n      Entry timeout count : 2833\n\n    Direction - IN\n      Cache entry count : 0\n      Peak entry count : 1\n      Entry creation count : 2827\n      Hash collision count : 0\n      Entry deletion count : 2827\n      Entry timeout count : 0\n\nCommand get-frag-cache-stats succeeded!\n",
+          "observedAt": "2026-09-07T15:54:38.228359+00:00"
+        },
+        "aws-win2025-v3": {
+          "raw": "\n ITEM LIST\n===========\n\n  FRAGMENT CACHE INFO\n    Direction - OUT\n      Cache entry count : 0\n      Peak entry count : 219\n      Entry creation count : 1884\n      Hash collision count : 14\n      Entry deletion count : 1884\n      Entry timeout count : 1884\n\n    Direction - IN\n      Cache entry count : 0\n      Peak entry count : 1\n      Entry creation count : 1887\n      Hash collision count : 0\n      Entry deletion count : 1887\n      Entry timeout count : 0\n\nCommand get-frag-cache-stats succeeded!\n",
+          "observedAt": "2026-09-07T15:54:38.474516+00:00"
+        }
+      },
+      "result": {
+        "ok": true,
+        "expectedResponses": 100,
+        "reportedResponses": 100,
+        "exactResponses": 100,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0
+      },
+      "afterCounters": {
+        "aws-win2022-v3": {
+          "raw": "\n ITEM LIST\n===========\n\n  FRAGMENT CACHE INFO\n    Direction - OUT\n      Cache entry count : 100\n      Peak entry count : 218\n      Entry creation count : 2933\n      Hash collision count : 6\n      Entry deletion count : 2833\n      Entry timeout count : 2833\n\n    Direction - IN\n      Cache entry count : 0\n      Peak entry count : 1\n      Entry creation count : 2927\n      Hash collision count : 0\n      Entry deletion count : 2927\n      Entry timeout count : 0\n\nCommand get-frag-cache-stats succeeded!\n",
+          "observedAt": "2026-09-07T15:54:39.130369+00:00"
+        },
+        "aws-win2025-v3": {
+          "raw": "\n ITEM LIST\n===========\n\n  FRAGMENT CACHE INFO\n    Direction - OUT\n      Cache entry count : 100\n      Peak entry count : 219\n      Entry creation count : 1984\n      Hash collision count : 14\n      Entry deletion count : 1884\n      Entry timeout count : 1884\n\n    Direction - IN\n      Cache entry count : 0\n      Peak entry count : 1\n      Entry creation count : 1987\n      Hash collision count : 0\n      Entry deletion count : 1987\n      Entry timeout count : 0\n\nCommand get-frag-cache-stats succeeded!\n",
+          "observedAt": "2026-09-07T15:54:39.362606+00:00"
+        }
+      },
+      "counterDeltas": {
+        "aws-win2022-v3": {
+          "OUT": {
+            "Cache entry count": 100,
+            "Peak entry count": 0,
+            "Entry creation count": 100,
+            "Hash collision count": 0,
+            "Entry deletion count": 0,
+            "Entry timeout count": 0
+          },
+          "IN": {
+            "Cache entry count": 0,
+            "Peak entry count": 0,
+            "Entry creation count": 100,
+            "Hash collision count": 0,
+            "Entry deletion count": 100,
+            "Entry timeout count": 0
+          }
+        },
+        "aws-win2025-v3": {
+          "OUT": {
+            "Cache entry count": 100,
+            "Peak entry count": 0,
+            "Entry creation count": 100,
+            "Hash collision count": 0,
+            "Entry deletion count": 0,
+            "Entry timeout count": 0
+          },
+          "IN": {
+            "Cache entry count": 0,
+            "Peak entry count": 0,
+            "Entry creation count": 100,
+            "Hash collision count": 0,
+            "Entry deletion count": 100,
+            "Entry timeout count": 0
+          }
+        }
+      }
+    },
+    {
+      "source": "aws-win2025-v3",
+      "target": "aws-win2022-v3",
+      "beforeCounters": {
+        "aws-win2022-v3": {
+          "raw": "\n ITEM LIST\n===========\n\n  FRAGMENT CACHE INFO\n    Direction - OUT\n      Cache entry count : 100\n      Peak entry count : 218\n      Entry creation count : 2933\n      Hash collision count : 6\n      Entry deletion count : 2833\n      Entry timeout count : 2833\n\n    Direction - IN\n      Cache entry count : 0\n      Peak entry count : 1\n      Entry creation count : 2927\n      Hash collision count : 0\n      Entry deletion count : 2927\n      Entry timeout count : 0\n\nCommand get-frag-cache-stats succeeded!\n",
+          "observedAt": "2026-09-07T15:54:39.618366+00:00"
+        },
+        "aws-win2025-v3": {
+          "raw": "\n ITEM LIST\n===========\n\n  FRAGMENT CACHE INFO\n    Direction - OUT\n      Cache entry count : 100\n      Peak entry count : 219\n      Entry creation count : 1984\n      Hash collision count : 14\n      Entry deletion count : 1884\n      Entry timeout count : 1884\n\n    Direction - IN\n      Cache entry count : 0\n      Peak entry count : 1\n      Entry creation count : 1987\n      Hash collision count : 0\n      Entry deletion count : 1987\n      Entry timeout count : 0\n\nCommand get-frag-cache-stats succeeded!\n",
+          "observedAt": "2026-09-07T15:54:39.855308+00:00"
+        }
+      },
+      "result": {
+        "ok": false,
+        "expectedResponses": 100,
+        "reportedResponses": 99,
+        "exactResponses": 99,
+        "responsesPresent": true,
+        "errors": [
+          "reading from udp connection failed. err:'read udp 10.244.42.5:62644->10.244.114.4:8081: i/o timeout'"
+        ],
+        "commandExitCode": 0
+      },
+      "afterCounters": {
+        "aws-win2022-v3": {
+          "raw": "\n ITEM LIST\n===========\n\n  FRAGMENT CACHE INFO\n    Direction - OUT\n      Cache entry count : 9\n      Peak entry count : 218\n      Entry creation count : 3032\n      Hash collision count : 6\n      Entry deletion count : 3023\n      Entry timeout count : 3023\n\n    Direction - IN\n      Cache entry count : 0\n      Peak entry count : 1\n      Entry creation count : 3026\n      Hash collision count : 0\n      Entry deletion count : 3026\n      Entry timeout count : 0\n\nCommand get-frag-cache-stats succeeded!\n",
+          "observedAt": "2026-09-07T15:54:45.435271+00:00"
+        },
+        "aws-win2025-v3": {
+          "raw": "\n ITEM LIST\n===========\n\n  FRAGMENT CACHE INFO\n    Direction - OUT\n      Cache entry count : 9\n      Peak entry count : 219\n      Entry creation count : 2083\n      Hash collision count : 15\n      Entry deletion count : 2074\n      Entry timeout count : 2074\n\n    Direction - IN\n      Cache entry count : 0\n      Peak entry count : 1\n      Entry creation count : 2086\n      Hash collision count : 0\n      Entry deletion count : 2086\n      Entry timeout count : 0\n\nCommand get-frag-cache-stats succeeded!\n",
+          "observedAt": "2026-09-07T15:54:45.678441+00:00"
+        }
+      },
+      "counterDeltas": {
+        "aws-win2022-v3": {
+          "OUT": {
+            "Cache entry count": -91,
+            "Peak entry count": 0,
+            "Entry creation count": 99,
+            "Hash collision count": 0,
+            "Entry deletion count": 190,
+            "Entry timeout count": 190
+          },
+          "IN": {
+            "Cache entry count": 0,
+            "Peak entry count": 0,
+            "Entry creation count": 99,
+            "Hash collision count": 0,
+            "Entry deletion count": 99,
+            "Entry timeout count": 0
+          }
+        },
+        "aws-win2025-v3": {
+          "OUT": {
+            "Cache entry count": -91,
+            "Peak entry count": 0,
+            "Entry creation count": 99,
+            "Hash collision count": 1,
+            "Entry deletion count": 190,
+            "Entry timeout count": 190
+          },
+          "IN": {
+            "Cache entry count": 0,
+            "Peak entry count": 0,
+            "Entry creation count": 99,
+            "Hash collision count": 0,
+            "Entry deletion count": 99,
+            "Entry timeout count": 0
+          }
+        }
+      }
+    }
+  ],
+  "after": [
+    {
+      "pod": "net-aws-win2022-v3",
+      "podUID": "536d831a-e33d-4cd3-840c-f7bd2bddb920",
+      "node": "aws-win2022-v3",
+      "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "os": "windows",
+      "container": "serve",
+      "containerID": "containerd://b9bf8094c22348d5bb0d2006fb4883c2834bd51789b1c653eb50f524dfa4aa26",
+      "podIP": "10.244.114.4",
+      "serviceUID": "3c9309bd-53ad-4c2b-a134-aa811391ec19",
+      "serviceIP": "10.98.160.233"
+    },
+    {
+      "pod": "net-aws-win2025-v3",
+      "podUID": "77696fb9-44a9-4075-bf83-e8993bf84230",
+      "node": "aws-win2025-v3",
+      "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "os": "windows",
+      "container": "serve",
+      "containerID": "containerd://b87960054e7f87c7e7f53a5419937746dc1be0893ef7b5eb16c4949ce8bdab9d",
+      "podIP": "10.244.42.5",
+      "serviceUID": "475a88d2-cc49-4739-8db6-f521dcac28c4",
+      "serviceIP": "10.99.76.215"
+    }
+  ],
+  "identitiesStable": true,
+  "scope": "Read-only VFP fragment-cache counters immediately before and after each ordinary-pod UDP direction, 100 attempts at 1400-byte echo bodies",
+  "finding": "The successful 100/100 direction had zero hash-collision increments on either port. The 99/100 Windows 2025 direction had exactly one outbound hash-collision increment on its source port, with zero on the receiver.",
+  "limitations": [
+    "Counters are cumulative port observations, not per-packet stack traces. This run did not capture packets.",
+    "Counter timing is sequential across hosts; the correlation does not prove internal VFP causality.",
+    "No network settings were modified. No mitigation has been qualified."
+  ]
+}

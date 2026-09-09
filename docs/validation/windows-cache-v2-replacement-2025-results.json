@@ -1,0 +1,356 @@
+{
+  "observedAt": "2026-09-07T22:47:48.525790+00:00",
+  "scope": "Windows 2025 corrected-cache replacement in progress",
+  "oldMachineUID": "d421bc25-db65-45d9-9a82-09018f97ffff",
+  "oldNodeUID": "d50b4863-9add-4771-ac68-d0e16ec26b6f",
+  "oldInstanceID": "i-0a0b16147b2137572",
+  "replacementImageID": "ami-0b5bfc5a6d0e2007c",
+  "survivorBefore": {
+    "passed": true,
+    "checks": {
+      "podSucceeded": true,
+      "jobComplete": true,
+      "containerExitedZero": true,
+      "containerIdentityPresent": true,
+      "hardwareRenderAndEncode": true
+    },
+    "receipt": {
+      "encoder": "h264_nvenc",
+      "containerWindowsBuild": 20348,
+      "decodedFrames": 30,
+      "render": {
+        "api": "Direct3D11",
+        "vendorID": 4318,
+        "deviceID": 10168,
+        "frames": 30,
+        "pixelsPerFrame": 4096,
+        "greenPixels": 1152,
+        "bluePixels": 2944,
+        "hardwareOnly": true
+      },
+      "encodedBytes": 3936
+    },
+    "podUID": "cc5237a7-13b5-4548-8ba1-63cc73adf946",
+    "nodeUID": "dd54061d-491a-4b12-95a7-27393e847780",
+    "jobUID": "6148843a-a8d0-41e4-9f0b-01a6e4a2f54b",
+    "observedAt": "2026-09-07T22:45:51.597909+00:00"
+  },
+  "deletionRequestedAt": "2026-09-07T22:45:59Z",
+  "status": "Untouched first GPU startup failed; full GPU probe later passed after diagnostic startup controls, without guest repair",
+  "limitations": [
+    "Windows 2025 corrected image is not qualified: first GPU job failed",
+    "No guest repair or restart performed",
+    "Network fragmentation and small-UDP loss remain unresolved"
+  ],
+  "unitChecks": {
+    "observerTests": 41,
+    "awsTests": 63,
+    "passed": true
+  },
+  "removal": {
+    "claim": "aws-win2025-gpu",
+    "instanceID": "i-0a0b16147b2137572",
+    "node": "aws-win2025-gpu",
+    "nodeUID": "d50b4863-9add-4771-ac68-d0e16ec26b6f",
+    "observedAt": "2026-09-07T22:51:35.591898072Z",
+    "productCleanup": true,
+    "providerID": "aws:///us-west-2a/i-0a0b16147b2137572",
+    "terminated": true
+  },
+  "initialRemovalGuard": {
+    "passed": false,
+    "checks": {
+      "instanceTerminated": true,
+      "productCleanup": true,
+      "targetMachineAbsent": true,
+      "survivorMachineIdentities": true,
+      "exactSurvivorSet": true,
+      "survivorIdentitiesAndReadiness": true,
+      "targetGatewayLeasesComplete": true,
+      "otherGatewayLeasesPreserved": false
+    },
+    "survivorCount": 12,
+    "retiredGatewayLeaseCount": 1,
+    "preservedGatewayLeaseCount": 4,
+    "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+  },
+  "survivorAfter": {
+    "passed": true,
+    "checks": {
+      "podSucceeded": true,
+      "jobComplete": true,
+      "containerExitedZero": true,
+      "containerIdentityPresent": true,
+      "hardwareRenderAndEncode": true
+    },
+    "receipt": {
+      "encoder": "h264_nvenc",
+      "containerWindowsBuild": 20348,
+      "decodedFrames": 30,
+      "render": {
+        "api": "Direct3D11",
+        "vendorID": 4318,
+        "deviceID": 10168,
+        "frames": 30,
+        "pixelsPerFrame": 4096,
+        "greenPixels": 1152,
+        "bluePixels": 2944,
+        "hardwareOnly": true
+      },
+      "encodedBytes": 3936
+    },
+    "podUID": "6c6de230-af54-4646-a9b1-bb7cbf68d861",
+    "nodeUID": "dd54061d-491a-4b12-95a7-27393e847780",
+    "jobUID": "03f37e56-e07d-44de-93eb-c929fc47a587",
+    "observedAt": "2026-09-07T22:52:24.945612+00:00"
+  },
+  "convergedRemovalGuard": {
+    "passed": true,
+    "checks": {
+      "instanceTerminated": true,
+      "productCleanup": true,
+      "targetMachineAbsent": true,
+      "survivorMachineIdentities": true,
+      "exactSurvivorSet": true,
+      "survivorIdentitiesAndReadiness": true,
+      "targetGatewayLeasesComplete": true,
+      "otherGatewayLeasesPreserved": true
+    },
+    "survivorCount": 12,
+    "retiredGatewayLeaseCount": 1,
+    "preservedGatewayLeaseCount": 4,
+    "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+  },
+  "newClaimUID": "17e30c98-9d15-48de-8d67-fe5c23b3217c",
+  "newInstance": {
+    "InstanceId": "i-0449d9b5d0719f8be",
+    "ImageId": "ami-0b5bfc5a6d0e2007c",
+    "InstanceType": "g6f.large",
+    "LaunchTime": "2026-09-07T22:53:44+00:00",
+    "PrivateIpAddress": "172.29.0.86",
+    "State": {
+      "Code": 16,
+      "Name": "running"
+    },
+    "eniID": "eni-0ea386ac6b6c847f8",
+    "eniCount": 1
+  },
+  "newNodeUID": "258d7b62-e774-48bc-94dc-e31ff042f585",
+  "newMachineUID": "b9c86bcb-2742-4e8d-9e3f-35e854392a87",
+  "joinChecks": {
+    "expectedWindowsBuild": true,
+    "onePhysicalNIC": true,
+    "k0sWorkerRunning": true,
+    "tunnelRunning": true,
+    "bootstrapInstalled": true,
+    "capiAssociation": true,
+    "windowsNode": true,
+    "matchesSiteKubelet": true,
+    "containerd2": true,
+    "cloudWorkerLabel": true,
+    "internetFacingTaint": true,
+    "nodeReady": true,
+    "publisherReady": true,
+    "expectedWorkerVersion": true,
+    "expectedWorkerHash": true,
+    "expectedTunnelHash": true,
+    "peerDelivery": true
+  },
+  "nativeGPUCache": {
+    "gpu": [
+      "NVIDIA L4-3Q, 582.53, WDDM"
+    ],
+    "dataInheritsPermissions": true,
+    "gpuStagePresent": false,
+    "license": [
+      "Product Brand                                      : NVIDIA RTX Virtual Workstation",
+      "GPU Virtualization Mode",
+      "Virtualization Mode                            : VGPU",
+      "License Status                                 : Licensed (Expiry: N/A)"
+    ],
+    "readyImages": [
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ]
+  },
+  "gpuObservation": {
+    "passed": false,
+    "checks": {
+      "podSucceeded": false,
+      "jobComplete": false,
+      "containerExitedZero": false,
+      "containerIdentityPresent": true,
+      "hardwareRenderAndEncode": false
+    },
+    "podUID": "8dfedb47-4499-42d5-9b25-aecb3279d31b",
+    "nodeUID": "258d7b62-e774-48bc-94dc-e31ff042f585",
+    "jobUID": "88f239df-bcba-47e5-95f4-241c0bd37fab",
+    "podPhase": "Failed",
+    "containerStatus": {
+      "allocatedResources": {
+        "directx.microsoft.com/display": "1"
+      },
+      "allocatedResourcesStatus": [
+        {
+          "name": "directx.microsoft.com/display",
+          "resources": [
+            {
+              "health": "Healthy",
+              "resourceID": "PCI\\VEN_10DE&DEV_27B8&SUBSYS_173310DE&REV_A1\\4&EE1B678&0&0000\\0"
+            }
+          ]
+        }
+      ],
+      "containerID": "containerd://851e61a80af98490c183154dc62c704e8aa669a31cf574ad56ac3c87d55c94c5",
+      "image": "sha256:903cd697133287523b9362733a8c418afe23de6e233d26b5c3fa934b6fe7e6bc",
+      "imageID": "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+      "lastState": {},
+      "name": "render-nvenc",
+      "ready": false,
+      "resources": {
+        "limits": {
+          "directx.microsoft.com/display": "1"
+        },
+        "requests": {
+          "directx.microsoft.com/display": "1"
+        }
+      },
+      "restartCount": 0,
+      "started": false,
+      "state": {
+        "terminated": {
+          "containerID": "containerd://851e61a80af98490c183154dc62c704e8aa669a31cf574ad56ac3c87d55c94c5",
+          "exitCode": 128,
+          "finishedAt": "2026-09-07T23:05:57Z",
+          "message": "failed to start containerd task \"851e61a80af98490c183154dc62c704e8aa669a31cf574ad56ac3c87d55c94c5\": hcs::System::CreateProcess: powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\gpu-probe\\run.ps1 851e61a80af98490c183154dc62c704e8aa669a31cf574ad56ac3c87d55c94c5: The RPC server is unavailable.",
+          "reason": "StartError",
+          "startedAt": "1970-01-01T00:00:00Z"
+        }
+      },
+      "volumeMounts": [
+        {
+          "mountPath": "C:\\gpu-probe",
+          "name": "probe",
+          "readOnly": true,
+          "recursiveReadOnly": "Disabled"
+        }
+      ]
+    }
+  },
+  "gpuEvents": [
+    {
+      "reason": "FailedScheduling",
+      "message": "0/13 nodes are available: 1 Insufficient directx.microsoft.com/display, 3 node(s) had untolerated taint(s), 9 node(s) didn't match Pod's node affinity/selector. no new claims to deallocate, preemption: 0/13 nodes are available: 13 Preemption is not helpful for scheduling.",
+      "firstTimestamp": null,
+      "lastTimestamp": null
+    },
+    {
+      "reason": "Scheduled",
+      "message": "Successfully assigned cldt-windows-gpu/windows-render-nvenc-2025-cache-v2-smd2s to aws-win2025-gpu",
+      "firstTimestamp": null,
+      "lastTimestamp": null
+    },
+    {
+      "reason": "Pulled",
+      "message": "Container image \"index.docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe\" already present on machine and can be accessed by the pod",
+      "firstTimestamp": "2026-09-07T23:05:04Z",
+      "lastTimestamp": "2026-09-07T23:05:04Z"
+    },
+    {
+      "reason": "Created",
+      "message": "Container created",
+      "firstTimestamp": "2026-09-07T23:05:05Z",
+      "lastTimestamp": "2026-09-07T23:05:05Z"
+    },
+    {
+      "reason": "Failed",
+      "message": "Error: failed to start containerd task \"render-nvenc\": hcs::System::CreateProcess: powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\gpu-probe\\run.ps1 render-nvenc: The RPC server is unavailable.",
+      "firstTimestamp": "2026-09-07T23:05:57Z",
+      "lastTimestamp": "2026-09-07T23:05:57Z"
+    },
+    {
+      "reason": "FailedKillPod",
+      "message": "error killing pod: failed to \"KillPodSandbox\" for \"8dfedb47-4499-42d5-9b25-aecb3279d31b\" with KillPodSandboxError: \"rpc error: code = Unknown desc = failed to remove network namespace for sandbox \\\"39757349195c36b49c20b5459e1ea0ea73e269344c91e0d70a5f03a00fad017e\\\": hcnDeleteNamespace failed in Win32: The specified request is unsupported. (0x803b0015) {\\\"Success\\\":false,\\\"Error\\\":\\\"The specified request is unsupported. \\\",\\\"ErrorCode\\\":2151350293}\"",
+      "firstTimestamp": "2026-09-07T23:06:00Z",
+      "lastTimestamp": "2026-09-07T23:06:02Z"
+    }
+  ],
+  "joinObservedAt": "2026-09-07T23:08:53.699331+00:00",
+  "gpuStartFailure": {
+    "processResult": "0x800706BA",
+    "processID": 0,
+    "nativeServicesRunning": [
+      "vmcompute",
+      "hns"
+    ],
+    "controlExperiment": {
+      "name": "windows-cache-control-2025",
+      "podUID": "8342d0d2-6c48-4036-8e81-1e6c9eaeb11d",
+      "phase": "Succeeded",
+      "containerStatus": {
+        "containerID": "containerd://5b78e2ec85f2a51a7b4939c04383fd4c09b3b9b6f9c2e07b51a23587aa992b22",
+        "image": "sha256:903cd697133287523b9362733a8c418afe23de6e233d26b5c3fa934b6fe7e6bc",
+        "imageID": "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe",
+        "lastState": {},
+        "name": "control",
+        "ready": false,
+        "resources": {},
+        "restartCount": 0,
+        "started": false,
+        "state": {
+          "terminated": {
+            "containerID": "containerd://5b78e2ec85f2a51a7b4939c04383fd4c09b3b9b6f9c2e07b51a23587aa992b22",
+            "exitCode": 0,
+            "finishedAt": "2026-09-07T23:10:10Z",
+            "reason": "Completed",
+            "startedAt": "2026-09-07T23:09:53Z"
+          }
+        }
+      },
+      "logs": "cached-image-process-started\n",
+      "scope": "Same cached image without GPU allocation or probe mount; process startup passed"
+    },
+    "nextControl": "Additional fresh VM tests no-GPU-first startup order; first-GPU qualification still failed",
+    "gpuOnlyControl": {
+      "podUID": "ebabfa27-8f59-488e-b34c-d6900b356e1f",
+      "phase": "Succeeded",
+      "logs": "gpu-assigned-process-started\n",
+      "scope": "Same cached image and GPU allocation without probe volume; process startup passed"
+    },
+    "gpuVolumeControl": {
+      "podUID": "7e79f520-bf3e-4537-9477-4ffa9d227c8b",
+      "phase": "Succeeded",
+      "logs": "\nAlgorithm       Hash                                                           \n---------       ----                                                           \nSHA256          C3BD523139EAC3615577F4E0B3DFB395E58083DEFE5E58E9FC7419DF43B2...\nSHA256          5DB856F0FF73AD6C9329A89493091B00999CC41473E14FE5F3F53D184F06...\ngpu-probe-volume-readable\n\n\n",
+      "scope": "GPU allocation and original probe volume; process startup and both file reads passed"
+    }
+  },
+  "warmGPUObservation": {
+    "passed": true,
+    "checks": {
+      "podSucceeded": true,
+      "jobComplete": true,
+      "containerExitedZero": true,
+      "containerIdentityPresent": true,
+      "hardwareRenderAndEncode": true
+    },
+    "receipt": {
+      "encoder": "h264_nvenc",
+      "containerWindowsBuild": 20348,
+      "decodedFrames": 30,
+      "render": {
+        "api": "Direct3D11",
+        "vendorID": 4318,
+        "deviceID": 10168,
+        "frames": 30,
+        "pixelsPerFrame": 4096,
+        "greenPixels": 1152,
+        "bluePixels": 2944,
+        "hardwareOnly": true
+      },
+      "encodedBytes": 3936
+    },
+    "podUID": "39aca83e-2e9f-4f20-8450-3e1cd76abd21",
+    "nodeUID": "258d7b62-e774-48bc-94dc-e31ff042f585",
+    "jobUID": "60e87798-b3ac-415f-855f-47d415be7714",
+    "observedAt": "2026-09-07T23:13:51.344904+00:00"
+  }
+}

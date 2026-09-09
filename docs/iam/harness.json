@@ -1,0 +1,77 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Observe",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:Describe*",
+        "ssm:DescribeInstanceInformation",
+        "ssm:GetCommandInvocation",
+        "ssm:ListCommandInvocations"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}"
+        }
+      }
+    },
+    {
+      "Sid": "PowerOwnedInstances",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:RebootInstances",
+        "ec2:StopInstances",
+        "ec2:StartInstances"
+      ],
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ec2:ResourceTag/cloud-provisioning-test": "${RUN_ID}"
+        }
+      }
+    },
+    {
+      "Sid": "UseGuestCommandDocuments",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:SendCommand"
+      ],
+      "Resource": [
+        "arn:aws:ssm:${AWS_REGION}::document/AWS-RunShellScript",
+        "arn:aws:ssm:${AWS_REGION}::document/AWS-RunPowerShellScript"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}"
+        }
+      }
+    },
+    {
+      "Sid": "RunCommandsOnOwnedInstances",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:SendCommand"
+      ],
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ssm:resourceTag/cloud-provisioning-test": "${RUN_ID}"
+        }
+      }
+    },
+    {
+      "Sid": "StagePrivateCommandInput",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::${ASSET_BUCKET}/transfers/*"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "observedAt": "2026-09-09T11:00:37.775060+00:00",
+  "result": "native-capa-linux-completion-network-and-replacement-passed",
+  "upstreamVersion": "v2.12.1",
+  "cloudInitVersion": "26.1",
+  "nativeCommandID": "47345e3d-6354-4515-85ff-d1a1df2c0069",
+  "observations": [
+    {
+      "complete": true,
+      "error": null,
+      "instanceID": "i-066846bed5329ceda"
+    },
+    {
+      "complete": true,
+      "error": null,
+      "instanceID": "i-05334f67644e29922"
+    }
+  ],
+  "nativeEvidenceSHA256": "b9461ae5b402d18402e585e893a540d8c23ce30837bccd15acedcf92018f2341",
+  "observedWarning": "[Errno 2] No such file or directory: '/etc/secret-userdata.txt' for url: file:///etc/secret-userdata.txt",
+  "upstreamDocumentation": "https://github.com/kubernetes-sigs/cluster-api-provider-aws/blob/v2.12.1/docs/book/src/topics/userdata-privacy.md#warning-messages",
+  "blame": {
+    "checkoutCommit": "13af066",
+    "shallowBoundary": true,
+    "originCommitNotEstablished": true
+  },
+  "adapter": "CAPALinuxCommands",
+  "genericLinuxGateUnchanged": true,
+  "unitRaceTestsPassed": true,
+  "functionCoveragePercent": {
+    "BootstrapComplete": 100,
+    "onlyCAPAIncludeWarning": 90.9
+  },
+  "sourceSHA256": {
+    "harness/e2e/rig/aws/capa_bootstrap.go": "2635c69efa3409d537d537302fa7d063a4044ef8adf0d8366d7085a043378e08",
+    "harness/e2e/rig/aws/capa_bootstrap_test.go": "2b0d2dddf7c041ea88f793e30d95e3bd9724a2a97848be3b6e3ca13f0f37da63",
+    "harness/e2e/rig/aws/testdata/capa-cloud-init-26.1-include-warning.json": "43f59cacb1883ed23fb7afef399d901c831c8d1546b741326ac801edabc24356"
+  },
+  "limits": [
+    "The original strict-gate row ended in failure and is retained. No userdata replay was performed.",
+    "The subsequent CAPA-aware rows passed; they cover one profile and placement, not all cloud distributions."
+  ],
+  "lifecycleEvidence": "microk8s-capa-lifecycle-results.json"
+}

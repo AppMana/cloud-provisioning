@@ -1,0 +1,449 @@
+{
+  "removal": [
+    {
+      "observedAt": "2026-09-07T23:51:10.7341495Z",
+      "interface": "cldt1775f69e",
+      "up": true,
+      "peers": [
+        {
+          "publicKeySHA256": "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad",
+          "endpoint": "35.163.248.36:51820",
+          "txBytes": 620,
+          "rxBytes": 644,
+          "lastHandshakeFiletime": 134332985344205027
+        },
+        {
+          "publicKeySHA256": "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2",
+          "endpoint": "44.251.58.244:51820",
+          "txBytes": 556,
+          "rxBytes": 740,
+          "lastHandshakeFiletime": 134332985575825274
+        },
+        {
+          "publicKeySHA256": "42fcc85cb03f215e75c5261bd3351014e5dce79f1edf5f536d7d107ec91807b3",
+          "endpoint": "35.92.119.228:51820",
+          "txBytes": 2388,
+          "rxBytes": 464,
+          "lastHandshakeFiletime": 134332984075517523
+        },
+        {
+          "publicKeySHA256": "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db",
+          "endpoint": "173.228.73.13:56283",
+          "txBytes": 696,
+          "rxBytes": 1488,
+          "lastHandshakeFiletime": 134332986700003095
+        },
+        {
+          "publicKeySHA256": "7574b4ca15136ead1df763ebe356d4d2d45b4e11217450e5a0cf8a969560f778",
+          "endpoint": "16.146.98.223:51820",
+          "txBytes": 540,
+          "rxBytes": 1044,
+          "lastHandshakeFiletime": 134332986389067417
+        },
+        {
+          "publicKeySHA256": "a145f1be2d4d0f573fc0bea939ef37faa444eb53657bdd282446046592a5d516",
+          "endpoint": "18.237.116.243:51820",
+          "txBytes": 524,
+          "rxBytes": 740,
+          "lastHandshakeFiletime": 134332985835504012
+        },
+        {
+          "publicKeySHA256": "b16d1e5da30b9fb1b8253b6a59e406d1dfd99987099dc791140f8b611a234461",
+          "endpoint": "173.228.73.13:56669",
+          "txBytes": 400,
+          "rxBytes": 1488,
+          "lastHandshakeFiletime": 134332986684293708
+        },
+        {
+          "publicKeySHA256": "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147",
+          "endpoint": "173.228.73.13:51820",
+          "txBytes": 696,
+          "rxBytes": 1488,
+          "lastHandshakeFiletime": 134332986692352778
+        },
+        {
+          "publicKeySHA256": "e4139fbb0cf8fdcc249ae3c0a803c8885e85da4f44b83e173e23e8130d5694a5",
+          "endpoint": "34.212.80.143:51820",
+          "txBytes": 616,
+          "rxBytes": 952,
+          "lastHandshakeFiletime": 134332986585505038
+        },
+        {
+          "publicKeySHA256": "fdcc78dba6de2e78d279106b1055b1a49594a984e19a86e5eaf5a58f4eefdc8a",
+          "endpoint": "173.228.73.13:38836",
+          "txBytes": 400,
+          "rxBytes": 1488,
+          "lastHandshakeFiletime": 134332986661268854
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-09-07T23:51:11.7368372Z",
+      "interface": "cldt1775f69e",
+      "up": true,
+      "peers": [
+        {
+          "publicKeySHA256": "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad",
+          "endpoint": "35.163.248.36:51820",
+          "txBytes": 620,
+          "rxBytes": 644,
+          "lastHandshakeFiletime": 134332985344205027
+        },
+        {
+          "publicKeySHA256": "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2",
+          "endpoint": "44.251.58.244:51820",
+          "txBytes": 556,
+          "rxBytes": 740,
+          "lastHandshakeFiletime": 134332985575825274
+        },
+        {
+          "publicKeySHA256": "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db",
+          "endpoint": "192.0.2.10:51820",
+          "txBytes": 696,
+          "rxBytes": 1488,
+          "lastHandshakeFiletime": 134332986700003095
+        },
+        {
+          "publicKeySHA256": "7574b4ca15136ead1df763ebe356d4d2d45b4e11217450e5a0cf8a969560f778",
+          "endpoint": "16.146.98.223:51820",
+          "txBytes": 540,
+          "rxBytes": 1044,
+          "lastHandshakeFiletime": 134332986389067417
+        },
+        {
+          "publicKeySHA256": "a145f1be2d4d0f573fc0bea939ef37faa444eb53657bdd282446046592a5d516",
+          "endpoint": "18.237.116.243:51820",
+          "txBytes": 524,
+          "rxBytes": 740,
+          "lastHandshakeFiletime": 134332985835504012
+        },
+        {
+          "publicKeySHA256": "b16d1e5da30b9fb1b8253b6a59e406d1dfd99987099dc791140f8b611a234461",
+          "endpoint": "173.228.73.13:56669",
+          "txBytes": 400,
+          "rxBytes": 1488,
+          "lastHandshakeFiletime": 134332986684293708
+        },
+        {
+          "publicKeySHA256": "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147",
+          "endpoint": "203.0.113.10:51820",
+          "txBytes": 696,
+          "rxBytes": 1488,
+          "lastHandshakeFiletime": 134332986692352778
+        },
+        {
+          "publicKeySHA256": "e4139fbb0cf8fdcc249ae3c0a803c8885e85da4f44b83e173e23e8130d5694a5",
+          "endpoint": "34.212.80.143:51820",
+          "txBytes": 616,
+          "rxBytes": 952,
+          "lastHandshakeFiletime": 134332986585505038
+        },
+        {
+          "publicKeySHA256": "fdcc78dba6de2e78d279106b1055b1a49594a984e19a86e5eaf5a58f4eefdc8a",
+          "endpoint": "173.228.73.13:38836",
+          "txBytes": 400,
+          "rxBytes": 1488,
+          "lastHandshakeFiletime": 134332986661268854
+        }
+      ]
+    }
+  ],
+  "oldReset": [
+    {
+      "observedAt": "2026-09-07T22:00:08.3873604Z",
+      "interface": "cldt1775f69e",
+      "up": true,
+      "peers": [
+        {
+          "publicKeySHA256": "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad",
+          "endpoint": "35.163.248.36:51820",
+          "txBytes": 2504,
+          "rxBytes": 2744,
+          "lastHandshakeFiletime": 134332919648018961
+        },
+        {
+          "publicKeySHA256": "2ae21796e6a9f26aac551eace21dd728b22c7bcdc40a2baebf29d99babd2cce1",
+          "endpoint": "54.244.199.184:51820",
+          "txBytes": 2016,
+          "rxBytes": 3776,
+          "lastHandshakeFiletime": 134332920063252033
+        },
+        {
+          "publicKeySHA256": "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2",
+          "endpoint": "44.251.58.244:51820",
+          "txBytes": 3724,
+          "rxBytes": 1860,
+          "lastHandshakeFiletime": 134332920025394334
+        },
+        {
+          "publicKeySHA256": "387e1ba0cdc7505dd7a04005053ffb4f25d6108de8c9b9ba834c4612b207271c",
+          "endpoint": "34.217.91.107:51820",
+          "txBytes": 2116,
+          "rxBytes": 3404,
+          "lastHandshakeFiletime": 134332920053141311
+        },
+        {
+          "publicKeySHA256": "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db",
+          "endpoint": "173.228.73.13:56283",
+          "txBytes": 3652,
+          "rxBytes": 5168,
+          "lastHandshakeFiletime": 134332919034504095
+        },
+        {
+          "publicKeySHA256": "7574b4ca15136ead1df763ebe356d4d2d45b4e11217450e5a0cf8a969560f778",
+          "endpoint": "16.146.98.223:51820",
+          "txBytes": 1620,
+          "rxBytes": 3964,
+          "lastHandshakeFiletime": 134332918406108950
+        },
+        {
+          "publicKeySHA256": "b16d1e5da30b9fb1b8253b6a59e406d1dfd99987099dc791140f8b611a234461",
+          "endpoint": "173.228.73.13:56669",
+          "txBytes": 1136,
+          "rxBytes": 5200,
+          "lastHandshakeFiletime": 134332919018763797
+        },
+        {
+          "publicKeySHA256": "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147",
+          "endpoint": "173.228.73.13:51820",
+          "txBytes": 3652,
+          "rxBytes": 5168,
+          "lastHandshakeFiletime": 134332919026859835
+        },
+        {
+          "publicKeySHA256": "fdcc78dba6de2e78d279106b1055b1a49594a984e19a86e5eaf5a58f4eefdc8a",
+          "endpoint": "173.228.73.13:38836",
+          "txBytes": 1136,
+          "rxBytes": 5200,
+          "lastHandshakeFiletime": 134332918995747381
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-09-07T22:00:09.3901436Z",
+      "interface": "cldt1775f69e",
+      "up": true,
+      "peers": [
+        {
+          "publicKeySHA256": "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad",
+          "endpoint": "35.163.248.36:51820",
+          "txBytes": 180,
+          "rxBytes": 92,
+          "lastHandshakeFiletime": 134332920087804773
+        },
+        {
+          "publicKeySHA256": "2ae21796e6a9f26aac551eace21dd728b22c7bcdc40a2baebf29d99babd2cce1",
+          "endpoint": "54.244.199.184:51820",
+          "txBytes": 180,
+          "rxBytes": 92,
+          "lastHandshakeFiletime": 134332920087804773
+        },
+        {
+          "publicKeySHA256": "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2",
+          "endpoint": "44.251.58.244:51820",
+          "txBytes": 180,
+          "rxBytes": 92,
+          "lastHandshakeFiletime": 134332920087804773
+        },
+        {
+          "publicKeySHA256": "387e1ba0cdc7505dd7a04005053ffb4f25d6108de8c9b9ba834c4612b207271c",
+          "endpoint": "34.217.91.107:51820",
+          "txBytes": 180,
+          "rxBytes": 92,
+          "lastHandshakeFiletime": 134332920087804773
+        },
+        {
+          "publicKeySHA256": "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db",
+          "endpoint": "192.0.2.10:51820",
+          "txBytes": 148,
+          "rxBytes": 0,
+          "lastHandshakeFiletime": 0
+        },
+        {
+          "publicKeySHA256": "7574b4ca15136ead1df763ebe356d4d2d45b4e11217450e5a0cf8a969560f778",
+          "endpoint": "16.146.98.223:51820",
+          "txBytes": 180,
+          "rxBytes": 92,
+          "lastHandshakeFiletime": 134332920087804773
+        },
+        {
+          "publicKeySHA256": "b16d1e5da30b9fb1b8253b6a59e406d1dfd99987099dc791140f8b611a234461",
+          "endpoint": "invalid IP:0",
+          "txBytes": 0,
+          "rxBytes": 0,
+          "lastHandshakeFiletime": 0
+        },
+        {
+          "publicKeySHA256": "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147",
+          "endpoint": "203.0.113.10:51820",
+          "txBytes": 148,
+          "rxBytes": 0,
+          "lastHandshakeFiletime": 0
+        },
+        {
+          "publicKeySHA256": "fdcc78dba6de2e78d279106b1055b1a49594a984e19a86e5eaf5a58f4eefdc8a",
+          "endpoint": "invalid IP:0",
+          "txBytes": 0,
+          "rxBytes": 0,
+          "lastHandshakeFiletime": 0
+        }
+      ]
+    }
+  ],
+  "missedAddition": [
+    {
+      "observedAt": "2026-09-08T00:02:29.9229874Z",
+      "interface": "cldt1775f69e",
+      "up": true,
+      "peers": [
+        {
+          "publicKeySHA256": "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad",
+          "endpoint": "35.163.248.36:51820",
+          "txBytes": 1780,
+          "rxBytes": 2012,
+          "lastHandshakeFiletime": 134332992344606469
+        },
+        {
+          "publicKeySHA256": "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2",
+          "endpoint": "44.251.58.244:51820",
+          "txBytes": 1588,
+          "rxBytes": 2236,
+          "lastHandshakeFiletime": 134332992325407877
+        },
+        {
+          "publicKeySHA256": "454251b2fe8a51113a1d9a9b34bd460747f014b38a9bcd6e06fc58c730ace942",
+          "endpoint": "44.248.206.167:51820",
+          "txBytes": 2960,
+          "rxBytes": 0,
+          "lastHandshakeFiletime": 0
+        },
+        {
+          "publicKeySHA256": "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db",
+          "endpoint": "173.228.73.13:56283",
+          "txBytes": 1156,
+          "rxBytes": 3828,
+          "lastHandshakeFiletime": 134332992741618814
+        },
+        {
+          "publicKeySHA256": "7574b4ca15136ead1df763ebe356d4d2d45b4e11217450e5a0cf8a969560f778",
+          "endpoint": "16.146.98.223:51820",
+          "txBytes": 1260,
+          "rxBytes": 2820,
+          "lastHandshakeFiletime": 134332993147444167
+        },
+        {
+          "publicKeySHA256": "a145f1be2d4d0f573fc0bea939ef37faa444eb53657bdd282446046592a5d516",
+          "endpoint": "18.237.116.243:51820",
+          "txBytes": 1328,
+          "rxBytes": 2704,
+          "lastHandshakeFiletime": 134332992335706141
+        },
+        {
+          "publicKeySHA256": "b16d1e5da30b9fb1b8253b6a59e406d1dfd99987099dc791140f8b611a234461",
+          "endpoint": "173.228.73.13:56669",
+          "txBytes": 860,
+          "rxBytes": 3828,
+          "lastHandshakeFiletime": 134332992725807372
+        },
+        {
+          "publicKeySHA256": "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147",
+          "endpoint": "173.228.73.13:51820",
+          "txBytes": 1156,
+          "rxBytes": 3828,
+          "lastHandshakeFiletime": 134332992733976057
+        },
+        {
+          "publicKeySHA256": "e4139fbb0cf8fdcc249ae3c0a803c8885e85da4f44b83e173e23e8130d5694a5",
+          "endpoint": "34.212.80.143:51820",
+          "txBytes": 1552,
+          "rxBytes": 2512,
+          "lastHandshakeFiletime": 134332992335405439
+        },
+        {
+          "publicKeySHA256": "fdcc78dba6de2e78d279106b1055b1a49594a984e19a86e5eaf5a58f4eefdc8a",
+          "endpoint": "173.228.73.13:38836",
+          "txBytes": 860,
+          "rxBytes": 3828,
+          "lastHandshakeFiletime": 134332992702893336
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-09-08T00:17:32.0615589Z",
+      "interface": "cldt1775f69e",
+      "up": true,
+      "peers": [
+        {
+          "publicKeySHA256": "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad",
+          "endpoint": "35.163.248.36:51820",
+          "txBytes": 3028,
+          "rxBytes": 4156,
+          "lastHandshakeFiletime": 134333002294679823
+        },
+        {
+          "publicKeySHA256": "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2",
+          "endpoint": "44.251.58.244:51820",
+          "txBytes": 2808,
+          "rxBytes": 4072,
+          "lastHandshakeFiletime": 134333000975213363
+        },
+        {
+          "publicKeySHA256": "454251b2fe8a51113a1d9a9b34bd460747f014b38a9bcd6e06fc58c730ace942",
+          "endpoint": "44.248.206.167:51820",
+          "txBytes": 10936,
+          "rxBytes": 1528,
+          "lastHandshakeFiletime": 134333001005515559
+        },
+        {
+          "publicKeySHA256": "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db",
+          "endpoint": "173.228.73.13:56283",
+          "txBytes": 1892,
+          "rxBytes": 7156,
+          "lastHandshakeFiletime": 134333002408109698
+        },
+        {
+          "publicKeySHA256": "7574b4ca15136ead1df763ebe356d4d2d45b4e11217450e5a0cf8a969560f778",
+          "endpoint": "16.146.98.223:51820",
+          "txBytes": 2160,
+          "rxBytes": 5168,
+          "lastHandshakeFiletime": 134333001595411317
+        },
+        {
+          "publicKeySHA256": "a145f1be2d4d0f573fc0bea939ef37faa444eb53657bdd282446046592a5d516",
+          "endpoint": "18.237.116.243:51820",
+          "txBytes": 2444,
+          "rxBytes": 5156,
+          "lastHandshakeFiletime": 134333002286207395
+        },
+        {
+          "publicKeySHA256": "b16d1e5da30b9fb1b8253b6a59e406d1dfd99987099dc791140f8b611a234461",
+          "endpoint": "173.228.73.13:56669",
+          "txBytes": 1596,
+          "rxBytes": 7156,
+          "lastHandshakeFiletime": 134333002392333183
+        },
+        {
+          "publicKeySHA256": "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147",
+          "endpoint": "173.228.73.13:51820",
+          "txBytes": 1892,
+          "rxBytes": 7156,
+          "lastHandshakeFiletime": 134333002400437756
+        },
+        {
+          "publicKeySHA256": "e4139fbb0cf8fdcc249ae3c0a803c8885e85da4f44b83e173e23e8130d5694a5",
+          "endpoint": "34.212.80.143:51820",
+          "txBytes": 2764,
+          "rxBytes": 4964,
+          "lastHandshakeFiletime": 134333002285818088
+        },
+        {
+          "publicKeySHA256": "fdcc78dba6de2e78d279106b1055b1a49594a984e19a86e5eaf5a58f4eefdc8a",
+          "endpoint": "173.228.73.13:38836",
+          "txBytes": 1596,
+          "rxBytes": 7188,
+          "lastHandshakeFiletime": 134333002369302300
+        }
+      ]
+    }
+  ]
+}

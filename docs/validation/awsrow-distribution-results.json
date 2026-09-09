@@ -1,0 +1,62 @@
+{
+  "scope": "Distribution-polymorphic Linux AWS row observation; no new VM or CAPI lifecycle campaign",
+  "selectableProfiles": [
+    "k0s/calico",
+    "k0s/kube-router",
+    "microk8s/calico"
+  ],
+  "nativeObservations": [
+    {
+      "criEndpoint": "unix:///run/k0s/containerd.sock",
+      "distribution": "k0s",
+      "node": "cp2",
+      "passed": true,
+      "transport": "QEMU guest agent"
+    },
+    {
+      "criEndpoint": "unix:///run/k0s/containerd.sock",
+      "distribution": "k0s",
+      "node": "aws-relay1",
+      "passed": true,
+      "transport": "AWS SSM"
+    }
+  ],
+  "unitValidation": {
+    "packages": [
+      "cmd/awsrow",
+      "cluster/k0s",
+      "cluster/microk8s",
+      "cmd/lab",
+      "kube"
+    ],
+    "passed": true,
+    "contracts": [
+      "Per-distribution import command and CRI socket",
+      "Pinned k0s release",
+      "MicroK8s snap name, version and revision",
+      "Missing runtime sockets rejected",
+      "Unsupported observer profiles rejected"
+    ],
+    "microk8sInputs": "Simulated snap-list table for the existing pinned contract, not native AWS observations"
+  },
+  "functionCoverage": [
+    "github.com/appmana/cloud-provisioning/harness/e2e/cluster/k0s/worker.go:11:\t\tVerifyWorker\t\t\t85.7%",
+    "github.com/appmana/cloud-provisioning/harness/e2e/cluster/microk8s/worker.go:11:\tverifySnap\t\t\t90.0%",
+    "github.com/appmana/cloud-provisioning/harness/e2e/cluster/microk8s/worker.go:27:\tVerifyWorker\t\t\t100.0%",
+    "github.com/appmana/cloud-provisioning/harness/e2e/cmd/awsrow/main.go:312:\t\tworkerProfile\t\t\t90.0%"
+  ],
+  "history": {
+    "head": "acade1891c36d4a0f94a8a8dd9805ddceba8620f",
+    "blame": "cmd/awsrow/main.go and cluster/microk8s/microk8s.go were absent from HEAD at inspection; the removed hard-coded AWS runner checks supersede uncommitted worktree code, not an attributed historical implementation."
+  },
+  "limitations": [
+    "Only the k0s verifier ran on live local/AWS machines; MicroK8s AWS join, matrix and lifecycle remain unrun.",
+    "This change does not extend the Linux runner to Windows; separate native Windows observers remain required.",
+    "No fresh k0s/kube-router AWS campaign in this change.",
+    "Runtime verification alone does not prove a CNI, CAPI association, label/taint, AMI, or single-NIC gate. The full row retains those separate checks."
+  ],
+  "evidenceSHA256": {
+    "native-results.json": "9d9350dd3511f5b48002352cd89a9af3562a74096e092fb30519c60177c4cf2d",
+    "coverage-final.out": "5a37f2e5c39e73300f7b565bda3f1319cf8f5cc20ca0d932445f9661f8823caa"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "observedAt": "2026-09-08T00:26:23.727916+00:00",
+  "scope": "Read-only Ready-attachment removal baseline validation; no deletion performed",
+  "readyCluster": {
+    "passed": true,
+    "checks": {
+      "targetMachineIdentity": true,
+      "noDeletingMachines": true,
+      "nodeAssociation": true,
+      "allNodesReady": true,
+      "targetGatewayLeasesReady": true,
+      "otherGatewayLeasesReady": true
+    },
+    "claim": "aws-win2025-gpu",
+    "machineUID": "b9c86bcb-2742-4e8d-9e3f-35e854392a87",
+    "nodeUID": "258d7b62-e774-48bc-94dc-e31ff042f585",
+    "providerID": "aws:///us-west-2a/i-0449d9b5d0719f8be",
+    "targetLeasePhases": {
+      "network-attachment-c5994feb22803fbdc169b9d295cf6e56": "Ready"
+    },
+    "otherLeasePhases": {
+      "network-attachment-157078f2ab5e8687be57aace685946aa": "Ready",
+      "network-attachment-6b32fae7b7b59f9868b31e34630bc454": "Ready",
+      "network-attachment-9065ccc1adea9514d4e30290eefd0c09": "Ready",
+      "network-attachment-b9665a3a0cf8f46a0806d528033cc990": "Ready"
+    },
+    "scope": "Snapshot preflight for Ready-attachment removal with survivors; does not delete resources or authorize reuse after state changes"
+  },
+  "historicalPublishingBaseline": {
+    "passed": false,
+    "checks": {
+      "targetMachineIdentity": true,
+      "noDeletingMachines": true,
+      "nodeAssociation": true,
+      "allNodesReady": true,
+      "targetGatewayLeasesReady": false,
+      "otherGatewayLeasesReady": true
+    },
+    "claim": "aws-win2025-gpu-first-v1",
+    "machineUID": "5ea578ce-fbd2-47a8-8282-56f5eed9ea3c",
+    "nodeUID": "e5f2fca5-5a8a-43c2-8aed-231afee2d4f4",
+    "providerID": "aws:///us-west-2a/i-0395f56956508deb2",
+    "targetLeasePhases": {
+      "network-attachment-f4980b114d6a8602d13d8a813c6a7075": "Publishing"
+    },
+    "otherLeasePhases": {
+      "network-attachment-157078f2ab5e8687be57aace685946aa": "Ready",
+      "network-attachment-6b32fae7b7b59f9868b31e34630bc454": "Ready",
+      "network-attachment-9065ccc1adea9514d4e30290eefd0c09": "Ready",
+      "network-attachment-b9665a3a0cf8f46a0806d528033cc990": "Ready",
+      "network-attachment-c5994feb22803fbdc169b9d295cf6e56": "Ready"
+    },
+    "scope": "Snapshot preflight for Ready-attachment removal with survivors; does not delete resources or authorize reuse after state changes"
+  },
+  "regressionTests": {
+    "removalTests": 11,
+    "observerSuiteTests": 57,
+    "passed": true
+  },
+  "sourceHistory": "observe/removal.py is untracked and has no HEAD blame history; the preflight supplements the existing post-deletion comparator without weakening its Ready-baseline requirement",
+  "coverage": {
+    "moduleStatementPercent": 68,
+    "preflightStatements": "All preflight statements exercised; command-line branches not covered by unit run",
+    "scope": "observe/removal.py only"
+  }
+}

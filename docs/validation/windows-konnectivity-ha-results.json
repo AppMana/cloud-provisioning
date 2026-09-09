@@ -1,0 +1,3844 @@
+{
+  "scope": "Two Linux agents on single-NIC QEMU controllers, AWS Windows 2022/2025 replacement workers; graceful agent withdrawal and generated-addon migration",
+  "versions": {
+    "k0s": "1.36.2+k0s.0",
+    "agent": "v0.36.0-k0s.0"
+  },
+  "cohorts": {
+    "cp2-loss": {
+      "admissionChecks": 120,
+      "execChecks": 6,
+      "failed": [],
+      "observations": [
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:25.078615+00:00",
+          "finishedAt": "2026-09-08T01:24:25.242870+00:00",
+          "exitCode": 0,
+          "seconds": 0.16427055903477594,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:26.243044+00:00",
+          "finishedAt": "2026-09-08T01:24:26.379597+00:00",
+          "exitCode": 0,
+          "seconds": 0.13656589400488883,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:27.379717+00:00",
+          "finishedAt": "2026-09-08T01:24:27.531865+00:00",
+          "exitCode": 0,
+          "seconds": 0.15216652903473005,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:28.532008+00:00",
+          "finishedAt": "2026-09-08T01:24:28.662811+00:00",
+          "exitCode": 0,
+          "seconds": 0.13082043698523194,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:29.662984+00:00",
+          "finishedAt": "2026-09-08T01:24:29.810803+00:00",
+          "exitCode": 0,
+          "seconds": 0.1478377740131691,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:30.810935+00:00",
+          "finishedAt": "2026-09-08T01:24:30.939225+00:00",
+          "exitCode": 0,
+          "seconds": 0.12830844899872318,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:31.939371+00:00",
+          "finishedAt": "2026-09-08T01:24:32.069237+00:00",
+          "exitCode": 0,
+          "seconds": 0.12987915199482813,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:33.069352+00:00",
+          "finishedAt": "2026-09-08T01:24:33.203659+00:00",
+          "exitCode": 0,
+          "seconds": 0.13432074896991253,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:34.203782+00:00",
+          "finishedAt": "2026-09-08T01:24:34.332544+00:00",
+          "exitCode": 0,
+          "seconds": 0.1287786249886267,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:35.332677+00:00",
+          "finishedAt": "2026-09-08T01:24:35.465611+00:00",
+          "exitCode": 0,
+          "seconds": 0.13294748798944056,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:36.465685+00:00",
+          "finishedAt": "2026-09-08T01:24:36.600171+00:00",
+          "exitCode": 0,
+          "seconds": 0.1345052570104599,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:37.600314+00:00",
+          "finishedAt": "2026-09-08T01:24:37.729006+00:00",
+          "exitCode": 0,
+          "seconds": 0.12870694999583066,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:38.729120+00:00",
+          "finishedAt": "2026-09-08T01:24:38.855157+00:00",
+          "exitCode": 0,
+          "seconds": 0.12605194200295955,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:39.855291+00:00",
+          "finishedAt": "2026-09-08T01:24:39.978044+00:00",
+          "exitCode": 0,
+          "seconds": 0.12280725198797882,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:40.978183+00:00",
+          "finishedAt": "2026-09-08T01:24:41.122455+00:00",
+          "exitCode": 0,
+          "seconds": 0.14429032296175137,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:42.122637+00:00",
+          "finishedAt": "2026-09-08T01:24:42.263474+00:00",
+          "exitCode": 0,
+          "seconds": 0.1408550429623574,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:43.263611+00:00",
+          "finishedAt": "2026-09-08T01:24:43.394596+00:00",
+          "exitCode": 0,
+          "seconds": 0.13099998398683965,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:44.394704+00:00",
+          "finishedAt": "2026-09-08T01:24:44.530328+00:00",
+          "exitCode": 0,
+          "seconds": 0.13563310401514173,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:45.530549+00:00",
+          "finishedAt": "2026-09-08T01:24:45.677525+00:00",
+          "exitCode": 0,
+          "seconds": 0.14699390099849552,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:46.677677+00:00",
+          "finishedAt": "2026-09-08T01:24:46.816586+00:00",
+          "exitCode": 0,
+          "seconds": 0.13892067497363314,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:47.816691+00:00",
+          "finishedAt": "2026-09-08T01:24:47.951810+00:00",
+          "exitCode": 0,
+          "seconds": 0.13513443199917674,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:48.951941+00:00",
+          "finishedAt": "2026-09-08T01:24:49.088413+00:00",
+          "exitCode": 0,
+          "seconds": 0.13648613198893145,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:50.088516+00:00",
+          "finishedAt": "2026-09-08T01:24:50.243917+00:00",
+          "exitCode": 0,
+          "seconds": 0.1554201549733989,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:51.244067+00:00",
+          "finishedAt": "2026-09-08T01:24:51.385226+00:00",
+          "exitCode": 0,
+          "seconds": 0.14118043595226482,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:52.385363+00:00",
+          "finishedAt": "2026-09-08T01:24:52.517101+00:00",
+          "exitCode": 0,
+          "seconds": 0.13175593002233654,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:53.517322+00:00",
+          "finishedAt": "2026-09-08T01:24:53.651832+00:00",
+          "exitCode": 0,
+          "seconds": 0.13452144601615146,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:54.651934+00:00",
+          "finishedAt": "2026-09-08T01:24:54.784614+00:00",
+          "exitCode": 0,
+          "seconds": 0.1326916550169699,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:55.784723+00:00",
+          "finishedAt": "2026-09-08T01:24:55.908292+00:00",
+          "exitCode": 0,
+          "seconds": 0.12358052999479696,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:56.908396+00:00",
+          "finishedAt": "2026-09-08T01:24:57.082690+00:00",
+          "exitCode": 0,
+          "seconds": 0.17430999199859798,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:58.082827+00:00",
+          "finishedAt": "2026-09-08T01:24:58.215924+00:00",
+          "exitCode": 0,
+          "seconds": 0.13311960198916495,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:59.216078+00:00",
+          "finishedAt": "2026-09-08T01:24:59.355529+00:00",
+          "exitCode": 0,
+          "seconds": 0.13946273602778092,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:00.355660+00:00",
+          "finishedAt": "2026-09-08T01:25:00.495879+00:00",
+          "exitCode": 0,
+          "seconds": 0.14023230702150613,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:01.496045+00:00",
+          "finishedAt": "2026-09-08T01:25:01.638883+00:00",
+          "exitCode": 0,
+          "seconds": 0.142863039043732,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:02.639048+00:00",
+          "finishedAt": "2026-09-08T01:25:02.774521+00:00",
+          "exitCode": 0,
+          "seconds": 0.1354930989909917,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:03.774653+00:00",
+          "finishedAt": "2026-09-08T01:25:03.908665+00:00",
+          "exitCode": 0,
+          "seconds": 0.13402961799874902,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:04.908789+00:00",
+          "finishedAt": "2026-09-08T01:25:05.047139+00:00",
+          "exitCode": 0,
+          "seconds": 0.1383625710150227,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:06.047352+00:00",
+          "finishedAt": "2026-09-08T01:25:06.190825+00:00",
+          "exitCode": 0,
+          "seconds": 0.14349395903991535,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:07.190966+00:00",
+          "finishedAt": "2026-09-08T01:25:07.330946+00:00",
+          "exitCode": 0,
+          "seconds": 0.14000417600618675,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:08.331107+00:00",
+          "finishedAt": "2026-09-08T01:25:08.458931+00:00",
+          "exitCode": 0,
+          "seconds": 0.12783837999450043,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:09.459040+00:00",
+          "finishedAt": "2026-09-08T01:25:09.583566+00:00",
+          "exitCode": 0,
+          "seconds": 0.12454062100732699,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "exec",
+          "windows": 2022,
+          "exitCode": 0,
+          "seconds": 0.3785054120235145,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "exec",
+          "windows": 2025,
+          "exitCode": 0,
+          "seconds": 0.27819549303967506,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:25.078935+00:00",
+          "finishedAt": "2026-09-08T01:24:25.242980+00:00",
+          "exitCode": 0,
+          "seconds": 0.16405173699604347,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:26.243179+00:00",
+          "finishedAt": "2026-09-08T01:24:26.387065+00:00",
+          "exitCode": 0,
+          "seconds": 0.14390107901999727,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:27.387165+00:00",
+          "finishedAt": "2026-09-08T01:24:27.533990+00:00",
+          "exitCode": 0,
+          "seconds": 0.14683638501446694,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:28.534071+00:00",
+          "finishedAt": "2026-09-08T01:24:28.662596+00:00",
+          "exitCode": 0,
+          "seconds": 0.12854486500145867,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:29.662737+00:00",
+          "finishedAt": "2026-09-08T01:24:29.811093+00:00",
+          "exitCode": 0,
+          "seconds": 0.1483734049834311,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:30.811253+00:00",
+          "finishedAt": "2026-09-08T01:24:30.941449+00:00",
+          "exitCode": 0,
+          "seconds": 0.13021232996834442,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:31.941574+00:00",
+          "finishedAt": "2026-09-08T01:24:32.068557+00:00",
+          "exitCode": 0,
+          "seconds": 0.12699969997629523,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:33.068674+00:00",
+          "finishedAt": "2026-09-08T01:24:33.204157+00:00",
+          "exitCode": 0,
+          "seconds": 0.13550008402671665,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:34.204283+00:00",
+          "finishedAt": "2026-09-08T01:24:34.333274+00:00",
+          "exitCode": 0,
+          "seconds": 0.12900436099153012,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:35.333396+00:00",
+          "finishedAt": "2026-09-08T01:24:35.464785+00:00",
+          "exitCode": 0,
+          "seconds": 0.13140051998198032,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:36.464889+00:00",
+          "finishedAt": "2026-09-08T01:24:36.601316+00:00",
+          "exitCode": 0,
+          "seconds": 0.13643638894427568,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:37.601433+00:00",
+          "finishedAt": "2026-09-08T01:24:37.730333+00:00",
+          "exitCode": 0,
+          "seconds": 0.12891448102891445,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:38.730453+00:00",
+          "finishedAt": "2026-09-08T01:24:38.855870+00:00",
+          "exitCode": 0,
+          "seconds": 0.1254361309693195,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:39.856361+00:00",
+          "finishedAt": "2026-09-08T01:24:39.979783+00:00",
+          "exitCode": 0,
+          "seconds": 0.12343553698156029,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:40.979832+00:00",
+          "finishedAt": "2026-09-08T01:24:41.122525+00:00",
+          "exitCode": 0,
+          "seconds": 0.14270047302125022,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:42.122730+00:00",
+          "finishedAt": "2026-09-08T01:24:42.266982+00:00",
+          "exitCode": 0,
+          "seconds": 0.14426405198173597,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:43.267097+00:00",
+          "finishedAt": "2026-09-08T01:24:43.393560+00:00",
+          "exitCode": 0,
+          "seconds": 0.12648159300442785,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:44.393709+00:00",
+          "finishedAt": "2026-09-08T01:24:44.534068+00:00",
+          "exitCode": 0,
+          "seconds": 0.14037748199189082,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:45.534176+00:00",
+          "finishedAt": "2026-09-08T01:24:45.678366+00:00",
+          "exitCode": 0,
+          "seconds": 0.1442093490040861,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:46.678507+00:00",
+          "finishedAt": "2026-09-08T01:24:46.813117+00:00",
+          "exitCode": 0,
+          "seconds": 0.1346323660109192,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:47.813264+00:00",
+          "finishedAt": "2026-09-08T01:24:47.955021+00:00",
+          "exitCode": 0,
+          "seconds": 0.14177332498366013,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:48.955213+00:00",
+          "finishedAt": "2026-09-08T01:24:49.084713+00:00",
+          "exitCode": 0,
+          "seconds": 0.12952203600434586,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:50.084855+00:00",
+          "finishedAt": "2026-09-08T01:24:50.236397+00:00",
+          "exitCode": 0,
+          "seconds": 0.1515559860272333,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:51.236502+00:00",
+          "finishedAt": "2026-09-08T01:24:51.387896+00:00",
+          "exitCode": 0,
+          "seconds": 0.15140568203059956,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:52.387964+00:00",
+          "finishedAt": "2026-09-08T01:24:52.517008+00:00",
+          "exitCode": 0,
+          "seconds": 0.12906121701234952,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:53.517225+00:00",
+          "finishedAt": "2026-09-08T01:24:53.657332+00:00",
+          "exitCode": 0,
+          "seconds": 0.14012456400087103,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:54.657467+00:00",
+          "finishedAt": "2026-09-08T01:24:54.788019+00:00",
+          "exitCode": 0,
+          "seconds": 0.1305676389602013,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:55.788155+00:00",
+          "finishedAt": "2026-09-08T01:24:55.915250+00:00",
+          "exitCode": 0,
+          "seconds": 0.12711011804640293,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:56.915367+00:00",
+          "finishedAt": "2026-09-08T01:24:57.085011+00:00",
+          "exitCode": 0,
+          "seconds": 0.16966142499586567,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:58.085150+00:00",
+          "finishedAt": "2026-09-08T01:24:58.220582+00:00",
+          "exitCode": 0,
+          "seconds": 0.1354465809999965,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:59.220692+00:00",
+          "finishedAt": "2026-09-08T01:24:59.356502+00:00",
+          "exitCode": 0,
+          "seconds": 0.13581759098451585,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:00.356630+00:00",
+          "finishedAt": "2026-09-08T01:25:00.502938+00:00",
+          "exitCode": 0,
+          "seconds": 0.14631936798105016,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:01.503079+00:00",
+          "finishedAt": "2026-09-08T01:25:01.641259+00:00",
+          "exitCode": 0,
+          "seconds": 0.13819408300332725,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:02.641355+00:00",
+          "finishedAt": "2026-09-08T01:25:02.775295+00:00",
+          "exitCode": 0,
+          "seconds": 0.13395234197378159,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:03.775418+00:00",
+          "finishedAt": "2026-09-08T01:25:03.908827+00:00",
+          "exitCode": 0,
+          "seconds": 0.13342545897467062,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:04.909113+00:00",
+          "finishedAt": "2026-09-08T01:25:05.051608+00:00",
+          "exitCode": 0,
+          "seconds": 0.14250449201790616,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:06.051716+00:00",
+          "finishedAt": "2026-09-08T01:25:06.192169+00:00",
+          "exitCode": 0,
+          "seconds": 0.14047220000065863,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:07.192312+00:00",
+          "finishedAt": "2026-09-08T01:25:07.331146+00:00",
+          "exitCode": 0,
+          "seconds": 0.13884359801886603,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:08.331275+00:00",
+          "finishedAt": "2026-09-08T01:25:08.458622+00:00",
+          "exitCode": 0,
+          "seconds": 0.1273658589925617,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:09.458766+00:00",
+          "finishedAt": "2026-09-08T01:25:09.586361+00:00",
+          "exitCode": 0,
+          "seconds": 0.12760812597116455,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "exec",
+          "windows": 2022,
+          "exitCode": 0,
+          "seconds": 0.3839561819913797,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "exec",
+          "windows": 2025,
+          "exitCode": 0,
+          "seconds": 0.2701110750203952,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:25.079362+00:00",
+          "finishedAt": "2026-09-08T01:24:25.242731+00:00",
+          "exitCode": 0,
+          "seconds": 0.1633852290106006,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:26.242888+00:00",
+          "finishedAt": "2026-09-08T01:24:26.377605+00:00",
+          "exitCode": 0,
+          "seconds": 0.1347362829837948,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:27.377731+00:00",
+          "finishedAt": "2026-09-08T01:24:27.526795+00:00",
+          "exitCode": 0,
+          "seconds": 0.14908881398150697,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:28.526936+00:00",
+          "finishedAt": "2026-09-08T01:24:28.664512+00:00",
+          "exitCode": 0,
+          "seconds": 0.13758887303993106,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:29.664613+00:00",
+          "finishedAt": "2026-09-08T01:24:29.821138+00:00",
+          "exitCode": 0,
+          "seconds": 0.15654067898867652,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:30.821262+00:00",
+          "finishedAt": "2026-09-08T01:24:30.939783+00:00",
+          "exitCode": 0,
+          "seconds": 0.11853484500898048,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:31.939926+00:00",
+          "finishedAt": "2026-09-08T01:24:32.068168+00:00",
+          "exitCode": 0,
+          "seconds": 0.12826030800351873,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:33.068297+00:00",
+          "finishedAt": "2026-09-08T01:24:33.207476+00:00",
+          "exitCode": 0,
+          "seconds": 0.13919409102527425,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:34.207581+00:00",
+          "finishedAt": "2026-09-08T01:24:34.332114+00:00",
+          "exitCode": 0,
+          "seconds": 0.12454946798970923,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:35.332248+00:00",
+          "finishedAt": "2026-09-08T01:24:35.463656+00:00",
+          "exitCode": 0,
+          "seconds": 0.13142865395639092,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:36.463793+00:00",
+          "finishedAt": "2026-09-08T01:24:36.606284+00:00",
+          "exitCode": 0,
+          "seconds": 0.14250410301610827,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:37.606382+00:00",
+          "finishedAt": "2026-09-08T01:24:37.728494+00:00",
+          "exitCode": 0,
+          "seconds": 0.12212617800105363,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:38.728624+00:00",
+          "finishedAt": "2026-09-08T01:24:38.859634+00:00",
+          "exitCode": 0,
+          "seconds": 0.13102187600452453,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:39.859742+00:00",
+          "finishedAt": "2026-09-08T01:24:39.979608+00:00",
+          "exitCode": 0,
+          "seconds": 0.11988159402972087,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:40.979741+00:00",
+          "finishedAt": "2026-09-08T01:24:41.124117+00:00",
+          "exitCode": 0,
+          "seconds": 0.14438623300520703,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:42.124208+00:00",
+          "finishedAt": "2026-09-08T01:24:42.261619+00:00",
+          "exitCode": 0,
+          "seconds": 0.1374277489958331,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:43.261749+00:00",
+          "finishedAt": "2026-09-08T01:24:43.392179+00:00",
+          "exitCode": 0,
+          "seconds": 0.13044979696860537,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:44.392354+00:00",
+          "finishedAt": "2026-09-08T01:24:44.530262+00:00",
+          "exitCode": 0,
+          "seconds": 0.1379309170297347,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:45.530431+00:00",
+          "finishedAt": "2026-09-08T01:24:45.681394+00:00",
+          "exitCode": 0,
+          "seconds": 0.15097882802365348,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:46.681505+00:00",
+          "finishedAt": "2026-09-08T01:24:46.813782+00:00",
+          "exitCode": 0,
+          "seconds": 0.1322862509987317,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:47.813934+00:00",
+          "finishedAt": "2026-09-08T01:24:47.955155+00:00",
+          "exitCode": 0,
+          "seconds": 0.1412298990180716,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:48.955307+00:00",
+          "finishedAt": "2026-09-08T01:24:49.087814+00:00",
+          "exitCode": 0,
+          "seconds": 0.13251634500920773,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:50.087920+00:00",
+          "finishedAt": "2026-09-08T01:24:50.234565+00:00",
+          "exitCode": 0,
+          "seconds": 0.14666140399640426,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:51.234702+00:00",
+          "finishedAt": "2026-09-08T01:24:51.384192+00:00",
+          "exitCode": 0,
+          "seconds": 0.1495089849922806,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:52.384324+00:00",
+          "finishedAt": "2026-09-08T01:24:52.519036+00:00",
+          "exitCode": 0,
+          "seconds": 0.1347264329669997,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:53.519149+00:00",
+          "finishedAt": "2026-09-08T01:24:53.650341+00:00",
+          "exitCode": 0,
+          "seconds": 0.13120775698916987,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:54.650473+00:00",
+          "finishedAt": "2026-09-08T01:24:54.780371+00:00",
+          "exitCode": 0,
+          "seconds": 0.12991908501135185,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:55.780521+00:00",
+          "finishedAt": "2026-09-08T01:24:55.905568+00:00",
+          "exitCode": 0,
+          "seconds": 0.12506463896716014,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:56.905711+00:00",
+          "finishedAt": "2026-09-08T01:24:57.096733+00:00",
+          "exitCode": 0,
+          "seconds": 0.19103880500188097,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:58.096861+00:00",
+          "finishedAt": "2026-09-08T01:24:58.218419+00:00",
+          "exitCode": 0,
+          "seconds": 0.12157926597865298,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:24:59.218557+00:00",
+          "finishedAt": "2026-09-08T01:24:59.355424+00:00",
+          "exitCode": 0,
+          "seconds": 0.1368881100206636,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:00.355571+00:00",
+          "finishedAt": "2026-09-08T01:25:00.495940+00:00",
+          "exitCode": 0,
+          "seconds": 0.1403816090314649,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:01.496148+00:00",
+          "finishedAt": "2026-09-08T01:25:01.639013+00:00",
+          "exitCode": 0,
+          "seconds": 0.14287387998774648,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:02.639156+00:00",
+          "finishedAt": "2026-09-08T01:25:02.781177+00:00",
+          "exitCode": 0,
+          "seconds": 0.1420335349976085,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:03.781303+00:00",
+          "finishedAt": "2026-09-08T01:25:03.916237+00:00",
+          "exitCode": 0,
+          "seconds": 0.13494959298986942,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:04.916363+00:00",
+          "finishedAt": "2026-09-08T01:25:05.047039+00:00",
+          "exitCode": 0,
+          "seconds": 0.13070981699274853,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:06.047260+00:00",
+          "finishedAt": "2026-09-08T01:25:06.197168+00:00",
+          "exitCode": 0,
+          "seconds": 0.1499257300165482,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:07.197289+00:00",
+          "finishedAt": "2026-09-08T01:25:07.331526+00:00",
+          "exitCode": 0,
+          "seconds": 0.13425560400355607,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:08.331640+00:00",
+          "finishedAt": "2026-09-08T01:25:08.461744+00:00",
+          "exitCode": 0,
+          "seconds": 0.13011991401435807,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:25:09.461863+00:00",
+          "finishedAt": "2026-09-08T01:25:09.583679+00:00",
+          "exitCode": 0,
+          "seconds": 0.12183451699092984,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "exec",
+          "windows": 2022,
+          "exitCode": 0,
+          "seconds": 0.38246980897383764,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "exec",
+          "windows": 2025,
+          "exitCode": 0,
+          "seconds": 0.2814415260218084,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        }
+      ]
+    },
+    "cp3-loss": {
+      "admissionChecks": 120,
+      "execChecks": 6,
+      "failed": [],
+      "observations": [
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:12.367382+00:00",
+          "finishedAt": "2026-09-08T01:26:12.499646+00:00",
+          "exitCode": 0,
+          "seconds": 0.13228703796630725,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:13.499807+00:00",
+          "finishedAt": "2026-09-08T01:26:13.633739+00:00",
+          "exitCode": 0,
+          "seconds": 0.13395244901767,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:14.633873+00:00",
+          "finishedAt": "2026-09-08T01:26:14.773892+00:00",
+          "exitCode": 0,
+          "seconds": 0.14003678399603814,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:15.774025+00:00",
+          "finishedAt": "2026-09-08T01:26:15.913081+00:00",
+          "exitCode": 0,
+          "seconds": 0.13907153496984392,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:16.913207+00:00",
+          "finishedAt": "2026-09-08T01:26:17.044320+00:00",
+          "exitCode": 0,
+          "seconds": 0.13112978398567066,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:18.044441+00:00",
+          "finishedAt": "2026-09-08T01:26:18.192972+00:00",
+          "exitCode": 0,
+          "seconds": 0.1485423060366884,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:19.193076+00:00",
+          "finishedAt": "2026-09-08T01:26:19.323732+00:00",
+          "exitCode": 0,
+          "seconds": 0.13067494705319405,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:20.323872+00:00",
+          "finishedAt": "2026-09-08T01:26:20.454179+00:00",
+          "exitCode": 0,
+          "seconds": 0.13032431504689157,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:21.454305+00:00",
+          "finishedAt": "2026-09-08T01:26:21.597588+00:00",
+          "exitCode": 0,
+          "seconds": 0.14329966896912083,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:22.597713+00:00",
+          "finishedAt": "2026-09-08T01:26:22.729503+00:00",
+          "exitCode": 0,
+          "seconds": 0.13180428696796298,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:23.729615+00:00",
+          "finishedAt": "2026-09-08T01:26:23.858646+00:00",
+          "exitCode": 0,
+          "seconds": 0.12904592498671263,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:24.858785+00:00",
+          "finishedAt": "2026-09-08T01:26:25.012530+00:00",
+          "exitCode": 0,
+          "seconds": 0.1537690949626267,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:26.012675+00:00",
+          "finishedAt": "2026-09-08T01:26:26.130693+00:00",
+          "exitCode": 0,
+          "seconds": 0.11803533701458946,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:27.130828+00:00",
+          "finishedAt": "2026-09-08T01:26:27.261226+00:00",
+          "exitCode": 0,
+          "seconds": 0.1304149969946593,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:28.261371+00:00",
+          "finishedAt": "2026-09-08T01:26:28.400087+00:00",
+          "exitCode": 0,
+          "seconds": 0.1387276349705644,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:29.400185+00:00",
+          "finishedAt": "2026-09-08T01:26:29.528910+00:00",
+          "exitCode": 0,
+          "seconds": 0.12873187102377415,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:30.529008+00:00",
+          "finishedAt": "2026-09-08T01:26:30.654677+00:00",
+          "exitCode": 0,
+          "seconds": 0.12568523600930348,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:31.654817+00:00",
+          "finishedAt": "2026-09-08T01:26:31.781206+00:00",
+          "exitCode": 0,
+          "seconds": 0.12641220598015934,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:32.781357+00:00",
+          "finishedAt": "2026-09-08T01:26:32.914407+00:00",
+          "exitCode": 0,
+          "seconds": 0.13306671800091863,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:33.914525+00:00",
+          "finishedAt": "2026-09-08T01:26:34.041304+00:00",
+          "exitCode": 0,
+          "seconds": 0.12680051900679246,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:35.041449+00:00",
+          "finishedAt": "2026-09-08T01:26:35.174226+00:00",
+          "exitCode": 0,
+          "seconds": 0.13279658800456673,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:36.174401+00:00",
+          "finishedAt": "2026-09-08T01:26:36.321480+00:00",
+          "exitCode": 0,
+          "seconds": 0.14710000494960696,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:37.321620+00:00",
+          "finishedAt": "2026-09-08T01:26:37.471467+00:00",
+          "exitCode": 0,
+          "seconds": 0.1498648709966801,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:38.471690+00:00",
+          "finishedAt": "2026-09-08T01:26:38.605758+00:00",
+          "exitCode": 0,
+          "seconds": 0.13409139000577852,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:39.605907+00:00",
+          "finishedAt": "2026-09-08T01:26:39.735661+00:00",
+          "exitCode": 0,
+          "seconds": 0.1297703799791634,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:40.735867+00:00",
+          "finishedAt": "2026-09-08T01:26:40.872533+00:00",
+          "exitCode": 0,
+          "seconds": 0.13667737698415294,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:41.872634+00:00",
+          "finishedAt": "2026-09-08T01:26:42.026502+00:00",
+          "exitCode": 0,
+          "seconds": 0.15388587402412668,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:43.026653+00:00",
+          "finishedAt": "2026-09-08T01:26:43.159921+00:00",
+          "exitCode": 0,
+          "seconds": 0.13328616105718538,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:44.160059+00:00",
+          "finishedAt": "2026-09-08T01:26:44.327667+00:00",
+          "exitCode": 0,
+          "seconds": 0.16763517598155886,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:45.327800+00:00",
+          "finishedAt": "2026-09-08T01:26:45.453962+00:00",
+          "exitCode": 0,
+          "seconds": 0.1261787959956564,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:46.454112+00:00",
+          "finishedAt": "2026-09-08T01:26:46.583566+00:00",
+          "exitCode": 0,
+          "seconds": 0.1294682399602607,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:47.583681+00:00",
+          "finishedAt": "2026-09-08T01:26:47.714620+00:00",
+          "exitCode": 0,
+          "seconds": 0.13095280999550596,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:48.714753+00:00",
+          "finishedAt": "2026-09-08T01:26:48.842436+00:00",
+          "exitCode": 0,
+          "seconds": 0.12769922299776226,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:49.842560+00:00",
+          "finishedAt": "2026-09-08T01:26:49.983284+00:00",
+          "exitCode": 0,
+          "seconds": 0.1407372439862229,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:50.983396+00:00",
+          "finishedAt": "2026-09-08T01:26:51.122069+00:00",
+          "exitCode": 0,
+          "seconds": 0.1386867570108734,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:52.122194+00:00",
+          "finishedAt": "2026-09-08T01:26:52.255599+00:00",
+          "exitCode": 0,
+          "seconds": 0.13341892103198916,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:53.255714+00:00",
+          "finishedAt": "2026-09-08T01:26:53.397560+00:00",
+          "exitCode": 0,
+          "seconds": 0.14186017197789624,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:54.397682+00:00",
+          "finishedAt": "2026-09-08T01:26:54.514877+00:00",
+          "exitCode": 0,
+          "seconds": 0.11720966902794316,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:55.514996+00:00",
+          "finishedAt": "2026-09-08T01:26:55.657990+00:00",
+          "exitCode": 0,
+          "seconds": 0.14300942898262292,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:56.658141+00:00",
+          "finishedAt": "2026-09-08T01:26:56.796241+00:00",
+          "exitCode": 0,
+          "seconds": 0.13811733201146126,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "exec",
+          "windows": 2022,
+          "exitCode": 0,
+          "seconds": 0.391615784028545,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "exec",
+          "windows": 2025,
+          "exitCode": 0,
+          "seconds": 0.29506798600777984,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:12.367826+00:00",
+          "finishedAt": "2026-09-08T01:26:12.512802+00:00",
+          "exitCode": 0,
+          "seconds": 0.14499056804925203,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:13.512953+00:00",
+          "finishedAt": "2026-09-08T01:26:13.643151+00:00",
+          "exitCode": 0,
+          "seconds": 0.13021506898803636,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:14.643260+00:00",
+          "finishedAt": "2026-09-08T01:26:14.773981+00:00",
+          "exitCode": 0,
+          "seconds": 0.13072897004894912,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:15.774118+00:00",
+          "finishedAt": "2026-09-08T01:26:15.905252+00:00",
+          "exitCode": 0,
+          "seconds": 0.13114669697824866,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:16.905381+00:00",
+          "finishedAt": "2026-09-08T01:26:17.038609+00:00",
+          "exitCode": 0,
+          "seconds": 0.1332510260399431,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:18.038752+00:00",
+          "finishedAt": "2026-09-08T01:26:18.189805+00:00",
+          "exitCode": 0,
+          "seconds": 0.15107194799929857,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:19.189961+00:00",
+          "finishedAt": "2026-09-08T01:26:19.347647+00:00",
+          "exitCode": 0,
+          "seconds": 0.15770333498949185,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:20.347799+00:00",
+          "finishedAt": "2026-09-08T01:26:20.463967+00:00",
+          "exitCode": 0,
+          "seconds": 0.11619149905163795,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:21.464086+00:00",
+          "finishedAt": "2026-09-08T01:26:21.602476+00:00",
+          "exitCode": 0,
+          "seconds": 0.1384027719614096,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:22.602584+00:00",
+          "finishedAt": "2026-09-08T01:26:22.735726+00:00",
+          "exitCode": 0,
+          "seconds": 0.1331571990158409,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:23.735852+00:00",
+          "finishedAt": "2026-09-08T01:26:23.868457+00:00",
+          "exitCode": 0,
+          "seconds": 0.13262171897804365,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:24.868569+00:00",
+          "finishedAt": "2026-09-08T01:26:25.012786+00:00",
+          "exitCode": 0,
+          "seconds": 0.14422526396811008,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:26.012961+00:00",
+          "finishedAt": "2026-09-08T01:26:26.133348+00:00",
+          "exitCode": 0,
+          "seconds": 0.12039575900416821,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:27.133522+00:00",
+          "finishedAt": "2026-09-08T01:26:27.261544+00:00",
+          "exitCode": 0,
+          "seconds": 0.12803883501328528,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:28.261678+00:00",
+          "finishedAt": "2026-09-08T01:26:28.400576+00:00",
+          "exitCode": 0,
+          "seconds": 0.13890950800850987,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:29.400684+00:00",
+          "finishedAt": "2026-09-08T01:26:29.527527+00:00",
+          "exitCode": 0,
+          "seconds": 0.1268577369628474,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:30.527651+00:00",
+          "finishedAt": "2026-09-08T01:26:30.658354+00:00",
+          "exitCode": 0,
+          "seconds": 0.1307170059881173,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:31.658468+00:00",
+          "finishedAt": "2026-09-08T01:26:31.784830+00:00",
+          "exitCode": 0,
+          "seconds": 0.12637822196120396,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:32.784953+00:00",
+          "finishedAt": "2026-09-08T01:26:32.913101+00:00",
+          "exitCode": 0,
+          "seconds": 0.1281642810208723,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:33.913230+00:00",
+          "finishedAt": "2026-09-08T01:26:34.042390+00:00",
+          "exitCode": 0,
+          "seconds": 0.12917604902759194,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:35.042521+00:00",
+          "finishedAt": "2026-09-08T01:26:35.174395+00:00",
+          "exitCode": 0,
+          "seconds": 0.13189074001275003,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:36.174567+00:00",
+          "finishedAt": "2026-09-08T01:26:36.323037+00:00",
+          "exitCode": 0,
+          "seconds": 0.14848563901614398,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:37.323200+00:00",
+          "finishedAt": "2026-09-08T01:26:37.471394+00:00",
+          "exitCode": 0,
+          "seconds": 0.14820824598427862,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:38.471594+00:00",
+          "finishedAt": "2026-09-08T01:26:38.608878+00:00",
+          "exitCode": 0,
+          "seconds": 0.1372962649911642,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:39.608980+00:00",
+          "finishedAt": "2026-09-08T01:26:39.735731+00:00",
+          "exitCode": 0,
+          "seconds": 0.1267599820275791,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:40.735945+00:00",
+          "finishedAt": "2026-09-08T01:26:40.871421+00:00",
+          "exitCode": 0,
+          "seconds": 0.13549280300503597,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:41.871569+00:00",
+          "finishedAt": "2026-09-08T01:26:42.031438+00:00",
+          "exitCode": 0,
+          "seconds": 0.15989194298163056,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:43.031569+00:00",
+          "finishedAt": "2026-09-08T01:26:43.157954+00:00",
+          "exitCode": 0,
+          "seconds": 0.1264027579454705,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:44.158091+00:00",
+          "finishedAt": "2026-09-08T01:26:44.323075+00:00",
+          "exitCode": 0,
+          "seconds": 0.16500552697107196,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:45.323207+00:00",
+          "finishedAt": "2026-09-08T01:26:45.455748+00:00",
+          "exitCode": 0,
+          "seconds": 0.1325583680300042,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:46.455876+00:00",
+          "finishedAt": "2026-09-08T01:26:46.580770+00:00",
+          "exitCode": 0,
+          "seconds": 0.12491195602342486,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:47.580897+00:00",
+          "finishedAt": "2026-09-08T01:26:47.713124+00:00",
+          "exitCode": 0,
+          "seconds": 0.13224623899441212,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:48.713280+00:00",
+          "finishedAt": "2026-09-08T01:26:48.842773+00:00",
+          "exitCode": 0,
+          "seconds": 0.1295047490275465,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:49.842874+00:00",
+          "finishedAt": "2026-09-08T01:26:49.982985+00:00",
+          "exitCode": 0,
+          "seconds": 0.14012665202608332,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:50.983077+00:00",
+          "finishedAt": "2026-09-08T01:26:51.121750+00:00",
+          "exitCode": 0,
+          "seconds": 0.13869246799731627,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:52.121879+00:00",
+          "finishedAt": "2026-09-08T01:26:52.253375+00:00",
+          "exitCode": 0,
+          "seconds": 0.13151449896395206,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:53.253583+00:00",
+          "finishedAt": "2026-09-08T01:26:53.387733+00:00",
+          "exitCode": 0,
+          "seconds": 0.13416624098317698,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:54.387861+00:00",
+          "finishedAt": "2026-09-08T01:26:54.509716+00:00",
+          "exitCode": 0,
+          "seconds": 0.12187338504008949,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:55.509864+00:00",
+          "finishedAt": "2026-09-08T01:26:55.651994+00:00",
+          "exitCode": 0,
+          "seconds": 0.14214964798884466,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:56.652140+00:00",
+          "finishedAt": "2026-09-08T01:26:56.794809+00:00",
+          "exitCode": 0,
+          "seconds": 0.1426812909776345,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "exec",
+          "windows": 2022,
+          "exitCode": 0,
+          "seconds": 0.3857267970452085,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "exec",
+          "windows": 2025,
+          "exitCode": 0,
+          "seconds": 0.3011294989846647,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:12.368026+00:00",
+          "finishedAt": "2026-09-08T01:26:12.504566+00:00",
+          "exitCode": 0,
+          "seconds": 0.13655097997980192,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:13.504682+00:00",
+          "finishedAt": "2026-09-08T01:26:13.634985+00:00",
+          "exitCode": 0,
+          "seconds": 0.13031224301084876,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:14.635062+00:00",
+          "finishedAt": "2026-09-08T01:26:14.777133+00:00",
+          "exitCode": 0,
+          "seconds": 0.1420839159982279,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:15.777233+00:00",
+          "finishedAt": "2026-09-08T01:26:15.906918+00:00",
+          "exitCode": 0,
+          "seconds": 0.12970359501196072,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:16.907070+00:00",
+          "finishedAt": "2026-09-08T01:26:17.044603+00:00",
+          "exitCode": 0,
+          "seconds": 0.1375413479981944,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:18.044696+00:00",
+          "finishedAt": "2026-09-08T01:26:18.194546+00:00",
+          "exitCode": 0,
+          "seconds": 0.1498639690107666,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:19.194676+00:00",
+          "finishedAt": "2026-09-08T01:26:19.330579+00:00",
+          "exitCode": 0,
+          "seconds": 0.13592046999838203,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:20.330699+00:00",
+          "finishedAt": "2026-09-08T01:26:20.457599+00:00",
+          "exitCode": 0,
+          "seconds": 0.1269168080179952,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:21.457722+00:00",
+          "finishedAt": "2026-09-08T01:26:21.598001+00:00",
+          "exitCode": 0,
+          "seconds": 0.14029017195571214,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:22.598064+00:00",
+          "finishedAt": "2026-09-08T01:26:22.727095+00:00",
+          "exitCode": 0,
+          "seconds": 0.12905274698277935,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:23.727253+00:00",
+          "finishedAt": "2026-09-08T01:26:23.864709+00:00",
+          "exitCode": 0,
+          "seconds": 0.1374717159778811,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:24.864831+00:00",
+          "finishedAt": "2026-09-08T01:26:25.000138+00:00",
+          "exitCode": 0,
+          "seconds": 0.13532376498915255,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:26.000275+00:00",
+          "finishedAt": "2026-09-08T01:26:26.133409+00:00",
+          "exitCode": 0,
+          "seconds": 0.1331520690000616,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:27.133575+00:00",
+          "finishedAt": "2026-09-08T01:26:27.262709+00:00",
+          "exitCode": 0,
+          "seconds": 0.12914374901447445,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:28.262810+00:00",
+          "finishedAt": "2026-09-08T01:26:28.399297+00:00",
+          "exitCode": 0,
+          "seconds": 0.13650514296023175,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:29.399429+00:00",
+          "finishedAt": "2026-09-08T01:26:29.528064+00:00",
+          "exitCode": 0,
+          "seconds": 0.1286470820195973,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:30.528175+00:00",
+          "finishedAt": "2026-09-08T01:26:30.661859+00:00",
+          "exitCode": 0,
+          "seconds": 0.13370008202036843,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:31.661989+00:00",
+          "finishedAt": "2026-09-08T01:26:31.788145+00:00",
+          "exitCode": 0,
+          "seconds": 0.12617200397653505,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:32.788224+00:00",
+          "finishedAt": "2026-09-08T01:26:32.918013+00:00",
+          "exitCode": 0,
+          "seconds": 0.12979838298633695,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:33.918161+00:00",
+          "finishedAt": "2026-09-08T01:26:34.041965+00:00",
+          "exitCode": 0,
+          "seconds": 0.12381486699450761,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:35.042104+00:00",
+          "finishedAt": "2026-09-08T01:26:35.192603+00:00",
+          "exitCode": 0,
+          "seconds": 0.15051482600392774,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:36.192766+00:00",
+          "finishedAt": "2026-09-08T01:26:36.329920+00:00",
+          "exitCode": 0,
+          "seconds": 0.13717489497503266,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:37.330055+00:00",
+          "finishedAt": "2026-09-08T01:26:37.473736+00:00",
+          "exitCode": 0,
+          "seconds": 0.143700834014453,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:38.473839+00:00",
+          "finishedAt": "2026-09-08T01:26:38.608760+00:00",
+          "exitCode": 0,
+          "seconds": 0.13493423000909388,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:39.608878+00:00",
+          "finishedAt": "2026-09-08T01:26:39.735406+00:00",
+          "exitCode": 0,
+          "seconds": 0.1265515389968641,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:40.735637+00:00",
+          "finishedAt": "2026-09-08T01:26:40.873549+00:00",
+          "exitCode": 0,
+          "seconds": 0.13792879797983915,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:41.873680+00:00",
+          "finishedAt": "2026-09-08T01:26:42.028313+00:00",
+          "exitCode": 0,
+          "seconds": 0.15465089702047408,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:43.028450+00:00",
+          "finishedAt": "2026-09-08T01:26:43.158960+00:00",
+          "exitCode": 0,
+          "seconds": 0.13052207796135917,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:44.159102+00:00",
+          "finishedAt": "2026-09-08T01:26:44.338117+00:00",
+          "exitCode": 0,
+          "seconds": 0.17902817501453683,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:45.338245+00:00",
+          "finishedAt": "2026-09-08T01:26:45.458089+00:00",
+          "exitCode": 0,
+          "seconds": 0.11985944694606587,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:46.458202+00:00",
+          "finishedAt": "2026-09-08T01:26:46.576790+00:00",
+          "exitCode": 0,
+          "seconds": 0.11860801698639989,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:47.576998+00:00",
+          "finishedAt": "2026-09-08T01:26:47.715909+00:00",
+          "exitCode": 0,
+          "seconds": 0.13892372301779687,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:48.716013+00:00",
+          "finishedAt": "2026-09-08T01:26:48.839830+00:00",
+          "exitCode": 0,
+          "seconds": 0.12383565603522584,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:49.839971+00:00",
+          "finishedAt": "2026-09-08T01:26:49.983417+00:00",
+          "exitCode": 0,
+          "seconds": 0.1434563819784671,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:50.983599+00:00",
+          "finishedAt": "2026-09-08T01:26:51.126288+00:00",
+          "exitCode": 0,
+          "seconds": 0.14269882399821654,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:52.126398+00:00",
+          "finishedAt": "2026-09-08T01:26:52.253244+00:00",
+          "exitCode": 0,
+          "seconds": 0.12686326599214226,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:53.253392+00:00",
+          "finishedAt": "2026-09-08T01:26:53.386714+00:00",
+          "exitCode": 0,
+          "seconds": 0.13334053294965997,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:54.386857+00:00",
+          "finishedAt": "2026-09-08T01:26:54.509829+00:00",
+          "exitCode": 0,
+          "seconds": 0.12298780697165057,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:55.509958+00:00",
+          "finishedAt": "2026-09-08T01:26:55.649177+00:00",
+          "exitCode": 0,
+          "seconds": 0.13924029003828764,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:26:56.649325+00:00",
+          "finishedAt": "2026-09-08T01:26:56.793989+00:00",
+          "exitCode": 0,
+          "seconds": 0.1446856709662825,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "exec",
+          "windows": 2022,
+          "exitCode": 0,
+          "seconds": 0.3889877780457027,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "exec",
+          "windows": 2025,
+          "exitCode": 0,
+          "seconds": 0.2964244639733806,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        }
+      ]
+    },
+    "daemonset-migration": {
+      "admissionChecks": 120,
+      "execChecks": 6,
+      "failed": [],
+      "observations": [
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:11.812849+00:00",
+          "finishedAt": "2026-09-08T01:30:12.005633+00:00",
+          "exitCode": 0,
+          "seconds": 0.19281132001196966,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:13.005774+00:00",
+          "finishedAt": "2026-09-08T01:30:13.160807+00:00",
+          "exitCode": 0,
+          "seconds": 0.15505692997248843,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:14.160950+00:00",
+          "finishedAt": "2026-09-08T01:30:14.296342+00:00",
+          "exitCode": 0,
+          "seconds": 0.13540872995508835,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:15.296453+00:00",
+          "finishedAt": "2026-09-08T01:30:15.434392+00:00",
+          "exitCode": 0,
+          "seconds": 0.13795576902339235,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:16.434518+00:00",
+          "finishedAt": "2026-09-08T01:30:16.566714+00:00",
+          "exitCode": 0,
+          "seconds": 0.13220921903848648,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:17.566818+00:00",
+          "finishedAt": "2026-09-08T01:30:17.686240+00:00",
+          "exitCode": 0,
+          "seconds": 0.119434566993732,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:18.686367+00:00",
+          "finishedAt": "2026-09-08T01:30:18.811283+00:00",
+          "exitCode": 0,
+          "seconds": 0.12493455701041967,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:19.811421+00:00",
+          "finishedAt": "2026-09-08T01:30:19.925946+00:00",
+          "exitCode": 0,
+          "seconds": 0.11453854700084776,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:20.926061+00:00",
+          "finishedAt": "2026-09-08T01:30:21.059512+00:00",
+          "exitCode": 0,
+          "seconds": 0.13346702902344987,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:22.059647+00:00",
+          "finishedAt": "2026-09-08T01:30:22.205884+00:00",
+          "exitCode": 0,
+          "seconds": 0.14625774399610236,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:23.206030+00:00",
+          "finishedAt": "2026-09-08T01:30:23.323425+00:00",
+          "exitCode": 0,
+          "seconds": 0.1174136070185341,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:24.323552+00:00",
+          "finishedAt": "2026-09-08T01:30:24.448844+00:00",
+          "exitCode": 0,
+          "seconds": 0.12530744599644095,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:25.448960+00:00",
+          "finishedAt": "2026-09-08T01:30:25.584832+00:00",
+          "exitCode": 0,
+          "seconds": 0.13589129300089553,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:26.584971+00:00",
+          "finishedAt": "2026-09-08T01:30:26.737066+00:00",
+          "exitCode": 0,
+          "seconds": 0.15211649402044713,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:27.737250+00:00",
+          "finishedAt": "2026-09-08T01:30:27.872573+00:00",
+          "exitCode": 0,
+          "seconds": 0.13533694302896038,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:28.872776+00:00",
+          "finishedAt": "2026-09-08T01:30:29.010970+00:00",
+          "exitCode": 0,
+          "seconds": 0.13820745999692008,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:30.011151+00:00",
+          "finishedAt": "2026-09-08T01:30:30.159542+00:00",
+          "exitCode": 0,
+          "seconds": 0.14840867900056764,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:31.159666+00:00",
+          "finishedAt": "2026-09-08T01:30:31.306033+00:00",
+          "exitCode": 0,
+          "seconds": 0.1463741369661875,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:32.306181+00:00",
+          "finishedAt": "2026-09-08T01:30:32.451376+00:00",
+          "exitCode": 0,
+          "seconds": 0.14520508999703452,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:33.451482+00:00",
+          "finishedAt": "2026-09-08T01:30:33.590950+00:00",
+          "exitCode": 0,
+          "seconds": 0.13948241400066763,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:34.591140+00:00",
+          "finishedAt": "2026-09-08T01:30:34.741219+00:00",
+          "exitCode": 0,
+          "seconds": 0.15010118699865416,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:35.741368+00:00",
+          "finishedAt": "2026-09-08T01:30:35.868682+00:00",
+          "exitCode": 0,
+          "seconds": 0.12732758704805747,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:36.868792+00:00",
+          "finishedAt": "2026-09-08T01:30:36.998953+00:00",
+          "exitCode": 0,
+          "seconds": 0.13018252502661198,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:37.999075+00:00",
+          "finishedAt": "2026-09-08T01:30:38.129772+00:00",
+          "exitCode": 0,
+          "seconds": 0.1307083360152319,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:39.129863+00:00",
+          "finishedAt": "2026-09-08T01:30:39.257899+00:00",
+          "exitCode": 0,
+          "seconds": 0.12804474995937198,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:40.258004+00:00",
+          "finishedAt": "2026-09-08T01:30:40.380183+00:00",
+          "exitCode": 0,
+          "seconds": 0.12219484499655664,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:41.380330+00:00",
+          "finishedAt": "2026-09-08T01:30:41.506376+00:00",
+          "exitCode": 0,
+          "seconds": 0.12606567202601582,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:42.506535+00:00",
+          "finishedAt": "2026-09-08T01:30:42.636844+00:00",
+          "exitCode": 0,
+          "seconds": 0.13032526103779674,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:43.636974+00:00",
+          "finishedAt": "2026-09-08T01:30:43.786010+00:00",
+          "exitCode": 0,
+          "seconds": 0.14905483304755762,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:44.786200+00:00",
+          "finishedAt": "2026-09-08T01:30:44.917307+00:00",
+          "exitCode": 0,
+          "seconds": 0.1311247469857335,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:45.917440+00:00",
+          "finishedAt": "2026-09-08T01:30:46.056788+00:00",
+          "exitCode": 0,
+          "seconds": 0.1393655010033399,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:47.056891+00:00",
+          "finishedAt": "2026-09-08T01:30:47.202577+00:00",
+          "exitCode": 0,
+          "seconds": 0.14570517098763958,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:48.202712+00:00",
+          "finishedAt": "2026-09-08T01:30:48.361696+00:00",
+          "exitCode": 0,
+          "seconds": 0.1590082829934545,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:49.361860+00:00",
+          "finishedAt": "2026-09-08T01:30:49.490759+00:00",
+          "exitCode": 0,
+          "seconds": 0.12892206199467182,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:50.490892+00:00",
+          "finishedAt": "2026-09-08T01:30:50.613155+00:00",
+          "exitCode": 0,
+          "seconds": 0.12227494799299166,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:51.613259+00:00",
+          "finishedAt": "2026-09-08T01:30:51.760703+00:00",
+          "exitCode": 0,
+          "seconds": 0.14746218000072986,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:52.760841+00:00",
+          "finishedAt": "2026-09-08T01:30:52.888833+00:00",
+          "exitCode": 0,
+          "seconds": 0.12800961098400876,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:53.889364+00:00",
+          "finishedAt": "2026-09-08T01:30:54.063093+00:00",
+          "exitCode": 0,
+          "seconds": 0.17374285199912265,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:55.063224+00:00",
+          "finishedAt": "2026-09-08T01:30:55.192634+00:00",
+          "exitCode": 0,
+          "seconds": 0.12942737998673692,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:56.192758+00:00",
+          "finishedAt": "2026-09-08T01:30:56.326516+00:00",
+          "exitCode": 0,
+          "seconds": 0.13377174898050725,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "exec",
+          "windows": 2022,
+          "exitCode": 0,
+          "seconds": 0.3931011470267549,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "kind": "exec",
+          "windows": 2025,
+          "exitCode": 0,
+          "seconds": 0.2608558170031756,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:11.813079+00:00",
+          "finishedAt": "2026-09-08T01:30:11.983851+00:00",
+          "exitCode": 0,
+          "seconds": 0.17078307404881343,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:12.983962+00:00",
+          "finishedAt": "2026-09-08T01:30:13.151379+00:00",
+          "exitCode": 0,
+          "seconds": 0.1674352689879015,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:14.151527+00:00",
+          "finishedAt": "2026-09-08T01:30:14.292506+00:00",
+          "exitCode": 0,
+          "seconds": 0.14099853602238,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:15.292617+00:00",
+          "finishedAt": "2026-09-08T01:30:15.422586+00:00",
+          "exitCode": 0,
+          "seconds": 0.1299872810486704,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:16.422712+00:00",
+          "finishedAt": "2026-09-08T01:30:16.561906+00:00",
+          "exitCode": 0,
+          "seconds": 0.13921204098733142,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:17.562040+00:00",
+          "finishedAt": "2026-09-08T01:30:17.683984+00:00",
+          "exitCode": 0,
+          "seconds": 0.12196192797273397,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:18.684157+00:00",
+          "finishedAt": "2026-09-08T01:30:18.808808+00:00",
+          "exitCode": 0,
+          "seconds": 0.12466941896127537,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:19.808943+00:00",
+          "finishedAt": "2026-09-08T01:30:19.922241+00:00",
+          "exitCode": 0,
+          "seconds": 0.11331340397009626,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:20.922355+00:00",
+          "finishedAt": "2026-09-08T01:30:21.048551+00:00",
+          "exitCode": 0,
+          "seconds": 0.1262150370166637,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:22.048684+00:00",
+          "finishedAt": "2026-09-08T01:30:22.181258+00:00",
+          "exitCode": 0,
+          "seconds": 0.13258509302977473,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:23.181363+00:00",
+          "finishedAt": "2026-09-08T01:30:23.311896+00:00",
+          "exitCode": 0,
+          "seconds": 0.13054897700203583,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:24.312035+00:00",
+          "finishedAt": "2026-09-08T01:30:24.443728+00:00",
+          "exitCode": 0,
+          "seconds": 0.13171262602554634,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:25.443863+00:00",
+          "finishedAt": "2026-09-08T01:30:25.585242+00:00",
+          "exitCode": 0,
+          "seconds": 0.141399406013079,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:26.585393+00:00",
+          "finishedAt": "2026-09-08T01:30:26.736862+00:00",
+          "exitCode": 0,
+          "seconds": 0.15149742900393903,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:27.737081+00:00",
+          "finishedAt": "2026-09-08T01:30:27.873706+00:00",
+          "exitCode": 0,
+          "seconds": 0.13663977198302746,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:28.873809+00:00",
+          "finishedAt": "2026-09-08T01:30:29.010718+00:00",
+          "exitCode": 0,
+          "seconds": 0.13692717399680987,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:30.010862+00:00",
+          "finishedAt": "2026-09-08T01:30:30.157156+00:00",
+          "exitCode": 0,
+          "seconds": 0.1463191810180433,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:31.157323+00:00",
+          "finishedAt": "2026-09-08T01:30:31.301223+00:00",
+          "exitCode": 0,
+          "seconds": 0.1439236699952744,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:32.301365+00:00",
+          "finishedAt": "2026-09-08T01:30:32.448339+00:00",
+          "exitCode": 0,
+          "seconds": 0.14700125600211322,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:33.448503+00:00",
+          "finishedAt": "2026-09-08T01:30:33.591718+00:00",
+          "exitCode": 0,
+          "seconds": 0.14322758401976898,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:34.591824+00:00",
+          "finishedAt": "2026-09-08T01:30:34.749945+00:00",
+          "exitCode": 0,
+          "seconds": 0.1581319139804691,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:35.750072+00:00",
+          "finishedAt": "2026-09-08T01:30:35.863190+00:00",
+          "exitCode": 0,
+          "seconds": 0.11313500697724521,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:36.863317+00:00",
+          "finishedAt": "2026-09-08T01:30:37.001330+00:00",
+          "exitCode": 0,
+          "seconds": 0.13802968699019402,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:38.001458+00:00",
+          "finishedAt": "2026-09-08T01:30:38.125785+00:00",
+          "exitCode": 0,
+          "seconds": 0.1243375200429,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:39.125969+00:00",
+          "finishedAt": "2026-09-08T01:30:39.252894+00:00",
+          "exitCode": 0,
+          "seconds": 0.12694197695236653,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:40.253044+00:00",
+          "finishedAt": "2026-09-08T01:30:40.387688+00:00",
+          "exitCode": 0,
+          "seconds": 0.134661910997238,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:41.387805+00:00",
+          "finishedAt": "2026-09-08T01:30:41.518484+00:00",
+          "exitCode": 0,
+          "seconds": 0.13069660804467276,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:42.518618+00:00",
+          "finishedAt": "2026-09-08T01:30:42.643521+00:00",
+          "exitCode": 0,
+          "seconds": 0.12491931900149211,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:43.643648+00:00",
+          "finishedAt": "2026-09-08T01:30:43.810665+00:00",
+          "exitCode": 0,
+          "seconds": 0.16703430301276967,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:44.810790+00:00",
+          "finishedAt": "2026-09-08T01:30:44.922749+00:00",
+          "exitCode": 0,
+          "seconds": 0.11197250202530995,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:45.922902+00:00",
+          "finishedAt": "2026-09-08T01:30:46.077046+00:00",
+          "exitCode": 0,
+          "seconds": 0.1541756730293855,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:47.077227+00:00",
+          "finishedAt": "2026-09-08T01:30:47.206170+00:00",
+          "exitCode": 0,
+          "seconds": 0.12896079203346744,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:48.206294+00:00",
+          "finishedAt": "2026-09-08T01:30:48.344971+00:00",
+          "exitCode": 0,
+          "seconds": 0.13869749999139458,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:49.345238+00:00",
+          "finishedAt": "2026-09-08T01:30:49.484837+00:00",
+          "exitCode": 0,
+          "seconds": 0.1396200240124017,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:50.484973+00:00",
+          "finishedAt": "2026-09-08T01:30:50.609469+00:00",
+          "exitCode": 0,
+          "seconds": 0.12450870702741668,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:51.609574+00:00",
+          "finishedAt": "2026-09-08T01:30:51.756756+00:00",
+          "exitCode": 0,
+          "seconds": 0.14719639101531357,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:52.756877+00:00",
+          "finishedAt": "2026-09-08T01:30:52.888603+00:00",
+          "exitCode": 0,
+          "seconds": 0.13174070499371737,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:53.888823+00:00",
+          "finishedAt": "2026-09-08T01:30:54.046987+00:00",
+          "exitCode": 0,
+          "seconds": 0.1581839799764566,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:55.047148+00:00",
+          "finishedAt": "2026-09-08T01:30:55.190964+00:00",
+          "exitCode": 0,
+          "seconds": 0.14383274299325421,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:56.191082+00:00",
+          "finishedAt": "2026-09-08T01:30:56.326595+00:00",
+          "exitCode": 0,
+          "seconds": 0.13553470402257517,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "exec",
+          "windows": 2022,
+          "exitCode": 0,
+          "seconds": 0.38725584797794,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "kind": "exec",
+          "windows": 2025,
+          "exitCode": 0,
+          "seconds": 0.26749659195775166,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:11.813709+00:00",
+          "finishedAt": "2026-09-08T01:30:11.982618+00:00",
+          "exitCode": 0,
+          "seconds": 0.16892958799144253,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:12.982768+00:00",
+          "finishedAt": "2026-09-08T01:30:13.112307+00:00",
+          "exitCode": 0,
+          "seconds": 0.12955845100805163,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:14.112443+00:00",
+          "finishedAt": "2026-09-08T01:30:14.250766+00:00",
+          "exitCode": 0,
+          "seconds": 0.13834358705207705,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:15.250904+00:00",
+          "finishedAt": "2026-09-08T01:30:15.387309+00:00",
+          "exitCode": 0,
+          "seconds": 0.13642850797623396,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:16.387450+00:00",
+          "finishedAt": "2026-09-08T01:30:16.519888+00:00",
+          "exitCode": 0,
+          "seconds": 0.13245787599589676,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:17.520035+00:00",
+          "finishedAt": "2026-09-08T01:30:17.641141+00:00",
+          "exitCode": 0,
+          "seconds": 0.12113085598684847,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:18.641262+00:00",
+          "finishedAt": "2026-09-08T01:30:18.780324+00:00",
+          "exitCode": 0,
+          "seconds": 0.13908390403958037,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:19.780467+00:00",
+          "finishedAt": "2026-09-08T01:30:19.916724+00:00",
+          "exitCode": 0,
+          "seconds": 0.13627341203391552,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:20.916867+00:00",
+          "finishedAt": "2026-09-08T01:30:21.042925+00:00",
+          "exitCode": 0,
+          "seconds": 0.12608303903834894,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:22.043075+00:00",
+          "finishedAt": "2026-09-08T01:30:22.177878+00:00",
+          "exitCode": 0,
+          "seconds": 0.1348225889960304,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:23.178010+00:00",
+          "finishedAt": "2026-09-08T01:30:23.311995+00:00",
+          "exitCode": 0,
+          "seconds": 0.13399451400619,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:24.312162+00:00",
+          "finishedAt": "2026-09-08T01:30:24.450754+00:00",
+          "exitCode": 0,
+          "seconds": 0.1386004330124706,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:25.450858+00:00",
+          "finishedAt": "2026-09-08T01:30:25.585561+00:00",
+          "exitCode": 0,
+          "seconds": 0.13471149402903393,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:26.585732+00:00",
+          "finishedAt": "2026-09-08T01:30:26.738289+00:00",
+          "exitCode": 0,
+          "seconds": 0.15256943501299247,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:27.738399+00:00",
+          "finishedAt": "2026-09-08T01:30:27.872477+00:00",
+          "exitCode": 0,
+          "seconds": 0.1340949779842049,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:28.872697+00:00",
+          "finishedAt": "2026-09-08T01:30:29.012529+00:00",
+          "exitCode": 0,
+          "seconds": 0.139845198020339,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:30.012631+00:00",
+          "finishedAt": "2026-09-08T01:30:30.158764+00:00",
+          "exitCode": 0,
+          "seconds": 0.14615156600484625,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:31.158905+00:00",
+          "finishedAt": "2026-09-08T01:30:31.305911+00:00",
+          "exitCode": 0,
+          "seconds": 0.14702647196827456,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:32.306078+00:00",
+          "finishedAt": "2026-09-08T01:30:32.450548+00:00",
+          "exitCode": 0,
+          "seconds": 0.14448717003688216,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:33.450686+00:00",
+          "finishedAt": "2026-09-08T01:30:33.590828+00:00",
+          "exitCode": 0,
+          "seconds": 0.14016001799609512,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:34.590975+00:00",
+          "finishedAt": "2026-09-08T01:30:34.729517+00:00",
+          "exitCode": 0,
+          "seconds": 0.1385732659837231,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:35.729693+00:00",
+          "finishedAt": "2026-09-08T01:30:35.857459+00:00",
+          "exitCode": 0,
+          "seconds": 0.1277844359865412,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:36.857594+00:00",
+          "finishedAt": "2026-09-08T01:30:36.987658+00:00",
+          "exitCode": 0,
+          "seconds": 0.13008315803017467,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:37.987788+00:00",
+          "finishedAt": "2026-09-08T01:30:38.125714+00:00",
+          "exitCode": 0,
+          "seconds": 0.1379431880195625,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:39.125890+00:00",
+          "finishedAt": "2026-09-08T01:30:39.256837+00:00",
+          "exitCode": 0,
+          "seconds": 0.13096100301481783,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:40.256952+00:00",
+          "finishedAt": "2026-09-08T01:30:40.388239+00:00",
+          "exitCode": 0,
+          "seconds": 0.13130116398679093,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:41.388395+00:00",
+          "finishedAt": "2026-09-08T01:30:41.526026+00:00",
+          "exitCode": 0,
+          "seconds": 0.1376502210041508,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:42.526200+00:00",
+          "finishedAt": "2026-09-08T01:30:42.643593+00:00",
+          "exitCode": 0,
+          "seconds": 0.11740426096366718,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:43.643747+00:00",
+          "finishedAt": "2026-09-08T01:30:43.810323+00:00",
+          "exitCode": 0,
+          "seconds": 0.16658812499372289,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:44.810441+00:00",
+          "finishedAt": "2026-09-08T01:30:44.922803+00:00",
+          "exitCode": 0,
+          "seconds": 0.11237356602214277,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:45.922952+00:00",
+          "finishedAt": "2026-09-08T01:30:46.057233+00:00",
+          "exitCode": 0,
+          "seconds": 0.13428928796201944,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:47.057332+00:00",
+          "finishedAt": "2026-09-08T01:30:47.194569+00:00",
+          "exitCode": 0,
+          "seconds": 0.1372547650244087,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:48.194724+00:00",
+          "finishedAt": "2026-09-08T01:30:48.345297+00:00",
+          "exitCode": 0,
+          "seconds": 0.1505866110092029,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:49.345402+00:00",
+          "finishedAt": "2026-09-08T01:30:49.475829+00:00",
+          "exitCode": 0,
+          "seconds": 0.1304448649752885,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:50.475978+00:00",
+          "finishedAt": "2026-09-08T01:30:50.607996+00:00",
+          "exitCode": 0,
+          "seconds": 0.1320373610360548,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:51.608159+00:00",
+          "finishedAt": "2026-09-08T01:30:51.760954+00:00",
+          "exitCode": 0,
+          "seconds": 0.15280834102304652,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:52.761090+00:00",
+          "finishedAt": "2026-09-08T01:30:52.888466+00:00",
+          "exitCode": 0,
+          "seconds": 0.1273924609995447,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:53.888620+00:00",
+          "finishedAt": "2026-09-08T01:30:54.054127+00:00",
+          "exitCode": 0,
+          "seconds": 0.16552617395063862,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:55.054253+00:00",
+          "finishedAt": "2026-09-08T01:30:55.191458+00:00",
+          "exitCode": 0,
+          "seconds": 0.1372181969927624,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "admission",
+          "startedAt": "2026-09-08T01:30:56.191562+00:00",
+          "finishedAt": "2026-09-08T01:30:56.325592+00:00",
+          "exitCode": 0,
+          "seconds": 0.13404249801533297,
+          "stdout": "machine.cluster.x-k8s.io/aws-win2022-v3 patched\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "exec",
+          "windows": 2022,
+          "exitCode": 0,
+          "seconds": 0.38962757599074394,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "kind": "exec",
+          "windows": 2025,
+          "exitCode": 0,
+          "seconds": 0.26705603301525116,
+          "stdout": "konnectivity-check\n",
+          "stderr": ""
+        }
+      ]
+    }
+  },
+  "finalAddon": {
+    "name": "cldt-konnectivity-default-route-linux",
+    "uid": "43c21e55-7d8d-4cb3-aeda-550204d93f44",
+    "desired": 2,
+    "ready": 2,
+    "nodes": [
+      "cp2",
+      "cp3"
+    ],
+    "serverConnectionsPerAgent": 3,
+    "temporaryDeploymentsRemoved": true
+  },
+  "nodes": {
+    "count": 13,
+    "allReady": true
+  },
+  "coverage": {
+    "DefaultRouteAgentsStatementsPercent": 100,
+    "InstallDefaultRouteAgentsStatementsPercent": 78.6,
+    "scope": "Targeted Go unit suite only; not project-wide coverage or native runtime coverage"
+  },
+  "limitations": [
+    "Agent withdrawal used Deployment scale-to-zero, allowing graceful termination; no power loss, partition, or abrupt-process failure proof.",
+    "The generated DaemonSet was validated on an existing site; the new fresh-site lab flag has unit coverage but has not yet completed a fresh VM bringup.",
+    "Dry-run Machine updates exercise admission, not new EC2 provisioning or CAPI deletion with this addon.",
+    "No independence assumption for HTTP keepalive connections or request samples.",
+    "The original immediate baseline also passed; no quantified reduction in intermittent admission failure rate.",
+    "Old aws-win2025 exec failure from the preceding observation remains unresolved; replacement-node success is not all-node exec proof.",
+    "All-default-route-agent loss can fall back to unsuitable Windows agents.",
+    "Windows fragmentation and GPU startup reliability remain release blockers."
+  ],
+  "evidenceSHA256": {
+    "cp3-agent.json": "0ada6dc6502ab502579be075fbb08f057c7406a00ae13d09c237363781b2c7b4",
+    "cp3-metrics-before.txt": "7c496a70f62313fae202d0698ea47eb927fc86d624fdf4659fd1459ce01cd24a",
+    "cp2-loss.json": "98097d21a00d2f592421892c42a93b090e7760c52e411c0ed2cf596704669d31",
+    "cp2-pod-before.json": "19ec6b72f70b112eef3e47156d80475a54cf31c5086498cdac23308408ff778d",
+    "cp3-pod-before.json": "ace165db937d35f9ee6b45c3838cd4c9c731dd880a5f7a0aa9c7e2780b0ada6a",
+    "cp2-loss-intent.json": "23f6be4a00aa72542515d1926e97a8852d83419a5ffc6a63b6b0dab34d7b293b",
+    "cp3-sockets-during-cp2-loss.txt": "cd4e2740da237cca800d143e3ce617a13335947e1d52d1d8cd20d6ec2f0db335",
+    "cp2-metrics-restored.txt": "b4fb6103ce265872b73c27e2988a26e7411b6c2a38271221cb1202fda054956e",
+    "cp3-loss.json": "caaf4c683a558e095de6b00ab6335e834207d3ceff51bb86f0cd03467f540844",
+    "cp3-loss-intent.json": "e45aa120e25384a9dff96d2ffb1587d7e93b431b8aded2bc0736fe1638dbb7c7",
+    "cp2-sockets-during-cp3-loss.txt": "a3434280297143b3bb63e75a9bf59db9016283d025aaa4954f394fc27bf5fcd4",
+    "default-route-daemonset.json": "3f8b95feba0ee9681e8d5602933886516a5df3f88e5eaade9fcd0d910bc96ba9",
+    "daemonset-cp2-metrics.txt": "c0e6df0c5ce6982d229ea761d32d73fd7df7eec06b13917e0bc3888a5e923d8d",
+    "daemonset-cp3-metrics.txt": "b6f7590b038e41f32dbe3e4af57c1f89bfcfa2b68e238658558987a51c97ba26",
+    "daemonset-migration.json": "8236b42308a5307d9cd95feea3ce597c7c1affe9f2a4047b7bc577c2e372dc8d",
+    "daemonset-cp2-sockets.txt": "caead8b2cd3118b39c7ee4f2d889060295b466560174d318c8699b7b27ddfe29",
+    "daemonset-cp3-sockets.txt": "c8da84bf477f9df71b715364d7c90b0458dad6a7bfc1e6fe1206acd140130487",
+    "daemonset-after.json": "fc83948a3a7adb2c6d2c9b49e6b7c782bd82fb10f67d0343db809d646168ae13",
+    "nodes-after.json": "7624d2e109bff278d0c7e99526fa3372050252bdb5987efb2076d57617c57be6"
+  }
+}

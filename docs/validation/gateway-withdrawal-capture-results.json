@@ -1,0 +1,91 @@
+{
+  "scope": "Read-only reusable gateway-withdrawal recorder and changed-document acknowledgement validator",
+  "unitTests": {
+    "command": "python3 -m unittest discover -s observe -p 'test_gateway_*.py'",
+    "passed": true,
+    "tests": 11
+  },
+  "selectedCoverage": {
+    "statementLinesCovered": 69,
+    "statementLines": 93,
+    "branchesCovered": 29,
+    "branches": 37,
+    "combinedPercent": 75.38461538461539,
+    "files": {
+      "observe/gateway_capture.py": {
+        "covered_lines": 49,
+        "num_statements": 73,
+        "percent_covered": 68.93203883495146,
+        "percent_covered_display": "69",
+        "missing_lines": 24,
+        "excluded_lines": 0,
+        "num_branches": 30,
+        "num_partial_branches": 2,
+        "covered_branches": 22,
+        "missing_branches": 8
+      },
+      "observe/gateway_withdrawal.py": {
+        "covered_lines": 20,
+        "num_statements": 20,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "num_branches": 7,
+        "num_partial_branches": 0,
+        "covered_branches": 7,
+        "missing_branches": 0
+      }
+    }
+  },
+  "native": {
+    "windowsVersion": "2022",
+    "binding": {
+      "machine": "aws-win2022-staged-v1",
+      "machineUID": "4bc1d6d0-c675-4da9-8f05-1bdd08b937c4",
+      "node": "aws-win2022-staged-v1",
+      "nodeUID": "c7adc6d4-e6e6-4e15-86e1-977ef152e9f1",
+      "meshUID": "5f9d0489-30a5-4b4c-9ea6-59c272c7f8d7",
+      "secretUID": "47694906-1e06-416a-82e7-018e21e779bf",
+      "lease": "cloud-provisioning/gateway-aws-win2022-staged-v1/f15cb3bd-501c-4e65-b768-745a58d144e3/4DRG57EJZQGBNL35TDEMZC6XGS/d7f6058e4a776abf9075987f94959e5d3003526b0ea1a5e2cfed0938a4e1d0ee"
+    },
+    "result": {
+      "passed": true,
+      "checks": {
+        "sameMesh": true,
+        "sameWorkerSecret": true,
+        "stagingObserved": true,
+        "globalWithdrawalObserved": true,
+        "changedDocument": true,
+        "newDocumentPendingThenAcknowledged": true,
+        "workerAcknowledgedBeforeGlobalWithdrawal": true,
+        "ackObservedWhileProjectionStable": true,
+        "nodeReadyThroughTransition": true,
+        "withdrawalIrreversible": true,
+        "originalMachineEventuallyAbsent": true
+      },
+      "originalDocumentSHA256": "a010a77db58f7499cbe37ff94cf7bae0a29d58f54f2da1f2eb2fd5cc1cbc27bc",
+      "withdrawnDocumentSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+      "firstNewDocumentAt": "2026-09-08T14:34:20.425901+00:00",
+      "firstNewAcknowledgementAt": "2026-09-08T14:34:27.464720+00:00",
+      "globalWithdrawalAt": "2026-09-08T14:34:53.095936+00:00",
+      "samples": 303,
+      "scope": "Observed changed-document acknowledgement before global withdrawal; requires separate native traffic and provider-cleanup evidence"
+    },
+    "samplesSHA256": "8eb0704c85326724aa910a7021653cde3f4f3ec9f9fdea6a35e3e38a61690130",
+    "lifecycleReport": "windows-capi-staged-withdrawal-2022-results.json"
+  },
+  "limitations": [
+    "API snapshots are sequential; the validator requires an unchanged mesh version to bracket the acknowledgement.",
+    "Observer qualification does not establish uninterrupted application traffic. The native Windows2022 lifecycle retained failed UDP samples.",
+    "Coverage is limited to these two Python modules; the command-line transport was exercised natively but was not instrumented for coverage."
+  ],
+  "sourceSHA256": {
+    "observe/gateway_capture.py": "d33a94fdcde1c905c65941ccf91a75a39a7ba975c563bb2dfe03be4de0da5010",
+    "observe/gateway_withdrawal.py": "285359326e71f0ce723ac02e9859b57d1bc26a0d66d5baf901d27654b6e7cf03",
+    "observe/test_gateway_capture.py": "8781be2ab0cd118e036e81e4e2526a0f8442c0690e21cc9af9f7c49a1641567f",
+    "observe/test_gateway_withdrawal.py": "aea32d3cb23e7e9c05cd2a57d41fdd5be0d42f1ecf22a93b077531d05fce72ae",
+    "observe/testdata/gateway-withdrawal-native.json": "35c4c32ec34406c8fc7bbdd0d64887627ca3ab4452814f4809af117ca5757b5d",
+    "observe/testdata/gateway-withdrawal-windows2022-native.json": "355c54bdddd1f2a2e3a1bb1af5fdefbf420493f093bed1fca1c76c8af46dc168"
+  }
+}

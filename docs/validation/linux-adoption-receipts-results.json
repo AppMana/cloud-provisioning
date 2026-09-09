@@ -1,0 +1,40 @@
+{
+  "observedAt": "2026-09-08T02:32:45.173965+00:00",
+  "receipts": [
+    {
+      "machine": "aws-relay1",
+      "secretUID": "57a9d576-052c-4b30-96d3-9f81eca3aac5",
+      "resourceVersion": "829589",
+      "desiredSHA256": "0acfec42aa6646e93f60e68c92d0b62dc2a3e7f328929c0fb1eb7a103e557f73",
+      "appliedSHA256": "0acfec42aa6646e93f60e68c92d0b62dc2a3e7f328929c0fb1eb7a103e557f73",
+      "matches": true
+    },
+    {
+      "machine": "remote1",
+      "secretUID": "3de17b8c-19c0-4754-8736-6450792c38b2",
+      "resourceVersion": "829598",
+      "desiredSHA256": "7a3ca3ca8e15093685ec44063c06c925d64bfddcbc309b27c5ca9dd41f112a37",
+      "appliedSHA256": "7a3ca3ca8e15093685ec44063c06c925d64bfddcbc309b27c5ca9dd41f112a37",
+      "matches": true
+    },
+    {
+      "machine": "remote2",
+      "secretUID": "d728a410-e796-4d3c-bbd2-3795e9dc045f",
+      "resourceVersion": "829604",
+      "desiredSHA256": "69cb2151b6cbc9d8be06d8f9f3b8644f3b22d763538fce2c8400d0a47a11d2ca",
+      "appliedSHA256": "69cb2151b6cbc9d8be06d8f9f3b8644f3b22d763538fce2c8400d0a47a11d2ca",
+      "matches": true
+    }
+  ],
+  "validation": "Fresh read-only native snapshots passed the Go validator used by awsrow; no new EC2 instance was launched.",
+  "limitations": [
+    "Acknowledgment is content-bound, not attributed to the current Pod UID.",
+    "Does not prove uninterrupted peer-change traffic or cache durability.",
+    "Full AWS row with this new gate has not been rerun."
+  ],
+  "sourceHistory": "Controller convergence acknowledgment introduced in e759ea15; current content comparison retained in 87c216fa. AWS row files are untracked and have no HEAD blame.",
+  "coverage": {
+    "appliedAdoptionReceipt": 100.0,
+    "awsrowPackage": 21.9
+  }
+}

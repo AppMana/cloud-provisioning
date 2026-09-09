@@ -1,0 +1,474 @@
+{
+  "scope": "Concurrent sampled 64-byte UDP echoes through Kubernetes exec; excludes delivery between attempts and fragmented UDP qualification",
+  "operation": {
+    "victim": "cp2",
+    "initialBootID": "ecc8fd1f-d940-4c90-a0a8-0d9d58e970fe",
+    "beforeNodes": {
+      "aws-win2022-gpu": {
+        "uid": "dd54061d-491a-4b12-95a7-27393e847780",
+        "ready": true
+      },
+      "aws-win2022-v3": {
+        "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ready": true
+      },
+      "aws-win2025": {
+        "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+        "ready": true
+      },
+      "aws-win2025-gpu": {
+        "uid": "258d7b62-e774-48bc-94dc-e31ff042f585",
+        "ready": true
+      },
+      "aws-win2025-v3": {
+        "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ready": true
+      },
+      "cp": {
+        "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+        "ready": true
+      },
+      "cp2": {
+        "uid": "947de62f-0920-408c-aa31-ac80a2344128",
+        "ready": true
+      },
+      "cp3": {
+        "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+        "ready": true
+      },
+      "ip-172-29-0-9": {
+        "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+        "ready": true
+      },
+      "remote1": {
+        "uid": "8935dd28-de93-44be-a887-73110fe88c51",
+        "ready": true
+      },
+      "remote2": {
+        "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+        "ready": true
+      },
+      "w1": {
+        "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+        "ready": true
+      },
+      "w2": {
+        "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+        "ready": true
+      }
+    },
+    "startedAt": "2026-09-08T07:30:21.891024+00:00",
+    "rebootRequestExitCode": 0,
+    "finalBootID": "fcfec7b5-b67a-4ce8-914f-e2f2118a7c81",
+    "afterNodes": {
+      "aws-win2022-gpu": {
+        "uid": "dd54061d-491a-4b12-95a7-27393e847780",
+        "ready": true
+      },
+      "aws-win2022-v3": {
+        "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ready": true
+      },
+      "aws-win2025": {
+        "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+        "ready": true
+      },
+      "aws-win2025-gpu": {
+        "uid": "258d7b62-e774-48bc-94dc-e31ff042f585",
+        "ready": true
+      },
+      "aws-win2025-v3": {
+        "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ready": true
+      },
+      "cp": {
+        "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+        "ready": true
+      },
+      "cp2": {
+        "uid": "947de62f-0920-408c-aa31-ac80a2344128",
+        "ready": true
+      },
+      "cp3": {
+        "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+        "ready": true
+      },
+      "ip-172-29-0-9": {
+        "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+        "ready": true
+      },
+      "remote1": {
+        "uid": "8935dd28-de93-44be-a887-73110fe88c51",
+        "ready": true
+      },
+      "remote2": {
+        "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+        "ready": true
+      },
+      "w1": {
+        "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+        "ready": true
+      },
+      "w2": {
+        "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+        "ready": true
+      }
+    },
+    "leaseRenewTime": "2026-09-08T07:31:06.711661Z",
+    "finishedAt": "2026-09-08T07:31:08.268109+00:00",
+    "passed": true
+  },
+  "traffic": {
+    "finishedAt": "2026-09-08T07:31:21.908693+00:00",
+    "elapsedSeconds": 95.553689302993,
+    "scope": "Concurrent sampled 64-byte UDP echoes through Kubernetes exec; excludes delivery between attempts and fragmented UDP qualification",
+    "maxAllowedGapSeconds": 5,
+    "intervalSeconds": 0.1,
+    "identitiesStable": true,
+    "identityError": null,
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 1.338594978034962,
+        "attempts": 310,
+        "passed": 309,
+        "maxGapSeconds": 0.10110462800366804,
+        "maxAttemptSeconds": 1.2383046180475503,
+        "ok": false
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 1.3748909960268065,
+        "attempts": 308,
+        "passed": 308,
+        "maxGapSeconds": 0.10063146700849757,
+        "maxAttemptSeconds": 1.274655873014126,
+        "ok": true
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 1.4248830399592407,
+        "attempts": 201,
+        "passed": 199,
+        "maxGapSeconds": 0.10148782603209838,
+        "maxAttemptSeconds": 10.160121177963447,
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 1.6287457259604707,
+        "attempts": 209,
+        "passed": 206,
+        "maxGapSeconds": 0.10115067602600902,
+        "maxAttemptSeconds": 10.16028032801114,
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 1.3886770340031944,
+        "attempts": 213,
+        "passed": 209,
+        "maxGapSeconds": 0.10087268997449428,
+        "maxAttemptSeconds": 10.13868120801635,
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 1.4505432909936644,
+        "attempts": 223,
+        "passed": 220,
+        "maxGapSeconds": 0.1010108320042491,
+        "maxAttemptSeconds": 10.159318271966185,
+        "ok": false
+      }
+    ],
+    "stopRequested": true,
+    "ready": true,
+    "ok": false
+  },
+  "window": {
+    "startedAt": "2026-09-08T07:30:21.891024+00:00",
+    "finishedAt": "2026-09-08T07:31:08.268109+00:00",
+    "lanesBracketWindow": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "lanesPassed": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ],
+    "ok": false,
+    "scope": "Successful sampled survivor probes bracket the operation; gaps and latency remain in the observer report"
+  },
+  "failedSamples": [
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 151,
+      "source": "net-w1",
+      "target": "net-aws-win2022-v3",
+      "startedAt": "2026-09-08T07:30:30.130409+00:00",
+      "finishedAt": "2026-09-08T07:30:30.274618+00:00",
+      "startMonotonic": 314448.774357105,
+      "finishMonotonic": 314448.918584773,
+      "error": null
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 199,
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "startedAt": "2026-09-08T07:31:10.375377+00:00",
+      "finishedAt": "2026-09-08T07:31:10.515234+00:00",
+      "startMonotonic": 314489.019323658,
+      "finishMonotonic": 314489.159207022,
+      "error": null
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 200,
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "startedAt": "2026-09-08T07:31:10.615601+00:00",
+      "finishedAt": "2026-09-08T07:31:20.775704+00:00",
+      "startMonotonic": 314489.259547788,
+      "finishMonotonic": 314499.419668966,
+      "error": null
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 1,
+      "exactResponses": 1,
+      "responsesPresent": true,
+      "errors": [],
+      "commandExitCode": 1,
+      "sequence": 206,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "startedAt": "2026-09-08T07:31:09.523195+00:00",
+      "finishedAt": "2026-09-08T07:31:10.283454+00:00",
+      "startMonotonic": 314488.167142944,
+      "finishMonotonic": 314488.927419007,
+      "error": null
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 207,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "startedAt": "2026-09-08T07:31:10.383685+00:00",
+      "finishedAt": "2026-09-08T07:31:10.515508+00:00",
+      "startMonotonic": 314489.027632934,
+      "finishMonotonic": 314489.159468545,
+      "error": null
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 208,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "startedAt": "2026-09-08T07:31:10.615798+00:00",
+      "finishedAt": "2026-09-08T07:31:20.776070+00:00",
+      "startMonotonic": 314489.259748046,
+      "finishMonotonic": 314499.420028374,
+      "error": null
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 112,
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "startedAt": "2026-09-08T07:30:30.010374+00:00",
+      "finishedAt": "2026-09-08T07:30:30.271463+00:00",
+      "startMonotonic": 314448.654321657,
+      "finishMonotonic": 314448.915440421,
+      "error": null
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 210,
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "startedAt": "2026-09-08T07:31:10.318902+00:00",
+      "finishedAt": "2026-09-08T07:31:10.456716+00:00",
+      "startMonotonic": 314488.962848797,
+      "finishMonotonic": 314489.100689627,
+      "error": null
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 211,
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "startedAt": "2026-09-08T07:31:10.556989+00:00",
+      "finishedAt": "2026-09-08T07:31:10.686324+00:00",
+      "startMonotonic": 314489.200937107,
+      "finishMonotonic": 314489.330290767,
+      "error": null
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 212,
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "startedAt": "2026-09-08T07:31:10.786614+00:00",
+      "finishedAt": "2026-09-08T07:31:20.925270+00:00",
+      "startMonotonic": 314489.430561631,
+      "finishMonotonic": 314499.569242839,
+      "error": null
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 220,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "startedAt": "2026-09-08T07:31:10.252938+00:00",
+      "finishedAt": "2026-09-08T07:31:10.383323+00:00",
+      "startMonotonic": 314488.896880385,
+      "finishMonotonic": 314489.027289456,
+      "error": null
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 221,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "startedAt": "2026-09-08T07:31:10.483638+00:00",
+      "finishedAt": "2026-09-08T07:31:10.619118+00:00",
+      "startMonotonic": 314489.127584205,
+      "finishMonotonic": 314489.26308435,
+      "error": null
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 222,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "startedAt": "2026-09-08T07:31:10.719392+00:00",
+      "finishedAt": "2026-09-08T07:31:20.878689+00:00",
+      "startMonotonic": 314489.363339123,
+      "finishMonotonic": 314499.522657395,
+      "error": null
+    }
+  ],
+  "interpretation": "VM recovered with the same Node identity. Survivor observation failed: commands returned exit 1, including one exact echo with nonzero exit. Missing stdout cannot distinguish packet loss from Kubernetes exec failure. Original observer discarded stderr; subsequent observer preserves it.",
+  "artifactSHA256": {
+    "initial.json": "85fd79204fb7b10347270b1f9493d9aea5dc423ae4ea917ff1c69a533ae94986",
+    "lane-00.jsonl": "da0d0fddfea6dbe7851a624de1be059331e4f54264d304bb64f8be53bf8d60b9",
+    "lane-01.jsonl": "4b5df0a8c1334de6c0022b6ad0d1aae216ecab7e11dda3ebd3466a1d9acdcda2",
+    "lane-02.jsonl": "bbb9c25ca5dc8e5371223e312ea0659ca33adead3453c59c55ae490638ae2c95",
+    "lane-03.jsonl": "cf6ceacd433e750134815b0b7dc8a0b4b13fc99341fdb36c61f646fd6df6c262",
+    "lane-04.jsonl": "52073ff8f0825721fd2a8b4f9af9eac53f9b8bb27406080ea4249dac36ac20b5",
+    "lane-05.jsonl": "e7284103da6f61ac5fc86d547eb27713b46525d9c01243c941c668dfe3b3f712",
+    "READY.json": "82f33d3bb869277c2beaf32d8ece28006e16ba61504c521d63c1ffadc15b3b9b",
+    "operation-start.json": "afb11bb87aea0f9dec922bfcb3bf956b3471320c07ff5a46d12a3954f3128765",
+    "operation.json": "515c1cc47073c839c2e1b0d63209ba9bd4aeff0a5dbc42ead5ad33ceb1107782",
+    "STOP": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "result.json": "fa5ecdf152cbf852db87814db49af869abc321bdcd4ec7bdbf20d51ac4b5aa3c",
+    "window.json": "3bb2ccacf6233cfff16bf906dc2c47c93899bee4939ad41cdcb2ced9242733f7"
+  },
+  "remaining": [
+    "Repeat with executor diagnostics and independent VM management observation to distinguish data-plane failures from API exec transport",
+    "CAPI addition/removal/replacement under sustained survivor traffic",
+    "Fragmented UDP remains unqualified"
+  ],
+  "diagnosticRepeat": "survivor-cp2-reboot-diagnostics-results.json"
+}

@@ -72,11 +72,12 @@ type Network struct {
 
 // Names of the networks understood here.
 const (
-	Calico       = "calico"
-	Cilium       = "cilium"
-	Flannel      = "flannel"
-	KubeRouter   = "kube-router"
-	Unrecognised = "unknown"
+	Calico        = "calico"
+	Cilium        = "cilium"
+	Flannel       = "flannel"
+	KubeRouter    = "kube-router"
+	OVNKubernetes = "ovn-kubernetes"
+	Unrecognised  = "unknown"
 )
 
 var (
@@ -92,6 +93,22 @@ var (
 // recognised by that, and only a cluster with none of them falls through
 // to the per node allocations the controller manager writes.
 func Detect(ctx context.Context, c client.Reader) (Network, error) {
+	// The distribution operator explicitly names the selected network. This
+	// must precede discovery from CRDs left by older standalone installations.
+	if n, ok, err := detectOVN(ctx, c); err != nil {
+		return Network{}, err
+	} else if ok {
+		return n, nil
+	}
+	// Canal first, ahead of Calico: canal installs calico's CRDs and
+	// pools for its policy engine while pods route by flannel's
+	// vxlan, so the pool check would classify it as native calico and
+	// model routes the network does not have.
+	if n, ok, err := detectCanal(ctx, c); err != nil {
+		return Network{}, err
+	} else if ok {
+		return n, nil
+	}
 	if n, ok, err := detectCalico(ctx, c); err != nil {
 		return Network{}, err
 	} else if ok {
@@ -113,6 +130,22 @@ func Detect(ctx context.Context, c client.Reader) (Network, error) {
 		return n, nil
 	}
 	return Network{Name: Unrecognised, Encapsulation: Unknown, Detail: "no recognised network configuration"}, nil
+}
+
+func detectOVN(ctx context.Context, c client.Reader) (Network, bool, error) {
+	config := &unstructured.Unstructured{}
+	config.SetGroupVersionKind(schema.GroupVersionKind{Group: "operator.openshift.io", Version: "v1", Kind: "Network"})
+	if err := c.Get(ctx, types.NamespacedName{Name: "cluster"}, config); err != nil {
+		if meaningfulError(err) {
+			return Network{}, false, fmt.Errorf("reading distribution network configuration: %w", err)
+		}
+		return Network{}, false, nil
+	}
+	kind, _, _ := unstructured.NestedString(config.Object, "spec", "defaultNetwork", "type")
+	if kind != "OVNKubernetes" {
+		return Network{}, false, nil
+	}
+	return Network{Name: OVNKubernetes, Encapsulation: Encapsulated, Detail: "distribution-managed OVN Geneve"}, true, nil
 }
 
 // detectCalico reads the encapsulation off the IP pools. A pool encapsulates
@@ -180,6 +213,39 @@ func ciliumTunnelDetail(cm *corev1.ConfigMap) string {
 	return "tunnel-protocol=vxlan"
 }
 
+// detectCanal recognises canal by its DaemonSet: flannel carrying
+// calico's policy engine, deployed under the name canal (or RKE2's
+// rke2-canal). It must run before the calico check, because canal's
+// pools exist for policy while pods route by flannel; the
+// encapsulation follows flannel's backend, vxlan unless canal's own
+// config says otherwise.
+func detectCanal(ctx context.Context, c client.Reader) (Network, bool, error) {
+	for _, name := range []string{"rke2-canal", "canal"} {
+		ds := &appsv1.DaemonSet{}
+		if err := c.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: name}, ds); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return Network{}, false, fmt.Errorf("reading the %s DaemonSet: %w", name, err)
+		}
+		backend := "vxlan"
+		for _, cmName := range []string{name + "-config", "canal-config"} {
+			cm := &corev1.ConfigMap{}
+			if err := c.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: cmName}, cm); err == nil {
+				if b := jsonStringValue(cm.Data["net-conf.json"], "Type"); b != "" {
+					backend = b
+					break
+				}
+			}
+		}
+		if strings.EqualFold(backend, "host-gw") {
+			return Network{Name: Flannel, Encapsulation: Native, Detail: "canal, Backend.Type=host-gw"}, true, nil
+		}
+		return Network{Name: Flannel, Encapsulation: Encapsulated, Detail: "canal, Backend.Type=" + backend}, true, nil
+	}
+	return Network{}, false, nil
+}
+
 func detectFlannel(ctx context.Context, c client.Reader) (Network, bool, error) {
 	for _, ns := range []string{"kube-flannel", "kube-system"} {
 		cm := &corev1.ConfigMap{}
@@ -198,11 +264,44 @@ func detectFlannel(ctx context.Context, c client.Reader) (Network, bool, error) 
 		}
 		return Network{Name: Flannel, Encapsulation: Encapsulated, Detail: "Backend.Type=" + backend}, true, nil
 	}
+	// No ConfigMap does not mean no flannel: k3s's embedded flannel
+	// runs in-process, with its configuration in a file on each node
+	// and nothing of its own in the API. What every flannel leaves,
+	// embedded or not, is its annotations on each node it serves, and
+	// the backend type is among them.
+	nodes := &corev1.NodeList{}
+	if err := c.List(ctx, nodes); err != nil {
+		if meaningfulError(err) {
+			return Network{}, false, fmt.Errorf("listing nodes for flannel annotations: %w", err)
+		}
+		return Network{}, false, nil
+	}
+	for _, node := range nodes.Items {
+		backend := node.Annotations["flannel.alpha.coreos.com/backend-type"]
+		if backend == "" {
+			continue
+		}
+		if strings.EqualFold(backend, "host-gw") {
+			return Network{Name: Flannel, Encapsulation: Native, Detail: "node annotation backend-type=host-gw"}, true, nil
+		}
+		return Network{Name: Flannel, Encapsulation: Encapsulated, Detail: "node annotation backend-type=" + backend}, true, nil
+	}
 	return Network{}, false, nil
 }
 
-// detectKubeRouter reads the overlay setting off the DaemonSet's own
-// arguments, which is where kube-router is configured.
+// detectKubeRouter recognises kube-router by its DaemonSet, and it is
+// native regardless of the overlay arguments there.
+//
+// The encapsulation question here is what the tunnel sees, and
+// kube-router's overlay never reaches it. It distributes routes over
+// its BGP sessions alone, and its overlay encapsulates only along
+// routes those sessions learned (a tunnel interface is created per
+// injected route, from BGP best-path updates and nothing else); the
+// mesh refuses BGP across its tunnels, so no route kube-router holds
+// ever crosses one, and a pod packet the mesh carries arrives
+// unwrapped whatever --enable-overlay and --overlay-type say. Those
+// flags describe node pairs kube-router routes between itself, which
+// across the tunnel is none.
 func detectKubeRouter(ctx context.Context, c client.Reader) (Network, bool, error) {
 	ds := &appsv1.DaemonSet{}
 	if err := c.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: "kube-router"}, ds); err != nil {
@@ -211,18 +310,11 @@ func detectKubeRouter(ctx context.Context, c client.Reader) (Network, bool, erro
 		}
 		return Network{}, false, fmt.Errorf("reading the kube-router DaemonSet: %w", err)
 	}
-	for _, container := range ds.Spec.Template.Spec.Containers {
-		for _, arg := range append(append([]string{}, container.Command...), container.Args...) {
-			switch {
-			case strings.HasPrefix(arg, "--enable-overlay=false"):
-				return Network{Name: KubeRouter, Encapsulation: Native, Detail: "enable-overlay=false"}, true, nil
-			case strings.HasPrefix(arg, "--overlay-type="):
-				return Network{Name: KubeRouter, Encapsulation: Encapsulated, Detail: strings.TrimPrefix(arg, "--")}, true, nil
-			}
-		}
-	}
-	// Overlay is on unless turned off.
-	return Network{Name: KubeRouter, Encapsulation: Encapsulated, Detail: "enable-overlay defaults to true"}, true, nil
+	return Network{
+		Name:          KubeRouter,
+		Encapsulation: Native,
+		Detail:        "routes are distributed by BGP alone, which never crosses the tunnel, so pod packets do",
+	}, true, nil
 }
 
 // PrefixesFor returns the prefixes a peer must be permitted so that pods

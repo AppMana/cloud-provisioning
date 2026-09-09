@@ -1,0 +1,239 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "DaemonSet",
+  "metadata": {
+    "name": "kube-router",
+    "namespace": "kube-system"
+  },
+  "spec": {
+    "revisionHistoryLimit": 10,
+    "selector": {
+      "matchLabels": {
+        "k8s-app": "kube-router",
+        "tier": "node"
+      }
+    },
+    "template": {
+      "metadata": {
+        "annotations": {
+          "prometheus.io/port": "8080",
+          "prometheus.io/scrape": "true"
+        },
+        "labels": {
+          "k8s-app": "kube-router",
+          "tier": "node"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "args": [
+              "--auto-mtu=true",
+              "--bgp-graceful-restart=true",
+              "--enable-ipv4=true",
+              "--enable-ipv6=false",
+              "--hairpin-mode=true",
+              "--metrics-port=8080",
+              "--run-firewall=true",
+              "--run-router=true",
+              "--run-service-proxy=false",
+              "--service-cluster-ip-range=10.96.0.0/12"
+            ],
+            "env": [
+              {
+                "name": "NODE_NAME",
+                "valueFrom": {
+                  "fieldRef": {
+                    "apiVersion": "v1",
+                    "fieldPath": "spec.nodeName"
+                  }
+                }
+              },
+              {
+                "name": "POD_NAME",
+                "valueFrom": {
+                  "fieldRef": {
+                    "apiVersion": "v1",
+                    "fieldPath": "metadata.name"
+                  }
+                }
+              },
+              {
+                "name": "KUBE_ROUTER_CNI_CONF_FILE",
+                "value": "/etc/cni/net.d/10-kuberouter.conflist"
+              }
+            ],
+            "image": "quay.io/k0sproject/kube-router:v2.10.0-iptables1.8.13-k0s.0",
+            "imagePullPolicy": "IfNotPresent",
+            "livenessProbe": {
+              "failureThreshold": 6,
+              "httpGet": {
+                "path": "/healthz",
+                "port": "healthz",
+                "scheme": "HTTP"
+              },
+              "initialDelaySeconds": 300,
+              "periodSeconds": 10,
+              "successThreshold": 1,
+              "timeoutSeconds": 10
+            },
+            "name": "kube-router",
+            "ports": [
+              {
+                "containerPort": 20244,
+                "name": "healthz",
+                "protocol": "TCP"
+              }
+            ],
+            "readinessProbe": {
+              "failureThreshold": 3,
+              "httpGet": {
+                "path": "/healthz",
+                "port": "healthz",
+                "scheme": "HTTP"
+              },
+              "periodSeconds": 3,
+              "successThreshold": 3,
+              "timeoutSeconds": 3
+            },
+            "resources": {
+              "requests": {
+                "cpu": "250m",
+                "memory": "16Mi"
+              }
+            },
+            "securityContext": {
+              "privileged": true
+            },
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File",
+            "volumeMounts": [
+              {
+                "mountPath": "/lib/modules",
+                "name": "lib-modules",
+                "readOnly": true
+              },
+              {
+                "mountPath": "/etc/cni/net.d",
+                "name": "cni-conf-dir"
+              },
+              {
+                "mountPath": "/run/xtables.lock",
+                "name": "xtables-lock"
+              }
+            ]
+          }
+        ],
+        "dnsPolicy": "ClusterFirst",
+        "hostNetwork": true,
+        "hostPID": true,
+        "initContainers": [
+          {
+            "args": [
+              "install"
+            ],
+            "image": "quay.io/k0sproject/cni-node:1.8.0-k0s.0",
+            "imagePullPolicy": "IfNotPresent",
+            "name": "install-cni-bins",
+            "resources": {},
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File",
+            "volumeMounts": [
+              {
+                "mountPath": "/host/opt/cni/bin",
+                "name": "cni-bin"
+              }
+            ]
+          },
+          {
+            "command": [
+              "/bin/sh",
+              "-c",
+              "set -e -x; if [ ! -f /etc/cni/net.d/10-kuberouter.conflist ]; then if [ -f /etc/cni/net.d/*.conf ]; then rm -f /etc/cni/net.d/*.conf; fi; TMP=/etc/cni/net.d/.tmp-kuberouter-cfg; cp /etc/kube-router/cni-conf.json ${TMP}; mv ${TMP} /etc/cni/net.d/10-kuberouter.conflist; fi"
+            ],
+            "image": "quay.io/k0sproject/kube-router:v2.10.0-iptables1.8.13-k0s.0",
+            "imagePullPolicy": "IfNotPresent",
+            "name": "install-cniconf",
+            "resources": {},
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File",
+            "volumeMounts": [
+              {
+                "mountPath": "/etc/cni/net.d",
+                "name": "cni-conf-dir"
+              },
+              {
+                "mountPath": "/etc/kube-router",
+                "name": "kube-router-cfg"
+              }
+            ]
+          }
+        ],
+        "nodeSelector": {
+          "kubernetes.io/os": "linux"
+        },
+        "priorityClassName": "system-node-critical",
+        "restartPolicy": "Always",
+        "schedulerName": "default-scheduler",
+        "securityContext": {},
+        "serviceAccount": "kube-router",
+        "serviceAccountName": "kube-router",
+        "terminationGracePeriodSeconds": 30,
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "operator": "Exists"
+          },
+          {
+            "effect": "NoExecute",
+            "operator": "Exists"
+          }
+        ],
+        "volumes": [
+          {
+            "hostPath": {
+              "path": "/lib/modules",
+              "type": ""
+            },
+            "name": "lib-modules"
+          },
+          {
+            "hostPath": {
+              "path": "/etc/cni/net.d",
+              "type": ""
+            },
+            "name": "cni-conf-dir"
+          },
+          {
+            "hostPath": {
+              "path": "/opt/cni/bin",
+              "type": "DirectoryOrCreate"
+            },
+            "name": "cni-bin"
+          },
+          {
+            "configMap": {
+              "defaultMode": 420,
+              "name": "kube-router-cfg"
+            },
+            "name": "kube-router-cfg"
+          },
+          {
+            "hostPath": {
+              "path": "/run/xtables.lock",
+              "type": "FileOrCreate"
+            },
+            "name": "xtables-lock"
+          }
+        ]
+      }
+    },
+    "updateStrategy": {
+      "rollingUpdate": {
+        "maxSurge": 0,
+        "maxUnavailable": 1
+      },
+      "type": "RollingUpdate"
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "windows-wddm-device-plugin",
+        "uid": "697aec6c-af30-4556-8e7c-5bcd17d73180"
+      },
+      "spec": {
+        "template": {
+          "spec": {
+            "nodeSelector": {
+              "cloud-provisioning.appmana.com/gpu-test": "true",
+              "kubernetes.io/arch": "amd64",
+              "kubernetes.io/os": "windows",
+              "node.kubernetes.io/windows-build": "10.0.20348"
+            },
+            "containers": [
+              {
+                "image": "index.docker.io/tensorworks/wddm-device-plugin@sha256:47f97c76c16ad24490caf1d344b4a9bc0ccc05fe787e2b68fe5a1051818ce9ec",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "plugin",
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "metadata": {
+        "name": "windows-wddm-device-plugin-runtime-mounts",
+        "uid": "8f29a1b0-0aba-4e71-b318-d5b762c001fb"
+      },
+      "spec": {
+        "template": {
+          "spec": {
+            "nodeSelector": {
+              "cloud-provisioning.appmana.com/gpu-test": "true",
+              "kubernetes.io/arch": "amd64",
+              "kubernetes.io/os": "windows",
+              "node.kubernetes.io/windows-build": "10.0.26100"
+            },
+            "containers": [
+              {
+                "env": [
+                  {
+                    "name": "WDDM_DEVICE_PLUGIN_SKIP_RUNTIME_MOUNTS",
+                    "value": "true"
+                  }
+                ],
+                "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-device-plugin@sha256:4529fec496b9800dc59f93783c1fa061423d9d5b05704b536e09e4b67e0c8208",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "plugin",
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

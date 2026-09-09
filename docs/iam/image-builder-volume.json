@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ObserveBuilderVolume",
+      "Effect": "Allow",
+      "Action": ["ec2:DescribeVolumes", "ec2:DescribeVolumesModifications"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ResizeSelectedBuilderVolume",
+      "Effect": "Allow",
+      "Action": "ec2:ModifyVolume",
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:volume/${BUILDER_VOLUME_ID}"
+    }
+  ]
+}

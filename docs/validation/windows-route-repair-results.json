@@ -1,0 +1,70 @@
+{
+  "scope": "Native Windows route drift repair and fresh publisher receipts on two single-physical-NIC VMs; no combined gateway readiness qualification",
+  "observedAt": "2026-09-07T09:09:15.377967+00:00",
+  "results": [
+    {
+      "removedObserved": true,
+      "serviceStatus": "Running",
+      "restoredObserved": true,
+      "binarySHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+      "seconds": 1.2976729999999999,
+      "observedAt": "2026-09-07T09:07:19.075627+00:00",
+      "windowsVersion": "2022",
+      "scope": "Live native tunnel route drift repair on the single-NIC Windows worker; no gateway readiness claim",
+      "joinChecks": {
+        "expectedWindowsBuild": true,
+        "onePhysicalNIC": true,
+        "k0sWorkerRunning": true,
+        "tunnelRunning": true,
+        "bootstrapInstalled": true,
+        "capiAssociation": true,
+        "windowsNode": true,
+        "matchesSiteKubelet": true,
+        "containerd2": true,
+        "cloudWorkerLabel": true,
+        "internetFacingTaint": true,
+        "nodeReady": true,
+        "publisherReady": true,
+        "peerDelivery": true
+      }
+    },
+    {
+      "removedObserved": true,
+      "serviceStatus": "Running",
+      "restoredObserved": true,
+      "binarySHA256": "3f9a1241788f67e56f7318464416078a68d5e0dca096f9e4f901f061859d2f71",
+      "seconds": 1.2020450999999999,
+      "observedAt": "2026-09-07T09:08:05.678272+00:00",
+      "windowsVersion": "2025",
+      "scope": "Live native tunnel route drift repair on the single-NIC Windows worker; no gateway readiness claim",
+      "joinChecks": {
+        "expectedWindowsBuild": true,
+        "onePhysicalNIC": true,
+        "k0sWorkerRunning": true,
+        "tunnelRunning": true,
+        "bootstrapInstalled": true,
+        "capiAssociation": true,
+        "windowsNode": true,
+        "matchesSiteKubelet": true,
+        "containerd2": true,
+        "cloudWorkerLabel": true,
+        "internetFacingTaint": true,
+        "nodeReady": true,
+        "publisherReady": true,
+        "peerDelivery": true
+      }
+    }
+  ],
+  "tests": {
+    "hostCoveragePercent": 85.5,
+    "portableDeviceCoveragePercent": 100,
+    "windowsNativeCoverage": "not instrumented; live route removal/readback exercised",
+    "attachmentSuite": "passed"
+  },
+  "remaining": [
+    "Gateway API backend reachability during native transport selection",
+    "Combined gateway publication and packet matrix",
+    "Rebake Windows images with repaired native service",
+    "CAPI deletion/replacement and broader distro/GPU workstream"
+  ]
+}

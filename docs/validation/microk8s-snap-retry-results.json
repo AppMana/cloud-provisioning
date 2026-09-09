@@ -1,0 +1,161 @@
+{
+  "result": "native-lifecycle-passed-bootstrap-completion-open",
+  "updatedAt": "2026-09-09T09:34:30.159348+00:00",
+  "profile": "microk8s/calico",
+  "priorCampaign": "microk8s-adoption-fix-results.json",
+  "observedFailure": {
+    "cloudInitStatus": "error - done",
+    "cloudFinalExitCode": 1,
+    "microk8sInstalled": false,
+    "dependency": "core22",
+    "dependencyRevision": "2437",
+    "request": "fetch snap assertion",
+    "HTTPStatus": 408,
+    "nativeCampaignExitCode": 1
+  },
+  "change": {
+    "pattern": "join-patterns/microk8s-worker.cloud-config.tmpl",
+    "snapRevision": "9063",
+    "maximumAttempts": 5,
+    "delaySeconds": 15,
+    "failureAfterExhaustion": true,
+    "samePatternForVMAndAWS": true
+  },
+  "unitValidation": {
+    "allJoinPackageRaceTestsPassed": true,
+    "cases": [
+      "first attempt succeeds",
+      "two observed assertion errors followed by success",
+      "persistent assertion error stops after five attempts"
+    ],
+    "fixture": "../../controller/pkg/join/testdata/microk8s-snap-assertion-408.txt",
+    "scope": "Shell retry behavior; stubs do not qualify native snap or network behavior."
+  },
+  "sourceArtifact": {
+    "key": "runners/cldt-microk8s-runner-v1/snap-retry-v5-source.tar.gz",
+    "sha256": "9e335f87c53cb171265a016dedbdb34c73c30068c5cb14a32959ad90229509d1",
+    "sourceSHA256": {
+      "harness/e2e/cmd/lab/main.go": "9c04c7eb1699794e2798b1774736588fb0e6191876a62276b79fad32d14fcac2",
+      "harness/e2e/cmd/lab/preconditions.go": "7c2ac121e64cc306b6903befa7c42b27de3af586c9b905d1c884ccf7d13c9d75",
+      "harness/e2e/cmd/lab/preconditions_test.go": "52ccc2bcb0414c863f9860c732468f0da9bbd07bb5706f513d505597820e9ed2",
+      "join-patterns/microk8s-worker.cloud-config.tmpl": "b5da31de0c5b2b220ce2189771786d7fc71f81e10ffa183f8d80fe8810e334af",
+      "controller/pkg/join/microk8s_install_test.go": "69be24b8d0fbf1cd618f586c678d5afb5ff0e81186b6327db5a8943e23bcba5d",
+      "controller/pkg/join/testdata/microk8s-snap-assertion-408.txt": "71621f2c9ec15ed8fcc82e294982818aa9f2c47e270fb10e46ef429501a46cc8"
+    }
+  },
+  "previousNativeArchive": {
+    "sha256": "0ec7c5a62e16383b0ee62aa157356baeda383d7e8dc937baf0509e1ae103df41",
+    "bytes": 29977,
+    "verifiedLocally": true,
+    "coveredStatements": 1291,
+    "totalStatements": 3357,
+    "matrices": 7,
+    "passedChecks": 866,
+    "failedChecks": 0
+  },
+  "limits": [
+    "The native campaign passed lifecycle and traffic gates but did not require completed cloud-init.",
+    "The worker status race requires fresh claims with the worker-specific wait and completed-bootstrap observer.",
+    "Actual CAPA worker lifecycle remains pending.",
+    "No snap HTTP 408 occurred in the observed successful trial; retry failure handling is based on the prior native failure and focused tests."
+  ],
+  "native": {
+    "commandID": "76b75d47-1f0d-414e-9070-d0102b953d0e",
+    "failedClaimRemovedThroughProduct": true,
+    "failedClaimRemovalCommandID": "2f9aee54-ece7-462a-81ea-bd04b3f44a5b",
+    "requestedPlacements": [
+      "control-plane",
+      "one-worker",
+      "two-workers",
+      "all-nodes"
+    ],
+    "requestedReplacementCycles": 8,
+    "perReplacementHardwareCheck": true,
+    "reusesVerifiedSite": true,
+    "completed": true,
+    "latestObservedAt": "2026-09-09T09:32:16.227573398Z",
+    "progress": {
+      "completedReplacementCycles": 8,
+      "replacementHardwareChecksPassed": 8,
+      "completedMatrices": 21,
+      "passedChecks": 2636,
+      "failedChecks": 0
+    },
+    "completedPlacements": [
+      "control-plane",
+      "one-worker",
+      "two-workers",
+      "all-nodes"
+    ],
+    "completedPlacementEvidence": {
+      "sha256": "fc3efdeecc05859eea3d9557bc2ac4c45a876807e32f14c149c9472b76cb2417",
+      "bytes": 131872,
+      "verifiedLocally": true,
+      "matrices": 5,
+      "passedChecks": 624,
+      "hardwareChecks": [
+        {
+          "newNodeUID": "61062b8f-471f-4f3e-855d-fc791d5e32c6",
+          "node": "remote1",
+          "placement": "control-plane"
+        },
+        {
+          "newNodeUID": "37ed9dab-1519-468e-9745-57e3f8469c5b",
+          "node": "remote2",
+          "placement": "control-plane"
+        }
+      ]
+    },
+    "guestRuntimeObservations": [
+      {
+        "helperSHA256": "9ce134a8d0f18766fa85208230d3f84a54501b035420adfb78e74efc27d7445a",
+        "cloudInitStatus": "running",
+        "cloudInitExit": 0,
+        "snapExit": 0,
+        "snapInfo": "Name      Version  Rev   Tracking       Publisher    Notes\nmicrok8s  v1.34.9  9063  latest/stable  canonical**  classic,held",
+        "assertion408Occurrences": 0,
+        "node": "remote1"
+      },
+      {
+        "helperSHA256": "9ce134a8d0f18766fa85208230d3f84a54501b035420adfb78e74efc27d7445a",
+        "cloudInitStatus": "running",
+        "cloudInitExit": 0,
+        "snapExit": 0,
+        "snapInfo": "Name      Version  Rev   Tracking       Publisher    Notes\nmicrok8s  v1.34.9  9063  latest/stable  canonical**  classic,held",
+        "assertion408Occurrences": 0,
+        "node": "remote2"
+      }
+    ],
+    "terminalExitCode": 0,
+    "terminalEvidence": {
+      "verifiedAt": "2026-09-09T09:33:54.613021+00:00",
+      "archive": {
+        "sha256": "d69b40b47b2247c43febd1a73aaecb05da9a0213ed28cc55af8a0426b9c97298",
+        "bytes": 39674
+      },
+      "nativeExit": 0,
+      "matrices": 21,
+      "checks": {
+        "total": 2636,
+        "passed": 2636,
+        "failed": 0,
+        "notRequired": 0
+      },
+      "allFirstAttempt": true,
+      "placements": [
+        "control-plane",
+        "one-worker",
+        "two-workers",
+        "all-nodes"
+      ],
+      "replacements": 8,
+      "nativeCoverage": {
+        "covered": 1316,
+        "total": 3378,
+        "percent": 38.96
+      },
+      "bootstrapCompletionQualified": false
+    }
+  },
+  "followUp": "microk8s-worker-bootstrap-wait-results.json"
+}

@@ -1,0 +1,11 @@
+{
+  "target": {
+    "kind": "DaemonSet",
+    "name": "calico-node-windows",
+    "namespace": "kube-system"
+  },
+  "patch": {
+    "type": "StrategicMergePatch",
+    "content": "{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"felix\", \"command\": [\"powershell.exe\", \"-NoProfile\", \"-NonInteractive\", \"-Command\"], \"args\": [\"$ErrorActionPreference='Stop';$binary='C:\\\\ProgramData\\\\CloudProvisioning\\\\diagnostics\\\\calico-node-v332-mtu.exe';if((Get-FileHash $binary -Algorithm SHA256).Hash -ne 'ba7b21009fbb787e2fb260d85208a53512671a5e2ad48bfcbc8365c3704dee0e'){throw 'Unexpected validation binary hash'};$root=Join-Path $env:CONTAINER_SANDBOX_MOUNT_POINT 'CalicoWindows';Copy-Item $binary (Join-Path $root 'calico-node.exe') -Force;Set-Location $root;& (Join-Path $root 'felix-service.ps1')\"]}]}}}}"
+  }
+}

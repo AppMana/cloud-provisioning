@@ -1,0 +1,35 @@
+{
+  "snapshot": {
+    "workerServicePresent": false,
+    "identityPathsPresent": [],
+    "pipe": "\\\\.\\pipe\\cldt-image-cache",
+    "containers": [],
+    "registeredImages": [
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ],
+    "namespace": "k8s.io",
+    "cacheService": "Running",
+    "root": "C:\\var\\lib\\k0s\\containerd",
+    "snapshotter": "windows",
+    "dataDirectoryInheritsPermissions": true,
+    "readyImages": [
+      "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ],
+    "tasks": [],
+    "observedAt": "2026-09-08T04:37:39.1522670Z",
+    "shimSHA256": "adb8e4d990da4bde04956441fcd569a2b13a298d89758ace0896b1bc3389c1ae",
+    "windowsBuild": 26100,
+    "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+    "containerdSHA256": "92fe1b334ef6ee9477fd22c88012bda605b52952fe4964705ada1a49ae0f2030"
+  },
+  "serviceStopped": true,
+  "finishedAt": "2026-09-08T04:37:41.4579295Z",
+  "startedAt": "2026-09-08T04:11:36.3531475Z",
+  "cacheServiceRemoved": true,
+  "recipeSHA256": "5af5af21dd3be79f8f124841185d0c50b699f1edea1441eb471105a1f6e881c5",
+  "registryCredentialsRemoved": true,
+  "exitCode": 0,
+  "status": "prepared"
+}

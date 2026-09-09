@@ -1,0 +1,367 @@
+{
+  "observedAt": "2026-09-08T01:06:19.956947+00:00",
+  "scope": "Completed real AWS CAPI addition/removal with target-bound native Windows 2022 and Windows 2025 candidate captures",
+  "target": {
+    "observedAt": "2026-09-08T00:36:34.926457+00:00",
+    "claim": "aws-win2022-peer-cycle-v1",
+    "machineUID": "e7dad16a-3f9b-4d7e-a953-32b9b24c8e74",
+    "providerID": "aws:///us-west-2a/i-01d82829cf747fd3e",
+    "secretUID": "5f9d0489-30a5-4b4c-9ea6-59c272c7f8d7",
+    "publicKeySHA256": "4356241e8f66ac7fa4ee5215a09e7301038d94dfea6cdcb495ba7c2de03d3f23"
+  },
+  "instance": {
+    "InstanceId": "i-01d82829cf747fd3e",
+    "InstanceType": "t3.large",
+    "ImageId": "ami-09af413882370ed0b",
+    "LaunchTime": "2026-09-08T00:34:51+00:00",
+    "PrivateIpAddress": "172.29.0.125",
+    "State": {
+      "Code": 16,
+      "Name": "running"
+    },
+    "eniCount": 1,
+    "eniID": "eni-0bb364800df6bf37b"
+  },
+  "additionObserved": {
+    "2022": {
+      "observerProcesses": [
+        {
+          "Id": 4956,
+          "StartTime": "/Date(1788827562575)/"
+        }
+      ],
+      "targetAbsentInitially": true,
+      "latestObservedAt": "2026-09-08T00:38:05.8672706Z",
+      "samples": 323,
+      "firstObservedAt": "2026-09-08T00:32:42.6322151Z",
+      "firstTargetObservedAt": "2026-09-08T00:34:56.2003124Z",
+      "targetPresentNow": true
+    },
+    "2025": {
+      "observerProcesses": [
+        {
+          "Id": 2620,
+          "StartTime": "/Date(1788827563269)/"
+        }
+      ],
+      "targetAbsentInitially": true,
+      "latestObservedAt": "2026-09-08T00:38:05.3270384Z",
+      "samples": 322,
+      "firstObservedAt": "2026-09-08T00:32:43.3485116Z",
+      "firstTargetObservedAt": "2026-09-08T00:35:00.7411061Z",
+      "targetPresentNow": true
+    }
+  },
+  "status": "Both native membership captures and Ready-baseline removal passed; transient admission-webhook failures retained",
+  "analyzerRegression": {
+    "tests": 7,
+    "observerSuiteTests": 64,
+    "passed": true,
+    "fixtures": "Native old-backend reset, candidate removal, and capture that missed addition; simulated reverse-membership case is explicitly labelled"
+  },
+  "limitations": [
+    "One real CAPI cycle; no general reliability or release qualification",
+    "One-second sampling cannot exclude changes between samples",
+    "Traffic capture started after peer addition, so addition downtime was not measured",
+    "64-byte UDP sweeps do not resolve prior fragmentation failures",
+    "CAPI webhook timeouts remain unexplained",
+    "Only existing CPU canary services use the candidate; baked images and GPU workers still use the original binary"
+  ],
+  "nativeCaptures": {
+    "2022": {
+      "passed": true,
+      "checks": {
+        "allSamplesAdapterUp": true,
+        "noObservedCounterDecreases": true,
+        "survivingPeersPresent": true,
+        "additionObserved": true,
+        "removalObserved": true
+      },
+      "samples": 1800,
+      "firstObservedAt": "2026-09-08T00:32:42.6322151Z",
+      "lastObservedAt": "2026-09-08T01:02:48.7106937Z",
+      "peerCounts": [
+        9,
+        10
+      ],
+      "membershipChanges": [
+        {
+          "observedAt": "2026-09-08T00:34:56.2003124Z",
+          "added": [
+            "4356241e8f66ac7fa4ee5215a09e7301038d94dfea6cdcb495ba7c2de03d3f23"
+          ],
+          "removed": []
+        },
+        {
+          "observedAt": "2026-09-08T00:57:56.5877042Z",
+          "added": [],
+          "removed": [
+            "4356241e8f66ac7fa4ee5215a09e7301038d94dfea6cdcb495ba7c2de03d3f23"
+          ]
+        }
+      ],
+      "counterDecreases": [],
+      "survivorCount": 9,
+      "expectedPeerSHA256": "4356241e8f66ac7fa4ee5215a09e7301038d94dfea6cdcb495ba7c2de03d3f23",
+      "scope": "Sampled peer membership and byte counters; does not establish packet delivery, between-sample continuity, or the cause of changes",
+      "rawSHA256": "fccb883c5fde1062a6a495cb9660400deea2855aa0d29b71770518b03f43726d"
+    },
+    "2025": {
+      "passed": true,
+      "checks": {
+        "allSamplesAdapterUp": true,
+        "noObservedCounterDecreases": true,
+        "survivingPeersPresent": true,
+        "additionObserved": true,
+        "removalObserved": true
+      },
+      "samples": 1800,
+      "firstObservedAt": "2026-09-08T00:32:43.3485116Z",
+      "lastObservedAt": "2026-09-08T01:02:48.085982Z",
+      "peerCounts": [
+        9,
+        10
+      ],
+      "membershipChanges": [
+        {
+          "observedAt": "2026-09-08T00:35:00.7411061Z",
+          "added": [
+            "4356241e8f66ac7fa4ee5215a09e7301038d94dfea6cdcb495ba7c2de03d3f23"
+          ],
+          "removed": []
+        },
+        {
+          "observedAt": "2026-09-08T00:57:56.1716569Z",
+          "added": [],
+          "removed": [
+            "4356241e8f66ac7fa4ee5215a09e7301038d94dfea6cdcb495ba7c2de03d3f23"
+          ]
+        }
+      ],
+      "counterDecreases": [],
+      "survivorCount": 9,
+      "expectedPeerSHA256": "4356241e8f66ac7fa4ee5215a09e7301038d94dfea6cdcb495ba7c2de03d3f23",
+      "scope": "Sampled peer membership and byte counters; does not establish packet delivery, between-sample continuity, or the cause of changes",
+      "rawSHA256": "a09c33121494451c2fc2c414a1c3cff3f963edacd447879deadc038fd7dc275c"
+    }
+  },
+  "joinChecks": {
+    "expectedWindowsBuild": true,
+    "onePhysicalNIC": true,
+    "k0sWorkerRunning": true,
+    "tunnelRunning": true,
+    "bootstrapInstalled": true,
+    "capiAssociation": true,
+    "windowsNode": true,
+    "matchesSiteKubelet": true,
+    "containerd2": true,
+    "cloudWorkerLabel": true,
+    "internetFacingTaint": true,
+    "nodeReady": true,
+    "publisherReady": true,
+    "expectedWorkerVersion": true,
+    "expectedWorkerHash": true,
+    "expectedTunnelHash": true,
+    "expectedRunningTunnelHash": true,
+    "peerDelivery": true
+  },
+  "removalPreflight": {
+    "passed": true,
+    "checks": {
+      "targetMachineIdentity": true,
+      "noDeletingMachines": true,
+      "nodeAssociation": true,
+      "allNodesReady": true,
+      "targetGatewayLeasesReady": true,
+      "otherGatewayLeasesReady": true
+    },
+    "claim": "aws-win2022-peer-cycle-v1",
+    "machineUID": "e7dad16a-3f9b-4d7e-a953-32b9b24c8e74",
+    "nodeUID": "10a32791-2414-4c0c-b491-6bdf093a3bcf",
+    "providerID": "aws:///us-west-2a/i-01d82829cf747fd3e",
+    "targetLeasePhases": {
+      "network-attachment-b9ab9a9d64f2948fa288cf99ce832b49": "Ready"
+    },
+    "otherLeasePhases": {
+      "network-attachment-157078f2ab5e8687be57aace685946aa": "Ready",
+      "network-attachment-6b32fae7b7b59f9868b31e34630bc454": "Ready",
+      "network-attachment-9065ccc1adea9514d4e30290eefd0c09": "Ready",
+      "network-attachment-b9665a3a0cf8f46a0806d528033cc990": "Ready",
+      "network-attachment-c5994feb22803fbdc169b9d295cf6e56": "Ready"
+    },
+    "scope": "Snapshot preflight for Ready-attachment removal with survivors; does not delete resources or authorize reuse after state changes"
+  },
+  "removalReceipt": {
+    "claim": "aws-win2022-peer-cycle-v1",
+    "instanceID": "i-01d82829cf747fd3e",
+    "node": "aws-win2022-peer-cycle-v1",
+    "nodeUID": "10a32791-2414-4c0c-b491-6bdf093a3bcf",
+    "observedAt": "2026-09-08T00:57:54.784308441Z",
+    "productCleanup": true,
+    "providerID": "aws:///us-west-2a/i-01d82829cf747fd3e",
+    "terminated": true
+  },
+  "initialRemovalComparison": {
+    "passed": false,
+    "checks": {
+      "instanceTerminated": true,
+      "productCleanup": true,
+      "targetMachineAbsent": true,
+      "survivorMachineIdentities": true,
+      "exactSurvivorSet": true,
+      "survivorIdentitiesAndReadiness": true,
+      "targetGatewayLeasesComplete": true,
+      "otherGatewayLeasesPreserved": false
+    },
+    "survivorCount": 13,
+    "retiredGatewayLeaseCount": 1,
+    "preservedGatewayLeaseCount": 5,
+    "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+  },
+  "convergedRemovalComparison": {
+    "passed": true,
+    "checks": {
+      "instanceTerminated": true,
+      "productCleanup": true,
+      "targetMachineAbsent": true,
+      "survivorMachineIdentities": true,
+      "exactSurvivorSet": true,
+      "survivorIdentitiesAndReadiness": true,
+      "targetGatewayLeasesComplete": true,
+      "otherGatewayLeasesPreserved": true
+    },
+    "survivorCount": 13,
+    "retiredGatewayLeaseCount": 1,
+    "preservedGatewayLeaseCount": 5,
+    "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+  },
+  "traffic": {
+    "add": {
+      "startedAt": "2026-09-08T00:35:09.679209+00:00",
+      "rounds": 120,
+      "intervalSeconds": 2,
+      "triesPerDirection": 20,
+      "payloadBytes": 64,
+      "scope": "Post-addition and bootstrap survivor traffic; starts after native peer-addition events",
+      "finishedAt": "2026-09-08T00:49:32.367551+00:00",
+      "failedRounds": 0,
+      "requestedEchoes": 14400,
+      "confirmedExactEchoes": 14400,
+      "identitiesStable": true,
+      "firstProbeStartedAt": "2026-09-08T00:35:10.595876+00:00"
+    },
+    "remove": {
+      "startedAt": "2026-09-08T00:53:04.933503+00:00",
+      "rounds": 90,
+      "intervalSeconds": 2,
+      "triesPerDirection": 20,
+      "payloadBytes": 64,
+      "scope": "Survivor traffic started before deletion and covered the peer-removal transition",
+      "finishedAt": "2026-09-08T01:04:01.700836+00:00",
+      "failedRounds": 0,
+      "requestedEchoes": 10800,
+      "confirmedExactEchoes": 10800,
+      "identitiesStable": true,
+      "firstProbeStartedAt": "2026-09-08T00:53:05.870649+00:00"
+    }
+  },
+  "transientFailure": {
+    "component": "CAPI admission webhook",
+    "service": "10.103.207.61:443",
+    "endpointNode": "cp2",
+    "endpoint": "10.244.121.66:9443",
+    "observedTimeouts": [
+      "2026-09-08T00:47:32Z",
+      "2026-09-08T00:48:03Z",
+      "2026-09-08T00:48:36Z",
+      "2026-09-08T00:49:07Z",
+      "2026-09-08T00:49:38Z"
+    ],
+    "effect": "Attachment preparation could not advance until webhook calls recovered",
+    "recovery": "Recovered without guest repair, controller restart or webhook bypass; Ready baseline was captured before deletion",
+    "directControlPlaneChecks": {
+      "controlPlaneVMs": [
+        "cp",
+        "cp2",
+        "cp3"
+      ],
+      "serviceAddress": "10.103.207.61:443",
+      "podAddress": "10.244.121.66:9443",
+      "httpStatus": 404,
+      "scope": "Direct VM host GET reached webhook on both addresses; does not exercise API-server egress selection"
+    },
+    "cause": "Unresolved; direct VM reachability does not establish API-server egress-path health"
+  },
+  "survivorJoinAfter": {
+    "2022": {
+      "observedAt": "2026-09-08T01:05:49.584972+00:00",
+      "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "checks": {
+        "expectedWindowsBuild": true,
+        "onePhysicalNIC": true,
+        "k0sWorkerRunning": true,
+        "tunnelRunning": true,
+        "bootstrapInstalled": true,
+        "capiAssociation": true,
+        "windowsNode": true,
+        "matchesSiteKubelet": true,
+        "containerd2": true,
+        "cloudWorkerLabel": true,
+        "internetFacingTaint": true,
+        "nodeReady": true,
+        "publisherReady": true,
+        "expectedWorkerVersion": true,
+        "expectedWorkerHash": true,
+        "expectedTunnelHash": true,
+        "expectedRunningTunnelHash": true,
+        "peerDelivery": true
+      },
+      "runningTunnels": [
+        {
+          "processId": 3652,
+          "name": "cloud-provisioning-cldt1775f69e",
+          "executableSHA256": "a513e39abc7ab84739160d60efffc7eb873b589a26ab3e0971e4e665060e0f3a"
+        }
+      ],
+      "sameServiceProcessAsPriorRollout": true
+    },
+    "2025": {
+      "observedAt": "2026-09-08T01:05:49.487752+00:00",
+      "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "checks": {
+        "expectedWindowsBuild": true,
+        "onePhysicalNIC": true,
+        "k0sWorkerRunning": true,
+        "tunnelRunning": true,
+        "bootstrapInstalled": true,
+        "capiAssociation": true,
+        "windowsNode": true,
+        "matchesSiteKubelet": true,
+        "containerd2": true,
+        "cloudWorkerLabel": true,
+        "internetFacingTaint": true,
+        "nodeReady": true,
+        "publisherReady": true,
+        "expectedWorkerVersion": true,
+        "expectedWorkerHash": true,
+        "expectedTunnelHash": true,
+        "expectedRunningTunnelHash": true,
+        "peerDelivery": true
+      },
+      "runningTunnels": [
+        {
+          "processId": 6288,
+          "name": "cloud-provisioning-cldt1775f69e",
+          "executableSHA256": "a513e39abc7ab84739160d60efffc7eb873b589a26ab3e0971e4e665060e0f3a"
+        }
+      ],
+      "sameServiceProcessAsPriorRollout": true
+    }
+  },
+  "diagnosticLimit": {
+    "initialReads": "Two diagnostic log reads exceeded SSM inline limits; no service failure inferred",
+    "boundedRead": "A log-only read completed; PowerShell attached filesystem metadata to Get-Content strings, increasing serialized output",
+    "harnessChange": "Output-limit errors now retain original command ID and stdout/stderr byte counts without disclosing content",
+    "tests": "go test ./rig/aws passed; error formatting covered for both output channels"
+  }
+}

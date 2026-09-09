@@ -1,0 +1,81 @@
+{
+  "observedAt": "2026-09-07T19:13:40.338646+00:00",
+  "scope": "Build-host extraction and native read-only byte verification; no runtime replacement or image-cache qualification",
+  "artifact": {
+    "schemaVersion": 1,
+    "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+    "runtimeArchiveSHA256": "68446c5c80e6e0d070b03b8b49c21ecf818cbf0c56054c1ac85961c449fd9bb0",
+    "components": [
+      {
+        "name": "containerd.exe",
+        "bytes": 36665344,
+        "sha256": "92fe1b334ef6ee9477fd22c88012bda605b52952fe4964705ada1a49ae0f2030"
+      },
+      {
+        "name": "containerd-shim-runhcs-v1.exe",
+        "bytes": 23673344,
+        "sha256": "adb8e4d990da4bde04956441fcd569a2b13a298d89758ace0896b1bc3389c1ae"
+      }
+    ],
+    "scope": "Exact embedded runtime bytes only; image cache and clone startup not qualified"
+  },
+  "rows": [
+    {
+      "windowsVersion": "2022",
+      "directAppendedPayloadDotNetRead": false,
+      "conventionalArchiveDotNetRead": true,
+      "installedRuntimeBytesMatch": true,
+      "components": [
+        {
+          "matches": true,
+          "nativeSHA256": "92fe1b334ef6ee9477fd22c88012bda605b52952fe4964705ada1a49ae0f2030",
+          "name": "containerd.exe",
+          "embeddedSHA256": "92fe1b334ef6ee9477fd22c88012bda605b52952fe4964705ada1a49ae0f2030",
+          "length": 36665344
+        },
+        {
+          "matches": true,
+          "nativeSHA256": "adb8e4d990da4bde04956441fcd569a2b13a298d89758ace0896b1bc3389c1ae",
+          "name": "containerd-shim-runhcs-v1.exe",
+          "embeddedSHA256": "adb8e4d990da4bde04956441fcd569a2b13a298d89758ace0896b1bc3389c1ae",
+          "length": 23673344
+        }
+      ],
+      "temporaryArchiveRemoved": true
+    },
+    {
+      "windowsVersion": "2025",
+      "directAppendedPayloadDotNetRead": false,
+      "conventionalArchiveDotNetRead": true,
+      "installedRuntimeBytesMatch": true,
+      "components": [
+        {
+          "matches": true,
+          "nativeSHA256": "92fe1b334ef6ee9477fd22c88012bda605b52952fe4964705ada1a49ae0f2030",
+          "name": "containerd.exe",
+          "embeddedSHA256": "92fe1b334ef6ee9477fd22c88012bda605b52952fe4964705ada1a49ae0f2030",
+          "length": 36665344
+        },
+        {
+          "matches": true,
+          "nativeSHA256": "adb8e4d990da4bde04956441fcd569a2b13a298d89758ace0896b1bc3389c1ae",
+          "name": "containerd-shim-runhcs-v1.exe",
+          "embeddedSHA256": "adb8e4d990da4bde04956441fcd569a2b13a298d89758ace0896b1bc3389c1ae",
+          "length": 23673344
+        }
+      ],
+      "temporaryArchiveRemoved": true
+    }
+  ],
+  "sourceHistory": {
+    "assetStagingChange": "7ce5d8164b42f364eadfbcf8c0f4ba69736e330c",
+    "assetStagingSubject": "Switch from embedded bins to appended zip payloads",
+    "ociPinningAndUnpinning": "812c456afb43d7afe5e4f732c83da1f27ece8545",
+    "ociImportObservation": "The existing reconciler imports and pins image content; it does not establish pre-unpacked Windows snapshots before capture."
+  },
+  "limitations": [
+    "No pre-unpacked runtime cache image captured",
+    "No cache reuse through Sysprep/fresh CAPI clone established",
+    "Cold application image preparation remains a startup cost"
+  ]
+}

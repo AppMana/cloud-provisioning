@@ -1,0 +1,32 @@
+{
+  "observedAt": "2026-09-08T13:39:50.235600+00:00",
+  "command": "go test -short ./... -coverprofile=<module-profile>",
+  "head": "acade1891c36d4a0f94a8a8dd9805ddceba8620f",
+  "workingTree": "uncommitted changes included",
+  "goToolchain": "go1.26.0",
+  "modules": {
+    "controller": {
+      "coveredStatements": 3589,
+      "totalStatements": 5816,
+      "statementCoveragePercent": 61.71,
+      "passed": true,
+      "scope": "go test -short ./...; no native Windows or real-cloud coverage claim",
+      "testedPackages": 23,
+      "coverageSHA256": "57edd89ec503d46a1c43e2ac209b147d7acf2de6df1eec175477a18007b115f7"
+    },
+    "harness": {
+      "coveredStatements": 1624,
+      "totalStatements": 5514,
+      "statementCoveragePercent": 29.45,
+      "passed": true,
+      "scope": "go test -short ./...; no native Windows or real-cloud coverage claim",
+      "testedPackages": 26,
+      "coverageSHA256": "d5bf74ac1bf50195d435853fcba2e2baf0e0fc7bdd10b22ae24739ca543d2223"
+    }
+  },
+  "passed": true,
+  "limitations": [
+    "Short tests do not establish cloud, VM, Windows, GPU, CNI, or lifecycle integration coverage.",
+    "Separate race-enabled Kubernetes envtest coverage for the selected tunnel/attachment packages was 78.7%; this is not module-wide coverage."
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "result": "export-growth-and-native-first-boot-passed",
+  "completedAt": "2026-09-09T05:43:53.389446+00:00",
+  "defaultDiskGiB": 32,
+  "allowedMinimumGiB": [
+    20,
+    2048
+  ],
+  "sourceDiskBytes": 17179869184,
+  "exportDiskBytes": 34359738368,
+  "guestRootPartitionBytes": 34243329536,
+  "guestFilesystemBytes": 33104523264,
+  "ethernetInterfaces": [
+    "ens2"
+  ],
+  "management": "virtio-serial",
+  "cloudInitGrowth": {
+    "partition": "SUCCESS",
+    "filesystem": "SUCCESS",
+    "finalStatus": "disabled",
+    "interpretation": "Growth logs prove cloud-init completed growth before the launcher-created disabled marker; status disabled alone is not a first-boot success gate."
+  },
+  "validation": {
+    "raceTests": "passed",
+    "nativeQEMUResize": "16 GiB to 32 GiB",
+    "largerDiskPreserved": "48 GiB",
+    "rejects": [
+      "out-of-range size before builder startup",
+      "backed image",
+      "non-qcow2 image",
+      "invalid or missing metadata",
+      "failed info or resize",
+      "incorrect size after successful resize command"
+    ]
+  },
+  "coverage": {
+    "diskSizing": {
+      "coveredStatements": 29,
+      "totalStatements": 29,
+      "percent": 100.0
+    },
+    "wholeCommand": {
+      "coveredStatements": 29,
+      "totalStatements": 98,
+      "percent": 29.59
+    }
+  },
+  "retainedFleets": {
+    "ready": {
+      "original": 13,
+      "kuberouter": 7
+    },
+    "nodeUIDsUnchanged": true,
+    "hostRoutesUnchanged": true
+  },
+  "cleanup": {
+    "temporaryVMRemoved": true,
+    "temporaryRunnerRemoved": true,
+    "grownPlatformArtifactRetained": true,
+    "originalPlatformImageUntouched": true
+  },
+  "limits": [
+    "The native test grows a standalone copy of the existing platform image using the new helper and boots it; it does not rerun the complete nodeimage builder.",
+    "Existing fleets and the original 16 GiB platform image remain unchanged.",
+    "Full MicroK8s multi-node CAPI and AWS lifecycle matrices remain unqualified."
+  ],
+  "history": {
+    "originalFlattenAndExport": "e14ddd6b",
+    "relationship": "Adds export sizing after existing flattening; preserves image-builder SSH and serial lab management."
+  },
+  "sourceSHA256": {
+    "cmd/nodeimage/main.go": "9e4fa4093413002692801e13625b8318cbb11645cd11e650cbd7d9ceead1f40f",
+    "cmd/nodeimage/disk.go": "fe7f6bccd876a3328097d8a28334e532978292d466b8cd9e379c646c42e1f699",
+    "cmd/nodeimage/disk_test.go": "57980f4e75ae6f952a6da34befa2ac4fcc59e54d52e42af75f00046f78cd02a2"
+  },
+  "evidenceSHA256": {
+    "guest-capacity.stdout": "1876eea2946de0efbc5645029077152e7134057d6c449aeffcf1d5a7d7ed1a46",
+    "cloud-init-growth.txt": "c373d015b15db61ab7302b9d04ad59f037783a1b74f5dc620c5d9b7f9c602c0a",
+    "unit.cover": "b22389f400bc23dd260e1b910be0eef07a17f07dd372ae1d185e21b22781e111"
+  }
+}

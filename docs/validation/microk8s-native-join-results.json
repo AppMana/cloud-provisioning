@@ -1,0 +1,115 @@
+{
+  "result": "native-worker-join-and-basic-removal-passed",
+  "completedAt": "2026-09-09T05:53:45.399402+00:00",
+  "scope": "Two single-NIC QEMU VMs, native MicroK8s join and Kubernetes Node deletion after worker stop. Not CAPI or WireGuard lifecycle qualification.",
+  "profile": {
+    "version": "v1.34.9",
+    "revision": "9063",
+    "channel": "1.34/stable",
+    "containerd": "1.7.29",
+    "calico": "3.29.3",
+    "vmMemoryMiB": 4096,
+    "diskGiB": 32
+  },
+  "join": {
+    "nativeCommandExitCode": 0,
+    "nodesEventuallyReady": 2,
+    "returnedBeforeWorkerRegistration": true,
+    "joinReplayed": false
+  },
+  "nativeValidation": {
+    "VerifyWorker": [
+      "cp",
+      "worker"
+    ],
+    "activeKubeletAPI": [
+      "cp",
+      "worker"
+    ],
+    "ethernetInterfaces": {
+      "cp": [
+        "ens2"
+      ],
+      "worker": [
+        "ens2"
+      ]
+    }
+  },
+  "removal": {
+    "workerStopped": true,
+    "kubernetesNodeDeleted": true,
+    "survivorReady": true,
+    "survivorUIDUnchanged": true,
+    "legacyCredentialFiles": {
+      "before": {
+        "callback-tokens.txt": {
+          "exists": false
+        },
+        "known_tokens.csv": {
+          "exists": false
+        }
+      },
+      "after": {
+        "callback-tokens.txt": {
+          "exists": false
+        },
+        "known_tokens.csv": {
+          "exists": false
+        }
+      }
+    }
+  },
+  "calicoNodeStorage": "projectcalico.org/IPv4Address and IPv4VXLANTunnelAddr annotations on Kubernetes Nodes; nodes.crd.projectcalico.org resource absent",
+  "failedObservations": [
+    {
+      "label": "wait-ready",
+      "reason": "NotFound immediately after native join returned; later observation after registration passed."
+    },
+    {
+      "label": "joined-calico-nodes",
+      "reason": "This bundled Calico does not expose a Calico Node CRD; Kubernetes Node annotations were observed instead."
+    }
+  ],
+  "coverage": {
+    "unit": {
+      "coveredStatements": 31,
+      "totalStatements": 94,
+      "percent": 32.98
+    },
+    "nativeSelectedMethods": {
+      "coveredStatements": 23,
+      "totalStatements": 94,
+      "percent": 24.47
+    },
+    "raceDetector": "passed"
+  },
+  "retainedFleets": {
+    "ready": {
+      "original": 13,
+      "kuberouter": 7
+    },
+    "UIDsUnchanged": true,
+    "hostRoutesUnchanged": true
+  },
+  "cleanup": {
+    "temporaryVMsRemoved": 2,
+    "temporaryRunnerRemoved": true,
+    "privateEvidenceRetained": true
+  },
+  "limits": [
+    "No CAPI Machine or claim was provisioned or removed in this test.",
+    "No WireGuard, multi-control-plane joining, pod traffic, isolation, replacement or AWS qualification.",
+    "Absence of two legacy files is not proof that all possible credentials or membership records were removed.",
+    "Worker installation and joining were executed through the serial agent, not through rendered cloud-init userdata."
+  ],
+  "sourceSHA256": {
+    "cluster/microk8s/microk8s.go": "c859e7fcc08c8ee90d9ca1f18dccac0f35d7f42ee8c01a01a1ea37e885dbe20c",
+    "cluster/microk8s/worker.go": "3291e29287e790ebd6ddc5a58a4639df6ba5b6a1952549915c2ff6c914a36a32",
+    "cluster/microk8s/worker_test.go": "17dbad8d38d8dbbb4c96d453a7b6dbfa30c2c424c8cb3de8cc197075275b63e0",
+    "cluster/microk8s/testdata/microk8s-1.34.9-kubelet.json": "918e84e5f387ab94b008d2a0789e42c03d7c8b0b034f7d4c2ec0c4a0c9f5081a"
+  },
+  "upstreamSourceSHA256": {
+    "remove_node.py": "317b69fa9e2bed126b66b50ebd96b1b93489ad6348c2b1d6596c5e236a1ab0e7",
+    "leave.py": "129e7663d28cf3f5dffedafd976046de0f8f2739b067e4150682239f344eef1d"
+  }
+}

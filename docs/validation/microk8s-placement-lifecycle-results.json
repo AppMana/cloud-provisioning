@@ -1,0 +1,466 @@
+{
+  "result": "native-control-plane-replacement-cross-remote-matrix-failed",
+  "observedAt": "2026-09-09T07:43:43.216186+00:00",
+  "profile": "microk8s/calico",
+  "reuseSite": true,
+  "expectedReplacements": 8,
+  "placements": [
+    "control-plane",
+    "one-worker",
+    "two-workers",
+    "all-nodes"
+  ],
+  "commandID": "1edd74b2-2feb-4c21-bfee-ea4bebd42a42",
+  "binarySHA256": "2e5f031e8c71d5277c82aa914f42581c35599bdb28708af80853dea9fec2fd7c",
+  "sourceSHA256": {
+    "harness/e2e/cmd/lab/main.go": "6eebcf3806ab917805e837d39ddfbebdb0ce4baffb290bd732a4e84f520a338e",
+    "harness/e2e/provider/provider.go": "77fb7cb65f2ca3cc2161d96ec887aaa97f06dfefcafa546473dbde97cb83156b",
+    "harness/e2e/provider/provider_test.go": "5dfa44acb3d90d99f7abf2478ae91d782119a766bc262e8ce7739318ced8bd01",
+    "harness/e2e/provider/cluster_test.go": "332c1abef1dceac13762b2074811d6429ddfddea402a597eaf1fa6fd1b579f7a",
+    "harness/e2e/kube/kube.go": "b56252bd23d2db0a5c61eb23ed242abf6878d767cf908e95c22474b3e5d71a45",
+    "harness/e2e/claim/claim.go": "79bad182f9911f6ca7107a8875fe1fb9ced7de0f4e63b945a08b2ffa3f9a0790",
+    "harness/e2e/claim/endpoint_test.go": "56b4642eeb4525c20232c6c270cf8f3594e2133f986959340cd8400e71394217"
+  },
+  "tests": {
+    "raceEnabledLabProviderClaimKube": "passed",
+    "readyInfrastructureEndpointCorrection": "passed"
+  },
+  "unitCoverage": {
+    "kube": {
+      "covered": 19,
+      "total": 59
+    },
+    "cmd": {
+      "covered": 42,
+      "total": 379
+    },
+    "provider": {
+      "covered": 124,
+      "total": 223
+    },
+    "claim": {
+      "covered": 50,
+      "total": 122
+    }
+  },
+  "nativeCoverage": {
+    "coveredStatements": 1244,
+    "totalStatements": 3260,
+    "scope": "instrumented harness packages"
+  },
+  "history": {
+    "placementLoop": "9c14b60f",
+    "infrastructureReadyShortCircuit": "ef815636",
+    "relationship": "Extends the placement loop to run each remote lifecycle at every placement; preserves real Helm movement and CAPI ownership. Moves endpoint correction ahead of the Ready shortcut."
+  },
+  "limits": [
+    "No placement completed its full lifecycle qualification in this attempt.",
+    "Other three placement lifecycle rows were not reached.",
+    "The earlier initial-placement lifecycle report remains separate evidence.",
+    "Route presence and forwarding settings do not establish packet delivery."
+  ],
+  "firstObservationSHA256": "36db0808639dfc682ea2c7b362925f9052340a32fffb3d18b0b2a3c3afc6b3e1",
+  "replacements": [
+    {
+      "newNodeUID": "8d3b6633-4bcc-4952-ac4c-be90afcec42f",
+      "node": "remote1",
+      "oldNodeUID": "4f4d2d2c-f30c-42fc-9dd6-ad8ee3e2a22c",
+      "placement": "control-plane"
+    },
+    {
+      "newNodeUID": "884007a0-d475-4c0f-a775-fc5b04d2ead6",
+      "node": "remote2",
+      "oldNodeUID": "d58ed2d2-100e-4298-b601-b92dc2fd98c4",
+      "placement": "control-plane"
+    }
+  ],
+  "completedPlacements": [],
+  "completedMatrices": [
+    {
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "18.27308994s",
+      "cancelled": false
+    },
+    {
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "7.360081201s",
+      "cancelled": false
+    },
+    {
+      "total": 140,
+      "passed": 140,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "10.20485421s",
+      "cancelled": false
+    },
+    {
+      "total": 102,
+      "passed": 102,
+      "failed": 0,
+      "notRequired": 0,
+      "elapsed": "8.332453106s",
+      "cancelled": false
+    },
+    {
+      "total": 140,
+      "passed": 134,
+      "failed": 6,
+      "notRequired": 0,
+      "elapsed": "5m37.792825929s",
+      "cancelled": false
+    }
+  ],
+  "latestObservationSHA256": "661d0821dbd5d67da63ece9af7308f7eb4d9721b5d9308403e849c70d7b51453",
+  "observedInfrastructurePort": 16443,
+  "nativeExit": 1,
+  "finishedAt": "2026-09-09T07:39:31.799499444Z",
+  "failure": "re-adding remote2 did not restore the full matrix",
+  "evidenceArchive": {
+    "sha256": "6b7c519a0676932dc5f43c8f738462c70fe2646f9dafc7b541c75923e5ecef8f",
+    "bytes": 17144863,
+    "verifiedLocally": true
+  },
+  "failedAttempts": [
+    {
+      "series": 5,
+      "attempt": 1,
+      "failed": 6,
+      "paths": [
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "pod"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "service"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "transfer"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "pod"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "service"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "transfer"
+        }
+      ]
+    },
+    {
+      "series": 5,
+      "attempt": 2,
+      "failed": 6,
+      "paths": [
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "pod"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "service"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "transfer"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "pod"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "service"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "transfer"
+        }
+      ]
+    },
+    {
+      "series": 5,
+      "attempt": 3,
+      "failed": 6,
+      "paths": [
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "pod"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "service"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "transfer"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "pod"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "service"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "transfer"
+        }
+      ]
+    },
+    {
+      "series": 5,
+      "attempt": 4,
+      "failed": 6,
+      "paths": [
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "pod"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "service"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "transfer"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "pod"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "service"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "transfer"
+        }
+      ]
+    },
+    {
+      "series": 5,
+      "attempt": 5,
+      "failed": 6,
+      "paths": [
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "pod"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "service"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "transfer"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "pod"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "service"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "transfer"
+        }
+      ]
+    },
+    {
+      "series": 5,
+      "attempt": 6,
+      "failed": 6,
+      "paths": [
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "pod"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "service"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "transfer"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "pod"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "service"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "transfer"
+        }
+      ]
+    },
+    {
+      "series": 5,
+      "attempt": 7,
+      "failed": 6,
+      "paths": [
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "pod"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "service"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "transfer"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "pod"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "service"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "transfer"
+        }
+      ]
+    },
+    {
+      "series": 5,
+      "attempt": 8,
+      "failed": 6,
+      "paths": [
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "pod"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "service"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "transfer"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "pod"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "service"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "transfer"
+        }
+      ]
+    },
+    {
+      "series": 5,
+      "attempt": 9,
+      "failed": 6,
+      "paths": [
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "pod"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "service"
+        },
+        {
+          "from": "remote1",
+          "to": "remote2",
+          "kind": "transfer"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "pod"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "service"
+        },
+        {
+          "from": "remote2",
+          "to": "remote1",
+          "kind": "transfer"
+        }
+      ]
+    }
+  ],
+  "diagnosticReport": "microk8s-adoption-image-results.json"
+}

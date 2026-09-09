@@ -1,0 +1,120 @@
+{
+  "observedAt": "2026-09-08T00:29:52.397438+00:00",
+  "scope": "Windows 2025 CPU workload tunnel canary rollout and post-recovery three-node traffic matrix",
+  "rollout": {
+    "service": "cloud-provisioning-cldt1775f69e",
+    "originalBinaryPreserved": true,
+    "passed": true,
+    "observedAt": "2026-09-08T00:28:05.9274489Z",
+    "executable": "C:\\ProgramData\\CloudProvisioning\\windows-tunnel-peer-update-v1.exe",
+    "identityUnchanged": true,
+    "processID": 6288,
+    "sha256": "a513e39abc7ab84739160d60efffc7eb873b589a26ab3e0971e4e665060e0f3a"
+  },
+  "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+  "instanceID": "i-07c9859f5ce8ed42b",
+  "joinChecks": {
+    "expectedWindowsBuild": true,
+    "onePhysicalNIC": true,
+    "k0sWorkerRunning": true,
+    "tunnelRunning": true,
+    "bootstrapInstalled": true,
+    "capiAssociation": true,
+    "windowsNode": true,
+    "matchesSiteKubelet": true,
+    "containerd2": true,
+    "cloudWorkerLabel": true,
+    "internetFacingTaint": true,
+    "nodeReady": true,
+    "publisherReady": true,
+    "expectedWorkerVersion": true,
+    "expectedWorkerHash": true,
+    "expectedTunnelHash": true,
+    "expectedRunningTunnelHash": true,
+    "peerDelivery": true
+  },
+  "runningTunnels": [
+    {
+      "processId": 6288,
+      "name": "cloud-provisioning-cldt1775f69e",
+      "executableSHA256": "a513e39abc7ab84739160d60efffc7eb873b589a26ab3e0971e4e665060e0f3a"
+    }
+  ],
+  "workloadIdentitiesUnchangedAcrossRollout": true,
+  "targets": [
+    {
+      "pod": "net-aws-win2022-v3",
+      "podUID": "536d831a-e33d-4cd3-840c-f7bd2bddb920",
+      "node": "aws-win2022-v3",
+      "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "os": "windows",
+      "container": "serve",
+      "containerID": "containerd://b9bf8094c22348d5bb0d2006fb4883c2834bd51789b1c653eb50f524dfa4aa26",
+      "podIP": "10.244.114.4",
+      "serviceUID": "3c9309bd-53ad-4c2b-a134-aa811391ec19",
+      "serviceIP": "10.98.160.233"
+    },
+    {
+      "pod": "net-aws-win2025-v3",
+      "podUID": "77696fb9-44a9-4075-bf83-e8993bf84230",
+      "node": "aws-win2025-v3",
+      "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "os": "windows",
+      "container": "serve",
+      "containerID": "containerd://b87960054e7f87c7e7f53a5419937746dc1be0893ef7b5eb16c4949ce8bdab9d",
+      "podIP": "10.244.42.5",
+      "serviceUID": "475a88d2-cc49-4739-8db6-f521dcac28c4",
+      "serviceIP": "10.99.76.215"
+    },
+    {
+      "pod": "net-w1",
+      "podUID": "5982bf45-2e0e-40c4-bd40-4b407742dc66",
+      "node": "w1",
+      "nodeUID": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "os": "linux",
+      "container": "serve",
+      "containerID": "containerd://ebb3abd4f0ed02e9122f5eced7fec62cf30d2266567dc39d676745eb415c2535",
+      "podIP": "10.244.190.81",
+      "serviceUID": "0d250803-853a-49a2-937b-5c9c2c0e49fb",
+      "serviceIP": "10.96.85.157"
+    }
+  ],
+  "networkBefore": {
+    "observedAt": "2026-09-08T00:27:40.384115+00:00",
+    "passed": true,
+    "checks": 60,
+    "passedChecks": 60,
+    "identitiesStable": true,
+    "udpRequested": 600,
+    "udpConfirmed": 600,
+    "checksByKind": {
+      "dns": 6,
+      "service": 6,
+      "tcp": 18,
+      "udp": 30
+    },
+    "failures": []
+  },
+  "networkAfter": {
+    "observedAt": "2026-09-08T00:29:10.877970+00:00",
+    "passed": true,
+    "checks": 60,
+    "passedChecks": 60,
+    "identitiesStable": true,
+    "udpRequested": 600,
+    "udpConfirmed": 600,
+    "checksByKind": {
+      "dns": 6,
+      "service": 6,
+      "tcp": 18,
+      "udp": 30
+    },
+    "failures": []
+  },
+  "limitations": [
+    "Service was deliberately restarted; traffic was measured before and after, not continuously during rollout",
+    "No Windows 2025 live membership-change qualification",
+    "Passing UDP sweep does not resolve earlier intermittent or fragmentation failures",
+    "Candidate is deployed to two CPU worker services only; baked images and GPU workers retain the original tunnel binary"
+  ]
+}

@@ -1,0 +1,223 @@
+{
+  "observedAt": "2026-09-07T08:08:31.088897824Z",
+  "results": [
+    {
+      "intent": {
+        "lease": "resolver-validation-2022/read-only/observation",
+        "projection": {
+          "lease": "resolver-validation-2022/read-only/observation",
+          "workerKey": "oC7rqFD7tkI+qMfx8drKsj/IDSH5g6SR2T7KFb5YcEQ=",
+          "gatewayKey": "v9LzC5HWxvKhvvZa/6z+QA4MOIp6U633DwyOvIxVmXE=",
+          "workerAddress": "172.29.0.21",
+          "workerHost": "172.29.0.21/32",
+          "directHosts": [
+            "10.10.0.10/32",
+            "10.10.0.11/32",
+            "10.10.0.12/32",
+            "10.10.0.13/32",
+            "10.10.0.14/32",
+            "10.100.0.1/32",
+            "10.100.0.2/32"
+          ]
+        },
+        "consumers": [
+          {
+            "nodeName": "aws-win2022",
+            "nodeUID": "817a65b2-fc50-41a9-af96-05eba64ce024",
+            "site": false,
+            "machineName": "aws-win2022",
+            "tunnelAddress": "10.100.0.133",
+            "publicKey": "oC7rqFD7tkI+qMfx8drKsj/IDSH5g6SR2T7KFb5YcEQ=",
+            "secretUID": "c7af9b77-ff4d-4cde-bcd9-2c48ca7324e0"
+          },
+          {
+            "nodeName": "aws-win2025",
+            "nodeUID": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+            "site": false,
+            "machineName": "aws-win2025",
+            "tunnelAddress": "10.100.0.134",
+            "publicKey": "DaVHNYm+FcOYcFSn3mR42igTXPS8eOHH8PMB0vSG4Bg=",
+            "secretUID": "380e622b-5fd4-46aa-93b9-91c285b8d685"
+          },
+          {
+            "nodeName": "cp",
+            "nodeUID": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+            "site": true,
+            "publicKey": "AHCG8KQpoiNKhJpMaKmS3wt6Fnhcn9HwBxqLs+1tixU="
+          },
+          {
+            "nodeName": "cp2",
+            "nodeUID": "947de62f-0920-408c-aa31-ac80a2344128",
+            "site": true,
+            "publicKey": "OgIXpq5DSyQ5ArQlDNSVxe/5H3z9pjZgeaUIl+i2+i0="
+          },
+          {
+            "nodeName": "cp3",
+            "nodeUID": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+            "site": true,
+            "publicKey": "T495sv5sExYRsKGR+okL12UN/wLBE/N2g9S4sZomkT8="
+          },
+          {
+            "nodeName": "ip-172-29-0-9",
+            "nodeUID": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+            "site": false,
+            "machineName": "aws-relay1",
+            "tunnelAddress": "10.100.0.136",
+            "publicKey": "v9LzC5HWxvKhvvZa/6z+QA4MOIp6U633DwyOvIxVmXE=",
+            "secretUID": "57a9d576-052c-4b30-96d3-9f81eca3aac5"
+          },
+          {
+            "nodeName": "remote1",
+            "nodeUID": "8935dd28-de93-44be-a887-73110fe88c51",
+            "site": false,
+            "machineName": "remote1",
+            "tunnelAddress": "10.100.0.130",
+            "publicKey": "C5DKp7m45TjbJUltRzHMSXWUoA/Iuz6i7E1qMKyqbVI=",
+            "secretUID": "3de17b8c-19c0-4754-8736-6450792c38b2"
+          },
+          {
+            "nodeName": "remote2",
+            "nodeUID": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+            "site": false,
+            "machineName": "remote2",
+            "tunnelAddress": "10.100.0.131",
+            "publicKey": "6w4vTcG1qlkY1UdHqFcoZL9dgpXQAXUF8KtXFGm2/zM=",
+            "secretUID": "d728a410-e796-4d3c-bbd2-3795e9dc045f"
+          },
+          {
+            "nodeName": "w1",
+            "nodeUID": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+            "site": true,
+            "publicKey": "iawhJX+3BwVJIFPi/hXAWXjIWdwaJDyZbuiOIQ6MAE4="
+          },
+          {
+            "nodeName": "w2",
+            "nodeUID": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+            "site": true,
+            "publicKey": "+ewxGqTjR0fYF3SvU+4tIq7NFzlU3qC3c5BTqM5VT14="
+          }
+        ],
+        "retired": false
+      },
+      "replacementNodeRejected": true,
+      "windowsVersion": "2022"
+    },
+    {
+      "intent": {
+        "lease": "resolver-validation-2025/read-only/observation",
+        "projection": {
+          "lease": "resolver-validation-2025/read-only/observation",
+          "workerKey": "DaVHNYm+FcOYcFSn3mR42igTXPS8eOHH8PMB0vSG4Bg=",
+          "gatewayKey": "v9LzC5HWxvKhvvZa/6z+QA4MOIp6U633DwyOvIxVmXE=",
+          "workerAddress": "172.29.0.13",
+          "workerHost": "172.29.0.13/32",
+          "directHosts": [
+            "10.10.0.10/32",
+            "10.10.0.11/32",
+            "10.10.0.12/32",
+            "10.10.0.13/32",
+            "10.10.0.14/32",
+            "10.100.0.1/32",
+            "10.100.0.2/32"
+          ]
+        },
+        "consumers": [
+          {
+            "nodeName": "aws-win2022",
+            "nodeUID": "817a65b2-fc50-41a9-af96-05eba64ce024",
+            "site": false,
+            "machineName": "aws-win2022",
+            "tunnelAddress": "10.100.0.133",
+            "publicKey": "oC7rqFD7tkI+qMfx8drKsj/IDSH5g6SR2T7KFb5YcEQ=",
+            "secretUID": "c7af9b77-ff4d-4cde-bcd9-2c48ca7324e0"
+          },
+          {
+            "nodeName": "aws-win2025",
+            "nodeUID": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+            "site": false,
+            "machineName": "aws-win2025",
+            "tunnelAddress": "10.100.0.134",
+            "publicKey": "DaVHNYm+FcOYcFSn3mR42igTXPS8eOHH8PMB0vSG4Bg=",
+            "secretUID": "380e622b-5fd4-46aa-93b9-91c285b8d685"
+          },
+          {
+            "nodeName": "cp",
+            "nodeUID": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+            "site": true,
+            "publicKey": "AHCG8KQpoiNKhJpMaKmS3wt6Fnhcn9HwBxqLs+1tixU="
+          },
+          {
+            "nodeName": "cp2",
+            "nodeUID": "947de62f-0920-408c-aa31-ac80a2344128",
+            "site": true,
+            "publicKey": "OgIXpq5DSyQ5ArQlDNSVxe/5H3z9pjZgeaUIl+i2+i0="
+          },
+          {
+            "nodeName": "cp3",
+            "nodeUID": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+            "site": true,
+            "publicKey": "T495sv5sExYRsKGR+okL12UN/wLBE/N2g9S4sZomkT8="
+          },
+          {
+            "nodeName": "ip-172-29-0-9",
+            "nodeUID": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+            "site": false,
+            "machineName": "aws-relay1",
+            "tunnelAddress": "10.100.0.136",
+            "publicKey": "v9LzC5HWxvKhvvZa/6z+QA4MOIp6U633DwyOvIxVmXE=",
+            "secretUID": "57a9d576-052c-4b30-96d3-9f81eca3aac5"
+          },
+          {
+            "nodeName": "remote1",
+            "nodeUID": "8935dd28-de93-44be-a887-73110fe88c51",
+            "site": false,
+            "machineName": "remote1",
+            "tunnelAddress": "10.100.0.130",
+            "publicKey": "C5DKp7m45TjbJUltRzHMSXWUoA/Iuz6i7E1qMKyqbVI=",
+            "secretUID": "3de17b8c-19c0-4754-8736-6450792c38b2"
+          },
+          {
+            "nodeName": "remote2",
+            "nodeUID": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+            "site": false,
+            "machineName": "remote2",
+            "tunnelAddress": "10.100.0.131",
+            "publicKey": "6w4vTcG1qlkY1UdHqFcoZL9dgpXQAXUF8KtXFGm2/zM=",
+            "secretUID": "d728a410-e796-4d3c-bbd2-3795e9dc045f"
+          },
+          {
+            "nodeName": "w1",
+            "nodeUID": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+            "site": true,
+            "publicKey": "iawhJX+3BwVJIFPi/hXAWXjIWdwaJDyZbuiOIQ6MAE4="
+          },
+          {
+            "nodeName": "w2",
+            "nodeUID": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+            "site": true,
+            "publicKey": "+ewxGqTjR0fYF3SvU+4tIq7NFzlU3qC3c5BTqM5VT14="
+          }
+        ],
+        "retired": false
+      },
+      "replacementNodeRejected": true,
+      "windowsVersion": "2025"
+    }
+  ],
+  "scope": "Read-only live consumer identity resolution for both Windows attachments; no publication or packet qualification",
+  "coverage": {
+    "consumerResolverNative": {
+      "covered": 58,
+      "total": 75,
+      "percent": 77.3
+    }
+  },
+  "sourceSHA256": {
+    "controller/pkg/attachment/consumer_resolver.go": "492ec0ea36096a4454c73d2280bc33d6077df00ae4b20cfd6020ac6e117b38c4"
+  },
+  "remaining": [
+    "Acknowledgements for relayed site consumers cp/cp2/cp3",
+    "Controller registration and deployment",
+    "Combined packet and removal/replacement matrix"
+  ]
+}

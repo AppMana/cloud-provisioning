@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "scope": "Linux k0s Calico GPU builder cache; no captured-cache or fresh-worker qualification",
+  "builder": {
+    "instanceType": "t3.large",
+    "parentImageID": "ami-007650e971dd51a9d",
+    "unjoined": true
+  },
+  "runtime": {
+    "distribution": "k0s",
+    "version": "1.36.2+k0s.0",
+    "containerd": "2.3.2",
+    "runtimeFilesAndInheritedDriverUnchanged": true
+  },
+  "cache": {
+    "imageInputs": 12,
+    "references": 23,
+    "independentNativeCheck": {
+      "passed": true,
+      "phases": {
+        "before": {
+          "inventoryMatches": true,
+          "digestsMatch": true,
+          "contentComplete": true,
+          "unpacked": true,
+          "quietAgrees": true
+        },
+        "after": {
+          "inventoryMatches": true,
+          "digestsMatch": true,
+          "contentComplete": true,
+          "unpacked": true,
+          "quietAgrees": true
+        }
+      },
+      "checks": {
+        "originalRuntimesStopped": true,
+        "temporaryStateRemoved": true
+      },
+      "references": 23,
+      "qualificationEligible": false,
+      "scope": "Builder cache only; capture and fresh-clone startup remain separate gates"
+    },
+    "checkerPullsOrImports": false
+  },
+  "tests": {
+    "command": "python3 -m unittest discover -s observe -p test_linux_cache.py",
+    "passed": 8,
+    "coveredStatements": 56,
+    "totalStatements": 70,
+    "statementCoveragePercent": 80,
+    "scope": "observe/linux_cache.py unit coverage only"
+  },
+  "retainedCluster": {
+    "nodes": 13,
+    "ready": 13,
+    "nodeUIDsUnchanged": true
+  },
+  "evidenceSHA256": {
+    "cache-native-evidence.json": "5589a960797c8872ef6f15bd097243304b3b19c692482e675d4015f67e4e63de",
+    "cache-observation.json": "9cfede377be9617d71fece0b8ae45863414749829bfd6e803761a934f3899111",
+    "cache-validated.json": "a48f7433bb4033bdbd42d9b2328b27ec079af14e7841d1eeac0010c568d1e39b",
+    "independent.stdout": "a26145552579d52dd02ef96a43a00604830aaf9fd6c50f22190925e1619f3cff",
+    "independent-input-hashes.json": "6c617bde584344261611c116be9746f1b1449cbb6679a40f5b2d46805de40f81",
+    "post-cache-runtime.stdout": "339ca8e9cafc710cabaa389f553079bd2f1b55cd7a7ae856a124c8f330481edd",
+    "nodes-cache-gate.json": "3e966e72a51d42f3d98099eb1ef08a872eaafb25ef96c2328d98132893dfec94",
+    "ssm-transfer-terminal-receipts.json": "3dabb61a56e1e6d584a6265153013215e4656d4375335418f1f7f65f3ef9aa5f",
+    "transfer-cleanup.stdout": "2b060999935eaf4268f6dd65236ccc3ab05227faf35d7bb41799e2254725bd2f",
+    "ssm-log-cleanup.stdout": "b5b52033a3a86a43f4d4827e5ac415c083c20a61e08106e0d4b82d3134bcc4af",
+    "final-transfer-scan.stdout": "367aa7039708f1f0297f6a3268503f56c2ae39b9eb85a31e76d86bea02cd6804",
+    "post-cleanup-evidence.stdout": "bdcc7cccdf68f36454dee1fad30f0508b6018c3f04aaa80f5e91de3f4935669c"
+  },
+  "qualificationEligible": false,
+  "remaining": [
+    "Cached-image worker replacement, dual-stack and isolation acceptance",
+    "Resolve Windows survivor UDP failures before release qualification",
+    "Consolidate native collection and cache-build prototypes"
+  ],
+  "transferCleanup": {
+    "successfulAWSCommandReceipts": 11,
+    "scriptsRemoved": 11,
+    "agentLogClearedWithInodePreserved": true,
+    "finalSignedURLFileCounts": {
+      "/var/lib/amazon/ssm": 0,
+      "/var/log/amazon/ssm": 0
+    },
+    "scope": "Scan for actual X-Amz-Signature values in SSM state and log directories; not a whole-image credential audit",
+    "testsPassed": 4,
+    "coveredStatements": 38,
+    "totalStatements": 43,
+    "statementCoveragePercent": 88.37209302325581
+  },
+  "captureEvidence": "linux-gpu-cache-capture-results.json",
+  "freshWorkerEvidence": "linux-gpu-cache-capi-results.json"
+}

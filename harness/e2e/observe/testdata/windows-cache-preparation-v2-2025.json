@@ -1,0 +1,27 @@
+{
+  "snapshot": {
+    "workerServicePresent": false,
+    "identityPathsPresent": [],
+    "pipe": "\\\\.\\pipe\\cldt-image-cache",
+    "containers": [],
+    "registeredImages": [
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ],
+    "namespace": "k8s.io",
+    "cacheService": "Running",
+    "root": "C:\\var\\lib\\k0s\\containerd",
+    "snapshotter": "windows",
+    "dataDirectoryInheritsPermissions": true,
+    "readyImages": [
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ],
+    "tasks": [],
+    "observedAt": "2026-09-07T21:48:55.5494251Z",
+    "shimSHA256": "adb8e4d990da4bde04956441fcd569a2b13a298d89758ace0896b1bc3389c1ae",
+    "windowsBuild": 26100,
+    "workerSHA256": "ee46a95bde767f65fd7472173b0028233adc8431c2c208931b82df5e88009e3e",
+    "containerdSHA256": "92fe1b334ef6ee9477fd22c88012bda605b52952fe4964705ada1a49ae0f2030"
+  },
+  "serviceStopped": true,
+  "cacheServiceRemoved": true
+}

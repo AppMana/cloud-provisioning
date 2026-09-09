@@ -1,111 +1,33 @@
 #cloud-config
-ssh_authorized_keys:
-{{- range .sshAuthorizedKeys }}
-  - {{ . }}
-{{- end }}
-# k0s-worker join pattern: download the pinned dialer binary, bring up
-# the WireGuard tunnel, gate on the cluster's API VIP becoming
-# reachable through it, then join as a plain k0s worker using a
-# pre-minted join token. This is CAPA's own
-# Machine.spec.bootstrap.dataSecretName content, with no bootstrap
-# provider involved. A bootstrap provider's value is generating this
-# content from a CAPI-managed control plane, and there isn't one here
-# (see ../README.md). Every value below comes from the join
-# reconciler's render, not from any control-plane object.
+{{- template "ssh-authorized-keys" . }}
+# k0s-worker join pattern: bring up the tunnel (the shared blocks in
+# _shared.tmpl), gate on the cluster's API becoming reachable through
+# it, then join as a plain k0s worker using a pre-minted join token.
+# This is CAPA's own Machine.spec.bootstrap.dataSecretName content,
+# with no bootstrap provider involved (see ../README.md). Every value
+# below comes from the join reconciler's render, not from any
+# control-plane object.
+#
+# No balancer here: k0s's nllb gives every worker a native proxy on its own
+# loopback, so the k0s provider does not implement
+# join.NodeLocalBalancer, apiProxyPort renders zero, and the shared
+# blocks emit no wg-apiproxy unit. The README's who-balances table is
+# that decision's record.
 write_files:
-  # Not wg0.conf/wg-quick: wg-quick installs a kernel route for every
-  # AllowedIPs entry, which is a route hijack. The same Go dialer
-  # binary that runs on-prem runs here instead (listener role, systemd
-  # unit below): pod and service CIDRs go only into WireGuard's
-  # cryptokey accept-list, and the only kernel routes it installs are
-  # /32 and /128 host routes to peer node addresses, enforced at parse
-  # time.
-  #
-  # This file is the bootstrap snapshot: identity (this node's private
-  # key and tunnel address, which do not travel through the API) plus
-  # the peer list as of render time. Post-join, the wg-dialer-cloud
-  # DaemonSet feeds the same dialer a live peer list from an in-cluster
-  # Secret (--machine-name-file below resolves which one). That
-  # adoption path, not this frozen file, is how peer and CIDR
-  # corrections reach a node whose userdata is immutable. The systemd
-  # unit is not disabled: if the DaemonSet cannot schedule, this file
-  # keeps the node reachable.
-  - path: /etc/wg-dialer/peers.json
-    permissions: '0600'
-    content: |
-      {{ .peersFileJSON }}
-  # The CAPI Machine name, for the adoption path: the DaemonSet's one
-  # shared pod spec derives this machine's own adoption Secret name
-  # from this node-local file.
-  - path: /etc/wg-dialer/machine-name
-    permissions: '0644'
-    content: |
-      {{ .machineName }}
-  - path: /etc/systemd/system/wg-dialer.service
-    permissions: '0644'
-    content: |
-      [Unit]
-      Description=wg-dialer (listener role)
-      After=network-online.target
-      Wants=network-online.target
-
-      [Service]
-      ExecStart=/usr/local/bin/wg-dialer \
-        --iface={{ .interfaceName }} \
-        --peers-file=/etc/wg-dialer/peers.json \
-        --listen-port={{ .wireguardListenPort }} \ \ \
-        --keepalive-seconds=15 \
-        --mtu=1420 \
-        --poll-interval=30s
-      Restart=always
-      # Re-exec hourly so the unit converges onto whatever binary is at
-      # the path: after the node joins, the wg-dialer-cloud DaemonSet
-      # installs its own (image-carried, digest-pinned) binary there,
-      # which is how upgrades reach this floor without a download host
-      # or any per-node action. Restart is <1s and the tunnel config is
-      # idempotent, so the re-exec is not a disruption.
-      RuntimeMaxSec=1h
-      AmbientCapabilities=CAP_NET_ADMIN
-
-      [Install]
-      WantedBy=multi-user.target
+{{- template "wg-dialer-files" . }}
+{{- template "wg-dialer-unit" . }}
+{{- template "wg-apiproxy-unit" . }}
   - path: /etc/k0s/join-token
     permissions: '0600'
     content: |
       {{ .joinToken }}
 runcmd:
-  # A stock cloud image has no wg-dialer: download the release binary
-  # for whatever machine this turned out to be, and verify its digest
-  # BEFORE anything depends on it. The architecture is read here rather
-  # than declared in the claim, because the machine already knows it. The
-  # sha256 is pinned into this (immutable) userdata at render time, so
-  # a compromised download host cannot swap the binary; a mismatch
-  # halts the join rather than running unverified code.
-  # Download to a temp path and rename into place: a re-run of this
-  # bootstrap (cloud-init reruns, an infrastructure provider retrying)
-  # would otherwise try to write a binary that is already executing,
-  # and the kernel refuses that (ETXTBSY), which curl reports as an
-  # opaque write failure. Rename replaces the directory entry and
-  # works regardless.
-  - |
-    set -e
-    case "$(uname -m)" in
-      aarch64|arm64) url='{{ .dialerBinaryURLArm64 }}'; sha='{{ .dialerBinarySHA256Arm64 }}' ;;
-      x86_64|amd64)  url='{{ .dialerBinaryURLAmd64 }}'; sha='{{ .dialerBinarySHA256Amd64 }}' ;;
-      *) echo "no wg-dialer build for $(uname -m)" >&2; exit 1 ;;
-    esac
-    [ -n "$url" ] || { echo "no wg-dialer URL configured for $(uname -m)" >&2; exit 1; }
-    curl -fsSL -o /usr/local/bin/.wg-dialer.new "$url"
-    echo "$sha  /usr/local/bin/.wg-dialer.new" | sha256sum -c -
-    chmod 0755 /usr/local/bin/.wg-dialer.new
-    mv -f /usr/local/bin/.wg-dialer.new /usr/local/bin/wg-dialer
-  - systemctl enable --now wg-dialer.service
+{{- template "dialer-install" . }}
   # Gate on the API's TCP port rather than ICMP: minimal cloud images
   # may ship no ping at all, and cloud firewalls routinely drop ICMP
-  # while allowing the API port, so a ping gate either loops forever or
-  # reports the wrong thing. curl is already a hard dependency of this
-  # pattern. Any HTTP response, including 401/403, proves reachability,
-  # so no -f here.
+  # while allowing the API port. curl is already a hard dependency of
+  # this pattern. Any HTTP response, including 401/403, proves
+  # reachability, so no -f here.
   - until curl -sk --max-time 3 -o /dev/null https://{{ .apiEndpoint }}/livez; do sleep 2; done
   # The cluster's CNI configuration chains standard plugins. For
   # example, 10-calico.conflist chains calico, calico-ipam, k8s,
@@ -138,28 +60,23 @@ runcmd:
     done
     rm -rf /tmp/cni-plugins /tmp/cni-plugins.tgz
   {{- end }}
-  - curl -sSLf https://get.k0s.sh | K0S_VERSION={{ .k0sVersion }} sh
+  - |
+    set -e
+    if [ "$(k0s version 2>/dev/null || true)" != '{{ .k0sVersion }}' ]; then
+      curl -sSLf https://get.k0s.sh -o /tmp/install-k0s.sh
+      K0S_VERSION='{{ .k0sVersion }}' sh /tmp/install-k0s.sh
+      rm -f /tmp/install-k0s.sh
+    fi
   # k0s resolves node IPs by looking up the instance's own hostname
   # rather than inspecting interfaces. On AWS that hostname maps only
   # to the private IPv4 in /etc/hosts, so a dual-stack cluster's
   # kubelet fails to start ("IP address lookup didn't return addresses
   # for both families") even when the interface has a real IPv6 GUA.
-  # --node-ip bypasses that lookup with addresses fetched directly from
-  # instance metadata instead. (IMDSv2, AWS-specific: a different
-  # infrastructure provider's variant of this pattern would fetch its
-  # own metadata service here instead.)
+  # --node-ip bypasses that lookup. Where the address comes from is
+  # the shared block's business, not this pattern's.
   - |
-    IMDS_TOKEN=$(curl -sSf -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
-    NODE_IPV4=$(curl -sSf -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
-    NODE_IPV6=$(curl -sSf -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/ipv6 || true)
-    NODE_IP_ARG="--node-ip=$NODE_IPV4"
-    [ -n "$NODE_IPV6" ] && NODE_IP_ARG="--node-ip=$NODE_IPV4,$NODE_IPV6"
-    k0s install worker --token-file /etc/k0s/join-token --kubelet-extra-args="{{ .kubeletExtraArgs }} $NODE_IP_ARG"
+    set -e
+{{- template "node-ip-arg" . }}
+    k0s install worker --token-file /etc/k0s/join-token --kubelet-extra-args="{{ .kubeletExtraArgs }} $NODE_IP_ARG $PROVIDER_ID_ARG"
   - k0s start
-  # CAPI's bootstrap-success sentinel. A conformant bootstrap provider
-  # writes it and infrastructure providers poll for it to decide the
-  # machine is bootstrapped; without it an infrastructure provider can
-  # re-execute this userdata indefinitely. This pattern takes the
-  # bootstrap provider's place, so it honors the same contract.
-  - mkdir -p /run/cluster-api
-  - touch /run/cluster-api/bootstrap-success.complete
+{{- template "bootstrap-sentinel" . }}

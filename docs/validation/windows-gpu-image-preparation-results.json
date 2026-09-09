@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 2,
+  "observedAt": "2026-09-07T17:09:25.673626+00:00",
+  "scope": "NVIDIA GRID image preparation on single-NIC Windows Server 2022 and 2025 g6f.large EC2 VMs; no Kubernetes GPU workload validation",
+  "instanceType": "g6f.large",
+  "scripts": {
+    "prepare-nvidia.ps1": "30faad0d9e43970cfc7290954e17d124b9eb25469db686d086a5a8378dc63041",
+    "verify-nvidia.ps1": "7a0b7d01488dae5793eb9ef03fb18ee4e333e8c6a919bb79ce84c4825b827bd6"
+  },
+  "cases": [
+    {
+      "windowsBuild": 20348,
+      "installation": {
+        "signer": "CN=NVIDIA Corporation, OU=2008B9F, O=NVIDIA Corporation, L=Santa Clara, S=California, C=US",
+        "licenseSource": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvidia-GRID-driver.html",
+        "windowsBuild": 20348,
+        "installationBootTime": "2026-09-07T16:59:19.4995610Z",
+        "driverVersion": "582.53",
+        "verifiedAfterReboot": false,
+        "installerExitCode": 0,
+        "packageSHA256": "1fe09ef6cc93124d2800c453d663e3a14c020ead68feb1001d6b93cb19bbcc12",
+        "licenseScope": "aws"
+      },
+      "ssmCommand": {
+        "status": "Success",
+        "exitCode": 0,
+        "startedAt": "2026-09-07T17:01:02.991Z",
+        "finishedAt": "2026-09-07T17:05:56.991Z"
+      },
+      "rebootVerification": {
+        "licenseActivationValidated": false,
+        "licenseScope": "aws",
+        "packageSHA256": "1fe09ef6cc93124d2800c453d663e3a14c020ead68feb1001d6b93cb19bbcc12",
+        "windowsBuild": 20348,
+        "bootTime": "2026-09-07T17:06:41.5000000Z",
+        "driverVersion": "582.53",
+        "workloadValidated": false,
+        "verifiedAfterReboot": true,
+        "gpuCount": 1,
+        "licenseSource": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvidia-GRID-driver.html",
+        "gpus": [
+          {
+            "driverVersion": "582.53",
+            "driverModel": "WDDM",
+            "name": "NVIDIA L4-3Q"
+          }
+        ]
+      },
+      "licenseObservation": [
+        {
+          "value": "NVIDIA RTX Virtual Workstation",
+          "field": "licensed_product_name"
+        },
+        {
+          "value": "Licensed (Expiry: N/A)",
+          "field": "license_status"
+        }
+      ]
+    },
+    {
+      "windowsBuild": 26100,
+      "installation": {
+        "signer": "CN=NVIDIA Corporation, OU=2008B9F, O=NVIDIA Corporation, L=Santa Clara, S=California, C=US",
+        "licenseSource": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvidia-GRID-driver.html",
+        "windowsBuild": 26100,
+        "installationBootTime": "2026-09-07T16:09:38.5003280Z",
+        "driverVersion": "582.53",
+        "verifiedAfterReboot": false,
+        "installerExitCode": 0,
+        "packageSHA256": "1fe09ef6cc93124d2800c453d663e3a14c020ead68feb1001d6b93cb19bbcc12",
+        "licenseScope": "aws"
+      },
+      "ssmCommand": {
+        "status": "Success",
+        "exitCode": 0,
+        "startedAt": "2026-09-07T16:22:57.478Z",
+        "finishedAt": "2026-09-07T16:26:43.478Z"
+      },
+      "rebootVerification": {
+        "licenseActivationValidated": false,
+        "licenseScope": "aws",
+        "packageSHA256": "1fe09ef6cc93124d2800c453d663e3a14c020ead68feb1001d6b93cb19bbcc12",
+        "windowsBuild": 26100,
+        "bootTime": "2026-09-07T16:28:56.5000000Z",
+        "driverVersion": "582.53",
+        "workloadValidated": false,
+        "verifiedAfterReboot": true,
+        "gpuCount": 1,
+        "licenseSource": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvidia-GRID-driver.html",
+        "gpus": [
+          {
+            "driverVersion": "582.53",
+            "driverModel": "WDDM",
+            "name": "NVIDIA L4-3Q"
+          }
+        ]
+      },
+      "licenseObservation": [
+        {
+          "value": "NVIDIA RTX Virtual WorkstationLicensed (Expiry: N/A)",
+          "field": "vgpu_software_licensed_product"
+        },
+        {
+          "value": "NVIDIA RTX Virtual Workstation",
+          "field": "licensed_product_name"
+        },
+        {
+          "value": "Licensed (Expiry: N/A)",
+          "field": "license_status"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Both VMs passed installation, a distinct reboot, WDDM/device checks and a separate native licensed-status query. The shared verifier does not itself evaluate license activation.",
+    "Capture status is tracked separately in windows-gpu-capture-results.json.",
+    "Fresh CAPI GPU-worker bootstrap, device allocation, DirectX rendering and encoding remain unqualified."
+  ]
+}

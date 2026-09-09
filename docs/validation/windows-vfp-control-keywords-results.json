@@ -1,0 +1,137 @@
+{
+  "scope": "Native Windows Server VM validation of corrected VFP control keywords; background traffic only.",
+  "qualificationEligible": false,
+  "collectorSHA256": "5bbb0d15acd77293aadc5494c73e61a3227d5f25cc33036c10be493ab2f8551b",
+  "hosts": [
+    {
+      "windowsServer": "2022",
+      "result": {
+        "build": 20348,
+        "session": "cldt-vfp-1b8450e6adcc4306ae7f3467bef5752d",
+        "startedAt": "2026-09-09T02:33:36.8102523Z",
+        "stoppedAt": "2026-09-09T02:33:39.2516099Z",
+        "requestedSeconds": 2,
+        "traceStopped": true,
+        "traceFilteringUnchanged": true,
+        "keywordMask": "0xcd0e0f",
+        "includesControl": true,
+        "includesControlValidation": true,
+        "maxFileMiB": 16,
+        "xmlExported": false,
+        "xmlEventLimit": 10000,
+        "xmlEventLimitReached": false,
+        "eventCount": 0,
+        "counts": {},
+        "artifacts": [
+          {
+            "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+            "name": "provider.json",
+            "bytes": 311964
+          },
+          {
+            "sha256": "9d99b5252820813ed1ed6f6ab03ca3218c1b4011881f0a8d23504ff4b812e641",
+            "name": "vfp.etl",
+            "bytes": 196608
+          }
+        ],
+        "qualificationEligible": false,
+        "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation."
+      },
+      "selectedNativeKeywords": {
+        "Control": 65536,
+        "ControlValidation": 4194304
+      },
+      "artifacts": [
+        {
+          "sha256": "aef98eb5d304840db3f7a702f4521e7772f73aaca1ef586f6ed6275cc4da8db3",
+          "name": "vfp\\provider.json",
+          "bytes": 311964
+        },
+        {
+          "sha256": "9d99b5252820813ed1ed6f6ab03ca3218c1b4011881f0a8d23504ff4b812e641",
+          "name": "vfp\\vfp.etl",
+          "bytes": 196608
+        },
+        {
+          "name": "vfp\\result.json",
+          "bytes": 834,
+          "sha256": "a356a75680df0247588a73b9d675b9cc2b1374cf4e1306382e9ec744b5bb7c8f"
+        }
+      ]
+    },
+    {
+      "windowsServer": "2025",
+      "result": {
+        "build": 26100,
+        "session": "cldt-vfp-48384330b9ed42acb912d28ee138b0d2",
+        "startedAt": "2026-09-09T02:33:36.7515833Z",
+        "stoppedAt": "2026-09-09T02:33:39.9615192Z",
+        "requestedSeconds": 2,
+        "traceStopped": true,
+        "traceFilteringUnchanged": true,
+        "keywordMask": "0xcd0e0f",
+        "includesControl": true,
+        "includesControlValidation": true,
+        "maxFileMiB": 16,
+        "xmlExported": false,
+        "xmlEventLimit": 10000,
+        "xmlEventLimitReached": false,
+        "eventCount": 0,
+        "counts": {},
+        "artifacts": [
+          {
+            "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+            "name": "provider.json",
+            "bytes": 327652
+          },
+          {
+            "sha256": "24627b7cc1722c41e1603394c0e365dad8601e2e0c65370f3a9c55ede5dec3fe",
+            "name": "vfp.etl",
+            "bytes": 196608
+          }
+        ],
+        "qualificationEligible": false,
+        "scope": "Bounded VFP event collection; circular capture may overwrite events. Event loss and packet identity require independent validation."
+      },
+      "selectedNativeKeywords": {
+        "Control": 65536,
+        "ControlValidation": 4194304
+      },
+      "artifacts": [
+        {
+          "sha256": "88739eb8cc2ef92da389a514e6488aaa80dd469e5c3e3d7ca826300920874362",
+          "name": "vfp\\provider.json",
+          "bytes": 327652
+        },
+        {
+          "sha256": "24627b7cc1722c41e1603394c0e365dad8601e2e0c65370f3a9c55ede5dec3fe",
+          "name": "vfp\\vfp.etl",
+          "bytes": 196608
+        },
+        {
+          "name": "vfp\\result.json",
+          "bytes": 834,
+          "sha256": "f75d4edcc8e741d273b0c25440fb07b4ab4d4e874932393239be58f38bd412f4"
+        }
+      ]
+    }
+  ],
+  "unitValidation": {
+    "observeTestsPassed": 192,
+    "vfpContextStatements": 53,
+    "vfpContextCoveredStatements": 53,
+    "powerShellCoverageMeasured": false
+  },
+  "cleanup": {
+    "2022": {
+      "traceAbsent": true,
+      "traceFiltering": "Trace filtering is Disabled\r\nCommand get-trace-filtering-state succeeded!\r\n",
+      "directoryAbsent": true
+    },
+    "2025": {
+      "traceAbsent": true,
+      "traceFiltering": "Trace filtering is Disabled\r\nCommand get-trace-filtering-state succeeded!\r\n",
+      "directoryAbsent": true
+    }
+  }
+}

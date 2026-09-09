@@ -1,0 +1,274 @@
+{
+  "observedAt": "2026-09-07T21:40:08.079816+00:00",
+  "scope": "Windows 2022 cache-image join failure and targeted ACL diagnostic; original image not qualified",
+  "instanceID": "i-0e40cc5c0c9b0e687",
+  "machineUID": "9f82cf96-8591-45cd-b693-872ab0404fa8",
+  "nodeUIDAfterRepair": "a2f58e47-c9d9-4c37-9f45-f397167876c1",
+  "imageID": "ami-0651d6fdbda2cdb63",
+  "observations": {
+    "criPluginsHealthy": true,
+    "kubeletServer": "https://[::1]:7443",
+    "traefikAttempt": 11,
+    "traefikError": "open C:\\etc\\traefik\\config.yaml: Access is denied.",
+    "dataDirectoryProtected": true,
+    "configInheritedAdministratorsAndSystemOnly": true,
+    "traefikAccount": "NT AUTHORITY\\Local service",
+    "repair": {
+      "before": "O:BAG:SYD:AI(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)",
+      "path": "C:\\var\\lib\\k0s\\nllb\\traefik",
+      "observedAt": "2026-09-07T21:28:59.0482617Z",
+      "config": "O:BAG:SYD:AI(A;ID;0x1200a9;;;LS)(A;ID;FA;;;SY)(A;ID;FA;;;BA)",
+      "after": "O:BAG:SYD:AI(A;OICI;0x1200a9;;;LS)(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)"
+    },
+    "nodeRegisteredAfterAutomaticRetry": true,
+    "serviceRestarted": false,
+    "konnectivity": {
+      "account": "NT AUTHORITY\\Local service",
+      "podUID": "7147bef7-9b61-4fef-86bf-596347b208ba",
+      "error": "failed to read projected service-account ca.crt: Access is denied.",
+      "repair": {
+        "before": "O:BAG:SYD:AI(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)",
+        "path": "C:\\var\\lib\\k0s\\kubelet\\pods\\7147bef7-9b61-4fef-86bf-596347b208ba\\volumes",
+        "observedAt": "2026-09-07T21:36:28.7977584Z",
+        "after": "O:BAG:SYD:AI(A;OICI;0x1200a9;;;LS)(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)"
+      },
+      "recoveredOnAutomaticRetry": true
+    }
+  },
+  "source": {
+    "k0sTraefikAccountCommit": "6c44a715b",
+    "cachePreparation": "Uncommitted new code; no HEAD blame history. Both prototype and shared preparer copied the protected bootstrap ACL onto the data directory."
+  },
+  "changes": [
+    "Preserve the normal inherited k0s data-directory permissions",
+    "Require native permission evidence before cache preparation acceptance and capture",
+    "Reject historical unpack-only receipts at the new gate"
+  ],
+  "validation": {
+    "cacheTests": 9,
+    "imageTests": 18,
+    "claimTests": 10,
+    "cachePythonStatementCoveragePercent": 77,
+    "nativeWindows2022Parser": [
+      {
+        "errors": 0,
+        "file": "cache-runtime.ps1"
+      },
+      {
+        "errors": 0,
+        "file": "inspect-cache.ps1"
+      },
+      {
+        "errors": 0,
+        "file": "prepare-cache.ps1"
+      },
+      {
+        "errors": 0,
+        "file": "verify-cache.ps1"
+      }
+    ],
+    "observerTests": 40,
+    "awsTests": 63,
+    "legacyImageClaimRejectedBeforeMutation": true,
+    "cacheUnitPlusRecipeCLIStatementCoveragePercent": 100
+  },
+  "limitations": [
+    "Original captured images remain unqualified; worker has two targeted diagnostic ACL repairs",
+    "Fresh corrected Windows 2022 and 2025 image builds and clones remain required",
+    "Successful cache reuse and GPU workload do not resolve the lifecycle/network matrix failures"
+  ],
+  "cacheRecipeSchemaVersion": 2,
+  "joinChecks": {
+    "expectedWindowsBuild": true,
+    "onePhysicalNIC": true,
+    "k0sWorkerRunning": true,
+    "tunnelRunning": true,
+    "bootstrapInstalled": true,
+    "capiAssociation": true,
+    "windowsNode": true,
+    "matchesSiteKubelet": true,
+    "containerd2": true,
+    "cloudWorkerLabel": true,
+    "internetFacingTaint": true,
+    "nodeReady": true,
+    "publisherReady": true,
+    "expectedWorkerVersion": true,
+    "expectedWorkerHash": true,
+    "expectedTunnelHash": true,
+    "peerDelivery": true
+  },
+  "gpuCacheNative": {
+    "gpu": [
+      "NVIDIA L4-3Q, 582.53, WDDM"
+    ],
+    "gpuStagePresent": false,
+    "license": [
+      "Product Brand                                      : NVIDIA RTX Virtual Workstation",
+      "GPU Virtualization Mode",
+      "Virtualization Mode                            : VGPU",
+      "License Status                                 : Licensed (Expiry: N/A)"
+    ],
+    "readyImages": [
+      "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+    ]
+  },
+  "gpuJob": {
+    "name": "windows-render-nvenc-2022-cache-acl-diagnostic",
+    "podUID": "65926e76-a666-45fc-90cf-cc814106fd2e",
+    "phase": "Succeeded",
+    "hardwareReceipt": {
+      "encoder": "h264_nvenc",
+      "containerWindowsBuild": 20348,
+      "decodedFrames": 30,
+      "render": {
+        "api": "Direct3D11",
+        "vendorID": 4318,
+        "deviceID": 10168,
+        "frames": 30,
+        "pixelsPerFrame": 4096,
+        "greenPixels": 1152,
+        "bluePixels": 2944,
+        "hardwareOnly": true
+      },
+      "encodedBytes": 3936
+    },
+    "imageAlreadyPresent": true,
+    "containerCreatedAt": "2026-09-07T21:34:59Z",
+    "containerStartedAt": "2026-09-07T21:35:32Z",
+    "checks": {
+      "podSucceeded": true,
+      "jobComplete": true,
+      "containerExitedZero": true,
+      "containerIdentityPresent": true,
+      "hardwareRenderAndEncode": true
+    },
+    "passed": true
+  },
+  "correctedBuilderVerification": {
+    "observedAt": "2026-09-07T21:53:52.469945+00:00",
+    "migrationGuard": "Exact security-descriptor comparison failed on both builders; original failures retained. No migration retries.",
+    "independentACLAudit": {
+      "observedAt": "2026-09-07T21:46:18.441372+00:00",
+      "scope": "Independent ACL audit after legacy migration guard failed; no migration retry",
+      "years": {
+        "2022": {
+          "checks": {
+            "dataDirectoryInheritsPermissions": true,
+            "bootstrapRestrictedToSystemAndAdministrators": true,
+            "containerdRestrictedToSystemAndAdministrators": true
+          },
+          "passed": true,
+          "containerdSDDL": "O:BAG:SYD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)"
+        },
+        "2025": {
+          "checks": {
+            "dataDirectoryInheritsPermissions": true,
+            "bootstrapRestrictedToSystemAndAdministrators": true,
+            "containerdRestrictedToSystemAndAdministrators": true
+          },
+          "passed": true,
+          "containerdSDDL": "O:BAG:SYD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)"
+        }
+      }
+    },
+    "2022": {
+      "passed": true,
+      "checks": {
+        "expectedWindowsBuild": true,
+        "workerMatches": true,
+        "runtimeMatches": true,
+        "k0sRuntimeStore": true,
+        "cacheServiceRunning": true,
+        "noWorkerServiceOrKnownIdentity": true,
+        "noWorkloadContainersOrTasks": true,
+        "exactImagesRegistered": true,
+        "allImagesDownloadedAndUnpacked": true,
+        "dataDirectoryInheritsPermissions": true
+      },
+      "observedAt": "2026-09-07T21:46:25.5353686Z",
+      "images": [
+        "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+      ],
+      "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+    },
+    "2025": {
+      "passed": true,
+      "checks": {
+        "expectedWindowsBuild": true,
+        "workerMatches": true,
+        "runtimeMatches": true,
+        "k0sRuntimeStore": true,
+        "cacheServiceRunning": true,
+        "noWorkerServiceOrKnownIdentity": true,
+        "noWorkloadContainersOrTasks": true,
+        "exactImagesRegistered": true,
+        "allImagesDownloadedAndUnpacked": true,
+        "dataDirectoryInheritsPermissions": true
+      },
+      "observedAt": "2026-09-07T21:48:55.5494251Z",
+      "images": [
+        "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+      ],
+      "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+    },
+    "scope": "Both corrected builders passed native verification, stopped after Sysprep, and have new image captures pending; untouched clones remain required",
+    "captures": {
+      "2022": {
+        "imageID": "ami-0f5c22e0cb0ec6f50",
+        "imageState": "pending",
+        "snapshotIDs": [
+          "snap-0f9134e2e88ba55ff"
+        ],
+        "generalizeRequestedAt": "2026-09-07T21:47:01.552717+00:00",
+        "cacheVerification": {
+          "passed": true,
+          "checks": {
+            "expectedWindowsBuild": true,
+            "workerMatches": true,
+            "runtimeMatches": true,
+            "k0sRuntimeStore": true,
+            "cacheServiceRunning": true,
+            "noWorkerServiceOrKnownIdentity": true,
+            "noWorkloadContainersOrTasks": true,
+            "exactImagesRegistered": true,
+            "allImagesDownloadedAndUnpacked": true,
+            "dataDirectoryInheritsPermissions": true
+          },
+          "observedAt": "2026-09-07T21:46:25.5353686Z",
+          "images": [
+            "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+          ],
+          "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+        }
+      },
+      "2025": {
+        "imageID": "ami-0b5bfc5a6d0e2007c",
+        "imageState": "pending",
+        "snapshotIDs": [
+          "snap-0b35250d2ad72024e"
+        ],
+        "generalizeRequestedAt": "2026-09-07T21:49:24.947002+00:00",
+        "cacheVerification": {
+          "passed": true,
+          "checks": {
+            "expectedWindowsBuild": true,
+            "workerMatches": true,
+            "runtimeMatches": true,
+            "k0sRuntimeStore": true,
+            "cacheServiceRunning": true,
+            "noWorkerServiceOrKnownIdentity": true,
+            "noWorkloadContainersOrTasks": true,
+            "exactImagesRegistered": true,
+            "allImagesDownloadedAndUnpacked": true,
+            "dataDirectoryInheritsPermissions": true
+          },
+          "observedAt": "2026-09-07T21:48:55.5494251Z",
+          "images": [
+            "docker.io/tensorworks/example-ffmpeg@sha256:e3cc01b8396c6f562c7530ef38271db29cb65d4b70a4c2b8eb76ab35eda9defe"
+          ],
+          "scope": "Running builder cache readiness only; service shutdown, Sysprep and fresh-clone reuse remain separate gates"
+        }
+      }
+    }
+  }
+}

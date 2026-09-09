@@ -1,0 +1,289 @@
+{
+  "observedAt": "2026-09-07T14:28:41.095018+00:00",
+  "machineUID": "797d3edd-a961-4003-ae43-ee418c238dd4",
+  "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+  "instanceID": "i-0ddaed6f030330992",
+  "tcpServiceDNS": {
+    "observedAt": "2026-09-07T14:27:18.572918+00:00",
+    "scope": "Windows 2022 replacement and Linux ordinary pods: bidirectional exact-body TCP, Service and DNS through native kubectl exec",
+    "pods": [
+      {
+        "name": "net-aws-win2022-v3",
+        "uid": "536d831a-e33d-4cd3-840c-f7bd2bddb920",
+        "node": "aws-win2022-v3"
+      },
+      {
+        "name": "net-w1",
+        "uid": "5982bf45-2e0e-40c4-bd40-4b407742dc66",
+        "node": "w1"
+      }
+    ],
+    "checks": [
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "kind": "tcp",
+        "bytes": 1024,
+        "ok": true,
+        "exitCode": 0,
+        "actualBytes": 1024,
+        "sha256": "49abd65bbf7f7e40c7055093ed2e3fd75f2f602f2c5fcf955c213e3135eb03f7"
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "kind": "tcp",
+        "bytes": 16384,
+        "ok": true,
+        "exitCode": 0,
+        "actualBytes": 16384,
+        "sha256": "1536c422c31cc98834759d7085cda394a3510a03d78188248986a6b1a7207d03"
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "kind": "tcp",
+        "bytes": 1048576,
+        "ok": true,
+        "exitCode": 0,
+        "actualBytes": 1048576,
+        "sha256": "8f990ba0b577b51cf009ea049368c16bbda1b21e1b93be07a824758bb253c39b"
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "kind": "clusterIP",
+        "ok": true,
+        "exitCode": 0
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "kind": "dns",
+        "ok": true,
+        "exitCode": 0
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "kind": "tcp",
+        "bytes": 1024,
+        "ok": true,
+        "exitCode": 0,
+        "actualBytes": 1024,
+        "sha256": "49abd65bbf7f7e40c7055093ed2e3fd75f2f602f2c5fcf955c213e3135eb03f7"
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "kind": "tcp",
+        "bytes": 16384,
+        "ok": true,
+        "exitCode": 0,
+        "actualBytes": 16384,
+        "sha256": "1536c422c31cc98834759d7085cda394a3510a03d78188248986a6b1a7207d03"
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "kind": "tcp",
+        "bytes": 1048576,
+        "ok": true,
+        "exitCode": 0,
+        "actualBytes": 1048576,
+        "sha256": "8f990ba0b577b51cf009ea049368c16bbda1b21e1b93be07a824758bb253c39b"
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "kind": "clusterIP",
+        "ok": true,
+        "exitCode": 0
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "kind": "dns",
+        "ok": true,
+        "exitCode": 0
+      }
+    ]
+  },
+  "ingressPolicy": {
+    "before": {
+      "at": "2026-09-07T14:28:08.629855+00:00",
+      "exitCode": 0,
+      "allowed": true,
+      "timedOut": false
+    },
+    "deny": [
+      {
+        "at": "2026-09-07T14:28:08.949670+00:00",
+        "exitCode": 0,
+        "allowed": true,
+        "timedOut": false
+      },
+      {
+        "at": "2026-09-07T14:28:14.103441+00:00",
+        "exitCode": 28,
+        "allowed": false,
+        "timedOut": true
+      },
+      {
+        "at": "2026-09-07T14:28:19.257024+00:00",
+        "exitCode": 28,
+        "allowed": false,
+        "timedOut": true
+      }
+    ],
+    "denyConverged": true,
+    "restored": [
+      {
+        "at": "2026-09-07T14:28:22.596801+00:00",
+        "exitCode": 28,
+        "allowed": false,
+        "timedOut": true
+      },
+      {
+        "at": "2026-09-07T14:28:24.799384+00:00",
+        "exitCode": 0,
+        "allowed": true,
+        "timedOut": false
+      }
+    ],
+    "scope": "Windows 2022 replacement ingress policy: Linux ordinary pod to Windows PodIP TCP8080, allow/deny/restore",
+    "podUID": "536d831a-e33d-4cd3-840c-f7bd2bddb920",
+    "policyUID": "9d58fd3b-43b7-4982-beaf-b1f386f940d1"
+  },
+  "limitations": [
+    "Two-node Linux/Windows 2022 checks only.",
+    "UDP sample passed all ten size/direction cases, each with ten exact responses; does not resolve previously observed intermittent VFP drops.",
+    "No Windows 2025 replacement, egress policy or gateway failover claim."
+  ],
+  "udp": {
+    "observedAt": "2026-09-07T14:32:44.728680+00:00",
+    "scope": "Windows 2022 replacement and Linux ordinary pods, bidirectional UDP exact echo; 10 attempts per size and direction",
+    "checks": [
+      {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "payloadBytes": 64
+      },
+      {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "payloadBytes": 1280
+      },
+      {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "payloadBytes": 1340
+      },
+      {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "payloadBytes": 1400
+      },
+      {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0,
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "payloadBytes": 1800
+      },
+      {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "payloadBytes": 64
+      },
+      {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "payloadBytes": 1280
+      },
+      {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "payloadBytes": 1340
+      },
+      {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "payloadBytes": 1400
+      },
+      {
+        "ok": true,
+        "expectedResponses": 10,
+        "reportedResponses": 10,
+        "exactResponses": 10,
+        "responsesPresent": true,
+        "errors": [],
+        "commandExitCode": 0,
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "payloadBytes": 1800
+      }
+    ]
+  }
+}

@@ -364,6 +364,14 @@ func TestReconcileDelete_RemovesComputeAndOnlyThenReleasesTheClaim(t *testing.T)
 	}
 	awsMachine := &unstructured.Unstructured{}
 	awsMachine.SetGroupVersionKind(joinaws.Provider{}.GVK())
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "public-worker"}, awsMachine); err != nil {
+		t.Fatalf("provider must survive the Machine deletion request: %v", err)
+	}
+	// This fake has no CAPI controller; after observing the Machine absent,
+	// the claim controller can collect the orphaned infrastructure object.
+	if err := reconcileClaim(t, r, created); err != nil {
+		t.Fatalf("Reconcile(orphan cleanup): %v", err)
+	}
 	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "public-worker"}, awsMachine); !apierrors.IsNotFound(err) {
 		t.Errorf("provider machine still present after teardown reconcile: %v", err)
 	}
@@ -378,6 +386,48 @@ func TestReconcileDelete_RemovesComputeAndOnlyThenReleasesTheClaim(t *testing.T)
 	}
 }
 
+func TestReconcileDelete_PreservesInfrastructureWhileCAPIDeletionIsPending(t *testing.T) {
+	claim := fakeClaim("public-worker")
+	r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), fakeNode())
+	if err := reconcileClaim(t, r, claim); err != nil {
+		t.Fatal(err)
+	}
+	key := client.ObjectKeyFromObject(claim)
+	machine := &unstructured.Unstructured{}
+	machine.SetGroupVersionKind(machineGVK)
+	if err := r.Get(context.Background(), key, machine); err != nil {
+		t.Fatal(err)
+	}
+	machine.SetFinalizers([]string{"machine.cluster.x-k8s.io"})
+	machine.SetAnnotations(map[string]string{"pre-drain.delete.hook.machine.cluster.x-k8s.io/test": "awaiting-network-withdrawal"})
+	if err := r.Update(context.Background(), machine); err != nil {
+		t.Fatal(err)
+	}
+	created := &v1alpha1.ProvisionedNodeClaim{}
+	if err := r.Get(context.Background(), key, created); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Delete(context.Background(), created); err != nil {
+		t.Fatal(err)
+	}
+	for attempt := 0; attempt < 3; attempt++ {
+		if err := reconcileClaim(t, r, created); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.Get(context.Background(), key, machine); err != nil || machine.GetDeletionTimestamp() == nil {
+			t.Fatalf("CAPI Machine must remain pending deletion: %v", err)
+		}
+		infra := &unstructured.Unstructured{}
+		infra.SetGroupVersionKind(joinaws.Provider{}.GVK())
+		if err := r.Get(context.Background(), key, infra); err != nil || infra.GetDeletionTimestamp() != nil {
+			t.Fatalf("claim bypassed CAPI's deletion gate: %v", err)
+		}
+		if err := r.Get(context.Background(), key, created); err != nil || !containsString(created.Finalizers, claimFinalizer) {
+			t.Fatalf("claim must retain cleanup ownership: %v", err)
+		}
+	}
+}
+
 // A template describes the machine completely, including the security
 // groups and subnet that decide whether the tunnel can be established
 // at all. Nothing about it may be second-guessed from the claim.
@@ -386,7 +436,10 @@ func TestReconcileDelete_RemovesComputeAndOnlyThenReleasesTheClaim(t *testing.T)
 // established at all. Nothing about it may be second-guessed.
 func TestReconcile_TemplateDrivesTheMachine(t *testing.T) {
 	claim := fakeClaim("public-worker")
-	r := newClaimReconciler(t, claim, fakeTemplate("public-worker"), fakeCluster("appmana"), fakeNode())
+	template := fakeTemplate("public-worker")
+	_ = unstructured.SetNestedStringMap(template.Object, map[string]string{"kubernetes.io/os": "windows", clusterNameLabel: "must-not-override-cluster"}, "spec", "template", "metadata", "labels")
+	_ = unstructured.SetNestedStringMap(template.Object, map[string]string{"image.example/recipe": "windows-2025"}, "spec", "template", "metadata", "annotations")
+	r := newClaimReconciler(t, claim, template, fakeCluster("appmana"), fakeNode())
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}
@@ -400,6 +453,9 @@ func TestReconcile_TemplateDrivesTheMachine(t *testing.T) {
 	}
 	if got, _, _ := unstructured.NestedString(machine.Object, "spec", "instanceType"); got != "t3.micro" {
 		t.Errorf("instanceType = %q, want the template's t3.micro", got)
+	}
+	if machine.GetLabels()["kubernetes.io/os"] != "windows" || machine.GetLabels()[clusterNameLabel] != "appmana" || machine.GetAnnotations()["image.example/recipe"] != "windows-2025" {
+		t.Errorf("template guest metadata or controller-owned cluster label lost: labels=%v annotations=%v", machine.GetLabels(), machine.GetAnnotations())
 	}
 	if ami, _, _ := unstructured.NestedString(machine.Object, "spec", "ami", "id"); ami != "ami-000000000000000ab" {
 		t.Errorf("ami = %q, want the template's", ami)

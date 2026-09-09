@@ -1,0 +1,897 @@
+{
+  "observedAt": "2026-09-08T02:36:58.626408+00:00",
+  "scope": "Existing CAPA Linux gateway against five single-NIC QEMU site VMs; no fresh boot, replacement or deletion in this row.",
+  "bindings": [
+    {
+      "eniCount": 1,
+      "instanceID": "i-0c31429bc71403d5b",
+      "machine": "aws-relay1",
+      "node": "ip-172-29-0-9",
+      "nodeUID": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+      "physicalNIC": "ens5",
+      "providerID": "aws:///us-west-2a/i-0c31429bc71403d5b"
+    }
+  ],
+  "adoption": {
+    "ip-172-29-0-9": {
+      "containers": [
+        {
+          "name": "dialer",
+          "state": {
+            "running": {
+              "startedAt": "2026-09-07T08:21:03Z"
+            }
+          },
+          "lastState": {},
+          "ready": true,
+          "restartCount": 0,
+          "image": "docker.io/library/cldt-dialer:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45",
+          "imageID": "sha256:2b87f6fe16eb90480b6f8490f17693c916e76aac6130752131419043a3c80b45",
+          "containerID": "containerd://5c6739d5cbb373b48ca1039b545b028bcdef04cf27784b622fe08cf4d7dd83e0",
+          "started": true,
+          "resources": {},
+          "volumeMounts": [
+            {
+              "name": "wg-dialer-config",
+              "mountPath": "/etc/wg-dialer"
+            },
+            {
+              "name": "host-bin",
+              "mountPath": "/host-bin"
+            },
+            {
+              "name": "kube-api-access-5wfgx",
+              "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+              "readOnly": true,
+              "recursiveReadOnly": "Disabled"
+            }
+          ],
+          "user": {
+            "linux": {
+              "uid": 0,
+              "gid": 0,
+              "supplementalGroups": [
+                0
+              ]
+            }
+          }
+        }
+      ],
+      "daemonSetUID": "8ac08e53-64c6-4494-af15-ae1851bcb0c6",
+      "machine": "aws-relay1",
+      "peerReceipt": {
+        "secretUID": "57a9d576-052c-4b30-96d3-9f81eca3aac5",
+        "resourceVersion": "829589",
+        "desiredSHA256": "0acfec42aa6646e93f60e68c92d0b62dc2a3e7f328929c0fb1eb7a103e557f73",
+        "appliedSHA256": "0acfec42aa6646e93f60e68c92d0b62dc2a3e7f328929c0fb1eb7a103e557f73"
+      },
+      "podUID": "7fb13f08-63d9-4b42-b7ec-05c27aeea84c"
+    }
+  },
+  "matrix": {
+    "criEndpoint": "unix:///run/k0s/containerd.sock",
+    "failed": 0,
+    "passed": 102,
+    "profile": {
+      "Distro": "k0s",
+      "Network": "calico",
+      "BuilderNetwork": "calico",
+      "Bundled": true,
+      "Encapsulation": 2
+    },
+    "results": [
+      {
+        "detail": "",
+        "from": "cp",
+        "kind": "dns",
+        "passed": true,
+        "to": ""
+      },
+      {
+        "detail": "",
+        "from": "cp",
+        "kind": "external",
+        "passed": true,
+        "to": ""
+      },
+      {
+        "detail": "",
+        "from": "cp",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "",
+        "from": "cp",
+        "kind": "service",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "",
+        "from": "cp",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "",
+        "from": "cp",
+        "kind": "service",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "",
+        "from": "cp",
+        "kind": "pod",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "",
+        "from": "cp",
+        "kind": "service",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp",
+        "kind": "transfer",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "",
+        "from": "cp",
+        "kind": "pod",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "",
+        "from": "cp",
+        "kind": "service",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp",
+        "kind": "transfer",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "",
+        "from": "cp",
+        "kind": "pod",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "",
+        "from": "cp",
+        "kind": "service",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp",
+        "kind": "transfer",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "",
+        "from": "cp2",
+        "kind": "dns",
+        "passed": true,
+        "to": ""
+      },
+      {
+        "detail": "",
+        "from": "cp2",
+        "kind": "external",
+        "passed": true,
+        "to": ""
+      },
+      {
+        "detail": "",
+        "from": "cp2",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "",
+        "from": "cp2",
+        "kind": "service",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp2",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "",
+        "from": "cp2",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "",
+        "from": "cp2",
+        "kind": "service",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp2",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "",
+        "from": "cp2",
+        "kind": "pod",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "",
+        "from": "cp2",
+        "kind": "service",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp2",
+        "kind": "transfer",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "",
+        "from": "cp2",
+        "kind": "pod",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "",
+        "from": "cp2",
+        "kind": "service",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp2",
+        "kind": "transfer",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "",
+        "from": "cp2",
+        "kind": "pod",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "",
+        "from": "cp2",
+        "kind": "service",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp2",
+        "kind": "transfer",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "",
+        "from": "cp3",
+        "kind": "dns",
+        "passed": true,
+        "to": ""
+      },
+      {
+        "detail": "",
+        "from": "cp3",
+        "kind": "external",
+        "passed": true,
+        "to": ""
+      },
+      {
+        "detail": "",
+        "from": "cp3",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "",
+        "from": "cp3",
+        "kind": "service",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp3",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "",
+        "from": "cp3",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "",
+        "from": "cp3",
+        "kind": "service",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp3",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "",
+        "from": "cp3",
+        "kind": "pod",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "",
+        "from": "cp3",
+        "kind": "service",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp3",
+        "kind": "transfer",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "",
+        "from": "cp3",
+        "kind": "pod",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "",
+        "from": "cp3",
+        "kind": "service",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp3",
+        "kind": "transfer",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "",
+        "from": "cp3",
+        "kind": "pod",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "",
+        "from": "cp3",
+        "kind": "service",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "cp3",
+        "kind": "transfer",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "",
+        "from": "ip-172-29-0-9",
+        "kind": "dns",
+        "passed": true,
+        "to": ""
+      },
+      {
+        "detail": "",
+        "from": "ip-172-29-0-9",
+        "kind": "external",
+        "passed": true,
+        "to": ""
+      },
+      {
+        "detail": "",
+        "from": "ip-172-29-0-9",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "",
+        "from": "ip-172-29-0-9",
+        "kind": "service",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "ip-172-29-0-9",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "",
+        "from": "ip-172-29-0-9",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "",
+        "from": "ip-172-29-0-9",
+        "kind": "service",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "ip-172-29-0-9",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "",
+        "from": "ip-172-29-0-9",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "",
+        "from": "ip-172-29-0-9",
+        "kind": "service",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "ip-172-29-0-9",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "",
+        "from": "ip-172-29-0-9",
+        "kind": "pod",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "",
+        "from": "ip-172-29-0-9",
+        "kind": "service",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "ip-172-29-0-9",
+        "kind": "transfer",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "",
+        "from": "ip-172-29-0-9",
+        "kind": "pod",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "",
+        "from": "ip-172-29-0-9",
+        "kind": "service",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "ip-172-29-0-9",
+        "kind": "transfer",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "",
+        "from": "w1",
+        "kind": "dns",
+        "passed": true,
+        "to": ""
+      },
+      {
+        "detail": "",
+        "from": "w1",
+        "kind": "external",
+        "passed": true,
+        "to": ""
+      },
+      {
+        "detail": "",
+        "from": "w1",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "",
+        "from": "w1",
+        "kind": "service",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "w1",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "",
+        "from": "w1",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "",
+        "from": "w1",
+        "kind": "service",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "w1",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "",
+        "from": "w1",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "",
+        "from": "w1",
+        "kind": "service",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "w1",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "",
+        "from": "w1",
+        "kind": "pod",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "",
+        "from": "w1",
+        "kind": "service",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "w1",
+        "kind": "transfer",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "",
+        "from": "w1",
+        "kind": "pod",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "",
+        "from": "w1",
+        "kind": "service",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "w1",
+        "kind": "transfer",
+        "passed": true,
+        "to": "w2"
+      },
+      {
+        "detail": "",
+        "from": "w2",
+        "kind": "dns",
+        "passed": true,
+        "to": ""
+      },
+      {
+        "detail": "",
+        "from": "w2",
+        "kind": "external",
+        "passed": true,
+        "to": ""
+      },
+      {
+        "detail": "",
+        "from": "w2",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "",
+        "from": "w2",
+        "kind": "service",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "w2",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp"
+      },
+      {
+        "detail": "",
+        "from": "w2",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "",
+        "from": "w2",
+        "kind": "service",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "w2",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp2"
+      },
+      {
+        "detail": "",
+        "from": "w2",
+        "kind": "pod",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "",
+        "from": "w2",
+        "kind": "service",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "w2",
+        "kind": "transfer",
+        "passed": true,
+        "to": "cp3"
+      },
+      {
+        "detail": "",
+        "from": "w2",
+        "kind": "pod",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "",
+        "from": "w2",
+        "kind": "service",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "w2",
+        "kind": "transfer",
+        "passed": true,
+        "to": "ip-172-29-0-9"
+      },
+      {
+        "detail": "",
+        "from": "w2",
+        "kind": "pod",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "",
+        "from": "w2",
+        "kind": "service",
+        "passed": true,
+        "to": "w1"
+      },
+      {
+        "detail": "1048576 bytes",
+        "from": "w2",
+        "kind": "transfer",
+        "passed": true,
+        "to": "w1"
+      }
+    ],
+    "total": 102
+  },
+  "nodes": [
+    {
+      "name": "aws-win2022-gpu",
+      "uid": "dd54061d-491a-4b12-95a7-27393e847780",
+      "ready": true
+    },
+    {
+      "name": "aws-win2022-v3",
+      "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "ready": true
+    },
+    {
+      "name": "aws-win2025",
+      "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+      "ready": true
+    },
+    {
+      "name": "aws-win2025-gpu",
+      "uid": "258d7b62-e774-48bc-94dc-e31ff042f585",
+      "ready": true
+    },
+    {
+      "name": "aws-win2025-v3",
+      "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "ready": true
+    },
+    {
+      "name": "cp",
+      "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+      "ready": true
+    },
+    {
+      "name": "cp2",
+      "uid": "947de62f-0920-408c-aa31-ac80a2344128",
+      "ready": true
+    },
+    {
+      "name": "cp3",
+      "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+      "ready": true
+    },
+    {
+      "name": "ip-172-29-0-9",
+      "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+      "ready": true
+    },
+    {
+      "name": "remote1",
+      "uid": "8935dd28-de93-44be-a887-73110fe88c51",
+      "ready": true
+    },
+    {
+      "name": "remote2",
+      "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+      "ready": true
+    },
+    {
+      "name": "w1",
+      "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "ready": true
+    },
+    {
+      "name": "w2",
+      "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+      "ready": true
+    }
+  ],
+  "nodeIdentitiesAndReadinessPreserved": true,
+  "cleanup": {
+    "namespace": "cloud-provisioning-health-1788834850710793227",
+    "absent": true,
+    "initialObservation": "Immediate post-exit absence assertion failed because deletion is asynchronous (--wait=false). Subsequent API read confirmed NotFound; no repeated deletion was needed."
+  },
+  "runtimeCoverage": {
+    "packages": [
+      "./cmd/awsrow",
+      "./kube",
+      "./rig/aws"
+    ],
+    "combinedStatementsPercent": 61.9,
+    "awsrowRunPercent": 70.0,
+    "appliedAdoptionReceiptPercent": 71.4,
+    "note": "Native successful-path coverage; distinct from 100% receipt unit-test coverage. Not project-wide coverage."
+  },
+  "limitations": [
+    "Matrix uses convergence retries and stores the final pass; does not establish uninterrupted traffic or preserve individual earlier passes.",
+    "Peer acknowledgment is content-bound, not attributed to the current Pod UID.",
+    "Does not qualify Windows fragmentation or GPU startup reliability."
+  ],
+  "artifactSHA256": {
+    "awsrow": "8b47d9a8f4b40a5b499dfb9c2ed30b0bf05ef021315deaf1dd7fdd61c157b01a",
+    "run.log": "47b32e8d024545fa17ac047ed1431f58a0ebc564caee3bc5f42c1f639cc54e98",
+    "row/bindings.json": "fc024f00b8d6fe172280cba8a7f4a7f17a04f009cb633dc23958e14d0cdc7c3d",
+    "row/adoption.json": "524336fd9dad630c050148330a879783605e32c052f19a4d135aae293fc50307",
+    "row/matrix.json": "2221210e9124aa140586311bff73fc1268a0d36486428bea97239ee0b316309d",
+    "native-coverage.out": "d623064b01d33886aeebd880eea05707f374357d74b3bc898a519db179e3348e"
+  }
+}

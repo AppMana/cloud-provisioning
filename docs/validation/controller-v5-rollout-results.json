@@ -1,0 +1,53 @@
+{
+  "scope": "Live elected controller rollout with no active gateway projections; no AWS attachment failover claim",
+  "observedAt": "2026-09-07T08:25:57.634398+00:00",
+  "image": "cldt/controller-windows:v5",
+  "imageID": "sha256:9f5649e91a1565f1d1551f86e5bea15decafd13bdc677e572cf145db0b0ecf9a",
+  "podUID": "6e81f63b-039c-4e83-a6f9-bee6b7dc5cbe",
+  "leaseName": "cloud-provisioning-mesh-150b6c81a348a87b7180eaf6a044d747",
+  "holder": "cloud-provisioning-endpoint-controller-79d758b95c-mpxbd_17a57152-95ad-4376-8b5d-597390c74e90",
+  "firstRenewTime": "2026-09-07T08:25:53.417017Z",
+  "nextRenewTime": "2026-09-07T08:25:57.432517Z",
+  "renewalObserved": true,
+  "nodesReady": 10,
+  "windowsChecks": {
+    "2022": {
+      "expectedWindowsBuild": true,
+      "onePhysicalNIC": true,
+      "k0sWorkerRunning": true,
+      "tunnelRunning": true,
+      "bootstrapInstalled": true,
+      "capiAssociation": true,
+      "windowsNode": true,
+      "matchesSiteKubelet": true,
+      "containerd2": true,
+      "cloudWorkerLabel": true,
+      "internetFacingTaint": true,
+      "nodeReady": true,
+      "publisherReady": true,
+      "peerDelivery": true
+    },
+    "2025": {
+      "expectedWindowsBuild": true,
+      "onePhysicalNIC": true,
+      "k0sWorkerRunning": true,
+      "tunnelRunning": true,
+      "bootstrapInstalled": true,
+      "capiAssociation": true,
+      "windowsNode": true,
+      "matchesSiteKubelet": true,
+      "containerd2": true,
+      "cloudWorkerLabel": true,
+      "internetFacingTaint": true,
+      "nodeReady": true,
+      "publisherReady": true,
+      "peerDelivery": true
+    }
+  },
+  "siteReceiptsValidated": 5,
+  "remaining": [
+    "AWS attachment controller registration and runtime transport",
+    "Combined projection/CNI transition",
+    "Full packet and CAPI removal/replacement matrix"
+  ]
+}

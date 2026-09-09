@@ -1,0 +1,37 @@
+{
+  "scope": "GPU Operator v26.3.3 bundled NFD worker OS selection on mixed Linux/Windows single-NIC VM site",
+  "finding": "Linux NFD worker scheduled onto Windows; image pull failed with no matching platform before a process started",
+  "sourcePodUID": "98e4122f-cf1a-4f74-90a2-f26d0ad5268c",
+  "change": {
+    "node-feature-discovery": {
+      "worker": {
+        "nodeSelector": {
+          "kubernetes.io/os": "linux"
+        }
+      }
+    }
+  },
+  "renderVerification": {
+    "changedResources": [
+      [
+        "DaemonSet",
+        "gpu-operator",
+        "gpu-operator-node-feature-discovery-worker"
+      ]
+    ]
+  },
+  "appliedReleaseVersion": 3,
+  "limitations": [
+    "Fixes NFD OS scheduling; does not resolve HCS GPU first-start or network fragmentation"
+  ],
+  "daemonsetStatus": {
+    "currentNumberScheduled": 8,
+    "desiredNumberScheduled": 8,
+    "numberAvailable": 8,
+    "numberMisscheduled": 0,
+    "numberReady": 8,
+    "observedGeneration": 3,
+    "updatedNumberScheduled": 8
+  },
+  "exampleMatchesLiveHelmValues": true
+}

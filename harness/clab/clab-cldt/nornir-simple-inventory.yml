@@ -19,43 +19,58 @@ cldt-wan:
     password: 
     platform: bridge
     hostname: 
+bastion:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
 cp:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.8
+    hostname: 
+cp2:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
+cp3:
+    username: 
+    password: 
+    platform: linux
+    hostname: 
 edge-a:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.9
+    hostname: 
 edge-b:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.6
+    hostname: 
 remote1:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.3
+    hostname: 
 remote2:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.5
+    hostname: 
 router:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.4
+    hostname: 
 w1:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.2
+    hostname: 
 w2:
     username: 
     password: 
     platform: linux
-    hostname: 172.30.30.7
+    hostname: 

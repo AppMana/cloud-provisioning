@@ -11,6 +11,11 @@ metadata:
     {{- include "cloud-provisioning.labels" . | nindent 4 }}
 spec:
   replicas: 1
+  # Keep upgrades simple while mesh-scoped leader election also protects
+  # against overlapping controller processes or releases.
+  strategy:
+    type: Recreate
+    rollingUpdate: null
   selector:
     matchLabels:
       app: {{ include "cloud-provisioning.controllerName" . }}
@@ -36,11 +41,31 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.awsGateway.configMap }}
+      volumes:
+        - name: aws-gateway-scope
+          configMap:
+            name: {{ . | quote }}
+      {{- end }}
       containers:
         - name: controller
           image: {{ include "cloud-provisioning.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.awsGateway.configMap }}
+          volumeMounts:
+            - name: aws-gateway-scope
+              mountPath: /etc/cloud-provisioning/gateway
+              readOnly: true
+          {{- with .Values.awsGateway.credentialsSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ . | quote }}
+          {{- end }}
+          {{- end }}
           args:
+            {{- if .Values.awsGateway.configMap }}
+            - "--aws-gateway-config=/etc/cloud-provisioning/gateway/scope.json"
+            {{- end }}
             {{- /* Every name the controller creates or looks up at
             runtime is stated here, so it matches what this chart
             actually created rather than whatever the binary happens to
@@ -57,6 +82,7 @@ spec:
             {{- end }}
             - "--owner-deployment={{ include "cloud-provisioning.controllerName" . }}"
             - "--dialer-image={{ include "cloud-provisioning.dialerImage" . }}"
+            - "--dialer-image-pull-policy={{ .Values.dialerImage.pullPolicy }}"
             - "--join-provider={{ .Values.joinProvider }}"
             - "--join-template-path=/join-patterns/{{ .Values.joinProvider }}-worker.cloud-config.tmpl"
             {{- with .Values.cluster.apiAddress }}
@@ -65,12 +91,30 @@ spec:
             {{- with .Values.tunnel.endpoints }}
             - "--tunnel-endpoints={{ . }}"
             {{- end }}
+            {{- with .Values.tunnel.endpointRetention }}
+            - "--tunnel-endpoint-retention={{ . }}"
+            {{- end }}
             {{- with .Values.dialerBinary.arm64.url }}
             - "--join-dialer-binary-url-arm64={{ . }}"
             - "--join-dialer-binary-sha256-arm64={{ $.Values.dialerBinary.arm64.sha256 | required "dialerBinary.arm64.sha256 is required when a url is set: an unpinned download is a supply-chain hole" }}"
             {{- end }}
             {{- with .Values.imagePullSecrets }}
             - "--dialer-image-pull-secret={{ (first .).name }}"
+            {{- end }}
+            {{- with .Values.windowsBootstrap.tunnelSHA256 }}
+            - {{ printf "--windows-tunnel-sha256=%s" . | quote }}
+            {{- end }}
+            {{- with .Values.windowsBootstrap.workerVersion }}
+            - {{ printf "--windows-worker-version=%s" . | quote }}
+            {{- end }}
+            {{- with .Values.windowsBootstrap.workerSHA256 }}
+            - {{ printf "--windows-worker-sha256=%s" . | quote }}
+            {{- end }}
+            {{- with .Values.windowsPublisher.apiServer }}
+            - {{ printf "--windows-publisher-api-server=%s" . | quote }}
+            {{- end }}
+            {{- with .Values.windowsPublisher.image }}
+            - {{ printf "--windows-publisher-image=%s" . | quote }}
             {{- end }}
             {{- with .Values.dialerCloud.image }}
             - "--dialer-cloud-image={{ . }}"

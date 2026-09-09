@@ -1,0 +1,90 @@
+{
+  "scope": "Live rejection of a previously used Windows 2025 GPU Node; successful fresh-VM submission remains unqualified",
+  "nodeUID": "258d7b62-e774-48bc-94dc-e31ff042f585",
+  "observation": {
+    "passed": false,
+    "startup": {
+      "passed": false,
+      "checks": {
+        "sameNode": true,
+        "windowsNode": true,
+        "nodeReady": true,
+        "noPriorOrdinaryContainers": false,
+        "gpuReportedAllocatable": true
+      },
+      "nodeUID": "258d7b62-e774-48bc-94dc-e31ff042f585",
+      "ordinaryContainers": [
+        {
+          "pod": "windows-cache-control-2025-jpwr8",
+          "podUID": "8342d0d2-6c48-4036-8e81-1e6c9eaeb11d",
+          "container": "control",
+          "kind": "containers",
+          "phase": "Succeeded"
+        },
+        {
+          "pod": "windows-gpu-process-control-2025-pfprg",
+          "podUID": "ebabfa27-8f59-488e-b34c-d6900b356e1f",
+          "container": "control",
+          "kind": "containers",
+          "phase": "Succeeded"
+        },
+        {
+          "pod": "windows-gpu-volume-control-2025-kk5rg",
+          "podUID": "7e79f520-bf3e-4537-9477-4ffa9d227c8b",
+          "container": "control",
+          "kind": "containers",
+          "phase": "Succeeded"
+        },
+        {
+          "pod": "windows-render-nvenc-2025-cache-v2-smd2s",
+          "podUID": "8dfedb47-4499-42d5-9b25-aecb3279d31b",
+          "container": "render-nvenc",
+          "kind": "containers",
+          "phase": "Failed"
+        },
+        {
+          "pod": "windows-render-nvenc-2025-cache-v2-warm-diagnostic-2f42r",
+          "podUID": "39aca83e-2e9f-4f20-8450-3e1cd76abd21",
+          "container": "render-nvenc",
+          "kind": "containers",
+          "phase": "Succeeded"
+        }
+      ],
+      "scope": "Pre-application Kubernetes snapshot; does not establish absence of deleted Pods or out-of-band containers"
+    },
+    "placement": {
+      "passed": true,
+      "checks": {
+        "profilesPresent": true,
+        "buildSelectors": true,
+        "windows2025RuntimeMountsSkipped": true,
+        "supportedNodesPresent": true,
+        "oneReadyPluginPerNode": true
+      },
+      "assignments": [
+        {
+          "node": "aws-win2025-gpu",
+          "nodeUID": "258d7b62-e774-48bc-94dc-e31ff042f585",
+          "build": "10.0.26100",
+          "expectedProfile": "windows-wddm-device-plugin-runtime-mounts",
+          "pods": [
+            "windows-wddm-device-plugin-runtime-mounts-cql6g"
+          ],
+          "passed": true
+        }
+      ],
+      "scope": "Test plugin placement and profile contract; GPU execution is a separate gate"
+    }
+  },
+  "jobAbsent": true,
+  "createAttemptAbsent": true,
+  "initialReadFailure": "kubectl -A before get was rejected; fixed argument ordering; original intent-only evidence directory retained",
+  "tests": 6,
+  "combinedNativeRejectionAndUnitCoverage": {
+    "coveredStatements": 79,
+    "statements": 86,
+    "percent": 92,
+    "nativeJobCreationCovered": false
+  },
+  "artifactSHA256": "34516de4578c31af92f0d112456d9b8c2f7caee44a1faaa9a329afb6f962c282"
+}

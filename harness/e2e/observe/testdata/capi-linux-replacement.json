@@ -1,0 +1,53 @@
+{
+  "scope": "Actual same-name Linux CAPA claim deletion/recreation, both generations natively adopted and passed 102 network checks",
+  "before": {
+    "eniCount": 1,
+    "instanceID": "i-05f1a3ac66b544862",
+    "machine": "aws-linux-replacement-v1",
+    "node": "ip-172-29-0-14",
+    "nodeUID": "8f06e00a-85f3-4cbc-b0c5-bb161759ac95",
+    "physicalNIC": "ens5",
+    "providerID": "aws:///us-west-2a/i-05f1a3ac66b544862",
+    "claim": "aws-linux-replacement-v1",
+    "claimUID": "e08426e1-5096-4e71-b3e2-a4bd716da1d5",
+    "machineUID": "e936f352-0b66-42c4-bd16-530e8142f39d",
+    "infrastructureUID": "f79cef20-05ab-46a7-8967-296c6d531dff",
+    "templateUID": "c4fd6366-bada-40f9-b922-372690ac507e",
+    "bootstrapSecretUID": "8d95bfc0-998e-47a0-82a8-e26df486a884",
+    "adoptionSecretUID": "817735cb-e1df-4e7c-8473-ec9856169177",
+    "adoptionPodUID": "389b3610-2912-4c59-96a4-e4d5a18693eb",
+    "desiredPeerSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+    "appliedPeerSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+    "publicKeySHA256": "5d3a0dd355823af7246338ba24f4e5585636370e16bb0dd382add89b3c669c39"
+  },
+  "after": {
+    "eniCount": 1,
+    "instanceID": "i-01cd63f53c877bded",
+    "machine": "aws-linux-replacement-v1",
+    "node": "ip-172-29-0-12",
+    "nodeUID": "5f0183ba-75cb-4a8d-9da8-1858b515f342",
+    "physicalNIC": "ens5",
+    "providerID": "aws:///us-west-2a/i-01cd63f53c877bded",
+    "claim": "aws-linux-replacement-v1",
+    "claimUID": "0c4c91eb-f28d-40c6-846a-2c43869cb93b",
+    "machineUID": "2c170c8c-9ef1-4d2b-9cf2-f4bf3e578ceb",
+    "infrastructureUID": "a5abeedd-5921-44b7-bc33-b907c08c4d69",
+    "templateUID": "c4fd6366-bada-40f9-b922-372690ac507e",
+    "bootstrapSecretUID": "63a65d32-7a46-48c2-b2dc-fd3aad37e560",
+    "adoptionSecretUID": "8718f716-8ab5-4699-bce4-ae35b42cbc13",
+    "adoptionPodUID": "fa62320a-0c73-48a3-ba4b-3a11a66b4d9a",
+    "desiredPeerSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+    "appliedPeerSHA256": "611899031df7cd95eb7310b7ade7a754370f0c987cc61001e1c0da2c2bb48f9c",
+    "publicKeySHA256": "3609940494e14b1b3b1fcef1157a6dfdae4f149601582ada45343d4bd521befa"
+  },
+  "removal": {
+    "claim": "aws-linux-replacement-v1",
+    "instanceID": "i-05f1a3ac66b544862",
+    "node": "ip-172-29-0-14",
+    "nodeUID": "8f06e00a-85f3-4cbc-b0c5-bb161759ac95",
+    "observedAt": "2026-09-08T08:11:49.699282276Z",
+    "productCleanup": true,
+    "providerID": "aws:///us-west-2a/i-05f1a3ac66b544862",
+    "terminated": true
+  }
+}

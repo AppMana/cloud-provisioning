@@ -1,0 +1,60 @@
+{
+  "observedAt": "2026-09-08T18:24:45.446228+00:00",
+  "scope": "Native preparation of the shared k0s executable layer on a disposable single-NIC Linux EC2 image builder",
+  "builder": {
+    "instanceID": "i-05f3203b29de46716",
+    "imageID": "ami-01dd03eb59b89f98b",
+    "vpcID": "vpc-08bba2b9e5f0ffd46",
+    "runID": "cldt-windows-v2",
+    "physicalENIs": 1,
+    "instanceType": "t3.small",
+    "cleanupRequired": false,
+    "terminated": true
+  },
+  "preparation": {
+    "schemaVersion": 1,
+    "version": "v1.36.2+k0s.0",
+    "sha256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+    "executable": "/usr/local/bin/k0s",
+    "scope": "Executable only; no runtime or workload cache",
+    "preparedAt": "2026-09-08T18:19:00.095785+00:00"
+  },
+  "idempotentReceiptUnchanged": true,
+  "nativeVersion": "v1.36.2+k0s.0",
+  "cleanup": {
+    "at": "2026-09-08T18:21:10.632725+00:00",
+    "instanceID": "i-05f3203b29de46716",
+    "terminated": true,
+    "noImageCaptured": true,
+    "existingAMIUnchanged": true
+  },
+  "unitTestsPassed": 4,
+  "unitCoverage": {
+    "covered_lines": 56,
+    "num_statements": 67,
+    "percent_covered": 83.58208955223881,
+    "percent_covered_display": "84",
+    "missing_lines": 11,
+    "excluded_lines": 0
+  },
+  "sourceSHA256": "16f5b6e02ed86017806fa91b929db2bdd285172c25334161cd8939722ba2a6b6",
+  "evidenceSHA256": {
+    "prepare.stdout": "a846c95b5511c2e343605454a89fe691a7e1d15d1f7a42b5e666b63b6a3fb9f9",
+    "prepare-repeat.stdout": "a846c95b5511c2e343605454a89fe691a7e1d15d1f7a42b5e666b63b6a3fb9f9",
+    "native-version.stdout": "45f9b4b0f11a599a741dc3105ccae9ddf51dfe0fa26724f8c1e8c86d94e7109d",
+    "builder.json": "1f633fcf41e0ecae8eec88a50d2ed52fc151680ad96b802bb9dc30dfa5938b51",
+    "cleanup.json": "68ed6075407f77c4ffeae3fa00929c9c5473fc4bf6603c9f5ecb0db4ca3d72d6"
+  },
+  "limitations": [
+    "No image captured or promoted; fresh CAPI bootstrap reuse has not been tested for this layer.",
+    "The executable layer does not pre-unpack containerd, preload workload images, or install NVIDIA toolkit/NRI integration.",
+    "No GPU was allocated to this CPU image-builder VM.",
+    "Selected Python unit coverage only; native CLI execution was not coverage-instrumented."
+  ],
+  "staleBuilderHandling": {
+    "recordedBuilderUnavailable": true,
+    "replacementWasSeparateDisposableBuilder": true,
+    "publicBakeRegressionTestsPassed": 5,
+    "publicBakeNativeRerun": false
+  }
+}

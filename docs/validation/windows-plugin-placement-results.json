@@ -1,0 +1,48 @@
+{
+  "passed": true,
+  "checks": {
+    "profilesPresent": true,
+    "buildSelectors": true,
+    "windows2025RuntimeMountsSkipped": true,
+    "supportedNodesPresent": true,
+    "oneReadyPluginPerNode": true
+  },
+  "assignments": [
+    {
+      "node": "aws-win2022-gpu",
+      "nodeUID": "dd54061d-491a-4b12-95a7-27393e847780",
+      "build": "10.0.20348",
+      "expectedProfile": "windows-wddm-device-plugin",
+      "pods": [
+        "windows-wddm-device-plugin-tf959"
+      ],
+      "passed": true
+    },
+    {
+      "node": "aws-win2025-gpu",
+      "nodeUID": "258d7b62-e774-48bc-94dc-e31ff042f585",
+      "build": "10.0.26100",
+      "expectedProfile": "windows-wddm-device-plugin-runtime-mounts",
+      "pods": [
+        "windows-wddm-device-plugin-runtime-mounts-cql6g"
+      ],
+      "passed": true
+    },
+    {
+      "node": "aws-win2025-gpu-cold-control",
+      "nodeUID": "e67cbbe1-08f2-4268-b579-41654d10bd38",
+      "build": "10.0.26100",
+      "expectedProfile": "windows-wddm-device-plugin-runtime-mounts",
+      "pods": [
+        "windows-wddm-device-plugin-runtime-mounts-lw5lk"
+      ],
+      "passed": true
+    }
+  ],
+  "scope": "Test plugin placement and profile contract; GPU execution is a separate gate",
+  "nodeIdentitiesStable": true,
+  "observedAt": "2026-09-07T23:38:40.983723+00:00",
+  "finding": "Native hostname-specific diagnostic overrides selected upstream plugin for a new Windows 2025 hostname",
+  "correction": "Disjoint build selectors matching repository manifests; retired upstream pod before expanding Windows 2025 profile",
+  "regressionTestsPassed": 5
+}

@@ -1,0 +1,13 @@
+# Build from the repository root with --platform windows/amd64.
+# HostProcess base follows the upstream SIG Windows CSI proxy build pattern.
+ARG WINDOWS_BASE=mcr.microsoft.com/oss/kubernetes/windows-host-process-containers-base-image:v1.0.0@sha256:b4c9637e032f667c52d1eccfa31ad8c63f1b035e8639f3f48a510536bf34032b
+FROM --platform=$BUILDPLATFORM golang:1.26@sha256:9d2f36f06329b2a141b9db99ffa32765cf695ee57b813ca29e245e8670bcbfff AS build
+WORKDIR /src
+COPY controller/go.mod controller/go.sum ./
+RUN go mod download
+COPY controller/pkg ./pkg
+COPY controller/cmd/peer-publisher ./cmd/peer-publisher
+RUN CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -o /out/peer-publisher.exe ./cmd/peer-publisher
+FROM ${WINDOWS_BASE}
+COPY --from=build /out/peer-publisher.exe /peer-publisher.exe
+ENTRYPOINT ["peer-publisher.exe"]

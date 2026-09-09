@@ -1,0 +1,77 @@
+{
+  "result": "clean-checkout-chart-fix-native-campaign-passed",
+  "observedAt": "2026-09-09T07:11:45.767826+00:00",
+  "firstAttempt": {
+    "nativeExitCode": 1,
+    "failedStage": "Helm chart installation",
+    "reason": "Locked cluster-api-operator dependency absent from clean source archive",
+    "freshSiteReady": 5,
+    "nativeCoveredStatements": 793,
+    "nativeTotalStatements": 3209,
+    "binarySHA256": "8ff5f2f7489dd900c888bba79267be16224d813dde0651c5956f7224a7434166",
+    "preservedArtifacts": [
+      "log",
+      "events",
+      "exit status",
+      "binary",
+      "coverage"
+    ],
+    "localArchiveVerification": {
+      "sha256": "8d942c7de5bc0d0e4e82c3f9f5cc0c4c9e2ccdfe3b19b93f46d9546e1440bd7c",
+      "bytes": 17097969,
+      "binaryVerified": true,
+      "coveredStatements": 793,
+      "totalStatements": 3209
+    }
+  },
+  "change": "Stage a private chart copy, register lock repositories in an isolated Helm cache, build locked dependencies, then carry the resulting chart to the bastion.",
+  "tests": {
+    "realHelmLoopbackRepository": "passed",
+    "dependencyCacheAbsentInSource": "passed",
+    "lockedDependencyRendered": "passed",
+    "sourceLockAndCacheUnchanged": "passed",
+    "staleLockRejected": "passed",
+    "failedStagingRemoved": "passed",
+    "missingLockRejectedBeforeArtifacts": "passed",
+    "raceEnabledInstallSuite": "passed",
+    "initialRegressionFailure": "Helm required repository registration in the fresh cache; fixed before retry."
+  },
+  "unitCoverage": {
+    "stageChart": {
+      "covered": 29,
+      "total": 37
+    },
+    "selectedInstallPackage": {
+      "covered": 29,
+      "total": 253
+    }
+  },
+  "history": {
+    "sourceFolderPackaging": "d5509933",
+    "dependencyDeclaration": "387972fc",
+    "relationship": "Replaces reliance on ignored dependency archives; preserves testing of the real Helm chart."
+  },
+  "retry": {
+    "freshSite": true,
+    "separateWorkAndCoverageDirectories": true,
+    "status": "passed",
+    "commandID": "d489103d-a8a0-4195-a173-0e2ef5b42645",
+    "chartInstall": "passed",
+    "stage": "run-passed",
+    "chartInstallEvidenceSHA256": "bde5bffea03699ca150d93d6af13089f5ea762d079ec49655216ccbbe2f928f6",
+    "productPodEvidenceSHA256": "6c5b7d84320a66e2a17cada3624652de35a2c53186a6b9babaf97b18a3ebe11c",
+    "nativeExitCode": 0,
+    "lifecycleReport": "microk8s-lifecycle-results.json",
+    "finalMatrices": 10,
+    "passedChecks": 1324
+  },
+  "limits": [
+    "Native lifecycle cycles ran under the initial two-worker placement; placement matrices followed separately.",
+    "Continuous packet-loss qualification and real CAPA MicroK8s worker provisioning remain separate gates."
+  ],
+  "sourceSHA256": {
+    "harness/e2e/install/install.go": "7b27b2f49936832fafa24f9ec9dfb514e41a652641a4db3792f52e27853dd031",
+    "harness/e2e/install/chart.go": "17d2860885a8102dada076e7cf5febd72c66e159fd9fa69f19e0cdc21e58313d",
+    "harness/e2e/install/chart_test.go": "bff76faa22521a62aad1a40953f66b4fbc3a689036913f3be54578cacf914962"
+  }
+}

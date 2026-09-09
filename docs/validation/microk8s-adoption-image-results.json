@@ -1,0 +1,68 @@
+{
+  "result": "adoption-container-image-descriptor-failure-observed",
+  "observedAt": "2026-09-09T07:54:05.943493+00:00",
+  "profile": "microk8s/calico",
+  "parentCampaign": "microk8s-placement-lifecycle-results.json",
+  "observations": {
+    "remote1AdoptionPodReady": false,
+    "remote1AdoptionAcknowledged": false,
+    "remote1MissingDesiredKernelPeers": 1,
+    "remote1UnexpectedKernelPeers": 1,
+    "remote2AdoptionPodReady": true,
+    "remote2AdoptionAcknowledged": true,
+    "remote2KernelPeersMatchDesired": true,
+    "bothAdoptionDocumentsCoverOtherCurrentTunnelAddress": true,
+    "publishedAPIPort": 16443,
+    "failingDirections": [
+      "remote1 to remote2",
+      "remote2 to remote1"
+    ],
+    "failingChecks": [
+      "pod HTTP",
+      "Service HTTP",
+      "1 MiB transfer"
+    ],
+    "vtepDiagnostic": {
+      "eachDirectionTransmitted": 5,
+      "eachDirectionReceived": 0,
+      "remote1LocalHostUnreachable": true,
+      "controlPlaneSawCrossRemoteVXLAN": false
+    },
+    "image": {
+      "name": "docker.io/library/cldt-dialer:feaef057bb3326a26fe07552b1b28bb648485570f8ca2fcaaacb2c6325391d2b",
+      "remote1MediaType": "text/html",
+      "remote1Digest": "sha256:e96a0b3e8b0b8163e88656a0bc6665094928cc00655d7b7cfdc2a2e76f729eb8",
+      "remote1ContentBytes": 347532,
+      "remote1ContentVerifiedAsHTML": true,
+      "remote2MediaType": "application/vnd.oci.image.manifest.v1+json",
+      "remote2Digest": "sha256:161049e3b072ef7050e7ab013a2704e20e923d4e30341aa9a375ed5e340be859"
+    }
+  },
+  "conclusion": "The remote1 adopting container never starts, leaving the bootstrap kernel configuration with the removed remote2 key. Its desired adoption configuration is already correct.",
+  "unprovenCause": "A registry pull racing the harness import may have replaced the image descriptor; the precise write ordering is not yet captured.",
+  "harnessGap": "VM join/lifecycle checks lack the current Ready adoption Pod and applied-document receipt gate already implemented in cmd/awsrow.",
+  "nextVerification": [
+    "Propagate an explicit image pull policy to generated dialer DaemonSets for preloaded harness images.",
+    "Share provider-independent adoption checks across VM and AWS rows.",
+    "Repeat the failed lifecycle under the same distribution defaults and then complete the remaining placements."
+  ],
+  "evidenceSHA256": {
+    "cross-vtep-diagnostic-v1-result.json": "a62eea4a4c6fc6b7581130d35154588bc66f31a56d0a2bb394acb89280cfc4cf",
+    "cross-peer-contract-v1-result.json": "b82f502d0490410c1fb9dcf8b67809abef7c675485e351ef5847908557b93972",
+    "cross-kernel-peers-v1-result.json": "02df674ce92c4a2aa072e7858b278bb591ee9b5a5eda5d10d679cc38c11b1b06",
+    "adoption-health-v3-result.json": "8207522e8d18cf84b8e57ff6bc37bbdb544d4b649e67da6da0685aabfc7e93fa",
+    "remote1-container-error-v3-result.json": "69751197d8adffff5057ebce29775a603abdacb9d9185521f8fe25610828e325",
+    "image-records-v3-result.json": "e42fbf89cb143added287b5d3bfc45a57d28eeaadd03b291a5b481b1f7daea64"
+  },
+  "limits": [
+    "At this observation, no repair or replacement campaign had yet validated a fix; see followUp for subsequent evidence.",
+    "The ICMP VTEP diagnostic is separate from the failed Pod/Service matrix."
+  ],
+  "diagnosticArchive": {
+    "sha256": "d7e189dc394059268f340d6f581047eb46c676e29482b4575e26a21177c7e970",
+    "bytes": 101916,
+    "verifiedLocally": true
+  },
+  "temporaryGuestObserverFilesRemoved": true,
+  "followUp": "microk8s-adoption-fix-results.json"
+}

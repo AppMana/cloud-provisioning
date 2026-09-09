@@ -1,0 +1,64 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeSecurityGroupRules"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}"
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:RevokeSecurityGroupIngress"
+      ],
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:security-group/${SECURITY_GROUP_ID}",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ec2:ResourceTag/cloud-provisioning-test": "${RUN_ID}"
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": "ec2:AuthorizeSecurityGroupIngress",
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:security-group-rule/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "aws:RequestTag/cloud-provisioning-test": "${RUN_ID}"
+        },
+        "Null": {
+          "aws:RequestTag/cloud-provisioning.appmana.com/ingress-owner": "false"
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": "arn:aws:ec2:${AWS_REGION}:${AWS_ACCOUNT_ID}:security-group-rule/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${AWS_REGION}",
+          "ec2:CreateAction": "AuthorizeSecurityGroupIngress",
+          "aws:RequestTag/cloud-provisioning-test": "${RUN_ID}"
+        },
+        "ForAllValues:StringEquals": {
+          "aws:TagKeys": [
+            "cloud-provisioning-test",
+            "cloud-provisioning.appmana.com/ingress-owner"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -55,11 +55,10 @@ func (Provider) GVK() schema.GroupVersionKind { return gvk }
 // ClusterGVK implements join.MachineProvisioner.
 func (Provider) ClusterGVK() schema.GroupVersionKind { return awsClusterGVK }
 
-// InfraValues contributes nothing beyond what the machine's own spec
-// already says. Architecture used to be derived here to pick a
-// download; the machine reads its own at boot instead.
+// InfraValues supplies platform identity discovery for first boot. CAPA cannot
+// allocate an instance ID until it has consumed the rendered bootstrap Secret.
 func (Provider) InfraValues(ctx context.Context, awsMachine *unstructured.Unstructured) (map[string]any, error) {
-	return map[string]any{}, nil
+	return bootstrapIdentityValues(), nil
 }
 
 // InfraMachine implements join.MachineProvisioner: renders the

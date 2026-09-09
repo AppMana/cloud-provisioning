@@ -1,0 +1,253 @@
+{
+  "observedAt": "2026-09-08T23:11:12.781382+00:00",
+  "scope": "Public Linux cache builder native pull, archive import, restart and replay-rejection checks on retained unjoined single-NIC AWS t3.large VM",
+  "instanceID": "i-001bd2820cad55bec",
+  "machineOS": "linux",
+  "architecture": "amd64",
+  "runtime": "containerd github.com/containerd/containerd/v2 2.3.2 fff62f14765df376e5fc36f5a8f8e795b5670f61",
+  "physicalNICs": [
+    "ens5"
+  ],
+  "qualificationEligible": false,
+  "defaultImagePromoted": false,
+  "phases": {
+    "pinnedPull": {
+      "recipe": {
+        "schemaVersion": 1,
+        "machineOS": "linux",
+        "architecture": "amd64",
+        "distribution": "k0s",
+        "version": "v1.36.2+k0s.0",
+        "cni": "calico",
+        "gpu": "T4",
+        "workerSHA256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+        "images": [
+          {
+            "reference": "quay.io/k0sproject/pause:3.10.2-0",
+            "pullReference": "quay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243",
+            "digest": "sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243",
+            "aliases": [
+              "quay.io/k0sproject/pause:3.10.2-0",
+              "quay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243"
+            ],
+            "usedBy": [
+              "k0s sandbox image observed on QEMU worker"
+            ]
+          }
+        ],
+        "excluded": [
+          "Windows workloads",
+          "MIG manager: absent from the tested worker",
+          "MPS daemon: absent from the tested worker"
+        ],
+        "qualified": false
+      },
+      "result": {
+        "recipeSHA256": "1afd45969a246860ce195bd81088072449f6098d3ab3c899681b0ab4d27e98af",
+        "cacheRoot": "/var/tmp/cldt-public-cache-build-v1/cache",
+        "references": 2,
+        "originalRuntimeProcessesExited": true,
+        "readyBeforeAndAfterRestart": true,
+        "qualificationEligible": false,
+        "scope": "Builder cache; independent verification and fresh-clone validation required"
+      },
+      "independentValidation": {
+        "passed": true,
+        "phases": {
+          "before": {
+            "inventoryMatches": true,
+            "digestsMatch": true,
+            "contentComplete": true,
+            "unpacked": true,
+            "quietAgrees": true
+          },
+          "after": {
+            "inventoryMatches": true,
+            "digestsMatch": true,
+            "contentComplete": true,
+            "unpacked": true,
+            "quietAgrees": true
+          }
+        },
+        "checks": {
+          "originalRuntimesStopped": true,
+          "temporaryStateRemoved": true
+        },
+        "references": 2,
+        "qualificationEligible": false,
+        "scope": "Builder cache only; capture and fresh-clone startup remain separate gates"
+      }
+    },
+    "archiveImport": {
+      "recipe": {
+        "schemaVersion": 1,
+        "machineOS": "linux",
+        "architecture": "amd64",
+        "distribution": "k0s",
+        "version": "v1.36.2+k0s.0",
+        "cni": "calico",
+        "gpu": "T4",
+        "workerSHA256": "8b5d985f803df27acb44f900b2574a5b48e600bd2f87a3335d2a853b888e9298",
+        "images": [
+          {
+            "reference": "quay.io/k0sproject/pause:3.10.2-0",
+            "digest": "sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243",
+            "aliases": [
+              "quay.io/k0sproject/pause:3.10.2-0",
+              "quay.io/k0sproject/pause@sha256:1dca17073186db812f380970077f5c82842c810f1bd75800cd926ab50cd34243"
+            ],
+            "usedBy": [
+              "k0s sandbox image observed on QEMU worker"
+            ],
+            "archive": "pause-oci.tar",
+            "archiveSHA256": "ffe69c74159eff1c7aeb1f8795a3f3850cdf45998f29e766dff670411d1d918b"
+          }
+        ],
+        "excluded": [
+          "Windows workloads",
+          "MIG manager: absent from the tested worker",
+          "MPS daemon: absent from the tested worker"
+        ],
+        "qualified": false
+      },
+      "result": {
+        "recipeSHA256": "5c40f43fe4321a8883e88f15319e3e5a220f09e9506d540c70c304932979c673",
+        "cacheRoot": "/var/tmp/cldt-public-cache-build-v1/archive-cache",
+        "references": 2,
+        "originalRuntimeProcessesExited": true,
+        "readyBeforeAndAfterRestart": true,
+        "qualificationEligible": false,
+        "scope": "Builder cache; independent verification and fresh-clone validation required"
+      },
+      "independentValidation": {
+        "passed": true,
+        "phases": {
+          "before": {
+            "inventoryMatches": true,
+            "digestsMatch": true,
+            "contentComplete": true,
+            "unpacked": true,
+            "quietAgrees": true
+          },
+          "after": {
+            "inventoryMatches": true,
+            "digestsMatch": true,
+            "contentComplete": true,
+            "unpacked": true,
+            "quietAgrees": true
+          }
+        },
+        "checks": {
+          "originalRuntimesStopped": true,
+          "temporaryStateRemoved": true
+        },
+        "references": 2,
+        "qualificationEligible": false,
+        "scope": "Builder cache only; capture and fresh-clone startup remain separate gates"
+      }
+    },
+    "existingOperation": {
+      "rejected": true,
+      "originalReceiptUnchanged": true,
+      "returnCode": 1
+    },
+    "originalGPUCache": {
+      "passed": true,
+      "phases": {
+        "before": {
+          "inventoryMatches": true,
+          "digestsMatch": true,
+          "contentComplete": true,
+          "unpacked": true,
+          "quietAgrees": true
+        },
+        "after": {
+          "inventoryMatches": true,
+          "digestsMatch": true,
+          "contentComplete": true,
+          "unpacked": true,
+          "quietAgrees": true
+        }
+      },
+      "checks": {
+        "originalRuntimesStopped": true,
+        "temporaryStateRemoved": true
+      },
+      "references": 23,
+      "qualificationEligible": false,
+      "scope": "Builder cache only; capture and fresh-clone startup remain separate gates"
+    }
+  },
+  "audit": {
+    "noRuntimeProcesses": true,
+    "scriptSHA256": "401095af8087d7c5b3f47ffbc9f70e0962859f67b7ee2eebdb556127ca7c0b5b",
+    "runtimeReceiptSHA256": "4232059dc2b20912d4987231e9a975ea035c573feee9c8586538e937e8a56868",
+    "evidenceArchiveSHA256": "20f4dfd2ba0e6ec078ef9e8f0672d8e13ef4eae3400744da0c1492d05079a335",
+    "bytes": 24116
+  },
+  "cleanup": {
+    "ownedScratchRemoved": true,
+    "noRuntimeProcesses": true,
+    "originalCacheStillPresent": true
+  },
+  "baseline": {
+    "nodes": 13,
+    "allReady": true,
+    "identitiesStable": true
+  },
+  "validation": {
+    "unitTests": {
+      "selectedInputTests": 8,
+      "linuxPreparationTests": 19,
+      "passed": true,
+      "command": "python3 -m unittest discover -s images/linux -p 'test_prepare*.py'",
+      "coverage": {
+        "covered_lines": 62,
+        "num_statements": 154,
+        "percent_covered": 40.25974025974026,
+        "percent_covered_display": "40",
+        "missing_lines": 92,
+        "excluded_lines": 0
+      }
+    },
+    "nativeArchiveExecution": {
+      "method": "Python standard-library trace on original guest build process, mapped to identical source bytes; selected statement coverage only",
+      "coverage": {
+        "covered_lines": 149,
+        "num_statements": 154,
+        "percent_covered": 96.75324675324676,
+        "percent_covered_display": "97",
+        "missing_lines": 5,
+        "excluded_lines": 0
+      }
+    }
+  },
+  "limitations": [
+    "Both fresh scratch builds used the pinned distribution pause image with two aliases. The full twelve-image GPU recipe has not yet been rebuilt with this public helper.",
+    "The original twenty-three-reference GPU cache was independently checked and retained; it was built by the earlier prototype. Its acceptance does not substitute for a full public-helper GPU build.",
+    "Scratch stores are outside the production k0s cache root. No new AMI was captured, no CAPI worker was launched, and no fresh-clone or GPU startup-cost qualification is claimed.",
+    "Native statement coverage measures this builder process, not Windows behavior, CAPI lifecycle coverage or the full repository.",
+    "The initial evidence export exceeded the SSM inline output limit; its original invocation succeeded. Evidence was recovered with a bounded archive transfer; no cache build was replayed."
+  ],
+  "sourceSHA256": {
+    "../../images/linux/prepare_cache.py": "401095af8087d7c5b3f47ffbc9f70e0962859f67b7ee2eebdb556127ca7c0b5b",
+    "../../images/linux/test_prepare_cache.py": "00605e933fee1c70348570ad99af7dbbba4e213048a7d0bbbe55ce1926dec328",
+    "observe/linux_cache.py": "76276b38851278dc8597fe820cdae6a52cfe8aaf9b703f70734a61f51d1aba8a",
+    "observe/linux_cache_native.py": "c74fa97d0000c1c1bf469af40ed5bbe651de6c0ac8cdf0cafeaecd90b5b1d440"
+  },
+  "evidenceSHA256": {
+    "native-result.json": "7ad0fb708728ec91754bde9d6375812ffc236bb83a7ccbce690384618b817418",
+    "archive-native-result.json": "be4ffbe4d209a9777e55f76102b328eb0c94a916d19a5191b47c0f371d7c0ac5",
+    "repeat-rejection.json": "bb1cfe1486301a61646064fc82700ec69390727f005e6bf6ee4b92bb3751bc5f",
+    "original-cache-acceptance.json": "a48f7433bb4033bdbd42d9b2328b27ec079af14e7841d1eeac0010c568d1e39b",
+    "original-audit-status.json": "1c23cd1fffa9c28a0edfbc2a75aa05e7a4bd11bf54113b09a2bd61b743dc185a",
+    "native-operations.tar.gz": "20f4dfd2ba0e6ec078ef9e8f0672d8e13ef4eae3400744da0c1492d05079a335",
+    "final-audit.json": "a5a88abf156033090f2d9559762687c723f7d306b28168c68bc3aabdd22d4bfd",
+    "guest-cleanup.json": "6cca6535484c1440d31d8c15a9c909e3be907399538ed4328aed56cfc0277c58"
+  },
+  "builderRestored": {
+    "instanceID": "i-001bd2820cad55bec",
+    "state": "stopped",
+    "at": "2026-09-08T23:11:12.539195+00:00"
+  }
+}

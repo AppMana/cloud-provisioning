@@ -1,0 +1,2 @@
+error: cannot perform the following tasks:
+- Fetch and check assertions for snap "core22" (2437) (cannot fetch assertion: got unexpected HTTP status code 408 via GET to "<redacted-url>")

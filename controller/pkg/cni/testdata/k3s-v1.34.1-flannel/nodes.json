@@ -1,0 +1,174 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "apiVersion": "v1",
+      "kind": "Node",
+      "metadata": {
+        "name": "cp",
+        "annotations": {
+          "flannel.alpha.coreos.com/backend-data": "{\"VNI\":1,\"VtepMAC\":\"5a:7a:a7:67:78:9c\"}",
+          "flannel.alpha.coreos.com/backend-type": "vxlan",
+          "flannel.alpha.coreos.com/kube-subnet-manager": "true",
+          "flannel.alpha.coreos.com/public-ip": "10.10.0.10"
+        }
+      },
+      "spec": {
+        "podCIDR": "10.244.0.0/24",
+        "podCIDRs": [
+          "10.244.0.0/24"
+        ]
+      },
+      "status": {
+        "nodeInfo": {
+          "kubeletVersion": "v1.34.1+k3s1"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Node",
+      "metadata": {
+        "name": "cp2",
+        "annotations": {
+          "flannel.alpha.coreos.com/backend-data": "{\"VNI\":1,\"VtepMAC\":\"4a:19:bf:83:4e:c8\"}",
+          "flannel.alpha.coreos.com/backend-type": "vxlan",
+          "flannel.alpha.coreos.com/kube-subnet-manager": "true",
+          "flannel.alpha.coreos.com/public-ip": "10.10.0.13"
+        }
+      },
+      "spec": {
+        "podCIDR": "10.244.1.0/24",
+        "podCIDRs": [
+          "10.244.1.0/24"
+        ]
+      },
+      "status": {
+        "nodeInfo": {
+          "kubeletVersion": "v1.34.1+k3s1"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Node",
+      "metadata": {
+        "name": "cp3",
+        "annotations": {
+          "flannel.alpha.coreos.com/backend-data": "{\"VNI\":1,\"VtepMAC\":\"fe:4d:13:a3:53:51\"}",
+          "flannel.alpha.coreos.com/backend-type": "vxlan",
+          "flannel.alpha.coreos.com/kube-subnet-manager": "true",
+          "flannel.alpha.coreos.com/public-ip": "10.10.0.14"
+        }
+      },
+      "spec": {
+        "podCIDR": "10.244.2.0/24",
+        "podCIDRs": [
+          "10.244.2.0/24"
+        ]
+      },
+      "status": {
+        "nodeInfo": {
+          "kubeletVersion": "v1.34.1+k3s1"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Node",
+      "metadata": {
+        "name": "remote1",
+        "annotations": {
+          "flannel.alpha.coreos.com/backend-data": "{\"VNI\":1,\"VtepMAC\":\"2a:31:da:ae:20:b6\"}",
+          "flannel.alpha.coreos.com/backend-type": "vxlan",
+          "flannel.alpha.coreos.com/kube-subnet-manager": "true",
+          "flannel.alpha.coreos.com/public-ip": "203.0.113.10"
+        }
+      },
+      "spec": {
+        "podCIDR": "10.244.8.0/24",
+        "podCIDRs": [
+          "10.244.8.0/24"
+        ]
+      },
+      "status": {
+        "nodeInfo": {
+          "kubeletVersion": "v1.34.1+k3s1"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Node",
+      "metadata": {
+        "name": "remote2",
+        "annotations": {
+          "flannel.alpha.coreos.com/backend-data": "{\"VNI\":1,\"VtepMAC\":\"02:37:a7:a3:07:85\"}",
+          "flannel.alpha.coreos.com/backend-type": "vxlan",
+          "flannel.alpha.coreos.com/kube-subnet-manager": "true",
+          "flannel.alpha.coreos.com/public-ip": "192.0.2.10"
+        }
+      },
+      "spec": {
+        "podCIDR": "10.244.9.0/24",
+        "podCIDRs": [
+          "10.244.9.0/24"
+        ]
+      },
+      "status": {
+        "nodeInfo": {
+          "kubeletVersion": "v1.34.1+k3s1"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Node",
+      "metadata": {
+        "name": "w1",
+        "annotations": {
+          "flannel.alpha.coreos.com/backend-data": "{\"VNI\":1,\"VtepMAC\":\"7a:da:07:43:c0:25\"}",
+          "flannel.alpha.coreos.com/backend-type": "vxlan",
+          "flannel.alpha.coreos.com/kube-subnet-manager": "true",
+          "flannel.alpha.coreos.com/public-ip": "10.10.0.11"
+        }
+      },
+      "spec": {
+        "podCIDR": "10.244.3.0/24",
+        "podCIDRs": [
+          "10.244.3.0/24"
+        ]
+      },
+      "status": {
+        "nodeInfo": {
+          "kubeletVersion": "v1.34.1+k3s1"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Node",
+      "metadata": {
+        "name": "w2",
+        "annotations": {
+          "flannel.alpha.coreos.com/backend-data": "{\"VNI\":1,\"VtepMAC\":\"52:fd:b4:f7:57:80\"}",
+          "flannel.alpha.coreos.com/backend-type": "vxlan",
+          "flannel.alpha.coreos.com/kube-subnet-manager": "true",
+          "flannel.alpha.coreos.com/public-ip": "10.10.0.12"
+        }
+      },
+      "spec": {
+        "podCIDR": "10.244.5.0/24",
+        "podCIDRs": [
+          "10.244.5.0/24"
+        ]
+      },
+      "status": {
+        "nodeInfo": {
+          "kubeletVersion": "v1.34.1+k3s1"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,461 @@
+{
+  "observedAt": "2026-09-07T14:22:38.985227+00:00",
+  "worker": "aws-win2025-v3",
+  "instanceID": "i-0dc2c8deb3a92b613",
+  "controllerImage": "cldt/controller-windows:v12",
+  "withdrawal": {
+    "observedAt": "2026-09-07T14:21:06.561531+00:00",
+    "phase": "Complete",
+    "requestAbsent": true,
+    "sharedResources": [
+      {
+        "name": "aws-ingress-29cd8969b361810a021f97f0267a50c6",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-ingress-51eb6d155ac7aa4953adc00a49067355",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-ingress-54c6ca87b81da31f2b0f24f8484d92cd",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-ingress-72e5eb9c4ea33eff91f97b46796f3bec",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-ingress-bf1cc68110136166862d0aa3a2ca9388",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-ingress-e58ebc4e77cb9016de13e57b8fb5bd17",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-ingress-f31fe2160282401a4209c9ed9dc05445",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-149b21c0498d6851649b019c42088239",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-30707c6810d3aa8e57bde68432cca63b",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-4635f5e76254405559840451d4353878",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-60923e25c5a222850ccc475e96fbc38d",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-a8787a1f9a7a0b12816d1a244be55c6a",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-cf6fa5388f4ffa1845ffe507e3fef0e4",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-route-d31cc12f9195d5150f5df24cdc48d283",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      },
+      {
+        "name": "aws-source-check-79ca0fcd00a6ad9dc8c95bedc90da555",
+        "leasesBefore": 4,
+        "leasesAfter": 3
+      }
+    ],
+    "removedExclusiveIngressRules": [
+      "sgr-08aba5774cbb1e42c",
+      "sgr-0770d4e968b706bb1"
+    ],
+    "allRoutesUnchanged": true,
+    "onlyExclusiveIngressRemoved": true,
+    "gatewaySourceDestCheckRemainsDisabled": true,
+    "nativeTransportOwnershipRemoved": true,
+    "otherReadyAttachments": 3,
+    "workerStillExists": true
+  },
+  "preDrain": {
+    "scope": "Claim deletion respects a real CAPI pre-drain hook across multiple reconciliations",
+    "observations": [
+      {
+        "at": "2026-09-07T14:21:37.908075+00:00",
+        "machineDeleting": true,
+        "infraDeleting": false,
+        "claimFinalized": true,
+        "ec2State": "running",
+        "machineConditions": [
+          {
+            "lastTransitionTime": "2026-09-07T14:20:54Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "NotReady",
+            "status": "False",
+            "type": "Available"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T14:21:23Z",
+            "message": "* Deleting: Machine deletion in progress, stage: WaitingForPreDrainHook\n* NodeHealthy:\n  * Node.AllConditions: Kubelet stopped posting node status.",
+            "observedGeneration": 3,
+            "reason": "NotReady",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T13:07:05Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "DataSecretProvided",
+            "status": "True",
+            "type": "BootstrapConfigReady"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T13:07:14Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "Ready",
+            "status": "True",
+            "type": "InfrastructureReady"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T14:20:54Z",
+            "message": "* Node.AllConditions: Kubelet stopped posting node status.",
+            "observedGeneration": 3,
+            "reason": "NodeHealthyUnknown",
+            "status": "Unknown",
+            "type": "NodeHealthy"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T14:20:54Z",
+            "message": "* Node.Ready: Kubelet stopped posting node status.",
+            "observedGeneration": 3,
+            "reason": "NodeReadyUnknown",
+            "status": "Unknown",
+            "type": "NodeReady"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T13:07:05Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "NotPaused",
+            "status": "False",
+            "type": "Paused"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T14:21:23Z",
+            "message": "Waiting for pre-drain hooks to succeed (hooks: pre-drain.delete.hook.machine.cluster.x-k8s.io/cldt-validation)",
+            "observedGeneration": 3,
+            "reason": "WaitingForPreDrainHook",
+            "status": "True",
+            "type": "Deleting"
+          }
+        ]
+      },
+      {
+        "at": "2026-09-07T14:21:50.274036+00:00",
+        "machineDeleting": true,
+        "infraDeleting": false,
+        "claimFinalized": true,
+        "ec2State": "running",
+        "machineConditions": [
+          {
+            "lastTransitionTime": "2026-09-07T14:20:54Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "NotReady",
+            "status": "False",
+            "type": "Available"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T14:21:23Z",
+            "message": "* Deleting: Machine deletion in progress, stage: WaitingForPreDrainHook",
+            "observedGeneration": 3,
+            "reason": "NotReady",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T13:07:05Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "DataSecretProvided",
+            "status": "True",
+            "type": "BootstrapConfigReady"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T13:07:14Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "Ready",
+            "status": "True",
+            "type": "InfrastructureReady"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T14:21:37Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "NodeHealthy",
+            "status": "True",
+            "type": "NodeHealthy"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T14:21:36Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "NodeReady",
+            "status": "True",
+            "type": "NodeReady"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T13:07:05Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "NotPaused",
+            "status": "False",
+            "type": "Paused"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T14:21:23Z",
+            "message": "Waiting for pre-drain hooks to succeed (hooks: pre-drain.delete.hook.machine.cluster.x-k8s.io/cldt-validation)",
+            "observedGeneration": 3,
+            "reason": "WaitingForPreDrainHook",
+            "status": "True",
+            "type": "Deleting"
+          }
+        ]
+      },
+      {
+        "at": "2026-09-07T14:22:02.501303+00:00",
+        "machineDeleting": true,
+        "infraDeleting": false,
+        "claimFinalized": true,
+        "ec2State": "running",
+        "machineConditions": [
+          {
+            "lastTransitionTime": "2026-09-07T14:20:54Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "NotReady",
+            "status": "False",
+            "type": "Available"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T14:21:23Z",
+            "message": "* Deleting: Machine deletion in progress, stage: WaitingForPreDrainHook",
+            "observedGeneration": 3,
+            "reason": "NotReady",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T13:07:05Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "DataSecretProvided",
+            "status": "True",
+            "type": "BootstrapConfigReady"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T13:07:14Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "Ready",
+            "status": "True",
+            "type": "InfrastructureReady"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T14:21:37Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "NodeHealthy",
+            "status": "True",
+            "type": "NodeHealthy"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T14:21:36Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "NodeReady",
+            "status": "True",
+            "type": "NodeReady"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T13:07:05Z",
+            "message": "",
+            "observedGeneration": 3,
+            "reason": "NotPaused",
+            "status": "False",
+            "type": "Paused"
+          },
+          {
+            "lastTransitionTime": "2026-09-07T14:21:23Z",
+            "message": "Waiting for pre-drain hooks to succeed (hooks: pre-drain.delete.hook.machine.cluster.x-k8s.io/cldt-validation)",
+            "observedGeneration": 3,
+            "reason": "WaitingForPreDrainHook",
+            "status": "True",
+            "type": "Deleting"
+          }
+        ]
+      }
+    ]
+  },
+  "postWithdrawalNode": {
+    "observedAt": "2026-09-07T14:22:20.520929+00:00",
+    "nodeUID": "90f3d1eb-5127-4e0a-b2d8-19b9f9fad9b7",
+    "conditions": [
+      {
+        "lastHeartbeatTime": "2026-09-07T13:20:44Z",
+        "lastTransitionTime": "2026-09-07T13:20:44Z",
+        "message": "Calico is running on this node",
+        "reason": "CalicoIsUp",
+        "status": "False",
+        "type": "NetworkUnavailable"
+      },
+      {
+        "lastHeartbeatTime": "2026-09-07T14:21:36Z",
+        "lastTransitionTime": "2026-09-07T14:21:36Z",
+        "message": "kubelet has sufficient memory available",
+        "reason": "KubeletHasSufficientMemory",
+        "status": "False",
+        "type": "MemoryPressure"
+      },
+      {
+        "lastHeartbeatTime": "2026-09-07T14:21:36Z",
+        "lastTransitionTime": "2026-09-07T14:21:36Z",
+        "message": "kubelet has no disk pressure",
+        "reason": "KubeletHasNoDiskPressure",
+        "status": "False",
+        "type": "DiskPressure"
+      },
+      {
+        "lastHeartbeatTime": "2026-09-07T14:21:36Z",
+        "lastTransitionTime": "2026-09-07T14:21:36Z",
+        "message": "kubelet has sufficient PID available",
+        "reason": "KubeletHasSufficientPID",
+        "status": "False",
+        "type": "PIDPressure"
+      },
+      {
+        "lastHeartbeatTime": "2026-09-07T14:21:36Z",
+        "lastTransitionTime": "2026-09-07T14:21:36Z",
+        "message": "kubelet is posting ready status",
+        "reason": "KubeletReady",
+        "status": "True",
+        "type": "Ready"
+      },
+      {
+        "lastHeartbeatTime": null,
+        "lastTransitionTime": "2026-09-07T13:17:04Z",
+        "message": "No containerd deprecation warnings detected",
+        "reason": "NoDeprecations",
+        "status": "True",
+        "type": "ContainerdHasNoDeprecations"
+      }
+    ]
+  },
+  "limitations": [
+    "Temporary readiness interruption during withdrawal remains unexplained.",
+    "Complete policy, sustained UDP and gateway failover matrix remain unqualified.",
+    "Pre-terminate hold was not verified."
+  ],
+  "temporaryHooksRemoved": true,
+  "preTerminateHoldVerified": false,
+  "deletionConditions": [
+    {
+      "lastTransitionTime": "2026-09-07T14:21:23Z",
+      "message": "Waiting for AWSMachine to be deleted",
+      "observedGeneration": 3,
+      "reason": "WaitingForInfrastructureDeletion",
+      "status": "True",
+      "type": "Deleting"
+    }
+  ],
+  "deletion": {
+    "observedAt": "2026-09-07T14:24:03.095864+00:00",
+    "instanceID": "i-0dc2c8deb3a92b613",
+    "ec2State": "terminated",
+    "objects": [
+      {
+        "kind": "provisionednodeclaim",
+        "absent": true
+      },
+      {
+        "kind": "machine",
+        "absent": true
+      },
+      {
+        "kind": "awsmachine",
+        "absent": true
+      },
+      {
+        "kind": "node",
+        "absent": true
+      }
+    ]
+  },
+  "readyRecoveryBeforeDeletion": {
+    "lastTransitionTime": "2026-09-07T14:21:36Z",
+    "status": "True",
+    "reason": "KubeletReady",
+    "evidence": "Observed live Node status and Machine NodeReady=True before infrastructure deletion"
+  },
+  "replacement": {
+    "observedAt": "2026-09-07T14:38:49.133123+00:00",
+    "machine": "aws-win2025-v3",
+    "machineUID": "d655db95-4e7d-4575-b5c9-e245f4efafc9",
+    "instanceID": "i-07c9859f5ce8ed42b",
+    "eniID": "eni-0ecf3c4b792b70a34",
+    "imageID": "ami-0a6405fa364804901",
+    "eniCount": 1,
+    "checks": {
+      "expectedWindowsBuild": true,
+      "onePhysicalNIC": true,
+      "k0sWorkerRunning": true,
+      "tunnelRunning": true,
+      "bootstrapInstalled": true,
+      "capiAssociation": true,
+      "windowsNode": true,
+      "matchesSiteKubelet": true,
+      "containerd2": true,
+      "cloudWorkerLabel": true,
+      "internetFacingTaint": true,
+      "nodeReady": true,
+      "publisherReady": true,
+      "expectedWorkerVersion": true,
+      "expectedWorkerHash": true,
+      "expectedTunnelHash": true,
+      "peerDelivery": true
+    },
+    "nodeUID": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+    "konnectivity": {
+      "observedAt": "2026-09-07T14:40:00.798104+00:00",
+      "agentUID": "7cdacd38-c4e5-4673-9e98-873ec001e966",
+      "agentReady": true,
+      "calicoPodUID": "fafff698-bbe8-43f3-8b71-fd232427a6c7",
+      "nativeExec": true,
+      "exitCode": 0
+    },
+    "activeAttachmentsReady": 4,
+    "networkMatrix": "windows-replacement-matrix-results.json"
+  }
+}

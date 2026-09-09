@@ -1,0 +1,778 @@
+{
+  "observedAt": "2026-09-07T22:41:40.344700+00:00",
+  "scope": "Completed read-only Windows survivor peer sampling during CAPI removal and replacement",
+  "source": {
+    "instanceID": "i-0ddaed6f030330992",
+    "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7"
+  },
+  "nativeSamplerSmoke": {
+    "samples": 3,
+    "peersPerSample": 9,
+    "adapterUp": true,
+    "fields": [
+      "publicKeySHA256",
+      "endpoint",
+      "txBytes",
+      "rxBytes",
+      "lastHandshakeFiletime"
+    ]
+  },
+  "peerCounterObservation": {
+    "samples": 1800,
+    "firstObservedAt": "2026-09-07T21:59:24.185444Z",
+    "lastObservedAt": "2026-09-07T22:29:29.7261852Z",
+    "allSamplesAdapterUp": true,
+    "rawSHA256": "31b16d2843d5515399904d944f3a0c90303414b03238e70d23e4a01b8cf06c78",
+    "resetCount": 39,
+    "events": [
+      {
+        "at": "2026-09-07T22:00:09.3901436Z",
+        "identity": "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad",
+        "beforeTx": 2504,
+        "afterTx": 180,
+        "beforeRx": 2744,
+        "afterRx": 92,
+        "beforeHandshake": 134332919648018961,
+        "afterHandshake": 134332920087804773
+      },
+      {
+        "at": "2026-09-07T22:00:09.3901436Z",
+        "identity": "2ae21796e6a9f26aac551eace21dd728b22c7bcdc40a2baebf29d99babd2cce1",
+        "beforeTx": 2016,
+        "afterTx": 180,
+        "beforeRx": 3776,
+        "afterRx": 92,
+        "beforeHandshake": 134332920063252033,
+        "afterHandshake": 134332920087804773
+      },
+      {
+        "at": "2026-09-07T22:00:09.3901436Z",
+        "identity": "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2",
+        "beforeTx": 3724,
+        "afterTx": 180,
+        "beforeRx": 1860,
+        "afterRx": 92,
+        "beforeHandshake": 134332920025394334,
+        "afterHandshake": 134332920087804773
+      },
+      {
+        "at": "2026-09-07T22:00:09.3901436Z",
+        "identity": "387e1ba0cdc7505dd7a04005053ffb4f25d6108de8c9b9ba834c4612b207271c",
+        "beforeTx": 2116,
+        "afterTx": 180,
+        "beforeRx": 3404,
+        "afterRx": 92,
+        "beforeHandshake": 134332920053141311,
+        "afterHandshake": 134332920087804773
+      },
+      {
+        "at": "2026-09-07T22:00:09.3901436Z",
+        "identity": "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db",
+        "beforeTx": 3652,
+        "afterTx": 148,
+        "beforeRx": 5168,
+        "afterRx": 0,
+        "beforeHandshake": 134332919034504095,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:00:09.3901436Z",
+        "identity": "7574b4ca15136ead1df763ebe356d4d2d45b4e11217450e5a0cf8a969560f778",
+        "beforeTx": 1620,
+        "afterTx": 180,
+        "beforeRx": 3964,
+        "afterRx": 92,
+        "beforeHandshake": 134332918406108950,
+        "afterHandshake": 134332920087804773
+      },
+      {
+        "at": "2026-09-07T22:00:09.3901436Z",
+        "identity": "b16d1e5da30b9fb1b8253b6a59e406d1dfd99987099dc791140f8b611a234461",
+        "beforeTx": 1136,
+        "afterTx": 0,
+        "beforeRx": 5200,
+        "afterRx": 0,
+        "beforeHandshake": 134332919018763797,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:00:09.3901436Z",
+        "identity": "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147",
+        "beforeTx": 3652,
+        "afterTx": 148,
+        "beforeRx": 5168,
+        "afterRx": 0,
+        "beforeHandshake": 134332919026859835,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:00:09.3901436Z",
+        "identity": "fdcc78dba6de2e78d279106b1055b1a49594a984e19a86e5eaf5a58f4eefdc8a",
+        "beforeTx": 1136,
+        "afterTx": 0,
+        "beforeRx": 5200,
+        "afterRx": 0,
+        "beforeHandshake": 134332918995747381,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:06:14.7209944Z",
+        "identity": "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad",
+        "beforeTx": 680,
+        "afterTx": 272,
+        "beforeRx": 856,
+        "afterRx": 272,
+        "beforeHandshake": 134332923095604631,
+        "afterHandshake": 134332923744448882
+      },
+      {
+        "at": "2026-09-07T22:06:14.7209944Z",
+        "identity": "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2",
+        "beforeTx": 856,
+        "afterTx": 180,
+        "beforeRx": 680,
+        "afterRx": 92,
+        "beforeHandshake": 134332923725409656,
+        "afterHandshake": 134332923737904495
+      },
+      {
+        "at": "2026-09-07T22:06:14.7209944Z",
+        "identity": "387e1ba0cdc7505dd7a04005053ffb4f25d6108de8c9b9ba834c4612b207271c",
+        "beforeTx": 604,
+        "afterTx": 180,
+        "beforeRx": 660,
+        "afterRx": 92,
+        "beforeHandshake": 134332923588206940,
+        "afterHandshake": 134332923737904495
+      },
+      {
+        "at": "2026-09-07T22:06:14.7209944Z",
+        "identity": "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db",
+        "beforeTx": 900,
+        "afterTx": 148,
+        "beforeRx": 1276,
+        "afterRx": 0,
+        "beforeHandshake": 134332922659426860,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:06:14.7209944Z",
+        "identity": "7574b4ca15136ead1df763ebe356d4d2d45b4e11217450e5a0cf8a969560f778",
+        "beforeTx": 540,
+        "afterTx": 180,
+        "beforeRx": 1012,
+        "afterRx": 92,
+        "beforeHandshake": 134332923464713775,
+        "afterHandshake": 134332923737904495
+      },
+      {
+        "at": "2026-09-07T22:06:14.7209944Z",
+        "identity": "b16d1e5da30b9fb1b8253b6a59e406d1dfd99987099dc791140f8b611a234461",
+        "beforeTx": 308,
+        "afterTx": 0,
+        "beforeRx": 1276,
+        "afterRx": 0,
+        "beforeHandshake": 134332922643705458,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:06:14.7209944Z",
+        "identity": "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147",
+        "beforeTx": 752,
+        "afterTx": 148,
+        "beforeRx": 1276,
+        "afterRx": 0,
+        "beforeHandshake": 134332922651772552,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:06:14.7209944Z",
+        "identity": "fdcc78dba6de2e78d279106b1055b1a49594a984e19a86e5eaf5a58f4eefdc8a",
+        "beforeTx": 308,
+        "afterTx": 0,
+        "beforeRx": 1276,
+        "afterRx": 0,
+        "beforeHandshake": 134332922620703043,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:11:03.8857363Z",
+        "identity": "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad",
+        "beforeTx": 524,
+        "afterTx": 180,
+        "beforeRx": 644,
+        "afterRx": 92,
+        "beforeHandshake": 134332925494921215,
+        "afterHandshake": 134332926637904031
+      },
+      {
+        "at": "2026-09-07T22:11:03.8857363Z",
+        "identity": "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2",
+        "beforeTx": 888,
+        "afterTx": 180,
+        "beforeRx": 552,
+        "afterRx": 92,
+        "beforeHandshake": 134332926575670660,
+        "afterHandshake": 134332926637904031
+      },
+      {
+        "at": "2026-09-07T22:11:03.8857363Z",
+        "identity": "387e1ba0cdc7505dd7a04005053ffb4f25d6108de8c9b9ba834c4612b207271c",
+        "beforeTx": 616,
+        "afterTx": 180,
+        "beforeRx": 824,
+        "afterRx": 92,
+        "beforeHandshake": 134332926503626379,
+        "afterHandshake": 134332926637904031
+      },
+      {
+        "at": "2026-09-07T22:11:03.8857363Z",
+        "identity": "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db",
+        "beforeTx": 752,
+        "afterTx": 148,
+        "beforeRx": 1116,
+        "afterRx": 0,
+        "beforeHandshake": 134332926284369153,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:11:03.8857363Z",
+        "identity": "7574b4ca15136ead1df763ebe356d4d2d45b4e11217450e5a0cf8a969560f778",
+        "beforeTx": 360,
+        "afterTx": 180,
+        "beforeRx": 760,
+        "afterRx": 92,
+        "beforeHandshake": 134332925425655639,
+        "afterHandshake": 134332926637904031
+      },
+      {
+        "at": "2026-09-07T22:11:03.8857363Z",
+        "identity": "b16d1e5da30b9fb1b8253b6a59e406d1dfd99987099dc791140f8b611a234461",
+        "beforeTx": 308,
+        "afterTx": 0,
+        "beforeRx": 1116,
+        "afterRx": 0,
+        "beforeHandshake": 134332926268606115,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:11:03.8857363Z",
+        "identity": "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147",
+        "beforeTx": 752,
+        "afterTx": 148,
+        "beforeRx": 1116,
+        "afterRx": 0,
+        "beforeHandshake": 134332926276704626,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:11:03.8857363Z",
+        "identity": "fdcc78dba6de2e78d279106b1055b1a49594a984e19a86e5eaf5a58f4eefdc8a",
+        "beforeTx": 308,
+        "afterTx": 0,
+        "beforeRx": 1116,
+        "afterRx": 0,
+        "beforeHandshake": 134332926245608810,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:11:18.9818823Z",
+        "identity": "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad",
+        "beforeTx": 272,
+        "afterTx": 180,
+        "beforeRx": 272,
+        "afterRx": 92,
+        "beforeHandshake": 134332926644676914,
+        "afterHandshake": 134332926787920336
+      },
+      {
+        "at": "2026-09-07T22:11:18.9818823Z",
+        "identity": "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2",
+        "beforeTx": 272,
+        "afterTx": 180,
+        "beforeRx": 272,
+        "afterRx": 92,
+        "beforeHandshake": 134332926775436448,
+        "afterHandshake": 134332926787920336
+      },
+      {
+        "at": "2026-09-07T22:11:18.9818823Z",
+        "identity": "387e1ba0cdc7505dd7a04005053ffb4f25d6108de8c9b9ba834c4612b207271c",
+        "beforeTx": 272,
+        "afterTx": 180,
+        "beforeRx": 272,
+        "afterRx": 92,
+        "beforeHandshake": 134332926653404230,
+        "afterHandshake": 134332926787920336
+      },
+      {
+        "at": "2026-09-07T22:11:18.9818823Z",
+        "identity": "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db",
+        "beforeTx": 444,
+        "afterTx": 148,
+        "beforeRx": 0,
+        "afterRx": 0,
+        "beforeHandshake": 0,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:11:18.9818823Z",
+        "identity": "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147",
+        "beforeTx": 444,
+        "afterTx": 148,
+        "beforeRx": 0,
+        "afterRx": 0,
+        "beforeHandshake": 0,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:25:09.7650873Z",
+        "identity": "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad",
+        "beforeTx": 1244,
+        "afterTx": 272,
+        "beforeRx": 1748,
+        "afterRx": 272,
+        "beforeHandshake": 134332934296247132,
+        "afterHandshake": 134332935094534096
+      },
+      {
+        "at": "2026-09-07T22:25:09.7650873Z",
+        "identity": "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2",
+        "beforeTx": 1928,
+        "afterTx": 180,
+        "beforeRx": 1336,
+        "afterRx": 92,
+        "beforeHandshake": 134332935075419997,
+        "afterHandshake": 134332935087911538
+      },
+      {
+        "at": "2026-09-07T22:25:09.7650873Z",
+        "identity": "387e1ba0cdc7505dd7a04005053ffb4f25d6108de8c9b9ba834c4612b207271c",
+        "beforeTx": 1208,
+        "afterTx": 180,
+        "beforeRx": 2088,
+        "afterRx": 92,
+        "beforeHandshake": 134332934804306419,
+        "afterHandshake": 134332935087911538
+      },
+      {
+        "at": "2026-09-07T22:25:09.7650873Z",
+        "identity": "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db",
+        "beforeTx": 2748,
+        "afterTx": 148,
+        "beforeRx": 2860,
+        "afterRx": 0,
+        "beforeHandshake": 134332934742506781,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:25:09.7650873Z",
+        "identity": "7574b4ca15136ead1df763ebe356d4d2d45b4e11217450e5a0cf8a969560f778",
+        "beforeTx": 900,
+        "afterTx": 180,
+        "beforeRx": 2188,
+        "afterRx": 92,
+        "beforeHandshake": 134332933545858202,
+        "afterHandshake": 134332935087911538
+      },
+      {
+        "at": "2026-09-07T22:25:09.7650873Z",
+        "identity": "b16d1e5da30b9fb1b8253b6a59e406d1dfd99987099dc791140f8b611a234461",
+        "beforeTx": 676,
+        "afterTx": 0,
+        "beforeRx": 2860,
+        "afterRx": 0,
+        "beforeHandshake": 134332934726829769,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:25:09.7650873Z",
+        "identity": "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147",
+        "beforeTx": 2748,
+        "afterTx": 148,
+        "beforeRx": 2860,
+        "afterRx": 0,
+        "beforeHandshake": 134332934734929907,
+        "afterHandshake": 0
+      },
+      {
+        "at": "2026-09-07T22:25:09.7650873Z",
+        "identity": "e4139fbb0cf8fdcc249ae3c0a803c8885e85da4f44b83e173e23e8130d5694a5",
+        "beforeTx": 11372,
+        "afterTx": 180,
+        "beforeRx": 1220,
+        "afterRx": 92,
+        "beforeHandshake": 134332935083604801,
+        "afterHandshake": 134332935087861212
+      },
+      {
+        "at": "2026-09-07T22:25:09.7650873Z",
+        "identity": "fdcc78dba6de2e78d279106b1055b1a49594a984e19a86e5eaf5a58f4eefdc8a",
+        "beforeTx": 676,
+        "afterTx": 0,
+        "beforeRx": 2860,
+        "afterRx": 0,
+        "beforeHandshake": 134332934703813430,
+        "afterHandshake": 0
+      }
+    ]
+  },
+  "udpFailures": [
+    {
+      "ok": false,
+      "expectedResponses": 20,
+      "reportedResponses": 19,
+      "exactResponses": 19,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.190.81:36523->10.244.114.4:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-w1",
+      "target": "net-aws-win2022-v3",
+      "kind": "udp",
+      "payloadBytes": 64,
+      "startedAt": "2026-09-07T22:01:26.505462+00:00",
+      "finishedAt": "2026-09-07T22:01:32.117254+00:00"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 20,
+      "reportedResponses": 19,
+      "exactResponses": 19,
+      "responsesPresent": true,
+      "errors": [
+        "reading from udp connection failed. err:'read udp 10.244.114.4:55398->10.244.190.81:8081: i/o timeout'"
+      ],
+      "commandExitCode": 0,
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "kind": "udp",
+      "payloadBytes": 64,
+      "startedAt": "2026-09-07T22:02:26.528433+00:00",
+      "finishedAt": "2026-09-07T22:02:32.244303+00:00"
+    }
+  ],
+  "limitations": [
+    "Counter resets do not establish packet loss or causality",
+    "The sampling window ends before the two later post-canary UDP failures",
+    "No fragmentation mitigation or packet-loss fix claimed"
+  ],
+  "sourceReview": {
+    "windowsApply": "The pre-candidate implementation set InterfaceReplacePeers for every configuration update; the candidate explicitly removes retired peers and updates surviving peers in place.",
+    "blame": "The Windows backend is new uncommitted code and has no HEAD blame history"
+  },
+  "candidateChange": {
+    "source": "controller/pkg/tunneldevice/device_windows.go",
+    "behavior": "Read current adapter peers, explicitly remove retired peers, update desired peers without InterfaceReplacePeers",
+    "deployment": "Deployed to existing Windows 2022 and Windows 2025 CPU workload services; original binaries preserved, baked images and GPU worker services unchanged.",
+    "validation": "Native isolated tests passed on both Windows versions. A target-bound real CAPI cycle captured addition and removal on both CPU canaries, with no counter decreases in 1800 samples each. Ready-baseline cleanup passed all eight checks. Small-payload traffic passed after addition and across removal; prior intermittent/fragmentation failures and transient CAPI webhook timeouts remain unresolved.",
+    "blame": "File is untracked and has no HEAD blame history; this candidate supersedes the earlier whole-peer replacement implementation in the same worktree",
+    "binarySHA256": "a513e39abc7ab84739160d60efffc7eb873b589a26ab3e0971e4e665060e0f3a"
+  },
+  "candidateNativeContinuity": {
+    "2022": {
+      "passed": true,
+      "testOutput": "=== RUN   TestNativePeerHandshakeContinuity\n    continuity_windows_test.go:37: owned adapter cldt15d67cfd\n    continuity_windows_test.go:37: owned adapter cldt70a10c90\n    continuity_windows_test.go:128: add: peers=2 handshake preserved, tx=180 rx=124\n    continuity_windows_test.go:128: remove: peers=1 handshake preserved, tx=180 rx=124\n    continuity_windows_test.go:128: unchanged: peers=1 handshake preserved, tx=180 rx=124\n--- PASS: TestNativePeerHandshakeContinuity (1.53s)\nPASS\n",
+      "cleanup": {
+        "liveAdapterUp": true,
+        "testAdaptersAbsent": true
+      },
+      "scope": "Two temporary adapters using real loopback handshakes; no IP addresses or routes assigned; verifies add/remove/unchanged update and final peer removal"
+    },
+    "2025": {
+      "passed": true,
+      "testOutput": "=== RUN   TestNativePeerHandshakeContinuity\n    continuity_windows_test.go:37: owned adapter cldt007475c6\n    continuity_windows_test.go:37: owned adapter cldt3d0a2013\n    continuity_windows_test.go:128: add: peers=2 handshake preserved, tx=180 rx=124\n    continuity_windows_test.go:128: remove: peers=1 handshake preserved, tx=180 rx=124\n    continuity_windows_test.go:128: unchanged: peers=1 handshake preserved, tx=180 rx=124\n--- PASS: TestNativePeerHandshakeContinuity (1.42s)\nPASS\n",
+      "cleanup": {
+        "liveAdapterUp": true,
+        "testAdaptersAbsent": true
+      },
+      "scope": "Two temporary adapters using real loopback handshakes; no IP addresses or routes assigned; verifies add/remove/unchanged update and final peer removal"
+    },
+    "limitations": [
+      "Does not qualify live workload tunnel rollout, route changes, cross-host traffic, or UDP fragmentation",
+      "An initial PowerShell argument-parsing invocation failed before executing the native test; corrected invocation passed"
+    ]
+  },
+  "candidateAuthenticatedTraffic": {
+    "2022": {
+      "passed": true,
+      "output": "=== RUN   TestNativePeerHandshakeContinuity\n    continuity_windows_test.go:37: owned adapter cldt49198c83\n    continuity_windows_test.go:37: owned adapter cldtd6c60cf2\n    continuity_windows_test.go:129: add: peers=2 handshake preserved, tx=180 rx=124\n    continuity_windows_test.go:129: remove: peers=1 handshake preserved, tx=180 rx=124\n    continuity_windows_test.go:129: unchanged: peers=1 handshake preserved, tx=180 rx=124\n    continuity_windows_test.go:144: authenticated keepalive delivered after membership updates without a new handshake\n--- PASS: TestNativePeerHandshakeContinuity (26.20s)\nPASS\n",
+      "scope": "Authenticated keepalive delivered across isolated loopback adapters after add/remove/unchanged updates, with original handshake preserved",
+      "cleanup": {
+        "liveAdapterUp": true,
+        "testAdaptersAbsent": true
+      }
+    },
+    "2025": {
+      "passed": true,
+      "output": "=== RUN   TestNativePeerHandshakeContinuity\n    continuity_windows_test.go:37: owned adapter cldta781a756\n    continuity_windows_test.go:37: owned adapter cldt1d172e2c\n    continuity_windows_test.go:129: add: peers=2 handshake preserved, tx=180 rx=124\n    continuity_windows_test.go:129: remove: peers=1 handshake preserved, tx=180 rx=124\n    continuity_windows_test.go:129: unchanged: peers=1 handshake preserved, tx=180 rx=124\n    continuity_windows_test.go:144: authenticated keepalive delivered after membership updates without a new handshake\n--- PASS: TestNativePeerHandshakeContinuity (26.25s)\nPASS\n",
+      "scope": "Authenticated keepalive delivered across isolated loopback adapters after add/remove/unchanged updates, with original handshake preserved",
+      "cleanup": {
+        "liveAdapterUp": true,
+        "testAdaptersAbsent": true
+      }
+    }
+  },
+  "nativeBackendCoverage": {
+    "platform": "Windows 2022",
+    "packageStatementsPercent": 88.8,
+    "Compile": 100.0,
+    "VerifyRoutes": 100.0,
+    "Apply": 80.0,
+    "buildPeerUpdate": 92.9,
+    "scope": "Native adapter lifecycle/route repair and native handshake traffic tests plus configuration unit tests; no whole-project coverage claim",
+    "profileSHA256": "2bce6574b4d31e3606c93d2212fc57e8fa254aacbcad186679ec2deec9a21ff8"
+  },
+  "nativeBackendLifecycle": {
+    "2022": {
+      "passed": true,
+      "cleanup": {
+        "liveAdapterUp": true,
+        "testRoutesAbsent": true,
+        "testAdaptersAbsent": true
+      },
+      "scope": "Production Native.Apply on an owned adapter: route drift repair, immutable address, last peer/route retirement"
+    },
+    "2025": {
+      "passed": true,
+      "cleanup": {
+        "liveAdapterUp": true,
+        "testRoutesAbsent": true,
+        "testAdaptersAbsent": true
+      },
+      "scope": "Production Native.Apply on an owned adapter: route drift repair, immutable address, last peer/route retirement"
+    }
+  },
+  "liveCanaryRemoval": {
+    "observedAt": "2026-09-07T23:58:17.842674+00:00",
+    "rollout": {
+      "service": "cloud-provisioning-cldt1775f69e",
+      "originalBinaryPreserved": true,
+      "passed": true,
+      "observedAt": "2026-09-07T23:45:01.7189186Z",
+      "executable": "C:\\ProgramData\\CloudProvisioning\\windows-tunnel-peer-update-v1.exe",
+      "identityUnchanged": true,
+      "processID": 3652,
+      "sha256": "a513e39abc7ab84739160d60efffc7eb873b589a26ab3e0971e4e665060e0f3a"
+    },
+    "joinChecks": {
+      "expectedWindowsBuild": true,
+      "onePhysicalNIC": true,
+      "k0sWorkerRunning": true,
+      "tunnelRunning": true,
+      "bootstrapInstalled": true,
+      "capiAssociation": true,
+      "windowsNode": true,
+      "matchesSiteKubelet": true,
+      "containerd2": true,
+      "cloudWorkerLabel": true,
+      "internetFacingTaint": true,
+      "nodeReady": true,
+      "publisherReady": true,
+      "expectedWorkerVersion": true,
+      "expectedWorkerHash": true,
+      "expectedTunnelHash": true,
+      "expectedRunningTunnelHash": true,
+      "peerDelivery": true
+    },
+    "runningTunnels": [
+      {
+        "processId": 3652,
+        "name": "cloud-provisioning-cldt1775f69e",
+        "executableSHA256": "a513e39abc7ab84739160d60efffc7eb873b589a26ab3e0971e4e665060e0f3a"
+      }
+    ],
+    "nodeUID": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+    "sameNodeAndServiceProcess": true,
+    "removal": {
+      "claim": "aws-win2025-gpu-cold-control",
+      "instanceID": "i-079b7a931134dc68d",
+      "node": "aws-win2025-gpu-cold-control",
+      "nodeUID": "e67cbbe1-08f2-4268-b579-41654d10bd38",
+      "observedAt": "2026-09-07T23:51:15.200401893Z",
+      "productCleanup": true,
+      "providerID": "aws:///us-west-2a/i-079b7a931134dc68d",
+      "terminated": true
+    },
+    "removalGuard": {
+      "passed": true,
+      "checks": {
+        "instanceTerminated": true,
+        "productCleanup": true,
+        "targetMachineAbsent": true,
+        "survivorMachineIdentities": true,
+        "exactSurvivorSet": true,
+        "survivorIdentitiesAndReadiness": true,
+        "targetGatewayLeasesComplete": true,
+        "otherGatewayLeasesPreserved": true
+      },
+      "survivorCount": 13,
+      "retiredGatewayLeaseCount": 1,
+      "preservedGatewayLeaseCount": 5,
+      "scope": "Snapshot identity/readiness and gateway lease preservation; application/network survivor probes are separate"
+    },
+    "peerObservation": {
+      "samples": 600,
+      "firstObservedAt": "2026-09-07T23:45:56.6632037Z",
+      "lastObservedAt": "2026-09-07T23:55:57.7497046Z",
+      "allSamplesAdapterUp": true,
+      "rawSHA256": "6ab2c49cf546e0801724e8d3f4da9a53adfd70a343ee0368ddd91647d981704f",
+      "peerCounts": [
+        9,
+        10
+      ],
+      "membershipChanges": [
+        {
+          "observedAt": "2026-09-07T23:51:11.7368372Z",
+          "added": [],
+          "removed": [
+            "42fcc85cb03f215e75c5261bd3351014e5dce79f1edf5f536d7d107ec91807b3"
+          ]
+        }
+      ],
+      "counterDecreases": [],
+      "survivorCount": 9,
+      "survivorTrafficProgress": {
+        "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad": {
+          "txBytes": 908,
+          "rxBytes": 1220
+        },
+        "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2": {
+          "txBytes": 720,
+          "rxBytes": 1136
+        },
+        "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db": {
+          "txBytes": 460,
+          "rxBytes": 2180
+        },
+        "7574b4ca15136ead1df763ebe356d4d2d45b4e11217450e5a0cf8a969560f778": {
+          "txBytes": 540,
+          "rxBytes": 1524
+        },
+        "a145f1be2d4d0f573fc0bea939ef37faa444eb53657bdd282446046592a5d516": {
+          "txBytes": 684,
+          "rxBytes": 1444
+        },
+        "b16d1e5da30b9fb1b8253b6a59e406d1dfd99987099dc791140f8b611a234461": {
+          "txBytes": 460,
+          "rxBytes": 2180
+        },
+        "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147": {
+          "txBytes": 460,
+          "rxBytes": 2180
+        },
+        "e4139fbb0cf8fdcc249ae3c0a803c8885e85da4f44b83e173e23e8130d5694a5": {
+          "txBytes": 748,
+          "rxBytes": 1380
+        },
+        "fdcc78dba6de2e78d279106b1055b1a49594a984e19a86e5eaf5a58f4eefdc8a": {
+          "txBytes": 460,
+          "rxBytes": 2180
+        }
+      }
+    },
+    "udpObservation": {
+      "startedAt": "2026-09-07T23:47:05.549749+00:00",
+      "rounds": 120,
+      "intervalSeconds": 2,
+      "triesPerDirection": 20,
+      "payloadBytes": 64,
+      "scope": "Real CAPI removal with peer-update candidate on Windows 2022 and stored-address canary on w1; preserve all outcomes; no fragmentation fix claim",
+      "finishedAt": "2026-09-07T23:56:23.185105+00:00",
+      "failedRounds": 1,
+      "requestedEchoes": 4800,
+      "confirmedExactEchoes": 4780,
+      "identitiesStable": true,
+      "failedChecks": [
+        {
+          "ok": false,
+          "expectedResponses": 20,
+          "reportedResponses": 0,
+          "exactResponses": 0,
+          "responsesPresent": false,
+          "errors": [
+            "reading from udp connection failed. err:'read udp 10.244.114.4:50503->10.244.190.81:8081: i/o timeout'"
+          ],
+          "commandExitCode": 0,
+          "source": "net-aws-win2022-v3",
+          "target": "net-w1",
+          "kind": "udp",
+          "payloadBytes": 64,
+          "startedAt": "2026-09-07T23:54:57.461180+00:00",
+          "finishedAt": "2026-09-07T23:55:03.182452+00:00"
+        }
+      ],
+      "interpretation": "One batch returned an error without a response list. Missing confirmations are not a measured packet-loss count; no peer counter decrease was sampled during this failure."
+    },
+    "limitations": [
+      "One Windows 2022 live removal; no live addition or Windows 2025 candidate rollout qualification",
+      "One-second samples cannot exclude changes between samples",
+      "Small-payload UDP did not pass completely; fragmentation and Windows 2025 first-GPU startup remain unresolved",
+      "No release or baked-image promotion"
+    ]
+  },
+  "liveCanaryPostAddition": {
+    "samples": 900,
+    "firstObservedAt": "2026-09-08T00:02:29.9229874Z",
+    "lastObservedAt": "2026-09-08T00:17:32.0615589Z",
+    "rawSHA256": "344358d1116c283235d38d0ed396025c6c34cf22eba9e04197974d4ab8a98420",
+    "allSamplesAdapterUp": true,
+    "peerCounts": [
+      10
+    ],
+    "membershipChanges": [],
+    "counterDecreases": [],
+    "survivorCount": 10,
+    "survivorTrafficProgress": {
+      "083215a41bd0139d5385d35045a155ece4847f622b3967ee21d44034ce34daad": {
+        "txBytes": 1248,
+        "rxBytes": 2144
+      },
+      "34dbebb81dded9a58b26fbf58bf5f517a1df3c40c50869669cfea465dc648ac2": {
+        "txBytes": 1220,
+        "rxBytes": 1836
+      },
+      "454251b2fe8a51113a1d9a9b34bd460747f014b38a9bcd6e06fc58c730ace942": {
+        "txBytes": 7976,
+        "rxBytes": 1528
+      },
+      "5584ca948d873867a0247d4c400966d31a867261299fe72072ec8a41bf8542db": {
+        "txBytes": 736,
+        "rxBytes": 3328
+      },
+      "7574b4ca15136ead1df763ebe356d4d2d45b4e11217450e5a0cf8a969560f778": {
+        "txBytes": 900,
+        "rxBytes": 2348
+      },
+      "a145f1be2d4d0f573fc0bea939ef37faa444eb53657bdd282446046592a5d516": {
+        "txBytes": 1116,
+        "rxBytes": 2452
+      },
+      "b16d1e5da30b9fb1b8253b6a59e406d1dfd99987099dc791140f8b611a234461": {
+        "txBytes": 736,
+        "rxBytes": 3328
+      },
+      "c25af0f01842f9caa7f0df3761501ce1d12cca5a379d859554789b683b88c147": {
+        "txBytes": 736,
+        "rxBytes": 3328
+      },
+      "e4139fbb0cf8fdcc249ae3c0a803c8885e85da4f44b83e173e23e8130d5694a5": {
+        "txBytes": 1212,
+        "rxBytes": 2452
+      },
+      "fdcc78dba6de2e78d279106b1055b1a49594a984e19a86e5eaf5a58f4eefdc8a": {
+        "txBytes": 736,
+        "rxBytes": 3360
+      }
+    },
+    "scope": "Windows 2022 candidate workload adapter while the new GPU worker bootstrapped and ran its first application. Capture began after peer publication and did not observe the addition transition.",
+    "limitations": [
+      "Cannot qualify peer addition: the new peer was already present in the first sample",
+      "Removal had not converged before sampling ended",
+      "One-second samples cannot exclude changes between samples; no application UDP sweep"
+    ]
+  },
+  "windows2025RolloutEvidence": "windows-peer-update-rollout-2025-results.json",
+  "bothWindowsMembershipEvidence": "windows-peer-membership-both-results.json"
+}

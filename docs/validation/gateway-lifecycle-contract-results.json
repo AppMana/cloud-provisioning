@@ -1,0 +1,26 @@
+{
+  "scope": "Durable attachment lifecycle contract; provider/publication test doubles plus isolated real Kubernetes API persistence checks. No live AWS forwarding or VM lifecycle qualification.",
+  "observedAt": "2026-09-07T06:36:30.346441+00:00",
+  "isolatedAPIVersion": "1.35.0",
+  "packageStatementCoveragePercent": 91.3,
+  "testsPassed": [
+    "TestPersistedIntentSurvivesInterruptedPreparation",
+    "TestReplacementWaitsForWithdrawalAndReleasesOriginalIdentity",
+    "TestDeletingIntentWithdrawsEvenWithInvalidDesired",
+    "TestStoreRejectsStaleWriter",
+    "TestReattachmentGetsNewLeaseAfterIntentDeletion",
+    "TestAPIProtectsAttachmentRetirementIntent"
+  ],
+  "sourceSHA256": {
+    "controller/pkg/attachment/reconcile.go": "4fadea0eec523fca006c7b2388e8a0abbf09c2fdc533c6cc4bb33c4d0eeaf5cb",
+    "controller/pkg/attachment/store.go": "a08bae7c7b467848f3b9bda9a3b3d0627d469a7f867d41bbb503516722898e93",
+    "controller/pkg/attachment/reconcile_test.go": "38e9fe0a67cf04a98b0b1dc5e6e928046e037622ec290d154ccfa7d8d456a7d0",
+    "controller/pkg/attachment/store_envtest_test.go": "f4fcd91d9975570890e57568035355f595536414f9d2667a68236f4951ed0738"
+  },
+  "remaining": [
+    "Provider-owned forwarding adapters and per-resource journal",
+    "Consumer publication adapter and continuous controller registration",
+    "CAPI deletion dependency/finalizer integration",
+    "Live Windows networking and worker/gateway replacement matrix"
+  ]
+}

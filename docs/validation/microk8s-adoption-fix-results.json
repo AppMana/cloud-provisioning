@@ -1,0 +1,191 @@
+{
+  "result": "control-plane-passed-one-worker-bootstrap-failed",
+  "profile": "microk8s/calico",
+  "updatedAt": "2026-09-09T08:43:22.687827+00:00",
+  "priorFailure": "microk8s-adoption-image-results.json",
+  "changes": [
+    "Configurable generated Linux dialer image pull policy; production default IfNotPresent, preloaded VM harness Never.",
+    "Shared VM/AWS adoption checks require a current Ready Pod with matching image and pull policy, and current applied peer-document hash.",
+    "Survivor adoption checked after removal and replacement."
+  ],
+  "unitValidation": {
+    "raceTestsPassed": [
+      "adoption",
+      "cmd/awsrow",
+      "cmd/lab",
+      "install",
+      "endpoint-controller pull-policy tests"
+    ],
+    "coveragePercent": {
+      "ReadyPod": 90.6,
+      "AppliedReceipt": 100,
+      "RequiredImages": 100,
+      "parseDialerPullPolicy": 100,
+      "effectiveDialerPullPolicy": 100,
+      "validatePlacements": 100,
+      "Wait": 0
+    },
+    "observedFailureFixture": "../../harness/e2e/adoption/testdata/microk8s-container-error.json",
+    "fixtureScope": "Observed MicroK8s CreateContainerError, without a synthetic recovery claim."
+  },
+  "superseded": {
+    "commit": "5b73a6c6",
+    "behavior": "Both generated Linux dialer DaemonSets hardcoded IfNotPresent.",
+    "replacement": "One validated controller setting; existing production default preserved."
+  },
+  "native": {
+    "commandID": "da3f7940-ef81-4133-a040-cc2296fc13a2",
+    "requestedPlacements": [
+      "control-plane",
+      "one-worker",
+      "two-workers",
+      "all-nodes"
+    ],
+    "requestedReplacementCycles": 8,
+    "reusesVerifiedSite": true,
+    "completed": false,
+    "observedDaemonSets": [
+      {
+        "name": "cloud-provisioning-dialer",
+        "containers": [
+          {
+            "name": "dialer",
+            "image": "cldt-dialer:feaef057bb3326a26fe07552b1b28bb648485570f8ca2fcaaacb2c6325391d2b",
+            "pullPolicy": "Never"
+          }
+        ],
+        "ready": 5,
+        "desired": 5
+      },
+      {
+        "name": "cloud-provisioning-dialer-remote",
+        "containers": [
+          {
+            "name": "dialer",
+            "image": "cldt-dialer:feaef057bb3326a26fe07552b1b28bb648485570f8ca2fcaaacb2c6325391d2b",
+            "pullPolicy": "Never"
+          }
+        ],
+        "ready": 2,
+        "desired": 2
+      }
+    ],
+    "latestObservedAt": "2026-09-09T08:26:29.320292786Z",
+    "progress": {
+      "placement": "one-worker",
+      "stage": "remote1 bootstrap failed",
+      "cause": "snap install received HTTP 408 while fetching the core22 revision 2437 assertion; cloud-final exited 1 before MicroK8s installation."
+    },
+    "observationLimit": "Terminal failure during one-worker remote1 bootstrap; one complete placement, seven passing matrices. Two-worker and all-nodes placements were not reached.",
+    "completedPlacements": [
+      "control-plane"
+    ],
+    "completedReplacementCycles": 2,
+    "completedPlacementChecks": {
+      "total": 624,
+      "passed": 624,
+      "matrices": 5,
+      "attempts": 5,
+      "notRequired": 0,
+      "failed": 0
+    },
+    "replacementIdentities": [
+      {
+        "newNodeUID": "7d143ddb-d37d-4245-b295-8e92814f7db2",
+        "node": "remote1",
+        "oldNodeUID": "8d3b6633-4bcc-4952-ac4c-be90afcec42f",
+        "placement": "control-plane"
+      },
+      {
+        "newNodeUID": "301041f0-6bfc-4459-9543-e495c791634c",
+        "node": "remote2",
+        "oldNodeUID": "884007a0-d475-4c0f-a775-fc5b04d2ead6",
+        "placement": "control-plane"
+      }
+    ],
+    "completedPlacementEvidence": {
+      "sha256": "26a67237645b15f65cb4516d76e8f2a4bc0d080533a788130c001b787a51549c",
+      "bytes": 131514,
+      "verifiedLocally": true
+    },
+    "previouslyFailingPaths": {
+      "directions": [
+        "remote1 to remote2",
+        "remote2 to remote1"
+      ],
+      "checks": [
+        "pod",
+        "service",
+        "1048576-byte transfer"
+      ],
+      "allSixPassedAfterBothReplacements": true
+    },
+    "status": "Failed",
+    "exitCode": 1,
+    "terminal": true,
+    "finishedAt": "2026-09-09T08:37:23.271Z",
+    "archive": {
+      "sha256": "0ec7c5a62e16383b0ee62aa157356baeda383d7e8dc937baf0509e1ae103df41",
+      "bytes": 29977,
+      "verifiedLocally": true,
+      "coveredStatements": 1291,
+      "totalStatements": 3357,
+      "matrices": 7,
+      "passedChecks": 866,
+      "failedChecks": 0
+    },
+    "qualificationComplete": false,
+    "coverage": {
+      "coveredStatements": 1291,
+      "totalStatements": 3357
+    },
+    "adoptionCoveragePercent": {
+      "DecodeDaemonSet": 66.7,
+      "ReadyPod": 78.1,
+      "AppliedReceipt": 78.6,
+      "Wait": 82.6
+    }
+  },
+  "evidenceSHA256": {
+    "adoption-shared-unit.cover": "bdbe387129ab70d74e5e62d007c1c7a2c911171d6fe170d2715394bde9a3142d",
+    "pull-policy-unit.cover": "30a956d051f62af9219336776b140bec62e6214fb87e227df4eef2518f688cca",
+    "adoption-v4-artifact.json": "2c6e2a0fe5fe5d2096c15450224fd40185346445bb6f8f8270efa0f7b7c0cbd2",
+    "adoption-runtime-v4-1-result.json": "47e262efa9fa7bb368cffd0e19415a85d315f2cd285c5f69e035397d9e7029bd"
+  },
+  "limits": [
+    "The exact writer of the earlier HTML image descriptor remains unproven.",
+    "The earlier cross-remote failure case passes, but the full campaign is not qualified because of the new startup failure.",
+    "The bounded snap retry and per-replacement hardware checks require a subsequent native run."
+  ],
+  "retainedFleets": {
+    "observedAt": "2026-09-09T08:09:38.676043+00:00",
+    "fleets": {
+      "original": {
+        "nodes": 13,
+        "allReady": true,
+        "baselineUnchanged": true
+      },
+      "kuberouter": {
+        "nodes": 7,
+        "allReady": true,
+        "baselineUnchanged": true
+      }
+    }
+  },
+  "additionalValidation": {
+    "placementPreconditions": "Reject comma-only placement lists, unknown placements and placements requested without -check before provisioning.",
+    "raceTestsPassed": true,
+    "includedInNativeBinary": false,
+    "awsPostPlacementAdoption": {
+      "behavior": "AWS row checks and records current adoption again after changing endpoint placement.",
+      "raceTestsPassed": true,
+      "nativeVerified": false
+    },
+    "replacementHardware": {
+      "behavior": "Repeat physical-NIC and KVM assertions after each VM replacement.",
+      "raceTestsPassed": true,
+      "includedInNativeBinary": false
+    }
+  },
+  "followUp": "microk8s-snap-retry-results.json"
+}

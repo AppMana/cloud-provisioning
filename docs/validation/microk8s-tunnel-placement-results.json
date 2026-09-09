@@ -1,0 +1,314 @@
+{
+  "schemaVersion": 1,
+  "state": "converged-checks-passed-survivor-failed",
+  "commandID": "a86a541a-1ee3-412b-bcd7-71adc0374d31",
+  "profile": {
+    "distro": "MicroK8s v1.34.9",
+    "snapRevision": "9063",
+    "cni": "bundled Calico v3.29.3",
+    "containerd": "1.7.29",
+    "workerImageID": "ami-095b7537ef1237e91"
+  },
+  "rows": [
+    {
+      "placement": "control-plane",
+      "networkPassed": 140,
+      "networkFailed": 0,
+      "matrixAttempts": 1,
+      "elapsed": "33.201987067s",
+      "managementChecks": 42,
+      "managementPassed": 42,
+      "nativeCoverage": {
+        "coveredStatements": 846,
+        "totalStatements": 2372
+      }
+    },
+    {
+      "placement": "one-worker",
+      "networkPassed": 140,
+      "networkFailed": 0,
+      "matrixAttempts": 1,
+      "elapsed": "33.970395636s",
+      "managementChecks": 42,
+      "managementPassed": 42,
+      "nativeCoverage": {
+        "coveredStatements": 848,
+        "totalStatements": 2372
+      }
+    },
+    {
+      "placement": "two-workers",
+      "networkPassed": 140,
+      "networkFailed": 0,
+      "matrixAttempts": 1,
+      "elapsed": "33.776086151s",
+      "managementChecks": 42,
+      "managementPassed": 42,
+      "nativeCoverage": {
+        "coveredStatements": 844,
+        "totalStatements": 2372
+      }
+    },
+    {
+      "placement": "all-nodes",
+      "networkPassed": 140,
+      "networkFailed": 0,
+      "matrixAttempts": 1,
+      "elapsed": "31.966646158s",
+      "managementChecks": 42,
+      "managementPassed": 42,
+      "nativeCoverage": {
+        "coveredStatements": 849,
+        "totalStatements": 2372
+      }
+    }
+  ],
+  "totals": {
+    "networkChecksPassed": 560,
+    "networkChecksFailed": 0,
+    "managementChecksPassed": 168,
+    "managementChecksFailed": 0
+  },
+  "bindings": [
+    {
+      "eniCount": 1,
+      "imageID": "ami-095b7537ef1237e91",
+      "instanceID": "i-03d79c1ca4c6b4113",
+      "machine": "aws-microk8s-remote1",
+      "node": "ip-172-29-0-37",
+      "nodeUID": "22c79da2-80bb-49fd-8f91-2fba3a9233ce",
+      "physicalNIC": "ens5",
+      "providerID": "aws:///us-west-2a/i-03d79c1ca4c6b4113"
+    },
+    {
+      "eniCount": 1,
+      "imageID": "ami-095b7537ef1237e91",
+      "instanceID": "i-08c0d5185533dabe2",
+      "machine": "aws-microk8s-tunnel-v1",
+      "node": "ip-172-29-0-64",
+      "nodeUID": "234868ac-c22e-4546-8657-4ed0a1bfa4e8",
+      "physicalNIC": "ens5",
+      "providerID": "aws:///us-west-2a/i-08c0d5185533dabe2"
+    }
+  ],
+  "bindingsStableAcrossRows": true,
+  "operationWindow": {
+    "startedAt": "2026-09-09T12:23:44.209568+00:00",
+    "finishedAt": "2026-09-09T12:42:32.179863+00:00",
+    "rows": [
+      {
+        "placement": "control-plane",
+        "startedAt": "2026-09-09T12:23:44.209707+00:00",
+        "finishedAt": "2026-09-09T12:29:51.925605+00:00",
+        "exitCode": 0
+      },
+      {
+        "placement": "one-worker",
+        "startedAt": "2026-09-09T12:29:51.925952+00:00",
+        "finishedAt": "2026-09-09T12:36:03.998199+00:00",
+        "exitCode": 0
+      },
+      {
+        "placement": "two-workers",
+        "startedAt": "2026-09-09T12:36:03.998527+00:00",
+        "finishedAt": "2026-09-09T12:39:05.922600+00:00",
+        "exitCode": 0
+      },
+      {
+        "placement": "all-nodes",
+        "startedAt": "2026-09-09T12:39:05.922937+00:00",
+        "finishedAt": "2026-09-09T12:42:32.179645+00:00",
+        "exitCode": 0
+      }
+    ]
+  },
+  "survivors": {
+    "transport": "native-oob",
+    "lanes": [
+      {
+        "source": "site",
+        "target": "remote1",
+        "attempts": 9362,
+        "passed": 9320,
+        "maxStartIntervalSeconds": 5.104774441000018,
+        "samplesSHA256": "0db70a4ff61b08e2865a874e2e4dd478e201bb16c72b7bf26a34eb1819363314",
+        "ok": false
+      },
+      {
+        "source": "site",
+        "target": "remote2",
+        "attempts": 9342,
+        "passed": 9300,
+        "maxStartIntervalSeconds": 5.105245596000003,
+        "samplesSHA256": "83475565d451993460d00fb64e9239cebea5c179e76b81ffd43d6db62a19c5f2",
+        "ok": false
+      },
+      {
+        "source": "remote1",
+        "target": "site",
+        "attempts": 9319,
+        "passed": 9276,
+        "maxStartIntervalSeconds": 5.105158388999996,
+        "samplesSHA256": "95c7c0e0c751c8f111d041bf609e6a8199803a5d2ede43111ff95d120d703d56",
+        "ok": false
+      },
+      {
+        "source": "remote1",
+        "target": "remote2",
+        "attempts": 11513,
+        "passed": 11513,
+        "maxStartIntervalSeconds": 0.13526991399999133,
+        "samplesSHA256": "d09eaf871ae5c0e1a979dac8445f4f824c15bc7f532d6b1728bfbeb086c9d768",
+        "ok": true
+      },
+      {
+        "source": "remote2",
+        "target": "site",
+        "attempts": 9277,
+        "passed": 9234,
+        "maxStartIntervalSeconds": 5.106875272999986,
+        "samplesSHA256": "28cde01efb91cb903ebe4e2f75edbc181a01ec016fb86f1ad96f4f379ebefb51",
+        "ok": false
+      },
+      {
+        "source": "remote2",
+        "target": "remote1",
+        "attempts": 11496,
+        "passed": 11496,
+        "maxStartIntervalSeconds": 0.14771602500002246,
+        "samplesSHA256": "990e2864c2fcbd1c2d61efbc379cf90586106cbe76265bc8ec0cb07d08300aba",
+        "ok": true
+      }
+    ],
+    "identitiesStable": true,
+    "window": {
+      "lanesBracketWindow": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "ok": true,
+      "scope": "Host OOB control ordering only; requires independent terminal logs and identity validation"
+    },
+    "diagnosticReason": null,
+    "qualificationEligible": true,
+    "ok": false
+  },
+  "udpSummary": {
+    "attempts": 60309,
+    "passed": 60139,
+    "failed": 170,
+    "payloadBytes": 64,
+    "nominalIntervalSeconds": 0.1,
+    "maxStartIntervalSeconds": 5.106875272999986,
+    "configuredMaxGapSeconds": 10,
+    "interpretation": "Failed UDP requests remain failures even though the sample-gap limit passed. A five-second receive timeout is not itself an outage-duration measurement."
+  },
+  "siteSourceFailureGroups": [
+    {
+      "lane": 0,
+      "failedSamples": 39,
+      "firstSequence": 1242,
+      "lastSequence": 1280,
+      "firstStartOffsetSeconds": 126.213000159,
+      "lastStartOffsetSeconds": 320.110518094,
+      "firstSampleHostTimeBounds": [
+        "2026-09-09T12:25:09.817943+00:00",
+        "2026-09-09T12:25:09.997601+00:00"
+      ],
+      "lastSampleHostTimeBounds": [
+        "2026-09-09T12:28:23.715461+00:00",
+        "2026-09-09T12:28:23.895119+00:00"
+      ]
+    },
+    {
+      "lane": 0,
+      "failedSamples": 3,
+      "firstSequence": 2978,
+      "lastSequence": 2980,
+      "firstStartOffsetSeconds": 500.880936002,
+      "lastStartOffsetSeconds": 511.088017327,
+      "firstSampleHostTimeBounds": [
+        "2026-09-09T12:31:24.485879+00:00",
+        "2026-09-09T12:31:24.665537+00:00"
+      ],
+      "lastSampleHostTimeBounds": [
+        "2026-09-09T12:31:34.692960+00:00",
+        "2026-09-09T12:31:34.872618+00:00"
+      ]
+    },
+    {
+      "lane": 1,
+      "failedSamples": 39,
+      "firstSequence": 1210,
+      "lastSequence": 1248,
+      "firstStartOffsetSeconds": 123.331239384,
+      "lastStartOffsetSeconds": 317.217069011,
+      "firstSampleHostTimeBounds": [
+        "2026-09-09T12:25:07.069183+00:00",
+        "2026-09-09T12:25:07.253075+00:00"
+      ],
+      "lastSampleHostTimeBounds": [
+        "2026-09-09T12:28:20.955013+00:00",
+        "2026-09-09T12:28:21.138905+00:00"
+      ]
+    },
+    {
+      "lane": 1,
+      "failedSamples": 3,
+      "firstSequence": 2970,
+      "lastSequence": 2972,
+      "firstStartOffsetSeconds": 500.823846122,
+      "lastStartOffsetSeconds": 511.030098406,
+      "firstSampleHostTimeBounds": [
+        "2026-09-09T12:31:24.561790+00:00",
+        "2026-09-09T12:31:24.745682+00:00"
+      ],
+      "lastSampleHostTimeBounds": [
+        "2026-09-09T12:31:34.768042+00:00",
+        "2026-09-09T12:31:34.951934+00:00"
+      ]
+    }
+  ],
+  "timeBoundsMethod": "Sampler start intent is the lower bound; the first observed completed sample and its monotonic finish offset provide the upper bound. Version 1 launch-response bounds are superseded. No cross-VM wall-clock equality is assumed.",
+  "evidenceArchive": {
+    "sha256": "d885ad01381f64d44bfd9c5617a73e92292b4f2005bfd82b41b2564fe5713e80",
+    "bytes": 2891028,
+    "downloadHashVerified": true,
+    "allSixRawLogsIndependentlyRevalidatedLocally": true,
+    "private": true
+  },
+  "collector": {
+    "transport": "Linux host Python through QGA/SSM and exact-container CRI",
+    "boundedChunkBytes": 12000,
+    "wholeCompressedHashVerified": true,
+    "rawSampleHashVerified": true
+  },
+  "scope": [
+    "Four endpoint placements with stable single-NIC CAPA workers",
+    "Continuous lanes between w1 and two CAPA workers, and between those workers",
+    "All samples and failed requests retained; no sampler restart during the walk"
+  ],
+  "limitations": [
+    "Not an uninterrupted-connectivity qualification",
+    "Losses involve site paths; the two AWS-to-AWS lanes passed all requests",
+    "Other distributions, Windows/GPU workers and remaining site-node survivor pairs require their own qualification"
+  ],
+  "nextInvestigation": {
+    "state": "hypothesis awaiting focused native route capture",
+    "candidate": "The retained-endpoint routing exception treats every destination in the WireGuard subnet as if it had a WireGuard source address. Calico VXLAN explicitly binds the site physical source address.",
+    "blame": "271ee50a",
+    "function": "controller/cmd/dialer/main.go:egressViaRelay",
+    "observedStaticFacts": {
+      "siteVXLANSource": "10.10.0.11",
+      "remoteVXLANAddresses": [
+        "10.100.0.160",
+        "10.100.0.159"
+      ],
+      "vxlanPort": 4789
+    }
+  }
+}

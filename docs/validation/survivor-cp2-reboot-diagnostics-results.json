@@ -1,0 +1,474 @@
+{
+  "scope": "Concurrent sampled 64-byte UDP echoes through Kubernetes exec; excludes delivery between attempts and fragmented UDP qualification",
+  "operation": {
+    "victim": "cp2",
+    "initialBootID": "fcfec7b5-b67a-4ce8-914f-e2f2118a7c81",
+    "beforeNodes": {
+      "aws-win2022-gpu": {
+        "uid": "dd54061d-491a-4b12-95a7-27393e847780",
+        "ready": true
+      },
+      "aws-win2022-v3": {
+        "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ready": true
+      },
+      "aws-win2025": {
+        "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+        "ready": true
+      },
+      "aws-win2025-gpu": {
+        "uid": "258d7b62-e774-48bc-94dc-e31ff042f585",
+        "ready": true
+      },
+      "aws-win2025-v3": {
+        "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ready": true
+      },
+      "cp": {
+        "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+        "ready": true
+      },
+      "cp2": {
+        "uid": "947de62f-0920-408c-aa31-ac80a2344128",
+        "ready": true
+      },
+      "cp3": {
+        "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+        "ready": true
+      },
+      "ip-172-29-0-9": {
+        "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+        "ready": true
+      },
+      "remote1": {
+        "uid": "8935dd28-de93-44be-a887-73110fe88c51",
+        "ready": true
+      },
+      "remote2": {
+        "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+        "ready": true
+      },
+      "w1": {
+        "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+        "ready": true
+      },
+      "w2": {
+        "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+        "ready": true
+      }
+    },
+    "startedAt": "2026-09-08T07:32:50.624388+00:00",
+    "rebootRequestExitCode": 0,
+    "finalBootID": "d641be1e-851b-4325-9d95-cdbf6bdc0eb8",
+    "afterNodes": {
+      "aws-win2022-gpu": {
+        "uid": "dd54061d-491a-4b12-95a7-27393e847780",
+        "ready": true
+      },
+      "aws-win2022-v3": {
+        "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+        "ready": true
+      },
+      "aws-win2025": {
+        "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+        "ready": true
+      },
+      "aws-win2025-gpu": {
+        "uid": "258d7b62-e774-48bc-94dc-e31ff042f585",
+        "ready": true
+      },
+      "aws-win2025-v3": {
+        "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+        "ready": true
+      },
+      "cp": {
+        "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+        "ready": true
+      },
+      "cp2": {
+        "uid": "947de62f-0920-408c-aa31-ac80a2344128",
+        "ready": true
+      },
+      "cp3": {
+        "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+        "ready": true
+      },
+      "ip-172-29-0-9": {
+        "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+        "ready": true
+      },
+      "remote1": {
+        "uid": "8935dd28-de93-44be-a887-73110fe88c51",
+        "ready": true
+      },
+      "remote2": {
+        "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+        "ready": true
+      },
+      "w1": {
+        "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+        "ready": true
+      },
+      "w2": {
+        "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+        "ready": true
+      }
+    },
+    "leaseRenewTime": "2026-09-08T07:33:34.119862Z",
+    "finishedAt": "2026-09-08T07:33:36.295711+00:00",
+    "passed": true
+  },
+  "traffic": {
+    "finishedAt": "2026-09-08T07:33:51.788003+00:00",
+    "elapsedSeconds": 67.79247283702716,
+    "scope": "Concurrent sampled 64-byte UDP echoes through Kubernetes exec; excludes delivery between attempts and fragmented UDP qualification",
+    "maxAllowedGapSeconds": 5,
+    "intervalSeconds": 0.1,
+    "identitiesStable": true,
+    "identityError": null,
+    "lanes": [
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 5.307228181045502,
+        "attempts": 196,
+        "passed": 195,
+        "maxGapSeconds": 0.10056825802894309,
+        "maxAttemptSeconds": 5.206955049012322,
+        "ok": false
+      },
+      {
+        "source": "net-w1",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 5.345421455975156,
+        "attempts": 196,
+        "passed": 195,
+        "maxGapSeconds": 0.10066122398711741,
+        "maxAttemptSeconds": 5.245215830975212,
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 10.240824932989199,
+        "attempts": 103,
+        "passed": 101,
+        "maxGapSeconds": 0.10074957401957363,
+        "maxAttemptSeconds": 10.140609733993188,
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2022-v3",
+        "target": "net-aws-win2025-v3",
+        "maxStartIntervalSeconds": 10.253695701016113,
+        "attempts": 108,
+        "passed": 105,
+        "maxGapSeconds": 0.10061692004092038,
+        "maxAttemptSeconds": 10.153382406977471,
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-w1",
+        "maxStartIntervalSeconds": 6.333828739007004,
+        "attempts": 118,
+        "passed": 116,
+        "maxGapSeconds": 0.10059731698129326,
+        "maxAttemptSeconds": 10.126631597988307,
+        "ok": false
+      },
+      {
+        "source": "net-aws-win2025-v3",
+        "target": "net-aws-win2022-v3",
+        "maxStartIntervalSeconds": 10.237360436993185,
+        "attempts": 113,
+        "passed": 110,
+        "maxGapSeconds": 0.10151004698127508,
+        "maxAttemptSeconds": 10.137107365997508,
+        "ok": false
+      }
+    ],
+    "stopRequested": true,
+    "ready": true,
+    "ok": false
+  },
+  "window": {
+    "startedAt": "2026-09-08T07:32:50.624388+00:00",
+    "finishedAt": "2026-09-08T07:33:36.295711+00:00",
+    "lanesBracketWindow": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "lanesPassed": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "ok": false,
+    "scope": "Successful sampled survivor probes bracket the operation; gaps and latency remain in the observer report"
+  },
+  "failedSamples": [
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 54,
+      "source": "net-w1",
+      "target": "net-aws-win2022-v3",
+      "startedAt": "2026-09-08T07:33:00.156057+00:00",
+      "finishedAt": "2026-09-08T07:33:00.325527+00:00",
+      "startMonotonic": 314598.799995708,
+      "finishMonotonic": 314598.969493165,
+      "error": null,
+      "executorDiagnostic": "E0908 07:33:00.317190  709043 v2.go:150] \"Unhandled Error\" err=\"next reader: websocket: close 1006 (abnormal closure): unexpected EOF\"\nE0908 07:33:00.317147  709043 v2.go:167] \"Unhandled Error\" err=\"next reader: websocket: close 1006 (abnormal closure): unexpected EOF\"\nE0908 07:33:00.317163  709043 v2.go:129] \"Unhandled Error\" err=\"next reader: websocket: close 1006 (abnormal closure): unexpected EOF\"\nerror: error reading from error stream: next reader: websocket: close 1006 (abnormal closure): unexpected EOF\n"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 54,
+      "source": "net-w1",
+      "target": "net-aws-win2025-v3",
+      "startedAt": "2026-09-08T07:33:00.148772+00:00",
+      "finishedAt": "2026-09-08T07:33:00.325199+00:00",
+      "startMonotonic": 314598.792720734,
+      "finishMonotonic": 314598.969164885,
+      "error": null,
+      "executorDiagnostic": "E0908 07:33:00.316590  709036 v2.go:167] \"Unhandled Error\" err=\"next reader: websocket: close 1006 (abnormal closure): unexpected EOF\"\nE0908 07:33:00.316602  709036 v2.go:129] \"Unhandled Error\" err=\"next reader: websocket: close 1006 (abnormal closure): unexpected EOF\"\nE0908 07:33:00.316619  709036 v2.go:150] \"Unhandled Error\" err=\"next reader: websocket: close 1006 (abnormal closure): unexpected EOF\"\nerror: error reading from error stream: next reader: websocket: close 1006 (abnormal closure): unexpected EOF\n"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 101,
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "startedAt": "2026-09-08T07:33:30.348632+00:00",
+      "finishedAt": "2026-09-08T07:33:40.489216+00:00",
+      "startMonotonic": 314628.992578432,
+      "finishMonotonic": 314639.133188166,
+      "error": null,
+      "executorDiagnostic": "Error from server: error dialing backend: dial tcp 172.29.0.24:10250: i/o timeout\n"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 102,
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "startedAt": "2026-09-08T07:33:40.589455+00:00",
+      "finishedAt": "2026-09-08T07:33:50.711035+00:00",
+      "startMonotonic": 314639.233403365,
+      "finishMonotonic": 314649.355060283,
+      "error": null,
+      "executorDiagnostic": "Error from server: error dialing backend: dial tcp 172.29.0.24:10250: i/o timeout\n"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 40,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "startedAt": "2026-09-08T07:33:00.232102+00:00",
+      "finishedAt": "2026-09-08T07:33:00.365353+00:00",
+      "startMonotonic": 314598.876049474,
+      "finishMonotonic": 314599.009315024,
+      "error": null,
+      "executorDiagnostic": "Error from server: error dialing backend: No agent available\n"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 106,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "startedAt": "2026-09-08T07:33:30.429709+00:00",
+      "finishedAt": "2026-09-08T07:33:40.583073+00:00",
+      "startMonotonic": 314629.073656353,
+      "finishMonotonic": 314639.22703876,
+      "error": null,
+      "executorDiagnostic": "Error from server: error dialing backend: dial tcp 172.29.0.24:10250: i/o timeout\n"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 107,
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "startedAt": "2026-09-08T07:33:40.683404+00:00",
+      "finishedAt": "2026-09-08T07:33:50.792303+00:00",
+      "startMonotonic": 314639.327352054,
+      "finishMonotonic": 314649.43626907,
+      "error": null,
+      "executorDiagnostic": "Error from server: error dialing backend: dial tcp 172.29.0.24:10250: i/o timeout\n"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 116,
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "startedAt": "2026-09-08T07:33:30.128409+00:00",
+      "finishedAt": "2026-09-08T07:33:36.361962+00:00",
+      "startMonotonic": 314628.772355926,
+      "finishMonotonic": 314635.005930963,
+      "error": null,
+      "executorDiagnostic": "Error from server: error dialing backend: dial tcp 172.29.0.68:10250: i/o timeout\n"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 117,
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "startedAt": "2026-09-08T07:33:36.462239+00:00",
+      "finishedAt": "2026-09-08T07:33:46.588849+00:00",
+      "startMonotonic": 314635.106184665,
+      "finishMonotonic": 314645.232816263,
+      "error": null,
+      "executorDiagnostic": "Error from server: error dialing backend: dial tcp 172.29.0.68:10250: i/o timeout\n"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 110,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "startedAt": "2026-09-08T07:33:30.102524+00:00",
+      "finishedAt": "2026-09-08T07:33:30.345189+00:00",
+      "startMonotonic": 314628.746471629,
+      "finishMonotonic": 314628.989154593,
+      "error": null,
+      "executorDiagnostic": "E0908 07:33:30.336228  720929 v2.go:167] \"Unhandled Error\" err=\"next reader: websocket: close 1006 (abnormal closure): unexpected EOF\"\nE0908 07:33:30.336241  720929 v2.go:129] \"Unhandled Error\" err=\"next reader: websocket: close 1006 (abnormal closure): unexpected EOF\"\nE0908 07:33:30.336272  720929 v2.go:150] \"Unhandled Error\" err=\"next reader: websocket: close 1006 (abnormal closure): unexpected EOF\"\nerror: error reading from error stream: next reader: websocket: close 1006 (abnormal closure): unexpected EOF\n"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 111,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "startedAt": "2026-09-08T07:33:30.445526+00:00",
+      "finishedAt": "2026-09-08T07:33:40.582611+00:00",
+      "startMonotonic": 314629.089471396,
+      "finishMonotonic": 314639.226578762,
+      "error": null,
+      "executorDiagnostic": "Error from server: error dialing backend: dial tcp 172.29.0.68:10250: i/o timeout\n"
+    },
+    {
+      "ok": false,
+      "expectedResponses": 1,
+      "reportedResponses": 0,
+      "exactResponses": 0,
+      "responsesPresent": false,
+      "errors": [],
+      "commandExitCode": 1,
+      "parseError": "Expecting value: line 1 column 1 (char 0)",
+      "sequence": 112,
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "startedAt": "2026-09-08T07:33:40.682886+00:00",
+      "finishedAt": "2026-09-08T07:33:50.812161+00:00",
+      "startMonotonic": 314639.326831833,
+      "finishMonotonic": 314649.456124253,
+      "error": null,
+      "executorDiagnostic": "Error from server: error dialing backend: dial tcp 172.29.0.68:10250: i/o timeout\n"
+    }
+  ],
+  "interpretation": "VM recovered with all 13 original Ready Node identities. Observer failed with retained WebSocket EOF, missing Konnectivity agent and kubelet backend timeout diagnostics. These are Kubernetes exec-path failures; uninterrupted workload UDP delivery is not established.",
+  "artifactSHA256": {
+    "initial.json": "85fd79204fb7b10347270b1f9493d9aea5dc423ae4ea917ff1c69a533ae94986",
+    "lane-00.jsonl": "8c6854e8b10b25759a031d72a94e902e7ce93ae80f745a763cf848e881432576",
+    "lane-01.jsonl": "0a160a8e22e361546879f34f5a0a27600e8088a6d90b556374756905321d3a35",
+    "lane-02.jsonl": "d9315475794daa00d35596a06c175b5270cb9e2c45759443aae637ddc7343f13",
+    "lane-03.jsonl": "844c22626a0b3de5221b847ff2fc3677b010de8f2227d9a8d88949774380d745",
+    "lane-04.jsonl": "c25179cec4c5ed7eda1267206d30fdff12e531abad514b46734ce11589c5a17a",
+    "lane-05.jsonl": "31fdcd805c0e1faf601a6ca58e6aab635a392c6b0b46534a6018456fdc3b4726",
+    "READY.json": "685ebf3a3e8737132a1795f4b9ea513a40ce9b0470df5587ff6178dc4cfa42b1",
+    "operation-start.json": "cb64f08020384640c8f523032258e11420772a238273119e8dcc510110a5ee10",
+    "operation.json": "c39ab569c1f7fcd5ab2e3fbeb13b8c81cdd05bad1d58ab087498ba9cade91361",
+    "STOP": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "result.json": "f7d22f0a6aa73031c4c9699275e6f4f4e1cc18257c194a59ffe0c64523bf3c0f",
+    "window.json": "4a0bc8b8ded918d73044b8dd89134dff5f8c975ce4ddb6e27579f2b79e37bde1"
+  },
+  "tests": {
+    "survivorUnitTestsPassed": 8,
+    "existingPodMatrixTestsPassed": 7,
+    "survivorUnitStatementCoveragePercent": 73,
+    "scope": "Current survivor.py unit coverage; native execution and CLI additionally exercised without claiming whole-harness coverage"
+  },
+  "remaining": [
+    "Observe survivor traffic out of band from actual VMs through CAPI addition/removal/replacement",
+    "Qualify workload traffic separately from Kubernetes exec availability",
+    "Fragmented UDP remains unqualified"
+  ]
+}

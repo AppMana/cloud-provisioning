@@ -49,7 +49,9 @@ An experimental `ProvisionedNodeGroupClaim` defines integer `spec.replicas` and 
 endpoint for capacity scaling. It owns individual claims and reuses their
 provider-specific provisioning and teardown. The [group-claim design and
 implementation plan](docs/node-groups.md) covers KEDA, scale-to-zero, draining,
-and stable child identities. This API is under development.
+and stable child identities. Group UID labels let workloads select their pool;
+[the scheduling example](docs/node-groups.md#selecting-a-worker-group) shows the Node
+selector and cloud-worker toleration. This API is under development.
 
 ## Deploying it
 

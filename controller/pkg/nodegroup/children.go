@@ -8,8 +8,18 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
+
+func machineOwnedByClaim(machine *unstructured.Unstructured, child *v1alpha1.ProvisionedNodeClaim) bool {
+	for _, owner := range machine.GetOwnerReferences() {
+		if owner.APIVersion == v1alpha1.GroupVersion.String() && owner.Kind == "ProvisionedNodeClaim" && owner.Name == child.Name && owner.UID == child.UID {
+			return true
+		}
+	}
+	return false
+}
 
 const (
 	GroupUIDLabel     = "cloud-provisioning.appmana.com/node-group-uid"

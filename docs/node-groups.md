@@ -93,6 +93,7 @@ separate runs.
 | Recovered capacity workload | ✅ Three adopted remote dialers and 184 workload checks after allocation starvation recovered | [Capacity workload](validation/node-group-vm-capacity-workload-results.json) |
 | Bootstrap observation retry | ✅ Same VM start time, guest boot ID, and single cloud-init execution across observer reconstruction | [Native retry](validation/vm-bootstrap-retry-native-results.json) |
 | Ready replica aggregation | ✅ Three adopted workers; cordon/uncordon changes Ready count 3 → 2 → 3 while total remains four | [Readiness](validation/node-group-vm-readiness-results.json) |
+| Group workload selection | ✅ Three ordinary pods on three group VMs; a different group UID remains unscheduled; `/scale` selects the worker pods | [Group labels](validation/node-group-vm-labels-results.json) |
 | Capacity exhaustion | ◐ Three reserved Machines progress with a fourth unallocated request; group cancellation remains incomplete | [Capacity](validation/node-group-vm-capacity-results.json) |
 
 UDP sweeps cover both directions for each pair, fresh and reused sockets, and
@@ -114,6 +115,13 @@ reservation contention, restart recovery, exhaustion, and provider finalizer
 handling. Site peer publication uses a mesh resource-version check and requires
 an allocated tunnel address; API tests cover retirement racing publication and
 reselection of an endpoint with its existing key.
+
+The [image-import recovery check](validation/vm-image-import-memory-results.json)
+records a runner OOM and read-only guest filesystems, including a Ready Node that
+could not create a new pod. Existing-disk recovery preserved all Node UIDs; serial
+image import, new pod creation, and a [184-check workload matrix](validation/node-group-vm-post-memory-results.json)
+then passed. This verifies recovered connectivity; traffic continuity through
+that failure is unqualified.
 
 ## Pending-worker cancellation
 
@@ -161,6 +169,50 @@ workload tests qualify continued connectivity separately. A pending Machine with
 no resolved Node is polled every five seconds while its group action remains
 reserved, allowing readiness updates without an increasing error backoff.
 
+## Selecting a worker group
+
+The controller labels each associated Node with
+`cloud-provisioning.appmana.com/node-group-uid`. It verifies the claim and CAPI
+ownership chain and the Node's provider ID before applying a UID/version-checked
+patch. Existing unrelated labels are preserved. A Node already labeled for another
+group is retained for investigation. Labels remain through drain until the Node
+is removed by the claim lifecycle.
+
+Read the group UID after creating the group:
+
+```sh
+kubectl -n cloud-provisioning get provisionednodegroupclaim render-workers \
+  -o jsonpath='{.metadata.uid}{"\n"}'
+```
+
+Set the worker Deployment's pod template before enabling its autoscaler. Replace
+`GROUP_UID_FROM_COMMAND` with that UID:
+
+```yaml
+spec:
+  template:
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+        cloud-provisioning.appmana.com/node-group-uid: GROUP_UID_FROM_COMMAND
+      tolerations:
+        - key: cloud-provisioning.appmana.com/internet-facing
+          operator: Exists
+          effect: NoSchedule
+```
+
+Set the group's `spec.workloadSelector.matchLabels` to the worker pods' labels,
+for example `app: render-workers`. This selector is exposed through `/scale`.
+Keep the pods and group in the same namespace. Recreating a group gives it a new
+UID; update the pod template's
+`nodeSelector` to target that replacement group. The broad `role: cloud-worker`
+Node label continues to identify cloud workers across individual claims and groups.
+
+The [native scheduling check](validation/node-group-vm-labels-results.json) uses
+required pod anti-affinity to place three pods on three group workers. A pod
+selecting a different group UID remains unscheduled. Native Windows and KEDA
+capacity-scaling checks remain separate acceptance work.
+
 ## Scaling and KEDA
 
 Expose `/scale` with `.spec.replicas`, `.status.replicas`, and `.status.selector`.
@@ -176,8 +228,8 @@ a worker consumes one job at a time, with four workers per machine:
 - Capacity target: one machine per four desired workers, capped by the cloud budget.
 - Count provisioning children toward capacity to avoid duplicate launches during boot.
 - Keep KEDA, metrics, queue services, and provisioning controllers on permanent nodes.
-- Define a stable workload selector and propagate a group label to Nodes before
-  enabling scheduling. The scale selector describes pods, not child claim objects.
+- Use the group UID in the pod template’s Node selector and set the group’s
+  workload selector to the pods’ labels. The scale selector describes pods.
 
 The example below is a design preview; install it only after the group CRD and
 controller are implemented and validated. The queue metric must remain available
@@ -191,6 +243,9 @@ metadata:
   namespace: cloud-provisioning
 spec:
   replicas: 0
+  workloadSelector:
+    matchLabels:
+      app: render-workers
   template:
     spec:
       clusterName: my-cluster
@@ -278,6 +333,9 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Publish observed replica counts before advancing pending actions and expose
       the workload selector through `/scale`. Provisioning and draining claims
       remain counted while their lifecycle work is pending.
+- [x] Publish group UID labels on associated Nodes with ownership and UID/version
+      checks. Native scheduling selects the three group VMs; real API tests
+      reject concurrent updates and replacement Nodes.
 - [x] Aggregate CAPI/Node readiness and current peer-document acknowledgements.
       The native check verifies 3 → 2 → 3 Ready workers during cordon/uncordon,
       retaining four total children and the pending cancellation action. Unit

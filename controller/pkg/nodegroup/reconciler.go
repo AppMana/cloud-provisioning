@@ -50,6 +50,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, err
 		}
 	}
+	if changed, err := r.labelNodes(ctx, group, claims.Items); err != nil || changed {
+		return again, err
+	}
 	// Report observed capacity before advancing intent, including while boot or
 	// removal is pending. The scale selector describes workload pods.
 	selector := ""

@@ -1,0 +1,106 @@
+{
+  "observedAt": "2026-09-09T23:06:39.803623+00:00",
+  "groupUID": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+  "nodeIdentities": {
+    "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+    "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+    "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+    "remote1": "4674271b-7639-49e7-aa0f-9228cc556459",
+    "remote2": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+    "remote3": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+    "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+    "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+  },
+  "selectedNodes": [
+    "remote1",
+    "remote2",
+    "remote3"
+  ],
+  "pods": [
+    {
+      "name": "cldt-group-scheduling-8ccb6c4df-8j87t",
+      "uid": "c298e19b-8cc4-4537-99f7-edc218c4c20d",
+      "node": "remote3",
+      "ready": true
+    },
+    {
+      "name": "cldt-group-scheduling-8ccb6c4df-9m2mm",
+      "uid": "2be99e49-4162-48e0-81cc-928ed4410008",
+      "node": "remote2",
+      "ready": true
+    },
+    {
+      "name": "cldt-group-scheduling-8ccb6c4df-ddqt8",
+      "uid": "214919f8-241d-4fac-bf36-7aa138507777",
+      "node": "remote1",
+      "ready": true
+    }
+  ],
+  "negativePod": {
+    "uid": "72e741cd-fd80-4fd1-aaea-6c4c934b11b2",
+    "scheduled": false,
+    "reason": "Unschedulable"
+  },
+  "scale": {
+    "kind": "Scale",
+    "apiVersion": "autoscaling/v1",
+    "metadata": {
+      "name": "pooled-workers",
+      "namespace": "cloud-provisioning",
+      "uid": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+      "resourceVersion": "53201",
+      "creationTimestamp": "2026-09-09T20:53:53Z"
+    },
+    "spec": {
+      "replicas": 3
+    },
+    "status": {
+      "replicas": 4,
+      "selector": "app=cldt-group-scheduling"
+    }
+  },
+  "pendingActionUnchanged": true,
+  "totalReplicas": 4,
+  "readyReplicas": 3,
+  "controllerImage": "cldt-controller:2f5c78a7a223e8709fdcc0480cda4f60392e3ca5e6991f61eee6ed137e3e6cbf",
+  "scope": "Single-NIC KVM Linux k0s/Calico workload placement using the exact group UID. Three ordinary pods spread across three group workers; a different group UID matches no Node. Scale selector describes those pods. This does not qualify KEDA-driven provisioning.",
+  "distribution": "k0s v1.36.2+k0s.0",
+  "cni": "bundled Calico 3.32.0-0",
+  "tests": {
+    "command": "KUBEBUILDER_ASSETS=/home/administrator/.local/share/kubebuilder-envtest/k8s/1.35.0-linux-amd64 go test -race ./pkg/nodegroup ./pkg/attachment -coverprofile=/tmp/cldt-group-labels.cover",
+    "passed": true,
+    "nodegroupCoveragePercent": 76.4,
+    "labelNodesCoveragePercent": 78.3,
+    "sharedOwnershipCheckCoveragePercent": 100.0,
+    "realAPI": [
+      "Concurrent Node updates reject stale label patches.",
+      "Node replacement rejects stale UID/version patches.",
+      "Retry preserves unrelated labels.",
+      "Repeated labeling does not change Node resourceVersion."
+    ],
+    "unitAxes": {
+      "CAPI": [
+        "v1beta1",
+        "v1beta2"
+      ],
+      "cases": [
+        "linux",
+        "windows",
+        "wrong-owner",
+        "wrong-provider",
+        "wrong-node",
+        "unallocated",
+        "draining",
+        "another-group",
+        "node-race",
+        "machine-race"
+      ]
+    },
+    "coverageSHA256": "443340b74447b98727c28e3eb24118d7594e008ad5d2309d1e971f6e8014d031"
+  },
+  "qualificationNotes": [
+    "Native workload selection is verified on Linux VMs. Windows labels have unit coverage here.",
+    "The first workload rollout timed out because remote3 had a read-only filesystem after runner memory exhaustion. The same Deployment and pod recovered after the VM rebooted on its existing disk.",
+    "KEDA-driven group provisioning and pending-worker cancellation remain unqualified."
+  ]
+}

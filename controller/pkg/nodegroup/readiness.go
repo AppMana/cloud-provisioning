@@ -71,13 +71,8 @@ func (r *Reconciler) readyChild(ctx context.Context, mesh *corev1.Secret, child 
 	if err := r.API.Get(ctx, client.ObjectKeyFromObject(child), machine); err != nil {
 		return "", client.IgnoreNotFound(err)
 	}
-	owned := false
-	for _, owner := range machine.GetOwnerReferences() {
-		if owner.APIVersion == v1alpha1.GroupVersion.String() && owner.Kind == "ProvisionedNodeClaim" && owner.Name == child.Name && owner.UID == child.UID {
-			owned = true
-		}
-	}
-	if !owned || machine.GetUID() == "" || !machine.GetDeletionTimestamp().IsZero() || machine.GetAnnotations()[attachment.DrainIntentAnnotation] != "" || !machineReady(machine) {
+
+	if !machineOwnedByClaim(machine, child) || machine.GetUID() == "" || !machine.GetDeletionTimestamp().IsZero() || machine.GetAnnotations()[attachment.DrainIntentAnnotation] != "" || !machineReady(machine) {
 		return "", nil
 	}
 	name, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name")

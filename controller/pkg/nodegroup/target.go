@@ -43,13 +43,8 @@ func BindDrainNode(ctx context.Context, management client.Client, workload clien
 	if err := management.Get(ctx, key, machine); err != nil {
 		return nil, err
 	}
-	owned := false
-	for _, owner := range machine.GetOwnerReferences() {
-		if owner.APIVersion == v1alpha1.GroupVersion.String() && owner.Kind == "ProvisionedNodeClaim" && owner.Name == child.Name && owner.UID == child.UID {
-			owned = true
-		}
-	}
-	if !owned || machine.GetUID() == "" || !machine.GetDeletionTimestamp().IsZero() {
+
+	if !machineOwnedByClaim(machine, child) || machine.GetUID() == "" || !machine.GetDeletionTimestamp().IsZero() {
 		return nil, fmt.Errorf("CAPI Machine ownership missing or changed")
 	}
 	name, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name")

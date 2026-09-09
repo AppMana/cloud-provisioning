@@ -165,7 +165,11 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Persist the discovered gateway request set in the drain action, then retire
       those requests serially. The real API test verifies schema retention and
       blocks retirement when an additional request appears after capture.
-- [ ] Validate integrated gateway retirement end to end, freeze new attachment
+- [x] Verify serial retirement of two gateway attachments against the real API
+      and attachment state machines. Controlled native acknowledgements keep the
+      first request pending across a group reload; the second remains untouched
+      until the first completes. The worker claim survives both retirements.
+- [ ] Verify retirement with native guest acknowledgements, freeze new attachment
       admission during drain, withdraw direct mesh peers, and serialize claim
       removal. Gateway retirement alone leaves the claim retained.
 - [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.

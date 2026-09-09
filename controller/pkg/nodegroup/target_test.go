@@ -8,8 +8,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"strings"
 	"testing"
 )
 
@@ -44,7 +46,7 @@ func TestDrainTargetPinsMachineAndNode(t *testing.T) {
 			_ = v1alpha1.AddToScheme(scheme)
 			_ = corev1.AddToScheme(scheme)
 			management := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(group).WithObjects(group, child, machine).Build()
-			workload := fake.NewClientBuilder().WithScheme(scheme).WithObjects(node).Build()
+			workload := fake.NewClientBuilder().WithScheme(scheme).WithObjects(node).WithIndex(&corev1.Pod{}, "spec.nodeName", func(obj client.Object) []string { return []string{obj.(*corev1.Pod).Spec.NodeName} }).Build()
 			bound, err := BindDrainNode(ctx, management, workload, gvk, group)
 			if err != nil {
 				t.Fatal(err)
@@ -54,6 +56,28 @@ func TestDrainTargetPinsMachineAndNode(t *testing.T) {
 			}
 			if _, err := BindDrainNode(ctx, management, workload, gvk, bound); err != nil {
 				t.Fatal("restart rejected same target", err)
+			}
+
+			r := &Reconciler{API: management, Workload: workload, MachineGVK: gvk}
+			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(group)}
+			// Install the group finalizer, then execute the persisted drain target.
+			for i := 0; i < 2; i++ {
+				if _, err := r.Reconcile(ctx, req); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := workload.Get(ctx, client.ObjectKeyFromObject(node), node); err != nil {
+				t.Fatal(err)
+			}
+			if !node.Spec.Unschedulable {
+				t.Fatal("reconciler did not cordon bound node")
+			}
+			if _, err := r.Reconcile(ctx, req); err == nil || !strings.Contains(err.Error(), "attachment withdrawal") {
+				t.Fatal("removal skipped withdrawal gate", err)
+			}
+			remaining := &v1alpha1.ProvisionedNodeClaim{}
+			if err := management.Get(ctx, client.ObjectKeyFromObject(child), remaining); err != nil || !remaining.DeletionTimestamp.IsZero() {
+				t.Fatal("deleted claim before withdrawal", err)
 			}
 			if err := workload.Delete(ctx, node); err != nil {
 				t.Fatal(err)

@@ -136,9 +136,14 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Resolve and persist the Machine UID, Node UID, and provider ID for a drain
       reservation. Resolver tests cover CAPI `v1beta1` and `v1beta2` object shapes
       and reject replacement Nodes; the real API test verifies schema retention.
-      Live CAPI validation of this binding remains part of VM acceptance.
-- [ ] Connect target binding and drain to group reconciliation, withdraw attachments,
-      and serialize claim removal.
+      A [live identity audit](validation/node-group-capi-identity-observations.json)
+      found matching claim owner UIDs and Node provider IDs for eight existing
+      Machines, including local harness and AWS Windows/GPU workers. Group drain
+      execution against those workers remains part of VM acceptance.
+- [x] Connect target binding and drain to the experimental reconciler with explicit
+      management/workload clients and the served CAPI version. Tests verify that
+      a drained worker retains its claim while withdrawal integration is pending.
+- [ ] Connect acknowledged attachment withdrawal and serialized claim removal.
 - [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.
 - [ ] Run single-NIC VM 0→3→1→0, controller restart, failed boot, PDB blockage,
       group recreation, and survivor-traffic tests.

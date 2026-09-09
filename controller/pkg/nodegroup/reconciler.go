@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -16,7 +18,11 @@ const GroupFinalizer = "cloud-provisioning.appmana.com/node-group"
 // Reconciler orchestrates claims independently of their machine provider. API
 // must bypass the cache so planning observes completed creation and deletion.
 // This experimental reconciler is not registered in the production manager yet.
-type Reconciler struct{ API client.Client }
+type Reconciler struct {
+	API        client.Client
+	Workload   client.Client
+	MachineGVK schema.GroupVersionKind
+}
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if r.API == nil {
@@ -50,7 +56,25 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			_, err = CompleteCreation(ctx, r.API, group, child.UID)
 			return again, err
 		case DrainAction:
-			return ctrl.Result{}, fmt.Errorf("group removal awaits drain and attachment withdrawal integration")
+			if r.Workload == nil {
+				return ctrl.Result{}, fmt.Errorf("group removal awaits drain and attachment withdrawal integration")
+			}
+			bound, err := BindDrainNode(ctx, r.API, r.Workload, r.MachineGVK, group)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if action.NodeUID == "" {
+				return again, nil
+			}
+			target := bound.Status.PendingAction
+			empty, err := DrainNode(ctx, r.Workload, target.NodeName, types.UID(target.NodeUID))
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if !empty {
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			}
+			return ctrl.Result{}, fmt.Errorf("drained group worker awaits attachment withdrawal integration")
 		default:
 			return ctrl.Result{}, fmt.Errorf("unknown pending group action")
 		}

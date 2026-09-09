@@ -1,0 +1,71 @@
+{
+  "observedAt": "2026-09-09T18:48:30.246376+00:00",
+  "scope": "Read-only observation of existing claim/Machine/Node identity chains; group drain was not executed on these workers.",
+  "machines": [
+    {
+      "machine": "aws-relay1",
+      "apiVersion": "cluster.x-k8s.io/v1beta2",
+      "claimOwnerUIDMatches": true,
+      "nodeRefPresent": true,
+      "providerIDMatches": true,
+      "nodeReady": true
+    },
+    {
+      "machine": "aws-win2022-gpu",
+      "apiVersion": "cluster.x-k8s.io/v1beta2",
+      "claimOwnerUIDMatches": true,
+      "nodeRefPresent": true,
+      "providerIDMatches": true,
+      "nodeReady": true
+    },
+    {
+      "machine": "aws-win2022-v3",
+      "apiVersion": "cluster.x-k8s.io/v1beta2",
+      "claimOwnerUIDMatches": true,
+      "nodeRefPresent": true,
+      "providerIDMatches": true,
+      "nodeReady": true
+    },
+    {
+      "machine": "aws-win2025",
+      "apiVersion": "cluster.x-k8s.io/v1beta2",
+      "claimOwnerUIDMatches": true,
+      "nodeRefPresent": true,
+      "providerIDMatches": true,
+      "nodeReady": true
+    },
+    {
+      "machine": "aws-win2025-gpu",
+      "apiVersion": "cluster.x-k8s.io/v1beta2",
+      "claimOwnerUIDMatches": true,
+      "nodeRefPresent": true,
+      "providerIDMatches": true,
+      "nodeReady": true
+    },
+    {
+      "machine": "aws-win2025-v3",
+      "apiVersion": "cluster.x-k8s.io/v1beta2",
+      "claimOwnerUIDMatches": true,
+      "nodeRefPresent": true,
+      "providerIDMatches": true,
+      "nodeReady": true
+    },
+    {
+      "machine": "remote1",
+      "apiVersion": "cluster.x-k8s.io/v1beta2",
+      "claimOwnerUIDMatches": true,
+      "nodeRefPresent": true,
+      "providerIDMatches": true,
+      "nodeReady": true
+    },
+    {
+      "machine": "remote2",
+      "apiVersion": "cluster.x-k8s.io/v1beta2",
+      "claimOwnerUIDMatches": true,
+      "nodeRefPresent": true,
+      "providerIDMatches": true,
+      "nodeReady": true
+    }
+  ],
+  "groupVMLifecycleQualified": false
+}

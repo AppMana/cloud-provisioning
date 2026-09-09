@@ -151,7 +151,13 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Connect target binding and drain to the experimental reconciler with explicit
       management/workload clients and the served CAPI version. Tests verify that
       a drained worker retains its claim while withdrawal integration is pending.
-- [ ] Connect acknowledged attachment withdrawal and serialized claim removal.
+- [x] Add retirement of an exact gateway request UID through the existing
+      attachment controller. The helper checks worker identity and waits for
+      both the durable `Complete` record and request disappearance. Unit tests
+      verify that pending hook cleanup and replacement requests retain the gate.
+- [ ] Persist the complete attachment request set for each drain target, connect
+      acknowledged withdrawal, and serialize claim removal. A single request's
+      completion covers only that attachment.
 - [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.
 - [ ] Run single-NIC VM 0→3→1→0, controller restart, failed boot, PDB blockage,
       group recreation, and survivor-traffic tests.

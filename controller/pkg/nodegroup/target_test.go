@@ -3,6 +3,7 @@ package nodegroup
 import (
 	"context"
 	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -78,6 +79,31 @@ func TestDrainTargetPinsMachineAndNode(t *testing.T) {
 			remaining := &v1alpha1.ProvisionedNodeClaim{}
 			if err := management.Get(ctx, client.ObjectKeyFromObject(child), remaining); err != nil || !remaining.DeletionTimestamp.IsZero() {
 				t.Fatal("deleted claim before withdrawal", err)
+			}
+			frozenGroup := &v1alpha1.ProvisionedNodeGroupClaim{}
+			if err := management.Get(ctx, req.NamespacedName, frozenGroup); err != nil {
+				t.Fatal(err)
+			}
+			frozenGroup.Status.PendingAction.Gateways = &v1alpha1.GroupGatewayInventory{Mesh: "mesh", Requests: []v1alpha1.GroupGatewayRequest{}}
+			if err := management.Status().Update(ctx, frozenGroup); err != nil {
+				t.Fatal(err)
+			}
+			if ready, err := FreezeGatewayAttachments(ctx, management, gvk, frozenGroup); err != nil || ready {
+				t.Fatal("first freeze must persist before proceeding", ready, err)
+			}
+			if ready, err := FreezeGatewayAttachments(ctx, management, gvk, frozenGroup); err != nil || !ready {
+				t.Fatal("freeze retry failed", ready, err)
+			}
+			otherAction := frozenGroup.DeepCopy()
+			otherAction.Status.PendingAction.ID = "other-action"
+			if _, err := FreezeGatewayAttachments(ctx, management, gvk, otherAction); err == nil {
+				t.Fatal("overwrote competing drain action")
+			}
+			if err := management.Get(ctx, client.ObjectKeyFromObject(machine), machine); err != nil {
+				t.Fatal(err)
+			}
+			if machine.GetAnnotations()[attachment.DrainIntentAnnotation] != string(group.UID)+"/"+action.ID {
+				t.Fatal("lost drain marker")
 			}
 			if err := workload.Delete(ctx, node); err != nil {
 				t.Fatal(err)

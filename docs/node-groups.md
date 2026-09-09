@@ -169,9 +169,13 @@ its own eviction and withdrawal gates before triggering that teardown.
       and attachment state machines. Controlled native acknowledgements keep the
       first request pending across a group reload; the second remains untouched
       until the first completes. The worker claim survives both retirements.
-- [ ] Verify retirement with native guest acknowledgements, freeze new attachment
-      admission during drain, withdraw direct mesh peers, and serialize claim
-      removal. Gateway retirement alone leaves the claim retained.
+- [x] Persist an action-owned drain marker on the CAPI Machine after workload
+      drain and gateway inventory capture. Attachment lifetime checks retire
+      requests for marked participants and preserve existing deletion hooks.
+      Unit tests cover retries, competing markers, and protected/unprotected leases.
+- [ ] Verify native retirement acknowledgements and preparation races around the
+      drain marker, withdraw direct mesh peers, and serialize claim removal.
+      Gateway retirement alone leaves the claim retained.
 - [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.
 - [ ] Run single-NIC VM 0→3→1→0, controller restart, failed boot, PDB blockage,
       group recreation, and survivor-traffic tests.

@@ -102,6 +102,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			if target.Gateways.Mesh != r.MeshName {
 				return ctrl.Result{}, fmt.Errorf("drain mesh scope changed")
 			}
+			frozen, err := FreezeGatewayAttachments(ctx, r.API, r.MachineGVK, bound)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if !frozen {
+				return again, nil
+			}
 			done, err := RetireGatewayInventory(ctx, r.API, bound)
 			if err != nil {
 				return ctrl.Result{}, err

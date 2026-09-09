@@ -137,3 +137,48 @@ func TestCAPILifetimeRejectsChangedRequestAndForeignParticipant(t *testing.T) {
 		}
 	}
 }
+
+func TestDrainIntentRetiresBeforeNewPreparation(t *testing.T) {
+	for _, protected := range []bool{false, true} {
+		c, record := lifetimeFixture(t)
+		ctx := context.Background()
+		if protected {
+			if retiring, err := c.Protect(ctx, record); err != nil || retiring {
+				t.Fatal(retiring, err)
+			}
+		}
+		machines, err := c.machines(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		worker := machines[record.Plan.Worker.UID]
+		annotations := worker.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[attachment.DrainIntentAnnotation] = "group/action"
+		worker.SetAnnotations(annotations)
+		if err := c.Client.Update(ctx, worker); err != nil {
+			t.Fatal(err)
+		}
+		if retiring, err := c.Protect(ctx, record); err != nil || !retiring {
+			t.Fatal("drain intent did not request retirement", retiring, err)
+		}
+		request, err := c.request(ctx, record)
+		if err != nil || request.DeletionTimestamp.IsZero() {
+			t.Fatal("request not retained for retirement", err)
+		}
+		machines, err = c.machines(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range machines {
+			if attachment.HasDeletionHold(m) != protected {
+				t.Fatal("drain intent changed existing hook protection")
+			}
+			if !m.GetDeletionTimestamp().IsZero() {
+				t.Fatal("drain intent deleted Machine")
+			}
+		}
+	}
+}

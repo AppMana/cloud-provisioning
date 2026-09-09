@@ -67,7 +67,7 @@ func (c CAPILifetime) Protect(ctx context.Context, r attachment.Record) (bool, e
 	participants := []attachment.Machine{r.Plan.Worker, r.Plan.Gateway}
 	for _, planned := range participants {
 		m := machines[planned.UID]
-		if m == nil || m.GetDeletionTimestamp() != nil {
+		if m == nil || m.GetDeletionTimestamp() != nil || m.GetAnnotations()[attachment.DrainIntentAnnotation] != "" {
 			retiring = true
 			continue
 		}
@@ -126,7 +126,7 @@ func (c CAPILifetime) Protect(ctx context.Context, r attachment.Record) (bool, e
 	}
 	for _, planned := range participants {
 		m := latest[planned.UID]
-		if m == nil || m.GetDeletionTimestamp() != nil {
+		if m == nil || m.GetDeletionTimestamp() != nil || m.GetAnnotations()[attachment.DrainIntentAnnotation] != "" {
 			uid := cm.UID
 			return true, c.Client.Delete(ctx, cm, &client.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}})
 		}

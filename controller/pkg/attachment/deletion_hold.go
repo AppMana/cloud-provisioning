@@ -30,3 +30,7 @@ func HasDeletionHold(machine metav1.Object) bool {
 	}
 	return false
 }
+
+// DrainIntentAnnotation marks a Machine whose workloads have drained and whose
+// network attachments must retire. The value identifies the owning drain action.
+const DrainIntentAnnotation = "cloud-provisioning.appmana.com/drain-intent"

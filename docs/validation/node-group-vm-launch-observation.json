@@ -1,0 +1,95 @@
+{
+  "observedAt": "2026-09-09T20:59:35.360811+00:00",
+  "groupUID": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+  "desiredReplicas": 3,
+  "observedGroupStatus": {
+    "readyReplicas": 0,
+    "replicas": 3
+  },
+  "claimCount": 3,
+  "machines": [
+    {
+      "name": "pooled-workers-8ae81037d7a1043c-0",
+      "uid": "c25ae263-299d-491b-8b37-c79a626041e2",
+      "providerID": "containernet://remote1/fb04f698-ef90-4a92-89ff-35ab083fda1c",
+      "nodeRef": {
+        "name": "remote1"
+      },
+      "phase": "Running"
+    },
+    {
+      "name": "pooled-workers-8ae81037d7a1043c-1",
+      "uid": "c904fb5a-67c5-4c26-89ed-6a1a9dff89f3",
+      "providerID": "containernet://remote2/09808495-ef08-45a3-92da-8be3d9f6bcd3",
+      "nodeRef": {
+        "name": "remote2"
+      },
+      "phase": "Running"
+    },
+    {
+      "name": "pooled-workers-8ae81037d7a1043c-2",
+      "uid": "fea85896-3914-4173-94ed-2d755d06db12",
+      "providerID": "containernet://remote3/13d416eb-95aa-42fc-b875-8a9d68c6008a",
+      "nodeRef": {
+        "name": "remote3"
+      },
+      "phase": "Running"
+    }
+  ],
+  "nodes": [
+    {
+      "name": "cp",
+      "uid": "20065eca-8909-434c-aa37-b7043b00f1b7",
+      "providerID": null,
+      "ready": true
+    },
+    {
+      "name": "cp2",
+      "uid": "c799108c-3743-4644-b5bd-93e066fcfff3",
+      "providerID": null,
+      "ready": true
+    },
+    {
+      "name": "cp3",
+      "uid": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+      "providerID": null,
+      "ready": true
+    },
+    {
+      "name": "remote1",
+      "uid": "3e308e06-67f4-419d-b71a-fbd2b37377e1",
+      "providerID": "containernet://remote1/fb04f698-ef90-4a92-89ff-35ab083fda1c",
+      "ready": true
+    },
+    {
+      "name": "remote2",
+      "uid": "11faa7e0-e73c-48d5-b72f-f940e864174a",
+      "providerID": "containernet://remote2/09808495-ef08-45a3-92da-8be3d9f6bcd3",
+      "ready": true
+    },
+    {
+      "name": "remote3",
+      "uid": "d46188f2-8b91-45c0-a3e7-83bef70101b3",
+      "providerID": "containernet://remote3/13d416eb-95aa-42fc-b875-8a9d68c6008a",
+      "ready": false
+    },
+    {
+      "name": "w1",
+      "uid": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+      "providerID": null,
+      "ready": true
+    },
+    {
+      "name": "w2",
+      "uid": "305d83b1-22ae-4400-b401-cfb58dbdb3a0",
+      "providerID": null,
+      "ready": true
+    }
+  ],
+  "providerErrors": [
+    "provider pass: pooled-workers-8ae81037d7a1043c-2: remote3 did not become reachable after being started: context deadline exceeded (last failure: remote3: [true] exited -1)"
+  ],
+  "cleanScaleUpQualified": false,
+  "scaleDownExercised": false,
+  "finding": "The 90-second provider pass expired while waiting for remote3 after launch. VM Userdata retries reset the disk and boot again because no durable launch receipt is checked. Retry must observe the same instance before this lifecycle can qualify."
+}

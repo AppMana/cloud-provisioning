@@ -72,6 +72,13 @@ verifies one physical NIC on each of eight guests, site-to-cloud reachability,
 and isolation of the site from direct remote access. A completed pooled VM
 lifecycle run is still pending.
 
+The [initial pooled launch observation](validation/node-group-vm-launch-observation.json)
+created three claims with distinct VM bindings. The provider pass expired while
+waiting for the third VM after launch. Bootstrap retries currently reset the VM
+disk; a durable launch receipt and observation of the existing instance are
+required before qualifying this lifecycle. Increasing the timeout alone would
+leave the retry behavior unresolved.
+
 ## API and ownership
 
 Introduce `ProvisionedNodeGroupClaim` with:

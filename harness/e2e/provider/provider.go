@@ -30,6 +30,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -191,6 +192,9 @@ func (c *Controller) reconcileOne(ctx context.Context, namespace, name string) (
 		return Machine{}, fmt.Errorf("reading the machine: %w", err)
 	}
 
+	if c.Slots != nil && obj.Metadata.DeletionTimestamp != nil && !slices.Contains(obj.Metadata.Finalizers, instanceFinalizer) {
+		return Machine{Name: name, Namespace: namespace}, nil
+	}
 	// Which node backs it, read from the machine rather than passed
 	// in. The annotation is what the printer column shows; the spec
 	// field is where a template puts it.

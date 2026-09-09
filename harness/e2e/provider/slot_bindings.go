@@ -25,6 +25,8 @@ func (c *Controller) reserveBindings(ctx context.Context, namespace string, name
 	type candidate struct {
 		name, uid, version, requested string
 		annotations                   map[string]string
+		finalizers                    []string
+		deleting                      bool
 	}
 	var fixed, dynamic []candidate
 	occupied := map[string]string{}
@@ -37,9 +39,11 @@ func (c *Controller) reserveBindings(ctx context.Context, namespace string, name
 		}
 		var obj struct {
 			Metadata struct {
-				UID         string            `json:"uid"`
-				Version     string            `json:"resourceVersion"`
-				Annotations map[string]string `json:"annotations"`
+				UID               string            `json:"uid"`
+				Version           string            `json:"resourceVersion"`
+				Annotations       map[string]string `json:"annotations"`
+				Finalizers        []string          `json:"finalizers"`
+				DeletionTimestamp *string           `json:"deletionTimestamp"`
 			} `json:"metadata"`
 			Spec struct {
 				ContainerName string `json:"containerName"`
@@ -51,7 +55,7 @@ func (c *Controller) reserveBindings(ctx context.Context, namespace string, name
 		if obj.Metadata.UID == "" || obj.Metadata.Version == "" {
 			return fmt.Errorf("persisted infrastructure Machine identity required")
 		}
-		item := candidate{name: name, uid: obj.Metadata.UID, version: obj.Metadata.Version, annotations: obj.Metadata.Annotations}
+		item := candidate{name: name, uid: obj.Metadata.UID, version: obj.Metadata.Version, annotations: obj.Metadata.Annotations, finalizers: obj.Metadata.Finalizers, deleting: obj.Metadata.DeletionTimestamp != nil}
 		binding := machineBinding(name, obj.Metadata.Annotations, obj.Spec.ContainerName)
 		node, err := c.node(binding)
 		if err == nil {
@@ -69,6 +73,56 @@ func (c *Controller) reserveBindings(ctx context.Context, namespace string, name
 		}
 	}
 	for _, item := range append(fixed, dynamic...) {
+		if item.deleting {
+			_, pool, err := c.Slots.readPool(ctx)
+			if err != nil {
+				return err
+			}
+			reserved := false
+			if pool != nil {
+				for _, owner := range pool.Owners {
+					if owner.UID == item.uid {
+						reserved = true
+						break
+					}
+				}
+			}
+			if !reserved {
+				if item.annotations[instanceAnnotation] != "" {
+					return fmt.Errorf("bootstrapped deleting Machine lacks its reservation")
+				}
+				if slices.Contains(item.finalizers, instanceFinalizer) {
+					kept := slices.DeleteFunc(append([]string{}, item.finalizers...), func(value string) bool { return value == instanceFinalizer })
+					patch, _ := json.Marshal([]map[string]any{{"op": "test", "path": "/metadata/uid", "value": item.uid}, {"op": "test", "path": "/metadata/resourceVersion", "value": item.version}, {"op": "add", "path": "/metadata/finalizers", "value": kept}})
+					if _, err := c.Kube.Run(ctx, "-n", namespace, "patch", machineKind, item.name, "--type=json", "-p", string(patch)); err != nil {
+						return err
+					}
+				}
+				continue
+			}
+			if !slices.Contains(item.finalizers, instanceFinalizer) {
+				return fmt.Errorf("reserved deleting Machine has lost its provider finalizer")
+			}
+		} else if !slices.Contains(item.finalizers, instanceFinalizer) {
+			finalizers := append(append([]string{}, item.finalizers...), instanceFinalizer)
+			patch, _ := json.Marshal([]map[string]any{{"op": "test", "path": "/metadata/uid", "value": item.uid}, {"op": "test", "path": "/metadata/resourceVersion", "value": item.version}, {"op": "add", "path": "/metadata/finalizers", "value": finalizers}})
+			raw, err := c.Kube.Run(ctx, "-n", namespace, "patch", machineKind, item.name, "--type=json", "-p", string(patch), "-o", "json")
+			if err != nil {
+				return err
+			}
+			var updated struct {
+				Metadata struct {
+					Version string `json:"resourceVersion"`
+				} `json:"metadata"`
+			}
+			if err := json.Unmarshal(raw, &updated); err != nil {
+				return err
+			}
+			if updated.Metadata.Version == "" {
+				return fmt.Errorf("finalizer patch returned no resourceVersion")
+			}
+			item.version = updated.Metadata.Version
+		}
 		slot, err := c.Slots.Reserve(ctx, SlotOwner{Namespace: namespace, Name: item.name, UID: item.uid}, item.requested)
 		if err != nil {
 			return err

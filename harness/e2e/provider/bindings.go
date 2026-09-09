@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 )
 
 // checkDistinctBindings checks the whole namespace before a reconcile pass can
@@ -19,7 +20,9 @@ func (c *Controller) checkDistinctBindings(ctx context.Context, namespace string
 		}
 		var obj struct {
 			Metadata struct {
-				Annotations map[string]string `json:"annotations"`
+				Annotations       map[string]string `json:"annotations"`
+				Finalizers        []string          `json:"finalizers"`
+				DeletionTimestamp *string           `json:"deletionTimestamp"`
 			} `json:"metadata"`
 			Spec struct {
 				ContainerName string `json:"containerName"`
@@ -27,6 +30,9 @@ func (c *Controller) checkDistinctBindings(ctx context.Context, namespace string
 		}
 		if err := json.Unmarshal(raw, &obj); err != nil {
 			return fmt.Errorf("reading binding for %s: %w", name, err)
+		}
+		if c.Slots != nil && obj.Metadata.DeletionTimestamp != nil && !slices.Contains(obj.Metadata.Finalizers, instanceFinalizer) {
+			continue
 		}
 		binding := machineBinding(name, obj.Metadata.Annotations, obj.Spec.ContainerName)
 		node, err := c.node(binding)

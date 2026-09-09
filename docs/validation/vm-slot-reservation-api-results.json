@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-09T20:29:45.003679+00:00",
+  "observedAt": "2026-09-09T20:33:17.550147+00:00",
   "scope": "UID-bound VM slot reservation ConfigMap transactions against the retained VM cluster API",
   "test": "CLDT_SLOT_API_TEST=1 go test -race ./provider -run TestSlotStoreRealAPI -v",
   "passed": true,
@@ -22,7 +22,11 @@
     "terminating infrastructure object retains stopped slot",
     "absent stopped owner releases slot once",
     "replacement can reuse released slot",
-    "stale stop owner cannot affect replacement reservation"
+    "stale stop owner cannot affect replacement reservation",
+    "provider finalizer installed before slot reservation",
+    "deleting unallocated Machine releases only provider finalizer",
+    "unallocated cancellation preserves other finalizers and the full pool inventory",
+    "unallocated deleting Machine does not enter compute lifecycle"
   ],
   "vmProvisioningExercised": false,
   "teardownReleaseImplemented": true,

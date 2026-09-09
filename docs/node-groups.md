@@ -38,9 +38,11 @@ generated names, persisting annotations before address publication or bootstrap.
 Pooled provider IDs include the infrastructure Machine UID. The provider records successful VM stop before removing its finalizer and
 releases the reservation after the old infrastructure UID disappears. API tests
 use a controlled stop callback; native pooled boot/teardown and harness command
-configuration remain required before a group VM campaign. Reservations left by
-interruption before the infrastructure finalizer is installed remain held and
-need a separately verified cancellation path. This allocation is
+configuration remain required before a group VM campaign. The provider installs its finalizer before reserving capacity. A deleting
+Machine that has no reservation and no bootstrap receipt releases only the
+provider finalizer; it allocates no slot and never enters the compute lifecycle.
+API tests cover cancellation while the pool is full and preservation of another
+controller's finalizer. This allocation is
 separate from CAPA, where AWS provisions each Machine from the shared template.
 
 

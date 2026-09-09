@@ -68,5 +68,6 @@ func verifyPooledBindings(t *testing.T, ctx context.Context, ns string) {
 		t.Fatal(err)
 	}
 	verifySlotRelease(t, ctx, *store)
+	verifyUnallocatedCancellation(t, ctx, controller, ns)
 
 }

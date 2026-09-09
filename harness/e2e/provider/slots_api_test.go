@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -49,6 +50,31 @@ func TestSlotStoreRealAPI(t *testing.T) {
 	defer func() {
 		cleanup, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
+		// These infrastructure objects exercise only API binding; no guests exist.
+		raw, err := api.Run(cleanup, "-n", ns, "get", machineKind, "-o", "json")
+		if err != nil {
+			t.Error(err)
+		} else {
+			var list struct {
+				Items []struct {
+					Metadata struct {
+						Name    string `json:"name"`
+						UID     string `json:"uid"`
+						Version string `json:"resourceVersion"`
+					} `json:"metadata"`
+				} `json:"items"`
+			}
+			if err := json.Unmarshal(raw, &list); err != nil {
+				t.Error(err)
+			} else {
+				for _, obj := range list.Items {
+					patch, _ := json.Marshal([]map[string]any{{"op": "test", "path": "/metadata/uid", "value": obj.Metadata.UID}, {"op": "test", "path": "/metadata/resourceVersion", "value": obj.Metadata.Version}, {"op": "add", "path": "/metadata/finalizers", "value": []string{}}})
+					if _, err := api.Run(cleanup, "-n", ns, "patch", machineKind, obj.Metadata.Name, "--type=json", "-p", string(patch)); err != nil {
+						t.Error(err)
+					}
+				}
+			}
+		}
 		if _, err := api.Run(cleanup, "delete", "namespace", ns, "--wait=false"); err != nil {
 			t.Error(err)
 		}

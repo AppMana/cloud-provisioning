@@ -139,6 +139,21 @@ docker exec -w /workspace/harness/e2e "$runner" \
 The inner names and IPs deliberately overlap the original lab. Omitting the
 outer `docker exec "$runner"` targets the original host daemon instead.
 
+## Memory during image import
+
+See the [native recovery evidence](../../../docs/validation/vm-image-import-memory-results.json).
+
+Budget for guest RAM, the nested Docker daemon, and image export/import buffers.
+The eight-VM group campaign exhausted a 38 GiB runner limit during concurrent
+imports: QEMU was killed and guest filesystems reported write failures. Recovery
+uses a 44 GiB limit and imports into one guest at a time, retaining a single image
+export. Check available host memory before increasing a runner's limit.
+
+After an OOM or image-import failure, inspect the runner's `memory.events`, QEMU
+processes, and guest filesystem writes through the serial guest agent. A Ready
+Node can still have a read-only filesystem. Preserve the disks and resource
+identities during recovery, then verify new pod creation and the workload matrix.
+
 ## Teardown
 
 After the run exits, verify the runner name and ownership label, then destroy

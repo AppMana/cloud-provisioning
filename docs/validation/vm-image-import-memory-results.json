@@ -1,0 +1,59 @@
+{
+  "observedAt": "2026-09-09T23:10:23.179162+00:00",
+  "initialRunnerLimitGiB": 38,
+  "recoveryRunnerLimitGiB": 44,
+  "guestCount": 8,
+  "guestMemoryGiB": 4,
+  "observedFailure": {
+    "hostOOMTimeUTC": "2026-09-09T22:47:35Z",
+    "killedProcess": "qemu-system-x86",
+    "killedPID": 635043,
+    "affectedWrapper": "clab-cldt-cp2",
+    "readOnlyGuests": [
+      "w1",
+      "remote3"
+    ],
+    "imageImportErrors": [
+      "cp2: guest-agent socket broken pipe",
+      "w1: read-only file system"
+    ],
+    "newPodFailure": "remote3: mkdir /var/lib/k0s/kubelet/pods/...: read-only file system",
+    "nodeReadyWasInsufficient": true
+  },
+  "recovery": {
+    "existingDiskBoots": [
+      "cp2",
+      "w1",
+      "remote3"
+    ],
+    "nodeUIDsUnchanged": true,
+    "allEightNodesReady": true,
+    "filesystemWriteChecks": {
+      "cp": true,
+      "cp2": true,
+      "cp3": true,
+      "remote1": true,
+      "remote2": true,
+      "remote3": true,
+      "w1": true,
+      "w2": true
+    },
+    "serialImageImportExitCode": 0,
+    "oomKillCountBeforeRecovery": 1,
+    "oomKillCountAfterRecovery": 1,
+    "networkMatrix": "node-group-vm-post-memory-results.json",
+    "originalClusterReadyNodes": 13
+  },
+  "implementation": {
+    "exportCountPerImage": 1,
+    "concurrentGuestImports": 1,
+    "supersedes": "The four-way VM image fanout in harness/e2e/rig/vm/images.go, introduced in 0d7fe740. Container and cloud-specific image carriers retain their own implementations."
+  },
+  "tests": {
+    "command": "go test -race ./rig/vm ./provider -coverprofile=/tmp/cldt-serial-images.cover",
+    "passed": true,
+    "vmStatementCoveragePercent": 59.8,
+    "coverageSHA256": "fa9c080feefba9ad397a8fb159ad5be6e49dd31f20011c9c0c5504dca71844a0"
+  },
+  "scope": "Recovery verified with both increased runner memory and serialized imports. This does not establish a minimum memory requirement or prove that serialization alone prevents OOM at the previous limit."
+}

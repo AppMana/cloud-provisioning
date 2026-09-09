@@ -7,13 +7,15 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 )
 
-func TestImageFanoutUsesOneExportAndReportsGuestFailure(t *testing.T) {
+func TestImageImportBoundsConcurrencyAndReportsGuestFailure(t *testing.T) {
 	var mu sync.Mutex
 	exports := 0
+	active, peak := 0, 0
 	imported := map[string]string{}
 	r := New(lab.Default(), t.TempDir())
 	r.Run = func(_ context.Context, input io.Reader, args ...string) ([]byte, []byte, int, error) {
@@ -27,6 +29,16 @@ func TestImageFanoutUsesOneExportAndReportsGuestFailure(t *testing.T) {
 			mu.Unlock()
 			return []byte("image archive"), nil, 0, nil
 		}
+
+		mu.Lock()
+		active++
+		if active > peak {
+			peak = active
+		}
+		mu.Unlock()
+		defer func() { mu.Lock(); active--; mu.Unlock() }()
+		// Keep a transfer in flight so an overlapping import is observable.
+		time.Sleep(5 * time.Millisecond)
 		body, err := io.ReadAll(input)
 		if err != nil {
 			return nil, nil, 0, err
@@ -42,6 +54,9 @@ func TestImageFanoutUsesOneExportAndReportsGuestFailure(t *testing.T) {
 	err := r.Load(context.Background(), "test:image", []string{"cp", "w1", "w2"}, []string{"k0s", "ctr", "images", "import", "-"})
 	if err == nil || !strings.Contains(err.Error(), "w1") {
 		t.Fatalf("guest failure lost: %v", err)
+	}
+	if peak != 1 {
+		t.Fatalf("concurrent image transfers=%d, want bounded memory with one", peak)
 	}
 	if exports != 1 || len(imported) != 3 {
 		t.Fatalf("exports=%d imports=%d", exports, len(imported))

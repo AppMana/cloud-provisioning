@@ -1,0 +1,55 @@
+{
+  "observedAt": "2026-09-09T21:52:45.786187+00:00",
+  "desiredReplicas": 4,
+  "poolCapacity": 3,
+  "reservedSlots": {
+    "remote1": {
+      "namespace": "cloud-provisioning",
+      "name": "pooled-workers-8ae81037d7a1043c-0",
+      "uid": "020f8372-4e25-49f9-8ef9-58ea9d227202"
+    },
+    "remote2": {
+      "namespace": "cloud-provisioning",
+      "name": "pooled-workers-8ae81037d7a1043c-1",
+      "uid": "895eb813-8f87-4318-8ac7-a5e2a9c02961"
+    },
+    "remote3": {
+      "namespace": "cloud-provisioning",
+      "name": "pooled-workers-8ae81037d7a1043c-2",
+      "uid": "c544f82d-868b-41e4-ac3b-fc998aa15571"
+    }
+  },
+  "machines": [
+    {
+      "name": "pooled-workers-8ae81037d7a1043c-0",
+      "uid": "020f8372-4e25-49f9-8ef9-58ea9d227202",
+      "binding": "remote1",
+      "ready": true
+    },
+    {
+      "name": "pooled-workers-8ae81037d7a1043c-1",
+      "uid": "895eb813-8f87-4318-8ac7-a5e2a9c02961",
+      "binding": "remote2",
+      "ready": false
+    },
+    {
+      "name": "pooled-workers-8ae81037d7a1043c-2",
+      "uid": "c544f82d-868b-41e4-ac3b-fc998aa15571",
+      "binding": "remote3",
+      "ready": true
+    },
+    {
+      "name": "pooled-workers-8ae81037d7a1043c-3",
+      "uid": "be2ca80f-ce63-4736-8ad7-6b99c0d9ed39",
+      "binding": null,
+      "ready": false
+    }
+  ],
+  "vmRunning": {
+    "/clab-cldt-remote1": true,
+    "/clab-cldt-remote2": false,
+    "/clab-cldt-remote3": true
+  },
+  "finding": "reserveBindings returns on capacity exhaustion before Controller.Reconcile can advance already-reserved Machines. The reserved remote2 VM remains stopped while the fourth Machine cannot allocate.",
+  "capacityExhaustionQualified": false
+}

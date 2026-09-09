@@ -136,8 +136,14 @@ The [ordinary-pod UDP sweep](validation/node-group-vm-udp-results.json) received
 and a cloud worker. It covers both directions for each pair, fresh and reused
 sockets, and 64, 1280, 1340, 1400, and 1800-byte echo bodies. Each datagram also
 contains the five-byte echo command prefix. Node, pod, and container identities
-stayed unchanged. This is steady-state pod-IP traffic; UDP Services, cross-cloud
-traffic, and UDP during removal remain to be verified.
+stayed unchanged. This is steady-state pod-IP traffic.
+
+The [UDP Service sweep](validation/node-group-vm-udp-service-results.json) also
+received 600 exact responses in 60 rows with the same payload sizes and socket
+modes. Each ClusterIP Service had exactly one Ready EndpointSlice endpoint
+matching its intended pod UID and IP. Service and workload identities stayed
+unchanged across the sweep. Cross-cloud UDP and UDP during removal remain to be
+verified.
 
 ## API and ownership
 

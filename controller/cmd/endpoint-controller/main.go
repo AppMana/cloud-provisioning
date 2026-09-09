@@ -70,9 +70,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// machineGVK is v1beta2 throughout this module: v1beta1 is gone from
-// current Cluster API, and a stale version here produces a watch that
-// never fires, so no DaemonSet is created.
+// machineGVK uses the same CAPI API version as claim creation and attachment
+// lifecycle queries. Older served versions depend on the installed CAPI release.
 var machineGVK = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"}
 
 var gatewayGVK = schema.GroupVersionKind{

@@ -33,7 +33,7 @@ func lifetimeFixture(t *testing.T) (CAPILifetime, attachment.Record) {
 		t.Fatal(err)
 	}
 	for _, m := range []attachment.Machine{plan.Worker, plan.Gateway} {
-		obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "cluster.x-k8s.io/v1beta1", "kind": "Machine", "metadata": map[string]any{"name": m.UID, "namespace": "test", "uid": m.UID, "finalizers": []any{"test/keep"}}, "spec": map[string]any{"providerID": m.ProviderID, "clusterName": "cluster"}, "status": map[string]any{"nodeRef": map[string]any{"name": m.UID}}}}
+		obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "cluster.x-k8s.io/v1beta2", "kind": "Machine", "metadata": map[string]any{"name": m.UID, "namespace": "test", "uid": m.UID, "finalizers": []any{"test/keep"}}, "spec": map[string]any{"providerID": m.ProviderID, "clusterName": "cluster"}, "status": map[string]any{"nodeRef": map[string]any{"name": m.UID}}}}
 		node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: m.UID, UID: types.UID(m.NodeUID)}, Spec: corev1.NodeSpec{ProviderID: m.ProviderID}}
 		for _, object := range []client.Object{obj, node} {
 			if err := r.Client.Create(ctx, object); err != nil {

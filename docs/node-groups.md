@@ -86,6 +86,11 @@ spec:
 
 ## Safe removal
 
+The controller's claim and attachment paths use CAPI `v1beta2`. Attachment API
+validation serves only that version, including deletion-hook retention and
+request retirement. The live harness also serves `v1beta1` for compatibility.
+
+
 Select excess children deterministically, one at a time. Cordon the chosen Node,
 evict workloads through the eviction API respecting disruption budgets, wait for
 active work, withdraw tunnel/attachment ownership, then delete the child claim.

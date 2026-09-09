@@ -41,7 +41,7 @@ func (r MeshConsumerResolver) Resolve(ctx context.Context, record Record) (*Publ
 		byName[node.Name] = node
 	}
 	machines := &unstructured.UnstructuredList{}
-	machines.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineList"})
+	machines.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "MachineList"})
 	if err := r.Reader.List(ctx, machines, client.InNamespace(r.Namespace)); err != nil {
 		return nil, err
 	}

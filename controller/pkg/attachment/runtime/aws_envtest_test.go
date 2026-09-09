@@ -44,7 +44,7 @@ func TestAPIRegisteredAWSRequestRetirementAndNameReuse(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "machines.cluster.x-k8s.io"},
 		Spec: apiextv1.CustomResourceDefinitionSpec{Group: "cluster.x-k8s.io", Scope: apiextv1.NamespaceScoped,
 			Names:    apiextv1.CustomResourceDefinitionNames{Plural: "machines", Singular: "machine", Kind: "Machine", ListKind: "MachineList"},
-			Versions: []apiextv1.CustomResourceDefinitionVersion{{Name: "v1beta1", Served: true, Storage: true, Schema: &apiextv1.CustomResourceValidation{OpenAPIV3Schema: &apiextv1.JSONSchemaProps{Type: "object", XPreserveUnknownFields: &preserve}}}},
+			Versions: []apiextv1.CustomResourceDefinitionVersion{{Name: "v1beta2", Served: true, Storage: true, Schema: &apiextv1.CustomResourceValidation{OpenAPIV3Schema: &apiextv1.JSONSchemaProps{Type: "object", XPreserveUnknownFields: &preserve}}}},
 		},
 	}}}}
 	config, err := env.Start()
@@ -172,7 +172,7 @@ func checkAPILifetime(t *testing.T, ctx context.Context, c client.Client) {
 		if err := c.Create(ctx, node); err != nil {
 			t.Fatal(err)
 		}
-		machine := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "cluster.x-k8s.io/v1beta1", "kind": "Machine", "metadata": map[string]any{"name": name, "namespace": "lifetime", "finalizers": []any{"test/keep"}}, "spec": map[string]any{"clusterName": "cluster", "providerID": node.Spec.ProviderID}, "status": map[string]any{"nodeRef": map[string]any{"name": name}}}}
+		machine := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "cluster.x-k8s.io/v1beta2", "kind": "Machine", "metadata": map[string]any{"name": name, "namespace": "lifetime", "finalizers": []any{"test/keep"}}, "spec": map[string]any{"clusterName": "cluster", "providerID": node.Spec.ProviderID}, "status": map[string]any{"nodeRef": map[string]any{"name": name}}}}
 		if err := c.Create(ctx, machine); err != nil {
 			t.Fatal(err)
 		}

@@ -51,7 +51,7 @@ func resolverFixture(t *testing.T) (Resolver, attachment.Record, *resolverEC2) {
 	var objects []client.Object
 	machine := func(name, ip string) attachment.Machine {
 		provider := "aws:///us-west-2a/i-" + name
-		obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "cluster.x-k8s.io/v1beta1", "kind": "Machine", "metadata": map[string]any{"name": name, "namespace": "test", "uid": name}, "spec": map[string]any{"providerID": provider, "clusterName": "cluster"}, "status": map[string]any{"nodeRef": map[string]any{"name": name}}}}
+		obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "cluster.x-k8s.io/v1beta2", "kind": "Machine", "metadata": map[string]any{"name": name, "namespace": "test", "uid": name}, "spec": map[string]any{"providerID": provider, "clusterName": "cluster"}, "status": map[string]any{"nodeRef": map[string]any{"name": name}}}}
 		node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID("node-" + name)}, Spec: corev1.NodeSpec{ProviderID: provider}}
 		objects = append(objects, obj, node)
 		return attachment.Machine{UID: name, NodeUID: "node-" + name, ProviderID: provider, InterfaceID: "eni-i-" + name, NetworkID: "aws:account:us-west-2:vpc", Subnet: netip.MustParsePrefix("172.29.0.0/25"), Address: netip.MustParseAddr(ip)}
@@ -69,7 +69,7 @@ func resolverFixture(t *testing.T) (Resolver, attachment.Record, *resolverEC2) {
 func TestResolverObservesDeletingMachineOnlyWhileLifetimeHeld(t *testing.T) {
 	ctx := context.Background()
 	r, record, _ := resolverFixture(t)
-	m := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "cluster.x-k8s.io/v1beta1", "kind": "Machine"}}
+	m := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "cluster.x-k8s.io/v1beta2", "kind": "Machine"}}
 	if err := r.Client.Get(ctx, client.ObjectKey{Namespace: "test", Name: "worker"}, m); err != nil {
 		t.Fatal(err)
 	}

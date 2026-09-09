@@ -39,7 +39,7 @@ func (r Resolver) machine(ctx context.Context, m attachment.Machine) (InterfaceT
 	}
 	target := InterfaceTarget{InterfaceID: m.InterfaceID, InstanceID: parts[4]}
 	list := &unstructured.UnstructuredList{}
-	list.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineList"})
+	list.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "MachineList"})
 	if err := r.Client.List(ctx, list, client.InNamespace(r.Namespace)); err != nil {
 		return target, err
 	}

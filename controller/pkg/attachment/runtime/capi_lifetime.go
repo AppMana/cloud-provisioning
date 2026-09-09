@@ -26,7 +26,7 @@ func (c CAPILifetime) machines(ctx context.Context) (map[string]*unstructured.Un
 		return nil, fmt.Errorf("CAPI lifetime scope required")
 	}
 	list := &unstructured.UnstructuredList{}
-	list.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "MachineList"})
+	list.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "MachineList"})
 	if err := c.Client.List(ctx, list, client.InNamespace(c.Namespace)); err != nil {
 		return nil, err
 	}

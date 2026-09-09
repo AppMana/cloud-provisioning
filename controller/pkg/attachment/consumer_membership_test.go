@@ -22,7 +22,7 @@ func membershipFixture(t *testing.T) (MeshConsumerResolver, Record, *corev1.Secr
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	gv := schema.GroupVersion{Group: "cluster.x-k8s.io", Version: "v1beta1"}
+	gv := schema.GroupVersion{Group: "cluster.x-k8s.io", Version: "v1beta2"}
 	scheme.AddKnownTypeWithName(gv.WithKind("Machine"), &unstructured.Unstructured{})
 	scheme.AddKnownTypeWithName(gv.WithKind("MachineList"), &unstructured.UnstructuredList{})
 	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mesh", Namespace: "test", UID: "mesh"}, Data: map[string][]byte{}}
@@ -55,7 +55,7 @@ func TestDeletingConsumerRequiresPairedLifetimeHooks(t *testing.T) {
 	r, record, _, _ := membershipFixture(t)
 	c := r.Reader.(client.Client)
 	m := &unstructured.Unstructured{}
-	m.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta1", Kind: "Machine"})
+	m.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"})
 	if err := c.Get(ctx, client.ObjectKey{Namespace: "test", Name: "worker"}, m); err != nil {
 		t.Fatal(err)
 	}

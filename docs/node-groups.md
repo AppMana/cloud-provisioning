@@ -26,133 +26,100 @@ release namespace, plus pod listing and eviction permissions for workload drain.
 It defaults to `false`; the group CRD is installed separately for this experiment.
 Ready aggregation, KEDA integration and complete VM qualification remain pending.
 
-The fake CAPI provider currently binds each template to a fixed remote VM slot.
-A template naming `remote1` cannot supply multiple group replicas: the provider
-rejects duplicate bindings before reporting addresses or starting a guest.
-Generated group child names use explicit slot allocation when the harness
-provider is configured with `Controller.Slots`. The [slot reservation store](validation/vm-slot-reservation-api-results.json)
-now reserves one remote slot per infrastructure Machine UID with ConfigMap
-UID/version checks. Its real API test covers restart recovery, contention and
-capacity exhaustion. The provider now reserves fixed bindings first and assigns unused slots to
-generated names, persisting annotations before address publication or bootstrap.
-Pooled provider IDs include the infrastructure Machine UID. The provider records successful VM stop before removing its finalizer and
-releases the reservation after the old infrastructure UID disappears. API tests
-use a controlled stop callback; native pooled boot/teardown remains to be validated in the group VM campaign. The provider installs its finalizer before reserving capacity. A deleting
-Machine that has no reservation and no bootstrap receipt releases only the
-provider finalizer; it allocates no slot and never enters the compute lifecycle.
-API tests cover cancellation while the pool is full and preservation of another
-controller's finalizer. This allocation is
-separate from CAPA, where AWS provisions each Machine from the shared template.
+## Pooled VM provider
 
-
-## Pooled VM provider loop
-
-Create a fresh isolated VM lab with `cmd/lab -remote-slots 3` for the three-worker
-campaign. The added `remote3` has one NIC on cloud A with its own address. Use
-the same capacity when starting the provider loop from `harness/e2e`:
+Create an isolated VM lab with `cmd/lab -remote-slots 3`, then run the provider
+from `harness/e2e` using the same capacity:
 
 ```sh
 go run ./cmd/vmprovider -work-dir /work -remote-slots 3 \
   -namespace cloud-provisioning
 ```
 
-The command uses the existing VM topology and holds the lab process lock. It
-serves `/work/binaries/wg-dialer-linux-amd64` at the harness's existing bootstrap
-URL while reconciling infrastructure Machines. Keep it running throughout the
-campaign; it does not build the site, install CAPI, or create group claims.
-Install the group controller and prepare the imported CAPI Cluster and a
-`ContainernetMachineTemplate` with an empty slot binding separately. Fixed
-`containerName` templates still describe one particular VM, so replicas require
-the unbound template. Use this mode on a fresh pool; existing legacy provider IDs
-do not contain an infrastructure UID.
+The provider requires an existing site, installed CAPI controllers, an imported
+CAPI Cluster, and `/work/binaries/wg-dialer-linux-amd64`. It holds the lab process
+lock and serves that binary at the existing bootstrap URL. Keep it running while
+claims are provisioning or terminating.
 
-The command and topology tests pass, and slot transactions have real API
-coverage. The [three-slot VM topology check](validation/node-group-vm-topology-results.json)
-verifies one physical NIC on each of eight guests, site-to-cloud reachability,
-and isolation of the site from direct remote access. A completed pooled VM
-lifecycle run is still pending.
+Use a `ContainernetMachineTemplate` with an empty `spec.template.spec` for a
+pool. A template with `containerName: remote1` describes a single fixed VM and
+cannot supply multiple replicas. `Controller.Slots` enables allocation for
+generated group child names. CAPA provisions independently from its shared
+`AWSMachineTemplate`.
 
-The [initial pooled launch observation](validation/node-group-vm-launch-observation.json)
-created three claims with distinct VM bindings. The provider pass expired while
-waiting for the third VM after launch. That run used a bootstrap retry path that
-reset the VM disk. The provider now supplies the infrastructure UID to the VM
-bootstrap implementation, which records a durable launch receipt before waiting
-for guest readiness. Retries verify the wrapper and boot identities and observe
-the existing boot. A stopped predecessor is required before a new UID can reuse
-its slot. An interrupted launch with an unresolved outcome remains held for
-inspection. Regression tests cover observer reconstruction after a timeout.
-The [native retry check](validation/vm-bootstrap-retry-native-results.json)
-interrupted readiness observation after launch and verified that reconstructed
-observers retained the same VM start time and guest boot ID, with one cloud-init
-execution. Interruption during reset or network plumbing remains untested.
+The VM provider applies these lifecycle rules:
 
-The [native three-to-one scale-down](validation/node-group-vm-scale-down-results.json)
-removed two claims, their CAPI and infrastructure Machines, and their Nodes.
-Both VM wrappers stopped and their slot reservations were released. The remaining
-Node identities were unchanged. A 121-second host-tunnel probe during removal
-received all 600 packets; pod and Service continuity and disruption-budget
-behavior remain to be tested. The offline lab requires the exact remote dialer
-DaemonSet image to be loaded into each joined VM's distribution runtime before
-adoption can complete, as in the single-node harness. The pooled provider command
-does not yet automate this image-loading step.
+- Reserve fixed bindings first, then assign free slots to generated names.
+- Bind each reservation and provider ID to the infrastructure Machine UID.
+- Persist reservations with ConfigMap UID and resource-version checks before
+  publishing addresses or starting a guest.
+- Continue reconciling reserved Machines when additional requests exceed capacity.
+- Record a durable launch receipt before waiting for guest readiness. Retries
+  observe the same running VM; a stopped predecessor is required for slot reuse.
+- Hold an interrupted launch with an unresolved outcome for inspection.
+- Record VM stop before removing the provider finalizer, then release the slot
+  after the infrastructure Machine UID disappears.
+- Release only the provider finalizer for a deleting infrastructure Machine that
+  has neither a reservation nor a bootstrap receipt. This provider operation
+  does not implement group cancellation.
 
-The [native disruption-budget check](validation/node-group-vm-pdb-results.json)
-held a Ready pod and its Machine while `minAvailable: 1` prohibited eviction.
-Changing the budget to zero allowed eviction. Final scale-to-zero initially
-held at withdrawal: the group captured three control-plane transit consumers
-with empty public keys, and their dialers republished the retired keys. The
-group rejected the changed identities. Site key publication now requires an
-allocated tunnel address and a matching mesh resource version. Real API tests
-cover retirement racing publication, transit nodes making no key write, and
-reselected endpoints publishing their existing local keys. After the native
-dialer rollout, scale-to-zero completed with the captured identities intact.
-All claims, CAPI and infrastructure Machines, remote Nodes, and slot reservations
-were removed, and all three remote VMs stopped.
+The offline lab also needs the remote dialer DaemonSet images imported into each
+joined VM's distribution runtime before adoption can complete. The pooled command
+currently requires this image-loading step separately. Workload probes require
+the harness's pinned `crictl` tool inside each newly provisioned guest.
 
-The [slot-reuse campaign](validation/node-group-vm-reuse-results.json) scaled the
-same group from zero back to three. Child names were reused with new Machine
-UIDs, provider IDs, and Node UIDs. A third-VM readiness timeout recovered without
-changing the VM start time. The [eight-node workload matrix](validation/node-group-vm-pod-matrix-results.json)
-then passed 184 checks: every ordered node pair by pod IP and Service IP, a
-1 MiB transfer for each pair, and DNS and external reachability from every node.
-Probes use guest-agent access to the distribution's container runtime. The first
-attempt could not execute because `crictl` was absent; the harness installed its
-pinned probe tool and reran against unchanged Node and pod identities. These are
-steady-state checks; UDP, Kubernetes exec, and continuous workload traffic
-during removal require separate validation.
+## Tested scenarios
 
-The [survivor continuity campaign](validation/node-group-vm-continuity-results.json)
-ran 30 repeated six-node matrices during another three-to-one scale-down,
-including a controller restart while a drain action was pending. All 2,880 pod,
-Service, 1 MiB transfer, and DNS checks passed. The pending action's child and
-Node identities survived the restart, the two removed VMs stopped, and the
-surviving Node and pod UIDs stayed unchanged. The observer included two passes
-after removal completed. There is a one-second pause between passes; this
-measures sampled request continuity, not packet-level zero loss. UDP remains
-outside this check.
+The native group campaign uses k0s `1.36.2+k0s.0`, containerd `2.3.2`, and bundled
+Calico `3.32.0-0`. Its eight KVM guests each have one physical NIC. Guest-agent
+access uses virtio-serial. These results qualify the linked scenarios for this
+configuration; other distributions, Windows groups, and CAPA groups require
+separate runs.
 
-The [ordinary-pod UDP sweep](validation/node-group-vm-udp-results.json) received
-600 exact responses in 60 rows across a transit site node, a tunnel endpoint,
-and a cloud worker. It covers both directions for each pair, fresh and reused
-sockets, and 64, 1280, 1340, 1400, and 1800-byte echo bodies. Each datagram also
-contains the five-byte echo command prefix. Node, pod, and container identities
-stayed unchanged. This is steady-state pod-IP traffic.
+| Scenario | Recorded result | Evidence |
+| --- | --- | --- |
+| Single-NIC topology | ✅ Eight guests; site-to-cloud reachability and remote isolation from direct site access | [Topology](validation/node-group-vm-topology-results.json) |
+| Three workers to one | ✅ Two claims, CAPI and infrastructure Machines, Nodes, VMs, and reservations removed; survivor identities retained | [Scale-down](validation/node-group-vm-scale-down-results.json) |
+| Disruption budget and scale-to-zero | ✅ A Ready pod blocks eviction until its budget permits it; all three workers subsequently removed | [PDB and zero](validation/node-group-vm-pdb-results.json) |
+| Slot reuse | ✅ Zero to three reuses names with new Machine, provider, and Node identities | [Reuse](validation/node-group-vm-reuse-results.json) |
+| Workload networking | ✅ 184 pod-IP, Service-IP, 1 MiB transfer, DNS, and external checks across eight Nodes | [Pod matrix](validation/node-group-vm-pod-matrix-results.json) |
+| Workload continuity during removal | ✅ 2,880 checks across six survivors, including a controller restart during drain; survivor Node and pod UIDs retained | [Continuity](validation/node-group-vm-continuity-results.json) |
+| UDP pod traffic | ✅ 600 exact responses across transit site, tunnel endpoint, and cloud worker | [UDP](validation/node-group-vm-udp-results.json) |
+| UDP Services | ✅ 600 exact responses; each Service resolves to its intended Ready pod | [UDP Services](validation/node-group-vm-udp-service-results.json) |
+| UDP between cloud workers | ✅ 1,200 exact pod and Service responses across same-cloud and cross-cloud pairs | [Cloud UDP](validation/node-group-vm-udp-cloud-results.json) |
+| Recovered capacity workload | ✅ Three adopted remote dialers and 184 workload checks after allocation starvation recovered | [Capacity workload](validation/node-group-vm-capacity-workload-results.json) |
+| Bootstrap observation retry | ✅ Same VM start time, guest boot ID, and single cloud-init execution across observer reconstruction | [Native retry](validation/vm-bootstrap-retry-native-results.json) |
+| Capacity exhaustion | ◐ Three reserved Machines progress with a fourth unallocated request; group cancellation remains incomplete | [Capacity](validation/node-group-vm-capacity-results.json) |
 
-The [UDP Service sweep](validation/node-group-vm-udp-service-results.json) also
-received 600 exact responses in 60 rows with the same payload sizes and socket
-modes. Each ClusterIP Service had exactly one Ready EndpointSlice endpoint
-matching its intended pod UID and IP. Service and workload identities stayed
-unchanged across the sweep. Cross-cloud UDP and UDP during removal remain to be
-verified.
+UDP sweeps cover both directions for each pair, fresh and reused sockets, and
+64, 1280, 1340, 1400, and 1800-byte bodies plus the five-byte echo prefix.
+The continuity observer pauses one second between matrices and measures sampled
+request success. UDP during removal and high-rate packet-loss behavior remain
+unverified. Bootstrap interruption during disk reset or network plumbing also
+requires separate validation.
 
-The [capacity-exhaustion campaign](validation/node-group-vm-capacity-results.json)
-requested four Machines from three VM slots. It exposed an allocation error
-that prevented already-reserved Machines from progressing. Allocation now
-returns the eligible bindings separately from capacity-pending requests, so
-bound Machines continue reconciling while excess demand remains unallocated.
-The same live request recovered to three CAPI Node associations with unchanged
-infrastructure UIDs. Real API tests cover eligible bindings across observer
-reconstruction. Cancellation of the unallocated claim remains to be validated.
+[Real API slot tests](validation/vm-slot-reservation-api-results.json) cover
+reservation contention, restart recovery, exhaustion, and provider finalizer
+handling. Site peer publication uses a mesh resource-version check and requires
+an allocated tunnel address; API tests cover retirement racing publication and
+reselection of an endpoint with its existing key.
+
+## Pending-worker cancellation
+
+Group scale-down currently requires a resolved Machine and Node identity. A
+capacity-pending child therefore retains its claim and the group's drain action.
+In the native four-request, three-slot case, the excess Machine already has a
+bootstrap Secret reference despite having no `providerID` or `nodeRef`. Those
+missing fields alone cannot establish that a provider has never launched compute.
+
+Cancellation needs its own persisted, UID-bound lifecycle. It must fence further
+bootstrap and peer publication, retire any published tunnel membership, and
+coordinate termination through CAPI's provider lifecycle. If a Node appears while
+cancellation is pending, removal must account for that Node and its workloads.
+Completion requires evidence that the original compute and its associated
+resources are gone. The group implementation must use this contract across
+providers, rather than treating a VM slot observation as proof for AWS. Existing
+workload eviction and peer-withdrawal gates continue to apply to joined workers.
 
 ## API and ownership
 

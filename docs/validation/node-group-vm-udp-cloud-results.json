@@ -1,0 +1,1291 @@
+{
+  "observedAt": "2026-09-09T22:08:58.417157+00:00",
+  "beforeIdentities": [
+    {
+      "serviceUID": "eb0727dd-c3bc-4986-a229-ee55f134ec04",
+      "serviceIP": "10.105.148.48",
+      "node": "remote1",
+      "nodeUID": "4674271b-7639-49e7-aa0f-9228cc556459",
+      "pod": "udp-remote1",
+      "podUID": "b82f33f6-01f1-4dce-8077-a5fd76aab6f5",
+      "podIP": "10.244.159.2",
+      "containerID": "containerd://b18c570e09927df216483661616cef213f5daf4e92a33cc903cf166983673253",
+      "imageID": "sha256:c9f5d8950c9708ecd87ab2f90056fb06ba2ecc65b24f52bae819ef2c0c7a78ad"
+    },
+    {
+      "serviceUID": "2f936295-18c2-42f2-b63b-8b5f4aa6d62f",
+      "serviceIP": "10.99.155.72",
+      "node": "remote2",
+      "nodeUID": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+      "pod": "udp-remote2",
+      "podUID": "6422bbea-c225-4f15-9f5b-1ec9397d0e1d",
+      "podIP": "10.244.133.2",
+      "containerID": "containerd://2019178c94e31f18417aa402c65af514de3576a64dcba5e544fbb85b6a21ba9d",
+      "imageID": "sha256:c9f5d8950c9708ecd87ab2f90056fb06ba2ecc65b24f52bae819ef2c0c7a78ad"
+    },
+    {
+      "serviceUID": "a161c09d-918a-436c-888a-abb4ce62e490",
+      "serviceIP": "10.101.5.13",
+      "node": "remote3",
+      "nodeUID": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+      "pod": "udp-remote3",
+      "podUID": "44f0af43-bb4b-49d3-973c-acb91c993c18",
+      "podIP": "10.244.28.130",
+      "containerID": "containerd://972ff7a2779ebbbefb266ef8ce9c18286ed9a8d5d8aa3279e0c9da65eb8c41b9",
+      "imageID": "sha256:c9f5d8950c9708ecd87ab2f90056fb06ba2ecc65b24f52bae819ef2c0c7a78ad"
+    }
+  ],
+  "afterIdentities": [
+    {
+      "serviceUID": "eb0727dd-c3bc-4986-a229-ee55f134ec04",
+      "serviceIP": "10.105.148.48",
+      "node": "remote1",
+      "nodeUID": "4674271b-7639-49e7-aa0f-9228cc556459",
+      "pod": "udp-remote1",
+      "podUID": "b82f33f6-01f1-4dce-8077-a5fd76aab6f5",
+      "podIP": "10.244.159.2",
+      "containerID": "containerd://b18c570e09927df216483661616cef213f5daf4e92a33cc903cf166983673253",
+      "imageID": "sha256:c9f5d8950c9708ecd87ab2f90056fb06ba2ecc65b24f52bae819ef2c0c7a78ad"
+    },
+    {
+      "serviceUID": "2f936295-18c2-42f2-b63b-8b5f4aa6d62f",
+      "serviceIP": "10.99.155.72",
+      "node": "remote2",
+      "nodeUID": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+      "pod": "udp-remote2",
+      "podUID": "6422bbea-c225-4f15-9f5b-1ec9397d0e1d",
+      "podIP": "10.244.133.2",
+      "containerID": "containerd://2019178c94e31f18417aa402c65af514de3576a64dcba5e544fbb85b6a21ba9d",
+      "imageID": "sha256:c9f5d8950c9708ecd87ab2f90056fb06ba2ecc65b24f52bae819ef2c0c7a78ad"
+    },
+    {
+      "serviceUID": "a161c09d-918a-436c-888a-abb4ce62e490",
+      "serviceIP": "10.101.5.13",
+      "node": "remote3",
+      "nodeUID": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+      "pod": "udp-remote3",
+      "podUID": "44f0af43-bb4b-49d3-973c-acb91c993c18",
+      "podIP": "10.244.28.130",
+      "containerID": "containerd://972ff7a2779ebbbefb266ef8ce9c18286ed9a8d5d8aa3279e0c9da65eb8c41b9",
+      "imageID": "sha256:c9f5d8950c9708ecd87ab2f90056fb06ba2ecc65b24f52bae819ef2c0c7a78ad"
+    }
+  ],
+  "identitiesUnchanged": true,
+  "rows": [
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote2",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote1",
+      "target": "remote3",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote1",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote2",
+      "target": "remote3",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote1",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 64,
+      "datagramBytes": 69,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1280,
+      "datagramBytes": 1285,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1340,
+      "datagramBytes": 1345,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1400,
+      "datagramBytes": 1405,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": false,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "pod",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    },
+    {
+      "mode": "service",
+      "source": "remote3",
+      "target": "remote2",
+      "payloadBytes": 1800,
+      "datagramBytes": 1805,
+      "reuseSocket": true,
+      "attempts": 10,
+      "passed": 10
+    }
+  ],
+  "totalRows": 120,
+  "passedRows": 120,
+  "totalResponses": 1200,
+  "exactResponses": 1200,
+  "rawSHA256": "38b288030c8b61eaf713869b8c4f678cbf81a1ecaa3adf3865f5634065e15b29",
+  "rig": "Single-NIC KVM guests; virtio-serial QGA executes CRI workload probes",
+  "distribution": "k0s v1.36.2+k0s.0",
+  "containerd": "2.3.2",
+  "cni": "bundled Calico 3.32.0-0",
+  "cloudPlacement": {
+    "remote1": "cloud A",
+    "remote2": "cloud B",
+    "remote3": "cloud A"
+  },
+  "qualificationScope": "Steady-state ordinary-pod UDP and ClusterIP UDP between all three cloud workers, including same-cloud and cross-cloud paths. Node/pod/container/Service identities and exact Ready EndpointSlice targets checked before and after. No withdrawal or high-rate load in this sweep."
+}

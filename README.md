@@ -305,6 +305,8 @@ before qualifying updated versions.
 
 | Additional scenario | Recorded result | Remaining gate |
 | --- | --- | --- |
+| k0s `1.36.2`, Calico pooled VM groups | [✅ scale-down, PDB hold, zero, reuse, and 2,880 survivor checks](docs/node-groups.md#tested-scenarios) | Pending-worker cancellation, Ready aggregation, and KEDA |
+| Pooled workers across two cloud networks | [✅ 1,200 UDP pod/Service exchanges](docs/validation/node-group-vm-udp-cloud-results.json) | UDP during removal |
 | Windows Server 2022 and 2025, host tunnel generation switch/rollback/retire | [✅ 8,803 authorized exchanges; 40 source rejections](docs/validation/windows-stable-owner-isolation-results.json) | Production controller and CNI integration |
 | Windows Calico MTU repair after adapter restart | [✅ both OS versions](docs/validation/windows-mtu-periodic-repair-results.json) | Complete networking/lifecycle matrix |
 | MicroK8s endpoint handover with continuous UDP | [◐ packet loss retained](docs/validation/microk8s-source-routing-results.json) | Loss-free production handover |

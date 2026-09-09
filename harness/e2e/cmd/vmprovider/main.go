@@ -77,15 +77,18 @@ func run(work, namespace string, count, port int, once bool) error {
 		pass, stop := context.WithTimeout(ctx, provider.ReconcileTimeout)
 		observed, err := c.Reconcile(pass, namespace)
 		stop()
+		// A capacity error can accompany successful reconciliation of bound
+		// Machines. Preserve those observations, including in one-pass mode.
+		if len(observed) > 0 || err == nil {
+			if encodeErr := json.NewEncoder(os.Stdout).Encode(observed); encodeErr != nil {
+				return encodeErr
+			}
+		}
 		if err != nil {
 			if once {
 				return err
 			}
 			fmt.Fprintln(os.Stderr, "provider pass:", err)
-		} else {
-			if err := json.NewEncoder(os.Stdout).Encode(observed); err != nil {
-				return err
-			}
 		}
 		if once {
 			return nil

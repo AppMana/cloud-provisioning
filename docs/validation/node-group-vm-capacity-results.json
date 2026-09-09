@@ -81,7 +81,58 @@
         "nodeName": null,
         "phase": "Pending"
       }
-    ]
+    ],
+    "workloadEvidence": "node-group-vm-capacity-workload-results.json"
   },
-  "qualificationScope": "Allocation starvation recovered under unchanged four-Machine demand. Cancellation of the unallocated claim and workload validation of the recovered workers remain pending."
+  "qualificationScope": "Allocation starvation recovered under unchanged four-Machine demand. All three remote dialers adopted, and the recovered eight-node lab passed 184 workload checks. Scaling to three retains the unallocated fourth child; group cancellation is incomplete.",
+  "cancellation": {
+    "observedAt": "2026-09-09T22:09:34.237787+00:00",
+    "desiredReplicas": 3,
+    "observedReplicas": 4,
+    "pendingAction": {
+      "childName": "pooled-workers-8ae81037d7a1043c-3",
+      "childUID": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8",
+      "generation": 8,
+      "id": "bae56eb2-1182-406b-bab0-981d5a837941",
+      "ordinal": 3,
+      "type": "Drain"
+    },
+    "machineUID": "34f6ec44-25ea-4be2-bf30-bef6285c19c1",
+    "bootstrapDataSecretReferenced": true,
+    "providerID": null,
+    "nodeRef": null,
+    "completed": false,
+    "finding": "Group BindDrainNode requires a Node identity and cannot cancel the unallocated child. Bootstrap data already exists, so absent providerID/nodeRef cannot serve as a portable never-launched proof."
+  },
+  "providerReporting": {
+    "observedAt": "2026-09-09T22:11:43.125958+00:00",
+    "readyMachineObservations": [
+      {
+        "ProviderID": "containernet://remote1/020f8372-4e25-49f9-8ef9-58ea9d227202",
+        "Name": "pooled-workers-8ae81037d7a1043c-0",
+        "Namespace": "cloud-provisioning",
+        "Node": "remote1",
+        "Address": "203.0.113.10",
+        "Ready": true
+      },
+      {
+        "ProviderID": "containernet://remote2/895eb813-8f87-4318-8ac7-a5e2a9c02961",
+        "Name": "pooled-workers-8ae81037d7a1043c-1",
+        "Namespace": "cloud-provisioning",
+        "Node": "remote2",
+        "Address": "192.0.2.10",
+        "Ready": true
+      },
+      {
+        "ProviderID": "containernet://remote3/c544f82d-868b-41e4-ac3b-fc998aa15571",
+        "Name": "pooled-workers-8ae81037d7a1043c-2",
+        "Namespace": "cloud-provisioning",
+        "Node": "remote3",
+        "Address": "203.0.113.11",
+        "Ready": true
+      }
+    ],
+    "capacityErrorAlsoReported": true,
+    "description": "Native provider loop emits successful bound-Machine observations even when excess demand causes a capacity error in the same pass."
+  }
 }

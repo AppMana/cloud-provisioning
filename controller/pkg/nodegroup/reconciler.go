@@ -2,6 +2,7 @@ package nodegroup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -60,8 +61,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		selector = parsed.String()
 	}
 	count := int32(len(claims.Items))
-	if group.Status.Replicas != count || group.Status.Selector != selector {
+	ready, err := r.readyChildren(ctx, group, claims.Items)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if group.Status.Replicas != count || group.Status.ReadyReplicas != ready || group.Status.Selector != selector {
 		group.Status.Replicas = count
+		group.Status.ReadyReplicas = ready
 		group.Status.Selector = selector
 		return again, r.API.Status().Update(ctx, group)
 	}
@@ -89,6 +95,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				return ctrl.Result{}, fmt.Errorf("group removal awaits drain and attachment withdrawal integration")
 			}
 			bound, err := BindDrainNode(ctx, r.API, r.Workload, r.MachineGVK, group)
+			if errors.Is(err, errUnresolvedNode) {
+				// Pending capacity is an expected state. Poll it regularly so
+				// readiness changes remain visible while cancellation is pending.
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			}
 			if err != nil {
 				return ctrl.Result{}, err
 			}

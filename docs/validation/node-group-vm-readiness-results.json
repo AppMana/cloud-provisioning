@@ -1,0 +1,253 @@
+{
+  "observedAt": "2026-09-09T22:35:45.145599+00:00",
+  "controllerImage": "cldt-controller:db2f19ee6b2b03286ae58a403319bfa340e59283eecf3905fcd292bafe45fe0c",
+  "before": {
+    "groupUID": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+    "generation": 8,
+    "desired": 3,
+    "status": {
+      "pendingAction": {
+        "childName": "pooled-workers-8ae81037d7a1043c-3",
+        "childUID": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8",
+        "generation": 8,
+        "id": "bae56eb2-1182-406b-bab0-981d5a837941",
+        "ordinal": 3,
+        "type": "Drain"
+      },
+      "readyReplicas": 3,
+      "replicas": 4
+    },
+    "nodes": {
+      "cp": {
+        "uid": "20065eca-8909-434c-aa37-b7043b00f1b7",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      },
+      "cp2": {
+        "uid": "c799108c-3743-4644-b5bd-93e066fcfff3",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      },
+      "cp3": {
+        "uid": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      },
+      "remote1": {
+        "uid": "4674271b-7639-49e7-aa0f-9228cc556459",
+        "providerID": "containernet://remote1/020f8372-4e25-49f9-8ef9-58ea9d227202",
+        "cordoned": false,
+        "ready": true
+      },
+      "remote2": {
+        "uid": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+        "providerID": "containernet://remote2/895eb813-8f87-4318-8ac7-a5e2a9c02961",
+        "cordoned": false,
+        "ready": true
+      },
+      "remote3": {
+        "uid": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+        "providerID": "containernet://remote3/c544f82d-868b-41e4-ac3b-fc998aa15571",
+        "cordoned": false,
+        "ready": true
+      },
+      "w1": {
+        "uid": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      },
+      "w2": {
+        "uid": "305d83b1-22ae-4400-b401-cfb58dbdb3a0",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      }
+    }
+  },
+  "cordoned": {
+    "groupUID": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+    "generation": 8,
+    "desired": 3,
+    "status": {
+      "pendingAction": {
+        "childName": "pooled-workers-8ae81037d7a1043c-3",
+        "childUID": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8",
+        "generation": 8,
+        "id": "bae56eb2-1182-406b-bab0-981d5a837941",
+        "ordinal": 3,
+        "type": "Drain"
+      },
+      "readyReplicas": 2,
+      "replicas": 4
+    },
+    "nodes": {
+      "cp": {
+        "uid": "20065eca-8909-434c-aa37-b7043b00f1b7",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      },
+      "cp2": {
+        "uid": "c799108c-3743-4644-b5bd-93e066fcfff3",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      },
+      "cp3": {
+        "uid": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      },
+      "remote1": {
+        "uid": "4674271b-7639-49e7-aa0f-9228cc556459",
+        "providerID": "containernet://remote1/020f8372-4e25-49f9-8ef9-58ea9d227202",
+        "cordoned": false,
+        "ready": true
+      },
+      "remote2": {
+        "uid": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+        "providerID": "containernet://remote2/895eb813-8f87-4318-8ac7-a5e2a9c02961",
+        "cordoned": true,
+        "ready": true
+      },
+      "remote3": {
+        "uid": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+        "providerID": "containernet://remote3/c544f82d-868b-41e4-ac3b-fc998aa15571",
+        "cordoned": false,
+        "ready": true
+      },
+      "w1": {
+        "uid": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      },
+      "w2": {
+        "uid": "305d83b1-22ae-4400-b401-cfb58dbdb3a0",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      }
+    }
+  },
+  "after": {
+    "groupUID": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+    "generation": 8,
+    "desired": 3,
+    "status": {
+      "pendingAction": {
+        "childName": "pooled-workers-8ae81037d7a1043c-3",
+        "childUID": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8",
+        "generation": 8,
+        "id": "bae56eb2-1182-406b-bab0-981d5a837941",
+        "ordinal": 3,
+        "type": "Drain"
+      },
+      "readyReplicas": 3,
+      "replicas": 4
+    },
+    "nodes": {
+      "cp": {
+        "uid": "20065eca-8909-434c-aa37-b7043b00f1b7",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      },
+      "cp2": {
+        "uid": "c799108c-3743-4644-b5bd-93e066fcfff3",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      },
+      "cp3": {
+        "uid": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      },
+      "remote1": {
+        "uid": "4674271b-7639-49e7-aa0f-9228cc556459",
+        "providerID": "containernet://remote1/020f8372-4e25-49f9-8ef9-58ea9d227202",
+        "cordoned": false,
+        "ready": true
+      },
+      "remote2": {
+        "uid": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+        "providerID": "containernet://remote2/895eb813-8f87-4318-8ac7-a5e2a9c02961",
+        "cordoned": false,
+        "ready": true
+      },
+      "remote3": {
+        "uid": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+        "providerID": "containernet://remote3/c544f82d-868b-41e4-ac3b-fc998aa15571",
+        "cordoned": false,
+        "ready": true
+      },
+      "w1": {
+        "uid": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      },
+      "w2": {
+        "uid": "305d83b1-22ae-4400-b401-cfb58dbdb3a0",
+        "providerID": null,
+        "cordoned": false,
+        "ready": true
+      }
+    }
+  },
+  "nodeIdentitiesUnchanged": true,
+  "pendingActionUnchanged": true,
+  "readyCounts": [
+    3,
+    2,
+    3
+  ],
+  "totalReplicas": [
+    4,
+    4,
+    4
+  ],
+  "scope": "Native Linux k0s/Calico group readiness with three adopted workers and one unallocated child. Cordon removes an otherwise Ready worker from available capacity; uncordon restores it. Pending-worker cancellation remains incomplete.",
+  "distribution": "k0s v1.36.2+k0s.0",
+  "containerd": "2.3.2",
+  "cni": "bundled Calico 3.32.0-0",
+  "rig": "Eight single-NIC KVM guests in an isolated runner",
+  "unitCases": {
+    "count": 80,
+    "axes": {
+      "os": [
+        "linux",
+        "windows"
+      ],
+      "CAPI": [
+        "v1beta1",
+        "v1beta2"
+      ]
+    },
+    "scope": "Readiness, Machine/Node association, cordon/drain, incomplete publication, stale acknowledgement, and changes during observation. Windows group behavior has unit coverage only in this run."
+  },
+  "tests": {
+    "command": "KUBEBUILDER_ASSETS=/home/administrator/.local/share/kubebuilder-envtest/k8s/1.35.0-linux-amd64 go test -race ./pkg/nodegroup ./pkg/attachment -coverprofile=/tmp/cldt-group-readiness.cover",
+    "passed": true,
+    "nodegroupStatementCoveragePercent": 76.3,
+    "attachmentStatementCoveragePercent": 75.4,
+    "functions": {
+      "readyChildren": 80.6,
+      "readyChild": 88.7,
+      "machineReady": 100.0
+    },
+    "coverageSHA256": "bd2840e49b8de13cb4303df061315ab93f4599c09ed4a76f2949571305c51aa5"
+  },
+  "sourceFilesSHA256": {
+    "controller/pkg/nodegroup/readiness.go": "3ebf1645a2d7d753cace899c200eb261b6b5bb90f6bd8ce974099392c461405e",
+    "controller/pkg/nodegroup/reconciler.go": "68bc4caadd48507634a9566ab394a6a3a1d60247df9033c79b8a562e4d63ac8b",
+    "controller/pkg/nodegroup/target.go": "bb3e6f6475f555d245511d73461d6e11028caf34b5005cc3856349cf3612ee42"
+  }
+}

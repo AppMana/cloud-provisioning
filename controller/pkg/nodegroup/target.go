@@ -2,6 +2,7 @@ package nodegroup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -11,6 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var errUnresolvedNode = errors.New("CAPI Machine has no resolved Node identity")
 
 // BindDrainNode records the Machine and workload Node incarnation before drain.
 // Management and workload clients must read directly from their respective APIs.
@@ -52,7 +55,7 @@ func BindDrainNode(ctx context.Context, management client.Client, workload clien
 	name, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name")
 	provider, _, _ := unstructured.NestedString(machine.Object, "spec", "providerID")
 	if name == "" || provider == "" {
-		return nil, fmt.Errorf("CAPI Machine has no resolved Node identity")
+		return nil, errUnresolvedNode
 	}
 	node := &corev1.Node{}
 	if err := workload.Get(ctx, client.ObjectKey{Name: name}, node); err != nil {

@@ -24,7 +24,7 @@ separate management/workload cluster registration remains to be implemented.
 The value adds group status and child creation/deletion permissions in the
 release namespace, plus pod listing and eviction permissions for workload drain.
 It defaults to `false`; the group CRD is installed separately for this experiment.
-Ready aggregation, KEDA integration and complete VM qualification remain pending.
+KEDA integration and complete VM qualification remain pending.
 
 ## Pooled VM provider
 
@@ -92,6 +92,7 @@ separate runs.
 | UDP between cloud workers | ✅ 1,200 exact pod and Service responses across same-cloud and cross-cloud pairs | [Cloud UDP](validation/node-group-vm-udp-cloud-results.json) |
 | Recovered capacity workload | ✅ Three adopted remote dialers and 184 workload checks after allocation starvation recovered | [Capacity workload](validation/node-group-vm-capacity-workload-results.json) |
 | Bootstrap observation retry | ✅ Same VM start time, guest boot ID, and single cloud-init execution across observer reconstruction | [Native retry](validation/vm-bootstrap-retry-native-results.json) |
+| Ready replica aggregation | ✅ Three adopted workers; cordon/uncordon changes Ready count 3 → 2 → 3 while total remains four | [Readiness](validation/node-group-vm-readiness-results.json) |
 | Capacity exhaustion | ◐ Three reserved Machines progress with a fourth unallocated request; group cancellation remains incomplete | [Capacity](validation/node-group-vm-capacity-results.json) |
 
 UDP sweeps cover both directions for each pair, fresh and reused sockets, and
@@ -138,7 +139,10 @@ Introduce `ProvisionedNodeGroupClaim` with:
 - `spec.replicas`: desired integer machine count, default 1, minimum 0.
 - `spec.template.spec`: the existing single-node claim specification.
 - `status.replicas`: live children, including provisioning and draining machines.
-- `status.readyReplicas`: children with verified Ready Nodes and healthy attachment.
+- `status.readyReplicas`: children whose owned CAPI Machine is Ready, whose matching
+  workload Node is Ready and uncordoned, and whose peer document matches the current
+  mesh render with an applied acknowledgement. Draining and terminating children
+  are excluded. Multiple children resolving to the same Node are excluded.
 - `status.selector`: workload pod selector used by the scale API.
 - Conditions for capacity pending, draining, blocked deletion, and readiness.
 
@@ -151,6 +155,11 @@ new children. Rolling replacement requires an explicit later policy.
 Use a separate resource to preserve existing single-claim names, status fields,
 finalizers, and one-machine semantics. Implement the group controller against
 claims so VM, AWS, Windows, and future providers share the same orchestration.
+
+Readiness is an API observation of capacity and applied configuration. Native
+workload tests qualify continued connectivity separately. A pending Machine with
+no resolved Node is polled every five seconds while its group action remains
+reserved, allowing readiness updates without an increasing error backoff.
 
 ## Scaling and KEDA
 
@@ -269,7 +278,11 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Publish observed replica counts before advancing pending actions and expose
       the workload selector through `/scale`. Provisioning and draining claims
       remain counted while their lifecycle work is pending.
-- [ ] Aggregate Ready Nodes and attachment health.
+- [x] Aggregate CAPI/Node readiness and current peer-document acknowledgements.
+      The native check verifies 3 → 2 → 3 Ready workers during cordon/uncordon,
+      retaining four total children and the pending cancellation action. Unit
+      tests cover Linux/Windows and both CAPI object versions, including identity
+      and receipt changes during observation.
 - [x] Add a workload API drain operation with Node UID checks, cordon, and
       UID-preconditioned pod eviction. Real API tests verify PDB blockage,
       subsequent eviction, and retention of network DaemonSet pods.

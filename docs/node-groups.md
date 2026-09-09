@@ -80,8 +80,11 @@ bootstrap implementation, which records a durable launch receipt before waiting
 for guest readiness. Retries verify the wrapper and boot identities and observe
 the existing boot. A stopped predecessor is required before a new UID can reuse
 its slot. An interrupted launch with an unresolved outcome remains held for
-inspection. Regression tests cover observer reconstruction after a timeout;
-native verification of the updated implementation remains pending.
+inspection. Regression tests cover observer reconstruction after a timeout.
+The [native retry check](validation/vm-bootstrap-retry-native-results.json)
+interrupted readiness observation after launch and verified that reconstructed
+observers retained the same VM start time and guest boot ID, with one cloud-init
+execution. Interruption during reset or network plumbing remains untested.
 
 The [native three-to-one scale-down](validation/node-group-vm-scale-down-results.json)
 removed two claims, their CAPI and infrastructure Machines, and their Nodes.
@@ -95,14 +98,16 @@ does not yet automate this image-loading step.
 
 The [native disruption-budget check](validation/node-group-vm-pdb-results.json)
 held a Ready pod and its Machine while `minAvailable: 1` prohibited eviction.
-Changing the budget to zero allowed eviction. Final scale-to-zero is still
+Changing the budget to zero allowed eviction. Final scale-to-zero initially
 held at withdrawal: the group captured three control-plane transit consumers
 with empty public keys, and their dialers republished the retired keys. The
 group rejected the changed identities. Site key publication now requires an
 allocated tunnel address and a matching mesh resource version. Real API tests
 cover retirement racing publication, transit nodes making no key write, and
-reselected endpoints publishing their existing local keys. Native rollout and
-scale-to-zero verification remain pending.
+reselected endpoints publishing their existing local keys. After the native
+dialer rollout, scale-to-zero completed with the captured identities intact.
+All claims, CAPI and infrastructure Machines, remote Nodes, and slot reservations
+were removed, and all three remote VMs stopped.
 
 ## API and ownership
 

@@ -1,0 +1,18 @@
+{
+  "VMStoppedAfterTest": true,
+  "actualVM": true,
+  "cloudInitExecutions": 1,
+  "cloudInitStatus": "done",
+  "observationNote": "The initial post-launch readiness observation was interrupted. A subsequent generic helper waited for a CAPI marker absent from this standalone fixture and timed out. Verification then resumed against the same running VM without another launch.",
+  "observedAt": "2026-09-09T21:29:17.933729001Z",
+  "observerReconstructionsVerified": 2,
+  "physicalNICs": 1,
+  "sameGuestBootID": true,
+  "sameWrapperStartTime": true,
+  "implementationCommit": "1198fb6",
+  "wrapper": "clab-cldt-remote3",
+  "initialStartedAt": "2026-09-09T21:25:04.633669914Z",
+  "retainedBootID": "0b56e3dc-d826-44bb-8974-ad3047ee3db5",
+  "faultScope": "Injected observation cancellation after real native launch, not interruption during disk reset or network plumbing",
+  "unresolvedLaunchRecoveryTested": false
+}

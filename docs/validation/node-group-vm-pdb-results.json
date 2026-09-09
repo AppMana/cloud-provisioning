@@ -14,8 +14,8 @@
   "observedAt": "2026-09-09T21:18:12.240527+00:00",
   "budgetChangedToMinAvailable": 0,
   "requestedReplicas": 0,
-  "remainingReplicas": 1,
-  "scaleToZeroCompleted": false,
+  "remainingReplicas": 0,
+  "scaleToZeroCompleted": true,
   "siteConsumers": [
     {
       "node": "cp",
@@ -53,13 +53,21 @@
       "siteAddressesPublished": false
     }
   ],
-  "blocker": "Group withdrawal rejects a changed retained consumer identity; investigation ongoing. No retirement gate was bypassed.",
+  "blocker": "Resolved by preventing retired site-key republication; captured consumer identities and retirement checks were preserved.",
   "originalPodAbsentAfterBudgetChange": true,
   "rootCause": "The group captured cp, cp2 and cp3 as transit consumers with empty public keys. Their site dialers unconditionally republished their local public keys after endpoint address retirement. The key was reintroduced, not rotated.",
   "fixValidation": {
     "realAPIRetirementPublicationConflict": true,
     "transitMakesNoPublication": true,
     "reselectedEndpointPublishesExistingKey": true,
-    "nativeRolloutPending": true
-  }
+    "nativeRolloutPending": false,
+    "nativeScaleToZeroCompleted": true
+  },
+  "completedAt": "2026-09-09T21:23:58.488807+00:00",
+  "allClaimsMachinesInfrastructureMachinesAbsent": true,
+  "allRemoteNodesAbsent": true,
+  "allRemoteVMsStopped": true,
+  "allSlotReservationsReleased": true,
+  "completionAfterSitePublicationFix": "7dca15c",
+  "dialerImage": "cldt-dialer:989bd31bda4911bd11564578b2375a75a9e53ee2daa74a58355593808a69cb07"
 }

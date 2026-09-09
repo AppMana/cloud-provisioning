@@ -131,6 +131,14 @@ after removal completed. There is a one-second pause between passes; this
 measures sampled request continuity, not packet-level zero loss. UDP remains
 outside this check.
 
+The [ordinary-pod UDP sweep](validation/node-group-vm-udp-results.json) received
+600 exact responses in 60 rows across a transit site node, a tunnel endpoint,
+and a cloud worker. It covers both directions for each pair, fresh and reused
+sockets, and 64, 1280, 1340, 1400, and 1800-byte echo bodies. Each datagram also
+contains the five-byte echo command prefix. Node, pod, and container identities
+stayed unchanged. This is steady-state pod-IP traffic; UDP Services, cross-cloud
+traffic, and UDP during removal remain to be verified.
+
 ## API and ownership
 
 Introduce `ProvisionedNodeGroupClaim` with:

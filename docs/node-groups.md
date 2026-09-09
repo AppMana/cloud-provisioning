@@ -142,6 +142,11 @@ unchanged existing Node/Machine identities, VM start times, and slot data.
 
 Group scale-down currently requires a resolved Machine and Node identity. A
 capacity-pending child therefore retains its claim and the group's drain action.
+The action records the owned Machine UID while Node registration is pending,
+and retains a provider ID once observed. Late registration fills the Node fields;
+a replacement Machine, changed provider ID, or mismatched Node reference UID
+cannot replace the recorded target. This journal update does not authorize
+compute termination.
 In the native four-request, three-slot case, the excess Machine already has a
 bootstrap Secret reference despite having no `providerID` or `nodeRef`. Those
 missing fields alone cannot establish that a provider has never launched compute.

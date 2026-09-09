@@ -285,6 +285,7 @@ func TestRealAPIScaleContract(t *testing.T) {
 		t.Fatal("lost next reservation")
 	}
 
+	verifyPendingDrainIdentity(t, fresh, schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"})
 	verifyRealAPIDrain(t, fresh)
 	verifyRealAPIReconciliation(t, fresh)
 	verifyRealAPINodeLabels(t, fresh)

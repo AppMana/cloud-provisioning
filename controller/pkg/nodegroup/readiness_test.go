@@ -97,8 +97,8 @@ func TestReadyChildrenRequireAssociatedNodeAndCurrentPeerReceipt(t *testing.T) {
 					if scenario != "missing-receipt" {
 						objects = append(objects, secret)
 					}
-					api := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
-					workload := fake.NewClientBuilder().WithScheme(scheme).WithObjects(node).Build()
+					api := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&v1alpha1.ProvisionedNodeGroupClaim{}).WithObjects(objects...).Build()
+					workload := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&v1alpha1.ProvisionedNodeGroupClaim{}).WithObjects(node).Build()
 					r := &Reconciler{API: api, Workload: workload, MachineGVK: gvk, MeshName: "mesh", APIVIP: "10.10.0.10", APIPort: "6443"}
 					if scenario == "node-changed-during-read" || scenario == "receipt-replaced-during-read" || scenario == "mesh-changed-during-read" {
 						r.API = &readinessRaceClient{Client: api, key: client.ObjectKeyFromObject(secret), mutate: func() {
@@ -150,9 +150,12 @@ func TestReadyChildrenRequireAssociatedNodeAndCurrentPeerReceipt(t *testing.T) {
 							t.Fatal(err)
 						}
 						current.Finalizers = []string{GroupFinalizer}
+						if err := api.Update(context.Background(), current); err != nil {
+							t.Fatal(err)
+						}
 						current.Status.Replicas = 1
 						current.Status.PendingAction = &v1alpha1.NodeGroupAction{Type: DrainAction, ID: "pending", ChildUID: string(child.UID), ChildName: child.Name, Ordinal: 0}
-						if err := api.Update(context.Background(), current); err != nil {
+						if err := api.Status().Update(context.Background(), current); err != nil {
 							t.Fatal(err)
 						}
 						result, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(group)})

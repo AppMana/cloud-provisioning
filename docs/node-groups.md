@@ -102,7 +102,11 @@ Group deletion follows the same sequence under a finalizer.
       An isolated API test verifies defaulting, scale-to-zero, status preservation,
       and resource-version conflicts. The CRD is in `controller/pkg/nodegroup/testdata`.
 - [ ] Ship the CRD with controller RBAC, watches, and lifecycle orchestration.
-- [ ] Implement child creation and Ready aggregation with conflict-safe updates.
+- [x] Add deterministic child construction and ownership validation. Child names
+      include a hash of the group UID; a recreated group cannot adopt its predecessor’s
+      claims. Template copies are independent, and terminating children retain slots.
+- [ ] Commit creation intent and reconcile children with conflict-safe updates.
+- [ ] Aggregate Ready Nodes and attachment health.
 - [ ] Implement cordon, eviction, withdrawal, and serialized removal.
 - [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.
 - [ ] Run single-NIC VM 0→3→1→0, controller restart, failed boot, PDB blockage,

@@ -37,14 +37,37 @@ capacity exhaustion. The provider now reserves fixed bindings first and assigns 
 generated names, persisting annotations before address publication or bootstrap.
 Pooled provider IDs include the infrastructure Machine UID. The provider records successful VM stop before removing its finalizer and
 releases the reservation after the old infrastructure UID disappears. API tests
-use a controlled stop callback; native pooled boot/teardown and harness command
-configuration remain required before a group VM campaign. The provider installs its finalizer before reserving capacity. A deleting
+use a controlled stop callback; native pooled boot/teardown remains to be validated in the group VM campaign. The provider installs its finalizer before reserving capacity. A deleting
 Machine that has no reservation and no bootstrap receipt releases only the
 provider finalizer; it allocates no slot and never enters the compute lifecycle.
 API tests cover cancellation while the pool is full and preservation of another
 controller's finalizer. This allocation is
 separate from CAPA, where AWS provisions each Machine from the shared template.
 
+
+## Pooled VM provider loop
+
+Create a fresh isolated VM lab with `cmd/lab -remote-slots 3` for the three-worker
+campaign. The added `remote3` has one NIC on cloud A with its own address. Use
+the same capacity when starting the provider loop from `harness/e2e`:
+
+```sh
+go run ./cmd/vmprovider -work-dir /work -remote-slots 3 \
+  -namespace cloud-provisioning
+```
+
+The command uses the existing VM topology and holds the lab process lock. It
+serves `/work/binaries/wg-dialer-linux-amd64` at the harness's existing bootstrap
+URL while reconciling infrastructure Machines. Keep it running throughout the
+campaign; it does not build the site, install CAPI, or create group claims.
+Install the group controller and prepare the imported CAPI Cluster and a
+`ContainernetMachineTemplate` with an empty slot binding separately. Fixed
+`containerName` templates still describe one particular VM, so replicas require
+the unbound template. Use this mode on a fresh pool; existing legacy provider IDs
+do not contain an infrastructure UID.
+
+The command and topology tests pass, and slot transactions have real API
+coverage. A completed pooled VM lifecycle run is still pending.
 
 ## API and ownership
 

@@ -72,6 +72,7 @@ func runLab() {
 		calicoManagedAddresses = flag.Bool("k0s-calico-managed-addresses", false, "use stored per-node Calico addresses on a fresh k0s site instead of repeated IP autodetection")
 		linuxEgress            = flag.Bool("k0s-linux-egress", false, "add Linux default-route Konnectivity agents on a fresh k0s VM site for mixed-OS API egress")
 		product                = flag.Bool("product", false, "also install the product's chart")
+		remoteSlots            = flag.Int("remote-slots", 2, "fixed single-NIC remote VM capacity (2..32), including spare group slots")
 		remotes                = flag.String("remotes", "", "comma-separated remotes to claim and bootstrap (e.g. remote1)")
 		lifecycle              = flag.Bool("lifecycle", true, "remove and re-add each claimed remote under every requested placement (initial two-workers if none)")
 		capiMode               = flag.String("capi-mode", "imported", "imported (CAPI associates Nodes) or unconnected (product providerID fallback)")
@@ -144,7 +145,10 @@ func runLab() {
 	ctx, cancelTimeout := context.WithTimeout(ctx, *timeout)
 	defer cancelTimeout()
 
-	topo := lab.Default()
+	topo, err := lab.WithRemoteSlots(*remoteSlots)
+	if err != nil {
+		fail("%v", err)
+	}
 
 	// Which disk the machines boot from, decided before the rig is
 	// made: the rig renders the topology it was given.

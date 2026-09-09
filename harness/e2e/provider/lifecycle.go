@@ -70,7 +70,7 @@ func (c *Controller) provision(ctx context.Context, namespace, name, node, uid s
 	if err != nil {
 		return false, fmt.Errorf("invalid bootstrap format encoding")
 	}
-	if err := rig.Bootstrap(ctx, c.Rig.Node(node), rig.BootstrapData{Format: string(decodedFormat), Value: data}); err != nil {
+	if err := rig.BootstrapInstance(ctx, c.Rig.Node(node), uid, rig.BootstrapData{Format: string(decodedFormat), Value: data}); err != nil {
 		return false, err
 	}
 	return true, c.patchMetadata(ctx, namespace, name, map[string]any{"annotations": map[string]string{instanceAnnotation: uid}})

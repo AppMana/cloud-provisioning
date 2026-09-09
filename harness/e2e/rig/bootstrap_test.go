@@ -48,3 +48,28 @@ func TestNativeBootstrapReceivesCAPIFormatUnchanged(t *testing.T) {
 		t.Fatal("native bootstrap was reinterpreted as legacy cloud-config")
 	}
 }
+
+type instanceBootstrapNode struct {
+	nativeBootstrapNode
+	uid string
+}
+
+func (n *instanceBootstrapNode) BootstrapInstance(_ context.Context, uid string, data BootstrapData) error {
+	n.uid, n.got = uid, data
+	return nil
+}
+
+func TestInstanceBootstrapDispatchPreservesIdentityAndFormat(t *testing.T) {
+	n := &instanceBootstrapNode{}
+	data := BootstrapData{Format: Ignition, Value: []byte(`{"ignition":{"version":"3.5.0"}}`)}
+	if err := BootstrapInstance(context.Background(), n, "infra-uid", data); err != nil {
+		t.Fatal(err)
+	}
+	if n.uid != "infra-uid" || n.got.Format != data.Format || string(n.got.Value) != string(data.Value) || n.called {
+		t.Fatal("instance bootstrap lost identity or changed the native document")
+	}
+	n.uid = ""
+	if err := BootstrapInstance(context.Background(), n, "", data); err == nil || n.uid != "" {
+		t.Fatal("accepted missing instance identity")
+	}
+}

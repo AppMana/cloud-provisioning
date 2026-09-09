@@ -74,10 +74,14 @@ lifecycle run is still pending.
 
 The [initial pooled launch observation](validation/node-group-vm-launch-observation.json)
 created three claims with distinct VM bindings. The provider pass expired while
-waiting for the third VM after launch. Bootstrap retries currently reset the VM
-disk; a durable launch receipt and observation of the existing instance are
-required before qualifying this lifecycle. Increasing the timeout alone would
-leave the retry behavior unresolved.
+waiting for the third VM after launch. That run used a bootstrap retry path that
+reset the VM disk. The provider now supplies the infrastructure UID to the VM
+bootstrap implementation, which records a durable launch receipt before waiting
+for guest readiness. Retries verify the wrapper and boot identities and observe
+the existing boot. A stopped predecessor is required before a new UID can reuse
+its slot. An interrupted launch with an unresolved outcome remains held for
+inspection. Regression tests cover observer reconstruction after a timeout;
+native verification of the updated implementation remains pending.
 
 ## API and ownership
 

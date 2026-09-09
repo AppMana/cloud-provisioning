@@ -265,6 +265,13 @@ func (n *Node) links() []link {
 // layer — the guest would come back as the same instance, past its
 // first boot, having read nothing.
 func (n *Node) Userdata(ctx context.Context, cloudConfig []byte) error {
+	if err := n.launchUserdata(ctx, cloudConfig); err != nil {
+		return err
+	}
+	return n.rig.waitForNode(ctx, n.node.Name, BootTimeout)
+}
+
+func (n *Node) launchUserdata(ctx context.Context, cloudConfig []byte) error {
 	if n.rig == nil {
 		return fmt.Errorf("%s: no lab to launch into", n.Name())
 	}
@@ -287,7 +294,7 @@ func (n *Node) Userdata(ctx context.Context, cloudConfig []byte) error {
 	if err := n.Boot(ctx); err != nil {
 		return fmt.Errorf("launching %s: %w", n.Name(), err)
 	}
-	return n.rig.waitForNode(ctx, n.node.Name, BootTimeout)
+	return nil
 }
 
 // BootstrapFailure observes the Ubuntu VM image's cloud-init through serial.

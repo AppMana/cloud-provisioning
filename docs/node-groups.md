@@ -95,6 +95,7 @@ separate runs.
 | Ready replica aggregation | ✅ Three adopted workers; cordon/uncordon changes Ready count 3 → 2 → 3 while total remains four | [Readiness](validation/node-group-vm-readiness-results.json) |
 | Group workload selection | ✅ Three ordinary pods on three group VMs; a different group UID remains unscheduled; `/scale` selects the worker pods | [Group labels](validation/node-group-vm-labels-results.json) |
 | Capacity exhaustion | ◐ Three reserved Machines progress with a fourth unallocated request; group cancellation remains incomplete | [Capacity](validation/node-group-vm-capacity-results.json) |
+| Group deletion before claim admission | ✅ Absent-child reservation and unadmitted child removed; eight Node identities and VM start times retained | [Creation cancellation](validation/node-group-vm-creation-cancellation-results.json) |
 
 UDP sweeps cover both directions for each pair, fresh and reused sockets, and
 64, 1280, 1340, 1400, and 1800-byte bodies plus the five-byte echo prefix.
@@ -134,8 +135,10 @@ Before admitting a new child, the claim controller reads its group directly from
 the API and checks its UID and deletion state. A late creation from a stale
 reconciler cannot start compute after its parent is deleting or gone. Already
 admitted claims continue provisioning so that removal can resolve and drain
-their Nodes. Real API tests cover late creation and concurrent admission;
-native VM validation of this cancellation path remains pending.
+their Nodes. Real API tests cover late creation and concurrent admission. The
+[native VM checks](validation/node-group-vm-creation-cancellation-results.json)
+delete groups at both pre-admission stages and verify removal of the fixtures,
+unchanged existing Node/Machine identities, VM start times, and slot data.
 
 Group scale-down currently requires a resolved Machine and Node identity. A
 capacity-pending child therefore retains its claim and the group's drain action.
@@ -336,14 +339,15 @@ its own eviction and withdrawal gates before triggering that teardown.
       reconciler. A real API test reaches three claims while recreating controller
       state between passes. Scale-down reserves one child and holds removal while
       drain and withdrawal integration is pending.
-- [x] During group deletion, complete a pending creation only when its matching
-      child already exists, then reserve that child for draining. The API test
-      verifies an absent child is never created after deletion begins.
+- [x] During group deletion, complete a pending creation for an admitted matching
+      child, then reserve it for draining. A reconciler that observes deletion
+      does not create an absent child; late writes are fenced at claim admission.
 - [x] Cancel absent-child creation reservations during group deletion and remove
       unadmitted children with UID/version preconditions. Real API tests cover
       stale creation after parent deletion and admission winning the deletion race.
-- [ ] Validate creation cancellation in the single-NIC VM lab and implement
-      cancellation for admitted workers that have not registered a Node.
+- [x] Validate creation cancellation in the single-NIC VM lab with both an absent
+      child and an unadmitted child. Existing workers retain their identities.
+- [ ] Implement cancellation for admitted workers that have not registered a Node.
 - [x] Publish observed replica counts before advancing pending actions and expose
       the workload selector through `/scale`. Provisioning and draining claims
       remain counted while their lifecycle work is pending.

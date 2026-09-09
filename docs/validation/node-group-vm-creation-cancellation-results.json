@@ -1,0 +1,147 @@
+{
+  "observedAt": "2026-09-09T23:39:02.039433+00:00",
+  "controllerImage": "cldt-controller:92d6ad15e42736d1b63005d55869fdc9a81f0b4b84fe804288f5423f48f95e63",
+  "fixtures": [
+    {
+      "group": "cancel-absent-e48fda21",
+      "groupUID": "4ce8f752-c65d-4e87-b56a-7930c4e4c1b7",
+      "child": "cancel-absent-e48fda21-9097cbaab311aac5-0",
+      "childPresent": false,
+      "action": {
+        "id": "b492cb32-6c90-4c3b-bf7a-d044381f643d",
+        "type": "Create",
+        "generation": 1,
+        "ordinal": 0,
+        "childName": "cancel-absent-e48fda21-9097cbaab311aac5-0",
+        "template": {
+          "spec": {
+            "clusterName": "cldt",
+            "infrastructureRef": {
+              "apiGroup": "containernet.appmana.com",
+              "kind": "ContainernetMachineTemplate",
+              "name": "pooled-worker"
+            }
+          }
+        }
+      }
+    },
+    {
+      "group": "cancel-child-25ab7d2e",
+      "groupUID": "828eb99c-6759-4508-9328-d678c28be2ac",
+      "child": "cancel-child-25ab7d2e-19cfc00f8dc339f8-0",
+      "childPresent": true,
+      "action": {
+        "id": "ff0e29f4-f7e1-4636-b839-e1a536215fbf",
+        "type": "Create",
+        "generation": 1,
+        "ordinal": 0,
+        "childName": "cancel-child-25ab7d2e-19cfc00f8dc339f8-0",
+        "template": {
+          "spec": {
+            "clusterName": "cldt",
+            "infrastructureRef": {
+              "apiGroup": "containernet.appmana.com",
+              "kind": "ContainernetMachineTemplate",
+              "name": "pooled-worker"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "originalIdentities": {
+    "nodes": {
+      "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+      "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+      "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+      "remote1": "4674271b-7639-49e7-aa0f-9228cc556459",
+      "remote2": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+      "remote3": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+      "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+      "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+    },
+    "machines.cluster.x-k8s.io": {
+      "pooled-workers-8ae81037d7a1043c-0": "d47f09f5-ec22-41fd-bd15-41c968a08db9",
+      "pooled-workers-8ae81037d7a1043c-1": "d27f15dd-1e17-44e5-9880-40433e64298b",
+      "pooled-workers-8ae81037d7a1043c-2": "5db97849-3ee1-46e6-8bb6-db0c99624a26",
+      "pooled-workers-8ae81037d7a1043c-3": "34f6ec44-25ea-4be2-bf30-bef6285c19c1"
+    },
+    "containernetmachines": {
+      "pooled-workers-8ae81037d7a1043c-0": "020f8372-4e25-49f9-8ef9-58ea9d227202",
+      "pooled-workers-8ae81037d7a1043c-1": "895eb813-8f87-4318-8ac7-a5e2a9c02961",
+      "pooled-workers-8ae81037d7a1043c-2": "c544f82d-868b-41e4-ac3b-fc998aa15571",
+      "pooled-workers-8ae81037d7a1043c-3": "be2ca80f-ce63-4736-8ad7-6b99c0d9ed39"
+    },
+    "provisionednodeclaims": {
+      "pooled-workers-8ae81037d7a1043c-0": "24102ef9-bf24-4d91-97fc-3a56fe5b7ee5",
+      "pooled-workers-8ae81037d7a1043c-1": "ee7e3ecb-2476-4872-bf6b-4eb41f395b63",
+      "pooled-workers-8ae81037d7a1043c-2": "89e82fc7-7335-444d-ae61-1ac6eeeebb5d",
+      "pooled-workers-8ae81037d7a1043c-3": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8"
+    }
+  },
+  "fixtureGroupsAndChildrenGone": true,
+  "originalIdentitiesUnchanged": true,
+  "slotDataUnchanged": true,
+  "vmStarts": {
+    "/clab-cldt-cp": {
+      "id": "bc5e1ff3c8a62ee47293734e1a6520b12ce9403f1a349e8ae4c5c6fa3d6febd9",
+      "startedAt": "2026-09-09T20:43:45.301823896Z",
+      "running": true
+    },
+    "/clab-cldt-cp2": {
+      "id": "32f5bc49b3110bf165e2d4d310059391ace48670c9b9381b352a5e324dba9975",
+      "startedAt": "2026-09-09T22:56:13.302633217Z",
+      "running": true
+    },
+    "/clab-cldt-cp3": {
+      "id": "0ce5afeb1b1d16c4c250dae985f8c828681a9a752f51a87364b0ea99dea8f564",
+      "startedAt": "2026-09-09T20:43:45.310292102Z",
+      "running": true
+    },
+    "/clab-cldt-remote1": {
+      "id": "97f367f093aca8cf7a4e450aff4c299fb5cfed5d554113dde915e4dfd4cde2fb",
+      "startedAt": "2026-09-09T21:30:25.415471705Z",
+      "running": true
+    },
+    "/clab-cldt-remote2": {
+      "id": "636602ec96fd135eae0adcd5f41b4d5b968ba88195b5d2c8a433e3f95bd14836",
+      "startedAt": "2026-09-09T21:57:16.188273546Z",
+      "running": true
+    },
+    "/clab-cldt-remote3": {
+      "id": "a8ce135e16d7cb23494a2dfa5446a651fa059bb2ccda49d651b9cb40399db857",
+      "startedAt": "2026-09-09T23:04:25.31430724Z",
+      "running": true
+    },
+    "/clab-cldt-w1": {
+      "id": "4ebeb13375a3d07df4c9e1996a60635390c2d07bdf0118a145d6e963e770fb94",
+      "startedAt": "2026-09-09T22:58:31.138996472Z",
+      "running": true
+    },
+    "/clab-cldt-w2": {
+      "id": "758fa95a8d0faf000c24bf7861fe197a9c5f23424e79e056ee641ab06b9954da",
+      "startedAt": "2026-09-09T20:43:45.37114804Z",
+      "running": true
+    }
+  },
+  "vmStartsUnchanged": true,
+  "allEightNodesReady": true,
+  "existingPendingDrainUnchanged": true,
+  "scope": "Single-NIC KVM lab: delete groups paused at an absent child reservation or an unadmitted child. Existing admitted pending-worker cancellation is not qualified.",
+  "sourceCommit": "d0b7748",
+  "realAPITests": {
+    "command": "KUBEBUILDER_ASSETS=/home/administrator/.local/share/kubebuilder-envtest/k8s/1.35.0-linux-amd64 go test -race -count=1 ./pkg/claim ./pkg/nodegroup -coverprofile=/tmp/cldt-create-cancellation.cover",
+    "passed": true,
+    "coveragePercent": {
+      "claim": 71.3,
+      "nodegroup": 76.7
+    },
+    "cases": [
+      "parent deleting or missing blocks new admission",
+      "replaced or ambiguous parent identity rejected",
+      "admitted children continue their lifecycle",
+      "late child creation after cancellation and parent removal",
+      "concurrent admission rejects stale child DELETE"
+    ]
+  }
+}

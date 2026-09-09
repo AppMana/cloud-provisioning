@@ -93,6 +93,14 @@ DaemonSet image to be loaded into each joined VM's distribution runtime before
 adoption can complete, as in the single-node harness. The pooled provider command
 does not yet automate this image-loading step.
 
+The [native disruption-budget check](validation/node-group-vm-pdb-results.json)
+held a Ready pod and its Machine while `minAvailable: 1` prohibited eviction.
+Changing the budget to zero allowed eviction. Final scale-to-zero is still
+held at withdrawal: three control-plane consumers retained their Node UIDs but
+changed published keys while reporting the transit role. The group rejects the
+changed identities. This transition requires investigation before scale-to-zero
+can be marked validated.
+
 ## API and ownership
 
 Introduce `ProvisionedNodeGroupClaim` with:

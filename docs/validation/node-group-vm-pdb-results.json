@@ -1,0 +1,58 @@
+{
+  "startedAt": "2026-09-09T21:14:03.265172+00:00",
+  "podName": "held-worker-57b5b9ffc9-5xfdt",
+  "podUID": "ef7c58bb-e410-49c8-b78d-f3457a52a9f9",
+  "nodeUID": "3e308e06-67f4-419d-b71a-fbd2b37377e1",
+  "pdbUID": "166e6905-80f5-41a6-aefb-f26114c422d9",
+  "initialHealthy": 1,
+  "initialDisruptionsAllowed": 0,
+  "heldObservedAt": "2026-09-09T21:15:07.885019+00:00",
+  "samePodRetained": true,
+  "nodeCordoned": true,
+  "machineRetained": true,
+  "withdrawalNotStartedWhileBudgetHeld": true,
+  "observedAt": "2026-09-09T21:18:12.240527+00:00",
+  "budgetChangedToMinAvailable": 0,
+  "requestedReplicas": 0,
+  "remainingReplicas": 1,
+  "scaleToZeroCompleted": false,
+  "siteConsumers": [
+    {
+      "node": "cp",
+      "sameNodeUID": true,
+      "samePublicKey": false,
+      "currentRole": "transit",
+      "siteAddressesPublished": true
+    },
+    {
+      "node": "cp2",
+      "sameNodeUID": true,
+      "samePublicKey": false,
+      "currentRole": "transit",
+      "siteAddressesPublished": true
+    },
+    {
+      "node": "cp3",
+      "sameNodeUID": true,
+      "samePublicKey": false,
+      "currentRole": "transit",
+      "siteAddressesPublished": true
+    },
+    {
+      "node": "w1",
+      "sameNodeUID": true,
+      "samePublicKey": true,
+      "currentRole": "direct",
+      "siteAddressesPublished": false
+    },
+    {
+      "node": "w2",
+      "sameNodeUID": true,
+      "samePublicKey": true,
+      "currentRole": "direct",
+      "siteAddressesPublished": false
+    }
+  ],
+  "blocker": "Group withdrawal rejects a changed retained consumer identity; investigation ongoing. No retirement gate was bypassed.",
+  "originalPodAbsentAfterBudgetChange": true
+}

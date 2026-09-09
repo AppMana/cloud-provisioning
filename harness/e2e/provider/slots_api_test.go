@@ -91,6 +91,7 @@ func TestSlotStoreRealAPI(t *testing.T) {
 			t.Fatal("lost retained owner", err)
 		}
 	}
+	verifyPooledBindings(t, ctx, ns)
 	changed := store
 	changed.Slots = []string{"remote1", "remote2"}
 	if _, err := changed.Reserve(ctx, first, ""); err == nil {

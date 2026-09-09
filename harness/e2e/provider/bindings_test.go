@@ -28,3 +28,23 @@ func TestDuplicateBindingsStopBeforeAnyProvisioningWrite(t *testing.T) {
 		}
 	}
 }
+
+func TestPooledProviderIdentityIncludesInfrastructureIncarnation(t *testing.T) {
+	for _, uid := range []string{"old-uid", "replacement-uid"} {
+		k := &fakeKube{objects: map[string]string{"generated-0": `{"metadata":{"uid":"` + uid + `","annotations":{"containernet.appmana.com/container-name":"remote1"}},"spec":{}}`}}
+		c := &Controller{Kube: k.client(), Topology: lab.Default(), LabName: "cldt", Slots: &SlotStore{}}
+		observed, err := c.reconcileOne(context.Background(), "test", "generated-0")
+		if err != nil || observed.ProviderID != "containernet://remote1/"+uid {
+			t.Fatal("provider identity lost incarnation", observed, err)
+		}
+		found := false
+		for _, call := range k.calls {
+			if strings.Contains(strings.Join(call, " "), `"providerID":"containernet://remote1/`+uid+`"`) {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("UID-bound provider identity not published")
+		}
+	}
+}

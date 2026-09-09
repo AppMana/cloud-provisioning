@@ -54,6 +54,8 @@ func ProviderID(node string) string { return providerScheme + node }
 // Controller reports the lab's machines the way an infrastructure
 // provider reports a cloud's.
 type Controller struct {
+	// Slots enables UID-bound allocation for generated Machine names.
+	Slots    *SlotStore
 	Rig      rig.Rig
 	Kube     *kube.Client
 	Topology lab.Topology
@@ -65,11 +67,12 @@ type Controller struct {
 // Machine is what one pass observed, for a caller that wants to
 // assert on it rather than only on the cluster's state afterwards.
 type Machine struct {
-	Name      string
-	Namespace string
-	Node      string
-	Address   string
-	Ready     bool
+	ProviderID string
+	Name       string
+	Namespace  string
+	Node       string
+	Address    string
+	Ready      bool
 }
 
 // Reconcile brings every machine in a namespace up to date and
@@ -78,11 +81,17 @@ type Machine struct {
 // Idempotent: a machine already reported is left alone, so this can
 // be called in a loop without churning the API.
 func (c *Controller) Reconcile(ctx context.Context, namespace string) ([]Machine, error) {
+	if c.Slots != nil && c.Rig == nil {
+		return nil, fmt.Errorf("pooled provisioning requires a VM rig")
+	}
 	names, err := c.machines(ctx, namespace)
 	if err != nil {
 		return nil, err
 	}
 
+	if err := c.reserveBindings(ctx, namespace, names); err != nil {
+		return nil, err
+	}
 	if err := c.checkDistinctBindings(ctx, namespace, names); err != nil {
 		return nil, err
 	}
@@ -196,10 +205,20 @@ func (c *Controller) reconcileOne(ctx context.Context, namespace, name string) (
 		return Machine{}, fmt.Errorf("%s backs this machine but holds no address", node.Name)
 	}
 
-	m := Machine{Name: name, Namespace: namespace, Node: node.Name, Address: address, Ready: obj.Status.Ready}
+	id := ProviderID(node.Name)
+	if c.Slots != nil {
+		if obj.Metadata.UID == "" {
+			return Machine{}, fmt.Errorf("pooled instance UID required")
+		}
+		id += "/" + obj.Metadata.UID
+		if obj.Spec.ProviderID != "" && obj.Spec.ProviderID != id {
+			return Machine{}, fmt.Errorf("pooled instance provider identity changed")
+		}
+	}
+	m := Machine{ProviderID: id, Name: name, Namespace: namespace, Node: node.Name, Address: address, Ready: obj.Status.Ready}
 	if c.Rig != nil {
 		if obj.Metadata.DeletionTimestamp == nil {
-			if err := c.setProviderID(ctx, namespace, name, node.Name); err != nil {
+			if err := c.setProviderID(ctx, namespace, name, id); err != nil {
 				return m, err
 			}
 			if err := c.setAddresses(ctx, namespace, name, address); err != nil {
@@ -231,7 +250,7 @@ func (c *Controller) reconcileOne(ctx context.Context, namespace, name string) (
 	// before ready, so that a consumer reading half-applied state sees
 	// a machine that is not yet ready rather than one that is ready
 	// and has nowhere to be reached.
-	if err := c.setProviderID(ctx, namespace, name, node.Name); err != nil {
+	if err := c.setProviderID(ctx, namespace, name, id); err != nil {
 		return m, err
 	}
 	if err := c.setAddresses(ctx, namespace, name, address); err != nil {
@@ -258,8 +277,8 @@ func (c *Controller) node(binding string) (lab.Node, error) {
 	return lab.Node{}, fmt.Errorf("no node in the topology backs %q", binding)
 }
 
-func (c *Controller) setProviderID(ctx context.Context, namespace, name, node string) error {
-	patch := fmt.Sprintf(`{"spec":{"providerID":%q}}`, ProviderID(node))
+func (c *Controller) setProviderID(ctx context.Context, namespace, name, id string) error {
+	patch := fmt.Sprintf(`{"spec":{"providerID":%q}}`, id)
 	_, err := c.Kube.Run(ctx, "-n", namespace, "patch", machineKind, name, "--type", "merge", "-p", patch)
 	return err
 }
@@ -355,7 +374,7 @@ func (c *Controller) AdoptNodes(ctx context.Context, namespace string, every tim
 					adopted = false
 					continue
 				}
-				if err := c.SetNodeProviderID(ctx, node, ProviderID(m.Node)); err != nil {
+				if err := c.SetNodeProviderID(ctx, node, m.ProviderID); err != nil {
 					return err
 				}
 			}

@@ -29,11 +29,15 @@ Ready aggregation, KEDA integration and complete VM qualification remain pending
 The fake CAPI provider currently binds each template to a fixed remote VM slot.
 A template naming `remote1` cannot supply multiple group replicas: the provider
 rejects duplicate bindings before reporting addresses or starting a guest.
-Generated group child names also require explicit slot allocation. The [slot reservation store](validation/vm-slot-reservation-api-results.json)
+Generated group child names use explicit slot allocation when the harness
+provider is configured with `Controller.Slots`. The [slot reservation store](validation/vm-slot-reservation-api-results.json)
 now reserves one remote slot per infrastructure Machine UID with ConfigMap
 UID/version checks. Its real API test covers restart recovery, contention and
-capacity exhaustion. Connecting reservations to provisioning and releasing them
-after teardown remain required before a group VM campaign. This allocation is
+capacity exhaustion. The provider now reserves fixed bindings first and assigns unused slots to
+generated names, persisting annotations before address publication or bootstrap.
+Pooled provider IDs include the infrastructure Machine UID. Harness command
+configuration and reservation release after teardown remain required before
+a group VM campaign. This allocation is
 separate from CAPA, where AWS provisions each Machine from the shared template.
 
 

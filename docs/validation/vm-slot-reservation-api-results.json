@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-09T20:21:53.541740+00:00",
+  "observedAt": "2026-09-09T20:25:47.715686+00:00",
   "scope": "UID-bound VM slot reservation ConfigMap transactions against the retained VM cluster API",
   "test": "CLDT_SLOT_API_TEST=1 go test -race ./provider -run TestSlotStoreRealAPI -v",
   "passed": true,
@@ -12,9 +12,13 @@
     "retry reserves the remaining free slot",
     "pool exhaustion rejects overcommit",
     "pool inventory changes are rejected",
-    "temporary test namespace removed"
+    "temporary test namespace removed",
+    "fixed topology binding reserved before lexically earlier generated Machine name",
+    "generated infrastructure Machine binding patched with UID/resourceVersion preconditions",
+    "reconstructed provider retains actual API Machine bindings"
   ],
   "vmProvisioningExercised": false,
   "teardownReleaseImplemented": false,
-  "providerLifecycleIntegrationImplemented": false
+  "providerLifecycleIntegrationImplemented": false,
+  "providerBindingIntegrationImplemented": true
 }

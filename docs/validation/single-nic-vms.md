@@ -19,8 +19,11 @@ not reproduce the corresponding routing behavior.
 The fake provider checks remote-slot bindings across its namespace before each
 reconcile pass. Two infrastructure Machines bound to the same slot, including a
 terminating Machine, block the pass before address publication or VM changes.
-This protects fixed-template tests; it does not allocate slots for generated
-node-group names. A durable pool allocator remains required for those tests.
+Fixed-template tests retain their existing behavior. With `Controller.Slots`
+configured, the provider reserves fixed bindings before allocating generated
+node-group names and saves each binding before provisioning. Pooled provider
+IDs include the infrastructure Machine UID. Teardown release and command-level
+configuration remain required before a complete group VM campaign.
 
 Out-of-band workload probes isolate pod-network behavior from API-server-to-
 kubelet access. AWS rows require a separate exec/logs check through every

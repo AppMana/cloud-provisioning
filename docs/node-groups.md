@@ -91,7 +91,9 @@ evict workloads through the eviction API respecting disruption budgets, wait for
 active work, withdraw tunnel/attachment ownership, then delete the child claim.
 Timeouts retain a blocked condition and resource ownership; forced deletion needs
 an explicit policy. Terminating children occupy their slots until disappearance.
-Group deletion follows the same sequence under a finalizer.
+Group deletion follows the same sequence under a finalizer. The existing single
+claim configures a 120-second CAPI drain timeout; group scale-down must complete
+its own eviction and withdrawal gates before triggering that teardown.
 
 ## Implementation and acceptance plan
 

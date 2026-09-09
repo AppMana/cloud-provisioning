@@ -1,0 +1,86 @@
+{
+  "observedAt": "2026-09-09T18:20:27.088311+00:00",
+  "workflow": "https://github.com/AppMana/forks-kube-proxy-calico-hostprocess-ipv6/actions/runs/34387250938",
+  "builderCommit": "250c512af1144f0560204ef406ff634c096698ce",
+  "scope": "Windows Server 2022/2025 winkernel contract tests, binary version verification, image publication and registry inspection",
+  "releaseQualified": false,
+  "limits": [
+    "No new distro/CNI VM lifecycle or packet-policy acceptance run for these candidate images.",
+    "Production branches remain unchanged."
+  ],
+  "images": [
+    {
+      "kubernetes": "1.34.6",
+      "sourceCommit": "fbb36641b584f07432649964054986cde373db5f",
+      "windowsImage": "ghcr.io/appmana/kube-proxy:v1.34.6-appmana.post.17-calico-hostprocess-cloud-provisioning-windows-matrix-250c512af114-windows-ltsc2022",
+      "windowsDigest": "sha256:5ca221efa01a447ccf186b129504e49f0583894a5c45cae7200441faf7cd1ff8",
+      "combinedImage": "ghcr.io/appmana/kube-proxy:v1.34.6-appmana.post.17-calico-hostprocess-cloud-provisioning-windows-matrix-250c512af114",
+      "platforms": [
+        {
+          "digest": "sha256:05d05a3432d9e9413f2baece1fa0ab5e41d27d35b9f633956655add724693012",
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        },
+        {
+          "digest": "sha256:5ca221efa01a447ccf186b129504e49f0583894a5c45cae7200441faf7cd1ff8",
+          "platform": {
+            "architecture": "amd64",
+            "os": "windows"
+          }
+        }
+      ],
+      "combinedDigest": "sha256:df9b4ce5079d2d5f6e40aec9be118d729c8a8a10d4b74ef34fa96a6cf5d35b76"
+    },
+    {
+      "kubernetes": "1.35.5",
+      "sourceCommit": "9b00f285777b78a8684700b822b5072f5c5de0a2",
+      "windowsImage": "ghcr.io/appmana/kube-proxy:v1.35.5-appmana.post.13-calico-hostprocess-cloud-provisioning-windows-matrix-250c512af114-windows-ltsc2022",
+      "windowsDigest": "sha256:d3e958b7be540e754f76bbd5348715f7fca198c05a3368c0ca0a97bbaaf6528a",
+      "combinedImage": "ghcr.io/appmana/kube-proxy:v1.35.5-appmana.post.13-calico-hostprocess-cloud-provisioning-windows-matrix-250c512af114",
+      "platforms": [
+        {
+          "digest": "sha256:7231a9d3090105871a147a31a1a71441132594d1e6966a8e917087ef07cc6799",
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        },
+        {
+          "digest": "sha256:d3e958b7be540e754f76bbd5348715f7fca198c05a3368c0ca0a97bbaaf6528a",
+          "platform": {
+            "architecture": "amd64",
+            "os": "windows"
+          }
+        }
+      ],
+      "combinedDigest": "sha256:bd084949a748fe170beefdc24ba03bfc1110d0bdf4ad280d656b75e782209fbc"
+    },
+    {
+      "kubernetes": "1.36.2",
+      "sourceCommit": "6d89988d2cc2ddcdd78138fe827b68232c5df8ab",
+      "windowsImage": "ghcr.io/appmana/kube-proxy:v1.36.2-appmana.post.13-calico-hostprocess-cloud-provisioning-windows-matrix-250c512af114-windows-ltsc2022",
+      "windowsDigest": "sha256:c544cb2761f6b67b4acba16183355f8d5b0fecb11626e244da26f80ef9161c15",
+      "combinedImage": "ghcr.io/appmana/kube-proxy:v1.36.2-appmana.post.13-calico-hostprocess-cloud-provisioning-windows-matrix-250c512af114",
+      "platforms": [
+        {
+          "digest": "sha256:99046c6ae6bc4f1eb62b7187d5265f69383090f3e503102d6caa86e756951e98",
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        },
+        {
+          "digest": "sha256:c544cb2761f6b67b4acba16183355f8d5b0fecb11626e244da26f80ef9161c15",
+          "platform": {
+            "architecture": "amd64",
+            "os": "windows"
+          }
+        }
+      ],
+      "combinedDigest": "sha256:d94fe9fdb00df05d46b6c7069b162a80aafeb53eb20628afc32a165b1cf04f95"
+    }
+  ],
+  "workflowConclusion": "success"
+}

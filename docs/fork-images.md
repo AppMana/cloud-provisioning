@@ -51,6 +51,11 @@ unconditional-reconcile experiment. Git blame attributes the selective predicate
 to `b5bd25ec` and subsequent patch context to `a4429b98`. The source branches carry
 the newer implementation so build inputs and reviewed Kubernetes code agree.
 
+[Published kube-proxy candidate results](validation/kube-proxy-branch-images-results.json)
+record the successful build workflow, exact Windows and combined-image digests,
+and the inspected platform descriptors. These images passed the workflow's
+Server 2022 and 2025 contract tests. Cluster VM acceptance remains separate.
+
 ## Promotion gates
 
 - Require successful build and test jobs for the exact source and builder commits.

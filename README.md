@@ -45,7 +45,7 @@ metric. Today, provision its node capacity with individual `ProvisionedNodeClaim
 objects. Workload replicas and machine capacity have separate lifecycles: queued
 pods wait while machines boot, and node removal must allow active work to finish.
 
-A proposed `ProvisionedNodeGroupClaim` adds integer `spec.replicas` and a `/scale`
+An experimental `ProvisionedNodeGroupClaim` defines integer `spec.replicas` and a `/scale`
 endpoint for capacity scaling. It owns individual claims and reuses their
 provider-specific provisioning and teardown. The [group-claim design and
 implementation plan](docs/node-groups.md) covers KEDA, scale-to-zero, draining,

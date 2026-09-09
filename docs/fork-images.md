@@ -36,6 +36,13 @@ The earlier source `2c82c85e8ed1` published a combined manifest with OS version
 now derive that field from the built image configuration. The earlier publisher
 queried a moving Nano Server tag. The superseded record retains the mismatch.
 
+The same evidence record verifies source `9f215e8ae9c3` for Calico 3.31.4:
+Linux component tests, Server 2022/2025 contract tests, image publication, and
+matching Windows image/manifest OS metadata passed. Its earlier Server 2022
+run faulted after test assertions had passed. The latest run did not reproduce
+that process fault; its cause remains unresolved. Failure-only diagnostics now
+capture the native test executable and repeated constructor runs if it recurs.
+
 Both candidates acknowledge workload updates only after HNS policy application
 succeeds. The 3.31 branch also backports 3.32's serialized Goldmane statistics
 queries after its race detector found concurrent access during bucket rollover.

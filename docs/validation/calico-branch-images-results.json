@@ -52,6 +52,45 @@
       "remaining": [
         "Single-NIC VM CNI and lifecycle acceptance"
       ]
+    },
+    {
+      "calicoVersion": "3.31.4",
+      "sourceCommit": "9f215e8ae9c3fe8e552662950ae335cf3ee8630e",
+      "observedAt": "2026-09-09T20:06:42.774245+00:00",
+      "workflow": "https://github.com/AppMana/forks-calico-windows-ipv6/actions/runs/34394289799",
+      "workflowConclusion": "success",
+      "windowsTestJobs": [
+        {
+          "name": "test-windows (windows-2025)",
+          "conclusion": "success"
+        },
+        {
+          "name": "test-windows (windows-2022)",
+          "conclusion": "success"
+        }
+      ],
+      "image": "ghcr.io/appmana/node:v3.31.4-appmana.post.15-cloud-provisioning-windows-isolation-v3.31.4-9f215e8ae9c3-windows-ltsc2022",
+      "digest": "sha256:cf37fc776163390acd6397fcbe447f24f494ed4ed3c4e3710fbd42c93a210caa",
+      "registryDigestVerified": true,
+      "combinedImage": "ghcr.io/appmana/node:v3.31.4-appmana.post.15-cloud-provisioning-windows-isolation-v3.31.4-9f215e8ae9c3",
+      "combinedDigest": "sha256:8322112a459bfc25346db728fbf070b68daadde9671be4ccd766a9e9e8a05715",
+      "linuxNodeDigest": "sha256:c2db8e31bd364557a22fa0e66fb1ce52898e3c1dd668b765adad8ac05d52cee1",
+      "linuxCNIDigest": "sha256:5bb58db1bafed9d9f8d80cb62ec8adf37d4af902578c065a9b6fe0cbc149d54d",
+      "windowsImageOSVersion": "10.0.20348.5499",
+      "combinedWindowsDescriptorOSVersion": "10.0.20348.5499",
+      "combinedDescriptorValid": true,
+      "remaining": [
+        "Single-NIC VM CNI and lifecycle acceptance",
+        "Explain the earlier Windows 2022 native test process fault; latest candidate passed without reproducing it"
+      ],
+      "earlierNativeFault": {
+        "workflow": "https://github.com/AppMana/forks-calico-windows-ipv6/actions/runs/34392941207",
+        "job": 102605504484,
+        "sourceCommit": "9510be714df61542f514a09874add0cee6ac1585",
+        "os": "windows-2022",
+        "exception": "0xc0000005 after test assertions passed",
+        "causeEstablished": false
+      }
     }
   ]
 }

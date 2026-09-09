@@ -326,6 +326,8 @@ For burst rendering, streaming and compute workloads, see
 [GPU workers and reusable images](docs/gpu-workers.md). It covers baked drivers,
 GPU Operator ownership, CDI/NRI, Windows image constraints and the validation
 required before promoting a GPU image.
+See [candidate Calico and kube-proxy images](docs/fork-images.md) for source
+branches, image tags, and promotion gates.
 See [Windows bootstrap and transport](docs/windows.md) for the Server 2022/2025
 VM results and the remaining Windows joining and networking boundaries.
 

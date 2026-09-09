@@ -146,7 +146,10 @@ The action records the owned Machine UID while Node registration is pending,
 and retains a provider ID once observed. Late registration fills the Node fields;
 a replacement Machine, changed provider ID, or mismatched Node reference UID
 cannot replace the recorded target. This journal update does not authorize
-compute termination.
+compute termination. The [native pending-target check](validation/node-group-vm-pending-target-results.json)
+records the fourth Machine UID while all eight Nodes and three workload pods
+remain Ready, with unchanged Node identities and slot data. Real API tests cover
+late registration and conflicting identity updates.
 In the native four-request, three-slot case, the excess Machine already has a
 bootstrap Secret reference despite having no `providerID` or `nodeRef`. Those
 missing fields alone cannot establish that a provider has never launched compute.
@@ -155,6 +158,11 @@ Cancellation needs its own persisted, UID-bound lifecycle. It must fence further
 bootstrap and peer publication, retire any published tunnel membership, and
 coordinate termination through CAPI's provider lifecycle. If a Node appears while
 cancellation is pending, removal must account for that Node and its workloads.
+The [CAPI deletion lifecycle](https://cluster-api.sigs.k8s.io/tasks/automated-machine-management/machine_deletions)
+provides pre-drain and pre-terminate hooks before infrastructure deletion. The
+cancellation implementation must retain its own hook ownership while preserving
+hooks held by gateway attachments or other controllers. A persisted Machine UID
+identifies the target; it does not prove that compute has stopped.
 Completion requires evidence that the original compute and its associated
 resources are gone. The group implementation must use this contract across
 providers, rather than treating a VM slot observation as proof for AWS. Existing

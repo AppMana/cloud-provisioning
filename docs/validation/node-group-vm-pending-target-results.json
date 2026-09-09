@@ -1,0 +1,70 @@
+{
+  "observedAt": "2026-09-09T23:47:48.488307+00:00",
+  "sourceCommit": "4b6b87a",
+  "groupUID": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+  "beforeAction": {
+    "childName": "pooled-workers-8ae81037d7a1043c-3",
+    "childUID": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8",
+    "generation": 8,
+    "id": "bae56eb2-1182-406b-bab0-981d5a837941",
+    "ordinal": 3,
+    "type": "Drain"
+  },
+  "afterAction": {
+    "childName": "pooled-workers-8ae81037d7a1043c-3",
+    "childUID": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8",
+    "generation": 8,
+    "id": "bae56eb2-1182-406b-bab0-981d5a837941",
+    "machineUID": "34f6ec44-25ea-4be2-bf30-bef6285c19c1",
+    "ordinal": 3,
+    "type": "Drain"
+  },
+  "machineUID": "34f6ec44-25ea-4be2-bf30-bef6285c19c1",
+  "hasBootstrapSecretReference": true,
+  "childRetained": true,
+  "machineRetained": true,
+  "nodeUIDs": {
+    "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+    "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+    "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+    "remote1": "4674271b-7639-49e7-aa0f-9228cc556459",
+    "remote2": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+    "remote3": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+    "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+    "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+  },
+  "allEightNodesReady": true,
+  "nodeIdentitiesUnchanged": true,
+  "slotDataUnchanged": true,
+  "readyReplicas": 3,
+  "totalReplicas": 4,
+  "readyWorkloadPods": 3,
+  "controllerImage": "cldt-controller:3b1b32249b30cac343c6ed86929243978e6a1a77665871eb3a94e68b27741cc2",
+  "scope": "Single-NIC Linux k0s/Calico VMs: journal the existing capacity-pending Machine UID before Node registration. No cancellation or compute teardown is authorized by this step.",
+  "tests": {
+    "command": "KUBEBUILDER_ASSETS=/home/administrator/.local/share/kubebuilder-envtest/k8s/1.35.0-linux-amd64 go test -race -count=1 ./pkg/nodegroup -coverprofile=/tmp/cldt-pending-target.cover",
+    "passed": true,
+    "coveragePercent": {
+      "nodegroup": 77.3,
+      "BindDrainNode": 83.6,
+      "persistDrainTarget": 87.5
+    },
+    "fakeAPIContractVersions": [
+      "v1beta1",
+      "v1beta2"
+    ],
+    "realAPIContractVersions": [
+      "v1beta2"
+    ],
+    "cases": [
+      "late Node registration",
+      "late provider ID",
+      "referenced Node absent",
+      "same-name replacement Machine",
+      "changed provider ID",
+      "stale group resource version",
+      "mismatched Node reference UID"
+    ],
+    "nativeLateNodeRegistrationTested": false
+  }
+}

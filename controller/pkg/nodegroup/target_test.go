@@ -61,7 +61,7 @@ func TestDrainTargetPinsMachineAndNode(t *testing.T) {
 			r := &Reconciler{API: management, Workload: workload, MachineGVK: gvk}
 			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(group)}
 			// Install the group finalizer, then execute the persisted drain target.
-			for i := 0; i < 2; i++ {
+			for i := 0; i < 3; i++ {
 				if _, err := r.Reconcile(ctx, req); err != nil {
 					t.Fatal(err)
 				}

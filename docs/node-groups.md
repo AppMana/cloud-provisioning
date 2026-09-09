@@ -134,6 +134,9 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [ ] Cancel unfulfilled creation reservations during group deletion and connect
       removal actions. Until cancellation is implemented, these reservations
       retain the group finalizer.
+- [x] Publish observed replica counts before advancing pending actions and expose
+      the workload selector through `/scale`. Provisioning and draining claims
+      remain counted while their lifecycle work is pending.
 - [ ] Aggregate Ready Nodes and attachment health.
 - [x] Add a workload API drain operation with Node UID checks, cordon, and
       UID-preconditioned pod eviction. Real API tests verify PDB blockage,

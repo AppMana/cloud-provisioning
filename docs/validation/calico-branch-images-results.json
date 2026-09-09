@@ -1,0 +1,19 @@
+{
+  "releaseQualified": false,
+  "candidates": [
+    {
+      "calicoVersion": "3.32.1",
+      "sourceCommit": "2c82c85e8ed1126fdc3fb4894b34131bd61426e9",
+      "workflow": "https://github.com/AppMana/forks-calico-windows-ipv6/actions/runs/34387899969",
+      "windowsImageJob": 102599018089,
+      "windowsImageJobConclusion": "success",
+      "image": "ghcr.io/appmana/node:v3.32.1-appmana.post.3-cloud-provisioning-windows-isolation-v3.32.1-2c82c85e8ed1-windows-ltsc2022",
+      "digest": "sha256:940283e1836f9e4748c8ca1ae4e71e361f7d50fb85fcd845d3a593986cfc34c5",
+      "registryDigestVerified": true,
+      "remaining": [
+        "Linux image and combined manifest completion",
+        "Single-NIC VM CNI and lifecycle acceptance"
+      ]
+    }
+  ]
+}

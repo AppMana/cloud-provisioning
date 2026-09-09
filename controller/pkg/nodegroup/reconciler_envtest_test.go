@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -16,6 +17,7 @@ func verifyRealAPIReconciliation(t *testing.T, api client.Client) {
 	ctx := context.Background()
 	group := groupFixture()
 	group.Name = "replica-loop"
+	group.Spec.WorkloadSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"app": "render-worker"}}
 	group.Namespace = "default"
 	group.UID = ""
 	desired := int32(3)
@@ -34,7 +36,7 @@ func verifyRealAPIReconciliation(t *testing.T, api client.Client) {
 	if err := api.Get(ctx, request.NamespacedName, group); err != nil {
 		t.Fatal(err)
 	}
-	if group.Status.Replicas != 3 || group.Status.PendingAction != nil || !slices.Contains(group.Finalizers, GroupFinalizer) || group.Status.ReadyReplicas != 0 {
+	if group.Status.Selector != "app=render-worker" || group.Status.Replicas != 3 || group.Status.PendingAction != nil || !slices.Contains(group.Finalizers, GroupFinalizer) || group.Status.ReadyReplicas != 0 {
 		t.Fatal("incorrect reconciled capacity", group)
 	}
 	claims := &v1alpha1.ProvisionedNodeClaimList{}
@@ -133,6 +135,10 @@ func verifyDeletingGroupCreation(t *testing.T, api client.Client) {
 		}
 		r := &Reconciler{API: api}
 		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: key})
+		if created && err == nil {
+			// Capacity status is committed before advancing the creation journal.
+			_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: key})
+		}
 		if created && err != nil {
 			t.Fatal("existing child stuck during deletion", err)
 		}

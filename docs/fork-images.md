@@ -25,6 +25,15 @@ and 74.2% on 3.32. Both complete node executables cross-compile for Windows.
 Linux-only HCN mutation fixtures remain Linux tests; MTU and isolation contract
 tests also compile for the real Windows API types.
 
+[Published Calico candidate results](validation/calico-branch-images-results.json)
+record the registry-verified Windows image for source `2c82c85e8ed1`. Use its
+immutable digest when preparing the VM acceptance run. Linux image and combined
+manifest completion remain pending for this recorded build.
+
+Both candidates acknowledge workload updates only after HNS policy application
+succeeds. The 3.31 branch also backports 3.32's serialized Goldmane statistics
+queries after its race detector found concurrent access during bucket rollover.
+
 ## kube-proxy
 
 | Kubernetes source branch | Pinned source commit |

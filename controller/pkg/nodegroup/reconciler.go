@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,6 +46,22 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if _, err := ObserveChild(group, &claims.Items[i]); err != nil {
 			return ctrl.Result{}, err
 		}
+	}
+	// Report observed capacity before advancing intent, including while boot or
+	// removal is pending. The scale selector describes workload pods.
+	selector := ""
+	if group.Spec.WorkloadSelector != nil {
+		parsed, err := metav1.LabelSelectorAsSelector(group.Spec.WorkloadSelector)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("invalid workload selector: %w", err)
+		}
+		selector = parsed.String()
+	}
+	count := int32(len(claims.Items))
+	if group.Status.Replicas != count || group.Status.Selector != selector {
+		group.Status.Replicas = count
+		group.Status.Selector = selector
+		return again, r.API.Status().Update(ctx, group)
 	}
 	if action := group.Status.PendingAction; action != nil {
 		switch action.Type {
@@ -90,13 +107,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if action != nil {
 		_, err = ReserveAction(ctx, r.API, group, action)
 		return again, err
-	}
-	// Counts include provisioning and terminating claims. Readiness requires a
-	// separately verified Node and attachment observation, not just claim creation.
-	count := int32(len(claims.Items))
-	if group.Status.Replicas != count {
-		group.Status.Replicas = count
-		return again, r.API.Status().Update(ctx, group)
 	}
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }

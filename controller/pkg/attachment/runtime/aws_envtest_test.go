@@ -20,6 +20,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -103,6 +104,7 @@ func TestAPIRegisteredAWSRequestRetirementAndNameReuse(t *testing.T) {
 		}
 	}
 	ids := []string{}
+	var previousUID types.UID
 	for range 2 {
 		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: original.Name, Namespace: original.Namespace, Labels: original.Labels}, Data: original.Data}
 		if err = c.Create(ctx, cm); err != nil {
@@ -119,12 +121,29 @@ func TestAPIRegisteredAWSRequestRetirementAndNameReuse(t *testing.T) {
 		if httpClient.calls.Load() != 0 {
 			t.Fatal("cloud call before identity validation")
 		}
-		if err = c.Delete(ctx, cm); err != nil {
-			t.Fatal(err)
+		active, e := store.Load(ctx, id)
+		if e != nil || active == nil {
+			t.Fatal("missing retirement intent", e)
+		}
+		if previousUID != "" {
+			if _, e := RetireWorkerRequest(ctx, c, cm.Namespace, "mesh", cm.Name, previousUID, active.Plan.Worker); e == nil {
+				t.Fatal("old request UID retired same-name replacement")
+			}
 		}
 		wait(func() bool {
-			return apierrors.IsNotFound(c.Get(ctx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}))
+			done, e := RetireWorkerRequest(ctx, c, cm.Namespace, "mesh", cm.Name, cm.UID, active.Plan.Worker)
+			if apierrors.IsConflict(e) {
+				return false
+			}
+			if e != nil {
+				t.Fatal(e)
+			}
+			return done
 		})
+		if !apierrors.IsNotFound(c.Get(ctx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{})) {
+			t.Fatal("retirement completed while request still existed")
+		}
+		previousUID = cm.UID
 		record, e := store.Load(ctx, id)
 		if e != nil || record == nil || record.Phase != attachment.Complete {
 			t.Fatalf("retirement record: %v %v", record, e)

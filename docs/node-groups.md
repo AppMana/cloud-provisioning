@@ -155,6 +155,9 @@ its own eviction and withdrawal gates before triggering that teardown.
       attachment controller. The helper checks worker identity and waits for
       both the durable `Complete` record and request disappearance. Unit tests
       verify that pending hook cleanup and replacement requests retain the gate.
+      The registered-controller API test retires two successive same-name requests,
+      rejects the old UID against its replacement, and requires both API removal
+      and a durable completion record. This test makes zero cloud calls.
 - [ ] Persist the complete attachment request set for each drain target, connect
       acknowledged withdrawal, and serialize claim removal. A single request's
       completion covers only that attachment.

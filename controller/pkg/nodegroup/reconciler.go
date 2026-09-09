@@ -23,6 +23,7 @@ type Reconciler struct {
 	API        client.Client
 	Workload   client.Client
 	MachineGVK schema.GroupVersionKind
+	MeshName   string
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -91,7 +92,24 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			if !empty {
 				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 			}
-			return ctrl.Result{}, fmt.Errorf("drained group worker awaits attachment withdrawal integration")
+			if r.MeshName == "" {
+				return ctrl.Result{}, fmt.Errorf("drained group worker awaits attachment withdrawal integration")
+			}
+			if target.Gateways == nil {
+				_, err := CaptureGatewayInventory(ctx, r.API, bound, r.MeshName)
+				return again, err
+			}
+			if target.Gateways.Mesh != r.MeshName {
+				return ctrl.Result{}, fmt.Errorf("drain mesh scope changed")
+			}
+			done, err := RetireGatewayInventory(ctx, r.API, bound)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if !done {
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			}
+			return ctrl.Result{}, fmt.Errorf("gateway retirement complete; direct mesh withdrawal remains required")
 		default:
 			return ctrl.Result{}, fmt.Errorf("unknown pending group action")
 		}

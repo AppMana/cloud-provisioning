@@ -186,6 +186,19 @@ spec:
                   childName:
                     type: string
                     minLength: 1
+                  gateways:
+                    type: object
+                    required: [mesh, requests]
+                    properties:
+                      mesh: {type: string, minLength: 1}
+                      requests:
+                        type: array
+                        items:
+                          type: object
+                          required: [name, uid]
+                          properties:
+                            name: {type: string, minLength: 1}
+                            uid: {type: string, minLength: 1}
                   nodeName:
                     type: string
                   nodeUID:

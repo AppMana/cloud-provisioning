@@ -162,9 +162,12 @@ its own eviction and withdrawal gates before triggering that teardown.
       requests after selector-label removal. Tests check stable name/UID inventory,
       replacement identities, mesh scope, and shared gateway rejection; the real
       API retirement test verifies discovery of each current request UID.
-- [ ] Persist the complete attachment request set for each drain target, connect
-      acknowledged withdrawal, and serialize claim removal. A single request's
-      completion covers only that attachment.
+- [x] Persist the discovered gateway request set in the drain action, then retire
+      those requests serially. The real API test verifies schema retention and
+      blocks retirement when an additional request appears after capture.
+- [ ] Validate integrated gateway retirement end to end, freeze new attachment
+      admission during drain, withdraw direct mesh peers, and serialize claim
+      removal. Gateway retirement alone leaves the claim retained.
 - [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.
 - [ ] Run single-NIC VM 0→3→1→0, controller restart, failed boot, PDB blockage,
       group recreation, and survivor-traffic tests.

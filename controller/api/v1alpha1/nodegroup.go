@@ -15,7 +15,16 @@ type ProvisionedNodeGroupClaimSpec struct {
 type ProvisionedNodeClaimTemplate struct {
 	Spec ProvisionedNodeClaimSpec `json:"spec"`
 }
+type GroupGatewayRequest struct {
+	Name string `json:"name"`
+	UID  string `json:"uid"`
+}
+type GroupGatewayInventory struct {
+	Mesh     string                `json:"mesh"`
+	Requests []GroupGatewayRequest `json:"requests"`
+}
 type NodeGroupAction struct {
+	Gateways   *GroupGatewayInventory        `json:"gateways,omitempty"`
 	NodeName   string                        `json:"nodeName,omitempty"`
 	NodeUID    string                        `json:"nodeUID,omitempty"`
 	MachineUID string                        `json:"machineUID,omitempty"`
@@ -58,6 +67,11 @@ func (in *ProvisionedNodeGroupClaim) DeepCopyInto(out *ProvisionedNodeGroupClaim
 	if in.Status.PendingAction != nil {
 		action := *in.Status.PendingAction
 		out.Status.PendingAction = &action
+		if action.Gateways != nil {
+			inventory := *action.Gateways
+			inventory.Requests = append([]GroupGatewayRequest{}, action.Gateways.Requests...)
+			out.Status.PendingAction.Gateways = &inventory
+		}
 		if action.Template != nil {
 			out.Status.PendingAction.Template = new(ProvisionedNodeClaimTemplate)
 			in.Status.PendingAction.Template.Spec.DeepCopyInto(&out.Status.PendingAction.Template.Spec)

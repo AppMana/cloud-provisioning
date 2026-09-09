@@ -2,6 +2,7 @@ package nodegroup
 
 import (
 	"context"
+	corev1 "k8s.io/api/core/v1"
 	"slices"
 	"strings"
 	"testing"
@@ -94,6 +95,43 @@ func verifyRealAPIReconciliation(t *testing.T, api client.Client) {
 	a := observed.Status.PendingAction
 	if a.NodeName != "reserved-node" || a.NodeUID != "reserved-node-uid" || a.MachineUID != "reserved-machine-uid" || a.ProviderID != "test:///reserved" {
 		t.Fatal("API pruned drain target", a)
+	}
+
+	requestCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "group-gateway-request", Namespace: group.Namespace, Annotations: map[string]string{"cloud-provisioning.appmana.com/gateway-mesh": "test-mesh"}}, Data: map[string]string{"request.json": `{"worker":{"uid":"reserved-machine-uid","nodeUID":"reserved-node-uid","providerID":"test:///reserved"}}`}}
+	if err := api.Create(ctx, requestCM); err != nil {
+		t.Fatal(err)
+	}
+	captured, err := CaptureGatewayInventory(ctx, api, observed, "test-mesh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if observed.Status.PendingAction.Gateways != nil {
+		t.Fatal("inventory capture mutated caller")
+	}
+	if err := api.Get(ctx, request.NamespacedName, observed); err != nil {
+		t.Fatal(err)
+	}
+	inventory := observed.Status.PendingAction.Gateways
+	if inventory == nil || inventory.Mesh != "test-mesh" || len(inventory.Requests) != 1 || inventory.Requests[0].UID != string(requestCM.UID) {
+		t.Fatal("API lost inventory", inventory)
+	}
+	copy := observed.DeepCopy()
+	copy.Status.PendingAction.Gateways.Requests[0].UID = "changed"
+	if observed.Status.PendingAction.Gateways.Requests[0].UID != string(requestCM.UID) {
+		t.Fatal("inventory deepcopy aliases source")
+	}
+	newRequest := requestCM.DeepCopy()
+	newRequest.Name += "-new"
+	newRequest.UID = ""
+	newRequest.ResourceVersion = ""
+	if err := api.Create(ctx, newRequest); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RetireGatewayInventory(ctx, api, captured); err == nil || !strings.Contains(err.Error(), "inventory changed") {
+		t.Fatal("new attachment did not stop retirement", err)
+	}
+	if err := api.Get(ctx, client.ObjectKeyFromObject(requestCM), requestCM); err != nil || !requestCM.DeletionTimestamp.IsZero() {
+		t.Fatal("changed requests before inventory was stable", err)
 	}
 
 }

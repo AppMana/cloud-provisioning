@@ -54,5 +54,12 @@
     }
   ],
   "blocker": "Group withdrawal rejects a changed retained consumer identity; investigation ongoing. No retirement gate was bypassed.",
-  "originalPodAbsentAfterBudgetChange": true
+  "originalPodAbsentAfterBudgetChange": true,
+  "rootCause": "The group captured cp, cp2 and cp3 as transit consumers with empty public keys. Their site dialers unconditionally republished their local public keys after endpoint address retirement. The key was reintroduced, not rotated.",
+  "fixValidation": {
+    "realAPIRetirementPublicationConflict": true,
+    "transitMakesNoPublication": true,
+    "reselectedEndpointPublishesExistingKey": true,
+    "nativeRolloutPending": true
+  }
 }

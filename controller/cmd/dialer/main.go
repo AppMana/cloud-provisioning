@@ -882,11 +882,21 @@ func loadOrGeneratePrivateKey(path string) (wgtypes.Key, error) {
 // so the controller can assemble the peer graph without any manual
 // `wg genkey` step ever happening anywhere.
 func publishNodeInfo(ctx context.Context, clientset *kubernetes.Clientset, cfg config, pub wgtypes.Key, current *corev1.Secret) error {
+	// The controller allocates an address before a site becomes an endpoint.
+	// A transit node keeps its local key, but must not republish it after its
+	// endpoint address has been retired.
+	if strings.TrimSpace(string(current.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName])) == "" {
+		return nil
+	}
 	key := tunnel.NodePublicKeyPrefix + cfg.nodeName
 	if strings.TrimSpace(string(current.Data[key])) == pub.String() {
 		return nil
 	}
+	if current.UID == "" || current.ResourceVersion == "" {
+		return fmt.Errorf("site key publication requires a versioned mesh identity")
+	}
 	patch, err := json.Marshal(map[string]any{
+		"metadata": map[string]string{"uid": string(current.UID), "resourceVersion": current.ResourceVersion},
 		"data": map[string]string{key: base64.StdEncoding.EncodeToString([]byte(pub.String()))},
 	})
 	if err != nil {

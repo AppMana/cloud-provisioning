@@ -188,8 +188,11 @@ its own eviction and withdrawal gates before triggering that teardown.
       consumer resolver. Preserve unavailable survivors, reject missing consumers
       and concurrent mesh changes, and exclude only the bound retiring worker.
       Serialization tests retain the complete recipient set.
-- [ ] Persist direct-peer recipient identities, connect publication to group drain,
-      and verify native application through the existing consumer verifier.
+- [x] Persist direct-peer identities in the pending group action after gateway
+      retirement. The real API test verifies CRD retention across reloads, deep
+      copies, stale-writer rejection, and preservation of the peer and child claim.
+- [ ] Publish the captured direct-peer withdrawal and verify native application
+      through the existing consumer verifier before completing group removal.
 - [ ] Verify native retirement acknowledgements and preparation races around the
       drain marker, withdraw direct mesh peers, and serialize claim removal.
       Gateway retirement alone leaves the claim retained.

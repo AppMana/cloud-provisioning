@@ -116,7 +116,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			if !done {
 				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 			}
-			return ctrl.Result{}, fmt.Errorf("gateway retirement complete; direct mesh withdrawal remains required")
+			if target.Withdrawal == nil {
+				_, err := CapturePeerWithdrawal(ctx, r.API, bound)
+				return again, err
+			}
+			return ctrl.Result{}, fmt.Errorf("direct withdrawal inventory captured; publication and native acknowledgements remain required")
 		default:
 			return ctrl.Result{}, fmt.Errorf("unknown pending group action")
 		}

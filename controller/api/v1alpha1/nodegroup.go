@@ -23,7 +23,24 @@ type GroupGatewayInventory struct {
 	Mesh     string                `json:"mesh"`
 	Requests []GroupGatewayRequest `json:"requests"`
 }
+type GroupPeerConsumer struct {
+	NodeName      string `json:"nodeName"`
+	NodeUID       string `json:"nodeUID"`
+	Site          bool   `json:"site"`
+	MachineName   string `json:"machineName,omitempty"`
+	TunnelAddress string `json:"tunnelAddress,omitempty"`
+	PublicKey     string `json:"publicKey"`
+	SecretUID     string `json:"secretUID,omitempty"`
+}
+type GroupPeerWithdrawal struct {
+	MeshName      string              `json:"meshName"`
+	MeshUID       string              `json:"meshUID"`
+	SourceVersion string              `json:"sourceVersion"`
+	PublicKey     string              `json:"publicKey"`
+	Consumers     []GroupPeerConsumer `json:"consumers"`
+}
 type NodeGroupAction struct {
+	Withdrawal *GroupPeerWithdrawal          `json:"withdrawal,omitempty"`
 	Gateways   *GroupGatewayInventory        `json:"gateways,omitempty"`
 	NodeName   string                        `json:"nodeName,omitempty"`
 	NodeUID    string                        `json:"nodeUID,omitempty"`
@@ -67,6 +84,11 @@ func (in *ProvisionedNodeGroupClaim) DeepCopyInto(out *ProvisionedNodeGroupClaim
 	if in.Status.PendingAction != nil {
 		action := *in.Status.PendingAction
 		out.Status.PendingAction = &action
+		if action.Withdrawal != nil {
+			withdrawal := *action.Withdrawal
+			withdrawal.Consumers = append([]GroupPeerConsumer{}, action.Withdrawal.Consumers...)
+			out.Status.PendingAction.Withdrawal = &withdrawal
+		}
 		if action.Gateways != nil {
 			inventory := *action.Gateways
 			inventory.Requests = append([]GroupGatewayRequest{}, action.Gateways.Requests...)

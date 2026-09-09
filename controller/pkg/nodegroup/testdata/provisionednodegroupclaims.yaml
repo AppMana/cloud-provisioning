@@ -186,6 +186,28 @@ spec:
                   childName:
                     type: string
                     minLength: 1
+                  withdrawal:
+                    type: object
+                    required: [meshName, meshUID, sourceVersion, publicKey, consumers]
+                    properties:
+                      meshName: {type: string, minLength: 1}
+                      meshUID: {type: string, minLength: 1}
+                      sourceVersion: {type: string, minLength: 1}
+                      publicKey: {type: string, minLength: 1}
+                      consumers:
+                        type: array
+                        minItems: 1
+                        items:
+                          type: object
+                          required: [nodeName, nodeUID, site, publicKey]
+                          properties:
+                            nodeName: {type: string, minLength: 1}
+                            nodeUID: {type: string, minLength: 1}
+                            site: {type: boolean}
+                            machineName: {type: string}
+                            tunnelAddress: {type: string}
+                            publicKey: {type: string}
+                            secretUID: {type: string}
                   gateways:
                     type: object
                     required: [mesh, requests]

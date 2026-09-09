@@ -1,0 +1,160 @@
+# Experimental API contract; install only in isolated API tests.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: provisionednodegroupclaims.cloud-provisioning.appmana.com
+spec:
+  group: cloud-provisioning.appmana.com
+  names:
+    kind: ProvisionedNodeGroupClaim
+    listKind: ProvisionedNodeGroupClaimList
+    plural: provisionednodegroupclaims
+    singular: provisionednodegroupclaim
+    shortNames:
+    - pngc
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+      scale:
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.replicas
+        labelSelectorPath: .status.selector
+    schema:
+      openAPIV3Schema:
+        type: object
+        required:
+        - spec
+        properties:
+          spec:
+            type: object
+            required:
+            - template
+            properties:
+              replicas:
+                type: integer
+                format: int32
+                minimum: 0
+                default: 1
+              workloadSelector:
+                type: object
+                properties:
+                  matchLabels:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  matchExpressions:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - key
+                      - operator
+                      properties:
+                        key:
+                          type: string
+                        operator:
+                          type: string
+                          enum:
+                          - In
+                          - NotIn
+                          - Exists
+                          - DoesNotExist
+                        values:
+                          type: array
+                          items:
+                            type: string
+              template:
+                type: object
+                required:
+                - spec
+                properties:
+                  spec:
+                    type: object
+                    required:
+                    - infrastructureRef
+                    properties:
+                      infrastructureRef:
+                        description: The infrastructure machine template describing
+                          the machine to create, such as an AWSMachineTemplate. It
+                          carries the whole machine, including its image, network
+                          placement and security groups, so reachability never depends
+                          on an out-of-band change. The machine created is the template's
+                          kind without the Template suffix.
+                        type: object
+                        required:
+                        - kind
+                        - name
+                        properties:
+                          apiGroup:
+                            type: string
+                          kind:
+                            type: string
+                          name:
+                            type: string
+                      internetFacing:
+                        description: Internet-facing nodes register with the internet-facing
+                          taint and a public address; the public ingress data plane
+                          tolerates that taint. Defaults to true.
+                        type: boolean
+                      tunnelEndpoints:
+                        description: Selects which topologically-local nodes terminate
+                          tunnels to this node. Empty selects every Linux worker;
+                          control-plane nodes are excluded unless explicitly selected.
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                      clusterName:
+                        description: The CAPI Cluster this node joins. Optional when
+                          exactly one Cluster exists in the claim's namespace.
+                        type: string
+          status:
+            type: object
+            properties:
+              observedGeneration:
+                type: integer
+                format: int64
+              replicas:
+                type: integer
+                format: int32
+                minimum: 0
+              readyReplicas:
+                type: integer
+                format: int32
+                minimum: 0
+              selector:
+                type: string
+              conditions:
+                type: array
+                x-kubernetes-list-type: map
+                x-kubernetes-list-map-keys:
+                - type
+                items:
+                  type: object
+                  required:
+                  - type
+                  - status
+                  - lastTransitionTime
+                  - reason
+                  - message
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                      enum:
+                      - 'True'
+                      - 'False'
+                      - Unknown
+                    observedGeneration:
+                      type: integer
+                      format: int64
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string

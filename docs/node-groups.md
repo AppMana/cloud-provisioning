@@ -1,7 +1,8 @@
 # Provisioned node groups
 
-Status: proposed API; the current `ProvisionedNodeClaim` provisions one machine.
-The initial planner implementation is separate from the production reconciler.
+Status: experimental API and replica planner; the current `ProvisionedNodeClaim`
+provisions one machine. Group orchestration is separate from the production
+reconciler and remains under development.
 
 ## API and ownership
 
@@ -97,7 +98,10 @@ Group deletion follows the same sequence under a finalizer.
 - [x] Inspect the single-claim lifecycle and define a separate group API.
 - [x] Add a deterministic replica planner with ownership and terminating-slot tests.
       See `controller/pkg/nodegroup`; it proposes one create or drain at a time.
-- [ ] Register API types, CRD schema, scale subresource, status, RBAC, and watches.
+- [x] Add API types and an experimental CRD with scale and status subresources.
+      An isolated API test verifies defaulting, scale-to-zero, status preservation,
+      and resource-version conflicts. The CRD is in `controller/pkg/nodegroup/testdata`.
+- [ ] Ship the CRD with controller RBAC, watches, and lifecycle orchestration.
 - [ ] Implement child creation and Ready aggregation with conflict-safe updates.
 - [ ] Implement cordon, eviction, withdrawal, and serialized removal.
 - [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.

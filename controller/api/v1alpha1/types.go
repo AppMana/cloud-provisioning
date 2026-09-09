@@ -171,7 +171,7 @@ func (in *ProvisionedNodeClaimList) DeepCopyObject() runtime.Object { return in.
 // AddToScheme registers the types.
 func AddToScheme(s *runtime.Scheme) error {
 	builder := runtime.NewSchemeBuilder(func(s *runtime.Scheme) error {
-		s.AddKnownTypes(GroupVersion, &ProvisionedNodeClaim{}, &ProvisionedNodeClaimList{})
+		s.AddKnownTypes(GroupVersion, &ProvisionedNodeClaim{}, &ProvisionedNodeClaimList{}, &ProvisionedNodeGroupClaim{}, &ProvisionedNodeGroupClaimList{})
 		metav1.AddToGroupVersion(s, GroupVersion)
 		return nil
 	})

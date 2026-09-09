@@ -184,6 +184,10 @@ its own eviction and withdrawal gates before triggering that teardown.
       test covers a writer paused before withdrawal and a stale Machine snapshot
       after the drain marker. These checks supersede the unconditional peer
       patches introduced in `f6e3d797`; surviving peer updates remain intact.
+- [x] Prepare public direct-peer withdrawal identities using the existing CAPI
+      consumer resolver. Preserve unavailable survivors, reject missing consumers
+      and concurrent mesh changes, and exclude only the bound retiring worker.
+      Serialization tests retain the complete recipient set.
 - [ ] Persist direct-peer recipient identities, connect publication to group drain,
       and verify native application through the existing consumer verifier.
 - [ ] Verify native retirement acknowledgements and preparation races around the

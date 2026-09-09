@@ -31,9 +31,25 @@ func (r MeshConsumerResolver) Resolve(ctx context.Context, record Record) (*Publ
 	if string(mesh.UID) != r.SecretUID || mesh.DeletionTimestamp != nil {
 		return nil, fmt.Errorf("consumer mesh identity changed")
 	}
+	consumers, keysByUID, err := r.resolveTargets(ctx, mesh, []Machine{record.Plan.Worker, record.Plan.Gateway})
+	if err != nil {
+		return nil, err
+	}
+	intent := &PublicationIntent{Lease: record.LeaseID(), Consumers: consumers}
+	worker, gateway := keysByUID[record.Plan.Worker.UID], keysByUID[record.Plan.Gateway.UID]
+	if worker == "" || gateway == "" || worker == gateway || len(intent.Consumers) == 0 {
+		return nil, fmt.Errorf("attachment participants not uniquely published")
+	}
+	intent.Projection = tunnel.GatewayProjection{Lease: intent.Lease, WorkerKey: worker, GatewayKey: gateway, WorkerAddress: record.Plan.Worker.Address, WorkerHost: record.Plan.WorkerHost, DirectHosts: append([]netip.Prefix(nil), record.Plan.DirectHosts...)}
+	return intent, nil
+}
+
+// resolveTargets shares the CAPI/Node/Secret identity rules between gateway
+// publication and direct peer retirement. Availability never filters membership.
+func (r MeshConsumerResolver) resolveTargets(ctx context.Context, mesh *corev1.Secret, plannedMachines []Machine) ([]ConsumerTarget, map[string]string, error) {
 	nodes := &corev1.NodeList{}
 	if err := r.Reader.List(ctx, nodes); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	byName := map[string]*corev1.Node{}
 	for i := range nodes.Items {
@@ -43,7 +59,7 @@ func (r MeshConsumerResolver) Resolve(ctx context.Context, record Record) (*Publ
 	machines := &unstructured.UnstructuredList{}
 	machines.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "MachineList"})
 	if err := r.Reader.List(ctx, machines, client.InNamespace(r.Namespace)); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	byMachine := map[string]*unstructured.Unstructured{}
 	for i := range machines.Items {
@@ -63,21 +79,21 @@ func (r MeshConsumerResolver) Resolve(ctx context.Context, record Record) (*Publ
 			remotes[strings.TrimPrefix(key, tunnel.PeerPublicKeyPrefix)] = true
 		}
 	}
-	intent := &PublicationIntent{Lease: record.LeaseID()}
+	var consumers []ConsumerTarget
 	keysByUID := map[string]string{}
 	for name := range sites {
 		node := byName[name]
 		key := strings.TrimSpace(string(mesh.Data[tunnel.NodePublicKeyPrefix+name]))
 		if node == nil || node.UID == "" || node.DeletionTimestamp != nil || (key == "" && len(mesh.Data[tunnel.SiteAddressesPrefix+name]) == 0) {
-			return nil, fmt.Errorf("site consumer %s lacks a current Node/key identity", name)
+			return nil, nil, fmt.Errorf("site consumer %s lacks a current Node/key identity", name)
 		}
-		intent.Consumers = append(intent.Consumers, ConsumerTarget{NodeName: name, NodeUID: string(node.UID), Site: true, PublicKey: key})
+		consumers = append(consumers, ConsumerTarget{NodeName: name, NodeUID: string(node.UID), Site: true, PublicKey: key})
 	}
 	for name := range remotes {
 		machine := byMachine[name]
 		key := strings.TrimSpace(string(mesh.Data[tunnel.PeerPublicKeyPrefix+name]))
 		if machine == nil || machine.GetUID() == "" || (machine.GetDeletionTimestamp() != nil && !HasDeletionHold(machine)) || key == "" {
-			return nil, fmt.Errorf("remote consumer %s lacks a current Machine/key identity", name)
+			return nil, nil, fmt.Errorf("remote consumer %s lacks a current Machine/key identity", name)
 		}
 		provider, _, _ := unstructured.NestedString(machine.Object, "spec", "providerID")
 		nodeName, _, _ := unstructured.NestedString(machine.Object, "status", "nodeRef", "name")
@@ -86,39 +102,34 @@ func (r MeshConsumerResolver) Resolve(ctx context.Context, record Record) (*Publ
 			for _, candidate := range byName {
 				if candidate.Spec.ProviderID == provider {
 					if node != nil {
-						return nil, fmt.Errorf("ambiguous provider association for %s", name)
+						return nil, nil, fmt.Errorf("ambiguous provider association for %s", name)
 					}
 					node = candidate
 				}
 			}
 		}
 		if node == nil || node.UID == "" || node.DeletionTimestamp != nil || provider == "" || node.Spec.ProviderID != provider {
-			return nil, fmt.Errorf("remote consumer %s Node association changed", name)
+			return nil, nil, fmt.Errorf("remote consumer %s Node association changed", name)
 		}
-		for _, planned := range []Machine{record.Plan.Worker, record.Plan.Gateway} {
+		for _, planned := range plannedMachines {
 			if planned.UID == string(machine.GetUID()) && (planned.NodeUID != string(node.UID) || planned.ProviderID != provider) {
-				return nil, fmt.Errorf("attachment participant %s replaced", name)
+				return nil, nil, fmt.Errorf("attachment participant %s replaced", name)
 			}
 		}
 		adoption := &corev1.Secret{}
 		if err := r.Reader.Get(ctx, client.ObjectKey{Namespace: r.Namespace, Name: tunnel.AdoptionSecretName(name)}, adoption); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if adoption.UID == "" || adoption.DeletionTimestamp != nil {
-			return nil, fmt.Errorf("remote adoption identity missing")
+			return nil, nil, fmt.Errorf("remote adoption identity missing")
 		}
 		address := strings.SplitN(strings.TrimSpace(machine.GetAnnotations()["cloud-provisioning.appmana.com/wireguard-addr4"]), "/", 2)[0]
 		if address == "" {
-			return nil, fmt.Errorf("remote tunnel identity missing")
+			return nil, nil, fmt.Errorf("remote tunnel identity missing")
 		}
-		intent.Consumers = append(intent.Consumers, ConsumerTarget{NodeName: node.Name, NodeUID: string(node.UID), MachineName: name, TunnelAddress: address, PublicKey: key, SecretUID: string(adoption.UID)})
+		consumers = append(consumers, ConsumerTarget{NodeName: node.Name, NodeUID: string(node.UID), MachineName: name, TunnelAddress: address, PublicKey: key, SecretUID: string(adoption.UID)})
 		keysByUID[string(machine.GetUID())] = key
 	}
-	worker, gateway := keysByUID[record.Plan.Worker.UID], keysByUID[record.Plan.Gateway.UID]
-	if worker == "" || gateway == "" || worker == gateway || len(intent.Consumers) == 0 {
-		return nil, fmt.Errorf("attachment participants not uniquely published")
-	}
-	intent.Projection = tunnel.GatewayProjection{Lease: intent.Lease, WorkerKey: worker, GatewayKey: gateway, WorkerAddress: record.Plan.Worker.Address, WorkerHost: record.Plan.WorkerHost, DirectHosts: append([]netip.Prefix(nil), record.Plan.DirectHosts...)}
-	sort.Slice(intent.Consumers, func(i, j int) bool { return intent.Consumers[i].NodeName < intent.Consumers[j].NodeName })
-	return intent, nil
+	sort.Slice(consumers, func(i, j int) bool { return consumers[i].NodeName < consumers[j].NodeName })
+	return consumers, keysByUID, nil
 }

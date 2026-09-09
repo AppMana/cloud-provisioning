@@ -145,6 +145,15 @@ matching its intended pod UID and IP. Service and workload identities stayed
 unchanged across the sweep. Cross-cloud UDP and UDP during removal remain to be
 verified.
 
+The [capacity-exhaustion campaign](validation/node-group-vm-capacity-results.json)
+requested four Machines from three VM slots. It exposed an allocation error
+that prevented already-reserved Machines from progressing. Allocation now
+returns the eligible bindings separately from capacity-pending requests, so
+bound Machines continue reconciling while excess demand remains unallocated.
+The same live request recovered to three CAPI Node associations with unchanged
+infrastructure UIDs. Real API tests cover eligible bindings across observer
+reconstruction. Cancellation of the unallocated claim remains to be validated.
+
 ## API and ownership
 
 Introduce `ProvisionedNodeGroupClaim` with:

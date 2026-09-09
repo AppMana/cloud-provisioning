@@ -3,8 +3,10 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os/exec"
+	"slices"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
@@ -35,7 +37,7 @@ func verifyPooledBindings(t *testing.T, ctx context.Context, ns string) {
 		}
 	}
 	names := []string{"aaa-generated-0", "zzz-fixed"}
-	if err := controller.reserveBindings(ctx, ns, names); err != nil {
+	if _, err := controller.reserveEligibleBindings(ctx, ns, names); err != nil {
 		t.Fatal(err)
 	}
 	if err := controller.checkDistinctBindings(ctx, ns, names); err != nil {
@@ -64,10 +66,53 @@ func verifyPooledBindings(t *testing.T, ctx context.Context, ns string) {
 	}
 	// Reconstructed controller retains bindings and allocates no additional slot.
 	restarted := &Controller{Kube: k, Topology: lab.Default(), LabName: "cldt", Slots: &SlotStore{API: k, Namespace: ns, Name: "binding-pool", Lab: "cldt", Slots: []string{"remote1", "remote2"}}}
-	if err := restarted.reserveBindings(ctx, ns, names); err != nil {
+	if _, err := restarted.reserveEligibleBindings(ctx, ns, names); err != nil {
 		t.Fatal(err)
 	}
 	verifySlotRelease(t, ctx, *store)
 	verifyUnallocatedCancellation(t, ctx, controller, ns)
+	verifyCapacityEligibility(t, ctx, k, ns)
 
+}
+
+// The native four-worker campaign exposed namespace-wide starvation when one
+// allocation returned capacity pending. Exercise that planning boundary with
+// real UID/version writes; this test does not boot or modify any VM.
+func verifyCapacityEligibility(t *testing.T, ctx context.Context, k *kube.Client, ns string) {
+	t.Helper()
+	names := []string{"capacity-0", "capacity-1", "capacity-2"}
+	for _, name := range names {
+		raw, _ := json.Marshal(map[string]any{"apiVersion": "containernet.appmana.com/v1beta2", "kind": "ContainernetMachine", "metadata": map[string]string{"name": name, "namespace": ns}, "spec": map[string]any{}})
+		if err := k.Apply(ctx, raw); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := &Controller{Kube: k, Topology: lab.Default(), LabName: "cldt", Slots: &SlotStore{API: k, Namespace: ns, Name: "capacity-pool", Lab: "cldt", Slots: []string{"remote1", "remote2"}}}
+	for attempt := 0; attempt < 2; attempt++ {
+		eligible, err := c.reserveEligibleBindings(ctx, ns, names)
+		if !errors.Is(err, ErrSlotCapacity) || !slices.Equal(eligible, names[:2]) {
+			t.Fatalf("eligible=%v err=%v", eligible, err)
+		}
+		if err := c.checkDistinctBindings(ctx, ns, eligible); err != nil {
+			t.Fatal(err)
+		}
+		// Reconstruct the controller and store; persisted reservations are retained.
+		copyStore := *c.Slots
+		c = &Controller{Kube: k, Topology: lab.Default(), LabName: "cldt", Slots: &copyStore}
+	}
+	raw, err := k.Run(ctx, "-n", ns, "get", machineKind, "capacity-2", "-o", "json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pending struct {
+		Metadata struct{ Annotations map[string]string }
+		Spec     struct{ ProviderID string }
+		Status   struct{ Ready bool }
+	}
+	if err := json.Unmarshal(raw, &pending); err != nil {
+		t.Fatal(err)
+	}
+	if pending.Metadata.Annotations[containerNameAnnotation] != "" || pending.Spec.ProviderID != "" || pending.Status.Ready {
+		t.Fatal("unallocated Machine acquired a binding or readiness")
+	}
 }

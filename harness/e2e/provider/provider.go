@@ -29,6 +29,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -95,21 +96,22 @@ func (c *Controller) Reconcile(ctx context.Context, namespace string) ([]Machine
 		return nil, err
 	}
 
-	if err := c.reserveBindings(ctx, namespace, names); err != nil {
-		return nil, err
+	eligible, allocationErr := c.reserveEligibleBindings(ctx, namespace, names)
+	if allocationErr != nil && !errors.Is(allocationErr, ErrSlotCapacity) {
+		return nil, allocationErr
 	}
-	if err := c.checkDistinctBindings(ctx, namespace, names); err != nil {
+	if err := c.checkDistinctBindings(ctx, namespace, eligible); err != nil {
 		return nil, err
 	}
 	var out []Machine
-	for _, name := range names {
+	for _, name := range eligible {
 		m, err := c.reconcileOne(ctx, namespace, name)
 		if err != nil {
 			return out, fmt.Errorf("%s: %w", name, err)
 		}
 		out = append(out, m)
 	}
-	return out, nil
+	return out, allocationErr
 }
 
 // ReconcileTimeout bounds one pass.

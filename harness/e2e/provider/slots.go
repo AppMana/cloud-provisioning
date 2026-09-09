@@ -3,10 +3,13 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
 )
+
+var ErrSlotCapacity = errors.New("VM pool has no available requested capacity")
 
 type SlotOwner struct {
 	Namespace string `json:"namespace"`
@@ -86,7 +89,7 @@ func (s SlotStore) Reserve(ctx context.Context, owner SlotOwner, requested strin
 		}
 	}
 	if assigned == "" {
-		return "", fmt.Errorf("VM pool has no available requested capacity")
+		return "", ErrSlotCapacity
 	}
 	pool.Owners[assigned] = owner
 	data, err := json.Marshal(pool)

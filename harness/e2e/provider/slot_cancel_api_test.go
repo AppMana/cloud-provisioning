@@ -21,7 +21,7 @@ func verifyUnallocatedCancellation(t *testing.T, ctx context.Context, c *Control
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := c.reserveBindings(ctx, ns, []string{name}); err != nil {
+	if _, err := c.reserveEligibleBindings(ctx, ns, []string{name}); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := c.Kube.Run(ctx, "-n", ns, "get", machineKind, name, "-o", "json")

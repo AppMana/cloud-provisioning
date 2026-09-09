@@ -51,5 +51,37 @@
     "/clab-cldt-remote3": true
   },
   "finding": "reserveBindings returns on capacity exhaustion before Controller.Reconcile can advance already-reserved Machines. The reserved remote2 VM remains stopped while the fourth Machine cannot allocate.",
-  "capacityExhaustionQualified": false
+  "capacityExhaustionQualified": false,
+  "recovery": {
+    "observedAt": "2026-09-09T21:59:27.337951+00:00",
+    "sameInfrastructureUIDs": true,
+    "machinesWithNodeAssociations": 3,
+    "unallocatedMachines": 1,
+    "previouslyStarvedVMNowRunning": true,
+    "allocationProgressVerified": true,
+    "realAPIEligibilityRegressionPassed": true,
+    "machines": [
+      {
+        "name": "pooled-workers-8ae81037d7a1043c-0",
+        "nodeName": "remote1",
+        "phase": "Running"
+      },
+      {
+        "name": "pooled-workers-8ae81037d7a1043c-1",
+        "nodeName": "remote2",
+        "phase": "Running"
+      },
+      {
+        "name": "pooled-workers-8ae81037d7a1043c-2",
+        "nodeName": "remote3",
+        "phase": "Running"
+      },
+      {
+        "name": "pooled-workers-8ae81037d7a1043c-3",
+        "nodeName": null,
+        "phase": "Pending"
+      }
+    ]
+  },
+  "qualificationScope": "Allocation starvation recovered under unchanged four-Machine demand. Cancellation of the unallocated claim and workload validation of the recovered workers remain pending."
 }

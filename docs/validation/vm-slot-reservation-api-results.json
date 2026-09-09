@@ -1,0 +1,20 @@
+{
+  "observedAt": "2026-09-09T20:21:53.541740+00:00",
+  "scope": "UID-bound VM slot reservation ConfigMap transactions against the retained VM cluster API",
+  "test": "CLDT_SLOT_API_TEST=1 go test -race ./provider -run TestSlotStoreRealAPI -v",
+  "passed": true,
+  "verified": [
+    "three distinct generated Machine identities reserve three distinct slots",
+    "restart preserves the original allocation",
+    "same-name replacement UID cannot steal the old allocation",
+    "existing owner cannot move slots",
+    "forced concurrent update rejects stale resourceVersion",
+    "retry reserves the remaining free slot",
+    "pool exhaustion rejects overcommit",
+    "pool inventory changes are rejected",
+    "temporary test namespace removed"
+  ],
+  "vmProvisioningExercised": false,
+  "teardownReleaseImplemented": false,
+  "providerLifecycleIntegrationImplemented": false
+}

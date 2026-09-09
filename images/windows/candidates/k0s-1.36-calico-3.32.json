@@ -1,5 +1,5 @@
 [
-  "ghcr.io/appmana/node@sha256:940283e1836f9e4748c8ca1ae4e71e361f7d50fb85fcd845d3a593986cfc34c5",
+  "ghcr.io/appmana/node@sha256:4d771e55e3d645adf54129223b3feb4b52f7144e677108b2babad1f84fddfaa5",
   "docker.io/calico/cni-windows@sha256:5456caa7392d397b2c36839e541ac2b51cac985217baf28ea48341b8188afded",
   "ghcr.io/appmana/kube-proxy@sha256:c544cb2761f6b67b4acba16183355f8d5b0fecb11626e244da26f80ef9161c15"
 ]

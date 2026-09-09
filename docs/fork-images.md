@@ -26,13 +26,15 @@ Linux-only HCN mutation fixtures remain Linux tests; MTU and isolation contract
 tests also compile for the real Windows API types.
 
 [Published Calico candidate results](validation/calico-branch-images-results.json)
-record the registry-verified Windows image for source `2c82c85e8ed1`. Use its
-immutable digest when preparing the VM acceptance run. The workflow completed,
-but registry inspection found an incorrect Windows OS version in its combined
-manifest: `10.0.20348.5622` instead of the image's `10.0.20348.5499`. Use the
-architecture-specific digest until a corrected combined manifest is verified.
-Both candidate branches now derive that field from the built image configuration;
-the earlier publisher queried a moving Nano Server tag.
+record the successful workflow and registry-verified images for source
+`9e4adf0f9920`. Its combined manifest and immutable Windows image configuration
+both specify OS version `10.0.20348.5499`. The Windows cache set pins this image;
+the evidence record also includes matching Linux node and CNI digests.
+
+The earlier source `2c82c85e8ed1` published a combined manifest with OS version
+`10.0.20348.5622`, which differed from its built image. Both candidate branches
+now derive that field from the built image configuration. The earlier publisher
+queried a moving Nano Server tag. The superseded record retains the mismatch.
 
 Both candidates acknowledge workload updates only after HNS policy application
 succeeds. The 3.31 branch also backports 3.32's serialized Goldmane statistics

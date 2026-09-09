@@ -21,7 +21,37 @@
       "linuxCNIDigest": "sha256:eac0e20c883772bce51d07fa8f5e6a87c57002e87d33a114a69d611389d039cc",
       "windowsImageOSVersion": "10.0.20348.5499",
       "combinedWindowsDescriptorOSVersion": "10.0.20348.5622",
-      "combinedDescriptorValid": false
+      "combinedDescriptorValid": false,
+      "supersededBy": "9e4adf0f9920ffde3677fa922be2e0b29bae3154"
+    },
+    {
+      "calicoVersion": "3.32.1",
+      "sourceCommit": "9e4adf0f9920ffde3677fa922be2e0b29bae3154",
+      "workflow": "https://github.com/AppMana/forks-calico-windows-ipv6/actions/runs/34392928706",
+      "workflowConclusion": "success",
+      "windowsTestJobs": [
+        {
+          "name": "test-windows (windows-2025)",
+          "conclusion": "success"
+        },
+        {
+          "name": "test-windows (windows-2022)",
+          "conclusion": "success"
+        }
+      ],
+      "image": "ghcr.io/appmana/node:v3.32.1-appmana.post.3-cloud-provisioning-windows-isolation-v3.32.1-9e4adf0f9920-windows-ltsc2022",
+      "digest": "sha256:4d771e55e3d645adf54129223b3feb4b52f7144e677108b2babad1f84fddfaa5",
+      "registryDigestVerified": true,
+      "combinedImage": "ghcr.io/appmana/node:v3.32.1-appmana.post.3-cloud-provisioning-windows-isolation-v3.32.1-9e4adf0f9920",
+      "combinedDigest": "sha256:58e96fd22f66674c5f2ddd6c6fc1309f3c342c52d47db6c7fbb34258cc7818e1",
+      "linuxNodeDigest": "sha256:7611396d51173cff4aa3768619270deddcc06e8d5d2f81a9adce5a2a8debe9f3",
+      "linuxCNIDigest": "sha256:aa3ddc9f5cfcbda422f43bc9fe70125d792f17c103d0462af65d9b5386ae227e",
+      "windowsImageOSVersion": "10.0.20348.5499",
+      "combinedWindowsDescriptorOSVersion": "10.0.20348.5499",
+      "combinedDescriptorValid": true,
+      "remaining": [
+        "Single-NIC VM CNI and lifecycle acceptance"
+      ]
     }
   ]
 }

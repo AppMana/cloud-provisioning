@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
@@ -170,7 +171,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 		return ctrl.Result{}, err
 	}
-	if !machine.GetDeletionTimestamp().IsZero() {
+	if !machine.GetDeletionTimestamp().IsZero() || machine.GetAnnotations()[attachment.DrainIntentAnnotation] != "" {
 		return ctrl.Result{}, nil
 	}
 
@@ -457,7 +458,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// node-to-node reachability is this tunnel layer's only routing
 	// job. Everything wider (pod blocks) is the CNI's concern, learned
 	// over the sessions these host routes make possible.
-	patch := client.MergeFrom(dialerSecret.DeepCopy())
+	if err := attachment.CheckPeerPublication(ctx, r.Reader, machine); err != nil {
+		return ctrl.Result{}, err
+	}
+	patch := client.MergeFromWithOptions(dialerSecret.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	if dialerSecret.Data == nil {
 		dialerSecret.Data = map[string][]byte{}
 	}

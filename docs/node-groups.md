@@ -179,9 +179,13 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Publish prepared direct peer removal with mesh UID/resource-version checks.
       The API test rejects concurrent survivor updates and same-name replacement
       peers while preserving address reservations.
+- [x] Fence bootstrap, endpoint, and pod-prefix peer writes with a fresh Machine
+      UID/drain check followed by an optimistic-lock mesh update. The real API
+      test covers a writer paused before withdrawal and a stale Machine snapshot
+      after the drain marker. These checks supersede the unconditional peer
+      patches introduced in `f6e3d797`; surviving peer updates remain intact.
 - [ ] Persist direct-peer recipient identities, connect publication to group drain,
-      stop peer writers from republishing retiring identities, and verify native
-      application through the existing consumer verifier.
+      and verify native application through the existing consumer verifier.
 - [ ] Verify native retirement acknowledgements and preparation races around the
       drain marker, withdraw direct mesh peers, and serialize claim removal.
       Gateway retirement alone leaves the claim retained.

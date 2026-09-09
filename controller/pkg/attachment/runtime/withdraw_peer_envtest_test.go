@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 )
@@ -25,6 +26,28 @@ func checkAPIWithdrawalPublication(t *testing.T, ctx context.Context, api client
 	if _, err := attachment.PublishRemoteWithdrawal(ctx, api, stale, "worker", "original-key"); !apierrors.IsConflict(err) {
 		t.Fatalf("stale source overwrote concurrent peer: %v", err)
 	}
+	machine := &unstructured.Unstructured{}
+	machine.SetAPIVersion("cluster.x-k8s.io/v1beta2")
+	machine.SetKind("Machine")
+	machine.SetNamespace("test")
+	machine.SetName("publication-worker")
+	if err := api.Create(ctx, machine); err != nil {
+		t.Fatal(err)
+	}
+	observed := machine.DeepCopy()
+	writer := mesh.DeepCopy()
+	if err := attachment.CheckPeerPublication(ctx, api, observed); err != nil {
+		t.Fatal(err)
+	}
+	writerPatch := client.MergeFromWithOptions(writer.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	writer.Data[tunnel.PeerEndpointPrefix+"worker"] = []byte("192.0.2.99:51820")
+	machine.SetAnnotations(map[string]string{attachment.DrainIntentAnnotation: "group/action"})
+	if err := api.Update(ctx, machine); err != nil {
+		t.Fatal(err)
+	}
+	if err := attachment.CheckPeerPublication(ctx, api, observed); err == nil {
+		t.Fatal("old Machine observation bypassed drain marker")
+	}
 	published, err := attachment.PublishRemoteWithdrawal(ctx, api, mesh, "worker", "original-key")
 	if err != nil {
 		t.Fatal(err)
@@ -34,6 +57,17 @@ func checkAPIWithdrawalPublication(t *testing.T, ctx context.Context, api client
 	}
 	if len(published.Data[tunnel.PeerPublicKeyPrefix+"worker"]) != 0 || string(published.Data[tunnel.PeerEndpointPrefix+"survivor"]) != "192.0.2.2:51820" || string(published.Data[tunnel.TunnelAddressReservationPrefix+"worker"]) != "10.100.0.2" {
 		t.Fatal("withdrawal changed survivor or reservation")
+	}
+	if err := api.Patch(ctx, writer, writerPatch); !apierrors.IsConflict(err) {
+		t.Fatalf("in-flight writer restored withdrawn peer: %v", err)
+	}
+	replacementObservation := observed.DeepCopy()
+	replacementObservation.SetUID("different-machine")
+	if err := attachment.CheckPeerPublication(ctx, api, replacementObservation); err == nil {
+		t.Fatal("replacement Machine accepted")
+	}
+	if err := attachment.CheckPeerPublication(ctx, api, &unstructured.Unstructured{}); err == nil {
+		t.Fatal("missing identity accepted")
 	}
 	withdrawn := published.DeepCopy()
 	published.Data[tunnel.PeerPublicKeyPrefix+"worker"] = []byte("replacement-key")

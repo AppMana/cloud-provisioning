@@ -277,7 +277,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 
 	machine := &unstructured.Unstructured{}
 	machine.SetGroupVersionKind(machineGVK)
-	if err := r.Get(ctx, req.NamespacedName, machine); err != nil {
+	if err := r.reader.Get(ctx, req.NamespacedName, machine); err != nil {
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, r.refreshAdoptionConfigs(ctx)
 		}
@@ -306,6 +306,10 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 		return ctrl.Result{}, fmt.Errorf("scoping the dialer Role: %w", err)
 	}
 
+	if !machine.GetDeletionTimestamp().IsZero() || machine.GetAnnotations()[attachment.DrainIntentAnnotation] != "" {
+		return ctrl.Result{}, nil
+	}
+
 	// The remote node's own pod blocks, published onto its peer entry
 	// so the nodes at home can reach the pods running on it. Its blocks
 	// are allocated after it joins, so this is recomputed here rather
@@ -332,7 +336,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	// itself a Machine event: the data source doubled as the trigger.
 	remoteBlocksPending := true
 	if nodeName := r.nodeNameForMachine(ctx, machine); nodeName != "" {
-		published, err := r.publishRemotePodCIDRs(ctx, machine.GetName(), nodeName)
+		published, err := r.publishRemotePodCIDRs(ctx, machine, nodeName)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -417,7 +421,10 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	wantRouteHosts := appendMissing(routeHosts, externalIP)
 	if string(secret.Data[machineKey]) != endpoint ||
 		len(wantAllowed) != len(allowed) || len(wantRouteHosts) != len(routeHosts) {
-		patch := client.MergeFrom(secret.DeepCopy())
+		if err := attachment.CheckPeerPublication(ctx, r.reader, machine); err != nil {
+			return ctrl.Result{}, err
+		}
+		patch := client.MergeFromWithOptions(secret.DeepCopy(), client.MergeFromWithOptimisticLock{})
 		if secret.Data == nil {
 			secret.Data = map[string][]byte{}
 		}
@@ -1415,7 +1422,7 @@ func (r *meshReconciler) publishSiteNode(ctx context.Context, secret *corev1.Sec
 
 // publishRemotePodCIDRs keeps a remote machine's peer entry carrying
 // its own node's blocks, alongside its tunnel address.
-func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machineName, nodeName string) (bool, error) {
+func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *unstructured.Unstructured, nodeName string) (bool, error) {
 	prefixes, err := r.network.PrefixesFor(ctx, r.reader, nodeName)
 	if err != nil {
 		// No block yet, which is not a failure: the caller comes back.
@@ -1437,7 +1444,7 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machineName,
 	if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, secret); err != nil {
 		return false, fmt.Errorf("getting peer secret: %w", err)
 	}
-	key := tunnel.PeerAllowedIPsPrefix + machineName
+	key := tunnel.PeerAllowedIPsPrefix + machine.GetName()
 	entries := tunnel.SplitList(string(secret.Data[key]))
 	var hosts []string
 	for _, entry := range entries {
@@ -1452,7 +1459,10 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machineName,
 	if want == string(secret.Data[key]) {
 		return true, nil
 	}
-	patch := client.MergeFrom(secret.DeepCopy())
+	if err := attachment.CheckPeerPublication(ctx, r.reader, machine); err != nil {
+		return false, err
+	}
+	patch := client.MergeFromWithOptions(secret.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	if secret.Data == nil {
 		secret.Data = map[string][]byte{}
 	}

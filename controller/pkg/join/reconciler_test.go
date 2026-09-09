@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -70,6 +71,7 @@ func fakeMachine(name string, _ string) *unstructured.Unstructured {
 	m := &unstructured.Unstructured{}
 	m.SetGroupVersionKind(machineGVK)
 	m.SetName(name)
+	m.SetUID(types.UID("machine-" + name))
 	m.SetNamespace("default")
 	return m
 }

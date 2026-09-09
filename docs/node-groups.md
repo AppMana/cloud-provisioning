@@ -109,6 +109,18 @@ dialer rollout, scale-to-zero completed with the captured identities intact.
 All claims, CAPI and infrastructure Machines, remote Nodes, and slot reservations
 were removed, and all three remote VMs stopped.
 
+The [slot-reuse campaign](validation/node-group-vm-reuse-results.json) scaled the
+same group from zero back to three. Child names were reused with new Machine
+UIDs, provider IDs, and Node UIDs. A third-VM readiness timeout recovered without
+changing the VM start time. The [eight-node workload matrix](validation/node-group-vm-pod-matrix-results.json)
+then passed 184 checks: every ordered node pair by pod IP and Service IP, a
+1 MiB transfer for each pair, and DNS and external reachability from every node.
+Probes use guest-agent access to the distribution's container runtime. The first
+attempt could not execute because `crictl` was absent; the harness installed its
+pinned probe tool and reran against unchanged Node and pod identities. These are
+steady-state checks; UDP, Kubernetes exec, and continuous workload traffic
+during removal require separate validation.
+
 ## API and ownership
 
 Introduce `ProvisionedNodeGroupClaim` with:

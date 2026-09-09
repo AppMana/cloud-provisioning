@@ -1,0 +1,42 @@
+{
+  "observedAt": "2026-09-09T21:33:41.919876+00:00",
+  "transition": "0 -> 3 after complete previous teardown",
+  "sameClaimNamesReused": true,
+  "newMachineUIDs": true,
+  "newProviderIDs": true,
+  "newNodeUIDs": true,
+  "allCAPIProviderIDsMatchNodes": true,
+  "bindings": [
+    {
+      "machine": "pooled-workers-8ae81037d7a1043c-0",
+      "machineUID": "d47f09f5-ec22-41fd-bd15-41c968a08db9",
+      "providerID": "containernet://remote1/020f8372-4e25-49f9-8ef9-58ea9d227202",
+      "node": "remote1",
+      "nodeUID": "4674271b-7639-49e7-aa0f-9228cc556459"
+    },
+    {
+      "machine": "pooled-workers-8ae81037d7a1043c-1",
+      "machineUID": "6b019c67-7714-4286-9659-edfe99162fc5",
+      "providerID": "containernet://remote2/7f8970f6-2e00-422a-9838-87e6d750eab7",
+      "node": "remote2",
+      "nodeUID": "80238b93-bd75-4593-ba05-7c88ff737b69"
+    },
+    {
+      "machine": "pooled-workers-8ae81037d7a1043c-2",
+      "machineUID": "21800b46-79f4-4fe9-8d13-53f2fa735c6b",
+      "providerID": "containernet://remote3/b3985ab4-6d89-46b7-b9b6-2ea54e6b038e",
+      "node": "remote3",
+      "nodeUID": "e1a0461a-87ad-466b-85ad-64b492d8cef8"
+    }
+  ],
+  "nativeThirdLaunchObservationTimedOut": true,
+  "thirdVMStartTimeUnchangedAcrossRetry": "2026-09-09T21:31:34.187703362Z",
+  "podServiceMatrixPending": false,
+  "fullGroupLifecycleQualified": false,
+  "podServiceMatrix": {
+    "total": 184,
+    "passed": 184,
+    "failed": 0,
+    "evidence": "node-group-vm-pod-matrix-results.json"
+  }
+}

@@ -21,7 +21,7 @@ func TestRealAPIScaleContract(t *testing.T) {
 	if os.Getenv("KUBEBUILDER_ASSETS") == "" {
 		t.Skip("set KUBEBUILDER_ASSETS for isolated API validation")
 	}
-	env := &envtest.Environment{CRDDirectoryPaths: []string{"testdata"}, ErrorIfCRDPathMissing: true}
+	env := &envtest.Environment{CRDDirectoryPaths: []string{"testdata", "../../../charts/cloud-provisioning/crds"}, ErrorIfCRDPathMissing: true}
 	cfg, e := env.Start()
 	if e != nil {
 		t.Fatal(e)
@@ -168,6 +168,56 @@ func TestRealAPIScaleContract(t *testing.T) {
 	}
 	if *restarted.Spec.Replicas != 0 || restarted.Status.PendingAction.ID != action.ID {
 		t.Fatal("scale update rewrote pending operation")
+	}
+
+	// Resume after a scale and template update using the original reservation.
+	restarted.Spec.Template.Spec.InfrastructureRef.Name = "next-image"
+	if e = typed.Update(ctx, restarted); e != nil {
+		t.Fatal(e)
+	}
+	child, e := ResumeCreation(ctx, typed, key, restarted.UID, action.ID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if child.Spec.InfrastructureRef.Name != "gpu" || child.UID == "" {
+		t.Fatal("resume lost frozen intent", child)
+	}
+	// A fresh client simulates losing the create response and restarting.
+	fresh, e := client.New(cfg, client.Options{Scheme: scheme})
+	if e != nil {
+		t.Fatal(e)
+	}
+	retried, e := ResumeCreation(ctx, fresh, key, restarted.UID, action.ID)
+	if e != nil || retried.UID != child.UID {
+		t.Fatal("retry duplicated reserved child", retried, e)
+	}
+	claims := &v1alpha1.ProvisionedNodeClaimList{}
+	if e = fresh.List(ctx, claims, client.InNamespace(key.Namespace)); e != nil {
+		t.Fatal(e)
+	}
+	if len(claims.Items) != 1 {
+		t.Fatal("duplicate capacity", len(claims.Items))
+	}
+	if _, e = ResumeCreation(ctx, fresh, key, "recreated-group", action.ID); e == nil {
+		t.Fatal("wrong group UID authorized create")
+	}
+	if _, e = ResumeCreation(ctx, fresh, key, restarted.UID, "stale-action"); e == nil {
+		t.Fatal("wrong action authorized create")
+	}
+	// A same-name object without the reserved action must never be adopted or overwritten.
+	child.Annotations[ActionAnnotation] = "other-action"
+	if e = fresh.Update(ctx, child); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = ResumeCreation(ctx, fresh, key, restarted.UID, action.ID); e == nil {
+		t.Fatal("adopted conflicting action")
+	}
+	unchanged := &v1alpha1.ProvisionedNodeClaim{}
+	if e = fresh.Get(ctx, client.ObjectKeyFromObject(child), unchanged); e != nil {
+		t.Fatal(e)
+	}
+	if unchanged.Annotations[ActionAnnotation] != "other-action" {
+		t.Fatal("rewrote conflicting child")
 	}
 
 }

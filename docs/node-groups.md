@@ -111,7 +111,12 @@ its own eviction and withdrawal gates before triggering that teardown.
       Creation intent freezes the template; removal intent records the child UID.
       The real API test verifies competing reservations conflict and scale updates
       preserve an in-flight action. Pending actions survive controller restarts.
-- [ ] Resume or cancel persisted actions and reconcile child changes idempotently.
+- [x] Resume reserved creation through direct API reads. A retry returns the same
+      claim UID and uses the frozen template after scale or template updates.
+      The real API test rejects mismatched group/action identities and preserves
+      conflicting claims for investigation.
+- [ ] Record action completion, reconcile desired capacity after committed actions,
+      and handle group deletion while creation is pending.
 - [ ] Aggregate Ready Nodes and attachment health.
 - [ ] Implement cordon, eviction, withdrawal, and serialized removal.
 - [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.

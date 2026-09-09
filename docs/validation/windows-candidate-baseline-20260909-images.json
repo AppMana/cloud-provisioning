@@ -1,0 +1,67 @@
+{
+  "observedAt": "2026-09-09T19:47:17.054945+00:00",
+  "scope": "Retained k0s baseline before candidate Calico and kube-proxy deployment",
+  "candidateImagesInstalled": false,
+  "daemonsets": [
+    {
+      "name": "calico-node",
+      "uid": "31c23a91-8da8-4251-b346-af418731b4f4",
+      "generation": 3,
+      "containers": [
+        {
+          "name": "install-cni",
+          "image": "quay.io/k0sproject/calico-cni:v3.32.0-0"
+        },
+        {
+          "name": "calico-node",
+          "image": "quay.io/k0sproject/calico-node:v3.32.0-0"
+        }
+      ]
+    },
+    {
+      "name": "calico-node-windows",
+      "uid": "a7132f6d-f36f-4bbe-928e-4349e0be9bb2",
+      "generation": 11,
+      "containers": [
+        {
+          "name": "uninstall-calico",
+          "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918"
+        },
+        {
+          "name": "install-cni",
+          "image": "docker.io/calico/cni-windows:v3.32.0"
+        },
+        {
+          "name": "felix",
+          "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918"
+        },
+        {
+          "name": "node",
+          "image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918"
+        }
+      ]
+    },
+    {
+      "name": "kube-proxy",
+      "uid": "2e830afd-7653-4e46-bdea-027d325c015f",
+      "generation": 1,
+      "containers": [
+        {
+          "name": "kube-proxy",
+          "image": "quay.io/k0sproject/kube-proxy:v1.36.2"
+        }
+      ]
+    },
+    {
+      "name": "kube-proxy-windows",
+      "uid": "41c839ed-3fee-4f53-ae91-96f4ee957d40",
+      "generation": 1,
+      "containers": [
+        {
+          "name": "kube-proxy",
+          "image": "docker.io/sigwindowstools/kube-proxy:v1.36.2-calico-hostprocess"
+        }
+      ]
+    }
+  ]
+}

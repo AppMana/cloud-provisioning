@@ -97,6 +97,20 @@ This set is a candidate for HostProcess testing on both OS versions. The current
 live harness remains on its recorded Calico 3.32.0 baseline. VM image baking,
 fresh-clone cache reuse, and CNI acceptance for this new set remain pending.
 
+## Current VM baseline
+
+The [pre-candidate ordinary-pod matrix](validation/windows-candidate-baseline-20260909-results.json)
+checks Linux, Windows Server 2022 and Server 2025 on three distinct nodes.
+It passed 59 of 60 checks with stable Node and pod identities. TCP payloads,
+Services and DNS passed. UDP returned 299 of 300 exact echoes; one 1,400-byte
+payload from Server 2022 to Server 2025 timed out. This run has no packet capture
+to attribute the loss. Policy, failover and candidate-image acceptance require
+separate tests.
+
+The [baseline component inventory](validation/windows-candidate-baseline-20260909-images.json)
+records the retained Calico 3.32.0 configuration and existing kube-proxy images.
+Compare candidate results against this baseline, including its recorded failure.
+
 ## Promotion gates
 
 - Require successful build and test jobs for the exact source and builder commits.

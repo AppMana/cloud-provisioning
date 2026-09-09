@@ -95,7 +95,8 @@ Group deletion follows the same sequence under a finalizer.
 ## Implementation and acceptance plan
 
 - [x] Inspect the single-claim lifecycle and define a separate group API.
-- [ ] Add a deterministic replica planner with ownership and terminating-slot tests.
+- [x] Add a deterministic replica planner with ownership and terminating-slot tests.
+      See `controller/pkg/nodegroup`; it proposes one create or drain at a time.
 - [ ] Register API types, CRD schema, scale subresource, status, RBAC, and watches.
 - [ ] Implement child creation and Ready aggregation with conflict-safe updates.
 - [ ] Implement cordon, eviction, withdrawal, and serialized removal.

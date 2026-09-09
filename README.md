@@ -183,8 +183,8 @@ For a k0s cluster using Calico and an AWS worker, provisioning follows these ste
    Selected on-premises endpoints connect to the instance's public address.
 5. The instance waits for the API through the tunnel and runs `k0s worker`.
 6. The node registers with the cloud-worker label and internet-facing taint.
-   The controller configures Calico peering addresses, and Calico distributes
-   pod routes across the tunnel.
+   The controller publishes the node transport addresses required by the
+   installed Calico mode, which provides pod connectivity across the tunnel.
 7. Workloads that select and tolerate the worker can use its public connectivity.
 
 ## The tunnel

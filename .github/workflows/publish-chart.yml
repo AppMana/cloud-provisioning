@@ -1,25 +1,22 @@
-# Publishes the Helm chart to GHCR on every change to the chart or the
-# controller. appVersion is stamped with the commit SHA at package
-# time, so a published chart pins the images built from that commit.
-# Pushing it by hand lets the registry drift behind the repository, and
-# an install from the README then gets whatever was pushed last.
+# Publish only after the matching main-branch image build succeeds.
+# Checkout that exact source revision so appVersion names available images.
 name: Publish Helm chart
 on:
-  push:
+  workflow_run:
+    workflows: [Build and publish controller images]
+    types: [completed]
     branches: [main]
-    paths:
-      - "charts/**"
-      - "controller/**"
-      - "join-patterns/**"
-      - ".github/workflows/publish-chart.yml"
 jobs:
   publish:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - uses: azure/setup-helm@v4
       - name: Log in to GHCR
         run: helm registry login ghcr.io -u ${{ github.actor }} --password-stdin <<< "${{ secrets.GITHUB_TOKEN }}"

@@ -78,3 +78,77 @@ func verifyRealAPIReconciliation(t *testing.T, api client.Client) {
 		}
 	}
 }
+
+func verifyDeletingGroupCreation(t *testing.T, api client.Client) {
+	t.Helper()
+	ctx := context.Background()
+	for _, created := range []bool{false, true} {
+		group := groupFixture()
+		group.Name = "deleting-pending-create"
+		if created {
+			group.Name += "-fulfilled"
+		}
+		group.Namespace = "default"
+		group.UID = ""
+		group.Finalizers = []string{GroupFinalizer}
+		if err := api.Create(ctx, group); err != nil {
+			t.Fatal(err)
+		}
+		action, err := ProposeAction(group, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		group, err = ReserveAction(ctx, api, group, action)
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := client.ObjectKeyFromObject(group)
+		var childUID string
+		if created {
+			child, err := ResumeCreation(ctx, api, key, group.UID, action.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			childUID = string(child.UID)
+		}
+		if err := api.Delete(ctx, group); err != nil {
+			t.Fatal(err)
+		}
+		r := &Reconciler{API: api}
+		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: key})
+		if created && err != nil {
+			t.Fatal("existing child stuck during deletion", err)
+		}
+		if !created && err == nil {
+			t.Fatal("unfulfilled reservation silently discarded")
+		}
+		if err := api.Get(ctx, key, group); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(group.Finalizers, GroupFinalizer) {
+			t.Fatal("released deletion before lifecycle gates")
+		}
+		claims := &v1alpha1.ProvisionedNodeClaimList{}
+		if err := api.List(ctx, claims, client.InNamespace(group.Namespace), client.MatchingLabels{GroupUIDLabel: string(group.UID)}); err != nil {
+			t.Fatal(err)
+		}
+		if !created {
+			if len(claims.Items) != 0 || group.Status.PendingAction == nil {
+				t.Fatal("created capacity during group deletion")
+			}
+			continue
+		}
+		if len(claims.Items) != 1 || string(claims.Items[0].UID) != childUID || group.Status.PendingAction != nil {
+			t.Fatal("lost completed child during deletion")
+		}
+		if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+			t.Fatal(err)
+		}
+		if err := api.Get(ctx, key, group); err != nil {
+			t.Fatal(err)
+		}
+		if group.Status.PendingAction == nil || group.Status.PendingAction.Type != DrainAction || group.Status.PendingAction.ChildUID != childUID {
+			t.Fatal("deletion did not reserve existing child for drain")
+		}
+	}
+}

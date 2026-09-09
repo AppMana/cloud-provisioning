@@ -123,7 +123,12 @@ its own eviction and withdrawal gates before triggering that teardown.
       reconciler. A real API test reaches three claims while recreating controller
       state between passes. Scale-down reserves one child and holds removal while
       drain and withdrawal integration is pending.
-- [ ] Handle group deletion while creation is pending and connect removal actions.
+- [x] During group deletion, complete a pending creation only when its matching
+      child already exists, then reserve that child for draining. The API test
+      verifies an absent child is never created after deletion begins.
+- [ ] Cancel unfulfilled creation reservations during group deletion and connect
+      removal actions. Until cancellation is implemented, these reservations
+      retain the group finalizer.
 - [ ] Aggregate Ready Nodes and attachment health.
 - [x] Add a workload API drain operation with Node UID checks, cordon, and
       UID-preconditioned pod eviction. Real API tests verify PDB blockage,

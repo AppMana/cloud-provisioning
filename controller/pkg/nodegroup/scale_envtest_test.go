@@ -287,5 +287,6 @@ func TestRealAPIScaleContract(t *testing.T) {
 
 	verifyRealAPIDrain(t, fresh)
 	verifyRealAPIReconciliation(t, fresh)
+	verifyDeletingGroupCreation(t, fresh)
 
 }

@@ -31,6 +31,10 @@ func ResumeCreation(ctx context.Context, api client.Client, key types.Namespaced
 	}
 	// A later template or scale update does not rewrite committed creation intent.
 	frozen := group.DeepCopy()
+	// Construct the expected identity even during deletion so an existing
+	// child can complete its creation journal and enter the drain plan.
+	// The live group's deletion timestamp still forbids a new API create.
+	frozen.DeletionTimestamp = nil
 	action.Template.Spec.DeepCopyInto(&frozen.Spec.Template.Spec)
 	expected, err := BuildChild(frozen, int(action.Ordinal))
 	if err != nil {
@@ -44,6 +48,9 @@ func ResumeCreation(ctx context.Context, api client.Client, key types.Namespaced
 	childKey := client.ObjectKeyFromObject(expected)
 	err = api.Get(ctx, childKey, actual)
 	if apierrors.IsNotFound(err) {
+		if !group.DeletionTimestamp.IsZero() {
+			return nil, fmt.Errorf("deleting group has an unfulfilled creation reservation")
+		}
 		actual = expected.DeepCopy()
 		err = api.Create(ctx, actual)
 		if apierrors.IsAlreadyExists(err) {

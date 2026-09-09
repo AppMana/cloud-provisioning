@@ -83,6 +83,16 @@ its slot. An interrupted launch with an unresolved outcome remains held for
 inspection. Regression tests cover observer reconstruction after a timeout;
 native verification of the updated implementation remains pending.
 
+The [native three-to-one scale-down](validation/node-group-vm-scale-down-results.json)
+removed two claims, their CAPI and infrastructure Machines, and their Nodes.
+Both VM wrappers stopped and their slot reservations were released. The remaining
+Node identities were unchanged. A 121-second host-tunnel probe during removal
+received all 600 packets; pod and Service continuity and disruption-budget
+behavior remain to be tested. The offline lab requires the exact remote dialer
+DaemonSet image to be loaded into each joined VM's distribution runtime before
+adoption can complete, as in the single-node harness. The pooled provider command
+does not yet automate this image-loading step.
+
 ## API and ownership
 
 Introduce `ProvisionedNodeGroupClaim` with:

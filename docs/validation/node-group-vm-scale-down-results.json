@@ -1,0 +1,70 @@
+{
+  "observedAt": "2026-09-09T21:12:19.694937+00:00",
+  "groupUID": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+  "transition": "3 -> 1",
+  "completed": true,
+  "removedNodes": [
+    "remote3",
+    "remote2"
+  ],
+  "remainingNodeUIDs": {
+    "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+    "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+    "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+    "remote1": "3e308e06-67f4-419d-b71a-fbd2b37377e1",
+    "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+    "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+  },
+  "survivorUIDsUnchanged": true,
+  "claimsRemaining": 1,
+  "machinesRemaining": 1,
+  "infrastructureMachinesRemaining": 1,
+  "removedVMsStopped": true,
+  "reservedSlotsRemaining": [
+    "remote1"
+  ],
+  "preRemovalAdoptionReceipts": [
+    {
+      "machine": "pooled-workers-8ae81037d7a1043c-0",
+      "podUID": "b8e72c9b-6f58-4489-9e7d-8b2358210c80",
+      "peerReceipt": {
+        "secretUID": "e47878cd-048c-4fe8-9f42-0c6e4326a430",
+        "resourceVersion": "8972",
+        "desiredSHA256": "87ec56e6ddfb6350a3bd7541d666501bef8e3ee15ca921726dd2acdc9a471aa1",
+        "appliedSHA256": "87ec56e6ddfb6350a3bd7541d666501bef8e3ee15ca921726dd2acdc9a471aa1"
+      }
+    },
+    {
+      "machine": "pooled-workers-8ae81037d7a1043c-1",
+      "podUID": "0bfdb78c-f14a-491d-9618-2741568684c7",
+      "peerReceipt": {
+        "secretUID": "a53cffd6-66ce-4eaf-bbfe-f218687d1dbc",
+        "resourceVersion": "8924",
+        "desiredSHA256": "6292c9c615c1f90cef56c8376f285e96431e952d90eab58216446490a9542365",
+        "appliedSHA256": "6292c9c615c1f90cef56c8376f285e96431e952d90eab58216446490a9542365"
+      }
+    },
+    {
+      "machine": "pooled-workers-8ae81037d7a1043c-2",
+      "podUID": "a6fcf639-8f3b-4b6e-a203-5b968060e464",
+      "peerReceipt": {
+        "secretUID": "b8c4178f-8c47-4323-9062-2e50e50c8389",
+        "resourceVersion": "8917",
+        "desiredSHA256": "a7cd2bcc1888060e21f4c04cdc82263ba99b8de4480b3b68dddf3ec112cab0b6",
+        "appliedSHA256": "a7cd2bcc1888060e21f4c04cdc82263ba99b8de4480b3b68dddf3ec112cab0b6"
+      }
+    }
+  ],
+  "hostTunnelProbe": {
+    "source": "remote1",
+    "destination": "10.100.0.1 (w1 tunnel address)",
+    "sent": 600,
+    "received": 600,
+    "lost": 0,
+    "scope": "121-second observation during removal; not the full scale-down duration"
+  },
+  "podServiceTrafficTested": false,
+  "workloadEvictionAndPDBTested": false,
+  "bootstrapRetryFixNativeQualified": false,
+  "fullGroupLifecycleQualified": false
+}

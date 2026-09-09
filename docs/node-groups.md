@@ -1,6 +1,6 @@
 # Provisioned node groups
 
-Status: experimental API and replica planner; the current `ProvisionedNodeClaim`
+Status: experimental API and claim reconciler; the current `ProvisionedNodeClaim`
 provisions one machine. Group orchestration is separate from the production
 reconciler and remains under development.
 
@@ -119,8 +119,11 @@ its own eviction and withdrawal gates before triggering that teardown.
       resource-version checks; stale completion cannot clear a later reservation.
       The API test verifies the next replica uses the current template. Creation
       completion records a claim, while Node readiness remains a separate gate.
-- [ ] Integrate action execution into reconciliation and handle group deletion
-      while creation is pending.
+- [x] Connect planning, reservation, creation, and completion in an experimental
+      reconciler. A real API test reaches three claims while recreating controller
+      state between passes. Scale-down reserves one child and holds removal while
+      drain and withdrawal integration is pending.
+- [ ] Handle group deletion while creation is pending and connect removal actions.
 - [ ] Aggregate Ready Nodes and attachment health.
 - [x] Add a workload API drain operation with Node UID checks, cordon, and
       UID-preconditioned pod eviction. Real API tests verify PDB blockage,

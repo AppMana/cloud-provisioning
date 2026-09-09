@@ -125,6 +125,10 @@ func TestAPIRegisteredAWSRequestRetirementAndNameReuse(t *testing.T) {
 		if e != nil || active == nil {
 			t.Fatal("missing retirement intent", e)
 		}
+		refs, e := WorkerRequests(ctx, c, cm.Namespace, "mesh", active.Plan.Worker)
+		if e != nil || len(refs) != 1 || refs[0].Name != cm.Name || refs[0].UID != cm.UID {
+			t.Fatal("real API request inventory mismatch", refs, e)
+		}
 		if previousUID != "" {
 			if _, e := RetireWorkerRequest(ctx, c, cm.Namespace, "mesh", cm.Name, previousUID, active.Plan.Worker); e == nil {
 				t.Fatal("old request UID retired same-name replacement")

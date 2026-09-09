@@ -158,6 +158,10 @@ its own eviction and withdrawal gates before triggering that teardown.
       The registered-controller API test retires two successive same-name requests,
       rejects the old UID against its replacement, and requires both API removal
       and a durable completion record. This test makes zero cloud calls.
+- [x] Discover gateway requests by worker identity within a mesh, retaining
+      requests after selector-label removal. Tests check stable name/UID inventory,
+      replacement identities, mesh scope, and shared gateway rejection; the real
+      API retirement test verifies discovery of each current request UID.
 - [ ] Persist the complete attachment request set for each drain target, connect
       acknowledged withdrawal, and serialize claim removal. A single request's
       completion covers only that attachment.

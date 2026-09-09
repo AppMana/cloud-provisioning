@@ -176,8 +176,12 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Prepare direct peer withdrawal from a mesh snapshot using the expected
       public key. Unit tests preserve survivor entries and address reservations,
       reject changed or missing key identities, and verify repeatable removal.
-- [ ] Persist direct-peer recipient identities, publish withdrawal with a source
-      version check, and verify application through the existing consumer verifier.
+- [x] Publish prepared direct peer removal with mesh UID/resource-version checks.
+      The API test rejects concurrent survivor updates and same-name replacement
+      peers while preserving address reservations.
+- [ ] Persist direct-peer recipient identities, connect publication to group drain,
+      stop peer writers from republishing retiring identities, and verify native
+      application through the existing consumer verifier.
 - [ ] Verify native retirement acknowledgements and preparation races around the
       drain marker, withdraw direct mesh peers, and serialize claim removal.
       Gateway retirement alone leaves the claim retained.

@@ -175,6 +175,7 @@ func TestAPIRegisteredAWSRequestRetirementAndNameReuse(t *testing.T) {
 		t.Fatal("unexpected cloud request")
 	}
 	checkAPILifetime(t, ctx, c)
+	checkAPIWithdrawalPublication(t, ctx, c)
 }
 
 func checkAPILifetime(t *testing.T, ctx context.Context, c client.Client) {

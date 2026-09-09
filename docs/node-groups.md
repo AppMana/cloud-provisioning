@@ -121,6 +121,16 @@ pinned probe tool and reran against unchanged Node and pod identities. These are
 steady-state checks; UDP, Kubernetes exec, and continuous workload traffic
 during removal require separate validation.
 
+The [survivor continuity campaign](validation/node-group-vm-continuity-results.json)
+ran 30 repeated six-node matrices during another three-to-one scale-down,
+including a controller restart while a drain action was pending. All 2,880 pod,
+Service, 1 MiB transfer, and DNS checks passed. The pending action's child and
+Node identities survived the restart, the two removed VMs stopped, and the
+surviving Node and pod UIDs stayed unchanged. The observer included two passes
+after removal completed. There is a one-second pause between passes; this
+measures sampled request continuity, not packet-level zero loss. UDP remains
+outside this check.
+
 ## API and ownership
 
 Introduce `ProvisionedNodeGroupClaim` with:

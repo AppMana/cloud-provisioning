@@ -1,0 +1,649 @@
+{
+  "afterIdentities": {
+    "nodes/cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+    "nodes/cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+    "nodes/cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+    "nodes/remote1": "4674271b-7639-49e7-aa0f-9228cc556459",
+    "nodes/w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+    "nodes/w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0",
+    "pods/hc-cp": "493c8b13-8230-4639-9bca-f45275e35bec",
+    "pods/hc-cp2": "e0a1b5f9-029c-4931-8091-8d2e6f8e1fee",
+    "pods/hc-cp3": "0ccafb22-9c5f-4720-8566-c95fe69a8554",
+    "pods/hc-remote1": "844c7c77-27af-4bb4-bf3c-49cab74cd3dd",
+    "pods/hc-w1": "3851134e-4e82-4f29-8c0b-87b44158fb18",
+    "pods/hc-w2": "05e5d284-62b1-49dd-98ff-cdebe72497a5"
+  },
+  "beforeIdentities": {
+    "nodes/cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+    "nodes/cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+    "nodes/cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+    "nodes/remote1": "4674271b-7639-49e7-aa0f-9228cc556459",
+    "nodes/w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+    "nodes/w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0",
+    "pods/hc-cp": "493c8b13-8230-4639-9bca-f45275e35bec",
+    "pods/hc-cp2": "e0a1b5f9-029c-4931-8091-8d2e6f8e1fee",
+    "pods/hc-cp3": "0ccafb22-9c5f-4720-8566-c95fe69a8554",
+    "pods/hc-remote1": "844c7c77-27af-4bb4-bf3c-49cab74cd3dd",
+    "pods/hc-w1": "3851134e-4e82-4f29-8c0b-87b44158fb18",
+    "pods/hc-w2": "05e5d284-62b1-49dd-98ff-cdebe72497a5"
+  },
+  "completed": true,
+  "failedChecks": 0,
+  "passes": [
+    {
+      "attempt": 1,
+      "cancelled": false,
+      "desiredReplicas": 3,
+      "elapsed": "5.380284106s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": false,
+      "startedAt": "2026-09-09T21:38:10.353517957Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 2,
+      "cancelled": false,
+      "desiredReplicas": 3,
+      "elapsed": "6.201853955s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": false,
+      "startedAt": "2026-09-09T21:38:17.463275365Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 3,
+      "cancelled": false,
+      "desiredReplicas": 3,
+      "elapsed": "6.217528887s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": false,
+      "startedAt": "2026-09-09T21:38:25.333265871Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 4,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.741916059s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:38:33.209153252Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 5,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.006046267s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:38:41.525313501Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 6,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "5.914467831s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:38:49.188551094Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 7,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.509558633s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:38:56.677304638Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 8,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "7.479065954s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:39:04.895158646Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 9,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "7.023718619s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:39:14.054149882Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 10,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "5.85552043s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:39:22.831130834Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 11,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.470496138s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:39:30.335433353Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 12,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.184269424s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:39:38.493505152Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 13,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "5.778361373s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:39:46.273770813Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 14,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "5.572584074s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:39:54.308160176Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 15,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "5.748759478s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:40:01.48715416Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 16,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "5.838351891s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:40:08.839149674Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 17,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "5.543134839s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:40:16.278082846Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 18,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.25399536s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 3,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:40:23.423152705Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 19,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.343102263s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 2,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:40:31.301158686Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 20,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.420058573s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 2,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:40:39.264188902Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 21,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.570221865s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 2,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:40:47.328120605Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 22,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "7.158681314s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 2,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:40:55.519826224Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 23,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.072126983s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 2,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:41:04.354142126Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 24,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.603926404s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 2,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:41:12.090193097Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 25,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.361871433s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 2,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:41:20.305772709Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 26,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.056282214s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 2,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:41:28.311583275Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 27,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "5.615951039s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 2,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:41:35.99417696Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 28,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "6.297589184s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 2,
+      "passed": 96,
+      "pendingAction": true,
+      "startedAt": "2026-09-09T21:41:43.32564653Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 29,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "5.966608988s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 1,
+      "passed": 96,
+      "pendingAction": false,
+      "startedAt": "2026-09-09T21:41:51.271196798Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    },
+    {
+      "attempt": 30,
+      "cancelled": false,
+      "desiredReplicas": 1,
+      "elapsed": "5.257160844s",
+      "failed": 0,
+      "notRequired": 0,
+      "observedReplicas": 1,
+      "passed": 96,
+      "pendingAction": false,
+      "startedAt": "2026-09-09T21:41:58.820175181Z",
+      "total": 96,
+      "checksByKind": {
+        "dns": 6,
+        "pod": 30,
+        "service": 30,
+        "transfer": 30
+      },
+      "failures": []
+    }
+  ],
+  "scope": "Repeated six-survivor matrices through three-to-one drain: pod, Service, 1 MiB transfer and DNS via guest-agent CRI. No UDP or Kubernetes exec checks. Passes have a one-second pause between them; this is sampled request continuity, not a packet-level zero-loss guarantee.",
+  "totalChecks": 2880,
+  "survivorIdentitiesUnchanged": true,
+  "rawResultsSHA256": "222c96bb8aee71059b74f26f1836ef4fbb0dd28674e83d40181764f081334a8e",
+  "controllerRestart": {
+    "requestedAt": "2026-09-09T21:40:48.663797+00:00",
+    "groupUID": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+    "actionID": "5f9edebd-5604-4929-b572-a4b1e49acded",
+    "childUID": "e5a86df5-d704-40c0-8cc4-ee47b42a7477",
+    "nodeUID": "80238b93-bd75-4593-ba05-7c88ff737b69",
+    "nodeName": "remote2",
+    "rolloutCompletedAt": "2026-09-09T21:41:15.365482+00:00",
+    "samePendingActionAfterControllerRollout": true
+  },
+  "removedVMsStopped": true
+}

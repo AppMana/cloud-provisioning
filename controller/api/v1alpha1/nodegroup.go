@@ -40,6 +40,7 @@ type GroupPeerWithdrawal struct {
 	Consumers     []GroupPeerConsumer `json:"consumers"`
 }
 type NodeGroupAction struct {
+	Removing   bool                          `json:"removing,omitempty"`
 	Withdrawal *GroupPeerWithdrawal          `json:"withdrawal,omitempty"`
 	Gateways   *GroupGatewayInventory        `json:"gateways,omitempty"`
 	NodeName   string                        `json:"nodeName,omitempty"`

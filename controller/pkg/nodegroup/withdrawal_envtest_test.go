@@ -33,6 +33,7 @@ func verifyPeerWithdrawalCapture(t *testing.T, api client.Client) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	child.Finalizers = []string{"test/teardown"}
 	if err := api.Create(ctx, child); err != nil {
 		t.Fatal(err)
 	}
@@ -192,11 +193,18 @@ func verifyPeerWithdrawalCapture(t *testing.T, api client.Client) {
 	if err := api.Get(ctx, client.ObjectKeyFromObject(child), child); err != nil {
 		t.Fatal("publication deleted child", err)
 	}
-	if err := api.Delete(ctx, secret); err != nil {
+	secret.Annotations = map[string]string{}
+	if err := api.Update(ctx, secret); err != nil {
 		t.Fatal(err)
 	}
 	if applied, err := ApplyPeerWithdrawal(ctx, api, gvk, reloaded, "", "6443"); err != nil || applied {
 		t.Fatal("missing recipient acknowledged withdrawal", applied, err)
 	}
+
+	secret.Annotations = map[string]string{tunnel.AppliedListAnnotation: tunnel.HashPeerList(doc)}
+	if err := api.Update(ctx, secret); err != nil {
+		t.Fatal(err)
+	}
+	verifyRemovalAfterWithdrawal(t, api, gvk, reloaded, child)
 
 }

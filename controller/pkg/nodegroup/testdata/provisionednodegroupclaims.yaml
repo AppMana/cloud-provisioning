@@ -186,6 +186,7 @@ spec:
                   childName:
                     type: string
                     minLength: 1
+                  removing: {type: boolean}
                   withdrawal:
                     type: object
                     required: [meshName, meshUID, sourceVersion, publicKey, consumers]

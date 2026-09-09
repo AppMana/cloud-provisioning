@@ -75,6 +75,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			_, err = CompleteCreation(ctx, r.API, group, child.UID)
 			return again, err
 		case DrainAction:
+			if action.Removing {
+				done, err := ResumeRemoval(ctx, r.API, r.Workload, r.MachineGVK, group)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+				if !done {
+					return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+				}
+				return again, nil
+			}
 			if r.Workload == nil {
 				return ctrl.Result{}, fmt.Errorf("group removal awaits drain and attachment withdrawal integration")
 			}
@@ -121,14 +131,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				_, err := CapturePeerWithdrawal(ctx, r.API, bound)
 				return again, err
 			}
-			applied, err := ApplyPeerWithdrawal(ctx, r.API, r.MachineGVK, bound, r.APIVIP, r.APIPort)
+			applied, err := BeginRemoval(ctx, r.API, r.MachineGVK, bound, r.APIVIP, r.APIPort)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
 			if !applied {
 				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 			}
-			return ctrl.Result{}, fmt.Errorf("direct withdrawal acknowledged; claim removal completion remains required")
+			return again, nil
 		default:
 			return ctrl.Result{}, fmt.Errorf("unknown pending group action")
 		}

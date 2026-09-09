@@ -2,6 +2,8 @@ package nodegroup
 
 import (
 	"context"
+	"encoding/json"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"reflect"
 	"testing"
 
@@ -62,6 +64,8 @@ func verifyPeerWithdrawalCapture(t *testing.T, api client.Client) {
 			t.Fatal(err)
 		}
 		mesh.Data[tunnel.PeerPublicKeyPrefix+name] = []byte("key-" + name)
+		mesh.Data[tunnel.PeerRouteHostsPrefix+name] = []byte("10.100.0.2")
+		mesh.Data[tunnel.PeerAllowedIPsPrefix+name] = []byte("10.100.0.2/32")
 		if name == child.Name {
 			a := g.Status.PendingAction
 			a.NodeName = node.Name
@@ -70,6 +74,13 @@ func verifyPeerWithdrawalCapture(t *testing.T, api client.Client) {
 			a.ProviderID = node.Spec.ProviderID
 		}
 	}
+	site := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "zz-withdrawal-site"}}
+	if err := api.Create(ctx, site); err != nil {
+		t.Fatal(err)
+	}
+	mesh.Data[tunnel.NodePublicKeyPrefix+site.Name] = []byte("site-key")
+	mesh.Data[tunnel.NodeTunnelAddressPrefix+site.Name] = []byte("10.100.0.1")
+	mesh.Data[tunnel.NodeAddressesPrefix+site.Name] = []byte("10.10.0.11")
 	if err := api.Create(ctx, mesh); err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +103,7 @@ func verifyPeerWithdrawalCapture(t *testing.T, api client.Client) {
 		t.Fatal("API pruned public inventory")
 	}
 	w := reloaded.Status.PendingAction.Withdrawal
-	if w.MeshUID != string(mesh.UID) || w.SourceVersion != mesh.ResourceVersion || len(w.Consumers) != 1 || w.Consumers[0].MachineName != "withdrawal-survivor" || w.Consumers[0].SecretUID == "" {
+	if w.MeshUID != string(mesh.UID) || w.SourceVersion != mesh.ResourceVersion || len(w.Consumers) != 2 || w.Consumers[0].MachineName != "withdrawal-survivor" || w.Consumers[0].SecretUID == "" {
 		t.Fatalf("lost identities: %+v", w)
 	}
 	copied := reloaded.DeepCopy()
@@ -115,4 +126,77 @@ func verifyPeerWithdrawalCapture(t *testing.T, api client.Client) {
 	if err := api.Get(ctx, client.ObjectKeyFromObject(child), child); err != nil {
 		t.Fatal("capture deleted child", err)
 	}
+	gvk := schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"}
+	mesh.Data[tunnel.PeerPublicKeyPrefix+"late-join"] = []byte("late-key")
+	if err := api.Update(ctx, mesh); err != nil {
+		t.Fatal(err)
+	}
+	if applied, err := ApplyPeerWithdrawal(ctx, api, gvk, reloaded, "", "6443"); err == nil || applied {
+		t.Fatal("new recipient bypassed retained inventory", applied, err)
+	}
+	if err := api.Get(ctx, client.ObjectKeyFromObject(mesh), mesh); err != nil {
+		t.Fatal(err)
+	}
+	if len(mesh.Data[tunnel.PeerPublicKeyPrefix+child.Name]) == 0 {
+		t.Fatal("membership error still removed peer")
+	}
+	delete(mesh.Data, tunnel.PeerPublicKeyPrefix+"late-join")
+	if err := api.Update(ctx, mesh); err != nil {
+		t.Fatal(err)
+	}
+	if applied, err := ApplyPeerWithdrawal(ctx, api, gvk, reloaded, "", "6443"); err != nil || applied {
+		t.Fatal("withdrawal acknowledged without receipts", applied, err)
+	}
+	if err := api.Get(ctx, client.ObjectKeyFromObject(mesh), mesh); err != nil {
+		t.Fatal(err)
+	}
+	if len(mesh.Data[tunnel.PeerPublicKeyPrefix+child.Name]) != 0 {
+		t.Fatal("peer not withdrawn")
+	}
+	// Real Secret writes model independently arriving native acknowledgements.
+	// This verifies controller gating, not a native WireGuard application.
+	hash, err := tunnel.SitePeerHash(mesh.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ack, err := json.Marshal(tunnel.SiteApplied{NodeUID: string(site.UID), PublicKey: "site-key", Hash: hash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mesh.Data[tunnel.SiteAppliedPrefix+site.Name] = ack
+	if err := api.Update(ctx, mesh); err != nil {
+		t.Fatal(err)
+	}
+	if applied, err := ApplyPeerWithdrawal(ctx, api, gvk, reloaded, "", "6443"); err != nil || applied {
+		t.Fatal("site receipt bypassed remote receipt", applied, err)
+	}
+	doc, err := tunnel.RemotePeerDocument(mesh.Data, "10.100.0.2", "", "6443")
+	if err != nil || len(doc) == 0 {
+		t.Fatal("missing survivor document", err)
+	}
+	secret := &corev1.Secret{}
+	if err := api.Get(ctx, client.ObjectKey{Namespace: g.Namespace, Name: tunnel.AdoptionSecretName("withdrawal-survivor")}, secret); err != nil {
+		t.Fatal(err)
+	}
+	secret.Data = map[string][]byte{tunnel.CloudPeersKey: doc}
+	secret.Annotations = map[string]string{tunnel.AppliedListAnnotation: tunnel.HashPeerList(doc)}
+	if err := api.Update(ctx, secret); err != nil {
+		t.Fatal(err)
+	}
+	if err := api.Get(ctx, client.ObjectKeyFromObject(g), reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if applied, err := ApplyPeerWithdrawal(ctx, api, gvk, reloaded, "", "6443"); err != nil || !applied {
+		t.Fatal("retained recipients did not converge", applied, err)
+	}
+	if err := api.Get(ctx, client.ObjectKeyFromObject(child), child); err != nil {
+		t.Fatal("publication deleted child", err)
+	}
+	if err := api.Delete(ctx, secret); err != nil {
+		t.Fatal(err)
+	}
+	if applied, err := ApplyPeerWithdrawal(ctx, api, gvk, reloaded, "", "6443"); err != nil || applied {
+		t.Fatal("missing recipient acknowledged withdrawal", applied, err)
+	}
+
 }

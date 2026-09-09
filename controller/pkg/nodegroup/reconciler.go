@@ -20,10 +20,11 @@ const GroupFinalizer = "cloud-provisioning.appmana.com/node-group"
 // must bypass the cache so planning observes completed creation and deletion.
 // This experimental reconciler is not registered in the production manager yet.
 type Reconciler struct {
-	API        client.Client
-	Workload   client.Client
-	MachineGVK schema.GroupVersionKind
-	MeshName   string
+	API             client.Client
+	Workload        client.Client
+	MachineGVK      schema.GroupVersionKind
+	MeshName        string
+	APIVIP, APIPort string
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -120,7 +121,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				_, err := CapturePeerWithdrawal(ctx, r.API, bound)
 				return again, err
 			}
-			return ctrl.Result{}, fmt.Errorf("direct withdrawal inventory captured; publication and native acknowledgements remain required")
+			applied, err := ApplyPeerWithdrawal(ctx, r.API, r.MachineGVK, bound, r.APIVIP, r.APIPort)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if !applied {
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			}
+			return ctrl.Result{}, fmt.Errorf("direct withdrawal acknowledged; claim removal completion remains required")
 		default:
 			return ctrl.Result{}, fmt.Errorf("unknown pending group action")
 		}

@@ -11,9 +11,17 @@
       "digest": "sha256:940283e1836f9e4748c8ca1ae4e71e361f7d50fb85fcd845d3a593986cfc34c5",
       "registryDigestVerified": true,
       "remaining": [
-        "Linux image and combined manifest completion",
+        "Rebuild combined manifest with Windows OS version from the built image config",
         "Single-NIC VM CNI and lifecycle acceptance"
-      ]
+      ],
+      "workflowConclusion": "success",
+      "combinedImage": "ghcr.io/appmana/node:v3.32.1-appmana.post.3-cloud-provisioning-windows-isolation-v3.32.1-2c82c85e8ed1",
+      "combinedDigest": "sha256:928dacedbef834ee94da46057f7ef078ecdb1a5155ee5208c3ec9e54c81b5350",
+      "linuxNodeDigest": "sha256:35b668c2f5fa95bc5ec462a7cfaac732515add6608c103b401feb701623d8a9f",
+      "linuxCNIDigest": "sha256:eac0e20c883772bce51d07fa8f5e6a87c57002e87d33a114a69d611389d039cc",
+      "windowsImageOSVersion": "10.0.20348.5499",
+      "combinedWindowsDescriptorOSVersion": "10.0.20348.5622",
+      "combinedDescriptorValid": false
     }
   ]
 }

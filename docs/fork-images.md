@@ -27,8 +27,12 @@ tests also compile for the real Windows API types.
 
 [Published Calico candidate results](validation/calico-branch-images-results.json)
 record the registry-verified Windows image for source `2c82c85e8ed1`. Use its
-immutable digest when preparing the VM acceptance run. Linux image and combined
-manifest completion remain pending for this recorded build.
+immutable digest when preparing the VM acceptance run. The workflow completed,
+but registry inspection found an incorrect Windows OS version in its combined
+manifest: `10.0.20348.5622` instead of the image's `10.0.20348.5499`. Use the
+architecture-specific digest until a corrected combined manifest is verified.
+Both candidate branches now derive that field from the built image configuration;
+the earlier publisher queried a moving Nano Server tag.
 
 Both candidates acknowledge workload updates only after HNS policy application
 succeeds. The 3.31 branch also backports 3.32's serialized Goldmane statistics

@@ -154,17 +154,26 @@ func verifyPeerWithdrawalCapture(t *testing.T, api client.Client) {
 	if len(mesh.Data[tunnel.PeerPublicKeyPrefix+child.Name]) != 0 {
 		t.Fatal("peer not withdrawn")
 	}
+	reloaded = verifyWithdrawalExpansion(t, api, reloaded)
+	if err := api.Get(ctx, client.ObjectKeyFromObject(mesh), mesh); err != nil {
+		t.Fatal(err)
+	}
 	// Real Secret writes model independently arriving native acknowledgements.
 	// This verifies controller gating, not a native WireGuard application.
 	hash, err := tunnel.SitePeerHash(mesh.Data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ack, err := json.Marshal(tunnel.SiteApplied{NodeUID: string(site.UID), PublicKey: "site-key", Hash: hash})
-	if err != nil {
-		t.Fatal(err)
+	for _, recipient := range reloaded.Status.PendingAction.Withdrawal.Consumers {
+		if !recipient.Site {
+			continue
+		}
+		ack, err := json.Marshal(tunnel.SiteApplied{NodeUID: recipient.NodeUID, PublicKey: recipient.PublicKey, Hash: hash})
+		if err != nil {
+			t.Fatal(err)
+		}
+		mesh.Data[tunnel.SiteAppliedPrefix+recipient.NodeName] = ack
 	}
-	mesh.Data[tunnel.SiteAppliedPrefix+site.Name] = ack
 	if err := api.Update(ctx, mesh); err != nil {
 		t.Fatal(err)
 	}

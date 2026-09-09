@@ -131,6 +131,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				_, err := CapturePeerWithdrawal(ctx, r.API, bound)
 				return again, err
 			}
+			_, expanded, err := ExtendPeerWithdrawal(ctx, r.API, bound)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if expanded {
+				return again, nil
+			}
 			applied, err := BeginRemoval(ctx, r.API, r.MachineGVK, bound, r.APIVIP, r.APIPort)
 			if err != nil {
 				return ctrl.Result{}, err

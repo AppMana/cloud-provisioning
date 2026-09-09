@@ -201,9 +201,13 @@ its own eviction and withdrawal gates before triggering that teardown.
       The real API test preserves finalizers, rejects a replacement Machine,
       resumes across reloads, and rejects replay of an old completed action.
       CAPI teardown is simulated by deleting test resources at each boundary.
-- [ ] Exercise direct withdrawal and claim teardown on VMs. Membership expansion
-      during an active withdrawal currently blocks and needs a durable inventory
-      extension.
+- [x] Extend the saved withdrawal inventory for newly published peers before
+      accepting acknowledgements. The real API test retains the original prefix,
+      reloads the extension, rejects stale updates and changed keys, and preserves
+      recipients that disappear from current publication.
+- [ ] Exercise direct withdrawal, concurrent membership changes and claim teardown
+      on VMs. Concurrent retirement of a required consumer needs explicit lifetime
+      evidence before its acknowledgement requirement can be released.
 - [ ] Verify native retirement acknowledgements and preparation races around the
       drain marker, withdraw direct mesh peers, and serialize claim removal.
       Gateway retirement alone leaves the claim retained.

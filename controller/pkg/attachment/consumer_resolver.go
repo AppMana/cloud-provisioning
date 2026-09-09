@@ -133,3 +133,23 @@ func (r MeshConsumerResolver) resolveTargets(ctx context.Context, mesh *corev1.S
 	sort.Slice(consumers, func(i, j int) bool { return consumers[i].NodeName < consumers[j].NodeName })
 	return consumers, keysByUID, nil
 }
+
+// PublishedConsumers resolves identities from an observed mesh snapshot. A
+// caller extending a durable inventory must retain its previous recipients.
+func (r MeshConsumerResolver) PublishedConsumers(ctx context.Context, mesh *corev1.Secret) ([]ConsumerTarget, error) {
+	if r.Reader == nil || mesh == nil || r.Namespace == "" || r.SecretName == "" || r.SecretUID == "" || mesh.Namespace != r.Namespace || mesh.Name != r.SecretName || string(mesh.UID) != r.SecretUID || mesh.ResourceVersion == "" || !mesh.DeletionTimestamp.IsZero() {
+		return nil, fmt.Errorf("current mesh snapshot and resolver scope required")
+	}
+	targets, _, err := r.resolveTargets(ctx, mesh, nil)
+	if err != nil {
+		return nil, err
+	}
+	last := &corev1.Secret{}
+	if err := r.Reader.Get(ctx, client.ObjectKeyFromObject(mesh), last); err != nil {
+		return nil, err
+	}
+	if last.UID != mesh.UID || last.ResourceVersion != mesh.ResourceVersion || !last.DeletionTimestamp.IsZero() {
+		return nil, fmt.Errorf("mesh changed during consumer resolution")
+	}
+	return targets, nil
+}

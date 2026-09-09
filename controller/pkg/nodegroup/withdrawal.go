@@ -145,3 +145,63 @@ func ApplyPeerWithdrawal(ctx context.Context, api client.Client, gvk schema.Grou
 	}
 	return true, nil
 }
+
+// ExtendPeerWithdrawal appends newly published consumers before their receipts
+// can satisfy removal. Previously captured recipients are never removed or
+// replaced, including when they disappear from the current published mesh.
+func ExtendPeerWithdrawal(ctx context.Context, api client.Client, group *v1alpha1.ProvisionedNodeGroupClaim) (*v1alpha1.ProvisionedNodeGroupClaim, bool, error) {
+	if _, err := drainWorker(group); err != nil {
+		return nil, false, err
+	}
+	a := group.Status.PendingAction
+	if api == nil || a.Removing || a.Withdrawal == nil || a.Gateways == nil || a.Withdrawal.MeshName != a.Gateways.Mesh {
+		return nil, false, fmt.Errorf("active withdrawal inventory required")
+	}
+	w := a.Withdrawal
+	mesh := &corev1.Secret{}
+	if err := api.Get(ctx, client.ObjectKey{Namespace: group.Namespace, Name: w.MeshName}, mesh); err != nil {
+		return nil, false, err
+	}
+	resolver := attachment.MeshConsumerResolver{Reader: api, Namespace: group.Namespace, SecretName: w.MeshName, SecretUID: w.MeshUID}
+	targets, err := resolver.PublishedConsumers(ctx, mesh)
+	if err != nil {
+		return nil, false, err
+	}
+	next := group.DeepCopy()
+	for _, c := range targets {
+		if !c.Site && c.MachineName == a.ChildName {
+			if c.NodeUID != a.NodeUID || c.PublicKey != w.PublicKey {
+				return nil, false, fmt.Errorf("retiring peer identity changed")
+			}
+			continue
+		}
+		if c.NodeUID == a.NodeUID || c.PublicKey == w.PublicKey {
+			return nil, false, fmt.Errorf("retiring identity overlaps new consumer")
+		}
+		value := v1alpha1.GroupPeerConsumer{NodeName: c.NodeName, NodeUID: c.NodeUID, Site: c.Site, MachineName: c.MachineName, TunnelAddress: c.TunnelAddress, PublicKey: c.PublicKey, SecretUID: c.SecretUID}
+		found := false
+		for _, old := range next.Status.PendingAction.Withdrawal.Consumers {
+			if old.NodeName == value.NodeName || old.NodeUID == value.NodeUID || (old.MachineName != "" && old.MachineName == value.MachineName) || (old.PublicKey != "" && old.PublicKey == value.PublicKey) {
+				if !reflect.DeepEqual(old, value) {
+					return nil, false, fmt.Errorf("retained consumer identity changed")
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			next.Status.PendingAction.Withdrawal.Consumers = append(next.Status.PendingAction.Withdrawal.Consumers, value)
+		}
+	}
+	if len(next.Status.PendingAction.Withdrawal.Consumers) == len(w.Consumers) {
+		return group.DeepCopy(), false, nil
+	}
+	expected := next.DeepCopy()
+	if err := api.Status().Update(ctx, next); err != nil {
+		return nil, false, err
+	}
+	if !reflect.DeepEqual(next.Status.PendingAction, expected.Status.PendingAction) {
+		return nil, false, fmt.Errorf("API did not retain extended consumer inventory")
+	}
+	return next, true, nil
+}

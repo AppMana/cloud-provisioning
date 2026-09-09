@@ -83,6 +83,9 @@ func (c *Controller) Reconcile(ctx context.Context, namespace string) ([]Machine
 		return nil, err
 	}
 
+	if err := c.checkDistinctBindings(ctx, namespace, names); err != nil {
+		return nil, err
+	}
 	var out []Machine
 	for _, name := range names {
 		m, err := c.reconcileOne(ctx, namespace, name)
@@ -177,13 +180,7 @@ func (c *Controller) reconcileOne(ctx context.Context, namespace, name string) (
 	// Which node backs it, read from the machine rather than passed
 	// in. The annotation is what the printer column shows; the spec
 	// field is where a template puts it.
-	binding := obj.Metadata.Annotations[containerNameAnnotation]
-	if binding == "" {
-		binding = obj.Spec.ContainerName
-	}
-	if binding == "" {
-		binding = name
-	}
+	binding := machineBinding(name, obj.Metadata.Annotations, obj.Spec.ContainerName)
 
 	node, err := c.node(binding)
 	if err != nil {

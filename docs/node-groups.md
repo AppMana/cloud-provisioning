@@ -26,6 +26,15 @@ release namespace, plus pod listing and eviction permissions for workload drain.
 It defaults to `false`; the group CRD is installed separately for this experiment.
 Ready aggregation, KEDA integration and complete VM qualification remain pending.
 
+The fake CAPI provider currently binds each template to a fixed remote VM slot.
+A template naming `remote1` cannot supply multiple group replicas: the provider
+rejects duplicate bindings before reporting addresses or starting a guest.
+Generated group child names also require explicit slot allocation. The next VM
+harness step is a durable pool allocator that reserves one remote slot per
+infrastructure Machine UID and releases it after teardown. This allocation is
+separate from CAPA, where AWS provisions each Machine from the shared template.
+
+
 ## API and ownership
 
 Introduce `ProvisionedNodeGroupClaim` with:

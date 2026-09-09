@@ -16,6 +16,12 @@ Those address-domain cases require real cloud validation until the VM topology
 and provider model support them together. Changing reported status alone would
 not reproduce the corresponding routing behavior.
 
+The fake provider checks remote-slot bindings across its namespace before each
+reconcile pass. Two infrastructure Machines bound to the same slot, including a
+terminating Machine, block the pass before address publication or VM changes.
+This protects fixed-template tests; it does not allocate slots for generated
+node-group names. A durable pool allocator remains required for those tests.
+
 Out-of-band workload probes isolate pod-network behavior from API-server-to-
 kubelet access. AWS rows require a separate exec/logs check through every
 control plane and record it in `kubelet-access.json`. See the

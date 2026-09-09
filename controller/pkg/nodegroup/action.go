@@ -77,6 +77,9 @@ func ReserveAction(ctx context.Context, writer client.Client, group *v1alpha1.Pr
 	if writer == nil || group == nil || action == nil || group.ResourceVersion == "" || group.Status.PendingAction != nil || action.Generation != group.Generation || action.Generation < 1 || action.ID == "" {
 		return nil, fmt.Errorf("invalid action reservation")
 	}
+	if action.NodeName != "" || action.NodeUID != "" || action.MachineUID != "" || action.ProviderID != "" {
+		return nil, fmt.Errorf("new reservation must resolve its target separately")
+	}
 	name, e := childName(group, int(action.Ordinal))
 	if e != nil {
 		return nil, e

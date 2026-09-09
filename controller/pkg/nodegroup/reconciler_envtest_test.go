@@ -77,6 +77,23 @@ func verifyRealAPIReconciliation(t *testing.T, api client.Client) {
 			t.Fatal("changed live child before withdrawal", c.Name)
 		}
 	}
+	// Ensure the API schema retains resolved target identity across restarts.
+	group.Status.PendingAction.NodeName = "reserved-node"
+	group.Status.PendingAction.NodeUID = "reserved-node-uid"
+	group.Status.PendingAction.MachineUID = "reserved-machine-uid"
+	group.Status.PendingAction.ProviderID = "test:///reserved"
+	if err := api.Status().Update(ctx, group); err != nil {
+		t.Fatal(err)
+	}
+	observed := &v1alpha1.ProvisionedNodeGroupClaim{}
+	if err := api.Get(ctx, request.NamespacedName, observed); err != nil {
+		t.Fatal(err)
+	}
+	a := observed.Status.PendingAction
+	if a.NodeName != "reserved-node" || a.NodeUID != "reserved-node-uid" || a.MachineUID != "reserved-machine-uid" || a.ProviderID != "test:///reserved" {
+		t.Fatal("API pruned drain target", a)
+	}
+
 }
 
 func verifyDeletingGroupCreation(t *testing.T, api client.Client) {

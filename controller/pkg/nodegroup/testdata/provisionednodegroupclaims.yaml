@@ -186,6 +186,14 @@ spec:
                   childName:
                     type: string
                     minLength: 1
+                  nodeName:
+                    type: string
+                  nodeUID:
+                    type: string
+                  machineUID:
+                    type: string
+                  providerID:
+                    type: string
                   childUID:
                     type: string
                   template:

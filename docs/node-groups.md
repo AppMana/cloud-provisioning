@@ -133,8 +133,12 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Add a workload API drain operation with Node UID checks, cordon, and
       UID-preconditioned pod eviction. Real API tests verify PDB blockage,
       subsequent eviction, and retention of network DaemonSet pods.
-- [ ] Persist resolved Node identity, connect drain to group reconciliation,
-      withdraw attachments, and serialize claim removal.
+- [x] Resolve and persist the Machine UID, Node UID, and provider ID for a drain
+      reservation. Resolver tests cover CAPI `v1beta1` and `v1beta2` object shapes
+      and reject replacement Nodes; the real API test verifies schema retention.
+      Live CAPI validation of this binding remains part of VM acceptance.
+- [ ] Connect target binding and drain to group reconciliation, withdraw attachments,
+      and serialize claim removal.
 - [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.
 - [ ] Run single-NIC VM 0→3→1→0, controller restart, failed boot, PDB blockage,
       group recreation, and survivor-traffic tests.

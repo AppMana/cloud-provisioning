@@ -16,6 +16,10 @@ type ProvisionedNodeClaimTemplate struct {
 	Spec ProvisionedNodeClaimSpec `json:"spec"`
 }
 type NodeGroupAction struct {
+	NodeName   string                        `json:"nodeName,omitempty"`
+	NodeUID    string                        `json:"nodeUID,omitempty"`
+	MachineUID string                        `json:"machineUID,omitempty"`
+	ProviderID string                        `json:"providerID,omitempty"`
 	ID         string                        `json:"id"`
 	Type       string                        `json:"type"`
 	Generation int64                         `json:"generation"`

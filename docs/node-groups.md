@@ -122,7 +122,11 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [ ] Integrate action execution into reconciliation and handle group deletion
       while creation is pending.
 - [ ] Aggregate Ready Nodes and attachment health.
-- [ ] Implement cordon, eviction, withdrawal, and serialized removal.
+- [x] Add a workload API drain operation with Node UID checks, cordon, and
+      UID-preconditioned pod eviction. Real API tests verify PDB blockage,
+      subsequent eviction, and retention of network DaemonSet pods.
+- [ ] Persist resolved Node identity, connect drain to group reconciliation,
+      withdraw attachments, and serialize claim removal.
 - [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.
 - [ ] Run single-NIC VM 0→3→1→0, controller restart, failed boot, PDB blockage,
       group recreation, and survivor-traffic tests.

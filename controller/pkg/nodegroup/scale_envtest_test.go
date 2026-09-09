@@ -3,6 +3,8 @@ package nodegroup
 import (
 	"context"
 	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"os"
@@ -117,6 +119,12 @@ func TestRealAPIScaleContract(t *testing.T) {
 	// Controller intent uses the same resource version as KEDA scale updates.
 	scheme := runtime.NewScheme()
 	if e = v1alpha1.AddToScheme(scheme); e != nil {
+		t.Fatal(e)
+	}
+	if e = corev1.AddToScheme(scheme); e != nil {
+		t.Fatal(e)
+	}
+	if e = policyv1.AddToScheme(scheme); e != nil {
 		t.Fatal(e)
 	}
 	typed, e := client.New(cfg, client.Options{Scheme: scheme})
@@ -276,5 +284,7 @@ func TestRealAPIScaleContract(t *testing.T) {
 	if restarted.Status.PendingAction.ID != next.ID {
 		t.Fatal("lost next reservation")
 	}
+
+	verifyRealAPIDrain(t, fresh)
 
 }

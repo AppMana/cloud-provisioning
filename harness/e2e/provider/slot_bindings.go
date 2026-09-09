@@ -77,20 +77,11 @@ func (c *Controller) reserveEligibleBindings(ctx context.Context, namespace stri
 	var pending []error
 	for _, item := range append(fixed, dynamic...) {
 		if item.deleting {
-			_, pool, err := c.Slots.readPool(ctx)
+			unallocated, err := c.Slots.CancelUnallocated(ctx, SlotOwner{Namespace: namespace, Name: item.name, UID: item.uid})
 			if err != nil {
 				return nil, err
 			}
-			reserved := false
-			if pool != nil {
-				for _, owner := range pool.Owners {
-					if owner.UID == item.uid {
-						reserved = true
-						break
-					}
-				}
-			}
-			if !reserved {
+			if unallocated {
 				if item.annotations[instanceAnnotation] != "" {
 					return nil, fmt.Errorf("bootstrapped deleting Machine lacks its reservation")
 				}

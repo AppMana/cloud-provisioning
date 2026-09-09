@@ -16,6 +16,13 @@ func (s SlotStore) readPool(ctx context.Context) (*corev1.ConfigMap, *SlotPool, 
 	if s.API == nil || s.Namespace == "" || s.Name == "" || s.Lab == "" || len(s.Slots) == 0 {
 		return nil, nil, fmt.Errorf("slot pool scope required")
 	}
+	slots := append([]string(nil), s.Slots...)
+	slices.Sort(slots)
+	for i, slot := range slots {
+		if slot == "" || strings.TrimSpace(slot) != slot || i > 0 && slots[i-1] == slot {
+			return nil, nil, fmt.Errorf("invalid slot inventory")
+		}
+	}
 	raw, err := s.API.Run(ctx, "-n", s.Namespace, "get", "configmap", s.Name, "--ignore-not-found", "-o", "json")
 	if err != nil {
 		return nil, nil, err
@@ -27,8 +34,6 @@ func (s SlotStore) readPool(ctx context.Context) (*corev1.ConfigMap, *SlotPool, 
 	if err := json.Unmarshal(raw, cm); err != nil {
 		return nil, nil, err
 	}
-	slots := append([]string(nil), s.Slots...)
-	slices.Sort(slots)
 	pool := &SlotPool{}
 	if err := json.Unmarshal([]byte(cm.Data["pool.json"]), pool); err != nil {
 		return nil, nil, err

@@ -21,11 +21,16 @@ type slotConcurrentWriter struct {
 	SlotCommands
 	beforePatch func()
 	fired       bool
+	operation   string
 }
 
 func (w *slotConcurrentWriter) Run(ctx context.Context, args ...string) ([]byte, error) {
+	operation := w.operation
+	if operation == "" {
+		operation = "patch"
+	}
 	for _, arg := range args {
-		if arg == "patch" && !w.fired {
+		if arg == operation && !w.fired {
 			w.fired = true
 			w.beforePatch()
 			break
@@ -40,7 +45,7 @@ func TestSlotStoreRealAPI(t *testing.T) {
 	if os.Getenv("CLDT_SLOT_API_TEST") != "1" {
 		t.Skip("set CLDT_SLOT_API_TEST=1 for the retained VM API")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	api := slotTestAPI{}
 	ns := fmt.Sprintf("cldt-slot-test-%d", time.Now().UnixNano())
@@ -80,7 +85,7 @@ func TestSlotStoreRealAPI(t *testing.T) {
 		}
 	}()
 	store := SlotStore{API: api, Namespace: ns, Name: "pool", Lab: "isolated-test", Slots: []string{"remote3", "remote1", "remote2"}}
-	first := SlotOwner{Namespace: ns, Name: "generated-group-0", UID: "infra-0"}
+	first := createSlotTestOwner(t, ctx, ns, "generated-group-0")
 	if slot, err := store.Reserve(ctx, first, ""); err != nil || slot != "remote1" {
 		t.Fatal("first allocation", slot, err)
 	}
@@ -94,8 +99,8 @@ func TestSlotStoreRealAPI(t *testing.T) {
 	if _, err := store.Reserve(ctx, first, "remote2"); err == nil {
 		t.Fatal("owner moved between slots")
 	}
-	second := SlotOwner{Namespace: ns, Name: "generated-group-1", UID: "infra-1"}
-	third := SlotOwner{Namespace: ns, Name: "generated-group-2", UID: "infra-2"}
+	second := createSlotTestOwner(t, ctx, ns, "generated-group-1")
+	third := createSlotTestOwner(t, ctx, ns, "generated-group-2")
 	racer := &slotConcurrentWriter{SlotCommands: api, beforePatch: func() {
 		if slot, err := restarted.Reserve(ctx, second, ""); err != nil || slot != "remote2" {
 			t.Fatal("concurrent allocation", slot, err)
@@ -109,7 +114,7 @@ func TestSlotStoreRealAPI(t *testing.T) {
 	if slot, err := restarted.Reserve(ctx, third, ""); err != nil || slot != "remote3" {
 		t.Fatal("retry reused occupied slot", slot, err)
 	}
-	if _, err := store.Reserve(ctx, SlotOwner{Namespace: ns, Name: "overflow", UID: "infra-3"}, ""); err == nil {
+	if _, err := store.Reserve(ctx, createSlotTestOwner(t, ctx, ns, "overflow"), ""); err == nil {
 		t.Fatal("overcommitted pool")
 	}
 	for _, owner := range []SlotOwner{first, second, third} {
@@ -118,6 +123,7 @@ func TestSlotStoreRealAPI(t *testing.T) {
 		}
 	}
 	verifyPooledBindings(t, ctx, ns)
+	verifyCancellationFences(t, ctx, ns)
 	changed := store
 	changed.Slots = []string{"remote1", "remote2"}
 	if _, err := changed.Reserve(ctx, first, ""); err == nil {

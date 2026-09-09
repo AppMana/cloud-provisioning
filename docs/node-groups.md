@@ -52,7 +52,8 @@ The VM provider applies these lifecycle rules:
 - Reserve fixed bindings first, then assign free slots to generated names.
 - Bind each reservation and provider ID to the infrastructure Machine UID.
 - Persist reservations with ConfigMap UID and resource-version checks before
-  publishing addresses or starting a guest.
+  publishing addresses or starting a guest. New reservations also verify the live
+  infrastructure Machine UID after reading the pool and reject deleting owners.
 - Continue reconciling reserved Machines when additional requests exceed capacity.
 - Record a durable launch receipt before waiting for guest readiness. Retries
   observe the same running VM; a stopped predecessor is required for slot reuse.
@@ -61,7 +62,9 @@ The VM provider applies these lifecycle rules:
   after the infrastructure Machine UID disappears.
 - Release only the provider finalizer for a deleting infrastructure Machine that
   has neither a reservation nor a bootstrap receipt. This provider operation
-  does not implement group cancellation.
+  does not implement group cancellation. Before releasing the finalizer, it writes
+  a cancellation fence to the pool so an allocator using an older snapshot cannot
+  reserve the deleted Machine.
 
 The offline lab also needs the remote dialer DaemonSet images imported into each
 joined VM's distribution runtime before adoption can complete. The pooled command
@@ -97,6 +100,13 @@ The continuity observer pauses one second between matrices and measures sampled
 request success. UDP during removal and high-rate packet-loss behavior remain
 unverified. Bootstrap interruption during disk reset or network plumbing also
 requires separate validation.
+
+The [cancellation fence checks](validation/vm-slot-cancellation-fence-results.json)
+exercise competing allocation and cancellation writes against a real API,
+including first-pool creation. Native provider cancellation of an unallocated
+infrastructure Machine preserves the three running VMs, eight Node UIDs, and
+slot reservations. Combined provider statement coverage is 71.8%; this evidence
+covers the provider operation separately from group cancellation.
 
 [Real API slot tests](validation/vm-slot-reservation-api-results.json) cover
 reservation contention, restart recovery, exhaustion, and provider finalizer

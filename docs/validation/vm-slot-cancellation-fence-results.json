@@ -1,0 +1,163 @@
+{
+  "observedAt": "2026-09-09T22:20:47.747383+00:00",
+  "probeInfrastructureUID": "a963266c-59e8-4485-a85a-7222aa8c2f7b",
+  "providerFinalizerObserved": true,
+  "unallocatedBeforeDeletion": true,
+  "infrastructureObjectAbsentAfterDeletion": true,
+  "cancellationFenceRecorded": true,
+  "before": {
+    "vms": [
+      {
+        "name": "/clab-cldt-remote1",
+        "wrapperID": "97f367f093aca8cf7a4e450aff4c299fb5cfed5d554113dde915e4dfd4cde2fb",
+        "running": true,
+        "startedAt": "2026-09-09T21:30:25.415471705Z"
+      },
+      {
+        "name": "/clab-cldt-remote2",
+        "wrapperID": "636602ec96fd135eae0adcd5f41b4d5b968ba88195b5d2c8a433e3f95bd14836",
+        "running": true,
+        "startedAt": "2026-09-09T21:57:16.188273546Z"
+      },
+      {
+        "name": "/clab-cldt-remote3",
+        "wrapperID": "a8ce135e16d7cb23494a2dfa5446a651fa059bb2ccda49d651b9cb40399db857",
+        "running": true,
+        "startedAt": "2026-09-09T21:51:31.597752576Z"
+      }
+    ],
+    "nodeUIDs": {
+      "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+      "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+      "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+      "remote1": "4674271b-7639-49e7-aa0f-9228cc556459",
+      "remote2": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+      "remote3": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+      "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+      "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+    },
+    "pool": {
+      "lab": "cldt",
+      "slots": [
+        "remote1",
+        "remote2",
+        "remote3"
+      ],
+      "owners": {
+        "remote1": {
+          "namespace": "cloud-provisioning",
+          "name": "pooled-workers-8ae81037d7a1043c-0",
+          "uid": "020f8372-4e25-49f9-8ef9-58ea9d227202"
+        },
+        "remote2": {
+          "namespace": "cloud-provisioning",
+          "name": "pooled-workers-8ae81037d7a1043c-1",
+          "uid": "895eb813-8f87-4318-8ac7-a5e2a9c02961"
+        },
+        "remote3": {
+          "namespace": "cloud-provisioning",
+          "name": "pooled-workers-8ae81037d7a1043c-2",
+          "uid": "c544f82d-868b-41e4-ac3b-fc998aa15571"
+        }
+      }
+    }
+  },
+  "after": {
+    "vms": [
+      {
+        "name": "/clab-cldt-remote1",
+        "wrapperID": "97f367f093aca8cf7a4e450aff4c299fb5cfed5d554113dde915e4dfd4cde2fb",
+        "running": true,
+        "startedAt": "2026-09-09T21:30:25.415471705Z"
+      },
+      {
+        "name": "/clab-cldt-remote2",
+        "wrapperID": "636602ec96fd135eae0adcd5f41b4d5b968ba88195b5d2c8a433e3f95bd14836",
+        "running": true,
+        "startedAt": "2026-09-09T21:57:16.188273546Z"
+      },
+      {
+        "name": "/clab-cldt-remote3",
+        "wrapperID": "a8ce135e16d7cb23494a2dfa5446a651fa059bb2ccda49d651b9cb40399db857",
+        "running": true,
+        "startedAt": "2026-09-09T21:51:31.597752576Z"
+      }
+    ],
+    "nodeUIDs": {
+      "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+      "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+      "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+      "remote1": "4674271b-7639-49e7-aa0f-9228cc556459",
+      "remote2": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+      "remote3": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+      "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+      "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+    },
+    "pool": {
+      "lab": "cldt",
+      "slots": [
+        "remote1",
+        "remote2",
+        "remote3"
+      ],
+      "owners": {
+        "remote1": {
+          "namespace": "cloud-provisioning",
+          "name": "pooled-workers-8ae81037d7a1043c-0",
+          "uid": "020f8372-4e25-49f9-8ef9-58ea9d227202"
+        },
+        "remote2": {
+          "namespace": "cloud-provisioning",
+          "name": "pooled-workers-8ae81037d7a1043c-1",
+          "uid": "895eb813-8f87-4318-8ac7-a5e2a9c02961"
+        },
+        "remote3": {
+          "namespace": "cloud-provisioning",
+          "name": "pooled-workers-8ae81037d7a1043c-2",
+          "uid": "c544f82d-868b-41e4-ac3b-fc998aa15571"
+        }
+      }
+    }
+  },
+  "survivorsUnchanged": true,
+  "scope": "Provider-only cancellation of an unallocated infrastructure Machine in the capacity-exhausted single-NIC VM lab. This does not qualify group pending-child cancellation.",
+  "rawSHA256": "f7b79bf788d7b22e900979e10ed24baa681f36c5708c9bce0ffe89f737a29768",
+  "implementation": {
+    "reservation": "Read the pool, verify the live infrastructure UID and non-deleting state, then reserve using pool UID/resourceVersion checks.",
+    "cancellation": "Verify the exact infrastructure UID is deleting. If it owns a reservation require normal teardown. Otherwise change the pool version before releasing the provider finalizer.",
+    "supersedes": {
+      "commit": "2647fe66",
+      "path": "harness/e2e/provider/slot_bindings.go",
+      "behavior": "Unallocated deletion previously read the pool and released its finalizer without a reservation fence."
+    }
+  },
+  "tests": {
+    "realAPI": {
+      "command": "CLDT_SLOT_API_TEST=1 go test -race ./provider -run TestSlotStoreRealAPI -count=1 -coverprofile=/tmp/cldt-cancellation-api.cover",
+      "passed": true,
+      "elapsedSeconds": 33.157,
+      "cases": [
+        "Cancellation conflicts with an allocator paused after owner validation and before its pool patch.",
+        "Reconstructed allocator rejects the deleting UID.",
+        "Existing allocation requires normal VM teardown.",
+        "Cancellation creates an empty pool when none exists.",
+        "A stale first-pool creation cannot overwrite cancellation.",
+        "Absent and obsolete infrastructure UIDs cannot reserve.",
+        "Cancellation leaves other slot owners and controller finalizers intact."
+      ]
+    },
+    "unitAndRig": {
+      "command": "go test -race ./provider ./rig/... ./cmd/vmprovider -coverprofile=/tmp/cldt-cancellation-unit.cover",
+      "passed": true
+    },
+    "coverage": {
+      "scope": "Provider statement coverage, union of real-API and unit/race profiles with matching source blocks; rig coverage excluded from aggregate.",
+      "providerPercent": 71.8,
+      "reservePercent": 89.8,
+      "cancelUnallocatedPercent": 87.0,
+      "currentOwnerPercent": 84.2,
+      "reserveEligibleBindingsPercent": 77.8,
+      "combinedProfileSHA256": "cf3f52a120e9ccbd327aaee61574e2516d00a3dc4d2f9b086dc993693a091ee3"
+    }
+  }
+}

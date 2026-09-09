@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 )
 
 var ErrSlotCapacity = errors.New("VM pool has no available requested capacity")
+var ErrSlotOwnerInactive = errors.New("infrastructure Machine is absent, replaced, or deleting")
 
 type SlotOwner struct {
 	Namespace string `json:"namespace"`
@@ -40,11 +40,6 @@ func (s SlotStore) Reserve(ctx context.Context, owner SlotOwner, requested strin
 	}
 	slots := append([]string(nil), s.Slots...)
 	slices.Sort(slots)
-	for i, slot := range slots {
-		if slot == "" || strings.TrimSpace(slot) != slot || i > 0 && slots[i-1] == slot {
-			return "", fmt.Errorf("invalid slot inventory")
-		}
-	}
 	if requested != "" && !slices.Contains(slots, requested) {
 		return "", fmt.Errorf("requested slot is outside the pool")
 	}
@@ -78,6 +73,12 @@ func (s SlotStore) Reserve(ctx context.Context, owner SlotOwner, requested strin
 			return "", fmt.Errorf("Machine already owns another slot")
 		}
 		return assigned, nil
+	}
+	// Read the owner after the pool snapshot. Cancellation changes the pool
+	// version before releasing the Machine finalizer, fencing a writer that
+	// observed the owner before deletion began.
+	if _, err := s.currentOwner(ctx, owner, false); err != nil {
+		return "", err
 	}
 	for _, slot := range slots {
 		if requested != "" && slot != requested {

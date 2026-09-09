@@ -58,7 +58,7 @@ func verifySlotRelease(t *testing.T, ctx context.Context, s SlotStore) {
 	if n, err := s.ReleaseStopped(ctx); err != nil || n != 0 {
 		t.Fatal("release not repeatable", n, err)
 	}
-	replacement := SlotOwner{Namespace: s.Namespace, Name: name, UID: "replacement-infrastructure-uid"}
+	replacement := createSlotTestOwner(t, ctx, s.Namespace, name)
 	if slot, err := s.Reserve(ctx, replacement, ""); err != nil || slot != "remote2" {
 		t.Fatal("replacement could not reuse released slot", slot, err)
 	}

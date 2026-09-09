@@ -4,11 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 type SlotOwner struct {
@@ -17,9 +14,10 @@ type SlotOwner struct {
 	UID       string `json:"uid"`
 }
 type SlotPool struct {
-	Lab    string               `json:"lab"`
-	Slots  []string             `json:"slots"`
-	Owners map[string]SlotOwner `json:"owners"`
+	Stopped map[string]string    `json:"stopped,omitempty"`
+	Lab     string               `json:"lab"`
+	Slots   []string             `json:"slots"`
+	Owners  map[string]SlotOwner `json:"owners"`
 }
 type SlotCommands interface {
 	Run(context.Context, ...string) ([]byte, error)
@@ -47,26 +45,14 @@ func (s SlotStore) Reserve(ctx context.Context, owner SlotOwner, requested strin
 	if requested != "" && !slices.Contains(slots, requested) {
 		return "", fmt.Errorf("requested slot is outside the pool")
 	}
-	raw, err := s.API.Run(ctx, "-n", s.Namespace, "get", "configmap", s.Name, "--ignore-not-found", "-o", "json")
+	cm, loaded, err := s.readPool(ctx)
 	if err != nil {
 		return "", err
 	}
+	existing := loaded != nil
 	pool := SlotPool{Lab: s.Lab, Slots: slots, Owners: map[string]SlotOwner{}}
-	cm := &corev1.ConfigMap{}
-	existing := len(strings.TrimSpace(string(raw))) > 0
 	if existing {
-		if err := json.Unmarshal(raw, cm); err != nil {
-			return "", err
-		}
-		if cm.UID == "" || cm.ResourceVersion == "" || cm.Name != s.Name || cm.Namespace != s.Namespace || !cm.DeletionTimestamp.IsZero() {
-			return "", fmt.Errorf("invalid persisted pool identity")
-		}
-		if err := json.Unmarshal([]byte(cm.Data["pool.json"]), &pool); err != nil {
-			return "", err
-		}
-		if pool.Lab != s.Lab || !reflect.DeepEqual(pool.Slots, slots) || pool.Owners == nil {
-			return "", fmt.Errorf("persisted pool scope changed")
-		}
+		pool = *loaded
 	}
 	seen := map[string]bool{}
 	assigned := ""
@@ -110,8 +96,7 @@ func (s SlotStore) Reserve(ctx context.Context, owner SlotOwner, requested strin
 	if !existing {
 		_, err = s.API.Run(ctx, "-n", s.Namespace, "create", "configmap", s.Name, "--from-literal=pool.json="+string(data), "-o", "json")
 	} else {
-		patch, _ := json.Marshal([]map[string]any{{"op": "test", "path": "/metadata/uid", "value": string(cm.UID)}, {"op": "test", "path": "/metadata/resourceVersion", "value": cm.ResourceVersion}, {"op": "replace", "path": "/data/pool.json", "value": string(data)}})
-		_, err = s.API.Run(ctx, "-n", s.Namespace, "patch", "configmap", s.Name, "--type=json", "-p", string(patch), "-o", "json")
+		err = s.updatePool(ctx, cm, &pool)
 	}
 	if err != nil {
 		return "", err

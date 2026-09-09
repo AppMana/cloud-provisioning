@@ -84,6 +84,11 @@ func (c *Controller) Reconcile(ctx context.Context, namespace string) ([]Machine
 	if c.Slots != nil && c.Rig == nil {
 		return nil, fmt.Errorf("pooled provisioning requires a VM rig")
 	}
+	if c.Slots != nil {
+		if _, err := c.Slots.ReleaseStopped(ctx); err != nil {
+			return nil, err
+		}
+	}
 	names, err := c.machines(ctx, namespace)
 	if err != nil {
 		return nil, err

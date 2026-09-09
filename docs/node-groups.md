@@ -35,9 +35,12 @@ now reserves one remote slot per infrastructure Machine UID with ConfigMap
 UID/version checks. Its real API test covers restart recovery, contention and
 capacity exhaustion. The provider now reserves fixed bindings first and assigns unused slots to
 generated names, persisting annotations before address publication or bootstrap.
-Pooled provider IDs include the infrastructure Machine UID. Harness command
-configuration and reservation release after teardown remain required before
-a group VM campaign. This allocation is
+Pooled provider IDs include the infrastructure Machine UID. The provider records successful VM stop before removing its finalizer and
+releases the reservation after the old infrastructure UID disappears. API tests
+use a controlled stop callback; native pooled boot/teardown and harness command
+configuration remain required before a group VM campaign. Reservations left by
+interruption before the infrastructure finalizer is installed remain held and
+need a separately verified cancellation path. This allocation is
 separate from CAPA, where AWS provisions each Machine from the shared template.
 
 

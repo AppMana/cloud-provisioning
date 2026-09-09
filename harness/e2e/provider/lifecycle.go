@@ -24,7 +24,12 @@ func (c *Controller) provision(ctx context.Context, namespace, name, node, uid s
 		if !slices.Contains(finalizers, instanceFinalizer) {
 			return false, nil
 		}
-		if err := c.Rig.Node(node).Kill(ctx); err != nil {
+		stop := func() error { return c.Rig.Node(node).Kill(ctx) }
+		if c.Slots != nil {
+			if err := c.Slots.Stop(ctx, node, SlotOwner{Namespace: namespace, Name: name, UID: uid}, stop); err != nil {
+				return false, err
+			}
+		} else if err := stop(); err != nil {
 			return false, err
 		}
 		kept := slices.DeleteFunc(finalizers, func(f string) bool { return f == instanceFinalizer })

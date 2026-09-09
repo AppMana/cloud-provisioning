@@ -22,8 +22,9 @@ terminating Machine, block the pass before address publication or VM changes.
 Fixed-template tests retain their existing behavior. With `Controller.Slots`
 configured, the provider reserves fixed bindings before allocating generated
 node-group names and saves each binding before provisioning. Pooled provider
-IDs include the infrastructure Machine UID. Teardown release and command-level
-configuration remain required before a complete group VM campaign.
+IDs include the infrastructure Machine UID. Stop receipts retain the reservation through infrastructure termination; the
+provider releases it after that UID disappears. Native pooled lifecycle tests
+and command-level configuration remain required for a group VM campaign.
 
 Out-of-band workload probes isolate pod-network behavior from API-server-to-
 kubelet access. AWS rows require a separate exec/logs check through every

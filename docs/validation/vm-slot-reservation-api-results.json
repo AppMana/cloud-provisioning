@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-09T20:25:47.715686+00:00",
+  "observedAt": "2026-09-09T20:29:45.003679+00:00",
   "scope": "UID-bound VM slot reservation ConfigMap transactions against the retained VM cluster API",
   "test": "CLDT_SLOT_API_TEST=1 go test -race ./provider -run TestSlotStoreRealAPI -v",
   "passed": true,
@@ -15,10 +15,18 @@
     "temporary test namespace removed",
     "fixed topology binding reserved before lexically earlier generated Machine name",
     "generated infrastructure Machine binding patched with UID/resourceVersion preconditions",
-    "reconstructed provider retains actual API Machine bindings"
+    "reconstructed provider retains actual API Machine bindings",
+    "active owner rejected before native stop callback",
+    "failed native stop leaves reservation held",
+    "persisted stop receipt skips repeat callback",
+    "terminating infrastructure object retains stopped slot",
+    "absent stopped owner releases slot once",
+    "replacement can reuse released slot",
+    "stale stop owner cannot affect replacement reservation"
   ],
   "vmProvisioningExercised": false,
-  "teardownReleaseImplemented": false,
-  "providerLifecycleIntegrationImplemented": false,
-  "providerBindingIntegrationImplemented": true
+  "teardownReleaseImplemented": true,
+  "providerLifecycleIntegrationImplemented": true,
+  "providerBindingIntegrationImplemented": true,
+  "nativeStopSimulated": true
 }

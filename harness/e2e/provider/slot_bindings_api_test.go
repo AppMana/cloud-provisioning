@@ -67,4 +67,6 @@ func verifyPooledBindings(t *testing.T, ctx context.Context, ns string) {
 	if err := restarted.reserveBindings(ctx, ns, names); err != nil {
 		t.Fatal(err)
 	}
+	verifySlotRelease(t, ctx, *store)
+
 }

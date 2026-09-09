@@ -1,0 +1,95 @@
+{
+  "observedAt": "2026-09-09T20:48:27.204568+00:00",
+  "sourceCommit": "bfd02bd12906245329161012eb14a04ee1328096",
+  "runner": "cldt-node-groups-runner-v1",
+  "rig": "KVM VMs; virtio-serial guest agent",
+  "remoteSlots": 3,
+  "nodes": [
+    {
+      "name": "cp",
+      "physicalNICs": [
+        "ens2"
+      ],
+      "ipv4": [
+        "10.10.0.10"
+      ]
+    },
+    {
+      "name": "cp2",
+      "physicalNICs": [
+        "ens2"
+      ],
+      "ipv4": [
+        "10.10.0.13"
+      ]
+    },
+    {
+      "name": "cp3",
+      "physicalNICs": [
+        "ens2"
+      ],
+      "ipv4": [
+        "10.10.0.14"
+      ]
+    },
+    {
+      "name": "w1",
+      "physicalNICs": [
+        "ens2"
+      ],
+      "ipv4": [
+        "10.10.0.11"
+      ]
+    },
+    {
+      "name": "w2",
+      "physicalNICs": [
+        "ens2"
+      ],
+      "ipv4": [
+        "10.10.0.12"
+      ]
+    },
+    {
+      "name": "remote1",
+      "physicalNICs": [
+        "ens2"
+      ],
+      "ipv4": [
+        "203.0.113.10"
+      ]
+    },
+    {
+      "name": "remote2",
+      "physicalNICs": [
+        "ens2"
+      ],
+      "ipv4": [
+        "192.0.2.10"
+      ]
+    },
+    {
+      "name": "remote3",
+      "physicalNICs": [
+        "ens2"
+      ],
+      "ipv4": [
+        "203.0.113.11"
+      ]
+    }
+  ],
+  "preInstallTopologyProofPassed": true,
+  "proofScope": [
+    "site reaches all remote slots",
+    "remote slots reach each other",
+    "remote slots cannot reach observed site addresses or directly dial site APIs"
+  ],
+  "retainedCluster": {
+    "identitiesUnchanged": true,
+    "readyNodes": 13,
+    "nodeCount": 13,
+    "hostRoutesUnchanged": true
+  },
+  "groupLifecycleQualified": false,
+  "scope": "Topology and hardware only. The pooled 0-to-3-to-1-to-0 lifecycle campaign remains pending."
+}

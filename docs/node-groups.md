@@ -67,7 +67,10 @@ the unbound template. Use this mode on a fresh pool; existing legacy provider ID
 do not contain an infrastructure UID.
 
 The command and topology tests pass, and slot transactions have real API
-coverage. A completed pooled VM lifecycle run is still pending.
+coverage. The [three-slot VM topology check](validation/node-group-vm-topology-results.json)
+verifies one physical NIC on each of eight guests, site-to-cloud reachability,
+and isolation of the site from direct remote access. A completed pooled VM
+lifecycle run is still pending.
 
 ## API and ownership
 

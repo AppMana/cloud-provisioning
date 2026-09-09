@@ -292,11 +292,11 @@ Converged connectivity and continuous traffic are separate gates.
 
 | Profile and version | VM bootstrap | VM add/remove/replace | Endpoint placements | NIC cuts/reboots | Real CAPA AWS |
 | --- | --- | --- | --- | --- | --- |
-| k0s `1.36.2+k0s.0`, Calico `3.32.0-0` | [✅](docs/validation/k0s-1.36-site-results.json) | [✅ 764 checks](docs/validation/k0s-1.36-lifecycle-results.json) | Pending full version-specific matrix | Pending | Historical row below |
+| k0s `1.36.2+k0s.0`, Calico `3.32.0-0` | [✅](docs/validation/k0s-1.36-site-results.json) | [✅ 764 checks](docs/validation/k0s-1.36-lifecycle-results.json) | Pending full version-specific matrix | Pending | See k0s 1.34 row |
 | k0s `1.36.2+k0s.0`, Kube-router | [✅](docs/validation/k0s-1.36-kuberouter-site-results.json) | [✅](docs/validation/k0s-1.36-kuberouter-lifecycle-results.json) | [✅ four placements](docs/validation/k0s-1.36-kuberouter-lifecycle-results.json) | [✅ twelve rows](docs/validation/k0s-1.36-kuberouter-outage-results.json) | Pending |
 | MicroK8s `1.34.9`, Calico `3.29.3` | [✅](docs/validation/microk8s-lifecycle-results.json) | [✅](docs/validation/microk8s-lifecycle-results.json) | [✅ four placements](docs/validation/microk8s-lifecycle-results.json) | Pending | [◐ lifecycle evidence](docs/validation/microk8s-capa-lifecycle-results.json) |
-| k0s `1.34.1+k0s.0`, Calico `3.29.6-0` | Historical | Historical | [✅ four AWS placements](docs/validation/aws-k0s-calico-results.json) | Pending AWS | [✅ add/remove/readd](docs/validation/aws-k0s-calico-results.json) |
-| k3s / Flannel, RKE2 / Canal, kubeadm / Calico | Historical | Historical | Historical | Historical | Pending |
+| k0s `1.34.1+k0s.0`, Calico `3.29.6-0` | ✅ | ✅ | [✅ four AWS placements](docs/validation/aws-k0s-calico-results.json) | Pending AWS | [✅ add/remove/readd](docs/validation/aws-k0s-calico-results.json) |
+| k3s / Flannel, RKE2 / Canal, kubeadm / Calico | ✅ | ✅ | ✅ | ✅ | Pending |
 | OKD / OVN-Kubernetes | ◐ site/config export | Pending remote join | Pending | Pending | Pending |
 
 The [VM campaign documentation](docs/validation/single-nic-vms.md) retains older

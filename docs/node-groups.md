@@ -115,8 +115,12 @@ its own eviction and withdrawal gates before triggering that teardown.
       claim UID and uses the frozen template after scale or template updates.
       The real API test rejects mismatched group/action identities and preserves
       conflicting claims for investigation.
-- [ ] Record action completion, reconcile desired capacity after committed actions,
-      and handle group deletion while creation is pending.
+- [x] Complete creation after observing the reserved child UID. Status writes use
+      resource-version checks; stale completion cannot clear a later reservation.
+      The API test verifies the next replica uses the current template. Creation
+      completion records a claim, while Node readiness remains a separate gate.
+- [ ] Integrate action execution into reconciliation and handle group deletion
+      while creation is pending.
 - [ ] Aggregate Ready Nodes and attachment health.
 - [ ] Implement cordon, eviction, withdrawal, and serialized removal.
 - [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.

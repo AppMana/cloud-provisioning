@@ -220,4 +220,61 @@ func TestRealAPIScaleContract(t *testing.T) {
 		t.Fatal("rewrote conflicting child")
 	}
 
+	if _, e = CompleteCreation(ctx, fresh, restarted, child.UID); e == nil {
+		t.Fatal("completed mismatched action")
+	}
+	child.Annotations[ActionAnnotation] = action.ID
+	if e = fresh.Update(ctx, child); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = CompleteCreation(ctx, fresh, restarted, "replaced-child"); e == nil {
+		t.Fatal("completed replacement child")
+	}
+	if e = fresh.Get(ctx, key, restarted); e != nil {
+		t.Fatal(e)
+	}
+	staleCompletion := restarted.DeepCopy()
+	// Race completion with another scaler update.
+	restarted.Spec.Replicas = new(int32)
+	*restarted.Spec.Replicas = 3
+	if e = fresh.Update(ctx, restarted); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = CompleteCreation(ctx, fresh, staleCompletion, child.UID); !apierrors.IsConflict(e) {
+		t.Fatalf("stale completion accepted: %v", e)
+	}
+	if e = fresh.Get(ctx, key, restarted); e != nil {
+		t.Fatal(e)
+	}
+	completed, e := CompleteCreation(ctx, fresh, restarted, child.UID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if completed.Status.PendingAction != nil || restarted.Status.PendingAction == nil || *completed.Spec.Replicas != 3 {
+		t.Fatal("completion changed caller or desired capacity")
+	}
+	if _, e = ResumeCreation(ctx, fresh, key, restarted.UID, action.ID); e == nil {
+		t.Fatal("replayed completed action")
+	}
+	next, e := ProposeAction(completed, []v1alpha1.ProvisionedNodeClaim{*child})
+	if e != nil || next == nil || next.Ordinal != 1 || next.Template.Spec.InfrastructureRef.Name != "next-image" {
+		t.Fatal("next replica did not use current template", next, e)
+	}
+	reservedNext, e := ReserveAction(ctx, fresh, completed, next)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = CompleteCreation(ctx, fresh, reservedNext, child.UID); !apierrors.IsNotFound(e) {
+		t.Fatalf("completed absent child: %v", e)
+	}
+	if _, e = CompleteCreation(ctx, fresh, restarted, child.UID); !apierrors.IsConflict(e) {
+		t.Fatalf("old completion cleared new reservation: %v", e)
+	}
+	if e = fresh.Get(ctx, key, restarted); e != nil {
+		t.Fatal(e)
+	}
+	if restarted.Status.PendingAction.ID != next.ID {
+		t.Fatal("lost next reservation")
+	}
+
 }

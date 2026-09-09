@@ -65,6 +65,32 @@ record the successful build workflow, exact Windows and combined-image digests,
 and the inspected platform descriptors. These images passed the workflow's
 Server 2022 and 2025 contract tests. Cluster VM acceptance remains separate.
 
+## Windows acceptance image set
+
+The [k0s 1.36 / Calico 3.32 candidate image set](../images/windows/candidates/k0s-1.36-calico-3.32.json)
+pins the Calico node, matching upstream Windows CNI installer, and forked
+Kubernetes 1.36.2 kube-proxy. The installer digest selects the LTSC 2022
+`windows/amd64` manifest. The node image also carries the fork's CNI executables;
+its node service copies those binaries to the host after installer setup.
+
+Use the shared set when preparing each Windows image:
+
+```sh
+python3 images/windows/cache.py --runtime runtime.json --windows-version 2022 \
+  --image-file images/windows/candidates/k0s-1.36-calico-3.32.json \
+  --output windows-2022-network-cache.json
+```
+
+Repeat with `--windows-version 2025` and a different output path. Add the complete
+sandbox and workload image set with additional `--image-file` or `--image` options.
+These three networking images alone are a partial cache recipe. Use these exact
+references in the acceptance DaemonSets, and install matching Linux Calico
+components and CRDs before testing the combined cluster.
+
+This set is a candidate for HostProcess testing on both OS versions. The current
+live harness remains on its recorded Calico 3.32.0 baseline. VM image baking,
+fresh-clone cache reuse, and CNI acceptance for this new set remain pending.
+
 ## Promotion gates
 
 - Require successful build and test jobs for the exact source and builder commits.

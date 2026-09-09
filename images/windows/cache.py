@@ -119,18 +119,26 @@ def evaluate(snapshot, runtime, images, year, aliases=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runtime', required=True, type=pathlib.Path)
-    parser.add_argument('--image', required=True, action='append')
+    parser.add_argument('--image', action='append', default=[])
+    parser.add_argument('--image-file', action='append', default=[], type=pathlib.Path,
+                        help='JSON list of digest-pinned image references; repeat to compose shared image sets')
     parser.add_argument('--alias', action='append', default=[], metavar='TAG=PINNED_IMAGE')
     parser.add_argument('--windows-version', required=True, choices=['2022', '2025'])
     parser.add_argument('--output', required=True, type=pathlib.Path)
     args = parser.parse_args()
+    images = list(args.image)
+    for path in args.image_file:
+        values = json.loads(path.read_text())
+        if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+            parser.error('image file must contain a JSON list of image references')
+        images.extend(values)
     aliases = []
     for item in args.alias:
         if item.count('=') != 1:
             parser.error('alias must be TAG=PINNED_IMAGE')
         reference, image = item.split('=')
         aliases.append(dict(reference=reference, image=image))
-    recipe = make_recipe(json.loads(args.runtime.read_text()), args.image, args.windows_version, aliases)
+    recipe = make_recipe(json.loads(args.runtime.read_text()), images, args.windows_version, aliases)
     with args.output.open('x') as stream:
         stream.write(json.dumps(recipe, indent=2) + '\n')
     print(recipe['sha256'])

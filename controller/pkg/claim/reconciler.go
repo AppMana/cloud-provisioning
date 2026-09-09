@@ -91,9 +91,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// creation. Deleting the claim would then leave the Machine Running
 	// with no deletionTimestamp and its instance still up. The claim
 	// owns this lifecycle, so it does the deleting itself.
-	if !containsString(claim.Finalizers, claimFinalizer) {
+	if !containsString(claim.Finalizers, Finalizer) {
+		allowed, err := r.groupAllowsProvisioning(ctx, claim)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if !allowed {
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
 		updated := claim.DeepCopy()
-		updated.Finalizers = append(updated.Finalizers, claimFinalizer)
+		updated.Finalizers = append(updated.Finalizers, Finalizer)
 		if err := r.Update(ctx, updated); err != nil {
 			return ctrl.Result{}, fmt.Errorf("adding finalizer: %w", err)
 		}
@@ -245,10 +252,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 }
 
-// claimFinalizer keeps the claim alive until the compute it created is
-// gone, so `kubectl delete provisionednodeclaim` is a reliable
-// teardown rather than an orphaning operation.
-const claimFinalizer = "cloud-provisioning.appmana.com/claim"
+// Finalizer is installed before any infrastructure creation. It keeps the claim
+// alive until its compute is gone, so claim deletion owns the whole teardown.
+const Finalizer = "cloud-provisioning.appmana.com/claim"
 
 // reconcileDelete removes what this claim created, in dependency
 // order, and only then releases the claim. Deleting the CAPI Machine
@@ -312,9 +318,9 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, claim *v1alpha1.Provis
 		return ctrl.Result{}, err
 	}
 
-	if containsString(claim.Finalizers, claimFinalizer) {
+	if containsString(claim.Finalizers, Finalizer) {
 		updated := claim.DeepCopy()
-		updated.Finalizers = removeString(updated.Finalizers, claimFinalizer)
+		updated.Finalizers = removeString(updated.Finalizers, Finalizer)
 		if err := r.Update(ctx, updated); err != nil && !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, fmt.Errorf("removing finalizer: %w", err)
 		}

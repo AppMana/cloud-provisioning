@@ -125,6 +125,18 @@ that failure is unqualified.
 
 ## Pending-worker cancellation
 
+Deleting a group cancels a reserved creation when its child is absent. A child
+that has not acquired the claim controller's lifecycle finalizer is deleted with
+UID and resource-version preconditions. Installing that finalizer first makes
+the competing deletion fail, preserving the admitted claim's lifecycle.
+
+Before admitting a new child, the claim controller reads its group directly from
+the API and checks its UID and deletion state. A late creation from a stale
+reconciler cannot start compute after its parent is deleting or gone. Already
+admitted claims continue provisioning so that removal can resolve and drain
+their Nodes. Real API tests cover late creation and concurrent admission;
+native VM validation of this cancellation path remains pending.
+
 Group scale-down currently requires a resolved Machine and Node identity. A
 capacity-pending child therefore retains its claim and the group's drain action.
 In the native four-request, three-slot case, the excess Machine already has a
@@ -327,9 +339,11 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] During group deletion, complete a pending creation only when its matching
       child already exists, then reserve that child for draining. The API test
       verifies an absent child is never created after deletion begins.
-- [ ] Cancel unfulfilled creation reservations during group deletion and connect
-      removal actions. Until cancellation is implemented, these reservations
-      retain the group finalizer.
+- [x] Cancel absent-child creation reservations during group deletion and remove
+      unadmitted children with UID/version preconditions. Real API tests cover
+      stale creation after parent deletion and admission winning the deletion race.
+- [ ] Validate creation cancellation in the single-NIC VM lab and implement
+      cancellation for admitted workers that have not registered a Node.
 - [x] Publish observed replica counts before advancing pending actions and expose
       the workload selector through `/scale`. Provisioning and draining claims
       remain counted while their lifecycle work is pending.

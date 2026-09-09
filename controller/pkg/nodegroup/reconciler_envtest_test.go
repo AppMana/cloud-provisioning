@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	claimcontroller "github.com/appmana/cloud-provisioning/controller/pkg/claim"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -167,6 +169,11 @@ func verifyDeletingGroupCreation(t *testing.T, api client.Client) {
 				t.Fatal(err)
 			}
 			childUID = string(child.UID)
+			// This child has crossed the claim controller's admission boundary.
+			child.Finalizers = []string{claimcontroller.Finalizer}
+			if err := api.Update(ctx, child); err != nil {
+				t.Fatal(err)
+			}
 		}
 		if err := api.Delete(ctx, group); err != nil {
 			t.Fatal(err)
@@ -180,8 +187,8 @@ func verifyDeletingGroupCreation(t *testing.T, api client.Client) {
 		if created && err != nil {
 			t.Fatal("existing child stuck during deletion", err)
 		}
-		if !created && err == nil {
-			t.Fatal("unfulfilled reservation silently discarded")
+		if !created && err != nil {
+			t.Fatal("unfulfilled reservation was not cancelled", err)
 		}
 		if err := api.Get(ctx, key, group); err != nil {
 			t.Fatal(err)
@@ -194,8 +201,14 @@ func verifyDeletingGroupCreation(t *testing.T, api client.Client) {
 			t.Fatal(err)
 		}
 		if !created {
-			if len(claims.Items) != 0 || group.Status.PendingAction == nil {
+			if len(claims.Items) != 0 || group.Status.PendingAction != nil {
 				t.Fatal("created capacity during group deletion")
+			}
+			if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: key}); err != nil {
+				t.Fatal(err)
+			}
+			if err := api.Get(ctx, key, group); !apierrors.IsNotFound(err) {
+				t.Fatal("cancelled empty group retained finalizer", err)
 			}
 			continue
 		}

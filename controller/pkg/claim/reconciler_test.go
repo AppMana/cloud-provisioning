@@ -336,8 +336,8 @@ func TestReconcileDelete_RemovesComputeAndOnlyThenReleasesTheClaim(t *testing.T)
 	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), created); err != nil {
 		t.Fatalf("getting claim: %v", err)
 	}
-	if !containsString(created.Finalizers, claimFinalizer) {
-		t.Fatalf("claim finalizers = %v, want %s: without it deletion orphans the compute", created.Finalizers, claimFinalizer)
+	if !containsString(created.Finalizers, Finalizer) {
+		t.Fatalf("claim finalizers = %v, want %s: without it deletion orphans the compute", created.Finalizers, Finalizer)
 	}
 
 	// Reproduce what CAPI does: strip the claim's ownerRef from the
@@ -422,7 +422,7 @@ func TestReconcileDelete_PreservesInfrastructureWhileCAPIDeletionIsPending(t *te
 		if err := r.Get(context.Background(), key, infra); err != nil || infra.GetDeletionTimestamp() != nil {
 			t.Fatalf("claim bypassed CAPI's deletion gate: %v", err)
 		}
-		if err := r.Get(context.Background(), key, created); err != nil || !containsString(created.Finalizers, claimFinalizer) {
+		if err := r.Get(context.Background(), key, created); err != nil || !containsString(created.Finalizers, Finalizer) {
 			t.Fatalf("claim must retain cleanup ownership: %v", err)
 		}
 	}
@@ -503,7 +503,7 @@ func TestReconcile_MachineKindComesFromTheTemplateKind(t *testing.T) {
 // clusters it manages.
 func TestReconcileDelete_RemovesTheNodeItProduced(t *testing.T) {
 	claim := fakeClaim("public-worker")
-	claim.Finalizers = []string{claimFinalizer}
+	claim.Finalizers = []string{Finalizer}
 	now := metav1.Now()
 	claim.DeletionTimestamp = &now
 

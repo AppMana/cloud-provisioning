@@ -50,6 +50,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, err
 		}
 	}
+	if changed, err := cancelUnstartedChildren(ctx, r.API, group, claims.Items); err != nil || changed {
+		return again, err
+	}
 	if changed, err := r.labelNodes(ctx, group, claims.Items); err != nil || changed {
 		return again, err
 	}
@@ -77,6 +80,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if action := group.Status.PendingAction; action != nil {
 		switch action.Type {
 		case CreateAction:
+			if !group.DeletionTimestamp.IsZero() {
+				cancelled, err := CancelUnfulfilledCreation(ctx, r.API, group)
+				if err != nil || cancelled {
+					return again, err
+				}
+			}
 			child, err := ResumeCreation(ctx, r.API, req.NamespacedName, group.UID, action.ID)
 			if err != nil {
 				return ctrl.Result{}, err

@@ -21,11 +21,12 @@ const GroupFinalizer = "cloud-provisioning.appmana.com/node-group"
 // must bypass the cache so planning observes completed creation and deletion.
 // Manager registration requires the explicit experimental-node-groups flag.
 type Reconciler struct {
-	API             client.Client
-	Workload        client.Client
-	MachineGVK      schema.GroupVersionKind
-	MeshName        string
-	APIVIP, APIPort string
+	API                       client.Client
+	Workload                  client.Client
+	MachineGVK                schema.GroupVersionKind
+	MeshName                  string
+	APIVIP, APIPort           string
+	BootstrapSecretNameFormat string
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -93,6 +94,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			_, err = CompleteCreation(ctx, r.API, group, child.UID)
 			return again, err
 		case DrainAction:
+			if action.BootstrapCancellation != nil {
+				done, err := r.resumeBootstrapCancellation(ctx, group)
+				if err != nil || done {
+					return again, err
+				}
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			}
 			if action.Removing {
 				done, err := ResumeRemoval(ctx, r.API, r.Workload, r.MachineGVK, group)
 				if err != nil {
@@ -108,6 +116,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			}
 			bound, err := BindDrainNode(ctx, r.API, r.Workload, r.MachineGVK, group)
 			if errors.Is(err, errUnresolvedNode) {
+				if r.BootstrapSecretNameFormat != "" && r.MeshName != "" {
+					changed, cancelErr := r.beginBootstrapCancellation(ctx, bound)
+					if cancelErr != nil || changed {
+						return again, cancelErr
+					}
+				}
 				// Pending capacity is an expected state. Poll it regularly so
 				// readiness changes remain visible while cancellation is pending.
 				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil

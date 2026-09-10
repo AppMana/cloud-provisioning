@@ -22,7 +22,7 @@ func verifyRegisteredGroups(t *testing.T, api client.Client, cfg *rest.Config) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Register(mgr, namespace, "mesh", "", "6443"); err != nil {
+	if err := Register(mgr, namespace, "mesh", "", "6443", ""); err != nil {
 		t.Fatal(err)
 	}
 	ended := make(chan error, 1)

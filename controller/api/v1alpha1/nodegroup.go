@@ -39,21 +39,31 @@ type GroupPeerWithdrawal struct {
 	PublicKey     string              `json:"publicKey"`
 	Consumers     []GroupPeerConsumer `json:"consumers"`
 }
+
+// BootstrapCancellation records cancellation before the join controller's
+// address reservation and userdata publication boundary.
+type BootstrapCancellation struct {
+	SecretName string `json:"secretName"`
+	MeshName   string `json:"meshName"`
+	MeshUID    string `json:"meshUID"`
+}
+
 type NodeGroupAction struct {
-	Removing   bool                          `json:"removing,omitempty"`
-	Withdrawal *GroupPeerWithdrawal          `json:"withdrawal,omitempty"`
-	Gateways   *GroupGatewayInventory        `json:"gateways,omitempty"`
-	NodeName   string                        `json:"nodeName,omitempty"`
-	NodeUID    string                        `json:"nodeUID,omitempty"`
-	MachineUID string                        `json:"machineUID,omitempty"`
-	ProviderID string                        `json:"providerID,omitempty"`
-	ID         string                        `json:"id"`
-	Type       string                        `json:"type"`
-	Generation int64                         `json:"generation"`
-	Ordinal    int32                         `json:"ordinal"`
-	ChildName  string                        `json:"childName"`
-	ChildUID   string                        `json:"childUID,omitempty"`
-	Template   *ProvisionedNodeClaimTemplate `json:"template,omitempty"`
+	BootstrapCancellation *BootstrapCancellation        `json:"bootstrapCancellation,omitempty"`
+	Removing              bool                          `json:"removing,omitempty"`
+	Withdrawal            *GroupPeerWithdrawal          `json:"withdrawal,omitempty"`
+	Gateways              *GroupGatewayInventory        `json:"gateways,omitempty"`
+	NodeName              string                        `json:"nodeName,omitempty"`
+	NodeUID               string                        `json:"nodeUID,omitempty"`
+	MachineUID            string                        `json:"machineUID,omitempty"`
+	ProviderID            string                        `json:"providerID,omitempty"`
+	ID                    string                        `json:"id"`
+	Type                  string                        `json:"type"`
+	Generation            int64                         `json:"generation"`
+	Ordinal               int32                         `json:"ordinal"`
+	ChildName             string                        `json:"childName"`
+	ChildUID              string                        `json:"childUID,omitempty"`
+	Template              *ProvisionedNodeClaimTemplate `json:"template,omitempty"`
 }
 
 type ProvisionedNodeGroupClaimStatus struct {
@@ -85,6 +95,10 @@ func (in *ProvisionedNodeGroupClaim) DeepCopyInto(out *ProvisionedNodeGroupClaim
 	if in.Status.PendingAction != nil {
 		action := *in.Status.PendingAction
 		out.Status.PendingAction = &action
+		if action.BootstrapCancellation != nil {
+			cancellation := *action.BootstrapCancellation
+			out.Status.PendingAction.BootstrapCancellation = &cancellation
+		}
 		if action.Withdrawal != nil {
 			withdrawal := *action.Withdrawal
 			withdrawal.Consumers = append([]GroupPeerConsumer{}, action.Withdrawal.Consumers...)

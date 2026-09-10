@@ -140,8 +140,18 @@ their Nodes. Real API tests cover late creation and concurrent admission. The
 delete groups at both pre-admission stages and verify removal of the fixtures,
 unchanged existing Node/Machine identities, VM start times, and slot data.
 
-Group scale-down currently requires a resolved Machine and Node identity. A
-capacity-pending child therefore retains its claim and the group's drain action.
+Group scale-down drains registered Nodes and can cancel a pending worker before
+the join controller reserves its WireGuard address or publishes userdata.
+Cancellation compares the Machine's resource version, records a marker that
+blocks join publication, then persists the bootstrap Secret and mesh identities.
+It deletes the exact child claim and waits for claim/CAPI/provider teardown.
+Provider finalizers and other controllers' deletion hooks remain in force.
+Real API tests cover both orders of the address-reservation race; native VM
+validation of this path is pending.
+
+An existing address reservation, bootstrap Secret, peer entry, or claimed Node
+requires the remaining full cancellation lifecycle. Those workers retain their
+claim and drain action.
 The action records the owned Machine UID while Node registration is pending,
 and retains a provider ID once observed. Late registration fills the Node fields;
 a replacement Machine, changed provider ID, or mismatched Node reference UID
@@ -151,8 +161,10 @@ records the fourth Machine UID while all eight Nodes and three workload pods
 remain Ready, with unchanged Node identities and slot data. Real API tests cover
 late registration and conflicting identity updates.
 In the native four-request, three-slot case, the excess Machine already has a
-bootstrap Secret reference despite having no `providerID` or `nodeRef`. Those
-missing fields alone cannot establish that a provider has never launched compute.
+bootstrap Secret reference despite having no `providerID` or `nodeRef`. The
+referenced Secret and peer entries are absent. The reference alone does not
+establish that userdata exists, and the missing status fields alone cannot
+establish that a provider has never launched compute.
 
 Cancellation needs its own persisted, UID-bound lifecycle. It must fence further
 bootstrap and peer publication, retire any published tunnel membership, and
@@ -360,7 +372,12 @@ its own eviction and withdrawal gates before triggering that teardown.
       stale creation after parent deletion and admission winning the deletion race.
 - [x] Validate creation cancellation in the single-NIC VM lab with both an absent
       child and an unadmitted child. Existing workers retain their identities.
-- [ ] Implement cancellation for admitted workers that have not registered a Node.
+- [x] Fence cancellation against the join controller's address reservation and
+      cancel admitted claims whose bootstrap data has not been published. Real
+      API tests verify the race, retained deletion gates, and changed-proof holds.
+- [ ] Validate pre-bootstrap cancellation through the native CAPI VM provider.
+- [ ] Cancel admitted workers after address reservation or userdata publication,
+      including failed joins and Nodes that register during cancellation.
 - [x] Publish observed replica counts before advancing pending actions and expose
       the workload selector through `/scale`. Provisioning and draining claims
       remain counted while their lifecycle work is pending.

@@ -2473,7 +2473,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "experimental node groups require --join-enabled")
 			os.Exit(1)
 		}
-		if err := nodegroup.Register(mgr, secretNamespace, secretName, joinAPIVIP, apiServerPortOf(joinAPIAddress)); err != nil {
+		if err := nodegroup.Register(mgr, secretNamespace, secretName, joinAPIVIP, apiServerPortOf(joinAPIAddress), bootstrapSecretNameFormat); err != nil {
 			fmt.Fprintf(os.Stderr, "unable to register node groups: %v\n", err)
 			os.Exit(1)
 		}

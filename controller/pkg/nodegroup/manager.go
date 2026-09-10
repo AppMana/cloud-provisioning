@@ -12,7 +12,7 @@ import (
 
 // Register enables experimental node groups for one mesh namespace. The current
 // deployment manages CAPI and workload objects through the same cluster API.
-func Register(mgr ctrl.Manager, namespace, mesh, apiVIP, apiPort string) error {
+func Register(mgr ctrl.Manager, namespace, mesh, apiVIP, apiPort, bootstrapFormat string) error {
 	if mgr == nil || namespace == "" || mesh == "" || apiPort == "" {
 		return fmt.Errorf("manager, namespace, mesh and API port required")
 	}
@@ -25,5 +25,5 @@ func Register(mgr ctrl.Manager, namespace, mesh, apiVIP, apiPort string) error {
 		For(&v1alpha1.ProvisionedNodeGroupClaim{}).
 		Owns(&v1alpha1.ProvisionedNodeClaim{}).
 		WithEventFilter(predicate.NewPredicateFuncs(func(obj client.Object) bool { return obj.GetNamespace() == namespace })).
-		Complete(&Reconciler{API: direct, Workload: direct, MachineGVK: schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"}, MeshName: mesh, APIVIP: apiVIP, APIPort: apiPort})
+		Complete(&Reconciler{API: direct, Workload: direct, MachineGVK: schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"}, MeshName: mesh, APIVIP: apiVIP, APIPort: apiPort, BootstrapSecretNameFormat: bootstrapFormat})
 }

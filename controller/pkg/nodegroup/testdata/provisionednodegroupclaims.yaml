@@ -186,6 +186,13 @@ spec:
                   childName:
                     type: string
                     minLength: 1
+                  bootstrapCancellation:
+                    type: object
+                    required: [secretName, meshName, meshUID]
+                    properties:
+                      secretName: {type: string, minLength: 1}
+                      meshName: {type: string, minLength: 1}
+                      meshUID: {type: string, minLength: 1}
                   removing: {type: boolean}
                   withdrawal:
                     type: object

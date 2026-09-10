@@ -81,6 +81,15 @@ all 13 original Node identities. Its retained boot and image-staging failures
 also produced new bootstrap-expiry and adoption gates. This single cycle does
 not establish the full Windows lifecycle or endpoint-failure matrix.
 
+A [later reconnection check](validation/windows-konnectivity-reconnection-results.json)
+found both Windows test workers unreachable through one API server while the
+other two could execute commands. The Windows 2022 agent had two server
+connections; recreating each affected native agent restored three connections
+and all six exec paths without changing Node or workload identities. The cause
+of the missing connection remains unresolved. Check every API server before
+network qualification. The post-recovery matrix retained two Windows UDP
+timeouts at 1,800-byte payloads, so exec recovery does not qualify UDP reliability.
+
 The [initial canary](validation/windows-konnectivity-default-route-results.json)
 established actual Linux-owned webhook sockets. Its immediate ten-probe baseline
 also passed, so neither observation quantifies a failure-rate improvement.

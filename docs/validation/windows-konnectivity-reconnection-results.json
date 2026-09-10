@@ -1,0 +1,150 @@
+{
+  "observedAt": "2026-09-10T01:12:01.751554+00:00",
+  "scope": "Windows 2022/2025 k0s 1.36.2 VM baseline and recovery of native Konnectivity agent connections before candidate Calico/kube-proxy rollout.",
+  "initialFailure": {
+    "api": "10.10.0.10",
+    "error": "kubelet dial timeout at TCP 10250 on both Windows workers",
+    "workingAPIs": [
+      "10.10.0.13",
+      "10.10.0.14"
+    ],
+    "windows2022OpenServerConnections": 2,
+    "cpServerLogAgent": "cldt-default-route-linux-10.10.0.14",
+    "windowsAgentLogServerCount": 1,
+    "runningControllerServerCount": 3,
+    "firstMatrix": "aborted after repeated exec failures; not counted as a completed network matrix"
+  },
+  "recovery": {
+    "action": "Recreated only the native Konnectivity agent pod on each Windows v3 test worker",
+    "agents": [
+      {
+        "windowsVersion": "2022",
+        "node": "aws-win2022-v3",
+        "before": {
+          "name": "konnectivity-agent-46w6k",
+          "uid": "b37c1889-88ae-4d00-838b-e8ff2d18df25"
+        },
+        "after": {
+          "name": "konnectivity-agent-w99gm",
+          "uid": "35e966ce-42e8-4883-a3ec-9f8be93f2f8f"
+        },
+        "deletionUIDAndResourceVersionPreconditions": true
+      },
+      {
+        "windowsVersion": "2025",
+        "node": "aws-win2025-v3",
+        "before": {
+          "name": "konnectivity-agent-2sb8j",
+          "uid": "7cdacd38-c4e5-4673-9e98-873ec001e966"
+        },
+        "after": {
+          "name": "konnectivity-agent-ppptx",
+          "uid": "19963b4c-8f7e-49fc-a59c-2c3eff0872c6"
+        },
+        "deletionUIDAndResourceVersionPreconditions": true
+      }
+    ],
+    "openServerConnections": {
+      "aws-win2022-v3": 3.0,
+      "aws-win2025-v3": 3.0
+    },
+    "execMatrix": {
+      "observedAt": "2026-09-10T01:10:57.718729+00:00",
+      "checks": [
+        {
+          "api": "10.10.0.10",
+          "node": "aws-win2022-v3",
+          "code": 0,
+          "stdout": "exec-check",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.10",
+          "node": "aws-win2025-v3",
+          "code": 0,
+          "stdout": "exec-check",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "node": "aws-win2022-v3",
+          "code": 0,
+          "stdout": "exec-check",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.13",
+          "node": "aws-win2025-v3",
+          "code": 0,
+          "stdout": "exec-check",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "node": "aws-win2022-v3",
+          "code": 0,
+          "stdout": "exec-check",
+          "stderr": ""
+        },
+        {
+          "api": "10.10.0.14",
+          "node": "aws-win2025-v3",
+          "code": 0,
+          "stdout": "exec-check",
+          "stderr": ""
+        }
+      ]
+    },
+    "all13NodeUIDsUnchanged": true,
+    "nodeUIDs": {
+      "aws-win2022-gpu": "dd54061d-491a-4b12-95a7-27393e847780",
+      "aws-win2022-v3": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "aws-win2025": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+      "aws-win2025-gpu": "258d7b62-e774-48bc-94dc-e31ff042f585",
+      "aws-win2025-v3": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "cp": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+      "cp2": "947de62f-0920-408c-aa31-ac80a2344128",
+      "cp3": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+      "ip-172-29-0-9": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+      "remote1": "8935dd28-de93-44be-a887-73110fe88c51",
+      "remote2": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+      "w1": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "w2": "4bcf04f8-ec26-4db7-bacb-85681c0145da"
+    }
+  },
+  "networkMatrices": [
+    {
+      "file": "windows-branch-baseline-network-results.json",
+      "api": "10.10.0.13",
+      "passed": 60,
+      "total": 60
+    },
+    {
+      "file": "windows-agent-recovery-network-results.json",
+      "api": "10.10.0.10",
+      "passed": 58,
+      "total": 60,
+      "failures": "Both directed Windows pairs at 1800-byte UDP payload. Executor commands succeeded; response bodies reported read timeouts."
+    }
+  ],
+  "networkImagesUnchanged": [
+    {
+      "daemonSet": "calico-node-windows",
+      "containers": {
+        "felix": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918",
+        "node": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/calico-node-windows:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918@sha256:f8c1dd04d20f1e202dec674218b9d34c1b13493954d24fd04882519d390e6918"
+      }
+    },
+    {
+      "daemonSet": "kube-proxy-windows",
+      "containers": {
+        "kube-proxy": "docker.io/sigwindowstools/kube-proxy:v1.36.2-calico-hostprocess"
+      }
+    }
+  ],
+  "limitations": [
+    "Agent recreation recovered this occurrence; the root cause of incomplete server connections and prevention remain unresolved.",
+    "The incomplete UDP response body can omit earlier successful echoes; missing reported responses are not an exact packet-loss count.",
+    "Candidate fork images remain unqualified and were not deployed during these observations."
+  ]
+}

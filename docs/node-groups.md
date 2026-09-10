@@ -131,8 +131,10 @@ Machine, orphaned infrastructure object, or Node. The [API deletion race tests](
 verify that a replacement or concurrent update causes a conflict and retains the
 claim finalizer. These checks protect the observed object during that request;
 ownership checks for replacements already present before observation remain
-separate work. The updated delete requests have API-test coverage and await a
-controller rollout in the VM lab.
+separate work. After rollout, the [native KEDA 1 → 0 → 1 cycle](validation/claim-teardown-vm-results.json)
+verified complete teardown, slot release, and recreation with fresh identities.
+All [102 network checks](validation/claim-teardown-vm-network-results.json) passed
+after activation; permanent site Node identities remained unchanged.
 
 ## Pending-worker cancellation
 

@@ -1,0 +1,463 @@
+{
+  "observedAt": "2026-09-10T01:01:26.607566+00:00",
+  "scope": "KEDA-driven 1-to-0-to-1 worker lifecycle on single-NIC KVMs after rollout of claim deletion preconditions. Linux k0s 1.36.2+k0s.0, containerd 2.3.2, Calico 3.32.0-0, CAPI 1.11.1, KEDA 2.20.0.",
+  "controller": {
+    "observedAt": "2026-09-10T00:55:46.505161+00:00",
+    "source": "adec482",
+    "image": "cldt-controller:efacf86bae446f5e7132b31c7642c864d438fb1242c38919e97fa5681d86b465",
+    "deploymentUID": "f593d1a6-0c71-4620-8240-976d1474812f",
+    "deploymentStatus": {
+      "availableReplicas": 1,
+      "conditions": [
+        {
+          "lastTransitionTime": "2026-09-10T00:53:52Z",
+          "lastUpdateTime": "2026-09-10T00:53:52Z",
+          "message": "Deployment has minimum availability.",
+          "reason": "MinimumReplicasAvailable",
+          "status": "True",
+          "type": "Available"
+        },
+        {
+          "lastTransitionTime": "2026-09-09T20:53:56Z",
+          "lastUpdateTime": "2026-09-10T00:53:52Z",
+          "message": "ReplicaSet \"cloud-provisioning-endpoint-controller-8976b4455\" has successfully progressed.",
+          "reason": "NewReplicaSetAvailable",
+          "status": "True",
+          "type": "Progressing"
+        }
+      ],
+      "observedGeneration": 12,
+      "readyReplicas": 1,
+      "replicas": 1,
+      "terminatingReplicas": 0,
+      "updatedReplicas": 1
+    },
+    "pods": [
+      {
+        "name": "cloud-provisioning-endpoint-controller-8976b4455-fh99s",
+        "node": "w1",
+        "containers": [
+          {
+            "allocatedResources": {
+              "cpu": "10m",
+              "memory": "64Mi"
+            },
+            "containerID": "containerd://a97e2deb93f62e2746ff1124661c1caef57ae97cd818df338cd593528d47d036",
+            "image": "docker.io/library/cldt-controller:efacf86bae446f5e7132b31c7642c864d438fb1242c38919e97fa5681d86b465",
+            "imageID": "sha256:efacf86bae446f5e7132b31c7642c864d438fb1242c38919e97fa5681d86b465",
+            "lastState": {},
+            "name": "controller",
+            "ready": true,
+            "resources": {
+              "limits": {
+                "memory": "128Mi"
+              },
+              "requests": {
+                "cpu": "10m",
+                "memory": "64Mi"
+              }
+            },
+            "restartCount": 0,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-09-10T00:53:52Z"
+              }
+            },
+            "user": {
+              "linux": {
+                "gid": 65532,
+                "supplementalGroups": [
+                  65532
+                ],
+                "uid": 65532
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-xdhjn",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "helmRevision": 9,
+  "beforeNodeUIDs": {
+    "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+    "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+    "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+    "remote1": "88c22799-b2e4-474f-8975-20f2193bc7ef",
+    "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+    "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+  },
+  "stages": [
+    {
+      "observedAt": "2026-09-10T00:56:51.025159+00:00",
+      "targetReplicas": 0,
+      "nodeUIDs": {
+        "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+        "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+        "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+        "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+        "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+      },
+      "machineUIDs": {},
+      "infraUIDs": {},
+      "stoppedVM": {
+        "Running": false,
+        "StartedAt": "2026-09-10T00:33:25.26277624Z",
+        "FinishedAt": "2026-09-10T00:56:40.133937758Z"
+      },
+      "wrapperID": "97f367f093aca8cf7a4e450aff4c299fb5cfed5d554113dde915e4dfd4cde2fb",
+      "permanentNodeUIDsUnchanged": true,
+      "slotsReleasedAt": "2026-09-10T00:57:04.765234+00:00",
+      "stage": "zero",
+      "group": {
+        "uid": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+        "desired": 0,
+        "status": {
+          "readyReplicas": 0,
+          "replicas": 0,
+          "selector": "app=cldt-group-scheduling"
+        }
+      },
+      "hpaStatus": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-09-10T00:12:27Z",
+            "message": "the HPA controller was able to get the target's current scale",
+            "reason": "SucceededGetScale",
+            "status": "True",
+            "type": "AbleToScale"
+          },
+          {
+            "lastTransitionTime": "2026-09-10T00:55:04Z",
+            "message": "scaling is disabled since the replica count of the target is zero",
+            "reason": "ScalingDisabled",
+            "status": "False",
+            "type": "ScalingActive"
+          },
+          {
+            "lastTransitionTime": "2026-09-10T00:54:04Z",
+            "message": "the desired replica count is less than the minimum replica count",
+            "reason": "TooFewReplicas",
+            "status": "True",
+            "type": "ScalingLimited"
+          }
+        ],
+        "currentMetrics": null,
+        "desiredReplicas": 0,
+        "lastScaleTime": "2026-09-10T00:26:28Z"
+      },
+      "slots": {
+        "lab": "cldt",
+        "slots": [
+          "remote1",
+          "remote2",
+          "remote3"
+        ],
+        "owners": {}
+      },
+      "transitions": [
+        {
+          "at": "2026-09-10T00:54:04.623683+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 1,
+          "action": null,
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:54:08.035942+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 1,
+          "action": null,
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:55:02.727370+00:00",
+          "desired": 0,
+          "total": 1,
+          "ready": 0,
+          "action": {
+            "id": "5e2b954f-b809-4921-9278-16349d60549b",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-0",
+            "node": "remote1",
+            "removing": false,
+            "withdrawal": false
+          },
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:55:06.124446+00:00",
+          "desired": 0,
+          "total": 1,
+          "ready": 0,
+          "action": {
+            "id": "5e2b954f-b809-4921-9278-16349d60549b",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-0",
+            "node": "remote1",
+            "removing": false,
+            "withdrawal": false
+          },
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:56:23.128986+00:00",
+          "desired": 0,
+          "total": 1,
+          "ready": 0,
+          "action": {
+            "id": "5e2b954f-b809-4921-9278-16349d60549b",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-0",
+            "node": "remote1",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:56:40.316982+00:00",
+          "desired": 0,
+          "total": 1,
+          "ready": 0,
+          "action": {
+            "id": "5e2b954f-b809-4921-9278-16349d60549b",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-0",
+            "node": "remote1",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:56:44.385487+00:00",
+          "desired": 0,
+          "total": 1,
+          "ready": 0,
+          "action": {
+            "id": "5e2b954f-b809-4921-9278-16349d60549b",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-0",
+            "node": "remote1",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 1,
+          "machines": 1,
+          "infra": 0
+        },
+        {
+          "at": "2026-09-10T00:56:47.716357+00:00",
+          "desired": 0,
+          "total": 1,
+          "ready": 0,
+          "action": {
+            "id": "5e2b954f-b809-4921-9278-16349d60549b",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-0",
+            "node": "remote1",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 1,
+          "machines": 0,
+          "infra": 0
+        },
+        {
+          "at": "2026-09-10T00:56:51.022347+00:00",
+          "desired": 0,
+          "total": 0,
+          "ready": 0,
+          "action": null,
+          "claims": 0,
+          "machines": 0,
+          "infra": 0
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-09-10T01:00:10.769125+00:00",
+      "targetReplicas": 1,
+      "nodeUIDs": {
+        "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+        "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+        "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+        "remote1": "14c27775-f455-45d7-b9ad-9bcbe9e5b27d",
+        "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+        "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+      },
+      "machineUIDs": {
+        "pooled-workers-8ae81037d7a1043c-0": "91fd8999-e10c-41f7-86dc-b9d971d6f3a1"
+      },
+      "infraUIDs": {
+        "pooled-workers-8ae81037d7a1043c-0": "26c84c2b-b1f5-4af6-a293-842a3c5eabc9"
+      },
+      "permanentNodeUIDsUnchanged": true,
+      "newNodeMachineAndInfraUIDs": true,
+      "fixtureImagePreloads": [
+        {
+          "at": "2026-09-10T00:59:35Z",
+          "node": "remote1",
+          "uid": "14c27775-f455-45d7-b9ad-9bcbe9e5b27d"
+        }
+      ],
+      "stage": "restart",
+      "group": {
+        "uid": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+        "desired": 1,
+        "status": {
+          "readyReplicas": 1,
+          "replicas": 1,
+          "selector": "app=cldt-group-scheduling"
+        }
+      },
+      "hpaStatus": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-09-10T00:12:27Z",
+            "message": "recommended size matches current size",
+            "reason": "ReadyForNewScale",
+            "status": "True",
+            "type": "AbleToScale"
+          },
+          {
+            "lastTransitionTime": "2026-09-10T00:57:19Z",
+            "message": "the HPA was able to successfully calculate a replica count from external metric s0-redis-cldt-capacity(&LabelSelector{MatchLabels:map[string]string{scaledobject.keda.sh/name: cldt-node-capacity,},MatchExpressions:[]LabelSelectorRequirement{},})",
+            "reason": "ValidMetricFound",
+            "status": "True",
+            "type": "ScalingActive"
+          },
+          {
+            "lastTransitionTime": "2026-09-10T00:57:19Z",
+            "message": "the desired count is within the acceptable range",
+            "reason": "DesiredWithinRange",
+            "status": "False",
+            "type": "ScalingLimited"
+          }
+        ],
+        "currentMetrics": [
+          {
+            "external": {
+              "current": {
+                "averageValue": "3"
+              },
+              "metric": {
+                "name": "s0-redis-cldt-capacity",
+                "selector": {
+                  "matchLabels": {
+                    "scaledobject.keda.sh/name": "cldt-node-capacity"
+                  }
+                }
+              }
+            },
+            "type": "External"
+          }
+        ],
+        "currentReplicas": 1,
+        "desiredReplicas": 1,
+        "lastScaleTime": "2026-09-10T00:26:28Z"
+      },
+      "slots": {
+        "lab": "cldt",
+        "slots": [
+          "remote1",
+          "remote2",
+          "remote3"
+        ],
+        "owners": {
+          "remote1": {
+            "namespace": "cloud-provisioning",
+            "name": "pooled-workers-8ae81037d7a1043c-0",
+            "uid": "26c84c2b-b1f5-4af6-a293-842a3c5eabc9"
+          }
+        }
+      },
+      "transitions": [
+        {
+          "at": "2026-09-10T00:57:16.718117+00:00",
+          "desired": 0,
+          "total": 0,
+          "ready": 0,
+          "action": null,
+          "claims": 0,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:57:20.127164+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 0,
+          "action": null,
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:57:23.494376+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 0,
+          "action": null,
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:59:12.401518+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 0,
+          "action": null,
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T01:00:10.766726+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 1,
+          "action": null,
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        }
+      ]
+    }
+  ],
+  "network": {
+    "file": "claim-teardown-vm-network-results.json",
+    "passed": 102,
+    "failed": 0,
+    "identitiesUnchangedDuringMatrix": true
+  },
+  "limitations": [
+    "Concurrent replacement and metadata-update races are exercised by the separate API-server tests. This native cycle verifies ordinary teardown and recreation with the changed controller.",
+    "Dialer and probe images are preloaded through QEMU Guest Agent as harness fixtures.",
+    "Networking is checked after convergence; this run does not measure traffic continuity during removal."
+  ]
+}

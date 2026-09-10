@@ -63,12 +63,12 @@
     "capiLifecycleOrdering": "0d7fe740"
   },
   "limitations": [
-    "Preconditions protect the object observed in this reconciliation; ownership of a replacement already present before the read requires separate validation.",
-    "This evidence qualifies API deletion races; the changed controller has not yet been deployed to the VM lab."
+    "Preconditions protect the object observed in this reconciliation; ownership of a replacement already present before the read requires separate validation."
   ],
   "command": "KUBEBUILDER_ASSETS=<k8s/1.35.0-linux-amd64> go test -race -coverprofile=<coverage-file> ./pkg/claim",
   "relatedValidation": {
     "command": "KUBEBUILDER_ASSETS=<k8s/1.35.0-linux-amd64> go test -race ./pkg/nodegroup ./pkg/join ./cmd/endpoint-controller",
     "result": "passed"
-  }
+  },
+  "nativeFollowup": "claim-teardown-vm-results.json"
 }

@@ -1,0 +1,35 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: cldt-node-capacity
+  namespace: cloud-provisioning
+spec:
+  scaleTargetRef:
+    apiVersion: cloud-provisioning.appmana.com/v1alpha1
+    kind: ProvisionedNodeGroupClaim
+    name: pooled-workers
+  pollingInterval: 5
+  cooldownPeriod: 60
+  minReplicaCount: 0
+  maxReplicaCount: 3
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Pods
+              value: 3
+              periodSeconds: 15
+  triggers:
+    - type: redis
+      metadata:
+        address: cldt-keda-redis.cloud-provisioning.svc:6379
+        listName: cldt-capacity
+        listLength: "3"

@@ -1,0 +1,2230 @@
+{
+  "scope": "Native single-NIC KVM node-group scaling through KEDA Redis external metrics and the group scale subresource. Five permanent site VMs and up to three cloud VMs across two cloud networks.",
+  "versions": {
+    "k0s": "1.36.2+k0s.0",
+    "containerd": "2.3.2",
+    "calico": "3.32.0-0",
+    "capi": "1.11.1",
+    "keda": "2.20.0",
+    "redis": "8.10.1"
+  },
+  "controllerSource": "2334772",
+  "fixtures": "../../harness/e2e/runner/keda",
+  "method": {
+    "demand": "Controlled Redis list; three items per Machine; maximum three Machines. Queue operations trigger capacity changes.",
+    "placement": "KEDA and Redis on permanent site worker w2; one separate scheduling probe retained during the cycle.",
+    "images": "Images preloaded through QEMU Guest Agent; fresh workers receive the campaign dialer and busybox probe images before Ready and network validation.",
+    "observation": "API state sampled every two seconds; VM stop and slot release checked separately."
+  },
+  "limitations": [
+    "Controlled queue depth does not qualify job consumption or workload autoscaling.",
+    "Network matrices run after convergence; these results do not measure packet loss during scaling.",
+    "Windows, GPU, CAPA, Prometheus, and cloud cold-start image behavior need separate qualification."
+  ],
+  "images": [
+    {
+      "tags": [
+        "ghcr.io/kedacore/keda:2.20.0"
+      ],
+      "digests": [
+        "ghcr.io/kedacore/keda@sha256:f9b156ce154d2557a284c4a11c258ccf8a4a02d7cfde339592b09267131c7df1"
+      ],
+      "id": "sha256:4287a890fb423d9ff8f423c2ee94ac77cfd6da8fbc5bd19c92d383de49ea61c8"
+    },
+    {
+      "tags": [
+        "ghcr.io/kedacore/keda-metrics-apiserver:2.20.0"
+      ],
+      "digests": [
+        "ghcr.io/kedacore/keda-metrics-apiserver@sha256:adbcb6f77a8e2a63f80723fe4cf9031dd204498f0d985d8856aaed15be03b0e6"
+      ],
+      "id": "sha256:0bd39086ffbe45c36da14688f85a689e05689f2440e1df26be1a25519fe285ed"
+    },
+    {
+      "tags": [
+        "ghcr.io/kedacore/keda-admission-webhooks:2.20.0"
+      ],
+      "digests": [
+        "ghcr.io/kedacore/keda-admission-webhooks@sha256:acb89f0fa76adf6cd2fb6f88c395619bd21b225ab0ef1bf4b9d2d50d537372a5"
+      ],
+      "id": "sha256:8dfa4f66b6c1b677b35471d92b358bf6226e310bab7e4bebcb5be8e7d80c375a"
+    },
+    {
+      "tags": [
+        "redis:8-alpine"
+      ],
+      "digests": [
+        "redis@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576"
+      ],
+      "id": "sha256:00c30ddf0ef8074bbc7b7e5ea655bb6d359dc66694edd57d70fe95ce6ba531aa"
+    }
+  ],
+  "runtimeImageChecks": [
+    {
+      "image": "ghcr.io/kedacore/keda:2.20.0",
+      "imageID": "sha256:4287a890fb423d9ff8f423c2ee94ac77cfd6da8fbc5bd19c92d383de49ea61c8",
+      "matched": true
+    },
+    {
+      "image": "ghcr.io/kedacore/keda-metrics-apiserver:2.20.0",
+      "imageID": "sha256:0bd39086ffbe45c36da14688f85a689e05689f2440e1df26be1a25519fe285ed",
+      "matched": true
+    },
+    {
+      "image": "ghcr.io/kedacore/keda-admission-webhooks:2.20.0",
+      "imageID": "sha256:8dfa4f66b6c1b677b35471d92b358bf6226e310bab7e4bebcb5be8e7d80c375a",
+      "matched": true
+    },
+    {
+      "image": "redis:8-alpine",
+      "imageID": "sha256:00c30ddf0ef8074bbc7b7e5ea655bb6d359dc66694edd57d70fe95ce6ba531aa",
+      "matched": true
+    }
+  ],
+  "controllerImages": [
+    {
+      "namespace": "capi-kubeadm-bootstrap-system",
+      "name": "capi-kubeadm-bootstrap-controller-manager",
+      "images": [
+        "registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.11.1"
+      ]
+    },
+    {
+      "namespace": "capi-kubeadm-control-plane-system",
+      "name": "capi-kubeadm-control-plane-controller-manager",
+      "images": [
+        "registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.11.1"
+      ]
+    },
+    {
+      "namespace": "capi-system",
+      "name": "capi-controller-manager",
+      "images": [
+        "registry.k8s.io/cluster-api/cluster-api-controller:v1.11.1"
+      ]
+    },
+    {
+      "namespace": "cloud-provisioning",
+      "name": "cloud-provisioning-endpoint-controller",
+      "images": [
+        "cldt-controller:a6593a221997e34fe0202bb38a00aa159665dd6c9ab74c9859fb3a187b3aa95f"
+      ]
+    },
+    {
+      "namespace": "keda",
+      "name": "keda-admission-webhooks",
+      "images": [
+        "ghcr.io/kedacore/keda-admission-webhooks:2.20.0"
+      ]
+    },
+    {
+      "namespace": "keda",
+      "name": "keda-operator",
+      "images": [
+        "ghcr.io/kedacore/keda:2.20.0"
+      ]
+    },
+    {
+      "namespace": "keda",
+      "name": "keda-operator-metrics-apiserver",
+      "images": [
+        "ghcr.io/kedacore/keda-metrics-apiserver:2.20.0"
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "observedAt": "2026-09-10T00:18:00.671014+00:00",
+      "targetReplicas": 1,
+      "nodeUIDs": {
+        "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+        "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+        "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+        "remote1": "4674271b-7639-49e7-aa0f-9228cc556459",
+        "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+        "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+      },
+      "machineUIDs": {
+        "pooled-workers-8ae81037d7a1043c-0": "d47f09f5-ec22-41fd-bd15-41c968a08db9"
+      },
+      "infraUIDs": {
+        "pooled-workers-8ae81037d7a1043c-0": "020f8372-4e25-49f9-8ef9-58ea9d227202"
+      },
+      "stoppedVMs": {
+        "/clab-cldt-remote2": {
+          "id": "636602ec96fd135eae0adcd5f41b4d5b968ba88195b5d2c8a433e3f95bd14836",
+          "running": false,
+          "finishedAt": "2026-09-10T00:17:51.014192201Z"
+        },
+        "/clab-cldt-remote3": {
+          "id": "a8ce135e16d7cb23494a2dfa5446a651fa059bb2ccda49d651b9cb40399db857",
+          "running": false,
+          "finishedAt": "2026-09-10T00:16:03.506500103Z"
+        }
+      },
+      "survivingNodeUIDsUnchanged": true,
+      "stage": "down",
+      "queueDepth": 3,
+      "group": {
+        "name": "pooled-workers",
+        "uid": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+        "spec": {
+          "replicas": 1,
+          "template": {
+            "spec": {
+              "clusterName": "cldt",
+              "infrastructureRef": {
+                "apiGroup": "containernet.appmana.com",
+                "kind": "ContainernetMachineTemplate",
+                "name": "pooled-worker"
+              }
+            }
+          },
+          "workloadSelector": {
+            "matchLabels": {
+              "app": "cldt-group-scheduling"
+            }
+          }
+        },
+        "status": {
+          "readyReplicas": 1,
+          "replicas": 1,
+          "selector": "app=cldt-group-scheduling"
+        }
+      },
+      "hpa": {
+        "name": "keda-hpa-cldt-node-capacity",
+        "uid": "bf97133d-a437-42d8-95bb-be22fed2e49c",
+        "spec": {
+          "behavior": {
+            "scaleDown": {
+              "policies": [
+                {
+                  "periodSeconds": 15,
+                  "type": "Percent",
+                  "value": 100
+                }
+              ],
+              "selectPolicy": "Max",
+              "stabilizationWindowSeconds": 0
+            },
+            "scaleUp": {
+              "policies": [
+                {
+                  "periodSeconds": 15,
+                  "type": "Pods",
+                  "value": 3
+                }
+              ],
+              "selectPolicy": "Max",
+              "stabilizationWindowSeconds": 0
+            }
+          },
+          "maxReplicas": 3,
+          "metrics": [
+            {
+              "external": {
+                "metric": {
+                  "name": "s0-redis-cldt-capacity",
+                  "selector": {
+                    "matchLabels": {
+                      "scaledobject.keda.sh/name": "cldt-node-capacity"
+                    }
+                  }
+                },
+                "target": {
+                  "averageValue": "3",
+                  "type": "AverageValue"
+                }
+              },
+              "type": "External"
+            }
+          ],
+          "minReplicas": 1,
+          "scaleTargetRef": {
+            "apiVersion": "cloud-provisioning.appmana.com/v1alpha1",
+            "kind": "ProvisionedNodeGroupClaim",
+            "name": "pooled-workers"
+          }
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastTransitionTime": "2026-09-10T00:12:27Z",
+              "message": "recommended size matches current size",
+              "reason": "ReadyForNewScale",
+              "status": "True",
+              "type": "AbleToScale"
+            },
+            {
+              "lastTransitionTime": "2026-09-10T00:17:57Z",
+              "message": "the HPA was able to successfully calculate a replica count from external metric s0-redis-cldt-capacity(&LabelSelector{MatchLabels:map[string]string{scaledobject.keda.sh/name: cldt-node-capacity,},MatchExpressions:[]LabelSelectorRequirement{},})",
+              "reason": "ValidMetricFound",
+              "status": "True",
+              "type": "ScalingActive"
+            },
+            {
+              "lastTransitionTime": "2026-09-10T00:12:27Z",
+              "message": "the desired count is within the acceptable range",
+              "reason": "DesiredWithinRange",
+              "status": "False",
+              "type": "ScalingLimited"
+            }
+          ],
+          "currentMetrics": [
+            {
+              "external": {
+                "current": {
+                  "averageValue": "3"
+                },
+                "metric": {
+                  "name": "s0-redis-cldt-capacity",
+                  "selector": {
+                    "matchLabels": {
+                      "scaledobject.keda.sh/name": "cldt-node-capacity"
+                    }
+                  }
+                }
+              },
+              "type": "External"
+            }
+          ],
+          "currentReplicas": 1,
+          "desiredReplicas": 1,
+          "lastScaleTime": "2026-09-10T00:14:12Z"
+        }
+      },
+      "scaledObject": {
+        "name": "cldt-node-capacity",
+        "uid": "479b5252-a19a-46dc-909c-fc75af297f1c",
+        "spec": {
+          "advanced": {
+            "horizontalPodAutoscalerConfig": {
+              "behavior": {
+                "scaleDown": {
+                  "policies": [
+                    {
+                      "periodSeconds": 15,
+                      "type": "Percent",
+                      "value": 100
+                    }
+                  ],
+                  "stabilizationWindowSeconds": 0
+                },
+                "scaleUp": {
+                  "policies": [
+                    {
+                      "periodSeconds": 15,
+                      "type": "Pods",
+                      "value": 3
+                    }
+                  ],
+                  "stabilizationWindowSeconds": 0
+                }
+              }
+            },
+            "scalingModifiers": {}
+          },
+          "cooldownPeriod": 60,
+          "maxReplicaCount": 3,
+          "minReplicaCount": 0,
+          "pollingInterval": 5,
+          "scaleTargetRef": {
+            "apiVersion": "cloud-provisioning.appmana.com/v1alpha1",
+            "kind": "ProvisionedNodeGroupClaim",
+            "name": "pooled-workers"
+          },
+          "triggers": [
+            {
+              "metadata": {
+                "address": "cldt-keda-redis.cloud-provisioning.svc:6379",
+                "listLength": "3",
+                "listName": "cldt-capacity"
+              },
+              "type": "redis"
+            }
+          ]
+        },
+        "status": {
+          "authenticationsTypes": "",
+          "conditions": [
+            {
+              "message": "ScaledObject is configured correctly but HPA is not healthy: FailedGetExternalMetric",
+              "reason": "HPAMetricsUnavailable",
+              "status": "False",
+              "type": "Ready"
+            },
+            {
+              "message": "Scaling is performed because triggers are active",
+              "reason": "ScalerActive",
+              "status": "True",
+              "type": "Active"
+            },
+            {
+              "message": "No fallbacks are active on this scaled object",
+              "reason": "NoFallbackFound",
+              "status": "False",
+              "type": "Fallback"
+            },
+            {
+              "status": "False",
+              "type": "Paused"
+            }
+          ],
+          "externalMetricNames": [
+            "s0-redis-cldt-capacity"
+          ],
+          "hpaName": "keda-hpa-cldt-node-capacity",
+          "lastActiveTime": "2026-09-10T00:17:55Z",
+          "originalReplicaCount": 3,
+          "scaleTargetGVKR": {
+            "group": "cloud-provisioning.appmana.com",
+            "kind": "ProvisionedNodeGroupClaim",
+            "resource": "provisionednodegroupclaims",
+            "version": "v1alpha1"
+          },
+          "scaleTargetKind": "cloud-provisioning.appmana.com/v1alpha1.ProvisionedNodeGroupClaim",
+          "triggersActivity": {
+            "s0-redis-cldt-capacity": {
+              "isActive": true
+            }
+          },
+          "triggersTypes": "redis"
+        }
+      },
+      "slots": {
+        "lab": "cldt",
+        "slots": [
+          "remote1",
+          "remote2",
+          "remote3"
+        ],
+        "owners": {
+          "remote1": {
+            "namespace": "cloud-provisioning",
+            "name": "pooled-workers-8ae81037d7a1043c-0",
+            "uid": "020f8372-4e25-49f9-8ef9-58ea9d227202"
+          }
+        }
+      },
+      "transitions": [
+        {
+          "at": "2026-09-10T00:14:14.031970+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 3,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:14:18.746849+00:00",
+          "desired": 1,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "abdb07ad-9f8d-40f2-9b98-afcd1c319198",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": false,
+            "withdrawal": false
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:14:29.150795+00:00",
+          "desired": 1,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "abdb07ad-9f8d-40f2-9b98-afcd1c319198",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": false,
+            "withdrawal": false
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:15:29.977678+00:00",
+          "desired": 1,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "abdb07ad-9f8d-40f2-9b98-afcd1c319198",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:15:36.928640+00:00",
+          "desired": 1,
+          "total": 3,
+          "ready": 0,
+          "action": {
+            "id": "abdb07ad-9f8d-40f2-9b98-afcd1c319198",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:15:47.395403+00:00",
+          "desired": 1,
+          "total": 3,
+          "ready": 1,
+          "action": {
+            "id": "abdb07ad-9f8d-40f2-9b98-afcd1c319198",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:15:57.901413+00:00",
+          "desired": 1,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "abdb07ad-9f8d-40f2-9b98-afcd1c319198",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:16:01.587758+00:00",
+          "desired": 1,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "abdb07ad-9f8d-40f2-9b98-afcd1c319198",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:16:09.106668+00:00",
+          "desired": 1,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "abdb07ad-9f8d-40f2-9b98-afcd1c319198",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:16:29.835942+00:00",
+          "desired": 1,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "abdb07ad-9f8d-40f2-9b98-afcd1c319198",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 2,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:16:33.337739+00:00",
+          "desired": 1,
+          "total": 2,
+          "ready": 1,
+          "action": {
+            "id": "4301464d-5dd6-47bc-bd80-8b03c4dcc559",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": false,
+            "withdrawal": false
+          },
+          "claims": 2,
+          "machines": 2,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:16:43.828045+00:00",
+          "desired": 1,
+          "total": 2,
+          "ready": 1,
+          "action": {
+            "id": "4301464d-5dd6-47bc-bd80-8b03c4dcc559",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": false,
+            "withdrawal": false
+          },
+          "claims": 2,
+          "machines": 2,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:17:14.817664+00:00",
+          "desired": 1,
+          "total": 2,
+          "ready": 1,
+          "action": {
+            "id": "4301464d-5dd6-47bc-bd80-8b03c4dcc559",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 2,
+          "machines": 2,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:17:21.739945+00:00",
+          "desired": 1,
+          "total": 2,
+          "ready": 0,
+          "action": {
+            "id": "4301464d-5dd6-47bc-bd80-8b03c4dcc559",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 2,
+          "machines": 2,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:17:50.425878+00:00",
+          "desired": 1,
+          "total": 2,
+          "ready": 1,
+          "action": {
+            "id": "4301464d-5dd6-47bc-bd80-8b03c4dcc559",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 2,
+          "machines": 2,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:17:53.830842+00:00",
+          "desired": 1,
+          "total": 2,
+          "ready": 1,
+          "action": {
+            "id": "4301464d-5dd6-47bc-bd80-8b03c4dcc559",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 2,
+          "machines": 2,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:17:57.208787+00:00",
+          "desired": 1,
+          "total": 2,
+          "ready": 1,
+          "action": {
+            "id": "4301464d-5dd6-47bc-bd80-8b03c4dcc559",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 2,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:18:00.667088+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 1,
+          "action": null,
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-09-10T00:22:54.668669+00:00",
+      "targetReplicas": 3,
+      "nodeUIDs": {
+        "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+        "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+        "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+        "remote1": "4674271b-7639-49e7-aa0f-9228cc556459",
+        "remote2": "81f42be3-4faa-475c-84f7-cbb7be17b3a5",
+        "remote3": "dca4cd79-94e8-459d-8414-df6e5fc740b1",
+        "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+        "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+      },
+      "machineUIDs": {
+        "pooled-workers-8ae81037d7a1043c-0": "d47f09f5-ec22-41fd-bd15-41c968a08db9",
+        "pooled-workers-8ae81037d7a1043c-1": "ffeb2bc7-b576-4820-80e0-a131e4ccc2e2",
+        "pooled-workers-8ae81037d7a1043c-2": "67045b79-ce35-4fd7-8624-780d90a468c4"
+      },
+      "infraUIDs": {
+        "pooled-workers-8ae81037d7a1043c-0": "020f8372-4e25-49f9-8ef9-58ea9d227202",
+        "pooled-workers-8ae81037d7a1043c-1": "51e3ce9e-e66c-4b5c-a28d-f29febbcf11d",
+        "pooled-workers-8ae81037d7a1043c-2": "9244aa7b-0e68-4cb9-8a99-bee5b2630bca"
+      },
+      "survivingNodeUIDsUnchanged": true,
+      "replacementNodeAndMachineUIDsChanged": true,
+      "fixtureImagePreloads": [
+        {
+          "at": "2026-09-10T00:21:34Z",
+          "node": "remote2",
+          "uid": "81f42be3-4faa-475c-84f7-cbb7be17b3a5"
+        },
+        {
+          "at": "2026-09-10T00:22:20Z",
+          "node": "remote3",
+          "uid": "dca4cd79-94e8-459d-8414-df6e5fc740b1"
+        }
+      ],
+      "stage": "up",
+      "queueDepth": 9,
+      "group": {
+        "name": "pooled-workers",
+        "uid": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+        "spec": {
+          "replicas": 3,
+          "template": {
+            "spec": {
+              "clusterName": "cldt",
+              "infrastructureRef": {
+                "apiGroup": "containernet.appmana.com",
+                "kind": "ContainernetMachineTemplate",
+                "name": "pooled-worker"
+              }
+            }
+          },
+          "workloadSelector": {
+            "matchLabels": {
+              "app": "cldt-group-scheduling"
+            }
+          }
+        },
+        "status": {
+          "readyReplicas": 3,
+          "replicas": 3,
+          "selector": "app=cldt-group-scheduling"
+        }
+      },
+      "hpa": {
+        "name": "keda-hpa-cldt-node-capacity",
+        "uid": "bf97133d-a437-42d8-95bb-be22fed2e49c",
+        "spec": {
+          "behavior": {
+            "scaleDown": {
+              "policies": [
+                {
+                  "periodSeconds": 15,
+                  "type": "Percent",
+                  "value": 100
+                }
+              ],
+              "selectPolicy": "Max",
+              "stabilizationWindowSeconds": 0
+            },
+            "scaleUp": {
+              "policies": [
+                {
+                  "periodSeconds": 15,
+                  "type": "Pods",
+                  "value": 3
+                }
+              ],
+              "selectPolicy": "Max",
+              "stabilizationWindowSeconds": 0
+            }
+          },
+          "maxReplicas": 3,
+          "metrics": [
+            {
+              "external": {
+                "metric": {
+                  "name": "s0-redis-cldt-capacity",
+                  "selector": {
+                    "matchLabels": {
+                      "scaledobject.keda.sh/name": "cldt-node-capacity"
+                    }
+                  }
+                },
+                "target": {
+                  "averageValue": "3",
+                  "type": "AverageValue"
+                }
+              },
+              "type": "External"
+            }
+          ],
+          "minReplicas": 1,
+          "scaleTargetRef": {
+            "apiVersion": "cloud-provisioning.appmana.com/v1alpha1",
+            "kind": "ProvisionedNodeGroupClaim",
+            "name": "pooled-workers"
+          }
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastTransitionTime": "2026-09-10T00:12:27Z",
+              "message": "recommended size matches current size",
+              "reason": "ReadyForNewScale",
+              "status": "True",
+              "type": "AbleToScale"
+            },
+            {
+              "lastTransitionTime": "2026-09-10T00:17:57Z",
+              "message": "the HPA was able to successfully calculate a replica count from external metric s0-redis-cldt-capacity(&LabelSelector{MatchLabels:map[string]string{scaledobject.keda.sh/name: cldt-node-capacity,},MatchExpressions:[]LabelSelectorRequirement{},})",
+              "reason": "ValidMetricFound",
+              "status": "True",
+              "type": "ScalingActive"
+            },
+            {
+              "lastTransitionTime": "2026-09-10T00:12:27Z",
+              "message": "the desired count is within the acceptable range",
+              "reason": "DesiredWithinRange",
+              "status": "False",
+              "type": "ScalingLimited"
+            }
+          ],
+          "currentMetrics": [
+            {
+              "external": {
+                "current": {
+                  "averageValue": "3"
+                },
+                "metric": {
+                  "name": "s0-redis-cldt-capacity",
+                  "selector": {
+                    "matchLabels": {
+                      "scaledobject.keda.sh/name": "cldt-node-capacity"
+                    }
+                  }
+                }
+              },
+              "type": "External"
+            }
+          ],
+          "currentReplicas": 3,
+          "desiredReplicas": 3,
+          "lastScaleTime": "2026-09-10T00:19:12Z"
+        }
+      },
+      "scaledObject": {
+        "name": "cldt-node-capacity",
+        "uid": "479b5252-a19a-46dc-909c-fc75af297f1c",
+        "spec": {
+          "advanced": {
+            "horizontalPodAutoscalerConfig": {
+              "behavior": {
+                "scaleDown": {
+                  "policies": [
+                    {
+                      "periodSeconds": 15,
+                      "type": "Percent",
+                      "value": 100
+                    }
+                  ],
+                  "stabilizationWindowSeconds": 0
+                },
+                "scaleUp": {
+                  "policies": [
+                    {
+                      "periodSeconds": 15,
+                      "type": "Pods",
+                      "value": 3
+                    }
+                  ],
+                  "stabilizationWindowSeconds": 0
+                }
+              }
+            },
+            "scalingModifiers": {}
+          },
+          "cooldownPeriod": 60,
+          "maxReplicaCount": 3,
+          "minReplicaCount": 0,
+          "pollingInterval": 5,
+          "scaleTargetRef": {
+            "apiVersion": "cloud-provisioning.appmana.com/v1alpha1",
+            "kind": "ProvisionedNodeGroupClaim",
+            "name": "pooled-workers"
+          },
+          "triggers": [
+            {
+              "metadata": {
+                "address": "cldt-keda-redis.cloud-provisioning.svc:6379",
+                "listLength": "3",
+                "listName": "cldt-capacity"
+              },
+              "type": "redis"
+            }
+          ]
+        },
+        "status": {
+          "authenticationsTypes": "",
+          "conditions": [
+            {
+              "message": "ScaledObject is defined correctly and is ready for scaling",
+              "reason": "ScaledObjectReady",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "message": "Scaling is performed because triggers are active",
+              "reason": "ScalerActive",
+              "status": "True",
+              "type": "Active"
+            },
+            {
+              "message": "No fallbacks are active on this scaled object",
+              "reason": "NoFallbackFound",
+              "status": "False",
+              "type": "Fallback"
+            },
+            {
+              "status": "False",
+              "type": "Paused"
+            }
+          ],
+          "externalMetricNames": [
+            "s0-redis-cldt-capacity"
+          ],
+          "hpaName": "keda-hpa-cldt-node-capacity",
+          "lastActiveTime": "2026-09-10T00:22:50Z",
+          "originalReplicaCount": 3,
+          "scaleTargetGVKR": {
+            "group": "cloud-provisioning.appmana.com",
+            "kind": "ProvisionedNodeGroupClaim",
+            "resource": "provisionednodegroupclaims",
+            "version": "v1alpha1"
+          },
+          "scaleTargetKind": "cloud-provisioning.appmana.com/v1alpha1.ProvisionedNodeGroupClaim",
+          "triggersActivity": {
+            "s0-redis-cldt-capacity": {
+              "isActive": true
+            }
+          },
+          "triggersTypes": "redis"
+        }
+      },
+      "slots": {
+        "lab": "cldt",
+        "slots": [
+          "remote1",
+          "remote2",
+          "remote3"
+        ],
+        "owners": {
+          "remote1": {
+            "namespace": "cloud-provisioning",
+            "name": "pooled-workers-8ae81037d7a1043c-0",
+            "uid": "020f8372-4e25-49f9-8ef9-58ea9d227202"
+          },
+          "remote2": {
+            "namespace": "cloud-provisioning",
+            "name": "pooled-workers-8ae81037d7a1043c-1",
+            "uid": "51e3ce9e-e66c-4b5c-a28d-f29febbcf11d"
+          },
+          "remote3": {
+            "namespace": "cloud-provisioning",
+            "name": "pooled-workers-8ae81037d7a1043c-2",
+            "uid": "9244aa7b-0e68-4cb9-8a99-bee5b2630bca"
+          }
+        }
+      },
+      "transitions": [
+        {
+          "at": "2026-09-10T00:19:03.929589+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 1,
+          "action": null,
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:19:14.137714+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 1,
+          "action": null,
+          "claims": 2,
+          "machines": 2,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:19:17.663646+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 1,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:19:28.024911+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 0,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:19:31.534269+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 0,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:19:48.972484+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 1,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:20:17.027590+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 0,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:20:47.834029+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 1,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:21:12.094925+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 0,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:21:15.670525+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 0,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:21:48.697444+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 1,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:22:00.118971+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 1,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:22:08.187733+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 2,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:22:54.665469+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 3,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-09-10T00:31:53.184239+00:00",
+      "targetReplicas": 0,
+      "nodeUIDs": {
+        "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+        "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+        "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+        "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+        "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+      },
+      "machineUIDs": {},
+      "infraUIDs": {},
+      "stoppedVMs": {
+        "/clab-cldt-remote1": {
+          "id": "97f367f093aca8cf7a4e450aff4c299fb5cfed5d554113dde915e4dfd4cde2fb",
+          "running": false,
+          "finishedAt": "2026-09-10T00:31:45.082276836Z"
+        },
+        "/clab-cldt-remote2": {
+          "id": "636602ec96fd135eae0adcd5f41b4d5b968ba88195b5d2c8a433e3f95bd14836",
+          "running": false,
+          "finishedAt": "2026-09-10T00:29:34.379205709Z"
+        },
+        "/clab-cldt-remote3": {
+          "id": "a8ce135e16d7cb23494a2dfa5446a651fa059bb2ccda49d651b9cb40399db857",
+          "running": false,
+          "finishedAt": "2026-09-10T00:28:14.516528388Z"
+        }
+      },
+      "permanentNodeUIDsUnchanged": true,
+      "slotsReleasedAt": "2026-09-10T00:33:01.900299+00:00",
+      "stage": "zero",
+      "queueDepth": 0,
+      "group": {
+        "name": "pooled-workers",
+        "uid": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+        "spec": {
+          "replicas": 0,
+          "template": {
+            "spec": {
+              "clusterName": "cldt",
+              "infrastructureRef": {
+                "apiGroup": "containernet.appmana.com",
+                "kind": "ContainernetMachineTemplate",
+                "name": "pooled-worker"
+              }
+            }
+          },
+          "workloadSelector": {
+            "matchLabels": {
+              "app": "cldt-group-scheduling"
+            }
+          }
+        },
+        "status": {
+          "readyReplicas": 0,
+          "replicas": 0,
+          "selector": "app=cldt-group-scheduling"
+        }
+      },
+      "hpa": {
+        "name": "keda-hpa-cldt-node-capacity",
+        "uid": "bf97133d-a437-42d8-95bb-be22fed2e49c",
+        "spec": {
+          "behavior": {
+            "scaleDown": {
+              "policies": [
+                {
+                  "periodSeconds": 15,
+                  "type": "Percent",
+                  "value": 100
+                }
+              ],
+              "selectPolicy": "Max",
+              "stabilizationWindowSeconds": 0
+            },
+            "scaleUp": {
+              "policies": [
+                {
+                  "periodSeconds": 15,
+                  "type": "Pods",
+                  "value": 3
+                }
+              ],
+              "selectPolicy": "Max",
+              "stabilizationWindowSeconds": 0
+            }
+          },
+          "maxReplicas": 3,
+          "metrics": [
+            {
+              "external": {
+                "metric": {
+                  "name": "s0-redis-cldt-capacity",
+                  "selector": {
+                    "matchLabels": {
+                      "scaledobject.keda.sh/name": "cldt-node-capacity"
+                    }
+                  }
+                },
+                "target": {
+                  "averageValue": "3",
+                  "type": "AverageValue"
+                }
+              },
+              "type": "External"
+            }
+          ],
+          "minReplicas": 1,
+          "scaleTargetRef": {
+            "apiVersion": "cloud-provisioning.appmana.com/v1alpha1",
+            "kind": "ProvisionedNodeGroupClaim",
+            "name": "pooled-workers"
+          }
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastTransitionTime": "2026-09-10T00:12:27Z",
+              "message": "the HPA controller was able to get the target's current scale",
+              "reason": "SucceededGetScale",
+              "status": "True",
+              "type": "AbleToScale"
+            },
+            {
+              "lastTransitionTime": "2026-09-10T00:27:28Z",
+              "message": "scaling is disabled since the replica count of the target is zero",
+              "reason": "ScalingDisabled",
+              "status": "False",
+              "type": "ScalingActive"
+            },
+            {
+              "lastTransitionTime": "2026-09-10T00:24:57Z",
+              "message": "the desired replica count is less than the minimum replica count",
+              "reason": "TooFewReplicas",
+              "status": "True",
+              "type": "ScalingLimited"
+            }
+          ],
+          "currentMetrics": null,
+          "desiredReplicas": 0,
+          "lastScaleTime": "2026-09-10T00:26:28Z"
+        }
+      },
+      "scaledObject": {
+        "name": "cldt-node-capacity",
+        "uid": "479b5252-a19a-46dc-909c-fc75af297f1c",
+        "spec": {
+          "advanced": {
+            "horizontalPodAutoscalerConfig": {
+              "behavior": {
+                "scaleDown": {
+                  "policies": [
+                    {
+                      "periodSeconds": 15,
+                      "type": "Percent",
+                      "value": 100
+                    }
+                  ],
+                  "stabilizationWindowSeconds": 0
+                },
+                "scaleUp": {
+                  "policies": [
+                    {
+                      "periodSeconds": 15,
+                      "type": "Pods",
+                      "value": 3
+                    }
+                  ],
+                  "stabilizationWindowSeconds": 0
+                }
+              }
+            },
+            "scalingModifiers": {}
+          },
+          "cooldownPeriod": 60,
+          "maxReplicaCount": 3,
+          "minReplicaCount": 0,
+          "pollingInterval": 5,
+          "scaleTargetRef": {
+            "apiVersion": "cloud-provisioning.appmana.com/v1alpha1",
+            "kind": "ProvisionedNodeGroupClaim",
+            "name": "pooled-workers"
+          },
+          "triggers": [
+            {
+              "metadata": {
+                "address": "cldt-keda-redis.cloud-provisioning.svc:6379",
+                "listLength": "3",
+                "listName": "cldt-capacity"
+              },
+              "type": "redis"
+            }
+          ]
+        },
+        "status": {
+          "authenticationsTypes": "",
+          "conditions": [
+            {
+              "message": "ScaledObject is defined correctly and is ready for scaling",
+              "reason": "ScaledObjectReady",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "message": "Scaling is not performed because triggers are not active",
+              "reason": "ScalerNotActive",
+              "status": "False",
+              "type": "Active"
+            },
+            {
+              "message": "No fallbacks are active on this scaled object",
+              "reason": "NoFallbackFound",
+              "status": "False",
+              "type": "Fallback"
+            },
+            {
+              "status": "False",
+              "type": "Paused"
+            }
+          ],
+          "externalMetricNames": [
+            "s0-redis-cldt-capacity"
+          ],
+          "hpaName": "keda-hpa-cldt-node-capacity",
+          "lastActiveTime": "2026-09-10T00:26:20Z",
+          "originalReplicaCount": 3,
+          "scaleTargetGVKR": {
+            "group": "cloud-provisioning.appmana.com",
+            "kind": "ProvisionedNodeGroupClaim",
+            "resource": "provisionednodegroupclaims",
+            "version": "v1alpha1"
+          },
+          "scaleTargetKind": "cloud-provisioning.appmana.com/v1alpha1.ProvisionedNodeGroupClaim",
+          "triggersActivity": {
+            "s0-redis-cldt-capacity": {
+              "isActive": false
+            }
+          },
+          "triggersTypes": "redis"
+        }
+      },
+      "slots": {
+        "lab": "cldt",
+        "slots": [
+          "remote1",
+          "remote2",
+          "remote3"
+        ],
+        "owners": {}
+      },
+      "transitions": [
+        {
+          "at": "2026-09-10T00:26:22.479350+00:00",
+          "desired": 3,
+          "total": 3,
+          "ready": 3,
+          "action": null,
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:26:33.612364+00:00",
+          "desired": 1,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "7fcb28b8-5d9a-4e18-92e0-39c19bbda0b0",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": false,
+            "withdrawal": false
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:26:47.550455+00:00",
+          "desired": 1,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "7fcb28b8-5d9a-4e18-92e0-39c19bbda0b0",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": false,
+            "withdrawal": false
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:27:16.124978+00:00",
+          "desired": 1,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "7fcb28b8-5d9a-4e18-92e0-39c19bbda0b0",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:27:23.033792+00:00",
+          "desired": 0,
+          "total": 3,
+          "ready": 0,
+          "action": {
+            "id": "7fcb28b8-5d9a-4e18-92e0-39c19bbda0b0",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:27:29.940265+00:00",
+          "desired": 0,
+          "total": 3,
+          "ready": 0,
+          "action": {
+            "id": "7fcb28b8-5d9a-4e18-92e0-39c19bbda0b0",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:27:51.213371+00:00",
+          "desired": 0,
+          "total": 3,
+          "ready": 1,
+          "action": {
+            "id": "7fcb28b8-5d9a-4e18-92e0-39c19bbda0b0",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:28:05.382368+00:00",
+          "desired": 0,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "7fcb28b8-5d9a-4e18-92e0-39c19bbda0b0",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 3
+        },
+        {
+          "at": "2026-09-10T00:28:17.016537+00:00",
+          "desired": 0,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "7fcb28b8-5d9a-4e18-92e0-39c19bbda0b0",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 3,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:28:20.342704+00:00",
+          "desired": 0,
+          "total": 3,
+          "ready": 2,
+          "action": {
+            "id": "7fcb28b8-5d9a-4e18-92e0-39c19bbda0b0",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-2",
+            "node": "remote3",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 3,
+          "machines": 2,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:28:27.262984+00:00",
+          "desired": 0,
+          "total": 2,
+          "ready": 1,
+          "action": {
+            "id": "82963a2b-6e69-4795-a081-d97e8d82cdf2",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": false,
+            "withdrawal": false
+          },
+          "claims": 2,
+          "machines": 2,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:29:02.603862+00:00",
+          "desired": 0,
+          "total": 2,
+          "ready": 1,
+          "action": {
+            "id": "82963a2b-6e69-4795-a081-d97e8d82cdf2",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 2,
+          "machines": 2,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:29:09.532745+00:00",
+          "desired": 0,
+          "total": 2,
+          "ready": 0,
+          "action": {
+            "id": "82963a2b-6e69-4795-a081-d97e8d82cdf2",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 2,
+          "machines": 2,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:29:19.931147+00:00",
+          "desired": 0,
+          "total": 2,
+          "ready": 1,
+          "action": {
+            "id": "82963a2b-6e69-4795-a081-d97e8d82cdf2",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 2,
+          "machines": 2,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:29:30.115519+00:00",
+          "desired": 0,
+          "total": 2,
+          "ready": 1,
+          "action": {
+            "id": "82963a2b-6e69-4795-a081-d97e8d82cdf2",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 2,
+          "machines": 2,
+          "infra": 2
+        },
+        {
+          "at": "2026-09-10T00:29:37.572527+00:00",
+          "desired": 0,
+          "total": 2,
+          "ready": 1,
+          "action": {
+            "id": "82963a2b-6e69-4795-a081-d97e8d82cdf2",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 2,
+          "machines": 2,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:29:51.355361+00:00",
+          "desired": 0,
+          "total": 2,
+          "ready": 1,
+          "action": {
+            "id": "82963a2b-6e69-4795-a081-d97e8d82cdf2",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-1",
+            "node": "remote2",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 2,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:30:01.625773+00:00",
+          "desired": 0,
+          "total": 1,
+          "ready": 0,
+          "action": {
+            "id": "f8e8edff-6093-4539-9375-f9dddcb934e5",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-0",
+            "node": "remote1",
+            "removing": false,
+            "withdrawal": false
+          },
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:31:22.133696+00:00",
+          "desired": 0,
+          "total": 1,
+          "ready": 0,
+          "action": {
+            "id": "f8e8edff-6093-4539-9375-f9dddcb934e5",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-0",
+            "node": "remote1",
+            "removing": false,
+            "withdrawal": true
+          },
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:31:42.571997+00:00",
+          "desired": 0,
+          "total": 1,
+          "ready": 0,
+          "action": {
+            "id": "f8e8edff-6093-4539-9375-f9dddcb934e5",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-0",
+            "node": "remote1",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:31:49.871479+00:00",
+          "desired": 0,
+          "total": 1,
+          "ready": 0,
+          "action": {
+            "id": "f8e8edff-6093-4539-9375-f9dddcb934e5",
+            "type": "Drain",
+            "child": "pooled-workers-8ae81037d7a1043c-0",
+            "node": "remote1",
+            "removing": true,
+            "withdrawal": true
+          },
+          "claims": 1,
+          "machines": 0,
+          "infra": 0
+        },
+        {
+          "at": "2026-09-10T00:31:53.181116+00:00",
+          "desired": 0,
+          "total": 0,
+          "ready": 0,
+          "action": null,
+          "claims": 0,
+          "machines": 0,
+          "infra": 0
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-09-10T00:35:31.204524+00:00",
+      "targetReplicas": 1,
+      "nodeUIDs": {
+        "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+        "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+        "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+        "remote1": "88c22799-b2e4-474f-8975-20f2193bc7ef",
+        "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+        "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+      },
+      "machineUIDs": {
+        "pooled-workers-8ae81037d7a1043c-0": "44c89810-c79f-463f-b87a-7d4c2295672f"
+      },
+      "infraUIDs": {
+        "pooled-workers-8ae81037d7a1043c-0": "f67751f6-3dd9-4650-96cd-a2b8e5d35d70"
+      },
+      "permanentNodeUIDsUnchanged": true,
+      "newMachineAndNodeUIDs": true,
+      "fixtureImagePreloads": [
+        {
+          "at": "2026-09-10T00:35:20Z",
+          "node": "remote1",
+          "uid": "88c22799-b2e4-474f-8975-20f2193bc7ef"
+        }
+      ],
+      "stage": "restart",
+      "queueDepth": 3,
+      "group": {
+        "name": "pooled-workers",
+        "uid": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+        "spec": {
+          "replicas": 1,
+          "template": {
+            "spec": {
+              "clusterName": "cldt",
+              "infrastructureRef": {
+                "apiGroup": "containernet.appmana.com",
+                "kind": "ContainernetMachineTemplate",
+                "name": "pooled-worker"
+              }
+            }
+          },
+          "workloadSelector": {
+            "matchLabels": {
+              "app": "cldt-group-scheduling"
+            }
+          }
+        },
+        "status": {
+          "readyReplicas": 1,
+          "replicas": 1,
+          "selector": "app=cldt-group-scheduling"
+        }
+      },
+      "hpa": {
+        "name": "keda-hpa-cldt-node-capacity",
+        "uid": "bf97133d-a437-42d8-95bb-be22fed2e49c",
+        "spec": {
+          "behavior": {
+            "scaleDown": {
+              "policies": [
+                {
+                  "periodSeconds": 15,
+                  "type": "Percent",
+                  "value": 100
+                }
+              ],
+              "selectPolicy": "Max",
+              "stabilizationWindowSeconds": 0
+            },
+            "scaleUp": {
+              "policies": [
+                {
+                  "periodSeconds": 15,
+                  "type": "Pods",
+                  "value": 3
+                }
+              ],
+              "selectPolicy": "Max",
+              "stabilizationWindowSeconds": 0
+            }
+          },
+          "maxReplicas": 3,
+          "metrics": [
+            {
+              "external": {
+                "metric": {
+                  "name": "s0-redis-cldt-capacity",
+                  "selector": {
+                    "matchLabels": {
+                      "scaledobject.keda.sh/name": "cldt-node-capacity"
+                    }
+                  }
+                },
+                "target": {
+                  "averageValue": "3",
+                  "type": "AverageValue"
+                }
+              },
+              "type": "External"
+            }
+          ],
+          "minReplicas": 1,
+          "scaleTargetRef": {
+            "apiVersion": "cloud-provisioning.appmana.com/v1alpha1",
+            "kind": "ProvisionedNodeGroupClaim",
+            "name": "pooled-workers"
+          }
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastTransitionTime": "2026-09-10T00:12:27Z",
+              "message": "recommended size matches current size",
+              "reason": "ReadyForNewScale",
+              "status": "True",
+              "type": "AbleToScale"
+            },
+            {
+              "lastTransitionTime": "2026-09-10T00:33:14Z",
+              "message": "the HPA was able to successfully calculate a replica count from external metric s0-redis-cldt-capacity(&LabelSelector{MatchLabels:map[string]string{scaledobject.keda.sh/name: cldt-node-capacity,},MatchExpressions:[]LabelSelectorRequirement{},})",
+              "reason": "ValidMetricFound",
+              "status": "True",
+              "type": "ScalingActive"
+            },
+            {
+              "lastTransitionTime": "2026-09-10T00:33:14Z",
+              "message": "the desired count is within the acceptable range",
+              "reason": "DesiredWithinRange",
+              "status": "False",
+              "type": "ScalingLimited"
+            }
+          ],
+          "currentMetrics": [
+            {
+              "external": {
+                "current": {
+                  "averageValue": "3"
+                },
+                "metric": {
+                  "name": "s0-redis-cldt-capacity",
+                  "selector": {
+                    "matchLabels": {
+                      "scaledobject.keda.sh/name": "cldt-node-capacity"
+                    }
+                  }
+                }
+              },
+              "type": "External"
+            }
+          ],
+          "currentReplicas": 1,
+          "desiredReplicas": 1,
+          "lastScaleTime": "2026-09-10T00:26:28Z"
+        }
+      },
+      "scaledObject": {
+        "name": "cldt-node-capacity",
+        "uid": "479b5252-a19a-46dc-909c-fc75af297f1c",
+        "spec": {
+          "advanced": {
+            "horizontalPodAutoscalerConfig": {
+              "behavior": {
+                "scaleDown": {
+                  "policies": [
+                    {
+                      "periodSeconds": 15,
+                      "type": "Percent",
+                      "value": 100
+                    }
+                  ],
+                  "stabilizationWindowSeconds": 0
+                },
+                "scaleUp": {
+                  "policies": [
+                    {
+                      "periodSeconds": 15,
+                      "type": "Pods",
+                      "value": 3
+                    }
+                  ],
+                  "stabilizationWindowSeconds": 0
+                }
+              }
+            },
+            "scalingModifiers": {}
+          },
+          "cooldownPeriod": 60,
+          "maxReplicaCount": 3,
+          "minReplicaCount": 0,
+          "pollingInterval": 5,
+          "scaleTargetRef": {
+            "apiVersion": "cloud-provisioning.appmana.com/v1alpha1",
+            "kind": "ProvisionedNodeGroupClaim",
+            "name": "pooled-workers"
+          },
+          "triggers": [
+            {
+              "metadata": {
+                "address": "cldt-keda-redis.cloud-provisioning.svc:6379",
+                "listLength": "3",
+                "listName": "cldt-capacity"
+              },
+              "type": "redis"
+            }
+          ]
+        },
+        "status": {
+          "authenticationsTypes": "",
+          "conditions": [
+            {
+              "message": "ScaledObject is defined correctly and is ready for scaling",
+              "reason": "ScaledObjectReady",
+              "status": "True",
+              "type": "Ready"
+            },
+            {
+              "message": "Scaling is performed because triggers are active",
+              "reason": "ScalerActive",
+              "status": "True",
+              "type": "Active"
+            },
+            {
+              "message": "No fallbacks are active on this scaled object",
+              "reason": "NoFallbackFound",
+              "status": "False",
+              "type": "Fallback"
+            },
+            {
+              "status": "False",
+              "type": "Paused"
+            }
+          ],
+          "externalMetricNames": [
+            "s0-redis-cldt-capacity"
+          ],
+          "hpaName": "keda-hpa-cldt-node-capacity",
+          "lastActiveTime": "2026-09-10T00:35:25Z",
+          "originalReplicaCount": 3,
+          "scaleTargetGVKR": {
+            "group": "cloud-provisioning.appmana.com",
+            "kind": "ProvisionedNodeGroupClaim",
+            "resource": "provisionednodegroupclaims",
+            "version": "v1alpha1"
+          },
+          "scaleTargetKind": "cloud-provisioning.appmana.com/v1alpha1.ProvisionedNodeGroupClaim",
+          "triggersActivity": {
+            "s0-redis-cldt-capacity": {
+              "isActive": true
+            }
+          },
+          "triggersTypes": "redis"
+        }
+      },
+      "slots": {
+        "lab": "cldt",
+        "slots": [
+          "remote1",
+          "remote2",
+          "remote3"
+        ],
+        "owners": {
+          "remote1": {
+            "namespace": "cloud-provisioning",
+            "name": "pooled-workers-8ae81037d7a1043c-0",
+            "uid": "f67751f6-3dd9-4650-96cd-a2b8e5d35d70"
+          }
+        }
+      },
+      "transitions": [
+        {
+          "at": "2026-09-10T00:33:04.815188+00:00",
+          "desired": 0,
+          "total": 0,
+          "ready": 0,
+          "action": null,
+          "claims": 0,
+          "machines": 0,
+          "infra": 0
+        },
+        {
+          "at": "2026-09-10T00:33:08.118940+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 0,
+          "action": null,
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:33:18.708797+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 0,
+          "action": null,
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:35:02.401025+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 0,
+          "action": null,
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        },
+        {
+          "at": "2026-09-10T00:35:31.200763+00:00",
+          "desired": 1,
+          "total": 1,
+          "ready": 1,
+          "action": null,
+          "claims": 1,
+          "machines": 1,
+          "infra": 1
+        }
+      ]
+    }
+  ],
+  "maximumCapacity": {
+    "observedAt": "2026-09-10T00:24:58.312348+00:00",
+    "queueDepth": 12,
+    "itemsPerMachine": 3,
+    "maxReplicas": 3,
+    "hpa": {
+      "name": "keda-hpa-cldt-node-capacity",
+      "uid": "bf97133d-a437-42d8-95bb-be22fed2e49c",
+      "spec": {
+        "behavior": {
+          "scaleDown": {
+            "policies": [
+              {
+                "periodSeconds": 15,
+                "type": "Percent",
+                "value": 100
+              }
+            ],
+            "selectPolicy": "Max",
+            "stabilizationWindowSeconds": 0
+          },
+          "scaleUp": {
+            "policies": [
+              {
+                "periodSeconds": 15,
+                "type": "Pods",
+                "value": 3
+              }
+            ],
+            "selectPolicy": "Max",
+            "stabilizationWindowSeconds": 0
+          }
+        },
+        "maxReplicas": 3,
+        "metrics": [
+          {
+            "external": {
+              "metric": {
+                "name": "s0-redis-cldt-capacity",
+                "selector": {
+                  "matchLabels": {
+                    "scaledobject.keda.sh/name": "cldt-node-capacity"
+                  }
+                }
+              },
+              "target": {
+                "averageValue": "3",
+                "type": "AverageValue"
+              }
+            },
+            "type": "External"
+          }
+        ],
+        "minReplicas": 1,
+        "scaleTargetRef": {
+          "apiVersion": "cloud-provisioning.appmana.com/v1alpha1",
+          "kind": "ProvisionedNodeGroupClaim",
+          "name": "pooled-workers"
+        }
+      },
+      "status": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-09-10T00:12:27Z",
+            "message": "recommended size matches current size",
+            "reason": "ReadyForNewScale",
+            "status": "True",
+            "type": "AbleToScale"
+          },
+          {
+            "lastTransitionTime": "2026-09-10T00:17:57Z",
+            "message": "the HPA was able to successfully calculate a replica count from external metric s0-redis-cldt-capacity(&LabelSelector{MatchLabels:map[string]string{scaledobject.keda.sh/name: cldt-node-capacity,},MatchExpressions:[]LabelSelectorRequirement{},})",
+            "reason": "ValidMetricFound",
+            "status": "True",
+            "type": "ScalingActive"
+          },
+          {
+            "lastTransitionTime": "2026-09-10T00:24:57Z",
+            "message": "the desired replica count is more than the maximum replica count",
+            "reason": "TooManyReplicas",
+            "status": "True",
+            "type": "ScalingLimited"
+          }
+        ],
+        "currentMetrics": [
+          {
+            "external": {
+              "current": {
+                "averageValue": "4"
+              },
+              "metric": {
+                "name": "s0-redis-cldt-capacity",
+                "selector": {
+                  "matchLabels": {
+                    "scaledobject.keda.sh/name": "cldt-node-capacity"
+                  }
+                }
+              }
+            },
+            "type": "External"
+          }
+        ],
+        "currentReplicas": 3,
+        "desiredReplicas": 3,
+        "lastScaleTime": "2026-09-10T00:19:12Z"
+      }
+    },
+    "group": {
+      "name": "pooled-workers",
+      "uid": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+      "spec": {
+        "replicas": 3,
+        "template": {
+          "spec": {
+            "clusterName": "cldt",
+            "infrastructureRef": {
+              "apiGroup": "containernet.appmana.com",
+              "kind": "ContainernetMachineTemplate",
+              "name": "pooled-worker"
+            }
+          }
+        },
+        "workloadSelector": {
+          "matchLabels": {
+            "app": "cldt-group-scheduling"
+          }
+        }
+      },
+      "status": {
+        "readyReplicas": 3,
+        "replicas": 3,
+        "selector": "app=cldt-group-scheduling"
+      }
+    }
+  },
+  "network": [
+    {
+      "stage": "up",
+      "file": "node-group-keda-up-network-results.json",
+      "passed": 184,
+      "failed": 0,
+      "observedAt": "2026-09-10T00:25:37.451244546Z",
+      "nodeAndPodUIDsUnchangedDuringMatrix": true
+    },
+    {
+      "stage": "restart",
+      "file": "node-group-keda-restart-network-results.json",
+      "passed": 102,
+      "failed": 0,
+      "observedAt": "2026-09-10T00:39:31.392731844Z",
+      "nodeAndPodUIDsUnchangedDuringMatrix": true
+    }
+  ]
+}

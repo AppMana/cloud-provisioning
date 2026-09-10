@@ -154,6 +154,12 @@ processes, and guest filesystem writes through the serial guest agent. A Ready
 Node can still have a read-only filesystem. Preserve the disks and resource
 identities during recovery, then verify new pod creation and the workload matrix.
 
+## KEDA scaling
+
+The [KEDA node-group scenario](keda/README.md) adds a queue and autoscaler to an
+existing pooled VM lab. Its fixtures keep those services on a permanent site
+worker and exercise the group's scale subresource through real queue metrics.
+
 ## Teardown
 
 After the run exits, verify the runner name and ownership label, then destroy

@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cldt-keda-redis
+  namespace: cloud-provisioning
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cldt-keda-redis
+  template:
+    metadata:
+      labels:
+        app: cldt-keda-redis
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: w2
+      containers:
+        - name: redis
+          image: redis:8-alpine
+          imagePullPolicy: Never
+          args: ["redis-server", "--save", "", "--appendonly", "no"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 1
+            periodSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cldt-keda-redis
+  namespace: cloud-provisioning
+spec:
+  selector:
+    app: cldt-keda-redis
+  ports:
+    - port: 6379
+      targetPort: 6379

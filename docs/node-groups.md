@@ -24,7 +24,8 @@ separate management/workload cluster registration remains to be implemented.
 The value adds group status and child creation/deletion permissions in the
 release namespace, plus pod listing and eviction permissions for workload drain.
 It defaults to `false`; the group CRD is installed separately for this experiment.
-KEDA integration and complete VM qualification remain pending.
+KEDA-driven scaling has native Linux k0s/Calico VM coverage. Broader distribution,
+Windows, and real-cloud group qualification remain pending.
 
 ## Pooled VM provider
 
@@ -95,6 +96,7 @@ separate runs.
 | Ready replica aggregation | ✅ Three adopted workers; cordon/uncordon changes Ready count 3 → 2 → 3 while total remains four | [Readiness](validation/node-group-vm-readiness-results.json) |
 | Group workload selection | ✅ Three ordinary pods on three group VMs; a different group UID remains unscheduled; `/scale` selects the worker pods | [Group labels](validation/node-group-vm-labels-results.json) |
 | Capacity exhaustion | ✅ Three reserved Machines progress; the excess request is cancelled before bootstrap publication | [Cancellation](validation/node-group-vm-bootstrap-cancellation-results.json), [capacity recovery](validation/node-group-vm-capacity-results.json) |
+| KEDA queue-driven capacity | ✅ 3 → 1 → 3 → 0 → 1, maximum of three, VM teardown and slot reuse; 184 and 102 network checks | [KEDA](validation/node-group-keda-results.json) |
 | Group deletion before claim admission | ✅ Absent-child reservation and unadmitted child removed; eight Node identities and VM start times retained | [Creation cancellation](validation/node-group-vm-creation-cancellation-results.json) |
 
 UDP sweeps cover both directions for each pair, fresh and reused sockets, and
@@ -254,8 +256,8 @@ Node label continues to identify cloud workers across individual claims and grou
 
 The [native scheduling check](validation/node-group-vm-labels-results.json) uses
 required pod anti-affinity to place three pods on three group workers. A pod
-selecting a different group UID remains unscheduled. Native Windows and KEDA
-capacity-scaling checks remain separate acceptance work.
+selecting a different group UID remains unscheduled. Native Windows placement
+remains separate acceptance work.
 
 ## Scaling and KEDA
 
@@ -275,9 +277,24 @@ a worker consumes one job at a time, with four workers per machine:
 - Use the group UID in the pod template’s Node selector and set the group’s
   workload selector to the pods’ labels. The scale selector describes pods.
 
-The example below is a design preview; install it only after the group CRD and
-controller are implemented and validated. The queue metric must remain available
-when worker replicas reach zero.
+The [VM scenario fixtures](../harness/e2e/runner/keda/README.md) use KEDA `2.20.0`
+and a Redis list. Nine queued items request three Machines; reducing the list to
+three items drains and removes two Machines. Restoring nine items creates two
+new Machine and Node identities. A queue depth requesting four Machines remains
+capped at the configured maximum of three. Emptying the queue removes all three
+workers and releases their slots. Three new items activate a fresh worker from
+zero, with a new Machine and Node identity. The five permanent site Nodes retain
+their identities throughout.
+
+The [recorded KEDA cycle](validation/node-group-keda-results.json) includes
+[184 network checks after scale-up](validation/node-group-keda-up-network-results.json)
+and [102 after activation from zero](validation/node-group-keda-restart-network-results.json).
+The test controls queue depth; separate probe pods verify scheduling and networking.
+
+The example below uses Prometheus for an application queue. Its metric must remain
+available when worker replicas reach zero. The Redis VM result does not qualify
+this Prometheus or AWS configuration; validate the queue metric and cloud image
+for the intended deployment.
 
 ```yaml
 apiVersion: cloud-provisioning.appmana.com/v1alpha1
@@ -468,7 +485,9 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [ ] Verify native retirement acknowledgements and preparation races around the
       drain marker, withdraw direct mesh peers, and serialize claim removal.
       Gateway retirement alone leaves the claim retained.
-- [ ] Verify real API scale updates and KEDA external-metric behavior, including zero.
+- [x] Verify real API scale updates and KEDA Redis external-metric behavior,
+      including zero, activation, and the maximum replica count on Linux k0s/Calico VMs.
+      See the [native KEDA cycle](validation/node-group-keda-results.json).
 - [ ] Run single-NIC VM 0→3→1→0, controller restart, failed boot, PDB blockage,
       group recreation, and survivor-traffic tests.
 - [ ] Repeat supported Linux/Windows cases with real CAPA and prepared GPU images.

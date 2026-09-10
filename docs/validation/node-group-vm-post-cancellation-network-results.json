@@ -1,0 +1,1532 @@
+{
+  "afterIdentities": {
+    "nodes/cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+    "nodes/cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+    "nodes/cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+    "nodes/remote1": "4674271b-7639-49e7-aa0f-9228cc556459",
+    "nodes/remote2": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+    "nodes/remote3": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+    "nodes/w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+    "nodes/w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0",
+    "pods/hc-cp": "493c8b13-8230-4639-9bca-f45275e35bec",
+    "pods/hc-cp2": "e0a1b5f9-029c-4931-8091-8d2e6f8e1fee",
+    "pods/hc-cp3": "0ccafb22-9c5f-4720-8566-c95fe69a8554",
+    "pods/hc-remote1": "844c7c77-27af-4bb4-bf3c-49cab74cd3dd",
+    "pods/hc-remote2": "5c11e14b-4181-4f2d-906a-3f7ee84ddcfe",
+    "pods/hc-remote3": "fcc448f2-3573-41b8-9c90-7d86f401c382",
+    "pods/hc-w1": "3851134e-4e82-4f29-8c0b-87b44158fb18",
+    "pods/hc-w2": "05e5d284-62b1-49dd-98ff-cdebe72497a5",
+    "pods/udp-cp": "2653db73-993f-48d5-bf9c-d794e5ac4efd",
+    "pods/udp-remote1": "b82f33f6-01f1-4dce-8077-a5fd76aab6f5",
+    "pods/udp-remote2": "6422bbea-c225-4f15-9f5b-1ec9397d0e1d",
+    "pods/udp-remote3": "44f0af43-bb4b-49d3-973c-acb91c993c18",
+    "pods/udp-w1": "82e1e4af-05a9-4286-b0cc-2eb646d172e3"
+  },
+  "beforeIdentities": {
+    "nodes/cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+    "nodes/cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+    "nodes/cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+    "nodes/remote1": "4674271b-7639-49e7-aa0f-9228cc556459",
+    "nodes/remote2": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+    "nodes/remote3": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+    "nodes/w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+    "nodes/w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0",
+    "pods/hc-cp": "493c8b13-8230-4639-9bca-f45275e35bec",
+    "pods/hc-cp2": "e0a1b5f9-029c-4931-8091-8d2e6f8e1fee",
+    "pods/hc-cp3": "0ccafb22-9c5f-4720-8566-c95fe69a8554",
+    "pods/hc-remote1": "844c7c77-27af-4bb4-bf3c-49cab74cd3dd",
+    "pods/hc-remote2": "5c11e14b-4181-4f2d-906a-3f7ee84ddcfe",
+    "pods/hc-remote3": "fcc448f2-3573-41b8-9c90-7d86f401c382",
+    "pods/hc-w1": "3851134e-4e82-4f29-8c0b-87b44158fb18",
+    "pods/hc-w2": "05e5d284-62b1-49dd-98ff-cdebe72497a5",
+    "pods/udp-cp": "2653db73-993f-48d5-bf9c-d794e5ac4efd",
+    "pods/udp-remote1": "b82f33f6-01f1-4dce-8077-a5fd76aab6f5",
+    "pods/udp-remote2": "6422bbea-c225-4f15-9f5b-1ec9397d0e1d",
+    "pods/udp-remote3": "44f0af43-bb4b-49d3-973c-acb91c993c18",
+    "pods/udp-w1": "82e1e4af-05a9-4286-b0cc-2eb646d172e3"
+  },
+  "cancelled": false,
+  "elapsed": "12.428567904s",
+  "failed": 0,
+  "notRequired": 0,
+  "observedAt": "2026-09-10T00:05:25.736214402Z",
+  "passed": 184,
+  "results": [
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "dns",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "external",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "cp",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "dns",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "external",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "cp2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "dns",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "external",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "cp3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "cp3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "dns",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "external",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "remote1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "dns",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "external",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "remote2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "dns",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "external",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "remote3",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "remote3",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "dns",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "external",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "w1",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w1",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w2"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "dns",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "external",
+      "notRequired": "",
+      "passed": true,
+      "to": ""
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp2"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "cp3"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote1"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote2"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "remote3"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "pod",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "",
+      "from": "w2",
+      "kind": "service",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    },
+    {
+      "detail": "1048576 bytes",
+      "from": "w2",
+      "kind": "transfer",
+      "notRequired": "",
+      "passed": true,
+      "to": "w1"
+    }
+  ],
+  "rig": "single-NIC KVM with virtio-serial CRI probes",
+  "total": 184,
+  "scope": "Post-cancellation convergence across all eight single-NIC KVM guests. Pod/Service traffic, large transfers, DNS, and external checks; does not measure packet loss during the transition.",
+  "sourceCommit": "2334772"
+}

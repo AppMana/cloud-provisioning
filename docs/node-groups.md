@@ -94,7 +94,7 @@ separate runs.
 | Bootstrap observation retry | ✅ Same VM start time, guest boot ID, and single cloud-init execution across observer reconstruction | [Native retry](validation/vm-bootstrap-retry-native-results.json) |
 | Ready replica aggregation | ✅ Three adopted workers; cordon/uncordon changes Ready count 3 → 2 → 3 while total remains four | [Readiness](validation/node-group-vm-readiness-results.json) |
 | Group workload selection | ✅ Three ordinary pods on three group VMs; a different group UID remains unscheduled; `/scale` selects the worker pods | [Group labels](validation/node-group-vm-labels-results.json) |
-| Capacity exhaustion | ◐ Three reserved Machines progress with a fourth unallocated request; group cancellation remains incomplete | [Capacity](validation/node-group-vm-capacity-results.json) |
+| Capacity exhaustion | ✅ Three reserved Machines progress; the excess request is cancelled before bootstrap publication | [Cancellation](validation/node-group-vm-bootstrap-cancellation-results.json), [capacity recovery](validation/node-group-vm-capacity-results.json) |
 | Group deletion before claim admission | ✅ Absent-child reservation and unadmitted child removed; eight Node identities and VM start times retained | [Creation cancellation](validation/node-group-vm-creation-cancellation-results.json) |
 
 UDP sweeps cover both directions for each pair, fresh and reused sockets, and
@@ -146,8 +146,12 @@ Cancellation compares the Machine's resource version, records a marker that
 blocks join publication, then persists the bootstrap Secret and mesh identities.
 It deletes the exact child claim and waits for claim/CAPI/provider teardown.
 Provider finalizers and other controllers' deletion hooks remain in force.
-Real API tests cover both orders of the address-reservation race; native VM
-validation of this path is pending.
+Real API tests cover both orders of the address-reservation race. The
+[native CAPI VM test](validation/node-group-vm-bootstrap-cancellation-results.json)
+removes the excess request from a three-slot pool, preserving the three allocated
+workers, all eight Node identities, VM start times, and slot data. The subsequent
+[184-check workload network matrix](validation/node-group-vm-post-cancellation-network-results.json)
+passes across all eight guests; it measures connectivity after cancellation.
 
 An existing address reservation, bootstrap Secret, peer entry, or claimed Node
 requires the remaining full cancellation lifecycle. Those workers retain their
@@ -375,7 +379,9 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Fence cancellation against the join controller's address reservation and
       cancel admitted claims whose bootstrap data has not been published. Real
       API tests verify the race, retained deletion gates, and changed-proof holds.
-- [ ] Validate pre-bootstrap cancellation through the native CAPI VM provider.
+- [x] Validate pre-bootstrap cancellation through the native CAPI VM provider.
+      The four-request, three-slot group returns to three Ready replicas with
+      the excess claim, CAPI Machine, and infrastructure Machine gone.
 - [ ] Cancel admitted workers after address reservation or userdata publication,
       including failed joins and Nodes that register during cancellation.
 - [x] Publish observed replica counts before advancing pending actions and expose

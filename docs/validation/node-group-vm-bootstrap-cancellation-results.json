@@ -1,0 +1,220 @@
+{
+  "observedAt": "2026-09-10T00:04:26.486308+00:00",
+  "before": {
+    "nodes": {
+      "cp": "20065eca-8909-434c-aa37-b7043b00f1b7",
+      "cp2": "c799108c-3743-4644-b5bd-93e066fcfff3",
+      "cp3": "5ddfe988-a1a7-4f5c-8694-ee7cbf120d05",
+      "remote1": "4674271b-7639-49e7-aa0f-9228cc556459",
+      "remote2": "e5769303-9442-40d8-92c3-78e2a7dc1821",
+      "remote3": "7a5676b6-1775-49f5-a349-4780d8875c1e",
+      "w1": "5ea0d54f-3eef-44ec-a297-a063cf00a0e3",
+      "w2": "305d83b1-22ae-4400-b401-cfb58dbdb3a0"
+    },
+    "machines": {
+      "pooled-workers-8ae81037d7a1043c-0": "d47f09f5-ec22-41fd-bd15-41c968a08db9",
+      "pooled-workers-8ae81037d7a1043c-1": "d27f15dd-1e17-44e5-9880-40433e64298b",
+      "pooled-workers-8ae81037d7a1043c-2": "5db97849-3ee1-46e6-8bb6-db0c99624a26",
+      "pooled-workers-8ae81037d7a1043c-3": "34f6ec44-25ea-4be2-bf30-bef6285c19c1"
+    },
+    "infra": {
+      "pooled-workers-8ae81037d7a1043c-0": "020f8372-4e25-49f9-8ef9-58ea9d227202",
+      "pooled-workers-8ae81037d7a1043c-1": "895eb813-8f87-4318-8ac7-a5e2a9c02961",
+      "pooled-workers-8ae81037d7a1043c-2": "c544f82d-868b-41e4-ac3b-fc998aa15571",
+      "pooled-workers-8ae81037d7a1043c-3": "be2ca80f-ce63-4736-8ad7-6b99c0d9ed39"
+    },
+    "claims": {
+      "pooled-workers-8ae81037d7a1043c-0": "24102ef9-bf24-4d91-97fc-3a56fe5b7ee5",
+      "pooled-workers-8ae81037d7a1043c-1": "ee7e3ecb-2476-4872-bf6b-4eb41f395b63",
+      "pooled-workers-8ae81037d7a1043c-2": "89e82fc7-7335-444d-ae61-1ac6eeeebb5d",
+      "pooled-workers-8ae81037d7a1043c-3": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8"
+    },
+    "slotData": {
+      "pool.json": "{\"lab\":\"cldt\",\"slots\":[\"remote1\",\"remote2\",\"remote3\"],\"owners\":{\"remote1\":{\"namespace\":\"cloud-provisioning\",\"name\":\"pooled-workers-8ae81037d7a1043c-0\",\"uid\":\"020f8372-4e25-49f9-8ef9-58ea9d227202\"},\"remote2\":{\"namespace\":\"cloud-provisioning\",\"name\":\"pooled-workers-8ae81037d7a1043c-1\",\"uid\":\"895eb813-8f87-4318-8ac7-a5e2a9c02961\"},\"remote3\":{\"namespace\":\"cloud-provisioning\",\"name\":\"pooled-workers-8ae81037d7a1043c-2\",\"uid\":\"c544f82d-868b-41e4-ac3b-fc998aa15571\"}}}"
+    },
+    "action": {
+      "childName": "pooled-workers-8ae81037d7a1043c-3",
+      "childUID": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8",
+      "generation": 8,
+      "id": "bae56eb2-1182-406b-bab0-981d5a837941",
+      "machineUID": "34f6ec44-25ea-4be2-bf30-bef6285c19c1",
+      "ordinal": 3,
+      "type": "Drain"
+    },
+    "groupUID": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9",
+    "meshUID": "f5b3648c-80bc-478c-a348-4692c5e02999"
+  },
+  "vmStarts": {
+    "/clab-cldt-cp": {
+      "id": "bc5e1ff3c8a62ee47293734e1a6520b12ce9403f1a349e8ae4c5c6fa3d6febd9",
+      "startedAt": "2026-09-09T20:43:45.301823896Z",
+      "running": true
+    },
+    "/clab-cldt-cp2": {
+      "id": "32f5bc49b3110bf165e2d4d310059391ace48670c9b9381b352a5e324dba9975",
+      "startedAt": "2026-09-09T22:56:13.302633217Z",
+      "running": true
+    },
+    "/clab-cldt-cp3": {
+      "id": "0ce5afeb1b1d16c4c250dae985f8c828681a9a752f51a87364b0ea99dea8f564",
+      "startedAt": "2026-09-09T20:43:45.310292102Z",
+      "running": true
+    },
+    "/clab-cldt-remote1": {
+      "id": "97f367f093aca8cf7a4e450aff4c299fb5cfed5d554113dde915e4dfd4cde2fb",
+      "startedAt": "2026-09-09T21:30:25.415471705Z",
+      "running": true
+    },
+    "/clab-cldt-remote2": {
+      "id": "636602ec96fd135eae0adcd5f41b4d5b968ba88195b5d2c8a433e3f95bd14836",
+      "startedAt": "2026-09-09T21:57:16.188273546Z",
+      "running": true
+    },
+    "/clab-cldt-remote3": {
+      "id": "a8ce135e16d7cb23494a2dfa5446a651fa059bb2ccda49d651b9cb40399db857",
+      "startedAt": "2026-09-09T23:04:25.31430724Z",
+      "running": true
+    },
+    "/clab-cldt-w1": {
+      "id": "4ebeb13375a3d07df4c9e1996a60635390c2d07bdf0118a145d6e963e770fb94",
+      "startedAt": "2026-09-09T22:58:31.138996472Z",
+      "running": true
+    },
+    "/clab-cldt-w2": {
+      "id": "758fa95a8d0faf000c24bf7861fe197a9c5f23424e79e056ee641ab06b9954da",
+      "startedAt": "2026-09-09T20:43:45.37114804Z",
+      "running": true
+    }
+  },
+  "events": [
+    {
+      "at": "2026-09-10T00:03:54.604993+00:00",
+      "state": {
+        "action": {
+          "childName": "pooled-workers-8ae81037d7a1043c-3",
+          "childUID": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8",
+          "generation": 8,
+          "id": "bae56eb2-1182-406b-bab0-981d5a837941",
+          "machineUID": "34f6ec44-25ea-4be2-bf30-bef6285c19c1",
+          "ordinal": 3,
+          "type": "Drain"
+        },
+        "claimDeleting": null,
+        "machineDeleting": null,
+        "infraDeleting": null,
+        "marker": null
+      }
+    },
+    {
+      "at": "2026-09-10T00:04:12.203399+00:00",
+      "state": {
+        "action": {
+          "childName": "pooled-workers-8ae81037d7a1043c-3",
+          "childUID": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8",
+          "generation": 8,
+          "id": "bae56eb2-1182-406b-bab0-981d5a837941",
+          "machineUID": "34f6ec44-25ea-4be2-bf30-bef6285c19c1",
+          "ordinal": 3,
+          "type": "Drain"
+        },
+        "claimDeleting": null,
+        "machineDeleting": null,
+        "infraDeleting": null,
+        "marker": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9/bae56eb2-1182-406b-bab0-981d5a837941"
+      }
+    },
+    {
+      "at": "2026-09-10T00:04:13.464541+00:00",
+      "state": {
+        "action": {
+          "bootstrapCancellation": {
+            "meshName": "cloud-provisioning-peers",
+            "meshUID": "f5b3648c-80bc-478c-a348-4692c5e02999",
+            "secretName": "pooled-workers-8ae81037d7a1043c-3-bootstrap"
+          },
+          "childName": "pooled-workers-8ae81037d7a1043c-3",
+          "childUID": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8",
+          "generation": 8,
+          "id": "bae56eb2-1182-406b-bab0-981d5a837941",
+          "machineUID": "34f6ec44-25ea-4be2-bf30-bef6285c19c1",
+          "ordinal": 3,
+          "type": "Drain"
+        },
+        "claimDeleting": "2026-09-10T00:04:12Z",
+        "machineDeleting": "2026-09-10T00:04:12Z",
+        "infraDeleting": "2026-09-10T00:04:12Z",
+        "marker": "c020e9e6-42e8-4844-b1ce-5f795b50b0e9/bae56eb2-1182-406b-bab0-981d5a837941"
+      }
+    },
+    {
+      "at": "2026-09-10T00:04:16.134304+00:00",
+      "state": {
+        "action": {
+          "bootstrapCancellation": {
+            "meshName": "cloud-provisioning-peers",
+            "meshUID": "f5b3648c-80bc-478c-a348-4692c5e02999",
+            "secretName": "pooled-workers-8ae81037d7a1043c-3-bootstrap"
+          },
+          "childName": "pooled-workers-8ae81037d7a1043c-3",
+          "childUID": "1bfb7373-ed67-49b1-9e8b-c49a7b0dc2c8",
+          "generation": 8,
+          "id": "bae56eb2-1182-406b-bab0-981d5a837941",
+          "machineUID": "34f6ec44-25ea-4be2-bf30-bef6285c19c1",
+          "ordinal": 3,
+          "type": "Drain"
+        },
+        "claimDeleting": "2026-09-10T00:04:12Z",
+        "machineDeleting": "absent",
+        "infraDeleting": "absent",
+        "marker": null
+      }
+    },
+    {
+      "at": "2026-09-10T00:04:23.627264+00:00",
+      "state": {
+        "action": null,
+        "claimDeleting": "absent",
+        "machineDeleting": "absent",
+        "infraDeleting": "absent",
+        "marker": null
+      }
+    }
+  ],
+  "controllerImage": "cldt-controller:a6593a221997e34fe0202bb38a00aa159665dd6c9ab74c9859fb3a187b3aa95f",
+  "excessClaimMachineInfrastructureGone": true,
+  "bootstrapSecretAbsent": true,
+  "peerEntriesAbsent": true,
+  "survivingResourceUIDsUnchanged": true,
+  "allEightNodesReady": true,
+  "vmStartsUnchanged": true,
+  "slotDataUnchanged": true,
+  "readyWorkloadPods": 3,
+  "readyReplicas": 3,
+  "totalReplicas": 3,
+  "scope": "Single-NIC Linux k0s/Calico KVM lab with CAPI: cancel the fourth request from a three-slot pool before address reservation or bootstrap publication. Existing three worker Machines and eight guest Node identities remain. Does not qualify cancellation after userdata publication or a failed join.",
+  "sourceCommit": "2334772",
+  "tests": {
+    "raceEnabled": true,
+    "realAPICases": [
+      "cancellation wins before address reservation",
+      "address reservation wins before cancellation",
+      "existing userdata, peer, or claimed Node holds cancellation",
+      "unexpected Secret or changed marker after fencing holds deletion",
+      "provider identity assigned after fencing still follows CAPI teardown",
+      "claim and Machine finalizers retain cancellation until resources disappear"
+    ],
+    "coveragePercent": {
+      "nodegroup": 76.7,
+      "join": 83.5,
+      "claim": 71.3,
+      "endpointController": 37.4
+    },
+    "scope": "Real API server with the minimal CAPI v1beta2 storage contract; native CAPI provider exercised separately below."
+  },
+  "postCancellationNetwork": {
+    "report": "node-group-vm-post-cancellation-network-results.json",
+    "passed": 184,
+    "failed": 0,
+    "nodeAndProbePodUIDsUnchangedDuringMatrix": true
+  }
+}

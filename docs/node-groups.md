@@ -126,6 +126,14 @@ image import, new pod creation, and a [184-check workload matrix](validation/nod
 then passed. This verifies recovered connectivity; traffic continuity through
 that failure is unqualified.
 
+Claim teardown sends UID and resource-version preconditions when deleting a CAPI
+Machine, orphaned infrastructure object, or Node. The [API deletion race tests](validation/claim-teardown-delete-races-results.json)
+verify that a replacement or concurrent update causes a conflict and retains the
+claim finalizer. These checks protect the observed object during that request;
+ownership checks for replacements already present before observation remain
+separate work. The updated delete requests have API-test coverage and await a
+controller rollout in the VM lab.
+
 ## Pending-worker cancellation
 
 Deleting a group cancels a reserved creation when its child is absent. A child

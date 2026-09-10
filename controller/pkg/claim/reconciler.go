@@ -271,7 +271,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, claim *v1alpha1.Provis
 	switch err := r.Reader.Get(ctx, key, machine); {
 	case err == nil:
 		if machine.GetDeletionTimestamp().IsZero() {
-			if err := r.Delete(ctx, machine); err != nil && !apierrors.IsNotFound(err) {
+			if err := r.deleteObserved(ctx, machine); err != nil && !apierrors.IsNotFound(err) {
 				return ctrl.Result{}, fmt.Errorf("deleting Machine %s: %w", key, err)
 			}
 			log.Info("deleting Machine for claim teardown", "machine", key)
@@ -293,7 +293,7 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, claim *v1alpha1.Provis
 		case err == nil:
 			remaining++
 			if infraMachine.GetDeletionTimestamp().IsZero() {
-				if err := r.Delete(ctx, infraMachine); err != nil && !apierrors.IsNotFound(err) {
+				if err := r.deleteObserved(ctx, infraMachine); err != nil && !apierrors.IsNotFound(err) {
 					return ctrl.Result{}, fmt.Errorf("deleting %s %s: %w", p.GVK().Kind, key, err)
 				}
 			}
@@ -327,6 +327,13 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, claim *v1alpha1.Provis
 	}
 	log.Info("claim teardown complete", "claim", key)
 	return ctrl.Result{}, nil
+}
+
+// deleteObserved binds a deletion to the object read for this reconciliation.
+// A concurrent replacement or metadata change must be observed before retrying.
+func (r *Reconciler) deleteObserved(ctx context.Context, obj client.Object) error {
+	uid, rv := obj.GetUID(), obj.GetResourceVersion()
+	return r.Delete(ctx, obj, &client.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid, ResourceVersion: &rv}})
 }
 
 // isMissingKind reports whether the error means the Kind isn't served
@@ -373,7 +380,7 @@ func (r *Reconciler) deleteClaimedNodes(ctx context.Context, claim *v1alpha1.Pro
 		if node.Annotations[ClaimAnnotation] != want {
 			continue
 		}
-		if err := r.Delete(ctx, node); err != nil && !apierrors.IsNotFound(err) {
+		if err := r.deleteObserved(ctx, node); err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("deleting node %s: %w", node.Name, err)
 		}
 		ctrl.LoggerFrom(ctx).Info("removed node for claim teardown", "node", node.Name)

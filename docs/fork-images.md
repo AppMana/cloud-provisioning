@@ -31,6 +31,16 @@ record the successful workflow and registry-verified images for source
 both specify OS version `10.0.20348.5499`. The Windows cache set pins this image;
 the evidence record also includes matching Linux node and CNI digests.
 
+The VXLAN node-service fix builds on both branches. The 3.32.1 source
+`d5037842ea85` publishes `ghcr.io/appmana/node` and `ghcr.io/appmana/cni` at tag
+`v3.32.1-appmana.post.3-cloud-provisioning-windows-isolation-v3.32.1-d5037842ea85`;
+the 3.31.4 source `21f2eefb8dbf` publishes them at
+`v3.31.4-appmana.post.15-cloud-provisioning-windows-isolation-v3.31.4-21f2eefb8dbf`.
+Both runs passed the Linux component tests, the Server 2022/2025 native Go and
+Pester suites, and the Linux and Windows image builds. These supersede
+`9e4adf0f9920` for VM acceptance; the earlier source's canary is the run that
+exposed the VXLAN bug.
+
 The earlier source `2c82c85e8ed1` published a combined manifest with OS version
 `10.0.20348.5622`, which differed from its built image. Both candidate branches
 now derive that field from the built image configuration. The earlier publisher
@@ -46,6 +56,16 @@ capture the native test executable and repeated constructor runs if it recurs.
 Both candidates acknowledge workload updates only after HNS policy application
 succeeds. The 3.31 branch also backports 3.32's serialized Goldmane statistics
 queries after its race detector found concurrent access during bucket rollover.
+
+Source `9e4adf0f9920` failed the Windows 2022 canary on a fresh pod. Its
+node-service script assumed the windows-bgp L2Bridge everywhere: the monitoring
+loop re-ran node initialisation every ten seconds because no `Calico` L2Bridge
+existed, while calico-node under VXLAN creates a `Calico` Overlay. Sources
+`d5037842ea85` (3.32.1) and `21f2eefb8dbf` (3.31.4) select the HNS network type
+from `CALICO_NETWORKING_BACKEND`: VXLAN follows upstream's Overlay bootstrap and
+the still-up check looks for the backend's own network; the management-address
+hook, WeakHost, host routing and RRAS repairs stay on the L2Bridge backend. The
+Pester suite covers the helpers and the script's gating (197 tests).
 
 ## kube-proxy
 
@@ -117,6 +137,18 @@ separate tests.
 The [baseline component inventory](validation/windows-candidate-baseline-20260909-images.json)
 records the retained Calico 3.32.0 configuration and existing kube-proxy images.
 Compare candidate results against this baseline, including its recorded failure.
+
+The first Calico canary rolled source `9e4adf0f9920` onto the Windows 2022
+worker alone with an `OnDelete` strategy. The existing-pod matrix passed 59 of
+60 checks, with one 1,400-byte UDP timeout from Server 2025 to Server 2022; a
+freshly created pod then exposed the repeated initialisation described above,
+and the original DaemonSet was restored. That run is not acceptance evidence for
+the candidate; the corrected sources need the same canary and a fresh pod again.
+
+The lab host restarted on 2026-09-11 and the site was recovered on its existing
+disks with `-reuse-site -recover-host`. The
+[post-recovery matrix](validation/windows-post-recovery-network-results.json)
+is the baseline for the next canary.
 
 ## Promotion gates
 

@@ -359,6 +359,12 @@ controllers own Machine-to-Node association. Results record bootstrap, routing,
 and `Machine.status.nodeRef` as produced by the product and CAPI. Any manual
 intervention is recorded as a validation limitation.
 
+After a host reboot the wrapper containers return without their links and the
+guests never launch. `-reuse-site -recover-host` rebuilds the host bridges,
+masquerading and return routes, re-plumbs every appliance and wrapper, and boots
+each machine from its existing disk before the usual site verification. Cluster
+state is not touched; what the guests rebuild at boot is what is measured.
+
 Fresh k0s Calico sites can specify `-k0s-calico-mtu 1370` when that value matches
 the tunnel path budget. Zero preserves the distro default; other CNI profiles
 and `-reuse-site` reject the override. See [MTU configuration](docs/windows-gateway.md#configure-the-k0s-mtu)

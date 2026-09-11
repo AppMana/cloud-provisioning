@@ -83,6 +83,7 @@ func runLab() {
 		rigKind                = flag.String("rig", "vm", "cluster node platform: vm (single-NIC KVM guest) or legacy container")
 		workDir                = flag.String("work-dir", "_work", "where the generated topology is written")
 		reuseSite              = flag.Bool("reuse-site", false, "resume tests on a verified existing VM site; does not establish a fresh bringup")
+		recoverHost            = flag.Bool("recover-host", false, "with -reuse-site after a host reboot: rebuild this host's segments and every wrapper's links, booting each machine from its existing disk")
 		down                   = flag.Bool("down", false, "destroy the lab instead of building it")
 		timeout                = flag.Duration("timeout", 2*time.Hour, "deadline for the whole run")
 	)
@@ -107,6 +108,9 @@ func runLab() {
 	}
 	if *linuxEgress && (*distro != "k0s" || *rigKind != "vm" || *reuseSite) {
 		fail("--k0s-linux-egress requires a fresh k0s VM site")
+	}
+	if *recoverHost && (!*reuseSite || *rigKind != "vm") {
+		fail("--recover-host rebuilds the host side of an existing VM site and requires -reuse-site")
 	}
 
 	if err := preconditions(*distro, *cni, *product, *remotes, *outages, *checks); err != nil {
@@ -226,6 +230,14 @@ func runLab() {
 
 	}
 
+	if *recoverHost {
+		step("recovering this host's side of the lab")
+		if err := recoverHostSide(ctx, topo, r, host); err != nil {
+			fail("recovering: %v", err)
+		}
+		recordEvent("host-recovered", topo.Name)
+	}
+
 	// Before anything is installed, because a topology that does not
 	// isolate makes every result taken on it meaningless.
 	if vr, ok := r.(*vm.Rig); ok {
@@ -302,7 +314,7 @@ func runLab() {
 				fail("%v", err)
 			}
 			fmt.Println("  every node Ready")
-			if err := observe.Capture(ctx, *workDir, "site-ready", d.Kube, r, nodes); err != nil {
+			if err := observe.Capture(ctx, *workDir, "site-ready", d.Kube, r, rigNodes(topo, nodes)); err != nil {
 				fail("%v", err)
 			}
 		}
@@ -595,7 +607,7 @@ func runLab() {
 					runLifecycle(install.OnTwoWorkers)
 				}
 
-				if err := observe.Capture(ctx, *workDir, "remotes-ready", d.Kube, r, nodes); err != nil {
+				if err := observe.Capture(ctx, *workDir, "remotes-ready", d.Kube, r, rigNodes(topo, nodes)); err != nil {
 					fail("%v", err)
 				}
 

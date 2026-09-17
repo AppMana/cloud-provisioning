@@ -87,6 +87,9 @@ spec:
             - "--dialer-image={{ include "cloud-provisioning.dialerImage" . }}"
             - "--dialer-image-pull-policy={{ .Values.dialerImage.pullPolicy }}"
             - "--join-provider={{ .Values.joinProvider }}"
+            {{- with .Values.joinKubeletExtraArgs }}
+            - {{ printf "--join-kubelet-extra-args=%s" . | quote }}
+            {{- end }}
             - "--join-template-path=/join-patterns/{{ .Values.joinProvider }}-worker.cloud-config.tmpl"
             {{- with .Values.cluster.apiAddress }}
             - "--join-api-address={{ . }}"

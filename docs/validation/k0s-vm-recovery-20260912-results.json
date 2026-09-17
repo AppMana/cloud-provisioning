@@ -1,0 +1,225 @@
+{
+  "observedAt": "2026-09-12T22:28:26.900099+00:00",
+  "sourceCommit": "18bd13ca3e7490fcbb9ce7011e82f6f912909629",
+  "scope": "Retained single-NIC QEMU/KVM k0s/Calico site host recovery and gateway runtime credential refresh; not a fresh bootstrap or uninterrupted-traffic test.",
+  "recovery": {
+    "events": [
+      {
+        "event": "run-start",
+        "time": "2026-09-12T22:19:43.162501766Z",
+        "value": {
+          "args": [
+            "-rig",
+            "vm",
+            "-distro",
+            "k0s",
+            "-cni",
+            "calico",
+            "-reuse-site",
+            "-recover-host",
+            "-work-dir",
+            ".state/k0s-1.36-gpu-site",
+            "-timeout",
+            "60m"
+          ],
+          "capiMode": "imported",
+          "profile": {
+            "Distro": "k0s",
+            "Network": "calico",
+            "BuilderNetwork": "calico",
+            "Bundled": true,
+            "Encapsulation": 2
+          }
+        }
+      },
+      {
+        "event": "stage",
+        "time": "2026-09-12T22:19:43.162738443Z",
+        "value": "recovering this host's side of the lab"
+      },
+      {
+        "event": "host-recovered",
+        "time": "2026-09-12T22:22:50.35624527Z",
+        "value": "cldt"
+      },
+      {
+        "event": "stage",
+        "time": "2026-09-12T22:22:51.7888681Z",
+        "value": "building the k0s site"
+      },
+      {
+        "event": "site-reused",
+        "time": "2026-09-12T22:22:53.477507633Z",
+        "value": {
+          "Distro": "k0s",
+          "Network": "calico",
+          "BuilderNetwork": "calico",
+          "Bundled": true,
+          "Encapsulation": 2
+        }
+      },
+      {
+        "event": "stage",
+        "time": "2026-09-12T22:22:53.477571994Z",
+        "value": "no kubelet depends on another node"
+      },
+      {
+        "event": "stage",
+        "time": "2026-09-12T22:22:54.43044005Z",
+        "value": "observing network calico"
+      },
+      {
+        "event": "stage",
+        "time": "2026-09-12T22:22:54.681327203Z",
+        "value": "waiting for every node to be Ready"
+      },
+      {
+        "event": "run-passed",
+        "time": "2026-09-12T22:23:38.300187206Z",
+        "value": null
+      }
+    ],
+    "eventsSHA256": "f542a56917d60f60bf4b85d455cc6062578f2a144c73b6c876ec34e83da32e4f",
+    "logSHA256": "b066078ea74f0d61823c05515048e1d0e30db5192b473d9e2b2e6c76749d305f",
+    "exitCode": 0
+  },
+  "nodes": [
+    {
+      "name": "aws-win2022-gpu",
+      "uid": "dd54061d-491a-4b12-95a7-27393e847780",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    },
+    {
+      "name": "aws-win2022-v3",
+      "uid": "3ea1abf0-65bf-48d1-a9a3-e008444349a7",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    },
+    {
+      "name": "aws-win2025",
+      "uid": "21cdcf96-038b-46ba-bbba-2d014c4e6dee",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    },
+    {
+      "name": "aws-win2025-gpu",
+      "uid": "258d7b62-e774-48bc-94dc-e31ff042f585",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    },
+    {
+      "name": "aws-win2025-v3",
+      "uid": "2ce1fc67-02f4-4b75-9f38-1af9fbc43128",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    },
+    {
+      "name": "cp",
+      "uid": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    },
+    {
+      "name": "cp2",
+      "uid": "947de62f-0920-408c-aa31-ac80a2344128",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    },
+    {
+      "name": "cp3",
+      "uid": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    },
+    {
+      "name": "ip-172-29-0-9",
+      "uid": "5855f046-1e36-4c14-8a4c-5713b2989c66",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    },
+    {
+      "name": "remote1",
+      "uid": "8935dd28-de93-44be-a887-73110fe88c51",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    },
+    {
+      "name": "remote2",
+      "uid": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    },
+    {
+      "name": "w1",
+      "uid": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    },
+    {
+      "name": "w2",
+      "uid": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+      "ready": true,
+      "kubeletVersion": "v1.36.2+k0s"
+    }
+  ],
+  "vms": [
+    {
+      "node": "cp",
+      "bootID": "42fbca36-6f58-44ae-aac2-77597640d894",
+      "physicalNICs": [
+        "ens2"
+      ]
+    },
+    {
+      "node": "cp2",
+      "bootID": "2f3111c5-a356-40bc-bded-af31d106ac9d",
+      "physicalNICs": [
+        "ens2"
+      ]
+    },
+    {
+      "node": "cp3",
+      "bootID": "46ef5c3e-710b-4ab0-abad-2a9b22668219",
+      "physicalNICs": [
+        "ens2"
+      ]
+    },
+    {
+      "node": "w1",
+      "bootID": "20dd04e2-9548-43bf-8157-15106eba0244",
+      "physicalNICs": [
+        "ens2"
+      ]
+    },
+    {
+      "node": "w2",
+      "bootID": "bc26b450-9cc2-4ca7-a438-cc36b1048f30",
+      "physicalNICs": [
+        "ens2"
+      ]
+    },
+    {
+      "node": "remote1",
+      "bootID": "3ee8a8e2-5264-46fb-a1c1-09b3529373cb",
+      "physicalNICs": [
+        "ens2"
+      ]
+    },
+    {
+      "node": "remote2",
+      "bootID": "1428a4d6-d2c8-48d1-8dc2-d24e46c1ce7e",
+      "physicalNICs": [
+        "ens2"
+      ]
+    }
+  ],
+  "gatewayCredentialRefresh": {
+    "secret": "cloud-provisioning/gateway-runtime-credentials",
+    "valuesVerifiedWithoutDisclosure": true,
+    "expiresAt": "2026-09-12T23:21:31+00:00",
+    "deployment": "cloud-provisioning/cloud-provisioning-endpoint-controller",
+    "rolloutSucceeded": true,
+    "limitation": "One-hour derived test session; no durable credential-provider change. Windows-to-Windows TCP still timed out after refresh."
+  }
+}

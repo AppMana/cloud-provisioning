@@ -1,0 +1,165 @@
+{
+  "observedAt": "2026-09-12T22:34:09.938391+00:00",
+  "scope": "Read-only diagnostics after gateway credential refresh, during the retained Windows baseline; no candidate image rollout or route mutation.",
+  "controllerLogWindow": "10m",
+  "controllerLogCounts": {
+    "RequestExpired": 0,
+    "ERROR": 0
+  },
+  "attachments": [
+    {
+      "journal": "network-attachment-157078f2ab5e8687be57aace685946aa",
+      "id": "cloud-provisioning/gateway-aws-win2022-v3/299e9e5f-733f-4e30-9949-ed51edd60f91",
+      "phase": "Ready",
+      "worker": "172.29.0.24",
+      "directHosts": [
+        "10.10.0.10/32",
+        "10.10.0.11/32",
+        "10.10.0.12/32",
+        "10.10.0.13/32",
+        "10.10.0.14/32"
+      ]
+    },
+    {
+      "journal": "network-attachment-9065ccc1adea9514d4e30290eefd0c09",
+      "id": "cloud-provisioning/gateway-aws-win2025-v3/2b175570-fb16-4afe-aad5-e64ffb90356f",
+      "phase": "Ready",
+      "worker": "172.29.0.68",
+      "directHosts": [
+        "10.10.0.10/32",
+        "10.10.0.11/32",
+        "10.10.0.12/32",
+        "10.10.0.13/32",
+        "10.10.0.14/32"
+      ]
+    }
+  ],
+  "windows2022": {
+    "nativeRouteLookupDestination": "172.29.0.68",
+    "nativeRouteLookup": [
+      {
+        "InterfaceAlias": "cldt1775f69e",
+        "IPAddress": "10.100.0.139",
+        "DestinationPrefix": null,
+        "NextHop": null
+      },
+      {
+        "InterfaceAlias": "cldt1775f69e",
+        "IPAddress": null,
+        "DestinationPrefix": "172.29.0.68/32",
+        "NextHop": "0.0.0.0"
+      }
+    ],
+    "hnsNetworks": [
+      {
+        "Name": "Calico",
+        "ID": "2309541D-F748-41C0-BB76-D267848B4215",
+        "Type": "Overlay",
+        "Policies": {
+          "value": [
+            {
+              "Type": "HostRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.121.64/26",
+              "DistributedRouterMacAddress": "66-4c-dd-f0-1a-88",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.13",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.155.0/26",
+              "DistributedRouterMacAddress": "66-39-d4-05-d2-c1",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.14",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.242.64/26",
+              "DistributedRouterMacAddress": "66-3f-81-e9-1d-69",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.10",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.233.128/26",
+              "DistributedRouterMacAddress": "00-15-5d-be-3f-de",
+              "IsolationId": 4096,
+              "ProviderAddress": "172.29.0.13",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.159.0/26",
+              "DistributedRouterMacAddress": "66-b0-da-90-d4-09",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.100.0.130",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.133.0/26",
+              "DistributedRouterMacAddress": "66-d2-d0-3f-bf-57",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.100.0.131",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.205.0/26",
+              "DistributedRouterMacAddress": "66-a9-c5-7c-6e-bc",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.100.0.136",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.42.0/26",
+              "DistributedRouterMacAddress": "00-15-5d-2e-c0-7b",
+              "IsolationId": 4096,
+              "ProviderAddress": "172.29.0.68",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.190.64/26",
+              "DistributedRouterMacAddress": "66-29-27-b4-64-9c",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.11",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.126.0/26",
+              "DistributedRouterMacAddress": "00-15-5d-c3-aa-d9",
+              "IsolationId": 4096,
+              "ProviderAddress": "172.29.0.91",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.177.0/26",
+              "DistributedRouterMacAddress": "00-15-5d-a0-48-90",
+              "IsolationId": 4096,
+              "ProviderAddress": "172.29.0.86",
+              "Type": "RemoteSubnetRoute"
+            },
+            {
+              "DestinationPrefix": "10.244.80.192/26",
+              "DistributedRouterMacAddress": "66-78-c3-7e-d1-a9",
+              "IsolationId": 4096,
+              "ProviderAddress": "10.10.0.12",
+              "Type": "RemoteSubnetRoute"
+            }
+          ],
+          "Count": 13
+        }
+      },
+      {
+        "Name": "External",
+        "ID": "6CF1FA0A-D2EC-4386-9A8F-679EE86AEB93",
+        "Type": "Overlay",
+        "Policies": {}
+      }
+    ]
+  },
+  "pairedTCPProbe": "exit=28\ncurl: (28) Connection timed out after 10003 milliseconds\ncommand terminated with exit code 28\n",
+  "gatewayPacketHeaderCaptures": {
+    "w1": "\ntcpdump: data link type LINUX_SLL2\ntcpdump: verbose output suppressed, use -v[v]... for full protocol decode\nlistening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes\n0 packets captured\n0 packets received by filter\n0 packets dropped by kernel\n",
+    "w2": "\ntcpdump: data link type LINUX_SLL2\ntcpdump: verbose output suppressed, use -v[v]... for full protocol decode\nlistening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes\n0 packets captured\n0 packets received by filter\n0 packets dropped by kernel\n"
+  },
+  "conclusion": "Credential errors cleared, but the paired Windows TCP probe timed out. Both attachment journals reported Ready. A host route lookup selected WireGuard for the other Windows native address, and neither site gateway captured matching VXLAN packets in the paired 20-second window. These observations do not locate the drop or establish a root cause."
+}

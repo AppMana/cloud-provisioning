@@ -1,0 +1,84 @@
+{
+  "observedAt": "2026-09-14T17:07:08.052410+00:00",
+  "scope": "Preparation and placement only; no AWS worker traffic qualification",
+  "awsMatrixPassed": false,
+  "blocker": "Automatic approval review requires explicit authorization for ECR credential publication to the isolated cluster",
+  "awsNodeDesired": 0,
+  "calicoNodeReady": 5,
+  "awsNodeSelector": {
+    "cloud-provisioning.appmana.com/cni": "aws-vpc",
+    "kubernetes.io/os": "linux"
+  },
+  "calicoNodeSelector": {
+    "cloud-provisioning.appmana.com/cni": "calico-site",
+    "kubernetes.io/os": "linux"
+  },
+  "nodeUIDs": {
+    "cp": "86a10d6a-d449-4f14-99ba-5c413335f3cb",
+    "cp2": "33c9006c-c964-4835-8fb1-144b53443f4b",
+    "cp3": "23961350-e7e0-4b37-b7cc-1c07c14c61df",
+    "w1": "842036ec-ff0d-4584-bb77-5e8b65658520",
+    "w2": "04eb4246-2b91-46bc-a535-c85c0774b267"
+  },
+  "deployments": [
+    {
+      "namespace": "capa-system",
+      "name": "capa-controller-manager",
+      "ready": 1
+    },
+    {
+      "namespace": "capi-kubeadm-bootstrap-system",
+      "name": "capi-kubeadm-bootstrap-controller-manager",
+      "ready": 1
+    },
+    {
+      "namespace": "capi-kubeadm-control-plane-system",
+      "name": "capi-kubeadm-control-plane-controller-manager",
+      "ready": 1
+    },
+    {
+      "namespace": "capi-system",
+      "name": "capi-controller-manager",
+      "ready": 1
+    },
+    {
+      "namespace": "cert-manager",
+      "name": "cert-manager",
+      "ready": 1
+    },
+    {
+      "namespace": "cert-manager",
+      "name": "cert-manager-cainjector",
+      "ready": 1
+    },
+    {
+      "namespace": "cert-manager",
+      "name": "cert-manager-webhook",
+      "ready": 1
+    },
+    {
+      "namespace": "cloud-provisioning",
+      "name": "cloud-provisioning-endpoint-controller",
+      "ready": 1
+    },
+    {
+      "namespace": "kube-system",
+      "name": "calico-kube-controllers",
+      "ready": 1
+    },
+    {
+      "namespace": "kube-system",
+      "name": "coredns",
+      "ready": 2
+    },
+    {
+      "namespace": "kube-system",
+      "name": "metrics-server",
+      "ready": 1
+    }
+  ],
+  "awsCNIImages": [
+    "602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.22.2",
+    "602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.22.2"
+  ]
+}

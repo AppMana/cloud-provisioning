@@ -282,6 +282,142 @@ graph LR
 `worker-2` sends remote pod traffic through `worker-1`, which forwards it across
 the tunnel. Return traffic follows the corresponding site routes.
 
+## Target networking architecture
+
+Use **Calico BGP on on-premises nodes** and **AWS VPC CNI on AWS nodes**, including
+Windows workers. Calico agents, CNI installers and IP pools must be restricted
+to the on-premises nodes; attaching an AWS worker must preserve its VPC CNI.
+The [mixed-CNI profile](docs/hybrid-cni.md) records the routing, Windows IPAM and
+validation requirements. The complete mixed-CNI profile is not yet qualified.
+The new `calico-site-bgp` VM profile verifies the on-premises component:
+**200/200 traffic checks and 1,000/1,000 UDP echoes**, with four Established
+BGP peers per node and 20 native remote-pod routes over `ens2` across five nodes.
+See the [BGP and route evidence](docs/validation/calico-site-bgp-20260913-results.json)
+and [directed traffic matrix](docs/validation/calico-site-bgp-20260913-network-results.json).
+AWS VPC CNI and cross-site routing remain unverified. Earlier Windows VXLAN
+results used Calico on AWS and do not validate the requested architecture.
+
+### How Calico BGP and AWS VPC CNI coexist
+
+This is **one Kubernetes cluster with one primary CNI per node**, not multiple
+interfaces per pod. **Multus is not required.** The on-premises control plane
+can remain k0s; selecting AWS VPC CNI for EC2 workers does not require moving it
+to EKS. Calico supplies site pod networking and BGP routes. AWS VPC CNI supplies
+EC2 pod networking and real VPC addresses. AWS nodes do not run Calico, Felix,
+a Calico CNI installer, or a Calico BGP speaker in this configuration.
+
+Use mutually exclusive labels at node registration:
+
+| Node location | Registration label | Primary CNI / IPAM |
+| --- | --- | --- |
+| On premises | `cloud-provisioning.appmana.com/cni=calico-site` | Calico / site IP pool |
+| AWS | `cloud-provisioning.appmana.com/cni=aws-vpc` | AWS VPC CNI / ENI addresses |
+
+For the product's AWS-only worker join configuration, set these chart values
+so the AWS label exists at first registration. This is a complete kubelet-args
+override, so it retains the product's role label and scheduling taint:
+
+```yaml
+joinProvider: k0s
+providerManagerNamespace: capa-system
+joinKubeletExtraArgs: >-
+  --node-labels=cloud-provisioning.appmana.com/role=cloud-worker,cloud-provisioning.appmana.com/cni=aws-vpc
+  --register-with-taints=cloud-provisioning.appmana.com/internet-facing:NoSchedule
+```
+
+For a fresh k0s site, the harness profile `-cni calico-site-bgp` registers the
+site label before the kubelet needs networking. Its k0s configuration sets
+`spec.network.provider: calico`, `spec.network.calico.mode: bird`, and
+`spec.network.calico.overlay: Never`. Its supported manifest patch adds this
+selector to the **entire Calico DaemonSet pod**, covering its init-container CNI
+installer as well as its node agent:
+
+```yaml
+spec:
+  template:
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+        cloud-provisioning.appmana.com/cni: calico-site
+```
+
+The initial Calico pool uses
+`nodeSelector: 'cloud-provisioning.appmana.com/cni == "calico-site"'`, with
+`ipipMode: Never` and `vxlanMode: Never`. For an existing installation, set the
+pool's actual selector too: the startup environment setting only affects pool
+creation. Do not give AWS nodes Calico address blocks.
+
+**Taints alone are insufficient when Calico tolerates them.** The bundled k0s
+DaemonSet has broad `operator: Exists` tolerations. The positive site selector
+excludes AWS even with those tolerations. Keep the AWS worker taint for workload
+placement; tolerations allow scheduling but do not select the correct CNI.
+Configure placement in the distro/operator's source of truth so reconciliation
+preserves it.
+
+On AWS Linux, scope `aws-node` to Linux plus the `cni=aws-vpc` label. The
+[pinned chart values](examples/aws-vpc-cni-coexistence-values.yaml) provide that
+selector and the test address/MTU settings. Render and review the upstream
+chart before deployment:
+
+```sh
+helm repo add eks https://aws.github.io/eks-charts
+helm template aws-vpc-cni eks/aws-vpc-cni --version 1.22.2 \
+  --namespace kube-system \
+  --values examples/aws-vpc-cni-coexistence-values.yaml > aws-vpc-cni.yaml
+# Apply to this cluster after verifying IAM, node labels and the CIDRs below.
+kubectl apply -f aws-vpc-cni.yaml
+```
+
+The AWS plugin must use the same CNI configuration and binary directories as
+the worker runtime. The upstream defaults are `/etc/cni/net.d` and `/opt/cni/bin`.
+Keep an already configured AWS CNI when joining a worker. Give IPAMD AWS
+permissions to discover networking and allocate/release its ENI addresses,
+using an appropriate node role or workload identity. The CAPA provisioning role
+and its bootstrap permissions do not automatically provide CNI IPAM permissions.
+Set kubelet pod capacity consistently with the instance's available ENI IPs.
+
+The two CNIs use ordinary IP routing across the site/AWS boundary:
+
+1. Keep the site pod CIDR, AWS VPC CIDR and Service CIDR disjoint. In the current
+   lab these are `10.244.0.0/16`, `172.29.0.0/25` and `10.96.0.0/12`.
+2. Establish Calico BGP peers on premises and verify learned site pod prefixes.
+   Route AWS pod destinations through the site's existing AWS transport or
+   routing boundary. AWS VPC CNI itself does not participate in BGP.
+3. Provide an AWS return route for site pod addresses through that same boundary
+   (VPN, Direct Connect, or the test gateway). For an EC2 forwarding gateway,
+   disable source/destination checking on the gateway and allow the intended
+   transit traffic. The VPC route table needs a real supported next hop; an
+   on-premises BGP announcement alone does not program it.
+4. Preserve source addresses across the boundary. The Linux test values exclude
+   the site pod/node CIDRs from AWS SNAT while retaining ordinary internet SNAT.
+   Calico's `natOutgoing` must likewise exempt AWS destinations—for example, a
+   disabled, non-allocating Calico pool covering the AWS VPC CIDR—without
+   assigning that CIDR to Calico IPAM. Verify observed source IPs in both directions.
+5. Match the pod MTU to the actual transport budget, and allow the required
+   traffic in security groups, network ACLs and site firewall rules. Verify
+   Services, DNS and large/fragmented packets as well as direct pod traffic.
+
+Windows AWS workers follow the same placement boundary but use the AWS Windows
+CNI plugins and Windows VPC IPAM components; the Linux `aws-node` DaemonSet does
+not install them. EKS supplies managed components for that workflow. With this
+k0s control plane, those components must be installed and verified separately.
+This is a Windows installation requirement, not a need for Multus or a reason
+Calico and VPC CNI cannot coexist.
+
+**Verification status:** the five-node on-premises BGP matrix above has passed.
+AWS account/VPC access was rechecked on September 14. The isolated site now
+has the product, CAPI and CAPA Ready; Calico schedules on all five site nodes
+and AWS CNI schedules on none. AWS worker launch and the cross-boundary matrix
+are pending approval of test credential publication, including the ECR pull
+Secret. No new AWS worker or mixed-CNI traffic pass has been recorded.
+The [September 14 preparation evidence](docs/validation/calico-aws-coexistence-preparation-20260914.json)
+records the live selectors and component readiness. The prior Windows Calico VXLAN
+matrix is not evidence for AWS VPC CNI. See the
+[setup and acceptance details](docs/hybrid-cni.md). The networking behavior and
+configuration options are described in the
+[upstream AWS CNI documentation](https://github.com/aws/amazon-vpc-cni-k8s/tree/v1.22.2)
+and [Calico IP pools documentation](https://docs.tigera.io/calico/latest/reference/resources/ippool).
+
 ## Compatibility
 
 Profiles use distribution-supported CNIs. k0s supports Kube-router and Calico;
@@ -294,6 +430,7 @@ Converged connectivity and continuous traffic are separate gates.
 
 | Profile and version | VM bootstrap | VM add/remove/replace | Endpoint placements | NIC cuts/reboots | Real CAPA AWS |
 | --- | --- | --- | --- | --- | --- |
+| k0s `1.36.2+k0s.0`, on-premises Calico BGP only | [✅ five site VMs; 200 checks](docs/validation/calico-site-bgp-20260913-results.json) | Pending | Pending | Pending | AWS VPC CNI pending |
 | k0s `1.36.2+k0s.0`, Calico `3.32.0-0` | [✅](docs/validation/k0s-1.36-site-results.json) | [✅ 764 checks](docs/validation/k0s-1.36-lifecycle-results.json) | Pending full version-specific matrix | Pending | See k0s 1.34 row |
 | k0s `1.36.2+k0s.0`, Kube-router | [✅](docs/validation/k0s-1.36-kuberouter-site-results.json) | [✅](docs/validation/k0s-1.36-kuberouter-lifecycle-results.json) | [✅ four placements](docs/validation/k0s-1.36-kuberouter-lifecycle-results.json) | [✅ twelve rows](docs/validation/k0s-1.36-kuberouter-outage-results.json) | Pending |
 | MicroK8s `1.34.9`, Calico `3.29.3` | [✅](docs/validation/microk8s-lifecycle-results.json) | [✅](docs/validation/microk8s-lifecycle-results.json) | [✅ four placements](docs/validation/microk8s-lifecycle-results.json) | Pending | [◐ lifecycle evidence](docs/validation/microk8s-capa-lifecycle-results.json) |
@@ -306,6 +443,8 @@ versions and detailed results.
 
 | Additional scenario | Recorded result | Remaining gate |
 | --- | --- | --- |
+| k0s `1.36.2`, Calico, seven retained single-NIC VMs after host recovery (2026-09-12) | [✅ 420/420 ordinary-pod checks; 2,100/2,100 exact UDP echoes](docs/validation/k0s-vm-post-recovery-20260912-network-results.json) | Policy, endpoint changes, and continuous traffic during outages |
+| Linux / Windows Server 2022 / Server 2025 after gateway credential refresh (2026-09-12) | [◐ 39/60 checks; 199/300 exact UDP echoes](docs/validation/windows-post-refresh-20260912-network-results.json) | Windows-to-Windows connectivity and candidate-image acceptance |
 | k0s `1.36.2`, Calico Linux VM groups | [✅ scale-down, PDB hold, zero, reuse, pre-bootstrap cancellation, and 2,880 survivor checks](docs/node-groups.md#tested-scenarios) | Cancellation after userdata publication |
 | KEDA `2.20.0`, Redis, Linux k0s/Calico VM groups | [✅ 3 → 1 → 3 → 0 → 1; capacity limit; 286 network checks](docs/validation/node-group-keda-results.json) | Windows, GPU, and real-cloud group runs |
 | Pooled workers across two cloud networks | [✅ 1,200 UDP pod/Service exchanges](docs/validation/node-group-vm-udp-cloud-results.json) | UDP during removal |
@@ -314,6 +453,30 @@ versions and detailed results.
 | MicroK8s endpoint handover with continuous UDP | [◐ packet loss retained](docs/validation/microk8s-source-routing-results.json) | Loss-free production handover |
 | Linux NVIDIA T4 worker | [✅ scheduled Vulkan/NVENC and network checks](docs/validation/linux-gpu-results.json) | Fresh-image replacement and continuity |
 | Windows GPU workers | [◐ bootstrap and GPU observations](docs/windows.md) | Startup, replacement, and networking qualification |
+
+The [2026-09-12 recovery](docs/validation/k0s-vm-recovery-20260912-results.json)
+restored the retained k0s/Calico lab on its existing disks: all 13 Nodes were
+Ready, and each of the seven local KVM guests still had one physical NIC.
+The seven-VM matrix covered all 42 directed pairs across three control planes,
+two site workers, and two remote workers. TCP payloads of 1 KiB, 16 KiB and
+1 MiB, Services, DNS, and UDP payloads of 64–1,800 bytes passed with stable
+Node, Pod, container and Service identities. This is settled-state connectivity
+after recovery; it does not establish uninterrupted traffic through the outage.
+The [additional VM checks](docs/validation/k0s-vm-post-recovery-20260912-extra-results.json)
+passed all seven own-pod Service hairpins and all seven external HTTPS probes,
+for 434/434 checks across the two VM result files.
+
+On the retained mixed Windows fleet, `gateway-runtime-credentials` was renewed
+and the endpoint controller restarted successfully. The
+[latest mixed matrix](docs/validation/windows-post-refresh-20260912-network-results.json)
+retained 21 failures: all 20 Windows-to-Windows checks, plus one 1,280-byte UDP
+case from Windows 2022 to Linux (9/10 echoes). Identities remained stable.
+[Bounded diagnostics](docs/validation/windows-post-refresh-20260912-diagnostics.json)
+found no new credential errors and both attachment journals reported Ready;
+credential refresh alone did not restore the failed path. The corrected Calico
+candidate remains unqualified on this baseline. The refreshed test session
+expires at 23:21 UTC on September 12; a durable runtime credential provider
+remains separate work.
 
 Test scenarios:
 

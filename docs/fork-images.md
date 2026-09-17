@@ -147,8 +147,24 @@ the candidate; the corrected sources need the same canary and a fresh pod again.
 
 The lab host restarted on 2026-09-11 and the site was recovered on its existing
 disks with `-reuse-site -recover-host`. The
-[post-recovery matrix](validation/windows-post-recovery-network-results.json)
-is the baseline for the next canary.
+[September 11 post-recovery matrix](validation/windows-post-recovery-network-results.json)
+passed 40/60 checks and remains recorded as a failed baseline.
+
+After another host-side recovery on September 12, the gateway runtime credential
+Secret was refreshed and the endpoint controller successfully restarted. The
+[latest mixed matrix](validation/windows-post-refresh-20260912-network-results.json)
+passed 39/60 checks with stable identities and 199/300 exact UDP echoes. All
+20 Windows-to-Windows checks failed; a 1,280-byte UDP case from Windows 2022
+to Linux returned 9/10 echoes. The
+[diagnostic observation](validation/windows-post-refresh-20260912-diagnostics.json)
+found no new credential errors, but renewal alone did not restore networking.
+The corrected candidate was not rolled out on this failed baseline.
+
+Separately, all seven retained single-NIC Linux VMs passed their
+[420-check ordinary-pod matrix](validation/k0s-vm-post-recovery-20260912-network-results.json)
+and [14 additional Service hairpin/external HTTPS checks](validation/k0s-vm-post-recovery-20260912-extra-results.json).
+These results do not qualify the Windows candidate or uninterrupted traffic
+during a lifecycle operation.
 
 ## Promotion gates
 

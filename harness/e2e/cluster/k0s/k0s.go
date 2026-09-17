@@ -81,7 +81,7 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 		return err
 	}
 	if err := b.start(ctx, d, first, "controller --enable-worker -c /etc/k0s/k0s.yaml"+
-		" --kubelet-extra-args=--node-ip="+first.Address(lab.LANSegment)); err != nil {
+		siteKubeletArgs(d.Network, first.Address(lab.LANSegment))); err != nil {
 		return err
 	}
 	if err := b.waitForAPI(ctx, d, first, 5*time.Minute); err != nil {
@@ -102,7 +102,7 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 		}
 		if err := b.join(ctx, d, first, n, "controller",
 			"controller --enable-worker --token-file /etc/k0s/token -c /etc/k0s/k0s.yaml"+
-				" --kubelet-extra-args=--node-ip="+n.Address(lab.LANSegment)); err != nil {
+				siteKubeletArgs(d.Network, n.Address(lab.LANSegment))); err != nil {
 			return err
 		}
 		// Adding an etcd member changes quorum. Starting the next join before
@@ -115,7 +115,7 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 	for _, n := range d.Topology.NodesInRole(lab.Worker) {
 		if err := b.join(ctx, d, first, n, "worker",
 			"worker --token-file /etc/k0s/token"+
-				" --kubelet-extra-args=--node-ip="+n.Address(lab.LANSegment)); err != nil {
+				siteKubeletArgs(d.Network, n.Address(lab.LANSegment))); err != nil {
 			return err
 		}
 	}
@@ -366,6 +366,12 @@ func (Builder) Reuse(ctx context.Context, d cluster.Deps) error {
 			if err != nil || !strings.Contains(string(config), "provider: "+networkProvider(d.Network)) {
 				return fmt.Errorf("%s network does not match requested profile", node.Name)
 			}
+			if d.Network == "calico-site-bgp" {
+				if err := verifySiteBGPConfig(config); err != nil {
+					return fmt.Errorf("%s: %w", node.Name, err)
+				}
+			}
+
 		}
 	}
 	return nil

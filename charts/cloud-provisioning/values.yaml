@@ -118,6 +118,9 @@ transit:
 # Which cluster technology mints join credentials
 # (k0s | kubeadm | k3s | rke2 | microk8s).
 joinProvider: k0s
+# Optional complete override of the controller's worker kubelet arguments.
+# Keep its cloud-worker role label and internet-facing taint when adding CNI labels.
+joinKubeletExtraArgs: ""
 
 # First-boot binary delivery. A remote node has no image puller before
 # it joins, so cloud-init fetches this sha-pinned binary; afterwards

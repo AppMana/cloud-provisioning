@@ -21,6 +21,8 @@ type Profile struct {
 
 var Profiles = []Profile{
 	{"k0s", "calico", "calico", true, cni.Encapsulated},
+	// Site component only; AWS VPC CNI qualification is separate.
+	{"k0s", "calico-site-bgp", "calico-site-bgp", true, cni.Native},
 	{"k0s", "kube-router", "kuberouter", true, cni.Native},
 	{"k3s", "flannel", "default", true, cni.Encapsulated},
 	{"rke2", "canal", "default", true, cni.Encapsulated},

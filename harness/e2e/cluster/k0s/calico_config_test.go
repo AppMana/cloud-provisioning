@@ -111,3 +111,80 @@ func TestCalicoMTUOverridePreservesProfileBoundaries(t *testing.T) {
 		}
 	}
 }
+
+// Apply the real strategic patch before checking scheduling: replacing the
+// selector would discard k0s's Linux constraint and expose Windows hosts.
+func TestSiteBGPPatchRestrictsInstallerAndPool(t *testing.T) {
+	original, err := os.ReadFile("testdata/calico-node-environment.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var base appsv1.DaemonSet
+	if err := json.Unmarshal(original, &base); err != nil {
+		t.Fatal(err)
+	}
+	base.Spec.Template.Spec.NodeSelector = map[string]string{"kubernetes.io/os": "linux"}
+	original, _ = json.Marshal(base)
+	for _, managed := range []bool{false, true} {
+		config, err := calicoConfig("calico-site-bgp", 1370, managed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var parsed struct {
+			Calico struct {
+				Mode, Overlay string
+				Patches       []struct{ Patch struct{ Content string } }
+			}
+		}
+		if err := yaml.Unmarshal([]byte(config), &parsed); err != nil {
+			t.Fatal(err)
+		}
+		if parsed.Calico.Mode != "bird" || parsed.Calico.Overlay != "Never" || len(parsed.Calico.Patches) != 1 {
+			t.Fatalf("invalid native BGP configuration: %s", config)
+		}
+		raw, err := strategicpatch.StrategicMergePatch(original, []byte(parsed.Calico.Patches[0].Patch.Content), appsv1.DaemonSet{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var after appsv1.DaemonSet
+		if err := json.Unmarshal(raw, &after); err != nil {
+			t.Fatal(err)
+		}
+		want := map[string]string{"kubernetes.io/os": "linux", siteCalicoLabel: siteCalicoValue}
+		if !reflect.DeepEqual(after.Spec.Template.Spec.NodeSelector, want) {
+			t.Fatalf("installer can escape site Linux nodes: %+v", after.Spec.Template.Spec.NodeSelector)
+		}
+		found := false
+		for _, e := range after.Spec.Template.Spec.Containers[0].Env {
+			if managed && e.Name == "IP" {
+				t.Fatal("lost stored-address override")
+			}
+			if e.Name == "CALICO_IPV4POOL_NODE_SELECTOR" {
+				found = e.Value == siteCalicoLabel+` == "calico-site"`
+			}
+		}
+		if !found {
+			t.Fatal("pool can allocate addresses outside the site")
+		}
+		if !reflect.DeepEqual(base.Spec.Template.Spec.InitContainers, after.Spec.Template.Spec.InitContainers) {
+			t.Fatal("changed the distro CNI installer")
+		}
+	}
+}
+
+func TestSiteBGPReuseRejectsOverlayAndUnscopedCalico(t *testing.T) {
+	for _, network := range []string{"calico", "calico-site-bgp"} {
+		cfg, err := calicoConfig(network, 0, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw := []byte("spec:\n  network:\n    provider: calico\n" + cfg)
+		err = verifySiteBGPConfig(raw)
+		if (err == nil) != (network == "calico-site-bgp") {
+			t.Fatalf("%s reuse: %v", network, err)
+		}
+	}
+	if verifySiteBGPConfig([]byte("spec:\n  network:\n    provider: calico\n    calico:\n      mode: bird\n      overlay: Never\n")) == nil {
+		t.Fatal("accepted unscoped Calico")
+	}
+}

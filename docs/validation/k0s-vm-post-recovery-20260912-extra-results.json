@@ -1,0 +1,234 @@
+{
+  "observedAt": "2026-09-12T22:32:24.948460+00:00",
+  "scope": "Seven retained single-NIC Linux VMs: own-pod Service hairpin and direct-IP external HTTPS; no Windows or lifecycle qualification.",
+  "targets": [
+    {
+      "pod": "net-cp",
+      "podUID": "8bd15d6d-2eba-42a8-849a-b15b43967367",
+      "node": "cp",
+      "nodeUID": "816291d3-96c7-4821-a1f2-6221e6fb0580",
+      "os": "linux",
+      "container": "serve",
+      "containerID": "containerd://144472d5af91c8cc0242387296da199b6821bb695a9f9b2e62b0acffee6dcc14",
+      "podIP": "10.244.242.101",
+      "serviceUID": "1375e744-956c-4459-94fa-14c9601a6a97",
+      "serviceIP": "10.105.179.165"
+    },
+    {
+      "pod": "net-cp2",
+      "podUID": "7db74aec-53fa-4383-88c4-3d775a57bc9e",
+      "node": "cp2",
+      "nodeUID": "947de62f-0920-408c-aa31-ac80a2344128",
+      "os": "linux",
+      "container": "serve",
+      "containerID": "containerd://74adcbc6aba0765ab7b1b85f2a496ad0a2a924164bd45c5e44b8ad6f6ba01ab3",
+      "podIP": "10.244.121.115",
+      "serviceUID": "8a8f7635-b2e7-407c-837a-611b9f76f077",
+      "serviceIP": "10.98.42.254"
+    },
+    {
+      "pod": "net-cp3",
+      "podUID": "08ae4788-0673-40be-8589-436b101b82c7",
+      "node": "cp3",
+      "nodeUID": "fb0c269d-b214-4aa0-b1ac-4072fe347f64",
+      "os": "linux",
+      "container": "serve",
+      "containerID": "containerd://5a0a9e72eb7ecd7bf6ab22a3f80e7838aab392b14a817b56f8b49266faadf301",
+      "podIP": "10.244.155.26",
+      "serviceUID": "290b3c4e-4639-4782-af85-3388ed7307cc",
+      "serviceIP": "10.96.109.217"
+    },
+    {
+      "pod": "net-w1",
+      "podUID": "bd538d33-82d4-40ec-9e94-e68a2925908c",
+      "node": "w1",
+      "nodeUID": "584dfa5f-5eca-4579-8dab-8e54e61af376",
+      "os": "linux",
+      "container": "serve",
+      "containerID": "containerd://179eed964f5668747043df0d5d8470bfb43d155c8c065aa52d50a75a011f1d75",
+      "podIP": "10.244.190.104",
+      "serviceUID": "0da38dc3-a83a-4898-9415-78bd08938f76",
+      "serviceIP": "10.102.254.58"
+    },
+    {
+      "pod": "net-w2",
+      "podUID": "90d35247-a687-40a8-b8a6-c803b8e1da04",
+      "node": "w2",
+      "nodeUID": "4bcf04f8-ec26-4db7-bacb-85681c0145da",
+      "os": "linux",
+      "container": "serve",
+      "containerID": "containerd://ae27fbb07317cd5d573ca7ae68c32693b4ee6bf8fab3a71c27de90b956af1806",
+      "podIP": "10.244.80.224",
+      "serviceUID": "c762a334-3307-46fa-92cd-5b2b300fb2e6",
+      "serviceIP": "10.109.252.249"
+    },
+    {
+      "pod": "net-remote1",
+      "podUID": "66a63500-3eeb-49c3-bbba-8dc07aefc6a4",
+      "node": "remote1",
+      "nodeUID": "8935dd28-de93-44be-a887-73110fe88c51",
+      "os": "linux",
+      "container": "serve",
+      "containerID": "containerd://82b8688840edb38ae5e6b377e5ff86bfdefc9d615122c6dd8799c88c8a233ab7",
+      "podIP": "10.244.159.6",
+      "serviceUID": "2f04ebf0-8243-45c1-a88f-3e607f610552",
+      "serviceIP": "10.103.49.198"
+    },
+    {
+      "pod": "net-remote2",
+      "podUID": "22a50812-6cee-4f81-8950-ecc3e577a319",
+      "node": "remote2",
+      "nodeUID": "f7939d07-f93a-4cb7-b7cb-2951dca6c2c3",
+      "os": "linux",
+      "container": "serve",
+      "containerID": "containerd://827c3173b6a67abf7545af93d2de8b7485cb5cb85efe807c54d08590e87805d6",
+      "podIP": "10.244.133.5",
+      "serviceUID": "e3fe3c03-4695-40c4-bd15-2631465cfa72",
+      "serviceIP": "10.111.137.193"
+    }
+  ],
+  "checks": [
+    {
+      "node": "cp",
+      "pod": "net-cp",
+      "kind": "own-pod-service",
+      "url": "http://10.105.179.165:8080/hostname",
+      "commandExitCode": 0,
+      "body": "net-cp",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "cp",
+      "pod": "net-cp",
+      "kind": "external-https",
+      "url": "https://1.1.1.1/cdn-cgi/trace",
+      "commandExitCode": 0,
+      "body": "fl=464f206\nh=1.1.1.1\nip=173.228.73.13\nts=1789252342.000\nvisit_scheme=https\nuag=curl/8.14.1\ncolo=SJC\nsliver=050-tier1\nhttp=http/2\nloc=US\ntls=TLSv1.3\nsni=off\nwarp=off\ngateway=off\nrbi=off\nkex=X25519\n",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "cp2",
+      "pod": "net-cp2",
+      "kind": "own-pod-service",
+      "url": "http://10.98.42.254:8080/hostname",
+      "commandExitCode": 0,
+      "body": "net-cp2",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "cp2",
+      "pod": "net-cp2",
+      "kind": "external-https",
+      "url": "https://1.1.1.1/cdn-cgi/trace",
+      "commandExitCode": 0,
+      "body": "fl=466f171\nh=1.1.1.1\nip=173.228.73.13\nts=1789252342.000\nvisit_scheme=https\nuag=curl/8.14.1\ncolo=SJC\nsliver=050-tier1\nhttp=http/2\nloc=US\ntls=TLSv1.3\nsni=off\nwarp=off\ngateway=off\nrbi=off\nkex=X25519\n",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "cp3",
+      "pod": "net-cp3",
+      "kind": "own-pod-service",
+      "url": "http://10.96.109.217:8080/hostname",
+      "commandExitCode": 0,
+      "body": "net-cp3",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "cp3",
+      "pod": "net-cp3",
+      "kind": "external-https",
+      "url": "https://1.1.1.1/cdn-cgi/trace",
+      "commandExitCode": 0,
+      "body": "fl=1231f75\nh=1.1.1.1\nip=173.228.73.13\nts=1789252342.000\nvisit_scheme=https\nuag=curl/8.14.1\ncolo=SJC\nsliver=050-tier1\nhttp=http/2\nloc=US\ntls=TLSv1.3\nsni=off\nwarp=off\ngateway=off\nrbi=off\nkex=X25519\n",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "w1",
+      "pod": "net-w1",
+      "kind": "own-pod-service",
+      "url": "http://10.102.254.58:8080/hostname",
+      "commandExitCode": 0,
+      "body": "net-w1",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "w1",
+      "pod": "net-w1",
+      "kind": "external-https",
+      "url": "https://1.1.1.1/cdn-cgi/trace",
+      "commandExitCode": 0,
+      "body": "fl=1231f101\nh=1.1.1.1\nip=173.228.73.13\nts=1789252342.000\nvisit_scheme=https\nuag=curl/8.14.1\ncolo=SJC\nsliver=010-tier1\nhttp=http/2\nloc=US\ntls=TLSv1.3\nsni=off\nwarp=off\ngateway=off\nrbi=off\nkex=X25519\n",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "w2",
+      "pod": "net-w2",
+      "kind": "own-pod-service",
+      "url": "http://10.109.252.249:8080/hostname",
+      "commandExitCode": 0,
+      "body": "net-w2",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "w2",
+      "pod": "net-w2",
+      "kind": "external-https",
+      "url": "https://1.1.1.1/cdn-cgi/trace",
+      "commandExitCode": 0,
+      "body": "fl=465f235\nh=1.1.1.1\nip=173.228.73.13\nts=1789252342.000\nvisit_scheme=https\nuag=curl/8.14.1\ncolo=SJC\nsliver=none\nhttp=http/2\nloc=US\ntls=TLSv1.3\nsni=off\nwarp=off\ngateway=off\nrbi=off\nkex=X25519\n",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "remote1",
+      "pod": "net-remote1",
+      "kind": "own-pod-service",
+      "url": "http://10.103.49.198:8080/hostname",
+      "commandExitCode": 0,
+      "body": "net-remote1",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "remote1",
+      "pod": "net-remote1",
+      "kind": "external-https",
+      "url": "https://1.1.1.1/cdn-cgi/trace",
+      "commandExitCode": 0,
+      "body": "fl=1231f126\nh=1.1.1.1\nip=173.228.73.13\nts=1789252342.000\nvisit_scheme=https\nuag=curl/8.14.1\ncolo=SJC\nsliver=none\nhttp=http/2\nloc=US\ntls=TLSv1.3\nsni=off\nwarp=off\ngateway=off\nrbi=off\nkex=X25519\n",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "remote2",
+      "pod": "net-remote2",
+      "kind": "own-pod-service",
+      "url": "http://10.111.137.193:8080/hostname",
+      "commandExitCode": 0,
+      "body": "net-remote2",
+      "error": "",
+      "ok": true
+    },
+    {
+      "node": "remote2",
+      "pod": "net-remote2",
+      "kind": "external-https",
+      "url": "https://1.1.1.1/cdn-cgi/trace",
+      "commandExitCode": 0,
+      "body": "fl=1231f94\nh=1.1.1.1\nip=173.228.73.13\nts=1789252342.000\nvisit_scheme=https\nuag=curl/8.14.1\ncolo=SJC\nsliver=050-tier1\nhttp=http/2\nloc=US\ntls=TLSv1.3\nsni=off\nwarp=off\ngateway=off\nrbi=off\nkex=X25519\n",
+      "error": "",
+      "ok": true
+    }
+  ],
+  "identitiesStable": true,
+  "ok": true
+}

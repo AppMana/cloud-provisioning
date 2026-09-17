@@ -100,11 +100,14 @@ func runLab() {
 		}
 		*cni = selected.Network
 	}
-	if *calicoMTU != 0 && (*distro != "k0s" || selected.Network != "calico" || *reuseSite || *calicoMTU < 1280 || *calicoMTU > 65535) {
+	if *calicoMTU != 0 && (*distro != "k0s" || (selected.Network != "calico" && selected.Network != "calico-site-bgp") || *reuseSite || *calicoMTU < 1280 || *calicoMTU > 65535) {
 		fail("--k0s-calico-mtu requires a fresh k0s Calico site and an MTU between 1280 and 65535")
 	}
-	if *calicoManagedAddresses && (*distro != "k0s" || selected.Network != "calico" || *reuseSite) {
+	if *calicoManagedAddresses && (*distro != "k0s" || (selected.Network != "calico" && selected.Network != "calico-site-bgp") || *reuseSite) {
 		fail("--k0s-calico-managed-addresses requires a fresh k0s Calico site")
+	}
+	if selected.Network == "calico-site-bgp" && *remotes != "" {
+		fail("calico-site-bgp remote VM claims need a separately configured remote CNI; use the AWS VPC CNI workflow for AWS workers")
 	}
 	if *linuxEgress && (*distro != "k0s" || *rigKind != "vm" || *reuseSite) {
 		fail("--k0s-linux-egress requires a fresh k0s VM site")

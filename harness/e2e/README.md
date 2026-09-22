@@ -46,6 +46,23 @@ as a compatibility symlink. Existing old wrapper images do not have the new
 entry point. Image-builder SSH, CoreOS's policy wrapper, and nil-runtime legacy
 tests remain separate paths; their migration is not claimed complete here.
 
+The Ubuntu SDK command adapter has an opt-in real-VM regression:
+
+```sh
+GOWORK=off \
+LABCONTAINERS_LABD=/absolute/path/labd \
+LABCONTAINERS_CONTAINERLAB=/absolute/path/corrected-containerlab \
+CLOUD_PROVISIONING_SDK_VM_IMAGE=YOUR_PRELOADED_SDK_VM_IMAGE \
+go test ./rig/vm -run '^TestLiveSDKGuestCommands$' -count=1 -v -timeout=6m
+```
+
+It constructs a native topology with one zero-NIC VM, reconnects through the
+product runtime, checks binary stdin/file transfer and mode, preserves nonzero
+command diagnostics, and tears down the owned session. The work/evidence path
+is printed and retained. It requires `/labcontainers-guest` in the prepared
+image and qualifies the command adapter only, not the product image builder or
+Kubernetes/Calico networking.
+
 The k0s builder now constructs upstream `v1beta1.ClusterConfig` objects,
 including native Calico patch objects. Configuration writing, native argument
 installation, and single-attempt readiness probes use

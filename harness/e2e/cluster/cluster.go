@@ -59,6 +59,10 @@ type Deps struct {
 	// distributions must be told at build time whether to bring their
 	// own.
 	Network string
+	// K0sBinary and K0sBinarySHA256 identify a prepared host artifact. A
+	// fresh k0s site never downloads or substitutes an upstream release.
+	K0sBinary       string
+	K0sBinarySHA256 string
 	// K0sCalicoMTU overrides the bundled Calico overlay MTU for a fresh k0s
 	// site. Zero preserves the distribution default.
 	K0sCalicoMTU int

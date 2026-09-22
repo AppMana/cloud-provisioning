@@ -67,6 +67,8 @@ func exitCode(run func()) (code int) {
 func runLab() {
 	var (
 		distro                 = flag.String("distro", "", "also build the site cluster with this distribution")
+		k0sBinary              = flag.String("k0s-binary", "", "prepared host k0s binary for a fresh k0s site; no automatic download")
+		k0sBinarySHA256        = flag.String("k0s-binary-sha256", "", "required SHA256 of --k0s-binary")
 		cni                    = flag.String("cni", "", "distribution-supported network profile (default: bundled default)")
 		calicoMTU              = flag.Int("k0s-calico-mtu", 0, "bundled Calico MTU for a fresh k0s site; zero preserves the distro default")
 		calicoManagedAddresses = flag.Bool("k0s-calico-managed-addresses", false, "use stored per-node Calico addresses on a fresh k0s site instead of repeated IP autodetection")
@@ -88,6 +90,9 @@ func runLab() {
 		timeout                = flag.Duration("timeout", 2*time.Hour, "deadline for the whole run")
 	)
 	flag.Parse()
+	if *distro == "k0s" && !*reuseSite && !*down && (*k0sBinary == "" || *k0sBinarySHA256 == "") {
+		fail("fresh k0s sites require --k0s-binary and --k0s-binary-sha256")
+	}
 	if *capiMode != "imported" && *capiMode != "unconnected" {
 		fail("unsupported CAPI mode %q", *capiMode)
 	}
@@ -268,6 +273,7 @@ func runLab() {
 		step("building the " + *distro + " site")
 		d := cluster.Deps{
 			Topology: topo, Rig: r, WorkDir: *workDir, Network: selected.BuilderNetwork,
+			K0sBinary: *k0sBinary, K0sBinarySHA256: *k0sBinarySHA256,
 			K0sCalicoMTU:              *calicoMTU,
 			K0sCalicoManagedAddresses: *calicoManagedAddresses,
 			Images:                    cluster.Importer{Images: images, Args: b.ImportArgs()},

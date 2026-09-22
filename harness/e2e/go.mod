@@ -1,11 +1,12 @@
 module github.com/appmana/cloud-provisioning/harness/e2e
 
-go 1.26.0
+go 1.26.3
 
 replace github.com/appmana/cloud-provisioning/controller => ../../controller
 
 require (
 	github.com/appmana/cloud-provisioning/controller v0.0.0-00010101000000-000000000000
+	github.com/k0sproject/k0s v1.36.3-0.20260626104849-bdf1c22c23a5
 	golang.org/x/crypto v0.50.0
 	k8s.io/api v0.36.0
 	k8s.io/apimachinery v0.36.0

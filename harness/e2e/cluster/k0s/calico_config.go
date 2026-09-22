@@ -3,30 +3,30 @@ package k0s
 import (
 	"encoding/json"
 	"fmt"
+	native "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	"sigs.k8s.io/yaml"
 )
 
 const siteCalicoLabel = "cloud-provisioning.appmana.com/cni"
 const siteCalicoValue = "calico-site"
 
-// calicoConfig renders only explicit overrides for the bundled Calico profile.
-func calicoConfig(network string, mtu int, managedAddresses bool) (string, error) {
+// calicoConfig constructs native k0s overrides for this product's profile.
+func calicoConfig(network string, mtu int, managedAddresses bool) (*native.Calico, error) {
 	siteBGP := network == "calico-site-bgp"
 	if mtu == 0 && !managedAddresses && !siteBGP {
-		return "", nil
+		return nil, nil
 	}
 	if network != "calico" && !siteBGP {
-		return "", fmt.Errorf("Calico configuration requires the bundled k0s Calico profile")
+		return nil, fmt.Errorf("Calico configuration requires the bundled k0s Calico profile")
 	}
 	if mtu != 0 && (mtu < 1280 || mtu > 65535) {
-		return "", fmt.Errorf("Calico MTU must be zero or between 1280 and 65535")
+		return nil, fmt.Errorf("Calico MTU must be zero or between 1280 and 65535")
 	}
-	config := "    calico:\n"
-	if mtu != 0 {
-		config += fmt.Sprintf("      mtu: %d\n", mtu)
-	}
+	config := &native.Calico{MTU: mtu}
 	if siteBGP {
-		config += "      mode: bird\n      overlay: Never\n      ipAutodetectionMethod: kubernetes-internal-ip\n"
+		config.Mode = native.CalicoModeBIRD
+		config.Overlay = "Never"
+		config.IPAutodetectionMethod = "kubernetes-internal-ip"
 	}
 	if managedAddresses || siteBGP {
 		env := []map[string]string{}
@@ -42,18 +42,13 @@ func calicoConfig(network string, mtu int, managedAddresses bool) (string, error
 		}
 		patch, err := json.Marshal(map[string]any{"spec": map[string]any{"template": map[string]any{"spec": spec}}})
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		// The patch covers the entire pod, including the host CNI installer.
-		config += fmt.Sprintf(`      patches:
-        - target:
-            kind: DaemonSet
-            name: calico-node
-            namespace: kube-system
-          patch:
-            type: StrategicMergePatch
-            content: '%s'
-`, patch)
+		config.Patches = native.Patches{{
+			Target: native.PatchTarget{Kind: "DaemonSet", Name: "calico-node", Namespace: "kube-system"},
+			Patch:  native.PatchSpec{Type: native.StrategicMergePatchType, Content: string(patch)},
+		}}
 	}
 	return config, nil
 }
@@ -75,7 +70,7 @@ func siteKubeletArgs(network, address string) string {
 	if network == "calico-site-bgp" {
 		args += " --node-labels=" + siteCalicoLabel + "=" + siteCalicoValue
 	}
-	return " --kubelet-extra-args='" + args + "'"
+	return "--kubelet-extra-args=" + args
 }
 
 // Reuse must not accept a VXLAN site just because both profiles use Calico.

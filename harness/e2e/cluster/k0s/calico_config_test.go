@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	native "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"sigs.k8s.io/yaml"
@@ -29,23 +30,11 @@ func TestStoredCalicoAddressesPatchObservedDaemonSet(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var parsed struct {
-			Calico struct {
-				MTU     int `json:"mtu"`
-				Patches []struct {
-					Target map[string]string              `json:"target"`
-					Patch  struct{ Type, Content string } `json:"patch"`
-				} `json:"patches"`
-			} `json:"calico"`
-		}
-		if err := yaml.Unmarshal([]byte(config), &parsed); err != nil {
-			t.Fatal(err)
-		}
-		if parsed.Calico.MTU != mtu || len(parsed.Calico.Patches) != 1 {
+		if config.MTU != mtu || len(config.Patches) != 1 {
 			t.Fatal("missing configuration")
 		}
-		patch := parsed.Calico.Patches[0]
-		if !reflect.DeepEqual(patch.Target, map[string]string{"kind": "DaemonSet", "name": "calico-node", "namespace": "kube-system"}) || patch.Patch.Type != "StrategicMergePatch" {
+		patch := config.Patches[0]
+		if patch.Target != (native.PatchTarget{Kind: "DaemonSet", Name: "calico-node", Namespace: "kube-system"}) || patch.Patch.Type != native.StrategicMergePatchType {
 			t.Fatal("wrong target or patch type")
 		}
 		updated, err := strategicpatch.StrategicMergePatch(original, []byte(patch.Patch.Content), appsv1.DaemonSet{})
@@ -79,8 +68,8 @@ func TestStoredCalicoAddressesPatchObservedDaemonSet(t *testing.T) {
 func TestCalicoMTUOverridePreservesProfileBoundaries(t *testing.T) {
 	for _, network := range []string{"default", "calico", "kuberouter", "custom"} {
 		config, err := calicoConfig(network, 0, false)
-		if err != nil || config != "" {
-			t.Fatalf("zero override changed distro defaults for %s: %q, %v", network, config, err)
+		if err != nil || config != nil {
+			t.Fatalf("zero override changed distro defaults for %s: %+v, %v", network, config, err)
 		}
 	}
 	for _, network := range []string{"", "default", "kuberouter", "kube-router", "custom", "cilium"} {
@@ -98,16 +87,8 @@ func TestCalicoMTUOverridePreservesProfileBoundaries(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var parsed struct {
-			Calico struct {
-				MTU int `json:"mtu"`
-			} `json:"calico"`
-		}
-		if err := yaml.Unmarshal([]byte(config), &parsed); err != nil {
-			t.Fatal(err)
-		}
-		if parsed.Calico.MTU != 1370 {
-			t.Fatalf("wrong observed path budget: %+v", parsed)
+		if config.MTU != 1370 {
+			t.Fatalf("wrong observed path budget: %+v", config)
 		}
 	}
 }
@@ -130,19 +111,10 @@ func TestSiteBGPPatchRestrictsInstallerAndPool(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var parsed struct {
-			Calico struct {
-				Mode, Overlay string
-				Patches       []struct{ Patch struct{ Content string } }
-			}
+		if config.Mode != native.CalicoModeBIRD || config.Overlay != "Never" || len(config.Patches) != 1 {
+			t.Fatalf("invalid native BGP configuration: %+v", config)
 		}
-		if err := yaml.Unmarshal([]byte(config), &parsed); err != nil {
-			t.Fatal(err)
-		}
-		if parsed.Calico.Mode != "bird" || parsed.Calico.Overlay != "Never" || len(parsed.Calico.Patches) != 1 {
-			t.Fatalf("invalid native BGP configuration: %s", config)
-		}
-		raw, err := strategicpatch.StrategicMergePatch(original, []byte(parsed.Calico.Patches[0].Patch.Content), appsv1.DaemonSet{})
+		raw, err := strategicpatch.StrategicMergePatch(original, []byte(config.Patches[0].Patch.Content), appsv1.DaemonSet{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -178,13 +150,22 @@ func TestSiteBGPReuseRejectsOverlayAndUnscopedCalico(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		raw := []byte("spec:\n  network:\n    provider: calico\n" + cfg)
+		raw, err := yaml.Marshal(&native.ClusterConfig{Spec: &native.ClusterSpec{Network: &native.Network{Provider: "calico", Calico: cfg}}})
+		if err != nil {
+			t.Fatal(err)
+		}
 		err = verifySiteBGPConfig(raw)
 		if (err == nil) != (network == "calico-site-bgp") {
 			t.Fatalf("%s reuse: %v", network, err)
 		}
 	}
-	if verifySiteBGPConfig([]byte("spec:\n  network:\n    provider: calico\n    calico:\n      mode: bird\n      overlay: Never\n")) == nil {
+	raw, err := yaml.Marshal(&native.ClusterConfig{Spec: &native.ClusterSpec{Network: &native.Network{
+		Provider: "calico", Calico: &native.Calico{Mode: native.CalicoModeBIRD, Overlay: "Never"},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verifySiteBGPConfig(raw) == nil {
 		t.Fatal("accepted unscoped Calico")
 	}
 }

@@ -24,6 +24,22 @@ also requires the isolated corrected Containerlab binary described in the SDK
 README, selected using `LABCONTAINERS_CONTAINERLAB`. Neither setup replaces the
 host installation.
 
-Distribution bootstrap builders and cloud provisioning operations are still
-part of this project; this change does not claim their full extraction or a
-qualified Calico/k0s pod network.
+The k0s builder now constructs upstream `v1beta1.ClusterConfig` objects,
+including native Calico patch objects. Configuration writing, native argument
+installation, and single-attempt readiness probes use
+`labcontainers/pkg/kubernetes/k0s`. Product profiles, site orchestration, and
+cloud provisioning assertions remain here.
+
+Fresh k0s builds require an explicitly prepared binary and its content pin:
+`cluster.Deps.K0sBinary` and `K0sBinarySHA256`, or the lab command's
+`--k0s-binary /absolute/path/to/k0s --k0s-binary-sha256 <64-hex-digest>`.
+There is no automatic upstream binary download or fallback to a cached build.
+Prepare the intended AppMana fork artifact before running a fork scenario.
+Reuse of an existing installation does not require a new binary.
+
+The native Go configuration dependency's pseudo-version resolves the
+`v1.36.2+k0s.0` release commit `bdf1c22c23a5`; it does not select the binary
+under test. This requires Go 1.26.3 or newer.
+
+Full distribution-builder extraction and Calico/k0s pod-network qualification
+are still pending. These changes do not claim either is complete.

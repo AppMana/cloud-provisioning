@@ -13,18 +13,21 @@
 package k0s
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	shared "github.com/appmana/labcontainers/pkg/kubernetes/k0s"
+	native "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func init() { cluster.Register(Builder{}) }
@@ -58,20 +61,22 @@ func (Builder) ImportArgs() []string {
 // Build carries the binary in, writes each node's config, and starts
 // the controllers and then the workers.
 func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
+	cps := d.Topology.NodesInRole(lab.ControlPlane)
+	if len(cps) == 0 {
+		return fmt.Errorf("the topology has no control planes")
+	}
+	if _, err := calicoConfig(d.Network, d.K0sCalicoMTU, d.K0sCalicoManagedAddresses); err != nil {
+		return err
+	}
 	binary, err := b.binary(ctx, d)
 	if err != nil {
 		return err
 	}
 	for _, n := range cluster.SiteNodes(d.Topology) {
-		if err := d.Rig.Node(n.Name).Put(ctx, strings.NewReader(string(binary)),
+		if err := d.Rig.Node(n.Name).Put(ctx, bytes.NewReader(binary),
 			"/usr/local/bin/k0s", 0o755); err != nil {
 			return fmt.Errorf("carrying k0s onto %s: %w", n.Name, err)
 		}
-	}
-
-	cps := d.Topology.NodesInRole(lab.ControlPlane)
-	if len(cps) == 0 {
-		return fmt.Errorf("the topology has no control planes")
 	}
 
 	// The first controller, which is also a worker: a row that places
@@ -80,7 +85,7 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 	if err := b.config(ctx, d, first); err != nil {
 		return err
 	}
-	if err := b.start(ctx, d, first, "controller --enable-worker -c /etc/k0s/k0s.yaml"+
+	if err := b.start(ctx, d, first, "controller", "--enable-worker", "-c", "/etc/k0s/k0s.yaml",
 		siteKubeletArgs(d.Network, first.Address(lab.LANSegment))); err != nil {
 		return err
 	}
@@ -101,8 +106,8 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 			return err
 		}
 		if err := b.join(ctx, d, first, n, "controller",
-			"controller --enable-worker --token-file /etc/k0s/token -c /etc/k0s/k0s.yaml"+
-				siteKubeletArgs(d.Network, n.Address(lab.LANSegment))); err != nil {
+			"controller", "--enable-worker", "--token-file", "/etc/k0s/token", "-c", "/etc/k0s/k0s.yaml",
+			siteKubeletArgs(d.Network, n.Address(lab.LANSegment))); err != nil {
 			return err
 		}
 		// Adding an etcd member changes quorum. Starting the next join before
@@ -114,8 +119,8 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 	}
 	for _, n := range d.Topology.NodesInRole(lab.Worker) {
 		if err := b.join(ctx, d, first, n, "worker",
-			"worker --token-file /etc/k0s/token"+
-				siteKubeletArgs(d.Network, n.Address(lab.LANSegment))); err != nil {
+			"worker", "--token-file", "/etc/k0s/token",
+			siteKubeletArgs(d.Network, n.Address(lab.LANSegment))); err != nil {
 			return err
 		}
 	}
@@ -141,45 +146,27 @@ func (b Builder) config(ctx context.Context, d cluster.Deps, n lab.Node) error {
 	// is Kube-router. Calico remains an explicit supported profile.
 	provider := networkProvider(d.Network)
 
-	config := fmt.Sprintf(`apiVersion: k0s.k0sproject.io/v1beta1
-kind: ClusterConfig
-metadata:
-  name: k0s
-spec:
-  api:
-    address: %[1]s
-    sans: [%[2]s]
-  storage:
-    type: etcd
-    etcd:
-      peerAddress: %[1]s
-  network:
-    provider: %[3]s
-%[6]s    podCIDR: %[4]s
-    serviceCIDR: %[5]s
-    # k0s owns API balancing. Its native Traefik backend supports both Linux
-    # and Windows; Envoy cannot bootstrap a Windows HostProcess pod.
-    nodeLocalLoadBalancing:
-      enabled: true
-      type: Traefik
-    kubeProxy:
-      extraArgs:
-        # kube-proxy would otherwise raise nf_conntrack_max, and
-        # /proc/sys is not writable from a container, so it exits and
-        # nothing translates a service address.
-        conntrack-max-per-core: "0"
-`, addr, strings.Join(sans, ", "), provider, d.PodCIDR, d.SvcCIDR, calicoSettings)
-
-	node := d.Rig.Node(n.Name)
-	if _, err := node.Exec(ctx, "mkdir", "-p", "/etc/k0s"); err != nil {
-		return err
+	config := &native.ClusterConfig{
+		TypeMeta:   metav1.TypeMeta{APIVersion: native.ClusterConfigAPIVersion, Kind: native.ClusterConfigKind},
+		ObjectMeta: metav1.ObjectMeta{Name: "k0s"},
+		Spec: &native.ClusterSpec{
+			API:     &native.APISpec{Address: addr, SANs: sans},
+			Storage: &native.StorageSpec{Type: native.EtcdStorageType, Etcd: &native.EtcdConfig{PeerAddress: addr}},
+			Network: &native.Network{
+				Provider: provider, Calico: calicoSettings, PodCIDR: d.PodCIDR, ServiceCIDR: d.SvcCIDR,
+				// k0s's Traefik backend supports both Linux and Windows.
+				NodeLocalLoadBalancing: &native.NodeLocalLoadBalancing{Enabled: true, Type: native.NllbTypeTraefik},
+				// Container rows cannot raise the host's nf_conntrack_max.
+				KubeProxy: &native.KubeProxy{ExtraArgs: map[string]string{"conntrack-max-per-core": "0"}},
+			},
+		},
 	}
-	return node.Put(ctx, strings.NewReader(config), "/etc/k0s/k0s.yaml", 0o644)
+	return shared.WriteConfig(ctx, d.Rig.Node(n.Name), "/etc/k0s/k0s.yaml", config)
 }
 
 // join mints a token on the first controller and starts the node with
 // it.
-func (b Builder) join(ctx context.Context, d cluster.Deps, first, n lab.Node, role, args string) error {
+func (b Builder) join(ctx context.Context, d cluster.Deps, first, n lab.Node, role string, args ...string) error {
 	node := d.Rig.Node(n.Name)
 	if _, err := node.Exec(ctx, "test", "-f", "/etc/systemd/system/k0sworker.service"); err == nil {
 		return nil
@@ -208,7 +195,7 @@ func (b Builder) join(ctx context.Context, d cluster.Deps, first, n lab.Node, ro
 	if err := node.Put(ctx, strings.NewReader(clean), "/etc/k0s/token", 0o600); err != nil {
 		return err
 	}
-	return b.start(ctx, d, n, args)
+	return b.start(ctx, d, n, args...)
 }
 
 // start installs k0s as a unit and starts it.
@@ -216,7 +203,7 @@ func (b Builder) join(ctx context.Context, d cluster.Deps, first, n lab.Node, ro
 // As a unit, because a reboot row brings the node back through the
 // distribution's own supervision, and a node started any other way
 // would prove this harness can restart it.
-func (b Builder) start(ctx context.Context, d cluster.Deps, n lab.Node, args string) error {
+func (b Builder) start(ctx context.Context, d cluster.Deps, n lab.Node, args ...string) error {
 	node := d.Rig.Node(n.Name)
 	installed := false
 	for _, unit := range []string{"k0scontroller", "k0sworker"} {
@@ -225,11 +212,14 @@ func (b Builder) start(ctx context.Context, d cluster.Deps, n lab.Node, args str
 		}
 	}
 	if !installed {
-		if out, err := node.Exec(ctx, "sh", "-c", "k0s install "+args); err != nil {
-			return fmt.Errorf("%s: k0s install: %w: %s", n.Name, err, out)
+		if err := shared.Install(ctx, node, args...); err != nil {
+			return err
 		}
 	}
-	_, _ = node.Exec(ctx, "k0s", "start")
+	out, err := node.Exec(ctx, "k0s", "start")
+	if err != nil {
+		return fmt.Errorf("%s: k0s start: %w: %s", n.Name, err, out)
+	}
 	return nil
 }
 
@@ -243,25 +233,7 @@ func (b Builder) start(ctx context.Context, d cluster.Deps, n lab.Node, args str
 // the distribution being broken rather than as not started yet.
 func (b Builder) waitForAPI(ctx context.Context, d cluster.Deps, n lab.Node, within time.Duration) error {
 	return wait.Until(ctx, within, n.Name+"'s k0s never served a ready API", func(ctx context.Context) error {
-		node := d.Rig.Node(n.Name)
-		if _, err := node.Exec(ctx, "k0s", "status"); err != nil {
-			return fmt.Errorf("k0s status: %w", err)
-		}
-		// And the API answering, not merely the process running.
-		//
-		// k0s status reports on the supervisor; the API server behind
-		// it comes up later, and on a machine that gap is wide enough
-		// to matter — minting a token went through and timed out
-		// waiting for a request the server could not yet serve. On
-		// containers the same gap existed and was too small to notice,
-		// which is the sort of thing only a slower rig finds.
-		if _, err := node.Exec(ctx, "k0s", "kubectl", "get", "--raw", "/readyz"); err != nil {
-			return fmt.Errorf("readyz: %w", err)
-		}
-		if _, err := node.Exec(ctx, "k0s", "kubeconfig", "admin"); err != nil {
-			return fmt.Errorf("kubeconfig: %w", err)
-		}
-		return nil
+		return shared.Ready(ctx, d.Rig.Node(n.Name))
 	})
 }
 
@@ -320,36 +292,23 @@ func (b Builder) readWithDeadline(ctx context.Context, d cluster.Deps, n lab.Nod
 	return out, err
 }
 
-// binary fetches the pinned release once and caches it, because this
-// host has a route out and the site does not.
+// binary consumes a prepared, content-pinned artifact. In particular, a missing
+// fork build must never silently fall back to an upstream release download.
 func (b Builder) binary(ctx context.Context, d cluster.Deps) ([]byte, error) {
-	path := filepath.Join(d.WorkDir, "k0s-"+Version)
-	if body, err := os.ReadFile(path); err == nil && len(body) > 0 {
-		return body, nil
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
-	url := fmt.Sprintf("https://github.com/k0sproject/k0s/releases/download/%s/k0s-%s-amd64",
-		Version, Version)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	pin, err := hex.DecodeString(d.K0sBinarySHA256)
+	if d.K0sBinary == "" || err != nil || len(pin) != sha256.Size {
+		return nil, fmt.Errorf("fresh k0s sites require a prepared K0sBinary and its K0sBinarySHA256; no release is downloaded")
+	}
+	body, err := os.ReadFile(d.K0sBinary)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading prepared k0s binary: %w", err)
 	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("fetching k0s: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetching k0s: %s", resp.Status)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(d.WorkDir, 0o755); err != nil {
-		return nil, err
-	}
-	if err := os.WriteFile(path, body, 0o755); err != nil {
-		return nil, err
+	sum := sha256.Sum256(body)
+	if len(body) == 0 || !strings.EqualFold(hex.EncodeToString(sum[:]), d.K0sBinarySHA256) {
+		return nil, fmt.Errorf("prepared k0s binary is empty or does not match SHA256 %s", d.K0sBinarySHA256)
 	}
 	return body, nil
 }

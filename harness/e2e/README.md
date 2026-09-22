@@ -22,7 +22,7 @@ explicitly; normal SDK operation does not adopt or remove it automatically.
 The explicit nil-runtime compatibility path remains for legacy callers/tests
 and does not provide these ownership guarantees.
 
-This module pins published Labcontainers commit `9fea7eee373a`; no local SDK
+This module pins published Labcontainers commit `43833b0979f7`; no local SDK
 workspace or SDK replace directive is needed. The local product controller
 module remains a dependency in this repository.
 

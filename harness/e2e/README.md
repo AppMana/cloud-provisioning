@@ -55,6 +55,16 @@ environment arguments. It neither downloads an installer nor silently reuses
 an arbitrary existing RKE2 executable. This extraction has unit-test coverage;
 it is not a new live RKE2 qualification.
 
+The kubeadm builder now constructs upstream `v1beta4.InitConfiguration`,
+`v1beta4.ClusterConfiguration`, and `v1alpha1.KubeProxyConfiguration` objects;
+the product's explicit API forwarder is a native `corev1.Pod`. The SDK's
+`kube.WriteObjects` writes these objects at the guest-file boundary, including
+multi-document configuration streams. Tests decode the resulting native
+objects to verify endpoint, kubelet arguments, conntrack settings, and proxy
+mounts. This changes configuration authoring, not the runtime binaries selected
+by the existing node-stack builder; its artifact preparation is still pending
+extraction. The forwarder remains a product scenario choice, not an SDK default.
+
 The native Go configuration dependency's pseudo-version resolves the
 `v1.36.2+k0s.0` release commit `bdf1c22c23a5`; it does not select the binary
 under test. This requires Go 1.26.3 or newer.

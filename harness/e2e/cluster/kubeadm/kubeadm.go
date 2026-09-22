@@ -17,7 +17,6 @@
 package kubeadm
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -25,6 +24,11 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+	shared "github.com/appmana/labcontainers/pkg/kubernetes/kube"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	proxy "k8s.io/kube-proxy/config/v1alpha1"
+	native "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 )
 
 func init() { cluster.Register(Builder{}) }
@@ -216,27 +220,22 @@ stream {
 }
 `, upstreams.String(), ProxyPort)
 
-	manifest := fmt.Sprintf(`apiVersion: v1
-kind: Pod
-metadata:
-  name: api-proxy
-  namespace: kube-system
-spec:
-  hostNetwork: true
-  priorityClassName: system-node-critical
-  containers:
-    - name: nginx
-      image: %s
-      imagePullPolicy: Never
-      command: ["nginx", "-g", "daemon off;", "-c", "/etc/api-proxy/nginx.conf"]
-      volumeMounts:
-        - {name: conf, mountPath: /etc/api-proxy, readOnly: true}
-  volumes:
-    - name: conf
-      hostPath:
-        path: /etc/api-proxy
-        type: Directory
-`, NginxImage)
+	directory := corev1.HostPathDirectory
+	manifest := &corev1.Pod{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+		ObjectMeta: metav1.ObjectMeta{Name: "api-proxy", Namespace: "kube-system"},
+		Spec: corev1.PodSpec{
+			HostNetwork: true, PriorityClassName: "system-node-critical",
+			Containers: []corev1.Container{{
+				Name: "nginx", Image: NginxImage, ImagePullPolicy: corev1.PullNever,
+				Command:      []string{"nginx", "-g", "daemon off;", "-c", "/etc/api-proxy/nginx.conf"},
+				VolumeMounts: []corev1.VolumeMount{{Name: "conf", MountPath: "/etc/api-proxy", ReadOnly: true}},
+			}},
+			Volumes: []corev1.Volume{{Name: "conf", VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/etc/api-proxy", Type: &directory},
+			}}},
+		},
+	}
 
 	var names []string
 	for _, n := range cluster.SiteNodes(d.Topology) {
@@ -260,8 +259,7 @@ spec:
 		// it runs, so the forwarder exists on a node before, during
 		// and after any control plane's death, depending on nothing
 		// that the API it fronts provides.
-		if err := node.Put(ctx, strings.NewReader(manifest),
-			"/etc/kubernetes/manifests/api-proxy.yaml", 0o644); err != nil {
+		if err := shared.WriteObjects(ctx, node, "/etc/kubernetes/manifests/api-proxy.yaml", 0o644, manifest); err != nil {
 			return err
 		}
 	}
@@ -275,47 +273,31 @@ func (b Builder) init(ctx context.Context, d cluster.Deps, first lab.Node, addrs
 		sans = append(sans, n.Name)
 	}
 
-	config := fmt.Sprintf(`apiVersion: kubeadm.k8s.io/v1beta4
-kind: InitConfiguration
-localAPIEndpoint:
-  advertiseAddress: %s
-  bindPort: 6443
-nodeRegistration:
-  kubeletExtraArgs:
-    - {name: node-ip, value: %s}
----
-apiVersion: kubeadm.k8s.io/v1beta4
-kind: ClusterConfiguration
-networking:
-  podSubnet: %s
-  serviceSubnet: %s
-# Every kubelet.conf kubeadm writes points here, which on any node is
-# that node's own path to whichever member is alive. Loopback in every
-# API server's SANs is what lets a client verify the certificate for
-# the address it dialled; the real addresses are there for the bastion
-# and for anything dialling a member directly.
-controlPlaneEndpoint: 127.0.0.1:%d
-apiServer:
-  certSANs: [%s]
----
-apiVersion: kubeproxy.config.k8s.io/v1alpha1
-kind: KubeProxyConfiguration
-conntrack:
-  # Left alone. kube-proxy would otherwise raise nf_conntrack_max, and
-  # /proc/sys is not writable from a container, so it exits and nothing
-  # translates a service address: the network's own pods then cannot
-  # reach the API service and never start. The kernel here belongs to
-  # the host and its value is the host's to choose.
-  maxPerCore: 0
-  min: 0
-`, first.Address(lab.LANSegment), first.Address(lab.LANSegment),
-		d.PodCIDR, d.SvcCIDR, ProxyPort, strings.Join(sans, ", "))
+	initConfig := &native.InitConfiguration{
+		TypeMeta:         metav1.TypeMeta{APIVersion: native.SchemeGroupVersion.String(), Kind: "InitConfiguration"},
+		LocalAPIEndpoint: native.APIEndpoint{AdvertiseAddress: first.Address(lab.LANSegment), BindPort: 6443},
+		NodeRegistration: native.NodeRegistrationOptions{KubeletExtraArgs: []native.Arg{{Name: "node-ip", Value: first.Address(lab.LANSegment)}}},
+	}
+	// The product deliberately tests its loopback forwarder. The SDK does not
+	// insert a proxy or endpoint on behalf of a generic Kubernetes fixture.
+	clusterConfig := &native.ClusterConfiguration{
+		TypeMeta:             metav1.TypeMeta{APIVersion: native.SchemeGroupVersion.String(), Kind: "ClusterConfiguration"},
+		Networking:           native.Networking{PodSubnet: d.PodCIDR, ServiceSubnet: d.SvcCIDR},
+		ControlPlaneEndpoint: fmt.Sprintf("127.0.0.1:%d", ProxyPort),
+		APIServer:            native.APIServer{CertSANs: sans},
+	}
+	// Container rows cannot change the host's conntrack sysctls.
+	zero := int32(0)
+	proxyConfig := &proxy.KubeProxyConfiguration{
+		TypeMeta:  metav1.TypeMeta{APIVersion: "kubeproxy.config.k8s.io/v1alpha1", Kind: "KubeProxyConfiguration"},
+		Conntrack: proxy.KubeProxyConntrackConfiguration{MaxPerCore: &zero, Min: &zero},
+	}
 
 	node := d.Rig.Node(first.Name)
 	if _, err := node.Exec(ctx, "test", "-f", "/etc/kubernetes/admin.conf"); err == nil {
 		return nil // already initialised
 	}
-	if err := node.Put(ctx, bytes.NewReader([]byte(config)), "/tmp/init.yaml", 0o644); err != nil {
+	if err := shared.WriteObjects(ctx, node, "/tmp/init.yaml", 0o600, initConfig, clusterConfig, proxyConfig); err != nil {
 		return err
 	}
 	// Preflight inspects the kernel it runs on, which in a container

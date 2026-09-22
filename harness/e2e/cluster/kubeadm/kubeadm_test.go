@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"io/fs"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,6 +13,11 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+	corev1 "k8s.io/api/core/v1"
+	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
+	proxy "k8s.io/kube-proxy/config/v1alpha1"
+	native "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+	"sigs.k8s.io/yaml"
 )
 
 // The forwarder must fan out to every control plane, not to one. A
@@ -39,6 +45,19 @@ func TestTheForwarderFansOutToEveryMember(t *testing.T) {
 	// start it with no API access at all — during exactly the outage
 	// it exists to survive.
 	manifest := r.fileOn("w1", "/etc/kubernetes/manifests/api-proxy.yaml")
+	var pod corev1.Pod
+	if err := yaml.UnmarshalStrict([]byte(manifest), &pod); err != nil {
+		t.Fatal(err)
+	}
+	if pod.Kind != "Pod" || pod.APIVersion != "v1" || pod.Name != "api-proxy" || pod.Namespace != "kube-system" {
+		t.Fatalf("wrong native pod: %+v", pod)
+	}
+	if len(pod.Spec.Containers) != 1 || !reflect.DeepEqual(pod.Spec.Containers[0].Command, []string{"nginx", "-g", "daemon off;", "-c", "/etc/api-proxy/nginx.conf"}) {
+		t.Fatal("proxy argv changed")
+	}
+	if len(pod.Spec.Volumes) != 1 || pod.Spec.Volumes[0].HostPath == nil || pod.Spec.Volumes[0].HostPath.Path != "/etc/api-proxy" {
+		t.Fatal("proxy mount changed")
+	}
 	if !strings.Contains(manifest, "hostNetwork: true") {
 		t.Error("the forwarder is not on the host network, so a loopback listener reaches nothing")
 	}
@@ -66,6 +85,31 @@ func TestTheClusterEndpointIsTheNodesOwnLoopback(t *testing.T) {
 		lab.Default().MustNode("cp"), cluster.ControlPlaneAddresses(lab.Default()))
 
 	config := r.fileOn("cp", "/tmp/init.yaml")
+	decoder := yamlutil.NewYAMLOrJSONDecoder(strings.NewReader(config), 4096)
+	var initConfig native.InitConfiguration
+	var clusterConfig native.ClusterConfiguration
+	var proxyConfig proxy.KubeProxyConfiguration
+	for _, document := range []any{&initConfig, &clusterConfig, &proxyConfig} {
+		if err := decoder.Decode(document); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		t.Fatal("expected exactly three native documents", err)
+	}
+	if initConfig.Kind != "InitConfiguration" || initConfig.LocalAPIEndpoint.AdvertiseAddress != "10.10.0.10" || initConfig.LocalAPIEndpoint.BindPort != 6443 {
+		t.Fatalf("wrong init config: %+v", initConfig)
+	}
+	if !reflect.DeepEqual(initConfig.NodeRegistration.KubeletExtraArgs, []native.Arg{{Name: "node-ip", Value: "10.10.0.10"}}) {
+		t.Fatal("kubelet native args changed")
+	}
+	if clusterConfig.Kind != "ClusterConfiguration" || clusterConfig.Networking.PodSubnet != d.PodCIDR || clusterConfig.Networking.ServiceSubnet != d.SvcCIDR {
+		t.Fatal("native networking configuration changed")
+	}
+	if proxyConfig.Kind != "KubeProxyConfiguration" || proxyConfig.Conntrack.MaxPerCore == nil || *proxyConfig.Conntrack.MaxPerCore != 0 || proxyConfig.Conntrack.Min == nil || *proxyConfig.Conntrack.Min != 0 {
+		t.Fatal("explicit conntrack zero values lost")
+	}
 	if !strings.Contains(config, "controlPlaneEndpoint: 127.0.0.1:7445") {
 		t.Errorf("the cluster endpoint is not the node's own forwarder:\n%s", config)
 	}

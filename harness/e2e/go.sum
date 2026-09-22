@@ -1,7 +1,7 @@
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
-github.com/appmana/labcontainers v0.2.0-alpha.1 h1:rho/UeuKEwXGySQOfpS5dZCls/M1Ws448k2xCkEaPZI=
-github.com/appmana/labcontainers v0.2.0-alpha.1/go.mod h1:61TTCK3XBskUX5MP2vKsSm16y2Brw4qWVLw7V9d4GFk=
+github.com/appmana/labcontainers v0.2.0-alpha.2 h1:fQavek0Bm16PnGnn0DDZU82Airl18lgxxptsGf+LYRo=
+github.com/appmana/labcontainers v0.2.0-alpha.2/go.mod h1:61TTCK3XBskUX5MP2vKsSm16y2Brw4qWVLw7V9d4GFk=
 github.com/aws/aws-sdk-go-v2 v1.46.0 h1:1kt7m/EKcEHt5mlyyxx9cSlMddRPIKbjb6DIQsu4HPk=
 github.com/aws/aws-sdk-go-v2 v1.46.0/go.mod h1:bttEH6JqnUL8LepvDVfdrds/fZ5bCIxzpe3abyUrhDU=
 github.com/aws/aws-sdk-go-v2/credentials v1.20.3 h1:tToOYM/LXev4NpfWlIYGDvBvjHmJ3HXpRU9ppl+pM6k=

@@ -19,7 +19,7 @@ require (
 )
 
 require (
-	github.com/appmana/labcontainers v0.2.0-alpha.1
+	github.com/appmana/labcontainers v0.2.0-alpha.2
 	github.com/aws/aws-sdk-go-v2 v1.46.0 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.2 // indirect

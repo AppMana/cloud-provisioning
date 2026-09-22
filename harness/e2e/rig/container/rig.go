@@ -99,16 +99,36 @@ func (r *Rig) Up(ctx context.Context) error {
 			return err
 		}
 	}
-	if !owned {
+	if r.Runtime == nil {
 		_, _, _, _ = r.runner()(ctx, nil, "sudo", "containerlab", "destroy", "-t", r.TopologyPath(), "--cleanup")
+	}
+	// A missing session is not ownership of an older lab or its bind data.
+	// Check every bind before modifying any of them. Fresh empty directories
+	// are permitted, but existing state requires explicit operator recovery.
+	if r.Runtime != nil && !owned {
+		for _, n := range r.Topology.Nodes {
+			for _, bind := range n.Binds {
+				host, _, _ := strings.Cut(bind, ":")
+				dir := filepath.Join(r.WorkDir, host)
+				entries, err := os.ReadDir(dir)
+				if err != nil && !os.IsNotExist(err) {
+					return fmt.Errorf("inspect unowned bind %s: %w", dir, err)
+				}
+				if len(entries) != 0 {
+					return fmt.Errorf("refusing to clear unowned bind data %s: no Labcontainers session", dir)
+				}
+			}
+		}
 	}
 
 	for _, n := range r.Topology.Nodes {
 		for _, bind := range n.Binds {
 			host, _, _ := strings.Cut(bind, ":")
 			dir := filepath.Join(r.WorkDir, host)
-			if _, _, _, err := r.runner()(ctx, nil, "sudo", "rm", "-rf", dir); err != nil {
-				return fmt.Errorf("clearing %s: %w", dir, err)
+			if r.Runtime == nil || owned {
+				if _, _, _, err := r.runner()(ctx, nil, "sudo", "rm", "-rf", dir); err != nil {
+					return fmt.Errorf("clearing %s: %w", dir, err)
+				}
 			}
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return fmt.Errorf("creating the bind directory %s: %w", host, err)
@@ -158,10 +178,9 @@ func (r *Rig) Load(ctx context.Context, image string, nodes []string, importArgs
 // Down destroys the topology.
 func (r *Rig) Down(ctx context.Context) error {
 	if r.Runtime != nil {
-		destroyed, err := r.Runtime.Destroy(ctx, r.WorkDir, r.Kind())
-		if err != nil || destroyed {
-			return err
-		}
+		// Never fall back to a topology-name destroy without session ownership.
+		_, err := r.Runtime.Destroy(ctx, r.WorkDir, r.Kind())
+		return err
 	}
 	_, errb, code, err := r.runner()(ctx, nil, "sudo", "containerlab", "destroy", "-t", r.TopologyPath(), "--cleanup")
 	if err != nil {

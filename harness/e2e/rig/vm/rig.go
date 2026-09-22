@@ -174,14 +174,12 @@ func (r *Rig) Up(ctx context.Context) error {
 	if err := os.MkdirAll(r.WorkDir, 0o755); err != nil {
 		return err
 	}
-	owned := false
 	if r.Runtime != nil {
-		owned, err = r.Runtime.Destroy(ctx, r.WorkDir, r.Kind())
+		_, err = r.Runtime.Destroy(ctx, r.WorkDir, r.Kind())
 		if err != nil {
 			return err
 		}
-	}
-	if !owned {
+	} else {
 		if err := r.DestroyDeployed(ctx); err != nil {
 			return err
 		}
@@ -300,10 +298,9 @@ func (r *Rig) crashing(ctx context.Context, node string) error {
 // Down destroys the lab.
 func (r *Rig) Down(ctx context.Context) error {
 	if r.Runtime != nil {
-		destroyed, err := r.Runtime.Destroy(ctx, r.WorkDir, r.Kind())
-		if err != nil || destroyed {
-			return err
-		}
+		// No owned session is not permission to destroy a same-named lab.
+		_, err := r.Runtime.Destroy(ctx, r.WorkDir, r.Kind())
+		return err
 	}
 	_, errb, code, err := r.runner()(ctx, nil,
 		"sudo", "containerlab", "destroy", "-t", r.TopologyPath(), "--cleanup")

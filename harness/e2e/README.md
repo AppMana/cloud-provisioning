@@ -6,6 +6,15 @@ to Labcontainers. The Kubernetes API-access client is shared from
 remain in this project. Probe Pods, Services, and their Namespace use native
 Kubernetes objects, not manifest strings. Probe images must be preloaded.
 
+SDK-backed VM/container rigs never interpret a missing saved session as
+permission to destroy a same-named Containerlab lab. `Down` is a no-op when no
+owned session exists; `Up` lets the SDK reject runtime name collisions. For
+container rigs, nonempty bind directories without an owned session also stop
+deployment rather than being erased. Recover or relocate legacy lab state
+explicitly; normal SDK operation does not adopt or remove it automatically.
+The explicit nil-runtime compatibility path remains for legacy callers/tests
+and does not provide these ownership guarantees.
+
 This migration currently requires a separate Go workspace containing this
 module and the Labcontainers `feature/native-typed-sdk` worktree. The released
 Labcontainers requirement in `go.mod` predates these APIs; an independent

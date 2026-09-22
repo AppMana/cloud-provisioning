@@ -71,6 +71,10 @@ func runLab() {
 		k0sBinarySHA256        = flag.String("k0s-binary-sha256", "", "required SHA256 of --k0s-binary")
 		k3sBinary              = flag.String("k3s-binary", "", "prepared host k3s binary; no automatic download")
 		k3sBinarySHA256        = flag.String("k3s-binary-sha256", "", "required SHA256 of --k3s-binary")
+		rke2Artifacts          = flag.String("rke2-artifacts-dir", "", "prepared RKE2 installer, archive and checksum directory")
+		rke2InstallerSHA256    = flag.String("rke2-installer-sha256", "", "required SHA256 of RKE2 install.sh")
+		rke2ArchiveSHA256      = flag.String("rke2-archive-sha256", "", "required SHA256 of rke2.linux-amd64.tar.gz")
+		rke2ChecksumsSHA256    = flag.String("rke2-checksums-sha256", "", "required SHA256 of sha256sum-amd64.txt")
 		cni                    = flag.String("cni", "", "distribution-supported network profile (default: bundled default)")
 		calicoMTU              = flag.Int("k0s-calico-mtu", 0, "bundled Calico MTU for a fresh k0s site; zero preserves the distro default")
 		calicoManagedAddresses = flag.Bool("k0s-calico-managed-addresses", false, "use stored per-node Calico addresses on a fresh k0s site instead of repeated IP autodetection")
@@ -92,6 +96,9 @@ func runLab() {
 		timeout                = flag.Duration("timeout", 2*time.Hour, "deadline for the whole run")
 	)
 	flag.Parse()
+	if *distro == "rke2" && !*reuseSite && !*down && (*rke2Artifacts == "" || *rke2InstallerSHA256 == "" || *rke2ArchiveSHA256 == "" || *rke2ChecksumsSHA256 == "") {
+		fail("fresh RKE2 sites require --rke2-artifacts-dir and installer, archive, and checksums SHA256 pins")
+	}
 	if *distro == "k3s" && !*reuseSite && !*down && (*k3sBinary == "" || *k3sBinarySHA256 == "") {
 		fail("fresh k3s sites require --k3s-binary and --k3s-binary-sha256")
 	}
@@ -280,6 +287,8 @@ func runLab() {
 			Topology: topo, Rig: r, WorkDir: *workDir, Network: selected.BuilderNetwork,
 			K0sBinary: *k0sBinary, K0sBinarySHA256: *k0sBinarySHA256,
 			K3sBinary: *k3sBinary, K3sBinarySHA256: *k3sBinarySHA256,
+			RKE2ArtifactsDirectory: *rke2Artifacts, RKE2InstallerSHA256: *rke2InstallerSHA256,
+			RKE2ArchiveSHA256: *rke2ArchiveSHA256, RKE2ChecksumsSHA256: *rke2ChecksumsSHA256,
 			K0sCalicoMTU:              *calicoMTU,
 			K0sCalicoManagedAddresses: *calicoManagedAddresses,
 			Images:                    cluster.Importer{Images: images, Args: b.ImportArgs()},

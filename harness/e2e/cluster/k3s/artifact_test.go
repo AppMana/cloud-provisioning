@@ -10,12 +10,14 @@ import (
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
+	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 )
 
 func TestBuildRequiresPreparedArtifactBeforeTouchingRig(t *testing.T) {
 	// An old cache must never substitute for an explicit artifact. The nil
 	// Rig also ensures invalid input is rejected before any node is touched.
 	d := cluster.Deps{WorkDir: t.TempDir()}
+	d.Topology.Nodes = []lab.Node{{Name: "cp", Role: lab.ControlPlane}}
 	filename := filepath.Join(d.WorkDir, "k3s-"+Version)
 	body := []byte("prepared project build")
 	if err := os.WriteFile(filename, body, 0o600); err != nil {

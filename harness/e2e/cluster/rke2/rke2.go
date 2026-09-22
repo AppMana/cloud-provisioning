@@ -21,11 +21,9 @@
 package rke2
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -33,6 +31,8 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/artifact"
+	shared "github.com/appmana/labcontainers/pkg/kubernetes/rke2"
 )
 
 func init() { cluster.Register(Builder{}) }
@@ -78,8 +78,12 @@ func (Builder) ImportArgs() []string {
 // Build installs the release on every site node, starts the first
 // server, then joins the rest and the agents.
 func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
+	files, err := preparedArtifacts(ctx, d)
+	if err != nil {
+		return err
+	}
 	for _, n := range cluster.SiteNodes(d.Topology) {
-		if err := b.install(ctx, d, n); err != nil {
+		if err := b.install(ctx, d, n, files); err != nil {
 			return err
 		}
 	}
@@ -139,44 +143,28 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 //
 // The installer rather than hand-placed binaries, because it is what
 // an operator runs and it writes the units, the tmpfiles and the
-// policy that go with them. From a local artifact path rather than
-// over the network: the release is fetched once onto this host, and
-// the alternative is every node pulling it through the lab's one way
-// out.
-func (b Builder) install(ctx context.Context, d cluster.Deps, n lab.Node) error {
+// policy that go with them. All bytes were verified before touching any node.
+// Reuse is not inferred from the presence of an arbitrary executable.
+func (b Builder) install(ctx context.Context, d cluster.Deps, n lab.Node, files map[string][]byte) error {
 	node := d.Rig.Node(n.Name)
-	if _, err := node.Exec(ctx, "test", "-x", "/usr/local/bin/rke2"); err == nil {
-		return nil
+	if _, err := node.Exec(ctx, "mkdir", "-p", ArtifactDir); err != nil {
+		return err
 	}
 
-	for name, url := range map[string]string{
-		"rke2.linux-amd64.tar.gz": b.releaseURL("rke2.linux-amd64.tar.gz"),
-		"sha256sum-amd64.txt":     b.releaseURL("sha256sum-amd64.txt"),
-	} {
-		body, err := cached(ctx, d.WorkDir, Version+"-"+name, url)
-		if err != nil {
-			return err
-		}
-		if err := node.Put(ctx, strings.NewReader(string(body)),
+	for _, name := range []string{"rke2.linux-amd64.tar.gz", "sha256sum-amd64.txt"} {
+		if err := node.Put(ctx, bytes.NewReader(files[name]),
 			ArtifactDir+"/"+name, 0o644); err != nil {
 			return fmt.Errorf("carrying %s onto %s: %w", name, n.Name, err)
 		}
 	}
-	script, err := cached(ctx, d.WorkDir, "rke2-install.sh", "https://get.rke2.io")
-	if err != nil {
+	if err := node.Put(ctx, bytes.NewReader(files["install.sh"]), "/tmp/rke2-install.sh", 0o755); err != nil {
 		return err
 	}
-	if err := node.Put(ctx, strings.NewReader(string(script)), "/tmp/rke2-install.sh", 0o755); err != nil {
-		return err
-	}
-	if out, err := node.Exec(ctx, "sh", "-c",
-		"INSTALL_RKE2_ARTIFACT_PATH="+ArtifactDir+
-			" INSTALL_RKE2_VERSION='"+Version+"'"+
-			" INSTALL_RKE2_TYPE="+b.installType(n)+
-			" /tmp/rke2-install.sh"); err != nil {
-		return fmt.Errorf("installing RKE2 on %s: %w: %s", n.Name, err, out)
-	}
-	return nil
+	return shared.Install(ctx, node, "/tmp/rke2-install.sh",
+		"INSTALL_RKE2_ARTIFACT_PATH="+ArtifactDir,
+		"INSTALL_RKE2_VERSION="+Version,
+		"INSTALL_RKE2_METHOD=tar",
+		"INSTALL_RKE2_TYPE="+b.installType(n))
 }
 
 // installType is which set of units a node gets.
@@ -235,15 +223,7 @@ func (b Builder) start(ctx context.Context, d cluster.Deps, n lab.Node, unit str
 // waitForAPI blocks until this server is actually serving.
 func (b Builder) waitForAPI(ctx context.Context, d cluster.Deps, n lab.Node, within time.Duration) error {
 	return wait.Until(ctx, within, n.Name+"'s RKE2 never served a ready API", func(ctx context.Context) error {
-		node := d.Rig.Node(n.Name)
-		if _, err := node.Exec(ctx, "test", "-f", "/etc/rancher/rke2/rke2.yaml"); err != nil {
-			return fmt.Errorf("no kubeconfig yet: %w", err)
-		}
-		if _, err := node.Exec(ctx, "sh", "-c",
-			"KUBECONFIG=/etc/rancher/rke2/rke2.yaml /var/lib/rancher/rke2/bin/kubectl get --raw /readyz"); err != nil {
-			return fmt.Errorf("readyz: %w", err)
-		}
-		return nil
+		return shared.Ready(ctx, d.Rig.Node(n.Name), "/var/lib/rancher/rke2/bin/kubectl", "/etc/rancher/rke2/rke2.yaml")
 	})
 }
 
@@ -285,40 +265,23 @@ func (b Builder) readWithDeadline(ctx context.Context, d cluster.Deps, n lab.Nod
 	return out, err
 }
 
-// releaseURL is where an artifact of the pinned release lives.
-func (Builder) releaseURL(name string) string {
-	return "https://github.com/rancher/rke2/releases/download/" +
-		strings.ReplaceAll(Version, "+", "%2B") + "/" + name
-}
-
-// cached fetches once and keeps it, because this host has a route out
-// and the site's nodes reach only what their own edges explain.
-func cached(ctx context.Context, workDir, name, url string) ([]byte, error) {
-	path := filepath.Join(workDir, name)
-	if body, err := os.ReadFile(path); err == nil && len(body) > 0 {
-		return body, nil
+// preparedArtifacts validates the complete input set before any VM mutation.
+// The installer itself is content-pinned, not fetched from get.rke2.io.
+func preparedArtifacts(ctx context.Context, d cluster.Deps) (map[string][]byte, error) {
+	if d.RKE2ArtifactsDirectory == "" {
+		return nil, fmt.Errorf("prepared RKE2ArtifactsDirectory and all three SHA256 pins are required")
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+	files := make(map[string][]byte)
+	for _, input := range []struct{ name, pin string }{
+		{"install.sh", d.RKE2InstallerSHA256},
+		{"rke2.linux-amd64.tar.gz", d.RKE2ArchiveSHA256},
+		{"sha256sum-amd64.txt", d.RKE2ChecksumsSHA256},
+	} {
+		body, err := artifact.ReadFile(ctx, filepath.Join(d.RKE2ArtifactsDirectory, input.name), input.pin)
+		if err != nil {
+			return nil, fmt.Errorf("prepared RKE2 %s: %w", input.name, err)
+		}
+		files[input.name] = body
 	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("fetching %s: %w", name, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetching %s: %s", name, resp.Status)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(workDir, 0o755); err != nil {
-		return nil, err
-	}
-	if err := os.WriteFile(path, body, 0o644); err != nil {
-		return nil, err
-	}
-	return body, nil
+	return files, nil
 }

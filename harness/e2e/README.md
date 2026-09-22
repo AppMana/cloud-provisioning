@@ -45,6 +45,16 @@ builder no longer reads an implicit cache or downloads a release. A digest
 verifies content identity, not that a binary is the right fork or version;
 artifact preparation remains the calling project's responsibility.
 
+Fresh RKE2 builds require `--rke2-artifacts-dir` containing `install.sh`,
+`rke2.linux-amd64.tar.gz`, and `sha256sum-amd64.txt`, with
+`--rke2-installer-sha256`, `--rke2-archive-sha256`, and
+`--rke2-checksums-sha256`. All three files are verified before any node is
+modified. The builder uses the staged native installer through
+`labcontainers/pkg/kubernetes/rke2`, with explicit native tar-installation
+environment arguments. It neither downloads an installer nor silently reuses
+an arbitrary existing RKE2 executable. This extraction has unit-test coverage;
+it is not a new live RKE2 qualification.
+
 The native Go configuration dependency's pseudo-version resolves the
 `v1.36.2+k0s.0` release commit `bdf1c22c23a5`; it does not select the binary
 under test. This requires Go 1.26.3 or newer.

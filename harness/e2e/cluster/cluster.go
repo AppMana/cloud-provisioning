@@ -66,6 +66,12 @@ type Deps struct {
 	// K3sBinary and K3sBinarySHA256 likewise identify a prepared k3s build.
 	K3sBinary       string
 	K3sBinarySHA256 string
+	// RKE2 installation consumes three caller-prepared, content-pinned files:
+	// install.sh, rke2.linux-amd64.tar.gz, and sha256sum-amd64.txt.
+	RKE2ArtifactsDirectory string
+	RKE2InstallerSHA256    string
+	RKE2ArchiveSHA256      string
+	RKE2ChecksumsSHA256    string
 	// K0sCalicoMTU overrides the bundled Calico overlay MTU for a fresh k0s
 	// site. Zero preserves the distribution default.
 	K0sCalicoMTU int

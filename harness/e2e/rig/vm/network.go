@@ -2,9 +2,9 @@ package vm
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
+	"github.com/appmana/labcontainers/pkg/cloudinit/networkconfig"
 )
 
 // Resolver is the nameserver a machine is given.
@@ -39,30 +39,25 @@ const Resolver = "9.9.9.9"
 // must find a NIC, an address and a gateway already there, provided
 // by its platform and by nothing else, so that everything above them
 // is the product rebuilding its own state.
-func NetworkConfig(n lab.Node) (string, error) {
-	var b strings.Builder
-	b.WriteString("version: 2\n")
-	b.WriteString("ethernets:\n")
-
+func NetworkConfig(n lab.Node) (*networkconfig.NetworkConfigVersion2, error) {
 	if len(n.Interfaces) != 1 {
-		return "", fmt.Errorf("%s must have exactly one Ethernet link", n.Name)
+		return nil, fmt.Errorf("%s must have exactly one Ethernet link", n.Name)
 	}
 	via, ok := lab.Gateway(n.Interfaces[0].Segment)
 	if !ok {
-		return "", fmt.Errorf("%s is on %s, which has no edge", n.Name, n.Interfaces[0].Segment)
+		return nil, fmt.Errorf("%s is on %s, which has no edge", n.Name, n.Interfaces[0].Segment)
 	}
-	for idx, i := range n.Interfaces {
-		fmt.Fprintf(&b, "  %s:\n", GuestInterface(idx))
-		if i.Address != "" {
-			fmt.Fprintf(&b, "    addresses: [%s]\n", i.Address)
-		}
-		if idx == 0 {
-			b.WriteString("    routes:\n")
-			b.WriteString("      - to: default\n")
-			fmt.Fprintf(&b, "        via: %s\n", via)
-			b.WriteString("    nameservers:\n")
-			fmt.Fprintf(&b, "      addresses: [%s]\n", Resolver)
-		}
+	// These routes and DNS belong to this product's cloud-connected fixture,
+	// not to the generic SDK or its generated cloud-init model.
+	physical := networkconfig.MappingPhysical{
+		Routes:      []networkconfig.MappingRoutesElem{{To: "default", Via: &via}},
+		Nameservers: &networkconfig.MappingNameservers{Addresses: []string{Resolver}},
 	}
-	return b.String(), nil
+	if address := n.Interfaces[0].Address; address != "" {
+		physical.Addresses = []string{address}
+	}
+	return &networkconfig.NetworkConfigVersion2{
+		Version:   2,
+		Ethernets: networkconfig.NetworkConfigVersion2Ethernets{GuestInterface(0): physical},
+	}, nil
 }

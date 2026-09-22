@@ -22,6 +22,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/cloudinit/networkconfig"
 	clab "github.com/appmana/labcontainers/pkg/containerlab"
 )
 
@@ -148,7 +149,7 @@ func (r *Rig) Up(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(dir, "extra-network.yaml"), []byte(netcfg), 0o644); err != nil {
+		if err := networkconfig.WriteFile(filepath.Join(dir, "extra-network.yaml"), netcfg); err != nil {
 			return err
 		}
 

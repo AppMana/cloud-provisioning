@@ -6,6 +6,13 @@ to Labcontainers. The Kubernetes API-access client is shared from
 remain in this project. Probe Pods, Services, and their Namespace use native
 Kubernetes objects, not manifest strings. Probe images must be preloaded.
 
+VM network bootstrap constructs Labcontainers' cloud-init schema-generated
+`NetworkConfigVersion2` objects. The shared writer handles the launcher's
+network-config file boundary; tests do not assemble YAML. This product's
+cloud-connected scenario still supplies its existing site gateway and resolver
+explicitly in that object. Those settings are not generic SDK defaults, and
+the product's single-link constraint does not restrict general SDK VM topologies.
+
 SDK-backed VM/container rigs never interpret a missing saved session as
 permission to destroy a same-named Containerlab lab. `Down` is a no-op when no
 owned session exists; `Up` lets the SDK reject runtime name collisions. For

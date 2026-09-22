@@ -1,94 +1,93 @@
 package vm
 
 import (
-	"strings"
+	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
+	"github.com/appmana/labcontainers/pkg/cloudinit/networkconfig"
 )
 
-// A machine is addressed on the segment its own bootstrap uses,
-// before that bootstrap runs.
-func TestAMachineIsAddressedByItsPlatform(t *testing.T) {
-	topo := lab.Default()
-	remote := topo.MustNode("remote1")
-
-	cfg, err := NetworkConfig(remote)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(cfg, remote.Interfaces[0].Address) {
-		t.Errorf("remote1 boots with no address on its own segment:\n%s", cfg)
-	}
-	// Its kernel's name for the link, not the topology's: a
-	// configuration naming eth1 addresses nothing and says so nowhere.
-	if !strings.Contains(cfg, GuestInterface(0)+":") {
-		t.Errorf("the configuration names a link the guest does not have:\n%s", cfg)
-	}
-	if strings.Contains(cfg, remote.Interfaces[0].Name+":") {
-		t.Errorf("the configuration uses the topology's name for the link:\n%s", cfg)
-	}
-}
-
-// Every cluster node can be given one, and each leaves by its own
-// segment's edge.
-func TestEveryMachineLeavesByItsOwnEdge(t *testing.T) {
-	topo := lab.Default()
-	for _, n := range topo.Nodes {
-		if !n.IsClusterNode() {
+func TestMachineNetworkUsesGeneratedCloudInitObjects(t *testing.T) {
+	for _, node := range lab.Default().Nodes {
+		if !node.IsClusterNode() {
 			continue
 		}
-		cfg, err := NetworkConfig(n)
-		if err != nil {
-			t.Fatalf("%s: %v", n.Name, err)
-		}
-		via, _ := lab.Gateway(n.Interfaces[0].Segment)
-		if !strings.Contains(cfg, "via: "+via) {
-			t.Errorf("%s does not leave by %s:\n%s", n.Name, via, cfg)
+		t.Run(node.Name, func(t *testing.T) {
+			cfg, err := NetworkConfig(node)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.Version != 2 || len(cfg.Ethernets) != 1 || len(cfg.Bridges) != 0 || len(cfg.Bonds) != 0 || len(cfg.Vlans) != 0 {
+				t.Fatalf("unexpected network devices: %+v", cfg)
+			}
+			physical, ok := cfg.Ethernets[GuestInterface(0)]
+			if !ok {
+				t.Fatal("configuration must use the guest's native NIC name")
+			}
+			if !reflect.DeepEqual(physical.Addresses, []string{node.Interfaces[0].Address}) {
+				t.Fatalf("guest address changed: %v", physical.Addresses)
+			}
+			via, _ := lab.Gateway(node.Interfaces[0].Segment)
+			if len(physical.Routes) != 1 || physical.Routes[0].To != "default" || physical.Routes[0].Via == nil || *physical.Routes[0].Via != via {
+				t.Fatalf("product route changed: %+v", physical.Routes)
+			}
+			if physical.Nameservers == nil || !reflect.DeepEqual(physical.Nameservers.Addresses, []string{Resolver}) {
+				t.Fatalf("product DNS changed: %+v", physical.Nameservers)
+			}
+			if physical.Gateway4 != nil || physical.Gateway6 != nil || physical.Dhcp4 != nil || physical.Dhcp6 != nil {
+				t.Fatal("unexpected alternate address/gateway configuration")
+			}
+			path := filepath.Join(t.TempDir(), "extra-network.yaml")
+			if err := networkconfig.WriteFile(path, cfg); err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var decoded networkconfig.NetworkConfigVersion2
+			if err := json.Unmarshal(data, &decoded); err != nil {
+				t.Fatal(err)
+			}
+			// Generated open-field decoding may materialize an empty map;
+			// compare wire objects, not nil versus empty implementation details.
+			roundTrip, err := json.Marshal(&decoded)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(data, roundTrip) {
+				t.Fatalf("native network object changed at serialization boundary: %s", data)
+			}
+		})
+	}
+}
+
+func TestMachineNetworkRejectsUnsupportedProductTopology(t *testing.T) {
+	for _, node := range []lab.Node{
+		{Name: "no-link"},
+		{Name: "two-links", Interfaces: []lab.Interface{{}, {}}},
+		{Name: "no-edge", Interfaces: []lab.Interface{{Segment: "unknown"}}},
+	} {
+		if _, err := NetworkConfig(node); err == nil {
+			t.Fatalf("accepted unsupported product node: %+v", node)
 		}
 	}
 }
 
-// The management path is not a way out of the lab. A machine that
-// could leave by it would leave by a path no router in the topology
-// explains, and the isolation proof would be proving nothing.
-func TestTheManagementPathIsNotAWayOut(t *testing.T) {
-	cfg, err := NetworkConfig(lab.Default().MustNode("remote1"))
+func TestMachineNetworkOmitsAbsentAddress(t *testing.T) {
+	node := lab.Default().MustNode("remote1")
+	node.Interfaces = append([]lab.Interface(nil), node.Interfaces...)
+	node.Interfaces[0].Address = ""
+	cfg, err := NetworkConfig(node)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(cfg, "enp1s0") || strings.Contains(cfg, "10.0.0.15") {
-		t.Errorf("unexpected management NIC: %s", cfg)
+	if len(cfg.Ethernets[GuestInterface(0)].Addresses) != 0 {
+		t.Fatal("inserted an address not supplied by the topology")
 	}
-}
-
-// A machine is given a resolver, and given it on the segment it
-// routes by.
-//
-// It needs one at all because a machine has no images but the ones it
-// pulls: k0s runs its node-local balancer as a static pod, so a
-// worker that cannot resolve a registry cannot start the balancer,
-// cannot reach the API through it, and never registers. The run that
-// found this reported "w1, w2 never registered" — four steps from a
-// DNS lookup.
-//
-// And on the lab segment rather than management, because a machine
-// resolving over management reaches a service by a path no router in
-// the topology explains. That borrowed path is what made an earlier
-// run pass, and with it a node could pull images while the segments
-// it is supposed to depend on were down.
-func TestAMachineIsGivenAResolverOnTheSegmentItRoutesBy(t *testing.T) {
-	cfg, err := NetworkConfig(lab.Default().MustNode("w1"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(cfg, Resolver) {
-		t.Fatalf("the machine is given no resolver:\n%s", cfg)
-	}
-
-	data := cfg[strings.Index(cfg, GuestInterface(0)+":"):]
-	if !strings.Contains(data, Resolver) {
-		t.Errorf("the resolver is not on the segment the machine routes by:\n%s", cfg)
-	}
-
 }

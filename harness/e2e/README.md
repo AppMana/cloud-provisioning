@@ -40,10 +40,21 @@ host installation.
 
 Normal Ubuntu VM command and file operations reconnect to the saved SDK session
 and use `Node.Commands()` over serial QGA, including SDK-owned node identity and
-native file transfer. Rebuild the product VM wrapper before using this path:
-the updated Dockerfile installs `/labcontainers-guest` and retains `/cldt-guest`
-as a compatibility symlink. Existing old wrapper images do not have the new
-entry point. Image-builder SSH, CoreOS's policy wrapper, and nil-runtime legacy
+native file transfer. The product wrapper now inherits the SDK's prepared Ubuntu
+image and launcher instead of maintaining a second NIC/QEMU implementation.
+It retains `/cldt-guest` only as a compatibility symlink. Build it with an
+explicit, already-loaded SDK base:
+
+```sh
+make vm-wrapper LABCONTAINERS_VM_IMAGE=YOUR_PREPARED_SDK_VM_IMAGE
+```
+
+Use `VM_WRAPPER_IMAGE=YOUR_NEW_TAG` to qualify a candidate without overwriting
+the normal product tag. Missing or unloaded base images fail before the build;
+there is no default base or automatic pull in the Make target. The SDK launcher
+owns declared-NIC handling, loopback-only QEMU control listeners, QGA, and the
+`/labcontainers-reset-instance` marker. Existing old product wrappers must be
+rebuilt before using these paths. Image-builder SSH, CoreOS's policy wrapper, and nil-runtime legacy
 tests remain separate paths; their migration is not claimed complete here.
 
 The Ubuntu SDK command adapter has an opt-in real-VM regression:
@@ -61,7 +72,7 @@ It constructs a native topology with one zero-NIC VM and a networkless appliance
 product runtime, checks binary stdin/file transfer and mode, preserves nonzero
 command diagnostics, and tears down the owned session. The work/evidence path
 is printed and retained. It requires `/labcontainers-guest` in the prepared
-image and qualifies the command adapter only, not the product image builder or
+image and qualifies the runtime command adapter only, not the guest image builder or
 Kubernetes/Calico networking.
 
 Container commands and file transfers also use the SDK session, including

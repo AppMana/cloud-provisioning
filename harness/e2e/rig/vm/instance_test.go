@@ -30,7 +30,7 @@ func TestInstanceRetryObservesBootAfterTimeoutAndReconstruction(t *testing.T) {
 			return b, nil, 0, nil
 		case strings.Contains(cmd, "{{.State.Running}}"):
 			return []byte(fmt.Sprint(state.State.Running)), nil, 0, nil
-		case strings.Contains(cmd, "/cldt-reset-instance"):
+		case strings.Contains(cmd, "/labcontainers-reset-instance"):
 			resets++
 		case strings.Contains(cmd, "docker kill"):
 			state.State.Running = false

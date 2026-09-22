@@ -1,5 +1,4 @@
-FROM vrnetlab/canonical_ubuntu:jammy
-COPY guestagent /labcontainers-guest
-RUN ln -s /labcontainers-guest /cldt-guest
-COPY launcher.py /cldt-launch.py
-ENTRYPOINT ["uv", "run", "/cldt-launch.py"]
+ARG LABCONTAINERS_VM_IMAGE
+FROM ${LABCONTAINERS_VM_IMAGE}
+RUN test -x /labcontainers-guest && test -f /labcontainers-launch.py && test -f /interfaces.py && ln -s /labcontainers-guest /cldt-guest
+ENTRYPOINT ["uv", "run", "/labcontainers-launch.py"]

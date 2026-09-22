@@ -149,7 +149,7 @@ func TestUserdataLaunchesTheMachineRatherThanRestartingIt(t *testing.T) {
 	for _, call := range rec.calls {
 		cmd := strings.Join(call, " ")
 		switch {
-		case strings.Contains(cmd, "/cldt-reset-instance"):
+		case strings.Contains(cmd, "/labcontainers-reset-instance"):
 			discarded++
 		case strings.Contains(cmd, "docker start"):
 			started++
@@ -175,7 +175,7 @@ func TestUserdataLaunchesTheMachineRatherThanRestartingIt(t *testing.T) {
 	var discardedAt, killedAt = -1, -1
 	for i, call := range rec.calls {
 		cmd := strings.Join(call, " ")
-		if discardedAt < 0 && strings.Contains(cmd, "/cldt-reset-instance") {
+		if discardedAt < 0 && strings.Contains(cmd, "/labcontainers-reset-instance") {
 			discardedAt = i
 		}
 		if killedAt < 0 && strings.Contains(cmd, "docker kill") {

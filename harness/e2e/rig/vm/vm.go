@@ -311,7 +311,7 @@ func (n *Node) launchUserdata(ctx context.Context, cloudConfig []byte) error {
 	if err := os.WriteFile(marker, nil, 0600); err != nil {
 		return err
 	}
-	if _, errb, code, err := n.run(ctx, nil, "docker", "cp", marker, n.Wrapper()+":/cldt-reset-instance"); err != nil {
+	if _, errb, code, err := n.run(ctx, nil, "docker", "cp", marker, n.Wrapper()+":/labcontainers-reset-instance"); err != nil {
 		return fmt.Errorf("resetting %s: %w", n.Name(), err)
 	} else if code != 0 {
 		return fmt.Errorf("resetting %s: %s", n.Name(), errb)

@@ -1,11 +1,11 @@
 STATE ?= .state/platform
+VM_WRAPPER_IMAGE ?= cloud-provisioning/vm:single-nic
 
 .PHONY: vm-wrapper platform-image kubeadm-image coverage
 vm-wrapper:
-	mkdir -p $(STATE)/wrapper
-	CGO_ENABLED=0 go build -trimpath -o $(STATE)/wrapper/guestagent ./cmd/guestagent
-	cp rig/vm/image/Dockerfile rig/vm/image/launcher.py $(STATE)/wrapper/
-	docker build -t cloud-provisioning/vm:single-nic $(STATE)/wrapper
+	@test -n "$(LABCONTAINERS_VM_IMAGE)" || { echo "LABCONTAINERS_VM_IMAGE must select a prepared SDK VM image" >&2; exit 1; }
+	docker image inspect "$(LABCONTAINERS_VM_IMAGE)" >/dev/null
+	docker build --build-arg LABCONTAINERS_VM_IMAGE="$(LABCONTAINERS_VM_IMAGE)" -t "$(VM_WRAPPER_IMAGE)" rig/vm/image
 
 platform-image: vm-wrapper
 	go run ./cmd/nodeimage -platform-only -work-dir $(STATE)

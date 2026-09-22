@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 
 	joinmicrok8s "github.com/appmana/cloud-provisioning/controller/pkg/join/microk8s"
@@ -120,17 +122,25 @@ func configureAccess(ctx context.Context, d cluster.Deps) error {
 	if err != nil {
 		return err
 	}
-	if err := d.Kube.Apply(ctx, []byte(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"cloud-provisioning"}}`)); err != nil {
+	if err := d.Kube.ApplyObjects(ctx, &corev1.Namespace{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"},
+		ObjectMeta: metav1.ObjectMeta{Name: "cloud-provisioning"},
+	}); err != nil {
 		return err
 	}
-	manifest, err := json.Marshal(map[string]any{"apiVersion": "v1", "kind": "Secret", "metadata": map[string]string{"name": "microk8s-provider-config", "namespace": "cloud-provisioning"}, "type": "Opaque", "stringData": map[string]string{"config.json": string(cfg)}})
-	if err != nil {
-		return err
-	}
-	if err := d.Kube.Apply(ctx, manifest); err != nil {
+	if err := d.Kube.ApplyObjects(ctx, providerSecret(cfg)); err != nil {
 		return fmt.Errorf("publishing native MicroK8s join credential failed")
 	}
 	return nil
+}
+
+func providerSecret(config []byte) *corev1.Secret {
+	return &corev1.Secret{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+		ObjectMeta: metav1.ObjectMeta{Name: "microk8s-provider-config", Namespace: "cloud-provisioning"},
+		Type:       corev1.SecretTypeOpaque,
+		StringData: map[string]string{"config.json": string(config)},
+	}
 }
 
 func (Builder) KubeletInvariant(ctx context.Context, d cluster.Deps) error {

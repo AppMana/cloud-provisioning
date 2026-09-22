@@ -37,6 +37,14 @@ There is no automatic upstream binary download or fallback to a cached build.
 Prepare the intended AppMana fork artifact before running a fork scenario.
 Reuse of an existing installation does not require a new binary.
 
+Fresh k3s builds likewise require `cluster.Deps.K3sBinary` and
+`K3sBinarySHA256`, or `--k3s-binary /absolute/path/to/k3s
+--k3s-binary-sha256 <64-hex-digest>`. Both builders use the SDK's generic
+`artifact.ReadFile` verifier and upload the returned, verified bytes. The k3s
+builder no longer reads an implicit cache or downloads a release. A digest
+verifies content identity, not that a binary is the right fork or version;
+artifact preparation remains the calling project's responsibility.
+
 The native Go configuration dependency's pseudo-version resolves the
 `v1.36.2+k0s.0` release commit `bdf1c22c23a5`; it does not select the binary
 under test. This requires Go 1.26.3 or newer.

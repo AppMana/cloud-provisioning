@@ -14,18 +14,16 @@
 package k3s
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/artifact"
 )
 
 func init() { cluster.Register(Builder{}) }
@@ -71,7 +69,7 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 		return err
 	}
 	for _, n := range cluster.SiteNodes(d.Topology) {
-		if err := d.Rig.Node(n.Name).Put(ctx, strings.NewReader(string(binary)),
+		if err := d.Rig.Node(n.Name).Put(ctx, bytes.NewReader(binary),
 			"/usr/local/bin/k3s", 0o755); err != nil {
 			return fmt.Errorf("carrying k3s onto %s: %w", n.Name, err)
 		}
@@ -260,37 +258,12 @@ func (b Builder) readWithDeadline(ctx context.Context, d cluster.Deps, n lab.Nod
 	return out, err
 }
 
-// binary fetches the pinned release once and caches it, because this
-// host has a route out and the site's nodes reach only what their own
-// edges explain.
+// binary consumes exactly the caller-prepared build. Release preparation is
+// outside cluster bringup; there is no cache or upstream download fallback.
 func (b Builder) binary(ctx context.Context, d cluster.Deps) ([]byte, error) {
-	path := filepath.Join(d.WorkDir, "k3s-"+Version)
-	if body, err := os.ReadFile(path); err == nil && len(body) > 0 {
-		return body, nil
-	}
-	url := "https://github.com/k3s-io/k3s/releases/download/" +
-		strings.ReplaceAll(Version, "+", "%2B") + "/k3s"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	body, err := artifact.ReadFile(ctx, d.K3sBinary, d.K3sBinarySHA256)
 	if err != nil {
-		return nil, err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("fetching k3s: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetching k3s: %s", resp.Status)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(d.WorkDir, 0o755); err != nil {
-		return nil, err
-	}
-	if err := os.WriteFile(path, body, 0o644); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading prepared k3s binary: %w", err)
 	}
 	return body, nil
 }

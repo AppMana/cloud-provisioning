@@ -63,6 +63,9 @@ type Deps struct {
 	// fresh k0s site never downloads or substitutes an upstream release.
 	K0sBinary       string
 	K0sBinarySHA256 string
+	// K3sBinary and K3sBinarySHA256 likewise identify a prepared k3s build.
+	K3sBinary       string
+	K3sBinarySHA256 string
 	// K0sCalicoMTU overrides the bundled Calico overlay MTU for a fresh k0s
 	// site. Zero preserves the distribution default.
 	K0sCalicoMTU int

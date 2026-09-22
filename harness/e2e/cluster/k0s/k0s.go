@@ -15,16 +15,14 @@ package k0s
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/artifact"
 	shared "github.com/appmana/labcontainers/pkg/kubernetes/k0s"
 	native "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -295,20 +293,9 @@ func (b Builder) readWithDeadline(ctx context.Context, d cluster.Deps, n lab.Nod
 // binary consumes a prepared, content-pinned artifact. In particular, a missing
 // fork build must never silently fall back to an upstream release download.
 func (b Builder) binary(ctx context.Context, d cluster.Deps) ([]byte, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	pin, err := hex.DecodeString(d.K0sBinarySHA256)
-	if d.K0sBinary == "" || err != nil || len(pin) != sha256.Size {
-		return nil, fmt.Errorf("fresh k0s sites require a prepared K0sBinary and its K0sBinarySHA256; no release is downloaded")
-	}
-	body, err := os.ReadFile(d.K0sBinary)
+	body, err := artifact.ReadFile(ctx, d.K0sBinary, d.K0sBinarySHA256)
 	if err != nil {
 		return nil, fmt.Errorf("reading prepared k0s binary: %w", err)
-	}
-	sum := sha256.Sum256(body)
-	if len(body) == 0 || !strings.EqualFold(hex.EncodeToString(sum[:]), d.K0sBinarySHA256) {
-		return nil, fmt.Errorf("prepared k0s binary is empty or does not match SHA256 %s", d.K0sBinarySHA256)
 	}
 	return body, nil
 }

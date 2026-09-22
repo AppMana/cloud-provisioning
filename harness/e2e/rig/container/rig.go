@@ -33,6 +33,9 @@ type Rig struct {
 	// Runtime owns Containerlab deployment. Nil retains the legacy direct path
 	// for focused unit tests and recovery of pre-Labcontainers labs.
 	Runtime rig.Runtime
+	// RuntimeKind selects the parent session when this is an appliance view
+	// of a VM rig. Empty uses this container rig's own kind.
+	RuntimeKind string
 }
 
 // New returns a rig for the given topology.
@@ -54,7 +57,7 @@ func (r *Rig) runner() Runner {
 // handle, so it panics rather than returning an interface that fails
 // later somewhere less obvious.
 func (r *Rig) Node(name string) rig.Node {
-	return &Node{node: r.Topology.MustNode(name), labName: r.Topology.Name, run: r.runner()}
+	return &Node{node: r.Topology.MustNode(name), labName: r.Topology.Name, run: r.runner(), rig: r}
 }
 
 // TopologyPath is where the generated containerlab file is written.

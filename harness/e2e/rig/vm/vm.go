@@ -180,13 +180,7 @@ func (n *Node) sdkControl() bool {
 }
 
 func (n *Node) openSDK(ctx context.Context) (*labclient.Client, *labclient.Session, error) {
-	opener, ok := n.rig.Runtime.(interface {
-		Open(context.Context, string, string) (*labclient.Client, *labclient.Session, error)
-	})
-	if !ok {
-		return nil, nil, fmt.Errorf("VM runtime does not support SDK session reconnection")
-	}
-	return opener.Open(ctx, n.rig.WorkDir, n.rig.Kind())
+	return rig.OpenRuntime(ctx, n.rig.Runtime, n.rig.WorkDir, n.rig.Kind())
 }
 
 // Cut takes the guest's sole Ethernet link down and leaves it running.

@@ -53,15 +53,22 @@ GOWORK=off \
 LABCONTAINERS_LABD=/absolute/path/labd \
 LABCONTAINERS_CONTAINERLAB=/absolute/path/corrected-containerlab \
 CLOUD_PROVISIONING_SDK_VM_IMAGE=YOUR_PRELOADED_SDK_VM_IMAGE \
+CLOUD_PROVISIONING_SDK_APPLIANCE_IMAGE=YOUR_PRELOADED_ALPINE_IMAGE \
 go test ./rig/vm -run '^TestLiveSDKGuestCommands$' -count=1 -v -timeout=6m
 ```
 
-It constructs a native topology with one zero-NIC VM, reconnects through the
+It constructs a native topology with one zero-NIC VM and a networkless appliance, reconnects through the
 product runtime, checks binary stdin/file transfer and mode, preserves nonzero
 command diagnostics, and tears down the owned session. The work/evidence path
 is printed and retained. It requires `/labcontainers-guest` in the prepared
 image and qualifies the command adapter only, not the product image builder or
 Kubernetes/Calico networking.
+
+Container commands and file transfers also use the SDK session, including
+router/bastion appliances inside a VM lab. Appliance views select their parent
+VM session rather than reconstructing Docker container names or looking for a
+separate container-rig session. A configured runtime that cannot reconnect fails
+explicitly instead of falling back to host CLI execution.
 
 The k0s builder now constructs upstream `v1beta1.ClusterConfig` objects,
 including native Calico patch objects. Configuration writing, native argument

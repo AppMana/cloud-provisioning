@@ -7,11 +7,8 @@
 // it cannot reach is a boot: no bootloader, no initramfs, no
 // first-boot userdata, and one kernel shared by every node.
 //
-// It drives the docker CLI rather than the engine's Go SDK. The SDK
-// is a large dependency for this, and the two things that actually
-// matter here are had either way: argv is passed through without a
-// shell, and standard input is attached by holding the pipe rather
-// than by remembering a flag.
+// Normal command/file operations use the owned Labcontainers session. The
+// explicit nil-runtime compatibility path still drives the Docker CLI.
 package container
 
 import (
@@ -28,6 +25,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/cloudinit"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+	labclient "github.com/appmana/labcontainers/pkg/client"
 )
 
 // Runner executes a command on this host. Injectable so that what the
@@ -54,6 +52,7 @@ type Node struct {
 	node    lab.Node
 	labName string
 	run     Runner
+	rig     *Rig
 
 	// accommodations records what this rig had to change about the
 	// last document it applied. See Accommodations.
@@ -80,7 +79,15 @@ func (n *Node) Exec(ctx context.Context, argv ...string) ([]byte, error) {
 	return n.Pipe(ctx, nil, argv...)
 }
 
-func (n *Node) Pipe(ctx context.Context, stdin io.Reader, argv ...string) ([]byte, error) {
+func (n *Node) Pipe(ctx context.Context, stdin io.Reader, argv ...string) (out []byte, runErr error) {
+	if n.rig != nil && n.rig.Runtime != nil {
+		c, session, err := n.openSDK(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { runErr = errors.Join(runErr, c.Close()) }()
+		return session.Node(n.Name()).Commands().Pipe(ctx, stdin, argv...)
+	}
 	full := []string{"docker", "exec"}
 	if stdin != nil {
 		// -i, the flag whose absence is silent: a manifest read from
@@ -105,11 +112,19 @@ func (n *Node) Pipe(ctx context.Context, stdin io.Reader, argv ...string) ([]byt
 // The parent directory is created first. cloud-init makes it; a shell
 // redirect does not, and the first file written to /etc/wg-dialer is
 // always the one creating it.
-func (n *Node) Put(ctx context.Context, src io.Reader, dst string, mode fs.FileMode) error {
+func (n *Node) Put(ctx context.Context, src io.Reader, dst string, mode fs.FileMode) (runErr error) {
 	if i := strings.LastIndex(dst, "/"); i > 0 {
 		if _, err := n.Exec(ctx, "mkdir", "-p", dst[:i]); err != nil {
 			return fmt.Errorf("creating %s: %w", dst[:i], err)
 		}
+	}
+	if n.rig != nil && n.rig.Runtime != nil {
+		c, session, err := n.openSDK(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() { runErr = errors.Join(runErr, c.Close()) }()
+		return session.Node(n.Name()).Commands().Put(ctx, src, dst, mode)
 	}
 	// Written through a shell redirect held open by this process
 	// rather than by docker cp, so that a file whose content is
@@ -121,6 +136,14 @@ func (n *Node) Put(ctx context.Context, src io.Reader, dst string, mode fs.FileM
 		return fmt.Errorf("setting mode on %s: %w", dst, err)
 	}
 	return nil
+}
+
+func (n *Node) openSDK(ctx context.Context) (*labclient.Client, *labclient.Session, error) {
+	kind := n.rig.RuntimeKind
+	if kind == "" {
+		kind = n.rig.Kind()
+	}
+	return rig.OpenRuntime(ctx, n.rig.Runtime, n.rig.WorkDir, kind)
 }
 
 // Cut takes every data interface down, leaving the machine running.

@@ -88,7 +88,7 @@ func (r *Rig) Node(name string) rig.Node {
 
 // appliances reaches the containers this rig still has.
 func (r *Rig) appliances() *container.Rig {
-	return &container.Rig{Topology: r.Topology, WorkDir: r.WorkDir, Run: container.Runner(r.runner())}
+	return &container.Rig{Topology: r.Topology, WorkDir: r.WorkDir, Run: container.Runner(r.runner()), Runtime: r.Runtime, RuntimeKind: r.Kind()}
 }
 
 // SeedDir is where a machine's first-boot material lives on this

@@ -26,6 +26,19 @@ type Runtime interface {
 // `lab down` processes operate on the same owned topology.
 type LabcontainersRuntime struct{}
 
+// OpenRuntime preserves the native SDK session/client pair for command callers.
+// A configured runtime without reconnection support must not fall back to
+// unowned host-CLI execution.
+func OpenRuntime(ctx context.Context, runtime Runtime, workDir, kind string) (*labclient.Client, *labclient.Session, error) {
+	opener, ok := runtime.(interface {
+		Open(context.Context, string, string) (*labclient.Client, *labclient.Session, error)
+	})
+	if !ok {
+		return nil, nil, fmt.Errorf("runtime does not support SDK session reconnection")
+	}
+	return opener.Open(ctx, workDir, kind)
+}
+
 // Open reconnects through the SDK's saved socket, without launching a second
 // daemon or resolving nodes by reconstructed container names.
 func (LabcontainersRuntime) Open(ctx context.Context, workDir, kind string) (*labclient.Client, *labclient.Session, error) {
@@ -73,12 +86,8 @@ func (LabcontainersRuntime) Deploy(ctx context.Context, workDir, kind, name stri
 
 func (LabcontainersRuntime) Destroy(ctx context.Context, workDir, kind string) (bool, error) {
 	opts := persistentOptions(workDir, kind)
-	labd, err := ensureLabd(ctx, workDir)
-	if err != nil {
-		return false, err
-	}
-	opts.LabdPath = labd
-	err = labclient.DestroyPersistent(ctx, opts)
+	// Teardown reconnects to the owner; it never needs to build/start labd.
+	err := labclient.DestroyPersistent(ctx, opts)
 	if errors.Is(err, labclient.ErrNoPersistentSession) {
 		return false, nil
 	}

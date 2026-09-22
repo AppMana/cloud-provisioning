@@ -20,8 +20,9 @@ import (
 // not a Kubernetes or product image-build qualification.
 func TestLiveSDKGuestCommands(t *testing.T) {
 	image := os.Getenv("CLOUD_PROVISIONING_SDK_VM_IMAGE")
-	if image == "" {
-		t.Skip("requires explicit prepared SDK VM image, Docker and KVM")
+	peerImage := os.Getenv("CLOUD_PROVISIONING_SDK_APPLIANCE_IMAGE")
+	if image == "" || peerImage == "" {
+		t.Skip("requires explicit prepared VM and appliance images, Docker and KVM")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
@@ -38,7 +39,8 @@ func TestLiveSDKGuestCommands(t *testing.T) {
 	owner := rig.LabcontainersRuntime{}
 	if err := owner.Deploy(ctx, work, r.Kind(), "sdk-commands", &core.Config{
 		Name: "sdk-commands", Topology: &types.Topology{Nodes: map[string]*types.NodeDefinition{
-			"cp": {Kind: "generic_vm", Image: image, ImagePullPolicy: "Never", NetworkMode: "none"},
+			"cp":      {Kind: "generic_vm", Image: image, ImagePullPolicy: "Never", NetworkMode: "none"},
+			"bastion": {Kind: "linux", Image: peerImage, ImagePullPolicy: "Never", NetworkMode: "none"},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -111,5 +113,21 @@ func TestLiveSDKGuestCommands(t *testing.T) {
 	var exit *rig.ExitError
 	if !errors.As(err, &exit) || exit.Code != 7 || string(out) != "partial" || string(exit.Stderr) != "diagnostic" {
 		t.Fatalf("command failure changed: %q %v", out, err)
+	}
+	appliance := r.Node("bastion")
+	out, err = appliance.Pipe(ctx, bytes.NewReader(payload), "cat")
+	if err != nil || !bytes.Equal(out, payload) {
+		t.Fatalf("appliance stdin changed: %x %v", out, err)
+	}
+	if err := appliance.Put(ctx, bytes.NewReader(payload), path, 0600); err != nil {
+		t.Fatal(err)
+	}
+	out, err = appliance.Exec(ctx, "cat", path)
+	if err != nil || !bytes.Equal(out, payload) {
+		t.Fatalf("appliance file changed: %x %v", out, err)
+	}
+	out, err = appliance.Exec(ctx, "ls", "/sys/class/net")
+	if err != nil || strings.TrimSpace(string(out)) != "lo" {
+		t.Fatalf("unexpected appliance NICs: %q %v", out, err)
 	}
 }

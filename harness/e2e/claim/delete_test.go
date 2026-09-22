@@ -37,7 +37,7 @@ func (n *removalNode) Exec(ctx context.Context, args ...string) ([]byte, error) 
 	if strings.Contains(command, "peer-public-key-worker") && n.remaining == "peer" {
 		return []byte("old-key"), nil
 	}
-	if strings.Contains(command, "containernetmachine") {
+	if strings.Contains(command, "labmachine") {
 		return nil, fmt.Errorf("wrong provider")
 	}
 	return nil, nil

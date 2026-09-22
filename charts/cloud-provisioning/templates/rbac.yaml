@@ -79,7 +79,7 @@ rules:
   # topology that owns its own containers. The wildcard covers the
   # cluster's status subresource too, which the claim reconciler patches
   # for a Cluster marked managed-by external.
-  - apiGroups: ["containernet.appmana.com"]
+  - apiGroups: ["infrastructure.labcontainers.appmana.com"]
     resources: ["*"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # The claim CRD itself.

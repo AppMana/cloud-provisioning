@@ -15,7 +15,7 @@ class SingleNIC(ubuntu.Ubuntu_vm):
     def __init__(self, hostname):
         super().__init__(hostname, "sysadmin", "sysadmin", 1, "tc")
         self.qemu_args.extend([
-            "-chardev", "socket,path=/run/cldt-qga.sock,server=on,wait=off,id=qga0",
+            "-chardev", "socket,path=/run/labcontainers-qga.sock,server=on,wait=off,id=qga0",
             "-device", "virtio-serial-pci,id=serial1",
             "-device", "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0",
         ])

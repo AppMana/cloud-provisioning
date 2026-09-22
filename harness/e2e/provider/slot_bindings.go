@@ -47,7 +47,7 @@ func (c *Controller) reserveEligibleBindings(ctx context.Context, namespace stri
 				DeletionTimestamp *string           `json:"deletionTimestamp"`
 			} `json:"metadata"`
 			Spec struct {
-				ContainerName string `json:"containerName"`
+				NodeName string `json:"nodeName"`
 			} `json:"spec"`
 		}
 		if err := json.Unmarshal(raw, &obj); err != nil {
@@ -57,7 +57,7 @@ func (c *Controller) reserveEligibleBindings(ctx context.Context, namespace stri
 			return nil, fmt.Errorf("persisted infrastructure Machine identity required")
 		}
 		item := candidate{name: name, uid: obj.Metadata.UID, version: obj.Metadata.Version, annotations: obj.Metadata.Annotations, finalizers: obj.Metadata.Finalizers, deleting: obj.Metadata.DeletionTimestamp != nil}
-		binding := machineBinding(name, obj.Metadata.Annotations, obj.Spec.ContainerName)
+		binding := machineBinding(name, obj.Metadata.Annotations, obj.Spec.NodeName)
 		node, err := c.node(binding)
 		if err == nil {
 			item.requested = node.Name
@@ -67,7 +67,7 @@ func (c *Controller) reserveEligibleBindings(ctx context.Context, namespace stri
 			occupied[node.Name] = name
 			fixed = append(fixed, item)
 		} else {
-			if obj.Metadata.Annotations[containerNameAnnotation] != "" || obj.Spec.ContainerName != "" {
+			if obj.Metadata.Annotations[nodeNameAnnotation] != "" || obj.Spec.NodeName != "" {
 				return nil, err
 			}
 			dynamic = append(dynamic, item)
@@ -126,14 +126,14 @@ func (c *Controller) reserveEligibleBindings(ctx context.Context, namespace stri
 			return nil, err
 		}
 		eligible = append(eligible, item.name)
-		if item.annotations[containerNameAnnotation] == slot {
+		if item.annotations[nodeNameAnnotation] == slot {
 			continue
 		}
 		annotations := item.annotations
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
-		annotations[containerNameAnnotation] = slot
+		annotations[nodeNameAnnotation] = slot
 		patch, _ := json.Marshal([]map[string]any{{"op": "test", "path": "/metadata/uid", "value": item.uid}, {"op": "test", "path": "/metadata/resourceVersion", "value": item.version}, {"op": "add", "path": "/metadata/annotations", "value": annotations}})
 		if _, err := c.Kube.Run(ctx, "-n", namespace, "patch", machineKind, item.name, "--type=json", "-p", string(patch)); err != nil {
 			return nil, err

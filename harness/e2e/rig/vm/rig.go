@@ -48,6 +48,7 @@ type Rig struct {
 	Topology lab.Topology
 	WorkDir  string
 	Run      Runner
+	Runtime  rig.Runtime
 	// GuestExecPrefix selects a platform's serial execution policy wrapper.
 	GuestExecPrefix []string
 	builderSSH      bool
@@ -55,7 +56,7 @@ type Rig struct {
 
 // New returns a VM rig.
 func New(topo lab.Topology, workDir string) *Rig {
-	return &Rig{Topology: topo, WorkDir: workDir, Run: Exec}
+	return &Rig{Topology: topo, WorkDir: workDir, Run: Exec, Runtime: rig.LabcontainersRuntime{}}
 }
 
 func (r *Rig) Kind() string { return lab.VM.String() }
@@ -168,13 +169,26 @@ func (r *Rig) Up(ctx context.Context) error {
 	if err := os.MkdirAll(r.WorkDir, 0o755); err != nil {
 		return err
 	}
-	if err := r.DestroyDeployed(ctx); err != nil {
-		return err
+	owned := false
+	if r.Runtime != nil {
+		owned, err = r.Runtime.Destroy(ctx, r.WorkDir, r.Kind())
+		if err != nil {
+			return err
+		}
+	}
+	if !owned {
+		if err := r.DestroyDeployed(ctx); err != nil {
+			return err
+		}
 	}
 	if err := os.WriteFile(r.TopologyPath(), []byte(yaml), 0o644); err != nil {
 		return err
 	}
-	if _, errb, code, err := r.runner()(ctx, nil,
+	if r.Runtime != nil {
+		if err := r.Runtime.Deploy(ctx, r.WorkDir, r.Kind(), r.Topology.Name, r.TopologyPath()); err != nil {
+			return err
+		}
+	} else if _, errb, code, err := r.runner()(ctx, nil,
 		"sudo", "containerlab", "deploy", "-t", r.TopologyPath(), "--reconfigure"); err != nil || code != 0 {
 		if err != nil {
 			return fmt.Errorf("deploying: %w", err)
@@ -280,6 +294,12 @@ func (r *Rig) crashing(ctx context.Context, node string) error {
 
 // Down destroys the lab.
 func (r *Rig) Down(ctx context.Context) error {
+	if r.Runtime != nil {
+		destroyed, err := r.Runtime.Destroy(ctx, r.WorkDir, r.Kind())
+		if err != nil || destroyed {
+			return err
+		}
+	}
 	_, errb, code, err := r.runner()(ctx, nil,
 		"sudo", "containerlab", "destroy", "-t", r.TopologyPath(), "--cleanup")
 	if err != nil {

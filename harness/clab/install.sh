@@ -19,6 +19,7 @@ NS=cloud-provisioning
 LAN=10.10.0
 POD_CIDR=10.244.0.0/16
 REPO_DIR="$(cd ../.. && pwd)"
+LABCONTAINERS_ROOT="${LABCONTAINERS_ROOT:-$(cd ../../.. && pwd)/labcontainers}"
 OUT="${OUT:-$PWD/out}"
 CAPI_VERSION="${CAPI_VERSION:-v1.11.1}"
 TUNNEL_ENDPOINTS="${TUNNEL_ENDPOINTS:-kubernetes.io/hostname=w1}"
@@ -156,9 +157,10 @@ PY
 fi
 docker cp "$OUT/capi-crds.yaml" "$(c bastion)":/tmp/capi-crds.yaml
 k apply -f /tmp/capi-crds.yaml >/dev/null || fail "applying cluster api crds"
-docker cp crds/containernet.yaml "$(c bastion)":/tmp/containernet.yaml
-k apply -f /tmp/containernet.yaml >/dev/null || fail "applying containernet crds"
-echo "  cluster, machine, and the containernet kinds"
+go -C "$LABCONTAINERS_ROOT" run ./cmd/labctl capi-crds >"$OUT/labcontainers-crds.yaml"
+docker cp "$OUT/labcontainers-crds.yaml" "$(c bastion)":/tmp/labcontainers-crds.yaml
+k apply -f /tmp/labcontainers-crds.yaml >/dev/null || fail "applying Labcontainers crds"
+echo "  cluster, machine, and the Labcontainers kinds"
 
 echo "--- the network ($CNI) ---"
 # One installer per network, under cni.d/, each defining

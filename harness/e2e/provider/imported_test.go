@@ -34,7 +34,7 @@ users:
 		t.Fatal(err)
 	}
 	for _, call := range k.calls {
-		if !contains(call, "patch") || !contains(call, "importedcontrolplane") {
+		if !contains(call, "patch") || !contains(call, "labimportedcontrolplane") {
 			continue
 		}
 		var body map[string]any
@@ -60,7 +60,7 @@ func (n *associationReader) Exec(_ context.Context, args ...string) ([]byte, err
 	command := strings.Join(args, " ")
 	id := n.providerID
 	if id == "" {
-		id = "containernet://remote1"
+		id = "labcontainers://cldt/remote1"
 	}
 	switch {
 	case strings.Contains(command, "/readyz"):

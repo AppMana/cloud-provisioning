@@ -42,8 +42,8 @@ CAPI Cluster, and `/work/binaries/wg-dialer-linux-amd64`. It holds the lab proce
 lock and serves that binary at the existing bootstrap URL. Keep it running while
 claims are provisioning or terminating.
 
-Use a `ContainernetMachineTemplate` with an empty `spec.template.spec` for a
-pool. A template with `containerName: remote1` describes a single fixed VM and
+Use a `LabMachineTemplate` with an empty `spec.template.spec` for a
+pool. A template with `nodeName: remote1` describes a single fixed VM and
 cannot supply multiple replicas. `Controller.Slots` enables allocation for
 generated group child names. CAPA provisions independently from its shared
 `AWSMachineTemplate`.

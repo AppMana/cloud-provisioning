@@ -40,11 +40,11 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/discover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
-	joincontainernet "github.com/appmana/cloud-provisioning/controller/pkg/join/containernet"
 	joindocker "github.com/appmana/cloud-provisioning/controller/pkg/join/docker"
 	joink0s "github.com/appmana/cloud-provisioning/controller/pkg/join/k0s"
 	joink3s "github.com/appmana/cloud-provisioning/controller/pkg/join/k3s"
 	joinkubeadm "github.com/appmana/cloud-provisioning/controller/pkg/join/kubeadm"
+	joinlabcontainers "github.com/appmana/cloud-provisioning/controller/pkg/join/labcontainers"
 	joinmicrok8s "github.com/appmana/cloud-provisioning/controller/pkg/join/microk8s"
 	joinrke2 "github.com/appmana/cloud-provisioning/controller/pkg/join/rke2"
 	"github.com/appmana/cloud-provisioning/controller/pkg/nodegroup"
@@ -2363,7 +2363,7 @@ func main() {
 		// topology presents a machine. Shipped like the docker provider
 		// rather than hidden behind a build tag, so a harness exercises
 		// the same binary that is released.
-		containernetProvider := joincontainernet.Provider{}
+		labcontainersProvider := joinlabcontainers.Provider{}
 
 		// Each cluster technology is one implementation of
 		// join.ClusterJoinProvider behind the same seam. Selection is by
@@ -2407,7 +2407,7 @@ func main() {
 			Client:         mgr.GetClient(),
 			Reader:         mgr.GetAPIReader(),
 			Join:           joinProvider,
-			InfraProviders: []join.InfraProvider{awsProvider, dockerProvider, containernetProvider},
+			InfraProviders: []join.InfraProvider{awsProvider, dockerProvider, labcontainersProvider},
 
 			BootstrapRenderers: bootstrapRenderers,
 			APIVIP:             joinAPIVIP,
@@ -2456,7 +2456,7 @@ func main() {
 			Complete(&claim.Reconciler{
 				Client:                    mgr.GetClient(),
 				Reader:                    mgr.GetAPIReader(),
-				Provisioners:              []join.MachineProvisioner{awsProvider, dockerProvider, containernetProvider},
+				Provisioners:              []join.MachineProvisioner{awsProvider, dockerProvider, labcontainersProvider},
 				RoleLabel:                 cloudWorkerRoleLabel,
 				RoleValue:                 cloudWorkerRoleValue,
 				BootstrapSecretNameFormat: bootstrapSecretNameFormat,

@@ -94,6 +94,6 @@ func cancellationAnnotations(existing map[string]string, uid string) map[string]
 	for key, value := range existing {
 		annotations[key] = value
 	}
-	annotations["containernet.appmana.com/cancelled-machine-uid"] = uid
+	annotations["infrastructure.labcontainers.appmana.com/cancelled-machine-uid"] = uid
 	return annotations
 }

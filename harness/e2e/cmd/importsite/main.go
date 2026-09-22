@@ -30,7 +30,7 @@ func main() {
 	defer cancel()
 	r := vm.New(lab.Default(), *work)
 	k := &kube.Client{Bastion: r.Node("bastion"), APIPort: *port, ControlPlanes: cluster.ControlPlaneAddresses(lab.Default())}
-	obj := map[string]any{"apiVersion": "containernet.appmana.com/v1beta2", "kind": "ImportedControlPlane", "metadata": map[string]string{"name": *name, "namespace": *namespace}, "spec": map[string]any{}}
+	obj := map[string]any{"apiVersion": "infrastructure.labcontainers.appmana.com/v1alpha1", "kind": "LabImportedControlPlane", "metadata": map[string]string{"name": *name, "namespace": *namespace}, "spec": map[string]any{}}
 	raw, _ := json.Marshal(obj)
 	if err := k.Apply(ctx, raw); err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -28,7 +28,7 @@ func (r bootstrapHealthRig) Node(string) rig.Node { return r.node }
 func TestRegistrationStopsOnObservedTerminalBootstrapFailure(t *testing.T) {
 	failure := errors.New("verified bootstrap failure")
 	node := &failedBootstrapNode{failure: failure}
-	k := &fakeKube{objects: map[string]string{"remote1": `{"metadata":{"uid":"instance-uid","annotations":{"lab.cloud-provisioning.appmana.com/bootstrapped-uid":"instance-uid"},"finalizers":["lab.cloud-provisioning.appmana.com/instance"]},"spec":{"containerName":"clab-cldt-remote1"},"status":{"ready":true}}`}, nodes: "cp 10.10.0.10,\n"}
+	k := &fakeKube{objects: map[string]string{"remote1": `{"metadata":{"uid":"instance-uid","annotations":{"lab.cloud-provisioning.appmana.com/bootstrapped-uid":"instance-uid"},"finalizers":["lab.cloud-provisioning.appmana.com/instance"]},"spec":{"nodeName":"remote1"},"status":{"ready":true}}`}, nodes: "cp 10.10.0.10,\n"}
 	c := &Controller{Kube: k.client(), Rig: bootstrapHealthRig{node: node}, Topology: lab.Default(), LabName: "cldt"}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

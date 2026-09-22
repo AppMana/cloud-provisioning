@@ -10,10 +10,10 @@ import (
 func TestTheLabsOwnKindsAreEmbedded(t *testing.T) {
 	body := string(labCRDs)
 	for _, kind := range []string{
-		"containernetmachines",
-		"containernetmachinetemplates",
-		"containernetclusters",
-		"importedcontrolplanes",
+		"labmachines",
+		"labmachinetemplates",
+		"labclusters",
+		"labimportedcontrolplanes",
 	} {
 		if !strings.Contains(body, kind) {
 			t.Errorf("the embedded CRDs do not define %s", kind)
@@ -41,7 +41,7 @@ func TestTheLabsKindsDeclareTheClusterAPIContract(t *testing.T) {
 	// The kinds are served at v1beta2, so that is what the label must
 	// name: a label pointing at a version the CRD does not serve is
 	// the same failure with a different message.
-	if !strings.Contains(body, "cluster.x-k8s.io/v1beta2: v1beta2") {
+	if !strings.Contains(body, "cluster.x-k8s.io/v1beta2: v1alpha1") {
 		t.Error("the contract label does not name the version these kinds are served at")
 	}
 }
@@ -56,7 +56,7 @@ func TestTheLabsKindsGrantClusterAPIAccessToThem(t *testing.T) {
 	if !strings.Contains(body, "cluster.x-k8s.io/aggregate-to-manager: \"true\"") {
 		t.Error("no role aggregates into Cluster API'''s manager, so it cannot read these kinds")
 	}
-	if !strings.Contains(body, "containernet.appmana.com") || !strings.Contains(body, "kind: ClusterRole") {
+	if !strings.Contains(body, "infrastructure.labcontainers.appmana.com") || !strings.Contains(body, "kind: ClusterRole") {
 		t.Error("the aggregated role does not grant this provider'''s group")
 	}
 }

@@ -79,12 +79,12 @@ infra['metadata']['annotations'] = {'cluster.x-k8s.io/managed-by': 'external'}
 apply(infra)
 kube('-n', ns, 'patch', 'awscluster', cluster, '--subresource=status', '--type=merge', '-p', json.dumps({'status': {'ready': True}}))
 # cmd/importsite observes the live site and creates this target's connection.
-observed = json.loads(kube('-n', ns, 'get', 'importedcontrolplane', cluster, '-o', 'json'))
+observed = json.loads(kube('-n', ns, 'get', 'labimportedcontrolplane', cluster, '-o', 'json'))
 if not observed.get('status', {}).get('initialization', {}).get('controlPlaneInitialized'):
     raise RuntimeError('run cmd/importsite for this cluster before creating claims')
 kube('-n', ns, 'get', 'secret', cluster+'-kubeconfig', '-o', 'name')
 apply(obj('cluster.x-k8s.io/v1beta2', 'Cluster', cluster, {
-    'controlPlaneRef': {'apiGroup': 'containernet.appmana.com', 'kind': 'ImportedControlPlane', 'name': cluster},
+    'controlPlaneRef': {'apiGroup': 'infrastructure.labcontainers.appmana.com', 'kind': 'LabImportedControlPlane', 'name': cluster},
     'infrastructureRef': {'apiGroup': 'infrastructure.cluster.x-k8s.io', 'kind': 'AWSCluster', 'name': cluster},
 }))
 apply(obj('infrastructure.cluster.x-k8s.io/v1beta2', 'AWSMachineTemplate', template_name, {'template': {'metadata': {'labels': {'kubernetes.io/os': machine_os}}, 'spec': {

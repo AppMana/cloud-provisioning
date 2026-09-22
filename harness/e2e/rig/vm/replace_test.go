@@ -14,6 +14,7 @@ import (
 // behind because --reconfigure destroyed only nodes in the new topology.
 func TestReplacementDestroysOldTopologyBeforeOverwritingIt(t *testing.T) {
 	r := New(lab.Default(), t.TempDir())
+	r.Runtime = nil
 	old := []byte("old deployed topology includes w1 and w2\n")
 	if err := os.WriteFile(r.TopologyPath(), old, 0600); err != nil {
 		t.Fatal(err)

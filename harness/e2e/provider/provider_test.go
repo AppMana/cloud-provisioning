@@ -24,7 +24,7 @@ import (
 // of passing.
 func TestTheAddressIsDerivedFromTheMachine(t *testing.T) {
 	k := &fakeKube{objects: map[string]string{
-		"remote1": `{"metadata":{"name":"remote1"},"spec":{"containerName":"clab-cldt-remote1"}}`,
+		"remote1": `{"metadata":{"name":"remote1"},"spec":{"nodeName":"remote1"}}`,
 	}}
 	c := &Controller{Kube: k.client(), Topology: lab.Default(), LabName: "cldt"}
 
@@ -53,8 +53,8 @@ func TestMachineBindingPrecedence(t *testing.T) {
 	for _, tc := range []struct {
 		name, machine, body, node, address string
 	}{
-		{"spec", "public-worker", `{"metadata":{"name":"public-worker"},"spec":{"containerName":"clab-cldt-remote1"}}`, "remote1", lab.CloudAPrefix + ".10"},
-		{"annotation overrides spec", "public-worker", `{"metadata":{"name":"public-worker","annotations":{"containernet.appmana.com/container-name":"clab-cldt-remote2"}},"spec":{"containerName":"clab-cldt-remote1"}}`, "remote2", lab.CloudBPrefix + ".10"},
+		{"spec", "public-worker", `{"metadata":{"name":"public-worker"},"spec":{"nodeName":"remote1"}}`, "remote1", lab.CloudAPrefix + ".10"},
+		{"annotation overrides spec", "public-worker", `{"metadata":{"name":"public-worker","annotations":{"infrastructure.labcontainers.appmana.com/node-name":"remote2"}},"spec":{"nodeName":"remote1"}}`, "remote2", lab.CloudBPrefix + ".10"},
 		{"object name fallback", "remote1", `{"metadata":{"name":"remote1"}}`, "remote1", lab.CloudAPrefix + ".10"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -79,7 +79,7 @@ func TestMachineBindingPrecedence(t *testing.T) {
 // wrong address would strand the join somewhere far from the cause.
 func TestAnUnknownBindingIsAnError(t *testing.T) {
 	k := &fakeKube{objects: map[string]string{
-		"stray": `{"metadata":{"name":"stray"},"spec":{"containerName":"clab-cldt-nowhere"}}`,
+		"stray": `{"metadata":{"name":"stray"},"spec":{"nodeName":"clab-cldt-nowhere"}}`,
 	}}
 	c := &Controller{Kube: k.client(), Topology: lab.Default(), LabName: "cldt"}
 
@@ -98,7 +98,7 @@ func TestAnUnknownBindingIsAnError(t *testing.T) {
 // nowhere to be reached.
 func TestTheContractIsAppliedInOrder(t *testing.T) {
 	k := &fakeKube{objects: map[string]string{
-		"remote1": `{"metadata":{"name":"remote1"},"spec":{"containerName":"clab-cldt-remote1"}}`,
+		"remote1": `{"metadata":{"name":"remote1"},"spec":{"nodeName":"remote1"}}`,
 	}}
 	c := &Controller{Kube: k.client(), Topology: lab.Default(), LabName: "cldt"}
 
@@ -137,7 +137,7 @@ func TestTheContractIsAppliedInOrder(t *testing.T) {
 // long as the lab ran without Cluster API installed.
 func TestAddressesGoOnTheInfrastructureMachineOnly(t *testing.T) {
 	k := &fakeKube{objects: map[string]string{
-		"remote1": `{"metadata":{"name":"remote1"},"spec":{"containerName":"clab-cldt-remote1"}}`,
+		"remote1": `{"metadata":{"name":"remote1"},"spec":{"nodeName":"remote1"}}`,
 	}}
 	c := &Controller{Kube: k.client(), Topology: lab.Default(), LabName: "cldt"}
 
@@ -151,7 +151,7 @@ func TestAddressesGoOnTheInfrastructureMachineOnly(t *testing.T) {
 			continue
 		}
 		switch {
-		case strings.Contains(joined, "patch containernetmachine"):
+		case strings.Contains(joined, "patch labmachine"):
 			onInfra = true
 		case strings.Contains(joined, "patch machine "):
 			t.Errorf("the harness wrote the Machine's addresses, which Cluster API copies up: %v", call)
@@ -166,8 +166,8 @@ func TestAddressesGoOnTheInfrastructureMachineOnly(t *testing.T) {
 // churn the API.
 func TestAReportedMachineIsNotRewritten(t *testing.T) {
 	k := &fakeKube{objects: map[string]string{
-		"remote1": `{"metadata":{"name":"remote1"},"spec":{"containerName":"clab-cldt-remote1",` +
-			`"providerID":"containernet://remote1"},"status":{"ready":true}}`,
+		"remote1": `{"metadata":{"name":"remote1"},"spec":{"nodeName":"remote1",` +
+			`"providerID":"labcontainers://cldt/remote1"},"status":{"ready":true}}`,
 	}}
 	c := &Controller{Kube: k.client(), Topology: lab.Default(), LabName: "cldt"}
 
@@ -290,7 +290,7 @@ func (*notFound) Error() string { return "not found" }
 func TestTheCloudGivesANodeItsIdentityAndNothingMore(t *testing.T) {
 	k := &fakeKube{
 		objects: map[string]string{
-			"remote1": `{"metadata":{"name":"remote1"},"spec":{"containerName":"clab-cldt-remote1"}}`,
+			"remote1": `{"metadata":{"name":"remote1"},"spec":{"nodeName":"remote1"}}`,
 		},
 		nodes: "cp 10.10.0.10,\nremote1 203.0.113.10,\n",
 	}
@@ -305,7 +305,7 @@ func TestTheCloudGivesANodeItsIdentityAndNothingMore(t *testing.T) {
 	var gaveIdentity bool
 	for _, call := range k.calls {
 		joined := strings.Join(call, " ")
-		if strings.Contains(joined, "patch node") && strings.Contains(joined, ProviderID("remote1")) {
+		if strings.Contains(joined, "patch node") && strings.Contains(joined, ProviderID("cldt", "remote1")) {
 			gaveIdentity = true
 		}
 		if strings.Contains(joined, "nodeRef") {
@@ -323,7 +323,7 @@ func TestTheCloudGivesANodeItsIdentityAndNothingMore(t *testing.T) {
 func TestTheNodeIsFoundByAddressNotByName(t *testing.T) {
 	k := &fakeKube{
 		objects: map[string]string{
-			"remote1": `{"metadata":{"name":"remote1"},"spec":{"containerName":"clab-cldt-remote1"}}`,
+			"remote1": `{"metadata":{"name":"remote1"},"spec":{"nodeName":"remote1"}}`,
 		},
 		// A node named remote1 exists, but at the wrong address.
 		nodes: "remote1 10.10.0.99,\n",

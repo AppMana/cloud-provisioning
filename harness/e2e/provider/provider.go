@@ -2,7 +2,7 @@
 // CAPA plays for AWS.
 //
 // Nothing has ever played it here. The join reconciler creates a
-// ContainernetMachine from a template and then waits for someone to
+// LabMachine from a template and then waits for someone to
 // say the machine exists and where it is; in AWS that someone is
 // CAPA, which launches an instance and reports its addresses. In the
 // lab the machine already exists, because the topology owns it, but
@@ -38,20 +38,20 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+	labcapi "github.com/appmana/labcontainers/pkg/capi"
 )
 
 // Annotation and field names, matching what the product's
-// containernet provider reads.
+// Labcontainers provider reads.
 const (
-	containerNameAnnotation = "containernet.appmana.com/container-name"
-	machineKind             = "containernetmachine"
-	providerScheme          = "containernet://"
+	nodeNameAnnotation = "infrastructure.labcontainers.appmana.com/node-name"
+	machineKind        = "labmachine"
 )
 
 // ProviderID is how this provider names a machine. Cluster API's
 // Machine controller links a Machine to a Node by matching it, so the
 // infrastructure machine and the node have to agree on it exactly.
-func ProviderID(node string) string { return providerScheme + node }
+func ProviderID(labName, node string) string { return labcapi.ProviderID(labName, node, "") }
 
 // Controller reports the lab's machines the way an infrastructure
 // provider reports a cloud's.
@@ -62,7 +62,7 @@ type Controller struct {
 	Kube     *kube.Client
 	Topology lab.Topology
 	// LabName prefixes container names, so that a machine bound to
-	// "clab-cldt-remote1" resolves to the topology's "remote1".
+	// "remote1" resolves to the topology's "remote1".
 	LabName string
 }
 
@@ -183,8 +183,8 @@ func (c *Controller) reconcileOne(ctx context.Context, namespace, name string) (
 			DeletionTimestamp *string           `json:"deletionTimestamp"`
 		} `json:"metadata"`
 		Spec struct {
-			ContainerName string `json:"containerName"`
-			ProviderID    string `json:"providerID"`
+			NodeName   string `json:"nodeName"`
+			ProviderID string `json:"providerID"`
 		} `json:"spec"`
 		Status struct {
 			Ready bool `json:"ready"`
@@ -200,7 +200,7 @@ func (c *Controller) reconcileOne(ctx context.Context, namespace, name string) (
 	// Which node backs it, read from the machine rather than passed
 	// in. The annotation is what the printer column shows; the spec
 	// field is where a template puts it.
-	binding := machineBinding(name, obj.Metadata.Annotations, obj.Spec.ContainerName)
+	binding := machineBinding(name, obj.Metadata.Annotations, obj.Spec.NodeName)
 
 	node, err := c.node(binding)
 	if err != nil {
@@ -216,7 +216,7 @@ func (c *Controller) reconcileOne(ctx context.Context, namespace, name string) (
 		return Machine{}, fmt.Errorf("%s backs this machine but holds no address", node.Name)
 	}
 
-	id := ProviderID(node.Name)
+	id := ProviderID(c.LabName, node.Name)
 	if c.Slots != nil {
 		if obj.Metadata.UID == "" {
 			return Machine{}, fmt.Errorf("pooled instance UID required")
@@ -276,7 +276,7 @@ func (c *Controller) reconcileOne(ctx context.Context, namespace, name string) (
 
 // node resolves a container name to the topology node behind it.
 func (c *Controller) node(binding string) (lab.Node, error) {
-	want := strings.TrimPrefix(binding, "clab-"+c.LabName+"-")
+	want := binding
 	for _, n := range c.Topology.Nodes {
 		if n.Name == want {
 			if n.Role != lab.Remote {
@@ -319,7 +319,7 @@ func (c *Controller) setAddresses(ctx context.Context, namespace, name, address 
 // Both fields. status.ready is the v1beta1 contract; the v1beta2
 // contract replaced it with status.initialization.provisioned, and
 // Cluster API v1.11 reads only the latter — it reported
-// "ContainernetMachine status.initialization.provisioned is false"
+// "LabMachine status.initialization.provisioned is false"
 // while status.ready had been true the whole time. The CRD declares
 // both contracts, so it satisfies both.
 func (c *Controller) setReady(ctx context.Context, namespace, name string) error {
@@ -437,14 +437,14 @@ func (c *Controller) nodeAt(ctx context.Context, address string) (string, error)
 // has no address that moves between nodes, so any member is as good
 // as any other and the first is chosen for being deterministic.
 func (c *Controller) ReconcileCluster(ctx context.Context, namespace, name, host string, port int) error {
-	ready, err := c.Kube.Get(ctx, namespace, "containernetcluster", name, "{.status.ready}")
+	ready, err := c.Kube.Get(ctx, namespace, "labcluster", name, "{.status.ready}")
 	if err != nil {
 		return fmt.Errorf("reading the infrastructure cluster: %w", err)
 	}
 	// Spec before status, as everywhere else: an endpoint has to be
 	// readable before anything is told the cluster is usable.
 	endpoint := fmt.Sprintf(`{"spec":{"controlPlaneEndpoint":{"host":%q,"port":%d}}}`, host, port)
-	if _, err := c.Kube.Run(ctx, "-n", namespace, "patch", "containernetcluster", name,
+	if _, err := c.Kube.Run(ctx, "-n", namespace, "patch", "labcluster", name,
 		"--type", "merge", "-p", endpoint); err != nil {
 		return fmt.Errorf("stating the cluster's endpoint: %w", err)
 	}
@@ -452,7 +452,7 @@ func (c *Controller) ReconcileCluster(ctx context.Context, namespace, name, host
 	if ready == "true" {
 		return nil
 	}
-	if _, err := c.Kube.Run(ctx, "-n", namespace, "patch", "containernetcluster", name,
+	if _, err := c.Kube.Run(ctx, "-n", namespace, "patch", "labcluster", name,
 		"--subresource=status", "--type", "merge",
 		"-p", `{"status":{"ready":true,"initialization":{"provisioned":true}}}`); err != nil {
 		return fmt.Errorf("reporting the cluster ready: %w", err)

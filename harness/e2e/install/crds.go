@@ -2,8 +2,9 @@ package install
 
 import (
 	"context"
-	_ "embed"
 	"fmt"
+
+	labcapi "github.com/appmana/labcontainers/pkg/capi"
 )
 
 // CAPIVersion is the Cluster API release whose kinds this lab serves.
@@ -15,9 +16,7 @@ const CAPIVersion = "v1.11.1"
 // Embedded rather than read from a path, so the harness carries its
 // own API and a run cannot half-work because a file was somewhere
 // else.
-//
-//go:embed crds/containernet.yaml
-var labCRDs []byte
+var labCRDs = labcapi.CRDs
 
 // ApplyCRDs installs the lab provider resources. InstallCAPI installs the real
 // CAPI controllers and their own CRDs separately.

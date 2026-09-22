@@ -4,7 +4,7 @@
 # The cluster objects and the template are applied the way an operator
 # applies them, and the claim names the template. What is missing here
 # and present in production is an infrastructure controller: nothing
-# watches a ContainernetMachine, because containerlab already made the
+# watches a LabMachine, because Labcontainers already made the
 # machine. So this fills in the two things such a controller would have
 # reported, and nothing else: that the machine exists, and what address
 # it has.
@@ -31,8 +31,8 @@ echo "--- the cluster objects, applied once per cluster ---"
 # than Cluster API's controllers, responsible for reporting that the
 # infrastructure is ready. No Cluster API controller runs here.
 apply <<EOF >/dev/null
-apiVersion: containernet.appmana.com/v1beta2
-kind: ContainernetCluster
+apiVersion: infrastructure.labcontainers.appmana.com/v1alpha1
+kind: LabCluster
 metadata:
   name: $CLUSTER_NAME
   namespace: $NS
@@ -47,15 +47,15 @@ metadata:
     cluster.x-k8s.io/managed-by: external
 spec:
   infrastructureRef:
-    apiGroup: containernet.appmana.com
-    kind: ContainernetCluster
+    apiGroup: infrastructure.labcontainers.appmana.com
+    kind: LabCluster
     name: $CLUSTER_NAME
 EOF
 
 echo "--- a machine template, and one claim naming it ---"
 apply <<EOF >/dev/null
-apiVersion: containernet.appmana.com/v1beta2
-kind: ContainernetMachineTemplate
+apiVersion: infrastructure.labcontainers.appmana.com/v1alpha1
+kind: LabMachineTemplate
 metadata:
   name: $NAME
   namespace: $NS
@@ -64,7 +64,7 @@ spec:
     spec:
       # The machine is a container the topology already owns, so the
       # template says which one rather than how to build it.
-      containerName: $(c "$CONTAINER")
+      nodeName: $CONTAINER
 ---
 apiVersion: cloud-provisioning.appmana.com/v1alpha1
 kind: ProvisionedNodeClaim
@@ -73,28 +73,28 @@ metadata:
   namespace: $NS
 spec:
   infrastructureRef:
-    apiGroup: containernet.appmana.com
-    kind: ContainernetMachineTemplate
+    apiGroup: infrastructure.labcontainers.appmana.com
+    kind: LabMachineTemplate
     name: $NAME
   clusterName: $CLUSTER_NAME
 EOF
 
 echo "--- the claim produces a machine ---"
 for _ in $(seq 1 60); do
-  k -n "$NS" get containernetmachine "$NAME" >/dev/null 2>&1 && break
+  k -n "$NS" get labmachine "$NAME" >/dev/null 2>&1 && break
   sleep 5
 done
-k -n "$NS" get containernetmachine "$NAME" >/dev/null 2>&1 \
-  || fail "the claim never produced a ContainernetMachine"
+k -n "$NS" get labmachine "$NAME" >/dev/null 2>&1 \
+  || fail "the claim never produced a LabMachine"
 k -n "$NS" get machine "$NAME" >/dev/null 2>&1 || fail "no Machine for the claim"
-echo "  ContainernetMachine and Machine exist"
+echo "  LabMachine and Machine exist"
 
 echo "--- standing in for the infrastructure controller ---"
 # Which container this machine is. The provider reads this to observe
 # the machine, and the object's own name is the claim's, which a
 # container name rarely matches.
-k -n "$NS" annotate containernetmachine "$NAME" \
-  "containernet.appmana.com/container-name=$(c "$CONTAINER")" --overwrite >/dev/null
+k -n "$NS" annotate labmachine "$NAME" \
+  "infrastructure.labcontainers.appmana.com/node-name=$CONTAINER" --overwrite >/dev/null
 
 # The address the site reaches it at, which is the one thing the mesh
 # cannot derive: it is a property of the cloud the machine sits in. A

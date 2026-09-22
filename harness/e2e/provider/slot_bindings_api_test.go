@@ -31,7 +31,7 @@ func verifyPooledBindings(t *testing.T, ctx context.Context, ns string) {
 	store := &SlotStore{API: k, Namespace: ns, Name: "binding-pool", Lab: "cldt", Slots: []string{"remote1", "remote2"}}
 	controller := &Controller{Kube: k, Topology: lab.Default(), LabName: "cldt", Slots: store}
 	for name, binding := range map[string]string{"aaa-generated-0": "", "zzz-fixed": "remote1"} {
-		data, _ := json.Marshal(map[string]any{"apiVersion": "containernet.appmana.com/v1beta2", "kind": "ContainernetMachine", "metadata": map[string]string{"name": name, "namespace": ns}, "spec": map[string]string{"containerName": binding}})
+		data, _ := json.Marshal(map[string]any{"apiVersion": "infrastructure.labcontainers.appmana.com/v1alpha1", "kind": "LabMachine", "metadata": map[string]string{"name": name, "namespace": ns}, "spec": map[string]string{"nodeName": binding}})
 		if err := k.Apply(ctx, data); err != nil {
 			t.Fatal(err)
 		}
@@ -57,8 +57,8 @@ func verifyPooledBindings(t *testing.T, ctx context.Context, ns string) {
 		if err := json.Unmarshal(raw, &obj); err != nil {
 			t.Fatal(err)
 		}
-		if obj.Metadata.Annotations[containerNameAnnotation] != want {
-			t.Fatalf("%s took %s, expected %s", name, obj.Metadata.Annotations[containerNameAnnotation], want)
+		if obj.Metadata.Annotations[nodeNameAnnotation] != want {
+			t.Fatalf("%s took %s, expected %s", name, obj.Metadata.Annotations[nodeNameAnnotation], want)
 		}
 		if slot, err := store.Reserve(ctx, SlotOwner{Namespace: ns, Name: name, UID: obj.Metadata.UID}, ""); err != nil || slot != want {
 			t.Fatal("binding lacks matching reservation", slot, err)
@@ -82,7 +82,7 @@ func verifyCapacityEligibility(t *testing.T, ctx context.Context, k *kube.Client
 	t.Helper()
 	names := []string{"capacity-0", "capacity-1", "capacity-2"}
 	for _, name := range names {
-		raw, _ := json.Marshal(map[string]any{"apiVersion": "containernet.appmana.com/v1beta2", "kind": "ContainernetMachine", "metadata": map[string]string{"name": name, "namespace": ns}, "spec": map[string]any{}})
+		raw, _ := json.Marshal(map[string]any{"apiVersion": "infrastructure.labcontainers.appmana.com/v1alpha1", "kind": "LabMachine", "metadata": map[string]string{"name": name, "namespace": ns}, "spec": map[string]any{}})
 		if err := k.Apply(ctx, raw); err != nil {
 			t.Fatal(err)
 		}
@@ -112,7 +112,7 @@ func verifyCapacityEligibility(t *testing.T, ctx context.Context, k *kube.Client
 	if err := json.Unmarshal(raw, &pending); err != nil {
 		t.Fatal(err)
 	}
-	if pending.Metadata.Annotations[containerNameAnnotation] != "" || pending.Spec.ProviderID != "" || pending.Status.Ready {
+	if pending.Metadata.Annotations[nodeNameAnnotation] != "" || pending.Spec.ProviderID != "" || pending.Status.Ready {
 		t.Fatal("unallocated Machine acquired a binding or readiness")
 	}
 }

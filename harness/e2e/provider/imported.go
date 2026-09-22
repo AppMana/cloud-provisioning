@@ -10,7 +10,7 @@ import (
 )
 
 // ImportControlPlane observes the existing site's API and supplies the CAPI
-// control-plane contract. It owns only ImportedControlPlane and its connection
+// control-plane contract. It owns only LabImportedControlPlane and its connection
 // Secret; the real CAPI controllers own Cluster status and Machine nodeRef.
 func (c *Controller) ImportControlPlane(ctx context.Context, namespace, name string) error {
 	if _, err := c.Kube.Server(ctx); err != nil {
@@ -46,7 +46,7 @@ func (c *Controller) ImportControlPlane(ctx context.Context, namespace, name str
 		"conditions": []map[string]any{{"type": "Available", "status": "True", "reason": "APIObserved",
 			"lastTransitionTime": time.Now().UTC().Format(time.RFC3339)}},
 	}})
-	_, err = c.Kube.Run(ctx, "-n", namespace, "patch", "importedcontrolplane", name, "--subresource=status", "--type=merge", "-p", string(status))
+	_, err = c.Kube.Run(ctx, "-n", namespace, "patch", "labimportedcontrolplane", name, "--subresource=status", "--type=merge", "-p", string(status))
 	return err
 }
 

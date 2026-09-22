@@ -12,7 +12,7 @@ import (
 func createSlotTestOwner(t *testing.T, ctx context.Context, namespace, name string) SlotOwner {
 	t.Helper()
 	k := &kube.Client{Bastion: slotAPIBastion{}, ControlPlanes: []string{"10.10.0.10"}}
-	data, _ := json.Marshal(map[string]any{"apiVersion": "containernet.appmana.com/v1beta2", "kind": "ContainernetMachine", "metadata": map[string]any{"name": name, "namespace": namespace, "finalizers": []string{"test/hold"}}, "spec": map[string]any{}})
+	data, _ := json.Marshal(map[string]any{"apiVersion": "infrastructure.labcontainers.appmana.com/v1alpha1", "kind": "LabMachine", "metadata": map[string]any{"name": name, "namespace": namespace, "finalizers": []string{"test/hold"}}, "spec": map[string]any{}})
 	if err := k.Apply(ctx, data); err != nil {
 		t.Fatal(err)
 	}

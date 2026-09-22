@@ -29,11 +29,14 @@ type Rig struct {
 	WorkDir string
 	// Run executes commands on this host. Zero value means Exec.
 	Run Runner
+	// Runtime owns Containerlab deployment. Nil retains the legacy direct path
+	// for focused unit tests and recovery of pre-Labcontainers labs.
+	Runtime rig.Runtime
 }
 
 // New returns a rig for the given topology.
 func New(topo lab.Topology, workDir string) *Rig {
-	return &Rig{Topology: topo, WorkDir: workDir, Run: Exec}
+	return &Rig{Topology: topo, WorkDir: workDir, Run: Exec, Runtime: rig.LabcontainersRuntime{}}
 }
 
 func (r *Rig) Kind() string { return lab.Container.String() }
@@ -83,7 +86,17 @@ func (r *Rig) Up(ctx context.Context) error {
 	// After the containers are gone, never before: removing a
 	// directory a running container has mounted races the mount and
 	// leaves it half there.
-	_, _, _, _ = r.runner()(ctx, nil, "sudo", "containerlab", "destroy", "-t", r.TopologyPath(), "--cleanup")
+	owned := false
+	if r.Runtime != nil {
+		var err error
+		owned, err = r.Runtime.Destroy(ctx, r.WorkDir, r.Kind())
+		if err != nil {
+			return err
+		}
+	}
+	if !owned {
+		_, _, _, _ = r.runner()(ctx, nil, "sudo", "containerlab", "destroy", "-t", r.TopologyPath(), "--cleanup")
+	}
 
 	for _, n := range r.Topology.Nodes {
 		for _, bind := range n.Binds {
@@ -96,6 +109,9 @@ func (r *Rig) Up(ctx context.Context) error {
 				return fmt.Errorf("creating the bind directory %s: %w", host, err)
 			}
 		}
+	}
+	if r.Runtime != nil {
+		return r.Runtime.Deploy(ctx, r.WorkDir, r.Kind(), r.Topology.Name, r.TopologyPath())
 	}
 	_, errb, code, err := r.runner()(ctx, nil, "sudo", "containerlab", "deploy", "-t", r.TopologyPath(), "--reconfigure")
 	if err != nil {
@@ -136,6 +152,12 @@ func (r *Rig) Load(ctx context.Context, image string, nodes []string, importArgs
 
 // Down destroys the topology.
 func (r *Rig) Down(ctx context.Context) error {
+	if r.Runtime != nil {
+		destroyed, err := r.Runtime.Destroy(ctx, r.WorkDir, r.Kind())
+		if err != nil || destroyed {
+			return err
+		}
+	}
 	_, errb, code, err := r.runner()(ctx, nil, "sudo", "containerlab", "destroy", "-t", r.TopologyPath(), "--cleanup")
 	if err != nil {
 		return fmt.Errorf("destroying: %w", err)

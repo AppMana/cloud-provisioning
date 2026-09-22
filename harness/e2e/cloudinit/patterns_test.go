@@ -125,6 +125,7 @@ func patternValues() map[string]any {
 		"machineName":         "remote1",
 		"interfaceName":       "cldt0",
 		"wireguardListenPort": "51820",
+		"wireguardAddress":    "100.64.0.2",
 		"apiProxyPort":        7445,
 		"apiEndpoint":         "10.10.0.10:6443",
 		"joinEndpoint":        "10.10.0.10:6443",

@@ -25,7 +25,7 @@ func (c *Controller) checkDistinctBindings(ctx context.Context, namespace string
 				DeletionTimestamp *string           `json:"deletionTimestamp"`
 			} `json:"metadata"`
 			Spec struct {
-				ContainerName string `json:"containerName"`
+				NodeName string `json:"nodeName"`
 			} `json:"spec"`
 		}
 		if err := json.Unmarshal(raw, &obj); err != nil {
@@ -34,7 +34,7 @@ func (c *Controller) checkDistinctBindings(ctx context.Context, namespace string
 		if c.Slots != nil && obj.Metadata.DeletionTimestamp != nil && !slices.Contains(obj.Metadata.Finalizers, instanceFinalizer) {
 			continue
 		}
-		binding := machineBinding(name, obj.Metadata.Annotations, obj.Spec.ContainerName)
+		binding := machineBinding(name, obj.Metadata.Annotations, obj.Spec.NodeName)
 		node, err := c.node(binding)
 		if err != nil {
 			return err
@@ -48,7 +48,7 @@ func (c *Controller) checkDistinctBindings(ctx context.Context, namespace string
 }
 
 func machineBinding(name string, annotations map[string]string, spec string) string {
-	if value := annotations[containerNameAnnotation]; value != "" {
+	if value := annotations[nodeNameAnnotation]; value != "" {
 		return value
 	}
 	if spec != "" {

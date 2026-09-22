@@ -50,13 +50,13 @@ type Claimer struct {
 // The template says which machine rather than how to build one,
 // because the topology already owns it — that is the whole difference
 // between this infrastructure provider and one that talks to a cloud.
-func Objects(name, container string, imported ...bool) string {
+func Objects(name, node string, imported ...bool) string {
 	controlPlane := ""
 	if len(imported) > 0 && imported[0] {
-		controlPlane = "  controlPlaneRef:\n    apiGroup: containernet.appmana.com\n    kind: ImportedControlPlane\n    name: " + ClusterName + "\n"
+		controlPlane = "  controlPlaneRef:\n    apiGroup: infrastructure.labcontainers.appmana.com\n    kind: LabImportedControlPlane\n    name: " + ClusterName + "\n"
 	}
-	objects := fmt.Sprintf(`apiVersion: containernet.appmana.com/v1beta2
-kind: ContainernetCluster
+	objects := fmt.Sprintf(`apiVersion: infrastructure.labcontainers.appmana.com/v1alpha1
+kind: LabCluster
 metadata:
   name: %[3]s
   namespace: %[4]s
@@ -69,19 +69,19 @@ metadata:
   namespace: %[4]s
 spec:
 %[5]s  infrastructureRef:
-    apiGroup: containernet.appmana.com
-    kind: ContainernetCluster
+    apiGroup: infrastructure.labcontainers.appmana.com
+    kind: LabCluster
     name: %[3]s
 ---
-apiVersion: containernet.appmana.com/v1beta2
-kind: ContainernetMachineTemplate
+apiVersion: infrastructure.labcontainers.appmana.com/v1alpha1
+kind: LabMachineTemplate
 metadata:
   name: %[1]s
   namespace: %[4]s
 spec:
   template:
     spec:
-      containerName: %[2]s
+      nodeName: %[2]s
 ---
 apiVersion: cloud-provisioning.appmana.com/v1alpha1
 kind: ProvisionedNodeClaim
@@ -90,13 +90,13 @@ metadata:
   namespace: %[4]s
 spec:
   infrastructureRef:
-    apiGroup: containernet.appmana.com
-    kind: ContainernetMachineTemplate
+    apiGroup: infrastructure.labcontainers.appmana.com
+    kind: LabMachineTemplate
     name: %[1]s
   clusterName: %[3]s
-`, name, container, ClusterName, Namespace, controlPlane)
+`, name, node, ClusterName, Namespace, controlPlane)
 	if controlPlane != "" {
-		objects += fmt.Sprintf("---\napiVersion: containernet.appmana.com/v1beta2\nkind: ImportedControlPlane\nmetadata:\n  name: %s\n  namespace: %s\nspec: {}\n", ClusterName, Namespace)
+		objects += fmt.Sprintf("---\napiVersion: infrastructure.labcontainers.appmana.com/v1alpha1\nkind: LabImportedControlPlane\nmetadata:\n  name: %s\n  namespace: %s\nspec: {}\n", ClusterName, Namespace)
 	}
 	return objects
 }
@@ -104,8 +104,7 @@ spec:
 // Claim commits the objects, lets the infrastructure controller
 // report the machine, and waits for the mesh to publish a peer.
 func (c *Claimer) Claim(ctx context.Context, name, node string) error {
-	container := "clab-" + c.LabName + "-" + node
-	if err := c.Kube.Apply(ctx, []byte(Objects(name, container, c.ImportedControlPlane))); err != nil {
+	if err := c.Kube.Apply(ctx, []byte(Objects(name, node, c.ImportedControlPlane))); err != nil {
 		return fmt.Errorf("committing the claim: %w", err)
 	}
 
@@ -140,8 +139,8 @@ func (c *Claimer) Claim(ctx context.Context, name, node string) error {
 
 	// The product's own reconciler creates these. Waiting for them is
 	// waiting for the product to have done its half.
-	if err := c.waitFor(ctx, "containernetmachine", name, 3*time.Minute); err != nil {
-		return fmt.Errorf("the claim never produced a ContainernetMachine: %w", err)
+	if err := c.waitFor(ctx, "labmachine", name, 3*time.Minute); err != nil {
+		return fmt.Errorf("the claim never produced a LabMachine: %w", err)
 	}
 	if err := c.waitFor(ctx, "machine", name, time.Minute); err != nil {
 		return fmt.Errorf("no Machine for the claim: %w", err)

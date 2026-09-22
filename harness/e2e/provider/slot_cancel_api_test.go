@@ -10,7 +10,7 @@ import (
 func verifyUnallocatedCancellation(t *testing.T, ctx context.Context, c *Controller, ns string) {
 	t.Helper()
 	name := "never-allocated"
-	data, _ := json.Marshal(map[string]any{"apiVersion": "containernet.appmana.com/v1beta2", "kind": "ContainernetMachine", "metadata": map[string]any{"name": name, "namespace": ns, "finalizers": []string{instanceFinalizer, "test/hold"}}, "spec": map[string]any{}})
+	data, _ := json.Marshal(map[string]any{"apiVersion": "infrastructure.labcontainers.appmana.com/v1alpha1", "kind": "LabMachine", "metadata": map[string]any{"name": name, "namespace": ns, "finalizers": []string{instanceFinalizer, "test/hold"}}, "spec": map[string]any{}})
 	if err := c.Kube.Apply(ctx, data); err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func verifyUnallocatedCancellation(t *testing.T, ctx context.Context, c *Control
 	if err := json.Unmarshal(raw, &obj); err != nil {
 		t.Fatal(err)
 	}
-	if slices.Contains(obj.Metadata.Finalizers, instanceFinalizer) || !slices.Contains(obj.Metadata.Finalizers, "test/hold") || obj.Metadata.Annotations[containerNameAnnotation] != "" {
+	if slices.Contains(obj.Metadata.Finalizers, instanceFinalizer) || !slices.Contains(obj.Metadata.Finalizers, "test/hold") || obj.Metadata.Annotations[nodeNameAnnotation] != "" {
 		t.Fatal("unallocated cancellation changed other ownership")
 	}
 	_, after, err := c.Slots.readPool(ctx)

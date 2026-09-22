@@ -22,11 +22,7 @@ func ImagesIn(manifest []byte) []string {
 	seen := map[string]bool{}
 	for _, m := range imageLine.FindAllStringSubmatch(string(manifest), -1) {
 		image := strings.Trim(m[1], `"'`)
-		// A digest pins the same image the tag names; the runtime
-		// takes either, and carrying both would carry it twice.
-		if at := strings.Index(image, "@sha256:"); at > 0 {
-			image = image[:at]
-		}
+		// Preserve digest identity: tags can move independently of the pin.
 		seen[image] = true
 	}
 	out := make([]string, 0, len(seen))

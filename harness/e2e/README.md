@@ -81,6 +81,24 @@ VM session rather than reconstructing Docker container names or looking for a
 separate container-rig session. A configured runtime that cannot reconnect fails
 explicitly instead of falling back to host CLI execution.
 
+The standalone Calico installer (kubeadm profile) no longer downloads vanilla
+Calico or reuses an unverified `calico.yaml` cache. Go callers supply
+`network.Deps.CalicoObjects` as native `runtime.Object` values, including an
+`apps/v1.DaemonSet` for `kube-system/calico-node`. Custom resources can use
+upstream `unstructured.Unstructured`; their fields are preserved. The fixture
+copies objects before setting the pool CIDR and `imagePullPolicy: Never`, and
+requires SHA256-pinned image references for DaemonSet/Deployment containers.
+Other workload kinds are rejected rather than silently missing their images.
+
+For CLI runs, supply `--calico-objects` and `--calico-objects-sha256`: an explicit
+prepared native Kubernetes `v1.List` JSON artifact from the aligned fork. The
+artifact can be serialized from the same Go objects; callers need not write
+YAML. Preparing/building the fork and selecting compatible image digests remain
+project responsibilities. Content pins alone do not prove fork provenance.
+These options do not override distribution-bundled Calico; using them with a
+different distribution fails explicitly. Bundled-provider fork alignment and
+full Windows pod-network qualification remain outstanding.
+
 The k0s builder now constructs upstream `v1beta1.ClusterConfig` objects,
 including native Calico patch objects. Configuration writing, native argument
 installation, and single-attempt readiness probes use

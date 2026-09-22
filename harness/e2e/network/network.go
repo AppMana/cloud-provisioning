@@ -13,6 +13,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
 
@@ -30,6 +31,9 @@ type Deps struct {
 	Images   cluster.Images
 	WorkDir  string
 	PodCIDR  string
+	// CalicoObjects are caller-prepared native objects from the aligned fork.
+	// The standalone installer never selects or downloads an upstream release.
+	CalicoObjects []runtime.Object
 	// APIServer is an address on the site that every node must be able
 	// to reach the cluster by. Networks that autodetect a node's
 	// address use it to choose the right one.

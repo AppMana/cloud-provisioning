@@ -2,18 +2,14 @@
 //
 // Native is the point: this mesh carries pod traffic unencapsulated,
 // so the tunnel sees packets addressed to pods and each peer's accept
-// list carries the blocks its node owns. The stock manifest
-// encapsulates, so the pool is changed and the daemonset restarted —
+// list carries the blocks its node owns. Prepared objects may enable
+// encapsulation, so the pool is changed and the daemonset restarted —
 // and the restart is not optional, for the reason below.
 package calico
 
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
@@ -23,23 +19,19 @@ import (
 
 func init() { network.Register(Installer{}) }
 
-// Manifest is the release this row installs. Pinned: a network that
-// changes under the matrix makes two runs incomparable.
-const Manifest = "https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/calico.yaml"
-
 // Installer installs Calico.
 type Installer struct{}
 
 func (Installer) Name() string { return "calico" }
 
-// Encapsulation is Native: this row turns the stock manifest's
+// Encapsulation is Native: this row turns the prepared network's
 // encapsulation off, so the tunnel sees packets addressed to pods.
 func (Installer) Encapsulation() cni.Encapsulation { return cni.Native }
 
-// Install fetches the manifest on this host, carries its images in,
-// applies it, and then makes it native.
+// Install validates caller-supplied fork objects, carries their pinned images
+// in, applies the native objects, and then makes the pool unencapsulated.
 func (i Installer) Install(ctx context.Context, d network.Deps) error {
-	manifest, err := i.manifest(ctx, d)
+	objects, images, err := prepareObjects(d.CalicoObjects, d.PodCIDR)
 	if err != nil {
 		return err
 	}
@@ -47,11 +39,11 @@ func (i Installer) Install(ctx context.Context, d network.Deps) error {
 	// Onto the site's nodes only. A remote has no runtime of its own
 	// until it joins, which is after this; its images arrive then,
 	// through LoadImages.
-	if err := i.LoadImages(ctx, d, network.SiteNodes(d.Topology)); err != nil {
+	if err := loadImages(ctx, d, images, network.SiteNodes(d.Topology)); err != nil {
 		return err
 	}
 
-	if err := d.Kube.Apply(ctx, pinPool(manifest, d.PodCIDR)); err != nil {
+	if err := d.Kube.ApplyObjects(ctx, objects...); err != nil {
 		return fmt.Errorf("installing Calico: %w", err)
 	}
 
@@ -81,46 +73,20 @@ func (i Installer) Install(ctx context.Context, d network.Deps) error {
 
 // LoadImages carries Calico's own images onto the given nodes.
 func (i Installer) LoadImages(ctx context.Context, d network.Deps, nodes []string) error {
-	manifest, err := i.manifest(ctx, d)
+	_, images, err := prepareObjects(d.CalicoObjects, d.PodCIDR)
 	if err != nil {
 		return err
 	}
-	images := network.ImagesIn(manifest)
-	if len(images) == 0 {
-		return fmt.Errorf("no images in the Calico manifest, so nothing would be carried in")
-	}
+	return loadImages(ctx, d, images, nodes)
+}
+
+func loadImages(ctx context.Context, d network.Deps, images, nodes []string) error {
 	for _, image := range images {
 		if err := d.Images.Load(ctx, image, nodes, nil); err != nil {
 			return fmt.Errorf("carrying %s in: %w", image, err)
 		}
 	}
 	return nil
-}
-
-// pinPool makes Calico allocate from the cluster's own pod CIDR.
-//
-// The stock manifest leaves CALICO_IPV4POOL_CIDR commented out, and
-// calico-node then creates its default pool from its own built-in
-// 192.168.0.0/16 — whatever the cluster was configured with. On
-// kubeadm the two happened to agree; on k0s they did not, and the row
-// passed anyway with the mesh carrying 192.168.159.0/26 for a cluster
-// told 10.244.0.0/16.
-//
-// It passes because the product reads the network's own records
-// rather than the cluster's configuration, which is the right way
-// round. But a lab whose pod network is not the one the row says it
-// installed makes two distributions incomparable, and hides any
-// disagreement between the two from ever being noticed.
-//
-// The pool's CIDR is immutable once created, so this has to be set
-// before calico-node first runs: uncommenting the variable the
-// manifest already carries is exactly what an operator does.
-func pinPool(manifest []byte, podCIDR string) []byte {
-	const commented = `            # - name: CALICO_IPV4POOL_CIDR
-            #   value: "192.168.0.0/16"`
-	pinned := fmt.Sprintf(`            - name: CALICO_IPV4POOL_CIDR
-              value: %q`, podCIDR)
-	return []byte(strings.Replace(string(manifest), commented, pinned, 1))
 }
 
 // assertPool refuses a pool that is not the cluster's own.
@@ -166,41 +132,4 @@ func (i Installer) makeNative(ctx context.Context, d network.Deps) error {
 		return fmt.Errorf("calico-node did not come back after the pool changed: %w", err)
 	}
 	return nil
-}
-
-// manifest fetches the release once and caches it, because this host
-// has a route out and the site does not.
-func (i Installer) manifest(ctx context.Context, d network.Deps) ([]byte, error) {
-	path := filepath.Join(d.WorkDir, "calico.yaml")
-	if body, err := os.ReadFile(path); err == nil && len(body) > 0 {
-		return body, nil
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, Manifest, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("fetching Calico: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetching Calico: %s", resp.Status)
-	}
-	var body []byte
-	buf := make([]byte, 32*1024)
-	for {
-		n, err := resp.Body.Read(buf)
-		body = append(body, buf[:n]...)
-		if err != nil {
-			break
-		}
-	}
-	if err := os.MkdirAll(d.WorkDir, 0o755); err != nil {
-		return nil, err
-	}
-	if err := os.WriteFile(path, body, 0o644); err != nil {
-		return nil, err
-	}
-	return body, nil
 }

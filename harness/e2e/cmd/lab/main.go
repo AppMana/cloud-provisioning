@@ -32,7 +32,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/network"
-	_ "github.com/appmana/cloud-provisioning/harness/e2e/network/calico"
+	"github.com/appmana/cloud-provisioning/harness/e2e/network/calico"
 	"github.com/appmana/cloud-provisioning/harness/e2e/observe"
 	"github.com/appmana/cloud-provisioning/harness/e2e/outage"
 	"github.com/appmana/cloud-provisioning/harness/e2e/provider"
@@ -40,6 +40,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // NodeImageName is what cmd/nodeimage writes into the work directory.
@@ -77,6 +78,8 @@ func runLab() {
 		rke2ChecksumsSHA256    = flag.String("rke2-checksums-sha256", "", "required SHA256 of sha256sum-amd64.txt")
 		cni                    = flag.String("cni", "", "distribution-supported network profile (default: bundled default)")
 		calicoMTU              = flag.Int("k0s-calico-mtu", 0, "bundled Calico MTU for a fresh k0s site; zero preserves the distro default")
+		calicoObjectsPath      = flag.String("calico-objects", "", "prepared native Kubernetes List JSON from the aligned Calico fork (standalone installer)")
+		calicoObjectsSHA256    = flag.String("calico-objects-sha256", "", "required SHA256 of --calico-objects")
 		calicoManagedAddresses = flag.Bool("k0s-calico-managed-addresses", false, "use stored per-node Calico addresses on a fresh k0s site instead of repeated IP autodetection")
 		linuxEgress            = flag.Bool("k0s-linux-egress", false, "add Linux default-route Konnectivity agents on a fresh k0s VM site for mixed-OS API egress")
 		product                = flag.Bool("product", false, "also install the product's chart")
@@ -109,6 +112,17 @@ func runLab() {
 		fail("unsupported CAPI mode %q", *capiMode)
 	}
 	var selected network.Profile
+	var calicoObjects []runtime.Object
+	if (*calicoObjectsPath != "" || *calicoObjectsSHA256 != "") && *distro != "kubeadm" {
+		fail("--calico-objects applies only to the standalone kubeadm Calico installer, not a distribution's bundled Calico")
+	}
+	if *distro == "kubeadm" && !*down {
+		var err error
+		calicoObjects, err = calico.ReadObjects(context.Background(), *calicoObjectsPath, *calicoObjectsSHA256)
+		if err != nil {
+			fail("prepared Calico objects: %v", err)
+		}
+	}
 	if *distro != "" {
 		var err error
 		selected, err = network.Select(*distro, *cni)
@@ -327,7 +341,8 @@ func runLab() {
 			}
 			step("observing network " + *cni)
 			nd := network.Deps{
-				Topology: topo, Rig: r, Kube: d.Kube, Images: d.Images, WorkDir: *workDir,
+				CalicoObjects: calicoObjects,
+				Topology:      topo, Rig: r, Kube: d.Kube, Images: d.Images, WorkDir: *workDir,
 				PodCIDR: d.PodCIDR, APIServer: cluster.ControlPlaneAddresses(topo)[0],
 			}
 			if err := inst.Install(ctx, nd); err != nil {
@@ -470,7 +485,8 @@ func runLab() {
 						fail("%v", err)
 					}
 					if err := inst.LoadImages(ctx, network.Deps{
-						Topology: topo, Rig: r, Kube: d.Kube, Images: d.Images,
+						CalicoObjects: calicoObjects,
+						Topology:      topo, Rig: r, Kube: d.Kube, Images: d.Images,
 						WorkDir: *workDir, PodCIDR: d.PodCIDR,
 					}, []string{name}); err != nil {
 						fail("%v", err)

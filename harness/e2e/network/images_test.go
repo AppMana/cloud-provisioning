@@ -31,13 +31,11 @@ func TestOnlyImageFieldsAreRead(t *testing.T) {
 	}
 }
 
-// A digest and a tag naming the same image are one image. Carried
-// twice, the second copy is not wrong so much as slow — and on the
-// machine rig every image crosses an ssh channel.
-func TestADigestAndItsTagAreOneImage(t *testing.T) {
+// Digest pins must survive transport, even when a tag is also present.
+func TestADigestPinIsPreserved(t *testing.T) {
 	got := ImagesIn([]byte("      image: quay.io/cilium/cilium:v1.16.5@sha256:abc\n"))
-	if len(got) != 1 || got[0] != "quay.io/cilium/cilium:v1.16.5" {
-		t.Errorf("read %v, want the image without its digest", got)
+	if len(got) != 1 || got[0] != "quay.io/cilium/cilium:v1.16.5@sha256:abc" {
+		t.Errorf("digest pin was changed: %v", got)
 	}
 }
 

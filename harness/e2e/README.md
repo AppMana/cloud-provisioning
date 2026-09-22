@@ -22,16 +22,14 @@ explicitly; normal SDK operation does not adopt or remove it automatically.
 The explicit nil-runtime compatibility path remains for legacy callers/tests
 and does not provide these ownership guarantees.
 
-This migration currently requires a separate Go workspace containing this
-module and the Labcontainers `feature/native-typed-sdk` worktree. The released
-Labcontainers requirement in `go.mod` predates these APIs; an independent
-release/pseudo-version pin is still pending. Do not mistake workspace test
-success for an independently installable consumer module.
+This module pins published Labcontainers commit `9fea7eee373a`; no local SDK
+workspace or SDK replace directive is needed. The local product controller
+module remains a dependency in this repository.
 
-With that workspace selected, run:
+From this module, test the published dependency with:
 
 ```sh
-GOWORK=/absolute/integration/go.work go test -p 2 ./...
+GOWORK=off go test -p 2 ./...
 ```
 
 Build the matching SDK daemon with `make build` in its worktree and set
@@ -39,6 +37,14 @@ Build the matching SDK daemon with `make build` in its worktree and set
 also requires the isolated corrected Containerlab binary described in the SDK
 README, selected using `LABCONTAINERS_CONTAINERLAB`. Neither setup replaces the
 host installation.
+
+Normal Ubuntu VM command and file operations reconnect to the saved SDK session
+and use `Node.Commands()` over serial QGA, including SDK-owned node identity and
+native file transfer. Rebuild the product VM wrapper before using this path:
+the updated Dockerfile installs `/labcontainers-guest` and retains `/cldt-guest`
+as a compatibility symlink. Existing old wrapper images do not have the new
+entry point. Image-builder SSH, CoreOS's policy wrapper, and nil-runtime legacy
+tests remain separate paths; their migration is not claimed complete here.
 
 The k0s builder now constructs upstream `v1beta1.ClusterConfig` objects,
 including native Calico patch objects. Configuration writing, native argument

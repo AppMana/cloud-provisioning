@@ -12,6 +12,7 @@ package vm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+	labclient "github.com/appmana/labcontainers/pkg/client"
 )
 
 // Guest is the SSH account used only for platform image preparation.
@@ -110,7 +112,15 @@ func (n *Node) Exec(ctx context.Context, argv ...string) ([]byte, error) {
 	return n.Pipe(ctx, nil, argv...)
 }
 
-func (n *Node) Pipe(ctx context.Context, stdin io.Reader, argv ...string) ([]byte, error) {
+func (n *Node) Pipe(ctx context.Context, stdin io.Reader, argv ...string) (out []byte, runErr error) {
+	if n.sdkControl() {
+		c, session, err := n.openSDK(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { runErr = errors.Join(runErr, c.Close()) }()
+		return session.Node(n.Name()).Commands().Pipe(ctx, stdin, argv...)
+	}
 	full := []string{"docker", "exec"}
 	input := "0"
 	if stdin != nil {
@@ -140,11 +150,19 @@ func (n *Node) Pipe(ctx context.Context, stdin io.Reader, argv ...string) ([]byt
 }
 
 // Put writes a file onto the guest.
-func (n *Node) Put(ctx context.Context, src io.Reader, dst string, mode fs.FileMode) error {
+func (n *Node) Put(ctx context.Context, src io.Reader, dst string, mode fs.FileMode) (runErr error) {
 	if i := strings.LastIndex(dst, "/"); i > 0 {
 		if _, err := n.Exec(ctx, "mkdir", "-p", dst[:i]); err != nil {
 			return fmt.Errorf("creating %s: %w", dst[:i], err)
 		}
+	}
+	if n.sdkControl() {
+		c, session, err := n.openSDK(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() { runErr = errors.Join(runErr, c.Close()) }()
+		return session.Node(n.Name()).Commands().Put(ctx, src, dst, mode)
 	}
 	if _, err := n.Pipe(ctx, src, "sh", "-c", "cat > "+shellQuote(dst)); err != nil {
 		return fmt.Errorf("writing %s: %w", dst, err)
@@ -153,6 +171,22 @@ func (n *Node) Put(ctx context.Context, src io.Reader, dst string, mode fs.FileM
 		return fmt.Errorf("setting mode on %s: %w", dst, err)
 	}
 	return nil
+}
+
+func (n *Node) sdkControl() bool {
+	// Image preparation and CoreOS's policy-wrapped execution remain explicit
+	// specialized paths until their runtime contracts are migrated as well.
+	return n.rig != nil && n.rig.Runtime != nil && !n.rig.builderSSH && len(n.rig.GuestExecPrefix) == 0
+}
+
+func (n *Node) openSDK(ctx context.Context) (*labclient.Client, *labclient.Session, error) {
+	opener, ok := n.rig.Runtime.(interface {
+		Open(context.Context, string, string) (*labclient.Client, *labclient.Session, error)
+	})
+	if !ok {
+		return nil, nil, fmt.Errorf("VM runtime does not support SDK session reconnection")
+	}
+	return opener.Open(ctx, n.rig.WorkDir, n.rig.Kind())
 }
 
 // Cut takes the guest's sole Ethernet link down and leaves it running.

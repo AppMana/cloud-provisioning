@@ -26,6 +26,12 @@ type Runtime interface {
 // `lab down` processes operate on the same owned topology.
 type LabcontainersRuntime struct{}
 
+// Open reconnects through the SDK's saved socket, without launching a second
+// daemon or resolving nodes by reconstructed container names.
+func (LabcontainersRuntime) Open(ctx context.Context, workDir, kind string) (*labclient.Client, *labclient.Session, error) {
+	return labclient.OpenPersistent(ctx, persistentOptions(workDir, kind))
+}
+
 func (LabcontainersRuntime) Deploy(ctx context.Context, workDir, kind, name string, config *core.Config) error {
 	source, err := clab.Source(config)
 	if err != nil {
@@ -42,14 +48,21 @@ func (LabcontainersRuntime) Deploy(ctx context.Context, workDir, kind, name stri
 	}
 	opts.LabdPath = labd
 	borrowedBridge := false
+	nodes := map[string]*labv1.NodeExtension{}
 	for _, node := range config.Topology.Nodes {
 		if node != nil && (node.Kind == "bridge" || node.Kind == "ovs-bridge") {
 			borrowedBridge = true
 		}
 	}
+	for name, node := range config.Topology.Nodes {
+		if node != nil && node.Kind == "generic_vm" {
+			nodes[name] = &labv1.NodeExtension{Control: "qga"}
+		}
+	}
 	_, err = labclient.DeployPersistent(ctx, opts, &labv1.LabSpec{
 		Name:              name,
 		Topology:          source,
+		Nodes:             nodes,
 		ArtifactDirectory: filepath.Join(workDir, "artifacts", kind),
 		// This product fixture explicitly borrows its site/cloud host bridges.
 		// Labcontainers still checks each network-mode:none runtime node.

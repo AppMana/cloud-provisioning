@@ -18,6 +18,9 @@ func TestImageImportBoundsConcurrencyAndReportsGuestFailure(t *testing.T) {
 	active, peak := 0, 0
 	imported := map[string]string{}
 	r := New(lab.Default(), t.TempDir())
+	// This unit test exercises the legacy streaming runner; SDK command
+	// transport is covered separately by the session-backed command tests.
+	r.Runtime = nil
 	r.Run = func(_ context.Context, input io.Reader, args ...string) ([]byte, []byte, int, error) {
 		command := strings.Join(args, " ")
 		if strings.Contains(command, "docker image inspect") {

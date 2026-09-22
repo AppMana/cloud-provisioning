@@ -71,3 +71,13 @@ under test. This requires Go 1.26.3 or newer.
 
 Full distribution-builder extraction and Calico/k0s pod-network qualification
 are still pending. These changes do not claim either is complete.
+
+MicroK8s site nodes must now come from prepared images with the builder's pinned
+version/revision already installed, including snap base dependencies and runtime
+images. The builder verifies every site node before mutation; it does not run
+apt or install a snap from the store during a test. It explicitly holds automatic
+MicroK8s snap refreshes indefinitely so a long-running scenario cannot change
+versions after 24 hours. Preparing the image remains a separate project-owned
+step; this check does not prove that all offline runtime images are present.
+The native refresh hold requires snapd 2.58 or newer, as documented in
+[Snap's update controls](https://snapcraft.io/docs/how-to-guides/manage-snaps/manage-updates/).

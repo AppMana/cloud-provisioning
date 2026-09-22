@@ -40,15 +40,15 @@ func (Builder) Build(ctx context.Context, d cluster.Deps) error {
 	if len(d.Topology.NodesInRole(lab.ControlPlane)) == 0 {
 		return fmt.Errorf("MicroK8s needs a control plane")
 	}
+	// Snap/base dependencies and Kubernetes images belong in the prepared VM
+	// image. Verify the entire site before mutating any node; test bringup must
+	// never install snapd through apt or contact the snap store as a fallback.
+	if err := verifyPreparedSite(ctx, d); err != nil {
+		return err
+	}
 	for i, n := range nodes {
 		node := d.Rig.Node(n.Name)
-		if out, err := node.Exec(ctx, "sh", "-c", "command -v snap >/dev/null || (apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y snapd)"); err != nil {
-			return fmt.Errorf("install snapd on %s: %w: %s", n.Name, err, out)
-		}
-		if out, err := node.Exec(ctx, "snap", "install", "microk8s", "--classic", "--channel="+Channel, "--revision="+Revision); err != nil {
-			return fmt.Errorf("install MicroK8s on %s: %w: %s", n.Name, err, out)
-		}
-		if _, err := node.Exec(ctx, "snap", "refresh", "--hold=24h", "microk8s"); err != nil {
+		if _, err := node.Exec(ctx, "snap", "refresh", "--hold=forever", "microk8s"); err != nil {
 			return err
 		}
 		if i > 0 {
@@ -78,6 +78,15 @@ func (Builder) Build(ctx context.Context, d cluster.Deps) error {
 		}
 	}
 	return configureAccess(ctx, d)
+}
+
+func verifyPreparedSite(ctx context.Context, d cluster.Deps) error {
+	for _, n := range cluster.SiteNodes(d.Topology) {
+		if err := verifySnap(ctx, d.Rig.Node(n.Name)); err != nil {
+			return fmt.Errorf("%s: prepare a guest image with MicroK8s %s revision %s and its offline dependencies before starting the lab: %w", n.Name, Version, Revision, err)
+		}
+	}
+	return nil
 }
 
 // Reuse checks the installed snap and native API version before renewing access.

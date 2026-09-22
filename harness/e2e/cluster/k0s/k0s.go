@@ -59,6 +59,9 @@ func (Builder) ImportArgs() []string {
 // Build carries the binary in, writes each node's config, and starts
 // the controllers and then the workers.
 func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
+	if err := ValidateImages(d.Network, d.K0sImages); err != nil {
+		return err
+	}
 	cps := d.Topology.NodesInRole(lab.ControlPlane)
 	if len(cps) == 0 {
 		return fmt.Errorf("the topology has no control planes")
@@ -127,6 +130,9 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 
 // config writes one node's k0s.yaml.
 func (b Builder) config(ctx context.Context, d cluster.Deps, n lab.Node) error {
+	if err := ValidateImages(d.Network, d.K0sImages); err != nil {
+		return err
+	}
 	calicoSettings, err := calicoConfig(d.Network, d.K0sCalicoMTU, d.K0sCalicoManagedAddresses)
 	if err != nil {
 		return err
@@ -148,6 +154,7 @@ func (b Builder) config(ctx context.Context, d cluster.Deps, n lab.Node) error {
 		TypeMeta:   metav1.TypeMeta{APIVersion: native.ClusterConfigAPIVersion, Kind: native.ClusterConfigKind},
 		ObjectMeta: metav1.ObjectMeta{Name: "k0s"},
 		Spec: &native.ClusterSpec{
+			Images:  d.K0sImages.DeepCopy(),
 			API:     &native.APISpec{Address: addr, SANs: sans},
 			Storage: &native.StorageSpec{Type: native.EtcdStorageType, Etcd: &native.EtcdConfig{PeerAddress: addr}},
 			Network: &native.Network{

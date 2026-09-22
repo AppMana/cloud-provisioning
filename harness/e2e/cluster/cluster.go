@@ -16,6 +16,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	nativek0s "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
@@ -63,6 +64,8 @@ type Deps struct {
 	// fresh k0s site never downloads or substitutes an upstream release.
 	K0sBinary       string
 	K0sBinarySHA256 string
+	// K0sImages passes upstream image configuration through unchanged.
+	K0sImages *nativek0s.ClusterImages
 	// K3sBinary and K3sBinarySHA256 likewise identify a prepared k3s build.
 	K3sBinary       string
 	K3sBinarySHA256 string

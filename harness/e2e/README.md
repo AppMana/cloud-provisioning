@@ -112,6 +112,22 @@ There is no automatic upstream binary download or fallback to a cached build.
 Prepare the intended AppMana fork artifact before running a fork scenario.
 Reuse of an existing installation does not require a new binary.
 
+For fresh k0s Calico profiles, also pass `cluster.Deps.K0sImages` using the
+upstream `v1beta1.ClusterImages` type. The CLI accepts the same native object's
+JSON via `--k0s-images` and `--k0s-images-sha256`. No parallel image schema is
+introduced. Calico CNI/node/controllers and kube-proxy must have explicit
+SHA256 pins in their native `ImageSpec.Version` (`tag@sha256:...`), and
+`DefaultPullPolicy` must be `Never`. Prepare and preload the aligned images;
+the fixture does not infer fork provenance or compatibility from a tag.
+Both native Windows image groups are also required with pinned CNI/node,
+kube-proxy and pause images: k0s can enable Windows manifests dynamically when
+a Windows worker joins, so leaving those fields unset would permit implicit
+upstream selection later. Other native image
+fields pass through unchanged. The reader does not insert k0s's default pull
+policy, and the fixture copies the native object before serialization.
+This is configuration/preflight coverage, not evidence that the aligned
+Windows cluster or its pod network has booted successfully.
+
 Fresh k3s builds likewise require `cluster.Deps.K3sBinary` and
 `K3sBinarySHA256`, or `--k3s-binary /absolute/path/to/k3s
 --k3s-binary-sha256 <64-hex-digest>`. Both builders use the SDK's generic

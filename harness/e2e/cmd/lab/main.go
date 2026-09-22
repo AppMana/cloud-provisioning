@@ -40,6 +40,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	nativek0s "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -70,6 +71,8 @@ func runLab() {
 		distro                 = flag.String("distro", "", "also build the site cluster with this distribution")
 		k0sBinary              = flag.String("k0s-binary", "", "prepared host k0s binary for a fresh k0s site; no automatic download")
 		k0sBinarySHA256        = flag.String("k0s-binary-sha256", "", "required SHA256 of --k0s-binary")
+		k0sImagesPath          = flag.String("k0s-images", "", "prepared native k0s ClusterImages JSON; required for fresh Calico profiles")
+		k0sImagesSHA256        = flag.String("k0s-images-sha256", "", "required SHA256 of --k0s-images")
 		k3sBinary              = flag.String("k3s-binary", "", "prepared host k3s binary; no automatic download")
 		k3sBinarySHA256        = flag.String("k3s-binary-sha256", "", "required SHA256 of --k3s-binary")
 		rke2Artifacts          = flag.String("rke2-artifacts-dir", "", "prepared RKE2 installer, archive and checksum directory")
@@ -112,6 +115,7 @@ func runLab() {
 		fail("unsupported CAPI mode %q", *capiMode)
 	}
 	var selected network.Profile
+	var k0sImages *nativek0s.ClusterImages
 	var calicoObjects []runtime.Object
 	if (*calicoObjectsPath != "" || *calicoObjectsSHA256 != "") && *distro != "kubeadm" {
 		fail("--calico-objects applies only to the standalone kubeadm Calico installer, not a distribution's bundled Calico")
@@ -139,6 +143,21 @@ func runLab() {
 	}
 	if selected.Network == "calico-site-bgp" && *remotes != "" {
 		fail("calico-site-bgp remote VM claims need a separately configured remote CNI; use the AWS VPC CNI workflow for AWS workers")
+	}
+	if *k0sImagesPath != "" || *k0sImagesSHA256 != "" {
+		if *distro != "k0s" {
+			fail("--k0s-images requires --distro=k0s")
+		}
+		var err error
+		k0sImages, err = k0s.ReadImages(context.Background(), *k0sImagesPath, *k0sImagesSHA256)
+		if err != nil {
+			fail("prepared k0s images: %v", err)
+		}
+	}
+	if *distro == "k0s" && !*reuseSite && !*down {
+		if err := k0s.ValidateImages(selected.BuilderNetwork, k0sImages); err != nil {
+			fail("%v", err)
+		}
 	}
 	if *linuxEgress && (*distro != "k0s" || *rigKind != "vm" || *reuseSite) {
 		fail("--k0s-linux-egress requires a fresh k0s VM site")
@@ -300,6 +319,7 @@ func runLab() {
 		d := cluster.Deps{
 			Topology: topo, Rig: r, WorkDir: *workDir, Network: selected.BuilderNetwork,
 			K0sBinary: *k0sBinary, K0sBinarySHA256: *k0sBinarySHA256,
+			K0sImages: k0sImages,
 			K3sBinary: *k3sBinary, K3sBinarySHA256: *k3sBinarySHA256,
 			RKE2ArtifactsDirectory: *rke2Artifacts, RKE2InstallerSHA256: *rke2InstallerSHA256,
 			RKE2ArchiveSHA256: *rke2ArchiveSHA256, RKE2ChecksumsSHA256: *rke2ChecksumsSHA256,

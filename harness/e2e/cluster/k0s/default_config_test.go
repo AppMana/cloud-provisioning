@@ -42,6 +42,9 @@ func TestRenderedK0sProviderMatchesNativeDefault(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			n := &configNode{}
 			d := cluster.Deps{Topology: lab.Default(), Rig: configRig{node: n}, PodCIDR: "10.244.0.0/16", SvcCIDR: "10.96.0.0/12", Network: tc.name, K0sCalicoMTU: tc.mtu}
+			if tc.want == "calico" {
+				d.K0sImages = pinnedTestImages()
+			}
 			if err := (Builder{}).config(context.Background(), d, d.Topology.MustNode("cp")); err != nil {
 				t.Fatal(err)
 			}

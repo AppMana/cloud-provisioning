@@ -44,6 +44,10 @@ Fresh k3s builds likewise require `cluster.Deps.K3sBinary` and
 builder no longer reads an implicit cache or downloads a release. A digest
 verifies content identity, not that a binary is the right fork or version;
 artifact preparation remains the calling project's responsibility.
+The k3s service is expressed with upstream `go-systemd/unit.UnitOption` values
+and serialized by that library directly into the existing Labcontainers node
+transport. Unit defaults and supervision choices remain visible in this
+product's builder; there is no parallel Labcontainers service schema.
 
 Fresh RKE2 builds require `--rke2-artifacts-dir` containing `install.sh`,
 `rke2.linux-amd64.tar.gz`, and `sha256sum-amd64.txt`, with

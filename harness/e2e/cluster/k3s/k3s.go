@@ -24,6 +24,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 	"github.com/appmana/labcontainers/pkg/artifact"
+	systemdunit "github.com/coreos/go-systemd/v22/unit"
 )
 
 func init() { cluster.Register(Builder{}) }
@@ -160,26 +161,7 @@ func (b Builder) start(ctx context.Context, d cluster.Deps, n lab.Node, unit, ar
 	if _, err := node.Exec(ctx, "test", "-f", "/etc/systemd/system/"+unit+".service"); err == nil {
 		return nil
 	}
-	service := fmt.Sprintf(`[Unit]
-Description=Lightweight Kubernetes (%[1]s)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=notify
-ExecStart=/usr/local/bin/k3s %[2]s
-KillMode=process
-Delegate=yes
-LimitNOFILE=1048576
-TasksMax=infinity
-Restart=always
-RestartSec=5s
-
-[Install]
-WantedBy=multi-user.target
-`, n.Name, args)
-
-	if err := node.Put(ctx, strings.NewReader(service),
+	if err := node.Put(ctx, systemdunit.Serialize(serviceOptions(n.Name, args)),
 		"/etc/systemd/system/"+unit+".service", 0o644); err != nil {
 		return fmt.Errorf("writing %s's unit: %w", n.Name, err)
 	}
@@ -190,6 +172,25 @@ WantedBy=multi-user.target
 		return fmt.Errorf("starting k3s on %s: %w", n.Name, err)
 	}
 	return nil
+}
+
+// Native systemd options, not a Labcontainers service schema. Unit choices
+// remain explicit in the product; the existing node transport carries bytes.
+func serviceOptions(name, args string) []*systemdunit.UnitOption {
+	return []*systemdunit.UnitOption{
+		systemdunit.NewUnitOption("Unit", "Description", "Lightweight Kubernetes ("+name+")"),
+		systemdunit.NewUnitOption("Unit", "After", "network-online.target"),
+		systemdunit.NewUnitOption("Unit", "Wants", "network-online.target"),
+		systemdunit.NewUnitOption("Service", "Type", "notify"),
+		systemdunit.NewUnitOption("Service", "ExecStart", "/usr/local/bin/k3s "+args),
+		systemdunit.NewUnitOption("Service", "KillMode", "process"),
+		systemdunit.NewUnitOption("Service", "Delegate", "yes"),
+		systemdunit.NewUnitOption("Service", "LimitNOFILE", "1048576"),
+		systemdunit.NewUnitOption("Service", "TasksMax", "infinity"),
+		systemdunit.NewUnitOption("Service", "Restart", "always"),
+		systemdunit.NewUnitOption("Service", "RestartSec", "5s"),
+		systemdunit.NewUnitOption("Install", "WantedBy", "multi-user.target"),
+	}
 }
 
 // waitForAPI blocks until this server is actually serving.

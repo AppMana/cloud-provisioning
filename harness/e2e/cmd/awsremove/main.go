@@ -68,7 +68,7 @@ func run() error {
 	if node == "" {
 		return fmt.Errorf("Machine has no associated Node")
 	}
-	if err = k.WaitMachineAssociation(ctx, claim.Namespace, *name, node); err != nil {
+	if err = kube.WaitMachineAssociation(ctx, k, claim.Namespace, *name, node); err != nil {
 		return err
 	}
 	uid, err := k.Get(ctx, "", "node", node, "{.metadata.uid}")

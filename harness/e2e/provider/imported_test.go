@@ -125,7 +125,7 @@ users:
 func TestCAPAAssociationUsesObservedProviderIdentity(t *testing.T) {
 	reader := &associationReader{refName: "remote1", providerID: "aws:///us-west-2a/i-0c1487c421cdf67e8"}
 	c := &kube.Client{Bastion: reader, ControlPlanes: []string{"10.10.0.10"}}
-	if err := c.WaitMachineAssociation(context.Background(), "cloud-provisioning", "remote1", "remote1"); err != nil {
+	if err := kube.WaitMachineAssociation(context.Background(), c, "cloud-provisioning", "remote1", "remote1"); err != nil {
 		t.Fatal(err)
 	}
 }

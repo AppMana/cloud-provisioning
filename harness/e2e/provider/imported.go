@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -67,5 +68,5 @@ func selfHostedConnection(raw []byte) ([]byte, error) {
 
 // WaitAssociation delegates the provider-independent CAPI identity gate.
 func (c *Controller) WaitAssociation(ctx context.Context, namespace, machine, node string) error {
-	return c.Kube.WaitMachineAssociation(ctx, namespace, machine, node)
+	return kube.WaitMachineAssociation(ctx, c.Kube, namespace, machine, node)
 }

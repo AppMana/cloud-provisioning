@@ -11,7 +11,7 @@ import (
 // WaitMachineAssociation requires CAPI's own Node association and Running phase.
 // CAPI v1beta2 references Nodes by name; the lifecycle driver separately asserts
 // that removal/recreation produces a new Node UID.
-func (c *Client) WaitMachineAssociation(ctx context.Context, namespace, machine, node string) error {
+func WaitMachineAssociation(ctx context.Context, c *Client, namespace, machine, node string) error {
 	return wait.Until(ctx, 5*time.Minute, "CAPI did not associate "+machine+" with its current Node", func(ctx context.Context) error {
 		var m struct {
 			Spec   struct{ ProviderID string } `json:"spec"`

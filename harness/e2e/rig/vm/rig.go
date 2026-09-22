@@ -22,6 +22,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	clab "github.com/appmana/labcontainers/pkg/containerlab"
 )
 
 var (
@@ -162,7 +163,11 @@ func (r *Rig) Up(ctx context.Context) error {
 		}
 	}
 
-	yaml, err := r.Topology.ContainerlabYAML(lab.VM)
+	config, err := r.Topology.ContainerlabConfig(lab.VM)
+	if err != nil {
+		return err
+	}
+	source, err := clab.Source(config)
 	if err != nil {
 		return err
 	}
@@ -181,11 +186,11 @@ func (r *Rig) Up(ctx context.Context) error {
 			return err
 		}
 	}
-	if err := os.WriteFile(r.TopologyPath(), []byte(yaml), 0o644); err != nil {
+	if err := os.WriteFile(r.TopologyPath(), source.GetYaml(), 0o644); err != nil {
 		return err
 	}
 	if r.Runtime != nil {
-		if err := r.Runtime.Deploy(ctx, r.WorkDir, r.Kind(), r.Topology.Name, r.TopologyPath()); err != nil {
+		if err := r.Runtime.Deploy(ctx, r.WorkDir, r.Kind(), r.Topology.Name, config); err != nil {
 			return err
 		}
 	} else if _, errb, code, err := r.runner()(ctx, nil,

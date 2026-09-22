@@ -1,9 +1,11 @@
 package lab
 
 import (
-	"sort"
+	"reflect"
 	"strings"
 	"testing"
+
+	clablinks "github.com/srl-labs/containerlab/links"
 )
 
 // The topology's whole reason for existing is that the four segments
@@ -82,92 +84,60 @@ func TestQuorumSurvivesOneDeath(t *testing.T) {
 // that a VM row and a container row differ in what a node *is* and
 // nothing else.
 func TestTheRigDecidesOnlyWhatANodeIsMadeOf(t *testing.T) {
-	asContainers, err := Default().ContainerlabYAML(Container)
+	asContainers, err := Default().ContainerlabConfig(Container)
 	if err != nil {
 		t.Fatal(err)
 	}
-	asVMs, err := Default().ContainerlabYAML(VM)
+	asVMs, err := Default().ContainerlabConfig(VM)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if !strings.Contains(asContainers, NodeImage) {
-		t.Error("the container rig does not name the node image")
-	}
-	// A machine is a wrapper carrying one, named by its image rather
-	// than by a kind: containerlab runs it as an ordinary node.
-	vmNodes := strings.Count(asVMs, "image: "+VMImage)
-	if want := len(Default().NodesInRole(ControlPlane, Worker, Remote)); vmNodes != want {
-		t.Errorf("the VM rig made %d nodes into machines, want %d (the cluster, and nothing else)", vmNodes, want)
-	}
-	for _, appliance := range []string{"router", "edge-a", "edge-b", "bastion"} {
-		node, _, _ := strings.Cut(afterNode(t, asVMs, appliance), "\n    ")
-		if strings.Contains(node, VMImage) {
-			t.Errorf("%s is a machine: an appliance with no kubelet costs RAM and a boot for nothing", appliance)
+	for _, node := range Default().Nodes {
+		if got := asContainers.Topology.GetNodeImage(node.Name); got != NodeImage {
+			t.Errorf("%s container image = %q", node.Name, got)
+		}
+		want := ApplianceImage
+		if node.IsClusterNode() {
+			want = VMImage
+		}
+		if got := asVMs.Topology.GetNodeImage(node.Name); got != want {
+			t.Errorf("%s VM rig image = %q, want %q", node.Name, got, want)
 		}
 	}
-
-	// The data plane is the same lab either way. Only the management
-	// channel differs, because a machine needs one and a container
-	// reached by docker exec does not.
-	if dataLinks(t, asContainers) != dataLinks(t, asVMs) {
-		t.Errorf("the two rigs wire the lab differently, so their rows are not comparable:\n container %s\n vm       %s",
-			dataLinks(t, asContainers), dataLinks(t, asVMs))
+	if !reflect.DeepEqual(asContainers.Topology.Links, asVMs.Topology.Links) {
+		t.Fatal("the two rigs wire the lab differently")
 	}
 }
 
 // Each guest has exactly one link and no management network.
 func TestEveryMachineHasOneEthernetLink(t *testing.T) {
-	yaml, err := Default().ContainerlabYAML(VM)
+	config, err := Default().ContainerlabConfig(VM)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(yaml, "mgmt-") {
-		t.Fatal("management bridge in single NIC topology")
+	if config.Mgmt != nil {
+		t.Fatal("implicit management network in topology")
 	}
-	for _, n := range Default().NodesInRole(ControlPlane, Worker, Remote) {
-		if count := strings.Count(yaml, `"`+n.Name+`:`); count != 1 {
-			t.Errorf("%s has %d links", n.Name, count)
+	for _, node := range Default().NodesInRole(ControlPlane, Worker, Remote) {
+		if config.Topology.GetNodeNetworkMode(node.Name) != "none" {
+			t.Errorf("%s has a management network", node.Name)
+		}
+		count := 0
+		for _, link := range config.Topology.Links {
+			brief, ok := link.Link.(*clablinks.LinkBriefRaw)
+			if !ok {
+				t.Fatalf("unexpected link type %T", link.Link)
+			}
+			for _, endpoint := range brief.Endpoints {
+				if strings.HasPrefix(endpoint, node.Name+":") {
+					count++
+				}
+			}
+		}
+		if count != 1 {
+			t.Errorf("%s has %d links", node.Name, count)
 		}
 	}
-}
-
-// dataLinks is every cable that is not a management one.
-func dataLinks(t *testing.T, yaml string) string {
-	t.Helper()
-	_, links, ok := strings.Cut(yaml, "links:")
-	if !ok {
-		t.Fatal("the generated topology has no links")
-	}
-	var kept []string
-	for _, line := range strings.Split(links, "\n") {
-		if strings.TrimSpace(line) == "" || strings.Contains(line, "mgmt-") {
-			continue
-		}
-		kept = append(kept, strings.TrimSpace(line))
-	}
-	sort.Strings(kept)
-	return strings.Join(kept, "\n")
-}
-
-// afterNode returns the generated stanza for one node, so an
-// assertion about that node cannot accidentally read another's.
-func afterNode(t *testing.T, yaml, name string) string {
-	t.Helper()
-	_, rest, ok := strings.Cut(yaml, "\n    "+name+":\n")
-	if !ok {
-		t.Fatalf("the generated topology has no node %q", name)
-	}
-	return rest
-}
-
-func linksOf(t *testing.T, yaml string) string {
-	t.Helper()
-	_, links, ok := strings.Cut(yaml, "links:")
-	if !ok {
-		t.Fatal("the generated topology has no links")
-	}
-	return links
 }
 
 // Every machine is given a name of its own.
@@ -184,7 +154,7 @@ func linksOf(t *testing.T, yaml string) string {
 // which is exactly why the container tier could not have found it.
 func TestEveryMachineIsGivenItsOwnName(t *testing.T) {
 	topo := Default()
-	yaml, err := topo.ContainerlabYAML(VM)
+	config, err := topo.ContainerlabConfig(VM)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +165,7 @@ func TestEveryMachineIsGivenItsOwnName(t *testing.T) {
 			continue
 		}
 		want := "--hostname " + n.Name
-		if !strings.Contains(yaml, want) {
+		if config.Topology.Nodes[n.Name].Cmd != want {
 			t.Errorf("%s is never told its own name: the launcher will call it ubuntu, "+
 				"as it will call every other machine in the lab", n.Name)
 			continue

@@ -10,13 +10,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"sigs.k8s.io/yaml"
-
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm/scos"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	clab "github.com/appmana/labcontainers/pkg/containerlab"
+	"github.com/srl-labs/containerlab/core"
+	"github.com/srl-labs/containerlab/types"
 )
 
 const Image = "cloud-provisioning/scos:single-nic"
@@ -48,19 +49,26 @@ func (r *Rig) Node(name string) rig.Node {
 	return &node{Node: n, rig: r}
 }
 
-// TopologyYAML reuses the shared appliance/link model and replaces only the
-// cluster machines' platform image, boot media and resource requirements.
+// TopologyYAML is the legacy CLI serialization boundary.
 func (r *Rig) TopologyYAML() ([]byte, error) {
-	raw, err := r.Topology.ContainerlabYAML(lab.Container)
+	config, err := r.TopologyConfig()
 	if err != nil {
 		return nil, err
 	}
-	var doc map[string]any
-	if err := yaml.Unmarshal([]byte(raw), &doc); err != nil {
+	source, err := clab.Source(config)
+	if err != nil {
 		return nil, err
 	}
-	topology := doc["topology"].(map[string]any)
-	nodes := topology["nodes"].(map[string]any)
+	return source.GetYaml(), nil
+}
+
+// TopologyConfig specializes native objects with the platform's boot media.
+// There is no YAML round trip or hand-maintained schema of node properties.
+func (r *Rig) TopologyConfig() (*core.Config, error) {
+	config, err := r.Topology.ContainerlabConfig(lab.Container)
+	if err != nil {
+		return nil, err
+	}
 	for _, n := range r.Topology.Nodes {
 		if !n.IsClusterNode() {
 			continue
@@ -89,10 +97,10 @@ func (r *Rig) TopologyYAML() ([]byte, error) {
 			}
 			binds = append(binds, disk+":/scos-base.qcow2:ro")
 		}
-		nodes[n.Name] = map[string]any{"kind": "linux", "image": Image,
-			"binds": binds, "env": map[string]string{"CLDT_MAC": MAC(n.Name), "QEMU_MEMORY": memory, "QEMU_SMP": "4"}}
+		config.Topology.Nodes[n.Name] = &types.NodeDefinition{Kind: "linux", Image: Image,
+			Binds: binds, Env: map[string]string{"CLDT_MAC": MAC(n.Name), "QEMU_MEMORY": memory, "QEMU_SMP": "4"}}
 	}
-	return yaml.Marshal(doc)
+	return config, nil
 }
 
 func (r *Rig) Seed(name string, userdata []byte) error {
@@ -138,14 +146,28 @@ func (r *Rig) Up(ctx context.Context) error {
 			}
 		}
 	}
-	raw, err := r.TopologyYAML()
+	config, err := r.TopologyConfig()
 	if err != nil {
 		return err
 	}
+	if r.Runtime != nil {
+		if _, err := r.Runtime.Destroy(ctx, r.WorkDir, r.Kind()); err != nil {
+			return err
+		}
+		if err := r.Runtime.Deploy(ctx, r.WorkDir, r.Kind(), r.Topology.Name, config); err != nil {
+			return err
+		}
+		return r.WaitReady(ctx, vm.BootTimeout)
+	}
+	// Explicit legacy recovery path, used only when no SDK runtime is supplied.
 	if err := r.DestroyDeployed(ctx); err != nil {
 		return err
 	}
-	if err := os.WriteFile(r.TopologyPath(), raw, 0600); err != nil {
+	source, err := clab.Source(config)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(r.TopologyPath(), source.GetYaml(), 0600); err != nil {
 		return err
 	}
 	_, stderr, code, err := r.Run(ctx, nil, "sudo", "containerlab", "deploy", "-t", r.TopologyPath(), "--reconfigure")

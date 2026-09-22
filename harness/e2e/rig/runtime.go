@@ -11,12 +11,14 @@ import (
 
 	labv1 "github.com/appmana/labcontainers/api/v1"
 	labclient "github.com/appmana/labcontainers/pkg/client"
+	clab "github.com/appmana/labcontainers/pkg/containerlab"
+	"github.com/srl-labs/containerlab/core"
 )
 
 // Runtime owns topology deployment independently of the product-specific node
 // configuration performed by this harness.
 type Runtime interface {
-	Deploy(context.Context, string, string, string, string) error
+	Deploy(context.Context, string, string, string, *core.Config) error
 	Destroy(context.Context, string, string) (bool, error)
 }
 
@@ -24,17 +26,34 @@ type Runtime interface {
 // `lab down` processes operate on the same owned topology.
 type LabcontainersRuntime struct{}
 
-func (LabcontainersRuntime) Deploy(ctx context.Context, workDir, kind, name, topologyPath string) error {
+func (LabcontainersRuntime) Deploy(ctx context.Context, workDir, kind, name string, config *core.Config) error {
+	source, err := clab.Source(config)
+	if err != nil {
+		return err
+	}
+	source.BaseDirectory, err = filepath.Abs(workDir)
+	if err != nil {
+		return err
+	}
 	opts := persistentOptions(workDir, kind)
 	labd, err := ensureLabd(ctx, workDir)
 	if err != nil {
 		return err
 	}
 	opts.LabdPath = labd
+	borrowedBridge := false
+	for _, node := range config.Topology.Nodes {
+		if node != nil && (node.Kind == "bridge" || node.Kind == "ovs-bridge") {
+			borrowedBridge = true
+		}
+	}
 	_, err = labclient.DeployPersistent(ctx, opts, &labv1.LabSpec{
 		Name:              name,
-		Topology:          &labv1.TopologySource{Source: &labv1.TopologySource_Path{Path: topologyPath}},
+		Topology:          source,
 		ArtifactDirectory: filepath.Join(workDir, "artifacts", kind),
+		// This product fixture explicitly borrows its site/cloud host bridges.
+		// Labcontainers still checks each network-mode:none runtime node.
+		AllowExternalAccess: borrowedBridge,
 	})
 	return err
 }

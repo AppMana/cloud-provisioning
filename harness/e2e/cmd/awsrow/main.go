@@ -192,7 +192,7 @@ func run() error {
 		remote.NodeName = nodeName
 		fleet.Remotes[nodeName] = remote
 		nodes = append(nodes, nodeName)
-		if err = k.WaitMachineAssociation(ctx, "cloud-provisioning", name, nodeName); err != nil {
+		if err = kube.WaitMachineAssociation(ctx, k, "cloud-provisioning", name, nodeName); err != nil {
 			return err
 		}
 		nodeRaw, e := k.Run(ctx, "get", "node", nodeName, "-o", "json")

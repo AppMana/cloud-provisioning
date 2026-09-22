@@ -10,6 +10,9 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // Image the probe pods run. Small, and it has httpd and wget, which
@@ -45,53 +48,47 @@ type Pods struct {
 	CRIEndpoint string
 }
 
-// Manifest renders one probe pod and its service for a node.
-//
-// The pod serves two things: a small body every ordinary check reads,
-// and a large one for the transfer check. The large one is generated
-// on the node rather than carried in, because a megabyte in a
-// manifest is a megabyte through the API server.
-func Manifest(node, namespace string) string {
-	return fmt.Sprintf(`apiVersion: v1
-kind: Pod
-metadata:
-  name: hc-%[1]s
-  namespace: %[2]s
-  labels: {app: hc-%[1]s}
-spec:
-  nodeSelector: {kubernetes.io/hostname: %[1]s}
-  # A provisioned node carries a taint that keeps ordinary workloads
-  # off it, and this check is not ordinary.
-  tolerations:
-    - operator: Exists
-  containers:
-    - name: serve
-      image: %[3]s
-      command: ["sh","-c","mkdir -p /tmp/www; printf ok > /tmp/www/index.html; dd if=/dev/zero of=/tmp/www/big bs=1024 count=%[5]d 2>/dev/null; httpd -f -p %[4]d -h /tmp/www"]
-      ports: [{containerPort: %[4]d}]
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: svc-hc-%[1]s
-  namespace: %[2]s
-spec:
-  selector: {app: hc-%[1]s}
-  ports:
-    - {name: http, port: %[4]d, targetPort: %[4]d}
-`, node, namespace, Image, Port, TransferBytes/1024)
+// ProbeObjects constructs native Kubernetes resources; callers never render YAML.
+// Probe images are preloaded by the harness, not fetched through an undeclared
+// registry path while measuring reachability.
+func ProbeObjects(node, namespace string) (*corev1.Pod, *corev1.Service) {
+	name := "hc-" + node
+	pod := &corev1.Pod{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Labels: map[string]string{"app": name}},
+		Spec: corev1.PodSpec{
+			NodeSelector: map[string]string{"kubernetes.io/hostname": node},
+			Tolerations:  []corev1.Toleration{{Operator: corev1.TolerationOpExists}},
+			Containers: []corev1.Container{{
+				Name: "serve", Image: Image, ImagePullPolicy: corev1.PullNever,
+				Command: []string{"sh", "-c", fmt.Sprintf("mkdir -p /tmp/www; printf ok > /tmp/www/index.html; dd if=/dev/zero of=/tmp/www/big bs=1024 count=%d 2>/dev/null; httpd -f -p %d -h /tmp/www", TransferBytes/1024, Port)},
+				Ports:   []corev1.ContainerPort{{ContainerPort: Port}},
+			}},
+		},
+	}
+	service := &corev1.Service{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
+		ObjectMeta: metav1.ObjectMeta{Name: "svc-" + name, Namespace: namespace},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{"app": name},
+			Ports:    []corev1.ServicePort{{Name: "http", Port: Port, TargetPort: intstr.FromInt(Port)}},
+		},
+	}
+	return pod, service
 }
 
 // Start creates a pod and a service on every node and waits for them
 // to run.
 func (p *Pods) Start(ctx context.Context, nodes []string, within time.Duration) ([]Target, error) {
-	if _, err := p.Kube.Run(ctx, "create", "namespace", p.Namespace); err != nil {
-		// Already there is fine; anything else surfaces when the pods
-		// fail to appear.
-		_ = err
+	if err := p.Kube.ApplyObjects(ctx, &corev1.Namespace{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"},
+		ObjectMeta: metav1.ObjectMeta{Name: p.Namespace},
+	}); err != nil {
+		return nil, fmt.Errorf("creating probe namespace: %w", err)
 	}
 	for _, node := range nodes {
-		if err := p.Kube.Apply(ctx, []byte(Manifest(node, p.Namespace))); err != nil {
+		pod, service := ProbeObjects(node, p.Namespace)
+		if err := p.Kube.ApplyObjects(ctx, pod, service); err != nil {
 			return nil, fmt.Errorf("creating %s's probe: %w", node, err)
 		}
 	}

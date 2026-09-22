@@ -10,6 +10,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+	clab "github.com/appmana/labcontainers/pkg/containerlab"
 )
 
 // The rig and its nodes satisfy the interfaces every stage reaches
@@ -63,14 +64,18 @@ func (r *Rig) TopologyPath() string {
 
 // Up writes the topology and deploys it.
 func (r *Rig) Up(ctx context.Context) error {
-	yaml, err := r.Topology.ContainerlabYAML(lab.Container)
+	config, err := r.Topology.ContainerlabConfig(lab.Container)
 	if err != nil {
 		return fmt.Errorf("rendering the topology: %w", err)
+	}
+	source, err := clab.Source(config)
+	if err != nil {
+		return err
 	}
 	if err := os.MkdirAll(r.WorkDir, 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(r.TopologyPath(), []byte(yaml), 0o644); err != nil {
+	if err := os.WriteFile(r.TopologyPath(), source.GetYaml(), 0o644); err != nil {
 		return err
 	}
 	// The previous lab goes first, and its state with it.
@@ -111,7 +116,7 @@ func (r *Rig) Up(ctx context.Context) error {
 		}
 	}
 	if r.Runtime != nil {
-		return r.Runtime.Deploy(ctx, r.WorkDir, r.Kind(), r.Topology.Name, r.TopologyPath())
+		return r.Runtime.Deploy(ctx, r.WorkDir, r.Kind(), r.Topology.Name, config)
 	}
 	_, errb, code, err := r.runner()(ctx, nil, "sudo", "containerlab", "deploy", "-t", r.TopologyPath(), "--reconfigure")
 	if err != nil {

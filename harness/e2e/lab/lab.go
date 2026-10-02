@@ -95,6 +95,9 @@ type Interface struct {
 	Name    string // inside the node: eth1, eth2
 	Segment string // the bridge it lands on
 	Address string // CIDR, or empty when the segment assigns none
+	// Address6 is the interface's IPv6 address (CIDR) on a dual-stack
+	// segment, or empty.
+	Address6 string
 }
 
 // Node is one machine in the topology.
@@ -107,6 +110,10 @@ type Node struct {
 	// fails in ways that look like the product misbehaving. A VM has a
 	// disk and needs none of it.
 	Binds []string
+	// Identity holds the node's cluster addresses (CIDRs, IPv4 first) on
+	// its identity device, for sites that do not identify nodes by their
+	// LAN address. See identity.go.
+	Identity []string
 }
 
 // Segments lists the segments this node has an interface on.
@@ -135,6 +142,10 @@ type Topology struct {
 	Name     string
 	Segments []string
 	Nodes    []Node
+	// IdentityRoutes are prefixes every LAN host routes on-link, so that
+	// identity addresses outside the LAN prefix are reachable. See
+	// identity.go.
+	IdentityRoutes []string
 }
 
 // Site addressing. A control plane is .10, .13, .14 and a worker .11,

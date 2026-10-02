@@ -57,7 +57,7 @@ func networkProvider(name string) string {
 	switch name {
 	case "", "default", "kuberouter", "kube-router":
 		return "kuberouter"
-	case "calico", "calico-site-bgp":
+	case "calico", "calico-site-bgp", BGPDualStack:
 		return "calico"
 	default:
 		return "custom"

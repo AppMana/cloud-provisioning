@@ -1,0 +1,50 @@
+# The network, API and storage sections of a production k0s v1.36.4+k0s.1
+# ClusterConfig (bundled Calico, BGP without encapsulation, dual-stack),
+# copied verbatim on 2026-10-02 except: the controller's host name is
+# replaced with "cp", and an operator-only SAN (a VPN address) is removed.
+# OIDC API arguments and kubelet worker profiles are omitted; they do not
+# affect networking.
+apiVersion: k0s.k0sproject.io/v1beta1
+kind: ClusterConfig
+metadata:
+  name: k0s
+spec:
+  api:
+    address: 10.101.0.1
+    sans:
+      - 10.101.0.1
+      - "fd8f:cf26:522a::1"
+      - cp
+      - cp.local
+      - 10.101.4.1
+      - "fd8f:cf26:522a:4::1"
+  storage:
+    type: etcd
+    etcd:
+      peerAddress: 10.101.0.1
+  controllerManager:
+    extraArgs:
+      allocate-node-cidrs: "false"
+  network:
+    provider: calico
+    podCIDR: 10.101.128.0/17
+    serviceCIDR: 10.101.4.0/22
+    primaryAddressFamily: IPv4
+    dualStack:
+      enabled: true
+      IPv6podCIDR: "fd8f:cf26:522a:128::/64"
+      IPv6serviceCIDR: "fd8f:cf26:522a:4::/108"
+    clusterDomain: cluster.local
+    calico:
+      mode: bird
+      overlay: Never
+      envVars:
+        IP_AUTODETECTION_METHOD: "cidr=10.101.0.0/24"
+        IP6_AUTODETECTION_METHOD: "cidr=fd8f:cf26:522a::/64"
+        FELIX_IPINIPMTU: "1500"
+        FELIX_VXLANMTU: "1500"
+        FELIX_WIREGUARDMTU: "1500"
+    kubeProxy:
+      mode: iptables
+  telemetry:
+    enabled: false

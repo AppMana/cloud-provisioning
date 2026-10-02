@@ -53,8 +53,10 @@ func NetworkConfig(n lab.Node) (*networkconfig.NetworkConfigVersion2, error) {
 		Routes:      []networkconfig.MappingRoutesElem{{To: "default", Via: &via}},
 		Nameservers: &networkconfig.MappingNameservers{Addresses: []string{Resolver}},
 	}
-	if address := n.Interfaces[0].Address; address != "" {
-		physical.Addresses = []string{address}
+	for _, address := range []string{n.Interfaces[0].Address, n.Interfaces[0].Address6} {
+		if address != "" {
+			physical.Addresses = append(physical.Addresses, address)
+		}
 	}
 	return &networkconfig.NetworkConfigVersion2{
 		Version:   2,

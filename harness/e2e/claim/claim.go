@@ -111,7 +111,7 @@ func (c *Claimer) Claim(ctx context.Context, name, node string) error {
 	// The infrastructure cluster, reported before anything waits on a
 	// machine: Cluster API keeps every Machine Pending until the
 	// Cluster its infrastructure belongs to is provisioned.
-	apiServer := c.Topology.NodesInRole(lab.ControlPlane)[0].Address(lab.LANSegment)
+	apiServer := c.Topology.NodesInRole(lab.ControlPlane)[0].ClusterAddress()
 	if err := c.Provider.ReconcileCluster(ctx, Namespace, ClusterName, apiServer, c.Kube.ServingPort()); err != nil {
 		return err
 	}

@@ -34,6 +34,14 @@ var pinnedVersion = regexp.MustCompile(`@sha256:[0-9a-fA-F]{64}$`)
 // ValidateImages prevents implicit bundled upstream Calico in test profiles.
 // Content pins do not prove fork provenance or compatible component versions.
 func ValidateImages(network string, images *native.ClusterImages) error {
+	if network == BGPDualStack {
+		// The profile reproduces a stock deployment and carries that
+		// deployment's digest-pinned images itself.
+		if images != nil {
+			return fmt.Errorf("%s uses its own stock image set; do not supply k0s images", BGPDualStack)
+		}
+		return nil
+	}
 	calico := network == "calico" || network == "calico-site-bgp"
 	if images == nil {
 		if calico {

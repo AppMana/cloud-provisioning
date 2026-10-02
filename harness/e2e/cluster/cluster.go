@@ -161,7 +161,7 @@ func SiteNodes(t lab.Topology) []lab.Node {
 func ControlPlaneAddresses(t lab.Topology) []string {
 	var out []string
 	for _, n := range t.NodesInRole(lab.ControlPlane) {
-		out = append(out, n.Address(lab.LANSegment))
+		out = append(out, n.ClusterAddress())
 	}
 	return out
 }

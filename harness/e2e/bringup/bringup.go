@@ -151,8 +151,11 @@ func Configure(ctx context.Context, t lab.Topology, r rig.Rig, h Host) error {
 			// them on, and addressing a name the guest does not have
 			// succeeds at nothing while reporting nothing.
 			dev := node.Interface(idx)
-			if i.Address != "" {
-				if _, err := node.Exec(ctx, "ip", "addr", "replace", i.Address, "dev", dev); err != nil {
+			for _, address := range []string{i.Address, i.Address6} {
+				if address == "" {
+					continue
+				}
+				if _, err := node.Exec(ctx, "ip", "addr", "replace", address, "dev", dev); err != nil {
 					return fmt.Errorf("addressing %s %s: %w", n.Name, dev, err)
 				}
 			}
@@ -163,6 +166,9 @@ func Configure(ctx context.Context, t lab.Topology, r rig.Rig, h Host) error {
 	}
 
 	if err := routes(ctx, t, r); err != nil {
+		return err
+	}
+	if err := identities(ctx, t, r); err != nil {
 		return err
 	}
 	return policy(ctx, t, r)
@@ -321,7 +327,7 @@ func Prove(ctx context.Context, t lab.Topology, p Prober) error {
 	// untested.
 	for _, r := range remotes {
 		for _, cp := range t.NodesInRole(lab.ControlPlane) {
-			if dialsVia(ctx, p, r.Name, cp.Address(lab.LANSegment), 6443) {
+			if dialsVia(ctx, p, r.Name, cp.ClusterAddress(), 6443) {
 				return fmt.Errorf("%s opened a connection to %s's API server directly, "+
 					"so a tunnel is not the only way in", r.Name, cp.Name)
 			}

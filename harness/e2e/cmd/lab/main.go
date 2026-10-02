@@ -203,6 +203,9 @@ func runLab() {
 	defer cancelTimeout()
 
 	topo, err := lab.WithRemoteSlots(*remoteSlots)
+	if selected.Network == k0s.BGPDualStack {
+		topo, err = lab.WithIdentities(*remoteSlots)
+	}
 	if err != nil {
 		fail("%v", err)
 	}
@@ -326,7 +329,7 @@ func runLab() {
 			K0sCalicoMTU:              *calicoMTU,
 			K0sCalicoManagedAddresses: *calicoManagedAddresses,
 			Images:                    cluster.Importer{Images: images, Args: b.ImportArgs()},
-			PodCIDR:                   "10.244.0.0/16", SvcCIDR: "10.96.0.0/12",
+			PodCIDR:                   podCIDR(selected), SvcCIDR: serviceCIDR(selected),
 			Kube: &kube.Client{Bastion: r.Node("bastion"), ControlPlanes: cluster.ControlPlaneAddresses(topo)},
 		}
 		if *reuseSite {
@@ -818,4 +821,19 @@ func fail(format string, args ...any) {
 	recordEvent("run-failed", fmt.Sprintf(format, args...))
 	fmt.Fprintf(os.Stderr, "FAIL: "+format+"\n", args...)
 	panic(runFailure{})
+}
+
+// podCIDR and serviceCIDR are the site's IPv4 address plan.
+func podCIDR(p network.Profile) string {
+	if p.Network == k0s.BGPDualStack {
+		return k0s.BGPDualStackPodCIDR4
+	}
+	return "10.244.0.0/16"
+}
+
+func serviceCIDR(p network.Profile) string {
+	if p.Network == k0s.BGPDualStack {
+		return k0s.BGPDualStackServiceCIDR4
+	}
+	return "10.96.0.0/12"
 }

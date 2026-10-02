@@ -86,8 +86,12 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 	if err := b.config(ctx, d, first); err != nil {
 		return err
 	}
-	if err := b.start(ctx, d, first, "controller", "--enable-worker", "-c", "/etc/k0s/k0s.yaml",
-		siteKubeletArgs(d.Network, first.Address(lab.LANSegment))); err != nil {
+	firstArgs := []string{"controller", "--enable-worker", "-c", "/etc/k0s/k0s.yaml",
+		siteKubeletArgs(d.Network, first.ClusterAddress())}
+	if d.Network == BGPDualStack {
+		firstArgs = bgpDualStackControllerArgs(first)
+	}
+	if err := b.start(ctx, d, first, firstArgs...); err != nil {
 		return err
 	}
 	if err := b.waitForAPI(ctx, d, first, 5*time.Minute); err != nil {
@@ -108,7 +112,7 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 		}
 		if err := b.join(ctx, d, first, n, "controller",
 			"controller", "--enable-worker", "--token-file", "/etc/k0s/token", "-c", "/etc/k0s/k0s.yaml",
-			siteKubeletArgs(d.Network, n.Address(lab.LANSegment))); err != nil {
+			siteKubeletArgs(d.Network, n.ClusterAddress())); err != nil {
 			return err
 		}
 		// Adding an etcd member changes quorum. Starting the next join before
@@ -119,9 +123,12 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 		}
 	}
 	for _, n := range d.Topology.NodesInRole(lab.Worker) {
-		if err := b.join(ctx, d, first, n, "worker",
-			"worker", "--token-file", "/etc/k0s/token",
-			siteKubeletArgs(d.Network, n.Address(lab.LANSegment))); err != nil {
+		args := []string{"worker", "--token-file", "/etc/k0s/token",
+			siteKubeletArgs(d.Network, n.ClusterAddress())}
+		if d.Network == BGPDualStack {
+			args = bgpDualStackWorkerArgs(n)
+		}
+		if err := b.join(ctx, d, first, n, "worker", args...); err != nil {
 			return err
 		}
 	}
@@ -133,14 +140,21 @@ func (b Builder) config(ctx context.Context, d cluster.Deps, n lab.Node) error {
 	if err := ValidateImages(d.Network, d.K0sImages); err != nil {
 		return err
 	}
+	if d.Network == BGPDualStack {
+		config, err := bgpDualStackConfig(d, n)
+		if err != nil {
+			return err
+		}
+		return shared.WriteConfig(ctx, d.Rig.Node(n.Name), "/etc/k0s/k0s.yaml", config)
+	}
 	calicoSettings, err := calicoConfig(d.Network, d.K0sCalicoMTU, d.K0sCalicoManagedAddresses)
 	if err != nil {
 		return err
 	}
-	addr := n.Address(lab.LANSegment)
+	addr := n.ClusterAddress()
 	sans := []string{"127.0.0.1"}
 	for _, cp := range d.Topology.NodesInRole(lab.ControlPlane) {
-		sans = append(sans, cp.Address(lab.LANSegment))
+		sans = append(sans, cp.ClusterAddress())
 	}
 	for _, cp := range d.Topology.NodesInRole(lab.ControlPlane) {
 		sans = append(sans, cp.Name)
@@ -259,6 +273,15 @@ func (b Builder) KubeletInvariant(ctx context.Context, d cluster.Deps) error {
 		// returns. Reading it the instant the site is built finds
 		// nothing and says the node has no balancer, when what it has
 		// is a balancer that is still starting.
+		if d.Network == BGPDualStack {
+			// No node-local balancing: one controller, which every worker
+			// dials at its cluster address, as the deployment does.
+			if err := singleControllerKubelet(ctx, d, n); err != nil {
+				return err
+			}
+			checked++
+			continue
+		}
 		out, err := b.readWithDeadline(ctx, d, n, 3*time.Minute)
 		if err != nil {
 			// A controller that is also a worker may keep its own
@@ -321,6 +344,11 @@ func (Builder) Reuse(ctx context.Context, d cluster.Deps) error {
 			}
 			if d.Network == "calico-site-bgp" {
 				if err := verifySiteBGPConfig(config); err != nil {
+					return fmt.Errorf("%s: %w", node.Name, err)
+				}
+			}
+			if d.Network == BGPDualStack {
+				if err := verifyBGPDualStackConfig(config, d, node); err != nil {
 					return fmt.Errorf("%s: %w", node.Name, err)
 				}
 			}

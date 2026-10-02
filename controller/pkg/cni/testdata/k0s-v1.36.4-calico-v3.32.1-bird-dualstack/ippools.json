@@ -1,0 +1,46 @@
+{
+  "apiVersion": "v1",
+  "items": [
+    {
+      "apiVersion": "crd.projectcalico.org/v1",
+      "kind": "IPPool",
+      "metadata": {
+        "name": "default-ipv4-ippool"
+      },
+      "spec": {
+        "allowedUses": [
+          "Workload",
+          "Tunnel"
+        ],
+        "assignmentMode": "Automatic",
+        "blockSize": 26,
+        "cidr": "10.101.128.0/17",
+        "ipipMode": "Never",
+        "natOutgoing": true,
+        "nodeSelector": "all()",
+        "vxlanMode": "Never"
+      }
+    },
+    {
+      "apiVersion": "crd.projectcalico.org/v1",
+      "kind": "IPPool",
+      "metadata": {
+        "name": "default-ipv6-ippool"
+      },
+      "spec": {
+        "allowedUses": [
+          "Workload",
+          "Tunnel"
+        ],
+        "assignmentMode": "Automatic",
+        "blockSize": 122,
+        "cidr": "fd8f:cf26:522a:128::/64",
+        "ipipMode": "Never",
+        "natOutgoing": true,
+        "nodeSelector": "all()",
+        "vxlanMode": "Never"
+      }
+    }
+  ],
+  "kind": "List"
+}

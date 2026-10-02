@@ -1,0 +1,166 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "DaemonSet",
+  "metadata": {
+    "name": "calico-node",
+    "namespace": "kube-system"
+  },
+  "spec": {
+    "template": {
+      "spec": {
+        "initContainers": [
+          {
+            "name": "install-cni",
+            "image": "quay.io/k0sproject/calico-cni:v3.32.1-3",
+            "env": [
+              {
+                "name": "CNI_CONF_NAME",
+                "value": "10-calico.conflist"
+              },
+              {
+                "name": "CNI_NETWORK_CONFIG",
+                "value": "{\n  \"name\": \"k8s-pod-network\",\n  \"cniVersion\": \"0.3.1\",\n  \"plugins\": [\n    {\n      \"type\": \"calico\",\n      \"log_level\": \"info\",\n      \"log_file_path\": \"__LOG_FILE_PATH__\",\n      \"datastore_type\": \"kubernetes\",\n      \"nodename\": \"__KUBERNETES_NODE_NAME__\",\n      \"mtu\": 1450,\n      \"ipam\": {\n          \"type\": \"calico-ipam\",\n          \"assign_ipv4\": \"true\",\n          \"assign_ipv6\": \"true\"\n      },\n      \"policy\": {\n          \"type\": \"k8s\"\n      },\n      \"kubernetes\": {\n          \"kubeconfig\": \"__KUBECONFIG_FILEPATH__\"\n      }\n    },\n    {\n      \"type\": \"portmap\",\n      \"snat\": true,\n      \"capabilities\": {\"portMappings\": true}\n    },\n    {\n      \"type\": \"bandwidth\",\n      \"capabilities\": {\"bandwidth\": true}\n    }\n  ]\n}\n"
+              }
+            ]
+          }
+        ],
+        "containers": [
+          {
+            "name": "calico-node",
+            "image": "quay.io/k0sproject/calico-node:v3.32.1-3",
+            "env": [
+              {
+                "name": "DATASTORE_TYPE",
+                "value": "kubernetes"
+              },
+              {
+                "name": "WAIT_FOR_DATASTORE",
+                "value": "true"
+              },
+              {
+                "name": "CALICO_NETWORKING_BACKEND",
+                "value": "bird"
+              },
+              {
+                "name": "CLUSTER_TYPE",
+                "value": "k8s,bgp"
+              },
+              {
+                "name": "IP",
+                "value": "autodetect"
+              },
+              {
+                "name": "FELIX_IPTABLESBACKEND",
+                "value": "auto"
+              },
+              {
+                "name": "CALICO_IPV4POOL_IPIP",
+                "value": "Never"
+              },
+              {
+                "name": "CALICO_IPV4POOL_VXLAN",
+                "value": "Never"
+              },
+              {
+                "name": "CALICO_IPV6POOL_VXLAN",
+                "value": "Never"
+              },
+              {
+                "name": "FELIX_IPINIPMTU",
+                "value": "1450"
+              },
+              {
+                "name": "FELIX_VXLANMTU",
+                "value": "1450"
+              },
+              {
+                "name": "FELIX_WIREGUARDMTU",
+                "value": "1450"
+              },
+              {
+                "name": "CALICO_IPV4POOL_CIDR",
+                "value": "10.101.128.0/17"
+              },
+              {
+                "name": "CALICO_DISABLE_FILE_LOGGING",
+                "value": "true"
+              },
+              {
+                "name": "FELIX_DEFAULTENDPOINTTOHOSTACTION",
+                "value": "ACCEPT"
+              },
+              {
+                "name": "CALICO_IPV6POOL_NAT_OUTGOING",
+                "value": "true"
+              },
+              {
+                "name": "FELIX_IPV6SUPPORT",
+                "value": "true"
+              },
+              {
+                "name": "IP6",
+                "value": "autodetect"
+              },
+              {
+                "name": "CALICO_IPV6POOL_CIDR",
+                "value": "fd8f:cf26:522a:128::/64"
+              },
+              {
+                "name": "FELIX_LOGSEVERITYSCREEN",
+                "value": "info"
+              },
+              {
+                "name": "FELIX_HEALTHENABLED",
+                "value": "true"
+              },
+              {
+                "name": "FELIX_PROMETHEUSMETRICSENABLED",
+                "value": "true"
+              },
+              {
+                "name": "FELIX_BPFENABLED",
+                "value": "false"
+              },
+              {
+                "name": "FELIX_BPFCONNECTTIMELOADBALANCING",
+                "value": "Disabled"
+              },
+              {
+                "name": "FELIX_BPFHOSTNETWORKEDNATWITHOUTCTLB",
+                "value": "Disabled"
+              },
+              {
+                "name": "FELIX_DebugSkipCTLBCleanup",
+                "value": "true"
+              },
+              {
+                "name": "FELIX_FEATUREDETECTOVERRIDE",
+                "value": "ChecksumOffloadBroken=true"
+              },
+              {
+                "name": "FELIX_IPINIPMTU",
+                "value": "1500"
+              },
+              {
+                "name": "FELIX_VXLANMTU",
+                "value": "1500"
+              },
+              {
+                "name": "FELIX_WIREGUARDMTU",
+                "value": "1500"
+              },
+              {
+                "name": "IP6_AUTODETECTION_METHOD",
+                "value": "cidr=fd8f:cf26:522a::/64"
+              },
+              {
+                "name": "IP_AUTODETECTION_METHOD",
+                "value": "cidr=10.101.0.0/24"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

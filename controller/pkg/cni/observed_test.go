@@ -210,3 +210,67 @@ func TestObservedKubeadmNativeCalicoBlocks(t *testing.T) {
 		}
 	}
 }
+
+// Captured read-only from a production k0s v1.36.4 cluster on 2026-10-02:
+// bundled Calico v3.32.1 in BGP mode without encapsulation, IPv4 and IPv6
+// pools, both masquerading outgoing traffic.
+func TestObservedK0sBundledCalicoBirdDualStack(t *testing.T) {
+	const fixture = "testdata/k0s-v1.36.4-calico-v3.32.1-bird-dualstack/"
+	var objects []client.Object
+	for _, name := range []string{"ippools.json", "blocks.json", "nodes.json"} {
+		raw, err := os.ReadFile(fixture + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var list unstructured.UnstructuredList
+		if err := json.Unmarshal(raw, &list); err != nil {
+			t.Fatal(err)
+		}
+		for i := range list.Items {
+			objects = append(objects, &list.Items[i])
+		}
+	}
+	reader := newClient(objects...)
+	network, err := Detect(context.Background(), reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if network.Name != Calico || network.Encapsulation != Native {
+		t.Fatalf("observed BGP Calico detected as %+v", network)
+	}
+	want := map[string][]string{
+		"controller": {"10.101.190.192/26", "fd8f:cf26:522a:128:df57:d189:53c6:3ec0/122"},
+		"worker-1":   {"10.101.155.0/26", "fd8f:cf26:522a:128:20e2:bc23:8099:5740/122"},
+		"worker-2":   {"10.101.166.128/26", "fd8f:cf26:522a:128:40b0:7997:8297:9dc0/122"},
+	}
+	pools := []netip.Prefix{netip.MustParsePrefix("10.101.128.0/17"), netip.MustParsePrefix("fd8f:cf26:522a:128::/64")}
+	nodeAddresses := []netip.Prefix{netip.MustParsePrefix("10.101.0.0/24"), netip.MustParsePrefix("fd8f:cf26:522a::/64")}
+	for node, cidrs := range want {
+		prefixes, err := network.PrefixesFor(context.Background(), reader, node)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(prefixes) != len(cidrs) {
+			t.Fatalf("native blocks for %s: got %v, want both families %v", node, prefixes, cidrs)
+		}
+		for i, cidr := range cidrs {
+			if prefixes[i] != netip.MustParsePrefix(cidr) {
+				t.Fatalf("native blocks for %s: got %v, want %v", node, prefixes, cidrs)
+			}
+		}
+		// A block is a node's own allocation: never a whole pool, never
+		// the node address range the site routes its own hosts by.
+		for _, prefix := range prefixes {
+			for _, broad := range append(append([]netip.Prefix{}, pools...), nodeAddresses...) {
+				if prefix.Bits() <= broad.Bits() && prefix.Overlaps(broad) {
+					t.Fatalf("%s published %s, which covers %s", node, prefix, broad)
+				}
+			}
+		}
+		// The blocks fall inside the cluster's own masquerading pools, so
+		// remote traffic keeps the pod source address.
+		if err := network.CheckMasquerade(context.Background(), reader, prefixes); err != nil {
+			t.Fatalf("observed blocks for %s rejected: %v", node, err)
+		}
+	}
+}

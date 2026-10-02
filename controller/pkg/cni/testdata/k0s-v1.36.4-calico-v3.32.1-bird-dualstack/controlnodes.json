@@ -1,0 +1,16 @@
+{
+  "apiVersion": "v1",
+  "items": [
+    {
+      "apiVersion": "autopilot.k0sproject.io/v1beta2",
+      "kind": "ControlNode",
+      "metadata": {
+        "name": "controller"
+      },
+      "status": {
+        "k0sVersion": "v1.36.4+k0s.1"
+      }
+    }
+  ],
+  "kind": "List"
+}

@@ -1,0 +1,90 @@
+{
+  "apiVersion": "v1",
+  "items": [
+    {
+      "apiVersion": "crd.projectcalico.org/v1",
+      "kind": "BlockAffinity",
+      "metadata": {
+        "name": "controller-10-101-190-192-26"
+      },
+      "spec": {
+        "cidr": "10.101.190.192/26",
+        "deleted": "false",
+        "node": "controller",
+        "state": "confirmed",
+        "type": "host"
+      }
+    },
+    {
+      "apiVersion": "crd.projectcalico.org/v1",
+      "kind": "BlockAffinity",
+      "metadata": {
+        "name": "controller-fd8f-cf26-522a-128-df57-d189-53c6-3ec0-122"
+      },
+      "spec": {
+        "cidr": "fd8f:cf26:522a:128:df57:d189:53c6:3ec0/122",
+        "deleted": "false",
+        "node": "controller",
+        "state": "confirmed",
+        "type": "host"
+      }
+    },
+    {
+      "apiVersion": "crd.projectcalico.org/v1",
+      "kind": "BlockAffinity",
+      "metadata": {
+        "name": "worker-1-10-101-155-0-26"
+      },
+      "spec": {
+        "cidr": "10.101.155.0/26",
+        "deleted": "false",
+        "node": "worker-1",
+        "state": "confirmed",
+        "type": "host"
+      }
+    },
+    {
+      "apiVersion": "crd.projectcalico.org/v1",
+      "kind": "BlockAffinity",
+      "metadata": {
+        "name": "worker-1-fd8f-cf26-522a-128-20e2-bc23-8099-5740-122"
+      },
+      "spec": {
+        "cidr": "fd8f:cf26:522a:128:20e2:bc23:8099:5740/122",
+        "deleted": "false",
+        "node": "worker-1",
+        "state": "confirmed",
+        "type": "host"
+      }
+    },
+    {
+      "apiVersion": "crd.projectcalico.org/v1",
+      "kind": "BlockAffinity",
+      "metadata": {
+        "name": "worker-2-10-101-166-128-26"
+      },
+      "spec": {
+        "cidr": "10.101.166.128/26",
+        "deleted": "false",
+        "node": "worker-2",
+        "state": "confirmed",
+        "type": "host"
+      }
+    },
+    {
+      "apiVersion": "crd.projectcalico.org/v1",
+      "kind": "BlockAffinity",
+      "metadata": {
+        "name": "worker-2-fd8f-cf26-522a-128-40b0-7997-8297-9dc0-122"
+      },
+      "spec": {
+        "cidr": "fd8f:cf26:522a:128:40b0:7997:8297:9dc0/122",
+        "deleted": "false",
+        "node": "worker-2",
+        "state": "confirmed",
+        "type": "host"
+      }
+    }
+  ],
+  "kind": "List"
+}

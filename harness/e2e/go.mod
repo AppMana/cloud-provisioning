@@ -6,13 +6,13 @@ replace github.com/appmana/cloud-provisioning/controller => ../../controller
 
 require (
 	github.com/appmana/cloud-provisioning/controller v0.0.0-00010101000000-000000000000
-	github.com/k0sproject/k0s v1.36.3-0.20260626104849-bdf1c22c23a5
+	github.com/k0sproject/k0s v1.36.5-0.20260918181138-c37fe960bdee
 	golang.org/x/crypto v0.54.0
 	google.golang.org/grpc v1.82.1
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.36.2
-	k8s.io/apimachinery v0.36.3
-	k8s.io/client-go v0.36.2
+	k8s.io/api v0.36.4
+	k8s.io/apimachinery v0.36.4
+	k8s.io/client-go v0.36.4
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -58,7 +58,7 @@ require (
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
-	github.com/containerd/platforms v1.0.0-rc.4 // indirect
+	github.com/containerd/platforms v1.0.0-rc.5 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.18.2 // indirect
 	github.com/containerd/ttrpc v1.2.8 // indirect
 	github.com/containerd/typeurl/v2 v2.3.0 // indirect
@@ -224,9 +224,9 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	go.etcd.io/etcd/api/v3 v3.6.12 // indirect
-	go.etcd.io/etcd/client/pkg/v3 v3.6.12 // indirect
-	go.etcd.io/etcd/client/v3 v3.6.12 // indirect
+	go.etcd.io/etcd/api/v3 v3.6.14 // indirect
+	go.etcd.io/etcd/client/pkg/v3 v3.6.14 // indirect
+	go.etcd.io/etcd/client/v3 v3.6.14 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.69.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
@@ -253,27 +253,27 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	helm.sh/helm/v3 v3.21.2 // indirect
-	k8s.io/apiextensions-apiserver v0.36.2 // indirect
-	k8s.io/apiserver v0.36.2 // indirect
-	k8s.io/cloud-provider v0.36.2 // indirect
-	k8s.io/cluster-bootstrap v0.36.2 // indirect
-	k8s.io/component-base v0.36.2 // indirect
-	k8s.io/component-helpers v0.36.2 // indirect
-	k8s.io/controller-manager v0.36.2 // indirect
-	k8s.io/cri-api v0.36.2 // indirect
-	k8s.io/cri-client v0.36.2 // indirect
-	k8s.io/kms v0.36.2 // indirect
-	k8s.io/kubelet v0.36.2 // indirect
-	k8s.io/mount-utils v0.36.2 // indirect
-	k8s.io/streaming v0.36.3 // indirect
+	helm.sh/helm/v3 v3.21.4 // indirect
+	k8s.io/apiextensions-apiserver v0.36.4 // indirect
+	k8s.io/apiserver v0.36.4 // indirect
+	k8s.io/cloud-provider v0.36.4 // indirect
+	k8s.io/cluster-bootstrap v0.36.4 // indirect
+	k8s.io/component-base v0.36.4 // indirect
+	k8s.io/component-helpers v0.36.4 // indirect
+	k8s.io/controller-manager v0.36.4 // indirect
+	k8s.io/cri-api v0.36.4 // indirect
+	k8s.io/cri-client v0.36.4 // indirect
+	k8s.io/kms v0.36.4 // indirect
+	k8s.io/kubelet v0.36.4 // indirect
+	k8s.io/mount-utils v0.36.4 // indirect
+	k8s.io/streaming v0.36.4 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.36.0 // indirect
 	sigs.k8s.io/kind v0.31.0 // indirect
 	tags.cncf.io/container-device-interface v1.1.0 // indirect
 )
 
 require (
-	github.com/appmana/labcontainers v0.2.0-alpha.2.0.20260922225920-43833b0979f7
+	github.com/appmana/labcontainers v0.2.0-alpha.2.0.20261002173627-20aaebeabe47
 	github.com/aws/aws-sdk-go-v2 v1.46.0 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.2 // indirect
@@ -313,8 +313,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260319004828-5883c5ee87b9 // indirect
-	k8s.io/kube-proxy v0.36.2
-	k8s.io/kubernetes v1.36.2
+	k8s.io/kube-proxy v0.36.4
+	k8s.io/kubernetes v1.36.4
 	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5 // indirect
 	sigs.k8s.io/controller-runtime v0.24.1 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect

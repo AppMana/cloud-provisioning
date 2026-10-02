@@ -32,7 +32,7 @@ func init() { cluster.Register(Builder{}) }
 
 // Version is the release this site runs. Pinned: a distribution that
 // changes under the matrix makes two runs incomparable.
-const Version = "v1.36.2+k0s.0"
+const Version = "v1.36.4+k0s.1"
 
 // Builder builds a k0s site.
 type Builder struct{}

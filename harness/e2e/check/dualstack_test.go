@@ -226,10 +226,10 @@ func TestProbeObjectsAreDualStackAndPinned(t *testing.T) {
 // above it are not answers.
 func TestNslookupAnswersExcludeTheServer(t *testing.T) {
 	out := "Server:\t\t10.101.4.10\nAddress:\t10.101.4.10:53\n\nName:\tsvc-hc-cp.ns.svc.cluster.local\nAddress: fd8f:cf26:522a:4::a\n\n"
-	if got := nslookupAnswers(out); !reflect.DeepEqual(got, []string{"fd8f:cf26:522a:4::a"}) {
+	if got := NslookupAnswers(out); !reflect.DeepEqual(got, []string{"fd8f:cf26:522a:4::a"}) {
 		t.Errorf("answers = %v", got)
 	}
-	if got := nslookupAnswers("Server:\t\t10.101.4.10\nAddress:\t10.101.4.10:53\n\n*** Can't find x: No answer\n"); len(got) != 0 {
+	if got := NslookupAnswers("Server:\t\t10.101.4.10\nAddress:\t10.101.4.10:53\n\n*** Can't find x: No answer\n"); len(got) != 0 {
 		t.Errorf("answers for no answer = %v", got)
 	}
 }

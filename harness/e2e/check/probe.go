@@ -35,12 +35,31 @@ const (
 	UDPPort = 8081
 )
 
-// transferFile is the body each probe posts: TransferBytes of x, written
-// once when the pod starts.
-const transferFile = "/tmp/transfer"
+// TransferFile is the body each probe posts: TransferBytes of x, written
+// once when the pod starts. TransferCommand posts it ($2) to an echo URL
+// ($1) and counts what comes back; pipefail keeps a failed curl from
+// passing through wc.
+const (
+	TransferFile    = "/tmp/transfer"
+	TransferCommand = `set -o pipefail; curl -sS --fail --noproxy '*' --max-time 60 --data-urlencode "msg@$2" "$1" | wc -c`
+)
 
-// udpProbePath is where the UDP prober is carried into a probe container.
-const udpProbePath = "/tmp/udpprobe"
+// UDPProbePath is where the UDP prober is carried into a probe container,
+// and CarryCommand writes stdin there ($1) atomically.
+const (
+	UDPProbePath = "/tmp/udpprobe"
+	CarryCommand = `cat > "$1.new"; chmod 0755 "$1.new"; mv "$1.new" "$1"`
+)
+
+// UDPProbeArgv is the prober's command line for one size.
+func UDPProbeArgv(destination string, payload, tries int, dontFragment bool) []string {
+	argv := []string{UDPProbePath, "-destination", destination,
+		"-payload-bytes", strconv.Itoa(payload), "-tries", strconv.Itoa(tries)}
+	if dontFragment {
+		argv = append(argv, "-dont-fragment")
+	}
+	return argv
+}
 
 // Pods puts one probe pod on each node and reaches them through each
 // node's own container runtime.
@@ -88,7 +107,7 @@ func ProbeObjects(node, namespace string) (*corev1.Pod, *corev1.Service) {
 			Tolerations:  []corev1.Toleration{{Operator: corev1.TolerationOpExists}},
 			Containers: []corev1.Container{{
 				Name: "serve", Image: Image, ImagePullPolicy: corev1.PullNever,
-				Command: []string{"sh", "-c", fmt.Sprintf("head -c %d /dev/zero | tr '\\0' x > %s; exec /agnhost netexec --http-port=%d --udp-port=%d", TransferBytes, transferFile, Port, UDPPort)},
+				Command: []string{"sh", "-c", fmt.Sprintf("head -c %d /dev/zero | tr '\\0' x > %s; exec /agnhost netexec --http-port=%d --udp-port=%d", TransferBytes, TransferFile, Port, UDPPort)},
 				Ports: []corev1.ContainerPort{
 					{Name: "http", ContainerPort: Port, Protocol: corev1.ProtocolTCP},
 					{Name: "udp", ContainerPort: UDPPort, Protocol: corev1.ProtocolUDP},
@@ -205,7 +224,7 @@ func (p *Pods) targets(ctx context.Context, nodes []string) ([]Target, error) {
 		if err != nil || strings.TrimSpace(svcIPs) == "" {
 			return out, fmt.Errorf("%s's probe has no service address", node)
 		}
-		target, err := targetFor(node, p.Namespace, strings.Fields(podIPs), strings.Fields(svcIPs))
+		target, err := TargetFor(node, p.Namespace, strings.Fields(podIPs), strings.Fields(svcIPs))
 		if err != nil {
 			return out, err
 		}
@@ -221,11 +240,11 @@ func (p *Pods) targets(ctx context.Context, nodes []string) ([]Target, error) {
 	return out, nil
 }
 
-// targetFor sorts a probe's addresses by family. The pod and its Service
+// TargetFor sorts a probe's addresses by family. The pod and its Service
 // must agree on which families they have: a dual-stack pod behind a
 // single-stack Service, or the reverse, is a cluster that is half
 // configured, and measuring only the half that works would hide it.
-func targetFor(node, namespace string, podIPs, serviceIPs []string) (Target, error) {
+func TargetFor(node, namespace string, podIPs, serviceIPs []string) (Target, error) {
 	t := Target{Node: node, ServiceName: "svc-hc-" + node + "." + namespace + ".svc.cluster.local"}
 	assign := func(addrs []string, v4, v6 *string, what string) error {
 		for _, a := range addrs {
@@ -285,7 +304,7 @@ func (p *Pods) HTTPSize(ctx context.Context, node, url string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	out, err := p.crictl(ctx, node, "exec", cid, "sh", "-ec", `set -o pipefail; curl -sS --fail --noproxy '*' --max-time 60 --data-urlencode "msg@$2" "$1" | wc -c`, "cldt-transfer", url, transferFile)
+	out, err := p.crictl(ctx, node, "exec", cid, "sh", "-ec", TransferCommand, "cldt-transfer", url, TransferFile)
 	if err != nil {
 		return 0, err
 	}
@@ -321,13 +340,13 @@ func (p *Pods) Lookup(ctx context.Context, node, name string, family Family) ([]
 	if err != nil {
 		return nil, err
 	}
-	return nslookupAnswers(string(out)), nil
+	return NslookupAnswers(string(out)), nil
 }
 
-// nslookupAnswers are the addresses in nslookup's answer section: the
+// NslookupAnswers are the addresses in nslookup's answer section: the
 // "Address" lines after the first "Name" line. Those before it name the
 // server that was asked.
-func nslookupAnswers(out string) []string {
+func NslookupAnswers(out string) []string {
 	var answers []string
 	inAnswer := false
 	for _, line := range strings.Split(out, "\n") {
@@ -358,14 +377,9 @@ func (p *Pods) UDPEcho(ctx context.Context, node, destination string, payload, t
 	if err := p.carry(ctx, node, cid); err != nil {
 		return UDPReport{}, err
 	}
-	argv := []string{"exec", cid, udpProbePath, "-destination", destination,
-		"-payload-bytes", strconv.Itoa(payload), "-tries", strconv.Itoa(tries)}
-	if dontFragment {
-		argv = append(argv, "-dont-fragment")
-	}
 	// A failed echo exits nonzero and still prints its report.
-	out, runErr := p.crictl(ctx, node, argv...)
-	report, err := parseUDPReport(out)
+	out, runErr := p.crictl(ctx, node, append([]string{"exec", cid}, UDPProbeArgv(destination, payload, tries, dontFragment)...)...)
+	report, err := ParseUDPReport(out)
 	if err != nil {
 		if runErr != nil {
 			return UDPReport{}, runErr
@@ -375,8 +389,8 @@ func (p *Pods) UDPEcho(ctx context.Context, node, destination string, payload, t
 	return report, nil
 }
 
-// parseUDPReport reads the prober's JSON report.
-func parseUDPReport(out []byte) (UDPReport, error) {
+// ParseUDPReport reads the prober's JSON report.
+func ParseUDPReport(out []byte) (UDPReport, error) {
 	var raw struct {
 		OK       bool `json:"ok"`
 		Attempts []struct {
@@ -412,8 +426,7 @@ func (p *Pods) carry(ctx context.Context, node, cid string) error {
 	if p.CRIEndpoint != "" {
 		argv = append(argv, "--runtime-endpoint", p.CRIEndpoint)
 	}
-	argv = append(argv, "exec", "-i", cid, "sh", "-ec",
-		`cat > "$1.new"; chmod 0755 "$1.new"; mv "$1.new" "$1"`, "cldt-carry", udpProbePath)
+	argv = append(argv, "exec", "-i", cid, "sh", "-ec", CarryCommand, "cldt-carry", UDPProbePath)
 	if _, err := p.Rig.Node(node).Pipe(ctx, bytes.NewReader(p.UDPProbe), argv...); err != nil {
 		return fmt.Errorf("carrying the UDP prober into %s's probe: %w", node, err)
 	}

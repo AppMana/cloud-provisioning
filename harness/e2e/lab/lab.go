@@ -328,6 +328,10 @@ func (t Topology) ContainerlabConfig(rig Rig) (*core.Config, error) {
 	for _, node := range t.Nodes {
 		definition := &types.NodeDefinition{Kind: "linux"}
 		if rig == VM && node.IsClusterNode() {
+			// The SDK commands a generic_vm through its guest agent; a
+			// linux node's commands would run in the wrapper container.
+			definition.Kind = "generic_vm"
+			definition.NetworkMode = "none"
 			definition.Image = VMImage
 			// etcd and kubelets must see the actual machine's name, not the
 			// wrapper launcher's default hostname shared by every guest.

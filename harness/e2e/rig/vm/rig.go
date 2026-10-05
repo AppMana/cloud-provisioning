@@ -246,16 +246,27 @@ func (r *Rig) WaitReady(ctx context.Context, within time.Duration) error {
 	return nil
 }
 
-// waitForNode blocks until one machine answers, or until it is clear
-// that it will not.
+// waitForNode blocks until one machine answers with every interface it
+// was declared with, or until it is clear that it will not.
+//
+// The guest agent can answer before the Ethernet device exists: under the
+// SDK launcher addressing failed with "Cannot find device ens2" seconds
+// before it appeared. A machine without its NIC is still booting.
 func (r *Rig) waitForNode(ctx context.Context, node string, within time.Duration) error {
+	machine := r.Node(node)
+	declared := len(r.Topology.MustNode(node).Interfaces)
 	return wait.Until(ctx, within, node+" did not become reachable after being started",
 		func(ctx context.Context) error {
-			if _, err := r.Node(node).Exec(ctx, "true"); err != nil {
+			if _, err := machine.Exec(ctx, "true"); err != nil {
 				if crash := r.crashing(ctx, node); crash != nil {
 					return wait.Fatal(crash)
 				}
 				return err
+			}
+			for i := 0; i < declared; i++ {
+				if _, err := machine.Exec(ctx, "ip", "link", "show", "dev", machine.Interface(i)); err != nil {
+					return fmt.Errorf("%s has no %s yet: %w", node, machine.Interface(i), err)
+				}
 			}
 			return nil
 		})

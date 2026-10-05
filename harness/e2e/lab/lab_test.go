@@ -179,3 +179,44 @@ func TestEveryMachineIsGivenItsOwnName(t *testing.T) {
 		t.Fatal("no machine is named at all")
 	}
 }
+
+// A machine is commanded through its guest agent, not through the
+// container wrapping it, and the SDK chooses guest-agent control by the
+// node's kind. Declared as an ordinary container, every command reached
+// the wrapper instead: "ip link show dev ens2" reported no such device on
+// a guest that had it, and addressing failed the same way.
+func TestEveryMachineIsAGuestAgentControlledVM(t *testing.T) {
+	for _, topo := range []Topology{Default(), mustIdentities(t)} {
+		config, err := topo.ContainerlabConfig(VM)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, n := range topo.Nodes {
+			want := "linux"
+			if n.IsClusterNode() {
+				want = "generic_vm"
+			}
+			if got := config.Topology.Nodes[n.Name].Kind; got != want {
+				t.Errorf("%s is declared as %q, want %q", n.Name, got, want)
+			}
+		}
+		containers, err := topo.ContainerlabConfig(Container)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, n := range topo.Nodes {
+			if got := containers.Topology.Nodes[n.Name].Kind; got != "linux" {
+				t.Errorf("container rig %s is %q", n.Name, got)
+			}
+		}
+	}
+}
+
+func mustIdentities(t *testing.T) Topology {
+	t.Helper()
+	topo, err := WithIdentities(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return topo
+}

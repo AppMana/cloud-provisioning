@@ -42,9 +42,12 @@ func TestImageImportBoundsConcurrencyAndReportsGuestFailure(t *testing.T) {
 		defer func() { mu.Lock(); active--; mu.Unlock() }()
 		// Keep a transfer in flight so an overlapping import is observable.
 		time.Sleep(5 * time.Millisecond)
-		body, err := io.ReadAll(input)
-		if err != nil {
-			return nil, nil, 0, err
+		var body []byte
+		if input != nil {
+			var err error
+			if body, err = io.ReadAll(input); err != nil {
+				return nil, nil, 0, err
+			}
 		}
 		mu.Lock()
 		imported[command] = string(body)
@@ -61,12 +64,29 @@ func TestImageImportBoundsConcurrencyAndReportsGuestFailure(t *testing.T) {
 	if peak != 1 {
 		t.Fatalf("concurrent image transfers=%d, want bounded memory with one", peak)
 	}
-	if exports != 1 || len(imported) != 3 {
-		t.Fatalf("exports=%d imports=%d", exports, len(imported))
+	if exports != 1 {
+		t.Fatalf("exports=%d", exports)
 	}
+	// The archive is carried as a file and imported from it: a guest
+	// agent message cannot carry an image archive as stdin.
+	carried, importedFromFile := 0, 0
 	for command, body := range imported {
-		if body != "image archive" || !strings.Contains(command, "k0s ctr images import -") {
-			t.Fatalf("incorrect import %q: %q", command, body)
+		switch {
+		case strings.Contains(command, "cat > '"+GuestImageArchive+"'"):
+			carried++
+			if body != "image archive" {
+				t.Fatalf("carried %q", body)
+			}
+		case strings.Contains(command, "k0s ctr images import "+GuestImageArchive):
+			importedFromFile++
+			if body != "" {
+				t.Fatalf("the import was piped stdin: %q", command)
+			}
+		case strings.Contains(command, "import -"):
+			t.Fatalf("an archive was piped through stdin: %q", command)
 		}
+	}
+	if carried != 2 || importedFromFile != 2 {
+		t.Fatalf("carried=%d imported=%d: %v", carried, importedFromFile, imported)
 	}
 }

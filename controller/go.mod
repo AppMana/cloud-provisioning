@@ -38,7 +38,7 @@ require (
 )
 
 require (
-	github.com/appmana/labcontainers v0.2.0-alpha.2.0.20261002173627-20aaebeabe47
+	github.com/appmana/labcontainers v0.2.0-alpha.2.0.20261005235206-208b63a3311d
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.19.2 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.2 // indirect
@@ -91,7 +91,7 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spf13/viper v1.16.0 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
-	github.com/vishvananda/netns v0.0.5 // indirect
+	github.com/vishvananda/netns v0.0.5
 	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect

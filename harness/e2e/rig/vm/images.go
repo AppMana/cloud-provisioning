@@ -37,15 +37,35 @@ func (r *Rig) Load(ctx context.Context, image string, nodes []string, importArgs
 	if err != nil || code != 0 {
 		return fmt.Errorf("saving %s: %v %s", image, err, stderr)
 	}
+	// Imported from a file carried into the guest, not from stdin: a guest
+	// agent message carries at most ~47 MiB of stdin, and image archives
+	// are routinely larger. File transfer is chunked.
+	args := append([]string(nil), importArgs...)
+	if len(args) == 0 || args[len(args)-1] != "-" {
+		return fmt.Errorf("image import command %v does not read its archive from \"-\"", importArgs)
+	}
+	args[len(args)-1] = GuestImageArchive
 	results := make([]error, len(nodes))
 	for index, name := range nodes {
 		if err := ctx.Err(); err != nil {
 			results[index] = err
 			continue
 		}
-		if _, err := r.Node(name).Pipe(ctx, bytes.NewReader(saved), importArgs...); err != nil {
+		node := r.Node(name)
+		if err := node.Put(ctx, bytes.NewReader(saved), GuestImageArchive, 0o600); err != nil {
+			results[index] = fmt.Errorf("carrying %s into %s: %w", image, name, err)
+			continue
+		}
+		_, err := node.Exec(ctx, args...)
+		if _, rmErr := node.Exec(ctx, "rm", "-f", GuestImageArchive); rmErr != nil && err == nil {
+			err = rmErr
+		}
+		if err != nil {
 			results[index] = fmt.Errorf("importing %s into %s: %w", image, name, err)
 		}
 	}
 	return errors.Join(results...)
 }
+
+// GuestImageArchive is where an image archive is carried before import.
+const GuestImageArchive = "/var/tmp/cldt-image-import.tar"

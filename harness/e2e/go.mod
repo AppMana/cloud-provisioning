@@ -273,7 +273,7 @@ require (
 )
 
 require (
-	github.com/appmana/labcontainers v0.2.0-alpha.2.0.20261002173627-20aaebeabe47
+	github.com/appmana/labcontainers v0.2.0-alpha.2.0.20261005235206-208b63a3311d
 	github.com/aws/aws-sdk-go-v2 v1.46.0 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.2 // indirect
@@ -316,7 +316,7 @@ require (
 	k8s.io/kube-proxy v0.36.4
 	k8s.io/kubernetes v1.36.4
 	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5 // indirect
-	sigs.k8s.io/controller-runtime v0.24.1 // indirect
+	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.3 // indirect

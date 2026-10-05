@@ -54,7 +54,7 @@ func TestTheTunnelRefusesBGPAgainstTheKernel(t *testing.T) {
 	if bgpTable == nil {
 		t.Fatal("no BGP boundary table: routing sessions can cross the tunnel and re-announce stale claims after every transition")
 	}
-	chains, err := c.ListChainsOfTableFamily(nftables.TableFamilyIPv4)
+	chains, err := c.ListChainsOfTableFamily(nftables.TableFamilyINet)
 	if err != nil {
 		t.Fatalf("listing chains: %v", err)
 	}

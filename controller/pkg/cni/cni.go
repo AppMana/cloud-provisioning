@@ -342,6 +342,51 @@ func (n Network) PrefixesFor(ctx context.Context, c client.Reader, node string) 
 	return nodeBlocksFor(ctx, c, node)
 }
 
+// DualStack reports whether the pod network allocates IPv6 as well as
+// IPv4, read from where the network allocates: Calico's enabled pools,
+// or the blocks the controller manager writes on each node.
+func (n Network) DualStack(ctx context.Context, c client.Reader) (bool, error) {
+	if n.Name == Calico {
+		pools := &unstructured.UnstructuredList{}
+		pools.SetGroupVersionKind(calicoIPPoolList)
+		if err := c.List(ctx, pools); err != nil {
+			if meaningfulError(err) {
+				return false, fmt.Errorf("listing Calico IP pools: %w", err)
+			}
+			return false, nil
+		}
+		v4, v6 := false, false
+		for _, pool := range pools.Items {
+			if disabled, _, _ := unstructured.NestedBool(pool.Object, "spec", "disabled"); disabled {
+				continue
+			}
+			cidr, _, _ := unstructured.NestedString(pool.Object, "spec", "cidr")
+			if prefix, err := netip.ParsePrefix(cidr); err == nil {
+				v4 = v4 || prefix.Addr().Is4()
+				v6 = v6 || prefix.Addr().Is6()
+			}
+		}
+		return v4 && v6, nil
+	}
+	nodes := &corev1.NodeList{}
+	if err := c.List(ctx, nodes); err != nil {
+		return false, fmt.Errorf("listing nodes: %w", err)
+	}
+	for _, node := range nodes.Items {
+		v4, v6 := false, false
+		for _, cidr := range node.Spec.PodCIDRs {
+			if prefix, err := netip.ParsePrefix(cidr); err == nil {
+				v4 = v4 || prefix.Addr().Is4()
+				v6 = v6 || prefix.Addr().Is6()
+			}
+		}
+		if v4 && v6 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // CheckMasquerade reports whether pod traffic to the given prefixes
 // would have its source address rewritten on the way.
 //

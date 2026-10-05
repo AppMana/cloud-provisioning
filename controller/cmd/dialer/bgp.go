@@ -53,8 +53,11 @@ type transitSpeaker struct {
 	server *server.BgpServer
 	asn    uint32
 	// nextHop is this node's own address, which is what the rest of the
-	// site can reach and where their packets have to arrive.
-	nextHop string
+	// site can reach and where their packets have to arrive. nextHop6 is
+	// its IPv6 counterpart: a route's next hop has to share the route's
+	// family, and without one no IPv6 route is spoken at all.
+	nextHop  string
+	nextHop6 string
 
 	peers map[string]bool // site nodes this speaker talks to
 	// advertised remembers the preference each prefix was spoken with,
@@ -67,13 +70,25 @@ type transitSpeaker struct {
 
 // startTransitSpeaker brings up a speaker on the given port. A zero port
 // disables it, which is the case on a cluster whose CNI has no router to
-// tell.
-func startTransitSpeaker(ctx context.Context, port int, asn uint32, nextHop string) (*transitSpeaker, error) {
+// tell. nextHops is this node's address, or one address per family
+// separated by a comma (the downward API's status.hostIPs).
+func startTransitSpeaker(ctx context.Context, port int, asn uint32, nextHops string) (*transitSpeaker, error) {
 	if port == 0 {
 		return nil, nil
 	}
+	nextHop, nextHop6 := "", ""
+	for _, addr := range strings.Split(nextHops, ",") {
+		ip := net.ParseIP(strings.TrimSpace(addr))
+		switch {
+		case ip == nil:
+		case ip.To4() != nil && nextHop == "":
+			nextHop = ip.String()
+		case ip.To4() == nil && nextHop6 == "":
+			nextHop6 = ip.String()
+		}
+	}
 	if nextHop == "" {
-		return nil, fmt.Errorf("a transit speaker needs this node's own address as the next hop")
+		return nil, fmt.Errorf("a transit speaker needs this node's own IPv4 address as the next hop (and router identifier), got %q", nextHops)
 	}
 	s := server.NewBgpServer()
 	go s.Serve()
@@ -90,6 +105,7 @@ func startTransitSpeaker(ctx context.Context, port int, asn uint32, nextHop stri
 		server:     s,
 		asn:        asn,
 		nextHop:    nextHop,
+		nextHop6:   nextHop6,
 		peers:      map[string]bool{},
 		advertised: map[string]uint32{},
 	}, nil
@@ -111,7 +127,7 @@ func (t *transitSpeaker) reconcile(ctx context.Context, sitePeers []string, rout
 	}
 	for _, addr := range sitePeers {
 		addr = strings.TrimSpace(addr)
-		if addr == "" || addr == t.nextHop || t.peers[addr] {
+		if addr == "" || addr == t.nextHop || addr == t.nextHop6 || t.peers[addr] {
 			continue
 		}
 		if err := t.server.AddPeer(ctx, &api.AddPeerRequest{Peer: &api.Peer{
@@ -127,9 +143,15 @@ func (t *transitSpeaker) reconcile(ctx context.Context, sitePeers []string, rout
 
 	want := map[string]transitRoute{}
 	for _, r := range routes {
-		if r.prefix = strings.TrimSpace(r.prefix); r.prefix != "" {
-			want[r.prefix] = r
+		if r.prefix = strings.TrimSpace(r.prefix); r.prefix == "" {
+			continue
 		}
+		if strings.Contains(r.prefix, ":") && t.nextHop6 == "" {
+			// No IPv6 address to name as the next hop, so no IPv6 route
+			// this speaker could truthfully say goes through it.
+			continue
+		}
+		want[r.prefix] = r
 	}
 	for _, r := range want {
 		if med, ok := t.advertised[r.prefix]; ok && med == r.med {
@@ -221,7 +243,14 @@ func (t *transitSpeaker) advertise(ctx context.Context, route transitRoute, with
 	if err != nil {
 		return err
 	}
-	nextHop, err := apb.New(&api.NextHopAttribute{NextHop: t.nextHop})
+	// An IPv6 route carries its next hop in the multiprotocol reach
+	// attribute, and it is this node's IPv6 address.
+	var nextHop *apb.Any
+	if prefix.Addr().Is6() {
+		nextHop, err = apb.New(&api.MpReachNLRIAttribute{Family: family, NextHops: []string{t.nextHop6}, Nlris: []*apb.Any{nlri}})
+	} else {
+		nextHop, err = apb.New(&api.NextHopAttribute{NextHop: t.nextHop})
+	}
 	if err != nil {
 		return err
 	}

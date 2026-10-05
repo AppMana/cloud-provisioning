@@ -78,6 +78,11 @@ var machineGVK = schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1
 // ambiguous for the on-prem dialer's kernel route.
 const WireGuardAddrAnnotation = "cloud-provisioning.appmana.com/wireguard-addr4"
 
+// WireGuardAddr6Annotation records a cloud worker's IPv6 tunnel address
+// on a dual-stack mesh. It is paired with the IPv4 reservation
+// (tunnel.TunnelAddress6), so that reservation is what keeps it unique.
+const WireGuardAddr6Annotation = "cloud-provisioning.appmana.com/wireguard-addr6"
+
 // AddressWait is how long to leave between checks for a machine's
 // address. Short, because the machine already exists and its provider
 // is reconciling it: this is a handoff, not a provisioning wait.
@@ -121,6 +126,10 @@ type Reconciler struct {
 	// prefix (see WireGuardAddrAnnotation).
 	WireGuardAddress    string
 	WireGuardListenPort string
+	// WireGuardAddress6Prefix is the dual-stack mesh's IPv6 tunnel
+	// prefix; each cloud Machine's IPv6 tunnel address is its IPv4 one
+	// paired into it. Empty on a single-stack mesh.
+	WireGuardAddress6Prefix string
 
 	// Peer Secret (namespace/name): where tunnel-endpoint nodes have
 	// published their public keys and the controller has allocated
@@ -268,6 +277,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			return ctrl.Result{}, fmt.Errorf("allocating wireguard address: %w", err)
 		}
 	}
+	cloudWGAddress6 := ""
+	if r.WireGuardAddress6Prefix != "" {
+		cloudWGAddress6, err = tunnel.TunnelAddress6(r.WireGuardAddress6Prefix, cloudWGAddress)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("pairing an IPv6 tunnel address: %w", err)
+		}
+	}
 	// The cloud node cannot read a cluster Secret before it joins, so
 	// its bootstrap peer list travels in cloud-init as a plain JSON
 	// file the same dialer binary reads via --peers-file. The peers are
@@ -314,10 +330,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	peersFileJSON, err := json.Marshal(tunnel.PeersFileDoc{
-		PrivateKey:   cloudPriv.String(),
-		LocalAddress: cloudWGAddress,
-		Peers:        peers,
-		APIServers:   apiServerEndpoints,
+		PrivateKey:    cloudPriv.String(),
+		LocalAddress:  cloudWGAddress,
+		LocalAddress6: cloudWGAddress6,
+		Peers:         peers,
+		APIServers:    apiServerEndpoints,
 	})
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("marshaling cloud-side peers file: %w", err)
@@ -365,6 +382,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		"apiProxyPort":            apiProxyPort,
 		"kubeletExtraArgs":        r.KubeletExtraArgs,
 		"wireguardAddress":        cloudWGAddress,
+		"wireguardAddress6":       cloudWGAddress6,
 		"wireguardListenPort":     r.WireGuardListenPort,
 		"peersFileJSON":           string(peersFileJSON),
 		"interfaceName":           r.InterfaceName,
@@ -434,13 +452,17 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// can boot. A transient admission error used to leave a bootstrap Secret
 	// without its Machine reservation; the next allocation reused that live IP.
 	// Retries read this reservation uncached and reuse it.
-	if machine.GetAnnotations()[WireGuardAddrAnnotation] != cloudWGAddress {
+	if machine.GetAnnotations()[WireGuardAddrAnnotation] != cloudWGAddress ||
+		(cloudWGAddress6 != "" && machine.GetAnnotations()[WireGuardAddr6Annotation] != cloudWGAddress6) {
 		machinePatch := client.MergeFromWithOptions(machine.DeepCopy(), client.MergeFromWithOptimisticLock{})
 		annotations := machine.GetAnnotations()
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
 		annotations[WireGuardAddrAnnotation] = cloudWGAddress
+		if cloudWGAddress6 != "" {
+			annotations[WireGuardAddr6Annotation] = cloudWGAddress6
+		}
 		machine.SetAnnotations(annotations)
 		if err := r.Patch(ctx, machine, machinePatch); err != nil {
 			return ctrl.Result{}, fmt.Errorf("annotating machine with its allocated tunnel address: %w", err)
@@ -469,6 +491,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	cloudTunnelAddr := strings.SplitN(strings.TrimSpace(cloudWGAddress), "/", 2)[0]
 	allowed := []string{tunnel.HostCIDR(cloudTunnelAddr)}
 	routeHosts := []string{cloudTunnelAddr}
+	if cloudWGAddress6 != "" {
+		cloudTunnelAddr6 := strings.SplitN(cloudWGAddress6, "/", 2)[0]
+		allowed = append(allowed, tunnel.HostCIDR(cloudTunnelAddr6))
+		routeHosts = append(routeHosts, cloudTunnelAddr6)
+	}
 	dialerSecret.Data[tunnel.PeerPublicKeyPrefix+machineName] = []byte(cloudPub.String())
 	dialerSecret.Data[tunnel.PeerEndpointPrefix+machineName] = []byte(tunnel.PeerEndpointPending)
 	dialerSecret.Data[tunnel.PeerAllowedIPsPrefix+machineName] = []byte(strings.Join(allowed, ","))

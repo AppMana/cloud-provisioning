@@ -440,7 +440,21 @@ func ensureForwardingPath(iface string, mtu int) error {
 	}
 	defer c.CloseLasting()
 
-	table := c.AddTable(&nftables.Table{Family: nftables.TableFamilyIPv4, Name: "cldt-mss-" + iface})
+	// Both families in one table each. Earlier dialers wrote these as
+	// IPv4-only tables of the same names, which left every IPv6 session
+	// unclamped and IPv6 BGP free to cross; those are removed here so
+	// the inet tables are the only statement of either rule.
+	legacy, err := c.ListTablesOfFamily(nftables.TableFamilyIPv4)
+	if err != nil {
+		return fmt.Errorf("listing IPv4 tables: %w", err)
+	}
+	for _, t := range legacy {
+		if t.Name == "cldt-mss-"+iface || t.Name == "cldt-bgp-"+iface {
+			c.DelTable(t)
+		}
+	}
+
+	table := c.AddTable(&nftables.Table{Family: nftables.TableFamilyINet, Name: "cldt-mss-" + iface})
 	c.FlushTable(table)
 	prio := *nftables.ChainPriorityFilter
 	chain := c.AddChain(&nftables.Chain{
@@ -451,30 +465,38 @@ func ensureForwardingPath(iface string, mtu int) error {
 		Priority: &prio,
 	})
 
-	// The segment size the far end may send, once the headers it will
-	// be wrapped in are accounted for.
-	mss := uint16(mtu - 40)
 	// Both directions: a session crossing the tunnel has one endpoint
-	// on either side, and each has to be told.
-	for _, key := range []expr.MetaKey{expr.MetaKeyIIFNAME, expr.MetaKeyOIFNAME} {
-		name := make([]byte, 16)
-		copy(name, iface)
-		c.AddRule(&nftables.Rule{
-			Table: table,
-			Chain: chain,
-			Exprs: []expr.Any{
-				&expr.Meta{Key: key, Register: 1},
-				&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: name},
-				&expr.Meta{Key: expr.MetaKeyL4PROTO, Register: 1},
-				&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte{unix.IPPROTO_TCP}},
-				// Only the handshake carries the option to rewrite.
-				&expr.Payload{DestRegister: 1, Base: expr.PayloadBaseTransportHeader, Offset: 13, Len: 1},
-				&expr.Bitwise{SourceRegister: 1, DestRegister: 1, Len: 1, Mask: []byte{0x06}, Xor: []byte{0x00}},
-				&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte{0x02}},
-				&expr.Immediate{Register: 1, Data: []byte{byte(mss >> 8), byte(mss)}},
-				&expr.Exthdr{SourceRegister: 1, Type: 2, Offset: 2, Len: 2, Op: expr.ExthdrOpTcpopt},
-			},
-		})
+	// on either side, and each has to be told. Each family separately,
+	// because the segment size the far end may send is what is left of
+	// the tunnel MTU once that family's headers are accounted for.
+	for _, family := range []byte{unix.NFPROTO_IPV4, unix.NFPROTO_IPV6} {
+		mss := clampedSegmentSize(family, mtu)
+		for _, key := range []expr.MetaKey{expr.MetaKeyIIFNAME, expr.MetaKeyOIFNAME} {
+			name := make([]byte, 16)
+			copy(name, iface)
+			c.AddRule(&nftables.Rule{
+				Table: table,
+				Chain: chain,
+				Exprs: []expr.Any{
+					&expr.Meta{Key: expr.MetaKeyNFPROTO, Register: 1},
+					&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte{family}},
+					&expr.Meta{Key: key, Register: 1},
+					&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: name},
+					&expr.Meta{Key: expr.MetaKeyL4PROTO, Register: 1},
+					&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte{unix.IPPROTO_TCP}},
+					// Only the handshake carries the option to rewrite.
+					&expr.Payload{DestRegister: 1, Base: expr.PayloadBaseTransportHeader, Offset: 13, Len: 1},
+					&expr.Bitwise{SourceRegister: 1, DestRegister: 1, Len: 1, Mask: []byte{0x06}, Xor: []byte{0x00}},
+					&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte{0x02}},
+					// Lowered, never raised: a SYN that already asks for
+					// less is describing a smaller path of its own.
+					&expr.Exthdr{DestRegister: 1, Type: 2, Offset: 2, Len: 2, Op: expr.ExthdrOpTcpopt},
+					&expr.Cmp{Op: expr.CmpOpGt, Register: 1, Data: []byte{byte(mss >> 8), byte(mss)}},
+					&expr.Immediate{Register: 1, Data: []byte{byte(mss >> 8), byte(mss)}},
+					&expr.Exthdr{SourceRegister: 1, Type: 2, Offset: 2, Len: 2, Op: expr.ExthdrOpTcpopt},
+				},
+			})
+		}
 	}
 	if err := c.Flush(); err != nil {
 		return fmt.Errorf("clamping the segment size on %s: %w", iface, err)
@@ -489,8 +511,9 @@ func ensureForwardingPath(iface string, mtu int) error {
 	// and retrying, and it re-announces whatever stale view it held
 	// when the path moved underneath it, a claim nothing then
 	// withdraws. Refusing BGP at the boundary makes the design's
-	// assumption a property of the boundary.
-	bgpTable := c.AddTable(&nftables.Table{Family: nftables.TableFamilyIPv4, Name: "cldt-bgp-" + iface})
+	// assumption a property of the boundary, in both families: a
+	// dual-stack CNI peers over IPv6 as well.
+	bgpTable := c.AddTable(&nftables.Table{Family: nftables.TableFamilyINet, Name: "cldt-bgp-" + iface})
 	c.FlushTable(bgpTable)
 	name := make([]byte, 16)
 	copy(name, iface)
@@ -532,6 +555,16 @@ func ensureForwardingPath(iface string, mtu int) error {
 		return fmt.Errorf("refusing BGP across %s: %w", iface, err)
 	}
 	return nil
+}
+
+// clampedSegmentSize is the TCP segment a session may carry across a
+// tunnel of the given MTU: what remains after the family's IP header
+// (20 bytes for IPv4, 40 for IPv6) and the 20-byte TCP header.
+func clampedSegmentSize(family byte, mtu int) uint16 {
+	if family == unix.NFPROTO_IPV6 {
+		return uint16(mtu - 60)
+	}
+	return uint16(mtu - 40)
 }
 
 // setSysctl writes one net sysctl, named relative to /proc/sys/net.
@@ -897,7 +930,7 @@ func publishNodeInfo(ctx context.Context, clientset *kubernetes.Clientset, cfg c
 	}
 	patch, err := json.Marshal(map[string]any{
 		"metadata": map[string]string{"uid": string(current.UID), "resourceVersion": current.ResourceVersion},
-		"data": map[string]string{key: base64.StdEncoding.EncodeToString([]byte(pub.String()))},
+		"data":     map[string]string{key: base64.StdEncoding.EncodeToString([]byte(pub.String()))},
 	})
 	if err != nil {
 		return err
@@ -911,7 +944,7 @@ func publishNodeInfo(ctx context.Context, clientset *kubernetes.Clientset, cfg c
 // ensureLink creates the WireGuard link if it doesn't exist, assigns
 // its address, and brings it up. Called every reconcile pass
 // (idempotent, self-healing if the address is removed from under it).
-func ensureLink(cfg config, localAddress string) error {
+func ensureLink(cfg config, localAddresses []string) error {
 	mtu := cfg.mtu
 	if mtu == 0 {
 		mtu = underlayMTU()
@@ -934,12 +967,21 @@ func ensureLink(cfg config, localAddress string) error {
 		}
 	}
 
-	addr, err := netlink.ParseAddr(localAddress)
-	if err != nil {
-		return fmt.Errorf("parsing local address %q: %w", localAddress, err)
-	}
-	if err := netlink.AddrAdd(link, addr); err != nil && !isAddrExists(err) {
-		return fmt.Errorf("assigning %s to %s: %w", localAddress, cfg.iface, err)
+	want := map[string]bool{}
+	for _, localAddress := range localAddresses {
+		addr, err := netlink.ParseAddr(localAddress)
+		if err != nil {
+			return fmt.Errorf("parsing local address %q: %w", localAddress, err)
+		}
+		// Without duplicate address detection: the tunnel is a
+		// point-to-point device with no neighbour to collide with, and a
+		// tentative IPv6 address can neither source nor receive until
+		// detection finishes.
+		addr.Flags = unix.IFA_F_NODAD
+		if err := netlink.AddrAdd(link, addr); err != nil && !isAddrExists(err) {
+			return fmt.Errorf("assigning %s to %s: %w", localAddress, cfg.iface, err)
+		}
+		want[addr.IPNet.String()] = true
 	}
 	// And carry no other. This interface belongs to this dialer alone,
 	// so an address on it that is not the allocated one is a previous
@@ -956,7 +998,7 @@ func ensureLink(cfg config, localAddress string) error {
 		return fmt.Errorf("listing addresses on %s: %w", cfg.iface, err)
 	}
 	for i := range existing {
-		if existing[i].IPNet != nil && existing[i].IPNet.String() == addr.IPNet.String() {
+		if existing[i].IPNet != nil && want[existing[i].IPNet.String()] {
 			continue
 		}
 		if existing[i].IP.IsLinkLocalUnicast() {
@@ -1128,10 +1170,13 @@ func claimHeld(path string, poll time.Duration) (bool, string) {
 func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.Client, cfg config) error {
 	var (
 		localAddress string
-		privateKey   wgtypes.Key
-		peers        []tunnel.PeerSpec
-		meshSecret   *corev1.Secret
-		usingSecret  = cfg.secretName != ""
+		// localAddresses is every tunnel address this node holds, one
+		// per family the mesh carries; localAddress is the IPv4 one.
+		localAddresses []string
+		privateKey     wgtypes.Key
+		peers          []tunnel.PeerSpec
+		meshSecret     *corev1.Secret
+		usingSecret    = cfg.secretName != ""
 		// The override list being applied this pass, acknowledged on
 		// the adoption Secret once the pass completes. The hash is the
 		// whole acknowledgment: content against content.
@@ -1165,6 +1210,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			return err
 		}
 		localAddress = strings.TrimSpace(string(secret.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName]))
+		localAddresses = siteTunnelAddresses(secret, cfg.nodeName)
 		if localAddress == "" {
 			// Either this node has never been allocated an address, or it
 			// has stopped being an endpoint and its retention has run
@@ -1252,6 +1298,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			return fmt.Errorf("parsing private key from %s: %w", cfg.peersFile, err)
 		}
 		localAddress = doc.LocalAddress
+		localAddresses = fileTunnelAddresses(doc)
 		floor, floorErr := bootPeerList(cfg, doc)
 		peers = floor.Peers
 		setAPIProxyBackends(floor.APIServers)
@@ -1619,7 +1666,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 	}
 
-	if err := ensureLink(cfg, localAddress); err != nil {
+	if err := ensureLink(cfg, localAddresses); err != nil {
 		return fmt.Errorf("ensuring %s: %w", cfg.iface, err)
 	}
 
@@ -1655,17 +1702,13 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		return err
 	}
 
-	var relayVia net.IP
-	if relayTransit != nil {
-		relayVia = net.ParseIP(relayTransit.Via)
-	}
 	// Install the explicit-source exception before moving general egress.
 	if len(tunnelSourceHosts) > 0 {
 		if err := reconcileTunnelSourceRoutes(cfg, localAddress, tunnelSourceHosts); err != nil {
 			return err
 		}
 	}
-	if err := installRoutes(cfg, routeHosts, claimedHosts, blocks, relayVia, relayDsts); err != nil {
+	if err := installRoutes(cfg, routeHosts, claimedHosts, blocks, relayTransit, relayDsts); err != nil {
 		return err
 	}
 	// On promotion, restore normal routes before removing the exception.
@@ -1676,7 +1719,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	}
 
 	if cfg.transitMasqueradeSource != "" {
-		if err := ensureTransit(cfg); err != nil {
+		if err := ensureTransit(cfg, localAddresses); err != nil {
 			return fmt.Errorf("ensuring transit masquerade: %w", err)
 		}
 	}
@@ -1833,7 +1876,7 @@ func disposeRouteHost(marked, isEndpointHost, peerCanCarry bool) routeHostDispos
 // control plane could not be re-read, and only the cached copy of that
 // same list carried it back once the handshake arrived, two minutes
 // later.
-func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relayVia net.IP, relayDsts []net.IPNet) error {
+func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relay *tunnel.TransitSpec, relayDsts []net.IPNet) error {
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
@@ -1898,9 +1941,14 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	// acknowledged the render. Same table, so the prune below covers
 	// both kinds and switching between them replaces rather than
 	// accumulates.
-	if relayVia != nil {
+	if relay != nil {
 		for i := range relayDsts {
 			dst := relayDsts[i]
+			relayVia := relay.Gateway(dst.IP)
+			if relayVia == nil {
+				fmt.Fprintf(os.Stderr, "no transit route for %s: the relay publishes no address of its family\n", dst.String())
+				continue
+			}
 			desired[dst.String()] = true
 			route := &netlink.Route{Dst: &dst, Gw: relayVia, Table: cfg.routeTable}
 			if err := netlink.RouteReplace(route); err != nil {
@@ -2016,13 +2064,24 @@ func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes
 	if err != nil {
 		return err
 	}
+	if err := installSiteTransit(cfg, transit); err != nil {
+		return err
+	}
+	if transit != nil {
+		return acknowledgeSite(ctx, clientset, cfg.secretNamespace, cfg.secretName, cfg.nodeName, string(node.UID), string(secret.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName]), string(secret.UID), sourceHash, transit)
+	}
+	return nil
+}
+
+// installSiteTransit makes table cfg.routeTable carry exactly the
+// transit: every remote prefix toward the relay, and nothing else.
+func installSiteTransit(cfg config, transit *tunnel.TransitSpec) error {
 	if err := ensureRouteRule(cfg.routeTable, cfg.fwmark); err != nil {
 		return fmt.Errorf("ensuring the rule for table %d: %w", cfg.routeTable, err)
 	}
 	desired := map[string]bool{}
 	if transit != nil {
-		via := net.ParseIP(transit.Via)
-		if via == nil {
+		if net.ParseIP(transit.Via) == nil {
 			return fmt.Errorf("transit next hop %q is not an address", transit.Via)
 		}
 		// Never via ourselves: a relay routes remotes through its own
@@ -2030,8 +2089,14 @@ func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes
 		self := false
 		if addrs, err := net.InterfaceAddrs(); err == nil {
 			for _, a := range addrs {
-				if ipNet, ok := a.(*net.IPNet); ok && ipNet.IP.Equal(via) {
-					self = true
+				ipNet, ok := a.(*net.IPNet)
+				if !ok {
+					continue
+				}
+				for _, via := range []string{transit.Via, transit.ViaOtherFamily} {
+					if ipNet.IP.Equal(net.ParseIP(via)) {
+						self = true
+					}
 				}
 			}
 		}
@@ -2053,6 +2118,14 @@ func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes
 			}
 			for i := range dsts {
 				dst := dsts[i]
+				// The relay's address of this destination's family. A
+				// relay with none cannot carry it, and saying so costs
+				// only that prefix rather than every route after it.
+				via := transit.Gateway(dst.IP)
+				if via == nil {
+					fmt.Fprintf(os.Stderr, "no transit route for %s: the relay publishes no address of its family\n", dst.String())
+					continue
+				}
 				desired[dst.String()] = true
 				route := &netlink.Route{Dst: &dst, Gw: via, Table: cfg.routeTable}
 				if err := netlink.RouteReplace(route); err != nil {
@@ -2080,9 +2153,6 @@ func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes
 			}
 			fmt.Fprintf(os.Stderr, "removed stale transit route %s\n", route.Dst)
 		}
-	}
-	if transit != nil {
-		return acknowledgeSite(ctx, clientset, cfg.secretNamespace, cfg.secretName, cfg.nodeName, string(node.UID), string(secret.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName]), string(secret.UID), sourceHash, transit)
 	}
 	return nil
 }
@@ -2191,7 +2261,7 @@ func removeRouteRule(table int) {
 // scoped to the tunnel subnet and to destinations outside it.
 // nftables via netlink (google/nftables) because the dialer image is
 // distroless and has no iptables binary to shell out to.
-func ensureTransit(cfg config) error {
+func ensureTransit(cfg config, localAddresses []string) error {
 	ip, subnet, err := net.ParseCIDR(cfg.transitMasqueradeSource)
 	if err != nil {
 		return fmt.Errorf("parsing --transit-masquerade-source %q: %w", cfg.transitMasqueradeSource, err)
@@ -2202,12 +2272,15 @@ func ensureTransit(cfg config) error {
 	// A Kubernetes node already has forwarding enabled, because the CNI
 	// and kube-proxy require it, so this is usually a read that finds
 	// the right answer. See setSysctl.
-	if err := setSysctl("ipv4/ip_forward", "1"); err != nil {
-		// A Kubernetes node has forwarding on already, so this is
-		// almost always a read that agreed. Not being able to write it
-		// is no reason to skip the rule below, which is what actually
-		// lets a remote reach an address with no tunnel of its own.
-		fmt.Fprintf(os.Stderr, "could not set ip_forward (continuing; if forwarding is off on this node, transit will not work): %v\n", err)
+	for _, knob := range forwardingSysctls(localAddresses) {
+		if err := setSysctl(knob, "1"); err != nil {
+			// A Kubernetes node has forwarding on already, so this is
+			// almost always a read that agreed. Not being able to write
+			// it is no reason to skip the rule below, which is what
+			// actually lets a remote reach an address with no tunnel of
+			// its own.
+			fmt.Fprintf(os.Stderr, "could not set %s (continuing; if forwarding is off on this node, transit will not work): %v\n", knob, err)
+		}
 	}
 
 	c, err := nftables.New()
@@ -2251,6 +2324,43 @@ func ensureTransit(cfg config) error {
 		return fmt.Errorf("applying nftables masquerade for %s: %w", cfg.transitMasqueradeSource, err)
 	}
 	return nil
+}
+
+// forwardingSysctls are the forwarding switches a node relaying tunnel
+// traffic needs: IPv4 always, and IPv6 only where the tunnel carries
+// IPv6. Turning IPv6 forwarding on also stops a host accepting router
+// advertisements, so it is not asked of a node that does not need it.
+func forwardingSysctls(localAddresses []string) []string {
+	knobs := []string{"ipv4/ip_forward"}
+	for _, addr := range localAddresses {
+		if strings.Contains(addr, ":") {
+			return append(knobs, "ipv6/conf/all/forwarding")
+		}
+	}
+	return knobs
+}
+
+// siteTunnelAddresses are the tunnel addresses the controller allocated
+// to a site node, IPv4 first and then IPv6 on a dual-stack mesh.
+func siteTunnelAddresses(secret *corev1.Secret, node string) []string {
+	var out []string
+	for _, key := range []string{tunnel.NodeTunnelAddressPrefix + node, tunnel.NodeTunnelAddress6Prefix + node} {
+		if addr := strings.TrimSpace(string(secret.Data[key])); addr != "" {
+			out = append(out, addr)
+		}
+	}
+	return out
+}
+
+// fileTunnelAddresses are a remote's tunnel addresses from its identity.
+func fileTunnelAddresses(doc tunnel.PeersFileDoc) []string {
+	var out []string
+	for _, addr := range []string{doc.LocalAddress, doc.LocalAddress6} {
+		if addr = strings.TrimSpace(addr); addr != "" {
+			out = append(out, addr)
+		}
+	}
+	return out
 }
 
 // loadPeersFromSecret reads every remote peer from the shared Secret's

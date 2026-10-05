@@ -85,6 +85,14 @@ tunnel:
   # node's health.
   endpointRetention: 3m
 
+  # IPv6 prefix for the tunnel addresses of a dual-stack mesh, /96 or
+  # shorter: each node's IPv6 tunnel address is its IPv4 tunnel address
+  # in the low 32 bits. Used only when the cluster's pod network
+  # allocates IPv6 (a Calico IPv6 pool, or IPv6 node pod CIDRs). It must
+  # not overlap any site, pod or service range. Empty keeps the mesh
+  # IPv4-only even on a dual-stack cluster.
+  ipv6Prefix: "fd00:10:100::/96"
+
 # The namespace an infrastructure provider's controller runs in, when
 # this controller needs to read a credentials Secret there to check a
 # cluster identity before provisioning. Empty grants no such access.

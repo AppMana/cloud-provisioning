@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net"
+	"net/netip"
 	"sort"
 	"strings"
 )
@@ -36,7 +37,17 @@ import (
 const (
 	NodePublicKeyPrefix     = "node-public-key-"
 	NodeTunnelAddressPrefix = "node-tunnel-address-"
-	NodeAddressesPrefix     = "node-addresses-"
+	// NodeTunnelAddress6Prefix carries a dual-stack mesh's IPv6 tunnel
+	// address for the node (CIDR), derived from its IPv4 one by
+	// TunnelAddress6. Absent on a single-stack mesh.
+	NodeTunnelAddress6Prefix = "node-tunnel-address6-"
+	// NodeTransitAddress6Prefix is the IPv6 address the rest of the site
+	// forwards to when this node relays for it: the address the site's
+	// network itself reaches the node by. It is not always one of the
+	// node's Kubernetes addresses; a node address held on a dummy device
+	// answers no neighbour solicitation on the LAN.
+	NodeTransitAddress6Prefix = "node-transit-address6-"
+	NodeAddressesPrefix       = "node-addresses-"
 	// NodePodCIDRsPrefix carries the pod blocks that node owns, so a
 	// peer is permitted exactly the pods behind it and no others. Empty
 	// when the network encapsulates: those packets are addressed to the
@@ -204,9 +215,12 @@ func (p *PeerSpec) AllRouteHosts() []string {
 // its identity (private key + tunnel address, written once by
 // cloud-init) plus the bootstrap peer list.
 type PeersFileDoc struct {
-	PrivateKey   string     `json:"privateKey"`
-	LocalAddress string     `json:"localAddress"`
-	Peers        []PeerSpec `json:"peers"`
+	PrivateKey   string `json:"privateKey"`
+	LocalAddress string `json:"localAddress"`
+	// LocalAddress6 is the node's IPv6 tunnel address on a dual-stack
+	// mesh (CIDR), empty otherwise.
+	LocalAddress6 string     `json:"localAddress6,omitempty"`
+	Peers         []PeerSpec `json:"peers"`
 	// APIServers is every control plane's host:port, for the node's
 	// own loopback balancer: a worker holds all of them and fails over
 	// by its own evidence, so no single member's death strands it and
@@ -293,8 +307,9 @@ func SplitList(lists ...string) []string {
 // freshness tiers, no drift.
 func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []string) ([]PeerSpec, error) {
 	type localNode struct {
-		name       string
-		tunnelAddr string
+		name        string
+		tunnelAddr  string
+		tunnelAddr6 string
 	}
 	var nodes []localNode
 	for key := range data {
@@ -309,7 +324,8 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 			// member.
 			continue
 		}
-		nodes = append(nodes, localNode{name: nodeName, tunnelAddr: strings.SplitN(addr, "/", 2)[0]})
+		addr6 := strings.SplitN(strings.TrimSpace(string(data[NodeTunnelAddress6Prefix+nodeName])), "/", 2)[0]
+		nodes = append(nodes, localNode{name: nodeName, tunnelAddr: strings.SplitN(addr, "/", 2)[0], tunnelAddr6: addr6})
 	}
 	sort.Slice(nodes, func(i, j int) bool {
 		return relayLess(data, nodes[i].name, nodes[i].tunnelAddr, nodes[j].name, nodes[j].tunnelAddr)
@@ -333,6 +349,9 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 			continue
 		}
 		ownHost[n.tunnelAddr] = true
+		if n.tunnelAddr6 != "" {
+			ownHost[n.tunnelAddr6] = true
+		}
 		if addrs := SplitList(string(data[NodeAddressesPrefix+n.name])); len(addrs) > 0 {
 			ownsAddresses[n.name] = true
 			for _, addr := range addrs {
@@ -353,6 +372,10 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 		}
 		allowed := []string{HostCIDR(n.tunnelAddr)}
 		routeHosts := []string{n.tunnelAddr}
+		if n.tunnelAddr6 != "" {
+			allowed = append(allowed, HostCIDR(n.tunnelAddr6))
+			routeHosts = append(routeHosts, n.tunnelAddr6)
+		}
 		for _, addr := range SplitList(string(data[NodeAddressesPrefix+n.name])) {
 			allowed = append(allowed, HostCIDR(addr))
 			routeHosts = append(routeHosts, addr)
@@ -465,8 +488,14 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 // of the site.
 type TransitSpec struct {
 	// Via is the relay's own address: the next hop for everything
-	// below, reachable over the site's ordinary network.
+	// below of its family, reachable over the site's ordinary network.
 	Via string
+	// ViaOtherFamily is the relay's next hop for destinations of the
+	// other address family on a dual-stack site. A route's gateway has
+	// to share its destination's family, so one next hop cannot carry
+	// both. Omitted when empty, so a single-stack transit serializes,
+	// and therefore hashes, exactly as it did before.
+	ViaOtherFamily string `json:",omitempty"`
 	// Hosts are the remote node addresses, one host each.
 	Hosts []string
 	// Blocks are the remote pod blocks.
@@ -597,7 +626,7 @@ func SiteTransit(data map[string][]byte, notReady map[string]bool) (*TransitSpec
 		return nil, nil
 	}
 
-	transit := &TransitSpec{Via: via}
+	transit := &TransitSpec{Via: via, ViaOtherFamily: otherFamilyVia(data, relay.name, via)}
 	seen := map[string]bool{}
 	peers, err := sitePeers(data, false)
 	if err != nil {
@@ -629,6 +658,66 @@ func SiteTransit(data map[string][]byte, notReady map[string]bool) (*TransitSpec
 	sort.Strings(transit.Hosts)
 	sort.Strings(transit.Blocks)
 	return transit, nil
+}
+
+// otherFamilyVia is the relay's next hop in the family Via is not. For
+// IPv6 that is the transit address the relay published, when it did,
+// and otherwise its first IPv6 node address.
+func otherFamilyVia(data map[string][]byte, relay, via string) string {
+	viaIP := net.ParseIP(via)
+	if viaIP == nil {
+		return ""
+	}
+	wantV4 := viaIP.To4() == nil
+	if !wantV4 {
+		if addr := strings.TrimSpace(string(data[NodeTransitAddress6Prefix+relay])); net.ParseIP(addr) != nil {
+			return addr
+		}
+	}
+	for _, key := range []string{NodeAddressesPrefix + relay, SiteAddressesPrefix + relay} {
+		for _, addr := range SplitList(string(data[key])) {
+			if ip := net.ParseIP(addr); ip != nil && (ip.To4() != nil) == wantV4 {
+				return addr
+			}
+		}
+	}
+	return ""
+}
+
+// Gateway is the next hop for dst: the relay's address of dst's own
+// family, or nil when the relay has none.
+func (t *TransitSpec) Gateway(dst net.IP) net.IP {
+	if t == nil || dst == nil {
+		return nil
+	}
+	for _, via := range []string{t.Via, t.ViaOtherFamily} {
+		if ip := net.ParseIP(via); ip != nil && (ip.To4() != nil) == (dst.To4() != nil) {
+			return ip
+		}
+	}
+	return nil
+}
+
+// TunnelAddress6 is the IPv6 tunnel address paired with an IPv4 one: the
+// IPv4 address in the low 32 bits of prefix6, with prefix6's length. The
+// pairing is the whole allocation scheme for the second family, so the
+// IPv4 allocator's reservations and retirements govern both.
+func TunnelAddress6(prefix6, addr4 string) (string, error) {
+	prefix, err := netip.ParsePrefix(strings.TrimSpace(prefix6))
+	if err != nil || !prefix.Addr().Is6() || prefix.Addr().Is4In6() {
+		return "", fmt.Errorf("tunnel IPv6 prefix %q must be an IPv6 prefix", prefix6)
+	}
+	if prefix.Bits() > 96 {
+		return "", fmt.Errorf("tunnel IPv6 prefix %q must leave 32 host bits (/96 or shorter)", prefix6)
+	}
+	host, err := netip.ParseAddr(strings.SplitN(strings.TrimSpace(addr4), "/", 2)[0])
+	if err != nil || !host.Is4() {
+		return "", fmt.Errorf("tunnel address %q must be IPv4", addr4)
+	}
+	bytes := prefix.Masked().Addr().As16()
+	v4 := host.As4()
+	copy(bytes[12:], v4[:])
+	return netip.PrefixFrom(netip.AddrFrom16(bytes), prefix.Bits()).String(), nil
 }
 
 // HostSysctlNet is where a node's real /proc/sys/net is mounted into

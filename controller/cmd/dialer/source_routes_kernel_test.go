@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"github.com/vishvananda/netlink"
 )
 
@@ -46,7 +47,7 @@ func TestRetainedTunnelRoutesRespectPacketSource(t *testing.T) {
 			t.Cleanup(func() { removeRouteRule(cfg.routeTable) })
 			_, host, _ := net.ParseCIDR(tc.remote)
 			physical, _, _ := net.ParseCIDR(tc.physical)
-			tunnel, _, _ := net.ParseCIDR(tc.tunnel)
+			tunnelAddr, _, _ := net.ParseCIDR(tc.tunnel)
 			check := func(source net.IP, mark uint32, want int) {
 				t.Helper()
 				routes, err := netlink.RouteGetWithOptions(host.IP, &netlink.RouteGetOptions{SrcAddr: source, Mark: mark})
@@ -67,14 +68,14 @@ func TestRetainedTunnelRoutesRespectPacketSource(t *testing.T) {
 				if err := reconcileTunnelSourceRoutes(cfg, tc.tunnel, []net.IPNet{*host}); err != nil {
 					t.Fatal(err)
 				}
-				if err := installRoutes(cfg, nil, nil, nil, net.ParseIP(tc.relay), []net.IPNet{*host}); err != nil {
+				if err := installRoutes(cfg, nil, nil, nil, &tunnel.TransitSpec{Via: tc.relay}, []net.IPNet{*host}); err != nil {
 					t.Fatal(err)
 				}
 			}
 			check(physical, 0, lan.Attrs().Index)
-			check(tunnel, 0, wg.Attrs().Index)
+			check(tunnelAddr, 0, wg.Attrs().Index)
 			// The tunnel's own marked outer packets still bypass both tables.
-			check(tunnel, uint32(cfg.fwmark), wg.Attrs().Index)
+			check(tunnelAddr, uint32(cfg.fwmark), wg.Attrs().Index)
 			table, _ := tunnelSourceTable(cfg.routeTable)
 			family := netlink.FAMILY_V6
 			if physical.To4() != nil {
@@ -92,7 +93,7 @@ func TestRetainedTunnelRoutesRespectPacketSource(t *testing.T) {
 				t.Fatal(err)
 			}
 			check(physical, 0, wg.Attrs().Index)
-			check(tunnel, 0, wg.Attrs().Index)
+			check(tunnelAddr, 0, wg.Attrs().Index)
 			rules, err = netlink.RuleListFiltered(family, &netlink.Rule{Table: table}, netlink.RT_FILTER_TABLE)
 			if err != nil || len(rules) != 0 {
 				t.Fatalf("stale source rules: %+v, %v", rules, err)

@@ -140,6 +140,10 @@ type meshReconciler struct {
 	tunnelEndpointsRaw     string
 	tunnelSubnet           string
 	localAddressBase       string
+	// tunnelIPv6Prefix is the prefix IPv6 tunnel addresses are paired
+	// into (tunnel.TunnelAddress6), set only when the cluster's pod
+	// network is dual-stack. Empty means a single-stack mesh.
+	tunnelIPv6Prefix string
 	// endpointRetention is how long a node that has left the selector
 	// goes on being an endpoint: dialer scheduled, entries published,
 	// tunnel carrying traffic. It is the time a remote is given to read
@@ -641,6 +645,9 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 			secret.Data[reservationKey] = secret.Data[addrKey]
 			changed = true
 		}
+		if r.syncIPv6Endpoint(secret.Data, node) {
+			changed = true
+		}
 		// The node's real addresses, which is what the network's own
 		// sessions and kubelet traffic use. The tunnel address alone is
 		// not enough for either.
@@ -689,7 +696,7 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 		// working loses the pod network it already had, in both
 		// directions, while the tunnel itself looks healthy. Bringing
 		// up a tunnel must never cost a node something it had.
-		if err := r.ensureCNINodeAddress(ctx, node.Name, firstAddress(addresses), ""); err != nil {
+		if err := r.ensureCNINodeAddress(ctx, node.Name, []string{firstAddress(addresses)}, ""); err != nil {
 			ctrl.LoggerFrom(ctx).Error(err, "could not pin this node's address for the network", "node", node.Name)
 		}
 
@@ -897,6 +904,7 @@ func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, r
 	}
 	for _, name := range publishedNames(data,
 		tunnel.NodePublicKeyPrefix, tunnel.NodeTunnelAddressPrefix,
+		tunnel.NodeTunnelAddress6Prefix, tunnel.NodeTransitAddress6Prefix,
 		tunnel.NodeAddressesPrefix, tunnel.NodePodCIDRsPrefix,
 		tunnel.NodeDepartedAtPrefix) {
 		if want.endpoints[name] {
@@ -953,6 +961,8 @@ func pruneDeparted(data map[string][]byte, want meshMembership, now time.Time, r
 		}
 		drop(tunnel.NodePublicKeyPrefix + name)
 		drop(tunnel.NodeTunnelAddressPrefix + name)
+		drop(tunnel.NodeTunnelAddress6Prefix + name)
+		drop(tunnel.NodeTransitAddress6Prefix + name)
 		drop(tunnel.NodeAddressesPrefix + name)
 		drop(tunnel.NodePodCIDRsPrefix + name)
 		drop(tunnel.NodeDepartedAtPrefix + name)
@@ -1307,19 +1317,32 @@ func (r *meshReconciler) nodeNameForMachine(ctx context.Context, machine *unstru
 
 func (r *meshReconciler) ensureCNINodeAddressForMachine(ctx context.Context, machine *unstructured.Unstructured) error {
 	nodeName := r.nodeNameForMachine(ctx, machine)
-	tunnelAddr := strings.SplitN(strings.TrimSpace(
-		machine.GetAnnotations()["cloud-provisioning.appmana.com/wireguard-addr4"]), "/", 2)[0]
+	var tunnelAddrs []string
+	for _, key := range []string{join.WireGuardAddrAnnotation, join.WireGuardAddr6Annotation} {
+		if addr := strings.SplitN(strings.TrimSpace(machine.GetAnnotations()[key]), "/", 2)[0]; addr != "" {
+			tunnelAddrs = append(tunnelAddrs, addr)
+		}
+	}
 	claimRef := ""
 	for _, owner := range machine.GetOwnerReferences() {
 		if owner.Kind == "ProvisionedNodeClaim" {
 			claimRef = machine.GetNamespace() + "/" + owner.Name
 		}
 	}
-	return r.ensureCNINodeAddress(ctx, nodeName, tunnelAddr, claimRef)
+	return r.ensureCNINodeAddress(ctx, nodeName, tunnelAddrs, claimRef)
 }
 
-func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tunnelAddr, claim string) error {
-	if nodeName == "" || tunnelAddr == "" {
+// ensureCNINodeAddress states the address the CNI peers on for each
+// family named in addrs. A family with no address here is left to the
+// CNI.
+func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName string, addrs []string, claim string) error {
+	var stated []string
+	for _, addr := range addrs {
+		if addr = strings.TrimSpace(addr); addr != "" {
+			stated = append(stated, addr)
+		}
+	}
+	if nodeName == "" || len(stated) == 0 {
 		return nil
 	}
 	node := &corev1.Node{}
@@ -1341,32 +1364,34 @@ func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tun
 		}
 		return nil
 	}
-	key, want := calicoIPv4Annotation, tunnelAddr+"/32"
-	if strings.Contains(tunnelAddr, ":") {
-		key, want = calicoIPv6Annotation, tunnelAddr+"/128"
-	}
-	// Calico rewrites this with the prefix length the address actually
-	// carries on the interface, so only the address is compared. Fixing
-	// the mask back every pass would be a fight with the thing being
-	// configured.
-	if existing := node.Annotations[key]; existing != "" &&
-		strings.SplitN(existing, "/", 2)[0] == tunnelAddr {
-		if claim == "" || node.Annotations[claimpkg.ClaimAnnotation] == claim {
-			return nil
+	want := map[string]string{}
+	for _, addr := range stated {
+		key, value := calicoIPv4Annotation, addr+"/32"
+		if strings.Contains(addr, ":") {
+			key, value = calicoIPv6Annotation, addr+"/128"
 		}
-		want = existing
+		// Calico rewrites this with the prefix length the address
+		// actually carries on the interface, so only the address is
+		// compared. Fixing the mask back every pass would be a fight
+		// with the thing being configured.
+		if existing := node.Annotations[key]; existing != "" && strings.SplitN(existing, "/", 2)[0] == addr {
+			continue
+		}
+		want[key] = value
 	}
 	// The claim is recorded here too, so its teardown can find the
 	// Node it produced. A Node is cluster-scoped and a claim is not, so
 	// an ownerReference cannot express this.
-	if node.Annotations[key] == want && (claim == "" || node.Annotations[claimpkg.ClaimAnnotation] == claim) {
+	if len(want) == 0 && (claim == "" || node.Annotations[claimpkg.ClaimAnnotation] == claim) {
 		return nil
 	}
 	patch := client.MergeFrom(node.DeepCopy())
 	if node.Annotations == nil {
 		node.Annotations = map[string]string{}
 	}
-	node.Annotations[key] = want
+	for key, value := range want {
+		node.Annotations[key] = value
+	}
 	if claim != "" {
 		node.Annotations[claimpkg.ClaimAnnotation] = claim
 	}
@@ -1374,6 +1399,60 @@ func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName, tun
 		return fmt.Errorf("annotating node %s with its tunnel address: %w", nodeName, err)
 	}
 	return nil
+}
+
+// syncIPv6Endpoint keeps an endpoint's IPv6 entries matching the mesh:
+// its IPv6 tunnel address, paired with the IPv4 one already allocated,
+// and the IPv6 address the rest of the site forwards to when it relays.
+// A single-stack mesh carries neither. Reports whether anything changed.
+func (r *meshReconciler) syncIPv6Endpoint(data map[string][]byte, node *corev1.Node) bool {
+	changed := false
+	set := func(key, value string) {
+		if value == "" {
+			if _, ok := data[key]; ok {
+				delete(data, key)
+				changed = true
+			}
+			return
+		}
+		if string(data[key]) != value {
+			data[key] = []byte(value)
+			changed = true
+		}
+	}
+	addr6, transit6 := "", ""
+	if r.tunnelIPv6Prefix != "" {
+		var err error
+		addr6, err = tunnel.TunnelAddress6(r.tunnelIPv6Prefix, string(data[tunnel.NodeTunnelAddressPrefix+node.Name]))
+		if err != nil {
+			addr6 = ""
+		}
+		transit6 = r.transitAddress6(node)
+	}
+	set(tunnel.NodeTunnelAddress6Prefix+node.Name, addr6)
+	set(tunnel.NodeTransitAddress6Prefix+node.Name, transit6)
+	return changed
+}
+
+// transitAddress6 is the IPv6 address the rest of the site reaches this
+// node at. Where the network is Calico, that is the address Calico
+// peers on: its own IPv6 routes already resolve through it, while a
+// Kubernetes address held on a dummy device answers no neighbour
+// solicitation on the LAN. Otherwise the node's IPv6 Kubernetes
+// address.
+func (r *meshReconciler) transitAddress6(node *corev1.Node) string {
+	if r.network.Name == cni.Calico {
+		addr := strings.SplitN(strings.TrimSpace(node.Annotations[calicoIPv6Annotation]), "/", 2)[0]
+		if ip := net.ParseIP(addr); ip != nil && ip.To4() == nil {
+			return ip.String()
+		}
+	}
+	for _, a := range node.Status.Addresses {
+		if ip := net.ParseIP(a.Address); a.Type == corev1.NodeInternalIP && ip != nil && ip.To4() == nil {
+			return ip.String()
+		}
+	}
+	return ""
 }
 
 // publishSiteNode records a node that terminates no tunnel: what it is
@@ -1479,7 +1558,7 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 	if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, peerSecret); err != nil {
 		return fmt.Errorf("getting peer secret: %w", err)
 	}
-	selfTunnelAddr := strings.SplitN(strings.TrimSpace(machine.GetAnnotations()["cloud-provisioning.appmana.com/wireguard-addr4"]), "/", 2)[0]
+	selfTunnelAddr := strings.SplitN(strings.TrimSpace(machine.GetAnnotations()[join.WireGuardAddrAnnotation]), "/", 2)[0]
 	doc, err := tunnel.RemotePeerDocument(peerSecret.Data, selfTunnelAddr, r.apiVIP, r.apiServerPort)
 	if err != nil {
 		return err
@@ -1645,6 +1724,10 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 							Env: []corev1.EnvVar{
 								{Name: "NODE_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"}}},
 								{Name: "NODE_IP", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"}}},
+								// Every family's address, for a speaker that
+								// names this node as the next hop of routes in
+								// each family.
+								{Name: "NODE_IPS", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIPs"}}},
 							},
 							Args: []string{
 								fmt.Sprintf("--secret-namespace=%s", r.secretNamespace),
@@ -1657,7 +1740,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 								// which is where their traffic has to arrive.
 								fmt.Sprintf("--transit-bgp-port=%d", r.transitBGPPort),
 								fmt.Sprintf("--transit-bgp-asn=%d", r.transitBGPASN),
-								"--transit-bgp-next-hop=$(NODE_IP)",
+								"--transit-bgp-next-hop=$(NODE_IPS)",
 								"--keepalive-seconds=15",
 								// No --mtu: it is derived from the interface the
 								// encapsulated packets leave by, so a number written
@@ -2067,6 +2150,7 @@ func main() {
 		wireGuardAddress          string
 		wireGuardListenPort       string
 		localAddressBase          string
+		tunnelIPv6Prefix          string
 		dialerListenPort          string
 		bootstrapSecretNameFormat string
 		dialerDaemonSetName       string
@@ -2138,6 +2222,7 @@ func main() {
 	flag.DurationVar(&joinTokenTTL, "join-token-ttl", 2*time.Hour, "validity window for a minted join token")
 	flag.StringVar(&wireGuardAddress, "join-wireguard-address", "10.100.0.128/24", "base WireGuard tunnel address for REMOTE (cloud) nodes; each gets the next free address in this subnet")
 	flag.StringVar(&localAddressBase, "tunnel-local-address-base", "10.100.0.1/24", "base WireGuard tunnel address for LOCAL tunnel-endpoint nodes; each selected node gets the next free address in this subnet")
+	flag.StringVar(&tunnelIPv6Prefix, "tunnel-ipv6-prefix", "fd00:10:100::/96", "IPv6 prefix (/96 or shorter) for a dual-stack mesh's tunnel addresses: each node's IPv6 tunnel address is its IPv4 one in the low 32 bits. Applied only when the cluster's pod network allocates IPv6; empty keeps every mesh single-stack")
 	flag.StringVar(&wireGuardListenPort, "join-wireguard-listen-port", "51820", "WireGuard listen port on the remote side")
 	flag.StringVar(&dialerListenPort, "join-dialer-listen-port", "51820", "WireGuard listen port the local dialers expect the remote peer to use")
 	flag.StringVar(&bootstrapSecretNameFormat, "join-bootstrap-secret-name-format", "%s-bootstrap", "printf format (with the Machine's name) for the bootstrap Secret's name")
@@ -2279,8 +2364,18 @@ func main() {
 			fmt.Fprintf(os.Stderr, "cannot determine the container network: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Fprintf(os.Stderr, "cluster: api=%s network=%s/%s (%s)\n",
-			joinAPIAddress, network.Name, network.Encapsulation, network.Detail)
+		dualStack, err := network.DualStack(ctx, discoveryClient)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cannot determine whether the container network is dual-stack: %v\n", err)
+			os.Exit(1)
+		}
+		tunnelIPv6Prefix, err = effectiveTunnelIPv6Prefix(tunnelIPv6Prefix, dualStack)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "cluster: api=%s network=%s/%s (%s) dual-stack=%v tunnel-ipv6-prefix=%q\n",
+			joinAPIAddress, network.Name, network.Encapsulation, network.Detail, dualStack, tunnelIPv6Prefix)
 	}
 
 	// The mesh's interface name is derived from the peer Secret's
@@ -2319,6 +2414,7 @@ func main() {
 			endpointRetention:      endpointRetention,
 			tunnelSubnet:           tunnelSubnet,
 			localAddressBase:       localAddressBase,
+			tunnelIPv6Prefix:       tunnelIPv6Prefix,
 			dialerDaemonSetName:    dialerDaemonSetName,
 			dialerServiceAccount:   dialerServiceAccount,
 			dialerImage:            dialerImage,
@@ -2415,8 +2511,9 @@ func main() {
 			KubeletExtraArgs:   joinKubeletExtraArgs,
 			SSHAuthorizedKeys:  sshKeys,
 
-			WireGuardAddress:    wireGuardAddress,
-			WireGuardListenPort: wireGuardListenPort,
+			WireGuardAddress:        wireGuardAddress,
+			WireGuardAddress6Prefix: tunnelIPv6Prefix,
+			WireGuardListenPort:     wireGuardListenPort,
 
 			DialerPeerSecretNamespace: secretNamespace,
 			DialerPeerSecretName:      secretName,
@@ -2489,6 +2586,24 @@ func main() {
 		fmt.Fprintf(os.Stderr, "problem running manager: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// effectiveTunnelIPv6Prefix is the IPv6 tunnel prefix the mesh uses:
+// the configured one on a dual-stack pod network, none on a single-stack
+// one. A configured prefix that cannot hold an IPv4 address is refused
+// at startup rather than at the first allocation.
+func effectiveTunnelIPv6Prefix(configured string, dualStack bool) (string, error) {
+	configured = strings.TrimSpace(configured)
+	if configured == "" {
+		return "", nil
+	}
+	if _, err := tunnel.TunnelAddress6(configured, "10.100.0.1"); err != nil {
+		return "", fmt.Errorf("--tunnel-ipv6-prefix: %w", err)
+	}
+	if !dualStack {
+		return "", nil
+	}
+	return configured, nil
 }
 
 // subnetOf turns "10.100.0.1/24" into "10.100.0.0/24", the tunnel

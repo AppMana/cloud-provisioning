@@ -29,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -533,6 +534,12 @@ func meaningfulError(err error) bool {
 }
 
 func meta(err error) bool {
+	// The client reports a group the server does not serve as a
+	// discovery failure wrapping a no-match error; older clients said so
+	// only in the message.
+	if apimeta.IsNoMatchError(err) {
+		return true
+	}
 	msg := err.Error()
 	return strings.Contains(msg, "no matches for kind") || strings.Contains(msg, "could not find the requested resource")
 }

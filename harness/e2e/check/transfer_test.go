@@ -30,7 +30,7 @@ func TestCountedTransferStillRequiresCompleteSuccessfulDownload(t *testing.T) {
 		{"empty response", 0, nil, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			result := transfer(context.Background(), countedProbe{tc.size, tc.err}, Pair{From: "aws-worker", To: "cp"}, "http://probe/big")
+			result := transfer(context.Background(), countedProbe{tc.size, tc.err}, Pair{From: "aws-worker", To: "cp"}, Transfer, "http://probe/echo")
 			if result.OK != tc.ok {
 				t.Fatalf("result=%+v", result)
 			}

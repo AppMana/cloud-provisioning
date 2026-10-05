@@ -12,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 type attempt struct {
@@ -27,6 +29,7 @@ type attempt struct {
 
 type report struct {
 	DiagnosticMode string    `json:"diagnosticMode,omitempty"`
+	DontFragment   bool      `json:"dontFragment,omitempty"`
 	InFlightLimit  int       `json:"inFlightLimit,omitempty"`
 	Destination    string    `json:"destination"`
 	PayloadBytes   int       `json:"payloadBytes"`
@@ -36,8 +39,8 @@ type report struct {
 	OK             bool      `json:"ok"`
 }
 
-func probe(destination string, size, tries int, reuse bool, timeout time.Duration, interval time.Duration) (report, error) {
-	result := report{Destination: destination, PayloadBytes: size, ReuseSocket: reuse, IntervalMillis: interval.Milliseconds(), OK: true}
+func probe(destination string, size, tries int, reuse bool, timeout time.Duration, interval time.Duration, dontFragment bool) (report, error) {
+	result := report{Destination: destination, PayloadBytes: size, ReuseSocket: reuse, IntervalMillis: interval.Milliseconds(), OK: true, DontFragment: dontFragment}
 	target, err := validateProbe(destination, size, tries, timeout, interval, 1000)
 	if err != nil {
 		return result, err
@@ -59,7 +62,7 @@ func probe(destination string, size, tries int, reuse bool, timeout time.Duratio
 		}
 		row := attempt{Sequence: i, Started: time.Now().UTC()}
 		if conn == nil {
-			conn, err = net.DialUDP("udp", nil, net.UDPAddrFromAddrPort(target))
+			conn, err = dialProbe(net.UDPAddrFromAddrPort(target), dontFragment)
 			if err != nil {
 				return result, fmt.Errorf("create socket: %w", err)
 			}
@@ -93,6 +96,35 @@ func probe(destination string, size, tries int, reuse bool, timeout time.Duratio
 	return result, nil
 }
 
+// dialProbe opens one probe socket. With dontFragment it sets the
+// don't-fragment bit and ignores the path MTU the kernel has learned
+// (IP_PMTUDISC_PROBE), so a datagram the path cannot carry whole is lost
+// every time instead of being fragmented after the first loss.
+func dialProbe(target *net.UDPAddr, dontFragment bool) (*net.UDPConn, error) {
+	conn, err := net.DialUDP("udp", nil, target)
+	if err != nil || !dontFragment {
+		return conn, err
+	}
+	raw, err := conn.SyscallConn()
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	level, option, value := unix.IPPROTO_IP, unix.IP_MTU_DISCOVER, unix.IP_PMTUDISC_PROBE
+	if target.IP.To4() == nil {
+		level, option, value = unix.IPPROTO_IPV6, unix.IPV6_MTU_DISCOVER, unix.IPV6_PMTUDISC_PROBE
+	}
+	var setErr error
+	if err := raw.Control(func(fd uintptr) { setErr = unix.SetsockoptInt(int(fd), level, option, value) }); err != nil {
+		setErr = err
+	}
+	if setErr != nil {
+		conn.Close()
+		return nil, fmt.Errorf("setting don't-fragment: %w", setErr)
+	}
+	return conn, nil
+}
+
 func validateProbe(destination string, size, tries int, timeout, interval time.Duration, maxTries int) (netip.AddrPort, error) {
 	target, err := netip.ParseAddrPort(destination)
 	if err != nil || target.Port() == 0 || target.Addr().IsUnspecified() || target.Addr().IsMulticast() {
@@ -109,6 +141,7 @@ func main() {
 	size := flag.Int("payload-bytes", 1400, "echo body size excluding the five-byte command prefix")
 	tries := flag.Int("tries", 100, "number of attempts (1..1000; up to 10000 with fixed cadence)")
 	reuse := flag.Bool("reuse-socket", false, "reuse one UDP socket across all attempts")
+	dontFragment := flag.Bool("dont-fragment", false, "set the don't-fragment bit and ignore the learned path MTU, so an oversized datagram is lost on every attempt (foreground mode)")
 	fixedCadence := flag.Bool("fixed-cadence", false, "diagnostic only: schedule independent fresh-socket attempts without waiting for earlier replies (up to 10000)")
 	interval := flag.Duration("interval", 0, "delay between completed attempts, or fixed send interval (0..1s)")
 	streamDir := flag.String("stream-dir", "", "new owned directory for bounded background samples")
@@ -194,7 +227,7 @@ func main() {
 	if *fixedCadence {
 		result, err = probeFixedCadence(*destination, *size, *tries, 5*time.Second, *interval, 512)
 	} else {
-		result, err = probe(*destination, *size, *tries, *reuse, 5*time.Second, *interval)
+		result, err = probe(*destination, *size, *tries, *reuse, 5*time.Second, *interval, *dontFragment)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -1,10 +1,17 @@
 package check
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
@@ -15,12 +22,25 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// Image the probe pods run. Small, and it has httpd and wget, which
-// is all a reachability probe needs.
-const Image = "busybox:1.37"
+// Image the probe pods run: the upstream Kubernetes network test image,
+// pinned by digest. Its netexec server answers /echo over HTTP (a posted
+// body comes back whole, so one request moves TransferBytes each way) and
+// echoes UDP on UDPPort, in both families; its Alpine userland carries the
+// curl, nslookup and shell the probes run inside it.
+const Image = "registry.k8s.io/e2e-test-images/agnhost:2.56@sha256:352a050380078cb2a1c246357a0dfa2fcf243ee416b92ff28b44a01d1b4b0294"
 
-// Port the probe pods serve on.
-const Port = 8080
+// Port the probe pods serve HTTP on, and UDPPort their UDP echo.
+const (
+	Port    = 8080
+	UDPPort = 8081
+)
+
+// transferFile is the body each probe posts: TransferBytes of x, written
+// once when the pod starts.
+const transferFile = "/tmp/transfer"
+
+// udpProbePath is where the UDP prober is carried into a probe container.
+const udpProbePath = "/tmp/udpprobe"
 
 // Pods puts one probe pod on each node and reaches them through each
 // node's own container runtime.
@@ -46,6 +66,12 @@ type Pods struct {
 	// crictl aimed at the wrong socket sees no containers, which reads
 	// as every path being broken at once.
 	CRIEndpoint string
+	// UDPProbe is the static UDP prober (cmd/udpprobe) carried into each
+	// probe container before its first UDP check. Empty disables UDP.
+	UDPProbe []byte
+
+	mu      sync.Mutex
+	carried map[string]bool // container IDs holding the UDP prober
 }
 
 // ProbeObjects constructs native Kubernetes resources; callers never render YAML.
@@ -53,6 +79,7 @@ type Pods struct {
 // registry path while measuring reachability.
 func ProbeObjects(node, namespace string) (*corev1.Pod, *corev1.Service) {
 	name := "hc-" + node
+	dualStack := corev1.IPFamilyPolicyPreferDualStack
 	pod := &corev1.Pod{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Labels: map[string]string{"app": name}},
@@ -61,8 +88,11 @@ func ProbeObjects(node, namespace string) (*corev1.Pod, *corev1.Service) {
 			Tolerations:  []corev1.Toleration{{Operator: corev1.TolerationOpExists}},
 			Containers: []corev1.Container{{
 				Name: "serve", Image: Image, ImagePullPolicy: corev1.PullNever,
-				Command: []string{"sh", "-c", fmt.Sprintf("mkdir -p /tmp/www; printf ok > /tmp/www/index.html; dd if=/dev/zero of=/tmp/www/big bs=1024 count=%d 2>/dev/null; httpd -f -p %d -h /tmp/www", TransferBytes/1024, Port)},
-				Ports:   []corev1.ContainerPort{{ContainerPort: Port}},
+				Command: []string{"sh", "-c", fmt.Sprintf("head -c %d /dev/zero | tr '\\0' x > %s; exec /agnhost netexec --http-port=%d --udp-port=%d", TransferBytes, transferFile, Port, UDPPort)},
+				Ports: []corev1.ContainerPort{
+					{Name: "http", ContainerPort: Port, Protocol: corev1.ProtocolTCP},
+					{Name: "udp", ContainerPort: UDPPort, Protocol: corev1.ProtocolUDP},
+				},
 			}},
 		},
 	}
@@ -70,11 +100,47 @@ func ProbeObjects(node, namespace string) (*corev1.Pod, *corev1.Service) {
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
 		ObjectMeta: metav1.ObjectMeta{Name: "svc-" + name, Namespace: namespace},
 		Spec: corev1.ServiceSpec{
-			Selector: map[string]string{"app": name},
-			Ports:    []corev1.ServicePort{{Name: "http", Port: Port, TargetPort: intstr.FromInt(Port)}},
+			Selector:       map[string]string{"app": name},
+			IPFamilyPolicy: &dualStack,
+			Ports: []corev1.ServicePort{
+				{Name: "http", Port: Port, TargetPort: intstr.FromInt(Port), Protocol: corev1.ProtocolTCP},
+				{Name: "udp", Port: UDPPort, TargetPort: intstr.FromInt(UDPPort), Protocol: corev1.ProtocolUDP},
+			},
 		},
 	}
 	return pod, service
+}
+
+// Prepare pulls the probe image by digest into each node's runtime, so the
+// probe pods start from it without fetching anything while they measure.
+// A by-digest pull through the runtime records the digest the pod names,
+// which an exported and reimported copy would not.
+func (p *Pods) Prepare(ctx context.Context, nodes []string) error {
+	for _, node := range nodes {
+		if _, err := p.crictl(ctx, node, "pull", Image); err != nil {
+			return fmt.Errorf("pulling the probe image onto %s: %w", node, err)
+		}
+	}
+	return nil
+}
+
+// BuildUDPProbe compiles the static UDP prober the probe pods run, from the
+// harness module at moduleDir, for linux/amd64 nodes.
+func BuildUDPProbe(ctx context.Context, moduleDir, workDir string) ([]byte, error) {
+	out, err := filepath.Abs(filepath.Join(workDir, "binaries", "udpprobe-linux-amd64"))
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		return nil, err
+	}
+	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", out, "./cmd/udpprobe")
+	cmd.Dir = moduleDir
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH=amd64")
+	if raw, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("building the UDP prober: %w: %s", err, raw)
+	}
+	return os.ReadFile(out)
 }
 
 // Start creates a pod and a service on every node and waits for them
@@ -131,17 +197,63 @@ func (p *Pods) targets(ctx context.Context, nodes []string) ([]Target, error) {
 		if err != nil || ready != "True" {
 			return out, fmt.Errorf("%s's probe is not ready (%q)", node, ready)
 		}
-		podIP, err := p.Kube.Get(ctx, p.Namespace, "pod", "hc-"+node, "{.status.podIP}")
-		if err != nil || podIP == "" {
+		podIPs, err := p.Kube.Get(ctx, p.Namespace, "pod", "hc-"+node, "{.status.podIPs[*].ip}")
+		if err != nil || strings.TrimSpace(podIPs) == "" {
 			return out, fmt.Errorf("%s's probe has no address", node)
 		}
-		svcIP, err := p.Kube.Get(ctx, p.Namespace, "service", "svc-hc-"+node, "{.spec.clusterIP}")
-		if err != nil || svcIP == "" {
+		svcIPs, err := p.Kube.Get(ctx, p.Namespace, "service", "svc-hc-"+node, "{.spec.clusterIPs[*]}")
+		if err != nil || strings.TrimSpace(svcIPs) == "" {
 			return out, fmt.Errorf("%s's probe has no service address", node)
 		}
-		out = append(out, Target{Node: node, PodIP: podIP, ServiceIP: svcIP})
+		target, err := targetFor(node, p.Namespace, strings.Fields(podIPs), strings.Fields(svcIPs))
+		if err != nil {
+			return out, err
+		}
+		// The pod's own MTU, read inside it: the size its network
+		// promises to carry, which the UDP probes are sized around.
+		if cid, err := p.container(ctx, node); err == nil {
+			if raw, err := p.crictl(ctx, node, "exec", cid, "cat", "/sys/class/net/eth0/mtu"); err == nil {
+				target.MTU, _ = strconv.Atoi(strings.TrimSpace(string(raw)))
+			}
+		}
+		out = append(out, target)
 	}
 	return out, nil
+}
+
+// targetFor sorts a probe's addresses by family. The pod and its Service
+// must agree on which families they have: a dual-stack pod behind a
+// single-stack Service, or the reverse, is a cluster that is half
+// configured, and measuring only the half that works would hide it.
+func targetFor(node, namespace string, podIPs, serviceIPs []string) (Target, error) {
+	t := Target{Node: node, ServiceName: "svc-hc-" + node + "." + namespace + ".svc.cluster.local"}
+	assign := func(addrs []string, v4, v6 *string, what string) error {
+		for _, a := range addrs {
+			ip := net.ParseIP(a)
+			switch {
+			case ip == nil:
+				return fmt.Errorf("%s's probe %s address %q is not an address", node, what, a)
+			case ip.To4() != nil && *v4 == "":
+				*v4 = ip.String()
+			case ip.To4() == nil && *v6 == "":
+				*v6 = ip.String()
+			}
+		}
+		if *v4 == "" {
+			return fmt.Errorf("%s's probe has no IPv4 %s address in %v", node, what, addrs)
+		}
+		return nil
+	}
+	if err := assign(podIPs, &t.PodIP, &t.PodIP6, "pod"); err != nil {
+		return Target{}, err
+	}
+	if err := assign(serviceIPs, &t.ServiceIP, &t.ServiceIP6, "service"); err != nil {
+		return Target{}, err
+	}
+	if (t.PodIP6 == "") != (t.ServiceIP6 == "") {
+		return Target{}, fmt.Errorf("%s's probe pod has addresses %v but its Service %v: the families disagree", node, podIPs, serviceIPs)
+	}
+	return t, nil
 }
 
 // Stop removes the namespace without waiting for it to go.
@@ -164,15 +276,16 @@ func (p *Pods) HTTPGet(ctx context.Context, node, url string) ([]byte, error) {
 	return out, nil
 }
 
-// HTTPSize receives the full response in the probe pod and returns its byte
-// count. The response still traverses the tested pod network; only the count
-// traverses serial or SSM. pipefail prevents a failed wget from passing via wc.
+// HTTPSize posts TransferBytes from the probe pod to url's echo and counts
+// the body that comes back, so the exchange crosses the tested pod network
+// in full in both directions; only the count traverses serial or SSM.
+// pipefail prevents a failed curl from passing via wc.
 func (p *Pods) HTTPSize(ctx context.Context, node, url string) (int64, error) {
 	cid, err := p.container(ctx, node)
 	if err != nil {
 		return 0, err
 	}
-	out, err := p.crictl(ctx, node, "exec", cid, "sh", "-ec", `set -o pipefail; wget -q -T 20 -O - "$1" | wc -c`, "cldt-transfer", url)
+	out, err := p.crictl(ctx, node, "exec", cid, "sh", "-ec", `set -o pipefail; curl -sS --fail --noproxy '*' --max-time 60 --data-urlencode "msg@$2" "$1" | wc -c`, "cldt-transfer", url, transferFile)
 	if err != nil {
 		return 0, err
 	}
@@ -191,6 +304,126 @@ func (p *Pods) Resolve(ctx context.Context, node, name string) error {
 	}
 	_, err = p.crictl(ctx, node, "exec", cid, "nslookup", name)
 	return err
+}
+
+// Lookup asks cluster DNS for name's addresses of one family from within
+// the probe pod on node.
+func (p *Pods) Lookup(ctx context.Context, node, name string, family Family) ([]string, error) {
+	cid, err := p.container(ctx, node)
+	if err != nil {
+		return nil, err
+	}
+	qtype := "A"
+	if family == IPv6 {
+		qtype = "AAAA"
+	}
+	out, err := p.crictl(ctx, node, "exec", cid, "nslookup", "-type="+qtype, name)
+	if err != nil {
+		return nil, err
+	}
+	return nslookupAnswers(string(out)), nil
+}
+
+// nslookupAnswers are the addresses in nslookup's answer section: the
+// "Address" lines after the first "Name" line. Those before it name the
+// server that was asked.
+func nslookupAnswers(out string) []string {
+	var answers []string
+	inAnswer := false
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "Name:"):
+			inAnswer = true
+		case inAnswer && strings.HasPrefix(line, "Address:"):
+			if ip := net.ParseIP(strings.TrimSpace(strings.TrimPrefix(line, "Address:"))); ip != nil {
+				answers = append(answers, ip.String())
+			}
+		}
+	}
+	return answers
+}
+
+// UDPEcho runs the UDP prober inside the probe pod on node, carrying it
+// in first if this container does not have it yet. Each attempt uses a
+// fresh socket and the prober reports every one.
+func (p *Pods) UDPEcho(ctx context.Context, node, destination string, payload, tries int, dontFragment bool) (UDPReport, error) {
+	if len(p.UDPProbe) == 0 {
+		return UDPReport{}, fmt.Errorf("no UDP prober was given to carry into the probe pods")
+	}
+	cid, err := p.container(ctx, node)
+	if err != nil {
+		return UDPReport{}, err
+	}
+	if err := p.carry(ctx, node, cid); err != nil {
+		return UDPReport{}, err
+	}
+	argv := []string{"exec", cid, udpProbePath, "-destination", destination,
+		"-payload-bytes", strconv.Itoa(payload), "-tries", strconv.Itoa(tries)}
+	if dontFragment {
+		argv = append(argv, "-dont-fragment")
+	}
+	// A failed echo exits nonzero and still prints its report.
+	out, runErr := p.crictl(ctx, node, argv...)
+	report, err := parseUDPReport(out)
+	if err != nil {
+		if runErr != nil {
+			return UDPReport{}, runErr
+		}
+		return UDPReport{}, err
+	}
+	return report, nil
+}
+
+// parseUDPReport reads the prober's JSON report.
+func parseUDPReport(out []byte) (UDPReport, error) {
+	var raw struct {
+		OK       bool `json:"ok"`
+		Attempts []struct {
+			OK    bool   `json:"ok"`
+			Error string `json:"error"`
+		} `json:"attempts"`
+	}
+	if err := json.Unmarshal(bytes.TrimSpace(out), &raw); err != nil {
+		return UDPReport{}, fmt.Errorf("reading the UDP prober's report %q: %w", truncate(string(out)), err)
+	}
+	report := UDPReport{OK: raw.OK, Attempts: len(raw.Attempts)}
+	seen := map[string]bool{}
+	for _, a := range raw.Attempts {
+		if a.OK {
+			report.Echoed++
+		} else if a.Error != "" && !seen[a.Error] {
+			seen[a.Error] = true
+			report.Errors = append(report.Errors, a.Error)
+		}
+	}
+	return report, nil
+}
+
+// carry puts the UDP prober into a probe container once.
+func (p *Pods) carry(ctx context.Context, node, cid string) error {
+	p.mu.Lock()
+	done := p.carried[cid]
+	p.mu.Unlock()
+	if done {
+		return nil
+	}
+	argv := []string{"crictl"}
+	if p.CRIEndpoint != "" {
+		argv = append(argv, "--runtime-endpoint", p.CRIEndpoint)
+	}
+	argv = append(argv, "exec", "-i", cid, "sh", "-ec",
+		`cat > "$1.new"; chmod 0755 "$1.new"; mv "$1.new" "$1"`, "cldt-carry", udpProbePath)
+	if _, err := p.Rig.Node(node).Pipe(ctx, bytes.NewReader(p.UDPProbe), argv...); err != nil {
+		return fmt.Errorf("carrying the UDP prober into %s's probe: %w", node, err)
+	}
+	p.mu.Lock()
+	if p.carried == nil {
+		p.carried = map[string]bool{}
+	}
+	p.carried[cid] = true
+	p.mu.Unlock()
+	return nil
 }
 
 // container finds the probe pod's container on a node.
@@ -227,4 +460,9 @@ func UniqueNamespace(seed int64) string {
 	return "cloud-provisioning-health-" + strconv.FormatInt(seed, 10)
 }
 
-var _ Prober = (*Pods)(nil)
+var (
+	_ Prober         = (*Pods)(nil)
+	_ TransferProber = (*Pods)(nil)
+	_ LookupProber   = (*Pods)(nil)
+	_ UDPProber      = (*Pods)(nil)
+)

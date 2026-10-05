@@ -36,7 +36,7 @@ func probeFixedCadence(destination string, size, tries int, timeout, interval ti
 				go func(i int, row attempt) {
 					defer pending.Done()
 					defer func() { <-slots }()
-					one, err := probe(destination, size, 1, false, timeout, 0)
+					one, err := probe(destination, size, 1, false, timeout, 0, false)
 					if err != nil {
 						row.Error, row.Finished = err.Error(), time.Now().UTC()
 					} else {

@@ -41,7 +41,7 @@ func echoServer(t *testing.T, stale bool) string {
 func TestSocketReuseAndExactEcho(t *testing.T) {
 	destination := echoServer(t, false)
 	for _, reuse := range []bool{false, true} {
-		result, err := probe(destination, 1400, 4, reuse, time.Second, 0)
+		result, err := probe(destination, 1400, 4, reuse, time.Second, 0, false)
 		if err != nil || !result.OK || len(result.Attempts) != 4 {
 			t.Fatalf("result=%+v error=%v", result, err)
 		}
@@ -56,7 +56,7 @@ func TestSocketReuseAndExactEcho(t *testing.T) {
 }
 
 func TestStaleEchoCannotPassNextAttempt(t *testing.T) {
-	result, err := probe(echoServer(t, true), 1400, 3, true, time.Second, 0)
+	result, err := probe(echoServer(t, true), 1400, 3, true, time.Second, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,12 +67,12 @@ func TestStaleEchoCannotPassNextAttempt(t *testing.T) {
 
 func TestInvalidProbeRejectedBeforeDial(t *testing.T) {
 	for _, destination := range []string{"example.com:8081", "0.0.0.0:8081", "224.0.0.1:8081", "127.0.0.1:0"} {
-		if _, err := probe(destination, 1400, 1, false, time.Second, 0); err == nil {
+		if _, err := probe(destination, 1400, 1, false, time.Second, 0, false); err == nil {
 			t.Fatal("accepted", destination)
 		}
 	}
 	for _, size := range []int{23, 2044} {
-		if _, err := probe("127.0.0.1:8081", size, 1, false, time.Second, 0); err == nil {
+		if _, err := probe("127.0.0.1:8081", size, 1, false, time.Second, 0, false); err == nil {
 			t.Fatal("accepted payload", size)
 		}
 	}
@@ -84,7 +84,7 @@ func TestMissingEchoFailsGate(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer server.Close()
-	result, err := probe(server.LocalAddr().String(), 1400, 1, true, 20*time.Millisecond, 0)
+	result, err := probe(server.LocalAddr().String(), 1400, 1, true, 20*time.Millisecond, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}

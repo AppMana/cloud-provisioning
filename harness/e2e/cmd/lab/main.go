@@ -554,10 +554,18 @@ func runLab() {
 				if err := cluster.EnsureCRICTL(ctx, r, *workDir, nodes); err != nil {
 					fail("%v", err)
 				}
+				udpProbe, err := check.BuildUDPProbe(ctx, filepath.Join(*repoDir, "harness", "e2e"), *workDir)
+				if err != nil {
+					fail("%v", err)
+				}
 				pods := &check.Pods{
 					Kube: d.Kube, Rig: r,
 					Namespace:   check.UniqueNamespace(time.Now().Unix()),
 					CRIEndpoint: b.CRIEndpoint(),
+					UDPProbe:    udpProbe,
+				}
+				if err := pods.Prepare(ctx, nodes); err != nil {
+					fail("%v", err)
 				}
 				targets, err := pods.Start(ctx, nodes, 5*time.Minute)
 				if err != nil {
@@ -645,6 +653,9 @@ func runLab() {
 						}
 						recordEvent("remote-recreated", map[string]string{"node": name, "oldNodeUID": oldUID, "newNodeUID": newUID, "placement": placement.Name})
 						if err := cluster.EnsureCRICTL(ctx, r, *workDir, []string{name}); err != nil {
+							fail("%v", err)
+						}
+						if err := pods.Prepare(ctx, []string{name}); err != nil {
 							fail("%v", err)
 						}
 						targets, err = pods.Start(ctx, nodes, 8*time.Minute)

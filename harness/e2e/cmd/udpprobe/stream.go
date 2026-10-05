@@ -199,7 +199,7 @@ func runStream(dir string, c streamConfig) (result streamResult, err error) {
 			return result, readErr
 		}
 		begin := time.Now()
-		one, probeErr := probe(c.Destination, c.PayloadBytes, 1, false, 5*time.Second, 0)
+		one, probeErr := probe(c.Destination, c.PayloadBytes, 1, false, 5*time.Second, 0, false)
 		a := attempt{Started: begin.UTC(), Finished: time.Now().UTC()}
 		if probeErr != nil {
 			a.Error = probeErr.Error()

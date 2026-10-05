@@ -53,7 +53,7 @@ func (p *observedIsolation) HTTPGet(_ context.Context, from, target string) ([]b
 	if p.down && ((to != "" && remote(from) != remote(to)) || (to == "" && remote(from) && p.externalBroken)) {
 		return nil, errDown
 	}
-	if u.Path == "/big" {
+	if u.Path == "/echo" && u.RawQuery == "" {
 		return bytes.Repeat([]byte("x"), check.TransferBytes), nil
 	}
 	return []byte("ok"), nil

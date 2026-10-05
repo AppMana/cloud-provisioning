@@ -56,6 +56,26 @@ const (
 	DNS Kind = "dns"
 	// External is the path off the cluster from a node.
 	External Kind = "external"
+
+	// Pod6, Service6 and Transfer6 are Pod, Service and Transfer over
+	// IPv6, for a dual-stack pair. DNS6 is cluster DNS answering with
+	// the target Service's IPv6 address.
+	Pod6      Kind = "pod6"
+	Service6  Kind = "service6"
+	Transfer6 Kind = "transfer6"
+	DNS6      Kind = "dns6"
+	// UDP and UDP6 are exact UDP echoes of one datagram size, by pod
+	// address, in each family. See UDPProbes.
+	UDP  Kind = "udp"
+	UDP6 Kind = "udp6"
+)
+
+// Family is an IP address family.
+type Family string
+
+const (
+	IPv4 Family = "IPv4"
+	IPv6 Family = "IPv6"
 )
 
 // Result is one check.
@@ -64,7 +84,9 @@ type Result struct {
 	From        string
 	To          string // empty for checks that are not about a pair
 	Kind        Kind
-	OK          bool
+	// Size is the whole IP datagram a UDP check sent, zero otherwise.
+	Size int
+	OK   bool
 	// Detail says what was observed when that is more than pass or
 	// fail: how many bytes came back, what address was resolved.
 	Detail string
@@ -86,6 +108,9 @@ func (r Result) String() string {
 		subject = r.From + " to " + r.To
 	}
 	line := fmt.Sprintf("  %s  %s %s", verdict, subject, r.Kind)
+	if r.Size != 0 {
+		line += fmt.Sprintf(" %dB", r.Size)
+	}
 	if r.Detail != "" {
 		line += " (" + r.Detail + ")"
 	}
@@ -146,7 +171,10 @@ func (m *Matrix) Results() []Result {
 		if out[a].To != out[b].To {
 			return out[a].To < out[b].To
 		}
-		return out[a].Kind < out[b].Kind
+		if out[a].Kind != out[b].Kind {
+			return out[a].Kind < out[b].Kind
+		}
+		return out[a].Size < out[b].Size
 	})
 	return out
 }
@@ -263,16 +291,116 @@ type Prober interface {
 
 // TransferProber measures the received body inside the probe pod. This avoids
 // carrying a large response through command transports with output limits.
-// Implementations must fetch the full body and propagate download failures.
+// Implementations must send TransferBytes, fetch the full echoed body and
+// propagate failures in either direction.
 type TransferProber interface {
 	HTTPSize(ctx context.Context, node, url string) (int64, error)
 }
 
-// Target is where a node's probe pod can be reached.
+// LookupProber resolves a name in one family from within the probe pod on
+// node and returns the answers.
+type LookupProber interface {
+	Lookup(ctx context.Context, node, name string, family Family) ([]string, error)
+}
+
+// UDPProber sends tries datagrams of payload bytes, each from a fresh socket,
+// from the probe pod on node to destination's echo listener and reports every
+// attempt. dontFragment sets the don't-fragment bit and ignores any learned
+// path MTU, so a datagram the path cannot carry is lost every time rather
+// than only until the sender learns to fragment it.
+type UDPProber interface {
+	UDPEcho(ctx context.Context, node, destination string, payload, tries int, dontFragment bool) (UDPReport, error)
+}
+
+// UDPReport is what came back from one UDPEcho.
+type UDPReport struct {
+	OK       bool
+	Attempts int
+	Echoed   int
+	Errors   []string
+}
+
+// Target is where a node's probe pod can be reached. The IPv6 fields are
+// set for a dual-stack pod and Service; ServiceName is the Service's
+// fully qualified DNS name.
 type Target struct {
-	Node      string
-	PodIP     string
-	ServiceIP string
+	Node        string
+	PodIP       string
+	ServiceIP   string
+	PodIP6      string
+	ServiceIP6  string
+	ServiceName string
+	// MTU is the probe pod's own interface MTU as read inside it, zero
+	// when it could not be read.
+	MTU int
+}
+
+// UDPOptions selects the UDP size probes.
+type UDPOptions struct {
+	// PodMTU is the MTU of the pods' own interfaces, the largest datagram
+	// a pod sends without fragmenting it. Zero probes each pair around
+	// the smaller of its two pods' measured MTUs (Target.MTU).
+	PodMTU int
+	// Tries is how many datagrams of each size are sent.
+	Tries int
+}
+
+// UDPProbe is one datagram size, as the whole IP datagram.
+type UDPProbe struct {
+	Datagram     int
+	DontFragment bool
+}
+
+// udpEchoPrefix is the command the echo listener strips before replying,
+// and udpMaxPayload is what fits its 2048-byte receive buffer with it.
+const (
+	udpEchoPrefix  = len("echo ")
+	udpMaxPayload  = 2048 - udpEchoPrefix
+	udpMinPayload  = 24
+	udpLargeProbe  = 1800
+	ipv6MinimumMTU = 1280
+)
+
+// Payload is the echo body that makes a datagram of p.Datagram bytes in
+// family: the datagram less the IP header (20 or 40 bytes), the UDP header
+// and the echo command.
+func (p UDPProbe) Payload(family Family) int {
+	header := 20
+	if family == IPv6 {
+		header = 40
+	}
+	return p.Datagram - header - 8 - udpEchoPrefix
+}
+
+// UDPProbes are the sizes measured around the pod MTU. With the
+// don't-fragment bit: the IPv6 minimum MTU, and the largest datagram a pod
+// sends unfragmented and one byte less, which every path must carry whole.
+// Without it: one byte over the pod MTU and a large datagram, which the
+// sender fragments and every path must carry in pieces.
+func UDPProbes(o UDPOptions) []UDPProbe {
+	var out []UDPProbe
+	seen := map[int]bool{}
+	add := func(size int, df bool) {
+		if seen[size] || size <= 0 {
+			return
+		}
+		probe := UDPProbe{Datagram: size, DontFragment: df}
+		if probe.Payload(IPv4) < udpMinPayload || probe.Payload(IPv6) > udpMaxPayload {
+			return
+		}
+		seen[size] = true
+		out = append(out, probe)
+	}
+	for _, size := range []int{ipv6MinimumMTU, o.PodMTU - 1, o.PodMTU} {
+		if size <= o.PodMTU {
+			add(size, true)
+		}
+	}
+	add(o.PodMTU+1, false)
+	if udpLargeProbe > o.PodMTU+1 {
+		add(udpLargeProbe, false)
+	}
+	return out
 }
 
 // TransferBytes is the body the transfer check asks for. A megabyte

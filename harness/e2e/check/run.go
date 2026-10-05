@@ -3,6 +3,8 @@ package check
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -36,28 +38,75 @@ func Run(ctx context.Context, p Prober, targets []Target, opts Options) *Matrix 
 		}()
 	}
 
-	emit := func(from, to string, kind Kind, probe func() Result) {
+	emit := func(from, to string, kind Kind, size int, probe func() Result) {
 		if opts.NotRequired != nil {
 			if reason := opts.NotRequired(from, to, kind); reason != "" {
-				m.Add(Result{From: from, To: to, Kind: kind, NotRequired: reason})
+				m.Add(Result{From: from, To: to, Kind: kind, Size: size, NotRequired: reason})
 				return
 			}
 		}
 		run(func() { m.Add(probe()) })
 	}
 	for _, pair := range Pairs(names) {
-		dst := byNode[pair.To]
-		emit(pair.From, pair.To, Pod, func() Result { return reach(ctx, p, pair, Pod, url(dst.PodIP, opts.Port, "")) })
-		emit(pair.From, pair.To, Service, func() Result { return reach(ctx, p, pair, Service, url(dst.ServiceIP, opts.Port, "")) })
+		src, dst := byNode[pair.From], byNode[pair.To]
+		emit(pair.From, pair.To, Pod, 0, func() Result { return reach(ctx, p, pair, Pod, url(dst.PodIP, opts.Port, reachPath)) })
+		emit(pair.From, pair.To, Service, 0, func() Result { return reach(ctx, p, pair, Service, url(dst.ServiceIP, opts.Port, reachPath)) })
 		if !opts.SkipTransfer {
-			emit(pair.From, pair.To, Transfer, func() Result { return transfer(ctx, p, pair, url(dst.PodIP, opts.Port, "big")) })
+			emit(pair.From, pair.To, Transfer, 0, func() Result { return transfer(ctx, p, pair, Transfer, url(dst.PodIP, opts.Port, transferPath)) })
+		}
+		dual := src.PodIP6 != "" && dst.PodIP6 != ""
+		if dual {
+			emit(pair.From, pair.To, Pod6, 0, func() Result { return reach(ctx, p, pair, Pod6, url(dst.PodIP6, opts.Port, reachPath)) })
+			if dst.ServiceIP6 != "" {
+				emit(pair.From, pair.To, Service6, 0, func() Result {
+					return reach(ctx, p, pair, Service6, url(dst.ServiceIP6, opts.Port, reachPath))
+				})
+			}
+			if !opts.SkipTransfer {
+				emit(pair.From, pair.To, Transfer6, 0, func() Result {
+					return transfer(ctx, p, pair, Transfer6, url(dst.PodIP6, opts.Port, transferPath))
+				})
+			}
+		}
+		if opts.UDP != nil {
+			udp := *opts.UDP
+			if udp.PodMTU == 0 {
+				udp.PodMTU = min(src.MTU, dst.MTU)
+			}
+			if udp.PodMTU <= 0 {
+				// Not probed at a guessed size: the pair's pod MTU is
+				// what the sizes mean, and it is unknown.
+				emit(pair.From, pair.To, UDP, 0, func() Result {
+					return Result{From: pair.From, To: pair.To, Kind: UDP,
+						Err: fmt.Errorf("the pod MTU of %s or %s could not be read", pair.From, pair.To)}
+				})
+			}
+			var probes []UDPProbe
+			if udp.PodMTU > 0 {
+				probes = UDPProbes(udp)
+			}
+			for _, probe := range probes {
+				probe := probe
+				emit(pair.From, pair.To, UDP, probe.Datagram, func() Result {
+					return udpEcho(ctx, p, pair, UDP, dst.PodIP, probe, IPv4, udp.Tries)
+				})
+				if dual {
+					emit(pair.From, pair.To, UDP6, probe.Datagram, func() Result {
+						return udpEcho(ctx, p, pair, UDP6, dst.PodIP6, probe, IPv6, udp.Tries)
+					})
+				}
+			}
 		}
 	}
 
 	for _, name := range names {
-		emit(name, "", DNS, func() Result { return resolve(ctx, p, name) })
+		target := byNode[name]
+		emit(name, "", DNS, 0, func() Result { return resolve(ctx, p, name) })
+		if target.PodIP6 != "" && target.ServiceIP6 != "" && target.ServiceName != "" {
+			emit(name, "", DNS6, 0, func() Result { return lookup6(ctx, p, target) })
+		}
 		if opts.ExternalURL != "" {
-			emit(name, "", External, func() Result { return external(ctx, p, name, opts.ExternalURL) })
+			emit(name, "", External, 0, func() Result { return external(ctx, p, name, opts.ExternalURL) })
 		}
 	}
 
@@ -86,6 +135,8 @@ type Options struct {
 	SkipTransfer bool
 	// Concurrency overrides the default bound.
 	Concurrency int
+	// UDP enables the UDP size probes. Nil skips them.
+	UDP *UDPOptions
 }
 
 func (o Options) concurrency() int {
@@ -95,8 +146,15 @@ func (o Options) concurrency() int {
 	return Concurrency
 }
 
+// reachPath is answered with exactly "ok", and transferPath echoes
+// whatever body is posted to it.
+const (
+	reachPath    = "echo?msg=ok"
+	transferPath = "echo"
+)
+
 func url(host string, port int, path string) string {
-	return fmt.Sprintf("http://%s:%d/%s", host, port, path)
+	return fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), path)
 }
 
 // reach is the small-packet check: one request, one known body.
@@ -117,7 +175,7 @@ func reach(ctx context.Context, p Prober, pair Pair, kind Kind, target string) R
 // transfer is the large-body check. It asserts the exact length,
 // because a body that comes back short is the failure this exists to
 // catch and a body that merely arrives is not evidence of anything.
-func transfer(ctx context.Context, p Prober, pair Pair, target string) Result {
+func transfer(ctx context.Context, p Prober, pair Pair, kind Kind, target string) Result {
 	var size int64
 	var err error
 	if counted, ok := p.(TransferProber); ok {
@@ -127,7 +185,7 @@ func transfer(ctx context.Context, p Prober, pair Pair, target string) Result {
 		body, err = p.HTTPGet(ctx, pair.From, target)
 		size = int64(len(body))
 	}
-	r := Result{From: pair.From, To: pair.To, Kind: Transfer}
+	r := Result{From: pair.From, To: pair.To, Kind: kind}
 	switch {
 	case err != nil:
 		r.Err = err
@@ -139,6 +197,65 @@ func transfer(ctx context.Context, p Prober, pair Pair, target string) Result {
 		r.Detail = fmt.Sprintf("%d bytes", size)
 	}
 	return r
+}
+
+// udpEcho is one datagram size between one pair, every attempt required.
+func udpEcho(ctx context.Context, p Prober, pair Pair, kind Kind, host string, probe UDPProbe, family Family, tries int) Result {
+	r := Result{From: pair.From, To: pair.To, Kind: kind, Size: probe.Datagram}
+	u, ok := p.(UDPProber)
+	if !ok {
+		r.Err = fmt.Errorf("this prober cannot send UDP")
+		return r
+	}
+	destination := net.JoinHostPort(host, strconv.Itoa(UDPPort))
+	report, err := u.UDPEcho(ctx, pair.From, destination, probe.Payload(family), tries, probe.DontFragment)
+	mode := "fragmentable"
+	if probe.DontFragment {
+		mode = "don't fragment"
+	}
+	r.Detail = fmt.Sprintf("%s, %d/%d echoed", mode, report.Echoed, tries)
+	if len(report.Errors) > 0 {
+		r.Detail += "; " + truncate(strings.Join(report.Errors, "; "))
+	}
+	switch {
+	case err != nil:
+		r.Err = err
+	case !report.OK || report.Echoed != tries:
+	default:
+		r.OK = true
+	}
+	return r
+}
+
+// lookup6 asks cluster DNS for the target Service's IPv6 address.
+func lookup6(ctx context.Context, p Prober, target Target) Result {
+	r := Result{From: target.Node, Kind: DNS6}
+	l, ok := p.(LookupProber)
+	if !ok {
+		r.Err = fmt.Errorf("this prober cannot look names up by family")
+		return r
+	}
+	answers, err := l.Lookup(ctx, target.Node, target.ServiceName, IPv6)
+	switch {
+	case err != nil:
+		r.Err = err
+	case !containsAddress(answers, target.ServiceIP6):
+		r.Detail = fmt.Sprintf("%s answered %v, want %s", target.ServiceName, answers, target.ServiceIP6)
+	default:
+		r.OK = true
+		r.Detail = target.ServiceIP6
+	}
+	return r
+}
+
+func containsAddress(answers []string, want string) bool {
+	w := net.ParseIP(want)
+	for _, a := range answers {
+		if ip := net.ParseIP(a); ip != nil && w != nil && ip.Equal(w) {
+			return true
+		}
+	}
+	return false
 }
 
 func resolve(ctx context.Context, p Prober, node string) Result {

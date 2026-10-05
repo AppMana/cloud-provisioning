@@ -65,8 +65,8 @@ func TestAShortTransferFails(t *testing.T) {
 	short := strings.Repeat("x", TransferBytes-1)
 
 	m := Run(context.Background(), &fake{bodies: map[string]string{
-		"http://10.0.0.2:8080/big": full,
-		"http://10.0.0.3:8080/big": short,
+		"http://10.0.0.2:8080/echo": full,
+		"http://10.0.0.3:8080/echo": short,
 	}, defaultBody: "ok"}, []Target{
 		{Node: "a", PodIP: "10.0.0.1", ServiceIP: "10.96.0.1"},
 		{Node: "b", PodIP: "10.0.0.2", ServiceIP: "10.96.0.2"},

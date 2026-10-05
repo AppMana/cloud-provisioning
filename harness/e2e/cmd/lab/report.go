@@ -35,8 +35,11 @@ func reportMatrix(m *check.Matrix) {
 	recordEvent("matrix", m.Details())
 }
 
+// udpTries is how many datagrams of each size every pair sends.
+const udpTries = 10
+
 func matrixOptions() check.Options {
-	return check.Options{Port: check.Port, ExternalURL: check.ExternalURL, ObservePass: func(attempt int, m *check.Matrix) {
+	return check.Options{Port: check.Port, ExternalURL: check.ExternalURL, UDP: &check.UDPOptions{Tries: udpTries}, ObservePass: func(attempt int, m *check.Matrix) {
 		if attempt == 1 {
 			matrixSeries++
 		}

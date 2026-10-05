@@ -5,6 +5,9 @@ func (m *Matrix) Details() map[string]any {
 	var results []map[string]any
 	for _, r := range m.Results() {
 		detail := map[string]any{"from": r.From, "to": r.To, "kind": r.Kind, "passed": r.OK, "detail": r.Detail, "notRequired": r.NotRequired}
+		if r.Size != 0 {
+			detail["datagramBytes"] = r.Size
+		}
 		if r.Err != nil {
 			detail["error"] = r.Err.Error()
 		}

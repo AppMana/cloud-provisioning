@@ -44,6 +44,7 @@ func run() error {
 	report := flag.String("report-dir", "", "evidence directory (must not exist)")
 	timeout := flag.Duration("timeout", 45*time.Minute, "row deadline")
 	moduleDir := flag.String("module-dir", ".", "harness module directory the UDP prober is built from")
+	calicoMTU := flag.Int("k0s-calico-mtu", 0, "the Calico MTU the site was built with (calico-bird-dualstack required settings); zero is the profile's own")
 	flag.Parse()
 	if *work == "" || *site == "" {
 		return fmt.Errorf("-work-dir and -site-work-dir are required")
@@ -79,7 +80,7 @@ func run() error {
 	}
 	siteRig := vm.New(topo, *site)
 	k := &kube.Client{Bastion: siteRig.Node("bastion"), ControlPlanes: cluster.ControlPlaneAddresses(topo)}
-	if err := builder.Reuse(ctx, cluster.Deps{Rig: siteRig, Kube: k, Topology: topo, Network: profile.BuilderNetwork, WorkDir: *site}); err != nil {
+	if err := builder.Reuse(ctx, cluster.Deps{Rig: siteRig, Kube: k, Topology: topo, Network: profile.BuilderNetwork, WorkDir: *site, K0sCalicoMTU: *calicoMTU}); err != nil {
 		return err
 	}
 	cli := &aws.CLI{Region: state.Region, SessionPath: filepath.Join(*work, "harness-session.json")}

@@ -11,7 +11,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
-	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
+	"github.com/appmana/cloud-provisioning/harness/e2e/network"
 	"github.com/appmana/cloud-provisioning/harness/e2e/provider"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm"
 )
@@ -21,6 +21,8 @@ func main() {
 	namespace := flag.String("namespace", "cloud-provisioning", "CAPI namespace")
 	work := flag.String("work-dir", "", "existing VM site work directory")
 	port := flag.Int("api-port", 6443, "distribution API port")
+	distro := flag.String("distro", "k0s", "site distribution")
+	cni := flag.String("cni", "default", "site network profile, which selects the site topology")
 	flag.Parse()
 	if *name == "" || *work == "" {
 		fmt.Fprintln(os.Stderr, "-name and -work-dir are required")
@@ -28,8 +30,18 @@ func main() {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	r := vm.New(lab.Default(), *work)
-	k := &kube.Client{Bastion: r.Node("bastion"), APIPort: *port, ControlPlanes: cluster.ControlPlaneAddresses(lab.Default())}
+	profile, err := network.Select(*distro, *cni)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	topo, err := profile.SiteTopology(2)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	r := vm.New(topo, *work)
+	k := &kube.Client{Bastion: r.Node("bastion"), APIPort: *port, ControlPlanes: cluster.ControlPlaneAddresses(topo)}
 	obj := map[string]any{"apiVersion": "infrastructure.labcontainers.appmana.com/v1alpha1", "kind": "LabImportedControlPlane", "metadata": map[string]string{"name": *name, "namespace": *namespace}, "spec": map[string]any{}}
 	raw, _ := json.Marshal(obj)
 	if err := k.Apply(ctx, raw); err != nil {

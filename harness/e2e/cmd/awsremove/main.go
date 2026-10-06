@@ -14,7 +14,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/claim"
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
-	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
+	"github.com/appmana/cloud-provisioning/harness/e2e/network"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/aws"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
@@ -30,6 +30,8 @@ func run() error {
 	work := flag.String("work-dir", "", "private AWS run directory")
 	site := flag.String("site-work-dir", "", "existing single-NIC VM site")
 	apiPort := flag.Int("api-port", 6443, "distribution API port (MicroK8s: 16443)")
+	distro := flag.String("distro", "k0s", "site distribution")
+	cni := flag.String("cni", "default", "site network profile, which selects the site topology")
 	name := flag.String("claim", "", "CAPA claim to delete")
 	report := flag.String("report", "", "new removal evidence JSON path")
 	flag.Parse()
@@ -58,7 +60,14 @@ func run() error {
 	if state.CleanedUp {
 		return fmt.Errorf("run already cleaned up")
 	}
-	topo := lab.Default()
+	profile, err := network.Select(*distro, *cni)
+	if err != nil {
+		return err
+	}
+	topo, err := profile.SiteTopology(2)
+	if err != nil {
+		return err
+	}
 	siteRig := vm.New(topo, *site)
 	k := &kube.Client{Bastion: siteRig.Node("bastion"), APIPort: *apiPort, ControlPlanes: cluster.ControlPlaneAddresses(topo)}
 	node, err := k.Get(ctx, claim.Namespace, "machine", *name, "{.status.nodeRef.name}")

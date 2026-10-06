@@ -202,10 +202,7 @@ func runLab() {
 	ctx, cancelTimeout := context.WithTimeout(ctx, *timeout)
 	defer cancelTimeout()
 
-	topo, err := lab.WithRemoteSlots(*remoteSlots)
-	if selected.Network == k0s.BGPDualStack {
-		topo, err = lab.WithIdentities(*remoteSlots)
-	}
+	topo, err := selected.SiteTopology(*remoteSlots)
 	if err != nil {
 		fail("%v", err)
 	}

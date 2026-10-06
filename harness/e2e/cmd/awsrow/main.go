@@ -19,7 +19,6 @@ import (
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/microk8s"
 	"github.com/appmana/cloud-provisioning/harness/e2e/install"
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
-	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/network"
 	"github.com/appmana/cloud-provisioning/harness/e2e/observe"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
@@ -44,6 +43,7 @@ func run() error {
 	placementName := flag.String("placement", "", "change tunnel endpoints: control-plane, one-worker, two-workers, all-nodes")
 	report := flag.String("report-dir", "", "evidence directory (must not exist)")
 	timeout := flag.Duration("timeout", 45*time.Minute, "row deadline")
+	moduleDir := flag.String("module-dir", ".", "harness module directory the UDP prober is built from")
 	flag.Parse()
 	if *work == "" || *site == "" {
 		return fmt.Errorf("-work-dir and -site-work-dir are required")
@@ -73,7 +73,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	topo := lab.Default()
+	topo, err := profile.SiteTopology(2)
+	if err != nil {
+		return err
+	}
 	siteRig := vm.New(topo, *site)
 	k := &kube.Client{Bastion: siteRig.Node("bastion"), ControlPlanes: cluster.ControlPlaneAddresses(topo)}
 	if err := builder.Reuse(ctx, cluster.Deps{Rig: siteRig, Kube: k, Topology: topo, Network: profile.BuilderNetwork, WorkDir: *site}); err != nil {
@@ -321,7 +324,14 @@ func run() error {
 	if err = cluster.EnsureCRICTL(ctx, fleet, *site, nodes); err != nil {
 		return err
 	}
-	pods := &check.Pods{Kube: k, Rig: fleet, Namespace: check.UniqueNamespace(time.Now().UnixNano()), CRIEndpoint: builder.CRIEndpoint()}
+	udpProbe, err := check.BuildUDPProbe(ctx, *moduleDir, *work)
+	if err != nil {
+		return err
+	}
+	pods := &check.Pods{Kube: k, Rig: fleet, Namespace: check.UniqueNamespace(time.Now().UnixNano()), CRIEndpoint: builder.CRIEndpoint(), UDPProbe: udpProbe}
+	if err = pods.Prepare(ctx, nodes); err != nil {
+		return err
+	}
 	defer func() {
 		cleanup, done := context.WithTimeout(context.Background(), 30*time.Second)
 		defer done()
@@ -339,7 +349,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	matrix, recordErr := recordedMatrix(ctx, pods, targets, check.Options{Port: check.Port, ExternalURL: check.ExternalURL}, 10*time.Minute, 10*time.Second, journal)
+	matrix, recordErr := recordedMatrix(ctx, pods, targets, check.Options{Port: check.Port, ExternalURL: check.ExternalURL, UDP: &check.UDPOptions{Tries: 10}}, 10*time.Minute, 10*time.Second, journal)
 	closeErr := journal.Close()
 	if recordErr != nil {
 		return recordErr

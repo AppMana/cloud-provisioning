@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
+	"github.com/appmana/cloud-provisioning/harness/e2e/cluster/k0s"
+	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 )
 
 // Profile is an intentionally supported distribution configuration. Bundled
@@ -84,4 +86,13 @@ func (b bundled) Install(ctx context.Context, d Deps) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, "daemonsets.json"), raw, 0600)
+}
+
+// SiteTopology is the lab a site of this profile is built on, which every
+// tool reaching that site must use too.
+func (p Profile) SiteTopology(remoteSlots int) (lab.Topology, error) {
+	if p.Network == k0s.BGPDualStack {
+		return lab.WithIdentities(remoteSlots)
+	}
+	return lab.WithRemoteSlots(remoteSlots)
 }

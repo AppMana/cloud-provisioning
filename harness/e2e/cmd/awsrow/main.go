@@ -15,7 +15,7 @@ import (
 	adopt "github.com/appmana/cloud-provisioning/harness/e2e/adoption"
 	"github.com/appmana/cloud-provisioning/harness/e2e/check"
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
-	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/k0s"
+	"github.com/appmana/cloud-provisioning/harness/e2e/cluster/k0s"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/microk8s"
 	"github.com/appmana/cloud-provisioning/harness/e2e/install"
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
@@ -341,6 +341,20 @@ func run() error {
 	targets, err := pods.Start(ctx, nodes, 10*time.Minute)
 	if err != nil {
 		return err
+	}
+	// The network's agent ready on every measured node, workers included:
+	// one that is never ready stalls every rolling update of it.
+	if strings.HasPrefix(profile.Network, "calico") {
+		readyErr := wait.Until(ctx, 10*time.Minute, "calico-node is not ready everywhere", func(ctx context.Context) error {
+			return k0s.CalicoNodesReady(ctx, k, nodes)
+		})
+		raw, _ := json.Marshal(map[string]any{"nodes": nodes, "ok": readyErr == nil, "error": fmt.Sprint(readyErr)})
+		if err = os.WriteFile(filepath.Join(reportDir, "calico-node-ready.json"), raw, 0600); err != nil {
+			return err
+		}
+		if readyErr != nil {
+			return readyErr
+		}
 	}
 	if err = observe.Capture(ctx, reportDir, "ready", k, fleet, nodes); err != nil {
 		return err

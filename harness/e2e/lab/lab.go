@@ -138,6 +138,8 @@ type Topology struct {
 	// on a disk seconds old. Which is what a prepared image is for,
 	// and what such a deployment assumes it has.
 	VMBaseImage string
+	// VMMemoryMB is each cluster machine's memory; zero is VMMemoryMB.
+	VMMemoryMB int
 
 	Name     string
 	Segments []string
@@ -346,7 +348,7 @@ func (t Topology) ContainerlabConfig(rig Rig) (*core.Config, error) {
 				definition.Binds = append(definition.Binds, t.VMBaseImage+":"+VMBaseImagePath+":ro")
 			}
 			definition.Env = map[string]string{
-				"QEMU_MEMORY": strconv.Itoa(VMMemoryMB), "QEMU_SMP": strconv.Itoa(VMCPUs),
+				"QEMU_MEMORY": strconv.Itoa(t.vmMemoryMB()), "QEMU_SMP": strconv.Itoa(VMCPUs),
 				"CLAB_MGMT_INTF": "eth1", "VR_MGMT_IS_A_LINK": "1",
 			}
 		}
@@ -380,6 +382,13 @@ const VMBaseImagePath = "/jammy-ubuntu-cloud.qcow2"
 // upstream vrnetlab default is 512, which is a network device's worth
 // and not enough to run a kubelet and a control plane.
 const VMMemoryMB = 4096
+
+func (t Topology) vmMemoryMB() int {
+	if t.VMMemoryMB > 0 {
+		return t.VMMemoryMB
+	}
+	return VMMemoryMB
+}
 
 // VMCPUs per cluster node.
 const VMCPUs = 2

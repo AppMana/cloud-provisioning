@@ -87,6 +87,7 @@ func runLab() {
 		linuxEgress            = flag.Bool("k0s-linux-egress", false, "add Linux default-route Konnectivity agents on a fresh k0s VM site for mixed-OS API egress")
 		product                = flag.Bool("product", false, "also install the product's chart")
 		remoteSlots            = flag.Int("remote-slots", 2, "fixed single-NIC remote VM capacity (2..32), including spare group slots")
+		vmMemory               = flag.Int("vm-memory-mib", lab.VMMemoryMB, "memory of each cluster VM; budget it against the host's available memory")
 		remotes                = flag.String("remotes", "", "comma-separated remotes to claim and bootstrap (e.g. remote1)")
 		lifecycle              = flag.Bool("lifecycle", true, "remove and re-add each claimed remote under every requested placement (initial two-workers if none)")
 		capiMode               = flag.String("capi-mode", "imported", "imported (CAPI associates Nodes) or unconnected (product providerID fallback)")
@@ -206,6 +207,10 @@ func runLab() {
 	if err != nil {
 		fail("%v", err)
 	}
+	if *vmMemory < 1024 {
+		fail("-vm-memory-mib must be at least 1024")
+	}
+	topo.VMMemoryMB = *vmMemory
 
 	// Which disk the machines boot from, decided before the rig is
 	// made: the rig renders the topology it was given.

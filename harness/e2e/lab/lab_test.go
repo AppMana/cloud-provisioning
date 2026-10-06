@@ -220,3 +220,26 @@ func mustIdentities(t *testing.T) Topology {
 	}
 	return topo
 }
+
+// Guest memory is the run's to choose, within what the host can spare;
+// the default stays what a kubelet and a control plane need.
+func TestGuestMemoryIsChosenPerTopology(t *testing.T) {
+	topo := Default()
+	config, err := topo.ContainerlabConfig(VM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := config.Topology.Nodes["cp"].Env["QEMU_MEMORY"]; got != "4096" {
+		t.Errorf("default guest memory %s", got)
+	}
+	topo.VMMemoryMB = 2560
+	config, err = topo.ContainerlabConfig(VM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range topo.Nodes {
+		if n.IsClusterNode() && config.Topology.Nodes[n.Name].Env["QEMU_MEMORY"] != "2560" {
+			t.Errorf("%s guest memory %s, want 2560", n.Name, config.Topology.Nodes[n.Name].Env["QEMU_MEMORY"])
+		}
+	}
+}

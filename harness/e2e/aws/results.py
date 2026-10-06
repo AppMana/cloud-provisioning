@@ -11,21 +11,58 @@ def read(path):
     return json.loads(path.read_text())
 
 
-def row(path, expected):
+DEFAULT_SITE = ('cp', 'cp2', 'cp3', 'w1', 'w2')
+
+
+def expected_paths(nodes, dual=False):
+    """Every ordered pair's reachability checks and every node's own."""
+    pair_kinds = ('pod', 'service', 'transfer') + (('pod6', 'service6', 'transfer6') if dual else ())
+    node_kinds = ('dns', 'external') + (('dns6',) if dual else ())
+    paths = {(source, target, kind, 0) for source in nodes for target in nodes
+             if source != target for kind in pair_kinds}
+    paths |= {(source, '', kind, 0) for source in nodes for kind in node_kinds}
+    return paths
+
+
+def row(path, expected=None, site=DEFAULT_SITE, dual=False, udp=False, workers=None):
+    """Check one row's matrix against the paths its profile requires.
+
+    UDP rows add, for every ordered pair, one exact-echo check per datagram
+    size in each family; the sizes follow the pods' measured MTU, so they
+    are required to be the same for every pair and family rather than
+    restated here.
+    """
     matrix = read(path / 'matrix.json')
     bindings = read(path / 'bindings.json')
-    if (matrix['total'], matrix['passed'], matrix['failed']) != (expected, expected, 0):
-        raise ValueError(f'{path.name}: matrix did not pass all {expected} checks')
-    if len(matrix['results']) != expected or not all(r['passed'] for r in matrix['results']):
+    if matrix['failed'] != 0 or matrix['passed'] != matrix['total']:
+        raise ValueError(f'{path.name}: matrix did not pass all {matrix["total"]} checks')
+    if len(matrix['results']) != matrix['total'] or not all(r['passed'] for r in matrix['results']):
         raise ValueError(f'{path.name}: incomplete result evidence')
-    if len(bindings) != (2 if expected == 140 else 1):
+    if workers is None:
+        workers = 2 if expected == 140 else 1
+    if len(bindings) != workers:
         raise ValueError(f'{path.name}: wrong number of AWS workers')
-    nodes = {'cp', 'cp2', 'cp3', 'w1', 'w2'} | {b['node'] for b in bindings}
-    paths = {(source, target, kind) for source in nodes for target in nodes
-             if source != target for kind in ('pod', 'service', 'transfer')}
-    paths |= {(source, '', kind) for source in nodes for kind in ('dns', 'external')}
-    observed = {(r['from'], r['to'], r['kind']) for r in matrix['results']}
-    if observed != paths or len(observed) != expected:
+    nodes = set(site) | {b['node'] for b in bindings}
+    paths = expected_paths(nodes, dual)
+    keys = [(r['from'], r['to'], r['kind'], r.get('datagramBytes', 0)) for r in matrix['results']]
+    observed = set(keys)
+    if len(observed) != len(keys):
+        raise ValueError(f'{path.name}: missing, duplicate or unexpected network paths')
+    if udp:
+        families = ('udp', 'udp6') if dual else ('udp',)
+        sizes = {(f, t, k): set() for f in nodes for t in nodes if f != t for k in families}
+        for f, t, k, size in observed:
+            if k in families:
+                if (f, t, k) not in sizes or size <= 0:
+                    raise ValueError(f'{path.name}: missing, duplicate or unexpected network paths')
+                sizes[(f, t, k)].add(size)
+        distinct = {frozenset(v) for v in sizes.values()}
+        if len(distinct) != 1 or not next(iter(distinct)):
+            raise ValueError(f'{path.name}: UDP sizes differ between pairs or are missing')
+        paths |= {(f, t, k, size) for (f, t, k), v in sizes.items() for size in v}
+    if observed != paths:
+        raise ValueError(f'{path.name}: missing, duplicate or unexpected network paths')
+    if expected is not None and len(observed) != expected:
         raise ValueError(f'{path.name}: missing, duplicate or unexpected network paths')
     if any(not b['nodeUID'] or not b['providerID'].endswith('/'+b['instanceID']) for b in bindings):
         raise ValueError(f'{path.name}: incomplete machine identity')
@@ -33,8 +70,9 @@ def row(path, expected):
         raise ValueError(f'{path.name}: duplicate instance identity')
     if any(b['eniCount'] != 1 or not b['physicalNIC'] for b in bindings):
         raise ValueError(f'{path.name}: missing single-NIC evidence')
+    total = len(observed)
     return {
-        'row': path.name, 'total': expected, 'passed': expected, 'failed': 0,
+        'row': path.name, 'total': total, 'passed': total, 'failed': 0,
         'matrixSHA256': hashlib.sha256((path / 'matrix.json').read_bytes()).hexdigest(),
         'bindings': bindings,
     }
@@ -42,7 +80,7 @@ def row(path, expected):
 
 def observed_images(path, versions):
     expected = {
-        'calico-node': 'quay.io/k0sproject/calico-node:' + versions['calico'],
+        'calico-node': versions.get('calicoImage') or 'quay.io/k0sproject/calico-node:' + versions['calico'],
         'capa-controller-manager': 'registry.k8s.io/cluster-api-aws/cluster-api-aws-controller:v2.12.1',
         'capi-controller-manager': 'registry.k8s.io/cluster-api/cluster-api-controller:v1.11.1',
     }
@@ -73,16 +111,22 @@ def observed_images(path, versions):
     return found
 
 
-def summarize(work, baseline, placements, versions=None):
+def summarize(work, baseline, placements, versions=None, profile=None):
     versions = versions or {'k0s': 'v1.34.1+k0s.0', 'calico': 'v3.29.6-0', 'capa': 'v2.12.1', 'capi': 'v1.11.1'}
+    profile = profile or {}
+    site = profile.get('site', DEFAULT_SITE)
+    shape = dict(site=site, dual=profile.get('dual', False), udp=profile.get('udp', False))
+    # The historical five-node VXLAN row counts stay pinned; other
+    # profiles are checked by their path set alone.
+    both, one = (140, 102) if not profile else (None, None)
     state = read(work / 'resources.json')
-    before = row(work / 'rows' / baseline, 140)
+    before = row(work / 'rows' / baseline, both, workers=2, **shape)
     rows = [before]
     replacements = []
     for index in (1, 2):
         removal = read(work / f'remove-{index}.json')
-        survivor = row(work / 'rows' / f'survivor-{index}', 102)
-        after = row(work / 'rows' / f'readded-{index}', 140)
+        survivor = row(work / 'rows' / f'survivor-{index}', one, workers=1, **shape)
+        after = row(work / 'rows' / f'readded-{index}', both, workers=2, **shape)
         name = f'aws-k0s-{index}'
         old = {b['machine']: b for b in before['bindings']}
         new = {b['machine']: b for b in after['bindings']}
@@ -104,7 +148,7 @@ def summarize(work, baseline, placements, versions=None):
         before = after
     for placement in placements:
         path = work / 'rows' / ('placement-' + placement)
-        measured = row(path, 140)
+        measured = row(path, both, workers=2, **shape)
         if read(path / 'placement.json')['Name'] != placement:
             raise ValueError('placement evidence mismatch')
         if measured['bindings'] != before['bindings']:
@@ -114,9 +158,10 @@ def summarize(work, baseline, placements, versions=None):
     return {
         'runID': state['runID'], 'region': state['region'],
         'versions': versions,
-        'network': 'bundled Calico, default VXLAN',
+        'network': profile.get('network', 'bundled Calico, default VXLAN'),
+        'dualStack': shape['dual'], 'udpSizeProbes': shape['udp'],
         'observedImages': observed_images(work / 'rows' / baseline, versions),
-        'topology': {'siteVMs': 5, 'awsWorkers': 2, 'physicalNICsPerMachine': 1},
+        'topology': {'siteVMs': len(site), 'awsWorkers': 2, 'physicalNICsPerMachine': 1},
         'baseAMIID': state['baseAMIID'], 'preparedAMIID': state['preparedAMIID'],
         'gates': len(rows), 'checksPassed': sum(r['passed'] for r in rows),
         'rows': rows, 'replacements': replacements,
@@ -137,9 +182,20 @@ if __name__ == '__main__':
     p.add_argument('--dialer-binary', type=Path)
     p.add_argument('--expected-k0s', default='v1.34.1+k0s.0', help='release under test; historical default retained for old evidence')
     p.add_argument('--expected-calico', default='v3.29.6-0', help='expected distribution-bundled Calico image tag')
+    p.add_argument('--expected-calico-image', help='exact calico-node image reference, for profiles that pin by digest')
+    p.add_argument('--site-nodes', help='comma-separated site nodes; selects profile-checked rows')
+    p.add_argument('--dual-stack', action='store_true', help='rows carry IPv6 checks for every path')
+    p.add_argument('--udp', action='store_true', help='rows carry UDP size probes')
+    p.add_argument('--network', help='network description for the summary')
     a = p.parse_args()
-    result = summarize(a.work_dir, a.baseline, [x for x in a.placements.split(',') if x],
-                       {'k0s': a.expected_k0s, 'calico': a.expected_calico, 'capa': 'v2.12.1', 'capi': 'v1.11.1'})
+    profile = None
+    if a.site_nodes:
+        profile = {'site': [n for n in a.site_nodes.split(',') if n], 'dual': a.dual_stack, 'udp': a.udp,
+                   'network': a.network or 'distribution-bundled network'}
+    versions = {'k0s': a.expected_k0s, 'calico': a.expected_calico, 'capa': 'v2.12.1', 'capi': 'v1.11.1'}
+    if a.expected_calico_image:
+        versions['calicoImage'] = a.expected_calico_image
+    result = summarize(a.work_dir, a.baseline, [x for x in a.placements.split(',') if x], versions, profile)
     coverage = {}
     if a.unit_coverage_log:
         totals = re.findall(r'^total:.*?([0-9.]+)%$', a.unit_coverage_log.read_text(), re.M)

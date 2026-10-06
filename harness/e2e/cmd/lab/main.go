@@ -383,6 +383,13 @@ func runLab() {
 				fail("%v", err)
 			}
 			fmt.Println("  every node Ready")
+			if *siteMesh {
+				step("peering Calico among site nodes only")
+				if err := d.Kube.ApplyObjects(ctx, k0s.SiteMeshObjects()...); err != nil {
+					fail("applying the site BGP mesh: %v", err)
+				}
+				recordEvent("calico-site-mesh-applied", k0s.SiteMeshObjects())
+			}
 			if err := observe.Capture(ctx, *workDir, "site-ready", d.Kube, r, rigNodes(topo, nodes)); err != nil {
 				fail("%v", err)
 			}

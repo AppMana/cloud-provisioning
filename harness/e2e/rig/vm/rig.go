@@ -120,47 +120,62 @@ func (r *Rig) Seed(node string, cloudConfig []byte) error {
 	return os.WriteFile(filepath.Join(dir, "extra-userdata.yaml"), cloudConfig, 0o600)
 }
 
+// prepareSeed writes one machine's first-boot material for a fresh
+// deployment, discarding whatever a previous run left there.
+func (r *Rig) prepareSeed(name string) error {
+	n := r.Topology.MustNode(name)
+	dir := r.SeedDir(name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	// An empty metadata file makes vrnetlab emit the cloud-init instance ID.
+	// Lab execution needs no SSH credentials.
+	if err := os.WriteFile(filepath.Join(dir, "extra-authorized-keys"), nil, 0600); err != nil {
+		return err
+	}
+	// Kept because the wrapper binds it, and because a machine
+	// may yet need first-boot setup that is the platform's rather
+	// than the tenant's.
+	if err := os.WriteFile(filepath.Join(dir, "extra-setup.sh"), []byte("#!/bin/sh\n:\n"), 0o755); err != nil {
+		return err
+	}
+
+	// The platform's network configuration, applied by the
+	// guest's cloud-init before any userdata runs — so a machine
+	// whose bootstrap dials the site has a segment to dial from.
+	netcfg, err := NetworkConfig(n)
+	if err != nil {
+		return err
+	}
+	if err := networkconfig.WriteFile(filepath.Join(dir, "extra-network.yaml"), netcfg); err != nil {
+		return err
+	}
+
+	// An empty document: a machine with nothing to do at first boot
+	// still needs the file to exist, because its wrapper binds it,
+	// and a previous run's rendered userdata would boot a new
+	// machine into a cluster that no longer exists.
+	if err := os.WriteFile(filepath.Join(dir, "extra-userdata.yaml"), []byte("#cloud-config\n{}\n"), 0o644); err != nil {
+		return err
+	}
+	// A launch receipt and reset marker describe a wrapper this
+	// deployment has destroyed.
+	for _, stale := range []string{"launch.json", "reset-instance"} {
+		if err := os.Remove(filepath.Join(dir, stale)); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
 // Up writes platform metadata and deploys the single-NIC guests.
 func (r *Rig) Up(ctx context.Context) error {
 	for _, n := range r.Topology.Nodes {
 		if !n.IsClusterNode() {
 			continue
 		}
-		dir := r.SeedDir(n.Name)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		if err := r.prepareSeed(n.Name); err != nil {
 			return err
-		}
-		// An empty metadata file makes vrnetlab emit the cloud-init instance ID.
-		// Lab execution needs no SSH credentials.
-		if err := os.WriteFile(filepath.Join(dir, "extra-authorized-keys"), nil, 0600); err != nil {
-			return err
-		}
-		// Kept because the wrapper binds it, and because a machine
-		// may yet need first-boot setup that is the platform's rather
-		// than the tenant's.
-		if err := os.WriteFile(filepath.Join(dir, "extra-setup.sh"), []byte("#!/bin/sh\n:\n"), 0o755); err != nil {
-			return err
-		}
-
-		// The platform's network configuration, applied by the
-		// guest's cloud-init before any userdata runs — so a machine
-		// whose bootstrap dials the site has a segment to dial from.
-		netcfg, err := NetworkConfig(n)
-		if err != nil {
-			return err
-		}
-		if err := networkconfig.WriteFile(filepath.Join(dir, "extra-network.yaml"), netcfg); err != nil {
-			return err
-		}
-
-		// An empty document by default: a machine with nothing to do
-		// at first boot still needs the file to exist, because its
-		// wrapper binds it.
-		userdata := filepath.Join(dir, "extra-userdata.yaml")
-		if _, err := os.Stat(userdata); os.IsNotExist(err) {
-			if err := os.WriteFile(userdata, []byte("#cloud-config\n{}\n"), 0o644); err != nil {
-				return err
-			}
 		}
 	}
 

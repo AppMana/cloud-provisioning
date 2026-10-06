@@ -176,3 +176,56 @@ versions after 24 hours. Preparing the image remains a separate project-owned
 step; this check does not prove that all offline runtime images are present.
 The native refresh hold requires snapd 2.58 or newer, as documented in
 [Snap's update controls](https://snapcraft.io/docs/how-to-guides/manage-snaps/manage-updates/).
+
+## VM nodes through the SDK
+
+Cluster VMs are declared as containerlab `generic_vm` nodes, which is what the
+SDK commands through the serial guest agent; a `linux` node's commands run in
+its wrapper container instead. A machine is ready only when its declared
+Ethernet devices exist in the guest, since the agent can answer first. Image
+archives are carried into guests by chunked file transfer and imported from
+that file: one guest agent message carries at most ~47 MiB of stdin
+(QEMU refuses a message over 64 MiB, and stdin travels base64-encoded).
+
+## Traffic matrix
+
+`check` measures every ordered pair of probe pods. Each pod runs the upstream
+`agnhost netexec` image pinned by digest, pulled by digest through the node's
+runtime before the pods start (`Pods.Prepare`), behind a `PreferDualStack`
+Service. Per pair: pod and Service HTTP, and a 1 MiB body posted to the target's
+echo and returned, so each transfer crosses in both directions. Per node:
+cluster DNS. For dual-stack pods the same pod, Service and transfer checks run
+over IPv6, and DNS must answer the target Service's IPv6 address.
+
+UDP size probes send exact echoes in each family around the smaller of the two
+pods' interface MTUs, read inside the pods: the IPv6 minimum MTU, MTU-1 and
+MTU with the don't-fragment bit set and the learned path MTU ignored
+(`udpprobe -dont-fragment`), then MTU+1 and 1800 bytes, which the sender
+fragments. Sizes are whole IP datagrams. Every one of the ten attempts must
+come back: a single lost datagram at one size is the signature of a path
+smaller than the pod MTU. The static prober is carried into each probe pod.
+
+## Real-cluster acceptance
+
+`cmd/acceptance` qualifies an existing cluster from an explicit kubeconfig,
+with no bastion or node access. It never reads `$KUBECONFIG` or
+`~/.kube/config`.
+
+```sh
+go run ./cmd/acceptance -kubeconfig /path/to/kubeconfig.yaml -out new.json preconditions
+go run ./cmd/acceptance -kubeconfig /path/to/kubeconfig.yaml -out new.json matrix
+```
+
+`preconditions` uses a client whose transport refuses every request but GET,
+and reuses the product's network detection. It reports the network and
+whether it is dual-stack, masquerade of every node's blocks, whether Calico's
+address autodetection could select an address on a remote (only `cidr=`
+methods excluding the tunnel ranges pass), the pod MTU against `-tunnel-mtu`
+(default 1420), tunnel range overlap, borrowed addresses, explicit BGP peers
+and endpoint candidates. Required failures exit nonzero.
+
+`matrix` also runs the preconditions, then creates one namespace labelled
+`cloud-provisioning.appmana.com/acceptance=true`, a probe pod and Service per
+Ready Linux node (or `-nodes`), runs the full matrix above through pod exec,
+and deletes that namespace on exit, including on interruption. It deletes no
+namespace without that label. Probe pods pull the pinned agnhost image.

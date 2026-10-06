@@ -71,8 +71,11 @@ func bgpDualStackConfig(d cluster.Deps, n lab.Node) (*native.ClusterConfig, erro
 					Enabled: true, IPv6PodCIDR: BGPDualStackPodCIDR6, IPv6ServiceCIDR: BGPDualStackServiceCIDR6,
 				},
 				ClusterDomain: "cluster.local",
-				Calico:        &native.Calico{EnvVars: copyEnv(bgpDualStackEnv)},
-				KubeProxy:     &native.KubeProxy{Mode: native.ModeIptables},
+				// MTU zero is k0s's own default (1450), as deployed. A
+				// required lower pod MTU is the one explicit change
+				// (cluster.Deps.K0sCalicoMTU, -k0s-calico-mtu).
+				Calico:    &native.Calico{EnvVars: copyEnv(bgpDualStackEnv), MTU: d.K0sCalicoMTU},
+				KubeProxy: &native.KubeProxy{Mode: native.ModeIptables},
 			},
 			Telemetry: &native.ClusterTelemetry{Enabled: new(bool)},
 		},

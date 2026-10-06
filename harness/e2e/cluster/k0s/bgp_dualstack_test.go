@@ -110,3 +110,39 @@ func TestBGPDualStackImagesAreTheStockReleasePinned(t *testing.T) {
 		t.Fatal("accepted a caller image set for the stock profile")
 	}
 }
+
+// The profile reproduces the deployment exactly; a required change is
+// applied on top of it explicitly and nowhere else. A pod MTU over the
+// tunnel's is that change: lowering it is k0s's own spec.network.calico.mtu,
+// and every other field stays the deployment's.
+func TestBGPDualStackTakesARequiredPodMTUAndNothingElse(t *testing.T) {
+	d := identityDeps(t)
+	base, err := bgpDualStackConfig(d, d.Topology.MustNode("cp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.K0sCalicoMTU = 1420
+	lowered, err := bgpDualStackConfig(d, d.Topology.MustNode("cp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lowered.Spec.Network.Calico.MTU != 1420 {
+		t.Fatalf("calico MTU = %d, want 1420", lowered.Spec.Network.Calico.MTU)
+	}
+	lowered.Spec.Network.Calico.MTU = base.Spec.Network.Calico.MTU
+	if !equality.Semantic.DeepEqual(base, lowered) {
+		t.Fatal("the MTU change altered other deployment fields")
+	}
+	// Reuse accepts the stored configuration only with the same MTU.
+	raw, err := yaml.Marshal(func() *native.ClusterConfig { c, _ := bgpDualStackConfig(d, d.Topology.MustNode("cp")); return c }())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyBGPDualStackConfig(raw, d, d.Topology.MustNode("cp")); err != nil {
+		t.Fatal(err)
+	}
+	d.K0sCalicoMTU = 0
+	if verifyBGPDualStackConfig(raw, d, d.Topology.MustNode("cp")) == nil {
+		t.Fatal("reuse accepted a site whose MTU differs from the requested one")
+	}
+}

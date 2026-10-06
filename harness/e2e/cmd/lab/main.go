@@ -136,8 +136,9 @@ func runLab() {
 		}
 		*cni = selected.Network
 	}
-	if *calicoMTU != 0 && (*distro != "k0s" || (selected.Network != "calico" && selected.Network != "calico-site-bgp") || *reuseSite || *calicoMTU < 1280 || *calicoMTU > 65535) {
-		fail("--k0s-calico-mtu requires a fresh k0s Calico site and an MTU between 1280 and 65535")
+	if *calicoMTU != 0 && (*distro != "k0s" || (selected.Network != "calico" && selected.Network != "calico-site-bgp" && selected.Network != k0s.BGPDualStack) || (*reuseSite && selected.Network != k0s.BGPDualStack) || *calicoMTU < 1280 || *calicoMTU > 65535) {
+		// The dual-stack profile verifies a reused site's stored MTU against it.
+		fail("--k0s-calico-mtu requires a fresh k0s Calico site (or a reused calico-bird-dualstack site built with it) and an MTU between 1280 and 65535")
 	}
 	if *calicoManagedAddresses && (*distro != "k0s" || (selected.Network != "calico" && selected.Network != "calico-site-bgp") || *reuseSite) {
 		fail("--k0s-calico-managed-addresses requires a fresh k0s Calico site")

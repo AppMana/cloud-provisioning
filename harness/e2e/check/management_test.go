@@ -60,3 +60,21 @@ func TestKubeletExecRequiresExpectedProbeBody(t *testing.T) {
 		t.Fatalf("unexpected verification: %+v", results)
 	}
 }
+
+// The exec reads something the probe pod actually serves: its own echo of
+// "ok" over loopback. The pod's image changed from busybox to agnhost and
+// the old file path stopped existing, failing every exec on a healthy node.
+func TestKubeletExecAsksTheProbeForItsOwnEcho(t *testing.T) {
+	var execArgs []string
+	run := func(_ context.Context, args ...string) ([]byte, error) {
+		if strings.Contains(strings.Join(args, " "), " exec ") {
+			execArgs = args
+		}
+		return []byte("ok"), nil
+	}
+	kubeletAccess(context.Background(), run, []string{"https://cp:6443"}, "probe", []string{"w1"})
+	got := strings.Join(execArgs, " ")
+	if !strings.Contains(got, "-- wget -q -T 5 -O - http://127.0.0.1:8080/echo?msg=ok") {
+		t.Fatalf("exec %q does not read the probe's own echo", got)
+	}
+}

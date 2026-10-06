@@ -37,7 +37,7 @@ func kubeletAccess(ctx context.Context, run func(context.Context, ...string) ([]
 			for _, operation := range []string{"exec", "logs"} {
 				args := []string{"kubectl", "--server=" + server, "--request-timeout=20s", "-n", namespace, operation, "hc-" + node}
 				if operation == "exec" {
-					args = append(args, "--", "cat", "/tmp/www/index.html")
+					args = append(args, "--", "wget", "-q", "-T", "5", "-O", "-", fmt.Sprintf("http://127.0.0.1:%d/%s", Port, reachPath))
 				} else {
 					args = append(args, "--tail=1")
 				}

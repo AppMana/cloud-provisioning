@@ -85,6 +85,7 @@ func runLab() {
 		calicoObjectsSHA256    = flag.String("calico-objects-sha256", "", "required SHA256 of --calico-objects")
 		calicoManagedAddresses = flag.Bool("k0s-calico-managed-addresses", false, "use stored per-node Calico addresses on a fresh k0s site instead of repeated IP autodetection")
 		linuxEgress            = flag.Bool("k0s-linux-egress", false, "add Linux default-route Konnectivity agents on a fresh k0s VM site for mixed-OS API egress")
+		siteMesh               = flag.Bool("calico-site-mesh", false, "replace Calico's full node mesh with BGP peering among site nodes only, the setting remote calico-node readiness requires")
 		product                = flag.Bool("product", false, "also install the product's chart")
 		remoteSlots            = flag.Int("remote-slots", 2, "fixed single-NIC remote VM capacity (2..32), including spare group slots")
 		vmMemory               = flag.Int("vm-memory-mib", lab.VMMemoryMB, "memory of each cluster VM; budget it against the host's available memory")
@@ -160,6 +161,9 @@ func runLab() {
 		if err := k0s.ValidateImages(selected.BuilderNetwork, k0sImages); err != nil {
 			fail("%v", err)
 		}
+	}
+	if *siteMesh && (*distro != "k0s" || (selected.Network != k0s.BGPDualStack && selected.Network != "calico-site-bgp")) {
+		fail("-calico-site-mesh applies to the k0s Calico BGP profiles")
 	}
 	if *linuxEgress && (*distro != "k0s" || *rigKind != "vm" || *reuseSite) {
 		fail("--k0s-linux-egress requires a fresh k0s VM site")
@@ -605,6 +609,18 @@ func runLab() {
 				requireManagement := func(stage string, live []string) {
 					if err := qualifyManagement(ctx, d.Kube, pods.Namespace, live, stage); err != nil {
 						fail("%v", err)
+					}
+					// The network's own agent has to be ready on every
+					// measured node, remotes included: an agent that is
+					// never ready stalls every rolling update of it.
+					if strings.HasPrefix(selected.Network, "calico") {
+						err := wait.Until(ctx, 5*time.Minute, "calico-node is not ready everywhere", func(ctx context.Context) error {
+							return k0s.CalicoNodesReady(ctx, d.Kube, live)
+						})
+						recordEvent("calico-node-ready", map[string]any{"stage": stage, "nodes": live, "ok": err == nil, "error": fmt.Sprint(err)})
+						if err != nil {
+							fail("%s: %v", stage, err)
+						}
 					}
 				}
 

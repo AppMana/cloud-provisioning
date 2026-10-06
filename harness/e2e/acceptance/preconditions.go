@@ -68,6 +68,7 @@ var (
 	calicoPools      = schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: "IPPoolList"}
 	calicoIPAMBlocks = schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: "IPAMBlockList"}
 	calicoBGPPeers   = schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: "BGPPeerList"}
+	calicoBGPConfig  = schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: "BGPConfiguration"}
 )
 
 // Preconditions reads the cluster and reports what the product needs of
@@ -118,6 +119,9 @@ func Preconditions(ctx context.Context, c client.Reader, o Options) ([]Check, er
 			out = append(out, autodetection("ipv6-autodetection", env["IP6"], env["IP6_AUTODETECTION_METHOD"], tunnel6))
 		}
 		out = append(out, podMTU(ctx, c, ds, o.TunnelMTU))
+		if env["CALICO_NETWORKING_BACKEND"] == "bird" {
+			out = append(out, bgpMesh(ctx, c))
+		}
 	}
 
 	ranges := []netip.Prefix{tunnel4}
@@ -409,6 +413,51 @@ func borrowedAddresses(ctx context.Context, c client.Reader) Check {
 	}
 	sort.Strings(parts)
 	check.Detail = "pods on these nodes hold borrowed addresses, unreachable across a tunnel if the node is a remote: " + strings.Join(parts, ", ")
+	return check
+}
+
+// bgpMesh: with Calico's full node mesh every node peers with every
+// remote, the tunnel refuses those sessions, and Calico reports a node
+// whose configured peers never establish as unready forever, so a remote's
+// calico-node never becomes Ready and every rolling update of the
+// DaemonSet stalls. Peering the site's nodes with each other only leaves a
+// remote with no peers, which Calico reports ready.
+func bgpMesh(ctx context.Context, c client.Reader) Check {
+	check := Check{Name: "bgp-mesh", Required: true}
+	config := &unstructured.Unstructured{}
+	config.SetGroupVersionKind(calicoBGPConfig)
+	err := c.Get(ctx, types.NamespacedName{Name: "default"}, config)
+	mesh := true
+	switch {
+	case err == nil:
+		if enabled, found, _ := unstructured.NestedBool(config.Object, "spec", "nodeToNodeMeshEnabled"); found {
+			mesh = enabled
+		}
+	case absent(err):
+	default:
+		check.Detail = "BGP configuration not readable: " + err.Error()
+		return check
+	}
+	if mesh {
+		check.Detail = "Calico's full node-to-node mesh is enabled, so every node peers with every remote across a tunnel that refuses BGP and remote calico-node pods are never Ready; disable it (BGPConfiguration default nodeToNodeMeshEnabled: false) and peer site nodes with each other (BGPPeer nodeSelector/peerSelector " + `"!has(cloud-provisioning.appmana.com/role)"` + ")"
+		return check
+	}
+	peers := &unstructured.UnstructuredList{}
+	peers.SetGroupVersionKind(calicoBGPPeers)
+	if err := c.List(ctx, peers); err != nil && !absent(err) {
+		check.Detail = "BGP peers not readable: " + err.Error()
+		return check
+	}
+	for _, p := range peers.Items {
+		node, _, _ := unstructured.NestedString(p.Object, "spec", "nodeSelector")
+		peer, _, _ := unstructured.NestedString(p.Object, "spec", "peerSelector")
+		if node != "" && peer != "" {
+			check.OK = true
+			check.Detail = fmt.Sprintf("node mesh disabled; %s peers nodes %q with %q", p.GetName(), node, peer)
+			return check
+		}
+	}
+	check.Detail = "node mesh disabled but no BGPPeer peers the site's nodes with each other, so the site has no routes"
 	return check
 }
 

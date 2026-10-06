@@ -23,13 +23,13 @@ const fixture = "../../../controller/pkg/cni/testdata/k0s-v1.36.4-calico-v3.32.1
 // observedCluster loads the read-only capture of the deployed dual-stack
 // k0s/Calico site: its pools, block affinities, nodes and calico-node
 // DaemonSet.
-func observedCluster(t *testing.T, mutate func(ds *appsv1.DaemonSet)) client.Reader {
+func observedCluster(t *testing.T, mutate func(ds *appsv1.DaemonSet), extra ...client.Object) client.Reader {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	for _, kind := range []string{"IPPool", "BlockAffinity", "IPAMBlock", "BGPPeer"} {
+	for _, kind := range []string{"IPPool", "BlockAffinity", "IPAMBlock", "BGPPeer", "BGPConfiguration"} {
 		gvk := schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: kind}
 		scheme.AddKnownTypeWithName(gvk, &unstructured.Unstructured{})
 		scheme.AddKnownTypeWithName(gvk.GroupVersion().WithKind(kind+"List"), &unstructured.UnstructuredList{})
@@ -74,6 +74,7 @@ func observedCluster(t *testing.T, mutate func(ds *appsv1.DaemonSet)) client.Rea
 		ObjectMeta: metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"},
 		Spec:       corev1.ServiceSpec{ClusterIPs: []string{"10.101.4.1", "fd8f:cf26:522a:4::1"}},
 	})
+	objects = append(objects, extra...)
 	return fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
 }
 
@@ -91,7 +92,7 @@ func byName(results []Check) map[string]Check {
 // ranges stay clear of the tunnel's. Its pods' 1450-byte MTU is larger
 // than the 1420 bytes the tunnel carries over a 1500-byte underlay, and
 // that is the one required change.
-func TestTheObservedDeploymentNeedsOnlyItsPodMTULowered(t *testing.T) {
+func TestTheObservedDeploymentNeedsItsPodMTULoweredAndASiteMesh(t *testing.T) {
 	results, err := Preconditions(context.Background(), observedCluster(t, nil), Options{TunnelMTU: 1420})
 	if err != nil {
 		t.Fatal(err)
@@ -109,15 +110,35 @@ func TestTheObservedDeploymentNeedsOnlyItsPodMTULowered(t *testing.T) {
 	if Passed(results) {
 		t.Error("the precondition set passed with a pod MTU larger than the tunnel's")
 	}
-	// Lowered to the tunnel's MTU, nothing required remains.
+	// Calico peers every node with every other unless told otherwise, and
+	// the deployment has no BGP configuration of its own.
+	mesh := got["bgp-mesh"]
+	if mesh.OK || !mesh.Required {
+		t.Errorf("bgp-mesh = %+v, want a required failure", mesh)
+	}
+	// Lowered to the tunnel's MTU and peering site nodes only, nothing
+	// required remains.
 	results, err = Preconditions(context.Background(), observedCluster(t, func(ds *appsv1.DaemonSet) {
 		setCNIMTU(ds, 1420)
-	}), Options{TunnelMTU: 1420})
+	}, siteMesh()...), Options{TunnelMTU: 1420})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !Passed(results) {
-		t.Errorf("a 1420-byte pod MTU still fails: %+v", results)
+		t.Errorf("the required settings still fail: %+v", results)
+	}
+}
+
+// siteMesh is the BGP setting the lab applies with -calico-site-mesh.
+func siteMesh() []client.Object {
+	return []client.Object{
+		&unstructured.Unstructured{Object: map[string]any{
+			"apiVersion": "crd.projectcalico.org/v1", "kind": "BGPConfiguration",
+			"metadata": map[string]any{"name": "default"}, "spec": map[string]any{"nodeToNodeMeshEnabled": false}}},
+		&unstructured.Unstructured{Object: map[string]any{
+			"apiVersion": "crd.projectcalico.org/v1", "kind": "BGPPeer",
+			"metadata": map[string]any{"name": "site-mesh"},
+			"spec": map[string]any{"nodeSelector": "!has(cloud-provisioning.appmana.com/role)", "peerSelector": "!has(cloud-provisioning.appmana.com/role)"}}},
 	}
 }
 

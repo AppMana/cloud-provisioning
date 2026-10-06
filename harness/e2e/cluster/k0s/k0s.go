@@ -346,6 +346,11 @@ func (b Builder) binary(ctx context.Context, d cluster.Deps) ([]byte, error) {
 
 // Reuse verifies the installed version and distribution-owned network.
 func (Builder) Reuse(ctx context.Context, d cluster.Deps) error {
+	pin, err := installedBinary(ctx, d)
+	if err != nil {
+		return err
+	}
+	d.K0sBinarySHA256 = pin
 	for _, node := range cluster.SiteNodes(d.Topology) {
 		version, err := d.Rig.Node(node.Name).Exec(ctx, "k0s", "version")
 		if err != nil || strings.TrimSpace(string(version)) != Version {
@@ -370,4 +375,31 @@ func (Builder) Reuse(ctx context.Context, d cluster.Deps) error {
 		}
 	}
 	return nil
+}
+
+// installedBinary is the digest of the k0s binary every site node carries.
+// A command reusing a site is not given the binary the site was built from,
+// so the installed one is the pin; a given pin must equal it.
+func installedBinary(ctx context.Context, d cluster.Deps) (string, error) {
+	var pin, first string
+	for _, node := range cluster.SiteNodes(d.Topology) {
+		out, err := d.Rig.Node(node.Name).Exec(ctx, "sha256sum", "/usr/local/bin/k0s")
+		if err != nil {
+			return "", fmt.Errorf("hashing %s's k0s binary: %w", node.Name, err)
+		}
+		fields := strings.Fields(string(out))
+		if len(fields) == 0 {
+			return "", fmt.Errorf("%s reported no k0s binary digest", node.Name)
+		}
+		switch {
+		case pin == "":
+			pin, first = fields[0], node.Name
+		case fields[0] != pin:
+			return "", fmt.Errorf("%s carries k0s %s, %s carries %s", node.Name, fields[0], first, pin)
+		}
+	}
+	if d.K0sBinarySHA256 != "" && !strings.EqualFold(d.K0sBinarySHA256, pin) {
+		return "", fmt.Errorf("site k0s binary %s differs from the given %s", pin, d.K0sBinarySHA256)
+	}
+	return pin, nil
 }

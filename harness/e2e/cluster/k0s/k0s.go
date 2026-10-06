@@ -66,7 +66,7 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 	if len(cps) == 0 {
 		return fmt.Errorf("the topology has no control planes")
 	}
-	if _, err := calicoConfig(d.Network, d.K0sCalicoMTU, d.K0sCalicoManagedAddresses); err != nil {
+	if err := validateSiteConfig(d); err != nil {
 		return err
 	}
 	binary, err := b.binary(ctx, d)
@@ -133,6 +133,20 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 		}
 	}
 	return nil
+}
+
+// validateSiteConfig rejects a configuration before any node is touched.
+// The dual-stack profile builds its own Calico settings, taking only a
+// required MTU; the other Calico profiles go through calicoConfig.
+func validateSiteConfig(d cluster.Deps) error {
+	if d.Network == BGPDualStack {
+		if d.K0sCalicoManagedAddresses {
+			return fmt.Errorf("%s keeps the deployment's own address autodetection", BGPDualStack)
+		}
+		return nil
+	}
+	_, err := calicoConfig(d.Network, d.K0sCalicoMTU, d.K0sCalicoManagedAddresses)
+	return err
 }
 
 // config writes one node's k0s.yaml.

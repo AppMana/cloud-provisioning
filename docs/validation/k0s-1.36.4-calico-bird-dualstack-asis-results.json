@@ -1,0 +1,484 @@
+{
+  "observedAt": "2026-10-06T00:40:47.268923947Z",
+  "scope": "Fresh isolated single-NIC VM lab reproducing the deployed k0s v1.36.4+k0s.1 bundled Calico v3.32.1-3 BGP dual-stack site exactly (profile calico-bird-dualstack), with the product installed and two VM remotes claimed through CAPI LabMachines. Converged reachability matrix only; no lifecycle or placement changes.",
+  "source": {
+    "branch": "feature/jarvis-k0s-calico-bird",
+    "commit": "ebdd7af",
+    "labcontainers": "208b63a"
+  },
+  "cluster": {
+    "k0s": "v1.36.4+k0s.1",
+    "calico": "v3.32.1-3 (bird, no overlay, IPv4+IPv6 pools)",
+    "podMTU": 1450,
+    "tunnelMTU": 1420,
+    "site": [
+      "cp (controller+worker)",
+      "w1",
+      "w2"
+    ],
+    "remotes": [
+      "remote1",
+      "remote2"
+    ],
+    "vmMemoryMiB": 2560,
+    "tunnelEndpoints": "kubernetes.io/hostname in (w1,w2)"
+  },
+  "matrix": {
+    "total": 335,
+    "passed": 278,
+    "failed": 57,
+    "byKind": {
+      "dns": {
+        "passed": 5,
+        "failed": 0
+      },
+      "dns6": {
+        "passed": 5,
+        "failed": 0
+      },
+      "external": {
+        "passed": 5,
+        "failed": 0
+      },
+      "pod": {
+        "passed": 20,
+        "failed": 0
+      },
+      "pod6": {
+        "passed": 20,
+        "failed": 0
+      },
+      "service": {
+        "passed": 20,
+        "failed": 0
+      },
+      "service6": {
+        "passed": 20,
+        "failed": 0
+      },
+      "transfer": {
+        "passed": 20,
+        "failed": 0
+      },
+      "transfer6": {
+        "passed": 20,
+        "failed": 0
+      },
+      "udp": {
+        "passed": 72,
+        "failed": 28
+      },
+      "udp6": {
+        "passed": 71,
+        "failed": 29
+      }
+    }
+  },
+  "failures": [
+    {
+      "from": "cp",
+      "to": "remote1",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.155.196:37496->10.101.19..."
+    },
+    {
+      "from": "cp",
+      "to": "remote1",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.155.196:34721->10.101.19..."
+    },
+    {
+      "from": "cp",
+      "to": "remote1",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:85a8:200e:8..."
+    },
+    {
+      "from": "cp",
+      "to": "remote1",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:85a8:200e:8..."
+    },
+    {
+      "from": "cp",
+      "to": "remote2",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.155.196:42713->10.101.15..."
+    },
+    {
+      "from": "cp",
+      "to": "remote2",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.155.196:46539->10.101.15..."
+    },
+    {
+      "from": "cp",
+      "to": "remote2",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:85a8:200e:8..."
+    },
+    {
+      "from": "cp",
+      "to": "remote2",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:85a8:200e:8..."
+    },
+    {
+      "from": "remote1",
+      "to": "cp",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.191.0:55220->10.101.155...."
+    },
+    {
+      "from": "remote1",
+      "to": "cp",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.191.0:41315->10.101.155...."
+    },
+    {
+      "from": "remote1",
+      "to": "cp",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:a94d:a65:80..."
+    },
+    {
+      "from": "remote1",
+      "to": "cp",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:a94d:a65:80..."
+    },
+    {
+      "from": "remote1",
+      "to": "remote2",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.191.0:33860->10.101.156...."
+    },
+    {
+      "from": "remote1",
+      "to": "remote2",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.191.0:49446->10.101.156...."
+    },
+    {
+      "from": "remote1",
+      "to": "remote2",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:a94d:a65:80..."
+    },
+    {
+      "from": "remote1",
+      "to": "remote2",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:a94d:a65:80..."
+    },
+    {
+      "from": "remote1",
+      "to": "w1",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.191.0:37565->10.101.166...."
+    },
+    {
+      "from": "remote1",
+      "to": "w1",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.191.0:54879->10.101.166...."
+    },
+    {
+      "from": "remote1",
+      "to": "w1",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:a94d:a65:80..."
+    },
+    {
+      "from": "remote1",
+      "to": "w1",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:a94d:a65:80..."
+    },
+    {
+      "from": "remote1",
+      "to": "w2",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.191.0:50095->10.101.205...."
+    },
+    {
+      "from": "remote1",
+      "to": "w2",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.191.0:60198->10.101.205...."
+    },
+    {
+      "from": "remote1",
+      "to": "w2",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:a94d:a65:80..."
+    },
+    {
+      "from": "remote1",
+      "to": "w2",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:a94d:a65:80..."
+    },
+    {
+      "from": "remote1",
+      "to": "w2",
+      "kind": "udp6",
+      "datagramBytes": 1451,
+      "detail": "fragmentable, 9/10 echoed; read udp [fd8f:cf26:522a:128:a94d:a65:80..."
+    },
+    {
+      "from": "remote2",
+      "to": "cp",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.156.0:37275->10.101.155...."
+    },
+    {
+      "from": "remote2",
+      "to": "cp",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.156.0:40361->10.101.155...."
+    },
+    {
+      "from": "remote2",
+      "to": "cp",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:70c8:1f6b:9..."
+    },
+    {
+      "from": "remote2",
+      "to": "cp",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:70c8:1f6b:9..."
+    },
+    {
+      "from": "remote2",
+      "to": "remote1",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.156.0:58809->10.101.191...."
+    },
+    {
+      "from": "remote2",
+      "to": "remote1",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.156.0:46130->10.101.191...."
+    },
+    {
+      "from": "remote2",
+      "to": "remote1",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:70c8:1f6b:9..."
+    },
+    {
+      "from": "remote2",
+      "to": "remote1",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:70c8:1f6b:9..."
+    },
+    {
+      "from": "remote2",
+      "to": "w1",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.156.0:56912->10.101.166...."
+    },
+    {
+      "from": "remote2",
+      "to": "w1",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.156.0:51383->10.101.166...."
+    },
+    {
+      "from": "remote2",
+      "to": "w1",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:70c8:1f6b:9..."
+    },
+    {
+      "from": "remote2",
+      "to": "w1",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:70c8:1f6b:9..."
+    },
+    {
+      "from": "remote2",
+      "to": "w2",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.156.0:58955->10.101.205...."
+    },
+    {
+      "from": "remote2",
+      "to": "w2",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.156.0:60528->10.101.205...."
+    },
+    {
+      "from": "remote2",
+      "to": "w2",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:70c8:1f6b:9..."
+    },
+    {
+      "from": "remote2",
+      "to": "w2",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:70c8:1f6b:9..."
+    },
+    {
+      "from": "w1",
+      "to": "remote1",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.166.68:35956->10.101.191..."
+    },
+    {
+      "from": "w1",
+      "to": "remote1",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.166.68:52868->10.101.191..."
+    },
+    {
+      "from": "w1",
+      "to": "remote1",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:f24d:df93:6..."
+    },
+    {
+      "from": "w1",
+      "to": "remote1",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:f24d:df93:6..."
+    },
+    {
+      "from": "w1",
+      "to": "remote2",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.166.68:58324->10.101.156..."
+    },
+    {
+      "from": "w1",
+      "to": "remote2",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.166.68:41270->10.101.156..."
+    },
+    {
+      "from": "w1",
+      "to": "remote2",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:f24d:df93:6..."
+    },
+    {
+      "from": "w1",
+      "to": "remote2",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:f24d:df93:6..."
+    },
+    {
+      "from": "w2",
+      "to": "remote1",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.205.131:39028->10.101.19..."
+    },
+    {
+      "from": "w2",
+      "to": "remote1",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.205.131:47364->10.101.19..."
+    },
+    {
+      "from": "w2",
+      "to": "remote1",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:f5d7:7b6f:9..."
+    },
+    {
+      "from": "w2",
+      "to": "remote1",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:f5d7:7b6f:9..."
+    },
+    {
+      "from": "w2",
+      "to": "remote2",
+      "kind": "udp",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.205.131:43054->10.101.15..."
+    },
+    {
+      "from": "w2",
+      "to": "remote2",
+      "kind": "udp",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp 10.101.205.131:37401->10.101.15..."
+    },
+    {
+      "from": "w2",
+      "to": "remote2",
+      "kind": "udp6",
+      "datagramBytes": 1449,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:f5d7:7b6f:9..."
+    },
+    {
+      "from": "w2",
+      "to": "remote2",
+      "kind": "udp6",
+      "datagramBytes": 1450,
+      "detail": "don't fragment, 0/10 echoed; read udp [fd8f:cf26:522a:128:f5d7:7b6f:9..."
+    }
+  ],
+  "calicoNodeReadiness": {
+    "observed": "before any BGP change, with both remotes joined: calico-node Ready on cp, w1 and w2; 0/1 on remote1 and remote2 with \"BGP not established with 10.101.0.1,10.101.0.2,10.101.0.3\"",
+    "afterSiteMesh": "BGPConfiguration default nodeToNodeMeshEnabled=false plus BGPPeer site-mesh (nodeSelector and peerSelector !has(cloud-provisioning.appmana.com/role)): calico-node 1/1 on all five nodes; site IPv4 and IPv6 block routes unchanged"
+  },
+  "conclusion": "IPv4 and IPv6 pod, Service, 1 MiB transfer and DNS checks pass on every ordered pair, through the tunnel included. Every cross-tunnel UDP datagram larger than the 1420-byte tunnel MTU and within the 1450-byte pod MTU is lost when sent with do-not-fragment, in both families; the deployment requires a pod MTU of at most 1420 and a site-only BGP mesh.",
+  "ok": false
+}

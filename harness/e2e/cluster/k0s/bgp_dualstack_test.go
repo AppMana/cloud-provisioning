@@ -146,3 +146,17 @@ func TestBGPDualStackTakesARequiredPodMTUAndNothingElse(t *testing.T) {
 		t.Fatal("reuse accepted a site whose MTU differs from the requested one")
 	}
 }
+
+// The builder validates a site's configuration before touching any node,
+// and that validation must accept what the profile itself accepts.
+func TestTheBuilderAcceptsTheDualStackProfilesRequiredMTU(t *testing.T) {
+	d := identityDeps(t)
+	d.K0sCalicoMTU = 1420
+	if err := validateSiteConfig(d); err != nil {
+		t.Fatalf("validateSiteConfig: %v", err)
+	}
+	d.K0sCalicoManagedAddresses = true
+	if err := validateSiteConfig(d); err == nil {
+		t.Fatal("managed addresses would change the deployment's own autodetection, and were accepted")
+	}
+}

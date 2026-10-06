@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
+	"strings"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
@@ -34,6 +36,11 @@ func identities(ctx context.Context, t lab.Topology, r rig.Rig) error {
 			if err := node.Put(ctx, bytes.NewReader(doc), IdentityNetplanPath, 0o600); err != nil {
 				return fmt.Errorf("%s identity configuration: %w", n.Name, err)
 			}
+			if path, ndp := identityProxyNDP(n, node.Interface(0)); path != "" {
+				if err := node.Put(ctx, bytes.NewReader(ndp), path, 0o644); err != nil {
+					return fmt.Errorf("%s identity neighbour discovery: %w", n.Name, err)
+				}
+			}
 			if _, err := node.Exec(ctx, "netplan", "apply"); err != nil {
 				return fmt.Errorf("%s applying identity configuration: %w", n.Name, err)
 			}
@@ -46,6 +53,27 @@ func identities(ctx context.Context, t lab.Topology, r rig.Rig) error {
 		}
 	}
 	return nil
+}
+
+// identityProxyNDP is a networkd drop-in for netplan's LAN network that
+// answers neighbour solicitations on the LAN for the node's IPv6
+// identities. IPv6 neighbour discovery is strong-host, so an address on
+// vip0 is otherwise unreachable from the rest of the LAN; this is the
+// IPv6 counterpart of the weak-host ARP the IPv4 identities rely on.
+// Empty for a node with no IPv6 identity.
+func identityProxyNDP(n lab.Node, lan string) (string, []byte) {
+	var b strings.Builder
+	for _, cidr := range n.Identity {
+		addr, _, _ := strings.Cut(cidr, "/")
+		if ip := net.ParseIP(addr); ip != nil && ip.To4() == nil {
+			b.WriteString("IPv6ProxyNDPAddress=" + ip.String() + "\n")
+		}
+	}
+	if b.Len() == 0 {
+		return "", nil
+	}
+	path := "/etc/systemd/network/10-netplan-" + lan + ".network.d/70-cluster-vip-ndp.conf"
+	return path, []byte("[Network]\nIPv6ProxyNDP=yes\n" + b.String())
 }
 
 type netplanRoute struct {

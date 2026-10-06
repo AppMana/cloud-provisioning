@@ -973,11 +973,13 @@ func ensureLink(cfg config, localAddresses []string) error {
 		if err != nil {
 			return fmt.Errorf("parsing local address %q: %w", localAddress, err)
 		}
-		// Without duplicate address detection: the tunnel is a
+		// IPv6 without duplicate address detection: the tunnel is a
 		// point-to-point device with no neighbour to collide with, and a
-		// tentative IPv6 address can neither source nor receive until
+		// tentative address can neither source nor receive until
 		// detection finishes.
-		addr.Flags = unix.IFA_F_NODAD
+		if addr.IP.To4() == nil {
+			addr.Flags = unix.IFA_F_NODAD
+		}
 		if err := netlink.AddrAdd(link, addr); err != nil && !isAddrExists(err) {
 			return fmt.Errorf("assigning %s to %s: %w", localAddress, cfg.iface, err)
 		}

@@ -10,6 +10,7 @@ import (
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,9 +41,25 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	scheme.AddKnownTypeWithName(clusterGVK, &unstructured.Unstructured{})
 	scheme.AddKnownTypeWithName(clusterListGVK, &unstructured.UnstructuredList{})
 	awsMachineGVK := joinaws.Provider{}.GVK()
-	scheme.AddKnownTypeWithName(awsMachineGVK, &unstructured.Unstructured{})
-	scheme.AddKnownTypeWithName(awsMachineGVK.GroupVersion().WithKind("AWSMachineList"), &unstructured.UnstructuredList{})
+	for _, kind := range []string{"AWSMachine", "AWSMachineTemplate", "DockerMachine", "DockerMachineTemplate"} {
+		scheme.AddKnownTypeWithName(awsMachineGVK.GroupVersion().WithKind(kind), &unstructured.Unstructured{})
+		scheme.AddKnownTypeWithName(awsMachineGVK.GroupVersion().WithKind(kind+"List"), &unstructured.UnstructuredList{})
+	}
 	return scheme
+}
+
+// servedBy maps every kind the scheme knows, as the API server serves
+// the kinds whose CRDs are installed.
+func servedBy(scheme *runtime.Scheme) apimeta.RESTMapper {
+	mapper := apimeta.NewDefaultRESTMapper(scheme.PrioritizedVersionsAllGroups())
+	for gvk := range scheme.AllKnownTypes() {
+		scope := apimeta.RESTScopeNamespace
+		if gvk.Kind == "Node" || gvk.Kind == "Namespace" {
+			scope = apimeta.RESTScopeRoot
+		}
+		mapper.Add(gvk, scope)
+	}
+	return mapper
 }
 
 func fakeCluster(name string) *unstructured.Unstructured {
@@ -107,8 +124,10 @@ func fakeClaim(name string) *v1alpha1.ProvisionedNodeClaim {
 
 func newClaimReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 	t.Helper()
+	scheme := testScheme(t)
 	c := fake.NewClientBuilder().
-		WithScheme(testScheme(t)).
+		WithScheme(scheme).
+		WithRESTMapper(servedBy(scheme)).
 		WithStatusSubresource(&v1alpha1.ProvisionedNodeClaim{}).
 		WithObjects(objs...).
 		Build()

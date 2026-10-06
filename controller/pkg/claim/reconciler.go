@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,11 +42,6 @@ var (
 )
 
 const clusterNameLabel = "cluster.x-k8s.io/cluster-name"
-
-// infraTemplateVersion is the infrastructure API version this reads
-// machine templates at. Providers move together with Cluster API's
-// contract, so one version covers every provider on a given release.
-const infraTemplateVersion = "v1beta2"
 
 // Reconciler expands claims.
 type Reconciler struct {
@@ -136,7 +132,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	infraMachine.SetGroupVersionKind(provisioner.GVK())
 	err = r.Reader.Get(ctx, types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name}, infraMachine)
 	if apierrors.IsNotFound(err) {
-		infraMachine, err = machineFromTemplate(ctx, r.Reader, claim)
+		infraMachine, err = machineFromTemplate(ctx, r.Reader, r.Client.RESTMapper(), claim)
 		if err != nil {
 			return r.fail(ctx, claim, err)
 		}
@@ -442,8 +438,12 @@ func (r *Reconciler) ensureClusterProvisioned(ctx context.Context, cluster *unst
 	infraGroup, _, _ := unstructured.NestedString(cluster.Object, "spec", "infrastructureRef", "apiGroup")
 	infraName, _, _ := unstructured.NestedString(cluster.Object, "spec", "infrastructureRef", "name")
 	if infraKind != "" && infraName != "" {
+		mapping, err := r.Client.RESTMapper().RESTMapping(schema.GroupKind{Group: infraGroup, Kind: infraKind})
+		if err != nil {
+			return fmt.Errorf("finding the served version of %s.%s: %w", infraKind, infraGroup, err)
+		}
 		infra := &unstructured.Unstructured{}
-		infra.SetGroupVersionKind(schema.GroupVersionKind{Group: infraGroup, Version: clusterGVK.Version, Kind: infraKind})
+		infra.SetGroupVersionKind(mapping.GroupVersionKind)
 		if err := r.Get(ctx, types.NamespacedName{Namespace: cluster.GetNamespace(), Name: infraName}, infra); err != nil {
 			return fmt.Errorf("getting %s %q: %w", infraKind, infraName, err)
 		}
@@ -507,7 +507,12 @@ func (r *Reconciler) provisionerForClusterKind(kind string) join.MachineProvisio
 // the claim names. A Cluster API infrastructure machine template holds
 // the machine's whole spec under spec.template.spec, and the machine is
 // that spec carrying the provider's own kind.
-func machineFromTemplate(ctx context.Context, reader client.Reader, claim *v1alpha1.ProvisionedNodeClaim) (*unstructured.Unstructured, error) {
+//
+// Both are read and written at the version the API serves for them: a
+// provider's contract version is its own (Labcontainers' is v1alpha1,
+// CAPA's v1beta2), and a template read at another fails as an unknown
+// kind before any machine exists.
+func machineFromTemplate(ctx context.Context, reader client.Reader, mapper apimeta.RESTMapper, claim *v1alpha1.ProvisionedNodeClaim) (*unstructured.Unstructured, error) {
 	ref := claim.Spec.InfrastructureRef
 	if ref.Kind == "" || ref.Name == "" {
 		return nil, fmt.Errorf("spec.infrastructureRef needs a kind and a name")
@@ -519,8 +524,23 @@ func machineFromTemplate(ctx context.Context, reader client.Reader, claim *v1alp
 	if ref.APIGroup != nil && *ref.APIGroup != "" {
 		group = *ref.APIGroup
 	}
+	served := func(kind string) (schema.GroupVersionKind, error) {
+		mapping, err := mapper.RESTMapping(schema.GroupKind{Group: group, Kind: kind})
+		if err != nil {
+			return schema.GroupVersionKind{}, fmt.Errorf("finding the served version of %s.%s: %w", kind, group, err)
+		}
+		return mapping.GroupVersionKind, nil
+	}
+	templateGVK, err := served(ref.Kind)
+	if err != nil {
+		return nil, err
+	}
+	machineGVK, err := served(strings.TrimSuffix(ref.Kind, "Template"))
+	if err != nil {
+		return nil, err
+	}
 	template := &unstructured.Unstructured{}
-	template.SetGroupVersionKind(schema.GroupVersionKind{Group: group, Version: infraTemplateVersion, Kind: ref.Kind})
+	template.SetGroupVersionKind(templateGVK)
 	if err := reader.Get(ctx, types.NamespacedName{Namespace: claim.Namespace, Name: ref.Name}, template); err != nil {
 		return nil, fmt.Errorf("getting %s %q: %w", ref.Kind, ref.Name, err)
 	}
@@ -546,11 +566,7 @@ func machineFromTemplate(ctx context.Context, reader client.Reader, claim *v1alp
 	}
 	machine.SetLabels(labels)
 	machine.SetAnnotations(annotations)
-	machine.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   group,
-		Version: infraTemplateVersion,
-		Kind:    strings.TrimSuffix(ref.Kind, "Template"),
-	})
+	machine.SetGroupVersionKind(machineGVK)
 	return machine, nil
 }
 

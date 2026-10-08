@@ -289,7 +289,7 @@ func TestSiteTransitRoutesUseEachFamilysGatewayAgainstTheKernel(t *testing.T) {
 		Blocks: []string{"10.101.200.0/26", "fd8f:cf26:522a:128:abcd::/122"},
 	}
 	cfg := config{iface: "cldtwg0", routeTable: 517}
-	if err := installSiteTransit(cfg, transit); err != nil {
+	if err := installSiteTransit(cfg, transit, nil); err != nil {
 		t.Fatalf("installSiteTransit: %v", err)
 	}
 	for family, want := range map[int]map[string]string{
@@ -356,5 +356,61 @@ func TestTheTunnelCarriesOneAddressPerFamilyAgainstTheKernel(t *testing.T) {
 	}
 	if got := addresses(); len(got) != 1 || !got["10.100.0.1/24"] {
 		t.Errorf("the tunnel carries %v, want only 10.100.0.1/24", got)
+	}
+}
+
+// A site node known by an identity address on a dummy device sends to a
+// remote through the relay from that identity, not from its LAN address.
+// The kernel picks a route's source from its outgoing device, the LAN, and
+// the remote accepts from the relay only the node's own addresses: the
+// relay's transit entry carries those, not the LAN's. Measured on the
+// dual-stack lab with the tunnel on one worker: the control plane's API
+// server could not reach a remote kubelet (logs, exec) while every pod
+// check passed, since pods source from their pod blocks.
+func TestSiteTransitRoutesSourceFromTheNodesOwnAddressAgainstTheKernel(t *testing.T) {
+	if os.Getenv("CLDT_NETNS") != "1" {
+		t.Skip("set CLDT_NETNS=1 inside a namespace")
+	}
+	lan := &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: "cldtlan1"}}
+	vip := &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: "cldtvip1"}}
+	for _, l := range []netlink.Link{lan, vip} {
+		if err := netlink.LinkAdd(l); err != nil {
+			t.Fatal(err)
+		}
+		defer netlink.LinkDel(l)
+	}
+	addAddrs(t, lan, "10.10.0.10/24", "fd8f:cf26:522a::a:10/64")
+	addAddrs(t, vip, "10.101.0.1/32", "fd8f:cf26:522a::1/128")
+	for _, l := range []netlink.Link{lan, vip} {
+		if err := netlink.LinkSetUp(l); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, identities, _ := net.ParseCIDR("10.101.0.0/24")
+	if err := netlink.RouteAdd(&netlink.Route{LinkIndex: lan.Attrs().Index, Dst: identities, Scope: netlink.SCOPE_LINK}); err != nil {
+		t.Fatal(err)
+	}
+	transit := &tunnel.TransitSpec{
+		Via: "10.101.0.2", ViaOtherFamily: "fd8f:cf26:522a::a:11",
+		Hosts:  []string{"203.0.113.10", "2001:db8:a::10"},
+		Blocks: []string{"10.101.156.0/26"},
+	}
+	cfg := config{iface: "cldtwg1", routeTable: 518}
+	// The node's own addresses, and one this host does not carry, which
+	// no route can source from.
+	own := []string{"10.101.0.1", "fd8f:cf26:522a::1", "10.101.0.9"}
+	if err := installSiteTransit(cfg, transit, own); err != nil {
+		t.Fatalf("installSiteTransit: %v", err)
+	}
+	for dst, want := range map[string]string{
+		"203.0.113.10": "10.101.0.1", "10.101.156.1": "10.101.0.1", "2001:db8:a::10": "fd8f:cf26:522a::1",
+	} {
+		routes, err := netlink.RouteGet(net.ParseIP(dst))
+		if err != nil {
+			t.Fatalf("route to %s: %v", dst, err)
+		}
+		if len(routes) == 0 || routes[0].Src.String() != want {
+			t.Errorf("traffic to %s sources from %v, want %s", dst, routes, want)
+		}
 	}
 }

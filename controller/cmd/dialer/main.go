@@ -2066,7 +2066,13 @@ func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes
 	if err != nil {
 		return err
 	}
-	if err := installSiteTransit(cfg, transit); err != nil {
+	var own []string
+	for _, a := range node.Status.Addresses {
+		if a.Type == corev1.NodeInternalIP && a.Address != "" {
+			own = append(own, a.Address)
+		}
+	}
+	if err := installSiteTransit(cfg, transit, own); err != nil {
 		return err
 	}
 	if transit != nil {
@@ -2076,8 +2082,13 @@ func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes
 }
 
 // installSiteTransit makes table cfg.routeTable carry exactly the
-// transit: every remote prefix toward the relay, and nothing else.
-func installSiteTransit(cfg config, transit *tunnel.TransitSpec) error {
+// transit: every remote prefix toward the relay, and nothing else. Each
+// route sources from the node's own address of its family (own, the
+// node's Kubernetes addresses) when this host carries it: the remote
+// accepts this node's traffic through the relay only from those, and the
+// kernel would otherwise pick the outgoing device's address, which on a
+// node known by an identity on another device is one no remote permits.
+func installSiteTransit(cfg config, transit *tunnel.TransitSpec, own []string) error {
 	if err := ensureRouteRule(cfg.routeTable, cfg.fwmark); err != nil {
 		return fmt.Errorf("ensuring the rule for table %d: %w", cfg.routeTable, err)
 	}
@@ -2089,12 +2100,14 @@ func installSiteTransit(cfg config, transit *tunnel.TransitSpec) error {
 		// Never via ourselves: a relay routes remotes through its own
 		// tunnel, not through a route that points back at it.
 		self := false
+		var local []net.IP
 		if addrs, err := net.InterfaceAddrs(); err == nil {
 			for _, a := range addrs {
 				ipNet, ok := a.(*net.IPNet)
 				if !ok {
 					continue
 				}
+				local = append(local, ipNet.IP)
 				for _, via := range []string{transit.Via, transit.ViaOtherFamily} {
 					if ipNet.IP.Equal(net.ParseIP(via)) {
 						self = true
@@ -2129,7 +2142,7 @@ func installSiteTransit(cfg config, transit *tunnel.TransitSpec) error {
 					continue
 				}
 				desired[dst.String()] = true
-				route := &netlink.Route{Dst: &dst, Gw: via, Table: cfg.routeTable}
+				route := &netlink.Route{Dst: &dst, Gw: via, Src: transitSource(dst.IP, own, local), Table: cfg.routeTable}
 				if err := netlink.RouteReplace(route); err != nil {
 					return fmt.Errorf("no transit route for %s via %s: %w", dst.String(), via, err)
 				}
@@ -2154,6 +2167,25 @@ func installSiteTransit(cfg config, transit *tunnel.TransitSpec) error {
 				return fmt.Errorf("removing stale transit route %s: %w", route.Dst, err)
 			}
 			fmt.Fprintf(os.Stderr, "removed stale transit route %s\n", route.Dst)
+		}
+	}
+	return nil
+}
+
+// transitSource is the first of the node's own addresses that shares
+// dst's family and is assigned on this host, or nil to leave the choice
+// to the kernel.
+func transitSource(dst net.IP, own []string, local []net.IP) net.IP {
+	v4 := dst.To4() != nil
+	for _, text := range own {
+		ip := net.ParseIP(strings.TrimSpace(text))
+		if ip == nil || (ip.To4() != nil) != v4 {
+			continue
+		}
+		for _, l := range local {
+			if l.Equal(ip) {
+				return ip
+			}
 		}
 	}
 	return nil

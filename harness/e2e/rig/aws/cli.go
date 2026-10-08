@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var ErrInvocationPending = errors.New("SSM invocation has not propagated")
@@ -18,6 +19,9 @@ var ErrInvocationPending = errors.New("SSM invocation has not propagated")
 type CLI struct {
 	Region      string
 	SessionPath string
+	// throttleBackoff is the first wait after a throttled call; zero is
+	// one second. It doubles to at most 30 seconds.
+	throttleBackoff time.Duration
 }
 
 func (c *CLI) environment() ([]string, error) {
@@ -55,7 +59,33 @@ func (c *CLI) Call(ctx context.Context, service, operation string, input map[str
 	return c.run(ctx, service, operation, "--cli-input-json", string(data), "--output", "json")
 }
 
+// run calls the AWS CLI, retrying a throttled call until it goes through
+// or ctx ends: SSM throttles SendCommand per account, and a row sends
+// hundreds of commands.
 func (c *CLI) run(ctx context.Context, service, operation string, args ...string) ([]byte, error) {
+	backoff := c.throttleBackoff
+	if backoff <= 0 {
+		backoff = time.Second
+	}
+	for {
+		out, err := c.runOnce(ctx, service, operation, args...)
+		if !errors.Is(err, errThrottled) {
+			return out, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("AWS %s/%s failed: ThrottlingException until %w", service, operation, ctx.Err())
+		case <-time.After(backoff):
+		}
+		if backoff *= 2; backoff > 30*time.Second {
+			backoff = 30 * time.Second
+		}
+	}
+}
+
+var errThrottled = errors.New("throttled")
+
+func (c *CLI) runOnce(ctx context.Context, service, operation string, args ...string) ([]byte, error) {
 	env, err := c.environment()
 	if err != nil {
 		return nil, err
@@ -76,6 +106,9 @@ func (c *CLI) run(ctx context.Context, service, operation string, args ...string
 		code := ""
 		if errors.As(err, &failed) {
 			code = errorCode(string(failed.Stderr))
+		}
+		if code == "ThrottlingException" || code == "Throttling" || code == "RequestLimitExceeded" {
+			return nil, errThrottled
 		}
 		if code != "" {
 			return nil, fmt.Errorf("AWS %s/%s failed: %s", service, operation, code)

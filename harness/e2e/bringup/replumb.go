@@ -3,6 +3,7 @@ package bringup
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
@@ -81,6 +82,13 @@ func Replumb(ctx context.Context, t lab.Topology, r rig.Rig, h Host, victim stri
 	if err := Configure(ctx, lab.Topology{Name: t.Name, Segments: t.Segments,
 		Nodes: []lab.Node{node}}, r, h); err != nil {
 		return fmt.Errorf("re-addressing %s: %w", victim, err)
+	}
+	// A machine's identity is on its disk and its own boot restores it;
+	// an appliance on an identity LAN has only the routes given to it.
+	if !node.IsClusterNode() && slices.Contains([]lab.Role{lab.ControlPlane, lab.Worker, lab.Bastion}, node.Role) {
+		if err := applianceIdentityRoutes(ctx, t, victim, r.Node(victim)); err != nil {
+			return fmt.Errorf("re-routing %s: %w", victim, err)
+		}
 	}
 	return nil
 }

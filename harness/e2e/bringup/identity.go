@@ -46,10 +46,20 @@ func identities(ctx context.Context, t lab.Topology, r rig.Rig) error {
 			}
 			continue
 		}
-		for _, cidr := range t.IdentityRoutes {
-			if _, err := node.Exec(ctx, "ip", "route", "replace", cidr, "dev", node.Interface(0), "scope", "link"); err != nil {
-				return fmt.Errorf("%s route to %s: %w", n.Name, cidr, err)
-			}
+		if err := applianceIdentityRoutes(ctx, t, n.Name, node); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// applianceIdentityRoutes gives a LAN appliance its on-link routes to the
+// identity prefixes. A container keeps none across a host reboot, so
+// recovery gives them back as bring-up first did.
+func applianceIdentityRoutes(ctx context.Context, t lab.Topology, name string, node rig.Node) error {
+	for _, cidr := range t.IdentityRoutes {
+		if _, err := node.Exec(ctx, "ip", "route", "replace", cidr, "dev", node.Interface(0), "scope", "link"); err != nil {
+			return fmt.Errorf("%s route to %s: %w", name, cidr, err)
 		}
 	}
 	return nil

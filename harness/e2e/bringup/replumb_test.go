@@ -171,3 +171,46 @@ func (n *bootingNode) Kill(ctx context.Context) error                         { 
 func (n *bootingNode) Boot(ctx context.Context) error                         { return nil }
 func (n *bootingNode) Userdata(ctx context.Context, cloudConfig []byte) error { return nil }
 func (n *bootingNode) Interface(nth int) string                               { return "ens" + strconv.Itoa(nth+2) }
+
+// A container appliance keeps no routes across a host reboot. On an
+// identity site the LAN's way to the identity prefixes is an on-link
+// route that bring-up gives the bastion directly, so recovering the
+// bastion without it leaves every control plane's API unreachable from
+// the one host the harness reaches the cluster through. A machine's
+// identity is on its own disk and is restored by its own boot, so a
+// replumbed machine is not given it again.
+func TestReplumbGivesAnApplianceBackItsIdentityRoutes(t *testing.T) {
+	topo, err := lab.WithIdentities(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(topo.IdentityRoutes) == 0 {
+		t.Fatal("the identity topology declares no identity routes")
+	}
+	h := &replumbHost{gone: map[string]bool{}}
+	r := &bootingRig{host: h}
+	if err := Replumb(context.Background(), topo, r, h, "bastion"); err != nil {
+		t.Fatal(err)
+	}
+	for _, cidr := range topo.IdentityRoutes {
+		found := false
+		for _, call := range r.commands {
+			if strings.HasPrefix(strings.Join(call, " "), "ip route replace "+cidr+" dev ") {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("the bastion was not given its route to %s", cidr)
+		}
+	}
+
+	r = &bootingRig{host: h}
+	if err := Replumb(context.Background(), topo, r, h, "cp"); err != nil {
+		t.Fatal(err)
+	}
+	for _, call := range r.commands {
+		if strings.Join(call, " ") == "netplan apply" {
+			t.Error("a replumbed machine had its identity configuration re-applied")
+		}
+	}
+}

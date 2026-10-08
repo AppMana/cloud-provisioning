@@ -87,6 +87,14 @@ var (
 	ciliumNodeGVK    = schema.GroupVersionKind{Group: "cilium.io", Version: "v2", Kind: "CiliumNode"}
 )
 
+// CalicoBlockAffinity is an empty BlockAffinity, Calico's record of a
+// node holding a pod block, for watching.
+func CalicoBlockAffinity() *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(schema.GroupVersionKind{Group: calicoBlockList.Group, Version: calicoBlockList.Version, Kind: "BlockAffinity"})
+	return u
+}
+
 // Detect and PrefixesFor take a Reader because they only ever read.
 //
 // Detect identifies the network from its own resources, in the order

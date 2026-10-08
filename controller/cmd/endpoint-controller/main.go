@@ -367,30 +367,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	// providers (CAPD containers, private-addressed infra) report only
 	// internal addresses, and for them that is the reachable endpoint.
 	// No address is invented here; absent both, keep waiting.
-	var externalIP, internalIP string
-	for _, entry := range addresses {
-		address, ok := entry.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		ip, ok := address["address"].(string)
-		if !ok || ip == "" {
-			continue
-		}
-		switch address["type"] {
-		case "ExternalIP":
-			if externalIP == "" {
-				externalIP = ip
-			}
-		case "InternalIP":
-			if internalIP == "" {
-				internalIP = ip
-			}
-		}
-	}
-	if externalIP == "" {
-		externalIP = internalIP
-	}
+	externalIP, machineAddrs := machineHosts(addresses)
 	if externalIP == "" {
 		log.V(1).Info("no ExternalIP/InternalIP in status.addresses yet, waiting")
 		return ctrl.Result{}, nil
@@ -408,9 +385,10 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	// not a flat singleton, so a second cloud Machine does not clobber
 	// the first's endpoint entry.
 	//
-	// The same address joins the machine's accept list and route
-	// hosts. It is one fact, learned here: the machine's node address.
-	// An encapsulating network addresses its packets to exactly it
+	// The machine's own addresses join its accept list and route
+	// hosts, learned here: the dialled address and its node addresses,
+	// which differ where a cloud dials a public address. The API server
+	// reaches the kubelet at the node address. An encapsulating network addresses its packets to exactly it
 	// (flannel's vxlan outers, cilium's tunnel outers), so the site's
 	// dialers must both accept it through cryptokey routing and route
 	// it into the tunnel; the dialer's fwmark is what makes that route
@@ -422,8 +400,11 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	routeHostsKey := tunnel.PeerRouteHostsPrefix + machine.GetName()
 	allowed := tunnel.SplitList(string(secret.Data[allowedKey]))
 	routeHosts := tunnel.SplitList(string(secret.Data[routeHostsKey]))
-	wantAllowed := appendMissing(allowed, tunnel.HostCIDR(externalIP))
-	wantRouteHosts := appendMissing(routeHosts, externalIP)
+	wantAllowed, wantRouteHosts := allowed, routeHosts
+	for _, addr := range machineAddrs {
+		wantAllowed = appendMissing(wantAllowed, tunnel.HostCIDR(addr))
+		wantRouteHosts = appendMissing(wantRouteHosts, addr)
+	}
 	if string(secret.Data[machineKey]) != endpoint ||
 		len(wantAllowed) != len(allowed) || len(wantRouteHosts) != len(routeHosts) {
 		if err := attachment.CheckPeerPublication(ctx, r.reader, machine); err != nil {
@@ -468,6 +449,48 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 	return ctrl.Result{}, nil
+}
+
+// machineHosts reads a Machine's status.addresses: the address the
+// tunnel dials (its first ExternalIP, else its first InternalIP) and
+// every address of its own to accept and route on its peer entry, the
+// dialled one first and then each InternalIP, the Node's own addresses
+// that the API server and the network address it by. Names are not
+// addresses and are skipped.
+func machineHosts(addresses []any) (string, []string) {
+	var external string
+	var internal []string
+	for _, entry := range addresses {
+		address, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		text, _ := address["address"].(string)
+		ip := net.ParseIP(text)
+		if ip == nil {
+			continue
+		}
+		switch address["type"] {
+		case "ExternalIP":
+			if external == "" {
+				external = ip.String()
+			}
+		case "InternalIP":
+			internal = append(internal, ip.String())
+		}
+	}
+	endpoint := external
+	if endpoint == "" && len(internal) > 0 {
+		endpoint = internal[0]
+	}
+	if endpoint == "" {
+		return "", nil
+	}
+	hosts := []string{endpoint}
+	for _, addr := range internal {
+		hosts = appendMissing(hosts, addr)
+	}
+	return endpoint, hosts
 }
 
 // appendMissing appends value to list unless an equal entry is
@@ -1201,6 +1224,37 @@ func nextFreeAddress(base string, used map[string]bool) (string, error) {
 // entries both, for as long as it takes a remote to poll and read the
 // list naming the replacement. For that window a remote has two working
 // paths rather than none, which is the whole trick.
+
+// machinesForBlock maps a pod block to the Machines this operator owns
+// whose node holds it.
+func (r *meshReconciler) machinesForBlock(ctx context.Context, block client.Object) []reconcile.Request {
+	u, ok := block.(*unstructured.Unstructured)
+	if !ok {
+		return nil
+	}
+	node, _, _ := unstructured.NestedString(u.Object, "spec", "node")
+	if node == "" {
+		return nil
+	}
+	machines := &unstructured.UnstructuredList{}
+	machines.SetGroupVersionKind(machineGVK.GroupVersion().WithKind(machineGVK.Kind + "List"))
+	opts := []client.ListOption{}
+	if r.machineSelector != nil {
+		opts = append(opts, client.MatchingLabelsSelector{Selector: r.machineSelector})
+	}
+	if err := r.List(ctx, machines, opts...); err != nil {
+		ctrl.LoggerFrom(ctx).Error(err, "listing machines for a pod block", "node", node)
+		return nil
+	}
+	var out []reconcile.Request
+	for i := range machines.Items {
+		if r.nodeNameForMachine(ctx, &machines.Items[i]) == node {
+			out = append(out, reconcile.Request{NamespacedName: types.NamespacedName{
+				Namespace: machines.Items[i].GetNamespace(), Name: machines.Items[i].GetName()}})
+		}
+	}
+	return out
+}
 
 // refreshAdoptionConfigs re-renders every remote's peer list, for the
 // passes that were not about any one machine.
@@ -2387,7 +2441,44 @@ func main() {
 	machine := &unstructured.Unstructured{}
 	machine.SetGroupVersionKind(machineGVK)
 
-	err = ctrl.NewControllerManagedBy(mgr).
+	mesh := &meshReconciler{
+		Client:                 mgr.GetClient(),
+		reader:                 mgr.GetAPIReader(),
+		machineSelector:        selector,
+		secretNamespace:        secretNamespace,
+		secretName:             secretName,
+		secretKey:              secretKey,
+		port:                   port,
+		gatewayNamespace:       gatewayNamespace,
+		gatewayName:            gatewayName,
+		tunnelEndpointSelector: endpointSelector,
+		tunnelEndpointsRaw:     rawTunnelEndpoints,
+		endpointRetention:      endpointRetention,
+		tunnelSubnet:           tunnelSubnet,
+		localAddressBase:       localAddressBase,
+		tunnelIPv6Prefix:       tunnelIPv6Prefix,
+		dialerDaemonSetName:    dialerDaemonSetName,
+		dialerServiceAccount:   dialerServiceAccount,
+		dialerImage:            dialerImage,
+		dialerImagePullSecret:  dialerImagePullSecret,
+		dialerImagePullPolicy:  corev1.PullPolicy(dialerImagePullPolicy),
+		dialerPrivateKeyDir:    dialerPrivateKeyDir,
+		ifaceName:              ifaceName,
+		apiVIP:                 joinAPIVIP,
+		apiServerPort:          apiServerPortOf(joinAPIAddress),
+
+		ownerRef:                  runtimeOwner,
+		network:                   network,
+		transitBGPPort:            transitBGPPort,
+		transitBGPASN:             transitBGPASN,
+		dialerCloudDaemonSetName:  dialerCloudDaemonSetName,
+		dialerCloudListenPort:     dialerListenPort,
+		dialerCloudImage:          dialerCloudImage,
+		windowsPublisherImage:     windowsPublisherImage,
+		windowsPublisherAPIServer: windowsPublisherAPIServer,
+		dialerCloudHostBinary:     dialerCloudHostBinary,
+	}
+	meshController := ctrl.NewControllerManagedBy(mgr).
 		Named("mesh").
 		For(machine, builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
 			return selector.Matches(labels.Set(obj.GetLabels()))
@@ -2398,44 +2489,15 @@ func main() {
 		// before it gets a tunnel address.
 		Watches(&corev1.Node{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
 			return []reconcile.Request{{}}
-		})).
-		Complete(&meshReconciler{
-			Client:                 mgr.GetClient(),
-			reader:                 mgr.GetAPIReader(),
-			machineSelector:        selector,
-			secretNamespace:        secretNamespace,
-			secretName:             secretName,
-			secretKey:              secretKey,
-			port:                   port,
-			gatewayNamespace:       gatewayNamespace,
-			gatewayName:            gatewayName,
-			tunnelEndpointSelector: endpointSelector,
-			tunnelEndpointsRaw:     rawTunnelEndpoints,
-			endpointRetention:      endpointRetention,
-			tunnelSubnet:           tunnelSubnet,
-			localAddressBase:       localAddressBase,
-			tunnelIPv6Prefix:       tunnelIPv6Prefix,
-			dialerDaemonSetName:    dialerDaemonSetName,
-			dialerServiceAccount:   dialerServiceAccount,
-			dialerImage:            dialerImage,
-			dialerImagePullSecret:  dialerImagePullSecret,
-			dialerImagePullPolicy:  corev1.PullPolicy(dialerImagePullPolicy),
-			dialerPrivateKeyDir:    dialerPrivateKeyDir,
-			ifaceName:              ifaceName,
-			apiVIP:                 joinAPIVIP,
-			apiServerPort:          apiServerPortOf(joinAPIAddress),
-
-			ownerRef:                  runtimeOwner,
-			network:                   network,
-			transitBGPPort:            transitBGPPort,
-			transitBGPASN:             transitBGPASN,
-			dialerCloudDaemonSetName:  dialerCloudDaemonSetName,
-			dialerCloudListenPort:     dialerListenPort,
-			dialerCloudImage:          dialerCloudImage,
-			windowsPublisherImage:     windowsPublisherImage,
-			windowsPublisherAPIServer: windowsPublisherAPIServer,
-			dialerCloudHostBinary:     dialerCloudHostBinary,
-		})
+		}))
+	if network.Name == cni.Calico {
+		// A remote's blocks are allocated after its Machine stops
+		// changing, one family at a time, and more as it fills. Each
+		// brings the remote's Machine back to publish it.
+		meshController = meshController.Watches(cni.CalicoBlockAffinity(),
+			handler.EnqueueRequestsFromMapFunc(mesh.machinesForBlock))
+	}
+	err = meshController.Complete(mesh)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create mesh controller: %v\n", err)
 		os.Exit(1)

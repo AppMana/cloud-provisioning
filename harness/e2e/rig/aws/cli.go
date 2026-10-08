@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -70,8 +71,26 @@ func (c *CLI) run(ctx context.Context, service, operation string, args ...string
 		if errors.As(err, &failed) && operation == "get-command-invocation" && strings.Contains(string(failed.Stderr), "InvocationDoesNotExist") {
 			return nil, ErrInvocationPending
 		}
-		// AWS errors can echo credential-bearing command parameters.
+		// AWS errors can echo credential-bearing command parameters, so
+		// only the error code is reported.
+		code := ""
+		if errors.As(err, &failed) {
+			code = errorCode(string(failed.Stderr))
+		}
+		if code != "" {
+			return nil, fmt.Errorf("AWS %s/%s failed: %s", service, operation, code)
+		}
 		return nil, fmt.Errorf("AWS %s/%s failed", service, operation)
 	}
 	return json.RawMessage(out), nil
+}
+
+var awsErrorCode = regexp.MustCompile(`An error occurred \(([A-Za-z0-9.]+)\)`)
+
+// errorCode is the AWS error code in a CLI error message, or empty.
+func errorCode(stderr string) string {
+	if m := awsErrorCode.FindStringSubmatch(stderr); m != nil {
+		return m[1]
+	}
+	return ""
 }

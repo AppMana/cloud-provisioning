@@ -1195,6 +1195,9 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		// goes instead.
 		selfRelayed  bool
 		relayTransit *tunnel.TransitSpec
+		// ownAddresses are a site node's Kubernetes addresses, which its
+		// own traffic to the remotes is sourced from. Empty on a remote.
+		ownAddresses []string
 	)
 
 	if usingSecret {
@@ -1213,6 +1216,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 		localAddress = strings.TrimSpace(string(secret.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName]))
 		localAddresses = siteTunnelAddresses(secret, cfg.nodeName)
+		ownAddresses = tunnel.SplitList(string(secret.Data[tunnel.NodeAddressesPrefix+cfg.nodeName]), string(secret.Data[tunnel.SiteAddressesPrefix+cfg.nodeName]))
 		if localAddress == "" {
 			// Either this node has never been allocated an address, or it
 			// has stopped being an endpoint and its retention has run
@@ -1710,7 +1714,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			return err
 		}
 	}
-	if err := installRoutes(cfg, routeHosts, claimedHosts, blocks, relayTransit, relayDsts); err != nil {
+	if err := installRoutes(cfg, routeHosts, claimedHosts, blocks, relayTransit, relayDsts, ownAddresses); err != nil {
 		return err
 	}
 	// On promotion, restore normal routes before removing the exception.
@@ -1878,7 +1882,7 @@ func disposeRouteHost(marked, isEndpointHost, peerCanCarry bool) routeHostDispos
 // control plane could not be re-read, and only the cached copy of that
 // same list carried it back once the handshake arrived, two minutes
 // later.
-func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relay *tunnel.TransitSpec, relayDsts []net.IPNet) error {
+func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relay *tunnel.TransitSpec, relayDsts []net.IPNet, own []string) error {
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
@@ -1894,11 +1898,15 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	for _, host := range claimedHosts {
 		claimed[host.String()] = true
 	}
+	// This node's own traffic leaves from its node address (own), the
+	// source every remote accepts from it whichever endpoint carries it,
+	// so a connection survives the endpoint set changing under it.
+	local := localIPs()
 	desired := map[string]bool{}
 	for _, host := range routeHosts {
 		dst := host
 		desired[dst.String()] = true
-		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK, Table: cfg.routeTable}
+		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Src: transitSource(dst.IP, own, local), Scope: netlink.SCOPE_LINK, Table: cfg.routeTable}
 		if err := netlink.RouteReplace(route); err != nil {
 			return fmt.Errorf("adding route %s dev %s: %w", dst.String(), cfg.iface, err)
 		}
@@ -1932,7 +1940,7 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	for _, block := range blocks {
 		dst := block
 		desired[dst.String()] = true
-		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Scope: netlink.SCOPE_LINK, Table: cfg.routeTable}
+		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Src: transitSource(dst.IP, own, local), Scope: netlink.SCOPE_LINK, Table: cfg.routeTable}
 		if err := netlink.RouteReplace(route); err != nil {
 			fmt.Fprintf(os.Stderr, "no route for %s via %s: %v\n", dst.String(), cfg.iface, err)
 		}
@@ -1952,7 +1960,7 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 				continue
 			}
 			desired[dst.String()] = true
-			route := &netlink.Route{Dst: &dst, Gw: relayVia, Table: cfg.routeTable}
+			route := &netlink.Route{Dst: &dst, Gw: relayVia, Src: transitSource(dst.IP, own, local), Table: cfg.routeTable}
 			if err := netlink.RouteReplace(route); err != nil {
 				return fmt.Errorf("adding transit route for %s via %s: %w", dst.String(), relayVia, err)
 			}
@@ -2100,18 +2108,11 @@ func installSiteTransit(cfg config, transit *tunnel.TransitSpec, own []string) e
 		// Never via ourselves: a relay routes remotes through its own
 		// tunnel, not through a route that points back at it.
 		self := false
-		var local []net.IP
-		if addrs, err := net.InterfaceAddrs(); err == nil {
-			for _, a := range addrs {
-				ipNet, ok := a.(*net.IPNet)
-				if !ok {
-					continue
-				}
-				local = append(local, ipNet.IP)
-				for _, via := range []string{transit.Via, transit.ViaOtherFamily} {
-					if ipNet.IP.Equal(net.ParseIP(via)) {
-						self = true
-					}
+		local := localIPs()
+		for _, ip := range local {
+			for _, via := range []string{transit.Via, transit.ViaOtherFamily} {
+				if ip.Equal(net.ParseIP(via)) {
+					self = true
 				}
 			}
 		}
@@ -2170,6 +2171,21 @@ func installSiteTransit(cfg config, transit *tunnel.TransitSpec, own []string) e
 		}
 	}
 	return nil
+}
+
+// localIPs is every address assigned on this host.
+func localIPs() []net.IP {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil
+	}
+	var out []net.IP
+	for _, a := range addrs {
+		if ipNet, ok := a.(*net.IPNet); ok {
+			out = append(out, ipNet.IP)
+		}
+	}
+	return out
 }
 
 // transitSource is the first of the node's own addresses that shares

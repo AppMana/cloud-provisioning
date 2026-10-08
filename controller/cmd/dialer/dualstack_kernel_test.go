@@ -414,3 +414,56 @@ func TestSiteTransitRoutesSourceFromTheNodesOwnAddressAgainstTheKernel(t *testin
 		}
 	}
 }
+
+// An endpoint sends its own traffic to the remotes from its node address
+// too, not from its tunnel address. The node address is the one source
+// that stays valid when the endpoint set changes: a tunnel address goes
+// with the tunnel, and a TCP connection bound to it cannot follow the
+// node onto a relay. Measured on the dual-stack lab: after each placement
+// change the API server's connections to remote kubelets hung for one to
+// two minutes while pod checks converged in seconds.
+func TestEndpointRoutesSourceFromTheNodesOwnAddressAgainstTheKernel(t *testing.T) {
+	if os.Getenv("CLDT_NETNS") != "1" {
+		t.Skip("set CLDT_NETNS=1 inside a namespace")
+	}
+	wg := &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: "cldtwg2"}}
+	vip := &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: "cldtvip2"}}
+	for _, l := range []netlink.Link{wg, vip} {
+		if err := netlink.LinkAdd(l); err != nil {
+			t.Fatal(err)
+		}
+		defer netlink.LinkDel(l)
+	}
+	addAddrs(t, wg, "10.100.0.3/24", "fd00:10:100::a64:3/96")
+	addAddrs(t, vip, "10.101.0.1/32", "fd8f:cf26:522a::1/128")
+	for _, l := range []netlink.Link{wg, vip} {
+		if err := netlink.LinkSetUp(l); err != nil {
+			t.Fatal(err)
+		}
+	}
+	host := func(s string) net.IPNet {
+		ip := net.ParseIP(s)
+		bits := 128
+		if ip.To4() != nil {
+			ip, bits = ip.To4(), 32
+		}
+		return net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)}
+	}
+	_, block, _ := net.ParseCIDR("10.101.156.0/26")
+	cfg := config{iface: "cldtwg2", routeTable: 519}
+	own := []string{"10.101.0.1", "fd8f:cf26:522a::1"}
+	if err := installRoutes(cfg, []net.IPNet{host("203.0.113.10"), host("2001:db8:a::10")}, nil, []net.IPNet{*block}, nil, nil, own); err != nil {
+		t.Fatalf("installRoutes: %v", err)
+	}
+	for dst, want := range map[string]string{
+		"203.0.113.10": "10.101.0.1", "10.101.156.1": "10.101.0.1", "2001:db8:a::10": "fd8f:cf26:522a::1",
+	} {
+		routes, err := netlink.RouteGet(net.ParseIP(dst))
+		if err != nil {
+			t.Fatalf("route to %s: %v", dst, err)
+		}
+		if len(routes) == 0 || routes[0].Src.String() != want {
+			t.Errorf("traffic to %s sources from %v, want %s", dst, routes, want)
+		}
+	}
+}

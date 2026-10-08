@@ -59,7 +59,7 @@ func TestRetainedTunnelRoutesRespectPacketSource(t *testing.T) {
 				}
 			}
 			// Start with the direct routes of an owning endpoint.
-			if err := installRoutes(cfg, []net.IPNet{*host}, nil, nil, nil, nil); err != nil {
+			if err := installRoutes(cfg, []net.IPNet{*host}, nil, nil, nil, nil, nil); err != nil {
 				t.Fatal(err)
 			}
 			check(physical, 0, wg.Attrs().Index)
@@ -68,7 +68,7 @@ func TestRetainedTunnelRoutesRespectPacketSource(t *testing.T) {
 				if err := reconcileTunnelSourceRoutes(cfg, tc.tunnel, []net.IPNet{*host}); err != nil {
 					t.Fatal(err)
 				}
-				if err := installRoutes(cfg, nil, nil, nil, &tunnel.TransitSpec{Via: tc.relay}, []net.IPNet{*host}); err != nil {
+				if err := installRoutes(cfg, nil, nil, nil, &tunnel.TransitSpec{Via: tc.relay}, []net.IPNet{*host}, nil); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -86,7 +86,7 @@ func TestRetainedTunnelRoutesRespectPacketSource(t *testing.T) {
 				t.Fatalf("source rules: %+v, %v", rules, err)
 			}
 			// Promotion restores the ordinary routes, then removes the exception.
-			if err := installRoutes(cfg, []net.IPNet{*host}, nil, nil, nil, nil); err != nil {
+			if err := installRoutes(cfg, []net.IPNet{*host}, nil, nil, nil, nil, nil); err != nil {
 				t.Fatal(err)
 			}
 			if err := reconcileTunnelSourceRoutes(cfg, tc.tunnel, nil); err != nil {

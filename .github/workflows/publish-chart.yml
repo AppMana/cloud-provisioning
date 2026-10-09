@@ -29,5 +29,9 @@ jobs:
           helm repo add cluster-api-operator https://kubernetes-sigs.github.io/cluster-api-operator
           helm dependency build charts/cloud-provisioning
           helm lint charts/cloud-provisioning
-          helm package charts/cloud-provisioning --app-version "$sha" --destination /tmp/chart
+          python3 .github/test_chart_publication.py
+          base_version="$(helm show chart charts/cloud-provisioning | awk '/^version:/ {print $2}')"
+          test -n "$base_version"
+          chart_version="${base_version}-sha.${{ github.event.workflow_run.head_sha }}"
+          helm package charts/cloud-provisioning --version "$chart_version" --app-version "$sha" --destination /tmp/chart
           helm push /tmp/chart/cloud-provisioning-*.tgz oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts

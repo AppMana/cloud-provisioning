@@ -1,0 +1,351 @@
+{
+ "observedAt": "2026-10-09T00:13:58.380316834Z",
+ "scope": "Fresh isolated single-NIC VM lab reproducing the deployed k0s v1.36.4+k0s.1 bundled Calico v3.32.1-3 BGP dual-stack site (profile calico-bird-dualstack) with the required settings applied: pod MTU 1420 and Calico BGP peering among site nodes only. Product installed; two VM remotes claimed through CAPI LabMachines; every remote removed and recreated under each of four endpoint placements; kubelet logs/exec through the API server and calico-node readiness gated at every stage.",
+ "source": {
+  "commit": "6aa8d41",
+  "labcontainers": "208b63a"
+ },
+ "arguments": [
+  "-rig",
+  "vm",
+  "-distro",
+  "k0s",
+  "-cni",
+  "calico-bird-dualstack",
+  "-k0s-calico-mtu",
+  "1420",
+  "-calico-site-mesh",
+  "-product",
+  "-remotes",
+  "remote1,remote2",
+  "-check",
+  "-placements",
+  "control-plane,one-worker,two-workers,all-nodes",
+  "-vm-memory-mib",
+  "2560",
+  "-k0s-binary",
+  "<path>",
+  "-k0s-binary-sha256",
+  "18c304d53cdd70095e99c6b859b269b4fef0bb84579d7e7185271a9135694a31",
+  "-repo-dir",
+  "<path>",
+  "-work-dir",
+  "<path>",
+  "-timeout",
+  "6h"
+ ],
+ "cluster": {
+  "k0s": "v1.36.4+k0s.1",
+  "calico": "v3.32.1-3 (bird, no overlay, IPv4+IPv6 pools)",
+  "podMTU": 1420,
+  "tunnelMTU": 1420,
+  "calicoBGP": "nodeToNodeMeshEnabled false; BGPPeer among nodes without the cloud-worker role",
+  "site": [
+   "cp (controller+worker)",
+   "w1",
+   "w2"
+  ],
+  "remotes": [
+   "remote1",
+   "remote2"
+  ],
+  "konnectivity": "disabled, as deployed"
+ },
+ "runPassed": true,
+ "requiredChecksPassed": 5987,
+ "checksByKind": {
+  "dns": 97,
+  "dns6": 97,
+  "external": 97,
+  "pod": 356,
+  "pod6": 356,
+  "service": 356,
+  "service6": 356,
+  "transfer": 356,
+  "transfer6": 356,
+  "udp": 1780,
+  "udp6": 1780
+ },
+ "stages": [
+  {
+   "time": "2026-10-08T23:26:30.676740223Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "22.697002969s",
+   "stage": "placement control-plane",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:27:35.645683865Z",
+   "total": 204,
+   "passed": 204,
+   "failed": 0,
+   "elapsed": "10.156381453s",
+   "stage": "removed remote1 at control-plane",
+   "kubeletAccess": "8/8",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:31:30.510591335Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "1m2.53503656s",
+   "stage": "recreated remote1 at control-plane",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:32:25.498886997Z",
+   "total": 204,
+   "passed": 204,
+   "failed": 0,
+   "elapsed": "8.451221112s",
+   "stage": "removed remote2 at control-plane",
+   "kubeletAccess": "8/8",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:36:24.062711912Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "1m14.467491733s",
+   "stage": "recreated remote2 at control-plane",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:40:53.652790865Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "12.671482326s",
+   "stage": "placement one-worker",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:42:11.841803904Z",
+   "total": 204,
+   "passed": 204,
+   "failed": 0,
+   "elapsed": "11.053090848s",
+   "stage": "removed remote1 at one-worker",
+   "kubeletAccess": "8/8",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:46:01.131299073Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "55.340256318s",
+   "stage": "recreated remote1 at one-worker",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:46:55.332232981Z",
+   "total": 204,
+   "passed": 204,
+   "failed": 0,
+   "elapsed": "8.030097344s",
+   "stage": "removed remote2 at one-worker",
+   "kubeletAccess": "8/8",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:50:51.180033592Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "1m1.625326021s",
+   "stage": "recreated remote2 at one-worker",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:52:07.496093165Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "31.013630785s",
+   "stage": "placement two-workers",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:53:20.767650358Z",
+   "total": 204,
+   "passed": 204,
+   "failed": 0,
+   "elapsed": "12.798388001s",
+   "stage": "removed remote1 at two-workers",
+   "kubeletAccess": "8/8",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:57:22.817764441Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "1m11.300215119s",
+   "stage": "recreated remote1 at two-workers",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-08T23:58:36.250656761Z",
+   "total": 204,
+   "passed": 204,
+   "failed": 0,
+   "elapsed": "10.084481649s",
+   "stage": "removed remote2 at two-workers",
+   "kubeletAccess": "8/8",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-09T00:02:34.144466179Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "1m1.779361893s",
+   "stage": "recreated remote2 at two-workers",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-09T00:03:26.630787503Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "17.626016846s",
+   "stage": "placement all-nodes",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-09T00:04:31.98343064Z",
+   "total": 204,
+   "passed": 204,
+   "failed": 0,
+   "elapsed": "10.96641886s",
+   "stage": "removed remote1 at all-nodes",
+   "kubeletAccess": "8/8",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-09T00:08:22.394349541Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "1m5.363209354s",
+   "stage": "recreated remote1 at all-nodes",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-09T00:09:23.377049448Z",
+   "total": 204,
+   "passed": 204,
+   "failed": 0,
+   "elapsed": "11.291674091s",
+   "stage": "removed remote2 at all-nodes",
+   "kubeletAccess": "8/8",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-09T00:13:40.601762338Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "1m21.105671766s",
+   "stage": "recreated remote2 at all-nodes",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  },
+  {
+   "time": "2026-10-09T00:13:56.916711236Z",
+   "total": 335,
+   "passed": 335,
+   "failed": 0,
+   "elapsed": "14.862649162s",
+   "stage": "final matrix",
+   "kubeletAccess": "10/10",
+   "calicoNodeReady": true
+  }
+ ],
+ "replacements": [
+  {
+   "node": "remote1",
+   "placement": "control-plane",
+   "nodeUIDChanged": true
+  },
+  {
+   "node": "remote2",
+   "placement": "control-plane",
+   "nodeUIDChanged": true
+  },
+  {
+   "node": "remote1",
+   "placement": "one-worker",
+   "nodeUIDChanged": true
+  },
+  {
+   "node": "remote2",
+   "placement": "one-worker",
+   "nodeUIDChanged": true
+  },
+  {
+   "node": "remote1",
+   "placement": "two-workers",
+   "nodeUIDChanged": true
+  },
+  {
+   "node": "remote2",
+   "placement": "two-workers",
+   "nodeUIDChanged": true
+  },
+  {
+   "node": "remote1",
+   "placement": "all-nodes",
+   "nodeUIDChanged": true
+  },
+  {
+   "node": "remote2",
+   "placement": "all-nodes",
+   "nodeUIDChanged": true
+  }
+ ],
+ "kubeletPathAcrossPlacementChanges": {
+  "method": "kubectl exec and logs against a remote calico-node pod through the API server every 2 s for 10 min while the endpoint set moved from all nodes to w1 and back after the 3 min retention; a failed request blocked about 60 s",
+  "beforeEndpointSourceFix": {
+   "samples": 159,
+   "failed": 4,
+   "failedAt": [
+    "22:58:30",
+    "22:59:38",
+    "23:01:30",
+    "23:02:32"
+   ],
+   "placementSwitchesAt": [
+    "22:57:13 all to w1",
+    "23:01:08 w1 to all"
+   ],
+   "commit": "fad4d38"
+  },
+  "afterEndpointSourceFix": {
+   "samples": 262,
+   "failed": 0,
+   "failedAt": [],
+   "placementSwitchesAt": [
+    "00:21:04 all to w1",
+    "00:25:11 w1 to all"
+   ],
+   "commit": "6aa8d41"
+  }
+ }
+}

@@ -84,6 +84,39 @@ flowchart LR
 - BGP belongs to profiles that use it. The controller reads the CNI's encapsulation
   mode and per-node allocations instead of assuming every network uses BGP.
 
+## Dual-stack native Calico BGP
+
+The `calico-bird-dualstack` VM profile reproduces a deployed k0s v1.36.4+k0s.1
+site with bundled Calico v3.32.1-3 in BGP mode without encapsulation, IPv4 and
+IPv6 pools, one controller that is also a worker and two workers, each known by
+identity addresses on a dummy device. Calico runs on the remotes as well. Remote
+pod blocks of both families reach the site through the endpoints' table 517 and
+the site-transit routes of nodes without a tunnel; BGP stays refused across the
+tunnel in both families. See [dual-stack meshes](dual-stack.md) for what the
+product does and the cluster settings it requires.
+
+```mermaid
+flowchart LR
+  sp[Site pod v4/v6] --> s[Site node without tunnel]
+  s -->|table 517 via relay, per family| e[Endpoint]
+  e -->|table 517 dev wg| wg[WireGuard: AllowedIPs v4+v6 blocks]
+  wg --> r[Remote: calico-node with stored v4/v6 tunnel addresses]
+  r --> rp[Remote pod v4/v6]
+```
+
+- [The deployment as configured](validation/k0s-1.36.4-calico-bird-dualstack-asis-results.json):
+  every IPv4 and IPv6 pod, Service, 1 MiB transfer and DNS check passes, while
+  every cross-tunnel do-not-fragment UDP datagram above the 1420-byte tunnel MTU
+  and within the 1450-byte pod MTU is lost, and remote `calico-node` pods are
+  never Ready under Calico's full node mesh.
+- [With the required settings](validation/k0s-1.36.4-calico-bird-dualstack-results.json)
+  (pod MTU 1420, site-only BGP peering): 5,987 checks, all passing, across four
+  endpoint placements with each remote removed and recreated under each, kubelet
+  logs and exec gated at every stage.
+- [CAPA AWS](validation/aws-k0s-1.36.4-calico-bird-dualstack-results.json): two
+  EC2 workers over the lab's real WAN, add, remove, recreate and four placements,
+  2,753 checks.
+
 ## Windows through an AWS gateway attachment
 
 A gateway attachment can route traffic between Windows worker interfaces and the

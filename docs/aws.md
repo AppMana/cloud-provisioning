@@ -983,6 +983,17 @@ The result exporter validates both replacements,
 unchanged survivor identities, matrix counts and placement records; it exports
 only selected metadata and matrix hashes, never raw observation snapshots.
 
+For the dual-stack Calico BGP site (`cmd/lab -cni calico-bird-dualstack
+-k0s-calico-mtu 1420 -calico-site-mesh`), pass `-cni calico-bird-dualstack
+-k0s-calico-mtu 1420` to `cmd/awsrow` and `-cni calico-bird-dualstack` to
+`cmd/awsremove`, and export with `--site-nodes cp,w1,w2 --dual-stack --udp`
+plus the expected k0s release and digest-pinned `calico-node` image. Each row
+then also requires a Ready `calico-node` on every measured node and kubelet
+logs and exec through the API server, which on this profile has no
+konnectivity agent. Renew the sessions before each row. The harness retries
+throttled AWS calls until the check's deadline; SSM throttles `SendCommand`
+per account during UDP-heavy rows.
+
 
 `aws/session.py` renews one-hour derived CAPA and harness sessions using the setup
 identity. Run it from the sourced setup shell, then rerun `aws/identity.py` to

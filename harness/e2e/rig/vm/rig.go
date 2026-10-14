@@ -170,6 +170,23 @@ func (r *Rig) prepareSeed(name string) error {
 
 // Up writes platform metadata and deploys the single-NIC guests.
 func (r *Rig) Up(ctx context.Context) error {
+	image, err := r.verifiedImage(ctx)
+	if err != nil {
+		return err
+	}
+	if runtime, ok := r.Runtime.(interface {
+		Validate(context.Context, string) error
+	}); ok {
+		if err := runtime.Validate(ctx, r.WorkDir); err != nil {
+			return err
+		}
+	}
+	// Containerlab canonicalizes bare image IDs as registry names. Give the
+	// inspected content a private, content-named local tag and forbid pulls.
+	imageRef := "cloud-provisioning/vm:sha256-" + strings.TrimPrefix(image, "sha256:")
+	if _, stderr, code, err := r.runner()(ctx, nil, "docker", "tag", image, imageRef); err != nil || code != 0 {
+		return fmt.Errorf("pinning local VM image: %v (exit %d): %s", err, code, stderr)
+	}
 	for _, n := range r.Topology.Nodes {
 		if !n.IsClusterNode() {
 			continue
@@ -182,6 +199,12 @@ func (r *Rig) Up(ctx context.Context) error {
 	config, err := r.Topology.ContainerlabConfig(lab.VM)
 	if err != nil {
 		return err
+	}
+	for _, node := range config.Topology.Nodes {
+		if node != nil && node.Kind == "generic_vm" {
+			node.Image = imageRef
+			node.ImagePullPolicy = "Never"
+		}
 	}
 	source, err := clab.Source(config)
 	if err != nil {

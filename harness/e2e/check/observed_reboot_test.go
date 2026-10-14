@@ -108,7 +108,7 @@ func TestObservedRebootFailuresRemainVisibleAfterConvergence(t *testing.T) {
 		}
 	}}
 	final := Converge(context.Background(), p, targets, opts, 5*time.Second, time.Millisecond)
-	if observed != len(fixture.Passes) || !final.OK() {
+	if observed != len(fixture.Passes) || (final.OK() || !final.Converged()) {
 		t.Fatalf("observed=%d final=%s", observed, final.Report())
 	}
 }

@@ -28,8 +28,11 @@ func TestConvergePreservesFailedPassBeforeSuccess(t *testing.T) {
 		attempts = append(attempts, attempt)
 		results = append(results, m.Results()...)
 	}}, time.Second, time.Millisecond)
-	if !final.OK() || len(attempts) != 2 || attempts[0] != 1 || attempts[1] != 2 {
+	if final.OK() || !final.Converged() || len(attempts) != 2 || attempts[0] != 1 || attempts[1] != 2 {
 		t.Fatalf("attempts=%v final=%s", attempts, final.Report())
+	}
+	if len(final.PriorPasses) != 1 || final.PriorPasses[0].Failed() != 1 {
+		t.Fatal("result lost failed history without an observer")
 	}
 	if len(results) != 2 || results[0].OK || results[0].Err == nil || results[0].Err.Error() != "observed DNS timeout" || results[0].From != "remote1" || results[0].Kind != DNS || !results[1].OK {
 		t.Fatalf("lost pass evidence: %+v", results)
@@ -49,5 +52,16 @@ func TestConvergeObservesFailureBeforeCancellation(t *testing.T) {
 	}}, time.Second, time.Hour)
 	if calls != 1 || !final.Cancelled || final.OK() {
 		t.Fatalf("calls=%d cancelled=%v final=%s", calls, final.Cancelled, final.Report())
+	}
+}
+
+func TestConvergeKeepsFailuresWithoutAnObserver(t *testing.T) {
+	final := Converge(context.Background(), &recoveringDNS{}, []Target{{Node: "worker"}}, Options{}, time.Second, time.Millisecond)
+	if final.OK() || !final.Converged() || len(final.PriorPasses) != 1 || final.PriorPasses[0].Failed() != 1 {
+		t.Fatal(final.Report())
+	}
+	details := final.Details()
+	if details["ok"] != false || details["converged"] != true || len(details["priorPasses"].([]map[string]any)) != 1 {
+		t.Fatalf("lost evidence: %+v", details)
 	}
 }

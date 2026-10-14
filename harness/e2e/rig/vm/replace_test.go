@@ -22,6 +22,9 @@ func TestReplacementDestroysOldTopologyBeforeOverwritingIt(t *testing.T) {
 	destroyed := false
 	r.Run = func(_ context.Context, _ io.Reader, args ...string) ([]byte, []byte, int, error) {
 		command := strings.Join(args, " ")
+		if strings.HasPrefix(command, "docker image inspect ") {
+			return validImage(), nil, 0, nil
+		}
 		switch command {
 		case "docker ps -aq --filter label=containerlab=cldt":
 			return []byte("old-worker-id\n"), nil, 0, nil

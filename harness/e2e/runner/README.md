@@ -82,12 +82,6 @@ go -C harness/e2e run ./cmd/nodeimage -platform-only -disk-gib 32 \
   -work-dir .state/platform-32g
 ```
 
-The [native capacity check](../../../docs/validation/nodeimage-capacity-results.json)
-verifies the grown platform copy's disk, root partition and filesystem in a
-single-NIC guest. Check growth logs as well as capacity: the wrapper may disable
-cloud-init after initial provisioning, so its final `disabled` status alone
-does not prove that first-boot setup succeeded.
-
 A successful single-VM installation checks prerequisites
 only; it cannot replace the multi-node CAPI lifecycle matrix.
 
@@ -120,10 +114,7 @@ The harness stages the product chart in its private work directory and runs
 the bastion. Locked HTTP(S) repositories are registered in an isolated Helm
 cache; OCI dependencies use Helm's registry support. The network-connected
 runner must be able to fetch these dependencies. An ignored local `charts/`
-cache is not part of a clean checkout and must not be required for a campaign.
-Staging leaves the source chart and lock unchanged. See the
-[clean-checkout regression](../../../docs/validation/chart-clean-checkout-results.json)
-for validation and native retry status.
+cache is not part of a clean checkout and must not be required for a campaign. Staging leaves the source chart and lock unchanged.
 
 Every command targeting this lab must traverse the outer runner:
 
@@ -141,13 +132,8 @@ outer `docker exec "$runner"` targets the original host daemon instead.
 
 ## Memory during image import
 
-See the [native recovery evidence](../../../docs/validation/vm-image-import-memory-results.json).
-
 Budget for guest RAM, the nested Docker daemon, and image export/import buffers.
-The eight-VM group campaign exhausted a 38 GiB runner limit during concurrent
-imports: QEMU was killed and guest filesystems reported write failures. Recovery
-uses a 44 GiB limit and imports into one guest at a time, retaining a single image
-export. Check available host memory before increasing a runner's limit.
+Import into one guest at a time and retain a single image export. Check available host memory before increasing a runner's limit.
 
 After an OOM or image-import failure, inspect the runner's `memory.events`, QEMU
 processes, and guest filesystem writes through the serial guest agent. A Ready
@@ -176,3 +162,42 @@ docker rm "$runner"
 Retain the state directory for evidence. Do not remove an active daemon's
 `docker-data` directory. Run another fresh profile in a new runner or explicitly
 destroy the previous inner lab first.
+
+## Match the wrapper to the pinned SDK
+
+The SDK currently pins upstream commit `208b63a3311d988688cd73b3a010d0b8708da4ef`
+in both Go modules. Build the guest helper and
+launcher from that same clean checkout:
+
+```sh
+bash harness/e2e/rig/vm/image/build.sh /path/to/labcontainers BASE_VM_IMAGE cloud-provisioning/vm:qualified-sdk
+```
+
+Import the resulting image into the isolated daemon, then tag it there as
+`cloud-provisioning/vm:single-nic`. Keep retained labs' host tags unchanged.
+The VM rig checks the image's source revision before modifying or destroying
+any lab and resolves its image ID into a content-named local tag with pulls disabled.
+Containerlab 0.79 interprets bare Docker image IDs as registry names.
+Missing or stale provenance fails closed. The daemon's Go build metadata must
+also match the SDK; a stale `LABCONTAINERS_LABD` or PATH binary is rejected.
+Build it from the pinned module when needed:
+
+```sh
+CGO_ENABLED=0 GOWORK=off go -C harness/e2e build -o /absolute/path/labd github.com/appmana/labcontainers/cmd/labd
+```
+
+These checks follow the storage reliability harness's source/image pinning
+pattern. Labels record build provenance; they are not cryptographic attestation.
+The builder installs current source files rather than relabeling old wrappers.
+
+## Assertion failures remain failures
+
+Readiness waits may retry before measurement. Every completed matrix attempt
+is evidence. `Matrix.OK()` requires every attempt to pass; `Converged()` reports
+only whether the final observation recovered. A later green pass cannot change
+a failed campaign to success. JSON retains prior attempts, and command exit
+status follows the campaign result. Fault campaigns must separately assert
+expected outages and recovery bounds; they cannot use blanket retry success.
+
+UDP probe installation is serialized through completion so concurrent IPv4
+and IPv6 checks cannot overwrite or remove each other's temporary executable.

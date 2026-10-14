@@ -1,0 +1,11 @@
+{
+  "published2022Image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:bd6062bd2510d8afdb42575e3f8b80b92e30529ad3c3ea07f598a512ff0aa542",
+  "preservedLegacy2025Image": "270666084746.dkr.ecr.us-west-2.amazonaws.com/cldt-windows-v2/windows-gpu-probe@sha256:84c291bd3a86d1c50e6400c95d4de43af86513b441ae402cb35cd8d257fdfd1c",
+  "build": {
+    "platform": {
+      "os": "windows",
+      "architecture": "amd64",
+      "os.version": "10.0.20348.5499"
+    }
+  }
+}

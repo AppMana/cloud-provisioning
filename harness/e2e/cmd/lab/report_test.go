@@ -34,9 +34,9 @@ func TestJournalRetainsFailedPassAndSeparatesConvergenceWindows(t *testing.T) {
 	opts := matrixOptions()
 	opts.ExternalURL = ""
 	p := &journalDNS{}
-	for range 2 {
+	for run := range 2 {
 		m := check.Converge(context.Background(), p, []check.Target{{Node: "remote1"}}, opts, time.Second, time.Millisecond)
-		if !m.OK() {
+		if m.OK() != (run == 1) || !m.Converged() {
 			t.Fatal(m.Report())
 		}
 	}

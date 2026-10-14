@@ -1,0 +1,67 @@
+{
+  "transport": "native-oob",
+  "lanes": [
+    {
+      "source": "net-w1",
+      "target": "net-aws-win2022-v3",
+      "attempts": 1278,
+      "passed": 1278,
+      "maxStartIntervalSeconds": 0.17834728799999944,
+      "samplesSHA256": "eb93775722de4cf8575761c13bd576ea60d1bc7c04bc6262038781f5206b5bb8",
+      "ok": true
+    },
+    {
+      "source": "net-w1",
+      "target": "net-aws-win2025-v3",
+      "attempts": 1241,
+      "passed": 1240,
+      "maxStartIntervalSeconds": 5.100591801000004,
+      "samplesSHA256": "e6ae8c384f0092b8344ce6db743901def45e96fb0bd47658040b262969cfa990",
+      "ok": false
+    },
+    {
+      "source": "net-aws-win2022-v3",
+      "target": "net-w1",
+      "attempts": 1261,
+      "passed": 1261,
+      "maxStartIntervalSeconds": 0.19983860000000053,
+      "samplesSHA256": "3ad4ae1ce05329408c8c3263b699119adfcad9fed9d0f182f7cbf32327b26a0d",
+      "ok": true
+    },
+    {
+      "source": "net-aws-win2022-v3",
+      "target": "net-aws-win2025-v3",
+      "attempts": 1518,
+      "passed": 1518,
+      "maxStartIntervalSeconds": 0.17817819999999074,
+      "samplesSHA256": "8d997e1ba4f7a22d0ccbdf34e974908dca14fa17635541fd98bf67adf90e2759",
+      "ok": true
+    },
+    {
+      "source": "net-aws-win2025-v3",
+      "target": "net-w1",
+      "attempts": 1258,
+      "passed": 1258,
+      "maxStartIntervalSeconds": 0.14961240000000942,
+      "samplesSHA256": "3a643d1a18521176b9fa31db98aa3ac738c36b8a1486d46b5f319293b4efdf1f",
+      "ok": true
+    },
+    {
+      "source": "net-aws-win2025-v3",
+      "target": "net-aws-win2022-v3",
+      "attempts": 1483,
+      "passed": 1482,
+      "maxStartIntervalSeconds": 5.101475100000002,
+      "samplesSHA256": "a61628925b54989ee9f8286bb0a0870aafc0b3cfe5b60cb251a5c74e524188c5",
+      "ok": false
+    }
+  ],
+  "identitiesStable": true,
+  "window": {
+    "ok": false,
+    "scope": "No qualified operation window"
+  },
+  "preflightFailed": true,
+  "reason": "Original survivor UDP loss before claim submission",
+  "ok": false
+}

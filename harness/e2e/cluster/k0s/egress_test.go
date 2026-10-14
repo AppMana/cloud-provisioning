@@ -12,7 +12,7 @@ import (
 
 // Fixture is the observed k0s 1.36.2 DaemonSet, with runtime metadata removed.
 // Native AWS Windows webhook failures and Linux-agent failover are recorded in
-// docs/validation; these unit tests protect the configuration boundary only.
+// retained native artifacts; these unit tests protect the configuration boundary only.
 func nativeAgent(t *testing.T) []byte {
 	t.Helper()
 	raw, err := os.ReadFile("testdata/konnectivity-native.json")

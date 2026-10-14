@@ -1,14 +1,19 @@
 package k0s
 
 import (
+	"bytes"
+	"io/fs"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	native "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
+	"github.com/k0sproject/k0s/static"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/yaml"
 )
@@ -158,5 +163,79 @@ func TestTheBuilderAcceptsTheDualStackProfilesRequiredMTU(t *testing.T) {
 	d.K0sCalicoManagedAddresses = true
 	if err := validateSiteConfig(d); err == nil {
 		t.Fatal("managed addresses would change the deployment's own autodetection, and were accepted")
+	}
+}
+
+func TestDualStackSiteOwnershipIsExplicitAndVerifiedOnReuse(t *testing.T) {
+	d := identityDeps(t)
+	d.K0sCalicoSiteOnly = true
+	config, err := bgpDualStackConfig(d, d.Topology.MustNode("cp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := yaml.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verifySiteBGPConfig(raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, family := range []string{"IPV4", "IPV6"} {
+		if config.Spec.Network.Calico.EnvVars["CALICO_"+family+"POOL_NODE_SELECTOR"] == "" {
+			t.Fatal("unbounded IPAM")
+		}
+	}
+	for _, n := range d.Topology.NodesInRole(lab.Worker) {
+		if !strings.Contains(kubeletNodeIPs(n, true), siteCalicoLabel+"="+siteCalicoValue) {
+			t.Fatal("site label missing before registration")
+		}
+	}
+	d.K0sCalicoSiteOnly = false
+	if verifyBGPDualStackConfig(raw, d, d.Topology.MustNode("cp")) == nil {
+		t.Fatal("reuse ignored CNI ownership")
+	}
+}
+
+// Use the pinned distribution's actual interpolation fragment: serializing the
+// ClusterConfig alone did not catch selector quotes breaking the generated DS.
+func TestSiteSelectorsRenderThroughK0sEnvironmentTemplate(t *testing.T) {
+	d := identityDeps(t)
+	d.K0sCalicoSiteOnly = true
+	config, err := bgpDualStackConfig(d, d.Topology.MustNode("cp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := fs.ReadFile(static.CalicoManifests, "DaemonSet/calico-node.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := strings.Index(string(source), "{{ range $name, $value := .EnvVars }}")
+	if start < 0 {
+		t.Fatal("k0s environment template changed")
+	}
+	end := strings.Index(string(source[start:]), "{{- end }}")
+	if end < 0 {
+		t.Fatal("k0s environment template changed")
+	}
+	tmpl, err := template.New("k0s-env").Parse(string(source[start : start+end+len("{{- end }}")]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rendered bytes.Buffer
+	if err := tmpl.Execute(&rendered, map[string]any{"EnvVars": config.Spec.Network.Calico.EnvVars}); err != nil {
+		t.Fatal(err)
+	}
+	var vars []corev1.EnvVar
+	if err := yaml.Unmarshal(rendered.Bytes(), &vars); err != nil {
+		t.Fatalf("k0s generated invalid environment YAML: %v", err)
+	}
+	found := 0
+	for _, v := range vars {
+		if strings.HasPrefix(v.Name, "CALICO_IPV") && strings.HasSuffix(v.Name, "POOL_NODE_SELECTOR") {
+			found++
+		}
+	}
+	if found != 2 {
+		t.Fatal("both family selectors must render")
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/check"
@@ -38,8 +37,7 @@ type Pods struct {
 	// UDPProbe is the static UDP prober carried into each probe pod.
 	UDPProbe []byte
 
-	mu      sync.Mutex
-	carried map[string]bool
+	carried check.CarryOnce
 }
 
 // Start creates the namespace, a probe pod and Service on each node, and
@@ -215,22 +213,12 @@ func (p *Pods) UDPEcho(ctx context.Context, node, destination string, payload, t
 }
 
 func (p *Pods) carry(ctx context.Context, node string) error {
-	p.mu.Lock()
-	done := p.carried[node]
-	p.mu.Unlock()
-	if done {
+	return p.carried.Do(node, func() error {
+		if _, err := p.exec(ctx, node, p.UDPProbe, "sh", "-ec", check.CarryCommand, "cldt-carry", check.UDPProbePath); err != nil {
+			return fmt.Errorf("carrying the UDP prober into %s's probe: %w", node, err)
+		}
 		return nil
-	}
-	if _, err := p.exec(ctx, node, p.UDPProbe, "sh", "-ec", check.CarryCommand, "cldt-carry", check.UDPProbePath); err != nil {
-		return fmt.Errorf("carrying the UDP prober into %s's probe: %w", node, err)
-	}
-	p.mu.Lock()
-	if p.carried == nil {
-		p.carried = map[string]bool{}
-	}
-	p.carried[node] = true
-	p.mu.Unlock()
-	return nil
+	})
 }
 
 // LinuxNodes are the Ready Linux nodes, the matrix's default population.

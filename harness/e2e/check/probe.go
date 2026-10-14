@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
@@ -88,15 +87,16 @@ type Pods struct {
 	// UDPProbe is the static UDP prober (cmd/udpprobe) carried into each
 	// probe container before its first UDP check. Empty disables UDP.
 	UDPProbe []byte
+	// Family explicitly limits a campaign; empty preserves the dual-stack contract.
+	Family Family
 
-	mu      sync.Mutex
-	carried map[string]bool // container IDs holding the UDP prober
+	carried CarryOnce // container IDs holding the UDP prober
 }
 
 // ProbeObjects constructs native Kubernetes resources; callers never render YAML.
 // Probe images are preloaded by the harness, not fetched through an undeclared
 // registry path while measuring reachability.
-func ProbeObjects(node, namespace string) (*corev1.Pod, *corev1.Service) {
+func ProbeObjects(node, namespace string, families ...Family) (*corev1.Pod, *corev1.Service) {
 	name := "hc-" + node
 	dualStack := corev1.IPFamilyPolicyPreferDualStack
 	pod := &corev1.Pod{
@@ -126,6 +126,11 @@ func ProbeObjects(node, namespace string) (*corev1.Pod, *corev1.Service) {
 				{Name: "udp", Port: UDPPort, TargetPort: intstr.FromInt(UDPPort), Protocol: corev1.ProtocolUDP},
 			},
 		},
+	}
+	if len(families) > 0 && (families[0] == IPv4 || families[0] == IPv6) {
+		policy := corev1.IPFamilyPolicySingleStack
+		service.Spec.IPFamilyPolicy = &policy
+		service.Spec.IPFamilies = []corev1.IPFamily{corev1.IPFamily(families[0])}
 	}
 	return pod, service
 }
@@ -165,6 +170,9 @@ func BuildUDPProbe(ctx context.Context, moduleDir, workDir string) ([]byte, erro
 // Start creates a pod and a service on every node and waits for them
 // to run.
 func (p *Pods) Start(ctx context.Context, nodes []string, within time.Duration) ([]Target, error) {
+	if p.Family != "" && p.Family != IPv4 && p.Family != IPv6 {
+		return nil, fmt.Errorf("invalid campaign family %q", p.Family)
+	}
 	if err := p.Kube.ApplyObjects(ctx, &corev1.Namespace{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"},
 		ObjectMeta: metav1.ObjectMeta{Name: p.Namespace},
@@ -172,7 +180,7 @@ func (p *Pods) Start(ctx context.Context, nodes []string, within time.Duration) 
 		return nil, fmt.Errorf("creating probe namespace: %w", err)
 	}
 	for _, node := range nodes {
-		pod, service := ProbeObjects(node, p.Namespace)
+		pod, service := ProbeObjects(node, p.Namespace, p.Family)
 		if err := p.Kube.ApplyObjects(ctx, pod, service); err != nil {
 			return nil, fmt.Errorf("creating %s's probe: %w", node, err)
 		}
@@ -224,7 +232,7 @@ func (p *Pods) targets(ctx context.Context, nodes []string) ([]Target, error) {
 		if err != nil || strings.TrimSpace(svcIPs) == "" {
 			return out, fmt.Errorf("%s's probe has no service address", node)
 		}
-		target, err := TargetFor(node, p.Namespace, strings.Fields(podIPs), strings.Fields(svcIPs))
+		target, err := TargetFor(node, p.Namespace, strings.Fields(podIPs), strings.Fields(svcIPs), p.Family)
 		if err != nil {
 			return out, err
 		}
@@ -244,11 +252,21 @@ func (p *Pods) targets(ctx context.Context, nodes []string) ([]Target, error) {
 // must agree on which families they have: a dual-stack pod behind a
 // single-stack Service, or the reverse, is a cluster that is half
 // configured, and measuring only the half that works would hide it.
-func TargetFor(node, namespace string, podIPs, serviceIPs []string) (Target, error) {
+func TargetFor(node, namespace string, podIPs, serviceIPs []string, families ...Family) (Target, error) {
+	family := Family("")
+	if len(families) > 0 {
+		family = families[0]
+	}
+	if family != "" && family != IPv4 && family != IPv6 {
+		return Target{}, fmt.Errorf("invalid campaign family %q", family)
+	}
 	t := Target{Node: node, ServiceName: "svc-hc-" + node + "." + namespace + ".svc.cluster.local"}
 	assign := func(addrs []string, v4, v6 *string, what string) error {
 		for _, a := range addrs {
 			ip := net.ParseIP(a)
+			if ip != nil && ((family == IPv4 && ip.To4() == nil) || (family == IPv6 && ip.To4() != nil)) {
+				continue
+			}
 			switch {
 			case ip == nil:
 				return fmt.Errorf("%s's probe %s address %q is not an address", node, what, a)
@@ -258,8 +276,8 @@ func TargetFor(node, namespace string, podIPs, serviceIPs []string) (Target, err
 				*v6 = ip.String()
 			}
 		}
-		if *v4 == "" {
-			return fmt.Errorf("%s's probe has no IPv4 %s address in %v", node, what, addrs)
+		if (family != IPv6 && *v4 == "") || (family == IPv6 && *v6 == "") {
+			return fmt.Errorf("%s's probe lacks required %s %s address in %v", node, family, what, addrs)
 		}
 		return nil
 	}
@@ -416,27 +434,17 @@ func ParseUDPReport(out []byte) (UDPReport, error) {
 
 // carry puts the UDP prober into a probe container once.
 func (p *Pods) carry(ctx context.Context, node, cid string) error {
-	p.mu.Lock()
-	done := p.carried[cid]
-	p.mu.Unlock()
-	if done {
+	return p.carried.Do(cid, func() error {
+		argv := []string{"crictl"}
+		if p.CRIEndpoint != "" {
+			argv = append(argv, "--runtime-endpoint", p.CRIEndpoint)
+		}
+		argv = append(argv, "exec", "-i", cid, "sh", "-ec", CarryCommand, "cldt-carry", UDPProbePath)
+		if _, err := p.Rig.Node(node).Pipe(ctx, bytes.NewReader(p.UDPProbe), argv...); err != nil {
+			return fmt.Errorf("carrying the UDP prober into %s's probe: %w", node, err)
+		}
 		return nil
-	}
-	argv := []string{"crictl"}
-	if p.CRIEndpoint != "" {
-		argv = append(argv, "--runtime-endpoint", p.CRIEndpoint)
-	}
-	argv = append(argv, "exec", "-i", cid, "sh", "-ec", CarryCommand, "cldt-carry", UDPProbePath)
-	if _, err := p.Rig.Node(node).Pipe(ctx, bytes.NewReader(p.UDPProbe), argv...); err != nil {
-		return fmt.Errorf("carrying the UDP prober into %s's probe: %w", node, err)
-	}
-	p.mu.Lock()
-	if p.carried == nil {
-		p.carried = map[string]bool{}
-	}
-	p.carried[cid] = true
-	p.mu.Unlock()
-	return nil
+	})
 }
 
 // container finds the probe pod's container on a node.

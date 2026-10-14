@@ -13,5 +13,9 @@ func (m *Matrix) Details() map[string]any {
 		}
 		results = append(results, detail)
 	}
-	return map[string]any{"total": m.Total(), "passed": m.Passed(), "failed": m.Failed(), "notRequired": m.NotRequired(), "elapsed": m.Elapsed.String(), "cancelled": m.Cancelled, "results": results}
+	prior := make([]map[string]any, 0, len(m.PriorPasses))
+	for _, pass := range m.PriorPasses {
+		prior = append(prior, pass.Details())
+	}
+	return map[string]any{"ok": m.OK(), "converged": m.Converged(), "priorPasses": prior, "total": m.Total(), "passed": m.Passed(), "failed": m.Failed(), "notRequired": m.NotRequired(), "elapsed": m.Elapsed.String(), "cancelled": m.Cancelled, "results": results}
 }

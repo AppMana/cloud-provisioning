@@ -122,10 +122,7 @@ func (r Result) String() string {
 
 // Matrix is every check from one run.
 //
-// It is a value rather than a log file on purpose. The bash harness
-// wrote verdicts as text and read them back by grepping for a marker,
-// and a stale copy of one of those files was reported as a live
-// result during the campaign this replaces.
+// Structured results bind verdicts to this run instead of log markers.
 type Matrix struct {
 	mu      sync.Mutex
 	results []Result
@@ -147,6 +144,8 @@ type Matrix struct {
 	// find out, and a result that needs a human with a shell is not a
 	// result.
 	Cancelled bool
+	// PriorPasses retain unsuccessful attempts; recovery never erases a failure.
+	PriorPasses []*Matrix
 }
 
 // Add records one result. Safe to call from many goroutines, which is
@@ -217,11 +216,18 @@ func (m *Matrix) Failures() []Result {
 
 // OK reports whether the run passed.
 //
-// Zero checks is not a pass. A check that never ran proves nothing,
-// and a harness that reports "no checks ran" as success is how a
-// broken configuration stays green: this happened, on a healthy
-// network, when a namespace from a previous run would not delete.
-func (m *Matrix) OK() bool { return !m.Cancelled && m.Passed() > 0 && m.Failed() == 0 }
+// Zero checks cannot qualify a run; setup failure and missing evidence fail closed.
+func (m *Matrix) OK() bool {
+	for _, pass := range m.PriorPasses {
+		if !pass.OK() {
+			return false
+		}
+	}
+	return m.Converged()
+}
+
+// Converged describes only the last observation, not a passing campaign.
+func (m *Matrix) Converged() bool { return !m.Cancelled && m.Passed() > 0 && m.Failed() == 0 }
 
 // Summary is the one line a row's log carries.
 func (m *Matrix) Summary() string {
@@ -230,6 +236,8 @@ func (m *Matrix) Summary() string {
 		line += fmt.Sprintf("  not required: %d", n)
 	}
 	switch {
+	case len(m.PriorPasses) > 0 && !m.OK():
+		return fmt.Sprintf("%s  FAILED: %d earlier unsuccessful attempts; final pass converged=%t", line, len(m.PriorPasses), m.Converged())
 	case m.Elapsed == 0:
 		return line
 	case m.OK():

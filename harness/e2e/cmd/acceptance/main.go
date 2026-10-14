@@ -12,6 +12,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -40,6 +42,13 @@ func main() {
 }
 
 func run(args []string) error {
+	return runWith(args, preconditions, runMatrix)
+}
+
+func runWith(args []string,
+	preflight func(context.Context, *rest.Config, acceptance.Options) ([]acceptance.Check, error),
+	probe func(context.Context, *rest.Config, string, int, time.Duration, string, string, string, func(int, *check.Matrix)) (*check.Matrix, error),
+) error {
 	flags := flag.NewFlagSet("acceptance", flag.ContinueOnError)
 	kubeconfig := flags.String("kubeconfig", "", "REQUIRED kubeconfig file; $KUBECONFIG and ~/.kube/config are never read")
 	kubeContext := flags.String("context", "", "context in that file (default: its current context)")
@@ -50,6 +59,8 @@ func run(args []string) error {
 	nodes := flags.String("nodes", "", "matrix: comma-separated nodes (default: every Ready Linux node)")
 	tries := flags.Int("udp-tries", 10, "matrix: datagrams per UDP size")
 	window := flags.Duration("window", 10*time.Minute, "matrix: convergence window")
+	udpFile := flags.String("udp-probe-file", "", "optional prebuilt Linux UDP prober for running without a Go toolchain")
+	udpSHA := flags.String("udp-probe-sha256", "", "required SHA256 of --udp-probe-file")
 	moduleDir := flags.String("module-dir", ".", "matrix: harness module directory the UDP prober is built from")
 	timeout := flags.Duration("timeout", 45*time.Minute, "deadline for the whole command")
 	if err := flags.Parse(args); err != nil {
@@ -80,7 +91,7 @@ func run(args []string) error {
 		"options":    opts,
 	}
 	// Preconditions always run, read-only, before anything is created.
-	checks, err := preconditions(ctx, config, opts)
+	checks, err := preflight(ctx, config, opts)
 	if err != nil {
 		return err
 	}
@@ -98,12 +109,31 @@ func run(args []string) error {
 	}
 
 	ok := acceptance.Passed(checks)
-	if flags.Arg(0) == "matrix" {
-		matrix, err := runMatrix(ctx, config, *nodes, *tries, *window, *moduleDir)
+	if flags.Arg(0) == "matrix" && !ok {
+		result["matrixSkipped"] = "required preconditions failed; no probes created"
+	}
+	if flags.Arg(0) == "matrix" && ok {
+		passes := []map[string]any{}
+		failedChecks := 0
+		allPassed := true
+		matrix, err := probe(ctx, config, *nodes, *tries, *window, *moduleDir, *udpFile, *udpSHA, func(attempt int, m *check.Matrix) {
+			passes = append(passes, map[string]any{"attempt": attempt, "matrix": m.Details()})
+			failedChecks += m.Failed()
+			allPassed = allPassed && m.OK()
+		})
+		result["passes"] = passes
+		result["allAttemptsPassed"] = len(passes) > 0 && allPassed
+		result["failedChecksAcrossPasses"] = failedChecks
+		if matrix == nil && err == nil {
+			err = fmt.Errorf("probe returned no matrix evidence")
+		}
+		if len(passes) > 0 {
+			fmt.Printf("  observed %d passes and %d failed checks across all attempts\n", len(passes), failedChecks)
+		}
 		if matrix != nil {
 			fmt.Println(matrix.Report())
 			result["matrix"] = matrix.Details()
-			ok = ok && matrix.OK()
+			ok = ok && matrix.OK() && len(passes) > 0 && allPassed
 		}
 		if err != nil {
 			result["matrixError"] = err.Error()
@@ -138,7 +168,7 @@ func preconditions(ctx context.Context, config *rest.Config, opts acceptance.Opt
 	return acceptance.Preconditions(ctx, reader, opts)
 }
 
-func runMatrix(ctx context.Context, config *rest.Config, nodeList string, tries int, window time.Duration, moduleDir string) (*check.Matrix, error) {
+func runMatrix(ctx context.Context, config *rest.Config, nodeList string, tries int, window time.Duration, moduleDir, udpFile, udpSHA string, observe func(int, *check.Matrix)) (*check.Matrix, error) {
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err
@@ -162,7 +192,7 @@ func runMatrix(ctx context.Context, config *rest.Config, nodeList string, tries 
 		return nil, err
 	}
 	defer os.RemoveAll(work)
-	udpProbe, err := check.BuildUDPProbe(ctx, moduleDir, filepath.Join(work, "build"))
+	udpProbe, err := loadUDPProbe(ctx, moduleDir, filepath.Join(work, "build"), udpFile, udpSHA)
 	if err != nil {
 		return nil, err
 	}
@@ -188,6 +218,24 @@ func runMatrix(ctx context.Context, config *rest.Config, nodeList string, tries 
 		return nil, err
 	}
 	return check.Converge(ctx, pods, targets, check.Options{
-		Port: check.Port, ExternalURL: check.ExternalURL, UDP: &check.UDPOptions{Tries: tries},
+		Port: check.Port, ExternalURL: check.ExternalURL, UDP: &check.UDPOptions{Tries: tries}, ObservePass: observe,
 	}, window, 15*time.Second), nil
+}
+
+func loadUDPProbe(ctx context.Context, moduleDir, work, path, expected string) ([]byte, error) {
+	if path == "" && expected == "" {
+		return check.BuildUDPProbe(ctx, moduleDir, work)
+	}
+	if path == "" || len(expected) != 64 {
+		return nil, fmt.Errorf("prebuilt UDP prober requires a file and SHA256")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	digest := sha256.Sum256(data)
+	if hex.EncodeToString(digest[:]) != expected {
+		return nil, fmt.Errorf("UDP prober SHA256 mismatch")
+	}
+	return data, nil
 }

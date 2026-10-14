@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,7 +139,7 @@ func siteMesh() []client.Object {
 		&unstructured.Unstructured{Object: map[string]any{
 			"apiVersion": "crd.projectcalico.org/v1", "kind": "BGPPeer",
 			"metadata": map[string]any{"name": "site-mesh"},
-			"spec": map[string]any{"nodeSelector": "!has(cloud-provisioning.appmana.com/role)", "peerSelector": "!has(cloud-provisioning.appmana.com/role)"}}},
+			"spec":     map[string]any{"nodeSelector": "!has(cloud-provisioning.appmana.com/role)", "peerSelector": "!has(cloud-provisioning.appmana.com/role)"}}},
 	}
 }
 
@@ -195,4 +196,61 @@ func setCNIMTU(ds *appsv1.DaemonSet, mtu int) {
 func itoa(n int) string {
 	raw, _ := json.Marshal(n)
 	return string(raw)
+}
+
+func TestUnrelatedOrCloudInclusiveBGPSelectorsDoNotQualifySiteMesh(t *testing.T) {
+	for _, selectors := range [][2]string{
+		{"all()", "all()"},
+		{"rack == 'absent'", "rack == 'absent'"},
+		{"!has(cloud-provisioning.appmana.com/role)", "all()"},
+		{"all()", "!has(cloud-provisioning.appmana.com/role)"},
+		{"", "!has(cloud-provisioning.appmana.com/role)"},
+	} {
+		objects := siteMesh()
+		peer := objects[1].(*unstructured.Unstructured)
+		_ = unstructured.SetNestedField(peer.Object, selectors[0], "spec", "nodeSelector")
+		_ = unstructured.SetNestedField(peer.Object, selectors[1], "spec", "peerSelector")
+		got := bgpMesh(context.Background(), observedCluster(t, nil, objects...))
+		if got.OK || !got.Required {
+			t.Fatalf("unsafe selectors %v accepted: %+v", selectors, got)
+		}
+	}
+}
+
+func TestSiteMeshRequiresActualSiteNodeCoverage(t *testing.T) {
+	objects := append(siteMesh(), &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+		Name: "excluded-site", Labels: map[string]string{"cloud-provisioning.appmana.com/role": "site"},
+	}})
+	got := bgpMesh(context.Background(), observedCluster(t, nil, objects...))
+	if got.OK || !strings.Contains(got.Detail, "excluded-site") {
+		t.Fatalf("excluded site node accepted: %+v", got)
+	}
+}
+
+func TestGlobalRouterPeerCannotHideBehindSafeSiteMesh(t *testing.T) {
+	objects := siteMesh()
+	router := objects[1].(*unstructured.Unstructured).DeepCopy()
+	router.SetName("external-router")
+	unstructured.RemoveNestedField(router.Object, "spec", "nodeSelector")
+	unstructured.RemoveNestedField(router.Object, "spec", "peerSelector")
+	_ = unstructured.SetNestedField(router.Object, "10.2.0.1", "spec", "peerIP")
+	objects = append(objects, router)
+	got := bgpMesh(context.Background(), observedCluster(t, nil, objects...))
+	if got.OK {
+		t.Fatal("global router peer passed cloud exclusion")
+	}
+	_ = unstructured.SetNestedField(router.Object, "!has(cloud-provisioning.appmana.com/role)", "spec", "nodeSelector")
+	got = bgpMesh(context.Background(), observedCluster(t, nil, objects...))
+	if !got.OK {
+		t.Fatalf("site-scoped router peer rejected: %+v", got)
+	}
+}
+
+func TestCalicoPreflightCannotQualifyAWSAllocations(t *testing.T) {
+	c := observedCluster(t, nil)
+	nodes := []corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "aws", Labels: map[string]string{"cloud-provisioning.appmana.com/cni": "aws-vpc"}}}}
+	got := masquerade(context.Background(), c, cni.Network{Name: cni.Calico, Encapsulation: cni.Native}, nodes)
+	if got.OK || !got.Required {
+		t.Fatal("Calico preflight claimed AWS source preservation")
+	}
 }

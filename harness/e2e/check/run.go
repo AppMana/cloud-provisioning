@@ -49,12 +49,21 @@ func Run(ctx context.Context, p Prober, targets []Target, opts Options) *Matrix 
 	}
 	for _, pair := range Pairs(names) {
 		src, dst := byNode[pair.From], byNode[pair.To]
-		emit(pair.From, pair.To, Pod, 0, func() Result { return reach(ctx, p, pair, Pod, url(dst.PodIP, opts.Port, reachPath)) })
-		emit(pair.From, pair.To, Service, 0, func() Result { return reach(ctx, p, pair, Service, url(dst.ServiceIP, opts.Port, reachPath)) })
-		if !opts.SkipTransfer {
-			emit(pair.From, pair.To, Transfer, 0, func() Result { return transfer(ctx, p, pair, Transfer, url(dst.PodIP, opts.Port, transferPath)) })
+		v4 := src.PodIP != "" && dst.PodIP != ""
+		if v4 {
+			emit(pair.From, pair.To, Pod, 0, func() Result { return reach(ctx, p, pair, Pod, url(dst.PodIP, opts.Port, reachPath)) })
+			emit(pair.From, pair.To, Service, 0, func() Result { return reach(ctx, p, pair, Service, url(dst.ServiceIP, opts.Port, reachPath)) })
+			if !opts.SkipTransfer {
+				emit(pair.From, pair.To, Transfer, 0, func() Result { return transfer(ctx, p, pair, Transfer, url(dst.PodIP, opts.Port, transferPath)) })
+			}
+
 		}
 		dual := src.PodIP6 != "" && dst.PodIP6 != ""
+		if !v4 && !dual {
+			emit(pair.From, pair.To, Pod, 0, func() Result {
+				return Result{From: pair.From, To: pair.To, Kind: Pod, Err: fmt.Errorf("no common pod address family")}
+			})
+		}
 		if dual {
 			emit(pair.From, pair.To, Pod6, 0, func() Result { return reach(ctx, p, pair, Pod6, url(dst.PodIP6, opts.Port, reachPath)) })
 			if dst.ServiceIP6 != "" {
@@ -87,9 +96,11 @@ func Run(ctx context.Context, p Prober, targets []Target, opts Options) *Matrix 
 			}
 			for _, probe := range probes {
 				probe := probe
-				emit(pair.From, pair.To, UDP, probe.Datagram, func() Result {
-					return udpEcho(ctx, p, pair, UDP, dst.PodIP, probe, IPv4, udp.Tries)
-				})
+				if v4 {
+					emit(pair.From, pair.To, UDP, probe.Datagram, func() Result {
+						return udpEcho(ctx, p, pair, UDP, dst.PodIP, probe, IPv4, udp.Tries)
+					})
+				}
 				if dual {
 					emit(pair.From, pair.To, UDP6, probe.Datagram, func() Result {
 						return udpEcho(ctx, p, pair, UDP6, dst.PodIP6, probe, IPv6, udp.Tries)
@@ -276,32 +287,21 @@ func truncate(s string) string {
 	return s
 }
 
-// Converge runs the matrix until it is green or the window runs out,
-// and returns the last one it ran.
-//
-// A single pass measures a moment, not a state. Routes converge
-// asynchronously — a remote's pod block is published after it joins,
-// the transit for a node with no tunnel follows an election, and a
-// network's own agent programs its routes on its own schedule — so a
-// matrix taken the instant a node appears reports a lab that is still
-// assembling itself as a lab that is broken.
-//
-// The window is bounded and its expiry is a failure, because the
-// claim is not that these paths work eventually: it is that they work
-// within the time an operator would wait.
-// passShare bounds one pass as a fraction of the window, so a pass
-// that cannot finish costs a retry rather than the whole budget.
+// Converge observes bounded recovery but retains all unsuccessful passes.
+// OK is false if any assertion failed, even when the final observation recovers.
+// Readiness belongs before this measurement; retries cannot qualify a campaign.
 const passShare = 3
 
 func Converge(ctx context.Context, p Prober, targets []Target, opts Options, within, every time.Duration) *Matrix {
 	started := time.Now()
 	deadline := started.Add(within)
+	var history []*Matrix
 	for attempt := 1; ; attempt++ {
 		// Each pass on its own clock. Run reaches every node through
 		// the rig, and a probe into a machine that has stopped talking
 		// returns only when something takes it away — which without a
 		// bound here is never, leaving a window that cannot expire.
-		pass, cancel := context.WithTimeout(ctx, within/passShare)
+		pass, cancel := context.WithTimeout(ctx, min(within/passShare, time.Until(deadline)))
 		m := Run(pass, p, targets, opts)
 		cancel()
 		m.Elapsed = time.Since(started)
@@ -311,13 +311,17 @@ func Converge(ctx context.Context, p Prober, targets []Target, opts Options, wit
 			opts.ObservePass(attempt, m)
 		}
 		if m.OK() || time.Now().After(deadline) || m.Cancelled {
+			m.Cancelled = ctx.Err() != nil
+			m.PriorPasses = history
 			return m
 		}
 		select {
 		case <-ctx.Done():
 			m.Cancelled = true
+			m.PriorPasses = history
 			return m
-		case <-time.After(every):
+		case <-time.After(min(every, time.Until(deadline))):
 		}
+		history = append(history, m)
 	}
 }

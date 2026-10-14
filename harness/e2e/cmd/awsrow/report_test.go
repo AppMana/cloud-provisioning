@@ -28,7 +28,7 @@ func (p *recoveryProbe) Resolve(context.Context, string, string) error {
 func TestAWSRowPreservesFailedAttemptBeforeSuccess(t *testing.T) {
 	var output bytes.Buffer
 	m, err := recordedMatrix(context.Background(), &recoveryProbe{}, []check.Target{{Node: "survivor"}}, check.Options{}, time.Second, time.Millisecond, &output)
-	if err != nil || !m.OK() {
+	if err != nil || m.OK() || !m.Converged() {
 		t.Fatalf("matrix=%s error=%v", m.Report(), err)
 	}
 	dec := json.NewDecoder(&output)

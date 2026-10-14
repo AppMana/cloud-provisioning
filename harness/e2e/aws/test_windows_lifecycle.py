@@ -119,7 +119,7 @@ class SequenceTest(unittest.TestCase):
         self.assertEqual(operation['survivorStatus'],'pending')
 
     def test_native_failure_cannot_leave_successful_operation_report(self):
-        fixture=json.loads((pathlib.Path(__file__).parents[3]/'docs/validation/windows-native-preflight-cleanup-results.json').read_text())['survivor']
+        fixture=json.loads((pathlib.Path(__file__).parent/'testdata/failed-survivor.json').read_text())
         _,root=self.exercise(survivor=fixture)
         operation=json.loads((root/'result/operation.json').read_text())
         self.assertTrue(operation['lifecyclePassed'])

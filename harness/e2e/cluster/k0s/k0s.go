@@ -89,7 +89,7 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 	firstArgs := []string{"controller", "--enable-worker", "-c", "/etc/k0s/k0s.yaml",
 		siteKubeletArgs(d.Network, first.ClusterAddress())}
 	if d.Network == BGPDualStack {
-		firstArgs = bgpDualStackControllerArgs(first)
+		firstArgs = bgpDualStackControllerArgs(first, d.K0sCalicoSiteOnly)
 	}
 	if err := b.start(ctx, d, first, firstArgs...); err != nil {
 		return err
@@ -126,7 +126,7 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 		args := []string{"worker", "--token-file", "/etc/k0s/token",
 			siteKubeletArgs(d.Network, n.ClusterAddress())}
 		if d.Network == BGPDualStack {
-			args = bgpDualStackWorkerArgs(n)
+			args = bgpDualStackWorkerArgs(n, d.K0sCalicoSiteOnly)
 		}
 		if err := b.join(ctx, d, first, n, "worker", args...); err != nil {
 			return err

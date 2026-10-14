@@ -262,3 +262,47 @@ func TestUDPSizesFollowTheMeasuredPodMTU(t *testing.T) {
 		}
 	}
 }
+
+func TestExplicitFamilyCampaignRejectsMissingFamily(t *testing.T) {
+	for _, family := range []Family{IPv4, IPv6} {
+		_, svc := ProbeObjects("worker", "test", family)
+		if *svc.Spec.IPFamilyPolicy != corev1.IPFamilyPolicySingleStack || len(svc.Spec.IPFamilies) != 1 || string(svc.Spec.IPFamilies[0]) != string(family) {
+			t.Fatal("campaign Service has wrong family")
+		}
+		target, err := TargetFor("worker", "test", []string{"10.0.0.1", "2001:db8::1"}, []string{"10.96.0.1", "2001:db8:1::1"}, family)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (family == IPv6 && target.PodIP != "") || (family == IPv4 && target.PodIP6 != "") {
+			t.Fatal("campaign measured an unrequested family")
+		}
+	}
+	if _, err := TargetFor("worker", "test", []string{"10.0.0.1"}, []string{"2001:db8:1::1"}, IPv6); err == nil {
+		t.Fatal("IPv6 campaign accepted an IPv4-only pod")
+	}
+}
+func TestIPv6OnlyCampaignMeasuresTCPUDPServiceAndDNS(t *testing.T) {
+	targets := dualTargets()
+	p := &dualProbe{aaaa: map[string][]string{}}
+	for i := range targets {
+		targets[i].PodIP = ""
+		targets[i].ServiceIP = ""
+		targets[i].MTU = 1370
+		p.aaaa[targets[i].ServiceName] = []string{targets[i].ServiceIP6}
+	}
+	m := Run(context.Background(), p, targets, Options{Port: 8080, UDP: &UDPOptions{Tries: 3}})
+	if !m.OK() {
+		t.Fatal(m.Report())
+	}
+	got := kinds(m)
+	for _, kind := range []Kind{Pod, Service, Transfer, UDP} {
+		if got[kind] != 0 {
+			t.Fatalf("IPv6-only campaign emitted %s", kind)
+		}
+	}
+	for _, kind := range []Kind{Pod6, Service6, Transfer6, DNS6, UDP6} {
+		if got[kind] == 0 {
+			t.Fatalf("IPv6-only campaign omitted %s", kind)
+		}
+	}
+}

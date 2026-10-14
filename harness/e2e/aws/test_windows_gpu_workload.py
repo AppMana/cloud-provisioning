@@ -25,7 +25,7 @@ class WorkloadSelection(unittest.TestCase):
 
     def setUp(self):
         root = pathlib.Path(__file__).resolve().parents[3]
-        publication = json.loads((root / 'docs/validation/windows-workload-platform-publication-results.json').read_text())
+        publication = json.loads((pathlib.Path(__file__).parent / 'testdata/windows-workload-platforms.json').read_text())
         cache = json.loads((root / 'harness/e2e/observe/testdata/windows-cache-complete-ready-2022.json').read_text())
         self.recipe = cache['recipe']
         self.record = dict(image=publication['published2022Image'],

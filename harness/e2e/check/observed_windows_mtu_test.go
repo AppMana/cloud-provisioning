@@ -20,7 +20,7 @@ type observedTransferRow struct {
 
 // This replays measured transfer outcomes, not Windows networking internals.
 // Evidence and the temporary MTU restoration are recorded in
-// docs/validation/windows-gateway-transfer-mtu-results.json.
+// the captured gateway transfer fixture.
 type observedWindowsTransfers map[string]map[string]struct {
 	size int64
 	err  error

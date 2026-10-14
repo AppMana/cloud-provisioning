@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
@@ -28,6 +29,12 @@ func TestMissingSessionNeverFallsBackToNativeDestroy(t *testing.T) {
 	r := New(lab.Default(), t.TempDir())
 	r.Runtime = runtime
 	r.Run = func(_ context.Context, _ io.Reader, argv ...string) ([]byte, []byte, int, error) {
+		if strings.Join(argv[:3], " ") == "docker image inspect" {
+			return validImage(), nil, 0, nil
+		}
+		if len(argv) > 1 && argv[0] == "docker" && argv[1] == "tag" {
+			return nil, nil, 0, nil
+		}
 		t.Fatalf("unexpected host command without session ownership: %v", argv)
 		return nil, nil, 0, nil
 	}

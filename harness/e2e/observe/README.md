@@ -76,41 +76,12 @@ udpprobe.exe -destination TARGET_POD_IP:8081 -payload-bytes 1400 -tries 100 -reu
 udpprobe.exe -destination TARGET_POD_IP:8081 -payload-bytes 1400 -tries 100 -reuse-socket -interval 10ms
 ```
 
-Use `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build` for a portable Linux
-executable: the ordinary probe image may not contain the build host's dynamic
-loader. Preserve Node, Pod and container identity
-snapshots before and after the comparison, and remove the staged executable when
-done. The `interval` is a delay after each completed attempt, not an enforced
-packet rate. Each receive has a five-second deadline. These are diagnostics;
-pacing or socket reuse must not replace the unpaced connectivity gate.
-The [native socket comparison](../../../docs/validation/windows-udp-socket-reuse-results.json)
-observed timeouts after successful requests on reused sockets on both Windows
-versions. That run did not capture packets and does not locate its timeouts.
-
 For independent send scheduling, use the foreground diagnostic mode:
 
 ```sh
 udpprobe.exe -fixed-cadence -destination TARGET_POD_IP:8081 \
   -payload-bytes 96 -tries 4500 -interval 20ms
 ```
-
-This uses a fresh socket and exact nonce echo for each request while earlier
-requests may still be awaiting replies. `scheduledAt`, `startedAt` and
-`finishedAt` distinguish scheduling delay from reply latency. Results remain
-ordered by sequence, even when replies finish out of order. A missed send slot
-or the 512-request concurrency bound produces an explicit skipped failure with
-no source socket; it is never counted as a transmitted packet. The run permits
-at most 10,000 slots over ten minutes of scheduling, followed by outstanding
-reply deadlines. It cannot be combined with socket reuse or background stream
-mode. This diagnostic does not change the sequential survivor acceptance gate:
-a serial probe's five-second pause after a missing reply alone is not evidence
-of a five-second network outage.
-The [native fixed-cadence comparison](../../../docs/validation/windows-fixed-cadence-results.json)
-retains seven lost Windows replies and 41 unsent slots separately. Following
-successful requests started about 16–24 ms after the lost requests and completed
-before those requests' receive deadlines. The Linux retry used a separate
-observation window after correcting an incompatible dynamic binary; it is not
-a simultaneous control for the Windows results.
 
 ### Bounded background survivor samples
 
@@ -149,17 +120,6 @@ source identity, timing, counts and the final stop sample. The caller must also
 verify stable Node/Pod/container identities and host-side ordering of progress,
 operation and stop; comparing guest wall clocks alone is insufficient.
 
-The [native qualification](../../../docs/validation/survivor-native-stream-results.json)
-passed all 1,303 64-byte echoes across six directions between ordinary Linux,
-Windows Server 2022 and Windows Server 2025 Pods. Background processes survived
-launch-command exit, and atomic stop/result publication worked on both Windows
-versions. Maximum sample start interval was 0.241 seconds against a preset
-10-second limit. Temporary executables and logs were removed after collection.
-This short qualification used Kubernetes exec for control. Out-of-band lifecycle
-integration remains required; it does not supersede the earlier lifecycle
-cadence failure or fragmented-UDP failures. Native logs also provide regression
-fixtures for the independent validator.
-
 ### Out-of-band native control
 
 `survivor_native.Session` controls pre-staged native probes using
@@ -175,16 +135,6 @@ sampler logs through the host executor and exact-container CRI command. Supply
 command, and `command` extends that prefix with crictl and its runtime flags.
 Pass a callback invoking `dump_linux(executors, source, argv)` to `Session.finish`.
 This path keeps collection available when Kubernetes exec fails.
-
-Responses contain at most 12,000 binary bytes encoded as base64, keeping each
-JSON response below SSM's inline limit. Every chunk binds its offset, total size,
-and the whole compressed-file SHA-256. Collection rejects truncation, a changing
-file, or a hash mismatch; the existing validator then checks the decompressed
-samples against the original sampler receipt and terminal result. The collector
-does not restart or stop samplers. It supports Linux host execution only; Windows
-requires a separately qualified binary-safe transport.
-The [native collector report](../../../docs/validation/survivor-oob-dump-results.json)
-records the byte-for-byte AWS comparison and unit coverage.
 
 Create a new Session output directory with `start`, then call `progress` twice
 with distinct labels and `ready` with those labels. Readiness requires increasing
@@ -213,27 +163,6 @@ if stop or collection fails; remove only owned probe files after collection.
 collection. `operation.json` is finalized afterward and cannot report combined
 success when native traffic failed or when the legacy external observer is still
 pending. `lifecyclePassed` records successful resource convergence independently.
-
-Omitting `observerMode` preserves the existing observer. Native integration has
-unit coverage and replay of the actual 3,603/3,604 failed run, including sticky
-failure after traffic recovery. The [real native lifecycle trial](../../../docs/validation/windows-capi-native-survivor-2022-results.json)
-passed 19 join checks and its 72-check network matrix, then failed the native
-survivor gate. Cleanup removal preserved all 13 original Ready Nodes and five
-gateway attachments. All six native lanes bracketed the operation with a maximum
-start interval of 5.105 seconds against the 10-second limit, but only 82,924 of
-82,933 echoes succeeded. The nine losses remain failures; cleanup does not turn
-this into a successful uninterrupted lifecycle qualification. All temporary
-probe and management tools were removed after terminal log collection.
-
-The [native OOB qualification](../../../docs/validation/survivor-native-oob-results.json)
-completed all launch/status/stop commands through VM management and preserved
-stable Pod identities. Traffic failed: 3,603 of 3,604 64-byte echoes succeeded;
-one Windows 2022 to Windows 2025 receive hit its five-second deadline. Readiness
-correctly failed before any lifecycle operation. Subsequent successful samples
-remained cumulatively unhealthy. This failed native log is a regression fixture;
-without packet capture it does not identify where the request or reply was lost.
-All six original samplers stopped and temporary Pod and Windows host tools were
-removed after collection.
 
 ## Packet Monitor correlation
 
@@ -266,13 +195,6 @@ python3 observe/pktmon.py RECEIVER_CAPTURE.txt \
   --source SERVER_POD_IP --port 8081 \
   --destination CLIENT_POD_IP --destination-port CLIENT_EPHEMERAL_PORT
 ```
-
-Read `vfpctrl.exe /get-frag-cache-stats /port PORT_GUID` before and after
-traffic, using the VFP port mapped to the exact ordinary pod's network adapter.
-Retain both directions' raw counters and capture evidence. Cumulative counters
-alone do not attribute a timeout or identify an internal driver defect. The
-[fragment-cache fixture](../../../docs/validation/windows-udp-collision-capture-results.json)
-retains the packet-level evidence separately from those counters.
 
 A first IPv4 fragment can legitimately display a UDP length larger than that
 fragment's payload. Require an actual drop event; the decoder annotation alone
@@ -317,13 +239,6 @@ non-delivery. A client timeout can coexist with a reply in a receiver capture;
 continue along the reply path. Do not compare different VM wall clocks as
 transit latency.
 
-The [dual-receiver fixtures](../../../docs/validation/windows-dual-receiver-drop-results.json)
-cover TCP/IP `Not locally destined` drops on both Windows versions and a failed
-client exchange with a visible reply. The
-[unfragmented VFP fixture](../../../docs/validation/windows-small-udp-vfp-drop-results.json)
-retains a different drop path. Keep these cases distinct until native evidence
-establishes a common cause; none qualifies Windows networking or a mitigation.
-
 ### TCP/IP interface context
 
 Capture the Windows TCP/IP provider alongside Packet Monitor when a drop needs
@@ -342,24 +257,6 @@ helper supports the observed Windows 2022 version 1 and Windows 2025 version 2
 schemas. It preserves multiple candidates and missing interface mappings instead
 of guessing. Snapshots describe their own observation time, not a guaranteed
 interface state at every packet event.
-
-Do not require `IPTransportProtocol == 17`: the
-[three-host native fixtures](../../../docs/validation/windows-tcpip-site-capture-results.json)
-report protocol `0` for TCP/IP events immediately preceding both request and
-reply VXLAN drops. Their interface indices map to compartment 2 link-local
-adapters in the accompanying snapshots. Event 1215 lacks a packet identifier;
-outer-address/time correlation supplies context, not independent packet identity
-or proof of the cause. The Linux site-path timeout remains a separate finding.
-The post-capture `Get-NetCompartment` observation identifies compartment 2 as
-`DR` on both hosts. HNS network mappings are retained in the report; the presence
-of both `Calico` and `External` overlay networks does not establish obsolete code
-or justify deleting either network.
-Inspect the corresponding VFP port's parser settings, address information,
-layers and inbound decapsulation rules before choosing a configuration change.
-The [native DR configuration reference](../../../docs/validation/windows-dr-configuration-results.json)
-contains both Windows versions' snapshots. Enabled ports, matching routes and
-present rules describe static configuration; they do not explain a transient
-packet failure. Keep those checks separate from packet-level qualification.
 
 ```sh
 PYTHONPATH=observe python3 -m unittest test_tcpip_context test_pktmon test_udp_capture
@@ -391,31 +288,6 @@ session before starting another capture. Forced process termination can prevent
 the `finally` block from running. A circular trace and successful export alone
 do not prove that no events were lost.
 
-Add `-IncludeControl` when investigating configuration changes. It enables both
-`Control` (65536) and `ControlValidation` (4194304), using mask `0xcd0e0f`.
-The native provider assigns IOCTL/object-processing events 700–706 to
-`ControlValidation`; enabling `Control` alone does not select them. Control
-timer events can be extremely frequent, so use exact time windows for export
-and retain any query-limit indication when interpreting the results.
-The [corrected-keyword validation](../../../docs/validation/windows-vfp-control-keywords-results.json)
-checks native provider keyword values and bounded collection on Windows Server
-2022 and 2025. It validates the collector, not a network mitigation.
-
-For flow-lifetime and IOCTL context, use `-FlowControlOnly` instead of
-`-IncludeControl`. Its `0xc80000` mask selects `UnifiedFlow`, `Flow`, and
-`ControlValidation`, omitting per-layer and control-timer events. The switches
-are mutually exclusive. The [native focused-profile smoke test](../../../docs/validation/windows-vfp-focused-collector-results.json)
-verifies keyword values and collection on both Windows versions. It does not
-establish retention improvement or network qualification.
-
-HNS dynamic events need a different decoder. In the
-[native HNS collector validation](../../../docs/validation/windows-hns-collector-results.json),
-`Get-WinEvent` produced XML `ProcessingErrorData` with code 15003 for many HNS
-records. Treat these as undecoded records. After stopping the named HNS and
-Host Network Management trace sessions, native
-[`tracerpt`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/tracerpt)
-decoded all HNS provider records from the same ETLs:
-
 ```powershell
 tracerpt C:\diagnostics\RUN\hns.etl C:\diagnostics\RUN\hnm.etl `
   -o C:\diagnostics\RUN\hns.xml -of XML
@@ -441,14 +313,6 @@ deleted. Preserve the API deletion, space-removal and measurement timestamps
 separately when evaluating a removal experiment. This function reports observed
 operations; an empty result does not prove that dataplane cleanup has finished.
 
-The [paired layer-gap result](../../../docs/validation/windows-hns-layer-gap-results.json)
-contains six packet drops inside HNS encapsulation-layer rebuild intervals on
-Windows Server 2022/2025. Matching inbound flows recorded `Ignore` during each
-interval. The [native fixtures](testdata/windows-hns.md) test this combined
-observation and reused activity IDs. They validate analysis, not a workaround.
-Do not delete the `External` overlay network based on its name: the reviewed
-Calico fork deliberately preserves that network type.
-
 `vfp_context.flow_events(text)` decodes the observed version-0 IPv4 rule,
 processing and unified-flow events. Feed it the decompressed `events.jsonl.gz`.
 Native `win:IPv4` and `win:Port` XML fields expose integer storage values; the
@@ -457,17 +321,6 @@ Event 354 indicates an inner-header forwarding fallback, so it must not be
 counted as a packet drop. Correlate flow tuples and timestamps with same-host
 Packet Monitor events and ordinary-Pod samples; a tuple match alone is not
 packet identity.
-
-The [Windows 2022/2025 native collector validation](../../../docs/validation/windows-vfp-collector-results.json)
-contains artifact hashes, unchanged-node checks and fixture provenance. It used
-background traffic to verify collection and decoding. Controlled UDP loss
-reproduction and causal analysis require a separate paired capture.
-The [paired-capture result](../../../docs/validation/windows-vfp-paired-results.json)
-documents why capture and export are separated: full XML conversion delayed
-Packet Monitor shutdown enough to overwrite earlier packets. Bound both capture
-windows and stop both before doing bulk conversion. The observed unchanged
-traffic-class VFP drop extends the earlier fixtures without establishing its
-cause.
 
 For targeted context after both captures stop, use `windows_vfp_events.ps1` with
 the receiver's Packet Monitor timestamp:
@@ -479,49 +332,6 @@ $drop = [DateTimeOffset]::Parse('2026-09-09T01:43:49.6395951Z')
   -StartUtc ($drop.AddMilliseconds(-1)) -EndUtc ($drop.AddMilliseconds(1)) `
   -MaxEvents 1000
 ```
-
-The output filename must be new, and the window must be ordered and no longer
-than one second. The exporter uses XPath for native selection, then checks the
-exact UTC bounds and VFP provider GUID. This matters on the observed Windows
-builds: a combined hashtable query missed known ETL events, and native XPath
-selection included some records just before a sub-millisecond lower bound.
-`outsideWindowEventCount` records those excluded events. They still consume the
-query limit: `eventLimitReached=true` means the result is incomplete even when
-`eventCount=0`. Verify the output hash and `sourceUnchanged` before analysis.
-Use `-EventId 600` for new-flow records, or `-EventId 700,701,702,704,706`
-for selected control records. The optional list accepts up to 20 numeric IDs,
-filters before the query limit, and checks IDs again before export. Omit it for
-all VFP event types. Preserve `eventIds` with the result: an empty selection
-result does not establish absence of other event types. Busy windows can still
-exceed the limit; narrow the event selection or time window before interpreting
-them as complete.
-The [native IOCTL-context result](../../../docs/validation/windows-vfp-ioctl-context-results.json)
-validates event-ID selection, including reached limits, an empty result and
-known records on both Windows versions. Its Windows 2022 drop coincided with
-HNS-issued VFP operations and preceded a native encapsulation-layer add. The
-record preserves the timing and process evidence without identifying the
-upstream HNS caller or claiming a fix. Existing HNS policy logs in that result
-begin after capture stop and cannot explain the earlier drop.
-
-`vfp_context.inbound_vxlan_creations(text, source, source_port, destination,
-destination_port, port_name)` selects newly created inbound UDP VXLAN flows on
-the explicitly observed DR port. It preserves the raw transformation and reports
-its encapsulation action. Protocol 252 records use encapsulation selectors;
-their values are preserved separately from transport ports.
-The [native failed/control comparison](../../../docs/validation/windows-vfp-decap-context-results.json)
-found `Ignore` in three failed inbound flows and `Pop` in their six immediately
-neighboring successful exchanges on the same paths. This narrows the investigation
-to the classifier decision; it does not identify why that decision differed or
-qualify a mitigation.
-The [native tuple simulations](../../../docs/validation/windows-vfp-tuple-simulation-results.json)
-subsequently produced `Pop` for all six tested historical failed/control tuples,
-with unchanged layer listings. These simulations exercise current classifier
-state; they do not reproduce the intermittent live failures.
-The [subsequent paired observation](../../../docs/validation/windows-vfp-control-context-results.json)
-recorded 10 failures in 27,426 UDP attempts. Two correlated drop windows again
-contained matching inbound flows with `Ignore`. Its older control mask omitted
-`ControlValidation`, and its broad control exports reached their limits before
-the drops; neither supports conclusions about concurrent IOCTL activity.
 
 ## UDP result gate
 
@@ -555,13 +365,6 @@ reports that omission explicitly and fails the gate; it does not infer unseen
 successes or treat a null value as a response. Preserve raw bodies for replay.
 These parser tests validate result handling, not the Windows network dataplane
 or the complete CAPI add/remove matrix.
-
-[Native checker evidence](../../../docs/validation/windows-udp-checker-results.json)
-records successful raw responses from Windows 2022, Windows 2025 and Linux pods,
-plus a deliberate unused-port timeout. The timeout fixture comes from the
-Windows 2022 source pod: curl exited successfully while the gate correctly
-failed. It is not an example of the intermittent VFP drops.
-
 
 ## Windows GPU application observations
 
@@ -622,16 +425,6 @@ run this read-only preflight with the Machine UID recorded for that test:
 python3 observe/removal.py --preflight --before BEFORE.json \
   --claim "$claim" --machine-uid "$machine_uid" --output PREFLIGHT.json
 ```
-
-The preflight requires healthy Nodes, the original Machine/Node association,
-and Ready target and survivor gateway attachments. Node readiness alone does
-not establish attachment readiness. Re-capture and re-check immediately before
-deletion if state changed. Testing deletion during Publishing is a separate
-scenario; it cannot satisfy the Ready-baseline comparison by rewriting its
-original snapshot. Every comparison and preflight requires a new output path.
-[Native preflight validation](../../../docs/validation/windows-removal-preflight-results.json)
-records acceptance of the current Ready baseline and rejection of the earlier
-Publishing target despite all Nodes being Ready.
 
 Capture a baseline with healthy Nodes before deletion. Wait for the existing
 removal operation and gateway acknowledgements; a `Publishing` lease does not
@@ -706,19 +499,6 @@ python3 observe/windows_first_application.py \
   --node "$node_name" --node-uid "$node_uid" --job first-gpu-job.json \
   --evidence first-gpu-submission --timeout 900
 ```
-
-A create timeout is ambiguous: inspect that exact Job name and retained evidence
-before further action. The command never retries creation, deletes evidence, or
-repairs the worker. A successful submission does not prove first-process or GPU
-success; retain HCS events and use the GPU observer separately. Snapshot checks
-also cannot exclude concurrent workload creation or previously deleted Pods.
-Retain observations from registration onward. The
-[native rejection result](../../../docs/validation/windows-first-application-submission-results.json)
-confirms that an already-used GPU VM is rejected before creation. The
-[fresh Windows 2025 GPU trial](../../../docs/validation/windows-first-gpu-gated-2025-results.json)
-also exercised the wait from a Ready plugin without advertised capacity to a
-qualified Node, then completed its first GPU workload. Removal and broader
-repeatability remain separate checks.
 
 For offline replay, validate the captured node and all-namespace Pod inventory:
 
@@ -799,25 +579,6 @@ never establishes successful rendering or encoding.
 
 ## Linux explicit-empty peer withdrawal
 
-The [isolated Linux VM canary](../../../docs/validation/linux-empty-peer-withdrawal-results.json)
-verifies actual WireGuard peer and route deletion by the Linux reconciler for an
-explicit `peers: []` document. Missing/null lists are not withdrawal instructions.
-The test also reconstructs the interface from the empty durable input. It does
-not reboot the VM or exercise Kubernetes Secret delivery. The site renderer now emits an explicit empty set after its last custom worker
-is removed. This differs from the remote last-path protection: no available
-cluster endpoint still means no new remote adoption document. Existing malformed, missing-field or null peer caches now fail reconciliation
-without restoring bootstrap peers; only a missing cache permits first boot.
-The native canary covers this rejection after withdrawal. Its adoption case uses
-a controlled HTTP server with the real Kubernetes Go client and native kernel:
-a current update repairs the cache, a simulated API outage retains the withdrawn
-state, and re-addition preserves the WireGuard private key. The server checks
-native peer count before accepting the applied-document acknowledgement. The
-acknowledgement is conditional on the UID and resourceVersion read before apply.
-A controlled race rejects the stale version, then accepts the next reconciliation;
-isolated real-API checks also verify matching, stale-version and recreated-UID
-patch behavior. Full worker Secret delivery, authorization, concurrent replacement
-under traffic, receipt convergence and VM reboot remain separate gates.
-
 `controller/cmd/dialer/native_empty_peers_test.go` skips ordinary unit runs.
 Compile it as a static test executable, transfer it through the QEMU guest
 agent, and run it **inside the VM** using a fresh network namespace:
@@ -841,17 +602,15 @@ private guest directory, set `KUBEBUILDER_ASSETS` to that directory, and select
 has no default route. A certificate-authenticated test User receives only
 `get`/`patch` access to the named adoption Secret. The canary verifies rejection
 of an unrelated Secret read, cache repair, native withdrawal/re-addition and
-actual API acknowledgements. The recorded run uses API server 1.35.0 and etcd
-3.6.6; it does not qualify ServiceAccount token delivery or a full cluster reboot.
+actual API acknowledgements. This case does not qualify ServiceAccount token delivery or a full cluster reboot.
 Retain process logs on startup failure and verify that no copied API executables
 remain running before removing their files from the guest.
 
 Set `CLDT_NATIVE_SERVICEACCOUNT=1` for the real-API case to use a TokenRequest-issued
 ServiceAccount token instead of the certificate-authenticated test User. The
 worker client retains only API CA trust and the bearer token, and the Role still
-permits `get`/`patch` only for the named adoption Secret. This variant passed cache
-repair, native withdrawal/re-addition, identity preservation and API acknowledgement
-checks with unrelated Secret access denied. It does not mount a kubelet-projected
+permits `get`/`patch` only for the named adoption Secret. This variant checks cache repair, native withdrawal/re-addition, identity
+preservation and API acknowledgement, with unrelated Secret access denied. It does not mount a kubelet-projected
 token volume or test token rotation; those require a deployed worker test.
 
 The real-API case also exercises the site endpoint: mesh Secret worker fields
@@ -864,13 +623,6 @@ The ServiceAccount receives named-Secret `get`/`patch` access and read-only Node
 CAPI VM replacement, VM reboot or uninterrupted traffic test.
 
 ### Durable peer withdrawal across a full VM reboot
-
-The [full reboot validation](../../../docs/validation/linux-empty-peer-reboot-results.json)
-uses a disposable QEMU guest on a separate bridge with one physical NIC, no
-default route, and serial guest-agent management. An enabled systemd unit runs
-the candidate dialer with a generated identity, a loopback peer endpoint, and
-an isolated routing table. This test requires a disposable guest because it
-reboots the whole operating system.
 
 The sequence is: apply one peer and host route; atomically write an explicit
 `{"peers":[]}` cache beside the identity file; observe native withdrawal; request
@@ -926,19 +678,6 @@ Kubernetes exec path; a transport failure is a failed observation, not an exact
 packet-loss count. Use VM out-of-band observation to distinguish that failure
 from workload networking. Larger fragmented packets require their own matrix.
 
-The [cp2 full reboot result](../../../docs/validation/survivor-cp2-reboot-results.json)
-records a failed survivor observation despite node recovery. Its original helper
-discarded stderr; the reusable helper now retains executor diagnostics. The
-outage harness's existing convergence checks remain useful for settled state:
-`git blame` attributes the deliberate post-outage waiting phase to `a356cad7`.
-They do not supersede probes running throughout a lifecycle operation.
-
-The [diagnostic repeat](../../../docs/validation/survivor-cp2-reboot-diagnostics-results.json)
-retained WebSocket closures, missing Konnectivity agents and kubelet backend
-timeouts. All original Node identities recovered, but the survivor observation
-remained failed. These API exec failures require out-of-band VM observation for
-workload-traffic qualification; retrying a failed probe must not erase its result.
-
 ### Out-of-band pod execution
 
 Use `--oob-executors executors.json` when Kubernetes exec would share the fault
@@ -973,22 +712,6 @@ finishes. This is temporary harness tooling, not a dependency to install at GPU
 worker startup. Windows `k0s ctr tasks exec` is not an accepted substitute here:
 a native attempt started the image's original server command instead of curl and
 failed on occupied ports. The adapter rejects `runtime: ctr`.
-
-The [out-of-band cp2 reboot validation](../../../docs/validation/survivor-oob-cp2-reboot-results.json)
-passed 539/539 sampled echoes across all six Linux/Windows 2022/Windows 2025
-directions. Every lane bracketed the full guest reboot and recovery with the
-same Node, Pod and container identities. The maximum start-to-start sampling
-interval was 5.588 seconds, including SSM execution. Both temporary Windows CRI
-clients were removed. This qualifies sampled traffic for that reboot; CAPI
-addition/removal/replacement and fragmented UDP remain separate gates.
-
-The [Linux CAPI lifecycle trial](../../../docs/validation/linux-capi-survivor-results.json)
-uses this observer across actual worker addition and removal. All 1,455 sampled
-echoes passed, with a maximum sampling interval of 6.473 seconds, alongside
-102/102 worker matrix checks and native adoption. The original CAPA removal
-command confirmed termination and product cleanup. An expired artifact URL
-required repair before launch; the same claim then continued. The same-name replacement qualification below covers operation without an
-in-window setup repair.
 
 ### Native sampler preflight failures
 
@@ -1050,18 +773,6 @@ projection presence and `retiringWorker`, worker Secret UID, desired/applied
 document hashes, Machine presence/deletion state and Node readiness. Keep the
 original worker Secret UID as an explicit input.
 
-An old desired/applied hash pair can still match after staging begins. The
-validator requires the changed document to be observed pending, then acknowledged
-before global withdrawal. A following sample with the same mesh resourceVersion
-brackets the acknowledgement with an unchanged staged projection. Missing
-samples are insufficient evidence; do not substitute the sampler's simpler
-self-consistency summary. The [native Windows 2025 result](../../../docs/validation/windows-capi-gpu-staged-withdrawal-2025-results.json)
-supplies the regression fixture and keeps its failed UDP gate separate.
-The [Windows 2022 recorder qualification](../../../docs/validation/gateway-withdrawal-capture-results.json)
-adds a second observed transition and records the focused tests and coverage.
-Its [complete lifecycle result](../../../docs/validation/windows-capi-staged-withdrawal-2022-results.json)
-retains the failed native survivor echoes despite successful withdrawal and cleanup.
-
 ### Reusing a claim name after removal
 
 For a delete-and-recreate replacement, keep survivor probes running from before
@@ -1091,12 +802,3 @@ NIC and matching desired/applied peer hashes. A hostname or private IP may be
 reused; it is not an identity check. Separately assess the survivor observer
 against the replacement window. This sequence tests claim deletion/recreation,
 not automated Machine repair while retaining an existing claim object.
-
-The [native replacement result](../../../docs/validation/linux-capi-replacement-results.json)
-passed all 17 identity checks, both 102-check worker matrices, and all 1,966
-sampled survivor echoes. The largest sampling interval was 7.983 seconds.
-Both temporary instances, the retained template and the Windows diagnostic
-clients were removed. Native snapshots show identical desired remote-peer
-content across generations: unchanged endpoints can legitimately produce the
-same hash. The new Secret UID and matching acknowledgement are required; a
-changed content hash is not. The recorded snapshots drive the regression tests.

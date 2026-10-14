@@ -89,23 +89,39 @@ func bgpDualStackConfig(d cluster.Deps, n lab.Node) (*native.ClusterConfig, erro
 	if err := shared.ConfigureNetwork(config, selection); err != nil {
 		return nil, err
 	}
+	if d.K0sCalicoSiteOnly {
+		site, err := calicoConfig("calico-site-bgp", d.K0sCalicoMTU, false)
+		if err != nil {
+			return nil, err
+		}
+		config.Spec.Network.Calico.Patches = site.Patches
+		// k0s interpolates EnvVars into double-quoted YAML scalars. Calico
+		// accepts single quotes, which avoid invalid generated manifests.
+		selector := siteCalicoLabel + " == '" + siteCalicoValue + "'"
+		config.Spec.Network.Calico.EnvVars["CALICO_IPV4POOL_NODE_SELECTOR"] = selector
+		config.Spec.Network.Calico.EnvVars["CALICO_IPV6POOL_NODE_SELECTOR"] = selector
+	}
 	return config, nil
 }
 
 // bgpDualStackControllerArgs are the controller's install arguments.
-func bgpDualStackControllerArgs(n lab.Node) []string {
+func bgpDualStackControllerArgs(n lab.Node, siteOnly ...bool) []string {
 	return []string{"controller", "--enable-worker", "--no-taints",
 		"--disable-components=" + strings.Join(bgpDualStackDisabled, ","),
-		"-c", "/etc/k0s/k0s.yaml", kubeletNodeIPs(n)}
+		"-c", "/etc/k0s/k0s.yaml", kubeletNodeIPs(n, siteOnly...)}
 }
 
 // bgpDualStackWorkerArgs are a worker's install arguments.
-func bgpDualStackWorkerArgs(n lab.Node) []string {
-	return []string{"worker", "--token-file", "/etc/k0s/token", kubeletNodeIPs(n)}
+func bgpDualStackWorkerArgs(n lab.Node, siteOnly ...bool) []string {
+	return []string{"worker", "--token-file", "/etc/k0s/token", kubeletNodeIPs(n, siteOnly...)}
 }
 
-func kubeletNodeIPs(n lab.Node) string {
-	return "--kubelet-extra-args=--node-ip=" + strings.Join(n.ClusterAddresses(), ",")
+func kubeletNodeIPs(n lab.Node, siteOnly ...bool) string {
+	args := "--kubelet-extra-args=--node-ip=" + strings.Join(n.ClusterAddresses(), ",")
+	if len(siteOnly) > 0 && siteOnly[0] {
+		args += " --node-labels=" + siteCalicoLabel + "=" + siteCalicoValue
+	}
+	return args
 }
 
 // kubernetesVersion is the Kubernetes release the pinned k0s release carries.
@@ -162,8 +178,7 @@ func singleControllerKubelet(ctx context.Context, d cluster.Deps, n lab.Node) er
 }
 
 // bgpDualStackImages is the stock k0s v1.36.4+k0s.1 image set, each pinned
-// to the digest the deployment runs (checked against its pods' imageIDs on
-// 2026-10-02) and pulled as that deployment pulls them.
+// to its immutable digest.
 func bgpDualStackImages() *native.ClusterImages {
 	pin := func(image, version, digest string) *native.ImageSpec {
 		return &native.ImageSpec{Image: image, Version: version + "@sha256:" + digest}

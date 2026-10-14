@@ -26,6 +26,12 @@ type Runtime interface {
 // `lab down` processes operate on the same owned topology.
 type LabcontainersRuntime struct{}
 
+// Validate checks the selected daemon before replacing an existing lab.
+func (LabcontainersRuntime) Validate(ctx context.Context, workDir string) error {
+	_, err := ensureLabd(ctx, workDir)
+	return err
+}
+
 // OpenRuntime preserves the native SDK session/client pair for command callers.
 // A configured runtime without reconnection support must not fall back to
 // unowned host-CLI execution.
@@ -96,14 +102,14 @@ func (LabcontainersRuntime) Destroy(ctx context.Context, workDir, kind string) (
 
 func ensureLabd(ctx context.Context, workDir string) (string, error) {
 	if configured := os.Getenv("LABCONTAINERS_LABD"); configured != "" {
-		return configured, nil
+		return verifiedLabd(configured)
 	}
 	if installed, err := exec.LookPath("labd"); err == nil {
-		return installed, nil
+		return verifiedLabd(installed)
 	}
-	target := filepath.Join(workDir, ".labcontainers", "bin", "labd")
+	target := filepath.Join(workDir, ".labcontainers", "bin", LabcontainersRevision, "labd")
 	if info, err := os.Stat(target); err == nil && info.Mode().IsRegular() {
-		return target, nil
+		return verifiedLabd(target)
 	}
 	if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
 		return "", err
@@ -112,7 +118,7 @@ func ensureLabd(ctx context.Context, workDir string) (string, error) {
 	if output, err := command.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("building labd: %w: %s", err, output)
 	}
-	return target, nil
+	return verifiedLabd(target)
 }
 
 func persistentOptions(workDir, kind string) labclient.PersistentOptions {

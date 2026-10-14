@@ -146,6 +146,11 @@ func masquerade(ctx context.Context, c client.Reader, network cni.Network, nodes
 	check := Check{Name: "masquerade", Required: true, OK: true}
 	var blocks []string
 	for _, n := range nodes {
+		if n.Labels["cloud-provisioning.appmana.com/cni"] == "aws-vpc" {
+			check.OK = false
+			check.Detail = "AWS VPC CNI source preservation requires the separately scoped AWS family campaign; Calico IPAM cannot prove it"
+			return check
+		}
 		prefixes, err := network.PrefixesFor(ctx, c, n.Name)
 		if err != nil {
 			if network.Encapsulation == cni.Native {
@@ -430,7 +435,12 @@ func bgpMesh(ctx context.Context, c client.Reader) Check {
 	mesh := true
 	switch {
 	case err == nil:
-		if enabled, found, _ := unstructured.NestedBool(config.Object, "spec", "nodeToNodeMeshEnabled"); found {
+		enabled, found, err := unstructured.NestedBool(config.Object, "spec", "nodeToNodeMeshEnabled")
+		if err != nil {
+			check.Detail = "invalid BGP mesh setting: " + err.Error()
+			return check
+		}
+		if found {
 			mesh = enabled
 		}
 	case absent(err):
@@ -448,16 +458,58 @@ func bgpMesh(ctx context.Context, c client.Reader) Check {
 		check.Detail = "BGP peers not readable: " + err.Error()
 		return check
 	}
+	const siteSelector = "!has(cloud-provisioning.appmana.com/role)"
+	// A safe site mesh does not make an additional global/router peer safe.
+	// Require every peer to exclude future cloud nodes on its local side.
 	for _, p := range peers.Items {
 		node, _, _ := unstructured.NestedString(p.Object, "spec", "nodeSelector")
 		peer, _, _ := unstructured.NestedString(p.Object, "spec", "peerSelector")
-		if node != "" && peer != "" {
-			check.OK = true
-			check.Detail = fmt.Sprintf("node mesh disabled; %s peers nodes %q with %q", p.GetName(), node, peer)
+		external, _, _ := unstructured.NestedString(p.Object, "spec", "peerIP")
+		localSafe := strings.TrimSpace(node) == siteSelector
+		if external != "" && peer == "" {
+			// Preserve AppMana's Linux-only IPv6 router scope while excluding cloud.
+			for _, osSelector := range []string{`kubernetes.io/os == 'linux'`, `kubernetes.io/os == "linux"`} {
+				localSafe = localSafe || strings.TrimSpace(node) == siteSelector+" && "+osSelector || strings.TrimSpace(node) == osSelector+" && "+siteSelector
+			}
+		}
+		if !localSafe || (peer != "" && strings.TrimSpace(peer) != siteSelector) {
+			check.Detail = fmt.Sprintf("BGP peer %s does not prove cloud exclusion; scope all peers (including external routers) to the qualified site selector", p.GetName())
 			return check
 		}
 	}
-	check.Detail = "node mesh disabled but no BGPPeer peers the site's nodes with each other, so the site has no routes"
+	for _, p := range peers.Items {
+		node, _, _ := unstructured.NestedString(p.Object, "spec", "nodeSelector")
+		peer, _, _ := unstructured.NestedString(p.Object, "spec", "peerSelector")
+		// Only the documented site mesh proves both complete site coverage
+		// and exclusion of future cloud workers. Nonempty selectors alone
+		// can select no nodes, or select every cloud worker as well.
+		if strings.TrimSpace(node) == siteSelector && strings.TrimSpace(peer) == siteSelector {
+			nodes := &corev1.NodeList{}
+			if err := c.List(ctx, nodes); err != nil {
+				check.Detail = "site node coverage not readable: " + err.Error()
+				return check
+			}
+			sites := 0
+			for _, n := range nodes.Items {
+				role, labelled := n.Labels["cloud-provisioning.appmana.com/role"]
+				if labelled && role != "cloud-worker" {
+					check.Detail = fmt.Sprintf("site mesh excludes node %s with unrecognised role %q", n.Name, role)
+					return check
+				}
+				if !labelled {
+					sites++
+				}
+			}
+			if sites < 2 {
+				check.Detail = "site mesh must cover at least two site nodes"
+				return check
+			}
+			check.OK = true
+			check.Detail = fmt.Sprintf("node mesh disabled; %s covers %d site nodes and excludes cloud workers", p.GetName(), sites)
+			return check
+		}
+	}
+	check.Detail = "node mesh disabled but no verified site mesh; require nodeSelector and peerSelector !has(cloud-provisioning.appmana.com/role); other selector expressions are not qualified"
 	return check
 }
 

@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/appmana/cloud-provisioning/controller/pkg/networkguard"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/appmana/cloud-provisioning/controller/pkg/networkguard"
 )
 
 func main() {
@@ -21,7 +22,7 @@ func main() {
 }
 func run() error {
 	dir := flag.String("state", "", "fresh absolute private state directory")
-	plan := flag.String("plan", "", "JSON plan: restore executable and files with candidateSHA256")
+	plan := flag.String("plan", "", "JSON plan: apply/restore executables and files with candidatePath/candidateSHA256")
 	token := flag.String("token", "", "transaction token for approval")
 	within := flag.Duration("within", 4*time.Minute, "fixed rollback deadline, at most four minutes")
 	flag.Parse()
@@ -38,13 +39,14 @@ func run() error {
 			return err
 		}
 		var p struct {
+			Apply   string              `json:"apply"`
 			Restore string              `json:"restore"`
 			Files   []networkguard.File `json:"files"`
 		}
 		if err = json.Unmarshal(raw, &p); err != nil {
 			return err
 		}
-		s, err := networkguard.Prepare(*dir, p.Restore, p.Files, *within)
+		s, err := networkguard.Prepare(*dir, p.Apply, p.Restore, p.Files, *within)
 		if err != nil {
 			return err
 		}
@@ -83,5 +85,5 @@ func run() error {
 }
 
 func printState(s *networkguard.State) error {
-	return json.NewEncoder(os.Stdout).Encode(map[string]any{"token": s.Token, "bootID": s.BootID, "deadlineUptimeSeconds": s.Deadline, "outcome": s.Outcome, "restoreAttempts": s.RestoreAttempts, "restoreFailures": s.RestoreFailures, "lastError": s.LastError})
+	return json.NewEncoder(os.Stdout).Encode(map[string]any{"token": s.Token, "bootID": s.BootID, "deadlineUptimeSeconds": s.Deadline, "outcome": s.Outcome, "applyFailures": s.ApplyFailures, "restoreAttempts": s.RestoreAttempts, "restoreFailures": s.RestoreFailures, "lastError": s.LastError})
 }

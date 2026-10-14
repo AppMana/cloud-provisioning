@@ -1,8 +1,8 @@
 # Node-local configuration rollback
 
 `network-guard` bounds a migration of explicitly owned Linux configuration
-files. Run it as an independent root systemd service before changing those
-files. It uses local snapshots and a pinned restore executable; it does not
+files. Run it as an independent root systemd service. It captures original and
+candidate bytes and pins both apply and restore executables; it does not
 need Kubernetes, SSH, Tailscale, or a remote heartbeat. It is a building block,
 not a complete CNI migration transaction or deployment authorization.
 
@@ -17,7 +17,7 @@ restoration when the enabled service starts.
 Build `controller/cmd/network-guard` for the node's architecture and install it
 at `/usr/local/sbin/network-guard`. Install the
 [service template](../deploy/network-guard@.service) in `/etc/systemd/system`.
-Create a root-owned executable that reapplies only the selected configuration.
+Create root-owned apply and restore executables for only the selected configuration.
 It must be idempotent and must not flush shared routing tables, firewall rules,
 or unrelated interfaces. Freeze other writers to the selected files until the
 transaction is committed or rolled back.
@@ -26,9 +26,10 @@ The plan lists existing files and the SHA-256 of their exact candidate bytes:
 
 ```json
 {
+  "apply": "/usr/local/libexec/apply-owned-network-config",
   "restore": "/usr/local/libexec/restore-owned-network-config",
   "files": [
-    {"path": "/etc/example/owned-network.conf", "candidateSHA256": "REPLACE_WITH_64_HEX_DIGITS"}
+    {"path": "/etc/example/owned-network.conf", "candidatePath": "/root/owned-network.candidate", "candidateSHA256": "REPLACE_WITH_64_HEX_DIGITS"}
   ]
 }
 ```
@@ -47,15 +48,21 @@ systemctl enable --now network-guard@change-001.service
 network-guard -state /var/lib/network-guard/change-001 status
 ```
 
-Use a fresh transaction directory every time. Before applying the candidate,
-require an active service, `ready.json`, `outcome: armed`, and enough remaining
-time for the change and its measurements. A ready file alone is insufficient
-because it remains as evidence after completion. Keep configuration ownership
-exclusive; digest checks detect drift but do not provide a lock against other
-software that ignores the transaction. The migration executor must finish or
-cancel all candidate writes before restoration; this guard does not cancel an
-external apply process. Integrating that ownership boundary is required before
-using it for live migration.
+Use a fresh transaction directory every time. The service installs the captured
+candidate bytes and runs the pinned apply executable within the original
+deadline. It kills the command process group before restoration on failure or
+timeout. Keep the service's `KillMode=control-group`: systemd must kill remaining
+children before restarting the guard. Commands must finish synchronously and
+must not delegate work to other services, schedulers, or detached process groups.
+
+Before measuring the candidate, require an active service, `ready.json`,
+`outcome: armed`, and enough remaining observation time. Readiness is emitted
+only after application succeeds. The ready file remains after completion, so
+it alone is insufficient. Keep configuration ownership exclusive; digest checks
+cannot lock out software that ignores the transaction. A restart during
+application restores immediately and records an application failure, without
+replaying the candidate. Application failures remain visible after restoration
+and prevent approval of that transaction.
 
 ## Observe, approve, or restore
 
@@ -77,7 +84,7 @@ the pinned executable. Changed files or command hashes stop restoration rather
 than overwrite another owner's work. Failed restoration exits nonzero so the
 host service retries without losing its snapshot or extending the deadline.
 Attempt and failure counts remain in state even if a later attempt restores
-connectivity; detailed command errors remain in the service journal. Qualification requires zero restore failures; eventual restoration
+connectivity; detailed command errors remain in the service journal. Qualification requires zero apply and restore failures; eventual restoration
 cannot turn a failed migration into a passing one.
 
 The restore executable must finish synchronously and may use local netlink;
@@ -91,7 +98,8 @@ file restoration alone does not revert API objects.
 
 Use [the native test](../harness/e2e/safety/network-guard-native.sh) inside a
 throwaway Linux VM with systemd. It owns a dedicated dummy interface, changes
-its MTU, requires autonomous restoration in three repetitions, kills the guard
-in one repetition, and checks an independent management ping stream. It never
+its MTU, and requires autonomous restoration. Cases include guard restart,
+apply timeout, and termination during application, with delayed child writes
+and an independent management ping stream. It never
 changes the VM's management interface or default route. That scope proves the
 local watchdog mechanism; it does not qualify a real CNI or cluster migration.

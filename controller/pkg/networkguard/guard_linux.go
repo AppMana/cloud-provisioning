@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/sys/unix"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,10 +17,14 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 type File struct {
 	Path            string `json:"path"`
+	CandidatePath   string `json:"candidatePath"`
+	Candidate       []byte `json:"candidate"`
 	CandidateSHA256 string `json:"candidateSHA256"`
 	Before          []byte `json:"before"`
 	Mode            uint32 `json:"mode"`
@@ -32,6 +35,9 @@ type State struct {
 	Token           string  `json:"token"`
 	BootID          string  `json:"bootID"`
 	Deadline        float64 `json:"deadlineUptimeSeconds"`
+	Apply           string  `json:"apply"`
+	ApplySHA256     string  `json:"applySHA256"`
+	ApplyFailures   int     `json:"applyFailures"`
 	Restore         string  `json:"restore"`
 	RestoreSHA256   string  `json:"restoreSHA256"`
 	Files           []File  `json:"files"`
@@ -165,8 +171,8 @@ func directory(dir string) error {
 }
 
 // Prepare creates a fresh private transaction. Call before starting the service;
-// do not apply changes until Watch has written ready.json.
-func Prepare(dir, restore string, files []File, within time.Duration) (*State, error) {
+// Watch exclusively installs and applies the captured candidate.
+func Prepare(dir, apply, restore string, files []File, within time.Duration) (*State, error) {
 	if within <= 0 || within > 4*time.Minute || len(files) == 0 {
 		return nil, errors.New("require files and a deadline of at most four minutes (leaving time for restoration)")
 	}
@@ -183,14 +189,21 @@ func Prepare(dir, restore string, files []File, within time.Duration) (*State, e
 	if info.Mode()&0111 == 0 {
 		return nil, errors.New("restore command is not executable")
 	}
-	s := &State{Restore: restore, RestoreSHA256: SHA(command), Outcome: "prepared"}
+	applyCommand, applyInfo, err := read(apply)
+	if err != nil {
+		return nil, err
+	}
+	if int(applyInfo.Sys().(*syscall.Stat_t).Uid) != os.Getuid() || applyInfo.Mode()&0111 == 0 {
+		return nil, errors.New("apply command must be executable and owned by the guard user")
+	}
+	s := &State{Apply: apply, ApplySHA256: SHA(applyCommand), Restore: restore, RestoreSHA256: SHA(command), Outcome: "prepared"}
 	seen := map[string]bool{}
 	for _, f := range files {
 		digest, err := hex.DecodeString(f.CandidateSHA256)
 		if err != nil || len(digest) != 32 || strings.ToLower(f.CandidateSHA256) != f.CandidateSHA256 {
 			return nil, errors.New("invalid candidate digest")
 		}
-		if seen[f.Path] || f.Path == restore || strings.HasPrefix(f.Path, dir+"/") {
+		if seen[f.Path] || f.Path == restore || f.Path == apply || strings.HasPrefix(f.Path, dir+"/") {
 			return nil, errors.New("duplicate or transaction-owned configuration path")
 		}
 		seen[f.Path] = true
@@ -202,6 +215,14 @@ func Prepare(dir, restore string, files []File, within time.Duration) (*State, e
 		if int(st.Uid) != os.Getuid() {
 			return nil, errors.New("configuration file must belong to the guard user")
 		}
+		candidate, candidateInfo, err := read(f.CandidatePath)
+		if err != nil {
+			return nil, err
+		}
+		if int(candidateInfo.Sys().(*syscall.Stat_t).Uid) != os.Getuid() || SHA(candidate) != f.CandidateSHA256 {
+			return nil, errors.New("candidate ownership or digest mismatch")
+		}
+		f.Candidate = candidate
 		f.Before = raw
 		f.Mode = uint32(info.Mode().Perm())
 		f.UID = int(st.Uid)
@@ -323,7 +344,12 @@ func Watch(ctx context.Context, dir string) error {
 	if err != nil {
 		return err
 	}
-	if expired(s, boot, now) {
+	if s.Outcome == "applying" {
+		s.ApplyFailures++
+		s.LastError = "application interrupted; refusing to replay"
+		return attemptRestore(dir, s)
+	}
+	if expired(s, boot, now) || s.Outcome == "restoring" || s.Outcome == "restore-failed" {
 		return attemptRestore(dir, s)
 	}
 	command, _, err := read(s.Restore)
@@ -333,8 +359,65 @@ func Watch(ctx context.Context, dir string) error {
 	if SHA(command) != s.RestoreSHA256 {
 		return errors.New("restore command changed before arming")
 	}
-	if err := checkFiles(s, false); err != nil {
+	if err := checkFiles(s, s.Outcome == "armed"); err != nil {
 		return err
+	}
+	if s.Outcome == "prepared" {
+		command, _, err := read(s.Apply)
+		if err != nil {
+			return err
+		}
+		if SHA(command) != s.ApplySHA256 {
+			return errors.New("apply command changed")
+		}
+		for _, f := range s.Files {
+			raw, _, err := read(f.Path)
+			if err != nil {
+				return err
+			}
+			if SHA(raw) != SHA(f.Before) || SHA(f.Candidate) != f.CandidateSHA256 {
+				return errors.New("original or captured candidate changed before application")
+			}
+		}
+		s.Outcome = "applying"
+		if err = save(dir, s); err != nil {
+			return err
+		}
+		fail := func(cause error) error {
+			s.ApplyFailures++
+			s.LastError = cause.Error()
+			return errors.Join(cause, attemptRestore(dir, s))
+		}
+		for _, f := range s.Files {
+			if err = atomicWrite(f.Path, f.Candidate, os.FileMode(f.Mode), f.UID, f.GID); err != nil {
+				return fail(err)
+			}
+		}
+		boot, now, err = clock()
+		if err != nil {
+			return fail(err)
+		}
+		if expired(s, boot, now) {
+			return fail(errors.New("deadline expired before application"))
+		}
+		applyCtx, cancel := context.WithTimeout(ctx, time.Duration((s.Deadline-now)*float64(time.Second)))
+		output, applyErr := runCommand(applyCtx, s.Apply)
+		cancel()
+		if applyErr != nil {
+			return fail(fmt.Errorf("apply command failed: %w: %s", applyErr, output))
+		}
+		if err = checkFiles(s, true); err != nil {
+			return fail(err)
+		}
+	} else if s.Outcome != "armed" {
+		return fmt.Errorf("unsupported transaction outcome %q", s.Outcome)
+	}
+	boot, now, err = clock()
+	if err != nil {
+		return err
+	}
+	if expired(s, boot, now) {
+		return attemptRestore(dir, s)
 	}
 	s.Outcome = "armed"
 	if err = save(dir, s); err != nil {
@@ -394,7 +477,7 @@ func runCommand(ctx context.Context, path string) ([]byte, error) {
 	var output boundedOutput
 	cmd.Stdout, cmd.Stderr = &output, &output
 	err := cmd.Run()
-	// A restore command must not leave asynchronous work after reporting success.
+	// Commands must not leave asynchronous work after reporting success.
 	if cmd.Process != nil {
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 	}

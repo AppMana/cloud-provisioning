@@ -20,8 +20,12 @@ func fixture(t *testing.T, within time.Duration) (string, *State, string) {
 	if err := os.WriteFile(restore, []byte("#!/bin/sh\nprintf restored > \""+filepath.Join(root, "receipt")+"\"\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
+	apply := filepath.Join(root, "apply")
+	os.WriteFile(apply, []byte("#!/bin/sh\nexit 0\n"), 0700)
+	candidate := filepath.Join(root, "candidate")
+	os.WriteFile(candidate, []byte("candidate"), 0600)
 	dir := filepath.Join(root, "state")
-	s, err := Prepare(dir, restore, []File{{Path: config, CandidateSHA256: SHA([]byte("candidate"))}}, within)
+	s, err := Prepare(dir, apply, restore, []File{{Path: config, CandidatePath: candidate, CandidateSHA256: SHA([]byte("candidate"))}}, within)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +37,7 @@ func start(t *testing.T, dir string) (context.CancelFunc, chan error) {
 	t.Cleanup(cancel)
 	done := make(chan error, 1)
 	go func() { done <- Watch(ctx, dir) }()
-	deadline := time.Now().Add(time.Second)
+	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		if _, err := os.Stat(filepath.Join(dir, "ready.json")); err == nil {
 			return cancel, done
@@ -44,7 +48,7 @@ func start(t *testing.T, dir string) (context.CancelFunc, chan error) {
 	return nil, nil
 }
 func TestExpiryRestoresWithoutExternalAcknowledgement(t *testing.T) {
-	dir, _, config := fixture(t, 250*time.Millisecond)
+	dir, _, config := fixture(t, 4*time.Second)
 	_, done := start(t, dir)
 	os.WriteFile(config, []byte("candidate"), 0600)
 	if err := <-done; err != nil {
@@ -61,11 +65,10 @@ func TestExpiryRestoresWithoutExternalAcknowledgement(t *testing.T) {
 }
 func TestApprovalNeedsExactCandidateAndCurrentToken(t *testing.T) {
 	dir, s, config := fixture(t, 3*time.Second)
-	_, done := start(t, dir)
 	if err := Approve(dir, s.Token); err == nil {
 		t.Fatal("approved unapplied configuration")
 	}
-	os.WriteFile(config, []byte("candidate"), 0600)
+	_, done := start(t, dir)
 	if err := Approve(dir, "stale"); err == nil {
 		t.Fatal("accepted stale token")
 	}
@@ -82,7 +85,7 @@ func TestApprovalNeedsExactCandidateAndCurrentToken(t *testing.T) {
 	}
 }
 func TestRestartDoesNotResetDeadline(t *testing.T) {
-	dir, s, config := fixture(t, 400*time.Millisecond)
+	dir, s, config := fixture(t, 4*time.Second)
 	cancel, done := start(t, dir)
 	os.WriteFile(config, []byte("candidate"), 0600)
 	cancel()
@@ -169,14 +172,14 @@ func TestFailedRestoreCanRetryWithoutLosingSnapshot(t *testing.T) {
 func TestPrepareRejectsReuseAndInvalidPlan(t *testing.T) {
 	dir, s, config := fixture(t, time.Minute)
 	for _, files := range [][]File{nil, {{Path: config, CandidateSHA256: "bad"}}, {{Path: config, CandidateSHA256: strings.Repeat("a", 64)}, {Path: config, CandidateSHA256: strings.Repeat("a", 64)}}} {
-		if _, err := Prepare(filepath.Join(filepath.Dir(dir), "invalid"), s.Restore, files, time.Minute); err == nil {
+		if _, err := Prepare(filepath.Join(filepath.Dir(dir), "invalid"), s.Apply, s.Restore, files, time.Minute); err == nil {
 			t.Fatal("accepted invalid plan")
 		}
 	}
-	if _, err := Prepare(dir, s.Restore, s.Files, time.Minute); err == nil {
+	if _, err := Prepare(dir, s.Apply, s.Restore, s.Files, time.Minute); err == nil {
 		t.Fatal("reused transaction")
 	}
-	if _, err := Prepare(filepath.Join(filepath.Dir(dir), "long"), s.Restore, s.Files, 5*time.Minute); err == nil {
+	if _, err := Prepare(filepath.Join(filepath.Dir(dir), "long"), s.Apply, s.Restore, s.Files, 5*time.Minute); err == nil {
 		t.Fatal("accepted excessive deadline")
 	}
 }
@@ -210,5 +213,79 @@ func TestGuardCannotArmWithInvalidRestoration(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "ready.json")); !os.IsNotExist(err) {
 		t.Fatal("advertised unusable rollback")
+	}
+}
+
+func TestOwnedApplyFailureCannotBecomeApproved(t *testing.T) {
+	for _, kind := range []string{"failure", "timeout", "interrupted", "command-drift", "snapshot-drift"} {
+		t.Run(kind, func(t *testing.T) {
+			dir, s, config := fixture(t, 2*time.Second)
+			switch kind {
+			case "failure":
+				script := []byte("#!/bin/sh\nexit 9\n")
+				os.WriteFile(s.Apply, script, 0700)
+				s.ApplySHA256 = SHA(script)
+			case "timeout":
+				script := []byte("#!/bin/sh\n(sleep 3; printf candidate > '" + config + "') &\nwait\n")
+				os.WriteFile(s.Apply, script, 0700)
+				s.ApplySHA256 = SHA(script)
+			case "interrupted":
+				s.Outcome = "applying"
+				os.WriteFile(config, []byte("candidate"), 0600)
+			case "command-drift":
+				os.WriteFile(s.Apply, []byte("#!/bin/sh\nexit 9\n"), 0700)
+			case "snapshot-drift":
+				s.Files[0].Candidate = []byte("unexpected")
+			}
+			if err := save(dir, s); err != nil {
+				t.Fatal(err)
+			}
+			err := Watch(context.Background(), dir)
+			if kind != "interrupted" && err == nil {
+				t.Fatal("failure returned success")
+			}
+			if kind == "timeout" {
+				time.Sleep(3200 * time.Millisecond)
+			}
+			raw, _ := os.ReadFile(config)
+			if string(raw) != "before" {
+				t.Fatalf("late candidate write: %s", raw)
+			}
+			final, _ := Load(dir)
+			if kind == "failure" || kind == "timeout" || kind == "interrupted" {
+				if final.Outcome != "rolled-back" || final.ApplyFailures != 1 || final.RestoreFailures != 0 {
+					t.Fatal(final)
+				}
+				if err := Watch(context.Background(), dir); err != nil {
+					t.Fatal(err)
+				}
+				final, _ = Load(dir)
+				if final.ApplyFailures != 1 {
+					t.Fatal("failure evidence lost")
+				}
+			}
+			if err := Approve(dir, s.Token); err == nil {
+				t.Fatal("approved failed application")
+			}
+			if _, err := os.Stat(filepath.Join(dir, "ready.json")); !os.IsNotExist(err) {
+				t.Fatal("failed application advertised readiness")
+			}
+		})
+	}
+}
+
+func TestCapturedCandidateSurvivesSourceChanges(t *testing.T) {
+	dir, s, config := fixture(t, 5*time.Second)
+	os.WriteFile(s.Files[0].CandidatePath, []byte("changed-source"), 0600)
+	_, done := start(t, dir)
+	raw, _ := os.ReadFile(config)
+	if string(raw) != "candidate" {
+		t.Fatalf("uncaptured source applied: %s", raw)
+	}
+	if err := Approve(dir, s.Token); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }

@@ -43,6 +43,11 @@ windowsPublisher:
 nodeSelector:
   kubernetes.io/os: linux
 tolerations: []
+siteDialer:
+  # Additional admission labels for privileged site agents, including transit
+  # agents on control planes. Empty preserves the existing all-Linux behavior.
+  # Endpoint placement alone does not limit where site agents run.
+  nodeSelector: {}
 # Optional: pin the controller to a specific node (e.g. when the
 # images are preloaded there rather than pullable from a registry).
 nodeName: ""
@@ -207,3 +212,9 @@ awsGateway:
 
 # Requires manual installation of the experimental group CRD.
 experimentalNodeGroups: false
+
+# Read-only EC2 allocation observation for AWS VPC CNI cloud nodes. Experimental:
+# this enables ownership publication, not deployment qualification.
+awsPodObserver:
+  configMap: ""
+  credentialsSecret: ""

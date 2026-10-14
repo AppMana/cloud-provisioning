@@ -741,7 +741,7 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 	// request went out. See transitRoute.
 	med := endpointRank(secret.Data, cfg.nodeName)
 
-	var routes []transitRoute
+	routes := make([]transitRoute, 0)
 	notSite := map[string]bool{}
 	for _, p := range peers {
 		if !p.Remote {
@@ -751,8 +751,7 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 		for _, host := range p.AllRouteHosts() {
 			route, err := hostRoute(host, med)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "not advertising %q: %v\n", host, err)
-				continue
+				return fmt.Errorf("invalid transit host %q: %w", host, err)
 			}
 			routes = append(routes, route)
 			notSite[host] = true
@@ -766,8 +765,7 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 			}
 			route, err := blockRoute(allowed, med)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "not advertising %q: %v\n", allowed, err)
-				continue
+				return fmt.Errorf("invalid transit prefix %q: %w", allowed, err)
 			}
 			routes = append(routes, route)
 		}
@@ -778,6 +776,9 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 	}
 	var site []string
 	for _, node := range nodes.Items {
+		if node.Labels["cloud-provisioning.appmana.com/role"] == "cloud-worker" {
+			continue
+		}
 		for _, addr := range node.Status.Addresses {
 			if addr.Type != corev1.NodeInternalIP || notSite[addr.Address] {
 				continue

@@ -444,7 +444,7 @@ func (n Network) CheckMasquerade(ctx context.Context, c client.Reader, prefixes 
 		if containedByAny(prefix, covered) {
 			continue
 		}
-		return fmt.Errorf("%s is outside every Calico IP pool while a pool masquerades outgoing traffic, so pod traffic to it would leave with a node's address and the replies would not come back to the pod; allocate the remote from a pool the cluster already has, or clear natOutgoing", prefix)
+		return fmt.Errorf("%s is outside every Calico IP pool while a pool masquerades outgoing traffic, so pod traffic to it would leave with a node's address and the replies would not come back to the pod; qualify an explicit destination NAT exclusion (for example a disabled, non-allocating pool for provider-owned pod ranges) before publishing it", prefix)
 	}
 	return nil
 }

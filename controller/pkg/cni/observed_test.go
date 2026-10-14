@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Captured from single-NIC VM and real CAPA AWS bringups on 2026-09-05/06.
+// Fixtures represent single-NIC VM and CAPA AWS resources.
 // This tests interpretation of real resources, not packet reachability.
 func TestObservedK0sBundledCalico(t *testing.T) {
 	for _, fixture := range []string{"k0s-v1.34.1-calico-v3.29.6", "k0s-v1.34.1-calico-v3.29.6-aws"} {
@@ -211,8 +211,8 @@ func TestObservedKubeadmNativeCalicoBlocks(t *testing.T) {
 	}
 }
 
-// Captured read-only from a production k0s v1.36.4 cluster on 2026-10-02:
-// bundled Calico v3.32.1 in BGP mode without encapsulation, IPv4 and IPv6
+// The fixture uses k0s v1.36.4 bundled Calico v3.32.1 in BGP mode without
+// encapsulation, with IPv4 and IPv6
 // pools, both masquerading outgoing traffic.
 func TestObservedK0sBundledCalicoBirdDualStack(t *testing.T) {
 	const fixture = "testdata/k0s-v1.36.4-calico-v3.32.1-bird-dualstack/"

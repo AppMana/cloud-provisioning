@@ -2,6 +2,9 @@
 unquoted YAML list item ending in a colon parses as a mapping key with
 a null value, which injects a {} into the container args and makes the
 Deployment patch invalid. */ -}}
+{{- if and .Values.awsGateway.configMap .Values.awsPodObserver.configMap }}
+{{- fail "AWS pod observer and Windows gateway require separate qualified deployments" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -41,11 +44,18 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.awsGateway.configMap }}
+      {{- if or .Values.awsGateway.configMap .Values.awsPodObserver.configMap }}
       volumes:
+        {{- with .Values.awsPodObserver.configMap }}
+        - name: aws-pod-scope
+          configMap:
+            name: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.awsGateway.configMap }}
         - name: aws-gateway-scope
           configMap:
             name: {{ . | quote }}
+        {{- end }}
       {{- end }}
       containers:
         - name: controller
@@ -62,7 +72,21 @@ spec:
                 name: {{ . | quote }}
           {{- end }}
           {{- end }}
+          {{- if .Values.awsPodObserver.configMap }}
+          volumeMounts:
+            - name: aws-pod-scope
+              mountPath: /etc/cloud-provisioning/aws-pods
+              readOnly: true
+          {{- with .Values.awsPodObserver.credentialsSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ . | quote }}
+          {{- end }}
+          {{- end }}
           args:
+            {{- if .Values.awsPodObserver.configMap }}
+            - "--aws-pod-config=/etc/cloud-provisioning/aws-pods/scope.json"
+            {{- end }}
             {{- if .Values.experimentalNodeGroups }}
             - "--experimental-node-groups=true"
             {{- end }}
@@ -87,8 +111,17 @@ spec:
             - "--dialer-image={{ include "cloud-provisioning.dialerImage" . }}"
             - "--dialer-image-pull-policy={{ .Values.dialerImage.pullPolicy }}"
             - "--join-provider={{ .Values.joinProvider }}"
-            {{- with .Values.joinKubeletExtraArgs }}
-            - {{ printf "--join-kubelet-extra-args=%s" . | quote }}
+            {{- with .Values.siteDialer.nodeSelector }}
+            {{- $selectors := list }}
+            {{- range $key, $value := . }}
+            {{- $selectors = append $selectors (printf "%s=%s" $key (toString $value)) }}
+            {{- end }}
+            - {{ printf "--site-dialer-node-selector=%s" (join "," $selectors) | quote }}
+            {{- end }}
+            {{- if .Values.joinKubeletExtraArgs }}
+            - {{ printf "--join-kubelet-extra-args=%s" .Values.joinKubeletExtraArgs | quote }}
+            {{- else if .Values.awsPodObserver.configMap }}
+            - "--join-kubelet-extra-args=--node-labels=cloud-provisioning.appmana.com/role=cloud-worker,cloud-provisioning.appmana.com/cni=aws-vpc --register-with-taints=cloud-provisioning.appmana.com/internet-facing:NoSchedule"
             {{- end }}
             - "--join-template-path=/join-patterns/{{ .Values.joinProvider }}-worker.cloud-config.tmpl"
             {{- with .Values.cluster.apiAddress }}

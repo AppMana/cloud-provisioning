@@ -25,6 +25,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
 	"os"
 	"sort"
@@ -37,6 +38,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	claimpkg "github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
+	"github.com/appmana/cloud-provisioning/controller/pkg/cni/awspod"
 	"github.com/appmana/cloud-provisioning/controller/pkg/discover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
@@ -138,6 +140,8 @@ type meshReconciler struct {
 	// excluded unless explicitly selected.
 	tunnelEndpointSelector labels.Selector
 	tunnelEndpointsRaw     string
+	siteDialerSelector     labels.Selector
+	awsPodObserver         *awspod.Observer
 	tunnelSubnet           string
 	localAddressBase       string
 	// tunnelIPv6Prefix is the prefix IPv6 tunnel addresses are paired
@@ -373,7 +377,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 		return ctrl.Result{}, nil
 	}
 
-	endpoint := fmt.Sprintf("%s:%s", externalIP, r.port)
+	endpoint := net.JoinHostPort(externalIP, r.port)
 
 	secret := &corev1.Secret{}
 	secretKey := types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}
@@ -444,7 +448,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 			log.Info("updated Gateway external-dns target", "ip", externalIP, "gateway", gwKey)
 		}
 	}
-	if remoteBlocksPending {
+	if remoteBlocksPending || r.awsPodObserver != nil {
 		// Come back for the blocks this node has not been given yet.
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
@@ -519,6 +523,9 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 	nodes := &corev1.NodeList{}
 	if err := r.List(ctx, nodes); err != nil {
 		return 0, fmt.Errorf("listing nodes: %w", err)
+	}
+	if err := r.validateSiteDialerAdmission(nodes.Items); err != nil {
+		return 0, err
 	}
 
 	secret := &corev1.Secret{}
@@ -1406,6 +1413,13 @@ func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName stri
 		}
 		return fmt.Errorf("getting node %s: %w", nodeName, err)
 	}
+	if r.awsPodObserver != nil && strings.HasPrefix(node.Spec.ProviderID, "aws:///") && node.Labels[awspod.NodeLabel] != awspod.NodeValue {
+		return fmt.Errorf("AWS node %s lacks its required VPC CNI ownership label", node.Name)
+	}
+	// AWS VPC CNI owns this node; never pin a Calico BGP address on it.
+	if node.Labels[awspod.NodeLabel] == awspod.NodeValue {
+		return nil
+	}
 	owned, err := attachment.NativeTransportOwned(node)
 	if err != nil {
 		return err
@@ -1557,12 +1571,32 @@ func (r *meshReconciler) publishSiteNode(ctx context.Context, secret *corev1.Sec
 // publishRemotePodCIDRs keeps a remote machine's peer entry carrying
 // its own node's blocks, alongside its tunnel address.
 func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *unstructured.Unstructured, nodeName string) (bool, error) {
-	prefixes, err := r.network.PrefixesFor(ctx, r.reader, nodeName)
+	node := &corev1.Node{}
+	if err := r.reader.Get(ctx, types.NamespacedName{Name: nodeName}, node); err != nil {
+		return false, err
+	}
+	if r.awsPodObserver != nil && strings.HasPrefix(node.Spec.ProviderID, "aws:///") && node.Labels[awspod.NodeLabel] != awspod.NodeValue {
+		return false, fmt.Errorf("AWS node %s lacks its required VPC CNI ownership label", node.Name)
+	}
+	awsNode := node.Labels[awspod.NodeLabel] == awspod.NodeValue
+	var prefixes []netip.Prefix
+	var err error
+	if awsNode {
+		if r.awsPodObserver == nil {
+			return false, fmt.Errorf("AWS VPC CNI node requires a scoped allocation observer")
+		}
+		prefixes, err = r.awsPodObserver.PrefixesFor(ctx, machine, nodeName)
+		if err != nil {
+			return false, fmt.Errorf("observing AWS pod allocation: %w", err)
+		}
+	} else {
+		prefixes, err = r.network.PrefixesFor(ctx, r.reader, nodeName)
+	}
 	if err != nil {
 		// No block yet, which is not a failure: the caller comes back.
 		return false, nil
 	}
-	if len(prefixes) == 0 {
+	if len(prefixes) == 0 && !awsNode {
 		// An encapsulated network needs none, so there is nothing
 		// pending and nothing to publish.
 		return r.network.Encapsulation == cni.Encapsulated, nil
@@ -1572,6 +1606,9 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 	// the node with no reachability at all rather than reachability
 	// that fails in one direction. Saying so is what was missing.
 	if err := r.network.CheckMasquerade(ctx, r.reader, prefixes); err != nil {
+		if awsNode {
+			return false, err
+		}
 		ctrl.LoggerFrom(ctx).Error(err, "the remote's pod block will not survive the network's outgoing NAT", "node", nodeName)
 	}
 	secret := &corev1.Secret{}
@@ -1590,6 +1627,12 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 		hosts = append(hosts, prefix.String())
 	}
 	want := strings.Join(hosts, ",")
+	if awsNode {
+		want, err = awsAllowedIPs(machine, secret, prefixes)
+		if err != nil {
+			return false, err
+		}
+	}
 	if want == string(secret.Data[key]) {
 		return true, nil
 	}
@@ -1763,7 +1806,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 					Tolerations:        tolerations,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: dialerNodeAffinity(),
+							RequiredDuringSchedulingIgnoredDuringExecution: r.siteDialerNodeAffinity(),
 						},
 					},
 					ImagePullSecrets: imagePullSecrets(r.dialerImagePullSecret),
@@ -1834,10 +1877,16 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 	existing := &appsv1.DaemonSet{}
 	err := r.reader.Get(ctx, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, existing)
 	if apierrors.IsNotFound(err) {
+		if err := r.pinSiteDialerAdmission(ctx, desired, nil); err != nil {
+			return err
+		}
 		return r.Create(ctx, desired)
 	}
 	if err != nil {
 		return fmt.Errorf("getting existing daemonset %s/%s: %w", desired.Namespace, desired.Name, err)
+	}
+	if err := r.pinSiteDialerAdmission(ctx, desired, existing); err != nil {
+		return err
 	}
 	existing.Spec = desired.Spec
 	return r.Update(ctx, existing)
@@ -2188,9 +2237,10 @@ func main() {
 		gatewayNamespace string
 		gatewayName      string
 
-		tunnelEndpoints     string
-		endpointRetention   time.Duration
-		dialerPrivateKeyDir string
+		tunnelEndpoints       string
+		siteDialerSelectorRaw string
+		endpointRetention     time.Duration
+		dialerPrivateKeyDir   string
 
 		joinEnabled               bool
 		joinTemplatePath          string
@@ -2244,6 +2294,7 @@ func main() {
 	flag.StringVar(&gatewayNamespace, "gateway-namespace", "", "optional: namespace of a Gateway to annotate with the node's external IP for external-dns (blank disables this)")
 	flag.StringVar(&gatewayName, "gateway-name", "", "optional: name of a Gateway to annotate with the node's external IP for external-dns")
 	flag.StringVar(&tunnelEndpoints, "tunnel-endpoints", "", "node selector (k=v,k2=v2) choosing which local nodes terminate tunnels; empty = every Linux worker. Control-plane nodes are excluded unless this selector names node-role.kubernetes.io/control-plane explicitly")
+	flag.StringVar(&siteDialerSelectorRaw, "site-dialer-node-selector", "", "additional label selector admitting site dialers; empty preserves all Linux site nodes; selected tunnel endpoints must be admitted")
 	flag.DurationVar(&endpointRetention, "tunnel-endpoint-retention", 3*time.Minute, "how long a node that has left --tunnel-endpoints goes on being one: dialer still scheduled, entries still published, tunnel still carrying traffic. A remote reads its peer list over the tunnel it is about to lose, so this is the time it is given to read the one naming the replacement, and it is measured in the dialer's 30s poll interval rather than in anything about the departing node's health")
 	flag.StringVar(&dialerPrivateKeyDir, "dialer-private-key-dir", "/var/lib/cloud-provisioning", "host directory where each node's dialer keeps its own WireGuard private key (generated on first start; never leaves the node)")
 	flag.StringVar(&dialerDaemonSetName, "dialer-daemonset-name", "tunnel-dialer", "name of the on-prem dialer DaemonSet this operator provisions directly")
@@ -2294,6 +2345,7 @@ func main() {
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
 	nodeGroups := flag.Bool("experimental-node-groups", false, "enable experimental node groups in the mesh namespace; requires the group CRD and drain RBAC")
+	awsPodConfig := flag.String("aws-pod-config", "", "optional scoped AWS VPC CNI allocation observer JSON file")
 	gatewayConfig := flag.String("aws-gateway-config", "", "optional path to AWS Windows Calico gateway scope JSON")
 	flag.Parse()
 	if _, err := parseDialerPullPolicy(dialerImagePullPolicy); err != nil {
@@ -2324,6 +2376,11 @@ func main() {
 	endpointSelector, err := labels.Parse(tunnelEndpoints)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "invalid --tunnel-endpoints: %v\n", err)
+		os.Exit(1)
+	}
+	siteDialerSelector, err := labels.Parse(siteDialerSelectorRaw)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid --site-dialer-node-selector: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -2453,6 +2510,7 @@ func main() {
 		gatewayName:            gatewayName,
 		tunnelEndpointSelector: endpointSelector,
 		tunnelEndpointsRaw:     rawTunnelEndpoints,
+		siteDialerSelector:     siteDialerSelector,
 		endpointRetention:      endpointRetention,
 		tunnelSubnet:           tunnelSubnet,
 		localAddressBase:       localAddressBase,
@@ -2477,6 +2535,13 @@ func main() {
 		windowsPublisherImage:     windowsPublisherImage,
 		windowsPublisherAPIServer: windowsPublisherAPIServer,
 		dialerCloudHostBinary:     dialerCloudHostBinary,
+	}
+	if *awsPodConfig != "" {
+		mesh.awsPodObserver, err = newAWSPodObserver(*awsPodConfig, mgr.GetAPIReader())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "AWS pod observer configuration: %v\n", err)
+			os.Exit(1)
+		}
 	}
 	meshController := ctrl.NewControllerManagedBy(mgr).
 		Named("mesh").

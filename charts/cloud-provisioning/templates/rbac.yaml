@@ -267,6 +267,31 @@ subjects:
     name: {{ include "cloud-provisioning.controllerName" . }}
     namespace: {{ .Release.Namespace }}
 ---
+# Admission retention reads existing agents only in the release namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}-site-admission
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}-site-admission
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "cloud-provisioning.controllerName" . }}-site-admission
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cloud-provisioning.controllerName" . }}
+    namespace: {{ .Release.Namespace }}
+---
 # The k0s join flow (pkg/join/k0s): mints a bootstrap-token Secret in
 # kube-system, reads kube-root-ca.crt, and lists one Node to discover
 # the k0s version.

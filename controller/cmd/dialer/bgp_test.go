@@ -190,3 +190,36 @@ func advertisedMED(ctx context.Context, t *transitSpeaker, prefix string) (uint3
 	}
 	return med, nil
 }
+
+func TestTransitWithdrawalDistinguishesFailedReadFromLastWorkerDeletion(t *testing.T) {
+	ctx := context.Background()
+	speaker, err := startTransitSpeaker(ctx, 17903, 64512, "172.21.0.17")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer speaker.stop(ctx)
+	routes := []transitRoute{{prefix: "172.29.0.11/32"}}
+	if err := speaker.reconcile(ctx, nil, routes); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config{secretNamespace: "test", secretName: "peers"}
+	c := fake.NewSimpleClientset()
+	if err := reconcileTransit(ctx, c, cfg, speaker); err == nil {
+		t.Fatal("absent Secret did not fail")
+	}
+	if len(speaker.advertised) != 1 {
+		t.Fatal("failed read withdrew working route")
+	}
+	if _, err := c.CoreV1().Secrets("test").Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "peers", Namespace: "test"}, Data: map[string][]byte{}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcileTransit(ctx, c, cfg, speaker); err != nil {
+		t.Fatal(err)
+	}
+	if len(speaker.advertised) != 0 {
+		t.Fatal("last worker deletion left stale route")
+	}
+	if _, err := advertisedMED(ctx, speaker, "172.29.0.11/32"); err == nil {
+		t.Fatal("withdrawn route still present in BGP RIB")
+	}
+}

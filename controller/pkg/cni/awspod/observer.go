@@ -1,0 +1,195 @@
+// Package awspod observes EC2 allocations. It never assigns addresses or changes
+// routing. Only a fresh Machine -> Node -> instance -> ENI binding is accepted.
+package awspod
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/netip"
+	"sort"
+	"strings"
+
+	attachmentaws "github.com/appmana/cloud-provisioning/controller/pkg/attachment/aws"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const NodeLabel = "cloud-provisioning.appmana.com/cni"
+const NodeValue = "aws-vpc"
+
+type Config struct {
+	Account    string   `json:"account"`
+	Region     string   `json:"region"`
+	VPC        string   `json:"vpc"`
+	Subnets    []string `json:"subnets"`
+	Namespace  string   `json:"namespace"`
+	Cluster    string   `json:"cluster"`
+	OwnerTag   string   `json:"ownerTag"`
+	OwnerValue string   `json:"ownerValue"`
+	Family     string   `json:"family"`
+	PodRanges  []string `json:"podRanges"`
+}
+
+func (c Config) Validate() error {
+	if c.Account == "" || c.Region == "" || c.VPC == "" || c.Namespace == "" || c.Cluster == "" || c.OwnerTag == "" || c.OwnerValue == "" || len(c.Subnets) == 0 || len(c.PodRanges) == 0 {
+		return fmt.Errorf("complete AWS allocation scope required")
+	}
+	if c.Family != "ipv4" && c.Family != "ipv6" {
+		return fmt.Errorf("family must be ipv4 or ipv6; dual-stack AWS pods are not supported")
+	}
+	for _, subnet := range c.Subnets {
+		if subnet == "" {
+			return fmt.Errorf("empty subnet")
+		}
+	}
+	for _, raw := range c.PodRanges {
+		p, err := netip.ParsePrefix(raw)
+		if err != nil || p != p.Masked() || p.Bits() == 0 || p.Addr().Is4In6() || p.Addr().Is4() != (c.Family == "ipv4") {
+			return fmt.Errorf("invalid %s pod range %q", c.Family, raw)
+		}
+	}
+	return nil
+}
+
+type Observer struct {
+	Config Config
+	Reader client.Reader
+	API    attachmentaws.API
+}
+
+func (o *Observer) PrefixesFor(ctx context.Context, expected *unstructured.Unstructured, nodeName string) ([]netip.Prefix, error) {
+	if err := o.Config.Validate(); err != nil {
+		return nil, err
+	}
+	if o.Reader == nil || o.API == nil || expected == nil || expected.GetUID() == "" {
+		return nil, fmt.Errorf("allocation observer requires clients and immutable Machine identity")
+	}
+	m := &unstructured.Unstructured{}
+	m.SetGroupVersionKind(expected.GroupVersionKind())
+	if err := o.Reader.Get(ctx, client.ObjectKeyFromObject(expected), m); err != nil {
+		return nil, err
+	}
+	cluster, _, _ := unstructured.NestedString(m.Object, "spec", "clusterName")
+	provider, _, _ := unstructured.NestedString(m.Object, "spec", "providerID")
+	boundName, _, _ := unstructured.NestedString(m.Object, "status", "nodeRef", "name")
+	boundUID, _, _ := unstructured.NestedString(m.Object, "status", "nodeRef", "uid")
+	if m.GetUID() != expected.GetUID() || m.GetDeletionTimestamp() != nil || m.GetNamespace() != o.Config.Namespace || cluster != o.Config.Cluster || boundName != nodeName || boundUID == "" {
+		return nil, fmt.Errorf("Machine allocation binding absent or changed")
+	}
+	node := &corev1.Node{}
+	if err := o.Reader.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
+		return nil, err
+	}
+	if string(node.UID) != boundUID || node.DeletionTimestamp != nil || node.Spec.ProviderID != provider || node.Labels[NodeLabel] != NodeValue || node.Labels["cloud-provisioning.appmana.com/role"] != "cloud-worker" || node.Labels["kubernetes.io/os"] != "linux" {
+		return nil, fmt.Errorf("Node allocation binding absent or changed")
+	}
+	parts := strings.Split(provider, "/")
+	if len(parts) != 5 || parts[0] != "aws:" || parts[1] != "" || parts[2] != "" || len(parts[3]) != len(o.Config.Region)+1 || !strings.HasPrefix(parts[3], o.Config.Region) || !strings.HasPrefix(parts[4], "i-") || len(parts[4]) <= 2 {
+		return nil, fmt.Errorf("invalid EC2 provider identity")
+	}
+	instance := parts[4]
+	var prefixes []netip.Prefix
+	seenENI := map[string]bool{}
+	tokens := map[string]bool{}
+	token := ""
+	for {
+		input := map[string]any{"Filters": []map[string]any{{"Name": "attachment.instance-id", "Values": []string{instance}}}}
+		if token != "" {
+			input["NextToken"] = token
+		}
+		raw, err := o.API.Call(ctx, "ec2", "describe-network-interfaces", input)
+		if err != nil {
+			return nil, err
+		}
+		var response struct {
+			NextToken         string
+			NetworkInterfaces []struct {
+				NetworkInterfaceId, OwnerId, VpcId, SubnetId, Status string
+				Attachment                                           struct{ InstanceId, Status string }
+				TagSet                                               []struct{ Key, Value string }
+				PrivateIpAddresses                                   []struct {
+					PrivateIpAddress string
+					Primary          bool
+				}
+				Ipv4Prefixes []struct{ Ipv4Prefix string }
+				Ipv6Prefixes []struct{ Ipv6Prefix string }
+			}
+		}
+		if err := json.Unmarshal(raw, &response); err != nil {
+			return nil, err
+		}
+		for _, eni := range response.NetworkInterfaces {
+			owned, subnet := false, false
+			for _, tag := range eni.TagSet {
+				if tag.Key == o.Config.OwnerTag && tag.Value == o.Config.OwnerValue {
+					owned = true
+				}
+			}
+			for _, id := range o.Config.Subnets {
+				if id == eni.SubnetId {
+					subnet = true
+				}
+			}
+			if eni.NetworkInterfaceId == "" || seenENI[eni.NetworkInterfaceId] || !owned || !subnet || eni.OwnerId != o.Config.Account || eni.VpcId != o.Config.VPC || eni.Status != "in-use" || eni.Attachment.InstanceId != instance || eni.Attachment.Status != "attached" {
+				return nil, fmt.Errorf("foreign, duplicate or detached EC2 interface")
+			}
+			seenENI[eni.NetworkInterfaceId] = true
+			if o.Config.Family == "ipv4" {
+				if len(eni.Ipv4Prefixes) > 0 {
+					return nil, fmt.Errorf("IPv4 qualification requires secondary IP mode, not prefix delegation")
+				}
+				for _, ip := range eni.PrivateIpAddresses {
+					if ip.Primary {
+						continue
+					}
+					addr, err := netip.ParseAddr(ip.PrivateIpAddress)
+					if err != nil || !addr.Is4() {
+						return nil, fmt.Errorf("invalid EC2 secondary IPv4 address")
+					}
+					prefixes = append(prefixes, netip.PrefixFrom(addr, 32))
+				}
+			} else {
+				for _, delegated := range eni.Ipv6Prefixes {
+					p, err := netip.ParsePrefix(delegated.Ipv6Prefix)
+					if err != nil || !p.Addr().Is6() || p.Addr().Is4In6() || p.Bits() != 80 || p != p.Masked() {
+						return nil, fmt.Errorf("invalid EC2 delegated IPv6 /80")
+					}
+					prefixes = append(prefixes, p)
+				}
+			}
+		}
+		token = response.NextToken
+		if token == "" {
+			break
+		}
+		if tokens[token] || len(tokens) >= 100 {
+			return nil, fmt.Errorf("EC2 pagination did not converge")
+		}
+		tokens[token] = true
+	}
+	if len(seenENI) == 0 {
+		return nil, fmt.Errorf("no bound EC2 interfaces")
+	}
+	for i, p := range prefixes {
+		scoped := false
+		for _, raw := range o.Config.PodRanges {
+			allowed, _ := netip.ParsePrefix(raw)
+			if allowed.Bits() <= p.Bits() && allowed.Contains(p.Addr()) {
+				scoped = true
+			}
+		}
+		if !scoped {
+			return nil, fmt.Errorf("EC2 pod allocation outside configured ranges")
+		}
+		for _, other := range prefixes[:i] {
+			if p.Overlaps(other) {
+				return nil, fmt.Errorf("overlapping EC2 pod allocations")
+			}
+		}
+	}
+	sort.Slice(prefixes, func(i, j int) bool { return prefixes[i].String() < prefixes[j].String() })
+	// A complete, successful empty observation is authoritative withdrawal.
+	return prefixes, nil
+}

@@ -115,12 +115,9 @@ func startTransitSpeaker(ctx context.Context, port int, asn uint32, nextHops str
 // one peering with every node at this site that cannot reach the
 // remotes itself, and one route for everything reachable through here.
 //
-// An empty route set withdraws nothing. Every route the site has to a
-// remote depends on these, and the session it then builds to that
-// remote depends on the route, so a withdrawal costs far more than the
-// staleness it prevents. A mesh that reads as empty is a failed read
-// until proven otherwise; a remote that is genuinely gone is removed
-// when some other remote is still there to prove the read was good.
+// A non-nil route set is a successfully observed desired state, including
+// explicit empty state after last-worker deletion. Nil means no observation;
+// it must not withdraw previously advertised paths.
 func (t *transitSpeaker) reconcile(ctx context.Context, sitePeers []string, routes []transitRoute) error {
 	if t == nil {
 		return nil
@@ -162,7 +159,7 @@ func (t *transitSpeaker) reconcile(ctx context.Context, sitePeers []string, rout
 		}
 		t.advertised[r.prefix] = r.med
 	}
-	if len(want) == 0 {
+	if routes == nil {
 		return nil
 	}
 	for prefix := range t.advertised {

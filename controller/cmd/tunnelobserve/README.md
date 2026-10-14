@@ -36,9 +36,3 @@ check describes its capture time, not necessarily the instant of packet loss.
 For temporary VM diagnostics, stage the binary outside system installation
 paths, record its SHA-256, and remove the owned binary and reports when finished.
 Do not change a worker image or install packages merely to make this observer run.
-
-The [Linux observation result](../../../docs/validation/tunnelobserve-linux-results.json)
-records native sampling on a single-NIC k0s remote and the selected-field
-regression tests. The separate [Windows observation result](../../../docs/validation/tunnelobserve-windows-results.json)
-records three native samples on each of Windows Server 2022 and 2025, with
-temporary files removed afterward. Neither report qualifies network reliability.

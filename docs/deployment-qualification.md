@@ -86,7 +86,7 @@ gate, not yet a deployment controller or CI enforcement hook.
    VIPs, Tailscale policy tables and IPv6 RA behavior. The second site profile needs its VyOS
    peers, routing policy and Windows site compatibility. The existing identity
    VM profile is a starting point, not proof of these properties.
-3. Implement and rehearse a node-local five-minute rollback watchdog with
+3. Integrate and rehearse the [node-local rollback guard](network-guard.md) with
    snapshots limited to owned changes. It must work without SSH, tailnet,
    cluster API connectivity or serial intervention. Preserve existing defaults,
    policy rules, firewall rules and external BGP peers. Establish a baseline

@@ -1,0 +1,16 @@
+[Unit]
+Description=Bounded rollback for an owned network configuration change
+After=local-fs.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/network-guard -state /var/lib/network-guard/%i watch
+Restart=on-failure
+RestartSec=1s
+KillMode=control-group
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

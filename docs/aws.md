@@ -193,13 +193,9 @@ instance to join and pass pod networking checks before accepting an image;
 successful SSM access or bootstrap-secret retrieval alone is insufficient.
 
 The AWS integration uses **k0s v1.34.1+k0s.0** and its bundled
-**Calico v3.29.6-0**, with the distribution's default VXLAN configuration.
-Five single-NIC site VMs and two single-ENI EC2 workers pass all **140** checks
-for pod traffic, Services, 1 MiB transfers, DNS and external access.
-The full AWS validation passes **1,184 checks across nine gates**: two independent
-delete-and-readd cycles, survivor connectivity, and all four endpoint placements.
-Both replacements require new EC2 instance IDs and Kubernetes Node UIDs.
-See the [AWS k0s/Calico evidence](validation/aws-k0s-calico.md) for scope and coverage.
+**Calico v3.29.6-0**, with the distribution's default VXLAN configuration. Five single-NIC site VMs and two single-ENI EC2 workers pass all **140** checks
+for pod traffic, Services, 1 MiB transfers, DNS and external access. The full AWS validation passes **1,184 checks across nine gates**: two independent
+delete-and-readd cycles, survivor connectivity, and all four endpoint placements. Both replacements require new EC2 instance IDs and Kubernetes Node UIDs.
 
 For k0s, k3s and RKE2, use a compatible cloud-init image with systemd and
 WireGuard support. MicroK8s additionally needs snapd and Python 3; its current
@@ -270,9 +266,6 @@ Recovery releases only the saved leases, checks the current run scope and
 requires the target route to be absent before reporting success. It does not
 need the worker Node or gateway instance to survive. An ENI reassigned to a
 different instance, a changed route target or lost ownership prevents deletion.
-The [route validation evidence](validation/aws-gateway-route-results.json)
-covers this provider component; it does not establish complete Windows CNI
-networking or automatic gateway attachment.
 
 The gateway source/destination-check policy uses `AWS_REGION`, `AWS_ACCOUNT_ID`,
 `GATEWAY_ENI_ID` and `RUN_ID`. Render it with `docs/iam/render.py` and attach it to
@@ -299,11 +292,6 @@ ConfigMap journal retains a finalizer until restoration completes, and cleanup
 refuses an ENI reassigned to another instance. Run one elected writer per
 provider scope and retain the journal through worker deletion.
 
-The [source-check validation evidence](validation/aws-gateway-source-check-results.json)
-records two live CAPI worker leases, original ENI restoration and native
-coverage. The component is registered when the opt-in attachment controller is
-enabled; attaching the policy alone does not configure a gateway.
-
 The gateway ingress policy uses `AWS_REGION`, `AWS_ACCOUNT_ID`,
 `SECURITY_GROUP_ID` and `RUN_ID`. Render `docs/iam/gateway-ingress.json` with
 `docs/iam/render.py` and attach it to the gateway reconciliation role. It grants
@@ -315,13 +303,9 @@ individual rule ARN. The policy therefore cannot isolate revocation to the
 adapter's rules within that group. The adapter persists a random ownership tag,
 checks the observed permission and recorded rule ID, and revokes only that ID
 after the final lease release. It rejects an existing matching permission
-without ownership. See the [EC2 authorization reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ec2.html).
-Do not grant this role to worker pods. The adapter validates an explicit IPv4
+without ownership. See the [EC2 authorization reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ec2.html). Do not grant this role to worker pods. The adapter validates an explicit IPv4
 host source and UDP port; these packet fields are application constraints,
-not restrictions enforced by this IAM policy. The
-[native ingress validation](validation/aws-gateway-ingress-results.json) records
-one tagged create, shared-lease retention and one exact-ID revoke using a
-temporary session restricted by this policy. All original rules were restored.
+not restrictions enforced by this IAM policy. All original rules were restored.
 
 For the gateway controller's guest observations, attach
 [gateway-observation.json](iam/gateway-observation.json) to its AWS role after
@@ -330,12 +314,8 @@ ENI lookup, invocation status lookup and shell/PowerShell documents on tagged
 instances. IAM permits arbitrary script content through those AWS documents;
 the controller's guest reader restricts calls to fixed HNS and Linux forwarding
 probes. This policy grants no power operations or S3 transfer access. Use the
-separate gateway resource policies for route, ingress and source-check changes.
-The opt-in [gateway runtime](windows-gateway.md#enable-the-aws-attachment-controller)
-loads credentials separately from its placement scope. The
-[combined CAPI worker cycle](validation/windows-peer-membership-both-results.json)
-validated attachment readiness and cleanup while preserving other worker
-leases. Gateway deletion and the full failure matrix remain separate gates.
+separate gateway resource policies for route, ingress and source-check changes. The opt-in [gateway runtime](windows-gateway.md#enable-the-aws-attachment-controller)
+loads credentials separately from its placement scope. Gateway deletion and the full failure matrix remain separate gates.
 
 Attach AWS's managed `AmazonSSMManagedInstanceCore` policy to the worker role
 when SSM diagnostics are required. The SSM agent must also be installed and able
@@ -431,14 +411,6 @@ uses `additionalSecurityGroups` for the externally managed AWSCluster; CAPA
 does not use `securityGroupOverrides` in that mode. It uses on-demand instances,
 an automatically created primary ENI, no EC2 key pair,
 and no extra volumes or security groups outside the rendered policy.
-
-The four permission templates pass IAM Access Analyzer validation with no
-findings. The isolated CAPA test also exercised EC2 launch and termination,
-private bootstrap retrieval, and SSM execution. That policy-only artifact is separate from the k0s/Calico
-network matrix described above. The
-[policy validation artifact](validation/aws-policy-results.json) records template
-hashes, findings, and IAM simulation of matching, different and absent ownership
-tags for bootstrap-secret deletion.
 
 These policy templates require live CAPA validation for your selected image and
 infrastructure settings. Successful IAM role creation or STS authentication alone
@@ -603,17 +575,6 @@ selections to appear in `authorizedLinuxAMIs` and records the choice in an
 image; the image still needs drivers appropriate to that shape. Authorization
 is permission to test, not evidence of image qualification.
 
-Pass `-expected-image <candidate-ami>` to `cmd/awsrow` for that claim. The row
-checks the run's authorization inventory and the actual EC2 AMI and physical
-NIC count. Its `bindings.json` records the observed image ID. Both subsequent
-Windows authorization and Linux promotion retain and revalidate additional
-Linux image grants. Use `observe/linux_image_reuse.py` to validate the saved
-candidate and native observation, including the baked-executable hash, receipt
-and pre-launch file timestamp. It checks the Kubernetes server version separately
-from the containerd client. The [native candidate report](validation/linux-k0s-baked-capi-results.json)
-records image-reuse and lifecycle qualification; a diagnostic survivor result
-does not qualify a release.
-
 In a mixed Linux/Windows test run, Linux promotion retains the previously
 authorized Windows image IDs. It rechecks their availability, private ownership
 and run tags before updating the CAPA role. This lets Linux and Windows machine
@@ -720,7 +681,6 @@ the EBS volume, extend the guest partition before preparing the cache.
 AWS documents the volume resource scope in its
 [EC2 authorization reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ec2.html#amazonec2-ModifyVolume).
 
-
 When replacing a worker with a different AMI or machine specification, use a
 new `AWSMachineTemplate` name. CAPA rejects changes to an existing template's
 specification. The harness accepts `--machine-template worker-image-v2` separately
@@ -774,10 +734,7 @@ running the workload matrix. `adoption.json` records the owning DaemonSet UID,
 Pod UID and container image identities. It also requires the current Machine's
 adoption Secret to acknowledge the SHA256 of its current peer payload, recording
 only the Secret UID, resource version and desired/applied hashes. Missing or stale
-acknowledgments fail the gate. The
-[native receipt](validation/linux-adoption-receipts-results.json) and
-[AWS row](validation/linux-adoption-row-results.json) reports describe observer
-qualification on existing workers. Run fresh-boot and replacement tests
+acknowledgments fail the gate. Run fresh-boot and replacement tests
 separately. Matrix results report the last convergence pass, not uninterrupted
 traffic throughout the run.
 
@@ -803,44 +760,20 @@ go run ./cmd/awsrow -distro microk8s -cni calico \
 Pass `-api-port 16443` to `cmd/awsremove` for MicroK8s removal checks too.
 That command defaults to 6443 for k0s; it must contact the same imported site.
 
-The pinned MicroK8s profile uses snap revision `9063` (`v1.34.9`), bundled
-Calico `v3.29.3`, and containerd `1.7.29`. Its CRI socket is
-`/var/snap/microk8s/common/run/containerd.sock`; this snap does not expose a
-`microk8s crictl` subcommand. The
-[single-VM prerequisite evidence](validation/microk8s-prerequisite-results.json)
-checks the installed version, socket, local kubelet API and native join-response
-shape. It does not qualify remote CAPI joins or the AWS lifecycle matrix.
-
-MicroK8s worker bootstrap retries the pinned snap installation up to five times,
-with 15 seconds between failures. A failed cloud-init run still fails bootstrap;
-inspect its status and `/var/log/cloud-init-output.log` through the provider's
-out-of-band management. Bootstrap changes apply to new Machines: replace a
-failed claim to test corrected userdata. The
-[bootstrap validation report](validation/microk8s-snap-retry-results.json) separates
-observed store failures, retry tests and subsequent native qualification.
-
 The worker pattern waits for MicroK8s's native worker marker and the local
 kubelet health endpoint before writing its bootstrap-success sentinel. It does
-not use the control-plane `status --wait-ready` loop. The
-[worker bootstrap report](validation/microk8s-worker-bootstrap-wait-results.json)
-records the observed startup race and the scope of the replacement check.
-Kubernetes Node readiness and network validation remain separate requirements.
-The Linux VM and EC2 rows also require `cloud-init status --format json` to
+not use the control-plane `status --wait-ready` loop. Kubernetes Node readiness and network validation remain separate requirements. The Linux VM and EC2 rows also require `cloud-init status --format json` to
 report `done` with a clean exit and
 `/run/cluster-api/bootstrap-success.complete` to exist. A Ready Node or working
 container runtime alone cannot satisfy this bootstrap gate. A terminal
-cloud-init error stops the row; an unavailable observer remains inconclusive.
-For secure CAPA Linux userdata, the AWS row selects `CAPALinuxCommands`.
-It additionally accepts cloud-init 26.1's exit code 2 only when the aggregate
+cloud-init error stops the row; an unavailable observer remains inconclusive. For secure CAPA Linux userdata, the AWS row selects `CAPALinuxCommands`. It additionally accepts cloud-init 26.1's exit code 2 only when the aggregate
 and module reports contain no errors and the sole warning is the exact initial
 `/etc/secret-userdata.txt` missing-include warning
-[documented by CAPA](https://github.com/kubernetes-sigs/cluster-api-provider-aws/blob/v2.12.1/docs/book/src/topics/userdata-privacy.md#warning-messages).
-Completed status and the success sentinel remain mandatory. Other recoverable
+[documented by CAPA](https://github.com/kubernetes-sigs/cluster-api-provider-aws/blob/v2.12.1/docs/book/src/topics/userdata-privacy.md#warning-messages). Completed status and the success sentinel remain mandatory. Other recoverable
 errors are not accepted, and generic Linux VM/image adapters retain the clean-exit
 requirement. Cloud-init's
 [exit-code documentation](https://docs.cloud-init.io/en/latest/explanation/return_codes.html)
-explains why `done` alone does not establish success.
-Windows requires a separate native completion observer and is not qualified
+explains why `done` alone does not establish success. Windows requires a separate native completion observer and is not qualified
 by this Linux check.
 
 AWS network rows write each convergence attempt to `matrix-attempts.jsonl`,
@@ -863,20 +796,11 @@ removal. A missing path set or failed exec/log request fails qualification.
 Checks during an intentional control-plane outage remain separate; the final
 management gate runs after the control planes have returned.
 
-MicroK8s workers advertise their allocated WireGuard address to the kubelet.
-The control planes need a route to that address on TCP 10250. EC2's private NIC
+MicroK8s workers advertise their allocated WireGuard address to the kubelet. The control planes need a route to that address on TCP 10250. EC2's private NIC
 address can be unreachable from the site and can overlap another cloud's
 network. The AWS provider ID still identifies the instance independently of
 the advertised kubelet address. Updating the join pattern takes effect on
-new Machines; existing workers require replacement to receive it.
-The [kubelet address report](validation/microk8s-kubelet-address-results.json)
-and [continuous replacement report](validation/microk8s-tunnel-lifecycle-results.json)
-record the qualified versions, endpoint placement, native checks, and coverage.
-The [three-worker replacement report](validation/microk8s-remote2-replacement-results.json)
-records qualification after replacing the remaining private-address worker,
-including survivor streams and direct kubelet access through all control planes.
-The [placement report](validation/microk8s-tunnel-placement-results.json) separates
-converged network and kubelet access from continuous packet delivery. Endpoint
+new Machines; existing workers require replacement to receive it. Endpoint
 handover is not qualified for uninterrupted traffic while that survivor gate fails. The
 [tunnel handover design](tunnel-handover.md) describes the receive-ownership
 constraint and the staged protocol required before lifting this limitation.
@@ -889,18 +813,12 @@ dialer therefore reserves a companion routing table (`route-table + 65536`,
 the ordinary table rule. Its direct host routes preserve explicitly tunnel-bound
 traffic; physical-source traffic follows the ordinary relay routes. The companion
 routes and rule are removed on promotion or endpoint teardown. Both tables must
-be reserved for the dialer. See the [source-routing qualification](validation/microk8s-source-routing-results.json)
-for native evidence and remaining continuity gates.
+be reserved for the dialer.
 
 Native `microk8s join --worker` can return before the worker's Kubernetes Node
 exists. Observe Node registration before waiting for Ready; a transient NotFound
 does not justify replaying the join. Inspect bundled Calico's addresses on the
-Kubernetes Node annotations rather than assuming a Calico Node CRD exists.
-The [two-VM native check](validation/microk8s-native-join-results.json) verifies
-worker joining, both active local kubelet API contexts, and basic Node removal
-after stopping the worker. The [single-NIC VM lifecycle campaign](validation/microk8s-lifecycle-results.json)
-also verifies rendered CAPI userdata, tunnel traffic, both remote replacements,
-survivor matrices and four endpoint placements. That campaign uses the VM
+Kubernetes Node annotations rather than assuming a Calico Node CRD exists. That campaign uses the VM
 infrastructure provider on an AWS runner; it does not qualify CAPA workers.
 
 For an unjoined Ubuntu AWS image, compose the shared
@@ -911,13 +829,6 @@ snapd and Python 3 while rejecting MicroK8s cluster state at capture. AWS CLI,
 cloud-init handling, IAM access and AMI capture remain in the AWS adapter.
 Installing the MicroK8s snap and joining the selected site still occur at first
 boot; these prerequisite images do not yet supply a cached snap/runtime layer.
-
-These selectable profiles are not a claim that every AWS matrix has passed.
-[Runtime observer validation](validation/awsrow-distribution-results.json)
-includes live k0s checks through QEMU guest-agent and AWS SSM transports, plus
-unit checks for distribution isolation. A fresh MicroK8s AWS join, network,
-removal and replacement campaign remains required. Windows uses the separate
-[Windows join and network observers](windows.md), not this Linux row runner.
 
 Use an existing k0s/Calico VM site prepared with `cmd/lab -rig vm -distro k0s
 -cni calico -product`. Configure its chart with
@@ -994,7 +905,6 @@ konnectivity agent. Renew the sessions before each row. The harness retries
 throttled AWS calls until the check's deadline; SSM throttles `SendCommand`
 per account during UDP-heavy rows.
 
-
 `aws/session.py` renews one-hour derived CAPA and harness sessions using the setup
 identity. Run it from the sourced setup shell, then rerun `aws/identity.py` to
 publish the renewed CAPA session. Session files are replaced atomically so active
@@ -1068,11 +978,6 @@ deployed dialer images before adoption; this does not qualify preloaded-image
 startup or unattended artifact renewal. Sampled traffic establishes delivery
 only for the recorded requests and observation window.
 
-See the [Linux lifecycle](validation/linux-capi-egress-results.json),
-[survivor traffic](validation/linux-capi-survivor-results.json), and
-[same-name replacement](validation/linux-capi-replacement-results.json) reports
-for tested versions, interventions, identity checks and qualification limits.
-
 The [asset policy](iam/assets.json) is for the setup/publishing identity.
 `GetFederationToken` requires IAM-user credentials; a runner already using an
 assumed role must instead use its role session with a suitably restricted S3
@@ -1100,23 +1005,6 @@ target instances. This enables diagnostics; it does not establish Windows
 bootstrap or joining support. Renew existing derived sessions after changing
 the policy. The session helper omits descriptive statement IDs from its wire
 policy to fit STS's compressed-policy limit without changing permissions.
-
-For long image preparation, set `awsnode -timeout 50m` before the command
-arguments. The shared AWS rig passes the remaining caller deadline to the SSM
-document's `executionTimeout` for both guest types (up to AWS's 48-hour limit).
-Callers without a deadline use ten minutes; `awsnode` defaults to five minutes.
-This execution limit is distinct from SSM command delivery and local polling.
-A local timeout does not cancel the remote command. Observation errors include
-its command ID: inspect it with `aws ssm get-command-invocation --command-id ID
---instance-id INSTANCE`, and check any durable guest receipt before retrying.
-Redirect verbose image-pull output to a
-guest file, because SSM's inline output is bounded.
-Output-limit errors include the original SSM command ID and the stdout/stderr
-byte counts. Inspect that invocation and retrieve its retained output through
-the configured evidence path; do not rerun a mutating command merely to obtain
-its output. The error message does not include command output or credentials.
-The [timeout validation](validation/aws-ssm-timeout-results.json) separates
-regression coverage from native command submission and completion evidence.
 
 The shared matrix must distinguish an EC2 power operation, a security-group
 WireGuard partition, and a physical NIC cut. An unsupported failure mechanism
@@ -1179,24 +1067,13 @@ complete startup cache. GPU qualification also requires the first hardware
 render/NVENC workload on a fresh VM. A successful workload or removal does not
 waive a failed traffic or observation-interval gate.
 
-| Qualification | Evidence |
-| --- | --- |
-| Windows Server 2022 CPU lifecycle | [Join, attachment, traffic and removal](validation/windows-capi-survivor-2022-results.json) |
-| Windows Server 2025 CPU lifecycle | [Join, attachment, traffic and removal](validation/windows-capi-survivor-2025-results.json) |
-| Windows Server 2025 GPU cache lifecycle | [GPU execution and remaining lifecycle failures](validation/windows-capi-gpu-cache-2025-results.json) |
-| Complete Windows Server 2025 startup cache | [Runtime pause and application cache validation](validation/windows-capi-gpu-startup-cache-2025-results.json) |
-
 Gateway withdrawal must preserve the retiring worker's API connectivity until
 it acknowledges direct tunnel routes. The controller stages this change with
 `retiringWorker` on the existing projection, preserving other recipients' gateway
 routes. Only the exact worker's acknowledgement permits global withdrawal;
 all recipients must then acknowledge before forwarding resources and CAPI hooks
 are released. Controllers that ignore `retiringWorker` cannot perform this
-staged transition.
-The [Windows 2025](validation/windows-capi-gpu-staged-withdrawal-2025-results.json)
-and [Windows 2022](validation/windows-capi-staged-withdrawal-2022-results.json)
-validation reports distinguish acknowledgment ordering and completed removal
-from survivor packet delivery. Both retain UDP failures and therefore do not
+staged transition. Both retain UDP failures and therefore do not
 qualify uninterrupted lifecycle traffic. CPU results do not qualify GPU caching,
 fragmented UDP or repeated reliability. Use the
 [withdrawal recorder](../harness/e2e/observe/README.md#verifying-staged-gateway-withdrawal)
@@ -1260,8 +1137,8 @@ Preserve the attachment retirement records.
 A failed stage preserves the original resources and evidence for diagnosis.
 Inspect the recorded process and original CAPI/SSM operation before any follow-up;
 rerunning with another output directory is not a resume mechanism. The output
-directory must be new. Use the release-specific validation reports above to
-check which lifecycle and survivor gates are qualified.
+directory must be new. Evaluate retained artifacts for the exact candidate to determine which
+lifecycle and survivor gates are qualified.
 
 ## Private Windows publisher image
 
@@ -1302,33 +1179,24 @@ qualification requires the first workload attempt on a fresh VM.
 
 For separate Server 2022 and 2025 workload bases, add `--windows-version 2022`
 or `--windows-version 2025`. The helper verifies the OCI manifest/config digests
-and requires the selected base build (20348 or 26100) before contacting AWS.
-It records `image`, `platform` and pull information under
+and requires the selected base build (20348 or 26100) before contacting AWS. It records `image`, `platform` and pull information under
 `windowsGPUProbeByWindowsVersion.YEAR`, preserving the legacy image field and
 the other release's record. Both releases share the owned component repository
 and pull Secret. Use the selected record's digest in its cache recipe, Job and
-observer; a copied Server 2025 image cannot qualify a Server 2022 worker.
-Pass the same version when using `--renew-pull-only` for that record. This
-base-build check does not replace native container compatibility or GPU tests.
-The [publication validation report](validation/windows-workload-platform-publication-results.json)
-documents cross-release rejection and publication-validation limits. Use
+observer; a copied Server 2025 image cannot qualify a Server 2022 worker. Pass the same version when using `--renew-pull-only` for that record. This
+base-build check does not replace native container compatibility or GPU tests. Use
 [`select_workload(inventory, recipe, year)`](../harness/e2e/aws/windows_gpu_workload.py)
 to require that the release-specific publication is present in the matching
 cache recipe. It returns the recorded image and pull Secret and rejects a
 missing versioned record instead of falling back to the legacy image. Pass
 that image to both the Job and GPU observer; the native first-application gate
-still determines whether the workload actually runs.
-The [selection tests](validation/windows-gpu-workload-selection-results.json)
-use the observed publication and native cache receipt as fixtures.
-Also call `require_plugin_cache(daemonsets, recipe, year)` with the site's live
+still determines whether the workload actually runs. Also call `require_plugin_cache(daemonsets, recipe, year)` with the site's live
 device-plugin DaemonSets before provisioning a cache trial. The Windows 2022
 and 2025 profiles use different images. This check requires the selected
 profile's pinned images in the recipe and rejects changed build selectors;
-it does not replace fresh-VM cache-hit and GPU execution checks.
-For a profile using `index.docker.io`, preload both its declared reference and
+it does not replace fresh-VM cache-hit and GPU execution checks. For a profile using `index.docker.io`, preload both its declared reference and
 the equivalent `docker.io` reference. Containerd 2.3.2 normalizes the hostname
-for CRI lookup, while the native `ctr` cache can retain only the declared name.
-The preflight checks both references; they point to the same pinned content.
+for CRI lookup, while the native `ctr` cache can retain only the declared name. The preflight checks both references; they point to the same pinned content.
 
 Render [publisher.json](iam/publisher.json) with `AWS_REGION`, `AWS_ACCOUNT_ID`
 and `RUN_ID` using the same renderer as the other policies. Attach it to the
@@ -1371,9 +1239,7 @@ distribution's other control-plane listeners in the request's `tcpPorts` field:
 k0s's default Konnectivity listener requires `[8132]`. Without it, a worker can
 be Node Ready while its Konnectivity agent and API-server-to-kubelet operations
 fail. The gateway controller manages these as distinct leases using the
-[gateway ingress policy](iam/gateway-ingress.json). The
-[Konnectivity validation](validation/windows-konnectivity-ingress-results.json)
-covers agent readiness and kubelet access. IAM scopes that policy to the
+[gateway ingress policy](iam/gateway-ingress.json). IAM scopes that policy to the
 owned security group; protocol, port and source restrictions are enforced by the
 adapter's exact rule construction and ownership journal. See the
 [gateway runtime](windows-gateway.md#enable-the-aws-attachment-controller) for its
@@ -1403,17 +1269,3 @@ EC2 dry run establishes authorization, not capacity availability or KVM support
 inside the guest. Retain instance identity immediately after launch, bound the
 campaign duration, and remove its owned instance and volumes after collecting
 evidence.
-
-Compare current compute prices together with EBS, public IPv4 and transfer
-costs. Verify cost-allocation tag activation before interpreting tagged Cost
-Explorer totals: an inactive tag can yield a misleading zero. Account-wide
-reported usage can provide context but excludes unreported usage and is not
-project attribution. The [capacity audit](validation/aws-runner-capacity-results.json)
-records candidate prices, billing limitations and the rejected worker-role
-base-AMI dry run. It does not establish a completed EC2 harness campaign.
-
-The [dedicated runner validation](validation/aws-runner-authorization-results.json)
-checks the approved launch and rejection of a different instance type or
-ownership tag using a separate role. It also records host KVM availability,
-the shutdown timer and verified artifact transfers. Host readiness is separate
-from successful nested VM bring-up and lifecycle-matrix results.

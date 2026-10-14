@@ -36,34 +36,3 @@ needed. Cloud transport must still match the cluster's CNI, routing and MTU.
 [GPU workers](docs/gpu-workers.md) · [Node groups](docs/node-groups.md) ·
 [Windows constraints](docs/windows.md) · [Tunnel scenarios](docs/tunneling-scenarios.md) ·
 [Dual-stack Calico BGP](docs/dual-stack.md)
-
-## Compatibility
-
-“Tested” covers only the linked scenario. “Fails” records a failed gate;
-“unknown” includes incomplete qualification.
-
-| Scenario | Result |
-| --- | --- |
-| k0s 1.36.4, Calico 3.32.1 BGP dual-stack ([required settings](docs/dual-stack.md#required-cluster-settings)): VM lifecycle and four placements | [tested](docs/validation/k0s-1.36.4-calico-bird-dualstack-results.json) |
-| Same profile: AWS add/remove/re-add and four placements | [tested](docs/validation/aws-k0s-1.36.4-calico-bird-dualstack-results.json) |
-| k0s 1.36.2, Calico: VM bootstrap and worker replacement | [tested](docs/validation/k0s-1.36-lifecycle-results.json) |
-| Same version: complete placement/outage/AWS matrix | unknown |
-| k0s 1.36.2, Kube-router: lifecycle and placements | [tested](docs/validation/k0s-1.36-kuberouter-lifecycle-results.json) |
-| Same profile: twelve outage cases | [tested](docs/validation/k0s-1.36-kuberouter-outage-results.json) |
-| MicroK8s 1.34.9, Calico: VM lifecycle/placements | [tested](docs/validation/microk8s-lifecycle-results.json) |
-| MicroK8s CAPA lifecycle checks | [tested](docs/validation/microk8s-capa-lifecycle-results.json) |
-| MicroK8s loss-free UDP endpoint handover | [fails](docs/validation/microk8s-source-routing-results.json) |
-| k0s 1.34.1, Calico: AWS placements and worker replacement | [tested](docs/validation/aws-k0s-calico-results.json) |
-| k3s/Flannel, RKE2/Canal, kubeadm/Calico recorded VM scenarios | [tested](docs/validation/single-nic-vms.md) |
-| OKD/OVN full remote-worker lifecycle | unknown |
-| Linux KEDA worker groups | [tested](docs/validation/node-group-keda-results.json) |
-| Pooled workers: steady-state cross-cloud UDP | [tested](docs/validation/node-group-vm-udp-cloud-results.json) |
-| Windows 2022/2025 host tunnel generation changes | [tested](docs/validation/windows-stable-owner-isolation-results.json) |
-| Windows Calico MTU repair | [tested](docs/validation/windows-mtu-periodic-repair-results.json) |
-| Windows full cloud-worker CNI/lifecycle | unknown |
-| Linux T4 Vulkan/NVENC/network workloads | [tested](docs/validation/linux-gpu-results.json) |
-| Windows GPU lifecycle; Linux arm64 workloads | unknown |
-| Latest recorded main chart publication | [fails](https://github.com/AppMana/cloud-provisioning/actions/runs/34423319430) |
-
-[Build configuration](.github/workflows/build-controller.yml) ·
-[VM harness](docs/validation/single-nic-vms.md)

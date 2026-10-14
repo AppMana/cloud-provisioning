@@ -1,14 +1,5 @@
 # CAPA Windows secure bootstrap extension
 
-This bounded extension targets CAPA **v2.12.1**. It adds a `powershell` bootstrap
-format that keeps CAPA's Secrets Manager chunk creation, ownership fields and
-cleanup, while replacing the Linux cloud-init consumer with EC2Launch PowerShell.
-It is not part of unmodified upstream CAPA. Fresh Windows CAPI joins pass the
-[image and association checks](../../docs/validation/windows-fresh-image-join-results.json);
-worker removal and replacement have separate
-[scoped VM evidence](../../docs/windows.md#validation-boundaries). Workload
-networking and gateway failover remain unqualified.
-
 Apply to a clean checkout, then build/test in that checkout:
 
 ```sh
@@ -27,9 +18,7 @@ do not update a production controller.
 The patch and overlay apply cleanly to the target release. The renderer and
 format tests pass, and the controller compiles with the extension. VM consumer
 checks use real encrypted, multi-chunk Secrets Manager payloads on Server 2022
-and 2025. The patched controller has also passed an
-[isolated VM-cluster rollout](../../docs/validation/capa-windows-rollout-results.json),
-with the running image ID matching the local build. Use the
+and 2025. Use the
 [Windows validation boundaries](../../docs/windows.md#validation-boundaries)
 for the subsequent first-boot, join, removal and replacement evidence; the
 controller rollout by itself does not establish those behaviors.
@@ -58,22 +47,11 @@ and absence of the temporary script; it does not treat an older instance's
 receipt as evidence for a new VM.
 
 `cmd/awsnode -bootstrap-status` observes this contract through the selected
-machine adapter. Add `-bootstrap-wait 15m -timeout 16m` to wait for completion.
-New Windows lifecycle rows require this receipt through
+machine adapter. Add `-bootstrap-wait 15m -timeout 16m` to wait for completion. New Windows lifecycle rows require this receipt through
 `aws/windows_join.py --require-bootstrap-completion`. They need a CAPA controller
-built from the updated consumer; older controllers do not write the receipt.
-The existing Windows image prerequisites remain unchanged.
-[Native receipt tests](../../docs/validation/windows-bootstrap-contract-results.json)
-cover synthetic success and script failure on both Windows releases. Fresh CAPI
-launches with this consumer also passed receipt, Node-association, peer-delivery
-and CAPI removal checks on Server 2022 and 2025. Those joins required renewal of
+built from the updated consumer; older controllers do not write the receipt. The existing Windows image prerequisites remain unchanged. Those joins required renewal of
 expired private image pull credentials. Workload traffic, continuous survivor
 availability and Windows replacement remain separate qualification gates.
-
-See [AWS's execution-order and detach documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2launch-v2-settings.html).
-[Native Windows 2022 and 2025 first boots](../../docs/validation/capa-windows-detached-results.json)
-confirmed SSM access before worker installation on both versions. These
-execution-order observations do not replace the subsequent join checks.
 
 The extension requires the Secrets Manager backend and refuses the insecure
 skip option or the Parameter Store backend. It disables EC2 userdata compression

@@ -1,9 +1,7 @@
 # Calico BGP on premises with AWS VPC CNI on EC2
 
-This is the requested networking target. Its on-premises BGP component has
-passed a fresh five-node VM matrix; the complete AWS VPC CNI integration remains
-unqualified. The retained VXLAN lab runs Calico on its AWS Windows workers and
-must not be reported as validation of this profile.
+Calico owns site networking; AWS VPC CNI owns EC2 pod allocation. Qualify the
+complete mixed-CNI path before deployment; Calico-only evidence does not apply.
 
 ## CNI placement
 
@@ -58,22 +56,6 @@ Changing an existing overlay cluster to this profile is not a supported
 migration procedure. Configuration tests apply the strategic patch to an
 observed k0s DaemonSet and verify the placement and pool boundaries.
 
-### Recorded site result: September 13, 2026 UTC
-
-The isolated single-NIC VM run passed **200/200** directed TCP, Service, DNS
-and UDP checks, including **1,000/1,000** exact UDP echoes. All five nodes had
-four Established BGP peers before and after the matrix. Each of the 20 remote
-pod destinations had a BIRD-installed route through `ens2`. The observed pool
-had VXLAN and IP-in-IP disabled and selected only labeled site nodes.
-Node, pod, container and Service identities remained stable. The retained lab's
-13 Node UIDs were unchanged and all remained Ready.
-
-- [BGP, route, placement and build evidence](validation/calico-site-bgp-20260913-results.json)
-- [Ordinary-pod traffic matrix](validation/calico-site-bgp-20260913-network-results.json)
-
-This verifies site BGP full mesh only. It does not verify external BGP peering,
-AWS address allocation, mixed-CNI routing or Windows-to-Windows traffic.
-
 ## Control-plane dependency
 
 The retained lab uses an on-premises k0s control plane. AWS documents its
@@ -108,10 +90,6 @@ on the on-premises control plane alone does not satisfy this dependency.
    between the site and AWS, checking both directions and original identities.
 5. Repeat pod creation, worker replacement, gateway changes and reboot tests,
    retaining packet losses and proving address/route withdrawal and reuse.
-
-The September 12 evidence linked from the README is retained historical
-Calico-only evidence. This mixed-CNI profile remains unverified until the above
-checks run with the required placement and native AWS allocation.
 
 ## Sources
 

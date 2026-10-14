@@ -72,70 +72,6 @@ joined VM's distribution runtime before adoption can complete. The pooled comman
 currently requires this image-loading step separately. Workload probes require
 the harness's pinned `crictl` tool inside each newly provisioned guest.
 
-## Tested scenarios
-
-The native group campaign uses k0s `1.36.2+k0s.0`, containerd `2.3.2`, and bundled
-Calico `3.32.0-0`. Its eight KVM guests each have one physical NIC. Guest-agent
-access uses virtio-serial. These results qualify the linked scenarios for this
-configuration; other distributions, Windows groups, and CAPA groups require
-separate runs.
-
-| Scenario | Recorded result | Evidence |
-| --- | --- | --- |
-| Single-NIC topology | ✅ Eight guests; site-to-cloud reachability and remote isolation from direct site access | [Topology](validation/node-group-vm-topology-results.json) |
-| Three workers to one | ✅ Two claims, CAPI and infrastructure Machines, Nodes, VMs, and reservations removed; survivor identities retained | [Scale-down](validation/node-group-vm-scale-down-results.json) |
-| Disruption budget and scale-to-zero | ✅ A Ready pod blocks eviction until its budget permits it; all three workers subsequently removed | [PDB and zero](validation/node-group-vm-pdb-results.json) |
-| Slot reuse | ✅ Zero to three reuses names with new Machine, provider, and Node identities | [Reuse](validation/node-group-vm-reuse-results.json) |
-| Workload networking | ✅ 184 pod-IP, Service-IP, 1 MiB transfer, DNS, and external checks across eight Nodes | [Pod matrix](validation/node-group-vm-pod-matrix-results.json) |
-| Workload continuity during removal | ✅ 2,880 checks across six survivors, including a controller restart during drain; survivor Node and pod UIDs retained | [Continuity](validation/node-group-vm-continuity-results.json) |
-| UDP pod traffic | ✅ 600 exact responses across transit site, tunnel endpoint, and cloud worker | [UDP](validation/node-group-vm-udp-results.json) |
-| UDP Services | ✅ 600 exact responses; each Service resolves to its intended Ready pod | [UDP Services](validation/node-group-vm-udp-service-results.json) |
-| UDP between cloud workers | ✅ 1,200 exact pod and Service responses across same-cloud and cross-cloud pairs | [Cloud UDP](validation/node-group-vm-udp-cloud-results.json) |
-| Recovered capacity workload | ✅ Three adopted remote dialers and 184 workload checks after allocation starvation recovered | [Capacity workload](validation/node-group-vm-capacity-workload-results.json) |
-| Bootstrap observation retry | ✅ Same VM start time, guest boot ID, and single cloud-init execution across observer reconstruction | [Native retry](validation/vm-bootstrap-retry-native-results.json) |
-| Ready replica aggregation | ✅ Three adopted workers; cordon/uncordon changes Ready count 3 → 2 → 3 while total remains four | [Readiness](validation/node-group-vm-readiness-results.json) |
-| Group workload selection | ✅ Three ordinary pods on three group VMs; a different group UID remains unscheduled; `/scale` selects the worker pods | [Group labels](validation/node-group-vm-labels-results.json) |
-| Capacity exhaustion | ✅ Three reserved Machines progress; the excess request is cancelled before bootstrap publication | [Cancellation](validation/node-group-vm-bootstrap-cancellation-results.json), [capacity recovery](validation/node-group-vm-capacity-results.json) |
-| KEDA queue-driven capacity | ✅ 3 → 1 → 3 → 0 → 1, maximum of three, VM teardown and slot reuse; 184 and 102 network checks | [KEDA](validation/node-group-keda-results.json) |
-| Group deletion before claim admission | ✅ Absent-child reservation and unadmitted child removed; eight Node identities and VM start times retained | [Creation cancellation](validation/node-group-vm-creation-cancellation-results.json) |
-
-UDP sweeps cover both directions for each pair, fresh and reused sockets, and
-64, 1280, 1340, 1400, and 1800-byte bodies plus the five-byte echo prefix.
-The continuity observer pauses one second between matrices and measures sampled
-request success. UDP during removal and high-rate packet-loss behavior remain
-unverified. Bootstrap interruption during disk reset or network plumbing also
-requires separate validation.
-
-The [cancellation fence checks](validation/vm-slot-cancellation-fence-results.json)
-exercise competing allocation and cancellation writes against a real API,
-including first-pool creation. Native provider cancellation of an unallocated
-infrastructure Machine preserves the three running VMs, eight Node UIDs, and
-slot reservations. Combined provider statement coverage is 71.8%; this evidence
-covers the provider operation separately from group cancellation.
-
-[Real API slot tests](validation/vm-slot-reservation-api-results.json) cover
-reservation contention, restart recovery, exhaustion, and provider finalizer
-handling. Site peer publication uses a mesh resource-version check and requires
-an allocated tunnel address; API tests cover retirement racing publication and
-reselection of an endpoint with its existing key.
-
-The [image-import recovery check](validation/vm-image-import-memory-results.json)
-records a runner OOM and read-only guest filesystems, including a Ready Node that
-could not create a new pod. Existing-disk recovery preserved all Node UIDs; serial
-image import, new pod creation, and a [184-check workload matrix](validation/node-group-vm-post-memory-results.json)
-then passed. This verifies recovered connectivity; traffic continuity through
-that failure is unqualified.
-
-Claim teardown sends UID and resource-version preconditions when deleting a CAPI
-Machine, orphaned infrastructure object, or Node. The [API deletion race tests](validation/claim-teardown-delete-races-results.json)
-verify that a replacement or concurrent update causes a conflict and retains the
-claim finalizer. These checks protect the observed object during that request;
-ownership checks for replacements already present before observation remain
-separate work. After rollout, the [native KEDA 1 → 0 → 1 cycle](validation/claim-teardown-vm-results.json)
-verified complete teardown, slot release, and recreation with fresh identities.
-All [102 network checks](validation/claim-teardown-vm-network-results.json) passed
-after activation; permanent site Node identities remained unchanged.
-
 ## Pending-worker cancellation
 
 Deleting a group cancels a reserved creation when its child is absent. A child
@@ -147,36 +83,16 @@ Before admitting a new child, the claim controller reads its group directly from
 the API and checks its UID and deletion state. A late creation from a stale
 reconciler cannot start compute after its parent is deleting or gone. Already
 admitted claims continue provisioning so that removal can resolve and drain
-their Nodes. Real API tests cover late creation and concurrent admission. The
-[native VM checks](validation/node-group-vm-creation-cancellation-results.json)
-delete groups at both pre-admission stages and verify removal of the fixtures,
-unchanged existing Node/Machine identities, VM start times, and slot data.
-
-Group scale-down drains registered Nodes and can cancel a pending worker before
-the join controller reserves its WireGuard address or publishes userdata.
-Cancellation compares the Machine's resource version, records a marker that
-blocks join publication, then persists the bootstrap Secret and mesh identities.
-It deletes the exact child claim and waits for claim/CAPI/provider teardown.
-Provider finalizers and other controllers' deletion hooks remain in force.
-Real API tests cover both orders of the address-reservation race. The
-[native CAPI VM test](validation/node-group-vm-bootstrap-cancellation-results.json)
-removes the excess request from a three-slot pool, preserving the three allocated
-workers, all eight Node identities, VM start times, and slot data. The subsequent
-[184-check workload network matrix](validation/node-group-vm-post-cancellation-network-results.json)
-passes across all eight guests; it measures connectivity after cancellation.
+their Nodes. Real API tests cover late creation and concurrent admission.
 
 An existing address reservation, bootstrap Secret, peer entry, or claimed Node
 requires the remaining full cancellation lifecycle. Those workers retain their
-claim and drain action.
-The action records the owned Machine UID while Node registration is pending,
+claim and drain action. The action records the owned Machine UID while Node registration is pending,
 and retains a provider ID once observed. Late registration fills the Node fields;
 a replacement Machine, changed provider ID, or mismatched Node reference UID
 cannot replace the recorded target. This journal update does not authorize
-compute termination. The [native pending-target check](validation/node-group-vm-pending-target-results.json)
-records the fourth Machine UID while all eight Nodes and three workload pods
-remain Ready, with unchanged Node identities and slot data. Real API tests cover
-late registration and conflicting identity updates.
-In the native four-request, three-slot case, the excess Machine already has a
+compute termination. Real API tests cover
+late registration and conflicting identity updates. In the native four-request, three-slot case, the excess Machine already has a
 bootstrap Secret reference despite having no `providerID` or `nodeRef`. The
 referenced Secret and peer entries are absent. The reference alone does not
 establish that userdata exists, and the missing status fields alone cannot
@@ -264,11 +180,6 @@ UID; update the pod template's
 `nodeSelector` to target that replacement group. The broad `role: cloud-worker`
 Node label continues to identify cloud workers across individual claims and groups.
 
-The [native scheduling check](validation/node-group-vm-labels-results.json) uses
-required pod anti-affinity to place three pods on three group workers. A pod
-selecting a different group UID remains unscheduled. Native Windows placement
-remains separate acceptance work.
-
 ## Scaling and KEDA
 
 Expose `/scale` with `.spec.replicas`, `.status.replicas`, and `.status.selector`.
@@ -295,11 +206,6 @@ capped at the configured maximum of three. Emptying the queue removes all three
 workers and releases their slots. Three new items activate a fresh worker from
 zero, with a new Machine and Node identity. The five permanent site Nodes retain
 their identities throughout.
-
-The [recorded KEDA cycle](validation/node-group-keda-results.json) includes
-[184 network checks after scale-up](validation/node-group-keda-up-network-results.json)
-and [102 after activation from zero](validation/node-group-keda-restart-network-results.json).
-The test controls queue depth; separate probe pods verify scheduling and networking.
 
 The example below uses Prometheus for an application queue. Its metric must remain
 available when worker replicas reach zero. The Redis VM result does not qualify
@@ -352,7 +258,6 @@ The controller's claim and attachment paths use CAPI `v1beta2`. Attachment API
 validation serves only that version, including deletion-hook retention and
 request retirement. The live harness also serves `v1beta1` for compatibility.
 
-
 Select excess children deterministically, one at a time. Cordon the chosen Node,
 evict workloads through the eviction API respecting disruption budgets, wait for
 active work, withdraw tunnel/attachment ownership, then delete the child claim.
@@ -362,13 +267,9 @@ Group deletion follows the same sequence under a finalizer. The existing single
 claim configures a 120-second CAPI drain timeout; group scale-down must complete
 its own eviction and withdrawal gates before triggering that teardown.
 
-## Implementation and acceptance plan
-
 - [x] Inspect the single-claim lifecycle and define a separate group API.
-- [x] Add a deterministic replica planner with ownership and terminating-slot tests.
-      See `controller/pkg/nodegroup`; it proposes one create or drain at a time.
-- [x] Add API types and an experimental CRD with scale and status subresources.
-      An isolated API test verifies defaulting, scale-to-zero, status preservation,
+- [x] Add a deterministic replica planner with ownership and terminating-slot tests. See `controller/pkg/nodegroup`; it proposes one create or drain at a time.
+- [x] Add API types and an experimental CRD with scale and status subresources. An isolated API test verifies defaulting, scale-to-zero, status preservation,
       and resource-version conflicts. The CRD is in `controller/pkg/nodegroup/testdata`.
 - [x] Register the experimental controller behind an explicit flag, with namespace
       filtering, child ownership watches and opt-in Helm RBAC. The real-manager
@@ -379,17 +280,13 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Add deterministic child construction and ownership validation. Child names
       include a hash of the group UID; a recreated group cannot adopt its predecessor’s
       claims. Template copies are independent, and terminating children retain slots.
-- [x] Persist a pending action with a resource-version check before changing children.
-      Creation intent freezes the template; removal intent records the child UID.
-      The real API test verifies competing reservations conflict and scale updates
+- [x] Persist a pending action with a resource-version check before changing children. Creation intent freezes the template; removal intent records the child UID. The real API test verifies competing reservations conflict and scale updates
       preserve an in-flight action. Pending actions survive controller restarts.
 - [x] Resume reserved creation through direct API reads. A retry returns the same
-      claim UID and uses the frozen template after scale or template updates.
-      The real API test rejects mismatched group/action identities and preserves
+      claim UID and uses the frozen template after scale or template updates. The real API test rejects mismatched group/action identities and preserves
       conflicting claims for investigation.
 - [x] Complete creation after observing the reserved child UID. Status writes use
-      resource-version checks; stale completion cannot clear a later reservation.
-      The API test verifies the next replica uses the current template. Creation
+      resource-version checks; stale completion cannot clear a later reservation. The API test verifies the next replica uses the current template. Creation
       completion records a claim, while Node readiness remains a separate gate.
 - [x] Connect planning, reservation, creation, and completion in an experimental
       reconciler. A real API test reaches three claims while recreating controller
@@ -406,8 +303,7 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Fence cancellation against the join controller's address reservation and
       cancel admitted claims whose bootstrap data has not been published. Real
       API tests verify the race, retained deletion gates, and changed-proof holds.
-- [x] Validate pre-bootstrap cancellation through the native CAPI VM provider.
-      The four-request, three-slot group returns to three Ready replicas with
+- [x] Validate pre-bootstrap cancellation through the native CAPI VM provider. The four-request, three-slot group returns to three Ready replicas with
       the excess claim, CAPI Machine, and infrastructure Machine gone.
 - [ ] Cancel admitted workers after address reservation or userdata publication,
       including failed joins and Nodes that register during cancellation.
@@ -417,8 +313,7 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Publish group UID labels on associated Nodes with ownership and UID/version
       checks. Native scheduling selects the three group VMs; real API tests
       reject concurrent updates and replacement Nodes.
-- [x] Aggregate CAPI/Node readiness and current peer-document acknowledgements.
-      The native check verifies 3 → 2 → 3 Ready workers during cordon/uncordon,
+- [x] Aggregate CAPI/Node readiness and current peer-document acknowledgements. The native check verifies 3 → 2 → 3 Ready workers during cordon/uncordon,
       retaining four total children and the pending cancellation action. Unit
       tests cover Linux/Windows and both CAPI object versions, including identity
       and receipt changes during observation.
@@ -427,10 +322,7 @@ its own eviction and withdrawal gates before triggering that teardown.
       subsequent eviction, and retention of network DaemonSet pods.
 - [x] Resolve and persist the Machine UID, Node UID, and provider ID for a drain
       reservation. Resolver tests cover CAPI `v1beta1` and `v1beta2` object shapes
-      and reject replacement Nodes; the real API test verifies schema retention.
-      A [live identity audit](validation/node-group-capi-identity-observations.json)
-      found matching claim owner UIDs and Node provider IDs for eight existing
-      Machines, including local harness and AWS Windows/GPU workers. Group drain
+      and reject replacement Nodes; the real API test verifies schema retention. Group drain
       execution against those workers remains part of VM acceptance.
 - [x] Connect target binding and drain to the experimental reconciler with explicit
       management/workload clients and the served CAPI version. Tests verify that
@@ -438,8 +330,7 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Add retirement of an exact gateway request UID through the existing
       attachment controller. The helper checks worker identity and waits for
       both the durable `Complete` record and request disappearance. Unit tests
-      verify that pending hook cleanup and replacement requests retain the gate.
-      The registered-controller API test retires two successive same-name requests,
+      verify that pending hook cleanup and replacement requests retain the gate. The registered-controller API test retires two successive same-name requests,
       rejects the old UID against its replacement, and requires both API removal
       and a durable completion record. This test makes zero cloud calls.
 - [x] Discover gateway requests by worker identity within a mesh, retaining
@@ -455,13 +346,11 @@ its own eviction and withdrawal gates before triggering that teardown.
       until the first completes. The worker claim survives both retirements.
 - [x] Persist an action-owned drain marker on the CAPI Machine after workload
       drain and gateway inventory capture. Attachment lifetime checks retire
-      requests for marked participants and preserve existing deletion hooks.
-      Unit tests cover retries, competing markers, and protected/unprotected leases.
+      requests for marked participants and preserve existing deletion hooks. Unit tests cover retries, competing markers, and protected/unprotected leases.
 - [x] Prepare direct peer withdrawal from a mesh snapshot using the expected
       public key. Unit tests preserve survivor entries and address reservations,
       reject changed or missing key identities, and verify repeatable removal.
-- [x] Publish prepared direct peer removal with mesh UID/resource-version checks.
-      The API test rejects concurrent survivor updates and same-name replacement
+- [x] Publish prepared direct peer removal with mesh UID/resource-version checks. The API test rejects concurrent survivor updates and same-name replacement
       peers while preserving address reservations.
 - [x] Fence bootstrap, endpoint, and pod-prefix peer writes with a fresh Machine
       UID/drain check followed by an optimistic-lock mesh update. The real API
@@ -470,21 +359,17 @@ its own eviction and withdrawal gates before triggering that teardown.
       patches introduced in `f6e3d797`; surviving peer updates remain intact.
 - [x] Prepare public direct-peer withdrawal identities using the existing CAPI
       consumer resolver. Preserve unavailable survivors, reject missing consumers
-      and concurrent mesh changes, and exclude only the bound retiring worker.
-      Serialization tests retain the complete recipient set.
+      and concurrent mesh changes, and exclude only the bound retiring worker. Serialization tests retain the complete recipient set.
 - [x] Persist direct-peer identities in the pending group action after gateway
       retirement. The real API test verifies CRD retention across reloads, deep
       copies, stale-writer rejection, and preservation of the peer and child claim.
 - [x] Publish the captured direct-peer withdrawal through the mesh version check
       and gate completion on every retained consumer receipt. The real API test
       withholds site and remote acknowledgements independently, reloads the group,
-      and verifies that missing recipients and new membership block completion.
-      These controlled receipts test controller behavior, not native application.
+      and verifies that missing recipients and new membership block completion. These controlled receipts test controller behavior, not native application.
 - [x] Commit removal after withdrawal receipts, delete the recorded child claim
-      with UID/version preconditions, and wait for claim, Machine and Node absence.
-      The real API test preserves finalizers, rejects a replacement Machine,
-      resumes across reloads, and rejects replay of an old completed action.
-      CAPI teardown is simulated by deleting test resources at each boundary.
+      with UID/version preconditions, and wait for claim, Machine and Node absence. The real API test preserves finalizers, rejects a replacement Machine,
+      resumes across reloads, and rejects replay of an old completed action. CAPI teardown is simulated by deleting test resources at each boundary.
 - [x] Extend the saved withdrawal inventory for newly published peers before
       accepting acknowledgements. The real API test retains the original prefix,
       reloads the extension, rejects stale updates and changed keys, and preserves
@@ -493,11 +378,6 @@ its own eviction and withdrawal gates before triggering that teardown.
       on VMs. Concurrent retirement of a required consumer needs explicit lifetime
       evidence before its acknowledgement requirement can be released.
 - [ ] Verify native retirement acknowledgements and preparation races around the
-      drain marker, withdraw direct mesh peers, and serialize claim removal.
-      Gateway retirement alone leaves the claim retained.
+      drain marker, withdraw direct mesh peers, and serialize claim removal. Gateway retirement alone leaves the claim retained.
 - [x] Verify real API scale updates and KEDA Redis external-metric behavior,
       including zero, activation, and the maximum replica count on Linux k0s/Calico VMs.
-      See the [native KEDA cycle](validation/node-group-keda-results.json).
-- [ ] Run single-NIC VM 0→3→1→0, controller restart, failed boot, PDB blockage,
-      group recreation, and survivor-traffic tests.
-- [ ] Repeat supported Linux/Windows cases with real CAPA and prepared GPU images.

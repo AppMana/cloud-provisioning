@@ -49,20 +49,14 @@ python3 prepare_k0s.py --artifact /private/k0s \
 Stage [prepare_k0s.py](linux/prepare_k0s.py) alongside the artifact. This common
 systemd Linux step validates the hash and native version, installs `/usr/local/bin/k0s`,
 and records `/etc/cloud-provisioning-image/k0s.json`. It rejects existing k0s
-configuration, runtime state, services, or a different installed executable.
-The k0s join pattern already skips its download when this version matches.
-This layer does not install a service, unpack containerd, preload workloads, or
+configuration, runtime state, services, or a different installed executable. The k0s join pattern already skips its download when this version matches. This layer does not install a service, unpack containerd, preload workloads, or
 provide NVIDIA toolkit integration. Those require separate preparation and
-fresh-VM acceptance; do not apply the k0s layer to other distribution images.
-For Linux runtime-cache inputs, run
+fresh-VM acceptance; do not apply the k0s layer to other distribution images. For Linux runtime-cache inputs, run
 `python3 images/linux/stage_k0s_runtime.py --worker /path/to/k0s --sha256 VERIFIED_SHA256 --output /path/to/new-directory`
 from the build host. The shared extractor selects Linux containerd, its runc
 shim and runc, preserving their exact embedded bytes and marking ZIP entries
 executable. The Windows entrypoint selects its own runtime filenames and file
-modes through the same extractor. The
-[Linux staging check](../docs/validation/linux-runtime-staging-results.json)
-matches all three components against the installed binaries in a QEMU worker.
-Staging creates `runtime.zip` and `runtime.json`. Transfer them and
+modes through the same extractor. Staging creates `runtime.zip` and `runtime.json`. Transfer them and
 [prepare_runtime.py](linux/prepare_runtime.py) into an unjoined Linux image
 builder, then run as root:
 
@@ -113,15 +107,6 @@ partial cache for inspection. Copy operation evidence off the image and remove
 staged archives before capture. Keep cloud credentials and provider capture
 logic in the infrastructure adapter.
 
-The [native public-builder checks](../docs/validation/linux-public-cache-builder-results.json)
-exercise digest-pinned pulling, archive import, alias preservation, runtime
-restart and refusal to replay an existing operation on a single-NIC AWS VM.
-The [complete GPU-recipe build](../docs/validation/linux-full-public-cache-builder-results.json)
-also exercises all twelve images and twenty-three runtime references, including
-the selected init containers, dialer and first GPU workload. These are native
-scratch-store checks on an unjoined CPU builder. Preparing the default store for
-capture and qualifying a fresh GPU worker remain separate requirements.
-
 Validate a prepared Linux cache with the independent
 [native checker](../harness/e2e/observe/linux_cache_native.py). Stage it with
 [linux_cache.py](../harness/e2e/observe/linux_cache.py) and a digest-pinned cache
@@ -151,14 +136,10 @@ Retain the operation evidence outside the image. If interrupted, inspect that
 operation and its processes before retrying in a new directory. A passing result
 only accepts the builder cache. Image capture and a fresh CAPI worker must still
 prove cache reuse before harness imports, application execution, and safe node
-removal and replacement. Builder checks do not establish startup savings.
-The [Linux cache capture evidence](../docs/validation/linux-gpu-cache-capture-results.json)
-records the runtime/driver checks and independent cache acceptance separately
-from fresh-worker qualification. For AWS, bind incremental acceptance using
+removal and replacement. Builder checks do not establish startup savings. For AWS, bind incremental acceptance using
 `bake.py capture --capture-check` as described in [the AWS workflow](../docs/aws.md).
 
-On a fresh Linux worker, inspect the cache before importing any harness images.
-Resolve each pinned image's Linux amd64 manifest and config, hash its required
+On a fresh Linux worker, inspect the cache before importing any harness images. Resolve each pinned image's Linux amd64 manifest and config, hash its required
 content blobs, and inspect the committed overlayfs snapshot chain derived from
 the config's `rootfs.diff_ids`. Compare blob modification/change times and native
 snapshot creation/update times with the provider's instance launch time. Compare
@@ -167,15 +148,8 @@ mtime alone does not prove that k0s skipped extraction. The
 [reuse validator](../harness/e2e/observe/linux_cache_reuse.py) and its native fixture
 implement these checks. This proves reuse of those cached artifacts; it does not
 prove zero registry requests or reduced startup cost. Run the intended GPU
-workload and lifecycle checks separately.
-The [fresh AWS GPU cache result](../docs/validation/linux-gpu-cache-capi-results.json)
-records blob and snapshot reuse, a GPU workload using its baked image, the
-network matrix, node removal and diagnostic survivor failures as separate results.
-Validate executable staging independently from image capture and fresh-worker
-reuse. The [runtime preparation evidence](../docs/validation/linux-runtime-preparation-results.json)
-covers the staged files and repeat behavior; the
-[CPU CAPI evidence](../docs/validation/linux-k0s-baked-capi-results.json)
-covers a fresh worker and removal. Neither replaces GPU cache, replacement or
+workload and lifecycle checks separately. Validate executable staging independently from image capture and fresh-worker
+reuse. Neither replaces GPU cache, replacement or
 survivor-traffic qualification. A diagnostic run remains unqualified even if its
 own traffic samples pass.
 
@@ -200,12 +174,7 @@ behavior. Cloud bootstrap prerequisites still run during the image build.
 
 Reboot the GPU builder and verify both the preserved k0s layer and native GPU
 execution before capture. A composed image still needs fresh CAPI joining,
-scheduled graphics/encoding, cache reuse, removal and replacement checks.
-This option does not bake the NVIDIA toolkit or qualify a parent image by itself.
-Use the [composed-image validation](../docs/validation/linux-k0s-gpu-image-capture-results.json)
-for the driver/reboot acceptance criteria and the
-[fresh GPU CAPI validation](../docs/validation/linux-k0s-gpu-baked-capi-results.json)
-for joining and hardware execution. A manually imported workload image does not
+scheduled graphics/encoding, cache reuse, removal and replacement checks. This option does not bake the NVIDIA toolkit or qualify a parent image by itself. A manually imported workload image does not
 prove startup cache reuse. Keep replacement and survivor-traffic results separate
 from successful GPU rendering or encoding.
 
@@ -251,9 +220,7 @@ add a parallel bootstrap importer for this distribution. A staged archive still
 requires import at startup; it is not evidence that Windows layers were unpacked
 before capture. Validate a prepared runtime cache on both Windows builds through
 Sysprep and a fresh CAPI boot before claiming that startup performs no image
-downloads or layer extraction. The [Windows 2022 fresh-cache result](../docs/validation/windows-capi-gpu-startup-cache-canonical-2022-results.json)
-and [Windows 2025 result](../docs/validation/windows-capi-gpu-staged-withdrawal-2025-results.json)
-establish observed cache reuse after capture and fresh CAPI boot. Cache-hit events
+downloads or layer extraction. Cache-hit events
 and runtime inventory do not establish zero registry access or startup savings.
 
 Prepare runtime inputs for that image-build work from the exact worker artifact:
@@ -263,15 +230,6 @@ python3 images/windows/stage_k0s_runtime.py \
   --worker /path/to/k0s.exe --sha256 VERIFIED_WORKER_SHA256 \
   --output /path/to/new-runtime-directory
 ```
-
-This build-host command reads k0s's appended payload and emits a conventional
-`runtime.zip` containing its containerd and Windows shim, plus `runtime.json`
-with the worker, archive and component hashes. It rejects a changed worker,
-missing or duplicate components, and an existing output directory. The build-host
-ZIP conversion is required for the native Windows reader;
-see the [runtime staging fixture](../docs/validation/windows-runtime-staging-results.json).
-Staging does not change a running runtime. Pre-unpacking on an unjoined builder
-and proving cache reuse after Sysprep remain separate requirements.
 
 `windows/prepare-cache.ps1` builds that cache on a fresh, unjoined Windows VM.
 Stage it beside `cache-runtime.ps1` and `inspect-cache.ps1`, together with the
@@ -364,12 +322,7 @@ recipe cannot prove a complete startup cache. Check fresh-VM events and the actu
 pull policy: a local alias does not remove `Always` policy's registry-resolution
 requirement. Containerd's
 [pinned local-tag implementation](https://github.com/containerd/containerd/blob/v2.3.2/cmd/ctr/commands/images/tag.go)
-copies existing metadata without looking up the registry tag. The
-[native alias fixtures](../docs/validation/windows-cache-alias-results.json)
-cover metadata preservation; the
-[Windows 2022](../docs/validation/windows-capi-gpu-startup-cache-canonical-2022-results.json)
-and [Windows 2025](../docs/validation/windows-capi-gpu-staged-withdrawal-2025-results.json)
-reports cover fresh-worker cache checks and retain their failed traffic gates.
+copies existing metadata without looking up the registry tag.
 
 For the standalone builder runtime on `\\.\pipe\cldt-image-cache`, run
 `windows/inspect-cache.ps1` on the guest and save its JSON output on the build
@@ -386,10 +339,7 @@ python3 harness/e2e/observe/windows_cache.py \
 
 Repeat `--image` for each intended image. The verifier requires the exact image
 set, downloaded and unpacked, in k0s's `k8s.io` namespace and Windows snapshotter,
-with the staged runtime hashes. Registered metadata alone is insufficient;
-require completed unpacking and cache survival across a runtime restart, as in
-the [native readiness fixture](../docs/validation/windows-runtime-cache-results.json).
-A passing running-builder snapshot does not replace service shutdown, Sysprep,
+with the staged runtime hashes. A passing running-builder snapshot does not replace service shutdown, Sysprep,
 or fresh-clone cache verification.
 
 `windows/prepare-k0s.ps1` enables Windows Containers and stages the checksum-pinned
@@ -405,20 +355,6 @@ when testing the Windows Traefik fix. This common layer performs no download and
 updates the preparation receipt checked by `verify-k0s.ps1`; cloud adapters can
 stage the same artifact before their own capture step. It rejects installed
 workers and known cluster identity files.
-
-For large Windows artifacts, use the harness's private file-transfer path rather
-than embedding data in userdata or command text. Its PowerShell downloader
-suppresses progress reporting during the download, then restores the prior
-preference. The [native large-artifact transfer check](../docs/validation/windows-large-artifact-transfer-results.json)
-records a 732 MB package transferred through that path; package hash and publisher
-verification remain the preparation recipe's responsibility.
-
-[Native preparation evidence](../docs/validation/windows-image-worker-results.json)
-records both AWS Windows builders accepting the pinned worker, refusing incorrect
-bootstrap versions/hashes, and retaining no joined-worker identity. The same
-preparation script rejects live joined workers without changing their executable.
-These checks qualify preparation guards; image capture and fresh CAPI boots
-have their own acceptance gates.
 
 `windows/prepare-wireguard.ps1` adds the signed WireGuardNT 1.1 DLL, checking the
 archive hash, DLL hash and publisher. It retains the SDK's license beside the
@@ -464,12 +400,6 @@ workload from the captured cache before any harness image imports. Verify staged
 CAPI removal and continuous survivor traffic independently. Successful graphics
 execution does not qualify node lifecycle reliability.
 
-| Validation scope | Native evidence |
-| --- | --- |
-| Driver preparation and licensing | [Windows 2022 and 2025](../docs/validation/windows-gpu-image-preparation-results.json) |
-| Joining and ordinary GPU containers | [Windows worker checks](../docs/validation/windows-gpu-worker-join-results.json) |
-| Fresh cache, first workload and staged removal | [Windows 2022](../docs/validation/windows-capi-gpu-startup-cache-canonical-2022-results.json), [Windows 2025](../docs/validation/windows-capi-gpu-staged-withdrawal-2025-results.json) |
-
 The fresh-cache reports retain failed survivor UDP checks; they do not qualify
 combined Windows lifecycle support or image promotion.
 
@@ -496,12 +426,10 @@ transport session. Preparation reruns native GPU verification, retains the drive
 receipts, and removes staged installers and diagnostic state. Capture requires
 saved post-reboot WDDM evidence for the selected Windows build. It creates a
 private candidate, records it for cleanup, and leaves workload qualification
-unchanged. See the [native GPU capture validation](../docs/validation/windows-gpu-capture-results.json)
-for completed phases and remaining gates. Once the candidate is available,
+unchanged. Once the candidate is available,
 use the same selectors with `--phase authorize` to allow its exact AMI in the
 isolated CAPA role. Authorization revalidates and retains previously authorized
-Windows candidates and the configured Linux AMI; it does not qualify the image.
-GPU `revise` requires an explicit changed cache recipe and preserves the recorded
+Windows candidates and the configured Linux AMI; it does not qualify the image. GPU `revise` requires an explicit changed cache recipe and preserves the recorded
 CPU base, worker, tunnel and driver. It retains the previous captured image in
 history. Change the CPU base first for a different worker or tunnel; a fresh
 CAPI boot and scheduled GPU workloads remain promotion gates.
@@ -521,7 +449,6 @@ CAPA provisions the VM. Use `aws/windows_join.py --variant gpu` with the same
 Windows version and claim name to observe joining against that image's hashes.
 This observer verifies joining, not GPU device allocation or container workloads.
 
-
 Retain the AWS-restricted package and images privately. This package must not be
 reused on another cloud. See [AWS's driver and license requirements](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/nvidia-GRID-driver.html).
 
@@ -529,7 +456,6 @@ The native tunnel probe uses the DLL through its documented API. Its integration
 test verifies that an application can create and remove the adapter on both OS
 builds. Bake the required binaries and driver into a final worker image before
 launching latency-sensitive workloads.
-
 
 The [Windows WDDM plugin test deployment](probes/windows/device-plugin.yaml)
 is restricted to Windows nodes explicitly labelled

@@ -81,22 +81,3 @@ These are checked read-only by `cmd/acceptance preconditions` (see
 | Address ranges | Tunnel ranges disjoint from pools, Service and node addresses, and remote cloud networks outside the autodetection CIDRs | A peer's accept list would otherwise claim an address the cluster already uses. |
 
 For k0s the pod MTU is `spec.network.calico.mtu`.
-
-## Validation
-
-- [VM lab, required settings](validation/k0s-1.36.4-calico-bird-dualstack-results.json):
-  5,987 checks over 21 stages, every one passing: four endpoint placements,
-  each remote removed and recreated under each placement, kubelet logs and exec
-  through the API server and `calico-node` readiness on every node at every
-  stage. Moving the endpoints between all nodes and one worker and back kept
-  262 of 262 kubelet requests working; before the endpoint source fix 4 of 159
-  hung for about a minute each.
-- [VM lab, deployment as configured](validation/k0s-1.36.4-calico-bird-dualstack-asis-results.json):
-  278 of 335 checks; every cross-tunnel don't-fragment UDP datagram of
-  1449 and 1450 bytes is lost, and remote `calico-node` pods are never Ready.
-- [CAPA AWS workers](validation/aws-k0s-1.36.4-calico-bird-dualstack-results.json):
-  two EC2 workers in us-west-2 joined over the lab's real WAN; 2,753 checks over
-  nine rows: both workers, each removed with the other surviving and recreated
-  on a new instance and Node, and four endpoint placements.
-
-See also the [tunnel scenarios](tunneling-scenarios.md#dual-stack-native-calico-bgp).

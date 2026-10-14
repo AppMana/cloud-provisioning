@@ -31,11 +31,7 @@ graph LR
 
 Recorded tests:
 
-- [k0s/Calico CAPA AWS](validation/aws-k0s-calico-results.json): add, remove, and
-  recreate workers, then verify converged connectivity under four placements.
-- [MicroK8s local VM lifecycle](validation/microk8s-lifecycle-results.json): two
-  replacement cycles and four placements, with 1,324 required checks.
-- The cloud-to-cloud edge above represents remote peering. Multi-provider AWS,
+Multi-provider AWS,
   Azure, and Google Cloud qualification requires separate assets and campaigns.
 
 ## Multiple site endpoints and outages
@@ -50,12 +46,6 @@ graph LR
   e1 === r[Cloud worker]
   e2 === r
 ```
-
-The [k0s/Kube-router outage campaign](validation/k0s-1.36-kuberouter-outage-results.json)
-checks twelve NIC-cut/reboot rows under one-worker and two-worker placements.
-It records 4,904 required checks at convergence. Sole-endpoint isolation has
-explicit expected failures for site-dependent traffic. Recovery checks and
-continuous packet-loss measurements are reported separately.
 
 ## CNI encapsulation and native routing
 
@@ -73,16 +63,6 @@ flowchart LR
   d --> wg
   wg --> peer[Peer node and destination pod]
 ```
-
-- [k0s/Calico](validation/k0s-1.36-lifecycle-results.json) and
-  [MicroK8s/Calico](validation/microk8s-lifecycle-results.json) exercise their
-  observed distribution configurations.
-- [Kube-router](validation/k0s-1.36-kuberouter-lifecycle-results.json) exercises
-  its routed profile and endpoint placement changes.
-- Flannel and Canal results retain their original versions in the
-  [VM campaign documentation](validation/single-nic-vms.md).
-- BGP belongs to profiles that use it. The controller reads the CNI's encapsulation
-  mode and per-node allocations instead of assuming every network uses BGP.
 
 ## Dual-stack native Calico BGP
 
@@ -104,19 +84,6 @@ flowchart LR
   r --> rp[Remote pod v4/v6]
 ```
 
-- [The deployment as configured](validation/k0s-1.36.4-calico-bird-dualstack-asis-results.json):
-  every IPv4 and IPv6 pod, Service, 1 MiB transfer and DNS check passes, while
-  every cross-tunnel do-not-fragment UDP datagram above the 1420-byte tunnel MTU
-  and within the 1450-byte pod MTU is lost, and remote `calico-node` pods are
-  never Ready under Calico's full node mesh.
-- [With the required settings](validation/k0s-1.36.4-calico-bird-dualstack-results.json)
-  (pod MTU 1420, site-only BGP peering): 5,987 checks, all passing, across four
-  endpoint placements with each remote removed and recreated under each, kubelet
-  logs and exec gated at every stage.
-- [CAPA AWS](validation/aws-k0s-1.36.4-calico-bird-dualstack-results.json): two
-  EC2 workers over the lab's real WAN, add, remove, recreate and four placements,
-  2,753 checks.
-
 ## Windows through an AWS gateway attachment
 
 A gateway attachment can route traffic between Windows worker interfaces and the
@@ -129,12 +96,6 @@ graph LR
   g --- v[VPC routes and security groups]
   v --- w[Windows worker: HNS and CNI]
 ```
-
-[Gateway ingress evidence](validation/gateway-api-ingress-results.json) covers
-native Windows Server 2022 API access diagnosis and withdrawal cleanup.
-[Windows gateway documentation](windows-gateway.md) describes setup and current
-limits. This partial evidence leaves full packet, lifecycle, and failure
-qualification open.
 
 ## Generation switch, rollback, and retirement
 
@@ -153,16 +114,6 @@ flowchart LR
   db --> endA[Retire B]
 ```
 
-[Linux VM experiments](validation/handover-egress-results.json) exercise IPv4/IPv6
-switch, rollback, retirement, and source isolation. The
-[Windows Server 2022/2025 experiment](validation/windows-stable-owner-isolation-results.json)
-keeps the host identity on a separate owner interface while selecting generation
-devices. Its IPv4/IPv6 runs record 8,803 authorized exchanges, 40 rejected source
-probes, and 1,483 positive alternate-source controls. Windows test packets use an
-opaque UDP relay because existing production routes constrain direct endpoints.
-
 These are host-level experiments. Production CNI/HNS policy and controller-driven
-handover require separate integration. The
-[MicroK8s production-path result](validation/microk8s-source-routing-results.json)
-retains packet loss. See [handover design](tunnel-handover.md) for persisted receipt
+handover require separate integration. See [handover design](tunnel-handover.md) for persisted receipt
 rounds, drain policy, and remaining acceptance gates.

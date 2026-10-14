@@ -76,23 +76,3 @@ runtime components from the network during startup. Verify its hash and version
 natively on both Windows versions, then test service restart, API backend updates
 and fresh CAPI boots. Keep the previous executable available for rollback during
 existing-worker testing.
-
-## Native worker validation
-
-[Full-worker evidence](../../docs/validation/windows-k0s-traefik-worker-results.json)
-records the packaged binary running as the worker service on Windows Server 2022
-and 2025. Existing read-only routing files become writable after startup. Stopping
-one of the isolated cluster's three controllers reduces both Windows proxies'
-API backend lists from three to two; restarting it restores all three through
-normal worker-profile updates. Worker service processes remain unchanged during
-those updates.
-
-Authenticated readiness probes use the node kubeconfig through the IPv6 loopback
-proxy, with TLS server-name verification. Both versions pass all probes after
-backend removal converges and after restoration. During removal, Server 2022
-passes 40/40 requests and Server 2025 passes 39/40. This demonstrates routing-file
-replacement and recovery; the failed request leaves continuous availability
-unqualified. Prepared-image CAPI boots have separate
-[fresh-image checks](../../docs/validation/windows-fresh-image-join-results.json).
-See the [Windows validation boundaries](../../docs/windows.md#validation-boundaries)
-for the scoped lifecycle results and remaining release gates.

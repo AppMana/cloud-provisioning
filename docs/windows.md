@@ -1,12 +1,11 @@
 # Windows workers
 
-Windows Server 2022 (build 20348) and Server 2025 (build 26100) have passed
-fresh-image CAPI join and replacement checks on single-NIC EC2 VMs. Workload
-networking remains **unqualified for release** because small and fragmented UDP traffic
-can be dropped by Windows VFP. Do not treat successful node registration as
-proof that a Windows workload is supported.
+Windows Server 2022 (build 20348) and Server 2025 (build 26100) require separate
+qualification. Workload networking remains **unqualified for release**: small
+and fragmented UDP can be dropped by Windows VFP. Node registration alone does
+not establish workload support.
 
-The tested images contain the patched k0s `v1.36.2+k0s.0.appmana.1` worker,
+The image configuration uses the patched k0s `v1.36.2+k0s.0.appmana.1` worker,
 containerd 2.3.2 and the native Windows tunnel service. Windows Calico uses its
 physical cloud NIC for VXLAN. A single-NIC Linux gateway carries traffic between
 the WireGuard mesh and that cloud subnet. Attachment requests bind the Machine,
@@ -14,27 +13,17 @@ Node and ENI identities, manage shared return routes and scoped ingress rules,
 and preserve Calico's native transport address. See
 [gateway configuration and removal ordering](windows-gateway.md).
 
-## Dual-stack test configuration
-
 The pinned k0s `v1.36.2+k0s.0` validator rejects Calico/VXLAN with dual-stack
 enabled. Its supported dual-stack Calico configuration uses BIRD; that is a
 different dataplane from the Windows VXLAN profile tested here. Passing BIRD
-validation cannot qualify the Windows VXLAN path. The
-[native configuration checks](validation/k0s-default-contract-results.json)
-record both accepted and rejected configurations without changing the running
-cluster. A Windows dual-stack VXLAN candidate needs compatible k0s and Calico
-implementations, then a separate VM bringup and source-identity policy matrix.
-See [the pinned k0s dual-stack configuration](https://github.com/k0sproject/k0s/blob/v1.36.2%2Bk0s.0/docs/dual-stack.md).
-
-## Bootstrap completion
+validation cannot qualify the Windows VXLAN path. A Windows dual-stack VXLAN candidate needs compatible k0s and Calico
+implementations, then a separate VM bringup and source-identity policy matrix. See [the pinned k0s dual-stack configuration](https://github.com/k0sproject/k0s/blob/v1.36.2%2Bk0s.0/docs/dual-stack.md).
 
 The Windows CAPA consumer uses detached EC2Launch userdata so SSM can start
 while joining is in progress. EC2Launch's successful agent state does not prove
 the detached script succeeded. `bootstrap-installed` marks service installation;
 absence of the temporary credential script also cannot prove success because
-the consumer removes it in its failure path. The
-[native Windows bootstrap observations](validation/windows-bootstrap-contract-results.json)
-record these separate states on Server 2022 and 2025. The updated CAPA consumer writes an instance-bound terminal receipt, and new
+the consumer removes it in its failure path. The updated CAPA consumer writes an instance-bound terminal receipt, and new
 Windows lifecycle rows wait for it before counting a join as complete. Build
 the CAPA controller from the updated consumer before running those rows;
 legacy consumers do not produce this receipt. Native synthetic success/failure
@@ -47,59 +36,23 @@ For CAPI webhook timeouts on mixed-OS k0s sites, see
 [API egress diagnosis and the Linux routing canary](k0s-windows-egress.md).
 Node readiness and successful Windows exec do not establish webhook reachability.
 
-| Capability | Current evidence and limits |
-| --- | --- |
-| Fresh-image join | [Both Windows versions](validation/windows-fresh-image-join-results.json): artifact hashes, Machine/Node provider identity, readiness and fresh peer-delivery acknowledgements. Consumed secure-bootstrap chunks are removed. |
-| Native Kubernetes exec | [Konnectivity](validation/windows-konnectivity-ingress-results.json) requires k0s TCP 8132 in addition to the API listener. Both replacement workers passed native execution checks in the [replacement matrix](validation/windows-replacement-matrix-results.json). Direct kubelet TCP 10250 access is not required for this path. |
-| API backend updates | [Existing-worker rollout](../providers/k0s/README.md#native-worker-validation) changes the proxies from three controllers to two and back without worker-service restarts. During backend removal, Windows 2022 passed 40/40 readiness requests and Windows 2025 passed 39/40. This establishes recovery within that test, with continuous availability unqualified. |
-| Removal and replacement | [Windows 2022](validation/windows-claim-removal-results.json) and [Windows 2025](validation/windows-2025-removal-results.json) retain shared resources and acquire new identities. [Consumer retirement](validation/windows-consumer-retirement-results.json) preserves old identity history while accepting replacements. |
-| Automatic CAPI withdrawal | [Deleting only a Windows 2022 claim](validation/capi-automatic-withdrawal-results.json) exercised attachment cleanup before instance deletion, including native pre-drain and pre-terminate holds. Automatic gateway deletion and the complete failover matrix remain unqualified. |
-| TCP, Services, DNS and policy | The [replacement matrix](validation/windows-replacement-matrix-results.json) covers distinct-node ordinary pods and separate ingress allow/deny/restore checks on both Windows versions. It does not cover the complete policy matrix or sustained reliability. |
-| Workload MTU | [Periodic reconciliation](validation/windows-mtu-periodic-repair-results.json) repairs workload interface MTU resets. MTU repair does not resolve the fragmented-UDP failures. |
-| UDP fragmentation | [Combined packet/counter evidence](validation/windows-udp-collision-capture-results.json) matches five missing echoes in 600 attempts to VFP fragment drops and outbound fragment-cache hash-collision increments. Two failures dropped requests; three dropped replies. A mitigation remains unproven. |
-| Small UDP reliability | [Native packet evidence](validation/windows-small-udp-vfp-drop-results.json) locates an unfragmented 64-byte reply drop at the Windows VFP extension despite valid captured checksums. The [staged-withdrawal trial](validation/windows-capi-staged-withdrawal-2022-results.json) retained 10 failed echoes out of 82,494 attempts. The root cause remains unresolved. |
-| IPv6 and dual stack | [Native tunnel tests](validation/windows-tunnel-results.json) cover IPv4 and IPv6 TCP and route removal/re-addition. They do not qualify simultaneous dual-stack Kubernetes or NetworkPolicy support. The [retained fleet observation](validation/windows-dualstack-prerequisites-results.json) has IPv4-only Node pod CIDRs and active pools; IPv6 isolation requires a separate dual-stack VM site. |
-| GPU workloads | Driver image preparation, license activation, device allocation, DirectX rendering and encoding are separate gates. Follow [GPU workers](gpu-workers.md); Windows GPU workloads are not yet qualified. |
-
 Use the [ordinary-pod matrix observer](../harness/e2e/observe/README.md) with the
 explicit Node UIDs from the lifecycle stage under test. Finite successful samples
-do not supersede earlier failures. [Socket reuse](validation/windows-udp-socket-reuse-results.json)
-and [10 ms pacing](validation/windows-udp-pacing-results.json) did not eliminate
-UDP timeouts. Packet captures must inspect both request and response directions.
-The [native preflight result](validation/windows-native-preflight-cleanup-results.json)
-retains two losses in 8,039 baseline echoes before any new claim was submitted.
-The original samplers were collected and removed, and all 13 original Nodes
+do not supersede earlier failures. Packet captures must inspect both request and response directions. The original samplers were collected and removed, and all 13 original Nodes
 remained Ready. This is baseline-failure evidence, not a completed GPU or CAPI
-lifecycle test. A separate [fresh GPU diagnostic](validation/windows-gpu-startup-cache-canonical-2022-results.json)
-passed cache reuse and hardware execution with the corrected image; its combined
-lifecycle qualification remains failed by design while networking is unresolved.
-The [physical ENA receive-offload comparison](validation/windows-ena-rx-offload-results.json)
-passed 6,000 small UDP echoes with the original settings, 6,000 with receive
-checksum offload disabled on Windows 2025, and 6,000 after restoration. Because
-neither control reproduced the loss, this does not demonstrate a mitigation.
-The original checksum settings, recorded MTUs and Pod identities were preserved;
-no offload change is included in worker images or bootstrap.
-The [Windows 2022 continuous-stream comparison](validation/windows2022-ena-native-stream-results.json)
-reproduced loss in both controls: 11/34,816 failed echoes before the change,
-10/36,813 with physical ENA UDP IPv4 receive-checksum offload disabled, and
-16/34,793 after restoration. The same six native sampler processes ran across
+lifecycle test. The original checksum settings, recorded MTUs and Pod identities were preserved;
+no offload change is included in worker images or bootstrap. The same six native sampler processes ran across
 all phases at a requested 10 ms interval. Disabling this offload did not eliminate
 loss, including traffic involving the changed worker. These bounded observations
-do not establish a change in failure rate or identify the dropping component.
-Phase counts are checked against original terminal logs; full logs also retain
-preflight and adapter-restart transitions. Original checksum settings and recorded
-MTUs were restored or preserved, and the owned test tools were removed.
-The [bounded native-stream capture](validation/windows-native-stream-drop-results.json)
-retains three timeouts in 14,280 attempts at a 10 ms interval. On Windows 2022,
+do not establish a change in failure rate or identify the dropping component. Phase counts are checked against original terminal logs; full logs also retain
+preflight and adapter-restart transitions. On Windows 2022,
 one request correlates with VFP `Invalid Packet` at `0xE0006096`; another
 correlates with TCP/IP `Not locally destined` at `0xE0004136`. The third timeout
 has no receiver-side capture in that run. The VFP drop-only bytes differ from
 ten earlier appearances only in the inner IPv4 traffic class (`0x00` to `0x74`)
 and its checksum; IPv4 and UDP checksums remain valid. This is a diagnostic lead,
 not an established cause or mitigation. The earlier captured VFP drop had no
-traffic-class change. [IP-ID comparison](validation/windows-vfp-ipid-comparison-results.json)
-also found no repeated outer tuple/ID in that earlier capture; matching IDs on
-unrelated tuples or encapsulation layers do not establish a collision.
+traffic-class change.
 
 Keep raw ETL and native drop metadata alongside the ordinary PCAP, and export
 `pktmon etl2pcap capture.etl --drop-only --out drops.pcapng` when comparing bytes
@@ -108,18 +61,12 @@ see [Microsoft's conversion reference](https://learn.microsoft.com/en-us/windows
 The parser preserves the native component/reason and reports traffic-class
 changes without treating them as proof of causation.
 
-The [native bootstrap checks](validation/windows-bootstrap-results.json) cover
-EC2Launch, binary transfer, native exit status and protected file permissions;
-those transport checks do not establish workload networking support.
-
-The [VFP reordered-fragment experiment](validation/windows-vfp-reordered-rejected-results.json)
-was rejected before traffic testing. On the tested Windows 2025 build, the
+On the tested Windows 2025 build, the
 native tool's documented argument sequence with `-1` preservation values also
 disabled two unrelated optimization settings; the attempted reversal returned
 error 87. Do not bake this command into images or startup scripts. Calico
 recreated the disposable probe endpoint, removing the modified port and restoring
-every observed flow setting to its original value. The restored network matrix
-passed 59 of 60 checks, retaining one fragmented UDP failure. This provides no
+every observed flow setting to its original value. This provides no
 evidence that reordered-fragment support fixes packet loss.
 
 ## Guest bootstrap selection
@@ -154,23 +101,9 @@ spec:
 ```
 
 [k0s documents that Envoy is unavailable on Windows](https://docs.k0sproject.io/stable/nllb/).
-With Envoy selected, the VM test observed the Windows kubelet waiting on its
-loopback API endpoint while the Envoy sandbox waited for CNI initialization.
-The node could not register, so k0s could not schedule the Windows Calico
-DaemonSet. Use the supported backend instead of installing CNI manually to
-break this dependency. Update the controller configuration consistently and
-restart existing workers as described by k0s. The harness uses Traefik for
-mixed Linux/Windows sites; historical Envoy matrix evidence remains specific
-to that configuration.
-
-k0s 1.36.2 also needs the [Windows Traefik file-replacement patch](../providers/k0s/README.md)
-to replace its existing read-only routing configuration on Windows. The original
-writer reproduced `Access is denied`; the patched package tests passed on both
-Windows versions and Linux. See [native regression evidence](validation/k0s-windows-traefik-results.json).
-The patched worker is baked into the images exercised by the
-[fresh-image join checks](validation/windows-fresh-image-join-results.json).
-Those join checks do not establish live backend updates or failover; validate
-those behaviors separately.
+Envoy can introduce a dependency cycle between loopback API access and CNI
+initialization. Use the supported backend, update controller configuration
+consistently, and restart existing workers as described by k0s.
 
 ## Prepared-image k0s bootstrap
 
@@ -198,9 +131,7 @@ the local VM provider uses its reported identity. The distribution renderer
 contains no AWS API calls. Windows AWS discovery currently supplies the primary
 IPv4 address; dual-stack node registration remains a separate integration gate.
 
-Renderer, provider-contract and PowerShell parser checks pass. Native AWS
-[first-boot and CAPI join checks](validation/windows-fresh-image-join-results.json)
-also pass for both Windows versions with the baked patched worker. Those AWS
+Renderer, provider-contract and PowerShell parser checks pass. Those AWS
 results do not qualify the local VM provider or workload networking. CAPA's
 Windows secure consumer must be installed, and images must be cleaned and
 generalized before capture.
@@ -314,10 +245,7 @@ HostProcess container cannot read its configuration. Containerd protects its
 own store separately. Cache preparation and capture require directory-permission
 evidence as well as unpacked images; older readiness receipts do not satisfy
 this gate. Regenerate recipes with the current helper: schema version 2 includes
-the inherited-permissions layout, giving corrected captures distinct names.
-A manually repaired worker does not qualify the original image.
-The [native permissions experiment](validation/windows-cache-permissions-results.json)
-records the Windows 2022 failure and scoped diagnostic repairs. The inherited ACL
+the inherited-permissions layout, giving corrected captures distinct names. A manually repaired worker does not qualify the original image. The inherited ACL
 also affected Konnectivity's projected service-account files; this was a file
 access failure, not evidence that Windows cannot use projected tokens.
 
@@ -424,12 +352,9 @@ not establish that condition. Duplicate-address detection is disabled on the
 owned WireGuard adapter, matching upstream WireGuard's static tunnel setup;
 physical NIC settings remain unchanged.
 
-The [native address report](validation/windows-generation-address-results.json)
-separates successful lifecycle/address repair from the unsupported experiment
-that assigns one identity address to two generation adapters. Do not use that
+Do not use that
 experiment as a deployment configuration. The [handover design](tunnel-handover.md)
-requires the stable address owner to outlive individual tunnel generations.
-The address-verification change still needs workload/image rollout validation.
+requires the stable address owner to outlive individual tunnel generations. The address-verification change still needs workload/image rollout validation.
 
 To run the focused native regression, cross-compile `pkg/tunneldevice` with
 `GOOS=windows GOARCH=amd64 go test -c -cover ./pkg/tunneldevice`, place the
@@ -440,14 +365,6 @@ and rejection of duplicate ownership without disrupting the existing adapter.
 The retired shared-address acceptance experiment is preserved in the native
 address report's evidence archive. Use the stable-owner experiment for
 generation lifetimes and retain the active duplicate-owner rejection regression.
-
-The [peer continuity report](validation/windows-peer-continuity-results.json),
-[Windows 2025 workload report](validation/windows-peer-update-rollout-2025-results.json),
-and [CAPI membership report](validation/windows-peer-membership-both-results.json)
-record native and workload validation scopes. They do not establish lossless
-traffic during every service restart or resolve fragmentation failures.
-For CAPI webhook failures caused by agent routing, see
-[Windows agent egress and the Linux default-route addon](k0s-windows-egress.md).
 
 Build the instrumented probe from `controller`:
 
@@ -477,23 +394,8 @@ rules when the probe finishes. Coverage files are saved beside each result.
 
 The [CAPA extension](../providers/capa/README.md) implements the Windows consumer
 for CAPA-owned Secrets Manager chunks; this requires the forked CAPA controller.
-The [consumer checks](validation/windows-secure-consumer-results.json) cover
-chunk retrieval, Unicode script execution and cleanup through instance-role
-credentials on both Windows builds using SSM on existing VMs. The separate
-[fresh-image join checks](validation/windows-fresh-image-join-results.json)
-cover native first-boot execution and CAPI joining through the modified controller.
 
 ## Native tunnel and API services
-
-The service backend owns one identity address on one adapter. Generation
-handover needs a separate stable address owner; do not assign that identity to
-multiple adapters. The [native VM experiment](../controller/pkg/tunneldevice/testdata/stable-owner-windows/README.md)
-and [packet evidence](validation/windows-stable-owner-packet-results.json)
-cover IPv4/IPv6 host traffic through selection, rollback and retirement on
-Server 2022 and 2025. The [source-isolation evidence](validation/windows-stable-owner-isolation-results.json)
-also checks alternate-source rejection with positive controls through both
-generations. These host experiments do not enable the production generation
-protocol or qualify CNI workload policy.
 
 `controller/cmd/windows-tunnel` runs under the Windows Service Control Manager
 and owns one WireGuardNT adapter for its lifetime. It reports Running after
@@ -524,15 +426,6 @@ dialer, to forward TCP without terminating TLS. A failed backend is skipped on
 new connections; endpoint updates affect subsequent connections. The proxy
 retains its serving list if a cache read fails. Numeric backend endpoints are
 validated before public state is persisted.
-
-The [service lifecycle evidence](validation/windows-service-results.json) covers
-Server 2022 and 2025 service start/stop, actual route removal/re-addition, recovery
-of an empty peer set after restart, rejection of an identity-changing update,
-adapter cleanup, API endpoint updates and failover, and continued API service
-operation while the tunnel service is stopped. API checks use local TCP
-backends; they do not prove Kubernetes TLS or API traffic over WireGuard.
-The HostProcess deployment is opt-in; running it on joined nodes and production
-bootstrap/service installation still need integration. Cluster adoption and CNI behavior remain separate gates.
 
 Build the instrumented service from `controller`:
 
@@ -588,19 +481,6 @@ volume mounts, including service-account credentials, support their configured
 mount paths with containerd 1.7 and later; see the
 [Kubernetes HostProcess volume documentation](https://kubernetes.io/docs/tasks/configure-pod-container/create-hostprocess-pod/#volume-mounts).
 
-The HostProcess publisher has authenticated with projected credentials on real
-CAPA-joined Server 2022 and 2025 workers. Native receipts matched the current
-request nonce, Secret UID and payload hash, and the publisher acknowledged that
-hash in Kubernetes; see [live delivery validation](validation/windows-publisher-live-results.json).
-Both versions also passed [projected-token rotation](validation/windows-token-rotation-results.json):
-the publisher ran beyond its requested one-hour token lifetime without a restart,
-the kubelet volume contained a newer token, and the publisher wrote a fresh
-authenticated acknowledgement. The observer records only JWT timestamps.
-Publisher authentication and token rotation do not establish workload networking
-or CAPI lifecycle behavior; see the separate evidence in
-[validation boundaries](#validation-boundaries). The controller renders the
-opt-in HostProcess deployment described below.
-
 Reproduce the rotation check after the publisher has run for more than one
 requested token lifetime:
 
@@ -618,12 +498,6 @@ resourceVersion, then requires the running publisher to acknowledge the same
 payload. It rejects token expiry, future issue timestamps, publisher restarts,
 Secret replacement and changes to the acknowledged payload. A failed run leaves
 the actual acknowledgement state visible; the observer never fabricates one.
-
-API backend membership is rendered as a sorted set, including deduplication of
-a VIP that is already a control-plane address. This prevents Kubernetes list
-ordering from changing peer hashes and repeatedly invalidating acknowledgements.
-The [observed regression](validation/api-endpoint-order-results.json) also tests
-that removing a real backend still changes the published configuration.
 
 ## HostProcess publisher deployment
 
@@ -667,18 +541,14 @@ publishing the image through your normal distribution process.
 
 The image build and Windows/amd64 OCI metadata are verified. Both the DaemonSet
 and its actual Pod pass isolated Kubernetes API admission; controller tests
-verify image updates. [Fresh-image join observations](validation/windows-fresh-image-join-results.json)
-also cover live publisher readiness and native peer-delivery receipts on both
-Windows versions. Repeat those checks for each changed image; admission alone
+verify image updates. Repeat those checks for each changed image; admission alone
 does not establish successful execution or delivery.
 
 ## Repeat the native bootstrap checks
 
 Use an isolated [AWS test environment](aws.md), with a private asset bucket and
 renewed harness session. The harness IAM policy now permits both AWS-owned SSM
-command documents, with the same run-tag restriction on instances. Its
-[current policy validation](validation/windows-harness-policy-results.json)
-also records the compressed STS policy limit encountered during testing.
+command documents, with the same run-tag restriction on instances.
 
 From `harness/e2e`:
 

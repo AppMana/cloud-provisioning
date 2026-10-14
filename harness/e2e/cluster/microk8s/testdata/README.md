@@ -9,19 +9,15 @@ projection to the private raw observation. No join credentials are included.
 `worker_test.go` uses the native observations for version, CRI socket and local
 API assertions, with deliberately changed versions, missing files and command
 failures as negative cases. These tests validate harness checks, not remote
-join or CNI behavior. See the
-[native report](../../../../../docs/validation/microk8s-prerequisite-results.json)
-for coverage, resource limits and qualification boundaries.
+join or CNI behavior. 
 
 The kubelet tests place the observed server line into a synthetic kubeconfig.
 They resolve the active context and reject inactive local endpoints, comments,
 URL suffixes and port prefixes. Context names and enclosing YAML are not native
-observations. The [parser regression report](../../../../../docs/validation/microk8s-kubeconfig-results.json)
-separates this updated validator's tests from the earlier native run.
+observations. 
 
 `microk8s-1.34.9-kubelet.json` supplies actual control-plane and joined-worker
-context names, cluster references and API endpoints from the
-[two-VM native run](../../../../../docs/validation/microk8s-native-join-results.json).
+context names, cluster references and API endpoints from a two-VM fixture.
 Credentials, certificate data and user references are removed; remaining fields
 are serialized as JSON. Per-config hashes identify the private source files.
 These fixtures supplement the synthetic negative cases.

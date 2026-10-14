@@ -1,9 +1,5 @@
 # Focused VM routing regression
 
-This legacy harness tests dialer routing and reboot behavior with two QEMU/KVM
-VMs. Use the [Go single-NIC harness](../../docs/validation/single-nic-vms.md) for
-current distribution, CAPI lifecycle, placement and outage matrices.
-
 ## Prerequisites and topology
 
 The scripts require Docker, containerlab, KVM, Go, k0sctl, kubectl and SSH.

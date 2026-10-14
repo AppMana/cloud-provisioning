@@ -44,9 +44,7 @@ selection, the controller receipt protocol, CNI traffic, or Windows.
 Evidence includes timestamped operation events, every request and expected
 rejection, receiver logs, physical NIC observations, and native process exit
 codes. `keys.private.json` contains ephemeral private keys: keep the evidence
-directory private and exclude that file from reports or shared archives. The
-[recorded packet experiment](../../../../../docs/validation/handover-packet-results.json)
-distinguishes these checks from full production handover qualification.
+directory private and exclude that file from reports or shared archives. These checks do not establish full production handover qualification.
 
 Use `--egress` for the extended matrix. It adds ordinary UDP sockets without
 `SO_BINDTODEVICE`, selects generation B with a preferred route, rolls back to A,

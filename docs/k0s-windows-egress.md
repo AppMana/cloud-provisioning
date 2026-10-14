@@ -7,8 +7,7 @@ using `destHost,defaultRoute,default`; the native agents advertise their node IP
 A Service address does not match those node identities. Without a default-route
 advertiser, the fallback can select a Windows agent that cannot reach the Service.
 
-Kubernetes documents that [Windows hosts cannot access Service IPs](https://kubernetes.io/docs/tasks/debug/debug-cluster/windows/#network-troubleshooting).
-The [Konnectivity strategies](https://pkg.go.dev/sigs.k8s.io/apiserver-network-proxy/pkg/server/proxystrategies)
+Kubernetes documents that [Windows hosts cannot access Service IPs](https://kubernetes.io/docs/tasks/debug/debug-cluster/windows/#network-troubleshooting). The [Konnectivity strategies](https://pkg.go.dev/sigs.k8s.io/apiserver-network-proxy/pkg/server/proxystrategies)
 distinguish destination-host matching, explicit default-route agents and random
 healthy backends. Native Windows 2022/2025 host probes and agent logs recorded
 webhook timeouts; Linux controller hosts reached the same webhook.
@@ -63,38 +62,6 @@ count. Exercise server dry-run CAPI Machine updates through each API server,
 native exec into both Windows versions, and actual provisioning/removal.
 Observe webhook sockets or dial logs to establish which agent carries traffic.
 Preserve failures and the original pre-change baseline.
-
-[Native two-agent evidence](validation/windows-konnectivity-ha-results.json)
-contains 240 passing admission probes and 12 Windows exec checks across graceful
-withdrawal of either temporary agent. Migration to the generated DaemonSet added
-120 passing admission probes and six exec checks. Both final agents connected
-to all three servers; all 13 Nodes were Ready. The temporary Deployments were
-removed. These are agent withdrawal tests, not VM power-loss or partition tests.
-An [identity-checked SIGKILL test](validation/windows-konnectivity-abrupt-results.json)
-added 120 passing admission probes and six Windows exec checks. The killed
-container exited 137 and restarted automatically in the same Pod, reconnecting
-to all three servers. This establishes one process-crash recovery observation;
-VM power loss, network partition and fresh-site gates remain open. A subsequent
-[Linux CAPI worker cycle](validation/linux-capi-egress-results.json) completed
-provisioning, 102 network checks and removal with the addon active, preserving
-all 13 original Node identities. Its retained boot and image-staging failures
-also produced new bootstrap-expiry and adoption gates. This single cycle does
-not establish the full Windows lifecycle or endpoint-failure matrix.
-
-A [later reconnection check](validation/windows-konnectivity-reconnection-results.json)
-found both Windows test workers unreachable through one API server while the
-other two could execute commands. The Windows 2022 agent had two server
-connections; recreating each affected native agent restored three connections
-and all six exec paths without changing Node or workload identities. The cause
-of the missing connection remains unresolved. Check every API server before
-network qualification. The post-recovery matrix retained two Windows UDP
-timeouts at 1,800-byte payloads, so exec recovery does not qualify UDP reliability.
-
-The [initial canary](validation/windows-konnectivity-default-route-results.json)
-established actual Linux-owned webhook sockets. Its immediate ten-probe baseline
-also passed, so neither observation quantifies a failure-rate improvement.
-A log query against the older Windows 2025 node failed with a kubelet dial timeout;
-replacement-node exec success does not establish all-node health.
 
 When all default-route agents disappear, the server's `default` fallback can
 again select an unsuitable Windows agent. To remove the addon:

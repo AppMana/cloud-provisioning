@@ -3,9 +3,7 @@
 `windows2022-hns-layers.xml` and `windows2025-hns-layers.xml` contain native
 `tracerpt` event elements selected from the paired single-NIC AWS VM capture.
 The `Events` wrapper is fixture packaging. Selected event elements preserve
-the decoded native text. The capture, source hashes, fixture hashes, port
-identities and cleanup are recorded in the
-[layer-gap validation](../../../../docs/validation/windows-hns-layer-gap-results.json).
+the decoded native text. Keep fixture hashes and port identities with the raw capture.
 
 The fixtures include encapsulation and unrelated layer operations, timer
 callbacks, reused activity IDs, and non-HNS decoding errors. Windows 2022 has
@@ -19,9 +17,7 @@ checks decoding and temporal correlation; it does not simulate HNS, prove a
 corrective change, or qualify continuous traffic.
 
 `windows2022-hns-undecoded.xml` preserves a payload-free native HNS record
-returned by `Get-WinEvent` with `ProcessingErrorData`. Its source is the
-[HNS collector validation](../../../../docs/validation/windows-hns-collector-results.json)
-(`2022-hns-events.jsonl.gz`). It verifies that an undecoded HNS record cannot
+returned by `Get-WinEvent` with `ProcessingErrorData`.  It verifies that an undecoded HNS record cannot
 silently become an empty analysis result. Unrelated provider errors in the
 layer fixtures do not prevent analysis of fully decoded HNS records.
 

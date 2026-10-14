@@ -1,30 +1,12 @@
 # Tunnel handover
 
-Endpoint placement currently converges, but is not qualified for uninterrupted
-traffic. The [source-routing report](validation/microk8s-source-routing-results.json)
-records packet loss during both endpoint withdrawal and promotion. A successful
-worker replacement at fixed placement does not qualify these transitions.
-
 ## Receive ownership constraint
 
-WireGuard's AllowedIPs select an outbound peer and constrain the source
-addresses accepted from that peer. On the Linux kernel tested in a QEMU VM,
-assigning an identical prefix to another peer removes it from the previous
-peer. Keeping both peer objects does not keep both owners. The
-[kernel experiment](validation/handover-ownership-results.json) covers IPv4 and
-IPv6 host and pod prefixes, repeated application, reversal, and independent
-ownership on two devices. It does not measure packet delivery.
-
-A separate [three-VM packet experiment](validation/handover-packet-results.json)
-verifies IPv4/IPv6 receive overlap, source rejection, and continued new-path
-traffic after old-device removal. Its replies are bound to their receive
-device; it does not qualify automatic egress selection or the production
-receipt protocol. The [native runner](../controller/pkg/tunneldevice/testdata/handover-vm/README.md)
-reproduces that experiment without rebuilding the Kubernetes cluster. The
-[extended egress experiment](validation/handover-egress-results.json) also checks
-unbound sockets across route selection, rollback, reselection and retirement.
-Its isolated Linux routes are distinct from the production policy-routing
-integration, which still needs implementation and qualification.
+WireGuard AllowedIPs control both egress peer selection and accepted ingress
+sources. A prefix has one peer owner per device; overlapping generations need
+separate devices and keys. Keep workload identity addresses on a stable owner,
+independent of generation-device lifetime. Handover must preserve physical
+NIC configuration, Node identity, CNI settings, and allocated addresses.
 
 The current remote applies its new peer list before publishing its
 acknowledgment. The site subsequently reads that acknowledgment and changes
@@ -48,17 +30,9 @@ and must be rejected by the protocol validator.
 
 These are virtual tunnel devices. Each VM retains one physical NIC and its
 distribution's supported CNI. The protocol must not alter the physical address,
-Node identity, CNI configuration, or allocated workload and tunnel addresses.
-Keep address ownership separate from generation-device ownership. The Linux
+Node identity, CNI configuration, or allocated workload and tunnel addresses. Keep address ownership separate from generation-device ownership. The Linux
 packet experiment places the stable address on loopback, outside the two
-WireGuard devices. The [Windows address experiment](validation/windows-generation-address-results.json)
-failed when assigning one identity address to two adapters through the current
-backend; changing DAD settings did not qualify that model. A separate stable
-address owner has [native Windows host packet evidence](validation/windows-stable-owner-packet-results.json)
-for IPv4/IPv6 route switching, rollback and old-adapter retirement on Server 2022
-and 2025. The [host-source isolation experiment](validation/windows-stable-owner-isolation-results.json)
-adds positive controls through both generations and rejection during every
-handover phase. CNI and production protocol qualification remain required
+WireGuard devices. CNI and production protocol qualification remain required
 before enabling it. The existing single-device backend remains a distinct
 implementation, not a substitute for that address-owner capability.
 
@@ -123,16 +97,6 @@ rejected; callers must reload authoritative state before recomputing. Receipt
 writers must lack access to this storage: persisted authentication is a trusted
 controller assertion. Publish only a successfully committed snapshot.
 
-The phase tests cover restart, rollback, renewal, chronology, receipt replay and
-drain timing. An isolated Kubernetes 1.35 API server verifies stale-write and
-recreated-object rejection. The package passes the race detector with 86.5%
-statement coverage. Production publisher/backend wiring and deployment-specific
-drain policy validation remain required before these primitives can authorize
-native transitions. Existing production delivery
-nonces, native-application checks and source-ownership safeguards remain active.
-The [receipt-gate validation report](validation/handover-round-results.json)
-records unit and race-test scope; it does not qualify runtime handover.
-
 ## Platform implementation boundaries
 
 The shared protocol owns generation identity, phase validation, peer graph
@@ -163,11 +127,7 @@ legacy generations.
 
 The [native stable-owner experiment](../controller/pkg/tunneldevice/testdata/stable-owner-windows/README.md)
 checks endpoint routes before creating adapters and rejects a selected `cldt`
-interface. Its [validation evidence](validation/windows-stable-owner-results.json)
-records the failed warmup attempts and native preflight rejection. The
-[relay-backed VM experiment](validation/windows-stable-owner-packet-results.json)
-uses an independently reachable endpoint and validates stable-owner traffic
-across selection, rollback and retirement with an independent sampler. This
+interface. This
 host experiment does not qualify production handover. A production backend
 must own and verify transport exemptions across all live generations, then
 pass workload and recovery gates in addition to the native host-source checks. Never replace production endpoint

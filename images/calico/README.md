@@ -99,39 +99,14 @@ startup latency matters, then verify it survives image generalization and boot.
 
 ## Native validation
 
-[Image validation evidence](../../docs/validation/windows-calico-image-results.json)
-records Server 2022 and 2025 pulling the derived image, verifying its runtime
-digest and executable hash, and recovering MTU after Felix restarts with the
-old staged executable path absent. Fresh probe pods have MTU 1370. TCP transfers
-and selected ingress-policy checks pass on both versions.
-
 The strict concurrent UDP gate remains open: the two runs received 89/90 and
 298/300 exact echoes. A UDP-only repeat received all 300. The missing packets'
 cause is unestablished; the isolated repeat does not prove that TCP load caused
 the losses. Preserve these failures when evaluating support.
 
-The later [Windows 2025 CAPI GPU trial](../../docs/validation/windows-capi-gpu-staged-withdrawal-2025-results.json)
-verifies a fresh single-NIC VM using the preloaded Calico image, all 19 join
-checks, and its first ordinary GPU workload rendering and encoding 30 frames.
-The complete startup image cache was reused. Staged gateway withdrawal and CAPI
-cleanup passed, but ten native survivor echoes failed, so the lifecycle row
-remains unqualified for uninterrupted networking. These observations do not
-establish the same startup-cache behavior on Windows 2022 or repeated reliability.
-
-[Native packet traces](../../docs/validation/windows-udp-vfp-drop-results.json)
-locate two reproduced timeouts at the sending Windows host's VFP extension:
-both IPv4 fragments have `Invalid Packet` drop records before VXLAN transmission.
-The internal reason and a mitigation remain unproven. A subsequent
-[controlled offload comparison](../../docs/validation/windows-udp-offload-results.json)
-did not eliminate timeouts by disabling IPv4 UDP transmit checksum offload on
-the two disposable pod adapters. All original offload settings were restored.
-Adapter restarts reset workload MTU to 1500, requiring explicit restoration to
-1370 before each traffic phase in that image version.
-The [periodic-repair image validation](../../docs/validation/windows-mtu-periodic-repair-results.json)
-verifies automatic restoration after an explicit adapter restart on both Windows
-versions, with unchanged Felix containers. Use the binary and image hashes in
+The internal reason and a mitigation remain unproven. All original offload settings were restored. Adapter restarts reset workload MTU to 1500, requiring explicit restoration to
+1370 before each traffic phase in that image version. Use the binary and image hashes in
 that receipt to distinguish it from the earlier image. The periodic scheduler
 rechecks one active endpoint per five-second tick; this repairs drift eventually
-and does not establish a fix for the UDP drops.
-The [trace correlator](../../harness/e2e/observe/README.md)
+and does not establish a fix for the UDP drops. The [trace correlator](../../harness/e2e/observe/README.md)
 includes regression fixtures from both OS versions.

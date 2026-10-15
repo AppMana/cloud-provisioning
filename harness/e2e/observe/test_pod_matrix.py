@@ -47,7 +47,47 @@ class Cluster:
         return json.dumps(dict(responses=None if self.failure == "null" else responses)).encode(), 0
 
 
+class DualStackCluster(Cluster):
+    def get(self, kind, name):
+        obj = super().get(kind, name)
+        if kind == 'pod':
+            index = [t[0] for t in self.targets].index(name)
+            addresses = [obj['status']['podIP'], '2001:db8::' + str(index + 1)]
+            obj['status']['podIPs'] = [{'ip': ip} for ip in addresses]
+            obj['status']['podIP'] = addresses[index % 2]
+        elif kind == 'service':
+            index = [t[0] for t in self.targets].index(name)
+            obj['spec']['clusterIPs'] = [obj['spec']['clusterIP'], 'fd00::' + str(index + 1)]
+        return obj
+
+
 class MatrixTest(unittest.TestCase):
+    def test_explicit_family_selects_registered_addresses_independently_of_primary(self):
+        import ipaddress
+        cluster = DualStackCluster()
+        for family in (4, 6):
+            sources = snapshot(cluster, cluster.targets, family=family)
+            for source in sources:
+                self.assertEqual(source['addressFamily'], family)
+                self.assertEqual(ipaddress.ip_address(source['podIP']).version, family)
+                self.assertEqual(ipaddress.ip_address(source['serviceIP']).version, family)
+        self.assertNotIn('addressFamily', snapshot(cluster, cluster.targets)[0])
+
+    def test_missing_or_ambiguous_family_never_falls_back_to_primary(self):
+        for kind in ('pod', 'service'):
+            for addresses in ([], ['2001:db8::1', '2001:db8::2']):
+                class MissingFamily(DualStackCluster):
+                    def get(self, requested, name):
+                        obj = super().get(requested, name)
+                        if requested == kind:
+                            if kind == 'pod':
+                                obj['status']['podIPs'] = [{'ip': ip} for ip in addresses]
+                            else:
+                                obj['spec']['clusterIPs'] = addresses
+                        return obj
+                with self.subTest(kind=kind, addresses=addresses), self.assertRaises(ValueError):
+                    snapshot(MissingFamily(), Cluster.targets, family=6)
+
     def test_boundary_sweep_sends_exact_request_sizes_and_attempts(self):
         class BoundaryCluster(Cluster):
             def curl(self, source, arguments, body=None, timeout=30):

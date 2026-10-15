@@ -7,6 +7,7 @@ Does not provision machines, install a CNI, or infer identity from pod names.
 import argparse
 import datetime
 import hashlib
+import ipaddress
 import json
 import pathlib
 import subprocess
@@ -53,8 +54,10 @@ def ready(obj):
                 for c in obj.get("status", {}).get("conditions", [])))
 
 
-def snapshot(kube, targets):
+def snapshot(kube, targets, family=None):
     """Bind the observations to explicit Node UIDs and live container identities."""
+    if family not in (None, 4, 6):
+        raise ValueError("address family must be 4 or 6")
     if len(targets) < 2 or len({t[0] for t in targets}) != len(targets):
         raise ValueError("at least two distinct target pods are required")
     result = []
@@ -80,12 +83,22 @@ def snapshot(kube, targets):
             raise ValueError("target container is not ready: " + name)
         address = pod["status"].get("podIP")
         service_ip = service["spec"].get("clusterIP")
+        if family is not None:
+            def select(addresses):
+                matches = [ip for ip in addresses if ipaddress.ip_address(ip).version == family]
+                if len(matches) != 1:
+                    raise ValueError("exactly one address of the requested family required: " + name)
+                return matches[0]
+            address = select([entry['ip'] for entry in pod['status'].get('podIPs', [{'ip': address}])])
+            service_ip = select(service['spec'].get('clusterIPs', [service_ip]))
         if not address or not service_ip or service_ip == "None":
             raise ValueError("pod and Service addresses are required")
         result.append(dict(pod=name, podUID=pod["metadata"]["uid"],
             node=node["metadata"]["name"], nodeUID=node_uid, os=os_name,
             container=containers[0]["name"], containerID=container["containerID"],
             podIP=address, serviceUID=service["metadata"]["uid"], serviceIP=service_ip))
+        if family is not None:
+            result[-1]['addressFamily'] = family
     if len({r["nodeUID"] for r in result}) != len(result):
         raise ValueError("matrix targets must occupy distinct nodes")
     return result

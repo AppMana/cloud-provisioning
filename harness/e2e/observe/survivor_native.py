@@ -5,6 +5,7 @@ commands are issued once and journaled before execution; timeouts require inspec
 """
 import concurrent.futures
 import datetime
+import ipaddress
 import json
 import pathlib
 
@@ -62,6 +63,13 @@ class Session:
             raise ValueError('distinct survivor Node identities required')
         if set(executables) != {s['nodeUID'] for s in sources}:
             raise ValueError('exact Node UID executable mapping required')
+        families = {s.get('addressFamily') for s in sources}
+        if len(families) != 1 or not families.issubset({None, 4, 6}):
+            raise ValueError('one address-family policy required for every source')
+        family = families.pop()
+        if family is not None and any(ipaddress.ip_address(s[key]).version != family
+                                     for s in sources for key in ('podIP', 'serviceIP')):
+            raise ValueError('source addresses do not match the selected family')
         if diagnostic_reason is not None and (not isinstance(diagnostic_reason, str) or not diagnostic_reason.strip()):
             raise ValueError('explicit diagnostic reason required')
         self.output.mkdir(mode=0o700)
@@ -71,7 +79,7 @@ class Session:
                  for i, (s, t) in enumerate((s, t) for s in sources for t in sources if s != t)]
         exclusive(self.output/'session.json', dict(lanes=lanes, maxGap=max_gap,
             duration=duration, interval=interval, transport='native-oob',
-            diagnosticReason=diagnostic_reason))
+            diagnosticReason=diagnostic_reason, addressFamily=family))
         for i, lane in enumerate(lanes):
             address = lane['target']['podIP']
             if ':' in address: address = '[' + address + ']'
@@ -210,14 +218,14 @@ class Session:
         if [(l['source'],l['target']) for l in session['lanes']] != expected:
             return False
         target_pairs = [tuple(t.split('=',1)) for t in targets]
-        if snapshot(self.kube, target_pairs) != initial:
+        if snapshot(self.kube, target_pairs, family=session.get('addressFamily')) != initial:
             return False
         earlier = self.progress(label+'-first')
         time.sleep(1)
         later = self.progress(label+'-second')
         if any(a['attempts'] >= b['attempts'] for a,b in zip(earlier,later)):
             return False
-        if snapshot(self.kube, target_pairs) != initial:
+        if snapshot(self.kube, target_pairs, family=session.get('addressFamily')) != initial:
             return False
         if not fresh_progress(later, session['maxGap']):
             return False
@@ -296,5 +304,6 @@ class Session:
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, max(1, len(groups)))) as pool:
             collected = list(pool.map(collect_host, groups.values()))
         reports = [report for _, report in sorted(item for group in collected for item in group)]
-        stable=snapshot(self.kube,[(s['pod'],s['nodeUID']) for s in initial]) == initial
+        stable=snapshot(self.kube,[(s['pod'],s['nodeUID']) for s in initial],
+                        family=session.get('addressFamily')) == initial
         return reports, stable

@@ -8,6 +8,38 @@ from survivor_native import Session
 
 
 class NativeControlTest(unittest.TestCase):
+    def test_ipv6_session_preserves_family_when_resuming_identity_checks(self):
+        from unittest.mock import patch
+        from pod_matrix import snapshot
+        from test_pod_matrix import DualStackCluster
+        kube = DualStackCluster()
+        sources = snapshot(kube, kube.targets, family=6)
+        targets = [s['pod']+'='+s['nodeUID'] for s in sources]
+        with tempfile.TemporaryDirectory() as root:
+            output = pathlib.Path(root)/'streams'
+            session = Session(kube, output)
+            with patch.object(session, 'control', return_value={}) as control:
+                session.start(sources, {s['nodeUID']: '/tmp/probe' for s in sources})
+            for call in control.call_args_list:
+                arguments = call.args[3]
+                self.assertTrue(arguments[arguments.index('-destination')+1].startswith('[2001:db8::'))
+                self.assertTrue(arguments[arguments.index('-source-ip')+1].startswith('2001:db8::'))
+            self.assertEqual(json.loads((output/'session.json').read_text())['addressFamily'], 6)
+            resumed = Session(kube, output)
+            with patch('time.sleep'), patch('survivor_native.fresh_progress', return_value=True), \
+                    patch.object(resumed, 'progress', side_effect=[[dict(attempts=1)]*6, [dict(attempts=2)]*6]), \
+                    patch.object(resumed, 'ready'):
+                self.assertTrue(resumed.live_ready(targets, 'ipv6'))
+            original_get = kube.get
+            def changed_address(kind, name):
+                obj = original_get(kind, name)
+                if kind == 'pod' and name == sources[0]['pod']:
+                    obj['status']['podIPs'][1]['ip'] = '2001:db8::ffff'
+                return obj
+            with patch.object(kube, 'get', side_effect=changed_address), patch.object(resumed, 'progress') as progress:
+                self.assertFalse(resumed.live_ready(targets, 'changed'))
+                progress.assert_not_called()
+
     def test_timeout_intent_prevents_duplicate_mutation(self):
         with tempfile.TemporaryDirectory() as root:
             kube = Mock(); kube.exec_result.return_value = (b'', 124, 'inspect original')

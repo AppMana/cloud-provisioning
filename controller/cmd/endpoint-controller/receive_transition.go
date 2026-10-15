@@ -182,6 +182,14 @@ func (r *meshReconciler) buildReceiveTransitionPlan(ctx context.Context, machine
 	if len(plan.Sites) == 0 {
 		return fail(fmt.Errorf("receiver transition has no site paths"))
 	}
+	sitePeers, err := tunnel.SitePeers(mesh.Data)
+	if err != nil {
+		return fail(err)
+	}
+	plan.SiteDesired = tunnel.PeerListDoc{Peers: sitePeers}
+	if _, err := tunnel.PlanReceiveRoutes(plan); err != nil {
+		return fail(err)
+	}
 	// Node and Secret snapshots above remain explicit in the plan and round.
 	// Runtime admission must revalidate them; journal creation does not fence nodes.
 	return plan, nil

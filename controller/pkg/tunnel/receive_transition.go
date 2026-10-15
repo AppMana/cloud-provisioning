@@ -19,6 +19,7 @@ type ReceiveTransitionPlan struct {
 	RootPublicKey string                           `json:"rootPublicKey"`
 	Base          []byte                           `json:"base"`
 	Desired       PeerListDoc                      `json:"desired"`
+	SiteDesired   PeerListDoc                      `json:"siteDesired"`
 	Native        []netip.Prefix                   `json:"native"`
 	Ports         map[string]int                   `json:"ports"`
 	Bindings      map[string]ReceiveBinding        `json:"bindings"`

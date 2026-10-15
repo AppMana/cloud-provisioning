@@ -7,18 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 )
 
 // Exact kernel identities accompany every selected route. Selecting an
 // interface must not configure its peer or move receive permissions.
-type receiveRouteSelection struct {
-	Interface     string `json:"interface"`
-	Alias         string `json:"alias"`
-	PublicKey     string `json:"publicKey"`
-	PeerPublicKey string `json:"peerPublicKey"`
-}
+type receiveRouteSelection = tunnel.ReceiveRouteSelection
 
 // Validate the whole selection before installRoutes changes rules or routes.
 // Destinations must already belong to the caller's validated tunnel route set.

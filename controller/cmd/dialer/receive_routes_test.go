@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 )
@@ -36,11 +37,27 @@ func TestNativeReceiveRouteSwitch(t *testing.T) {
 		t.Fatal(err)
 	}
 	var request struct {
-		Destination string                `json:"destination"`
-		Selection   receiveRouteSelection `json:"selection"`
+		Destination string                        `json:"destination"`
+		Selection   receiveRouteSelection         `json:"selection"`
+		Plan        *tunnel.ReceiveTransitionPlan `json:"plan"`
+		NodeUID     string                        `json:"nodeUID"`
 	}
 	if err := json.Unmarshal(raw, &request); err != nil {
 		t.Fatal(err)
+	}
+	if request.Plan != nil {
+		if request.Selection != (receiveRouteSelection{}) {
+			t.Fatal("route request has competing selection sources")
+		}
+		selections, err := tunnel.PlanReceiveRoutes(*request.Plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var found bool
+		request.Selection, found = selections[request.NodeUID][request.Destination]
+		if !found {
+			t.Fatal("committed plan does not select this node and destination")
+		}
 	}
 	_, dst, err := net.ParseCIDR(request.Destination)
 	if err != nil {

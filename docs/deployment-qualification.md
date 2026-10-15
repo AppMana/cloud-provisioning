@@ -86,6 +86,12 @@ workers after cleanup. The gate verifies file hashes and row completeness;
 review the raw artifacts for the stated scope. It is a standalone read-only
 gate, not yet a deployment controller or CI enforcement hook.
 
+Row IDs use `site-a` for the first site profile and `site-b` for the second.
+Keep the mapping to actual cluster identities in the private qualification
+bundle. Both profiles remain required; aliases must not be used to count one
+cluster's measurements twice. Evidence with older row IDs must be explicitly
+mapped and reviewed before it can satisfy the gate.
+
 1. Freeze binaries, chart and multi-architecture image digests, CAPI/CAPA,
    k0s, both Calico variants and AWS VPC CNI versions. Prove ARM64 runtime,
    not merely an image manifest. Rebuild after any code change.

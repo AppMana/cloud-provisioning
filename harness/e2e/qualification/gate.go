@@ -37,7 +37,7 @@ type Row struct {
 // RequiredRows is stable, explicit scope; adding a row fails old evidence closed.
 func RequiredRows() []string {
 	var rows []string
-	for _, site := range []string{"jarvis", "appmana"} {
+	for _, site := range []string{"site-a", "site-b"} {
 		rows = append(rows, site+"/preconditions", site+"/version-bundle", site+"/management-baseline", site+"/arm64-runtime")
 		for run := 1; run <= 3; run++ {
 			rows = append(rows, fmt.Sprintf("%s/vm-migration/%d", site, run), fmt.Sprintf("%s/vm-rollback/%d", site, run))
@@ -52,7 +52,7 @@ func RequiredRows() []string {
 			}
 		}
 	}
-	rows = append(rows, "appmana/windows-site-compatibility", "release/immutable-artifacts")
+	rows = append(rows, "site-b/windows-site-compatibility", "release/immutable-artifacts")
 	sort.Strings(rows)
 	return rows
 }

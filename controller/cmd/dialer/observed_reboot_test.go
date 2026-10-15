@@ -8,10 +8,8 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 )
 
-// The k0s/Calico remote rebooted after w1/w2 -> cp settled. Its host
-// service installed the original worker peers, although the durable cache
-// named cp. Neither retired worker could carry the API path needed to restart
-// the adopting DaemonSet. No Kubernetes client exists at this point in boot.
+// A host service without API access must restore the last durably adopted
+// peer list, including explicit withdrawal, rather than bootstrap peers.
 func TestObservedReboot_HostServiceUsesCachedPeers(t *testing.T) {
 	cfg := config{iface: "cldt1775f69e", peersFile: filepath.Join(t.TempDir(), "peers.json")}
 	bootstrap := tunnel.PeersFileDoc{Peers: []tunnel.PeerSpec{{PublicKey: "retired-w1"}, {PublicKey: "retired-w2"}}, APIServers: []string{"10.10.0.10:6443"}}

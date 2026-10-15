@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -150,6 +151,31 @@ func nativeAdoptionAPI(t *testing.T, cfg config, devices *wgctrl.Client, bootstr
 	update(bootstrap.Peers)
 	check(1)
 	update([]tunnel.PeerSpec{})
+	// A failed durable write must not withdraw the working peer or publish an
+	// acknowledgement for state that cannot be recovered after an API outage.
+	if err := os.Remove(cachePath(cfg)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(cachePath(cfg), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcile(ctx, worker, devices, cfg); err == nil || !strings.Contains(err.Error(), "persisting adopted peer list") {
+		t.Fatalf("cache failure did not stop adoption: %v", err)
+	}
+	currentDevice, err := devices.Device(cfg.iface)
+	if err != nil || len(currentDevice.Peers) != 1 {
+		t.Fatalf("cache failure changed active peer membership: %v", err)
+	}
+	currentSecret, err := secrets.Get(ctx, "adoption", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if currentSecret.Annotations[tunnel.AppliedListAnnotation] == tunnel.HashPeerList(currentSecret.Data[tunnel.CloudPeersKey]) {
+		t.Fatal("cache failure acknowledged unapplied withdrawal")
+	}
+	if err := os.Remove(cachePath(cfg)); err != nil {
+		t.Fatal(err)
+	}
 	check(0)
 	nativeSiteAPI(t, cfg, devices, bootstrap, admin, worker, ns, subject)
 	t.Logf("Real API: ServiceAccount=%v, restricted Secret access, cache repair, re-addition, withdrawal and applied-hash acknowledgements passed", serviceAccount)

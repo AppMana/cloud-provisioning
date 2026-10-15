@@ -24,7 +24,9 @@ func nativeSiteAPI(t *testing.T, cfg config, devices *wgctrl.Client, bootstrap t
 	if err != nil {
 		t.Fatal(err)
 	}
-	role.Rules[0].ResourceNames = append(role.Rules[0].ResourceNames, "mesh")
+	// Site reconciliation reads each known worker's adoption Secret even when
+	// no preparation request exists. Match the controller's named grant.
+	role.Rules[0].ResourceNames = append(role.Rules[0].ResourceNames, "mesh", tunnel.AdoptionSecretName("worker"))
 	if _, err = admin.RbacV1().Roles(ns).Update(ctx, role, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}

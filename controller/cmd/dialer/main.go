@@ -1019,11 +1019,30 @@ func writeCachedPeers(path string, doc tunnel.PeerListDoc) error {
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+"-*")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+	if _, err := tmp.Write(raw); err != nil {
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		return err
+	}
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
 }
 
 // readCachedPeers returns the last list read from the cluster. A cache
@@ -1271,12 +1290,12 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 						return fmt.Errorf("parsing %s from %s/%s: %w", tunnel.CloudPeersKey, cfg.peersSecretNamespace, cfg.peersSecretName, err)
 					}
 					if overlay.Peers != nil {
+						if err := writeCachedPeers(cachePath(cfg), overlay); err != nil {
+							return fmt.Errorf("persisting adopted peer list before forwarding changes: %w", err)
+						}
 						floorErr = nil // A current valid public document can repair the durable cache.
 						peers = overlay.Peers
 						setAPIProxyBackends(overlay.APIServers)
-						if err := writeCachedPeers(cachePath(cfg), overlay); err != nil {
-							fmt.Fprintf(os.Stderr, "could not cache the peer list (a later API outage will cost more than it should): %v\n", err)
-						}
 						// Acknowledged at the end of the pass, once
 						// this list is applied in full, not merely
 						// read. See tunnel.AppliedListAnnotation.

@@ -199,3 +199,55 @@ func TestPrimaryENIAddressIsNativeButNeverPodOwned(t *testing.T) {
 		t.Fatalf("native primary missing: %+v", allocation)
 	}
 }
+
+func TestIPv6ENIAddressesAreNativeButNeverPodOwned(t *testing.T) {
+	for _, family := range []string{"ipv4", "ipv6"} {
+		t.Run(family, func(t *testing.T) {
+			o, machine, api := fixture(t)
+			o.Config.Family = family
+			if family == "ipv6" {
+				o.Config.PodRanges = []string{"2001:db8:1::/64"}
+			}
+			api.eni["Ipv6Addresses"] = []any{
+				map[string]any{"Ipv6Address": "2001:db8:1:0:1234::1", "IsPrimaryIpv6": true},
+				map[string]any{"Ipv6Address": "2001:db8:1:0:1234::2", "IsPrimaryIpv6": false},
+			}
+			allocation, err := o.AllocationsFor(context.Background(), machine, "worker")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(allocation.PodPrefixes) != 1 {
+				t.Fatalf("host addresses leaked into pod ownership: %+v", allocation)
+			}
+			native := map[string]bool{}
+			for _, p := range allocation.NativePrefixes {
+				native[p.String()] = true
+			}
+			for _, host := range []string{"2001:db8:1:0:1234::1/128", "2001:db8:1:0:1234::2/128"} {
+				if !native[host] {
+					t.Errorf("native IPv6 host missing: %s", host)
+				}
+			}
+			delete(api.eni, "Ipv6Addresses")
+			released, err := o.AllocationsFor(context.Background(), machine, "worker")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(released.NativePrefixes) != 2 {
+				t.Fatalf("released host retained: %+v", released)
+			}
+		})
+	}
+}
+
+func TestRejectInvalidNativeIPv6Host(t *testing.T) {
+	for _, address := range []string{"", "garbage", "172.29.0.10", "::ffff:172.29.0.10", "::", "::1", "ff02::1", "fe80::1"} {
+		t.Run(address, func(t *testing.T) {
+			o, machine, api := fixture(t)
+			api.eni["Ipv6Addresses"] = []any{map[string]any{"Ipv6Address": address}}
+			if _, err := o.AllocationsFor(context.Background(), machine, "worker"); err == nil {
+				t.Fatal("accepted invalid native IPv6 host")
+			}
+		})
+	}
+}

@@ -18,11 +18,11 @@ func TestNativeNetworkProjectionPreservesSiteAndForeignPaths(t *testing.T) {
 				PeerRouteHostsPrefix + "self":    []byte("10.100.0.128"),
 				PeerAllowedIPsPrefix + "self":    []byte("10.100.0.128/32"),
 				PeerPublicKeyPrefix + "other":    []byte("other-key"),
-				PeerRouteHostsPrefix + "other":   []byte("10.100.0.129,172.29.0.27"),
-				PeerAllowedIPsPrefix + "other":   []byte("10.100.0.129/32,172.29.0.27/32,172.29.0.45/32,2001:db8:1::/80"),
+				PeerRouteHostsPrefix + "other":   []byte("10.100.0.129,172.29.0.27,2001:db8:1:0:1234::1"),
+				PeerAllowedIPsPrefix + "other":   []byte("10.100.0.129/32,172.29.0.27/32,172.29.0.45/32,2001:db8:1::/80,2001:db8:1:0:1234::1/128"),
 			}
 			self := NativeNetwork{PublicKey: "self-key", ID: "aws:123:region:vpc", Prefixes: []string{"172.29.0.104/32"}}
-			other := NativeNetwork{PublicKey: "other-key", ID: self.ID, Prefixes: []string{"172.29.0.27/32", "172.29.0.45/32", "2001:db8:1::/80"}}
+			other := NativeNetwork{PublicKey: "other-key", ID: self.ID, Prefixes: []string{"172.29.0.27/32", "172.29.0.45/32", "2001:db8:1::/80", "2001:db8:1:0:1234::1/128"}}
 			if mode == "foreign" {
 				other.ID = "aws:123:region:other-vpc"
 			}
@@ -53,7 +53,7 @@ func TestNativeNetworkProjectionPreservesSiteAndForeignPaths(t *testing.T) {
 					if !reflect.DeepEqual(peer.WGAllowedIPs, []string{"10.100.0.129/32"}) || !reflect.DeepEqual(peer.RouteHosts, []string{"10.100.0.129"}) {
 						t.Fatalf("native destinations still tunnelled: %+v", peer)
 					}
-				} else if len(peer.WGAllowedIPs) != 4 || len(peer.RouteHosts) != 2 {
+				} else if len(peer.WGAllowedIPs) != 5 || len(peer.RouteHosts) != 3 {
 					t.Fatalf("foreign/unverified peer lost reachability: %+v", peer)
 				}
 			}
@@ -69,7 +69,7 @@ func TestNativeNetworkProjectionPreservesSiteAndForeignPaths(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, peer := range site {
-				if peer.PublicKey == "other-key" && len(peer.WGAllowedIPs) != 4 {
+				if peer.PublicKey == "other-key" && len(peer.WGAllowedIPs) != 5 {
 					t.Fatal("site lost provider routes")
 				}
 			}

@@ -114,8 +114,9 @@ func (o *Observer) AllocationsFor(ctx context.Context, expected *unstructured.Un
 					PrivateIpAddress string
 					Primary          bool
 				}
-				Ipv4Prefixes []struct{ Ipv4Prefix string }
-				Ipv6Prefixes []struct{ Ipv6Prefix string }
+				Ipv6Addresses []struct{ Ipv6Address string }
+				Ipv4Prefixes  []struct{ Ipv4Prefix string }
+				Ipv6Prefixes  []struct{ Ipv6Prefix string }
 			}
 		}
 		if err := json.Unmarshal(raw, &response); err != nil {
@@ -146,6 +147,16 @@ func (o *Observer) AllocationsFor(ctx context.Context, expected *unstructured.Un
 					return nil, fmt.Errorf("invalid ENI primary address")
 				}
 				nativeHosts = append(nativeHosts, netip.PrefixFrom(address, 32))
+			}
+			// ENI IPv6 host addresses are native return destinations, including
+			// for Service traffic masqueraded by kube-proxy. They are not
+			// delegated pod allocations, regardless of the configured pod family.
+			for _, ip := range eni.Ipv6Addresses {
+				address, err := netip.ParseAddr(ip.Ipv6Address)
+				if err != nil || !address.Is6() || address.Is4In6() || !address.IsGlobalUnicast() {
+					return nil, fmt.Errorf("invalid ENI IPv6 host address")
+				}
+				nativeHosts = append(nativeHosts, netip.PrefixFrom(address, 128))
 			}
 
 			if o.Config.Family == "ipv4" {

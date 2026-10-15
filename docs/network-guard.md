@@ -175,3 +175,21 @@ Production use additionally requires exclusive ownership across all controllers,
 reconciliation after API loss, BGP resource restoration, and each site's routing
 and workload compatibility. Do not substitute this isolated MTU rehearsal for
 those deployment gates.
+
+The fixture's apply and restore commands restart `k0scontroller`. On a
+single-controller cluster this interrupts the API server even when host and
+pod pings continue without loss. Its ICMP measurements therefore cannot prove
+API, exec or logs availability. Measure those operations with the existing
+[management observer](deployment-qualification.md#continuous-management-observations)
+through both application and restoration. Any failed management sample fails
+deployment qualification, including when configuration and connectivity are
+subsequently restored within the rollback deadline.
+
+Do not use this restart-based transaction as a zero-interruption migration for
+a single-controller deployment. Qualify a configuration update path that keeps
+the management endpoint available before applying the change. k0s supports
+[dynamic configuration](https://docs.k0sproject.io/head/dynamic-configuration/),
+but it must already be enabled on every controller; a static configuration file
+transaction does not update the API-owned configuration or provide its rollback.
+Changing configuration mode is a separate migration requiring its own ownership,
+availability and autonomous recovery proof.

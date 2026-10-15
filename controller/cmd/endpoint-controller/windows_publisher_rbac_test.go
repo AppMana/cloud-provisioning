@@ -108,4 +108,34 @@ func TestWindowsPublisherReconcilesWithChartServiceAccount(t *testing.T) {
 			t.Fatal("request deletion escaped namespace", err)
 		}
 	})
+	t.Run("leader election events are namespace confined", func(t *testing.T) {
+		event := &corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "leader-election", Namespace: namespace},
+			InvolvedObject: corev1.ObjectReference{Kind: "Lease", Namespace: namespace, Name: "mesh"},
+			Reason:         "LeaderElection", Message: "controller became leader", Type: "Normal"}
+		if err := scoped.Create(ctx, event); err != nil {
+			t.Fatal("record leader election:", err)
+		}
+		before := event.DeepCopy()
+		event.Count = 2
+		if err := scoped.Patch(ctx, event, client.MergeFrom(before)); err != nil {
+			t.Fatal("aggregate leader election:", err)
+		}
+		event.Count = 3
+		if err := scoped.Update(ctx, event); err != nil {
+			t.Fatal("update leader election:", err)
+		}
+		if err := scoped.Delete(ctx, event); !apierrors.IsForbidden(err) {
+			t.Fatal("unexpected event deletion permission:", err)
+		}
+		const other = "event-other"
+		if err := admin.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: other}}); err != nil {
+			t.Fatal(err)
+		}
+		event.ObjectMeta = metav1.ObjectMeta{Name: "leader-election", Namespace: other}
+		event.InvolvedObject.Namespace = other
+		if err := scoped.Create(ctx, event); !apierrors.IsForbidden(err) {
+			t.Fatal("event permission escaped release namespace:", err)
+		}
+	})
+
 }

@@ -170,6 +170,10 @@ rules:
     resources: ["provisionednodeclaims"]
     verbs: ["create", "delete"]
   {{- end }}
+  # The leader-election recorder writes Events only in the release namespace.
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
   # A mesh-scoped Lease serializes controllers, including overlapping releases.
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]

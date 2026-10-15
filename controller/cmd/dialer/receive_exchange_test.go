@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/netip"
@@ -13,12 +14,17 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 // TestNativeReceiveExchange is a test-binary adapter for the isolated packet
 // experiment. Only public bindings leave the process; root material stays in
 // the experiment's private temporary directory. The parent owns topology and
-// traffic assertions. This adapter is never part of the shipped dialer binary.
+// traffic assertions. Kubernetes receipt publication uses an in-memory API;
+// API-server concurrency and authorization are outside this test. This adapter
+// is never part of the shipped dialer binary.
 func TestNativeReceiveExchange(t *testing.T) {
 	requestPath := os.Getenv("CLDT_NATIVE_RECEIVE_EXCHANGE")
 	if requestPath == "" {
@@ -89,17 +95,47 @@ func TestNativeReceiveExchange(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer devices.Close()
-	bindings, err := prepareReceivePaths(devices, request.MeshID, root, request.Previous, request.Desired, request.Native, 1400, 518)
+	base, err := json.Marshal(request.Previous)
 	if err != nil {
 		t.Fatal(err)
 	}
-	repeated, err := prepareReceivePaths(devices, request.MeshID, root, request.Previous, request.Desired, request.Native, 1400, 518)
+	intent := tunnel.ReceivePrepare{Version: 1, MeshUID: request.MeshID, NodeName: "worker", NodeUID: "node-uid", RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(base), Desired: request.Desired, Native: request.Native}
+	intentRaw, err := json.Marshal(intent)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(bindings, repeated) {
-		t.Fatal("repeated preparation changed live bindings")
+	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "adoption", Namespace: "experiment", UID: "secret-uid", ResourceVersion: "1"}, Data: map[string][]byte{tunnel.CloudPeersKey: base, tunnel.ReceivePrepareKey: intentRaw}}
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker", UID: "node-uid"}}
+	api := fake.NewClientset(secret, node)
+	prepare := func(intent tunnel.ReceivePrepare, previous tunnel.PeerListDoc) ([]receiveBinding, error) {
+		return prepareReceivePaths(devices, intent.MeshUID, root, previous, intent.Desired, intent.Native, 1400, 518)
 	}
+	var receipt tunnel.ReceiveReady
+	for attempt := 0; attempt < 2; attempt++ {
+		current, err := api.CoreV1().Secrets(secret.Namespace).Get(context.Background(), secret.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := reconcileReceivePreparation(context.Background(), api, current, "worker", root, prepare); err != nil {
+			t.Fatal(err)
+		}
+		published, err := api.CoreV1().Secrets(secret.Namespace).Get(context.Background(), secret.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var observed tunnel.ReceiveReady
+		if err := json.Unmarshal(published.Data[tunnel.ReceiveReadyKey], &observed); err != nil {
+			t.Fatal(err)
+		}
+		if observed.RequestHash != tunnel.HashPeerList(intentRaw) {
+			t.Fatal("runtime published readiness for another request")
+		}
+		if attempt == 1 && !reflect.DeepEqual(receipt, observed) {
+			t.Fatal("repeated preparation changed readiness")
+		}
+		receipt = observed
+	}
+	bindings := receipt.Bindings
 	afterRoutes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, 0)
 	if err != nil {
 		t.Fatal(err)

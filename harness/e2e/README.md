@@ -242,19 +242,26 @@ unshare --net env CLDT_NATIVE_RECEIVE_PATHS=1 /staged/dialer.test \
 It checks separate public identities and listener ports, stable repeated
 preparation, dual-family accept lists, retained old receivers, and unchanged
 routes and policy rules. It rejects identity replacement and implicit source
-withdrawal. This preparation function is not yet called by the reconciliation
-loop; the test does not establish packet continuity, publication, activation,
-retirement, or reboot recovery.
+withdrawal. The reconciliation loop invokes preparation only when its adoption
+Secret contains an explicit `receive-prepare.json` request. That request binds
+the node and root public identity, mesh identity, current `peers.json` hash,
+future peer document, and native network boundaries. Preparation publishes
+`receive-ready.json` with public kernel bindings and the exact request hash;
+it does not change `peers.json` or the applied-list acknowledgment. The controller
+does not yet produce these requests or consume readiness. The standalone test
+does not establish publication, activation, retirement, or reboot recovery.
 
 To send packets through receivers created by that runtime code, pass
 `--runtime /staged/dialer.test` to `wireguard_handover_native.py --mode dual`
 instead of `--planner`. The experiment invokes a test-only adapter inside the
 cloud namespace, uses its returned public identities and actual listener ports,
-and lets WireGuard learn site endpoints from authenticated traffic. Receiver
-configuration is performed by the Go runtime, while the experiment still owns
+and lets WireGuard learn site endpoints from authenticated traffic. The adapter
+exercises the readiness handler with an in-memory Kubernetes API and verifies
+stable receipts across repeated preparation. Receiver configuration is performed
+by the Go runtime, while the experiment still owns
 the site peers and route transitions. All four IPv4 exchange phases must
 preserve the original pod source. This is a mechanism test, not controller
-publication or CAPI lifecycle qualification.
+API-server publication semantics or CAPI lifecycle qualification.
 
 The single-device control expects failed exchanges when sender and receiver
 ownership disagree. The dual-receiver case requires exchanges in both

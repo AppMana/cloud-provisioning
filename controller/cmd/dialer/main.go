@@ -1172,6 +1172,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		privateKey     wgtypes.Key
 		peers          []tunnel.PeerSpec
 		meshSecret     *corev1.Secret
+		adoptionSecret *corev1.Secret
 		usingSecret    = cfg.secretName != ""
 		// The override list being applied this pass, acknowledged on
 		// the adoption Secret once the pass completes. The hash is the
@@ -1331,6 +1332,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 						applyingUID = string(secret.UID)
 						applyingVersion = secret.ResourceVersion
 						alreadyApplied = secret.Annotations[tunnel.AppliedListAnnotation]
+						adoptionSecret = secret
 					}
 				}
 			} else {
@@ -1717,6 +1719,17 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			if err := acknowledgeSite(ctx, clientset, cfg.secretNamespace, cfg.secretName, cfg.nodeName, siteNodeUID, privateKey.PublicKey().String(), string(meshSecret.UID), siteHash, relayTransit); err != nil {
 				fmt.Fprintf(os.Stderr, "acknowledging relayed site peers: %v\n", err)
 			}
+		}
+	}
+	if adoptionSecret != nil {
+		if err := reconcileReceivePreparation(ctx, clientset, adoptionSecret, cfg.nodeName, privateKey, func(request tunnel.ReceivePrepare, previous tunnel.PeerListDoc) ([]receiveBinding, error) {
+			mtu := cfg.mtu
+			if mtu == 0 {
+				mtu = underlayMTU()
+			}
+			return prepareReceivePaths(wg, request.MeshUID, privateKey, previous, request.Desired, request.Native, mtu, cfg.fwmark)
+		}); err != nil {
+			return fmt.Errorf("preparing receive paths: %w", err)
 		}
 	}
 	if applyingHash != "" && applyingHash != alreadyApplied && clientset != nil {

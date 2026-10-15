@@ -12,14 +12,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-// receiveBinding contains only public connection details. Preparation does not
-// authorize route activation or retirement of any earlier receiver.
-type receiveBinding struct {
-	Interface     string `json:"interface"`
-	PeerPublicKey string `json:"peerPublicKey"`
-	PublicKey     string `json:"publicKey"`
-	ListenPort    int    `json:"listenPort"`
-}
+type receiveBinding = tunnel.ReceiveBinding
 
 type receiverDevices interface {
 	Device(string) (*wgtypes.Device, error)

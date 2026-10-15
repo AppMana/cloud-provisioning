@@ -11,7 +11,7 @@ import (
 
 // A fresh handshake proves the prepared transport can exchange authenticated
 // packets. It is not a forwarding acknowledgement or a workload/MTU test.
-const receiveHandshakeMaxAge = 3 * time.Minute
+const receiveHandshakeMaxAge = tunnel.ReceiveHandshakeMaxAge
 
 func siteReceiveHandshake(devices receiverDevices, key wgtypes.Key, plan tunnel.SiteReceiveClient, mark int, now time.Time) (time.Time, error) {
 	live, err := devices.Device(plan.Interface)

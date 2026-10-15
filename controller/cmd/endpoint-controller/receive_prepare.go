@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/netip"
 	"strings"
+	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
@@ -21,6 +22,7 @@ import (
 type preparedRemoteReceivers struct {
 	Target          tunnel.ReceiveTarget
 	AdoptionVersion string
+	MeshVersion     string
 	RequestHash     string
 	BaseHash        string
 	Bindings        map[string]tunnel.ReceiveBinding
@@ -187,5 +189,86 @@ func (r *meshReconciler) prepareRemoteReceivePaths(ctx context.Context, expected
 	if err != nil {
 		return nil, err
 	}
-	return &preparedRemoteReceivers{Target: target, AdoptionVersion: adoption.ResourceVersion, RequestHash: tunnel.HashPeerList(raw), BaseHash: request.BaseHash, Bindings: bindings}, nil
+	if ready, err := r.siteReceivePathsReady(ctx, mesh, adoption, request, bindings, time.Now()); err != nil || !ready {
+		return nil, err
+	}
+	return &preparedRemoteReceivers{Target: target, MeshVersion: mesh.ResourceVersion, AdoptionVersion: adoption.ResourceVersion, RequestHash: tunnel.HashPeerList(raw), BaseHash: request.BaseHash, Bindings: bindings}, nil
+}
+
+// Require the desired site's authenticated transport before returning prepared
+// receivers to activation orchestration. Old receive-only devices stay retained;
+// they do not become required egress paths merely because they remain in union.
+func (r *meshReconciler) siteReceivePathsReady(ctx context.Context, mesh, adoption *corev1.Secret, request tunnel.ReceivePrepare, bindings map[string]tunnel.ReceiveBinding, now time.Time) (bool, error) {
+	sitePeers, err := tunnel.SitePeers(mesh.Data)
+	if err != nil {
+		return false, err
+	}
+	siteDoc := tunnel.PeerListDoc{Peers: sitePeers}
+	siteHash, err := tunnel.SitePeerHash(mesh.Data)
+	if err != nil {
+		return false, err
+	}
+	names := map[string]string{}
+	for key, value := range mesh.Data {
+		if !strings.HasPrefix(key, tunnel.NodePublicKeyPrefix) {
+			continue
+		}
+		public := strings.TrimSpace(string(value))
+		if _, exists := names[public]; exists && public != "" {
+			return false, fmt.Errorf("duplicate site receiver identity")
+		}
+		names[public] = strings.TrimPrefix(key, tunnel.NodePublicKeyPrefix)
+	}
+	for _, peer := range request.Desired.Peers {
+		if peer.Remote {
+			continue
+		}
+		name := names[peer.PublicKey]
+		if name == "" {
+			return false, fmt.Errorf("desired site receiver has no current node")
+		}
+		binding, found := bindings[peer.PublicKey]
+		if !found {
+			return false, fmt.Errorf("desired site receiver has no cloud binding")
+		}
+		raw := adoption.Data[tunnel.SiteReceiveReadyKey(peer.PublicKey)]
+		if len(raw) == 0 {
+			return false, nil
+		}
+		node := &corev1.Node{}
+		if err := r.reader.Get(ctx, types.NamespacedName{Name: name}, node); err != nil {
+			return false, err
+		}
+		ready := false
+		for _, condition := range node.Status.Conditions {
+			if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
+				ready = true
+			}
+		}
+		if !ready || node.UID == "" || node.Status.NodeInfo.BootID == "" || node.DeletionTimestamp != nil {
+			return false, nil
+		}
+		plan, err := tunnel.PlanSiteReceiveClient(string(mesh.UID), peer.PublicKey, request.RootPublicKey, binding, siteDoc, siteDoc)
+		if err != nil {
+			return false, err
+		}
+		expected := tunnel.SiteReceiveReady{Version: 1, MeshUID: string(mesh.UID), SecretUID: string(adoption.UID), RequestHash: tunnel.HashPeerList(adoption.Data[tunnel.ReceivePrepareKey]), SiteHash: siteHash, NodeName: node.Name, NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, Client: plan}
+		if err := tunnel.ValidateSiteReceiveReadiness(expected, raw, now); err != nil {
+			return false, err
+		}
+	}
+	// Site reads can take multiple API round trips. Return only a still-current
+	// proposal snapshot; activation must also check these versions when writing.
+	currentMesh := &corev1.Secret{}
+	if err := r.reader.Get(ctx, client.ObjectKeyFromObject(mesh), currentMesh); err != nil {
+		return false, err
+	}
+	currentAdoption := &corev1.Secret{}
+	if err := r.reader.Get(ctx, client.ObjectKeyFromObject(adoption), currentAdoption); err != nil {
+		return false, err
+	}
+	if currentMesh.UID != mesh.UID || currentMesh.ResourceVersion != mesh.ResourceVersion || currentMesh.DeletionTimestamp != nil || currentAdoption.UID != adoption.UID || currentAdoption.ResourceVersion != adoption.ResourceVersion || currentAdoption.DeletionTimestamp != nil {
+		return false, fmt.Errorf("receiver proposal changed during site readiness validation")
+	}
+	return true, nil
 }

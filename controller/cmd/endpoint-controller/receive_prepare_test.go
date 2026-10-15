@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/netip"
 	"testing"
+	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
@@ -57,7 +58,7 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			adoption := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: tunnel.AdoptionSecretName(machine.GetName()), Namespace: machine.GetNamespace(), UID: "adoption-uid", Annotations: map[string]string{tunnel.AppliedListAnnotation: tunnel.HashPeerList(base)}}, Data: map[string][]byte{tunnel.CloudPeersKey: base}}
 			mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "peers", Namespace: machine.GetNamespace(), UID: "mesh-uid"}, Data: map[string][]byte{
 				tunnel.NodePublicKeyPrefix + "site": []byte(preparationKey(16)), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.100.0.2/24"), tunnel.NodeAddressesPrefix + "site": []byte("10.101.0.2"), tunnel.NodePodCIDRsPrefix + "site": []byte("10.101.128.0/26"),
-				tunnel.PeerPublicKeyPrefix + "worker": []byte(preparationKey(24)), tunnel.PeerRouteHostsPrefix + "worker": []byte("10.100.0.128"), tunnel.PeerAllowedIPsPrefix + "worker": []byte("10.100.0.128/32"),
+				tunnel.PeerEndpointPrefix + "worker": []byte("198.51.100.10:51820"), tunnel.PeerPublicKeyPrefix + "worker": []byte(preparationKey(24)), tunnel.PeerRouteHostsPrefix + "worker": []byte("10.100.0.128"), tunnel.PeerAllowedIPsPrefix + "worker": []byte("10.100.0.128/32"),
 			}}
 			native := []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}
 			pool := []int{51821, 51822, 51823, 51824}
@@ -86,7 +87,8 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			case "exhausted-ports":
 				pool = []int{51821}
 			}
-			r, c := dualStackReconciler(t, "", machine, node, mesh, adoption)
+			siteNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "site", UID: "site-uid"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{BootID: "site-boot"}, Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}}}
+			r, c := dualStackReconciler(t, "", machine, node, siteNode, mesh, adoption)
 			if fault == "adoption-race" {
 				r.Client = &receivePreparationRaceClient{Client: c, beforePatch: func(ctx context.Context) error {
 					changed := &corev1.Secret{}
@@ -154,6 +156,60 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			current.Data[tunnel.ReceiveReadyKey], _ = json.Marshal(receipt)
 			if err := c.Update(ctx, current); err != nil {
 				t.Fatal(err)
+			}
+			bindings, err = r.prepareRemoteReceivePaths(ctx, expected, native, pool)
+			if err != nil || bindings != nil {
+				t.Fatalf("cloud readiness bypassed missing site transport: %v", err)
+			}
+			if err := c.Get(ctx, client.ObjectKeyFromObject(mesh), mesh); err != nil {
+				t.Fatal(err)
+			}
+			sitePeers, err := tunnel.SitePeers(mesh.Data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			siteDoc := tunnel.PeerListDoc{Peers: sitePeers}
+			siteHash, err := tunnel.SitePeerHash(mesh.Data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var siteBinding tunnel.ReceiveBinding
+			for _, binding := range receipt.Bindings {
+				if binding.PeerPublicKey == preparationKey(16) {
+					siteBinding = binding
+				}
+			}
+			sitePlan, err := tunnel.PlanSiteReceiveClient(string(mesh.UID), preparationKey(16), request.RootPublicKey, siteBinding, siteDoc, siteDoc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			siteReceipt := tunnel.SiteReceiveReady{Version: 1, MeshUID: string(mesh.UID), SecretUID: string(current.UID), RequestHash: receipt.RequestHash, SiteHash: siteHash, NodeName: "site", NodeUID: "site-uid", BootID: "site-boot", Client: sitePlan, HandshakeAt: time.Now().Add(-time.Second)}
+			for _, fault := range []string{"boot", "node", "request", "permissions", "expired", "future", "none"} {
+				bad := siteReceipt
+				switch fault {
+				case "boot":
+					bad.BootID = "old-boot"
+				case "node":
+					bad.NodeUID = "old-node"
+				case "request":
+					bad.RequestHash = "old-request"
+				case "permissions":
+					bad.Client.AllowedSources = []string{"0.0.0.0/0"}
+				case "expired":
+					bad.HandshakeAt = time.Now().Add(-time.Hour)
+				case "future":
+					bad.HandshakeAt = time.Now().Add(time.Hour)
+				}
+				current.Data[tunnel.SiteReceiveReadyKey(preparationKey(16))], _ = json.Marshal(bad)
+				if err := c.Update(ctx, current); err != nil {
+					t.Fatal(err)
+				}
+				if fault != "none" {
+					result, err := r.prepareRemoteReceivePaths(ctx, expected, native, pool)
+					if err == nil || result != nil {
+						t.Fatalf("invalid site readiness accepted: %s", fault)
+					}
+				}
 			}
 			readyVersion := current.ResourceVersion
 			bindings, err = r.prepareRemoteReceivePaths(ctx, expected, native, pool)

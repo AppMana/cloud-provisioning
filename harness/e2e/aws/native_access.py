@@ -18,6 +18,11 @@ def node_policy(state):
          'Resource': f'arn:aws:ec2:{region}:{account}:network-interface/*',
          'Condition': {'StringEquals': {'aws:RequestedRegion': region,
                        'ec2:ResourceTag/cloud-provisioning-test': state['runID']}}},
+        {'Effect': 'Allow', 'Action': ['ec2:CreateTags'],
+         'Resource': f'arn:aws:ec2:{region}:{account}:network-interface/*',
+         'Condition': {'StringEquals': {'aws:RequestedRegion': region,
+                       'ec2:ResourceTag/cloud-provisioning-test': state['runID']},
+                       'ForAllValues:StringEquals': {'aws:TagKeys': ['node.k8s.amazonaws.com/instance_id']}}},
     ]}
 
 

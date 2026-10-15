@@ -132,7 +132,8 @@ Removal refuses to withdraw the fallback while primary routing is missing or
 changed. It preserves unexpected shadow state and can resume an interrupted
 cleanup of unchanged state. It does not restore a failed agent, roll back
 Kubernetes objects, or prove live-upgrade continuity. This helper still needs
-deployment integration and monitored VM rehearsal; it is not a replacement
+deployment integration and upgrade qualification for each supported site,
+IP family, and endpoint placement; it is not a replacement
 for the autonomous rollback and deployment qualification requirements.
 
 ## Disposable-VM qualification

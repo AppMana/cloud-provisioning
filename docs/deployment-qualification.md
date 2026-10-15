@@ -99,6 +99,17 @@ A restart of the same version does not satisfy this row. Upgrade measurements
 require continuous management observation and zero retained packet failures;
 bounded fault-recovery results cannot substitute for an uninterrupted upgrade.
 
+Upgrade the image through its owner. The endpoint controller reconciles both
+dialer DaemonSets from its `--dialer-image` argument, rendered from the chart's
+`dialerImage` values. Direct DaemonSet image patches can be overwritten during
+the measurement and cannot establish the intended predecessor or candidate.
+Wait for the controller deployment to converge, then verify both DaemonSets'
+desired image before observing their rollouts. Retain the resource snapshots.
+Require exactly one nonterminating, Ready agent on every intended node, the
+expected immutable runtime image identity, and a changed Pod UID at each
+transition. A successful `rollout status` alone does not prove the requested
+version ran: another writer can change the desired revision while it waits.
+
 1. Freeze binaries, chart and multi-architecture image digests, CAPI/CAPA,
    k0s, both Calico variants and AWS VPC CNI versions. Prove ARM64 runtime,
    not merely an image manifest. Rebuild after any code change.

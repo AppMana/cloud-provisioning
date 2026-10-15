@@ -1604,8 +1604,8 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			Endpoint:                    endpoint,
 			PersistentKeepaliveInterval: &keepalive,
 			AllowedIPs:                  allowedIPs,
-			// Per-peer AllowedIPs replacement is a trie update; it
-			// does not reset the peer's established session.
+			// The delta planner omits unchanged prefixes and appends additions.
+			// Only withdrawals require replacing the peer's accept list.
 			ReplaceAllowedIPs: true,
 		})
 
@@ -1648,24 +1648,6 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		return fmt.Errorf("ensuring %s: %w", cfg.iface, err)
 	}
 
-	// ReplacePeers is not used: replacement removes and re-adds every
-	// peer, and removal destroys the peer's established session, so an
-	// unchanged config re-applied every poll interval would tear the
-	// tunnel down as often as it reconciles it. Removed peers are
-	// deleted explicitly; existing peers are updated in place (endpoint,
-	// keepalive, AllowedIPs trie), none of which resets a session.
-	desired := map[wgtypes.Key]bool{}
-	for _, p := range peerConfigs {
-		desired[p.PublicKey] = true
-	}
-	if device, err := wg.Device(cfg.iface); err == nil {
-		for _, existing := range device.Peers {
-			if !desired[existing.PublicKey] {
-				peerConfigs = append(peerConfigs, wgtypes.PeerConfig{PublicKey: existing.PublicKey, Remove: true})
-			}
-		}
-	}
-
 	deviceCfg := wgtypes.Config{
 		PrivateKey: &privateKey,
 		Peers:      peerConfigs,
@@ -1676,8 +1658,14 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	if cfg.fwmark > 0 {
 		deviceCfg.FirewallMark = &cfg.fwmark
 	}
-	if err := wg.ConfigureDevice(cfg.iface, deviceCfg); err != nil {
-		return err
+	device, err := wg.Device(cfg.iface)
+	if err != nil {
+		return fmt.Errorf("reading %s before applying peer changes: %w", cfg.iface, err)
+	}
+	if delta, changed := deviceDelta(deviceCfg, device); changed {
+		if err := wg.ConfigureDevice(cfg.iface, delta); err != nil {
+			return err
+		}
 	}
 
 	// Install the explicit-source exception before moving general egress.

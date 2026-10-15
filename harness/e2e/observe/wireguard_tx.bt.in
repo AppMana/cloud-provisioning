@@ -1,0 +1,39 @@
+BEGIN { printf("{\"event\":\"ready\"}\n"); }
+tracepoint:net:net_dev_start_xmit
+/str(args->name) == @@INTERFACE@@/
+{
+  $skb = (struct sk_buff *)args->skbaddr;
+  $offset = (uint64)$skb->network_header;
+  $tail = (uint64)$skb->tail;
+  if ($offset + 20 <= $tail) {
+    $ip = (uint8 *)($skb->head + $offset);
+    $ihl = (*$ip & 15) * 4;
+    $dst = *(uint32 *)($ip + 16);
+    if ((*$ip >> 4) == 4 && $ihl >= 20 && $offset + $ihl + 24 <= $tail && *(uint8 *)($ip + 9) == 17 && (*(uint16 *)($ip + 6) & 0xff3f) == 0 && (@@DESTINATIONS@@)) {
+      $udp = $ip + $ihl;
+      if (*(uint32 *)($udp + 8) == 4) {
+        $key = (uint64)args->skbaddr;
+        @active[$key] = nsecs;
+        @receiver[$key] = *(uint32 *)($udp + 12);
+        @counter[$key] = *(uint64 *)($udp + 16);
+        @destination[$key] = $dst;
+        printf("{\"event\":\"start\",\"ns\":%llu,\"skb\":%llu,\"receiver\":%u,\"counter\":%llu,\"destinationNative\":%u,\"queue\":%u,\"gsoSize\":%u,\"gsoSegments\":%u}\n",nsecs,$key,@receiver[$key],@counter[$key],$dst,args->queue_mapping,args->gso_size,args->gso_segs);
+      }
+    }
+  }
+}
+tracepoint:net:net_dev_xmit
+/@active[(uint64)args->skbaddr]/
+{
+  $key = (uint64)args->skbaddr;
+  printf("{\"event\":\"return\",\"ns\":%llu,\"skb\":%llu,\"receiver\":%u,\"counter\":%llu,\"destinationNative\":%u,\"rc\":%d}\n",nsecs,$key,@receiver[$key],@counter[$key],@destination[$key],args->rc);
+  delete(@active[$key]); delete(@receiver[$key]); delete(@counter[$key]); delete(@destination[$key]);
+}
+tracepoint:skb:kfree_skb
+/@active[(uint64)args->skbaddr]/
+{
+  $key = (uint64)args->skbaddr;
+  printf("{\"event\":\"free-before-return\",\"ns\":%llu,\"receiver\":%u,\"counter\":%llu,\"reason\":%d}\n",nsecs,@receiver[$key],@counter[$key],args->reason);
+}
+interval:s:@@SECONDS@@ { exit(); }
+END { clear(@active);clear(@receiver);clear(@counter);clear(@destination);printf("{\"event\":\"stopped\"}\n"); }

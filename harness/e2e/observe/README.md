@@ -1,5 +1,44 @@
 # Native packet-drop analysis
 
+## Host transmit observation
+
+`wireguard_tx.py` generates a bounded bpftrace program for a little-endian Linux
+host with BTF and the `net_dev_start_xmit`, `net_dev_xmit`, and `kfree_skb`
+tracepoints. It observes an explicit interface and up to sixteen IPv4 peer
+addresses. It does not alter routes, firewall policy, offloads, or packets.
+
+```sh
+umask 077
+python3 observe/wireguard_tx.py --interface "$UPLINK_INTERFACE" \
+  --peer "$CLOUD_PUBLIC_IPV4" --seconds 300 > "$EVIDENCE/trace.bt"
+sudo bpftrace -q "$EVIDENCE/trace.bt" \
+  > "$EVIDENCE/trace.jsonl" 2> "$EVIDENCE/trace.stderr"
+```
+
+Use fresh private artifact paths. Wait for the `ready` event before starting
+the measured operation and require the `stopped` event and successful process
+exit afterward. Retain stderr; lost-event warnings, unmatched starts/returns,
+or missing coverage invalidate complete-transmit claims. Records contain
+kernel addresses and should stay in private evidence. Empty traces do not
+prove an absence of drops.
+
+The program follows unfragmented IPv4 UDP WireGuard data headers from transmit
+start to driver return. It records the peer address, receiver index, counter,
+queue, segmentation metadata, and return code. Match those identifiers against
+simultaneous captures, retaining every repeated transmission and nonzero return.
+The `ns` field uses the kernel clock, not pcap wall-clock timestamps; correlate
+by packet identifiers rather than subtracting those timestamps directly.
+The optional `free-before-return` event records the kernel reason when the same
+buffer is freed before return; it is not by itself a packet-loss verdict.
+Inspect tracepoint layouts and validate the program against packet captures on
+the actual host before using it in a diagnostic campaign.
+
+A zero driver return does not prove transmission on the physical wire or
+delivery to the peer. This trace cannot see losses before its selected
+transmit-start hook, in firmware, at a router, or elsewhere in transit. Retain
+ordinary-pod observations and captures at both ends; the trace supplements
+them and never substitutes for deployment qualification.
+
 ## Ordinary-pod matrix
 
 `pod_matrix.py` tests existing ordinary agnhost `netexec` pods on distinct nodes.

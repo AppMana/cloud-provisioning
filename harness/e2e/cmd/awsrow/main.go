@@ -35,6 +35,7 @@ func main() {
 }
 func run() error {
 	work := flag.String("work-dir", "", "private AWS run directory")
+	preloadDialer := flag.Bool("preload-dialer", false, "explicitly import dialer images for an offline campaign; default verifies registry delivery")
 	expectedImage := flag.String("expected-image", "", "authorized Linux image expected on each measured worker; defaults to the prepared AMI")
 	site := flag.String("site-work-dir", "", "existing single-NIC VM site directory")
 	distro := flag.String("distro", "k0s", "site distribution: k0s or microk8s")
@@ -105,31 +106,34 @@ func run() error {
 	if image == "" {
 		return fmt.Errorf("site dialer has no image")
 	}
-	archive, err := os.CreateTemp(*work, "dialer-image-*.tar")
-	if err != nil {
-		return err
-	}
-	archivePath := archive.Name()
-	defer os.Remove(archivePath)
-	remoteRaw, err := k.Run(ctx, "-n", "cloud-provisioning", "get", "daemonset", "cloud-provisioning-dialer-remote", "-o", "json")
-	if err != nil {
-		archive.Close()
-		return err
-	}
-	remoteDS, err := adopt.DecodeDaemonSet(remoteRaw)
-	if err != nil {
-		archive.Close()
-		return err
-	}
-	images := adopt.RequiredImages(image, remoteDS)
-	save := exec.CommandContext(ctx, "docker", append([]string{"save"}, images...)...)
-	save.Stdout = archive
-	if err = save.Run(); err != nil {
-		archive.Close()
-		return fmt.Errorf("saving dialer image: %w", err)
-	}
-	if err = archive.Close(); err != nil {
-		return err
+	archivePath := ""
+	if *preloadDialer {
+		archive, err := os.CreateTemp(*work, "dialer-image-*.tar")
+		if err != nil {
+			return err
+		}
+		archivePath = archive.Name()
+		defer os.Remove(archivePath)
+		remoteRaw, err := k.Run(ctx, "-n", "cloud-provisioning", "get", "daemonset", "cloud-provisioning-dialer-remote", "-o", "json")
+		if err != nil {
+			archive.Close()
+			return err
+		}
+		remoteDS, err := adopt.DecodeDaemonSet(remoteRaw)
+		if err != nil {
+			archive.Close()
+			return err
+		}
+		images := adopt.RequiredImages(image, remoteDS)
+		save := exec.CommandContext(ctx, "docker", append([]string{"save"}, images...)...)
+		save.Stdout = archive
+		if err = save.Run(); err != nil {
+			archive.Close()
+			return fmt.Errorf("saving dialer image: %w", err)
+		}
+		if err = archive.Close(); err != nil {
+			return err
+		}
 	}
 	bindings := []map[string]any{}
 	for _, name := range strings.Split(*claims, ",") {
@@ -177,14 +181,16 @@ func run() error {
 			return err
 		}
 		fmt.Println("Native bootstrap and CAPI success marker verified on", id)
-		f, e := os.Open(archivePath)
-		if e != nil {
-			return e
-		}
-		_, e = remote.Pipe(ctx, f, builder.ImportArgs()...)
-		f.Close()
-		if e != nil {
-			return fmt.Errorf("importing dialer measurement image: %w", e)
+		if *preloadDialer {
+			f, e := os.Open(archivePath)
+			if e != nil {
+				return e
+			}
+			_, e = remote.Pipe(ctx, f, builder.ImportArgs()...)
+			f.Close()
+			if e != nil {
+				return fmt.Errorf("importing dialer measurement image: %w", e)
+			}
 		}
 		var nodeName string
 		err = wait.Until(ctx, 10*time.Minute, "CAPI has no Node reference for "+name, func(ctx context.Context) error {
@@ -267,7 +273,7 @@ func run() error {
 			return fmt.Errorf("guest has %d physical NICs", len(interfaces))
 		}
 		remote.NIC = interfaces[0]
-		bindings = append(bindings, map[string]any{"machine": name, "node": nodeName, "nodeUID": uid, "providerID": providerID, "instanceID": id, "physicalNIC": remote.NIC, "eniCount": 1, "imageID": instance.ImageID})
+		bindings = append(bindings, map[string]any{"machine": name, "node": nodeName, "nodeUID": uid, "providerID": providerID, "instanceID": id, "physicalNIC": remote.NIC, "eniCount": 1, "imageID": instance.ImageID, "dialerPreloaded": *preloadDialer})
 		fmt.Println("CAPI associated", name, "with", nodeName, "on one ENI")
 	}
 	reportDir := filepath.Join(*work, "rows", time.Now().UTC().Format("20060102T150405Z"))

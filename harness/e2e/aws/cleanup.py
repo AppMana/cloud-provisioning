@@ -73,7 +73,7 @@ for owned in images:
             if {t['Key']: t['Value'] for t in item.get('Tags', [])}.get('cloud-provisioning-test') != s['runID']:
                 raise RuntimeError('prepared snapshot ownership tag mismatch')
             aws('ec2', 'delete-snapshot', '--snapshot-id', snapshot, absent_ok=True)
-for key in ('publisherRepository', 'calicoWindowsRepository', 'windowsGPUPluginRepository', 'windowsGPUProbeRepository'):
+for key in ('linuxDialerRepository', 'publisherRepository', 'calicoWindowsRepository', 'windowsGPUPluginRepository', 'windowsGPUProbeRepository'):
     if not s.get(key):
         continue
     repo = s[key]
@@ -101,6 +101,8 @@ if s.get('instanceProfileName'):
     aws('iam', 'delete-instance-profile', '--instance-profile-name', s['instanceProfileName'], absent_ok=True)
 if s.get('nodeRoleName'):
     aws('iam', 'delete-role-policy', '--role-name', s['nodeRoleName'], '--policy-name', 'cldt-test', absent_ok=True)
+    if s.get('nativeCNI'):
+        aws('iam', 'delete-role-policy', '--role-name', s['nodeRoleName'], '--policy-name', 'cldt-native-cni', absent_ok=True)
     aws('iam', 'detach-role-policy', '--role-name', s['nodeRoleName'], '--policy-arn', 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore', absent_ok=True)
     aws('iam', 'delete-role', '--role-name', s['nodeRoleName'], absent_ok=True)
 if s.get('gatewayRuntimeRoleName'):
@@ -118,6 +120,7 @@ if s.get('capaRoleName'):
 session = path.parent / 'capa-session.json'
 session.unlink(missing_ok=True)
 (path.parent / 'harness-session.json').unlink(missing_ok=True)
+(path.parent / 'observer-session.json').unlink(missing_ok=True)
 (path.parent / 'asset-urls.json').unlink(missing_ok=True)
 s['cleanedUp'] = True
 path.write_text(json.dumps(s, indent=2) + '\n')

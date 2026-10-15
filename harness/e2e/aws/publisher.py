@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish a test Windows image to run-owned private ECR.
+"""Publish a test image to run-owned private ECR.
 
 Source the setup identity. Authentication stays in a temporary Docker config;
 the isolated cluster receives an expiring imagePullSecret, never setup keys.
@@ -20,6 +20,7 @@ artifact.add_argument('--layout', type=pathlib.Path)
 artifact.add_argument('--archive', type=pathlib.Path, help='Docker image tar archive')
 artifact.add_argument('--renew-pull-only', action='store_true', help='renew access to the recorded immutable image without pushing it again')
 COMPONENTS = {
+    'linux-dialer': ('linuxDialer', 'cloud-provisioning', 'dialer-pull'),
     'windows-publisher': ('publisher', 'cloud-provisioning', 'publisher-pull'),
     'calico-node-windows': ('calicoWindows', 'kube-system', 'calico-pull'),
     'windows-gpu-probe': ('windowsGPUProbe', 'cldt-windows-gpu', 'gpu-probe-pull'),
@@ -29,6 +30,7 @@ p.add_argument('--component', choices=COMPONENTS, default='windows-publisher')
 p.add_argument('--windows-version', choices=['2022','2025'], help='record a build-checked GPU workload separately for this Windows release')
 p.add_argument('--api-server', required=True)
 p.add_argument('--bastion', default='clab-cldt-bastion')
+p.add_argument('--runner', help='isolated Docker runner containing the bastion')
 a = p.parse_args()
 if a.windows_version and (a.component!='windows-gpu-probe' or a.archive):
     raise RuntimeError('Windows release selection requires a GPU probe OCI layout or recorded pull renewal')
@@ -119,7 +121,8 @@ secret_name = s['runID']+'-'+secret_suffix
 secret = {'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {'name': secret_name, 'namespace': namespace},
           'type': 'kubernetes.io/dockerconfigjson',
           'data': {'.dockerconfigjson': base64.b64encode(json.dumps(config).encode()).decode()}}
-r = subprocess.run(['docker', 'exec', '-i', a.bastion, 'kubectl', '--server='+a.api_server, 'apply', '-f', '-'],
+docker = ['docker', 'exec', '-i', a.runner, 'docker'] if a.runner else ['docker']
+r = subprocess.run(docker + ['exec', '-i', a.bastion, 'kubectl', '--server='+a.api_server, 'apply', '-f', '-'],
                    input=json.dumps(secret), capture_output=True, text=True)
 if r.returncode: raise RuntimeError('isolated publisher pull-secret publication failed')
 image_state[key('Image')] = repo['repositoryUri']+'@'+digest

@@ -14,17 +14,8 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 )
 
-// Cluster API and the cert-manager it requires, which the product's
-// own README names as dependencies before its chart is installed.
-//
-// They were not installed here for a long time, on the stated grounds
-// that "the join path never talks to them". That was wrong, and the
-// lab hid it: the product reads Machine.status.nodeRef.name to learn
-// which node's pod blocks belong to a remote, and only Cluster API's
-// Machine controller ever sets that field. With the controllers
-// absent the harness set it instead, so every row proved the join
-// against a harness standing in for a dependency rather than against
-// the dependency.
+// Cluster API associates Machines with Nodes; cert-manager supplies its webhook
+// certificates. Install both real dependencies before exercising worker joins.
 const (
 	CertManagerVersion = "v1.16.2"
 	CertManagerURL     = "https://github.com/cert-manager/cert-manager/releases/download/" +

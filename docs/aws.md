@@ -616,8 +616,8 @@ the separate reboot, capture and fresh-worker acceptance requirements.
 For Linux runtime caches, use the [independent native cache check](../images/README.md)
 before capture. It opens the prepared store without pulling or importing images
 and requires the selected references to remain complete and unpacked across a
-runtime restart. Run fresh-worker cache observations before `awsrow` imports test
-images; those imports would hide missing baked entries.
+runtime restart. Run fresh-worker cache observations before workload image
+imports; those imports would hide missing baked entries.
 
 SSM file transfers can leave signed URLs in historical guest command scripts.
 Before capture, obtain successful `GetCommandInvocation` receipts for the exact
@@ -721,8 +721,8 @@ during cleanup.
 `cmd/awsrow` observes Linux workers using the selected distribution's runtime.
 Its `-distro` and `-cni` flags accept k0s/kube-router (the default), k0s/Calico,
 and MicroK8s/Calico. It checks the pinned distribution version, MicroK8s snap
-revision where applicable, and the native runtime socket before importing test
-images. The distribution builder supplies the import command, CRI endpoint and
+revision where applicable, and the native runtime socket before measuring
+traffic. The distribution builder supplies the import command, CRI endpoint and
 site reuse checks; the AWS rig supplies guest execution through SSM. Reports
 record the selected profile and CRI endpoint. Unsupported observer profiles are
 rejected before contacting AWS.
@@ -735,8 +735,8 @@ Pod UID and container image identities. It also requires the current Machine's
 adoption Secret to acknowledge the SHA256 of its current peer payload, recording
 only the Secret UID, resource version and desired/applied hashes. Missing or stale
 acknowledgments fail the gate. Run fresh-boot and replacement tests
-separately. Matrix results report the last convergence pass, not uninterrupted
-traffic throughout the run.
+separately. Matrix results retain every convergence pass and fail when any required
+attempt fails. Continuous traffic observation is a separate requirement.
 
 The acknowledgment proves applied content at the observation time; it does not
 identify which Pod wrote it or prove uninterrupted traffic during updates.
@@ -852,8 +852,10 @@ The import observes the live site and publishes the CAPI connection contract.
 CAPA launches workers; the harness observes their provider IDs and Node UIDs.
 Each row verifies the selected native release, product label and taint, approved AMI,
 one EC2 ENI and one guest physical NIC before measuring traffic. Guest execution
-uses SSM; the site guests use serial QGA. The harness imports the test dialer
-image through private S3 without changing bootstrap configuration.
+uses SSM; the site guests use serial QGA. By default, the remote dialer must
+start through its configured image delivery path. For an offline campaign,
+`-preload-dialer` explicitly imports its image through private S3; the worker
+bindings record that choice so it cannot be mistaken for registry delivery.
 
 To test removal, replacement and survivor connectivity:
 

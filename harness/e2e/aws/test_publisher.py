@@ -12,7 +12,7 @@ from unittest.mock import patch
 SCRIPT = pathlib.Path(__file__).with_name('publisher.py')
 
 class PublisherTest(unittest.TestCase):
-    def exercise(self, owner='cldt-test', observed_digest='sha256:abc', component='windows-publisher', archive=False, renew=False, recorded=None, missing_repo=False, windows_version=None, image_build='20348', forged_descriptor=False):
+    def exercise(self, owner='cldt-test', observed_digest='sha256:abc', component='windows-publisher', archive=False, renew=False, recorded=None, missing_repo=False, windows_version=None, image_build='20348', forged_descriptor=False, runner=None):
         temp = tempfile.TemporaryDirectory(); self.addCleanup(temp.cleanup)
         root = pathlib.Path(temp.name)
         (root/'resources.json').write_text(json.dumps(dict(runID='cldt-test', account='123', region='us-west-2', publisherImage=(recorded or '123.dkr.ecr.us-west-2.amazonaws.com/cldt-test/windows-publisher@sha256:abc') if renew else 'original-publisher')))
@@ -57,12 +57,25 @@ class PublisherTest(unittest.TestCase):
             else: self.fail(args)
             return subprocess.CompletedProcess(args,0,json.dumps(result),'')
         argv=[str(SCRIPT),'--work-dir',str(root)]+(['--renew-pull-only'] if renew else ['--archive' if archive else '--layout',str(root)])+['--component',component,'--api-server','https://10.10.0.10:6443']
+        if runner:argv+=['--runner',runner]
         if windows_version:argv+=['--windows-version',windows_version]
         error=None
         with patch.object(sys,'argv',argv), patch('subprocess.run',run):
             try: runpy.run_path(str(SCRIPT),run_name='__main__')
             except RuntimeError as e: error=e
         return root, calls, published, error
+
+    def test_linux_dialer_uses_isolated_bastion_and_scoped_pull_identity(self):
+        root,calls,published,error=self.exercise(component='linux-dialer', archive=True, runner='isolated-runner')
+        self.assertIsNone(error)
+        request=next(args for args,kw in calls if args[0]=='docker')
+        self.assertEqual(request[:8],['docker','exec','-i','isolated-runner','docker','exec','-i','clab-cldt-bastion'])
+        state=json.loads((root/'resources.json').read_text())
+        self.assertTrue(state['linuxDialerImage'].endswith('/linux-dialer@sha256:abc'))
+        self.assertEqual(published[0]['metadata']['name'],'cldt-test-dialer-pull')
+        config=json.loads(base64.b64decode(published[0]['data']['.dockerconfigjson']))
+        self.assertEqual(next(iter(config['auths'].values()))['auth'],'read-only')
+        self.assertIn('linuxDialerRepository',state)
 
     def test_cluster_receives_only_repository_scoped_read_token(self):
         root,calls,published,error=self.exercise()

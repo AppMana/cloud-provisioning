@@ -107,6 +107,9 @@ type config struct {
 	// node claim every prefix, and a node choosing between those claims
 	// steers traffic to a peer whose accept list drops it.
 	routeTable int
+	// Set only by validated receiver activation; absent entries keep the
+	// legacy interface. The map does not add destinations or alter peers.
+	receiveRoutes map[string]receiveRouteSelection
 
 	// transitMasqueradeSource, when set (a CIDR, the tunnel subnet),
 	// makes this node a transit for tunnel peers reaching cluster
@@ -1875,6 +1878,16 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	if err != nil {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
 	}
+	selected, err := validateReceiveRouteSelections(cfg, routeHosts, blocks)
+	if err != nil {
+		return err
+	}
+	routeLink := func(dst net.IPNet) int {
+		if index, found := selected[dst.String()]; found {
+			return index
+		}
+		return link.Attrs().Index
+	}
 	// The dialer's own table, consulted ahead of main. See
 	// config.routeTable: a route in main is an ownership claim to any
 	// router that learns alien routes there, and these routes are this
@@ -1894,7 +1907,7 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	for _, host := range routeHosts {
 		dst := host
 		desired[dst.String()] = true
-		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Src: transitSource(dst.IP, own, local), Scope: netlink.SCOPE_LINK, Table: cfg.routeTable}
+		route := &netlink.Route{LinkIndex: routeLink(dst), Dst: &dst, Src: transitSource(dst.IP, own, local), Scope: netlink.SCOPE_LINK, Table: cfg.routeTable}
 		if err := netlink.RouteReplace(route); err != nil {
 			return fmt.Errorf("adding route %s dev %s: %w", dst.String(), cfg.iface, err)
 		}
@@ -1906,9 +1919,9 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	for _, block := range blocks {
 		dst := block
 		desired[dst.String()] = true
-		route := &netlink.Route{LinkIndex: link.Attrs().Index, Dst: &dst, Src: transitSource(dst.IP, own, local), Scope: netlink.SCOPE_LINK, Table: cfg.routeTable}
+		route := &netlink.Route{LinkIndex: routeLink(dst), Dst: &dst, Src: transitSource(dst.IP, own, local), Scope: netlink.SCOPE_LINK, Table: cfg.routeTable}
 		if err := netlink.RouteReplace(route); err != nil {
-			fmt.Fprintf(os.Stderr, "no route for %s via %s: %v\n", dst.String(), cfg.iface, err)
+			return fmt.Errorf("adding pod route %s: %w", dst.String(), err)
 		}
 	}
 

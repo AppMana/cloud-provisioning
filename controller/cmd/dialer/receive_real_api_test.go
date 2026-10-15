@@ -651,5 +651,6 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	if err != nil || meshAfter.ResourceVersion != mesh.ResourceVersion {
 		t.Fatal("offline transit published acknowledgement", err)
 	}
+	checkNativeBGPRecovery(t, ctx, worker, disconnected, devices, siteCfg, sources)
 	t.Log("Real API receiver preparation, offline site forwarding reconstruction, and authoritative withdrawal recovery passed")
 }

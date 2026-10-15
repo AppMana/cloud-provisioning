@@ -321,11 +321,8 @@ func main() {
 	ticker := time.NewTicker(cfg.pollInterval)
 	defer ticker.Stop()
 	for {
-		if err := reconcile(ctx, clientset, wg, cfg); err != nil {
+		if err := reconcileNode(ctx, clientset, wg, cfg, speaker); err != nil {
 			fmt.Fprintf(os.Stderr, "reconcile: %v\n", err)
-		}
-		if err := reconcileTransit(ctx, clientset, cfg, speaker); err != nil {
-			fmt.Fprintf(os.Stderr, "transit advertisement: %v\n", err)
 		}
 		select {
 		case <-ticker.C:
@@ -687,17 +684,44 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 	}
 	secret, err := clientset.CoreV1().Secrets(cfg.secretNamespace).Get(ctx, cfg.secretName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("reading the peer secret: %w", err)
+		return recoverTransitAdvertisements(ctx, cfg, speaker, err)
 	}
-	peers, err := loadPeersFromSecret(secret)
+	routes, notSite, err := transitAdvertisementPlan(secret.Data, cfg.nodeName)
 	if err != nil {
 		return err
+	}
+	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return recoverTransitAdvertisements(ctx, cfg, speaker, err)
+	}
+	site := []string{}
+	for _, node := range nodes.Items {
+		if node.Labels["cloud-provisioning.appmana.com/role"] == "cloud-worker" {
+			continue
+		}
+		for _, addr := range node.Status.Addresses {
+			if addr.Type != corev1.NodeInternalIP || notSite[addr.Address] {
+				continue
+			}
+			site = append(site, addr.Address)
+		}
+	}
+	if err := saveTransitAdvertisements(cfg, speaker, secret, site); err != nil {
+		return err
+	}
+	return speaker.reconcile(ctx, site, routes)
+}
+
+func transitAdvertisementPlan(data map[string][]byte, nodeName string) ([]transitRoute, map[string]bool, error) {
+	peers, err := tunnel.SitePeers(data)
+	if err != nil {
+		return nil, nil, err
 	}
 	// Which endpoint this one is, among all of them, ordered the same
 	// way on every endpoint. Every site node then prefers the same
 	// endpoint for a given remote, so a reply comes back the way the
 	// request went out. See transitRoute.
-	med := endpointRank(secret.Data, cfg.nodeName)
+	med := endpointRank(data, nodeName)
 
 	routes := make([]transitRoute, 0)
 	notSite := map[string]bool{}
@@ -709,7 +733,7 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 		for _, host := range p.AllRouteHosts() {
 			route, err := hostRoute(host, med)
 			if err != nil {
-				return fmt.Errorf("invalid transit host %q: %w", host, err)
+				return nil, nil, fmt.Errorf("invalid transit host %q: %w", host, err)
 			}
 			routes = append(routes, route)
 			notSite[host] = true
@@ -723,28 +747,12 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 			}
 			route, err := blockRoute(allowed, med)
 			if err != nil {
-				return fmt.Errorf("invalid transit prefix %q: %w", allowed, err)
+				return nil, nil, fmt.Errorf("invalid transit prefix %q: %w", allowed, err)
 			}
 			routes = append(routes, route)
 		}
 	}
-	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("listing the site's nodes: %w", err)
-	}
-	var site []string
-	for _, node := range nodes.Items {
-		if node.Labels["cloud-provisioning.appmana.com/role"] == "cloud-worker" {
-			continue
-		}
-		for _, addr := range node.Status.Addresses {
-			if addr.Type != corev1.NodeInternalIP || notSite[addr.Address] {
-				continue
-			}
-			site = append(site, addr.Address)
-		}
-	}
-	return speaker.reconcile(ctx, site, routes)
+	return routes, notSite, nil
 }
 
 // endpointRank orders this node among every node that terminates a

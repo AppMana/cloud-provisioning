@@ -129,6 +129,10 @@ func (t *transitSpeaker) reconcile(ctx context.Context, sitePeers []string, rout
 		}
 		if err := t.server.AddPeer(ctx, &api.AddPeerRequest{Peer: &api.Peer{
 			Conf: &api.PeerConf{NeighborAddress: addr, PeerAsn: t.asn},
+			AfiSafis: []*api.AfiSafi{
+				{Config: &api.AfiSafiConfig{Family: &api.Family{Afi: api.Family_AFI_IP, Safi: api.Family_SAFI_UNICAST}, Enabled: true}},
+				{Config: &api.AfiSafiConfig{Family: &api.Family{Afi: api.Family_AFI_IP6, Safi: api.Family_SAFI_UNICAST}, Enabled: true}},
+			},
 			// This side never initiates. A node at the site dials the
 			// speaker, the same way it dials its CNI's other peers.
 			Transport: &api.Transport{PassiveMode: true},

@@ -6,6 +6,13 @@ import wireguard_handover_native as native
 
 
 class IsolationGuardTest(unittest.TestCase):
+    def test_runtime_requires_dual_mode_and_owns_planning(self):
+        for mode, planner in [('single', None), ('dual', '/planner')]:
+            with self.subTest(mode=mode, planner=planner), patch.object(native, 'require_isolation') as isolation:
+                with self.assertRaises(ValueError):
+                    native.experiment(mode, planner, '/dialer.test')
+                isolation.assert_not_called()
+
     def test_host_network_and_mount_namespaces_are_refused_before_commands(self):
         for shared in ['net', 'mnt']:
             def identity(path):

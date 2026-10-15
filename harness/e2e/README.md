@@ -246,6 +246,16 @@ withdrawal. This preparation function is not yet called by the reconciliation
 loop; the test does not establish packet continuity, publication, activation,
 retirement, or reboot recovery.
 
+To send packets through receivers created by that runtime code, pass
+`--runtime /staged/dialer.test` to `wireguard_handover_native.py --mode dual`
+instead of `--planner`. The experiment invokes a test-only adapter inside the
+cloud namespace, uses its returned public identities and actual listener ports,
+and lets WireGuard learn site endpoints from authenticated traffic. Receiver
+configuration is performed by the Go runtime, while the experiment still owns
+the site peers and route transitions. All four IPv4 exchange phases must
+preserve the original pod source. This is a mechanism test, not controller
+publication or CAPI lifecycle qualification.
+
 The single-device control expects failed exchanges when sender and receiver
 ownership disagree. The dual-receiver case requires exchanges in both
 asymmetric directions and checks the source address observed by the receiver.

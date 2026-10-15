@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/netip"
 	"os"
@@ -20,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -285,5 +287,83 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	if string(current.Data[tunnel.ReceiveReadyKey]) != string(stale.Data[tunnel.ReceiveReadyKey]) {
 		t.Fatal("recovery changed prepared identities")
 	}
-	t.Log("Real API: scoped access, cloud and site preparation, unchanged forwarding, stale-write rejection, and malformed-request recovery passed")
+	cacheBefore, err := os.ReadFile(receiveCachePath(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	changedPorts := request
+	changedPorts.Ports = map[string]int{}
+	for key, port := range request.Ports {
+		changedPorts.Ports[key] = port + 10
+	}
+	changedRaw, _ := json.Marshal(changedPorts)
+	patchData(map[string][]byte{tunnel.ReceivePrepareKey: changedRaw})
+	if err := reconcile(ctx, worker, devices, cfg); err == nil {
+		t.Fatal("live receiver moved ports without retirement")
+	}
+	cacheAfter, err := os.ReadFile(receiveCachePath(cfg))
+	if err != nil || string(cacheBefore) != string(cacheAfter) {
+		t.Fatal("rejected native preparation replaced offline recovery state", err)
+	}
+	patchData(map[string][]byte{tunnel.ReceivePrepareKey: requestRaw})
+	if err := reconcile(ctx, worker, devices, cfg); err != nil {
+		t.Fatal(err)
+	}
+	current, err = secrets.Get(ctx, "worker-tunnel-peers", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Reconstruct prepared devices through the actual file-only bootstrap path.
+	// API readiness remains tied to its original boot; offline reconstruction
+	// must not publish a fresh receipt or select these devices for forwarding.
+	for _, binding := range receipt.Bindings {
+		link, err := netlink.LinkByName(binding.Interface)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := netlink.LinkDel(link); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Remove(claimPath(cfg)); err != nil {
+		t.Fatal(err)
+	}
+	offline := cfg
+	offline.peersSecretNamespace, offline.peersSecretName = "", ""
+	if err := reconcile(ctx, nil, devices, offline); err != nil {
+		t.Fatalf("API-free bootstrap could not restore receivers: %v", err)
+	}
+	unavailable := rest.CopyConfig(apiConfig)
+	unavailable.Dial = func(context.Context, string, string) (net.Conn, error) {
+		return nil, errors.New("test API is unavailable")
+	}
+	disconnected, err := kubernetes.NewForConfig(unavailable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcile(ctx, disconnected, devices, cfg); err != nil {
+		t.Fatalf("adopting dialer could not hold receivers during API outage: %v", err)
+	}
+	for _, binding := range receipt.Bindings {
+		device, err := devices.Device(binding.Interface)
+		if err != nil || device.PublicKey.String() != binding.PublicKey || device.ListenPort != binding.ListenPort || len(device.Peers) != 1 || device.Peers[0].PublicKey.String() != binding.PeerPublicKey {
+			t.Fatal("offline reconstruction changed reserved receiver identities", err)
+		}
+	}
+	recovered, err := secrets.Get(ctx, "worker-tunnel-peers", metav1.GetOptions{})
+	if err != nil || recovered.ResourceVersion != current.ResourceVersion {
+		t.Fatal("offline reconstruction changed API readiness", err)
+	}
+	afterRoutes, err = netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterRules, err = netlink.RuleList(netlink.FAMILY_ALL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(routes, afterRoutes) || !reflect.DeepEqual(rules, afterRules) {
+		t.Fatal("offline preparation selected receiver routes or changed policy rules")
+	}
+	t.Log("Real API preparation and API-free receiver reconstruction passed without forwarding or readiness changes")
 }

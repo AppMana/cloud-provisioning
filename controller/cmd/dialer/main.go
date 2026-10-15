@@ -1013,10 +1013,14 @@ func cachePath(cfg config) string {
 }
 
 func writeCachedPeers(path string, doc tunnel.PeerListDoc) error {
+	return writeDurableJSON(path, doc)
+}
+
+func writeDurableJSON(path string, value any) error {
 	if path == "" {
 		return nil
 	}
-	raw, err := json.Marshal(doc)
+	raw, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
@@ -1147,13 +1151,14 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		localAddress string
 		// localAddresses is every tunnel address this node holds, one
 		// per family the mesh carries; localAddress is the IPv4 one.
-		localAddresses []string
-		privateKey     wgtypes.Key
-		peers          []tunnel.PeerSpec
-		meshSecret     *corev1.Secret
-		adoptionSecret *corev1.Secret
-		pendingCache   *tunnel.PeerListDoc
-		usingSecret    = cfg.secretName != ""
+		localAddresses   []string
+		privateKey       wgtypes.Key
+		peers            []tunnel.PeerSpec
+		meshSecret       *corev1.Secret
+		adoptionSecret   *corev1.Secret
+		pendingCache     *tunnel.PeerListDoc
+		receiveCacheBase tunnel.PeerListDoc
+		usingSecret      = cfg.secretName != ""
 		// The override list being applied this pass, acknowledged on
 		// the adoption Secret once the pass completes. The hash is the
 		// whole acknowledgment: content against content.
@@ -1275,6 +1280,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		localAddress = doc.LocalAddress
 		localAddresses = fileTunnelAddresses(doc)
 		floor, floorErr := bootPeerList(cfg, doc)
+		receiveCacheBase = floor
 		peers = floor.Peers
 		setAPIProxyBackends(floor.APIServers)
 
@@ -1301,6 +1307,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 						// Validate the candidate before replacing recovery state.
 						// Persistence still precedes every kernel forwarding change.
 						pendingCache = &overlay
+						receiveCacheBase = overlay
 						floorErr = nil
 						peers = overlay.Peers
 						// Acknowledged at the end of the pass, once
@@ -1330,6 +1337,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 				// it become true again.
 				if cached, cerr := readCachedPeers(cachePath(cfg)); cerr == nil && cached.Peers != nil {
 					peers = cached.Peers
+					receiveCacheBase = cached
 					setAPIProxyBackends(cached.APIServers)
 					fmt.Fprintf(os.Stderr, "peer override secret not readable (%v); holding the last list read from the cluster\n", err)
 				} else {
@@ -1623,6 +1631,11 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 	}
 
+	if !usingSecret && adoptionSecret == nil {
+		if err := restoreCachedReceivePreparation(cfg, wg, privateKey, receiveCacheBase); err != nil {
+			return fmt.Errorf("restoring prepared receivers: %w", err)
+		}
+	}
 	if pendingCache != nil {
 		if err := writeCachedPeers(cachePath(cfg), *pendingCache); err != nil {
 			return fmt.Errorf("persisting adopted peer list before forwarding changes: %w", err)
@@ -1718,7 +1731,16 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			if mtu == 0 {
 				mtu = underlayMTU()
 			}
-			return prepareReceivePaths(wg, request.MeshUID, privateKey, previous, request.Desired, request.Native, mtu, cfg.fwmark, request.Ports)
+			bindings, err := prepareReceivePaths(wg, request.MeshUID, privateKey, previous, request.Desired, request.Native, mtu, cfg.fwmark, request.Ports)
+			if err != nil {
+				return nil, err
+			}
+			// Preparation is additive and does not change forwarding. Persist
+			// only after native validation succeeds, before publishing readiness.
+			if err := cacheReceivePreparation(cfg, privateKey, adoptionSecret.Data[tunnel.CloudPeersKey], request); err != nil {
+				return nil, err
+			}
+			return bindings, nil
 		}); err != nil {
 			return fmt.Errorf("preparing receive paths: %w", err)
 		}

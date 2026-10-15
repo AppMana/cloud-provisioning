@@ -9,7 +9,7 @@ import unittest
 SCRIPT = pathlib.Path(__file__).with_name('claim.py')
 
 class ClaimTest(unittest.TestCase):
-    def run_claim(self, version=None, image_state='available', volume=None, unprepared=False, gpu=False, instance_type=None, machine_template=None, cache=None, linux_image=None, authorized=True, architecture='x86_64'):
+    def run_claim(self, version=None, image_state='available', volume=None, unprepared=False, gpu=False, instance_type=None, machine_template=None, cache=None, linux_image=None, authorized=True, architecture='x86_64', ipv6=None):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         root = pathlib.Path(temp.name)
@@ -18,6 +18,7 @@ class ClaimTest(unittest.TestCase):
                      instanceProfileName='profile', amiID='ami-linux',
                      windowsImageBuilds={year: dict(imageID='ami-'+year, imageState=image_state)
                                          for year in ['2022', '2025']})
+        if ipv6 is not None: state.update(ipv6)
         state['windowsGpuImageBuilds']={year:dict(imageID='ami-gpu-'+year,imageState=image_state) for year in ['2022','2025']}
         if cache is not None:
             for key in ['windowsImageBuilds','windowsGpuImageBuilds']:
@@ -48,6 +49,23 @@ elif 'labimportedcontrolplane' in sys.argv:
                                 env=dict(os.environ, PATH=str(root)+os.pathsep+os.environ['PATH'], CLAIM_TEST_ROOT=str(root)))
         objects = [json.loads(line) for line in (root/'objects.jsonl').read_text().splitlines()] if (root/'objects.jsonl').exists() else []
         return result, objects
+
+    def test_dual_stack_claim_uses_capa_ipv6_fields(self):
+        result, objects = self.run_claim(ipv6=dict(vpcIPv6CIDR='2001:db8:1::/56', subnetIPv6CIDR='2001:db8:1::/64'))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        network = next(o for o in objects if o['kind'] == 'AWSCluster')['spec']['network']
+        self.assertEqual(network['vpc']['ipv6'], {'cidrBlock': '2001:db8:1::/56'})
+        self.assertTrue(network['subnets'][0]['isIpv6'])
+        machine = next(o for o in objects if o['kind'] == 'AWSMachineTemplate')['spec']['template']['spec']
+        self.assertEqual(machine['assignPrimaryIPv6'], 'enabled')
+        self.assertEqual(machine['additionalSecurityGroups'], [{'id': 'sg-owned'}])
+
+    def test_partial_or_mismatched_ipv6_inventory_has_no_writes(self):
+        for inventory in [dict(vpcIPv6CIDR='2001:db8:1::/56'),
+                          dict(vpcIPv6CIDR='2001:db8:1::/56', subnetIPv6CIDR='2001:db8:2::/64')]:
+            result, objects = self.run_claim(ipv6=inventory)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(objects, [])
 
     def test_architecture_defaults_do_not_change_windows_or_explicit_types(self):
         for options, expected in [

@@ -4,7 +4,7 @@ Run after sourcing appmana's source-me.sh. Root credentials stay in this process
 only the assumed test role's session is written to the private work directory.
 Every created resource is recorded immediately for deterministic cleanup.
 """
-import argparse, json, os, pathlib, subprocess, time
+import argparse, ipaddress, json, os, pathlib, subprocess, time
 
 p=argparse.ArgumentParser()
 p.add_argument('--work-dir',required=True)
@@ -12,6 +12,7 @@ p.add_argument('--run-id',required=True)
 p.add_argument('--region',default='us-west-2')
 p.add_argument('--base-ami-id',help='explicit Canonical base image matching the selected architecture')
 p.add_argument('--architecture',choices=['x86_64','arm64'],default='x86_64')
+p.add_argument('--ipv6', action='store_true', help='create dual-stack infrastructure for a native IPv6 pod campaign')
 a=p.parse_args()
 if not a.run_id.startswith('cldt-') or not all(c.isalnum() or c=='-' for c in a.run_id):
     p.error('run-id must start cldt- and contain only alphanumeric characters or hyphens')
@@ -40,16 +41,35 @@ ami=remember('amiID',max(images,key=lambda i:i['CreationDate'])['ImageId'])
 remember('baseAMIID',ami)
 tags=[{'Key':'cloud-provisioning-test','Value':a.run_id},{'Key':'Name','Value':a.run_id}]
 def tag_spec(kind):return json.dumps([{'ResourceType':kind,'Tags':tags}])
-vpc=remember('vpcID',aws('ec2','create-vpc','--cidr-block','172.29.0.0/24','--tag-specifications',tag_spec('vpc'))['Vpc']['VpcId'])
+vpc=remember('vpcID',aws('ec2','create-vpc','--cidr-block','172.29.0.0/24','--tag-specifications',tag_spec('vpc'),
+    *(['--amazon-provided-ipv6-cidr-block'] if a.ipv6 else []))['Vpc']['VpcId'])
+subnet_ipv6_args=[]
+if a.ipv6:
+    for attempt in range(60):
+        observed=aws('ec2','describe-vpcs','--vpc-ids',vpc)['Vpcs'][0]
+        associations=observed.get('Ipv6CidrBlockAssociationSet',[])
+        remember('vpcIPv6Associations',associations)
+        ready=[item for item in associations if item['Ipv6CidrBlockState']['State']=='associated']
+        if len(ready)==1:
+            cidr=remember('vpcIPv6CIDR',ready[0]['Ipv6CidrBlock'])
+            subnet_cidr=remember('subnetIPv6CIDR',str(next(ipaddress.ip_network(cidr).subnets(new_prefix=64))))
+            subnet_ipv6_args=['--ipv6-cidr-block',subnet_cidr]
+            break
+        if any(item['Ipv6CidrBlockState']['State'] in ('failed','failing') for item in associations):
+            raise RuntimeError('original VPC IPv6 association failed; inspect recorded resources')
+        time.sleep(2)
+    else:raise RuntimeError('original VPC IPv6 association is still pending; inspect recorded resources')
 aws('ec2','modify-vpc-attribute','--vpc-id',vpc,'--enable-dns-hostnames','{"Value":true}')
 az=aws('ec2','describe-availability-zones','--filters','Name=state,Values=available')['AvailabilityZones'][0]['ZoneName']
-subnet=remember('subnetID',aws('ec2','create-subnet','--vpc-id',vpc,'--cidr-block','172.29.0.0/25','--availability-zone',az,'--tag-specifications',tag_spec('subnet'))['Subnet']['SubnetId'])
+subnet=remember('subnetID',aws('ec2','create-subnet','--vpc-id',vpc,'--cidr-block','172.29.0.0/25','--availability-zone',az,'--tag-specifications',tag_spec('subnet'),*subnet_ipv6_args)['Subnet']['SubnetId'])
 aws('ec2','modify-subnet-attribute','--subnet-id',subnet,'--map-public-ip-on-launch')
+if a.ipv6:aws('ec2','modify-subnet-attribute','--subnet-id',subnet,'--assign-ipv6-address-on-creation')
 igw=remember('internetGatewayID',aws('ec2','create-internet-gateway','--tag-specifications',tag_spec('internet-gateway'))['InternetGateway']['InternetGatewayId'])
 aws('ec2','attach-internet-gateway','--vpc-id',vpc,'--internet-gateway-id',igw)
 rt=remember('routeTableID',aws('ec2','create-route-table','--vpc-id',vpc,'--tag-specifications',tag_spec('route-table'))['RouteTable']['RouteTableId'])
 remember('routeAssociationID',aws('ec2','associate-route-table','--subnet-id',subnet,'--route-table-id',rt)['AssociationId'])
 aws('ec2','create-route','--route-table-id',rt,'--destination-cidr-block','0.0.0.0/0','--gateway-id',igw)
+if a.ipv6:aws('ec2','create-route','--route-table-id',rt,'--destination-ipv6-cidr-block','::/0','--gateway-id',igw)
 sg=remember('securityGroupID',aws('ec2','create-security-group','--vpc-id',vpc,'--group-name',a.run_id,'--description','Single-NIC cloud-provisioning WireGuard test workers','--tag-specifications',tag_spec('security-group'))['GroupId'])
 aws('ec2','authorize-security-group-ingress','--group-id',sg,'--ip-permissions',json.dumps([{'IpProtocol':'udp','FromPort':51820,'ToPort':51820,'IpRanges':[{'CidrIp':'0.0.0.0/0','Description':'Authenticated WireGuard transport'}]}]))
 node_role=a.run_id+'-node';capa_role=a.run_id+'-capa'

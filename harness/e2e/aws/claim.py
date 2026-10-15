@@ -6,6 +6,7 @@ infrastructure and imported control-plane status describe resources owned by
 the test setup; CAPA and CAPI reconcile the worker and its Node association.
 """
 import argparse
+import ipaddress
 import json
 import pathlib
 import subprocess
@@ -29,6 +30,15 @@ if a.variant == 'gpu' and (not a.windows_version or not a.instance_type):
     p.error('GPU Windows claims require --windows-version and --instance-type')
 minimum_volume = 60 if a.variant == 'gpu' else (50 if a.windows_version else 20)
 s = json.loads((pathlib.Path(a.work_dir) / 'resources.json').read_text())
+ipv6 = bool(s.get('vpcIPv6CIDR') or s.get('subnetIPv6CIDR'))
+if ipv6:
+    try:
+        vpc6 = ipaddress.IPv6Network(s['vpcIPv6CIDR'])
+        subnet6 = ipaddress.IPv6Network(s['subnetIPv6CIDR'])
+        if vpc6.prefixlen == 0 or subnet6.prefixlen != 64 or not subnet6.subnet_of(vpc6):
+            raise ValueError('subnet must be a /64 inside the recorded VPC range')
+    except (KeyError, ValueError) as error:
+        p.error('incomplete or invalid dual-stack infrastructure: ' + str(error))
 a.instance_type = a.instance_type or ('m6g.large' if not a.windows_version and s.get('architecture') == 'arm64' else 't3.large')
 if a.windows_version:
     image = s.get('windowsGpuImageBuilds' if a.variant == 'gpu' else 'windowsImageBuilds', {}).get(a.windows_version, {})
@@ -76,6 +86,9 @@ infra = obj('infrastructure.cluster.x-k8s.io/v1beta2', 'AWSCluster', cluster, {
     'network': {'vpc': {'id': s['vpcID']}, 'subnets': [{'id': s['subnetID'], 'isPublic': True}]},
 })
 infra['metadata']['annotations'] = {'cluster.x-k8s.io/managed-by': 'external'}
+if ipv6:
+    infra['spec']['network']['vpc']['ipv6'] = {'cidrBlock': str(vpc6)}
+    infra['spec']['network']['subnets'][0].update(ipv6CidrBlock=str(subnet6), isIpv6=True)
 apply(infra)
 kube('-n', ns, 'patch', 'awscluster', cluster, '--subresource=status', '--type=merge', '-p', json.dumps({'status': {'ready': True}}))
 # cmd/importsite observes the live site and creates this target's connection.
@@ -90,6 +103,7 @@ apply(obj('cluster.x-k8s.io/v1beta2', 'Cluster', cluster, {
 apply(obj('infrastructure.cluster.x-k8s.io/v1beta2', 'AWSMachineTemplate', template_name, {'template': {'metadata': {'labels': {'kubernetes.io/os': machine_os}}, 'spec': {
     'instanceType': a.instance_type, 'ami': {'id': ami_id}, 'subnet': {'id': s['subnetID']},
     'additionalSecurityGroups': [{'id': s['securityGroupID']}], 'publicIP': True,
+    **({'assignPrimaryIPv6': 'enabled'} if ipv6 else {}),
     'sshKeyName': '', 'iamInstanceProfile': s['instanceProfileName'],
     'additionalTags': {'cloud-provisioning-test': s['runID']},
     'cloudInit': {'insecureSkipSecretsManager': False},

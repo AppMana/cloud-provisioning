@@ -110,6 +110,13 @@ IPv6 range and delegated /80s. Register cloud nodes with both
 `cloud-provisioning.appmana.com/cni=aws-vpc` before CNI installation. Configure
 site-only Calico first. The observer alone does not install AWS VPC CNI.
 
+For a separate native IPv6 campaign, use `aws/bootstrap.py --ipv6` when
+creating its infrastructure and `aws/native_access.py --family ipv6` when
+configuring IPAM and observation. The recorded VPC and subnet IPv6 ranges feed
+the existing CAPA claim's IPv6 configuration and primary-address assignment.
+Use `aws/vpc_cni.py --family ipv6` and `awsrow -pod-family IPv6` for that
+campaign. Changing the family of an existing native CNI campaign is rejected.
+
 ## Qualification order
 
 From `harness/e2e`:

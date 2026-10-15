@@ -130,8 +130,16 @@ and applies the same verified bytes. An ambiguous apply failure is never
 retried automatically: inspect actual resources before another attempt.
 The bundle is limited to 1 MiB and each rendered manifest to 64 MiB.
 
+The gate rejects mutable references in container, init-container and ephemeral
+container image fields, including nested workload templates and Lists. It also
+checks the controller's dialer, cloud and Windows image flags and requires
+canonical SHA-256 values for configured dialer/CNI bootstrap downloads.
+Duplicate YAML keys and duplicate artifact flags fail closed.
+
 This entry point trusts the evidence producer and does not validate the
-semantics of raw measurements or prove image immutability from YAML. Keep
+semantics of raw measurements. Images embedded in shell scripts, ConfigMaps,
+Secrets or arbitrary operator configuration still need producer review; the
+static check cannot establish their runtime interpretation or availability. Keep
 kubeconfig, credentials, context selection and evidence unchanged throughout
 the operation. Control competing GitOps and Helm writers separately. It does
 not arm node-local rollback, assess rollout health, sequence canary expansion,

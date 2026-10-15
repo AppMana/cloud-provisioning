@@ -193,3 +193,56 @@ func TestDeploymentExecution(t *testing.T) {
 		})
 	}
 }
+
+func TestPrepareRejectsHashValidMutableManifest(t *testing.T) {
+	path, candidate := deploymentFixture(t, nil)
+	dir := filepath.Dir(path)
+	manifest := []byte("apiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - name: worker\n    image: image:latest\n")
+	if err := os.WriteFile(filepath.Join(dir, "a.yaml"), manifest, 0600); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "bundle.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bundle DeploymentBundle
+	if err := json.Unmarshal(raw, &bundle); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(manifest)
+	bundle.Targets[0].SHA256 = hex.EncodeToString(sum[:])
+	raw, err = json.Marshal(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "bundle.json"), raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	sum = sha256.Sum256(raw)
+	raw, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var evidence Evidence
+	if err := json.Unmarshal(raw, &evidence); err != nil {
+		t.Fatal(err)
+	}
+	for i := range evidence.Rows {
+		if evidence.Rows[i].ID == "release/immutable-artifacts" {
+			evidence.Rows[i].SHA256 = hex.EncodeToString(sum[:])
+		}
+	}
+	raw, err = json.Marshal(evidence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, failures, err := VerifyFile(path); err != nil || len(failures) != 0 {
+		t.Fatalf("fixture hashes failed: %v %v", err, failures)
+	}
+	if _, err := PrepareDeployment(path, candidate, "site-a"); err == nil || !strings.Contains(err.Error(), "image must use a sha256 digest") {
+		t.Fatalf("mutable image not rejected: %v", err)
+	}
+}

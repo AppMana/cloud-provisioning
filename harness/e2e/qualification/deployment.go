@@ -106,6 +106,9 @@ func PrepareDeployment(path, candidate, site string) (*PreparedDeployment, error
 		if len(bytes.TrimSpace(manifest)) == 0 {
 			return nil, fmt.Errorf("%s manifest is empty", target.Site)
 		}
+		if err := CheckManifestPins(manifest); err != nil {
+			return nil, fmt.Errorf("%s manifest: %w", target.Site, err)
+		}
 		if target.Site == site {
 			result = &PreparedDeployment{candidate: candidate, target: target, manifest: manifest}
 		}

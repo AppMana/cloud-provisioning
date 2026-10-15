@@ -17,7 +17,10 @@ import (
 // Forget an explicitly withdrawn preparation durably. This does not retire
 // live devices: removal of receive permissions belongs to the handover phase.
 func clearReceivePreparationCache(cfg config) error {
-	path := receiveCachePath(cfg)
+	return removeDurableCache(receiveCachePath(cfg))
+}
+
+func removeDurableCache(path string) error {
 	if path == "" {
 		return nil
 	}

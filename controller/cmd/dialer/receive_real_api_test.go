@@ -198,29 +198,33 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	}
 	// Consume the real cloud receipt through the site reconciliation path,
 	// retaining the active cloud device and all existing routes.
+	siteCfg := config{iface: "cldtapisite", privateKeyFile: filepath.Join(t.TempDir(), "site.key"), secretNamespace: namespace, secretName: "mesh", nodeName: "cp", mtu: 1400, fwmark: 518}
+	if err := os.WriteFile(siteCfg.privateKeyFile, []byte(newPeer.String()), 0600); err != nil {
+		t.Fatal(err)
+	}
 	var sitePlan tunnel.SiteReceiveClient
 	for pass := 0; pass < 2; pass++ {
-		calls := 0
-		if err := reconcileSiteReceivePreparation(ctx, worker, mesh, "cp", newPeer, func(cloud string, binding receiveBinding, doc tunnel.PeerListDoc) error {
-			calls++
-			prepared, err := prepareSiteReceiveClient(devices, string(mesh.UID), newPeer, cloud, binding, doc, doc, 1400, 518)
-			if err != nil {
-				return err
-			}
-			if pass == 1 && !reflect.DeepEqual(sitePlan, prepared) {
-				t.Fatal("site preparation is not idempotent")
-			}
-			sitePlan = prepared
-			return nil
-		}, func(plan tunnel.SiteReceiveClient) (time.Time, error) {
-			return siteReceiveHandshake(devices, newPeer, plan, 518, time.Now())
-		}); err != nil {
+		if err := reconcileDurableSiteReceivers(ctx, worker, devices, siteCfg, mesh, newPeer); err != nil {
 			t.Fatal(err)
 		}
-		if calls != 1 {
-			t.Fatal("site did not consume cloud readiness")
+		raw, err := os.ReadFile(siteReceiveCachePath(siteCfg))
+		if err != nil {
+			t.Fatal(err)
 		}
+		cached, err := decodeSiteReceiveCache(raw, siteCfg, newPeer)
+		if err != nil || len(cached.Bindings) != 1 {
+			t.Fatal("site preparation not durable", err)
+		}
+		prepared, err := tunnel.PlanSiteReceiveClient(cached.MeshUID, cached.PublicKey, root.PublicKey().String(), cached.Bindings[root.PublicKey().String()], cached.Peers, cached.Peers)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pass == 1 && !reflect.DeepEqual(sitePlan, prepared) {
+			t.Fatal("site preparation is not idempotent")
+		}
+		sitePlan = prepared
 	}
+
 	unready, err := secrets.Get(ctx, "worker-tunnel-peers", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -344,6 +348,20 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	if err := reconcile(ctx, disconnected, devices, cfg); err != nil {
 		t.Fatalf("adopting dialer could not hold receivers during API outage: %v", err)
 	}
+	siteLink, err := netlink.LinkByName(sitePlan.Interface)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := netlink.LinkDel(siteLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcile(ctx, disconnected, devices, siteCfg); err == nil || !strings.Contains(err.Error(), "getting secret") {
+		t.Fatal("site recovery must still report unavailable forwarding configuration", err)
+	}
+	siteRecovered, err := devices.Device(sitePlan.Interface)
+	if err != nil || siteRecovered.PrivateKey != newPeer || len(siteRecovered.Peers) != 1 || siteRecovered.Peers[0].PublicKey.String() != sitePlan.PublicKey || siteRecovered.Peers[0].Endpoint.String() != sitePlan.Endpoint {
+		t.Fatal("site receiver was not recovered with its reserved identity", err)
+	}
 	for _, binding := range receipt.Bindings {
 		device, err := devices.Device(binding.Interface)
 		if err != nil || device.PublicKey.String() != binding.PublicKey || device.ListenPort != binding.ListenPort || len(device.Peers) != 1 || device.Peers[0].PublicKey.String() != binding.PeerPublicKey {
@@ -367,6 +385,22 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	}
 	// Observe an explicit withdrawal without changing the active peer list.
 	patchData(map[string][]byte{tunnel.ReceivePrepareKey: nil})
+	if err := reconcileDurableSiteReceivers(ctx, worker, devices, siteCfg, mesh, newPeer); err != nil {
+		t.Fatal(err)
+	}
+	siteLink, err = netlink.LinkByName(sitePlan.Interface)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := netlink.LinkDel(siteLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcile(ctx, disconnected, devices, siteCfg); err == nil || !strings.Contains(err.Error(), "getting secret") {
+		t.Fatal(err)
+	}
+	if _, err := netlink.LinkByName(sitePlan.Interface); !isLinkNotFound(err) {
+		t.Fatal("withdrawn site preparation resurrected", err)
+	}
 	if err := reconcile(ctx, worker, devices, cfg); err != nil {
 		t.Fatal(err)
 	}

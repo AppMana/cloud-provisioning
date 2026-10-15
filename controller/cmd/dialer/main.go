@@ -55,6 +55,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -1189,6 +1190,13 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 
 		secret, err := clientset.CoreV1().Secrets(cfg.secretNamespace).Get(ctx, cfg.secretName, metav1.GetOptions{})
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				if clearErr := removeDurableCache(siteReceiveCachePath(cfg)); clearErr != nil {
+					return fmt.Errorf("forgetting removed site preparation: %w", clearErr)
+				}
+			} else if restoreErr := restoreSiteReceiveCache(cfg, wg, key); restoreErr != nil {
+				return fmt.Errorf("restoring site receivers while API is unavailable: %w", restoreErr)
+			}
 			return fmt.Errorf("getting secret %s/%s: %w", cfg.secretNamespace, cfg.secretName, err)
 		}
 		if err := publishNodeInfo(ctx, clientset, cfg, key.PublicKey(), secret); err != nil {
@@ -1198,6 +1206,9 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		localAddresses = siteTunnelAddresses(secret, cfg.nodeName)
 		ownAddresses = tunnel.SplitList(string(secret.Data[tunnel.NodeAddressesPrefix+cfg.nodeName]), string(secret.Data[tunnel.SiteAddressesPrefix+cfg.nodeName]))
 		if localAddress == "" {
+			if err := removeDurableCache(siteReceiveCachePath(cfg)); err != nil {
+				return fmt.Errorf("forgetting departed site preparation: %w", err)
+			}
 			// Either this node has never been allocated an address, or it
 			// has stopped being an endpoint and its retention has run
 			// out. The two look identical here and differ in one thing:
@@ -1722,16 +1733,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 	}
 	if meshSecret != nil && clientset != nil {
-		if err := reconcileSiteReceivePreparation(ctx, clientset, meshSecret, cfg.nodeName, privateKey, func(root string, binding receiveBinding, doc tunnel.PeerListDoc) error {
-			mtu := cfg.mtu
-			if mtu == 0 {
-				mtu = underlayMTU()
-			}
-			_, err := prepareSiteReceiveClient(wg, string(meshSecret.UID), privateKey, root, binding, doc, doc, mtu, cfg.fwmark)
-			return err
-		}, func(plan tunnel.SiteReceiveClient) (time.Time, error) {
-			return siteReceiveHandshake(wg, privateKey, plan, cfg.fwmark, time.Now())
-		}); err != nil {
+		if err := reconcileDurableSiteReceivers(ctx, clientset, wg, cfg, meshSecret, privateKey); err != nil {
 			return fmt.Errorf("preparing site receive paths: %w", err)
 		}
 	}

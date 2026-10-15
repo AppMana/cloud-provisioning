@@ -192,11 +192,8 @@ EOF
         sleep 5
       done
       if ! in_node "$victim" ip link show eth1 >/dev/null 2>&1; then
-        # The old pair's host side can outlive the killed container,
-        # and the re-plumb then fails renaming onto the name it still
-        # holds ("failed to rename link: file exists", measured on
-        # remote1). With the container's side gone, the leftover is
-        # dead by definition, so it is removed by name first.
+        # Remove the dead host-side veth left by a killed container before
+        # recreating the pair, so its name cannot collide with the replacement.
         sudo ip link del "$peer" 2>/dev/null || true
         sudo containerlab tools veth create -a "$(c "$victim"):eth1" -b "bridge:$bridge:$peer" >"$OUT/outage/$name-veth.log" 2>&1 \
           || { echo "  restore: veth re-plumb failed, see $OUT/outage/$name-veth.log" >&2; return 1; }
@@ -204,13 +201,9 @@ EOF
       in_node "$victim" ip addr replace "$addr" dev eth1 \
         || { echo "  restore: could not address eth1" >&2; return 1; }
       in_node "$victim" ip link set eth1 up
-      # The pair's host side can be left down: a re-plumb that races
-      # the old pair's deletion gets a generated name instead of the
-      # requested one, and nothing raises it. Carrier is part of the
-      # NIC a platform provides, so find the peer by ifindex, the one
-      # identity a veth cannot lose, and raise it. Measured: cp came
-      # back addressed, routed, UP, and NO-CARRIER, and its etcd
-      # called elections into a wire that was not plugged in.
+      # Locate the recreated veth peer by ifindex and raise its host side.
+      # Name allocation can race old-pair deletion; link carrier is part of
+      # the platform state that reboot restoration must provide.
       peer_idx=$(in_node "$victim" cat /sys/class/net/eth1/iflink 2>/dev/null | tr -d '\r')
       if [ -n "$peer_idx" ]; then
         peer_if=$(ip -o link | awk -F': ' -v i="$peer_idx" '$1==i {print $2}' | cut -d@ -f1)

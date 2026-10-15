@@ -448,10 +448,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			"format": rendered.Format,
 		},
 	}
-	// Reserve the address before publishing anything an infrastructure provider
-	// can boot. A transient admission error used to leave a bootstrap Secret
-	// without its Machine reservation; the next allocation reused that live IP.
-	// Retries read this reservation uncached and reuse it.
+	// Reserve the address before publishing bootable userdata so an admission
+	// failure cannot leave a live address available for reuse. Retries read the
+	// existing reservation directly from the API.
 	if machine.GetAnnotations()[WireGuardAddrAnnotation] != cloudWGAddress ||
 		(cloudWGAddress6 != "" && machine.GetAnnotations()[WireGuardAddr6Annotation] != cloudWGAddress6) {
 		machinePatch := client.MergeFromWithOptions(machine.DeepCopy(), client.MergeFromWithOptimisticLock{})

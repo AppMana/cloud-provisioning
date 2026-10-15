@@ -51,8 +51,7 @@ func main() { os.Exit(exitCode(runLab)) }
 
 type runFailure struct{}
 
-// Unwind lab cleanup before returning a failing process status. An immediate
-// os.Exit in fail used to leave probe namespaces behind after failed runs.
+// Unwind lab cleanup before returning a failing process status.
 func exitCode(run func()) (code int) {
 	defer func() {
 		if failure := recover(); failure != nil {

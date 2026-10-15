@@ -8,17 +8,9 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/check"
 )
 
-// A pod dies with its node and comes back at a different address.
-// Measuring the address it had before the outage reports the path as
-// broken when what is broken is the harness's memory of it.
-//
-// And it fails selectively, which is what makes it dangerous: the
-// service address still resolves to whatever is serving now, so a
-// stale pod address fails while the service address beside it passes.
-// Measured on a real reboot row before this existed — every site node
-// failed "to remote1 pod" and "to remote1 transfer" while every
-// "to remote1 service" passed, a pattern that reads exactly like a
-// routing fault and is not one.
+// Refresh pod addresses after reboot. A recreated pod can have a new IP
+// while its Service address stays stable; probing the old IP would falsely
+// report a routing failure.
 func TestTheProbesAreReReadAfterTheVictimReturns(t *testing.T) {
 	p := &fakeProber{}
 	p.onCut = func() { p.unreachable = "c" }

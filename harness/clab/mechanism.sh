@@ -28,12 +28,9 @@ in_node() { docker exec "$(c "$1")" "${@:2}"; }
 k() { in_node bastion kubectl "$@"; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
-# What this row installed, in the terms the controller reports. The
-# encapsulation is as much of the claim as the name: it decides
-# whether a peer is permitted pod prefixes or node addresses alone,
-# and getting it wrong publishes nothing while every component looks
-# healthy (measured on kube-router, whose overlay the model believed
-# in for two full rows).
+# Check both the network name and encapsulation reported by the controller.
+# They determine whether tunnel permissions carry pod prefixes or node
+# addresses; an incorrect classification can omit required routes.
 expected_network() {
   case "$CNI" in
     calico)      echo "calico/native" ;;

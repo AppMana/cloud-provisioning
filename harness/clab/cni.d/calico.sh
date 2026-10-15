@@ -10,16 +10,9 @@ CALICO_MANIFEST="${CALICO_MANIFEST:-https://raw.githubusercontent.com/projectcal
 
 install_network() {
   curl -fsSL "$CALICO_MANIFEST" -o "$OUT/calico.yaml" || fail "fetching calico"
-  # No per-distribution CNI path overrides, k3s included. k3s moves its
-  # CNI directories into its data dir ONLY when its embedded flannel
-  # runs: the assignment sits inside the flannel branch
-  # (pkg/executor/embed/embed.go, "if Flannel.Backend != BackendNone"),
-  # so with flannel-backend none the dirs stay unset and k3s's
-  # containerd falls back to the stock /etc/cni/net.d and /opt/cni/bin.
-  # Measured before reading the branch: redirected hostPaths delivered
-  # Calico's conflist and binaries into the data dir perfectly, and
-  # containerd, looking at the stock paths, said "cni plugin not
-  # initialized" on every node.
+  # Use stock CNI paths when embedded flannel is disabled. k3s sets its
+  # private CNI paths only in the embedded-flannel branch; with backend
+  # none, containerd uses /etc/cni/net.d and /opt/cni/bin.
   local images
   images=$(grep -oE 'image: [^ ]+' "$OUT/calico.yaml" | awk '{print $2}' | sort -u)
   [ -n "$images" ] || fail "no images in the calico manifest"

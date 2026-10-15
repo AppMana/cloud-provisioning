@@ -69,21 +69,9 @@ func (n *Node) ssh(stdin bool, argv ...string) []string {
 		"-o", "UserKnownHostsFile=/dev/null",
 		"-o", "LogLevel=ERROR",
 		"-o", "ConnectTimeout=10",
-		// One connection per guest, shared by every command.
-		//
-		// A guest's sshd admits ten unauthenticated connections at
-		// once and drops the rest: the reachability matrix opens one
-		// ssh per check and fans out over every pair, so a row on
-		// machines walks straight into it. Measured in the guest's own
-		// log — "beginning MaxStartups throttling", "drop connection
-		// #11 ... past MaxStartups" — while the check it killed
-		// reported ssh's exit 255 against a crictl that never ran, and
-		// the row failed one of a hundred and forty for a reason that
-		// had nothing to do with the datapath.
-		//
-		// Multiplexing also removes a TCP handshake and a key exchange
-		// from every command, which on this rig is every command the
-		// harness runs.
+		// Share one SSH connection per guest. The connectivity matrix runs many
+		// commands concurrently; separate handshakes can exceed sshd's limit on
+		// unauthenticated connections and fail before the probe executes.
 		"-o", "ControlMaster=auto",
 		"-o", "ControlPath="+ControlPath,
 		"-o", "ControlPersist=120s",

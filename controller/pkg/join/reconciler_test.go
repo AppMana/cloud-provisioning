@@ -727,21 +727,12 @@ func (s *observingInfraStub) InfraValues(ctx context.Context, m *unstructured.Un
 	return values, nil
 }
 
-// Userdata is read once, so a document rendered before the machine's
-// address is known can never carry it. The node then chooses for
-// itself and chooses wrong wherever it has more than one address:
-// measured on a machine with an out-of-band interface, the kubelet
-// registered 10.0.0.15 — shared by every machine in that lab, part of
-// no network the cluster models — while the provider had published
-// 203.0.113.10 for the same node. It joined, went Ready, and was
-// never adopted, because no node carried the identity being looked
-// for.
-//
-// Waiting is safe precisely for the providers this applies to: they
-// observe machines that already exist, so nothing is waiting on this
-// Secret to create one. A provider that creates the instance is not
-// waited for, and must not be — CAPA does not call RunInstances until
-// the Secret exists.
+// Immutable userdata must carry the provider's node address when the
+// provider observes an existing machine. Otherwise a multi-interface
+// node may register an address that cannot be matched to its Machine.
+// Providers that create machines from userdata must discover identity at
+// boot instead: CAPA cannot allocate an instance before its bootstrap
+// Secret exists.
 func TestReconcile_WaitsForAnObservedAddressInsteadOfRenderingWithout(t *testing.T) {
 	machine := machineWithInfraRef("cloud-worker-0", "default", "cloud-worker-0")
 	infraMachine := fakeAWSMachine("cloud-worker-0", "default", false)

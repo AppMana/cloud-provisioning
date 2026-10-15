@@ -267,19 +267,9 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 		return ctrl.Result{}, fmt.Errorf("ensuring Windows peer publisher: %w", err)
 	}
 
-	// Node events enqueue a nameless request: they change the endpoint
-	// set rather than any one Machine. An empty-name Get would be a
-	// non-NotFound error, an infinite error requeue rather than a
-	// no-op, so the Machine-scoped work below is skipped.
-	//
-	// But every remote reads its own peer list, and that list names the
-	// endpoints. Changing which nodes hold tunnels therefore changes
-	// what every remote must be told, and nothing else will tell them:
-	// no Machine has changed, so no Machine event follows. Measured, a
-	// tunnel moved from one site node to another and the site converged
-	// while the remote went on naming a node that no longer ran a
-	// dialer, its handshake ten minutes stale, until the next resync
-	// hours later.
+	// Node events enqueue a nameless request because they change the endpoint
+	// set rather than one Machine. Refresh every remote's adoption document:
+	// endpoint changes do not necessarily produce a Machine event.
 	if req.Name == "" {
 		return ctrl.Result{}, r.refreshAdoptionConfigs(ctx)
 	}
@@ -319,30 +309,9 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 		return ctrl.Result{}, nil
 	}
 
-	// The remote node's own pod blocks, published onto its peer entry
-	// so the nodes at home can reach the pods running on it. Its blocks
-	// are allocated after it joins, so this is recomputed here rather
-	// than written once when the machine was created.
-	//
-	// A node has no blocks until something is scheduled on it, which is
-	// after it joins, so this comes back until it does. Nothing else
-	// would bring it back: the reconciler is driven by Machine events,
-	// and the machine stops changing once it is running.
-	// Pending until proven otherwise, which includes the case where
-	// this machine has no node yet.
-	//
-	// A node has no blocks until something is scheduled on it, and it
-	// has no node at all until it joins — both after the Machine
-	// stopped changing. Gating the requeue on the node already being
-	// known therefore never comes back for the one case that needs it:
-	// the machine is reconciled while the node is still absent, sets
-	// nothing pending, and is never reconciled again. The blocks are
-	// never published, the site cannot reach a pod on the remote, and
-	// every component reports healthy.
-	//
-	// This was hidden for as long as the node was found through
-	// status.nodeRef, because Cluster API writing that field was
-	// itself a Machine event: the data source doubled as the trigger.
+	// Keep reconciliation pending until the remote Node and its pod allocations
+	// are observed and published. Either can appear after Machine events stop;
+	// absence of a Node must not disable the periodic retry.
 	remoteBlocksPending := true
 	if nodeName := r.nodeNameForMachine(ctx, machine); nodeName != "" {
 		published, err := r.publishRemotePodCIDRs(ctx, machine, nodeName)
@@ -587,32 +556,10 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 			if node.Labels[cloudWorkerRoleLabel] == cloudWorkerRoleValue {
 				continue
 			}
-			// A node the selector has let go of, still inside its
-			// retention window, is still an endpoint: it holds a
-			// published key and address, its dialer still runs, and its
-			// tunnel still carries traffic.
-			//
-			// But it stops being the way to reach anything at once. The
-			// window exists so a remote can move off this node before
-			// its tunnel goes, and a remote can only move if something
-			// else already owns the prefixes it needs. Leaving them here
-			// meant the handover happened at the same instant as the
-			// teardown: the node was unpublished, its interface swept,
-			// and only then did its addresses appear on a surviving
-			// endpoint, by which time the remote had no path left to
-			// learn that. Measured on cp, which owned the API server's
-			// address: at 14:36:11 the remote permitted 10.10.0.10 on
-			// cp's peer entry and reached the API; at 14:36:17 cp's
-			// interface was gone, the remote still named cp for
-			// 10.10.0.10, and it could not read the list that would have
-			// told it otherwise. It stayed that way for ten minutes.
-			//
-			// So a departing endpoint keeps its key and its tunnel
-			// address, which is what keeps its tunnel usable, and its
-			// node addresses and pod blocks move to the site entries
-			// now, where a surviving endpoint relays them. One owner per
-			// prefix throughout: they are published here or there, never
-			// both.
+			// A departing endpoint retains its key, tunnel address, and dialer during
+			// retention. Publish its node addresses and pod blocks as site entries so
+			// surviving endpoints can relay them before the old tunnel is removed.
+			// Keep each prefix under one owner in the published peer document.
 			if publishedEndpoint(secret.Data, node.Name) {
 				if len(secret.Data[tunnel.NodeDepartedAtPrefix+node.Name]) == 0 {
 					continue
@@ -635,22 +582,9 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 			}
 			continue
 		}
-		// This node owns its own prefixes now, so nothing relays them.
-		// A node that returns to the selector takes back what it handed
-		// over when it left.
-		//
-		// Only once it is a peer as published, though. Selection makes
-		// this operator allocate a tunnel address; it is the node's own
-		// dialer that publishes the key, and RemotePeers renders a node
-		// only when both are there. Taking the relayed entry away at
-		// selection meant the node's address and pod block belonged to
-		// nobody in the render until that key landed, which is however
-		// long the dialer takes to schedule and come up. A remote
-		// reading the list in that window prunes the route and cannot
-		// read the correction, because the site is only reachable over
-		// what it just pruned. Measured on remote2: the host routes for
-		// all three site nodes were removed, and the API server was
-		// unreadable for 26 minutes.
+		// A returning endpoint takes back its relayed prefixes only after both its
+		// tunnel address and public key are published. Removing the relay entry
+		// before RemotePeers can render the endpoint would leave a routing gap.
 		if takeBackFromRelay(secret.Data, node.Name) {
 			changed = true
 		}
@@ -1062,22 +996,9 @@ func (r *meshReconciler) convergedMachines(ctx context.Context, data map[string]
 	return converged
 }
 
-// relaysFromApplied reports, per site node, whether an applied peer
-// list carries that node's addresses on a relay rather than on the
-// node's own entry.
-//
-// This is the content behind an acknowledgment. A departing endpoint
-// is held until every remote has moved, and "moved" cannot mean "has
-// applied its current list": right after a placement change the
-// current list is the one the remote applied long ago, still routing
-// the departing node directly, so a freshness test releases the node
-// the moment before the remote learns where it went. The node then
-// loses its own tunnel while the remotes still accept its sources
-// only there, and everything it sends is dropped by cryptokey
-// routing until the next render reaches them. Measured as a
-// sub-minute flap on exactly the transit pairs after a placement
-// shrink; the dialer's own egress decision had the same defect and
-// the same fix.
+// relaysFromApplied reports whether each site's addresses are carried by
+// a relay in the remote's applied document. Hash freshness alone cannot
+// release retention: the current document may still route a node directly.
 func relaysFromApplied(doc tunnel.PeerListDoc, data map[string][]byte) map[string]bool {
 	relays := map[string]bool{}
 	for key := range data {
@@ -1791,21 +1712,9 @@ func equalStrings(a, b []string) bool {
 // controlPlaneLabel) and no toleration for the cloud-worker taint (so
 // it never lands on the remote node it dials).
 func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
-	// A control plane carries a NoSchedule taint, so allowing it by
-	// affinity is not enough: without a toleration a selected control
-	// plane simply never gets a pod, and the mesh silently omits it.
-	//
-	// Unconditional, because a toleration decides nothing about where a
-	// pod goes. It only removes an objection; the affinity above is what
-	// chooses, and it admits a control plane exactly when the selector
-	// names one or retention still holds one. Deriving this from the
-	// selector alone tied the two together and got retention wrong: a
-	// control plane that had just left the selector was still published,
-	// still expected to carry its tunnel through the window, and could
-	// no longer be scheduled at all. Measured with cp retained and
-	// desiredNumberScheduled 1, so the node kept a tunnel that no dialer
-	// maintained and, when its retention expired, no dialer was there to
-	// take the interface down either.
+	// A selected or retained control-plane endpoint needs a NoSchedule
+	// toleration. Affinity determines placement; toleration permits that
+	// placement and must remain present throughout endpoint retention.
 	tolerations := dialerTolerations()
 
 	hostPathDirectoryOrCreate := corev1.HostPathDirectoryOrCreate

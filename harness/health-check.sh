@@ -16,16 +16,9 @@
 # Usage: health-check.sh [--namespace NS] [--service-port PORT] NODE...
 set -uo pipefail
 
-# Unique per run. A fixed name couples this run to the previous run's
-# cleanup having finished, and namespace deletion is allowed to hang
-# in real clusters: with a node dead ungracefully, an aggregated API
-# served from it (k0s ships metrics-server) makes the namespace
-# controller's discovery fail, and every deletion waits until the
-# aggregated API reschedules. Measured: cp3 down, the previous check's
-# namespace Terminating for the whole 150s wait, and the survivors'
-# check reported "no checks ran" on a healthy network. A fresh name
-# needs nobody's deletion to finish; the old ones drain on their own
-# once discovery recovers.
+# Use a unique namespace for each run. Namespace deletion can wait for
+# unavailable aggregated API discovery during an outage; a new measurement
+# must not depend on the previous namespace's cleanup completing.
 NAMESPACE="cloud-provisioning-health-$(date +%s)"
 SERVICE_PORT=8080
 # The large object every pod serves, for the transfer check below. A
@@ -238,17 +231,8 @@ if [[ ${#NODES[@]} -gt 1 ]]; then
       sleep 10
     done
   }
-  # Every ordered pair, not a sample through the first node. The pairs
-  # the sample missed are exactly the slowest ones: a transit pair
-  # (neither end holds a tunnel; the path goes through a relay) after
-  # a placement shrink converges on the rehoming evidence's schedule,
-  # minutes, not seconds, and a gate that never probed it left the
-  # checks' own short retries to eat that convergence. Measured:
-  # endpoints moved from all to w1,w2, and the two transit pairs
-  # (cp2 to remote2, cp3 to remote1) were the 2 of 112 still
-  # converging when the checks ran. Once converged, this is n-squared
-  # fast probes; while converging, it is the wait the measurement
-  # needs to mean anything.
+  # Probe every ordered pair, including paths through relay endpoints.
+  # The convergence gate must cover the same path classes as the checks.
   for src in "${NODES[@]}"; do
     for dst in "${NODES[@]}"; do
       [[ "$src" == "$dst" ]] && continue
@@ -263,16 +247,9 @@ if [[ ${#NODES[@]} -gt 1 ]]; then
         http_from_early "$src" "http://${SERVICE_IP[$first]}:$SERVICE_PORT/"
     fi
   done
-  # Cluster DNS too, per node, because the checks measure it and a
-  # check that is not gated eats convergence out of its own single
-  # try. This is the one path class with cluster-side convergence in
-  # it: a DNS replica on a node that died ungracefully stays in the
-  # service's endpoints until the node lifecycle controller marks that
-  # node's pods NotReady, and until then the service address is a coin
-  # flip. That is Kubernetes' documented window, not this mesh's, and
-  # the checks below assert recovery, not luck. Measured: cp died
-  # ungracefully, pods and services converged, and three nodes' DNS
-  # lost the flip inside the window.
+  # Gate DNS recovery per node. Kubernetes may retain a dead DNS replica
+  # in Service endpoints until node lifecycle detection marks it unready;
+  # DNS convergence must be observed before the recovery assertion.
   for n in "${NODES[@]}"; do
     wait_path "$n to resolve cluster DNS" \
       pod_exec "$n" nslookup kubernetes.default.svc.cluster.local

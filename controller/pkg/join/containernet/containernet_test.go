@@ -7,21 +7,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// The provider reports where a machine can be reached, so it can also
-// tell the machine's own kubelet which address that is.
-//
-// A node that picks its own address gets it wrong wherever there is
-// more than one to pick from. Measured on a machine with a management
-// interface beside its real one: the kubelet registered 10.0.0.15,
-// the out-of-band address every machine in the lab shares, instead of
-// the 203.0.113.10 the mesh had already published for it. It joined,
-// went Ready, and then no node carried the identity the provider was
-// looking for, so nothing was ever adopted.
-//
-// The address is not a guess here. It is the same one this provider
-// reports to Cluster API and the same one the peer list is built
-// from, so a kubelet pinned to it agrees with everything else that
-// already believes it.
+// Pin the kubelet to the address reported by the infrastructure provider.
+// On a multi-interface machine, automatic selection can choose an unrelated
+// management address and prevent association with the provider's Machine.
 func TestInfraValuesTellTheNodeItsOwnAddress(t *testing.T) {
 	machine := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",

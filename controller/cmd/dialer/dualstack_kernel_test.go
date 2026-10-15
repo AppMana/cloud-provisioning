@@ -359,14 +359,9 @@ func TestTheTunnelCarriesOneAddressPerFamilyAgainstTheKernel(t *testing.T) {
 	}
 }
 
-// A site node known by an identity address on a dummy device sends to a
-// remote through the relay from that identity, not from its LAN address.
-// The kernel picks a route's source from its outgoing device, the LAN, and
-// the remote accepts from the relay only the node's own addresses: the
-// relay's transit entry carries those, not the LAN's. Measured on the
-// dual-stack lab with the tunnel on one worker: the control plane's API
-// server could not reach a remote kubelet (logs, exec) while every pod
-// check passed, since pods source from their pod blocks.
+// A relayed node must source its own traffic from its published node
+// identity, including when that address belongs to a dummy interface.
+// Using the LAN interface address can violate the remote's source permissions.
 func TestSiteTransitRoutesSourceFromTheNodesOwnAddressAgainstTheKernel(t *testing.T) {
 	if os.Getenv("CLDT_NETNS") != "1" {
 		t.Skip("set CLDT_NETNS=1 inside a namespace")
@@ -415,13 +410,9 @@ func TestSiteTransitRoutesSourceFromTheNodesOwnAddressAgainstTheKernel(t *testin
 	}
 }
 
-// An endpoint sends its own traffic to the remotes from its node address
-// too, not from its tunnel address. The node address is the one source
-// that stays valid when the endpoint set changes: a tunnel address goes
-// with the tunnel, and a TCP connection bound to it cannot follow the
-// node onto a relay. Measured on the dual-stack lab: after each placement
-// change the API server's connections to remote kubelets hung for one to
-// two minutes while pod checks converged in seconds.
+// An endpoint must source its own traffic from its node address. That
+// identity remains valid when the node becomes relayed; connections bound
+// to a removed tunnel address cannot survive the placement change.
 func TestEndpointRoutesSourceFromTheNodesOwnAddressAgainstTheKernel(t *testing.T) {
 	if os.Getenv("CLDT_NETNS") != "1" {
 		t.Skip("set CLDT_NETNS=1 inside a namespace")

@@ -72,13 +72,8 @@ func TestACutLeavesTheMachineRunning(t *testing.T) {
 	}
 }
 
-// A pulled cable takes the node's routes with it, and nothing in the
-// kernel puts them back. So a cut row is given the platform's share
-// too: a node restored with an address and no gateway is reachable on
-// its own segment and nowhere else, which reads exactly like the
-// cluster failing to readmit it. Measured on cp, whose every check
-// failed for a full fifteen minute window with its address restored
-// and its default route gone.
+// Restoring a cut link must restore its gateway as well as its address.
+// Missing platform routing must not be reported as cluster recovery failure.
 func TestACutRowAlsoGetsThePlatformsShare(t *testing.T) {
 	r := &fakeRig{}
 	p := &fakeProber{}

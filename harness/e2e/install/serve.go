@@ -17,23 +17,9 @@ const BinaryPort = 18080
 // BinaryName is what the binary is called on the wire.
 const BinaryName = "wg-dialer-linux-amd64"
 
-// Origin serves the first-boot binary from the far side of the lab's
-// transit segment, which is where a node's own edge leads.
-//
-// The chart used to hand a node a file:// URL and the harness put the
-// file on the node beforehand. That worked only while a node's disk
-// outlived the harness reaching it, and a remote's does not: it is
-// launched as a new instance to read its userdata, and everything
-// staged on the old one goes with the old one. The failure was a line
-// of curl output inside a boot log — "Couldn't open file
-// /opt/dialer-dist/wg-dialer-linux-amd64" — and a node that never
-// joined.
-//
-// Serving it is not a workaround for that; it is what the value
-// means. dialerBinary.amd64.url is a URL an operator sets to
-// something a node can fetch before it has joined anything, and the
-// lab already proves every node reaches this address by its own edge
-// and by no other path. Pre-staging the file was the accommodation.
+// Origin serves the first-boot binary across the lab transit segment.
+// A fresh instance must fetch its configured URL before joining the cluster;
+// staging a local file on a previous instance cannot satisfy that contract.
 type Origin struct {
 	// Path is the binary on this host.
 	Path string

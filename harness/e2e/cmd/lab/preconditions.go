@@ -6,20 +6,9 @@ import (
 	"strings"
 )
 
-// preconditions refuses a set of flags the run cannot honour.
-//
-// The stages nest: a network needs a cluster, the product needs a
-// network, a remote needs the product, the matrix needs somewhere to
-// run, and an outage row is a matrix taken three times. Asking for an
-// inner stage without an outer one used to do nothing at all — no
-// warning, no failure, and a run that ended by printing every
-// assertion it had passed.
-//
-// That is how a kubeadm row on machines reported a site built, a
-// network installed and every node Ready, having quietly not run the
-// reachability matrix it was asked for. A flag that does nothing is
-// worse than one that fails: the run looks like the thing it was
-// supposed to prove.
+// preconditions rejects flags whose required stages are disabled. Network,
+// product, remote, matrix, and outage stages depend on their preceding
+// stages; a requested check must not be silently skipped.
 func preconditions(distro, cni string, product bool, remotes, outages string, checks bool) error {
 	switch {
 	case cni != "" && distro == "":

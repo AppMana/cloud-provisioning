@@ -6,21 +6,11 @@ import (
 	"testing"
 )
 
-// A peer whose own address this node routes through the tunnel still
-// sends its WireGuard packets over the underlay, and strict reverse
-// path filtering drops exactly those: the route back to that source
-// does not leave by the interface they arrived on. The kernel takes
-// max(conf/all, conf/<iface>), so relaxing "all" alone cannot save an
-// interface that is itself strict, which is what a NIC restored after
-// a reboot inherits from conf/default.
-//
-// Measured before this existed: a rebooted remote with all=0 and a
-// restored eth1 at 1, its peer's handshake responses on the wire,
-// IPReversePathFilter counting every one, WireGuard's rx frozen, and
-// that node's cloud-to-cloud tunnel dead while every other path
-// worked.
-//
-// Exercises the real kernel: run under a network namespace.
+// WireGuard outer packets arrive over the underlay even when their source
+// has a tunnel route. Strict reverse-path filtering rejects that mismatch.
+// The kernel uses max(conf/all, conf/<iface>), so both the current interface
+// and the default inherited by recreated interfaces must permit it.
+// Exercise the real kernel in an isolated network namespace.
 func TestEveryStrictReversePathKnobIsRelaxed(t *testing.T) {
 	if os.Getenv("CLDT_NETNS") != "1" {
 		t.Skip("set CLDT_NETNS=1 inside a namespace")

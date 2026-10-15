@@ -11,22 +11,10 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 )
 
-// WaitForRemoteReach waits for the mesh to carry whatever this
-// network needs for a remote, and describes what it found.
-//
-// The two networks want opposite things, and this is the one place
-// that has to know it. On a native network the tunnel sees packets
-// addressed to pods, so a remote's accept list has to carry the
-// blocks its node owns; until it does, the nodes at home have the
-// remote's addresses and no way to reach anything running on it — a
-// state in which every component reports healthy. On an encapsulating
-// network the packets are addressed to nodes, so the list carries
-// host routes and a pod block on it would be wrong: the mesh would
-// accept pod-addressed packets that never arrive.
-//
-// Waiting for blocks either way is what this used to do, and the
-// first encapsulating row failed for the network doing exactly the
-// right thing.
+// WaitForRemoteReach waits for the address permissions required by the
+// network: pod allocations for native routing, node addresses for an
+// encapsulating network. Requiring pod blocks for both would reject valid
+// encapsulated connectivity.
 func WaitForRemoteReach(ctx context.Context, k *kube.Client, machine string,
 	encapsulation cni.Encapsulation, within time.Duration) (string, error) {
 

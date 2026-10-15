@@ -841,17 +841,8 @@ func TestDialerToleratesAControlPlane(t *testing.T) {
 	}
 }
 
-// Retention exists so a remote can move off a departing endpoint before
-// that endpoint's tunnel goes away. It can only move if something else
-// already owns the prefixes it needs, so ownership has to change at the
-// START of the window while the old tunnel still carries traffic.
-//
-// Holding both together meant the handover happened at the same instant
-// as the teardown. Measured on cp, the node carrying the API server's
-// address: the remote permitted 10.10.0.10 on cp's peer entry and
-// reached the API; six seconds later cp was unpublished and its
-// interface swept, the remote still named cp for 10.10.0.10, and the
-// list that would have corrected it was only reachable through cp.
+// Retention must publish replacement prefix ownership before removing the
+// old endpoint's tunnel, so remotes can learn the replacement path.
 func TestADepartingEndpointStopsOwningPrefixesAtOnce(t *testing.T) {
 	data := published(map[string][2]string{
 		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},
@@ -897,14 +888,9 @@ func TestADepartingEndpointStopsOwningPrefixesAtOnce(t *testing.T) {
 	}
 }
 
-// The handover has to run both ways. A node that leaves the selector
-// hands its prefixes to the site entries so a surviving endpoint relays
-// them; a node that returns takes them back. Doing only the first half
-// left a returning endpoint owning its block twice, on its own peer
-// entry and on whichever endpoint relays the site, and WireGuard
-// resolves a prefix named on two peers by keeping whichever was written
-// last. Measured after one placement change: w1 published as both
-// node-pod-cidrs-w1 and site-pod-cidrs-w1, the same block.
+// A returning endpoint takes its prefixes back from site relay entries.
+// Publishing a prefix under both owners would make WireGuard configuration
+// order determine which peer can send it.
 func TestAPrefixIsOwnedInExactlyOnePlaceAcrossAReturn(t *testing.T) {
 	data := published(map[string][2]string{
 		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},

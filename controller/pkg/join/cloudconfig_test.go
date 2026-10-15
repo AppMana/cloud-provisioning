@@ -388,29 +388,9 @@ func renderKubeadmPattern(t *testing.T, proxyPort int) string {
 	})
 }
 
-// A pattern that asks a cloud's instance-metadata service for the
-// node's addresses must survive not being on that cloud.
-//
-// The service answers on a link-local address that nothing routes, so
-// where it is absent the request does not fail — it hangs until the
-// connection times out, and then, if the command was not allowed to
-// fail, takes the rest of the bootstrap with it. Measured on a real
-// first boot, in a lab with no metadata service:
-//
-//	curl: (28) Failed to connect to 169.254.169.254 port 80
-//	      after 129587 ms: Connection timed out
-//	cc_scripts_user.py[WARNING]: Failed to run module scripts_user
-//
-// The dialer was installed and the tunnel was up; "k0s install
-// worker" and "k0s start" were in the same aborted block and never
-// ran. The node joined nothing, and did it slowly.
-//
-// The addresses are an optimisation — a distribution that cannot get
-// them falls back to resolving its own hostname, which is what it
-// does everywhere this operator is not — so absence has to be cheap
-// and survivable. Two of the patterns already bounded the wait and
-// tolerated the failure; this makes it every pattern's contract
-// rather than a habit two of them happened to have.
+// Metadata lookup must have a bounded timeout and tolerate an unavailable
+// service. Address discovery is optional and must not abort the commands
+// that install and start the Kubernetes worker.
 func TestEveryPatternSurvivesTheAbsenceOfAMetadataService(t *testing.T) {
 	patterns, err := filepath.Glob(filepath.Join("..", "..", "..", "join-patterns", "*.cloud-config.tmpl"))
 	if err != nil || len(patterns) == 0 {
@@ -494,23 +474,9 @@ func TestAnUnknownAddressStillAsksTheInstance(t *testing.T) {
 	}
 }
 
-// Every pattern tells the node the identity Cluster API binds it by.
-//
-// Cluster API matches a Machine to a Node on spec.providerID, and
-// some distributions assign one themselves as the node registers —
-// k3s writes k3s://<name>, RKE2 writes rke2://<name>. A node left to
-// do that carries an identity the Machine does not have, so
-// status.nodeRef is never set; the controller that publishes a
-// remote's pod block then never finds a node to publish for, and the
-// remote joins, goes Ready, and is unreachable from the site while
-// every component reports healthy. Measured on a k3s row: the node
-// said k3s://remote1 and the Machine said containernet://remote1.
-//
-// The ones that do not self-assign are told too. It is the same fact,
-// it belongs to the node at registration rather than being patched in
-// afterwards by something standing in for a cloud controller manager,
-// and a pattern that only worked because its distribution happened to
-// stay quiet is not a pattern that works.
+// Each bootstrap pattern must configure the providerID that Cluster API
+// uses to associate the Node with its Machine. Distribution-generated
+// identities can prevent adoption and publication of the node's pod routes.
 func TestEveryPatternTellsTheNodeItsProviderIdentity(t *testing.T) {
 	patterns, err := filepath.Glob(filepath.Join("..", "..", "..", "join-patterns", "*.cloud-config.tmpl"))
 	if err != nil || len(patterns) == 0 {

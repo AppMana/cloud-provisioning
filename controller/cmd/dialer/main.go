@@ -327,39 +327,9 @@ func main() {
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
-			// Asked to stop, which says nothing about why.
-			//
-			// This used to take the interface down whenever the node
-			// reached the cluster over its own LAN, reasoning that the
-			// DaemonSet going away means the tunnel is meant to go
-			// away. But this process is stopped far more often for
-			// reasons that mean the opposite: any edit to the
-			// DaemonSet's pod template restarts every dialer, and
-			// changing where tunnels are placed edits that template.
-			// Removing interfaces on every restart would also remove
-			// the path a remote needs to read its updated peer list.
-			//
-			// A left-behind device is a bounded cost: the next dialer
-			// on this node adopts it, and the operator who genuinely
-			// wants it gone is uninstalling, which takes the node's
-			// whole configuration with it. Being wrong in the other
-			// direction costs a node that cannot be recovered without
-			// out-of-band access.
-			//
-			// So ask the cluster why, rather than inferring it from the
-			// signal. A node that is still a published endpoint is being
-			// restarted and keeps its interface. A node that is no
-			// longer published has had its retention run out, and its
-			// interface is about to become a corpse: the pod block route
-			// on it sits inside the cluster's pod pool, the CNI
-			// redistributes it, and the node keeps telling the site it
-			// can reach pods it has no tunnel for. The site installs
-			// that alongside the working path and sends half of every
-			// flow into it.
-			//
-			// The unpublish happens before the pod template stops
-			// selecting this node, so by the time this runs the answer
-			// is already in the Secret.
+			// A process stop does not authorize tunnel removal. Preserve a published
+			// endpoint across restarts; remove its interface only after the cluster
+			// unpublishes it and ends retention.
 			if cfg.secretName != "" {
 				if published, err := nodeStillPublished(clientset, cfg); err == nil && !published {
 					fmt.Fprintf(os.Stderr, "removing %s on the way out: this node is no longer a published endpoint\n", cfg.iface)
@@ -371,29 +341,9 @@ func main() {
 	}
 }
 
-// ensureForwardingPath makes this node able to carry traffic that is
-// neither from nor to a workload on it, which is what a tunnel endpoint
-// is for. Three things have to hold, and all three were previously
-// assumed.
-//
-// Reverse path filtering is the first. A packet arriving on the tunnel
-// carries a source address that the endpoint reaches through that same
-// tunnel, so strict mode accepts it; but a site with two endpoints has
-// traffic that legitimately arrives one way and returns another, and
-// strict mode drops exactly that. Loose mode asks only that the source
-// be reachable somehow, which is the question worth asking here.
-//
-// TCP segment size is the second. See underlayMTU for why the "packet
-// too big" path cannot be relied on: the endpoint would have to signal
-// a pod on a node it does not control. Clamping the advertised segment
-// size on the handshake means the far end never sends one too large, so
-// nothing has to be signalled at all.
-//
-// Forwarding itself is the third, and is handled by ensureTransit.
-//
-// A drop from any of these looks exactly like a missing route from the
-// outside, which is the reason to set them rather than infer them from
-// a passing test.
+// ensureForwardingPath permits transit traffic through this endpoint.
+// Loose reverse-path filtering allows asymmetric endpoint paths, MSS
+// clamping handles the tunnel MTU, and ensureTransit enables forwarding.
 func ensureForwardingPath(iface string, mtu int) error {
 	// Reverse path filtering, on every interface the node has rather
 	// than the two this process owns.
@@ -1508,17 +1458,9 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	peerName := map[string]string{}
 	peerAcked := map[string]bool{}
 	if selfRelayed && meshSecret != nil && clientset != nil {
-		// What the remote applied, not merely that it applied: the
-		// hash equality proves the remote holds the current list, and
-		// DocRelaysNode asks the question the egress decision actually
-		// turns on, whether that list carries THIS node's addresses on
-		// the relay. Right after a placement shrink the remote's
-		// current list is the old one, applied long ago and still
-		// routing this node directly; a freshness-only test read that
-		// as acknowledged, this node egressed via the relay, and the
-		// remote's cryptokey trie dropped every packet: 78 seconds of
-		// dead return traffic, then an oscillation as re-renders
-		// toggled the freshness. Content does not oscillate.
+		// Verify the applied document's content as well as its hash. Relay egress
+		// is valid only when that document places this node's source addresses on
+		// the relay; a current document may still assign them to the direct peer.
 		myAddrs := tunnel.SplitList(string(meshSecret.Data[tunnel.SiteAddressesPrefix+cfg.nodeName]))
 		myPub := privateKey.PublicKey().String()
 		for dataKey, raw := range meshSecret.Data {

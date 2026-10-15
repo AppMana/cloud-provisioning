@@ -5,14 +5,9 @@ import (
 	"testing"
 )
 
-// A cloud worker's node address is not always the address it is dialled
-// at. On AWS the Machine reports the instance's public ExternalIP, which
-// the tunnel dials, and its VPC InternalIP, which is the Node's address:
-// the one the API server dials for logs and exec when no konnectivity
-// agent carries that traffic. Measured on the dual-stack AWS row, the
-// site routed only the public address into the tunnel, and kubelet
-// access to both workers timed out. Both addresses are the machine's
-// own, accepted and routed on its entry.
+// A cloud worker can have a public tunnel endpoint and a private node
+// address used for kubelet access. Both provider-reported addresses must
+// be accepted and routed through the worker's tunnel.
 func TestAMachinesNodeAddressesJoinItsPeerEntry(t *testing.T) {
 	addresses := []any{
 		map[string]any{"type": "InternalDNS", "address": "ip-172-29-0-93.us-west-2.compute.internal"},

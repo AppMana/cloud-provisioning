@@ -54,19 +54,9 @@ func TestCloudConfigPatternsPreserveBootstrapStructure(t *testing.T) {
 	}
 }
 
-// --join-ssh-authorized-keys says "on every new node". Every pattern
-// must honour it, and the empty case must render nothing at all.
-//
-// This test previously recorded the opposite: only k0s read the value,
-// so an operator who set the flag and ran kubeadm, k3s or RKE2 got no
-// keys and no error. It was written to make the asymmetry visible
-// rather than to bless it, and it failed the moment the patterns were
-// fixed, which is what it was for.
-//
-// The container rig cannot install a login it never uses — it reaches
-// nodes by docker exec — so it reports the key as skipped rather than
-// applying it. That difference closes on the VM rig, where a real
-// cloud-init reads the document.
+// Every bootstrap pattern must honor --join-ssh-authorized-keys and omit
+// keys when the value is empty. The container rig reports key installation
+// as skipped because it uses docker exec; VM coverage exercises cloud-init.
 func TestEveryPatternHonoursTheAuthorizedKeysFlag(t *testing.T) {
 	dir := patternDir(t)
 	entries, err := os.ReadDir(dir)

@@ -535,10 +535,8 @@ spec:
 EOF
 
 echo "--- the chart's Cluster pair is reported provisioned BY THE CONTROLLER ---"
-# Externally-managed means Cluster API's own controllers stand down, so
-# nothing upstream ever sets this status and Machines block on it
-# forever. It used to be a `kubectl patch` here, which is exactly the
-# kind of step a real install would never know to run.
+# Externally managed clusters require the product controller to publish
+# readiness; the harness must not repair that status with a manual patch.
 until_ok 90 sh -c "kubectl -n "$NS" get cluster $CLUSTER -o jsonpath='{.status.initialization.controlPlaneInitialized}' | grep -q true" \
   || fail "the controller never reported the externally-managed Cluster provisioned"
 
@@ -765,12 +763,8 @@ echo
 echo "  one claim became a real second kind node over a real tunnel, and one delete removed it"
 
 echo "--- uninstall: the release must take everything with it ---"
-# The controller creates the DaemonSets, the peer Secret and the
-# per-machine adoption Secrets at RUNTIME, so Helm never templated
-# them and an uninstall used to leave them behind: a tunnel interface
-# on every endpoint node with nothing reconciling it. They carry an
-# ownerReference to the controller's own Deployment now, so removing
-# the release collects them.
+# Runtime-created DaemonSets and Secrets are owned by the controller
+# Deployment so uninstalling the release garbage-collects them.
 helm uninstall cloud-provisioning --namespace "$NS" --wait >/dev/null 2>&1 \
   || fail "helm uninstall failed"
 for res in daemonset/$LOCAL_DS daemonset/$REMOTE_DS secret/$PEER_SECRET; do

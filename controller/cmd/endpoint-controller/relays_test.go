@@ -6,19 +6,9 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 )
 
-// A departing endpoint is held until every remote has moved, and the
-// only honest reading of "moved" is what the remote's applied list
-// says about THIS node. A list can be perfectly current and still
-// route the departing node directly: right after a placement change
-// that is exactly what every remote is holding, because the render
-// that moves the node is the one they have not applied yet. Releasing
-// on freshness takes the node's tunnel away while the remotes still
-// accept its sources only there, and everything it sends is dropped
-// by cryptokey routing until the next render lands.
-//
-// Measured as a sub-minute flap on the transit pairs after a
-// placement shrink: cp3, no longer an endpoint, unable to reach a
-// remote that had not yet learned to accept it through the relay.
+// Release a departing endpoint only after each remote's applied document
+// places that node's addresses on a relay. A current document can still
+// route the node directly; hash freshness alone does not prove migration.
 func TestRelaysFromApplied(t *testing.T) {
 	const (
 		keyCP = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB="

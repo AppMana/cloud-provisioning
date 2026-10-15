@@ -120,15 +120,9 @@ type Builder interface {
 	// on a disk seconds old.
 	NeedsNodeImage() bool
 
-	// ImportArgs is how this distribution's runtime takes an image on
-	// standard input.
-	//
-	// A distribution that brings its own containerd does not share the
-	// one on the node's PATH, and an image imported into the wrong one
-	// is invisible to the kubelet that needs it: the pod sits in
-	// ErrImageNeverPull while `ctr images ls` shows the image present,
-	// because they are two different runtimes. Measured on k0s, whose
-	// containerd held none of the images the default one held.
+	// ImportArgs selects the distribution's container runtime for image
+	// imports from standard input. Importing into a different containerd
+	// leaves the image unavailable to its kubelet.
 	ImportArgs() []string
 }
 

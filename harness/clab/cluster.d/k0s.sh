@@ -160,22 +160,10 @@ distro_build() {
 }
 
 distro_kubelet_invariant() {
-  # nllb is the claim: a pure worker's kubelet dials its own loopback
-  # envoy, which holds every controller address, so no single
-  # controller's death strands it. Measured, not assumed, against the
-  # kubeconfig the running kubelet actually loads: nllb hands kubelet
-  # its own file under /run/k0s/nllb (the kubelet process's
-  # --kubeconfig says so), aimed at the envoy on the node's own
-  # loopback, k0s's choice of family included ([::1]). The file at
-  # /var/lib/k0s/kubelet.conf keeps the bootstrap-time join server
-  # forever and describes nothing the kubelet still does. The envoy
-  # image is pulled on first start, so this converges rather than
-  # holding instantly, and a check without a deadline's patience
-  # reports the wrong verdict on a healthy node.
-  #
-  # A controller's kubelet dialing its own API server is k0s's
-  # arrangement for --enable-worker nodes (nllb's documented
-  # limitation there), and is no cross-node dependency either.
+  # Verify the kubeconfig used by the running kubelet, not its bootstrap
+  # file. Pure workers use the node-local Envoy endpoint, including its
+  # selected IP family. Allow startup time for the Envoy image pull.
+  # Controller kubelets may use their local API server directly.
   local deadline=$((SECONDS + 300)) server ok
   for n in $SITE_NODES; do
     while :; do

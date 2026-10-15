@@ -516,10 +516,9 @@ func TestReconcile_MachineKindComesFromTheTemplateKind(t *testing.T) {
 // Both set is ambiguous: the catalogue would silently override half of
 // what the template says.
 
-// Deleting a claim used to leave its Node registered and NotReady
-// forever: nothing collects it, because a cluster-scoped Node cannot be
-// owned by a namespaced claim and Cluster API only removes nodes for
-// clusters it manages.
+// Claim deletion must remove the workload Node explicitly. A namespaced
+// claim cannot own a cluster-scoped Node, and an externally managed cluster
+// cannot rely on CAPI to collect it.
 func TestReconcileDelete_RemovesTheNodeItProduced(t *testing.T) {
 	claim := fakeClaim("public-worker")
 	claim.Finalizers = []string{Finalizer}

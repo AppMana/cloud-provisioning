@@ -573,7 +573,7 @@ func runLab() {
 				if err := cluster.EnsureCRICTL(ctx, r, *workDir, nodes); err != nil {
 					fail("%v", err)
 				}
-				udpProbe, err := check.BuildUDPProbe(ctx, filepath.Join(*repoDir, "harness", "e2e"), *workDir)
+				udpProbe, err := check.BuildUDPProbes(ctx, filepath.Join(*repoDir, "harness", "e2e"), *workDir)
 				if err != nil {
 					fail("%v", err)
 				}
@@ -581,7 +581,7 @@ func runLab() {
 					Kube: d.Kube, Rig: r,
 					Namespace:   check.UniqueNamespace(time.Now().Unix()),
 					CRIEndpoint: b.CRIEndpoint(),
-					UDPProbe:    udpProbe,
+					UDPProbes:   udpProbe,
 				}
 				if err := pods.Prepare(ctx, nodes); err != nil {
 					fail("%v", err)

@@ -192,7 +192,13 @@ func runMatrix(ctx context.Context, config *rest.Config, nodeList string, tries 
 		return nil, err
 	}
 	defer os.RemoveAll(work)
-	udpProbe, err := loadUDPProbe(ctx, moduleDir, filepath.Join(work, "build"), udpFile, udpSHA)
+	var udpProbe []byte
+	var udpProbes map[string][]byte
+	if udpFile == "" && udpSHA == "" {
+		udpProbes, err = check.BuildUDPProbes(ctx, moduleDir, filepath.Join(work, "build"))
+	} else {
+		udpProbe, err = loadUDPProbe(ctx, moduleDir, filepath.Join(work, "build"), udpFile, udpSHA)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -201,6 +207,7 @@ func runMatrix(ctx context.Context, config *rest.Config, nodeList string, tries 
 		Namespace:  fmt.Sprintf("cloud-provisioning-acceptance-%d", time.Now().Unix()),
 		PullPolicy: corev1.PullIfNotPresent,
 		UDPProbe:   udpProbe,
+		UDPProbes:  udpProbes,
 	}
 	defer func() {
 		// Its own clock: the run's may already be spent or cancelled.

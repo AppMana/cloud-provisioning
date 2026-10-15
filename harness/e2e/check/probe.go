@@ -87,6 +87,8 @@ type Pods struct {
 	// UDPProbe is the static UDP prober (cmd/udpprobe) carried into each
 	// probe container before its first UDP check. Empty disables UDP.
 	UDPProbe []byte
+	// UDPProbes selects native binaries by architecture for mixed fleets.
+	UDPProbes map[string][]byte
 	// Family explicitly limits a campaign; empty preserves the dual-stack contract.
 	Family Family
 
@@ -151,7 +153,15 @@ func (p *Pods) Prepare(ctx context.Context, nodes []string) error {
 // BuildUDPProbe compiles the static UDP prober the probe pods run, from the
 // harness module at moduleDir, for linux/amd64 nodes.
 func BuildUDPProbe(ctx context.Context, moduleDir, workDir string) ([]byte, error) {
-	out, err := filepath.Abs(filepath.Join(workDir, "binaries", "udpprobe-linux-amd64"))
+	return BuildUDPProbeFor(ctx, moduleDir, workDir, "amd64")
+}
+
+// BuildUDPProbeFor builds a native prober for the requested Linux architecture.
+func BuildUDPProbeFor(ctx context.Context, moduleDir, workDir, arch string) ([]byte, error) {
+	if arch != "amd64" && arch != "arm64" {
+		return nil, fmt.Errorf("unsupported probe architecture %q", arch)
+	}
+	out, err := filepath.Abs(filepath.Join(workDir, "binaries", "udpprobe-linux-"+arch))
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +170,7 @@ func BuildUDPProbe(ctx context.Context, moduleDir, workDir string) ([]byte, erro
 	}
 	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", out, "./cmd/udpprobe")
 	cmd.Dir = moduleDir
-	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH=amd64")
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+arch)
 	if raw, err := cmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("building the UDP prober: %w: %s", err, raw)
 	}
@@ -385,7 +395,7 @@ func NslookupAnswers(out string) []string {
 // in first if this container does not have it yet. Each attempt uses a
 // fresh socket and the prober reports every one.
 func (p *Pods) UDPEcho(ctx context.Context, node, destination string, payload, tries int, dontFragment bool) (UDPReport, error) {
-	if len(p.UDPProbe) == 0 {
+	if len(p.UDPProbe) == 0 && len(p.UDPProbes) == 0 {
 		return UDPReport{}, fmt.Errorf("no UDP prober was given to carry into the probe pods")
 	}
 	cid, err := p.container(ctx, node)
@@ -435,12 +445,23 @@ func ParseUDPReport(out []byte) (UDPReport, error) {
 // carry puts the UDP prober into a probe container once.
 func (p *Pods) carry(ctx context.Context, node, cid string) error {
 	return p.carried.Do(cid, func() error {
+		arch, err := rig.LinuxArchitecture(ctx, p.Rig.Node(node))
+		if err != nil {
+			return err
+		}
+		binary := p.UDPProbe
+		if p.UDPProbes != nil {
+			binary = p.UDPProbes[arch]
+		}
+		if err := rig.ValidateLinuxBinary(binary, arch); err != nil {
+			return fmt.Errorf("probe for %s: %w", node, err)
+		}
 		argv := []string{"crictl"}
 		if p.CRIEndpoint != "" {
 			argv = append(argv, "--runtime-endpoint", p.CRIEndpoint)
 		}
 		argv = append(argv, "exec", "-i", cid, "sh", "-ec", CarryCommand, "cldt-carry", UDPProbePath)
-		if _, err := p.Rig.Node(node).Pipe(ctx, bytes.NewReader(p.UDPProbe), argv...); err != nil {
+		if _, err := p.Rig.Node(node).Pipe(ctx, bytes.NewReader(binary), argv...); err != nil {
 			return fmt.Errorf("carrying the UDP prober into %s's probe: %w", node, err)
 		}
 		return nil
@@ -487,3 +508,16 @@ var (
 	_ LookupProber   = (*Pods)(nil)
 	_ UDPProber      = (*Pods)(nil)
 )
+
+// BuildUDPProbes builds both supported Linux binaries before a campaign starts.
+func BuildUDPProbes(ctx context.Context, moduleDir, workDir string) (map[string][]byte, error) {
+	out := map[string][]byte{}
+	for _, arch := range []string{"amd64", "arm64"} {
+		binary, err := BuildUDPProbeFor(ctx, moduleDir, workDir, arch)
+		if err != nil {
+			return nil, err
+		}
+		out[arch] = binary
+	}
+	return out, nil
+}

@@ -340,11 +340,11 @@ func run() error {
 	if err = cluster.EnsureCRICTL(ctx, fleet, *site, nodes); err != nil {
 		return err
 	}
-	udpProbe, err := check.BuildUDPProbe(ctx, *moduleDir, *work)
+	udpProbe, err := check.BuildUDPProbes(ctx, *moduleDir, *work)
 	if err != nil {
 		return err
 	}
-	pods := &check.Pods{Family: check.Family(*podFamily), Kube: k, Rig: fleet, Namespace: check.UniqueNamespace(time.Now().UnixNano()), CRIEndpoint: builder.CRIEndpoint(), UDPProbe: udpProbe}
+	pods := &check.Pods{Family: check.Family(*podFamily), Kube: k, Rig: fleet, Namespace: check.UniqueNamespace(time.Now().UnixNano()), CRIEndpoint: builder.CRIEndpoint(), UDPProbes: udpProbe}
 	if err = pods.Prepare(ctx, nodes); err != nil {
 		return err
 	}

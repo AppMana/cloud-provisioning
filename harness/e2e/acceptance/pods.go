@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/check"
+	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +36,8 @@ type Pods struct {
 	// digest-pinned image itself.
 	PullPolicy corev1.PullPolicy
 	// UDPProbe is the static UDP prober carried into each probe pod.
-	UDPProbe []byte
+	UDPProbe  []byte
+	UDPProbes map[string][]byte
 
 	carried check.CarryOnce
 }
@@ -194,7 +196,7 @@ func (p *Pods) Lookup(ctx context.Context, node, name string, family check.Famil
 
 // UDPEcho runs the carried UDP prober in node's probe pod.
 func (p *Pods) UDPEcho(ctx context.Context, node, destination string, payload, tries int, dontFragment bool) (check.UDPReport, error) {
-	if len(p.UDPProbe) == 0 {
+	if len(p.UDPProbe) == 0 && len(p.UDPProbes) == 0 {
 		return check.UDPReport{}, fmt.Errorf("no UDP prober was given to carry into the probe pods")
 	}
 	if err := p.carry(ctx, node); err != nil {
@@ -214,7 +216,22 @@ func (p *Pods) UDPEcho(ctx context.Context, node, destination string, payload, t
 
 func (p *Pods) carry(ctx context.Context, node string) error {
 	return p.carried.Do(node, func() error {
-		if _, err := p.exec(ctx, node, p.UDPProbe, "sh", "-ec", check.CarryCommand, "cldt-carry", check.UDPProbePath); err != nil {
+		n, err := p.Client.CoreV1().Nodes().Get(ctx, node, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if n.Status.NodeInfo.OperatingSystem != "linux" {
+			return fmt.Errorf("unsupported probe OS on %s", node)
+		}
+		arch := n.Status.NodeInfo.Architecture
+		binary := p.UDPProbe
+		if p.UDPProbes != nil {
+			binary = p.UDPProbes[arch]
+		}
+		if err := rig.ValidateLinuxBinary(binary, arch); err != nil {
+			return fmt.Errorf("probe for %s: %w", node, err)
+		}
+		if _, err := p.exec(ctx, node, binary, "sh", "-ec", check.CarryCommand, "cldt-carry", check.UDPProbePath); err != nil {
 			return fmt.Errorf("carrying the UDP prober into %s's probe: %w", node, err)
 		}
 		return nil

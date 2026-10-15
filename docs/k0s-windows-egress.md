@@ -22,6 +22,16 @@ Qualify a rebuilt controller with this patch; native runtime and upgrade
 validation remain required. A harness-installed addon does not qualify the
 controller fix.
 
+Rollback must cover the generated manifest and its resources as well as the
+controller executable and service arguments. Disabling Konnectivity does not
+remove an existing manifest stack. On an isolated test site that originally
+disabled it, restore the original controller first, then let its existing stack
+reconciler apply an empty Konnectivity manifest and verify resource removal
+before removing the empty directory. Deleting the directory while the
+controller is stopped does not deliver a removal event to that reconciler.
+Record service restoration and resource cleanup separately; cleanup performed
+by the test driver does not prove autonomous resource rollback.
+
 ## Legacy diagnostic addon
 
 For diagnosis on an unpatched test site, the harness can derive an additional

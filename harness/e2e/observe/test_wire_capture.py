@@ -2,7 +2,7 @@ import io
 import struct
 import unittest
 
-from wire_capture import window
+from wire_capture import window, udp_metadata
 
 
 def packet(payload, source=b'\xac\x1d\0\x1d', link=276):
@@ -49,6 +49,37 @@ class CaptureTest(unittest.TestCase):
         self.assertFalse(row['complete'])
         self.assertNotIn('payloadSHA256', row)
         self.assertNotIn('wireguardCounter', row)
+
+    def test_truncated_header_requires_explicit_opt_in_and_never_has_hash(self):
+        payload = struct.pack('<IIQ', 4, 321, 987654)+b'x'*256
+        for link, header in [(1, 14), (276, 20)]:
+            body = packet(payload, link=link)
+            cut = header+20+8+16
+            row = udp_metadata(link, body[:cut], include_truncated_headers=True)
+            self.assertTrue(row['wireguardHeaderOnly'])
+            self.assertFalse(row['complete'])
+            self.assertEqual((row['wireguardReceiver'], row['wireguardCounter']), (321, 987654))
+            self.assertNotIn('payloadSHA256', row)
+            self.assertNotIn('wireguardCounter', udp_metadata(link, body[:cut]))
+            self.assertNotIn('wireguardCounter', udp_metadata(link, body[:cut-1], include_truncated_headers=True))
+
+    def test_header_opt_in_rejects_fragments_and_invalid_data_lengths(self):
+        for payload in [struct.pack('<IIQ', 4, 1, 2)+b'x'*15,
+                        struct.pack('<IIQ', 3, 1, 2)+b'x'*32]:
+            self.assertNotIn('wireguardCounter', udp_metadata(276, packet(payload), include_truncated_headers=True))
+        body = bytearray(packet(struct.pack('<IIQ', 4, 1, 2)+b'x'*32))
+        body[26:28] = struct.pack('!H', 0x2000)
+        self.assertNotIn('wireguardCounter', udp_metadata(276, bytes(body), include_truncated_headers=True))
+
+    def test_mtu_capped_padding_need_not_align_to_sixteen_bytes(self):
+        body = packet(struct.pack('<IIQ', 4, 321, 987654)+b'x'*1436)
+        complete = udp_metadata(276, body)
+        self.assertEqual(complete['wireguardCounter'], 987654)
+        self.assertIn('payloadSHA256', complete)
+        short = udp_metadata(276, body[:192], include_truncated_headers=True)
+        self.assertEqual(short['wireguardCounter'], 987654)
+        self.assertTrue(short['wireguardHeaderOnly'])
+        self.assertNotIn('payloadSHA256', short)
 
     def test_missing_file_bytes_and_invalid_bounds_fail(self):
         raw = capture([packet(b'x')])

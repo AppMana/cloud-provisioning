@@ -38,7 +38,7 @@ def frames(stream):
         yield seconds*1000000000 + fraction*(1000000000//resolution), link, packet
 
 
-def udp_metadata(link, packet):
+def udp_metadata(link, packet, *, include_truncated_headers=False):
     if link == 276:
         if len(packet) < 20:
             raise ValueError('incomplete SLL2 header')
@@ -73,11 +73,17 @@ def udp_metadata(link, packet):
                destination=str(ipaddress.ip_address(packet[16:20])), destinationPort=destination,
                ipID=struct.unpack('!H', packet[4:6])[0], udpBytes=length,
                complete=bool(complete))
-    if complete:
-        payload = packet[ihl+8:ihl+length]
-        row['payloadSHA256'] = hashlib.sha256(payload).hexdigest()
-        if len(payload) >= 32 and len(payload) % 16 == 0 and payload[:4] == b'\x04\0\0\0':
+    payload = packet[ihl+8:ihl+length]
+    if complete or (include_truncated_headers and not fragment & 0x2000):
+        # WireGuard padding is capped at the tunnel MTU, so valid data lengths
+        # need not be multiples of sixteen (send.c: calculate_skb_padding).
+        if (length-8 >= 32 and len(payload) >= 16
+                and payload[:4] == b'\x04\0\0\0'):
             row['wireguardReceiver'], row['wireguardCounter'] = struct.unpack('<IQ', payload[4:16])
+            if not complete:
+                row['wireguardHeaderOnly'] = True
+    if complete:
+        row['payloadSHA256'] = hashlib.sha256(payload).hexdigest()
         if source == 8081 or destination == 8081:
             token = payload[5:29] if payload.startswith(b'echo ') else payload[:24]
             if len(token) == 24 and all(c in b'0123456789abcdef' for c in token):

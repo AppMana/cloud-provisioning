@@ -28,6 +28,12 @@ queue, segmentation metadata, and return code. Match those identifiers against
 simultaneous captures, retaining every repeated transmission and nonzero return.
 The `ns` field uses the kernel clock, not pcap wall-clock timestamps; correlate
 by packet identifiers rather than subtracting those timestamps directly.
+For captures with a short snap length, callers of `wire_capture.udp_metadata`
+can opt into `include_truncated_headers=True`. Such records explicitly carry
+`wireguardHeaderOnly` and never receive a payload hash; receiver/counter
+matching alone must not be presented as a complete-ciphertext hash match.
+WireGuard data lengths need not align to sixteen bytes: the kernel
+[caps padding at the tunnel MTU](https://github.com/torvalds/linux/blob/v6.17/drivers/net/wireguard/send.c#L129-L146).
 The optional `free-before-return` event records the kernel reason when the same
 buffer is freed before return; it is not by itself a packet-loss verdict.
 Inspect tracepoint layouts and validate the program against packet captures on

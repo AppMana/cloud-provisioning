@@ -263,6 +263,29 @@ the site peers and route transitions. All four IPv4 exchange phases must
 preserve the original pod source. This is a mechanism test, not controller
 API-server publication semantics or CAPI lifecycle qualification.
 
+`TestNativeReceiveRealAPI` runs the reconciliation path against a real lab API
+from a fresh VM network namespace. Its fixture needs a short-lived kubeconfig,
+a Unix-socket TCP relay to the API, a dedicated namespace whose name starts with
+`cldt-receiver-api-`, and the expected `cp` Node UID. The test ServiceAccount needs
+`get,patch` on only the `adoption` Secret and `get` on only the `cp` Node; an
+`unrelated` Secret must also exist so the test can check denied access. Stage the
+credentials with mode `0600` and pass these environment variables:
+
+```text
+CLDT_NATIVE_RECEIVE_API_CONFIG=/staged/worker-kubeconfig
+CLDT_NATIVE_RECEIVE_API_SOCKET=/staged/api-relay.sock
+CLDT_NATIVE_RECEIVE_API_NAMESPACE=<isolated-test-namespace>
+CLDT_NATIVE_RECEIVE_API_NODE_UID=<expected-lab-node-uid>
+```
+
+Run the staged test binary with `-test.run '^TestNativeReceiveRealAPI$' -test.v`
+under `unshare --net`. The relay carries TLS unchanged and avoids adding guest
+routes. The test checks real authorization and resource-version conflicts,
+prepared kernel bindings, unchanged active forwarding, and recovery from a
+malformed request. Stop the relay and remove the test namespace and its scoped
+RBAC resources afterward. It does not move traffic between receivers or qualify
+the controller's activation and retirement protocol.
+
 The single-device control expects failed exchanges when sender and receiver
 ownership disagree. The dual-receiver case requires exchanges in both
 asymmetric directions and checks the source address observed by the receiver.

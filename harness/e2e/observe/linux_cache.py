@@ -10,8 +10,8 @@ REFERENCE = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:/@+-]*')
 
 
 def expected_images(recipe):
-    if not isinstance(recipe, dict) or type(recipe.get('schemaVersion')) is not int or recipe.get('schemaVersion') != 1 or recipe.get('machineOS') != 'linux' or recipe.get('architecture') != 'amd64':
-        raise ValueError('Require the tested Linux amd64 cache recipe profile')
+    if not isinstance(recipe, dict) or type(recipe.get('schemaVersion')) is not int or recipe.get('schemaVersion') != 1 or recipe.get('machineOS') != 'linux' or recipe.get('architecture') not in ('amd64', 'arm64'):
+        raise ValueError('Require a Linux amd64 or arm64 cache recipe profile')
     expected = {}
     images = recipe.get('images', [])
     if not isinstance(images, list) or not images:
@@ -68,7 +68,7 @@ def evaluate(recipe, observation):
     stops = observation.get('stops', [])
     stopped = (len(stops) == 2 and all(type(stop.get('exitCode')) is int and stop['exitCode'] == 0
                and stop.get('originalProcessExited') is True for stop in stops))
-    checks = dict(originalRuntimesStopped=stopped, temporaryStateRemoved=observation.get('temporaryStateRemoved') is True)
+    checks = dict(nativeArchitectureMatches=observation.get('nativeArchitecture') == recipe['architecture'], originalRuntimesStopped=stopped, temporaryStateRemoved=observation.get('temporaryStateRemoved') is True)
     passed = all(checks.values()) and all(all(phase.values()) for phase in phases.values())
     return dict(passed=passed, phases=phases, checks=checks, references=len(expected),
                 qualificationEligible=False, scope='Builder cache only; capture and fresh-clone startup remain separate gates')

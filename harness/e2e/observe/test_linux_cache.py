@@ -2,12 +2,17 @@ import copy
 import json
 import pathlib
 import unittest
+from unittest import mock
+import linux_cache_native
 from linux_cache import evaluate, expected_images, inventory
 
 
 class NativeLinuxCache(unittest.TestCase):
     def setUp(self):
         self.native = json.loads((pathlib.Path(__file__).parent/'testdata/linux-pause-cache-native.json').read_text())
+        # Bind the historical packet-independent cache fixture to a synthetic
+        # host observation for gate tests; do not alter the retained evidence.
+        self.native['observation']['nativeArchitecture'] = 'amd64'
 
     def test_actual_pause_cache_survived_restart_without_qualifying_clone(self):
         result = evaluate(**self.native)
@@ -19,6 +24,8 @@ class NativeLinuxCache(unittest.TestCase):
         for fixture in ['linux-gpu-cache-native.json', 'linux-public-full-cache-native.json']:
             with self.subTest(fixture=fixture):
                 native = json.loads((pathlib.Path(__file__).parent/'testdata'/fixture).read_text())
+                self.assertFalse(evaluate(**native)['passed'])  # historical evidence has no host binding
+                native['observation']['nativeArchitecture'] = 'amd64'
                 result = evaluate(**native)
                 self.assertTrue(result['passed'])
                 self.assertEqual(result['references'], 23)
@@ -27,6 +34,24 @@ class NativeLinuxCache(unittest.TestCase):
                 row[0] = 'unexpected:latest'
                 native['observation']['after'] += ' '.join(row)+'\n'
                 self.assertFalse(evaluate(**native)['passed'])
+
+    def test_host_architecture_is_required_for_each_family(self):
+        for architecture in ['amd64', 'arm64']:
+            native = copy.deepcopy(self.native)
+            native['recipe']['architecture'] = architecture
+            native['observation']['nativeArchitecture'] = architecture
+            self.assertTrue(evaluate(**native)['passed'])
+            native['observation']['nativeArchitecture'] = 'arm64' if architecture == 'amd64' else 'amd64'
+            self.assertFalse(evaluate(**native)['passed'])
+            del native['observation']['nativeArchitecture']
+            self.assertFalse(evaluate(**native)['passed'])
+
+    def test_native_preflight_rejects_wrong_host_before_runtime_commands(self):
+        recipe = dict(self.native['recipe'], architecture='arm64')
+        with mock.patch('linux_cache_native.platform.machine', return_value='x86_64'), mock.patch('linux_cache_native.platform.system', return_value='Linux'), mock.patch('linux_cache_native.subprocess.check_output') as commands:
+            with self.assertRaisesRegex(ValueError, 'architecture differs'):
+                linux_cache_native.preflight(recipe)
+            commands.assert_not_called()
 
     def test_malformed_recipe_types_are_rejected(self):
         for recipe in [None, dict(self.native['recipe'], schemaVersion=True),

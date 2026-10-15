@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from prepare_cache import build, inputs
+from prepare_cache import native_architecture, build, inputs
 
 
 class CacheBuildInputs(unittest.TestCase):
@@ -68,8 +68,18 @@ class CacheBuildInputs(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'regular archive'):
             inputs(self.recipe, self.directory)
 
+    def test_native_architecture_must_match_recipe(self):
+        for machine, architecture in [('x86_64', 'amd64'), ('aarch64', 'arm64')]:
+            with self.subTest(machine=machine), mock.patch('prepare_cache.platform.machine', return_value=machine), mock.patch('prepare_cache.platform.system', return_value='Linux'):
+                recipe = dict(self.recipe, architecture=architecture)
+                inputs(recipe, self.directory)
+                self.assertEqual(native_architecture(recipe), architecture)
+                other = 'arm64' if architecture == 'amd64' else 'amd64'
+                with self.assertRaisesRegex(ValueError, 'differs'):
+                    native_architecture(dict(recipe, architecture=other))
+
     def test_invalid_profile_and_missing_worker_identity(self):
-        for change in [dict(schemaVersion=True), dict(machineOS='windows'), dict(architecture='arm64'),
+        for change in [dict(schemaVersion=True), dict(machineOS='windows'), dict(architecture='riscv64'),
                        dict(workerSHA256=''), dict(images=[]), dict(images=[None])]:
             recipe = dict(self.recipe, **change)
             with self.assertRaises(ValueError):

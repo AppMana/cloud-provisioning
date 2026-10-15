@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import pathlib
+import platform
 import shutil
 import stat
 import subprocess
@@ -33,6 +34,8 @@ def sha256(path):
 
 def preflight(recipe):
     expected_images(recipe)
+    architecture = {'x86_64': 'amd64', 'aarch64': 'arm64'}.get(platform.machine())
+    require(platform.system() == 'Linux' and architecture == recipe['architecture'], 'Recipe architecture differs from native Linux host')
     require(os.geteuid() == 0, 'Require root on the unjoined Linux builder')
     for service in ['k0sworker', 'k0scontroller', 'kubelet']:
         state = subprocess.check_output(
@@ -52,10 +55,11 @@ def preflight(recipe):
         require(not path.is_symlink() and sha256(path) == entry['sha256'], 'Runtime bytes changed')
         require(path.stat().st_mtime_ns == runtime['workerMtimeNs'] and
                 stat.S_IMODE(path.stat().st_mode) == 0o750, 'Runtime metadata changed')
+    return architecture
 
 
 def observe(recipe, operation):
-    preflight(recipe)
+    architecture = preflight(recipe)
     operation.mkdir(mode=0o700)
 
     def save(name, value):
@@ -71,7 +75,7 @@ def observe(recipe, operation):
     config = operation/'containerd.toml'
     config.write_text('version = 3\ndisabled_plugins = ["io.containerd.grpc.v1.cri"]\n')
     ctr = [str(WORKER), 'ctr', '--address', socket, '--namespace', 'k8s.io']
-    observation = dict(stops=[])
+    observation = dict(stops=[], nativeArchitecture=architecture)
     for phase in ['before', 'after']:
         with (operation/(phase+'.log')).open('xb') as log:
             process = subprocess.Popen(

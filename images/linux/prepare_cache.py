@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a fresh k0s/containerd 2 cache on an unjoined Linux amd64 VM.
+"""Build a fresh k0s/containerd 2 cache on an unjoined Linux amd64 or arm64 VM.
 
 The operation directory and cache must be new. Interrupted builds retain their
 original logs and partial store for inspection; this command never replays them.
@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import pathlib
+import platform
 import re
 import shutil
 import stat
@@ -36,7 +37,7 @@ def sha256(path):
 
 def inputs(recipe, directory):
     require(type(recipe.get('schemaVersion')) is int and recipe.get('schemaVersion') == 1 and recipe.get('machineOS') == 'linux'
-            and recipe.get('architecture') == 'amd64', 'Require a Linux amd64 schema 1 recipe')
+            and recipe.get('architecture') in ('amd64', 'arm64'), 'Require a Linux amd64 or arm64 schema 1 recipe')
     require(re.fullmatch(r'[a-f0-9]{64}', recipe.get('workerSHA256', '')), 'Require worker SHA256')
     require(isinstance(recipe.get('images'), list) and recipe['images'], 'Require images')
     expected = {}
@@ -66,7 +67,14 @@ def inputs(recipe, directory):
     return expected
 
 
+def native_architecture(recipe):
+    architecture = {'x86_64': 'amd64', 'aarch64': 'arm64'}.get(platform.machine())
+    require(platform.system() == 'Linux' and architecture == recipe['architecture'], 'Recipe architecture differs from native Linux host')
+    return architecture
+
+
 def runtime(recipe):
+    architecture = native_architecture(recipe)
     require(os.geteuid() == 0, 'Require root on the builder VM')
     for service in ['k0sworker', 'k0scontroller', 'kubelet']:
         result = subprocess.check_output(['systemctl', 'show', service, '--property=LoadState', '--value'], text=True)
@@ -84,13 +92,14 @@ def runtime(recipe):
         require(not path.is_symlink() and sha256(path) == item['sha256'], 'Runtime bytes changed')
         require(path.stat().st_mtime_ns == receipt['workerMtimeNs']
                 and stat.S_IMODE(path.stat().st_mode) == 0o750, 'Runtime metadata changed')
+    return architecture
 
 
 def build(recipe_path, operation, root, minimum_free_gib=8):
     recipe = json.loads(recipe_path.read_text())
     recipe_sha256 = sha256(recipe_path)
     expected = inputs(recipe, recipe_path.parent)
-    runtime(recipe)
+    architecture = runtime(recipe)
     for path in [operation, root]:
         require(path.is_absolute() and path == path.resolve(), 'Require absolute paths without symlinks')
         require(not path.exists(), 'Inspect the existing operation/cache; do not replay')
@@ -116,7 +125,7 @@ def build(recipe_path, operation, root, minimum_free_gib=8):
         save(label+'.exit.json', dict(exitCode=result.returncode))
         require(result.returncode == 0, 'Native command failed: '+label)
         return (operation/(label+'.stdout')).read_text()
-    observation = dict(stops=[])
+    observation = dict(stops=[], nativeArchitecture=architecture)
     for phase in ['before', 'after']:
         with (operation/(phase+'.log')).open('xb') as log:
             process = subprocess.Popen([str(BIN/'containerd'), '--root', str(root), '--state', str(state),
@@ -139,9 +148,9 @@ def build(recipe_path, operation, root, minimum_free_gib=8):
                         if 'archive' in item:
                             archive = recipe_path.parent/item['archive']
                             require(sha256(archive) == item['archiveSHA256'], 'Archive changed before import')
-                            call(['images', 'import', '--platform', 'linux/amd64', str(archive)], label+'-import', 600)
+                            call(['images', 'import', '--platform', 'linux/'+architecture, str(archive)], label+'-import', 600)
                         else:
-                            call(['images', 'pull', '--platform', 'linux/amd64', source], label+'-pull', 600)
+                            call(['images', 'pull', '--platform', 'linux/'+architecture, source], label+'-pull', 600)
                         inventory = {row.split()[0]: row.split()[2] for row in call(['images', 'list'], label+'-inventory').splitlines()[1:] if len(row.split()) >= 3}
                         require(inventory.get(source) == item['digest'], 'Pulled/imported source digest differs')
                         for number, alias in enumerate(item['aliases']):
@@ -167,7 +176,7 @@ def build(recipe_path, operation, root, minimum_free_gib=8):
     observation['temporaryStateRemoved'] = True
     save('observation.json', observation)
     require(sha256(recipe_path) == recipe_sha256, 'Recipe changed during the original build')
-    result = dict(recipeSHA256=recipe_sha256, cacheRoot=str(root), references=len(expected),
+    result = dict(recipeSHA256=recipe_sha256, cacheRoot=str(root), references=len(expected), nativeArchitecture=architecture,
                   originalRuntimeProcessesExited=True, readyBeforeAndAfterRestart=True,
                   qualificationEligible=False, scope='Builder cache; independent verification and fresh-clone validation required')
     save('result.json', result)

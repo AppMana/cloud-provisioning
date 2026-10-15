@@ -117,12 +117,19 @@ python3 linux_cache_native.py --recipe cache-recipe.json \
   --operation /var/tmp/cache-acceptance-unique-build-id
 ```
 
-The recipe requires `schemaVersion: 1`, `machineOS: linux`, `architecture: amd64`,
-the installed `workerSHA256`, and an `images` array. Each image declares an
+The recipe requires `schemaVersion: 1`, `machineOS: linux`, `architecture: amd64`
+or `architecture: arm64`, the installed `workerSHA256`, and an `images` array. Each image declares an
 immutable `digest` and explicit `aliases` matching the workload's references.
 Include selected DaemonSet init containers, the distribution's pause image, and
 the first application workload. A tag alias must resolve to its declared digest;
 pin the corresponding deployment input as well to avoid registry tag changes.
+
+The builder and native checker require the recipe architecture to match the
+Linux host (`x86_64` or `aarch64`). Imports and pulls select that platform. Each
+observation records `nativeArchitecture`; missing or mismatched host evidence
+fails validation, including older receipts that lack the field. Recollect those
+receipts on the original native builder rather than adding an inferred value.
+This validates cache preparation, not ARM64 worker runtime qualification.
 
 The checker verifies runtime hashes, modes and timestamps, then opens the
 existing `/var/lib/k0s/containerd` store twice using the staged containerd. It
@@ -139,7 +146,7 @@ prove cache reuse before harness imports, application execution, and safe node
 removal and replacement. Builder checks do not establish startup savings. For AWS, bind incremental acceptance using
 `bake.py capture --capture-check` as described in [the AWS workflow](../docs/aws.md).
 
-On a fresh Linux worker, inspect the cache before importing any harness images. Resolve each pinned image's Linux amd64 manifest and config, hash its required
+On a fresh Linux worker, inspect the cache before importing any harness images. Resolve each pinned image's manifest and config for the worker's native Linux architecture, hash its required
 content blobs, and inspect the committed overlayfs snapshot chain derived from
 the config's `rootfs.diff_ids`. Compare blob modification/change times and native
 snapshot creation/update times with the provider's instance launch time. Compare

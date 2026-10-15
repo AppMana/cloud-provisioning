@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -193,6 +194,38 @@ func nativeAdoptionAPI(t *testing.T, cfg config, devices *wgctrl.Client, bootstr
 	restored, err := devices.Device(cfg.iface)
 	if err != nil || len(restored.Peers) != 1 || restored.Peers[0].PublicKey.String() != bootstrap.Peers[0].PublicKey {
 		t.Fatalf("offline reconstruction lost the previous valid peer: %v", err)
+	}
+	// A newer cache format must not be interpreted as legacy forwarding by an
+	// older reader. Reject it before touching the surviving device or routes.
+	var unsupported map[string]any
+	if err := json.Unmarshal(cacheBefore, &unsupported); err != nil {
+		t.Fatal(err)
+	}
+	unsupported["activeGeneration"] = "unsupported"
+	unsupportedRaw, err := json.Marshal(unsupported)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routesBefore, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cachePath(cfg), unsupportedRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcile(ctx, nil, devices, bootConfig); err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("unsupported recovery format was not rejected: %v", err)
+	}
+	preserved, err := devices.Device(cfg.iface)
+	if err != nil || preserved.PublicKey != restored.PublicKey || len(preserved.Peers) != 1 || preserved.Peers[0].PublicKey != restored.Peers[0].PublicKey || !reflect.DeepEqual(preserved.Peers[0].AllowedIPs, restored.Peers[0].AllowedIPs) {
+		t.Fatal("unsupported cache changed the surviving device", err)
+	}
+	routesAfter, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
+	if err != nil || !reflect.DeepEqual(routesBefore, routesAfter) {
+		t.Fatal("unsupported cache changed surviving routes", err)
+	}
+	if err := os.WriteFile(cachePath(cfg), cacheBefore, 0600); err != nil {
+		t.Fatal(err)
 	}
 	update([]tunnel.PeerSpec{})
 	// A failed durable write must not withdraw the working peer or publish an

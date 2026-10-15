@@ -33,7 +33,7 @@ func TestObservedReboot_HostServiceUsesCachedPeers(t *testing.T) {
 	if got, err := bootPeerList(cfg, bootstrap); err != nil || got.Peers == nil || len(got.Peers) != 0 {
 		t.Fatalf("explicit cached withdrawal resurrected bootstrap peers: %+v", got)
 	}
-	for _, raw := range []string{"invalid", `{}`, `{"peers":null}`} {
+	for _, raw := range []string{"invalid", `{}`, `{"peers":null}`, `{"peers":[],"activeGeneration":"unsupported"}`, `{"peers":[{"publicKey":"peer","receiveInterface":"unsupported"}]}`, `{"peers":[]} {}`} {
 		if err := os.WriteFile(cachePath(cfg), []byte(raw), 0600); err != nil {
 			t.Fatal(err)
 		}
@@ -51,7 +51,7 @@ func TestCorruptCacheDoesNotSelectBootstrapAPIBackends(t *testing.T) {
 	if got := apiProxyBackendsFromFiles(cfg); len(got) != 1 {
 		t.Fatalf("missing cache must permit first boot: %v", got)
 	}
-	for _, raw := range []string{"invalid", `{}`, `{"peers":null}`, `{"peers":[]}`} {
+	for _, raw := range []string{"invalid", `{}`, `{"peers":null}`, `{"peers":[]}`, `{"peers":[],"apiServers":["10.10.0.99:6443"],"activeGeneration":"unsupported"}`, `{"peers":[]} {}`} {
 		if err := os.WriteFile(cachePath(cfg), []byte(raw), 0600); err != nil {
 			t.Fatal(err)
 		}

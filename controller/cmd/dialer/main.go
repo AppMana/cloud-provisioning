@@ -27,6 +27,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -1063,8 +1064,14 @@ func readCachedPeers(path string) (tunnel.PeerListDoc, error) {
 	if err != nil {
 		return doc, err
 	}
-	if err = json.Unmarshal(raw, &doc); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err = decoder.Decode(&doc); err != nil {
 		return doc, err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		return tunnel.PeerListDoc{}, fmt.Errorf("trailing durable peer cache data")
 	}
 	if doc.Peers == nil {
 		return doc, fmt.Errorf("cached peer list must contain a peers array")

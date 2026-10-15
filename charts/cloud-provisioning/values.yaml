@@ -5,6 +5,7 @@ nameOverride: ""
 image:
   repository: ghcr.io/appmana/cloud-provisioning-endpoint-controller
   tag: ""            # defaults to .Chart.AppVersion
+  digest: ""         # sha256:<64 lowercase hex>; takes precedence over tag
   pullPolicy: IfNotPresent
 # Image the operator renders into both dialer DaemonSets. Pin by digest
 # in production; a tag is fine when the image is preloaded on the node.
@@ -12,6 +13,7 @@ dialerImage:
   pullPolicy: IfNotPresent # Never requires images preloaded into each node runtime
   repository: ghcr.io/appmana/cloud-provisioning-dialer
   tag: ""            # defaults to .Chart.AppVersion
+  digest: ""         # sha256:<64 lowercase hex>; takes precedence over tag
 
 imagePullSecrets: []
 

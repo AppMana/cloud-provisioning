@@ -41,5 +41,65 @@ class ChartPublication(unittest.TestCase):
         self.assertNotEqual(*versions)
 
 
+class ImageReferences(unittest.TestCase):
+    def render(self, values):
+        args = ["helm", "template", "image-test", "charts/cloud-provisioning",
+                "--set", "cluster-api-operator.enabled=false",
+                "--show-only", "templates/deployment.yaml"]
+        for key, value in values.items():
+            args += ["--set-string", f"{key}={value}"]
+        return subprocess.run(args, cwd=ROOT, text=True, capture_output=True)
+
+    def test_digests_pin_controller_and_reconciled_dialers(self):
+        values = {}
+        expected = []
+        for component, digit in [("image", "a"), ("dialerImage", "b")]:
+            repository = f"registry.example:5443/release/{component.lower()}"
+            digest = "sha256:" + digit * 64
+            values.update({f"{component}.repository": repository,
+                           f"{component}.digest": digest,
+                           f"{component}.tag": "ignored-mutable-tag"})
+            expected.append(f"{repository}@{digest}")
+        result = self.render(values)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"image: {expected[0]}", result.stdout)
+        self.assertIn(f'"--dialer-image={expected[1]}"', result.stdout)
+        self.assertNotIn("ignored-mutable-tag", result.stdout)
+
+    def test_invalid_digest_and_ambiguous_repository_fail_rendering(self):
+        for component in ["image", "dialerImage"]:
+            for digest in ["sha256:abc", "sha256:" + "A" * 64,
+                           "sha512:" + "a" * 64, "sha256:" + "g" * 64]:
+                with self.subTest(component=component, digest=digest):
+                    result = self.render({f"{component}.digest": digest})
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("image digest must be", result.stderr)
+            for repository in ["registry.example/image:tag",
+                               "registry.example/image@sha256:" + "a" * 64]:
+                with self.subTest(component=component, repository=repository):
+                    result = self.render({f"{component}.digest": "sha256:" + "a" * 64,
+                                          f"{component}.repository": repository})
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("repository must not include", result.stderr)
+
+    def test_tag_only_values_keep_existing_behavior(self):
+        result = self.render({"image.tag": "controller-tag", "dialerImage.tag": "dialer-tag"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("image: ghcr.io/appmana/cloud-provisioning-endpoint-controller:controller-tag", result.stdout)
+        self.assertIn('"--dialer-image=ghcr.io/appmana/cloud-provisioning-dialer:dialer-tag"', result.stdout)
+
+    def test_nonstring_digest_cannot_silently_fall_back_to_tag(self):
+        for component in ["image", "dialerImage"]:
+            for value in ["false", "0"]:
+                with self.subTest(component=component, value=value):
+                    result = subprocess.run([
+                        "helm", "template", "image-test", "charts/cloud-provisioning",
+                        "--set", "cluster-api-operator.enabled=false",
+                        "--set", f"{component}.digest={value}"],
+                        cwd=ROOT, text=True, capture_output=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("image digest must be a string", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

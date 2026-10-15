@@ -110,6 +110,14 @@ expected immutable runtime image identity, and a changed Pod UID at each
 transition. A successful `rollout status` alone does not prove the requested
 version ran: another writer can change the desired revision while it waits.
 
+Set `image.digest` and `dialerImage.digest` to their tested `sha256:` manifest
+digests, with plain registry/repository names in the corresponding `repository`
+values. A digest takes precedence over the tag and chart application version.
+These fields pin image selection; they do not establish that the selected
+artifacts passed qualification. Include the rendered chart and effective values
+in the immutable release bundle, including any separate cloud or Windows image
+overrides.
+
 1. Freeze binaries, chart and multi-architecture image digests, CAPI/CAPA,
    k0s, both Calico variants and AWS VPC CNI versions. Prove ARM64 runtime,
    not merely an image manifest. Rebuild after any code change.

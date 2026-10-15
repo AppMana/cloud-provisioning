@@ -17,11 +17,30 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | 
 {{- end -}}
 
 {{- define "cloud-provisioning.image" -}}
-{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+{{ include "cloud-provisioning.imageReference" (dict "image" .Values.image "defaultTag" .Chart.AppVersion) }}
 {{- end -}}
 
 {{- define "cloud-provisioning.dialerImage" -}}
-{{ .Values.dialerImage.repository }}:{{ .Values.dialerImage.tag | default .Chart.AppVersion }}
+{{ include "cloud-provisioning.imageReference" (dict "image" .Values.dialerImage "defaultTag" .Chart.AppVersion) }}
+{{- end -}}
+
+{{- define "cloud-provisioning.imageReference" -}}
+{{- $digest := get .image "digest" -}}
+{{- if not (kindIs "string" $digest) -}}
+{{- fail "image digest must be a string" -}}
+{{- end -}}
+{{- if $digest -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) -}}
+{{- fail "image digest must be sha256 followed by 64 lowercase hexadecimal characters" -}}
+{{- end -}}
+{{- $repository := required "digest-pinned image requires a repository" .image.repository -}}
+{{- if or (contains "@" $repository) (contains ":" (last (splitList "/" $repository))) -}}
+{{- fail "digest-pinned image repository must not include a tag or digest" -}}
+{{- end -}}
+{{- printf "%s@%s" $repository $digest -}}
+{{- else -}}
+{{ .image.repository }}:{{ .image.tag | default .defaultTag }}
+{{- end -}}
 {{- end -}}
 
 {{/* Host and port of the cluster API, split out of cluster.apiAddress

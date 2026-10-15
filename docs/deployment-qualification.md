@@ -113,3 +113,22 @@ gate, not yet a deployment controller or CI enforcement hook.
    maintenance/GitOps ownership, arm the verified local rollback, admit one
    canary, verify it, expand site-agent admission, then add cloud capacity.
    Preserve existing CAPI/CAPA installations and router peers.
+
+## Continuous management observations
+
+`harness/e2e/observe/management.py` samples each explicitly named API directly,
+plus Kubernetes exec and logs to each bound ordinary probe pod. Supply repeated
+`--server` and `--target pod=NodeUID` arguments, an explicit bastion and namespace,
+and a fresh private `--output` directory. Probe pods and matching Services must
+already exist. The probe container must serve the netexec HTTP endpoint and
+provide `wget`.
+
+Wait for `READY.json` before starting an operation. Record its timezone-aware
+start and finish times outside the observer, then create `OUTPUT/STOP`. Wait for
+the original observer process to terminate and require a successful result.
+Call `management.assess_window(output, started_at, finished_at)` to verify raw
+sample hashes, process identity, ordering, sampling gaps, and samples bracketing
+the operation. Deadline expiry, failed samples, and changed pod/container/Node
+identities fail closed. A readiness receipt alone is insufficient. These are
+sampled availability measurements; they do not establish traffic delivery
+between samples or substitute for continuous ordinary-pod workload probes.

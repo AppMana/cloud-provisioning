@@ -21,6 +21,7 @@ DEFAULT_UDP_SIZES = (64, 1280, 1340, 1400, 1800)
 
 class Kubectl:
     def __init__(self, server, bastion, namespace):
+        self.bastion, self.namespace = bastion, namespace
         self.command = ["docker", "exec", "-i", bastion, "kubectl",
                         "--server=" + server, "-n", namespace]
 

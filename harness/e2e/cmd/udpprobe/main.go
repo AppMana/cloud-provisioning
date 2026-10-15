@@ -100,9 +100,11 @@ func probe(destination string, size, tries int, reuse bool, timeout time.Duratio
 // don't-fragment bit and ignores the path MTU the kernel has learned
 // (IP_PMTUDISC_PROBE), so a datagram the path cannot carry whole is lost
 // every time instead of being fragmented after the first loss.
+// Otherwise explicitly permit fragmentation, including the first datagram:
+// the default WANT mode can set DF until ICMP teaches it a smaller path MTU.
 func dialProbe(target *net.UDPAddr, dontFragment bool) (*net.UDPConn, error) {
 	conn, err := net.DialUDP("udp", nil, target)
-	if err != nil || !dontFragment {
+	if err != nil {
 		return conn, err
 	}
 	raw, err := conn.SyscallConn()
@@ -110,9 +112,15 @@ func dialProbe(target *net.UDPAddr, dontFragment bool) (*net.UDPConn, error) {
 		conn.Close()
 		return nil, err
 	}
-	level, option, value := unix.IPPROTO_IP, unix.IP_MTU_DISCOVER, unix.IP_PMTUDISC_PROBE
+	level, option, value := unix.IPPROTO_IP, unix.IP_MTU_DISCOVER, unix.IP_PMTUDISC_DONT
+	if dontFragment {
+		value = unix.IP_PMTUDISC_PROBE
+	}
 	if target.IP.To4() == nil {
-		level, option, value = unix.IPPROTO_IPV6, unix.IPV6_MTU_DISCOVER, unix.IPV6_PMTUDISC_PROBE
+		level, option, value = unix.IPPROTO_IPV6, unix.IPV6_MTU_DISCOVER, unix.IPV6_PMTUDISC_DONT
+		if dontFragment {
+			value = unix.IPV6_PMTUDISC_PROBE
+		}
 	}
 	var setErr error
 	if err := raw.Control(func(fd uintptr) { setErr = unix.SetsockoptInt(int(fd), level, option, value) }); err != nil {
@@ -120,7 +128,7 @@ func dialProbe(target *net.UDPAddr, dontFragment bool) (*net.UDPConn, error) {
 	}
 	if setErr != nil {
 		conn.Close()
-		return nil, fmt.Errorf("setting don't-fragment: %w", setErr)
+		return nil, fmt.Errorf("setting fragmentation mode: %w", setErr)
 	}
 	return conn, nil
 }

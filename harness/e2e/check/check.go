@@ -316,6 +316,7 @@ type LookupProber interface {
 // attempt. dontFragment sets the don't-fragment bit and ignores any learned
 // path MTU, so a datagram the path cannot carry is lost every time rather
 // than only until the sender learns to fragment it.
+// Otherwise the socket explicitly permits fragmentation from the first send.
 type UDPProber interface {
 	UDPEcho(ctx context.Context, node, destination string, payload, tries int, dontFragment bool) (UDPReport, error)
 }

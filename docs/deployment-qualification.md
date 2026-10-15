@@ -32,6 +32,10 @@ results do not qualify changed binaries or a different cloud CNI.
   Every AWS matrix also compares the source IP reported by the destination
   pod with the sending pod IP for each directed pod path. Sender-local socket
   addresses alone cannot establish source preservation.
+  Native campaigns also require one Ready CNI agent per measured node,
+  Calico confined to site nodes, AWS CNI confined to cloud nodes, and a single
+  AWS-first CNI configuration on each cloud worker. Competing plugins fail
+  the ownership check even when existing workload probes still pass.
 
 These safeguards do not implement or prove the entire routing/migration
 contract. In particular, a successful allocation observation does not establish

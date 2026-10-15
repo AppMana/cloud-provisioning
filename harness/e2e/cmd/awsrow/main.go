@@ -382,6 +382,9 @@ func run() error {
 		return err
 	}
 	if *calicoSiteOnly {
+		if err := verifyNativeCNI(ctx, k, fleet, nodes, bindings, reportDir); err != nil {
+			return fmt.Errorf("native CNI ownership failed: %w", err)
+		}
 		if err := verifyNativePaths(ctx, fleet, targets, bindings, *podFamily, reportDir); err != nil {
 			return fmt.Errorf("native VPC routing failed: %w", err)
 		}

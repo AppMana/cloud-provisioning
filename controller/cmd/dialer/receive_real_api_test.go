@@ -365,5 +365,27 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	if !reflect.DeepEqual(routes, afterRoutes) || !reflect.DeepEqual(rules, afterRules) {
 		t.Fatal("offline preparation selected receiver routes or changed policy rules")
 	}
+	// Observe an explicit withdrawal without changing the active peer list.
+	patchData(map[string][]byte{tunnel.ReceivePrepareKey: nil})
+	if err := reconcile(ctx, worker, devices, cfg); err != nil {
+		t.Fatal(err)
+	}
+	for _, binding := range receipt.Bindings {
+		link, err := netlink.LinkByName(binding.Interface)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := netlink.LinkDel(link); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := reconcile(ctx, disconnected, devices, cfg); err != nil {
+		t.Fatal(err)
+	}
+	for _, binding := range receipt.Bindings {
+		if _, err := netlink.LinkByName(binding.Interface); !isLinkNotFound(err) {
+			t.Fatal("API outage resurrected withdrawn receiver preparation", err)
+		}
+	}
 	t.Log("Real API preparation and API-free receiver reconstruction passed without forwarding or readiness changes")
 }

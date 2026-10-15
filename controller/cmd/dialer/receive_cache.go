@@ -7,11 +7,30 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"reflect"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
+
+// Forget an explicitly withdrawn preparation durably. This does not retire
+// live devices: removal of receive permissions belongs to the handover phase.
+func clearReceivePreparationCache(cfg config) error {
+	path := receiveCachePath(cfg)
+	if path == "" {
+		return nil
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
+}
 
 // This cache contains only additive preparation, never route activation or
 // readiness receipts. Private receiver keys derive from the existing root key.

@@ -1631,6 +1631,16 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 	}
 
+	if adoptionSecret != nil {
+		if _, requested := adoptionSecret.Data[tunnel.ReceivePrepareKey]; !requested {
+			if adoptionSecret.UID == "" || adoptionSecret.ResourceVersion == "" || adoptionSecret.DeletionTimestamp != nil {
+				return fmt.Errorf("withdrawing receiver recovery requires a live versioned Secret")
+			}
+			if err := clearReceivePreparationCache(cfg); err != nil {
+				return fmt.Errorf("forgetting withdrawn receiver preparation: %w", err)
+			}
+		}
+	}
 	if !usingSecret && adoptionSecret == nil {
 		if err := restoreCachedReceivePreparation(cfg, wg, privateKey, receiveCacheBase); err != nil {
 			return fmt.Errorf("restoring prepared receivers: %w", err)

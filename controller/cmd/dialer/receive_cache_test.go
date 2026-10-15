@@ -74,4 +74,15 @@ func TestReceiveCachePreservesOnlyValidatedPublicPreparation(t *testing.T) {
 	if err := restoreCachedReceivePreparation(cfg, nil, root, tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: peer.PublicKey().String()}}}); err != nil {
 		t.Fatal(err)
 	}
+	for pass := 0; pass < 2; pass++ {
+		if err := clearReceivePreparationCache(cfg); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(receiveCachePath(cfg)); !os.IsNotExist(err) {
+			t.Fatal("withdrawn preparation remains cached", err)
+		}
+		if err := restoreCachedReceivePreparation(cfg, nil, root, tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{}}); err != nil {
+			t.Fatal("withdrawal did not survive offline recovery", err)
+		}
+	}
 }

@@ -276,7 +276,7 @@ func main() {
 				fatal("unable to load in-cluster config: %v", err)
 			}
 			fmt.Fprintf(os.Stderr, "no in-cluster config (%v); running from --peers-file only\n", err)
-		} else if clientset, err = kubernetes.NewForConfig(restCfg); err != nil {
+		} else if clientset, err = newAPIClient(restCfg); err != nil {
 			fatal("unable to build clientset: %v", err)
 		}
 	}

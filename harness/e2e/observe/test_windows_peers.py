@@ -1,3 +1,4 @@
+"""Native-format regression fixtures use synthetic public network identities."""
 import copy
 import json
 import pathlib

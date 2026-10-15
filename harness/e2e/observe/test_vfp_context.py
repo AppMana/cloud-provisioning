@@ -1,3 +1,4 @@
+"""Native-format regression fixtures use synthetic public network identities."""
 import json
 import pathlib
 import unittest
@@ -25,7 +26,7 @@ class NativeVFPContextTest(unittest.TestCase):
         incoming = next(x for x in rows if x['eventID'] == 110)
         self.assertEqual((incoming['source'], incoming['sourcePort'], incoming['destination'],
                           incoming['destinationPort'], incoming['protocol']),
-                         ('173.228.73.13', 51820, '172.29.0.24', 51820, 17))
+                         ('198.51.100.200', 51820, '172.29.0.24', 51820, 17))
         rows = vfp.flow_events(self.fixture('2025'))
         incoming = next(x for x in rows if x['eventID'] == 110)
         self.assertEqual((incoming['source'], incoming['sourcePort'], incoming['destination'],

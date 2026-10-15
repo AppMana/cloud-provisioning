@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -14,8 +15,8 @@ import (
 )
 
 func TestImportedControlPlaneDeclaresExternalManagementForCAPIDeletion(t *testing.T) {
-	// CAPI 1.11.1 skipped the live Windows pre-drain hook because the site has
-	// no CAPI-owned control-plane Machines and this status field was absent.
+	// An imported site has no CAPI-owned control-plane Machines. Declare its
+	// external management so worker drain and pre-drain hooks still run.
 	k := &fakeKube{objects: map[string]string{"config": `apiVersion: v1
 kind: Config
 current-context: site
@@ -74,8 +75,7 @@ func (n *associationReader) Exec(_ context.Context, args ...string) ([]byte, err
 	}
 }
 
-// The fresh kube-router run had Ready Nodes and Provisioned Machines, but no
-// CAPI association because its imported cluster was not connected/initialized.
+// Node readiness cannot replace the imported cluster's CAPI association.
 func TestReadyNodeDoesNotSubstituteForCAPIAssociation(t *testing.T) {
 	for _, name := range []string{"", "different-node", "remote1"} {
 		t.Run("name="+name, func(t *testing.T) {
@@ -127,5 +127,19 @@ func TestCAPAAssociationUsesObservedProviderIdentity(t *testing.T) {
 	c := &kube.Client{Bastion: reader, ControlPlanes: []string{"10.10.0.10"}}
 	if err := kube.WaitMachineAssociation(context.Background(), c, "cloud-provisioning", "remote1", "remote1"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestImportedCAPAReadAccessIsNamespacedReadOnlyAndNamed(t *testing.T) {
+	role, binding := importedCAPAReader("workers", "observed-site")
+	if role.Namespace != "workers" || len(role.Rules) != 1 {
+		t.Fatal("scope widened")
+	}
+	rule := role.Rules[0]
+	if !reflect.DeepEqual(rule.Verbs, []string{"get"}) || !reflect.DeepEqual(rule.Resources, []string{"labimportedcontrolplanes"}) || !reflect.DeepEqual(rule.ResourceNames, []string{"observed-site"}) {
+		t.Fatalf("unexpected access: %+v", rule)
+	}
+	if binding.Namespace != role.Namespace || binding.RoleRef.Kind != "Role" || binding.RoleRef.Name != role.Name || len(binding.Subjects) != 1 || binding.Subjects[0].Name != "capa-controller-manager" || binding.Subjects[0].Namespace != "capa-system" {
+		t.Fatal("unexpected read-access subject")
 	}
 }

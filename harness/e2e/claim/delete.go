@@ -74,7 +74,7 @@ func (c *Remover) Delete(ctx context.Context, name, node string) error {
 				return fmt.Errorf("%s/%s still exists", obj.kind, obj.name)
 			}
 		}
-		for _, field := range []string{"peer-endpoint-", "peer-public-key-", "peer-allowed-ips-", "peer-route-hosts-", "peer-route-host-"} {
+		for _, field := range []string{"peer-endpoint-", "peer-public-key-", "peer-allowed-ips-", "peer-route-hosts-", "peer-route-host-", tunnel.PeerNativeNetworkPrefix} {
 			value, err := c.Kube.Get(ctx, Namespace, "secret", Namespace+"-peers", "{.data."+field+name+"}")
 			if err != nil {
 				return err

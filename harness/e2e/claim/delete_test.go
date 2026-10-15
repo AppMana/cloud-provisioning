@@ -37,6 +37,9 @@ func (n *removalNode) Exec(ctx context.Context, args ...string) ([]byte, error) 
 	if strings.Contains(command, "peer-public-key-worker") && n.remaining == "peer" {
 		return []byte("old-key"), nil
 	}
+	if strings.Contains(command, "peer-native-network-worker") && n.remaining == "native-network" {
+		return []byte("stale-native-scope"), nil
+	}
 	if strings.Contains(command, "labmachine") {
 		return nil, fmt.Errorf("wrong provider")
 	}
@@ -46,7 +49,7 @@ func (n *removalNode) Exec(ctx context.Context, args ...string) ([]byte, error) 
 // Real CAPA deletion leaves AWSMachine present while EC2 is shutting down.
 // Checking the local provider resource would report a false success.
 func TestRemovalWaitsForActualInfrastructureAndPeerCleanup(t *testing.T) {
-	for _, remaining := range []string{"", "infrastructure", "peer"} {
+	for _, remaining := range []string{"", "infrastructure", "peer", "native-network"} {
 		t.Run(remaining, func(t *testing.T) {
 			n := &removalNode{ref: `{"spec":{"infrastructureRef":{"kind":"AWSMachine","apiGroup":"infrastructure.cluster.x-k8s.io","name":"infra-worker"}}}`, remaining: remaining}
 			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)

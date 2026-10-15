@@ -1622,7 +1622,15 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 	if string(existing.Data[tunnel.CloudPeersKey]) == string(doc) {
 		return nil
 	}
-	patch := client.MergeFrom(existing.DeepCopy())
+	// Receiver preparation owns the forwarding base until the transition
+	// explicitly releases it. Even an invalid proposal must not allow ordinary
+	// reconciliation to move prefix ownership underneath prepared transports.
+	if _, preparing := existing.Data[tunnel.ReceivePrepareKey]; preparing {
+		return nil
+	}
+	// Preparation can start after this read. A resource-version precondition
+	// prevents this writer from overwriting its newly reserved forwarding base.
+	patch := client.MergeFromWithOptions(existing.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	if existing.Data == nil {
 		existing.Data = map[string][]byte{}
 	}

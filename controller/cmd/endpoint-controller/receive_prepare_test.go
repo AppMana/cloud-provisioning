@@ -129,6 +129,16 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 				}
 			}
 			assertBase(current)
+			// The normal reconcile path runs repeatedly while agents prepare.
+			// It must leave the acknowledged legacy document in place even though
+			// the mesh already describes different endpoint ownership.
+			if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
+				t.Fatal(err)
+			}
+			if err := c.Get(ctx, client.ObjectKeyFromObject(adoption), current); err != nil {
+				t.Fatal(err)
+			}
+			assertBase(current)
 			var request tunnel.ReceivePrepare
 			if err := json.Unmarshal(current.Data[tunnel.ReceivePrepareKey], &request); err != nil {
 				t.Fatal(err)

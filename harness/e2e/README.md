@@ -206,6 +206,28 @@ fragments. Sizes are whole IP datagrams. Every one of the ten attempts must
 come back: a single lost datagram at one size is the signature of a path
 smaller than the pod MTU. The static prober is carried into each probe pod.
 
+### Native handover characterization
+
+`observe/wireguard_handover_native.py` compares single-device prefix ownership
+with independent WireGuard receivers in a four-namespace topology. Run it only
+inside fresh mount and network namespaces of an isolated Linux VM, with
+`iproute2`, `sysctl`, `mount`, and `wg` already staged:
+
+```sh
+unshare --mount --net --propagation private \
+  python3 observe/wireguard_handover_native.py --mode single
+unshare --mount --net --propagation private \
+  python3 observe/wireguard_handover_native.py --mode dual
+```
+
+The single-device control expects failed exchanges when sender and receiver
+ownership disagree. The dual-receiver case requires exchanges in both
+asymmetric directions and checks the source address observed by the receiver.
+`expectedOutcomesObserved` validates that experimental contract, including the
+negative control; `qualificationEligible` is always false. These kernel
+experiments do not test product orchestration, lifecycle recovery, Windows,
+IPv6, or deployment safety. Keep the returned JSON with the campaign evidence.
+
 ## Real-cluster acceptance
 
 `cmd/acceptance` qualifies an existing cluster from an explicit kubeconfig,

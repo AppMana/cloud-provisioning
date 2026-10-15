@@ -1,0 +1,142 @@
+"""Characterize source-preserving handover on the native Linux WireGuard path.
+
+Run explicitly inside fresh mount AND network namespaces of an isolated lab VM:
+  unshare --mount --net --propagation private python3 wireguard_handover_native.py --mode dual
+The single-device control expects loss during mismatched ownership. The dual
+receiver case requires delivery in both asymmetric directions. Neither case
+qualifies a product deployment. Requires iproute2, sysctl, mount and wg.
+"""
+import argparse
+import json
+import os
+import pathlib
+import shutil
+import subprocess
+import tempfile
+import time
+
+def require_isolation():
+    for kind in ('net', 'mnt'):
+        if os.readlink('/proc/self/ns/' + kind) == os.readlink('/proc/1/ns/' + kind):
+            raise RuntimeError('refusing the host ' + kind + ' namespace')
+    links = json.loads(subprocess.check_output(['ip', '-j', 'link']))
+    if any((link['ifname'] != 'lo' for link in links)):
+        raise RuntimeError('network namespace must be empty')
+    if shutil.which('wg') is None:
+        raise RuntimeError('WireGuard CLI must be staged before the experiment')
+
+def outcomes_expected(phases, mode):
+    names = {'both-directions-old', 'old-outbound-new-return',
+             'both-directions-new', 'new-outbound-old-return'}
+    if mode not in ('single', 'dual') or set(phases) != names:
+        return False
+    for name, rows in phases.items():
+        expected = mode == 'dual' or name in ('both-directions-old', 'both-directions-new')
+        if len(rows) != 3:
+            return False
+        for row in rows:
+            if row.get('ok') is not expected:
+                return False
+            if expected:
+                if (row.get('receiverObservedSource') != '10.90.0.10' or
+                        row.get('replySource') != '10.88.0.3'):
+                    return False
+            elif row.get('error') != 'timeout':
+                return False
+    return True
+
+
+def experiment(mode):
+    if mode not in ('single', 'dual'):
+        raise ValueError('unsupported receiver mode')
+    require_isolation()
+
+    def run(*args, input=None):
+        return subprocess.check_output(args, input=input, stderr=subprocess.PIPE)
+
+    def ns(name, *args, input=None):
+        return run('ip', 'netns', 'exec', name, *args, input=input)
+    run('mount', '--make-rprivate', '/')
+    run('mount', '-t', 'tmpfs', 'tmpfs', '/run')
+    pathlib.Path('/run/netns').mkdir()
+    run('ip', 'link', 'set', 'lo', 'up')
+    for bridge in ['underlay', 'site']:
+        run('ip', 'link', 'add', bridge, 'type', 'bridge')
+        run('ip', 'link', 'set', bridge, 'up')
+    names = ['old', 'new', 'cloud', 'pod']
+    procs = []
+
+    def attach(name, iface, bridge, address):
+        peer = name + iface
+        run('ip', 'link', 'add', peer, 'type', 'veth', 'peer', 'name', iface, 'netns', name)
+        run('ip', 'link', 'set', peer, 'master', bridge)
+        run('ip', 'link', 'set', peer, 'up')
+        ns(name, 'ip', 'address', 'add', address, 'dev', iface)
+        ns(name, 'ip', 'link', 'set', iface, 'up')
+    try:
+        with tempfile.TemporaryDirectory(prefix='cldt-dual-receiver-') as directory:
+            os.chmod(directory, 448)
+            paths = {}
+            pubs = {}
+            for name in names:
+                run('ip', 'netns', 'add', name)
+                ns(name, 'ip', 'link', 'set', 'lo', 'up')
+                for key, value in [('net.ipv4.conf.all.rp_filter', '0'), ('net.ipv4.conf.default.rp_filter', '0'), ('net.ipv4.ip_forward', '1')]:
+                    ns(name, 'sysctl', '-q', '-w', key + '=' + value)
+            for i, name in enumerate(['old', 'new', 'cloud'], 1):
+                attach(name, 'outer', 'underlay', f'198.18.0.{i}/24')
+            for i, name in [(1, 'old'), (2, 'new'), (10, 'pod')]:
+                attach(name, 'inner', 'site', f'10.90.0.{i}/24')
+            for name in ['old', 'new', 'receiver-old', 'receiver-new']:
+                key = run('wg', 'genkey')
+                pubs[name] = run('wg', 'pubkey', input=key).decode().strip()
+                path = pathlib.Path(directory) / name
+                path.write_bytes(key)
+                path.chmod(384)
+                paths[name] = str(path)
+            devices = [('old', 'wgtest', 'old', 51820), ('new', 'wgtest', 'new', 51820), ('cloud', 'wgold', 'receiver-old', 51820)]
+            if mode == 'dual':
+                devices.append(('cloud', 'wgnew', 'receiver-new', 51821))
+            for name, iface, key, port in devices:
+                ns(name, 'ip', 'link', 'add', iface, 'type', 'wireguard')
+                ns(name, 'wg', 'set', iface, 'private-key', paths[key], 'listen-port', str(port))
+                ns(name, 'ip', 'link', 'set', iface, 'up')
+            ns('cloud', 'ip', 'address', 'add', '10.88.0.3/32', 'dev', 'lo')
+            for i, name in enumerate(['old', 'new'], 1):
+                ns(name, 'wg', 'set', 'wgtest', 'peer', pubs['receiver-' + (name if mode == 'dual' else 'old')], 'endpoint', '198.18.0.3:' + str(51819 + i if mode == 'dual' else 51820), 'allowed-ips', '10.88.0.3/32', 'persistent-keepalive', '1')
+                ns(name, 'ip', 'route', 'add', '10.88.0.3/32', 'dev', 'wgtest')
+                ns('cloud', 'wg', 'set', 'wg' + (name if mode == 'dual' else 'old'), 'peer', pubs[name], 'endpoint', f'198.18.0.{i}:51820', 'allowed-ips', '10.90.0.10/32' if mode == 'dual' or name == 'old' else '10.90.0.99/32', 'persistent-keepalive', '1')
+            ns('pod', 'ip', 'route', 'add', '10.88.0.3/32', 'via', '10.90.0.1')
+            ns('cloud', 'ip', 'route', 'add', '10.90.0.10/32', 'dev', 'wgold')
+            server = "import socket,json;s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);s.bind(('10.88.0.3',8081));\nwhile True:\n b,a=s.recvfrom(4096);s.sendto(json.dumps(dict(body=b.decode(),source=a[0])).encode(),a)"
+            procs.append(subprocess.Popen(['ip', 'netns', 'exec', 'cloud', 'python3', '-c', server], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE))
+            time.sleep(2)
+            sender = "import socket,json,time\nrows=[]\nfor i in range(3):\n s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);s.bind(('10.90.0.10',0));s.settimeout(1);body='probe-'+str(i);s.sendto(body.encode(),('10.88.0.3',8081))\n try:\n  b,a=s.recvfrom(4096);r=json.loads(b);rows.append(dict(ok=r['body']==body and r['source']=='10.90.0.10',receiverObservedSource=r['source'],replySource=a[0]))\n except TimeoutError:rows.append(dict(ok=False,error='timeout'))\n finally:s.close()\n time.sleep(.1)\nprint(json.dumps(rows))"
+            result = dict(scope='Isolated kernel handover characterization', mode=mode, qualificationEligible=False, isolatedFromGuestHost=True, phases={})
+            result['phases']['both-directions-old'] = json.loads(ns('pod', 'python3', '-c', sender))
+            if mode == 'dual':
+                ns('cloud', 'ip', 'route', 'replace', '10.90.0.10/32', 'dev', 'wgnew')
+            else:
+                ns('cloud', 'wg', 'set', 'wgold', 'peer', pubs['new'], 'allowed-ips', '10.90.0.10/32')
+            result['phases']['old-outbound-new-return'] = json.loads(ns('pod', 'python3', '-c', sender))
+            ns('pod', 'ip', 'route', 'replace', '10.88.0.3/32', 'via', '10.90.0.2')
+            result['phases']['both-directions-new'] = json.loads(ns('pod', 'python3', '-c', sender))
+            if mode == 'dual':
+                ns('cloud', 'ip', 'route', 'replace', '10.90.0.10/32', 'dev', 'wgold')
+            else:
+                ns('cloud', 'wg', 'set', 'wgold', 'peer', pubs['old'], 'allowed-ips', '10.90.0.10/32')
+            result['phases']['new-outbound-old-return'] = json.loads(ns('pod', 'python3', '-c', sender))
+            result['expectedOutcomesObserved'] = outcomes_expected(result['phases'], mode)
+            print(json.dumps(result), flush=True)
+            if not result['expectedOutcomesObserved']:
+                raise RuntimeError('Native observations differ from the handover contract')
+    finally:
+        for proc in procs:
+            proc.terminate()
+            proc.wait()
+        for name in reversed(names):
+            subprocess.run(['ip', 'netns', 'delete', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--mode', choices=['single', 'dual'], required=True)
+    experiment(parser.parse_args().mode)

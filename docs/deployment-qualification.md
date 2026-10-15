@@ -83,8 +83,9 @@ relative artifact path and SHA-256, attempts/failures, management and site
 failures, recovery/duration seconds, campaign worker count and cloud CNI.
 `workers` means campaign participants (including deletion tests), not remaining
 workers after cleanup. The gate verifies file hashes and row completeness;
-review the raw artifacts for the stated scope. It is a standalone read-only
-gate, not yet a deployment controller or CI enforcement hook.
+review the raw artifacts for the stated scope. The qualification command is
+read-only. The `deploy-qualified` command below enforces these checks before
+its own apply operation; direct Helm, kubectl and GitOps writes are not gated.
 
 Run artifact verification on Linux. The verifier streams regular files beneath
 the evidence JSON directory and rejects paths or symlinks that escape it.
@@ -92,6 +93,53 @@ Symlinks resolving within that directory are allowed. Keep the evidence
 directory immutable during verification and deployment; a matching hash does
 not authenticate the producer or prove that an artifact measures its claimed
 scenario.
+
+
+## Applying a qualified manifest
+
+The `release/immutable-artifacts` row must hash a deployment bundle JSON with
+this schema. Retain the remaining immutable version and binary evidence in the
+site version-bundle artifacts. Both manifests must be the exact rendered
+resources used in qualification, with immutable image references and the
+reviewed effective configuration. File paths are relative to the evidence JSON
+directory. Each cluster identity is its `kube-system` namespace UID.
+
+```json
+{
+  "candidate": "FULL_40_CHARACTER_COMMIT",
+  "targets": [
+    {"site": "site-a", "kubeSystemUID": "FIRST_CLUSTER_UID", "manifest": "site-a.yaml", "sha256": "MANIFEST_SHA256"},
+    {"site": "site-b", "kubeSystemUID": "SECOND_CLUSTER_UID", "manifest": "site-b.yaml", "sha256": "MANIFEST_SHA256"}
+  ]
+}
+```
+
+From `harness/e2e`, first run the command without `-apply`:
+
+```sh
+go run ./cmd/deploy-qualified \
+  -evidence /private/qualification/evidence.json \
+  -candidate FULL_40_CHARACTER_COMMIT -site site-a \
+  -kubeconfig /private/target.kubeconfig -context EXPLICIT_CONTEXT
+```
+
+It rejects failed or incomplete qualification before any cluster request,
+verifies both manifest hashes, checks the selected cluster identity and runs
+`kubectl apply --dry-run=server`. Adding `-apply` repeats the identity check
+and applies the same verified bytes. An ambiguous apply failure is never
+retried automatically: inspect actual resources before another attempt.
+The bundle is limited to 1 MiB and each rendered manifest to 64 MiB.
+
+This entry point trusts the evidence producer and does not validate the
+semantics of raw measurements or prove image immutability from YAML. Keep
+kubeconfig, credentials, context selection and evidence unchanged throughout
+the operation. Control competing GitOps and Helm writers separately. It does
+not arm node-local rollback, assess rollout health, sequence canary expansion,
+or enforce admission on other clients. Those deployment requirements remain
+necessary before production use; a successful server dry run does not satisfy
+them. Do not regenerate or edit manifests between qualification and apply.
+
+## Required campaign coverage
 
 Row IDs use `site-a` for the first site profile and `site-b` for the second.
 Keep the mapping to actual cluster identities in the private qualification

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,4 +139,20 @@ func TestWindowsPublisherReconcilesWithChartServiceAccount(t *testing.T) {
 		}
 	})
 
+	t.Run("network discovery cannot mutate Calico routing", func(t *testing.T) {
+		for _, resource := range []string{"ippools", "blockaffinities", "bgppeers", "bgpconfigurations"} {
+			for _, verb := range []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"} {
+				review := &authorizationv1.SelfSubjectAccessReview{Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationv1.ResourceAttributes{Group: "crd.projectcalico.org", Resource: resource, Verb: verb},
+				}}
+				if err := scoped.Create(ctx, review); err != nil {
+					t.Fatal("review controller authorization:", err)
+				}
+				want := (resource == "ippools" || resource == "blockaffinities") && (verb == "get" || verb == "list" || verb == "watch")
+				if review.Status.Allowed != want {
+					t.Errorf("controller %s %s allowed=%v, want %v", verb, resource, review.Status.Allowed, want)
+				}
+			}
+		}
+	})
 }

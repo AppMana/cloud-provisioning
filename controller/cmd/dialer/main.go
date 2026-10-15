@@ -1721,6 +1721,18 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			}
 		}
 	}
+	if meshSecret != nil && clientset != nil {
+		if err := reconcileSiteReceivePreparation(ctx, clientset, meshSecret, cfg.nodeName, privateKey, func(root string, binding receiveBinding, doc tunnel.PeerListDoc) error {
+			mtu := cfg.mtu
+			if mtu == 0 {
+				mtu = underlayMTU()
+			}
+			_, err := prepareSiteReceiveClient(wg, string(meshSecret.UID), privateKey, root, binding, doc, doc, mtu, cfg.fwmark)
+			return err
+		}); err != nil {
+			return fmt.Errorf("preparing site receive paths: %w", err)
+		}
+	}
 	if adoptionSecret != nil {
 		if err := reconcileReceivePreparation(ctx, clientset, adoptionSecret, cfg.nodeName, privateKey, func(request tunnel.ReceivePrepare, previous tunnel.PeerListDoc) ([]receiveBinding, error) {
 			mtu := cfg.mtu

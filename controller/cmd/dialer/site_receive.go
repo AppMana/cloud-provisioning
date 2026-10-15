@@ -1,14 +1,23 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"net"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // prepareSiteReceiveClient configures an independent device without changing
@@ -104,4 +113,103 @@ func prepareSiteReceiveClient(devices receiverDevices, mesh string, siteKey wgty
 		}
 	}
 	return plan, nil
+}
+
+// reconcileSiteReceivePreparation consumes cloud readiness using the same
+// adoption Secrets the site already reads for forwarding acknowledgements.
+// It prepares only additional devices; it neither switches routes nor publishes
+// a forwarding acknowledgement. Missing readiness leaves the legacy path active.
+func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface, mesh *corev1.Secret, nodeName string, siteKey wgtypes.Key, prepare func(string, receiveBinding, tunnel.PeerListDoc) error) error {
+	if mesh.UID == "" || mesh.DeletionTimestamp != nil || siteKey == (wgtypes.Key{}) || strings.TrimSpace(string(mesh.Data[tunnel.NodePublicKeyPrefix+nodeName])) != siteKey.PublicKey().String() {
+		return fmt.Errorf("site receive preparation requires the published local identity")
+	}
+	peers, err := tunnel.SitePeers(mesh.Data)
+	if err != nil {
+		return err
+	}
+	doc := tunnel.PeerListDoc{Peers: peers}
+	machines := []string{}
+	for key := range mesh.Data {
+		if strings.HasPrefix(key, tunnel.PeerPublicKeyPrefix) {
+			machines = append(machines, strings.TrimPrefix(key, tunnel.PeerPublicKeyPrefix))
+		}
+	}
+	sort.Strings(machines)
+	for _, machine := range machines {
+		adoption, err := k.CoreV1().Secrets(mesh.Namespace).Get(ctx, tunnel.AdoptionSecretName(machine), metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		requestRaw, receiptRaw := adoption.Data[tunnel.ReceivePrepareKey], adoption.Data[tunnel.ReceiveReadyKey]
+		if len(requestRaw) == 0 || len(receiptRaw) == 0 {
+			continue
+		}
+		if adoption.UID == "" || adoption.ResourceVersion == "" || adoption.DeletionTimestamp != nil {
+			return fmt.Errorf("site receiver adoption identity unavailable")
+		}
+		base := adoption.Data[tunnel.CloudPeersKey]
+		if adoption.Annotations[tunnel.AppliedListAnnotation] != tunnel.HashPeerList(base) {
+			continue
+		}
+		var request tunnel.ReceivePrepare
+		if err := json.Unmarshal(requestRaw, &request); err != nil {
+			return fmt.Errorf("invalid site receiver request")
+		}
+		node, err := k.CoreV1().Nodes().Get(ctx, request.NodeName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		ready := false
+		for _, condition := range node.Status.Conditions {
+			if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
+				ready = true
+			}
+		}
+		root := strings.TrimSpace(string(mesh.Data[tunnel.PeerPublicKeyPrefix+machine]))
+		target := tunnel.ReceiveTarget{MeshUID: string(mesh.UID), SecretUID: string(adoption.UID), NodeName: node.Name, NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, RootPublicKey: root, Ready: ready && node.DeletionTimestamp == nil}
+		bindings, err := tunnel.ValidateReceiveReadiness(target, base, requestRaw, receiptRaw)
+		if err != nil {
+			return err
+		}
+		binding, found := bindings[siteKey.PublicKey().String()]
+		if !found {
+			continue
+		}
+		// Re-read the documents before preparing a device. A subsequent change can
+		// leave an unused additive device, but cannot authorize traffic on it.
+		current, err := k.CoreV1().Secrets(mesh.Namespace).Get(ctx, mesh.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if current.UID != mesh.UID || current.ResourceVersion != mesh.ResourceVersion || current.DeletionTimestamp != nil {
+			return fmt.Errorf("site receiver mesh changed")
+		}
+		latest, err := k.CoreV1().Secrets(mesh.Namespace).Get(ctx, adoption.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if latest.UID != adoption.UID || latest.ResourceVersion != adoption.ResourceVersion || latest.DeletionTimestamp != nil || !bytes.Equal(latest.Data[tunnel.ReceivePrepareKey], requestRaw) || !bytes.Equal(latest.Data[tunnel.ReceiveReadyKey], receiptRaw) || !bytes.Equal(latest.Data[tunnel.CloudPeersKey], base) {
+			return fmt.Errorf("site receiver proposal changed")
+		}
+		currentNode, err := k.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		stillReady := false
+		for _, condition := range currentNode.Status.Conditions {
+			if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
+				stillReady = true
+			}
+		}
+		if currentNode.UID != node.UID || currentNode.Status.NodeInfo.BootID != node.Status.NodeInfo.BootID || currentNode.DeletionTimestamp != nil || !stillReady {
+			return fmt.Errorf("site receiver cloud node changed")
+		}
+		if err := prepare(root, binding, doc); err != nil {
+			return err
+		}
+	}
+	return nil
 }

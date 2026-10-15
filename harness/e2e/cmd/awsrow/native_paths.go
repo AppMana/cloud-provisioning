@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/check"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
@@ -91,4 +92,21 @@ func verifyNativePaths(ctx context.Context, fleet *rig.Fleet, targets []check.Ta
 		return err
 	}
 	return failure
+}
+
+// Native VPC qualification must compare distinct cloud workers, so reject an
+// incomplete population before staging tools or creating workload probes.
+func validateNativeClaims(claims string) error {
+	seen := map[string]bool{}
+	for _, value := range strings.Split(claims, ",") {
+		name := strings.TrimSpace(value)
+		if name == "" || seen[name] {
+			return fmt.Errorf("native routing requires distinct, nonempty AWS claim names")
+		}
+		seen[name] = true
+	}
+	if len(seen) < 2 {
+		return fmt.Errorf("native routing requires at least two AWS workers")
+	}
+	return nil
 }

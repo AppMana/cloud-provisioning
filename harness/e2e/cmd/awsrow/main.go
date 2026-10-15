@@ -55,6 +55,11 @@ func run() error {
 	if *calicoSiteOnly && *podFamily == "" {
 		return fmt.Errorf("site-only Calico requires an explicit AWS pod-family campaign")
 	}
+	if *calicoSiteOnly {
+		if err := validateNativeClaims(*claims); err != nil {
+			return err
+		}
+	}
 	if *work == "" || *site == "" {
 		return fmt.Errorf("-work-dir and -site-work-dir are required")
 	}

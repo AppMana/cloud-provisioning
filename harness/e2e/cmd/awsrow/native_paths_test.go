@@ -18,3 +18,16 @@ func TestNativePathRejectsTunnelAndAmbiguousRoutes(t *testing.T) {
 		}
 	}
 }
+
+func TestNativeClaimsRequireDistinctCloudWorkers(t *testing.T) {
+	for _, claims := range []string{"", "worker-a", "worker-a,worker-a", "worker-a, worker-a", "worker-a,", ",worker-b"} {
+		if err := validateNativeClaims(claims); err == nil {
+			t.Errorf("accepted invalid population %q", claims)
+		}
+	}
+	for _, claims := range []string{"worker-a,worker-b", "worker-a, worker-b, worker-c"} {
+		if err := validateNativeClaims(claims); err != nil {
+			t.Errorf("rejected %q: %v", claims, err)
+		}
+	}
+}

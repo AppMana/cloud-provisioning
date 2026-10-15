@@ -421,5 +421,122 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 			t.Fatal("API outage resurrected withdrawn receiver preparation", err)
 		}
 	}
-	t.Log("Real API preparation and API-free receiver reconstruction passed without forwarding or readiness changes")
+	// Exercise endpoint forwarding recovery after removing the entire legacy
+	// device. Its link-owned routes disappear with it, as after a reboot.
+	cloudLink, err := netlink.LinkByName(cfg.iface)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := netlink.LinkDel(cloudLink); err != nil {
+		t.Fatal(err)
+	}
+	siteCfg.routeTable = 519
+	mesh, err = secrets.Get(ctx, "mesh", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	meshPatch, _ = json.Marshal(map[string]any{"metadata": map[string]any{"uid": mesh.UID, "resourceVersion": mesh.ResourceVersion}, "data": map[string][]byte{tunnel.NodeTunnelAddressPrefix + "cp": []byte("10.88.0.4/32")}})
+	mesh, err = secrets.Patch(ctx, "mesh", types.MergePatchType, meshPatch, metav1.PatchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcile(ctx, worker, devices, siteCfg); err != nil {
+		t.Fatal("initial site endpoint reconciliation", err)
+	}
+	beforeSite, err := devices.Device(siteCfg.iface)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(beforeSite.Peers) != 1 || beforeSite.Peers[0].PublicKey != root.PublicKey() {
+		t.Fatal("site peer was not configured")
+	}
+	siteLink, err = netlink.LinkByName(siteCfg.iface)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeSiteRoutes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: siteCfg.routeTable}, netlink.RT_FILTER_TABLE)
+	if err != nil || len(beforeSiteRoutes) != 1 || beforeSiteRoutes[0].Dst.String() != "10.88.0.3/32" {
+		t.Fatal("site route missing", err)
+	}
+	beforeSiteAddresses, err := netlink.AddrList(siteLink, netlink.FAMILY_ALL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeSiteRules, err := netlink.RuleList(netlink.FAMILY_ALL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mesh, err = secrets.Get(ctx, "mesh", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := netlink.LinkDel(siteLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcile(ctx, disconnected, devices, siteCfg); err != nil {
+		t.Fatal("offline site forwarding reconstruction", err)
+	}
+	afterSite, err := devices.Device(siteCfg.iface)
+	if err != nil || afterSite.PrivateKey != beforeSite.PrivateKey || afterSite.FirewallMark != beforeSite.FirewallMark || len(afterSite.Peers) != 1 || afterSite.Peers[0].PublicKey != beforeSite.Peers[0].PublicKey || !reflect.DeepEqual(afterSite.Peers[0].AllowedIPs, beforeSite.Peers[0].AllowedIPs) {
+		t.Fatal("site forwarding identity or permissions changed", err)
+	}
+	siteLink, err = netlink.LinkByName(siteCfg.iface)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterSiteRoutes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: siteCfg.routeTable}, netlink.RT_FILTER_TABLE)
+	if err != nil || len(afterSiteRoutes) != 1 || afterSiteRoutes[0].LinkIndex != siteLink.Attrs().Index {
+		t.Fatal("site route not reconstructed", err)
+	}
+	beforeSiteRoutes[0].LinkIndex = siteLink.Attrs().Index
+	if !reflect.DeepEqual(beforeSiteRoutes, afterSiteRoutes) {
+		t.Fatal("site route properties changed")
+	}
+	afterSiteAddresses, err := netlink.AddrList(siteLink, netlink.FAMILY_ALL)
+	if err != nil || len(afterSiteAddresses) != len(beforeSiteAddresses) {
+		t.Fatal("site addresses missing", err)
+	}
+	for i := range beforeSiteAddresses {
+		if beforeSiteAddresses[i].IPNet.String() != afterSiteAddresses[i].IPNet.String() {
+			t.Fatal("site address changed")
+		}
+	}
+	afterSiteRules, err := netlink.RuleList(netlink.FAMILY_ALL)
+	if err != nil || !reflect.DeepEqual(beforeSiteRules, afterSiteRules) {
+		t.Fatal("site policy rules changed", err)
+	}
+	meshAfter, err := secrets.Get(ctx, "mesh", metav1.GetOptions{})
+	if err != nil || meshAfter.ResourceVersion != mesh.ResourceVersion {
+		t.Fatal("offline forwarding published fresh acknowledgement", err)
+	}
+	// A later authoritative empty peer set must replace recovery state too.
+	meshPatch, _ = json.Marshal(map[string]any{"metadata": map[string]any{"uid": meshAfter.UID, "resourceVersion": meshAfter.ResourceVersion}, "data": map[string][]byte{tunnel.PeerPublicKeyPrefix + "worker": nil, tunnel.PeerEndpointPrefix + "worker": nil, tunnel.PeerAllowedIPsPrefix + "worker": nil, tunnel.PeerRouteHostsPrefix + "worker": nil}})
+	if _, err := secrets.Patch(ctx, "mesh", types.MergePatchType, meshPatch, metav1.PatchOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcile(ctx, worker, devices, siteCfg); err != nil {
+		t.Fatal("site withdrawal", err)
+	}
+	if err := netlink.LinkDel(siteLink); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcile(ctx, disconnected, devices, siteCfg); err != nil {
+		t.Fatal("empty offline site recovery", err)
+	}
+	afterSite, err = devices.Device(siteCfg.iface)
+	if err != nil || len(afterSite.Peers) != 0 {
+		t.Fatal("site recovery resurrected withdrawn peers", err)
+	}
+	afterSiteRoutes, err = netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: siteCfg.routeTable}, netlink.RT_FILTER_TABLE)
+	if err != nil || len(afterSiteRoutes) != 0 {
+		t.Fatal("site recovery resurrected withdrawn routes", err)
+	}
+	retireUnpublishedEndpoint(siteCfg)
+	if err := reconcile(ctx, disconnected, devices, siteCfg); err == nil || !strings.Contains(err.Error(), "getting secret") {
+		t.Fatal("retired endpoint retained offline forwarding", err)
+	}
+	if _, err := netlink.LinkByName(siteCfg.iface); !isLinkNotFound(err) {
+		t.Fatal("retired endpoint resurrected", err)
+	}
+	t.Log("Real API receiver preparation, offline site forwarding reconstruction, and authoritative withdrawal recovery passed")
 }

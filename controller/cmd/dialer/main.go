@@ -112,6 +112,7 @@ type config struct {
 	// Set only by validated receiver activation; absent entries keep the
 	// legacy interface. The map does not add destinations or alter peers.
 	receiveRoutes map[string]receiveRouteSelection
+	siteRecovery  *siteForwardingCache
 
 	// transitMasqueradeSource, when set (a CIDR, the tunnel subnet),
 	// makes this node a transit for tunnel peers reaching cluster
@@ -649,6 +650,12 @@ func removeDevice(iface string) {
 // must survive process exit so routes through another node remain usable.
 // Removing the device retires only routes through that device.
 func retireUnpublishedEndpoint(cfg config) {
+	for _, path := range []string{siteForwardingCachePath(cfg), siteReceiveCachePath(cfg)} {
+		if err := removeDurableCache(path); err != nil {
+			fmt.Fprintf(os.Stderr, "forgetting unpublished endpoint recovery: %v\n", err)
+			return
+		}
+	}
 	removeDevice(cfg.iface)
 }
 
@@ -1148,6 +1155,7 @@ func claimHeld(path string, poll time.Duration) (bool, string) {
 // device config, host routes, and (transit role only) the masquerade
 // rule.
 func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.Client, cfg config) error {
+	var siteNotReady map[string]bool
 	var (
 		localAddress string
 		// localAddresses is every tunnel address this node holds, one
@@ -1188,24 +1196,47 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 		privateKey = key
 
-		secret, err := clientset.CoreV1().Secrets(cfg.secretNamespace).Get(ctx, cfg.secretName, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				if clearErr := removeDurableCache(siteReceiveCachePath(cfg)); clearErr != nil {
-					return fmt.Errorf("forgetting removed site preparation: %w", clearErr)
+		var secret *corev1.Secret
+		if cfg.siteRecovery != nil {
+			secret = cfg.siteRecovery.secret()
+			siteNotReady = cfg.siteRecovery.NotReady
+		} else {
+			secret, err = clientset.CoreV1().Secrets(cfg.secretNamespace).Get(ctx, cfg.secretName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					if clearErr := removeDurableCache(siteReceiveCachePath(cfg)); clearErr != nil {
+						return clearErr
+					}
+					if clearErr := removeDurableCache(siteForwardingCachePath(cfg)); clearErr != nil {
+						return clearErr
+					}
+				} else {
+					if restoreErr := restoreSiteReceiveCache(cfg, wg, key); restoreErr != nil {
+						return fmt.Errorf("restoring site receivers: %w", restoreErr)
+					}
+					saved, cacheErr := readSiteForwardingCache(cfg, key)
+					if cacheErr == nil {
+						cfg.siteRecovery = saved
+						return reconcile(ctx, nil, wg, cfg)
+					}
+					if !errors.Is(cacheErr, os.ErrNotExist) {
+						return fmt.Errorf("reading site forwarding recovery: %w", cacheErr)
+					}
 				}
-			} else if restoreErr := restoreSiteReceiveCache(cfg, wg, key); restoreErr != nil {
-				return fmt.Errorf("restoring site receivers while API is unavailable: %w", restoreErr)
+				return fmt.Errorf("getting secret %s/%s: %w", cfg.secretNamespace, cfg.secretName, err)
 			}
-			return fmt.Errorf("getting secret %s/%s: %w", cfg.secretNamespace, cfg.secretName, err)
+			if err := publishNodeInfo(ctx, clientset, cfg, key.PublicKey(), secret); err != nil {
+				return err
+			}
 		}
-		if err := publishNodeInfo(ctx, clientset, cfg, key.PublicKey(), secret); err != nil {
-			return err
-		}
+
 		localAddress = strings.TrimSpace(string(secret.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName]))
 		localAddresses = siteTunnelAddresses(secret, cfg.nodeName)
 		ownAddresses = tunnel.SplitList(string(secret.Data[tunnel.NodeAddressesPrefix+cfg.nodeName]), string(secret.Data[tunnel.SiteAddressesPrefix+cfg.nodeName]))
 		if localAddress == "" {
+			if err := removeDurableCache(siteForwardingCachePath(cfg)); err != nil {
+				return err
+			}
 			if err := removeDurableCache(siteReceiveCachePath(cfg)); err != nil {
 				return fmt.Errorf("forgetting departed site preparation: %w", err)
 			}
@@ -1237,9 +1268,11 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		if err != nil {
 			return fmt.Errorf("loading peer list: %w", err)
 		}
-		if node, err := clientset.CoreV1().Nodes().Get(ctx, cfg.nodeName, metav1.GetOptions{}); err == nil {
-			siteNodeUID = string(node.UID)
-			siteHash, _ = tunnel.SitePeerHash(secret.Data)
+		if clientset != nil {
+			if node, err := clientset.CoreV1().Nodes().Get(ctx, cfg.nodeName, metav1.GetOptions{}); err == nil {
+				siteNodeUID = string(node.UID)
+				siteHash, _ = tunnel.SitePeerHash(secret.Data)
+			}
 		}
 		meshSecret = secret
 		selfRelayed = len(tunnel.SplitList(string(secret.Data[tunnel.SiteAddressesPrefix+cfg.nodeName]))) > 0
@@ -1250,7 +1283,10 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			// of the remote blocks resolves through this node's still
 			// standing tunnel, which is exactly the path the remotes
 			// no longer accept its sources on.
-			relayTransit, err = tunnel.SiteTransit(secret.Data, notReadyNodes(ctx, clientset))
+			if cfg.siteRecovery == nil {
+				siteNotReady = notReadyNodes(ctx, clientset)
+			}
+			relayTransit, err = tunnel.SiteTransit(secret.Data, siteNotReady)
 			if err != nil {
 				return fmt.Errorf("deriving transit while relayed: %w", err)
 			}
@@ -1502,6 +1538,14 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	// from reading the configuration needed to complete the transition.
 	peerName := map[string]string{}
 	peerAcked := map[string]bool{}
+	if cfg.siteRecovery != nil {
+		peerAcked = cfg.siteRecovery.PeerAcked
+		for dataKey, raw := range meshSecret.Data {
+			if strings.HasPrefix(dataKey, tunnel.PeerPublicKeyPrefix) {
+				peerName[strings.TrimSpace(string(raw))] = strings.TrimPrefix(dataKey, tunnel.PeerPublicKeyPrefix)
+			}
+		}
+	}
 	if selfRelayed && meshSecret != nil && clientset != nil {
 		// Verify the applied document's content as well as its hash. Relay egress
 		// is valid only when that document places this node's source addresses on
@@ -1655,6 +1699,11 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	if !usingSecret && adoptionSecret == nil {
 		if err := restoreCachedReceivePreparation(cfg, wg, privateKey, receiveCacheBase); err != nil {
 			return fmt.Errorf("restoring prepared receivers: %w", err)
+		}
+	}
+	if meshSecret != nil && cfg.siteRecovery == nil {
+		if err := saveSiteForwardingCache(cfg, privateKey, meshSecret, siteNotReady, peerAcked); err != nil {
+			return fmt.Errorf("persisting site forwarding before changes: %w", err)
 		}
 	}
 	if pendingCache != nil {

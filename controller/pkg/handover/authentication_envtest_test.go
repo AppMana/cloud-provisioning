@@ -109,6 +109,7 @@ func TestPodReceiptAuthenticationRealAPI(t *testing.T) {
 	if _, err := verifier.Authenticate(ctx, otherBearer, Receipt{NodeUID: string(nodes[1].UID)}, nodes[1].Status.NodeInfo.BootID); err != nil {
 		t.Fatal("second daemon could not authenticate its own node", err)
 	}
+	verifyAuthenticatedAdvancement(t, verifier, nodes, []string{bearer, otherBearer})
 	reject("another-node-same-account", otherBearer, verifier, receipt, boot)
 	reject("unbound-account-token", mint(nil, verifier.Audience), verifier, receipt, boot)
 	reject("wrong-audience", mint(pods[0], "another-audience"), verifier, receipt, boot)

@@ -103,8 +103,8 @@ gate, not yet a deployment controller or CI enforcement hook.
    infrastructure. Verify no Calico installer/Felix on AWS, native allocations,
    original packet sources, return routes, DNS, Services and ingress. Exercise
    each endpoint placement, address churn, pod and worker replacement, final
-   claim deletion, API loss, controller restart, route conflicts and MTU
-   blackholes. Retain every attempt, including failed convergence attempts.
+   claim deletion, API loss, controller and cloud network-manager restarts,
+   route conflicts and MTU blackholes. Retain every attempt, including failed convergence attempts.
 5. Require zero management and existing-site regressions, cloud failover within
    60 seconds, autonomous rollback within five minutes, and a 24-hour soak.
    Resolve failures and repeat affected qualification; never reuse a pass from

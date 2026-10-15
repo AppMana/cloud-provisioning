@@ -47,7 +47,7 @@ func RequiredRows() []string {
 			for _, placement := range []string{"control-plane", "one-worker", "two-workers", "all-nodes"} {
 				rows = append(rows, prefix+"aws-matrix/"+placement)
 			}
-			for _, test := range []string{"source-preservation", "cni-ownership", "allocation-churn", "pod-recreate", "worker-replace", "last-worker-delete", "endpoint-failover", "api-loss", "controller-restart", "route-collision", "mtu-blackhole", "ingress", "soak-24h"} {
+			for _, test := range []string{"source-preservation", "cni-ownership", "allocation-churn", "pod-recreate", "worker-replace", "last-worker-delete", "endpoint-failover", "api-loss", "controller-restart", "network-manager-restart", "route-collision", "mtu-blackhole", "ingress", "soak-24h"} {
 				rows = append(rows, prefix+test)
 			}
 		}
@@ -95,7 +95,7 @@ func Check(e Evidence) []string {
 		}
 		// Fault injection can lose cloud requests, but every attempt remains in the
 		// artifact. Bounded recovery does not permit management/site losses.
-		fault := strings.Contains(id, "/endpoint-failover") || strings.Contains(id, "/api-loss") || strings.Contains(id, "/controller-restart") || strings.Contains(id, "/mtu-blackhole")
+		fault := strings.Contains(id, "/endpoint-failover") || strings.Contains(id, "/api-loss") || strings.Contains(id, "/controller-restart") || strings.Contains(id, "/network-manager-restart") || strings.Contains(id, "/mtu-blackhole")
 		if !fault && r.Failures != 0 {
 			problem = "failed required attempts"
 		}

@@ -16,6 +16,43 @@ func complete() Evidence {
 	}
 	return e
 }
+
+func TestNetworkManagerRestartRequiresBoundedObservedFault(t *testing.T) {
+	count := 0
+	for _, id := range RequiredRows() {
+		if !strings.HasSuffix(id, "/network-manager-restart") {
+			continue
+		}
+		count++
+		for _, bad := range []string{"not-injected", "slow-recovery", "management-loss", "unobserved"} {
+			t.Run(id+"/"+bad, func(t *testing.T) {
+				e := complete()
+				for i := range e.Rows {
+					if e.Rows[i].ID != id {
+						continue
+					}
+					switch bad {
+					case "not-injected":
+						e.Rows[i].FaultInjected = false
+					case "slow-recovery":
+						e.Rows[i].RecoverySeconds = 61
+					case "management-loss":
+						e.Rows[i].ManagementFailures = 1
+					case "unobserved":
+						e.Rows[i].ManagementContinuous = false
+					}
+				}
+				if len(Check(e)) == 0 {
+					t.Fatal("accepted incomplete network-manager restart qualification")
+				}
+			})
+		}
+	}
+	if count != 4 {
+		t.Fatalf("expected both sites and both families, found %d restart rows", count)
+	}
+}
+
 func TestGateRequiresEverySiteAndFamily(t *testing.T) {
 	if got := Check(complete()); len(got) != 0 {
 		t.Fatal(got)

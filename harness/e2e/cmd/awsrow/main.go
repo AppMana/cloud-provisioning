@@ -41,6 +41,7 @@ func run() error {
 	distro := flag.String("distro", "k0s", "site distribution: k0s or microk8s")
 	cni := flag.String("cni", "default", "distribution-supported site network")
 	claims := flag.String("claims", "aws-k0s-1", "existing CAPA claim/Machine names, comma separated")
+	chartPath := flag.String("chart-path", "/tmp/chart", "chart directory or archive on the bastion used for placement upgrades")
 	placementName := flag.String("placement", "", "change tunnel endpoints: control-plane, one-worker, two-workers, all-nodes")
 	report := flag.String("report-dir", "", "evidence directory (must not exist)")
 	timeout := flag.Duration("timeout", 45*time.Minute, "row deadline")
@@ -325,7 +326,7 @@ func run() error {
 			return err
 		}
 		fmt.Println("Moving tunnel endpoints to", placement.Name)
-		_, err = k.Helm(ctx, "upgrade", "cloud-provisioning", "/tmp/chart", "--namespace", install.Namespace,
+		_, err = k.Helm(ctx, "upgrade", "cloud-provisioning", *chartPath, "--namespace", install.Namespace,
 			"--reuse-values", "--wait", "--timeout", "6m", "--set-string", "tunnel.endpoints="+strings.ReplaceAll(placement.Endpoints, ",", `\,`))
 		if err != nil {
 			return fmt.Errorf("endpoint placement Helm upgrade failed")

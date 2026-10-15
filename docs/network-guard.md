@@ -96,6 +96,45 @@ and preserved external routing for each actual site before using this on a
 live management path. Kubernetes resource rollback needs additional design;
 file restoration alone does not revert API objects.
 
+## Transit-only agent upgrades
+
+`controller/cmd/transit-guard` provides a separate Linux routing fallback for
+upgrading an older agent that removes its transit lookup rules on exit. It
+copies the current nondefault relay routes into an explicitly reserved table
+and installs fallback rules immediately after the original lookup priority.
+A second rule pointing at the original table is insufficient when the old
+agent removes every rule referencing that table.
+
+The owned tunnel interface must be absent. Both source lookup rules must be
+ordinary, unconditional lookups, and all source routes must use a relay.
+Occupied fallback tables or priorities, rules targeting the fallback priority,
+unsupported policy, and changes from the captured plan block installation.
+Freeze placement and allocation changes throughout this operation. Reserve a
+fresh private plan file and a shadow table unused by any other component:
+
+```sh
+transit-guard -plan /root/transit-upgrade.json -interface "$TUNNEL_INTERFACE" \
+  -source-table "$TRANSIT_TABLE" -shadow-table "$UNUSED_TABLE" prepare
+transit-guard -plan /root/transit-upgrade.json install
+transit-guard -plan /root/transit-upgrade.json verify
+```
+
+Journal the plan and successful verification before stopping the predecessor.
+The fallback survives process exit; it has no automatic expiry. Retain the plan
+if any operation fails. After the replacement restores the original routing
+unchanged and continuous workload/management observations pass, remove it:
+
+```sh
+transit-guard -plan /root/transit-upgrade.json remove
+```
+
+Removal refuses to withdraw the fallback while primary routing is missing or
+changed. It preserves unexpected shadow state and can resume an interrupted
+cleanup of unchanged state. It does not restore a failed agent, roll back
+Kubernetes objects, or prove live-upgrade continuity. This helper still needs
+deployment integration and monitored VM rehearsal; it is not a replacement
+for the autonomous rollback and deployment qualification requirements.
+
 ## Disposable-VM qualification
 
 Use [the native test](../harness/e2e/safety/network-guard-native.sh) inside a

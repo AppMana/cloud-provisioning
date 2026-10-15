@@ -223,6 +223,20 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			if current.ResourceVersion != readyVersion {
 				t.Fatal("valid readiness was needlessly rewritten")
 			}
+			publicPlan, err := r.buildReceiveTransitionPlan(ctx, expected, bindings, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(publicPlan.Base) != string(base) || publicPlan.MachineUID != string(expected.GetUID()) || publicPlan.CloudNodeUID != string(node.UID) || len(publicPlan.Sites) != 1 || publicPlan.Sites[preparationKey(16)].NodeUID != "site-uid" {
+				t.Fatal("public transition plan lost validated configuration or identity")
+			}
+			stalePrepared := *bindings
+			stalePrepared.AdoptionVersion = "stale"
+			if _, err := r.buildReceiveTransitionPlan(ctx, expected, &stalePrepared, time.Now()); err == nil {
+				t.Fatal("stale preparation became a public transition plan")
+			}
+			verifyReceiveTransitionJournal(t, r, expected, native, pool)
+
 			if err := c.Get(ctx, client.ObjectKeyFromObject(mesh), mesh); err != nil {
 				t.Fatal(err)
 			}

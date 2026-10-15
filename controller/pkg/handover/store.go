@@ -18,9 +18,10 @@ const planKey = "plan.json"
 // API resourceVersion and UID protect against concurrent writes and recreation.
 // It does not retry conflicts: reload authoritative state before recomputing.
 type Store struct {
-	ConfigMaps typedcore.ConfigMapInterface
-	Name       string
-	ClusterUID string
+	ConfigMaps      typedcore.ConfigMapInterface
+	Name            string
+	ClusterUID      string
+	OwnerReferences []metav1.OwnerReference
 }
 type Snapshot struct {
 	transition Transition
@@ -106,7 +107,7 @@ func (s Store) create(ctx context.Context, t Transition, plan []byte) (Snapshot,
 	if plan != nil {
 		data[planKey] = string(plan)
 	}
-	object, e := s.ConfigMaps.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: s.Name}, Data: data}, metav1.CreateOptions{})
+	object, e := s.ConfigMaps.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: s.Name, OwnerReferences: append([]metav1.OwnerReference(nil), s.OwnerReferences...)}, Data: data}, metav1.CreateOptions{})
 	if e != nil {
 		return Snapshot{}, e
 	}

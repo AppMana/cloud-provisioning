@@ -63,7 +63,7 @@ var digest = regexp.MustCompile(`^[0-9a-f]{64}$`)
 var commit = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // Check validates measured results, not just a ready-looking installation.
-// Artifact content hashes must additionally be verified by the CLI.
+// Use VerifyFile to additionally verify artifact content hashes and containment.
 func Check(e Evidence) []string {
 	var failures []string
 	if !commit.MatchString(e.Candidate) {

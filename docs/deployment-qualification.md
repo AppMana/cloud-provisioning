@@ -86,6 +86,13 @@ workers after cleanup. The gate verifies file hashes and row completeness;
 review the raw artifacts for the stated scope. It is a standalone read-only
 gate, not yet a deployment controller or CI enforcement hook.
 
+Run artifact verification on Linux. The verifier streams regular files beneath
+the evidence JSON directory and rejects paths or symlinks that escape it.
+Symlinks resolving within that directory are allowed. Keep the evidence
+directory immutable during verification and deployment; a matching hash does
+not authenticate the producer or prove that an artifact measures its claimed
+scenario.
+
 Row IDs use `site-a` for the first site profile and `site-b` for the second.
 Keep the mapping to actual cluster identities in the private qualification
 bundle. Both profiles remain required; aliases must not be used to count one

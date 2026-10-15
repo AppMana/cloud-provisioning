@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"net/netip"
 	"os"
 	"testing"
@@ -109,6 +111,65 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	if err != nil {
 		t.Fatal(err)
 	}
+	original := object.DeepCopy()
+	for _, fault := range []string{"unsupported-field", "trailing-data", "route-outside-source"} {
+		t.Run(fault, func(t *testing.T) {
+			var changed map[string]any
+			if err := json.Unmarshal(snapshot.Plan(), &changed); err != nil {
+				t.Fatal(err)
+			}
+			switch fault {
+			case "unsupported-field":
+				changed["futureRoutePolicy"] = "required"
+			case "route-outside-source":
+				var invalid tunnel.ReceiveTransitionPlan
+				if err := json.Unmarshal(snapshot.Plan(), &invalid); err != nil {
+					t.Fatal(err)
+				}
+				for i := range invalid.Desired.Peers {
+					if !invalid.Desired.Peers[i].Remote {
+						invalid.Desired.Peers[i].RouteHosts = []string{"0.0.0.0/0"}
+					}
+				}
+				changed["desired"] = invalid.Desired
+			}
+			planRaw, err := json.Marshal(changed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if fault == "trailing-data" {
+				planRaw = append(planRaw, []byte(" {}")...)
+			}
+			spec := view.Round.Spec
+			spec.PlanHash = fmt.Sprintf("%x", sha256.Sum256(planRaw))
+			spec.TransitionUID = string(machine.GetUID()) + ":" + spec.PlanHash
+			spec.ToGeneration = "receivers:" + spec.PlanHash
+			transition, err := handover.NewTransition(spec, now, handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: 10 * time.Second, DrainInterval: 5 * time.Second})
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := transition.Bytes()
+			if err != nil {
+				t.Fatal(err)
+			}
+			object.Data["plan.json"], object.Data["transition.json"] = string(planRaw), string(raw)
+			object, err = k.CoreV1().ConfigMaps(machine.GetNamespace()).Update(ctx, object, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := store.Load(ctx); err != nil {
+				t.Fatalf("fixture must have a matching storage hash: %v", err)
+			}
+			if err := r.ensureAdoptionConfig(ctx, machine); err == nil {
+				t.Fatal("normal reconciliation resumed an unsupported or unsafe plan")
+			}
+			current, err := k.CoreV1().ConfigMaps(machine.GetNamespace()).Get(ctx, store.Name, metav1.GetOptions{})
+			if err != nil || current.ResourceVersion != object.ResourceVersion {
+				t.Fatal("rejected recovery rewrote the committed journal", err)
+			}
+		})
+	}
+	object.Data = original.Data
 	object.Data["plan.json"] = "{}"
 	if _, err := k.CoreV1().ConfigMaps(machine.GetNamespace()).Update(ctx, object, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)

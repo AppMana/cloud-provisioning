@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/netip"
 	"time"
 
@@ -64,8 +66,22 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 	existing, err := store.Load(ctx)
 	if err == nil {
 		var plan tunnel.ReceiveTransitionPlan
-		if err := json.Unmarshal(existing.Plan(), &plan); err != nil || plan.Version != 1 || plan.MachineUID != string(machine.GetUID()) || plan.MachineName != machine.GetName() || plan.Namespace != r.secretNamespace {
+		decoder := json.NewDecoder(bytes.NewReader(existing.Plan()))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&plan); err != nil {
+			return nil, fmt.Errorf("decoding receiver journal plan: %w", err)
+		}
+		if plan.Version != 1 || plan.MachineUID != string(machine.GetUID()) || plan.MachineName != machine.GetName() || plan.Namespace != r.secretNamespace {
 			return nil, fmt.Errorf("receiver journal belongs to another machine or has no public plan")
+		}
+		var trailing any
+		if err := decoder.Decode(&trailing); err != io.EOF {
+			return nil, fmt.Errorf("receiver journal contains trailing plan data")
+		}
+		// A matching storage hash proves integrity, not that this binary can
+		// execute the saved configuration. Revalidate on every recovery, too.
+		if _, err := tunnel.PlanReceiveRoutes(plan); err != nil {
+			return nil, fmt.Errorf("receiver journal has an invalid route plan: %w", err)
 		}
 		return &existing, nil
 	}

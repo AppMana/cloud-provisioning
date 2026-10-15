@@ -1717,9 +1717,8 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 // the adoption Secrets, because machines come and go after install, so
 // it renders the Role with only the peer Secret's name and this method
 // carries the rest, derived from the same machine list that drives the
-// adoption Secrets themselves. A helm upgrade may reset the Role to
-// the chart's floor; the upgrade also restarts this controller, whose
-// first pass restores it.
+// adoption Secrets themselves. Online chart upgrades preserve the current
+// named grants; this reconciliation removes grants for departed machines.
 func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 	if r.dialerServiceAccount == "" {
 		return nil

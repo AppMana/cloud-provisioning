@@ -56,3 +56,20 @@ from the same single value the rest of the chart already takes. */}}
 {{- $tail := last (splitList ":" $hp) -}}
 {{- if eq $tail $hp }}6443{{ else }}{{ $tail }}{{ end -}}
 {{- end -}}
+
+{{/* Preserve only the controller's named Secret grants, never wildcard access
+or additional verbs/resources from a live Role. The controller remains
+responsible for removing names when machines disappear. */}}
+{{- define "cloud-provisioning.dialerSecretNames" -}}
+{{- $names := list (printf "%s-peers" .name) -}}
+{{- range .role.rules -}}
+{{- if and (deepEqual .apiGroups (list "")) (deepEqual .resources (list "secrets")) (deepEqual .verbs (list "get" "patch")) (not .nonResourceURLs) -}}
+{{- range .resourceNames -}}
+{{- if hasSuffix "-tunnel-peers" . -}}
+{{- $names = append $names . -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- toYaml (uniq $names) -}}
+{{- end -}}

@@ -17,6 +17,11 @@ helm upgrade --install cloud-provisioning \
   --set-string tunnel.endpoints='kubernetes.io/hostname=worker-1'
 ```
 
+Online Helm upgrades preserve the dialer's existing named adoption-Secret grants.
+Rendering offline cannot read those grants. For a rendered-manifest upgrade,
+render against the target API and retain those exact bytes; keep machine
+membership stable between rendering and applying the RBAC resources.
+
 Apply [a worker template and claim](examples/aws-worker.yaml). Claims create
 billable resources; deleting one removes its worker. The chart uses these
 Linux amd64/arm64 images:

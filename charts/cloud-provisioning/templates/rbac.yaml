@@ -334,8 +334,8 @@ subjects:
 # its own). The chart cannot name the adoption Secrets, because
 # machines come and go after install, so this is the floor: the
 # controller keeps the resourceNames current from its machine list
-# (ensureDialerRole), and an upgrade that resets this Role to the
-# floor is repaired by the controller's first pass after restart.
+# (ensureDialerRole). Preserve its named grants when rendering against the
+# cluster so an upgrade does not revoke access before reconciliation resumes.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -346,7 +346,9 @@ rules:
     resources: ["secrets"]
     verbs: ["get", "patch"]
     resourceNames:
-      - {{ include "cloud-provisioning.name" . }}-peers
+      {{- $name := include "cloud-provisioning.name" . }}
+      {{- $live := lookup "rbac.authorization.k8s.io/v1" "Role" .Release.Namespace $name }}
+      {{- include "cloud-provisioning.dialerSecretNames" (dict "name" $name "role" $live) | nindent 6 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

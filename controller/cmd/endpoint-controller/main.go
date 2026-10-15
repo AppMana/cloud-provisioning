@@ -142,6 +142,7 @@ type meshReconciler struct {
 	tunnelEndpointsRaw     string
 	siteDialerSelector     labels.Selector
 	awsPodObserver         *awspod.Observer
+	receivePreparation     *receivePreparationPolicy
 	tunnelSubnet           string
 	localAddressBase       string
 	// tunnelIPv6Prefix is the prefix IPv6 tunnel addresses are paired
@@ -271,7 +272,11 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	// set rather than one Machine. Refresh every remote's adoption document:
 	// endpoint changes do not necessarily produce a Machine event.
 	if req.Name == "" {
-		return ctrl.Result{}, r.refreshAdoptionConfigs(ctx)
+		result := ctrl.Result{}
+		if r.receivePreparation != nil {
+			result.RequeueAfter = 30 * time.Second
+		}
+		return result, r.refreshAdoptionConfigs(ctx)
 	}
 
 	machine := &unstructured.Unstructured{}
@@ -417,7 +422,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 			log.Info("updated Gateway external-dns target", "ip", externalIP, "gateway", gwKey)
 		}
 	}
-	if remoteBlocksPending || r.awsPodObserver != nil {
+	if remoteBlocksPending || r.awsPodObserver != nil || r.receivePreparation != nil {
 		// Come back for the blocks this node has not been given yet.
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
@@ -979,6 +984,11 @@ func (r *meshReconciler) convergedMachines(ctx context.Context, data map[string]
 			continue
 		}
 		raw, ok := adoption.Data[tunnel.CloudPeersKey]
+		// Preparation is not a forwarding acknowledgement. Only explicit
+		// transition completion may release the retained legacy endpoints.
+		if _, preparing := adoption.Data[tunnel.ReceivePrepareKey]; preparing {
+			continue
+		}
 		if !ok || len(raw) == 0 {
 			continue
 		}
@@ -1618,6 +1628,13 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 	}
 	if err != nil {
 		return fmt.Errorf("getting adoption secret %s/%s: %w", r.secretNamespace, name, err)
+	}
+	if r.receivePreparation != nil {
+		if !machine.GetDeletionTimestamp().IsZero() || machine.GetAnnotations()[attachment.DrainIntentAnnotation] != "" {
+			return nil
+		}
+		_, err := r.prepareRemoteReceivePaths(ctx, machine, r.receivePreparation.NativeCIDRs, r.receivePreparation.Ports)
+		return err
 	}
 	if string(existing.Data[tunnel.CloudPeersKey]) == string(doc) {
 		return nil
@@ -2284,8 +2301,14 @@ func main() {
 	nodeGroups := flag.Bool("experimental-node-groups", false, "enable experimental node groups in the mesh namespace; requires the group CRD and drain RBAC")
 	awsPodConfig := flag.String("aws-pod-config", "", "optional scoped AWS VPC CNI allocation observer JSON file")
 	awsPodCredentialsFile := flag.String("aws-pod-credentials-file", "", "optional rotating STS credential JSON file; overrides ambient credentials for the AWS pod observer")
+	receivePolicyJSON := flag.String("receive-preparation-policy", "", "experimental additive receiver preparation JSON with nativeCIDRs and permitted ports; freezes active peer updates and does not switch traffic")
 	gatewayConfig := flag.String("aws-gateway-config", "", "optional path to AWS Windows Calico gateway scope JSON")
 	flag.Parse()
+	receivePolicy, policyErr := parseReceivePreparationPolicy(*receivePolicyJSON, wireGuardListenPort)
+	if policyErr != nil {
+		fmt.Fprintln(os.Stderr, policyErr)
+		os.Exit(2)
+	}
 	if _, err := parseDialerPullPolicy(dialerImagePullPolicy); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -2450,6 +2473,7 @@ func main() {
 		tunnelEndpointsRaw:     rawTunnelEndpoints,
 		siteDialerSelector:     siteDialerSelector,
 		endpointRetention:      endpointRetention,
+		receivePreparation:     receivePolicy,
 		tunnelSubnet:           tunnelSubnet,
 		localAddressBase:       localAddressBase,
 		tunnelIPv6Prefix:       tunnelIPv6Prefix,

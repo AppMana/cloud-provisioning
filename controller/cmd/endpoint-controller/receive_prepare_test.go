@@ -99,7 +99,14 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 					return c.Update(ctx, changed)
 				}}
 			}
-			bindings, err := r.prepareRemoteReceivePaths(ctx, expected, native, pool)
+			var bindings *preparedRemoteReceivers
+			var err error
+			if fault == "none" {
+				r.receivePreparation = &receivePreparationPolicy{NativeCIDRs: native, Ports: pool}
+				err = r.ensureAdoptionConfig(ctx, machine)
+			} else {
+				bindings, err = r.prepareRemoteReceivePaths(ctx, expected, native, pool)
+			}
 			current := &corev1.Secret{}
 			if getErr := c.Get(ctx, client.ObjectKeyFromObject(adoption), current); getErr != nil {
 				t.Fatal(getErr)
@@ -129,6 +136,9 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 				}
 			}
 			assertBase(current)
+			if _, acknowledged := r.convergedMachines(ctx, mesh.Data)[machine.GetName()]; acknowledged {
+				t.Fatal("preparation released legacy endpoint retention")
+			}
 			// The normal reconcile path runs repeatedly while agents prepare.
 			// It must leave the acknowledged legacy document in place even though
 			// the mesh already describes different endpoint ownership.

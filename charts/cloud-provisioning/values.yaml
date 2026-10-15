@@ -75,6 +75,11 @@ cluster:
 # Calico, Cilium, Flannel and kube-router are understood.
 
 tunnel:
+  # Experimental additive preparation only: {nativeCIDRs: [...], ports: [...]}.
+  # Supply complete protected cloud network ranges and UDP ports already
+  # permitted by the worker security groups. Requires receiver-capable agents.
+  # Freezes active peer updates and retains endpoints; does not switch traffic.
+  receivePreparation: {}
   # Node selector (k=v,k2=v2) choosing which local nodes terminate
   # tunnels. Empty selects every Linux worker; control planes are
   # excluded unless named explicitly. Only the selected nodes get a

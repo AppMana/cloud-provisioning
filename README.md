@@ -22,6 +22,15 @@ Rendering offline cannot read those grants. For a rendered-manifest upgrade,
 render against the target API and retain those exact bytes; keep machine
 membership stable between rendering and applying the RBAC resources.
 
+For Linux receiver-preparation testing, `tunnel.receivePreparation` accepts
+`nativeCIDRs` (the complete protected cloud network ranges) and `ports` (distinct
+UDP listener ports already permitted by the worker's security groups, excluding
+the existing WireGuard port). The controller stages additional receivers through
+the normal adoption reconciliation. This experimental setting requires agents
+with receiver support; it freezes active peer-list updates and retains existing
+endpoints. It does not activate routes or complete a handover. Removing the
+setting does not discard a persisted proposal or release its forwarding base.
+
 Apply [a worker template and claim](examples/aws-worker.yaml). Claims create
 billable resources; deleting one removes its worker. The chart uses these
 Linux amd64/arm64 images:

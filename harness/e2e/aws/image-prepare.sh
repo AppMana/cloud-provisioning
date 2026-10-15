@@ -1,10 +1,21 @@
 set -eu
+case "$(uname -m)" in
+  x86_64)
+    awscli_arch=x86_64
+    awscli_sha256=d1d0c36d2582925e52022d8675e7fdaed8bb871af97ce2ff7c69e8bd81b123a0
+    ;;
+  aarch64)
+    awscli_arch=aarch64
+    awscli_sha256=e70dca4d9109efd807e173782d7024f524f23b45d24645ea32f44a175e6eb19e
+    ;;
+  *) echo 'Unsupported Linux image architecture' >&2; exit 1 ;;
+esac
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y unzip
 mkdir -p /tmp/cldt-awscli
 cd /tmp/cldt-awscli
-curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.36.33.zip -o awscli.zip
-printf '%s  %s\n' d1d0c36d2582925e52022d8675e7fdaed8bb871af97ce2ff7c69e8bd81b123a0 awscli.zip | sha256sum -c -
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${awscli_arch}-2.36.33.zip" -o awscli.zip
+printf '%s  %s\n' "$awscli_sha256" awscli.zip | sha256sum -c -
 unzip -q awscli.zip
 ./aws/install --update
 /usr/local/bin/aws --version

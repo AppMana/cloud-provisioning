@@ -487,10 +487,23 @@ python3 ~/Documents/cloud-provisioning/harness/e2e/aws/bootstrap.py \
   --run-id cldt-example
 ```
 
-`bootstrap.py --base-ami-id` selects an explicit Canonical x86_64 base image
-instead of the default Noble lookup. Keep the resolved ID in the run inventory.
+`bootstrap.py --base-ami-id` selects an explicit Canonical base image
+instead of the default Noble lookup. Use `--architecture arm64` for a separate
+ARM64 campaign; the default remains `x86_64`. Keep the resolved ID in the run inventory.
 Image discovery runs before creating cloud infrastructure, so an invalid image
 selection does not leave a VPC and IAM roles behind.
+
+The Linux builder and CPU claims default to `m6g.large` for ARM64 campaigns and
+`t3.large` for x86-64; explicit instance types remain available. Before an ARM64
+builder launch, the harness checks the instance type's supported architectures.
+The preparation recipe selects a checksum-pinned AWS CLI 2.36.33 installer for
+`x86_64` or `aarch64` and rejects other host architectures. ARM64 capture verifies
+the running architecture, and image authorization retains campaign architecture
+checks. The installer signature can be verified using the
+[AWS CLI installation instructions](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
+Windows defaults remain x86-64. Architecture-aware preparation is not runtime
+qualification: each candidate still needs a fresh CAPI worker join, native CNI
+and workload tests on actual ARM64 hardware.
 
 The setup identity needs these actions in the test account:
 
@@ -615,7 +628,7 @@ hashes, and existing script files are retained as evidence until a later recipe
 explicitly replaces them.
 For a layered build, add `--base-image-id <owned-linux-ami>` to `start`.
 The helper validates the private parent against the account/run, requires an
-x86_64 HVM image with one EBS root disk, and preserves its root device name and
+HVM image matching the campaign architecture with one EBS root disk, and preserves its root device name and
 minimum volume size. It records the parent without changing the default worker
 AMI or granting CAPA permission to launch it. See the
 [shared image composition workflow](../images/README.md) for GPU layers and

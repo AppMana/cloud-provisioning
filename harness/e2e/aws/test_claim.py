@@ -9,11 +9,11 @@ import unittest
 SCRIPT = pathlib.Path(__file__).with_name('claim.py')
 
 class ClaimTest(unittest.TestCase):
-    def run_claim(self, version=None, image_state='available', volume=None, unprepared=False, gpu=False, instance_type=None, machine_template=None, cache=None, linux_image=None, authorized=True):
+    def run_claim(self, version=None, image_state='available', volume=None, unprepared=False, gpu=False, instance_type=None, machine_template=None, cache=None, linux_image=None, authorized=True, architecture='x86_64'):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         root = pathlib.Path(temp.name)
-        state = dict(runID='test-run', region='us-west-2', vpcID='vpc-owned',
+        state = dict(architecture=architecture, runID='test-run', region='us-west-2', vpcID='vpc-owned',
                      subnetID='subnet-owned', securityGroupID='sg-owned',
                      instanceProfileName='profile', amiID='ami-linux',
                      windowsImageBuilds={year: dict(imageID='ami-'+year, imageState=image_state)
@@ -33,7 +33,7 @@ import json, os, pathlib, sys
 root = pathlib.Path(os.environ['CLAIM_TEST_ROOT'])
 if 'apply' in sys.argv:
  with (root/'objects.jsonl').open('a') as f: f.write(sys.stdin.read()+'\\n')
-elif 'importedcontrolplane' in sys.argv:
+elif 'labimportedcontrolplane' in sys.argv:
  print(json.dumps({'status': {'initialization': {'controlPlaneInitialized': True}}}))
 ''')
         docker.chmod(0o700)
@@ -48,6 +48,18 @@ elif 'importedcontrolplane' in sys.argv:
                                 env=dict(os.environ, PATH=str(root)+os.pathsep+os.environ['PATH'], CLAIM_TEST_ROOT=str(root)))
         objects = [json.loads(line) for line in (root/'objects.jsonl').read_text().splitlines()] if (root/'objects.jsonl').exists() else []
         return result, objects
+
+    def test_architecture_defaults_do_not_change_windows_or_explicit_types(self):
+        for options, expected in [
+            (dict(architecture='arm64'), 'm6g.large'),
+            (dict(architecture='arm64', version='2022'), 't3.large'),
+            (dict(architecture='arm64', instance_type='c7g.large'), 'c7g.large'),
+        ]:
+            with self.subTest(options=options):
+                result, objects = self.run_claim(**options)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                template = next(o for o in objects if o['kind'] == 'AWSMachineTemplate')
+                self.assertEqual(template['spec']['template']['spec']['instanceType'], expected)
 
     def test_explicit_linux_candidate_selects_its_template_without_changing_os(self):
         result, objects = self.run_claim(linux_image='ami-candidate')

@@ -22,7 +22,7 @@ p.add_argument('stage', choices=['start', 'capture', 'authorize', 'promote'])
 p.add_argument('--work-dir', required=True)
 p.add_argument('--image-id', help='owned Linux candidate to authorize without changing the default AMI')
 p.add_argument('--base-image-id', help='owned Linux image layer for a new builder; does not change worker defaults')
-p.add_argument('--instance-type', default='t3.large', help='disposable builder type; GPU verification needs a GPU builder')
+p.add_argument('--instance-type', help='disposable builder type; GPU verification needs a GPU builder')
 p.add_argument('--prepare-script', type=pathlib.Path, help='additional Linux image recipe, executed only while building')
 p.add_argument('--verify-script', type=pathlib.Path, help='Linux acceptance script saved with the build and run before capture')
 p.add_argument('--replace-candidate', action='store_true', help='capture an updated builder image; keep the previous image in cleanup inventory')
@@ -32,7 +32,7 @@ if a.capture_check and a.stage != 'capture':
     p.error('--capture-check applies only to capture')
 if bool(a.image_id) != (a.stage == 'authorize'):
     p.error('--image-id is required only for authorize')
-if a.stage != 'start' and (a.base_image_id or a.prepare_script or a.verify_script or a.instance_type != 't3.large'):
+if a.stage != 'start' and (a.base_image_id or a.prepare_script or a.verify_script or a.instance_type is not None):
     p.error('recipe and instance-type options apply only to start')
 if bool(a.prepare_script) != bool(a.verify_script):
     p.error('additional preparation requires a matching verification script')
@@ -40,6 +40,9 @@ os.umask(0o077)
 work = pathlib.Path(a.work_dir).resolve()
 path = work / 'resources.json'
 s = json.loads(path.read_text())
+architecture = s.get('architecture', 'x86_64')
+if architecture not in ['x86_64', 'arm64']: raise RuntimeError('unsupported campaign architecture')
+a.instance_type = a.instance_type or ('m6g.large' if architecture == 'arm64' else 't3.large')
 def save():
     path.write_text(json.dumps(s, indent=2) + '\n')
 def aws(service, operation, **inputs):
@@ -82,6 +85,11 @@ if a.stage == 'start':
     else:
         parent = (linux_builder_parent(aws, s, a.base_image_id) if a.base_image_id else
                   dict(imageID=s['baseAMIID'], rootDeviceName='/dev/sda1', rootVolumeGiB=20))
+        if architecture == 'arm64':
+            types = aws('ec2', 'describe-instance-types', InstanceTypes=[a.instance_type])['InstanceTypes']
+            if (len(types) != 1 or types[0]['InstanceType'] != a.instance_type or
+                    'arm64' not in types[0]['ProcessorInfo']['SupportedArchitectures']):
+                raise RuntimeError('builder instance type does not support arm64')
         script = pathlib.Path(__file__).with_name('image-prepare.sh').read_text()
         # Clean only after cloud-final finishes, through a separate SSM command.
         script = script.replace('cloud-init clean --logs --machine-id --seed\n', '')
@@ -132,6 +140,8 @@ elif a.stage == 'capture':
             raise RuntimeError('image builder parent differs from the recorded launch')
         # Capture validates the build; it must not download/reinstall tooling.
         prepare = "set -eu\n/usr/local/bin/aws --version\npython3 -c 'from cloudinit import features; assert not features.ERROR_ON_USER_DATA_FAILURE'\n"
+        if architecture == 'arm64':
+            prepare += 'test "$(uname -m)" = aarch64\n'
         if s.get('imageRecipe'):
             verify = (work / 'additional-verify.sh').read_text()
             if hashlib.sha256(verify.encode()).hexdigest() != s['imageRecipe']['verifySHA256']:

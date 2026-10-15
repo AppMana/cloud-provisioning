@@ -10,7 +10,8 @@ p=argparse.ArgumentParser()
 p.add_argument('--work-dir',required=True)
 p.add_argument('--run-id',required=True)
 p.add_argument('--region',default='us-west-2')
-p.add_argument('--base-ami-id',help='explicit Canonical x86_64 base image to prepare for CAPA')
+p.add_argument('--base-ami-id',help='explicit Canonical base image matching the selected architecture')
+p.add_argument('--architecture',choices=['x86_64','arm64'],default='x86_64')
 a=p.parse_args()
 if not a.run_id.startswith('cldt-') or not all(c.isalnum() or c=='-' for c in a.run_id):
     p.error('run-id must start cldt- and contain only alphanumeric characters or hyphens')
@@ -18,7 +19,7 @@ os.umask(0o077)
 work=pathlib.Path(a.work_dir).resolve();work.mkdir(parents=True,exist_ok=True)
 state_path=work/'resources.json'
 if state_path.exists():p.error('resources.json already exists; use its recorded resources or clean them up first')
-state={'runID':a.run_id,'region':a.region,'createdAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}
+state={'runID':a.run_id,'region':a.region,'architecture':a.architecture,'createdAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}
 def save():state_path.write_text(json.dumps(state,indent=2)+'\n')
 def aws(*args):
     r=subprocess.run(['aws','--region',a.region,*args,'--output','json'],capture_output=True,text=True)
@@ -29,12 +30,12 @@ identity=aws('sts','get-caller-identity');account=identity['Account'];state['acc
 # Resolve the exact AMI once; both the template and IAM policy use this ID.
 if a.base_ami_id:
     images=aws('ec2','describe-images','--owners','099720109477','--image-ids',a.base_ami_id,
-        '--filters','Name=state,Values=available','Name=architecture,Values=x86_64')['Images']
+        '--filters','Name=state,Values=available','Name=architecture,Values='+a.architecture)['Images']
 else:
     images=aws('ec2','describe-images','--owners','099720109477','--filters',
-        'Name=name,Values=ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*',
-        'Name=state,Values=available','Name=architecture,Values=x86_64')['Images']
-if not images:raise RuntimeError('no available Canonical x86_64 base AMI found')
+        'Name=name,Values=ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-'+('arm64' if a.architecture=='arm64' else 'amd64')+'-server-*',
+        'Name=state,Values=available','Name=architecture,Values='+a.architecture)['Images']
+if not images:raise RuntimeError('no available Canonical base AMI for selected architecture')
 ami=remember('amiID',max(images,key=lambda i:i['CreationDate'])['ImageId'])
 remember('baseAMIID',ami)
 tags=[{'Key':'cloud-provisioning-test','Value':a.run_id},{'Key':'Name','Value':a.run_id}]

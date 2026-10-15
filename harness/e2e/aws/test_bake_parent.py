@@ -21,10 +21,10 @@ IMAGE = dict(ImageId='ami-layer', State='available', Public=False, OwnerId='123'
 
 
 class ParentLayer(unittest.TestCase):
-    def exercise(self, image=None, existing=False):
+    def exercise(self, image=None, existing=False, architecture='x86_64', supported=None):
         with tempfile.TemporaryDirectory() as directory:
             work = pathlib.Path(directory)
-            state = dict(account='123', region='us-west-2', runID='test', baseAMIID='ami-base',
+            state = dict(architecture=architecture, account='123', region='us-west-2', runID='test', baseAMIID='ami-base',
                          preparedAMIID='ami-default', amiID='ami-default', subnetID='subnet',
                          securityGroupID='sg', instanceProfileName='profile')
             if existing:
@@ -42,6 +42,7 @@ class ParentLayer(unittest.TestCase):
                 elif operation == 'describe-images': result = {'Images': [image or IMAGE]}
                 elif operation == 'describe-instances':
                     result = {'Reservations': [{'Instances': [dict(InstanceId='i-original', State=dict(Name='running'))]}]}
+                elif operation == 'describe-instance-types': result = {'InstanceTypes': [dict(InstanceType=inputs['InstanceTypes'][0], ProcessorInfo=dict(SupportedArchitectures=supported or ['arm64']))]}
                 elif operation == 'run-instances': result = {'Instances': [{'InstanceId': 'i-new'}]}
                 else: self.fail(operation)
                 return subprocess.CompletedProcess(args, 0, json.dumps(result), '')
@@ -66,6 +67,20 @@ class ParentLayer(unittest.TestCase):
             self.assertEqual((state['baseAMIID'], state['amiID'], state['preparedAMIID']),
                              ('ami-base', 'ami-default', 'ami-default'))
             self.assertEqual(state['builderParent']['imageID'], 'ami-layer')
+
+    def test_arm_parent_and_instance_architecture_are_bound(self):
+        image = dict(IMAGE, Architecture='arm64')
+        calls, state, error = self.exercise(image, architecture='arm64')
+        self.assertIsNone(error)
+        launch = next(inputs for op, inputs in calls if op == 'run-instances')
+        self.assertEqual(launch['InstanceType'], 'm6g.large')
+        self.assertEqual(launch['ImageId'], 'ami-layer')
+        calls, state, error = self.exercise(image, architecture='arm64', supported=['x86_64'])
+        self.assertIsNotNone(error)
+        self.assertNotIn('run-instances', [op for op, _ in calls])
+        calls, state, error = self.exercise(IMAGE, architecture='arm64')
+        self.assertIsNotNone(error)
+        self.assertNotIn('run-instances', [op for op, _ in calls])
 
     def test_invalid_parent_cannot_launch(self):
         for change in [dict(Public=True), dict(Platform='windows'), dict(OwnerId='other'),

@@ -11,6 +11,8 @@ def owned_image(aws, state, image_id, machine_os):
             or image['OwnerId'] != state['account'] or actual_os != machine_os
             or {t['Key']: t['Value'] for t in image.get('Tags', [])}.get('cloud-provisioning-test') != state['runID']):
         raise RuntimeError('image ownership, operating system or availability mismatch')
+    if machine_os == 'linux' and state.get('architecture') and image.get('Architecture') != state['architecture']:
+        raise RuntimeError('Linux image architecture differs from campaign')
     return image
 
 
@@ -24,9 +26,9 @@ def retained_linux_arns(aws, state):
 def linux_builder_parent(aws, state, image_id):
     """Select an owned reusable layer without promoting it for worker launch."""
     image = owned_image(aws, state, image_id, 'linux')
-    if (image.get('Architecture') != 'x86_64' or image.get('VirtualizationType') != 'hvm'
+    if (image.get('Architecture') != state.get('architecture', 'x86_64') or image.get('VirtualizationType') != 'hvm'
             or image.get('RootDeviceType') != 'ebs'):
-        raise RuntimeError('Linux builder requires an x86_64 HVM EBS parent image')
+        raise RuntimeError('Linux builder requires an HVM EBS parent matching the campaign architecture')
     disks = [disk for disk in image.get('BlockDeviceMappings', []) if 'Ebs' in disk]
     if len(disks) != 1 or disks[0].get('DeviceName') != image.get('RootDeviceName'):
         raise RuntimeError('Linux builder requires exactly one root EBS volume')

@@ -27,9 +27,9 @@ if a.linux_image_id and a.windows_version:
 template_name = a.machine_template or a.name
 if a.variant == 'gpu' and (not a.windows_version or not a.instance_type):
     p.error('GPU Windows claims require --windows-version and --instance-type')
-a.instance_type = a.instance_type or 't3.large'
 minimum_volume = 60 if a.variant == 'gpu' else (50 if a.windows_version else 20)
 s = json.loads((pathlib.Path(a.work_dir) / 'resources.json').read_text())
+a.instance_type = a.instance_type or ('m6g.large' if not a.windows_version and s.get('architecture') == 'arm64' else 't3.large')
 if a.windows_version:
     image = s.get('windowsGpuImageBuilds' if a.variant == 'gpu' else 'windowsImageBuilds', {}).get(a.windows_version, {})
     if image.get('imageState') != 'available' or not image.get('imageID'):

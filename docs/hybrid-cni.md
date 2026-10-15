@@ -129,6 +129,15 @@ ownership tags before the allocation observer can accept it. Observe actual
 ENI allocations and packet sources after installation. Rendered manifests alone
 are insufficient evidence for a mixed-CNI campaign.
 
+For an isolated IPv4 run, `harness/e2e/aws/native_access.py --work-dir
+"$PRIVATE_AWS_RUN" --runner "$ISOLATED_LAB_RUNNER" --calico-site` configures
+single-ENI IPAM permissions, the read-only allocation observer and a site SNAT
+exclusion for the verified AWS subnet. Run it on the setup host; only derived
+observer credentials enter the lab. The exclusion is a disabled Calico pool
+with allocation and BGP export disabled. Existing pool overlap or foreign
+ownership is rejected. Remove this run-owned pool after its workers and routes
+are removed if retaining the lab for a different campaign.
+
 The chart archive is published in [the AWS Helm repository](https://aws.github.io/eks-charts/).
 The family and prefix-delegation contract is documented in the
 [pinned VPC CNI release](https://github.com/aws/amazon-vpc-cni-k8s/blob/v1.23.2/README.md).

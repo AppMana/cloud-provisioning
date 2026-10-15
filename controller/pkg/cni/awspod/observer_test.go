@@ -15,10 +15,11 @@ import (
 )
 
 type ec2 struct {
-	eni   map[string]any
-	calls int
-	fail  bool
-	token string
+	eni       map[string]any
+	calls     int
+	fail      bool
+	token     string
+	afterRead func()
 }
 
 func (e *ec2) Call(_ context.Context, service, op string, input map[string]any) (json.RawMessage, error) {
@@ -29,6 +30,9 @@ func (e *ec2) Call(_ context.Context, service, op string, input map[string]any) 
 		return nil, fmt.Errorf("wrong instance")
 	}
 	e.calls++
+	if e.afterRead != nil {
+		e.afterRead()
+	}
 	if e.fail {
 		return nil, fmt.Errorf("EC2 unavailable")
 	}
@@ -120,6 +124,63 @@ func TestRejectUnverifiedAllocations(t *testing.T) {
 			}
 			if got, err := o.PrefixesFor(context.Background(), m, "worker"); err == nil {
 				t.Fatalf("accepted %s: %v", kind, got)
+			}
+		})
+	}
+}
+
+func TestNameOnlyCAPIBinding(t *testing.T) {
+	for _, fault := range []string{"", "missing-reverse", "foreign-machine", "foreign-cluster", "not-running", "old-api", "node-replaced-during-read", "provider-changed-during-read"} {
+		t.Run(fault, func(t *testing.T) {
+			ctx := context.Background()
+			o, m, api := fixture(t)
+			c := o.Reader.(client.Client)
+			unstructured.RemoveNestedField(m.Object, "status", "nodeRef", "uid")
+			_ = unstructured.SetNestedField(m.Object, "Running", "status", "phase")
+			if fault == "not-running" {
+				_ = unstructured.SetNestedField(m.Object, "Provisioned", "status", "phase")
+			}
+			if fault == "old-api" {
+				m.SetAPIVersion("cluster.x-k8s.io/v1beta1")
+			}
+			n := &corev1.Node{}
+			if err := c.Get(ctx, client.ObjectKey{Name: "worker"}, n); err != nil {
+				t.Fatal(err)
+			}
+			n.Annotations = map[string]string{"cluster.x-k8s.io/machine": "worker", "cluster.x-k8s.io/cluster-name": "cluster", "cluster.x-k8s.io/cluster-namespace": "test"}
+			switch fault {
+			case "missing-reverse":
+				n.Annotations = nil
+			case "foreign-machine":
+				n.Annotations["cluster.x-k8s.io/machine"] = "other"
+			case "foreign-cluster":
+				n.Annotations["cluster.x-k8s.io/cluster-namespace"] = "other"
+			}
+			c = fake.NewClientBuilder().WithScheme(c.Scheme()).WithObjects(m, n).Build()
+			o.Reader = c
+			if fault == "node-replaced-during-read" || fault == "provider-changed-during-read" {
+				api.afterRead = func() {
+					current := &corev1.Node{}
+					if err := c.Get(ctx, client.ObjectKey{Name: "worker"}, current); err != nil {
+						t.Fatal(err)
+					}
+					if fault == "node-replaced-during-read" {
+						current.UID = "replacement"
+					} else {
+						current.Spec.ProviderID = "aws:///us-west-2a/i-other"
+					}
+					if err := c.Update(ctx, current); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			got, err := o.PrefixesFor(ctx, m, "worker")
+			if fault == "" {
+				if err != nil || len(got) != 1 {
+					t.Fatalf("name-only association rejected: %v %v", got, err)
+				}
+			} else if err == nil {
+				t.Fatalf("accepted %s: %v", fault, got)
 			}
 		})
 	}

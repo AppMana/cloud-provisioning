@@ -66,25 +66,11 @@ func (o *Observer) PrefixesFor(ctx context.Context, expected *unstructured.Unstr
 	if o.Reader == nil || o.API == nil || expected == nil || expected.GetUID() == "" {
 		return nil, fmt.Errorf("allocation observer requires clients and immutable Machine identity")
 	}
-	m := &unstructured.Unstructured{}
-	m.SetGroupVersionKind(expected.GroupVersionKind())
-	if err := o.Reader.Get(ctx, client.ObjectKeyFromObject(expected), m); err != nil {
+	m, node, err := o.binding(ctx, expected, nodeName)
+	if err != nil {
 		return nil, err
 	}
-	cluster, _, _ := unstructured.NestedString(m.Object, "spec", "clusterName")
 	provider, _, _ := unstructured.NestedString(m.Object, "spec", "providerID")
-	boundName, _, _ := unstructured.NestedString(m.Object, "status", "nodeRef", "name")
-	boundUID, _, _ := unstructured.NestedString(m.Object, "status", "nodeRef", "uid")
-	if m.GetUID() != expected.GetUID() || m.GetDeletionTimestamp() != nil || m.GetNamespace() != o.Config.Namespace || cluster != o.Config.Cluster || boundName != nodeName || boundUID == "" {
-		return nil, fmt.Errorf("Machine allocation binding absent or changed")
-	}
-	node := &corev1.Node{}
-	if err := o.Reader.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
-		return nil, err
-	}
-	if string(node.UID) != boundUID || node.DeletionTimestamp != nil || node.Spec.ProviderID != provider || node.Labels[NodeLabel] != NodeValue || node.Labels["cloud-provisioning.appmana.com/role"] != "cloud-worker" || node.Labels["kubernetes.io/os"] != "linux" {
-		return nil, fmt.Errorf("Node allocation binding absent or changed")
-	}
 	parts := strings.Split(provider, "/")
 	if len(parts) != 5 || parts[0] != "aws:" || parts[1] != "" || parts[2] != "" || len(parts[3]) != len(o.Config.Region)+1 || !strings.HasPrefix(parts[3], o.Config.Region) || !strings.HasPrefix(parts[4], "i-") || len(parts[4]) <= 2 {
 		return nil, fmt.Errorf("invalid EC2 provider identity")
@@ -189,7 +175,51 @@ func (o *Observer) PrefixesFor(ctx context.Context, expected *unstructured.Unstr
 			}
 		}
 	}
+	// The EC2 read can span multiple requests. Never publish allocations for
+	// a Node or Machine replaced while those requests were in flight.
+	latestMachine, latestNode, err := o.binding(ctx, expected, nodeName)
+	if err != nil {
+		return nil, err
+	}
+	latestProvider, _, _ := unstructured.NestedString(latestMachine.Object, "spec", "providerID")
+	if latestNode.UID != node.UID || latestProvider != provider {
+		return nil, fmt.Errorf("allocation binding changed during EC2 observation")
+	}
 	sort.Slice(prefixes, func(i, j int) bool { return prefixes[i].String() < prefixes[j].String() })
 	// A complete, successful empty observation is authoritative withdrawal.
 	return prefixes, nil
+}
+
+func (o *Observer) binding(ctx context.Context, expected *unstructured.Unstructured, nodeName string) (*unstructured.Unstructured, *corev1.Node, error) {
+	m := &unstructured.Unstructured{}
+	m.SetGroupVersionKind(expected.GroupVersionKind())
+	if err := o.Reader.Get(ctx, client.ObjectKeyFromObject(expected), m); err != nil {
+		return nil, nil, err
+	}
+	cluster, _, _ := unstructured.NestedString(m.Object, "spec", "clusterName")
+	provider, _, _ := unstructured.NestedString(m.Object, "spec", "providerID")
+	boundName, _, _ := unstructured.NestedString(m.Object, "status", "nodeRef", "name")
+	boundUID, _, _ := unstructured.NestedString(m.Object, "status", "nodeRef", "uid")
+	if m.GetUID() != expected.GetUID() || m.GetDeletionTimestamp() != nil || m.GetNamespace() != o.Config.Namespace || cluster != o.Config.Cluster || boundName != nodeName {
+		return nil, nil, fmt.Errorf("Machine allocation binding absent or changed")
+	}
+	node := &corev1.Node{}
+	if err := o.Reader.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
+		return nil, nil, err
+	}
+	if node.UID == "" || (boundUID != "" && string(node.UID) != boundUID) || node.DeletionTimestamp != nil || node.Spec.ProviderID != provider || node.Labels[NodeLabel] != NodeValue || node.Labels["cloud-provisioning.appmana.com/role"] != "cloud-worker" || node.Labels["kubernetes.io/os"] != "linux" {
+		return nil, nil, fmt.Errorf("Node allocation binding absent or changed")
+	}
+	if boundUID == "" {
+		// CAPI v1beta2's MachineNodeReference contains only a name. Bind the
+		// live Node UID through CAPI's reverse association and provider ID.
+		phase, _, _ := unstructured.NestedString(m.Object, "status", "phase")
+		if m.GroupVersionKind().Version != "v1beta2" || phase != "Running" ||
+			node.Annotations["cluster.x-k8s.io/machine"] != m.GetName() ||
+			node.Annotations["cluster.x-k8s.io/cluster-name"] != cluster ||
+			node.Annotations["cluster.x-k8s.io/cluster-namespace"] != m.GetNamespace() {
+			return nil, nil, fmt.Errorf("CAPI Node reverse association absent or changed")
+		}
+	}
+	return m, node, nil
 }

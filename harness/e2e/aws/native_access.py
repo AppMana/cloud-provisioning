@@ -3,6 +3,7 @@
 import argparse
 import base64
 import json
+import ipaddress
 import os
 from pathlib import Path
 import subprocess
@@ -26,10 +27,20 @@ def node_policy(state):
     ]}
 
 
+def calico_exclusion(state, cidr):
+    return {'apiVersion': 'crd.projectcalico.org/v1', 'kind': 'IPPool',
+            'metadata': {'name': state['runID'] + '-native-pods',
+                         'labels': {'cloud-provisioning-test': state['runID']}},
+            'spec': {'cidr': cidr, 'disabled': True, 'nodeSelector': '!all()',
+                     'disableBGPExport': True, 'natOutgoing': False,
+                     'ipipMode': 'Never', 'vxlanMode': 'Never'}}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--work-dir', type=Path, required=True)
     parser.add_argument('--runner', required=True)
+    parser.add_argument('--calico-site', action='store_true', help='exclude the owned subnet from site Calico SNAT without allocating or advertising it')
     args = parser.parse_args()
     os.umask(0o077)
     path = args.work_dir / 'resources.json'
@@ -84,6 +95,19 @@ def main():
           for name, key in {'AWS_ACCESS_KEY_ID': 'AccessKeyId', 'AWS_SECRET_ACCESS_KEY': 'SecretAccessKey',
                             'AWS_SESSION_TOKEN': 'SessionToken'}.items()}},
     ]
+    if args.calico_site:
+        exclusion = calico_exclusion(state, subnet['CidrBlock'])
+        existing = subprocess.run(['docker', 'exec', args.runner, 'docker', 'exec', 'clab-cldt-bastion',
+            'kubectl', '--server=https://10.101.0.1:6443', 'get', 'ippools.crd.projectcalico.org', '-o', 'json'],
+            check=True, capture_output=True, text=True)
+        for pool in json.loads(existing.stdout)['items']:
+            same = pool['metadata']['name'] == exclusion['metadata']['name']
+            if same and (pool['metadata'].get('labels', {}).get('cloud-provisioning-test') != state['runID'] or
+                         not pool['spec'].get('disabled') or pool['spec']['cidr'] != subnet['CidrBlock']):
+                raise RuntimeError('existing exclusion is not owned, disabled and bound to this subnet')
+            if not same and ipaddress.ip_network(pool['spec']['cidr']).overlaps(ipaddress.ip_network(subnet['CidrBlock'])):
+                raise RuntimeError('AWS subnet overlaps an existing Calico pool')
+        objects.append(exclusion)
     subprocess.run(['docker', 'exec', '-i', args.runner, 'docker', 'exec', '-i', 'clab-cldt-bastion',
                     'kubectl', '--server=https://10.101.0.1:6443', 'apply', '-f', '-'],
                    input=json.dumps({'apiVersion': 'v1', 'kind': 'List', 'items': objects}),

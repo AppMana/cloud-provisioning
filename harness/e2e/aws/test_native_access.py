@@ -26,6 +26,15 @@ class NativeAccessTest(unittest.TestCase):
         self.assertEqual(tagging["Condition"]["StringEquals"]["ec2:ResourceTag/cloud-provisioning-test"], "cldt-test")
         self.assertEqual(tagging["Condition"]["ForAllValues:StringEquals"]["aws:TagKeys"], ["node.k8s.amazonaws.com/instance_id"])
 
+    def test_site_exclusion_neither_allocates_nor_advertises_aws_addresses(self):
+        obj = module.calico_exclusion({'runID': 'cldt-test'}, '172.29.0.0/25')
+        self.assertEqual(obj['metadata']['labels']['cloud-provisioning-test'], 'cldt-test')
+        self.assertEqual(obj['spec']['cidr'], '172.29.0.0/25')
+        self.assertTrue(obj['spec']['disabled'])
+        self.assertTrue(obj['spec']['disableBGPExport'])
+        self.assertEqual(obj['spec']['nodeSelector'], '!all()')
+        self.assertFalse(obj['spec']['natOutgoing'])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -24,6 +25,12 @@ type PodReceiptAuthenticator struct {
 	ServiceAccountUID  string
 	DaemonSetName      string
 	DaemonSetUID       string
+	// These are trusted release inputs, never learned from a submitting pod.
+	// ImageID is explicit because runtimes may report the manifest index or
+	// an architecture-specific manifest. Image alone is only desired state.
+	ContainerName string
+	Image         string
+	ImageID       string
 }
 
 // Authenticate binds a receipt to a live, Ready daemon pod and its current
@@ -37,6 +44,9 @@ func (a PodReceiptAuthenticator) Authenticate(ctx context.Context, bearer string
 	}
 	if a.API == nil || a.Audience == "" || a.Namespace == "" || a.ServiceAccountName == "" || a.ServiceAccountUID == "" || a.DaemonSetName == "" || a.DaemonSetUID == "" || bearer == "" || receipt.NodeUID == "" || bootID == "" {
 		return fail("missing policy, credential or identity")
+	}
+	if a.ContainerName == "" || !receiptImagePinned(a.Image, false) || !receiptImagePinned(a.ImageID, true) {
+		return fail("missing immutable agent image policy")
 	}
 	review, err := a.API.AuthenticationV1().TokenReviews().Create(ctx, &authenticationv1.TokenReview{Spec: authenticationv1.TokenReviewSpec{Token: bearer, Audiences: []string{a.Audience}}}, metav1.CreateOptions{})
 	// Do not return arbitrary server errors or review bodies: those may contain
@@ -76,6 +86,19 @@ func (a PodReceiptAuthenticator) Authenticate(ctx context.Context, bearer string
 	if err != nil || string(daemon.UID) != a.DaemonSetUID || daemon.DeletionTimestamp != nil {
 		return fail("daemon identity is no longer current")
 	}
+	if !receiptContainerImage(daemon.Spec.Template.Spec.Containers, a.ContainerName, a.Image) || !receiptContainerImage(pod.Spec.Containers, a.ContainerName, a.Image) {
+		return fail("daemon or pod agent image differs from the admitted release")
+	}
+	currentImage := false
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.Name == a.ContainerName {
+			currentImage = status.ImageID == a.ImageID && status.Ready && status.ContainerID != "" && status.State.Running != nil
+			break
+		}
+	}
+	if !currentImage {
+		return fail("running agent image differs or is not Ready")
+	}
 	node, err := a.API.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	if err != nil || string(node.UID) != nodeUID || node.DeletionTimestamp != nil || node.Status.NodeInfo.BootID != bootID {
 		return fail("node identity or boot is no longer current")
@@ -95,4 +118,24 @@ func (a PodReceiptAuthenticator) Authenticate(ctx context.Context, bearer string
 		return fail("pod or node is not Ready")
 	}
 	return AuthenticatedReceipt{AuthenticatedNodeUID: nodeUID, Receipt: receipt}, nil
+}
+
+func receiptContainerImage(containers []corev1.Container, name, image string) bool {
+	for _, container := range containers {
+		if container.Name == name {
+			return container.Image == image
+		}
+	}
+	return false
+}
+
+func receiptImagePinned(value string, runtimeID bool) bool {
+	if strings.ContainsAny(value, " \t\r\n") {
+		return false
+	}
+	if runtimeID && strings.HasPrefix(value, "sha256:") {
+		return hexToken(strings.TrimPrefix(value, "sha256:"), 32)
+	}
+	name, digest, found := strings.Cut(value, "@sha256:")
+	return found && name != "" && !strings.Contains(name, "@") && hexToken(digest, 32)
 }

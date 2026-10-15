@@ -14,6 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
+const receiptTestImage = "example.invalid/dialer@sha256:" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
 func TestPodReceiptAuthenticationRealAPI(t *testing.T) {
 	if os.Getenv("KUBEBUILDER_ASSETS") == "" {
 		t.Skip("requires real Kubernetes API assets")
@@ -43,11 +45,11 @@ func TestPodReceiptAuthenticationRealAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	labels := map[string]string{"app": "dialer"}
-	daemon, err := api.AppsV1().DaemonSets(ns).Create(ctx, &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "dialer"}, Spec: appsv1.DaemonSetSpec{Selector: &metav1.LabelSelector{MatchLabels: labels}, Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labels}, Spec: corev1.PodSpec{ServiceAccountName: sa.Name, Containers: []corev1.Container{{Name: "dialer", Image: "example.invalid/dialer"}}}}}}, metav1.CreateOptions{})
+	daemon, err := api.AppsV1().DaemonSets(ns).Create(ctx, &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "dialer"}, Spec: appsv1.DaemonSetSpec{Selector: &metav1.LabelSelector{MatchLabels: labels}, Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labels}, Spec: corev1.PodSpec{ServiceAccountName: sa.Name, Containers: []corev1.Container{{Name: "dialer", Image: receiptTestImage}}}}}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifier := PodReceiptAuthenticator{API: api, Audience: "cloud-provisioning-receipts", Namespace: ns, ServiceAccountName: sa.Name, ServiceAccountUID: string(sa.UID), DaemonSetName: daemon.Name, DaemonSetUID: string(daemon.UID)}
+	verifier := PodReceiptAuthenticator{API: api, Audience: "cloud-provisioning-receipts", Namespace: ns, ServiceAccountName: sa.Name, ServiceAccountUID: string(sa.UID), DaemonSetName: daemon.Name, DaemonSetUID: string(daemon.UID), ContainerName: "dialer", Image: receiptTestImage, ImageID: receiptTestImage}
 	var nodes []*corev1.Node
 	var pods []*corev1.Pod
 	for _, name := range []string{"worker-a", "worker-b"} {
@@ -61,11 +63,12 @@ func TestPodReceiptAuthenticationRealAPI(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		pod, err := api.CoreV1().Pods(ns).Create(ctx, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels, OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(daemon, appsv1.SchemeGroupVersion.WithKind("DaemonSet"))}}, Spec: corev1.PodSpec{NodeName: node.Name, ServiceAccountName: sa.Name, Containers: []corev1.Container{{Name: "dialer", Image: "example.invalid/dialer"}}}}, metav1.CreateOptions{})
+		pod, err := api.CoreV1().Pods(ns).Create(ctx, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels, OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(daemon, appsv1.SchemeGroupVersion.WithKind("DaemonSet"))}}, Spec: corev1.PodSpec{NodeName: node.Name, ServiceAccountName: sa.Name, Containers: []corev1.Container{{Name: "dialer", Image: receiptTestImage}}}}, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		pod.Status.Phase = corev1.PodRunning
+		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://running-agent", Image: "sha256:runtime-config", ImageID: receiptTestImage, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.Now()}}}}
 		pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
 		pod, err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
 		if err != nil {
@@ -110,6 +113,78 @@ func TestPodReceiptAuthenticationRealAPI(t *testing.T) {
 		t.Fatal("second daemon could not authenticate its own node", err)
 	}
 	verifyAuthenticatedAdvancement(t, verifier, nodes, []string{bearer, otherBearer})
+
+	// An existing Ready pod and its token survive a DaemonSet image update.
+	// That old process must not authorize phases for the new desired version.
+	daemon.Spec.Template.Spec.Containers[0].Image = "example.invalid/dialer@sha256:" + strings.Repeat("b", 64)
+	daemon, err = api.AppsV1().DaemonSets(ns).Update(ctx, daemon, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reject("daemon-image-changed", bearer, verifier, receipt, boot)
+	daemon.Spec.Template.Spec.Containers[0].Image = receiptTestImage
+	daemon, err = api.AppsV1().DaemonSets(ns).Update(ctx, daemon, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, field := range []string{"pod-image", "runtime-image", "missing-status", "container-not-ready", "container-not-running"} {
+		original := pods[0].DeepCopy()
+		switch field {
+		case "pod-image":
+			pods[0].Spec.Containers[0].Image = "example.invalid/dialer@sha256:" + strings.Repeat("b", 64)
+			pods[0], err = api.CoreV1().Pods(ns).Update(ctx, pods[0], metav1.UpdateOptions{})
+		case "runtime-image":
+			pods[0].Status.ContainerStatuses[0].ImageID = "example.invalid/dialer@sha256:" + strings.Repeat("b", 64)
+		case "missing-status":
+			pods[0].Status.ContainerStatuses = nil
+		case "container-not-ready":
+			pods[0].Status.ContainerStatuses[0].Ready = false
+		case "container-not-running":
+			pods[0].Status.ContainerStatuses[0].State = corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "Restarting"}}
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if field != "pod-image" {
+			pods[0], err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pods[0], metav1.UpdateOptions{})
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		reject(field, bearer, verifier, receipt, boot)
+		pods[0].Spec = original.Spec
+		pods[0], err = api.CoreV1().Pods(ns).Update(ctx, pods[0], metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		pods[0].Status = original.Status
+		pods[0], err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pods[0], metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := verifier.Authenticate(ctx, bearer, receipt, boot); err != nil {
+		t.Fatal("restored agent did not authenticate", err)
+	}
+	// A runtime can report a platform image digest instead of the requested
+	// multi-architecture index. Only an explicitly admitted ID may differ.
+	pods[0].Status.ContainerStatuses[0].ImageID = "sha256:" + strings.Repeat("c", 64)
+	pods[0], err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pods[0], metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reject("unadmitted-platform-image", bearer, verifier, receipt, boot)
+	platformPolicy := verifier
+	platformPolicy.ImageID = pods[0].Status.ContainerStatuses[0].ImageID
+	if _, err := platformPolicy.Authenticate(ctx, bearer, receipt, boot); err != nil {
+		t.Fatal("explicit platform image policy rejected", err)
+	}
+	pods[0].Status.ContainerStatuses[0].ImageID = receiptTestImage
+	pods[0], err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pods[0], metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	reject("another-node-same-account", otherBearer, verifier, receipt, boot)
 	reject("unbound-account-token", mint(nil, verifier.Audience), verifier, receipt, boot)
 	reject("wrong-audience", mint(pods[0], "another-audience"), verifier, receipt, boot)

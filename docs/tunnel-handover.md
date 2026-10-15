@@ -86,6 +86,13 @@ replaced node's receipt. A receipt for selecting B cannot authorize a rollback
 to A, and a receipt from an earlier attempt cannot satisfy a fresh round.
 
 Hosts still need to perform native phase verification before issuing receipts.
+Pod receipt authentication requires a controller-configured container name,
+digest-pinned image, and expected runtime image ID. Both the DaemonSet template
+and submitting pod must request that image, and its container must be running
+and Ready with the expected image ID. Supply architecture-specific runtime IDs
+from trusted release artifacts, not from the submitting pod's status. This
+checks the container image; a container executing a mounted host binary still
+requires separate executable-version admission.
 `Transition` now persists and replays prepare, switch, drain, and retire history.
 Rollback during prepare aborts B; rollback after switching selects A, drains B,
 and retires B. Expired rounds require explicit renewal and fresh receipts. Drain

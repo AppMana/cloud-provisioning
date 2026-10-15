@@ -17,7 +17,7 @@ func TestReceiptAuthenticationRejectsIncompleteReviews(t *testing.T) {
 	for _, fault := range []string{"api-error", "status-error", "unauthenticated", "missing-audience", "wrong-audience", "missing-pod", "missing-node", "ambiguous-node", "wrong-account"} {
 		t.Run(fault, func(t *testing.T) {
 			api := fake.NewSimpleClientset()
-			verifier := PodReceiptAuthenticator{API: api, Audience: "receipts", Namespace: "test", ServiceAccountName: "dialer", ServiceAccountUID: "sa-uid", DaemonSetName: "dialer", DaemonSetUID: "daemon-uid"}
+			verifier := PodReceiptAuthenticator{API: api, Audience: "receipts", Namespace: "test", ServiceAccountName: "dialer", ServiceAccountUID: "sa-uid", DaemonSetName: "dialer", DaemonSetUID: "daemon-uid", ContainerName: "dialer", Image: receiptTestImage, ImageID: receiptTestImage}
 			status := authenticationv1.TokenReviewStatus{Authenticated: true, Audiences: []string{verifier.Audience}, User: authenticationv1.UserInfo{Username: "system:serviceaccount:test:dialer", UID: "sa-uid", Extra: map[string]authenticationv1.ExtraValue{
 				"authentication.kubernetes.io/pod-name": {"pod"}, "authentication.kubernetes.io/pod-uid": {"pod-uid"}, "authentication.kubernetes.io/node-name": {"node"}, "authentication.kubernetes.io/node-uid": {"node-uid"},
 			}}}
@@ -58,6 +58,33 @@ func TestReceiptAuthenticationRejectsIncompleteReviews(t *testing.T) {
 			}
 			if len(api.Actions()) != 1 {
 				t.Fatal("invalid identity reached object authorization")
+			}
+		})
+	}
+}
+
+func TestReceiptAuthenticationRequiresPinnedAgentPolicy(t *testing.T) {
+	for _, fault := range []string{"container", "image", "tag", "short-digest", "image-id", "mutable-image-id"} {
+		t.Run(fault, func(t *testing.T) {
+			api := fake.NewSimpleClientset()
+			policy := PodReceiptAuthenticator{API: api, Audience: "receipts", Namespace: "test", ServiceAccountName: "dialer", ServiceAccountUID: "sa", DaemonSetName: "dialer", DaemonSetUID: "ds", ContainerName: "dialer", Image: receiptTestImage, ImageID: receiptTestImage}
+			switch fault {
+			case "container":
+				policy.ContainerName = ""
+			case "image":
+				policy.Image = ""
+			case "tag":
+				policy.Image = "example.invalid/dialer:latest"
+			case "short-digest":
+				policy.Image = "example.invalid/dialer@sha256:abc"
+			case "image-id":
+				policy.ImageID = ""
+			case "mutable-image-id":
+				policy.ImageID = "example.invalid/dialer:latest"
+			}
+			proof, err := policy.Authenticate(context.Background(), "credential", Receipt{NodeUID: "node"}, "boot")
+			if err == nil || proof != (AuthenticatedReceipt{}) || len(api.Actions()) != 0 {
+				t.Fatal("invalid release policy reached authentication")
 			}
 		})
 	}

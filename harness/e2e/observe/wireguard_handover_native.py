@@ -46,7 +46,9 @@ def outcomes_expected(phases, mode):
     return True
 
 
-def experiment(mode):
+def experiment(mode, planner=None):
+    if planner and mode != 'dual':
+        raise ValueError('planner requires independent receiver mode')
     if mode not in ('single', 'dual'):
         raise ValueError('unsupported receiver mode')
     require_isolation()
@@ -94,9 +96,22 @@ def experiment(mode):
                 path.write_bytes(key)
                 path.chmod(384)
                 paths[name] = str(path)
-            devices = [('old', 'wgtest', 'old', 51820), ('new', 'wgtest', 'new', 51820), ('cloud', 'wgold', 'receiver-old', 51820)]
+            receivers = {name: dict(interface='wg'+name, allowedSources=['10.90.0.10/32']) for name in ['old', 'new']}
+            if planner:
+                request = dict(meshID='native-receiver-contract',
+                    previous=dict(peers=[dict(publicKey=pubs['old'], allowedIPs=['10.90.0.10/32'])]),
+                    desired=dict(peers=[dict(publicKey=pubs['new'], allowedIPs=['10.90.0.10/32'], routeHosts=['10.90.0.10'])]),
+                    native=['172.29.0.0/24'])
+                plan = json.loads(run(planner, input=json.dumps(request).encode()))
+                if plan['desired'] != request['desired']:
+                    raise RuntimeError('receiver preparation changed the desired egress document')
+                by_key = {path['publicKey']: path for path in plan['receivers']}
+                if set(by_key) != {pubs['old'], pubs['new']}:
+                    raise RuntimeError('receiver plan omitted or added an endpoint')
+                receivers = {name: by_key[pubs[name]] for name in ['old', 'new']}
+            devices = [('old', 'wgtest', 'old', 51820), ('new', 'wgtest', 'new', 51820), ('cloud', receivers['old']['interface'], 'receiver-old', 51820)]
             if mode == 'dual':
-                devices.append(('cloud', 'wgnew', 'receiver-new', 51821))
+                devices.append(('cloud', receivers['new']['interface'], 'receiver-new', 51821))
             for name, iface, key, port in devices:
                 ns(name, 'ip', 'link', 'add', iface, 'type', 'wireguard')
                 ns(name, 'wg', 'set', iface, 'private-key', paths[key], 'listen-port', str(port))
@@ -105,24 +120,24 @@ def experiment(mode):
             for i, name in enumerate(['old', 'new'], 1):
                 ns(name, 'wg', 'set', 'wgtest', 'peer', pubs['receiver-' + (name if mode == 'dual' else 'old')], 'endpoint', '198.18.0.3:' + str(51819 + i if mode == 'dual' else 51820), 'allowed-ips', '10.88.0.3/32', 'persistent-keepalive', '1')
                 ns(name, 'ip', 'route', 'add', '10.88.0.3/32', 'dev', 'wgtest')
-                ns('cloud', 'wg', 'set', 'wg' + (name if mode == 'dual' else 'old'), 'peer', pubs[name], 'endpoint', f'198.18.0.{i}:51820', 'allowed-ips', '10.90.0.10/32' if mode == 'dual' or name == 'old' else '10.90.0.99/32', 'persistent-keepalive', '1')
+                ns('cloud', 'wg', 'set', receivers[name if mode == 'dual' else 'old']['interface'], 'peer', pubs[name], 'endpoint', f'198.18.0.{i}:51820', 'allowed-ips', ','.join(receivers[name]['allowedSources']) if mode == 'dual' or name == 'old' else '10.90.0.99/32', 'persistent-keepalive', '1')
             ns('pod', 'ip', 'route', 'add', '10.88.0.3/32', 'via', '10.90.0.1')
-            ns('cloud', 'ip', 'route', 'add', '10.90.0.10/32', 'dev', 'wgold')
+            ns('cloud', 'ip', 'route', 'add', '10.90.0.10/32', 'dev', receivers['old']['interface'])
             server = "import socket,json;s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);s.bind(('10.88.0.3',8081));\nwhile True:\n b,a=s.recvfrom(4096);s.sendto(json.dumps(dict(body=b.decode(),source=a[0])).encode(),a)"
             procs.append(subprocess.Popen(['ip', 'netns', 'exec', 'cloud', 'python3', '-c', server], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE))
             time.sleep(2)
             sender = "import socket,json,time\nrows=[]\nfor i in range(3):\n s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);s.bind(('10.90.0.10',0));s.settimeout(1);body='probe-'+str(i);s.sendto(body.encode(),('10.88.0.3',8081))\n try:\n  b,a=s.recvfrom(4096);r=json.loads(b);rows.append(dict(ok=r['body']==body and r['source']=='10.90.0.10',receiverObservedSource=r['source'],replySource=a[0]))\n except TimeoutError:rows.append(dict(ok=False,error='timeout'))\n finally:s.close()\n time.sleep(.1)\nprint(json.dumps(rows))"
-            result = dict(scope='Isolated kernel handover characterization', mode=mode, qualificationEligible=False, isolatedFromGuestHost=True, phases={})
+            result = dict(scope='Isolated kernel handover characterization', mode=mode, qualificationEligible=False, isolatedFromGuestHost=True, plannerUsed=bool(planner), phases={})
             result['phases']['both-directions-old'] = json.loads(ns('pod', 'python3', '-c', sender))
             if mode == 'dual':
-                ns('cloud', 'ip', 'route', 'replace', '10.90.0.10/32', 'dev', 'wgnew')
+                ns('cloud', 'ip', 'route', 'replace', '10.90.0.10/32', 'dev', receivers['new']['interface'])
             else:
                 ns('cloud', 'wg', 'set', 'wgold', 'peer', pubs['new'], 'allowed-ips', '10.90.0.10/32')
             result['phases']['old-outbound-new-return'] = json.loads(ns('pod', 'python3', '-c', sender))
             ns('pod', 'ip', 'route', 'replace', '10.88.0.3/32', 'via', '10.90.0.2')
             result['phases']['both-directions-new'] = json.loads(ns('pod', 'python3', '-c', sender))
             if mode == 'dual':
-                ns('cloud', 'ip', 'route', 'replace', '10.90.0.10/32', 'dev', 'wgold')
+                ns('cloud', 'ip', 'route', 'replace', '10.90.0.10/32', 'dev', receivers['old']['interface'])
             else:
                 ns('cloud', 'wg', 'set', 'wgold', 'peer', pubs['old'], 'allowed-ips', '10.90.0.10/32')
             result['phases']['new-outbound-old-return'] = json.loads(ns('pod', 'python3', '-c', sender))
@@ -139,4 +154,6 @@ def experiment(mode):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mode', choices=['single', 'dual'], required=True)
-    experiment(parser.parse_args().mode)
+    parser.add_argument('--planner', help='staged receiveplan executable; consumes the public request on stdin')
+    args = parser.parse_args()
+    experiment(args.mode, args.planner)

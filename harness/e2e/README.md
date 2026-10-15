@@ -220,6 +220,15 @@ unshare --mount --net --propagation private \
   python3 observe/wireguard_handover_native.py --mode dual
 ```
 
+To exercise the Go receive-only planner, build `./cmd/receiveplan`, stage the
+binary in the VM through the labcontainers node transport, and pass
+`--planner /staged/receiveplan` with `--mode dual`. The experiment uses the
+planner's actual interface identities and source permissions. The planner
+preserves desired egress separately, rejects missing peer documents and
+ambiguous ownership, and excludes protected native prefixes from site ingress.
+It does not allocate listening ports, distribute private identities, activate
+routes, or authorize retirement of previous receive permissions.
+
 The single-device control expects failed exchanges when sender and receiver
 ownership disagree. The dual-receiver case requires exchanges in both
 asymmetric directions and checks the source address observed by the receiver.

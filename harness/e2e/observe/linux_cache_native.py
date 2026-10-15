@@ -32,6 +32,24 @@ def sha256(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
+def file_identities(paths):
+    """Read stable regular files without following a final symbolic link."""
+    identities = {}
+    for path in paths:
+        with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as stream:
+            before = os.fstat(stream.fileno())
+            require(stat.S_ISREG(before.st_mode), 'Require a regular runtime file')
+            digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+            after = os.fstat(stream.fileno())
+        current = path.lstat()
+        fields = ('st_dev', 'st_ino', 'st_mode', 'st_size', 'st_mtime_ns', 'st_ctime_ns')
+        require(all(getattr(before, field) == getattr(after, field) == getattr(current, field)
+                    for field in fields), 'Runtime file changed during observation')
+        identities[str(path)] = dict(sha256=digest, inode=after.st_ino,
+                                     ctimeNs=after.st_ctime_ns, mtimeNs=after.st_mtime_ns)
+    return identities
+
+
 def preflight(recipe):
     expected_images(recipe)
     architecture = {'x86_64': 'amd64', 'aarch64': 'arm64'}.get(platform.machine())
@@ -60,6 +78,8 @@ def preflight(recipe):
 
 def observe(recipe, operation):
     architecture = preflight(recipe)
+    paths = [WORKER, *(BIN/name for name in ('containerd', 'containerd-shim-runc-v2', 'runc'))]
+    identities = file_identities(paths)
     operation.mkdir(mode=0o700)
 
     def save(name, value):
@@ -67,6 +87,7 @@ def observe(recipe, operation):
             json.dump(value, stream, indent=2)
             stream.write('\n')
 
+    save('file-identities-before.json', identities)
     save('intent.json', dict(recipeSHA256=hashlib.sha256(
         json.dumps(recipe, sort_keys=True).encode()).hexdigest(), root=str(ROOT)))
     state = pathlib.Path('/run')/('cldt-cache-check-'+str(os.getpid()))
@@ -113,6 +134,13 @@ def observe(recipe, operation):
     result = evaluate(recipe, observation)
     save('validation.json', result)
     require(result['passed'], 'Native cache gate failed; retain the original operation evidence')
+    final_identities = file_identities(paths)
+    save('file-identities-after.json', final_identities)
+    require(identities == final_identities, 'Runtime files changed during cache verification')
+    save('capture-receipt.json', dict(schemaVersion=1, validation=result, observation=observation,
+        fileIdentities=identities, nativeArchitecture=architecture,
+        recipeSHA256=hashlib.sha256(json.dumps(recipe, sort_keys=True).encode()).hexdigest(),
+        qualificationEligible=False))
     return result
 
 

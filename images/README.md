@@ -139,6 +139,12 @@ configuration stays in the operation directory; it does not generate the
 distribution's configuration or install Kubernetes services. Both original
 runtime processes must exit before the check passes.
 
+The checker also writes `capture-receipt.json` with the recipe digest, native
+architecture, cache observations, and the hash, inode, modification time and
+change time of each runtime executable. It rejects replacement or modification
+during verification. Retain this receipt for comparison with a fresh worker;
+a matching file timestamp alone cannot establish reuse.
+
 Retain the operation evidence outside the image. If interrupted, inspect that
 operation and its processes before retrying in a new directory. A passing result
 only accepts the builder cache. Image capture and a fresh CAPI worker must still

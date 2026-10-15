@@ -5,7 +5,7 @@
 // out, no wg-quick, no dependence on the node's AppArmor profile for
 // /usr/bin/wg.
 //
-// It provides node-to-node reachability only.
+// It routes node identities and discovered pod allocations between peers.
 //
 //   - WireGuard's cryptokey-routing accept list
 //     (wgtypes.PeerConfig.AllowedIPs) decides which peer's key
@@ -16,20 +16,14 @@
 //     nothing else: the trie has one owner per prefix, so a range
 //     shared between peers would belong to whichever was written last.
 //     It is a packet filter, not a route source.
-//   - Kernel routes: one host route (/32 or /128, enforced at parse
-//     time; anything broader is a hard error, not a warning) per
-//     peer route-host, installed in the main table. Longest-prefix
-//     match is the whole mechanism: a /32 to a peer's tunnel address
-//     wins over a LAN /24 or a VPC default route for exactly that one
-//     host and nothing else. Routing to pods is the network's concern:
-//     it learns pod blocks over sessions that ride these node routes,
-//     and this binary installs no pod or service route of its own.
+//   - Kernel routes: node route-hosts must be /32 or /128. Discovered
+//     pod allocations retain their published prefixes. These routes live
+//     in the dialer's policy table, consulted before main, so they do not
+//     become main-table advertisements for a site's routing daemon.
 //
-// There is no policy-routing table here. Peer routes in a dedicated
-// table behind an after-main FIB rule are structurally unreachable on
-// any host with a default route, because main matches everything
-// first. Safety comes from the host-prefix-only rule above, not from
-// table placement.
+// An exact firewall-mark exemption sends encrypted outer packets through
+// main before consulting the tunnel table. This prevents recursive routing
+// when a peer's endpoint address is also a destination carried by the tunnel.
 package main
 
 import (
@@ -339,12 +333,8 @@ func main() {
 			// reasons that mean the opposite: any edit to the
 			// DaemonSet's pod template restarts every dialer, and
 			// changing where tunnels are placed edits that template.
-			// So moving a tunnel from one node to another tore down
-			// every other node's tunnel too, and a remote that reads
-			// its peer list over one of them lost the path it needed
-			// in order to be told anything. Measured: a node still
-			// selected, still published, still retained, with no
-			// interface at all.
+			// Removing interfaces on every restart would also remove
+			// the path a remote needs to read its updated peer list.
 			//
 			// A left-behind device is a bounded cost: the next dialer
 			// on this node adopts it, and the operator who genuinely
@@ -419,11 +409,8 @@ func ensureForwardingPath(iface string, mtu int) error {
 	// numerically greater than 1 (strict), so a single 2 anywhere in
 	// that pair decides it. That is why relaxing only "all" is not
 	// enough: with all=0 an interface that is itself 1 stays strict.
-	// Measured on a rebooted remote, where the restored NIC inherited
-	// conf/default/rp_filter=1 while all was 0: the peer's handshake
-	// responses arrived on the wire, IPReversePathFilter counted every
-	// one of them, WireGuard's rx never moved, and that node's
-	// cloud-to-cloud tunnel stayed dead while every other path worked.
+	// A restored NIC can inherit conf/default/rp_filter=1 even when all
+	// is zero, causing handshake responses to fail the reverse-path check.
 	//
 	// So: every knob that is strict becomes loose, and a knob that is
 	// off is left alone. Loose still drops a packet whose source is
@@ -1224,15 +1211,9 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			// out. The two look identical here and differ in one thing:
 			// whether an interface exists.
 			//
-			// If one does, it is a corpse, and leaving it is not free.
-			// Its route for the remote's pod block sits in the kernel
-			// inside the cluster's pod pool, so the CNI redistributes it
-			// and the node goes on telling the whole site it can reach
-			// pods it cannot: a black hole that the site installs
-			// alongside the working path and sends half its traffic
-			// into. Measured on a node that had not been an endpoint for
-			// an hour, still advertising, still winning half of every
-			// flow.
+			// An existing interface and its routes no longer represent
+			// published ownership. Retaining them can keep forwarding
+			// traffic toward a peer that no longer accepts this node.
 			//
 			// This is cluster state saying the node is not an endpoint,
 			// which is not the same as this process being told to stop.
@@ -1510,10 +1491,9 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 	// node is relayed, its egress follows each remote's applied view,
 	// not the render's: a remote that has not acknowledged still
 	// accepts this node's sources only on this node's own entry, and
-	// one that has accepts them only through the relay. Sending every
-	// remote down the relay was measured as the deadlock it caused:
-	// the stale remote's API replies left by the relay, were dropped,
-	// and the list that would have updated it stayed unreadable.
+	// one that has accepts them only through the relay. Switching an
+	// unacknowledged remote can discard its API replies and prevent it
+	// from reading the configuration needed to complete the transition.
 	peerName := map[string]string{}
 	peerAcked := map[string]bool{}
 	if selfRelayed && meshSecret != nil && clientset != nil {
@@ -1867,13 +1847,8 @@ func disposeRouteHost(marked, isEndpointHost, peerCanCarry bool) routeHostDispos
 // accept list, not by the route, so a route left in place becomes
 // correct the moment the handshake lands.
 //
-// Measured on remote2, when the control plane became the endpoint: the
-// route for the API server's address was pruned at 22:17:33 because
-// the control plane, which is behind NAT and therefore dials in, had
-// not handshaked yet. The API went unreachable, so the list naming the
-// control plane could not be re-read, and only the cached copy of that
-// same list carried it back once the handshake arrived, two minutes
-// later.
+// Withdrawing a still-claimed API route before a NATed peer completes its
+// handshake can also remove the path needed to read corrective peer state.
 func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relay *tunnel.TransitSpec, relayDsts []net.IPNet, own []string) error {
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
@@ -1993,16 +1968,6 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	return nil
 }
 
-// reconcileSiteTransit is the dialer's whole job on a site node that
-// terminates no tunnel: reach the remotes through the node that relays
-// for it.
-//
-// The next hop is derived from the same data and the same election the
-// render uses (see tunnel.SiteTransit), so it is, by construction, the
-// peer whose entry carries this node's own prefixes in every remote's
-// accept list. A routing protocol carried this before, and its windows
-// were measured: the choice was in flight while the routes it replaced
-// were already gone.
 // notReadyNodes is the set of node names whose Ready condition the API
 // server does not report true. It is advisory input to the transit
 // election: no reachable API server or no listable nodes means no
@@ -2031,6 +1996,10 @@ func notReadyNodes(ctx context.Context, clientset *kubernetes.Clientset) map[str
 	return dead
 }
 
+// reconcileSiteTransit routes through the published relay on a site node
+// that terminates no tunnel. The next hop and peer rendering use the same
+// election (tunnel.SiteTransit), keeping route selection consistent with
+// the peer whose entry accepts this node's prefixes.
 func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes.Clientset, secret *corev1.Secret) error {
 	node, err := clientset.CoreV1().Nodes().Get(ctx, cfg.nodeName, metav1.GetOptions{})
 	if err != nil {
@@ -2179,12 +2148,9 @@ func transitSource(dst net.IP, own []string, local []net.IP) net.IP {
 
 // exemptRulePriority is where the tunnel's mark exemption lives:
 // ahead of every CNI's own fwmark classifier, because those match by
-// MASK and can capture our mark by accident. Measured: cilium
-// installs "from all fwmark 0x200/0xf00 lookup 2004" at priority 9,
-// our 0x205 & 0xf00 == 0x200, and table 2004 is "local default dev
-// lo", so every encrypted packet the tunnel sent was delivered to
-// loopback: zero egress, zero handshakes, a join gate that waited
-// twelve hours. The exemption matches our exact mark and nothing
+// MASK and can capture our mark by accident. For example, a CNI rule
+// matching 0x200/0xf00 also matches 0x205 and may select a local-delivery
+// table. The exemption matches our exact mark and nothing
 // else, so sitting at priority 1 takes precisely the tunnel's own
 // packets and no one else's.
 const exemptRulePriority = 1

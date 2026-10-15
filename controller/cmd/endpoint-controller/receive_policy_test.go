@@ -8,6 +8,10 @@ func TestReceivePreparationPolicy(t *testing.T) {
 		valid     bool
 	}{
 		{"disabled", "", true},
+		{"journal", `{"nativeCIDRs":["172.29.0.0/24"],"ports":[51821],"journal":{"roundLifetime":"5m","maxReceiptAge":"1m","drainInterval":"3m"}}`, true},
+		{"journal-missing-drain", `{"nativeCIDRs":["172.29.0.0/24"],"ports":[51821],"journal":{"roundLifetime":"5m","maxReceiptAge":"1m"}}`, false},
+		{"journal-stale-receipts", `{"nativeCIDRs":["172.29.0.0/24"],"ports":[51821],"journal":{"roundLifetime":"1m","maxReceiptAge":"5m","drainInterval":"3m"}}`, false},
+		{"journal-duration", `{"nativeCIDRs":["172.29.0.0/24"],"ports":[51821],"journal":{"roundLifetime":"invalid","maxReceiptAge":"1m","drainInterval":"3m"}}`, false},
 		{"explicit", `{"nativeCIDRs":["172.29.0.0/24","2001:db8::/56"],"ports":[51821,51822]}`, true},
 		{"empty", `{}`, false},
 		{"null", `null`, false},

@@ -13,10 +13,40 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func (r *meshReconciler) configureReceiveJournal(ctx context.Context, api kubernetes.Interface) error {
+	namespace, err := api.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if namespace.UID == "" || namespace.DeletionTimestamp != nil {
+		return fmt.Errorf("receiver journal requires a live cluster identity")
+	}
+	r.receiveJournal = handover.Store{ConfigMaps: api.CoreV1().ConfigMaps(r.secretNamespace), ClusterUID: string(namespace.UID)}
+	return nil
+}
+
+func (r *meshReconciler) reconcileReceivePreparation(ctx context.Context, machine *unstructured.Unstructured) error {
+	p := r.receivePreparation
+	if p.Journal == nil {
+		_, err := r.prepareRemoteReceivePaths(ctx, machine, p.NativeCIDRs, p.Ports)
+		return err
+	}
+	policy, err := p.Journal.policy()
+	if err != nil {
+		return err
+	}
+	store := r.receiveJournal
+	store.Name = receiveTransitionName(string(machine.GetUID()))
+	_, err = r.ensureReceiveTransition(ctx, machine, store, p.NativeCIDRs, p.Ports, policy, time.Now())
+	return err
+}
 
 func receiveTransitionName(machineUID string) string {
 	sum := sha256.Sum256([]byte(machineUID))

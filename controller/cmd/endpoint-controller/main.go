@@ -40,6 +40,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni/awspod"
 	"github.com/appmana/cloud-provisioning/controller/pkg/discover"
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	joindocker "github.com/appmana/cloud-provisioning/controller/pkg/join/docker"
@@ -143,6 +144,7 @@ type meshReconciler struct {
 	siteDialerSelector     labels.Selector
 	awsPodObserver         *awspod.Observer
 	receivePreparation     *receivePreparationPolicy
+	receiveJournal         handover.Store
 	tunnelSubnet           string
 	localAddressBase       string
 	// tunnelIPv6Prefix is the prefix IPv6 tunnel addresses are paired
@@ -1633,8 +1635,7 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 		if !machine.GetDeletionTimestamp().IsZero() || machine.GetAnnotations()[attachment.DrainIntentAnnotation] != "" {
 			return nil
 		}
-		_, err := r.prepareRemoteReceivePaths(ctx, machine, r.receivePreparation.NativeCIDRs, r.receivePreparation.Ports)
-		return err
+		return r.reconcileReceivePreparation(ctx, machine)
 	}
 	if string(existing.Data[tunnel.CloudPeersKey]) == string(doc) {
 		return nil
@@ -2506,6 +2507,20 @@ func main() {
 		mesh.awsPodObserver, err = newAWSPodObserver(*awsPodConfig, *awsPodCredentialsFile, mgr.GetAPIReader())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "AWS pod observer configuration: %v\n", err)
+			os.Exit(1)
+		}
+	}
+	if receivePolicy != nil && receivePolicy.Journal != nil {
+		api, err := kubernetes.NewForConfig(mgr.GetConfig())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		err = mesh.configureReceiveJournal(ctx, api)
+		cancel()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "receiver journal configuration: %v\n", err)
 			os.Exit(1)
 		}
 	}

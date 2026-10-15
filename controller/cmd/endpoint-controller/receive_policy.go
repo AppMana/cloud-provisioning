@@ -7,13 +7,31 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
+
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // receivePreparationPolicy is operator-supplied network policy, not inferred
 // permission to open a firewall. It enables additive preparation only.
 type receivePreparationPolicy struct {
-	NativeCIDRs []netip.Prefix `json:"nativeCIDRs"`
-	Ports       []int          `json:"ports"`
+	NativeCIDRs []netip.Prefix        `json:"nativeCIDRs"`
+	Ports       []int                 `json:"ports"`
+	Journal     *receiveJournalPolicy `json:"journal,omitempty"`
+}
+
+type receiveJournalPolicy struct {
+	RoundLifetime metav1.Duration `json:"roundLifetime"`
+	MaxReceiptAge metav1.Duration `json:"maxReceiptAge"`
+	DrainInterval metav1.Duration `json:"drainInterval"`
+}
+
+func (p receiveJournalPolicy) policy() (handover.Policy, error) {
+	v := handover.Policy{RoundLifetime: p.RoundLifetime.Duration, MaxReceiptAge: p.MaxReceiptAge.Duration, DrainInterval: p.DrainInterval.Duration}
+	if v.RoundLifetime <= 0 || v.MaxReceiptAge <= 0 || v.MaxReceiptAge > v.RoundLifetime || v.DrainInterval <= 0 {
+		return handover.Policy{}, fmt.Errorf("journal requires positive explicit round, receipt and drain durations; receipt age must not exceed round lifetime")
+	}
+	return v, nil
 }
 
 func parseReceivePreparationPolicy(raw, legacyPort string) (*receivePreparationPolicy, error) {
@@ -32,6 +50,11 @@ func parseReceivePreparationPolicy(raw, legacyPort string) (*receivePreparationP
 	}
 	if len(p.NativeCIDRs) == 0 || len(p.Ports) == 0 {
 		return nil, fmt.Errorf("receiver preparation requires native CIDRs and explicitly permitted ports")
+	}
+	if p.Journal != nil {
+		if _, err := p.Journal.policy(); err != nil {
+			return nil, err
+		}
 	}
 	seen := map[netip.Prefix]bool{}
 	for _, prefix := range p.NativeCIDRs {

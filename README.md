@@ -30,6 +30,12 @@ the normal adoption reconciliation. This experimental setting requires agents
 with receiver support; it freezes active peer-list updates and retains existing
 endpoints. It does not activate routes or complete a handover. Removing the
 setting does not discard a persisted proposal or release its forwarding base.
+An optional `journal` object supplies explicit `roundLifetime`, `maxReceiptAge`
+and `drainInterval` duration strings. This persists the validated public plan
+and initial prepare round in a controller-owned ConfigMap, bound to the cluster
+and Machine UIDs. Reconciliation resumes that exact journal; it does not renew
+expired rounds or advance phases. Choose the drain bound for the deployment's
+packet lifetime before enabling phase execution.
 
 Apply [a worker template and claim](examples/aws-worker.yaml). Claims create
 billable resources; deleting one removes its worker. The chart uses these

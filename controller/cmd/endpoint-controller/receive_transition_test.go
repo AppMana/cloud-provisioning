@@ -12,6 +12,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes"
@@ -43,11 +44,23 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	if _, err := k.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: machine.GetNamespace()}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	store := handover.Store{ConfigMaps: k.CoreV1().ConfigMaps(machine.GetNamespace()), Name: receiveTransitionName(string(machine.GetUID())), ClusterUID: "cluster-uid"}
+	if _, err := k.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system"}}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+		t.Fatal(err)
+	}
+	if err := r.configureReceiveJournal(ctx, k); err != nil {
+		t.Fatal(err)
+	}
+	r.receivePreparation.Journal = &receiveJournalPolicy{RoundLifetime: metav1.Duration{Duration: time.Minute}, MaxReceiptAge: metav1.Duration{Duration: 10 * time.Second}, DrainInterval: metav1.Duration{Duration: 5 * time.Second}}
+	defer func() { r.receivePreparation.Journal = nil }()
+	store := r.receiveJournal
+	store.Name = receiveTransitionName(string(machine.GetUID()))
 	now := time.Now()
-	snapshot, err := r.ensureReceiveTransition(ctx, machine, store, native, ports, handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: 10 * time.Second, DrainInterval: 5 * time.Second}, now)
-	if err != nil || snapshot == nil {
-		t.Fatalf("controller did not commit a prepared plan: %v", err)
+	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
+		t.Fatalf("normal adoption reconciliation did not commit a prepared plan: %v", err)
+	}
+	snapshot, err := store.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
 	}
 	view, err := snapshot.Transition().View()
 	if err != nil {
@@ -62,6 +75,17 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	}
 	if plan.MachineUID != string(machine.GetUID()) || len(plan.Sites) != 1 {
 		t.Fatal("journal lost controller plan")
+	}
+	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
+		t.Fatalf("normal reconciliation could not resume its journal: %v", err)
+	}
+	resumed, err := store.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resumedView, err := resumed.Transition().View()
+	if err != nil || resumedView.Round.Nonce != view.Round.Nonce || !bytes.Equal(snapshot.Plan(), resumed.Plan()) {
+		t.Fatal("normal reconciliation replaced the committed plan or round")
 	}
 	// An expired observation round remains the same persisted round on restart.
 	// No new policy or missing transient preparation input may silently renew it.
@@ -80,5 +104,16 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	replaced.SetUID("replacement-machine")
 	if _, err := r.ensureReceiveTransition(ctx, replaced, store, native, ports, handover.Policy{}, now); err == nil {
 		t.Fatal("replacement machine adopted another journal")
+	}
+	object, err := k.CoreV1().ConfigMaps(machine.GetNamespace()).Get(ctx, store.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	object.Data["plan.json"] = "{}"
+	if _, err := k.CoreV1().ConfigMaps(machine.GetNamespace()).Update(ctx, object, metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.ensureAdoptionConfig(ctx, machine); err == nil {
+		t.Fatal("normal reconciliation accepted a corrupted journal plan")
 	}
 }

@@ -79,6 +79,8 @@ tunnel:
   # Supply complete protected cloud network ranges and UDP ports already
   # permitted by the worker security groups. Requires receiver-capable agents.
   # Freezes active peer updates and retains endpoints; does not switch traffic.
+  # Optional journal: {roundLifetime: <duration>, maxReceiptAge: <duration>,
+  # drainInterval: <duration>} persists the initial phase without advancing it.
   receivePreparation: {}
   # Node selector (k=v,k2=v2) choosing which local nodes terminate
   # tunnels. Empty selects every Linux worker; control planes are

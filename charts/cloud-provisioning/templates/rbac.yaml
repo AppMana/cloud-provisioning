@@ -23,6 +23,12 @@ kind: ClusterRole
 metadata:
   name: {{ include "cloud-provisioning.controllerName" . }}
 rules:
+  {{- if and .Values.tunnel.receivePreparation .Values.tunnel.receivePreparation.journal }}
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    resourceNames: ["kube-system"]
+    verbs: ["get"]
+  {{- end }}
   {{- if .Values.experimentalNodeGroups }}
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodegroupclaims"]

@@ -181,6 +181,46 @@ class CaptureResume(unittest.TestCase):
         self.assertEqual(len(self.state['builderVerificationHistory']), 1)
         self.assertEqual(self.state['builderVerificationHistory'][0]['capturedImageID'], 'ami-candidate')
 
+    def test_replacement_can_bind_new_check_and_resume_only_new_command(self):
+        first = self.work/'first.sh'
+        first.write_text('echo first-check\n')
+        self.invoke(check=first)
+        original = dict(self.state['captureCheck'])
+        second = self.work/'second.sh'
+        second.write_text('echo second-check\n')
+        with self.assertRaisesRegex(RuntimeError, 'observation timed out'):
+            self.invoke(replace=True, check=second, timeout=True)
+        self.invoke(replace=True)
+        self.assertEqual(self.count('send-command'), 2)
+        self.assertEqual(self.state['captureCheckHistory'], [original])
+        self.assertEqual((self.work/original['file']).read_text(), 'echo first-check\n')
+        commands = [value['Parameters']['commands'][0] for op, value in self.calls if op == 'send-command']
+        self.assertIn('second-check', commands[1])
+        self.assertNotIn('first-check', commands[1])
+
+    def test_replacement_cannot_change_pending_check(self):
+        first = self.work/'first.sh'
+        first.write_text('true\n')
+        with self.assertRaises(RuntimeError):
+            self.invoke(check=first, timeout=True)
+        second = self.work/'second.sh'
+        second.write_text('echo changed\n')
+        with self.assertRaisesRegex(RuntimeError, 'already bound'):
+            self.invoke(replace=True, check=second)
+        self.assertEqual(self.count('send-command'), 1)
+        self.assertNotIn('builderVerificationHistory', self.state)
+
+    def test_completed_check_tampering_cannot_be_hidden_by_replacement(self):
+        first = self.work/'first.sh'
+        first.write_text('true\n')
+        self.invoke(check=first)
+        (self.work/self.state['captureCheck']['file']).write_text('false\n')
+        second = self.work/'second.sh'
+        second.write_text('echo changed\n')
+        with self.assertRaisesRegex(RuntimeError, 'content changed'):
+            self.invoke(replace=True, check=second)
+        self.assertEqual(self.count('send-command'), 1)
+
     def test_unbound_legacy_command_requires_reconciliation(self):
         self.state['builderCommandID'] = 'legacy-command'
         self.save()

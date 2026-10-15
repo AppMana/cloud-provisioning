@@ -147,6 +147,27 @@ elif a.stage == 'capture':
             if hashlib.sha256(verify.encode()).hexdigest() != s['imageRecipe']['verifySHA256']:
                 raise RuntimeError('saved image verification script has changed')
             prepare += verify + '\n'
+        if a.replace_candidate and s.get('builderVerification', {}).get('capturedImageID'):
+            previous = s['builderVerification']
+            if previous['capturedImageID'] != s.get('candidateAMIID'):
+                raise RuntimeError('recorded verification does not match the candidate being replaced')
+            if (previous.get('status') != 'Success' or previous.get('responseCode') != 0 or
+                    previous.get('instanceID') != s['builderInstanceID']):
+                raise RuntimeError('replacement requires a successful capture from this builder')
+            if s.get('captureCheck'):
+                prior = s['captureCheck']
+                if (prior['instanceID'] != s['builderInstanceID'] or
+                        hashlib.sha256((work/prior['file']).read_bytes()).hexdigest() != prior['sha256']):
+                    raise RuntimeError('Saved capture check identity or content changed')
+            if a.capture_check:
+                validate_shell(a.capture_check.read_text())
+            # Only a completed capture can begin another acceptance command.
+            # Pending/failed commands keep their original binding and receipts.
+            s.setdefault('builderVerificationHistory', []).append(s.pop('builderVerification'))
+            s.pop('builderCommandID', None)
+            if a.capture_check and s.get('captureCheck'):
+                s.setdefault('captureCheckHistory', []).append(s.pop('captureCheck'))
+            save()
         if a.capture_check:
             extra_check = a.capture_check.read_text()
             validate_shell(extra_check)
@@ -178,12 +199,6 @@ elif a.stage == 'capture':
         command = ('set -eu; test -f /var/lib/cloud-provisioning-image-ready; '
             'if test -e /var/lib/cloud/data/status.json; then cloud-init status --wait; fi; cloud-init --version; '
             'test ! -e /etc/secret-userdata.txt; bash -c ' + shlex.quote(prepare))
-        if a.replace_candidate and s.get('builderVerification', {}).get('capturedImageID'):
-            if s['builderVerification']['capturedImageID'] != s.get('candidateAMIID'):
-                raise RuntimeError('recorded verification does not match the candidate being replaced')
-            s.setdefault('builderVerificationHistory', []).append(s.pop('builderVerification'))
-            s.pop('builderCommandID', None)
-            save()
         identity = dict(instanceID=s['builderInstanceID'],
                         commandSHA256=hashlib.sha256(command.encode()).hexdigest())
         verification = s.get('builderVerification')

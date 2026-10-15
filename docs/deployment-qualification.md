@@ -67,6 +67,29 @@ harness or registry credentials, and it does not itself issue credentials.
 Qualify rotation across an actual expiry boundary, including producer outage,
 before relying on this mechanism for the 24-hour soak.
 
+The isolated AWS harness provides `aws/observer_credentials.py` as a separate
+producer. Run it with setup credentials that remain refreshable for the entire
+campaign; the one-hour harness federation session cannot issue these sessions.
+From `harness/e2e`:
+
+```sh
+python3 aws/observer_credentials.py --work-dir "$CAMPAIGN_DIRECTORY" \
+  --runner "$ISOLATED_RUNNER" --cluster-uid "$KUBE_SYSTEM_UID" \
+  --receipts "$FRESH_PRIVATE_RECEIPTS_DIRECTORY" --duration 86400
+```
+
+Set `awsPodObserver.credentialsFileSecret=native-pod-observer-file` in the
+candidate deployment. The producer verifies the distinct Docker daemon,
+explicit cluster UID, AWS account and Secret ownership before each renewal.
+It issues region-limited `ec2:DescribeNetworkInterfaces` credentials and renews
+ten minutes before expiry. Secret replacement uses its existing resource
+version. It does not change IAM policies, networking or controller workloads.
+A failed or ambiguous write stops the process without automatic retry; inspect
+the actual Secret before restarting. Retain all receipts and require terminal
+completion; a missing terminal receipt is incomplete, including process death.
+Successful Secret publication alone does not establish projection to the Pod
+or successful observer API calls across expiry.
+
 Do not enable the Windows gateway adapter in the same deployment.
 
 ```json

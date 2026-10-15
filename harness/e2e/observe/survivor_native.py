@@ -268,8 +268,7 @@ class Session:
         session = json.loads((self.output/'session.json').read_text())
         initial = json.loads((self.output/'initial.json').read_text())
         self.stop()
-        reports=[]
-        for i,lane in enumerate(session['lanes']):
+        def collect_lane(i, lane):
             for attempt in range(30):
                 status=self.control(i,lane,'terminal-'+str(attempt),
                     [lane['executable'],'-stream-dir',lane['directory'],'-status'])
@@ -283,6 +282,19 @@ class Session:
             result=evaluate(gzip.decompress(compressed),receipt,status['result'],
                 lane['source']['podIP'],session['maxGap'],
                 progress_attempts[i] if progress_attempts is not None else None)
-            reports.append(dict(source=lane['source']['pod'],target=lane['target']['pod'],**result))
+            return i, dict(source=lane['source']['pod'],target=lane['target']['pod'],**result)
+
+        # Serialize requests to each host while independent hosts collect in
+        # parallel. Every lane keeps its own immutable receipts and log file.
+        groups = {}
+        for i, lane in enumerate(session['lanes']):
+            groups.setdefault(lane['source']['nodeUID'], []).append((i, lane))
+
+        def collect_host(lanes):
+            return [collect_lane(i, lane) for i, lane in lanes]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, max(1, len(groups)))) as pool:
+            collected = list(pool.map(collect_host, groups.values()))
+        reports = [report for _, report in sorted(item for group in collected for item in group)]
         stable=snapshot(self.kube,[(s['pod'],s['nodeUID']) for s in initial]) == initial
         return reports, stable

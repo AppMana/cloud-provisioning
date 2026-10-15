@@ -120,6 +120,68 @@ class NativeControlTest(unittest.TestCase):
             self.assertTrue(report['identitiesStable'])
             self.assertEqual(len(list(p.glob('lane-*.jsonl.gz'))),6)
 
+    def test_collection_parallelizes_hosts_but_preserves_lane_order(self):
+        import gzip
+        import threading
+        from unittest.mock import patch
+        f=json.loads(gzip.decompress((pathlib.Path(__file__).parent/'testdata/survivor-native-session-failure.json.gz').read_bytes()))
+        hosts={lane['source']['nodeUID'] for lane in f['session']['lanes']}
+        self.assertGreater(len(hosts), 1)
+        barrier=threading.Barrier(len(hosts), timeout=5)
+        lock=threading.Lock(); active=set(); seen=set()
+        with tempfile.TemporaryDirectory() as root:
+            p=pathlib.Path(root); session=Session(Mock(),p)
+            for name,value in [('session.json',f['session']),('initial.json',f['initial'])]:
+                (p/name).write_text(json.dumps(value))
+            for i,lane in enumerate(f['lanes']):
+                (p/f'lane-{i:02d}-receipt.json').write_text(json.dumps(lane['receipt']))
+            def dump(source,args):
+                uid=source['nodeUID']
+                with lock:
+                    self.assertNotIn(uid, active, 'concurrent reads against one host')
+                    active.add(uid); first=uid not in seen; seen.add(uid)
+                try:
+                    if first: barrier.wait()
+                    index=next(i for i,l in enumerate(f['session']['lanes']) if l['directory']==args[2])
+                    return gzip.compress(f['lanes'][index]['raw'].encode())
+                finally:
+                    with lock: active.remove(uid)
+            with patch.object(session,'stop') as stop,patch.object(session,'control',side_effect=lambda i,*args:f['lanes'][i]['terminal']),patch('pod_matrix.snapshot',return_value=f['initial']):
+                reports,stable=session._collect(dump,None)
+            stop.assert_called_once()
+            self.assertTrue(stable)
+            self.assertEqual(seen,hosts)
+            self.assertEqual([(r['source'],r['target']) for r in reports],
+                [(l['source']['pod'],l['target']['pod']) for l in f['session']['lanes']])
+            self.assertEqual(sum(r['attempts']-r['passed'] for r in reports),1)
+            self.assertEqual(len(list(p.glob('lane-*.jsonl.gz'))),len(f['lanes']))
+
+    def test_collection_failure_keeps_other_hosts_evidence_without_retry(self):
+        import gzip
+        from unittest.mock import patch
+        f=json.loads(gzip.decompress((pathlib.Path(__file__).parent/'testdata/survivor-native-session-failure.json.gz').read_bytes()))
+        failed_host=f['session']['lanes'][0]['source']['nodeUID']
+        with tempfile.TemporaryDirectory() as root:
+            p=pathlib.Path(root); session=Session(Mock(),p)
+            for name,value in [('session.json',f['session']),('initial.json',f['initial'])]:
+                (p/name).write_text(json.dumps(value))
+            for i,lane in enumerate(f['lanes']):
+                (p/f'lane-{i:02d}-receipt.json').write_text(json.dumps(lane['receipt']))
+            def dump(source,args):
+                if source['nodeUID']==failed_host: raise RuntimeError('collection unavailable')
+                index=next(i for i,l in enumerate(f['session']['lanes']) if l['directory']==args[2])
+                return gzip.compress(f['lanes'][index]['raw'].encode())
+            callback=Mock(side_effect=dump)
+            with patch.object(session,'stop') as stop,patch.object(session,'control',side_effect=lambda i,*args:f['lanes'][i]['terminal']),patch('pod_matrix.snapshot') as snapshot:
+                with self.assertRaisesRegex(RuntimeError,'collection unavailable'):
+                    session._collect(callback,None)
+            stop.assert_called_once(); snapshot.assert_not_called()
+            self.assertEqual(sum(c.args[0]['nodeUID']==failed_host for c in callback.call_args_list),1)
+            for i,lane in enumerate(f['session']['lanes']):
+                if lane['source']['nodeUID']!=failed_host:
+                    self.assertTrue((p/f'lane-{i:02d}.jsonl.gz').exists())
+            self.assertFalse((p/'result.json').exists())
+
     def test_live_ready_rejects_missing_lane_without_contacting_vm(self):
         import gzip
         from unittest.mock import patch

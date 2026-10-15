@@ -229,6 +229,23 @@ ambiguous ownership, and excludes protected native prefixes from site ingress.
 It does not allocate listening ports, distribute private identities, activate
 routes, or authorize retirement of previous receive permissions.
 
+The dialer's `TestNativeReceivePreparation` exercises receiver creation through
+netlink and wgctrl. Build the dialer test binary with `CGO_ENABLED=0`, stage it
+through the labcontainers node transport, and run it inside a fresh network
+namespace of the isolated VM:
+
+```sh
+unshare --net env CLDT_NATIVE_RECEIVE_PATHS=1 /staged/dialer.test \
+  -test.run '^TestNativeReceivePreparation$' -test.v
+```
+
+It checks separate public identities and listener ports, stable repeated
+preparation, dual-family accept lists, retained old receivers, and unchanged
+routes and policy rules. It rejects identity replacement and implicit source
+withdrawal. This preparation function is not yet called by the reconciliation
+loop; the test does not establish packet continuity, publication, activation,
+retirement, or reboot recovery.
+
 The single-device control expects failed exchanges when sender and receiver
 ownership disagree. The dual-receiver case requires exchanges in both
 asymmetric directions and checks the source address observed by the receiver.

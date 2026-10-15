@@ -98,3 +98,37 @@ on the on-premises control plane alone does not satisfy this dependency.
 - [AWS Windows VPC CNI plugins](https://github.com/aws/amazon-vpc-cni-plugins)
 - [Calico BGP peering](https://docs.tigera.io/calico/latest/networking/configuring/bgp)
 - [AWS hybrid network routing requirements](https://docs.aws.amazon.com/eks/latest/userguide/hybrid-nodes-networking.html)
+
+## Linux campaign manifests
+
+Use `harness/e2e/aws/vpc_cni.py` to render the pinned AWS VPC CNI 1.23.2 Helm
+chart for separate IPv4 and IPv6 campaigns. The renderer verifies the chart
+archive digest, requires immutable CNI/init image references, validates site,
+Service and VPC ranges, and restricts the installer to labelled Linux cloud
+workers. It sets IPv6 consistently in the initializer and IPAM containers;
+IPv6 uses prefix delegation and requires Nitro instances. IPv4 uses secondary
+addresses. Site-bound IPv4 traffic is excluded from SNAT, while normal VPC
+egress retains its upstream behavior.
+
+```sh
+python3 harness/e2e/aws/vpc_cni.py \
+  --chart "$PINNED_CNI_CHART_ARCHIVE" --family ipv6 \
+  --site-cidr "$SITE_NODE_CIDR4" --site-cidr "$SITE_POD_CIDR4" \
+  --site-cidr "$SITE_NODE_CIDR6" --site-cidr "$SITE_POD_CIDR6" \
+  --service-cidr "$SERVICE_CIDR4" --service-cidr "$SERVICE_CIDR6" \
+  --vpc-cidr "$VPC_CIDR4" --vpc-cidr "$VPC_CIDR6" \
+  --run-id "$ISOLATED_RUN_ID" \
+  --image "$CNI_IMAGE_DIGEST" --init-image "$CNI_INIT_IMAGE_DIGEST" \
+  > "$PRIVATE_MANIFEST_PATH"
+```
+
+Installation requires the matching VPC/subnet family, native IPAM IAM policy,
+positive Calico exclusion, and pre-registration cloud labels. The renderer tags
+IPAM-created ENIs with the test run ID; the primary ENI also needs verified
+ownership tags before the allocation observer can accept it. Observe actual
+ENI allocations and packet sources after installation. Rendered manifests alone
+are insufficient evidence for a mixed-CNI campaign.
+
+The chart archive is published in [the AWS Helm repository](https://aws.github.io/eks-charts/).
+The family and prefix-delegation contract is documented in the
+[pinned VPC CNI release](https://github.com/aws/amazon-vpc-cni-k8s/blob/v1.23.2/README.md).

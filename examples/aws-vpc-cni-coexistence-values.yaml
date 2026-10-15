@@ -1,19 +1,25 @@
-# AWS VPC CNI Helm chart v1.22.2. One primary CNI per node; no Multus.
+# AWS VPC CNI Helm chart v1.23.2. One primary CNI per node; no Multus.
 # Label AWS nodes at registration, before any workload CNI installer schedules.
 nodeSelector:
   kubernetes.io/os: linux
   cloud-provisioning.appmana.com/cni: aws-vpc
+  cloud-provisioning.appmana.com/role: cloud-worker
 # NetworkPolicy enforcement is a separate deployment choice.
 enableNetworkPolicy: "false"
 nodeAgent:
   enabled: false
+init:
+  env:
+    ENABLE_IPv6: "false"
 env:
+  ENABLE_IPv4: "true"
+  ENABLE_IPv6: "false"
   AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG: "false"
   AWS_VPC_K8S_CNI_EXTERNALSNAT: "false"
   # Replace with the real site pod and node CIDRs. Preserve pod sources to site.
   AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS: "10.244.0.0/16,10.10.0.0/24"
   AWS_VPC_ENI_MTU: "1500"
-  POD_MTU: "1370"
+  POD_MTU: "1420"
   # This test profile keeps one ENI and a small secondary-address warm pool.
   MAX_ENI: "1"
   WARM_ENI_TARGET: "0"

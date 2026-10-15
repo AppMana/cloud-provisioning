@@ -138,7 +138,7 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := tunnel.ReceivePrepare{Version: 1, MeshUID: string(before.UID), NodeName: "cp", NodeUID: nodeUID, RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(baseRaw), Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: newPeer.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.10/32"}}}}, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}}
+	request := tunnel.ReceivePrepare{Version: 1, MeshUID: string(before.UID), NodeName: "cp", NodeUID: nodeUID, BootID: node.Status.NodeInfo.BootID, RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(baseRaw), Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: newPeer.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.10/32"}}}}, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}}
 	requestRaw, _ := json.Marshal(request)
 	patchData(map[string][]byte{tunnel.ReceivePrepareKey: requestRaw})
 	if err := reconcile(ctx, worker, devices, cfg); err != nil {
@@ -152,8 +152,22 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	if err := json.Unmarshal(current.Data[tunnel.ReceiveReadyKey], &receipt); err != nil {
 		t.Fatal(err)
 	}
-	if receipt.RequestHash != tunnel.HashPeerList(requestRaw) || receipt.SecretUID != string(current.UID) || receipt.NodeUID != nodeUID || len(receipt.Bindings) != 2 {
+	if receipt.RequestHash != tunnel.HashPeerList(requestRaw) || receipt.SecretUID != string(current.UID) || receipt.NodeUID != nodeUID || receipt.BootID != node.Status.NodeInfo.BootID || len(receipt.Bindings) != 2 {
 		t.Fatal("real API receipt identity or binding mismatch")
+	}
+	target := tunnel.ReceiveTarget{MeshUID: request.MeshUID, SecretUID: string(current.UID), NodeName: node.Name, NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, RootPublicKey: root.PublicKey().String()}
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == "Ready" && condition.Status == "True" && node.DeletionTimestamp == nil {
+			target.Ready = true
+		}
+	}
+	if _, err := tunnel.ValidateReceiveReadiness(target, baseRaw, requestRaw, current.Data[tunnel.ReceiveReadyKey]); err != nil {
+		t.Fatal(err)
+	}
+	oldBootTarget := target
+	oldBootTarget.BootID = "another-boot"
+	if _, err := tunnel.ValidateReceiveReadiness(oldBootTarget, baseRaw, requestRaw, current.Data[tunnel.ReceiveReadyKey]); err == nil {
+		t.Fatal("readiness survived a changed target boot identity")
 	}
 	if string(current.Data[tunnel.CloudPeersKey]) != string(baseRaw) || current.Annotations[tunnel.AppliedListAnnotation] != before.Annotations[tunnel.AppliedListAnnotation] {
 		t.Fatal("preparation changed active forwarding document")

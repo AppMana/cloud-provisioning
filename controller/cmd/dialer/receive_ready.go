@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"strings"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -14,6 +16,18 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
+
+func localReceiveBootID() (string, error) {
+	raw, err := os.ReadFile("/proc/sys/kernel/random/boot_id")
+	if err != nil {
+		return "", fmt.Errorf("reading receiver boot identity: %w", err)
+	}
+	boot := strings.TrimSpace(string(raw))
+	if boot == "" {
+		return "", fmt.Errorf("receiver boot identity is missing")
+	}
+	return boot, nil
+}
 
 type prepareReceivers func(tunnel.ReceivePrepare, tunnel.PeerListDoc) ([]receiveBinding, error)
 
@@ -41,6 +55,13 @@ func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, se
 	if request.Version != 1 || request.MeshUID == "" || request.NodeName == "" || request.NodeName != nodeName || request.NodeUID == "" || root == (wgtypes.Key{}) || request.RootPublicKey != root.PublicKey().String() || request.Native == nil {
 		return fmt.Errorf("receive preparation identity or protocol mismatch")
 	}
+	bootID, err := localReceiveBootID()
+	if err != nil {
+		return err
+	}
+	if request.BootID != bootID {
+		return fmt.Errorf("receive preparation targets another kernel boot")
+	}
 	base := secret.Data[tunnel.CloudPeersKey]
 	if len(base) == 0 || request.BaseHash != tunnel.HashPeerList(base) {
 		return fmt.Errorf("receive preparation base changed")
@@ -57,34 +78,15 @@ func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, se
 	if err != nil {
 		return err
 	}
-	if string(node.UID) != request.NodeUID || node.DeletionTimestamp != nil {
+	if string(node.UID) != request.NodeUID || node.Status.NodeInfo.BootID != bootID || node.DeletionTimestamp != nil {
 		return fmt.Errorf("receive preparation node identity changed")
 	}
 	bindings, err := prepare(request, previous)
 	if err != nil {
 		return err
 	}
-	// Check completeness before publishing; no partial preparation is readiness.
-	if len(bindings) != len(plan.Receivers) {
-		return fmt.Errorf("incomplete receiver preparation")
-	}
-	byPeer := map[string]receiveBinding{}
-	publicKeys := map[string]bool{}
-	for _, binding := range bindings {
-		key, err := wgtypes.ParseKey(binding.PublicKey)
-		if err != nil || key == (wgtypes.Key{}) || key.String() != binding.PublicKey || binding.PublicKey == request.RootPublicKey || publicKeys[binding.PublicKey] || binding.ListenPort <= 0 || binding.ListenPort > 65535 {
-			return fmt.Errorf("invalid prepared receiver binding")
-		}
-		if _, found := byPeer[binding.PeerPublicKey]; found {
-			return fmt.Errorf("duplicate prepared receiver")
-		}
-		byPeer[binding.PeerPublicKey] = binding
-		publicKeys[binding.PublicKey] = true
-	}
-	for _, path := range plan.Receivers {
-		if binding, found := byPeer[path.PublicKey]; !found || binding.Interface != path.Interface {
-			return fmt.Errorf("prepared receiver identity mismatch")
-		}
+	if err := tunnel.ValidateReceiveBindings(plan.Receivers, request.RootPublicKey, bindings); err != nil {
+		return err
 	}
 	current, err := k.CoreV1().Secrets(secret.Namespace).Get(ctx, secret.Name, metav1.GetOptions{})
 	if err != nil {
@@ -97,10 +99,10 @@ func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, se
 	if err != nil {
 		return err
 	}
-	if string(node.UID) != request.NodeUID || node.DeletionTimestamp != nil {
+	if string(node.UID) != request.NodeUID || node.Status.NodeInfo.BootID != bootID || node.DeletionTimestamp != nil {
 		return fmt.Errorf("receive preparation node changed before publication")
 	}
-	receipt := tunnel.ReceiveReady{Version: 1, MeshUID: request.MeshUID, SecretUID: string(secret.UID), NodeName: nodeName, NodeUID: request.NodeUID, RootPublicKey: request.RootPublicKey, BaseHash: request.BaseHash, RequestHash: tunnel.HashPeerList(raw), Bindings: bindings}
+	receipt := tunnel.ReceiveReady{Version: 1, MeshUID: request.MeshUID, SecretUID: string(secret.UID), NodeName: nodeName, NodeUID: request.NodeUID, BootID: bootID, RootPublicKey: request.RootPublicKey, BaseHash: request.BaseHash, RequestHash: tunnel.HashPeerList(raw), Bindings: bindings}
 	encoded, err := json.Marshal(receipt)
 	if err != nil {
 		return err

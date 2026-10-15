@@ -19,14 +19,20 @@ import (
 )
 
 func TestReceiveReadinessIsBoundToPreparedRequest(t *testing.T) {
-	for _, fault := range []string{"none", "malformed", "version", "root", "base", "missing-native", "node", "desired", "prepare-error", "missing-binding", "wrong-interface", "root-binding", "stale-secret", "stale-version", "stale-base", "stale-request", "replaced-node", "patch-conflict"} {
+	for _, fault := range []string{"none", "malformed", "version", "root", "base", "missing-native", "node", "desired", "prepare-error", "missing-binding", "wrong-interface", "root-binding", "stale-secret", "stale-version", "stale-base", "stale-request", "replaced-node", "patch-conflict", "old-boot", "node-boot", "reboot-during-preparation"} {
 		t.Run(fault, func(t *testing.T) {
 			ctx := context.Background()
+			bootID, err := localReceiveBootID()
+			if err != nil {
+				t.Fatal(err)
+			}
 			root, _ := wgtypes.GeneratePrivateKey()
 			peer, _ := wgtypes.GeneratePrivateKey()
 			base := []byte(`{"peers":[]}`)
-			request := tunnel.ReceivePrepare{Version: 1, MeshUID: "mesh-uid", NodeName: "worker", NodeUID: "node-uid", RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(base), Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: peer.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.10/32"}}}}, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}}
+			request := tunnel.ReceivePrepare{Version: 1, MeshUID: "mesh-uid", NodeName: "worker", NodeUID: "node-uid", BootID: bootID, RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(base), Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: peer.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.10/32"}}}}, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}}
 			switch fault {
+			case "old-boot":
+				request.BootID = "old-boot"
 			case "version":
 				request.Version = 2
 			case "root":
@@ -45,7 +51,10 @@ func TestReceiveReadinessIsBoundToPreparedRequest(t *testing.T) {
 				raw = []byte(`{"version":1,"unknown":true}`)
 			}
 			secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "adoption", Namespace: "test", UID: "secret-uid", ResourceVersion: "7", Annotations: map[string]string{tunnel.AppliedListAnnotation: "old-applied"}}, Data: map[string][]byte{tunnel.CloudPeersKey: base, tunnel.ReceivePrepareKey: raw}}
-			node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker", UID: "node-uid"}}
+			node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker", UID: "node-uid"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{BootID: bootID}}}
+			if fault == "node-boot" {
+				node.Status.NodeInfo.BootID = "old-boot"
+			}
 			k := fake.NewClientset(secret.DeepCopy(), node.DeepCopy())
 			calls := 0
 			k.PrependReactor("patch", "secrets", func(action ktesting.Action) (bool, runtime.Object, error) {
@@ -99,16 +108,20 @@ func TestReceiveReadinessIsBoundToPreparedRequest(t *testing.T) {
 					if _, err := k.CoreV1().Secrets("test").Update(ctx, changed, metav1.UpdateOptions{}); err != nil {
 						t.Fatal(err)
 					}
-				case "replaced-node":
+				case "replaced-node", "reboot-during-preparation":
 					changed := node.DeepCopy()
-					changed.UID = "replacement"
+					if fault == "replaced-node" {
+						changed.UID = "replacement"
+					} else {
+						changed.Status.NodeInfo.BootID = "new-boot"
+					}
 					if _, err := k.CoreV1().Nodes().Update(ctx, changed, metav1.UpdateOptions{}); err != nil {
 						t.Fatal(err)
 					}
 				}
 				return bindings, nil
 			}
-			err := reconcileReceivePreparation(ctx, k, secret, "worker", root, prepare)
+			err = reconcileReceivePreparation(ctx, k, secret, "worker", root, prepare)
 			current, getErr := k.CoreV1().Secrets("test").Get(ctx, "adoption", metav1.GetOptions{})
 			if getErr != nil {
 				t.Fatal(getErr)
@@ -118,7 +131,7 @@ func TestReceiveReadinessIsBoundToPreparedRequest(t *testing.T) {
 					t.Fatal("invalid or stale preparation published readiness")
 				}
 				switch fault {
-				case "malformed", "version", "root", "base", "missing-native", "node", "desired":
+				case "malformed", "version", "root", "base", "missing-native", "node", "desired", "old-boot", "node-boot":
 					if calls != 0 {
 						t.Fatal("invalid request reached kernel preparation")
 					}
@@ -132,14 +145,14 @@ func TestReceiveReadinessIsBoundToPreparedRequest(t *testing.T) {
 			if err := json.Unmarshal(current.Data[tunnel.ReceiveReadyKey], &receipt); err != nil {
 				t.Fatal(err)
 			}
-			if receipt.RequestHash != tunnel.HashPeerList(raw) || receipt.BaseHash != request.BaseHash || receipt.SecretUID != "secret-uid" || receipt.NodeUID != "node-uid" || receipt.MeshUID != "mesh-uid" || len(receipt.Bindings) != 1 {
+			if receipt.RequestHash != tunnel.HashPeerList(raw) || receipt.BaseHash != request.BaseHash || receipt.SecretUID != "secret-uid" || receipt.NodeUID != "node-uid" || receipt.BootID != bootID || receipt.MeshUID != "mesh-uid" || len(receipt.Bindings) != 1 {
 				t.Fatal("incomplete readiness identity")
 			}
 			if string(current.Data[tunnel.CloudPeersKey]) != string(base) || current.Annotations[tunnel.AppliedListAnnotation] != "old-applied" {
 				t.Fatal("preparation changed forwarding or applied acknowledgement")
 			}
 			k.ClearActions()
-			if err := reconcileReceivePreparation(ctx, k, current, "worker", root, prepare); err != nil {
+			if err = reconcileReceivePreparation(ctx, k, current, "worker", root, prepare); err != nil {
 				t.Fatal(err)
 			}
 			for _, action := range k.Actions() {

@@ -57,8 +57,7 @@ func PlanReceiveHandover(meshID string, previous, desired PeerListDoc, native []
 		seen := map[string]bool{}
 		var owners []owner
 		for _, peer := range doc.Peers {
-			key, err := base64.StdEncoding.DecodeString(peer.PublicKey)
-			if err != nil || len(key) != 32 || bytes.Equal(key, make([]byte, 32)) || base64.StdEncoding.EncodeToString(key) != peer.PublicKey {
+			if !validReceivePublicKey(peer.PublicKey) {
 				return ReceiveHandover{}, fmt.Errorf("invalid peer identity")
 			}
 			if seen[peer.PublicKey] {
@@ -129,4 +128,9 @@ func PlanReceiveHandover(meshID string, previous, desired PeerListDoc, native []
 	}
 	slices.SortFunc(result.Receivers, func(a, b ReceivePath) int { return strings.Compare(a.PublicKey, b.PublicKey) })
 	return result, nil
+}
+
+func validReceivePublicKey(value string) bool {
+	key, err := base64.StdEncoding.DecodeString(value)
+	return err == nil && len(key) == 32 && !bytes.Equal(key, make([]byte, 32)) && base64.StdEncoding.EncodeToString(key) == value
 }

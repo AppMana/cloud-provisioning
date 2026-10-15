@@ -244,10 +244,15 @@ preparation, dual-family accept lists, retained old receivers, and unchanged
 routes and policy rules. It rejects identity replacement and implicit source
 withdrawal. The reconciliation loop invokes preparation only when its adoption
 Secret contains an explicit `receive-prepare.json` request. That request binds
-the node and root public identity, mesh identity, current `peers.json` hash,
+the node, kernel boot and root public identity, mesh identity, current `peers.json` hash,
 future peer document, and native network boundaries. Preparation publishes
 `receive-ready.json` with public kernel bindings and the exact request hash;
-it does not change `peers.json` or the applied-list acknowledgment. The controller
+it does not change `peers.json` or the applied-list acknowledgment. The local
+kernel boot ID must match both the request and current Node status before
+publication. `ValidateReceiveReadiness` requires an independently observed ready
+target, the same boot and request identities, and complete, distinct listener
+bindings. It validates preparation only; it cannot authorize traffic movement
+or retirement. The controller
 does not yet produce these requests or consume readiness. The standalone test
 does not establish publication, activation, retirement, or reboot recovery.
 

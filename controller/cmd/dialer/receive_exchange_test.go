@@ -99,13 +99,17 @@ func TestNativeReceiveExchange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	intent := tunnel.ReceivePrepare{Version: 1, MeshUID: request.MeshID, NodeName: "worker", NodeUID: "node-uid", RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(base), Desired: request.Desired, Native: request.Native}
+	bootID, err := localReceiveBootID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	intent := tunnel.ReceivePrepare{Version: 1, MeshUID: request.MeshID, NodeName: "worker", NodeUID: "node-uid", BootID: bootID, RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(base), Desired: request.Desired, Native: request.Native}
 	intentRaw, err := json.Marshal(intent)
 	if err != nil {
 		t.Fatal(err)
 	}
 	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "adoption", Namespace: "experiment", UID: "secret-uid", ResourceVersion: "1"}, Data: map[string][]byte{tunnel.CloudPeersKey: base, tunnel.ReceivePrepareKey: intentRaw}}
-	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker", UID: "node-uid"}}
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker", UID: "node-uid"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{BootID: bootID}}}
 	api := fake.NewClientset(secret, node)
 	prepare := func(intent tunnel.ReceivePrepare, previous tunnel.PeerListDoc) ([]receiveBinding, error) {
 		return prepareReceivePaths(devices, intent.MeshUID, root, previous, intent.Desired, intent.Native, 1400, 518)

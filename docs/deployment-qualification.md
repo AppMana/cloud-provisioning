@@ -29,6 +29,9 @@ results do not qualify changed binaries or a different cloud CNI.
 - `awsrow -pod-family IPv4|IPv6 -k0s-calico-site-only` measures separate
   single-family campaigns. IPv6-only probes include TCP, Service, DNS, large
   transfers and UDP; missing requested families fail instead of being skipped.
+  Every AWS matrix also compares the source IP reported by the destination
+  pod with the sending pod IP for each directed pod path. Sender-local socket
+  addresses alone cannot establish source preservation.
 
 These safeguards do not implement or prove the entire routing/migration
 contract. In particular, a successful allocation observation does not establish

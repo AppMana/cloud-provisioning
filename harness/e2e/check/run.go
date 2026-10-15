@@ -4,19 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
-// Run measures every ordered pair and every per-node check.
-//
-// Concurrently, bounded. The bash harness walked the pairs in nested
-// loops, one exec at a time: on a seven-node row that is 161 checks
-// in sequence, and the wall clock it cost is what made a full
-// campaign an overnight job. Nothing about a pair depends on any
-// other pair.
+// Run measures every ordered pair and every per-node check with bounded concurrency.
 func Run(ctx context.Context, p Prober, targets []Target, opts Options) *Matrix {
 	m := &Matrix{}
 	byNode := map[string]Target{}
@@ -51,6 +46,11 @@ func Run(ctx context.Context, p Prober, targets []Target, opts Options) *Matrix 
 		src, dst := byNode[pair.From], byNode[pair.To]
 		v4 := src.PodIP != "" && dst.PodIP != ""
 		if v4 {
+			if opts.VerifySource {
+				emit(pair.From, pair.To, Source, 0, func() Result {
+					return sourceAddress(ctx, p, pair, Source, url(dst.PodIP, opts.Port, "clientip"), src.PodIP)
+				})
+			}
 			emit(pair.From, pair.To, Pod, 0, func() Result { return reach(ctx, p, pair, Pod, url(dst.PodIP, opts.Port, reachPath)) })
 			emit(pair.From, pair.To, Service, 0, func() Result { return reach(ctx, p, pair, Service, url(dst.ServiceIP, opts.Port, reachPath)) })
 			if !opts.SkipTransfer {
@@ -65,6 +65,11 @@ func Run(ctx context.Context, p Prober, targets []Target, opts Options) *Matrix 
 			})
 		}
 		if dual {
+			if opts.VerifySource {
+				emit(pair.From, pair.To, Source6, 0, func() Result {
+					return sourceAddress(ctx, p, pair, Source6, url(dst.PodIP6, opts.Port, "clientip"), src.PodIP6)
+				})
+			}
 			emit(pair.From, pair.To, Pod6, 0, func() Result { return reach(ctx, p, pair, Pod6, url(dst.PodIP6, opts.Port, reachPath)) })
 			if dst.ServiceIP6 != "" {
 				emit(pair.From, pair.To, Service6, 0, func() Result {
@@ -127,6 +132,9 @@ func Run(ctx context.Context, p Prober, targets []Target, opts Options) *Matrix 
 
 // Options tunes a run.
 type Options struct {
+	// VerifySource checks the source address observed by the destination pod.
+	VerifySource bool
+
 	// ObservePass receives every completed Converge pass, including failures
 	// later hidden by convergence. It runs synchronously after all probes finish;
 	// observers must treat the matrix as read-only. Attempts start at one.
@@ -324,4 +332,28 @@ func Converge(ctx context.Context, p Prober, targets []Target, opts Options, wit
 		}
 		history = append(history, m)
 	}
+}
+
+// sourceAddress requires receiver-observed identity; a sender's local socket
+// address cannot detect SNAT along the path.
+func sourceAddress(ctx context.Context, p Prober, pair Pair, kind Kind, target, expected string) Result {
+	r := Result{From: pair.From, To: pair.To, Kind: kind}
+	body, err := p.HTTPGet(ctx, pair.From, target)
+	if err != nil {
+		r.Err = err
+		return r
+	}
+	observed, err := netip.ParseAddrPort(strings.TrimSpace(string(body)))
+	if err != nil {
+		r.Err = fmt.Errorf("invalid receiver source address %q: %w", truncate(string(body)), err)
+		return r
+	}
+	want, err := netip.ParseAddr(expected)
+	if err != nil {
+		r.Err = fmt.Errorf("invalid expected pod address: %w", err)
+		return r
+	}
+	r.Detail = fmt.Sprintf("receiver observed %s; expected pod %s", observed.Addr(), want)
+	r.OK = observed.Addr().Unmap() == want.Unmap()
+	return r
 }

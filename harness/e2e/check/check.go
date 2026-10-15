@@ -9,9 +9,6 @@
 // network. A node with no tunnel reaches a remote by transiting one
 // that has one; a row that fails is that claim being wrong.
 //
-// Two decisions here are load-bearing and both were learned the hard
-// way.
-//
 // Workload probes use the node's container runtime through out-of-band
 // management. This keeps pod-network failures distinguishable from failures
 // of the API server's kubelet connection. Kubernetes exec and logs require
@@ -35,13 +32,16 @@ import (
 
 // ExternalURL stays on a literal IP. The root at http://1.1.1.1 redirects to
 // one.one.one.one, which incorrectly makes an external-path check depend on
-// cluster DNS while the sole site endpoint is down. Observed on k0s/kube-router.
+// cluster DNS while the sole site endpoint is down.
 const ExternalURL = "https://1.1.1.1/cdn-cgi/trace"
 
 // Kind is what one check measured.
 type Kind string
 
 const (
+	// Source and Source6 verify the pod source IP observed at the receiver.
+	Source  Kind = "source"
+	Source6 Kind = "source6"
 	// Pod is one pod reaching another by pod address.
 	Pod Kind = "pod"
 	// Service is the same reach by service address. It matters

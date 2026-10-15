@@ -391,7 +391,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	matrix, recordErr := recordedMatrix(ctx, pods, targets, check.Options{Port: check.Port, ExternalURL: check.ExternalURL, UDP: &check.UDPOptions{Tries: 10}}, 10*time.Minute, 10*time.Second, journal)
+	matrix, recordErr := recordedMatrix(ctx, pods, targets, check.Options{VerifySource: true, Port: check.Port, ExternalURL: check.ExternalURL, UDP: &check.UDPOptions{Tries: 10}}, 10*time.Minute, 10*time.Second, journal)
 	closeErr := journal.Close()
 	if recordErr != nil {
 		return recordErr

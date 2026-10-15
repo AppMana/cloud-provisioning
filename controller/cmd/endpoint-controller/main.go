@@ -2380,6 +2380,7 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	nodeGroups := flag.Bool("experimental-node-groups", false, "enable experimental node groups in the mesh namespace; requires the group CRD and drain RBAC")
 	awsPodConfig := flag.String("aws-pod-config", "", "optional scoped AWS VPC CNI allocation observer JSON file")
+	awsPodCredentialsFile := flag.String("aws-pod-credentials-file", "", "optional rotating STS credential JSON file; overrides ambient credentials for the AWS pod observer")
 	gatewayConfig := flag.String("aws-gateway-config", "", "optional path to AWS Windows Calico gateway scope JSON")
 	flag.Parse()
 	if _, err := parseDialerPullPolicy(dialerImagePullPolicy); err != nil {
@@ -2570,8 +2571,12 @@ func main() {
 		windowsPublisherAPIServer: windowsPublisherAPIServer,
 		dialerCloudHostBinary:     dialerCloudHostBinary,
 	}
+	if *awsPodCredentialsFile != "" && *awsPodConfig == "" {
+		fmt.Fprintln(os.Stderr, "AWS pod credential file requires --aws-pod-config")
+		os.Exit(1)
+	}
 	if *awsPodConfig != "" {
-		mesh.awsPodObserver, err = newAWSPodObserver(*awsPodConfig, mgr.GetAPIReader())
+		mesh.awsPodObserver, err = newAWSPodObserver(*awsPodConfig, *awsPodCredentialsFile, mgr.GetAPIReader())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "AWS pod observer configuration: %v\n", err)
 			os.Exit(1)

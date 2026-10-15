@@ -101,5 +101,33 @@ class ImageReferences(unittest.TestCase):
                     self.assertIn("image digest must be a string", result.stderr)
 
 
+class ObserverCredentialMount(unittest.TestCase):
+    def render(self, *values):
+        args = ["helm", "template", "credential-test", "charts/cloud-provisioning"]
+        for value in values:
+            args += ["--set-string", value]
+        return subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
+
+    def test_rotating_secret_directory_and_nonroot_access(self):
+        result = self.render("awsPodObserver.configMap=scope", "awsPodObserver.credentialsFileSecret=rotating")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("fsGroup: 65532", result.stdout)
+        self.assertIn("defaultMode: 0440", result.stdout)
+        self.assertIn('secretName: "rotating"', result.stdout)
+        self.assertIn("key: credentials.json", result.stdout)
+        self.assertIn("mountPath: /etc/cloud-provisioning/aws-credentials", result.stdout)
+        self.assertIn("--aws-pod-credentials-file=/etc/cloud-provisioning/aws-credentials/credentials.json", result.stdout)
+        self.assertNotIn("subPath:", result.stdout)
+        self.assertNotIn("envFrom:", result.stdout)
+
+    def test_rejects_ambiguous_or_unused_credential_source(self):
+        for values in [
+            ["awsPodObserver.credentialsFileSecret=rotating"],
+            ["awsPodObserver.configMap=scope", "awsPodObserver.credentialsFileSecret=rotating", "awsPodObserver.credentialsSecret=environment"],
+        ]:
+            with self.subTest(values=values):
+                self.assertNotEqual(self.render(*values).returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

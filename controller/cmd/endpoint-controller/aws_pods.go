@@ -5,10 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/appmana/cloud-provisioning/controller/pkg/awscredentials"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"io"
 	"net/netip"
 	"os"
 	"strings"
+	"time"
 
 	attachmentaws "github.com/appmana/cloud-provisioning/controller/pkg/attachment/aws"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni/awspod"
@@ -20,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func newAWSPodObserver(path string, reader client.Reader) (*awspod.Observer, error) {
+func newAWSPodObserver(path, credentialsPath string, reader client.Reader) (*awspod.Observer, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -37,7 +40,12 @@ func newAWSPodObserver(path string, reader client.Reader) (*awspod.Observer, err
 	if err := scope.Validate(); err != nil {
 		return nil, err
 	}
-	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(scope.Region), config.WithRetryMaxAttempts(3))
+	options := []func(*config.LoadOptions) error{config.WithRegion(scope.Region), config.WithRetryMaxAttempts(3)}
+	if credentialsPath != "" {
+		provider := aws.NewCredentialsCache(awscredentials.FileProvider{Path: credentialsPath}, func(o *aws.CredentialsCacheOptions) { o.ExpiryWindow = time.Minute })
+		options = append(options, config.WithCredentialsProvider(provider))
+	}
+	cfg, err := config.LoadDefaultConfig(context.Background(), options...)
 	if err != nil {
 		return nil, err
 	}

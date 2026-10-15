@@ -1,3 +1,9 @@
+{{- if and .Values.awsPodObserver.credentialsSecret .Values.awsPodObserver.credentialsFileSecret }}
+{{- fail "Choose either AWS observer environment credentials or rotating file credentials" }}
+{{- end }}
+{{- if and .Values.awsPodObserver.credentialsFileSecret (not .Values.awsPodObserver.configMap) }}
+{{- fail "Rotating AWS observer credentials require awsPodObserver.configMap" }}
+{{- end }}
 {{- /* Every arg is quoted: an IPv6 prefix value ends in ":", and an
 unquoted YAML list item ending in a colon parses as a mapping key with
 a null value, which injects a {} into the container args and makes the
@@ -44,12 +50,25 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.awsPodObserver.credentialsFileSecret }}
+      securityContext:
+        fsGroup: 65532
+      {{- end }}
       {{- if or .Values.awsGateway.configMap .Values.awsPodObserver.configMap }}
       volumes:
         {{- with .Values.awsPodObserver.configMap }}
         - name: aws-pod-scope
           configMap:
             name: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.awsPodObserver.credentialsFileSecret }}
+        - name: aws-pod-credentials
+          secret:
+            secretName: {{ . | quote }}
+            defaultMode: 0440
+            items:
+              - key: credentials.json
+                path: credentials.json
         {{- end }}
         {{- with .Values.awsGateway.configMap }}
         - name: aws-gateway-scope
@@ -77,6 +96,11 @@ spec:
             - name: aws-pod-scope
               mountPath: /etc/cloud-provisioning/aws-pods
               readOnly: true
+            {{- with .Values.awsPodObserver.credentialsFileSecret }}
+            - name: aws-pod-credentials
+              mountPath: /etc/cloud-provisioning/aws-credentials
+              readOnly: true
+            {{- end }}
           {{- with .Values.awsPodObserver.credentialsSecret }}
           envFrom:
             - secretRef:
@@ -86,6 +110,9 @@ spec:
           args:
             {{- if .Values.awsPodObserver.configMap }}
             - "--aws-pod-config=/etc/cloud-provisioning/aws-pods/scope.json"
+            {{- if .Values.awsPodObserver.credentialsFileSecret }}
+            - "--aws-pod-credentials-file=/etc/cloud-provisioning/aws-credentials/credentials.json"
+            {{- end }}
             {{- end }}
             {{- if .Values.experimentalNodeGroups }}
             - "--experimental-node-groups=true"

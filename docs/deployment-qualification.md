@@ -48,6 +48,25 @@ Use `awsPodObserver.configMap` containing `scope.json`; optionally supply
 Prefer refreshable role credentials. The observer needs only
 `ec2:DescribeNetworkInterfaces`; it does not allocate ENIs or change AWS routes.
 CAPA provisioning credentials and AWS-node IPAM credentials remain separate.
+
+For installations without workload identity, set
+`awsPodObserver.credentialsFileSecret` instead of `credentialsSecret`. The
+Secret must contain `credentials.json` with the STS response's `Credentials`
+object: `AccessKeyId`, `SecretAccessKey`, `SessionToken` and RFC3339
+`Expiration`. The chart mounts the entire directory read-only and grants the
+nonroot controller group read access. Do not use a `subPath` mount: it would
+prevent projected Secret rotation from reaching the process.
+
+A separate trusted credential producer must update the Secret well before
+expiration, allowing for Kubernetes projection delay. The observer's SDK cache
+refreshes one minute before expiry and rereads the file without restarting the
+controller. Missing, malformed or expired replacements fail observation rather
+than falling back to other credentials. Existing observed allocations retain
+the observer's existing API-failure behavior. This option does not renew CAPA,
+harness or registry credentials, and it does not itself issue credentials.
+Qualify rotation across an actual expiry boundary, including producer outage,
+before relying on this mechanism for the 24-hour soak.
+
 Do not enable the Windows gateway adapter in the same deployment.
 
 ```json

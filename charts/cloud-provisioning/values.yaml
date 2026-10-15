@@ -220,3 +220,5 @@ experimentalNodeGroups: false
 awsPodObserver:
   configMap: ""
   credentialsSecret: ""
+  # Alternative to environment credentials; mount credentials.json for SDK refresh.
+  credentialsFileSecret: ""

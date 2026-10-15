@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -150,6 +151,49 @@ func nativeAdoptionAPI(t *testing.T, cfg config, devices *wgctrl.Client, bootstr
 	}
 	update(bootstrap.Peers)
 	check(1)
+	cacheBefore, err := os.ReadFile(cachePath(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	invalid := append([]tunnel.PeerSpec(nil), bootstrap.Peers...)
+	invalid[0].PublicKey = "invalid-key"
+	update(invalid)
+	if err := reconcile(ctx, worker, devices, cfg); err == nil || !strings.Contains(err.Error(), "parsing peer public key") {
+		t.Fatalf("invalid peer update was not rejected: %v", err)
+	}
+	cacheAfter, err := os.ReadFile(cachePath(cfg))
+	if err != nil || !bytes.Equal(cacheBefore, cacheAfter) {
+		t.Fatal("rejected update replaced durable recovery state")
+	}
+	invalidSecret, err := secrets.Get(ctx, "adoption", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if invalidSecret.Annotations[tunnel.AppliedListAnnotation] == tunnel.HashPeerList(invalidSecret.Data[tunnel.CloudPeersKey]) {
+		t.Fatal("invalid peer update was acknowledged")
+	}
+	// Reconstruct the kernel interface without API access, after the adopting
+	// process has released its claim. Recovery must use the prior valid cache.
+	link, err := netlink.LinkByName(cfg.iface)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := netlink.LinkDel(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(claimPath(cfg)); err != nil {
+		t.Fatal(err)
+	}
+	bootConfig := cfg
+	bootConfig.peersSecretNamespace = ""
+	bootConfig.peersSecretName = ""
+	if err := reconcile(ctx, nil, devices, bootConfig); err != nil {
+		t.Fatalf("offline reconstruction after a rejected update: %v", err)
+	}
+	restored, err := devices.Device(cfg.iface)
+	if err != nil || len(restored.Peers) != 1 || restored.Peers[0].PublicKey.String() != bootstrap.Peers[0].PublicKey {
+		t.Fatalf("offline reconstruction lost the previous valid peer: %v", err)
+	}
 	update([]tunnel.PeerSpec{})
 	// A failed durable write must not withdraw the working peer or publish an
 	// acknowledgement for state that cannot be recovered after an API outage.

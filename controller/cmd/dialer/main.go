@@ -1145,6 +1145,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		peers          []tunnel.PeerSpec
 		meshSecret     *corev1.Secret
 		adoptionSecret *corev1.Secret
+		pendingCache   *tunnel.PeerListDoc
 		usingSecret    = cfg.secretName != ""
 		// The override list being applied this pass, acknowledged on
 		// the adoption Secret once the pass completes. The hash is the
@@ -1290,12 +1291,11 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 						return fmt.Errorf("parsing %s from %s/%s: %w", tunnel.CloudPeersKey, cfg.peersSecretNamespace, cfg.peersSecretName, err)
 					}
 					if overlay.Peers != nil {
-						if err := writeCachedPeers(cachePath(cfg), overlay); err != nil {
-							return fmt.Errorf("persisting adopted peer list before forwarding changes: %w", err)
-						}
-						floorErr = nil // A current valid public document can repair the durable cache.
+						// Validate the candidate before replacing recovery state.
+						// Persistence still precedes every kernel forwarding change.
+						pendingCache = &overlay
+						floorErr = nil
 						peers = overlay.Peers
-						setAPIProxyBackends(overlay.APIServers)
 						// Acknowledged at the end of the pass, once
 						// this list is applied in full, not merely
 						// read. See tunnel.AppliedListAnnotation.
@@ -1616,6 +1616,12 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 	}
 
+	if pendingCache != nil {
+		if err := writeCachedPeers(cachePath(cfg), *pendingCache); err != nil {
+			return fmt.Errorf("persisting adopted peer list before forwarding changes: %w", err)
+		}
+		setAPIProxyBackends(pendingCache.APIServers)
+	}
 	if err := ensureLink(cfg, localAddresses); err != nil {
 		return fmt.Errorf("ensuring %s: %w", cfg.iface, err)
 	}

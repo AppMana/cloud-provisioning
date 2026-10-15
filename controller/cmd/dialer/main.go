@@ -360,8 +360,7 @@ func main() {
 			if cfg.secretName != "" {
 				if published, err := nodeStillPublished(clientset, cfg); err == nil && !published {
 					fmt.Fprintf(os.Stderr, "removing %s on the way out: this node is no longer a published endpoint\n", cfg.iface)
-					removeDevice(cfg.iface)
-					removeRouteRule(cfg.routeTable)
+					retireUnpublishedEndpoint(cfg)
 				}
 			}
 			return
@@ -689,6 +688,13 @@ func removeDevice(iface string) {
 	if err := netlink.LinkDel(link); err != nil {
 		fmt.Fprintf(os.Stderr, "removing %s on shutdown: %v\n", iface, err)
 	}
+}
+
+// An unpublished endpoint can still be a transit client. Its routing rules
+// must survive process exit so routes through another node remain usable.
+// Removing the device retires only routes through that device.
+func retireUnpublishedEndpoint(cfg config) {
+	removeDevice(cfg.iface)
 }
 
 // reconcileTransit tells the rest of this site which remote nodes are

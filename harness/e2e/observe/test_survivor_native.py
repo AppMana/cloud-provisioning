@@ -20,7 +20,7 @@ class NativeControlTest(unittest.TestCase):
     def test_ready_requires_advancing_same_process(self):
         with tempfile.TemporaryDirectory() as root:
             p = pathlib.Path(root); session = Session(Mock(), p)
-            (p/'session.json').write_text('{}')
+            (p/'session.json').write_text(json.dumps(dict(maxGap=10,lanes=[{}])))
             earlier = [dict(nonce='a', pid=3, attempts=10, observedAt='2026-09-08T00:00:00+00:00')]
             later = [dict(nonce='a', pid=3, attempts=11, observedAt='2026-09-08T00:00:01+00:00')]
             (p/'progress-a.json').write_text(json.dumps(earlier))
@@ -28,7 +28,9 @@ class NativeControlTest(unittest.TestCase):
                 (p/'progress-b.json').write_text(json.dumps([dict(later[0], **change)]))
                 with self.assertRaises(ValueError): session.ready('a','b')
             (p/'progress-b.json').write_text(json.dumps(later))
-            self.assertEqual(session.ready('a','b')['lanes'], 1)
+            from unittest.mock import patch
+            with patch('survivor_native.fresh_progress', return_value=True):
+                self.assertEqual(session.ready('a','b')['lanes'], 1)
 
     def test_native_loss_requires_explicit_diagnostic_session(self):
         f=json.loads((pathlib.Path(__file__).parent/'testdata/survivor-preflight-loss.json').read_text())
@@ -177,7 +179,7 @@ class NativeControlTest(unittest.TestCase):
                     (p/name).write_text(json.dumps(value))
                 second=copy.deepcopy(f['initial'])
                 if changed:second[0]['containerID']='containerd://'+'0'*64
-                with patch('pod_matrix.snapshot',side_effect=[f['initial'],second]),patch('time.sleep'),patch.object(session,'progress',side_effect=[[dict(attempts=1)]*6,[dict(attempts=2 if advancing else 1)]*6]),patch.object(session,'ready') as ready:
+                with patch('pod_matrix.snapshot',side_effect=[f['initial'],second]),patch('time.sleep'),patch('survivor_native.fresh_progress',return_value=True),patch.object(session,'progress',side_effect=[[dict(attempts=1)]*6,[dict(attempts=2 if advancing else 1)]*6]),patch.object(session,'ready') as ready:
                     result=session.live_ready([s['pod']+'='+s['nodeUID'] for s in f['initial']],'check')
                 self.assertEqual(result,advancing and not changed)
                 self.assertEqual(ready.call_count,int(result))

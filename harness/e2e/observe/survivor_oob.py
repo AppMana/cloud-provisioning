@@ -41,6 +41,16 @@ class OutOfBand(Kubectl):
         except subprocess.TimeoutExpired:
             return b'', 124, 'Out-of-band probe observation timed out; inspect original executor before retrying lifecycle actions'
 
+    def status_many(self, source, entries):
+        """Read one source's native samplers in a single bounded CRI call."""
+        if source.get('os') != 'linux' or not entries:
+            raise ValueError('nonempty Linux status batch required')
+        arguments = []
+        for executable, directory in entries:
+            arguments.extend([executable, directory])
+        script = 'printf "["; separator=""; while [ "$#" -ge 2 ]; do printf "%s" "$separator"; "$1" -stream-dir "$2" -status; separator=","; shift 2; done; printf "]\\n"'
+        return self.exec_result(source, ['sh', '-ec', script, 'cldt-status'] + arguments)
+
     def curl_result(self, source, arguments, body=None, timeout=30):
         if body is not None:
             raise ValueError('out-of-band survivor probes do not stage stdin')

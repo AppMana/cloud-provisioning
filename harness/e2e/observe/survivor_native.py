@@ -3,6 +3,7 @@
 Staging is runner-owned; bulk collection uses a binary-safe callback. Mutating
 commands are issued once and journaled before execution; timeouts require inspection.
 """
+import concurrent.futures
 import datetime
 import json
 import pathlib
@@ -10,6 +11,24 @@ import pathlib
 
 def utc():
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+def fresh_progress(rows, max_age, now=None):
+    """Bound age from request submission, including executor queueing time."""
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    if not rows or not 0 < max_age <= 60:
+        return False
+    for row in rows:
+        try:
+            requested = datetime.datetime.fromisoformat(row['requestedAt'])
+            observed = datetime.datetime.fromisoformat(row['observedAt'])
+            if requested.tzinfo is None or observed.tzinfo is None or not requested <= observed <= now:
+                return False
+            if (now - requested).total_seconds() > max_age:
+                return False
+        except (KeyError, ValueError, TypeError):
+            return False
+    return True
 
 
 def exclusive(path, value):
@@ -70,24 +89,57 @@ class Session:
             raise ValueError('simple unique progress label required')
         session = json.loads((self.output/'session.json').read_text())
         diagnostic = bool(session.get('diagnosticReason'))
-        observations = []
+        if not session['lanes']:
+            raise ValueError('native session has no lanes')
+        groups = {}
         for i, lane in enumerate(session['lanes']):
-            receipt = json.loads((self.output/f'lane-{i:02d}-receipt.json').read_text())
-            status = self.control(i, lane, 'status-'+label,
-                [lane['executable'], '-stream-dir', lane['directory'], '-status'])
-            row = status.get('latest', {})
-            attempts, passed = row.get('attempts'), row.get('passed')
-            gap = row.get('maxStartIntervalSeconds', float('inf'))
-            if (status.get('terminal') is not False or row.get('nonce') != receipt['nonce'] or
-                    row.get('pid') != receipt['pid'] or
-                    type(attempts) is not int or attempts < 1 or type(passed) is not int or
-                    not 0 <= passed <= attempts or not isinstance(gap, (int, float)) or
-                    not math.isfinite(gap) or gap < 0 or gap > session['maxGap'] or
-                    type(row.get('healthy')) is not bool or row['healthy'] != (passed == attempts) or
-                    (not diagnostic and not row['healthy'])):
-                raise ValueError('original stream is not live and healthy')
-            observations.append(dict(observedAt=utc(), attempts=attempts, passed=passed,
-                healthy=row['healthy'], nonce=row['nonce'], pid=row['pid']))
+            groups.setdefault(lane['source'].get('nodeUID', str(i)), []).append((i, lane))
+
+        def read_group(entries):
+            first, lane = entries[0]
+            batch = getattr(type(self.kube), 'status_many', None)
+            statuses = []
+            if batch is not None and lane['source'].get('os') == 'linux':
+                requested = utc()
+                path = self.output / f'group-{first:02d}-status-{label}'
+                arguments = [(l['executable'], l['directory']) for _, l in entries]
+                exclusive(path.with_suffix('.intent.json'), dict(requestedAt=requested, source=lane['source'], arguments=arguments))
+                body, code, executor_diagnostic = self.kube.status_many(lane['source'], arguments)
+                exclusive(path.with_suffix('.response.json'), dict(observedAt=utc(), exitCode=code,
+                    stdout=body.decode('utf-8', errors='replace'), diagnostic=executor_diagnostic))
+                if code:
+                    raise RuntimeError('native status batch observation failed')
+                values = json.loads(body)
+                if not isinstance(values, list) or len(values) != len(entries):
+                    raise ValueError('native status batch omitted lanes')
+                statuses = [(i, requested, status) for (i, _), status in zip(entries, values)]
+            else:
+                for i, current in entries:
+                    requested = utc()
+                    status = self.control(i, current, 'status-'+label,
+                        [current['executable'], '-stream-dir', current['directory'], '-status'])
+                    statuses.append((i, requested, status))
+            result = []
+            for i, requested, status in statuses:
+                receipt = json.loads((self.output/f'lane-{i:02d}-receipt.json').read_text())
+                row = status.get('latest', {})
+                attempts, passed = row.get('attempts'), row.get('passed')
+                gap = row.get('maxStartIntervalSeconds', float('inf'))
+                if (status.get('terminal') is not False or row.get('nonce') != receipt['nonce'] or
+                        row.get('pid') != receipt['pid'] or
+                        type(attempts) is not int or attempts < 1 or type(passed) is not int or
+                        not 0 <= passed <= attempts or not isinstance(gap, (int, float)) or
+                        not math.isfinite(gap) or gap < 0 or gap > session['maxGap'] or
+                        type(row.get('healthy')) is not bool or row['healthy'] != (passed == attempts) or
+                        (not diagnostic and not row['healthy'])):
+                    raise ValueError('original stream is not live and healthy')
+                result.append((i, dict(requestedAt=requested, observedAt=utc(), attempts=attempts, passed=passed,
+                    healthy=row['healthy'], nonce=row['nonce'], pid=row['pid'])))
+            return result
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(groups))) as pool:
+            grouped = list(pool.map(read_group, groups.values()))
+        observations = [value for _, value in sorted(item for group in grouped for item in group)]
         exclusive(self.output/f'progress-{label}.json', observations)
         return observations
 
@@ -100,6 +152,10 @@ class Session:
                 for x, y in zip(a, b)):
             raise ValueError('two advancing progress rounds required')
         session = json.loads((self.output/'session.json').read_text())
+        if len(b) != len(session['lanes']):
+            raise ValueError('readiness omitted native lanes')
+        if not fresh_progress(b, session['maxGap']):
+            raise ValueError('native progress is stale; collect a bounded fresh round')
         receipt = dict(readyAt=utc(), lanes=len(b), transport='native-oob', progress=b,
             diagnosticReason=session.get('diagnosticReason'))
         exclusive(self.output/'READY.json', receipt)
@@ -162,6 +218,8 @@ class Session:
         if any(a['attempts'] >= b['attempts'] for a,b in zip(earlier,later)):
             return False
         if snapshot(self.kube, target_pairs) != initial:
+            return False
+        if not fresh_progress(later, session['maxGap']):
             return False
         # Preserve the original pre-operation readiness for final window proof.
         if not (self.output/'READY.json').exists():

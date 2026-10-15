@@ -73,7 +73,7 @@ func (r *Reconciler) bootstrapUnpublished(ctx context.Context, group *v1alpha1.P
 	if mesh.UID == "" || !mesh.DeletionTimestamp.IsZero() || (proof.MeshUID != "" && proof.MeshUID != string(mesh.UID)) {
 		return false, fmt.Errorf("cancellation mesh identity changed")
 	}
-	for _, prefix := range []string{tunnel.PeerPublicKeyPrefix, tunnel.PeerEndpointPrefix, tunnel.PeerAllowedIPsPrefix, tunnel.PeerRouteHostsPrefix, tunnel.PeerRouteHostPrefix, tunnel.TunnelAddressReservationPrefix} {
+	for _, prefix := range []string{tunnel.PeerPublicKeyPrefix, tunnel.PeerEndpointPrefix, tunnel.PeerAllowedIPsPrefix, tunnel.PeerRouteHostsPrefix, tunnel.PeerRouteHostPrefix, tunnel.PeerNativeNetworkPrefix, tunnel.TunnelAddressReservationPrefix} {
 		if _, exists := mesh.Data[prefix+a.ChildName]; exists {
 			return false, nil
 		}

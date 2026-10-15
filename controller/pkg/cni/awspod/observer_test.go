@@ -185,3 +185,17 @@ func TestNameOnlyCAPIBinding(t *testing.T) {
 		})
 	}
 }
+
+func TestPrimaryENIAddressIsNativeButNeverPodOwned(t *testing.T) {
+	o, machine, _ := fixture(t)
+	allocation, err := o.AllocationsFor(context.Background(), machine, "worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(allocation.PodPrefixes) != 1 || allocation.PodPrefixes[0].String() != "172.29.0.11/32" {
+		t.Fatalf("primary leaked into pod ownership: %+v", allocation)
+	}
+	if len(allocation.NativePrefixes) != 2 || allocation.NativePrefixes[0].String() != "172.29.0.10/32" {
+		t.Fatalf("native primary missing: %+v", allocation)
+	}
+}

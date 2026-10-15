@@ -59,7 +59,22 @@ type Observer struct {
 	API    attachmentaws.API
 }
 
+// Allocation keeps native VPC destinations separate from pod ownership.
+// Primary ENI addresses are native destinations but are never pod allocations.
+type Allocation struct {
+	PodPrefixes    []netip.Prefix
+	NativePrefixes []netip.Prefix
+}
+
 func (o *Observer) PrefixesFor(ctx context.Context, expected *unstructured.Unstructured, nodeName string) ([]netip.Prefix, error) {
+	allocation, err := o.AllocationsFor(ctx, expected, nodeName)
+	if err != nil {
+		return nil, err
+	}
+	return allocation.PodPrefixes, nil
+}
+
+func (o *Observer) AllocationsFor(ctx context.Context, expected *unstructured.Unstructured, nodeName string) (*Allocation, error) {
 	if err := o.Config.Validate(); err != nil {
 		return nil, err
 	}
@@ -76,7 +91,7 @@ func (o *Observer) PrefixesFor(ctx context.Context, expected *unstructured.Unstr
 		return nil, fmt.Errorf("invalid EC2 provider identity")
 	}
 	instance := parts[4]
-	var prefixes []netip.Prefix
+	var prefixes, nativeHosts []netip.Prefix
 	seenENI := map[string]bool{}
 	tokens := map[string]bool{}
 	token := ""
@@ -122,6 +137,17 @@ func (o *Observer) PrefixesFor(ctx context.Context, expected *unstructured.Unstr
 				return nil, fmt.Errorf("foreign, duplicate or detached EC2 interface")
 			}
 			seenENI[eni.NetworkInterfaceId] = true
+			for _, ip := range eni.PrivateIpAddresses {
+				if !ip.Primary {
+					continue
+				}
+				address, err := netip.ParseAddr(ip.PrivateIpAddress)
+				if err != nil || !address.Is4() || address.IsUnspecified() || address.IsLoopback() || address.IsMulticast() {
+					return nil, fmt.Errorf("invalid ENI primary address")
+				}
+				nativeHosts = append(nativeHosts, netip.PrefixFrom(address, 32))
+			}
+
 			if o.Config.Family == "ipv4" {
 				if len(eni.Ipv4Prefixes) > 0 {
 					return nil, fmt.Errorf("IPv4 qualification requires secondary IP mode, not prefix delegation")
@@ -187,7 +213,7 @@ func (o *Observer) PrefixesFor(ctx context.Context, expected *unstructured.Unstr
 	}
 	sort.Slice(prefixes, func(i, j int) bool { return prefixes[i].String() < prefixes[j].String() })
 	// A complete, successful empty observation is authoritative withdrawal.
-	return prefixes, nil
+	return &Allocation{PodPrefixes: prefixes, NativePrefixes: append(nativeHosts, prefixes...)}, nil
 }
 
 func (o *Observer) binding(ctx context.Context, expected *unstructured.Unstructured, nodeName string) (*unstructured.Unstructured, *corev1.Node, error) {

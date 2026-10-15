@@ -22,8 +22,8 @@ func (failedMachineRead) List(context.Context, client.ObjectList, ...client.List
 	return fmt.Errorf("API unavailable")
 }
 
-// Observed in the k0s/kube-router VM lifecycle run: all remote1 resources and
-// compute were gone, but its four peer fields and adoption Secret survived.
+// Deleting a Machine must revoke its transport, native-network metadata and
+// adoption Secret while preserving live peers.
 func TestDeletedRemoteRevokesItsPeerAndAdoption(t *testing.T) {
 	for _, unavailable := range []bool{false, true} {
 		scheme := runtime.NewScheme()
@@ -41,15 +41,16 @@ func TestDeletedRemoteRevokesItsPeerAndAdoption(t *testing.T) {
 			r.reader = failedMachineRead{Reader: c}
 		}
 		peer := &corev1.Secret{Data: map[string][]byte{
-			"peer-public-key-remote1":  []byte("redacted public key"),
-			"peer-endpoint-remote1":    []byte("203.0.113.10:51820"),
-			"peer-allowed-ips-remote1": []byte("10.100.0.128/32,203.0.113.10/32,10.244.5.0/24"),
-			"peer-route-hosts-remote1": []byte("10.100.0.128,203.0.113.10"),
-			"peer-public-key-remote2":  []byte("surviving public key"),
+			"peer-native-network-remote1": []byte(`{"id":"aws:account:region:vpc"}`),
+			"peer-public-key-remote1":     []byte("redacted public key"),
+			"peer-endpoint-remote1":       []byte("203.0.113.10:51820"),
+			"peer-allowed-ips-remote1":    []byte("10.100.0.128/32,203.0.113.10/32,10.244.5.0/24"),
+			"peer-route-hosts-remote1":    []byte("10.100.0.128,203.0.113.10"),
+			"peer-public-key-remote2":     []byte("surviving public key"),
 		}}
 		changed, err := r.pruneDeletedMachines(context.Background(), peer)
 		if unavailable {
-			if err == nil || changed || len(peer.Data) != 5 {
+			if err == nil || changed || len(peer.Data) != 6 {
 				t.Fatalf("failed observation mutated peers: changed=%v err=%v", changed, err)
 			}
 			continue
@@ -57,7 +58,7 @@ func TestDeletedRemoteRevokesItsPeerAndAdoption(t *testing.T) {
 		if err != nil || !changed {
 			t.Fatalf("changed=%v err=%v", changed, err)
 		}
-		for _, prefix := range []string{tunnel.PeerPublicKeyPrefix, tunnel.PeerEndpointPrefix, tunnel.PeerAllowedIPsPrefix, tunnel.PeerRouteHostsPrefix} {
+		for _, prefix := range []string{tunnel.PeerPublicKeyPrefix, tunnel.PeerEndpointPrefix, tunnel.PeerAllowedIPsPrefix, tunnel.PeerRouteHostsPrefix, tunnel.PeerNativeNetworkPrefix} {
 			if _, ok := peer.Data[prefix+"remote1"]; ok {
 				t.Fatalf("stale %s", prefix)
 			}

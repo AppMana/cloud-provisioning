@@ -452,6 +452,23 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 		return nil, nil
 	}
 
+	selfName := ""
+	for key := range data {
+		if !strings.HasPrefix(key, PeerPublicKeyPrefix) {
+			continue
+		}
+		name := strings.TrimPrefix(key, PeerPublicKeyPrefix)
+		hosts := SplitList(string(data[PeerRouteHostsPrefix+name]))
+		if len(hosts) == 0 {
+			hosts = SplitList(string(data[PeerRouteHostPrefix+name]))
+		}
+		if selfTunnelAddr != "" && containsHost(hosts, selfTunnelAddr) {
+			if selfName != "" {
+				return nil, fmt.Errorf("ambiguous native network membership")
+			}
+			selfName = name
+		}
+	}
 	var remotes []PeerSpec
 	for key := range data {
 		if !strings.HasPrefix(key, PeerPublicKeyPrefix) {
@@ -471,12 +488,17 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 		if endpoint == PeerEndpointPending {
 			endpoint = ""
 		}
-		remotes = append(remotes, PeerSpec{
+		peer := PeerSpec{
 			PublicKey:    strings.TrimSpace(string(data[key])),
 			Endpoint:     endpoint,
 			WGAllowedIPs: SplitList(string(data[PeerAllowedIPsPrefix+name])),
 			RouteHosts:   routeHosts,
-		})
+		}
+		peer, err := projectNativeNetwork(data, selfName, name, peer)
+		if err != nil {
+			return nil, err
+		}
+		remotes = append(remotes, peer)
 	}
 	sort.Slice(remotes, func(i, j int) bool { return remotes[i].PublicKey < remotes[j].PublicKey })
 

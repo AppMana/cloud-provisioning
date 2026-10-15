@@ -1580,12 +1580,25 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 	}
 	awsNode := node.Labels[awspod.NodeLabel] == awspod.NodeValue
 	var prefixes []netip.Prefix
+	var nativeNetwork []byte
+	var nativeScope *tunnel.NativeNetwork
 	var err error
 	if awsNode {
 		if r.awsPodObserver == nil {
 			return false, fmt.Errorf("AWS VPC CNI node requires a scoped allocation observer")
 		}
-		prefixes, err = r.awsPodObserver.PrefixesFor(ctx, machine, nodeName)
+		allocation, observeErr := r.awsPodObserver.AllocationsFor(ctx, machine, nodeName)
+		err = observeErr
+		if err == nil {
+			prefixes = allocation.PodPrefixes
+			scope := r.awsPodObserver.Config
+			network := tunnel.NativeNetwork{ID: fmt.Sprintf("aws:%s:%s:%s", scope.Account, scope.Region, scope.VPC)}
+			for _, prefix := range allocation.NativePrefixes {
+				network.Prefixes = append(network.Prefixes, prefix.String())
+			}
+			sort.Strings(network.Prefixes)
+			nativeScope = &network
+		}
 		if err != nil {
 			return false, fmt.Errorf("observing AWS pod allocation: %w", err)
 		}
@@ -1615,6 +1628,16 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 	if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, secret); err != nil {
 		return false, fmt.Errorf("getting peer secret: %w", err)
 	}
+	if nativeScope != nil {
+		nativeScope.PublicKey = string(secret.Data[tunnel.PeerPublicKeyPrefix+machine.GetName()])
+		if nativeScope.PublicKey == "" {
+			return false, fmt.Errorf("native network has no peer identity")
+		}
+		nativeNetwork, err = json.Marshal(nativeScope)
+		if err != nil {
+			return false, err
+		}
+	}
 	key := tunnel.PeerAllowedIPsPrefix + machine.GetName()
 	entries := tunnel.SplitList(string(secret.Data[key]))
 	var hosts []string
@@ -1633,7 +1656,8 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 			return false, err
 		}
 	}
-	if want == string(secret.Data[key]) {
+	nativeKey := tunnel.PeerNativeNetworkPrefix + machine.GetName()
+	if want == string(secret.Data[key]) && string(nativeNetwork) == string(secret.Data[nativeKey]) {
 		return true, nil
 	}
 	if err := attachment.CheckPeerPublication(ctx, r.reader, machine); err != nil {
@@ -1644,6 +1668,11 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 		secret.Data = map[string][]byte{}
 	}
 	secret.Data[key] = []byte(want)
+	if awsNode {
+		secret.Data[nativeKey] = nativeNetwork
+	} else {
+		delete(secret.Data, nativeKey)
+	}
 	if err := r.Patch(ctx, secret, patch); err != nil {
 		return false, fmt.Errorf("publishing the remote node's pod blocks: %w", err)
 	}

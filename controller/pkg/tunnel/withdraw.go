@@ -18,7 +18,7 @@ func WithdrawRemotePeer(data map[string][]byte, name, publicKey string) (map[str
 	if len(current) > 0 && !bytes.Equal(current, []byte(publicKey)) {
 		return nil, false, fmt.Errorf("remote peer public key changed")
 	}
-	prefixes := []string{PeerPublicKeyPrefix, PeerEndpointPrefix, PeerAllowedIPsPrefix, PeerRouteHostsPrefix, PeerRouteHostPrefix}
+	prefixes := []string{PeerPublicKeyPrefix, PeerEndpointPrefix, PeerAllowedIPsPrefix, PeerRouteHostsPrefix, PeerRouteHostPrefix, PeerNativeNetworkPrefix}
 	if len(current) == 0 {
 		for _, prefix := range prefixes {
 			if _, exists := data[prefix+name]; exists {

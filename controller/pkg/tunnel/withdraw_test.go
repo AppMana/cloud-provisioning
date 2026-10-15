@@ -7,7 +7,8 @@ import (
 
 func TestWithdrawRemotePeerPreservesSurvivorsAndReservations(t *testing.T) {
 	data := map[string][]byte{
-		PeerPublicKeyPrefix + "worker": []byte("old-key"), PeerEndpointPrefix + "worker": []byte("192.0.2.2:51820"),
+		PeerNativeNetworkPrefix + "worker": []byte(`{"id":"aws:account:region:vpc","prefixes":["172.29.0.5/32"]}`),
+		PeerPublicKeyPrefix + "worker":     []byte("old-key"), PeerEndpointPrefix + "worker": []byte("192.0.2.2:51820"),
 		PeerAllowedIPsPrefix + "worker": []byte("10.100.0.2/32"), PeerRouteHostsPrefix + "worker": []byte("192.0.2.2"), PeerRouteHostPrefix + "worker": []byte("192.0.2.2"),
 		PeerPublicKeyPrefix + "worker-other": []byte("survivor-key"), TunnelAddressReservationPrefix + "worker": []byte("10.100.0.2"),
 	}

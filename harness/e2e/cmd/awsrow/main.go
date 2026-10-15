@@ -69,9 +69,9 @@ func run() error {
 		return err
 	}
 	var state struct {
-		Region, AssetBucket, PreparedAMIID string
-		AuthorizedLinuxAMIs                []string
-		CleanedUp                          bool
+		Region, AssetBucket, PreparedAMIID, VPCID string
+		AuthorizedLinuxAMIs                       []string
+		CleanedUp                                 bool
 	}
 	if err = json.Unmarshal(raw, &state); err != nil {
 		return err
@@ -250,6 +250,7 @@ func run() error {
 			Reservations []struct {
 				Instances []struct {
 					ImageID           string `json:"ImageId"`
+					VPCID             string `json:"VpcId"`
 					NetworkInterfaces []json.RawMessage
 				}
 			}
@@ -261,7 +262,7 @@ func run() error {
 			return fmt.Errorf("EC2 returned ambiguous instance identity")
 		}
 		instance := ec2.Reservations[0].Instances[0]
-		if len(instance.NetworkInterfaces) != 1 || instance.ImageID != imageID {
+		if len(instance.NetworkInterfaces) != 1 || instance.ImageID != imageID || instance.VPCID != state.VPCID {
 			return fmt.Errorf("EC2 machine does not match single-ENI prepared-image contract")
 		}
 		physical, e := remote.Exec(ctx, "sh", "-ec", `for p in /sys/class/net/*; do [ ! -e "$p/device" ] || basename "$p"; done`)
@@ -379,6 +380,11 @@ func run() error {
 	}
 	if err = observe.Capture(ctx, reportDir, "ready", k, fleet, nodes); err != nil {
 		return err
+	}
+	if *calicoSiteOnly {
+		if err := verifyNativePaths(ctx, fleet, targets, bindings, *podFamily, reportDir); err != nil {
+			return fmt.Errorf("native VPC routing failed: %w", err)
+		}
 	}
 	fmt.Println("Measuring pod, Service, large-transfer, DNS and external paths across", len(nodes), "nodes")
 	journal, err := os.OpenFile(filepath.Join(reportDir, "matrix-attempts.jsonl"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)

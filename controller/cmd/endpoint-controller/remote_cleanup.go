@@ -27,7 +27,7 @@ func (r *meshReconciler) pruneDeletedMachines(ctx context.Context, secret *corev
 	for _, machine := range machines.Items {
 		live[machine.GetName()] = true
 	}
-	prefixes := []string{tunnel.PeerPublicKeyPrefix, tunnel.PeerEndpointPrefix, tunnel.PeerAllowedIPsPrefix, tunnel.PeerRouteHostsPrefix, tunnel.PeerRouteHostPrefix}
+	prefixes := []string{tunnel.PeerPublicKeyPrefix, tunnel.PeerEndpointPrefix, tunnel.PeerAllowedIPsPrefix, tunnel.PeerRouteHostsPrefix, tunnel.PeerRouteHostPrefix, tunnel.PeerNativeNetworkPrefix}
 	changed := false
 	_, subnet, _ := net.ParseCIDR(r.tunnelSubnet)
 	for _, name := range publishedNames(secret.Data, prefixes...) {

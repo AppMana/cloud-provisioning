@@ -29,7 +29,11 @@ The two address-management domains need bidirectional native pod routing.
 On-premises BGP distributes the site pod CIDRs to the site routing boundary.
 The inter-site transport carries native pod packets, with explicit routes back
 to the site pod CIDRs in the AWS network. VPC pod addresses remain natively
-reachable within their AWS network.
+reachable within their AWS network. The allocation observer publishes the
+verified account/region/VPC identity and exact ENI destinations, bound to the
+peer's current key. A worker omits those destinations from another worker's
+tunnel only when both belong to that native network. Site and foreign-network
+peers retain the provider routes; no cluster-wide or VPC-wide bypass is inferred.
 
 The product must observe provider-owned per-node VPC allocations separately
 from Calico IPAM. It must not infer AWS pod ownership from `Node.spec.podCIDR`
@@ -141,3 +145,9 @@ are removed if retaining the lab for a different campaign.
 The chart archive is published in [the AWS Helm repository](https://aws.github.io/eks-charts/).
 The family and prefix-delegation contract is documented in the
 [pinned VPC CNI release](https://github.com/aws/amazon-vpc-cni-k8s/blob/v1.23.2/README.md).
+
+The IPv4/IPv6 `awsrow` campaigns with `-k0s-calico-site-only` also require
+`native-vpc-routes.json` to pass. This checks host-originated and forwarded pod
+routes between at least two workers against each worker's physical ENI. Every
+measured worker must belong to the campaign VPC. Connectivity through WireGuard
+does not satisfy this check, even when the workload matrix passes.

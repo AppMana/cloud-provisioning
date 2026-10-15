@@ -76,7 +76,7 @@ func TestAWSObservationPublishesAndWithdrawsWithoutCalicoFallback(t *testing.T) 
 	m := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "cluster.x-k8s.io/v1beta2", "kind": "Machine", "metadata": map[string]any{"name": "worker", "namespace": "cloud-provisioning", "uid": "machine-uid"}, "spec": map[string]any{"clusterName": "cluster", "providerID": "aws:///us-west-2a/i-123"}, "status": map[string]any{"nodeRef": map[string]any{"name": "worker", "uid": "node-uid"}}}}
 	m.SetAnnotations(map[string]string{join.WireGuardAddrAnnotation: "10.100.0.128/24"})
 	n := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker", UID: "node-uid", Labels: map[string]string{awspod.NodeLabel: awspod.NodeValue, cloudWorkerRoleLabel: cloudWorkerRoleValue, "kubernetes.io/os": "linux"}}, Spec: corev1.NodeSpec{ProviderID: "aws:///us-west-2a/i-123"}}
-	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "peers", Namespace: "cloud-provisioning"}, Data: map[string][]byte{tunnel.PeerAllowedIPsPrefix + "worker": []byte("10.100.0.128/32")}}
+	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "peers", Namespace: "cloud-provisioning"}, Data: map[string][]byte{tunnel.PeerPublicKeyPrefix + "worker": []byte("worker-key"), tunnel.PeerAllowedIPsPrefix + "worker": []byte("10.100.0.128/32")}}
 	r, c := dualStackReconciler(t, "", m, n, secret)
 	// This test focuses on the publication transaction; NAT is independently
 	// checked by the CNI package and must be qualified by the native campaign.
@@ -94,6 +94,11 @@ func TestAWSObservationPublishesAndWithdrawsWithoutCalicoFallback(t *testing.T) 
 		t.Fatalf("publish: %v %v", ok, err)
 	}
 	before := read()
+	nativeBefore := string(secret.Data[tunnel.PeerNativeNetworkPrefix+"worker"])
+	if !strings.Contains(nativeBefore, "aws:123:us-west-2:vpc-1") || !strings.Contains(nativeBefore, "172.29.0.11/32") {
+		t.Fatalf("native network not published with allocation: %s", nativeBefore)
+	}
+
 	if !strings.Contains(before, "172.29.0.11/32") {
 		t.Fatal("AWS allocation not published")
 	}
@@ -101,7 +106,7 @@ func TestAWSObservationPublishesAndWithdrawsWithoutCalicoFallback(t *testing.T) 
 	if _, err := r.publishRemotePodCIDRs(ctx, m, n.Name); err == nil {
 		t.Fatal("API failure hidden")
 	}
-	if read() != before {
+	if read() != before || string(secret.Data[tunnel.PeerNativeNetworkPrefix+"worker"]) != nativeBefore {
 		t.Fatal("API failure withdrew known-good state")
 	}
 	api.fail = false
@@ -112,4 +117,8 @@ func TestAWSObservationPublishesAndWithdrawsWithoutCalicoFallback(t *testing.T) 
 	if got := read(); got != "10.100.0.128/32" {
 		t.Fatalf("released IP retained: %s", got)
 	}
+	if strings.Contains(string(secret.Data[tunnel.PeerNativeNetworkPrefix+"worker"]), "172.29.0.11") {
+		t.Fatal("released native allocation retained")
+	}
+
 }

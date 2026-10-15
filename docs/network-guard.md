@@ -53,7 +53,9 @@ candidate bytes and runs the pinned apply executable within the original
 deadline. It kills the command process group before restoration on failure or
 timeout. Keep the service's `KillMode=control-group`: systemd must kill remaining
 children before restarting the guard. Commands must finish synchronously and
-must not delegate work to other services, schedulers, or detached process groups.
+must not delegate candidate writes to other services, schedulers, or detached
+process groups. Service-managed configuration needs the additional reconciliation
+proof described below; process cleanup alone does not cover it.
 
 Before measuring the candidate, require an active service, `ready.json`,
 `outcome: armed`, and enough remaining observation time. Readiness is emitted
@@ -103,3 +105,33 @@ apply timeout, and termination during application, with delayed child writes
 and an independent management ping stream. It never
 changes the VM's management interface or default route. That scope proves the
 local watchdog mechanism; it does not qualify a real CNI or cluster migration.
+
+## k0s reconciliation rehearsal
+
+Run [the k0s MTU fixture](../harness/e2e/safety/k0s-mtu-native.py) against the
+isolated three-node native lab. It requires a separate Docker daemon and
+network namespace, a built Linux guard binary, and a fresh artifact directory:
+
+```sh
+python3 harness/e2e/safety/k0s-mtu-native.py \
+  --runner "$ISOLATED_RUNNER" --guard "$GUARD_BINARY" \
+  --artifacts "$PRIVATE_ARTIFACT_DIRECTORY" --repetitions 3
+```
+
+The fixture snapshots the controller's k0s configuration, changes the Calico
+MTU and pod-template revision, and asks k0s to regenerate its managed manifests.
+It verifies CNI installation on all three nodes and creates new pods to check
+actual interface MTU before and after autonomous restoration. Independent
+IPv4/IPv6 management and existing-workload probes span the change. A dropped
+probe, failed command, missing candidate, or incomplete restoration fails the
+run; subsequent convergence does not erase that failure. Failed runs retain
+workloads and guard state for diagnosis.
+
+This fixture deliberately exercises a service-managed configuration. Restarting
+k0s starts reconciliation outside the guard's process group, so command exit
+and `rolled-back` state alone do not prove CNI restoration. The fixture requires
+observed convergence of installed CNI configuration and newly created pods.
+Production use additionally requires exclusive ownership across all controllers,
+reconciliation after API loss, BGP resource restoration, and each site's routing
+and workload compatibility. Do not substitute this isolated MTU rehearsal for
+those deployment gates.

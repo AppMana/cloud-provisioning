@@ -81,19 +81,9 @@ func (r *Rig) Up(ctx context.Context) error {
 	if err := os.WriteFile(r.TopologyPath(), source.GetYaml(), 0o644); err != nil {
 		return err
 	}
-	// The previous lab goes first, and its state with it.
-	//
-	// A data root is a bind mount, so it outlives the container that
-	// used it: a distribution that keeps its cluster state there —
-	// k0s keeps etcd's — comes back believing in a cluster whose
-	// other members no longer exist. Measured: cp's etcd campaigning
-	// at term 3 to two peers from a previous run, never electing a
-	// leader, and k0s never reporting itself running. A lab that
-	// reuses a previous run's cluster state is not a fresh lab.
-	//
-	// After the containers are gone, never before: removing a
-	// directory a running container has mounted races the mount and
-	// leaves it half there.
+	// Remove the previous containers before clearing their persistent data roots.
+	// Reusing distribution state can retain obsolete cluster membership; clearing
+	// a root while its container is running races the active mount.
 	owned := false
 	if r.Runtime != nil {
 		var err error

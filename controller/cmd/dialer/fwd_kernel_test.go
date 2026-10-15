@@ -18,17 +18,9 @@ func TestForwardingPathAgainstTheKernel(t *testing.T) {
 	}
 }
 
-// The tunnel does not carry the network's control plane. The mesh's
-// routing sessions crossing the tunnel are how a router on one side
-// installs the other side's claims, and every claim they carry is one
-// this dialer already provides from the mesh's own record: the accept
-// lists say what a peer may source, the tables say where a prefix
-// goes. What the sessions add is failure: they ride TCP over the very
-// paths a placement change moves, so each transition leaves them
-// half-dead, retrying into backoff, and re-announcing whatever stale
-// view they held when the path moved underneath them. Measured: a
-// block routed at the default gateway for half an hour because the
-// session that announced it died before it could withdraw it.
+// Tunnel routes and source permissions come from the mesh record. Routing
+// sessions must not cross the tunnel: endpoint transitions can interrupt their
+// withdrawals and leave stale routes behind.
 func TestTheTunnelRefusesBGPAgainstTheKernel(t *testing.T) {
 	if os.Getenv("CLDT_NETNS") != "1" {
 		t.Skip("set CLDT_NETNS=1 inside a namespace")

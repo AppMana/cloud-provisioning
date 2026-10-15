@@ -70,15 +70,8 @@ func UDPProbeArgv(destination string, payload, tries int, dontFragment bool) []s
 type Pods struct {
 	Kube *kube.Client
 	Rig  rig.Nodes
-	// Namespace is unique per run.
-	//
-	// A fixed name couples this run to the previous run's cleanup
-	// having finished, and namespace deletion is allowed to hang: with
-	// a node dead ungracefully, an aggregated API served from it makes
-	// the namespace controller's discovery fail and every deletion
-	// waits. Measured: a previous check's namespace Terminating for a
-	// whole wait, and the survivors' check reporting that no checks
-	// ran on a healthy network.
+	// Namespace is unique per run so a stalled namespace deletion cannot block
+	// new probes. An unavailable aggregated API can delay namespace cleanup.
 	Namespace string
 	// CRIEndpoint is where crictl finds this distribution's runtime. A
 	// crictl aimed at the wrong socket sees no containers, which reads
@@ -217,18 +210,9 @@ func (p *Pods) Start(ctx context.Context, nodes []string, within time.Duration) 
 func (p *Pods) targets(ctx context.Context, nodes []string) ([]Target, error) {
 	var out []Target
 	for _, node := range nodes {
-		// Ready, not merely Running.
-		//
-		// A pod whose node was killed comes back at a new address, and
-		// for a moment the API still carries the old object: phase
-		// Running, and the address it had before. Reading that gives
-		// every prober a target that no longer exists, and the failure
-		// is selective — the service address still resolves to
-		// whatever is serving now, so pod checks fail while service
-		// checks beside them pass, a pattern that reads exactly like a
-		// routing fault. Measured: every site node failing
-		// "to remote1 pod" against 10.244.159.0 while the pod had come
-		// back at 10.244.159.1.
+		// Require readiness before reading addresses. A recreated pod may briefly
+		// retain Running status and stale addresses while its Service already
+		// resolves to the replacement.
 		ready, err := p.Kube.Get(ctx, p.Namespace, "pod", "hc-"+node,
 			`{.status.conditions[?(@.type=="Ready")].status}`)
 		if err != nil || ready != "True" {

@@ -8,18 +8,9 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 )
 
-// A lab that reuses a previous run's cluster state is not a fresh
-// lab.
-//
-// A data root is a bind mount and outlives the container that used
-// it, so a distribution that keeps its cluster state there — k0s
-// keeps etcd's — comes back believing in a cluster whose other
-// members are gone. Measured: cp's etcd campaigning at term 3 to two
-// peers from a previous run, never electing a leader, and k0s never
-// reporting itself running.
-//
-// And the order matters: the containers go first. Removing a
-// directory a running container has mounted races the mount.
+// Fresh labs must discard persistent distribution state after removing the
+// containers that mounted it. Reused state can retain obsolete cluster members;
+// removing a mounted directory before teardown races the running container.
 func TestThePreviousLabsStateIsClearedBeforeDeploying(t *testing.T) {
 	rec := &recorder{}
 	r := &Rig{Topology: lab.Default(), WorkDir: t.TempDir(), Run: rec.run}

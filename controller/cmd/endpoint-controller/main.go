@@ -1219,23 +1219,10 @@ func nextFreeAddress(base string, used map[string]bool) (string, error) {
 	return "", fmt.Errorf("tunnel subnet %s is exhausted", base)
 }
 
-// Refreshing a remote's peer list is necessary and not sufficient, and
-// the other half is not here.
-//
-// A remote learns its peer list from the API server and reaches the API
-// server over the tunnel, so a pass that names the new endpoint and
-// withdraws the old one at once removes the only path the new name
-// could have travelled by. Measured: the site published only the new
-// endpoint, the remote's own peer list was correctly re-rendered to
-// name it, and the remote's WireGuard still held the old peer eighteen
-// minutes later, NotReady throughout.
-//
-// The other half is two phase, and it is pruneDeparted's retention
-// window together with dialerNodeAffinity's second term. A node the
-// selector has let go of stays a full endpoint, dialer and published
-// entries both, for as long as it takes a remote to poll and read the
-// list naming the replacement. For that window a remote has two working
-// paths rather than none, which is the whole trick.
+// Remote nodes fetch peer lists through the tunnel. Publishing a replacement
+// and withdrawing its predecessor in one pass can remove the path needed to
+// learn the replacement. pruneDeparted and dialerNodeAffinity retain the old
+// endpoint until the remote can acknowledge the replacement configuration.
 
 // machinesForBlock maps a pod block to the Machines this operator owns
 // whose node holds it.

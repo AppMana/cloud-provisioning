@@ -8,15 +8,8 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 )
 
-// ssh does not take an argv. It joins what it is given and hands the
-// result to a shell on the far side, which splits it again — so a
-// word carrying a space, a quote or a redirect means something on the
-// guest that the caller never wrote.
-//
-// Measured: writing the k0s binary ran
-// "sh -c cat > '/usr/local/bin/k0s'", the login shell performed the
-// redirect itself, and the word the caller passed was not the word
-// the guest ran.
+// SSH joins command arguments into a remote shell command. Quote each argument
+// so spaces, quotes, and redirects retain the caller's intended boundaries.
 func TestWordsSurviveTheTransport(t *testing.T) {
 	rec := &recorder{}
 	n := testNode(t, rec)

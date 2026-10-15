@@ -5,16 +5,9 @@ import (
 	"testing"
 )
 
-// The relay-egress decision is a content question, not a freshness
-// question. A site node being relayed must not send a remote its
-// traffic through the relay until that remote's APPLIED list actually
-// carries the node's addresses on the relay: an applied hash that
-// matches a list which still routes the node directly means the
-// remote's accept list still owns those sources on the direct entry,
-// and everything arriving via the relay is dropped by cryptokey
-// routing. Measured: a placement shrink, cp3 switching to the relay
-// on a fresh-but-direct acknowledgment, and 78 seconds of its return
-// traffic dying inside remote2's trie.
+// Relay egress requires an applied peer list that assigns the site node
+// addresses to the relay. A fresh acknowledgment of a direct-route list is
+// insufficient: the remote would reject relayed traffic under cryptokey routing.
 func TestDocRelaysNode(t *testing.T) {
 	direct := PeerListDoc{Peers: []PeerSpec{
 		{PublicKey: "CP3", WGAllowedIPs: []string{"10.10.0.14/32", "10.244.2.0/24"}},
@@ -285,14 +278,9 @@ func TestRemotePeers_RemotesReachEachOther(t *testing.T) {
 	}
 }
 
-// A remote reaches a site node that has no tunnel by relaying through
-// one that does. The route for that node's pods comes from the network,
-// but WireGuard checks its accept list on the way out as well as in, so
-// a block that is routed into the tunnel and permitted by nothing is
-// dropped by the sender. Measured: the remote held
-// "10.244.168.64/26 via ... dev cldt..." and an accept list without it,
-// and every pair involving a node with no tunnel failed in both
-// directions.
+// A remote reaches site nodes without tunnels through a relay. Their pod
+// prefixes must be present in both routing tables and WireGuard accept lists;
+// WireGuard enforces those lists on egress as well as ingress.
 func TestRemotePeers_PermitsTheSiteNodesWithNoTunnel(t *testing.T) {
 	data := peerSecret(
 		map[string][2]string{

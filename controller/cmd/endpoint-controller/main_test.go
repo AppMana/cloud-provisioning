@@ -195,12 +195,8 @@ func members(names ...string) map[string]bool {
 	return set
 }
 
-// Nothing removed what a node published once it stopped being what it
-// published as. Measured: the selector was moved from w1 to cp, cp came
-// up and dialed the remote correctly, and the remote's peer list still
-// held exactly one peer carrying w1's key and w1's tunnel address, with
-// a handshake six minutes stale. It never learned cp, lost its only
-// path to the API server, and went NotReady.
+// Changing the endpoint selector must update remote peer lists while preserving
+// a working API path through the transition.
 func TestPruneDeparted(t *testing.T) {
 	const (
 		keyW1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA="
@@ -1015,25 +1011,10 @@ func TestNoPrefixIsUnownedWhileAnEndpointReturns(t *testing.T) {
 	check("returned")
 }
 
-// Retention is a floor, not a ceiling. The window exists so a remote
-// can read the list naming the replacement while the old path still
-// carries it, and a clock cannot know whether that read happened: a
-// controller outage or a slow render can eat the entire window, and a
-// departed endpoint released on schedule then strands every remote
-// that still names only it. Measured twice: both remotes NotReady,
-// holding a list whose one peer had been swept, the correction
-// rendered seconds after their last successful read.
-//
-// Nor is a live handshake evidence. A retained-era config keeps bare
-// peers handshaking on keepalive alone, so a remote can handshake a
-// current endpoint continuously while routing every packet by a list
-// two placements old. Measured: a hold built on handshakes released
-// on schedule, into exactly the stranding it existed to prevent.
-//
-// The only honest evidence is the remote's own acknowledgment: it
-// stamps the hash of the list it applied, and it has moved when that
-// hash matches the current render, which no longer names the departed
-// node as an owner.
+// Retention is a minimum duration. Elapsed time and live handshakes cannot prove
+// that a remote has applied the replacement routes. Release a departed endpoint
+// only after the remote acknowledges the current peer-list hash without that
+// endpoint as an owner.
 func TestADepartedEndpointIsHeldUntilEveryRemoteAcknowledges(t *testing.T) {
 	data := published(map[string][2]string{
 		"cp": {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbB=", "10.100.0.2/24"},

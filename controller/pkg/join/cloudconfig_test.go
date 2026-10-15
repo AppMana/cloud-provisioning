@@ -451,15 +451,9 @@ func hasConnectBound(line string) bool {
 		strings.Contains(line, "--connect-timeout")
 }
 
-// When the infrastructure provider knows where the machine is, the
-// node is told, and nothing asks a metadata service at all.
-//
-// A kubelet left to choose gets it wrong wherever there is more than
-// one address to choose from. Measured: a machine with an
-// out-of-band interface beside its real one registered the
-// out-of-band address, the one every machine in that lab shares,
-// while the mesh had already published the other. It joined, went
-// Ready, and carried an identity nothing was looking for.
+// When the infrastructure provider supplies a node address, use it explicitly
+// without metadata discovery. Automatic address selection on a multi-interface
+// machine can register an out-of-band address instead of its routable identity.
 func TestAKnownAddressReachesTheNodeAndReplacesTheMetadataLookup(t *testing.T) {
 	patterns, err := filepath.Glob(filepath.Join("..", "..", "..", "join-patterns", "*.cloud-config.tmpl"))
 	if err != nil || len(patterns) == 0 {

@@ -97,7 +97,7 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	newPeer, _ := wgtypes.GeneratePrivateKey()
 	base := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: oldPeer.PublicKey().String(), Endpoint: "127.0.0.1:51822", WGAllowedIPs: []string{"10.90.0.10/32"}, RouteHosts: []string{"10.90.0.10"}}}}
 	baseRaw, _ := json.Marshal(base)
-	cfg := config{iface: "cldtapibase", peersFile: filepath.Join(t.TempDir(), "identity.json"), peersSecretNamespace: namespace, peersSecretName: "adoption", nodeName: "cp", mtu: 1400, routeTable: 518, fwmark: 518, pollInterval: time.Second}
+	cfg := config{iface: "cldtapibase", peersFile: filepath.Join(t.TempDir(), "identity.json"), peersSecretNamespace: namespace, peersSecretName: "worker-tunnel-peers", nodeName: "cp", mtu: 1400, routeTable: 518, fwmark: 518, pollInterval: time.Second}
 	bootstrap := tunnel.PeersFileDoc{PrivateKey: root.String(), LocalAddress: "10.88.0.3/32", Peers: base.Peers}
 	raw, _ := json.Marshal(bootstrap)
 	if err := os.WriteFile(cfg.peersFile, raw, 0600); err != nil {
@@ -105,12 +105,12 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	}
 	patchData := func(data map[string][]byte) {
 		t.Helper()
-		current, err := secrets.Get(ctx, "adoption", metav1.GetOptions{})
+		current, err := secrets.Get(ctx, "worker-tunnel-peers", metav1.GetOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		patch, _ := json.Marshal(map[string]any{"metadata": map[string]any{"uid": current.UID, "resourceVersion": current.ResourceVersion}, "data": data})
-		if _, err := secrets.Patch(ctx, "adoption", types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+		if _, err := secrets.Patch(ctx, "worker-tunnel-peers", types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -123,7 +123,7 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	if err := reconcile(ctx, worker, devices, cfg); err != nil {
 		t.Fatal(err)
 	}
-	before, err := secrets.Get(ctx, "adoption", metav1.GetOptions{})
+	before, err := secrets.Get(ctx, "worker-tunnel-peers", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,13 +138,28 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := tunnel.ReceivePrepare{Version: 1, MeshUID: string(before.UID), NodeName: "cp", NodeUID: nodeUID, BootID: node.Status.NodeInfo.BootID, RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(baseRaw), Ports: map[string]int{oldPeer.PublicKey().String(): 51821, newPeer.PublicKey().String(): 51822}, Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: newPeer.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.10/32"}}}}, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}}
+	mesh, err := secrets.Get(ctx, "mesh", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	meshPatch, _ := json.Marshal(map[string]any{"metadata": map[string]any{"uid": mesh.UID, "resourceVersion": mesh.ResourceVersion}, "data": map[string][]byte{
+		tunnel.NodePublicKeyPrefix + "cp":      []byte(newPeer.PublicKey().String()),
+		tunnel.PeerPublicKeyPrefix + "worker":  []byte(root.PublicKey().String()),
+		tunnel.PeerEndpointPrefix + "worker":   []byte("198.51.100.10:51820"),
+		tunnel.PeerAllowedIPsPrefix + "worker": []byte("10.88.0.3/32"),
+		tunnel.PeerRouteHostsPrefix + "worker": []byte("10.88.0.3"),
+	}})
+	mesh, err = secrets.Patch(ctx, "mesh", types.MergePatchType, meshPatch, metav1.PatchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := tunnel.ReceivePrepare{Version: 1, MeshUID: string(mesh.UID), NodeName: "cp", NodeUID: nodeUID, BootID: node.Status.NodeInfo.BootID, RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(baseRaw), Ports: map[string]int{oldPeer.PublicKey().String(): 51821, newPeer.PublicKey().String(): 51822}, Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: newPeer.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.10/32"}}}}, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}}
 	requestRaw, _ := json.Marshal(request)
 	patchData(map[string][]byte{tunnel.ReceivePrepareKey: requestRaw})
 	if err := reconcile(ctx, worker, devices, cfg); err != nil {
 		t.Fatal(err)
 	}
-	current, err := secrets.Get(ctx, "adoption", metav1.GetOptions{})
+	current, err := secrets.Get(ctx, "worker-tunnel-peers", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,6 +194,43 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	if len(live.Peers) != 1 || live.Peers[0].PublicKey != oldPeer.PublicKey() {
 		t.Fatal("preparation changed active WireGuard peer")
 	}
+	// Consume the real cloud receipt through the site reconciliation path,
+	// retaining the active cloud device and all existing routes.
+	var sitePlan tunnel.SiteReceiveClient
+	for pass := 0; pass < 2; pass++ {
+		calls := 0
+		if err := reconcileSiteReceivePreparation(ctx, worker, mesh, "cp", newPeer, func(cloud string, binding receiveBinding, doc tunnel.PeerListDoc) error {
+			calls++
+			prepared, err := prepareSiteReceiveClient(devices, string(mesh.UID), newPeer, cloud, binding, doc, doc, 1400, 518)
+			if err != nil {
+				return err
+			}
+			if pass == 1 && !reflect.DeepEqual(sitePlan, prepared) {
+				t.Fatal("site preparation is not idempotent")
+			}
+			sitePlan = prepared
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if calls != 1 {
+			t.Fatal("site did not consume cloud readiness")
+		}
+	}
+	siteDevice, err := devices.Device(sitePlan.Interface)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if siteDevice.PrivateKey != newPeer || len(siteDevice.Peers) != 1 || siteDevice.Peers[0].PublicKey.String() != sitePlan.PublicKey {
+		t.Fatal("site kernel device differs from validated cloud binding")
+	}
+	live, err = devices.Device(cfg.iface)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(live.Peers) != 1 || live.Peers[0].PublicKey != oldPeer.PublicKey() {
+		t.Fatal("site preparation changed the legacy device")
+	}
 	afterRoutes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -194,7 +246,7 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	stale := current.DeepCopy()
 	patchData(map[string][]byte{"test-revision": []byte("new")})
 	stalePatch, _ := json.Marshal(map[string]any{"metadata": map[string]any{"uid": stale.UID, "resourceVersion": stale.ResourceVersion}, "data": map[string][]byte{tunnel.ReceiveReadyKey: []byte("invalid")}})
-	if _, err := secrets.Patch(ctx, "adoption", types.MergePatchType, stalePatch, metav1.PatchOptions{}); !apierrors.IsConflict(err) {
+	if _, err := secrets.Patch(ctx, "worker-tunnel-peers", types.MergePatchType, stalePatch, metav1.PatchOptions{}); !apierrors.IsConflict(err) {
 		t.Fatalf("stale readiness write was not rejected: %v", err)
 	}
 	if err := reconcileReceivePreparation(ctx, worker, stale, "cp", root, func(req tunnel.ReceivePrepare, previous tunnel.PeerListDoc) ([]receiveBinding, error) {
@@ -202,7 +254,7 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	}); err == nil {
 		t.Fatal("stale preparation snapshot published readiness")
 	}
-	current, err = secrets.Get(ctx, "adoption", metav1.GetOptions{})
+	current, err = secrets.Get(ctx, "worker-tunnel-peers", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,12 +269,12 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	if err := reconcile(ctx, worker, devices, cfg); err != nil {
 		t.Fatal(err)
 	}
-	current, err = secrets.Get(ctx, "adoption", metav1.GetOptions{})
+	current, err = secrets.Get(ctx, "worker-tunnel-peers", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(current.Data[tunnel.ReceiveReadyKey]) != string(stale.Data[tunnel.ReceiveReadyKey]) {
 		t.Fatal("recovery changed prepared identities")
 	}
-	t.Log("Real API: scoped access, reconciler preparation, unchanged forwarding, stale-write rejection, and malformed-request recovery passed")
+	t.Log("Real API: scoped access, cloud and site preparation, unchanged forwarding, stale-write rejection, and malformed-request recovery passed")
 }

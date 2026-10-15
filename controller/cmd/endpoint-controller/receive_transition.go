@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/netip"
+	"reflect"
+	"sort"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
@@ -80,8 +82,8 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 		}
 		// A matching storage hash proves integrity, not that this binary can
 		// execute the saved configuration. Revalidate on every recovery, too.
-		if _, err := tunnel.PlanReceiveRoutes(plan); err != nil {
-			return nil, fmt.Errorf("receiver journal has an invalid route plan: %w", err)
+		if err := validateReceiveTransitionBinding(existing, plan, store.ClusterUID); err != nil {
+			return nil, err
 		}
 		return &existing, nil
 	}
@@ -101,14 +103,10 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 		return nil, err
 	}
 	hash := fmt.Sprintf("%x", sha256.Sum256(raw))
-	members := make([]handover.Member, 0, 2*len(plan.Sites))
-	for pub, site := range plan.Sites {
-		binding := plan.Bindings[pub]
-		members = append(members,
-			handover.Member{NodeUID: plan.CloudNodeUID, DeviceID: "site:" + pub, FromKey: plan.RootPublicKey, ToKey: binding.PublicKey, FromPeerKey: pub, ToPeerKey: pub},
-			handover.Member{NodeUID: site.NodeUID, DeviceID: "cloud:" + plan.RootPublicKey, FromKey: pub, ToKey: pub, FromPeerKey: plan.RootPublicKey, ToPeerKey: binding.PublicKey})
+	spec, err := receiveTransitionSpec(plan, store.ClusterUID, hash)
+	if err != nil {
+		return nil, err
 	}
-	spec := handover.Spec{ClusterUID: store.ClusterUID, TransitionUID: string(machine.GetUID()) + ":" + hash, PlanHash: hash, FromGeneration: "legacy:" + tunnel.HashPeerList(plan.Base), ToGeneration: "receivers:" + hash, Phase: handover.Prepare, Members: members}
 	transition, err := handover.NewTransition(spec, now, policy)
 	if err != nil {
 		return nil, err
@@ -119,6 +117,53 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 		return nil, err
 	}
 	return &persisted, nil
+}
+
+func receiveTransitionSpec(plan tunnel.ReceiveTransitionPlan, clusterUID, hash string) (handover.Spec, error) {
+	if _, err := tunnel.PlanReceiveRoutes(plan); err != nil {
+		return handover.Spec{}, fmt.Errorf("receiver journal has an invalid route plan: %w", err)
+	}
+	members := make([]handover.Member, 0, 2*len(plan.Sites))
+	for pub, site := range plan.Sites {
+		binding := plan.Bindings[pub]
+		members = append(members,
+			handover.Member{NodeUID: plan.CloudNodeUID, DeviceID: "site:" + pub, FromKey: plan.RootPublicKey, ToKey: binding.PublicKey, FromPeerKey: pub, ToPeerKey: pub},
+			handover.Member{NodeUID: site.NodeUID, DeviceID: "cloud:" + plan.RootPublicKey, FromKey: pub, ToKey: pub, FromPeerKey: plan.RootPublicKey, ToPeerKey: binding.PublicKey})
+	}
+	sort.Slice(members, func(i, j int) bool {
+		if members[i].NodeUID != members[j].NodeUID {
+			return members[i].NodeUID < members[j].NodeUID
+		}
+		return members[i].DeviceID < members[j].DeviceID
+	})
+	return handover.Spec{ClusterUID: clusterUID, TransitionUID: plan.MachineUID + ":" + hash, PlanHash: hash, FromGeneration: "legacy:" + tunnel.HashPeerList(plan.Base), ToGeneration: "receivers:" + hash, Phase: handover.Prepare, Members: members}, nil
+}
+
+// A valid journal and matching plan hash do not by themselves bind its
+// participants to the plan. Reconstruct that binding without minting a round
+// or changing persisted state, including the reversed direction of rollback.
+func validateReceiveTransitionBinding(snapshot handover.Snapshot, plan tunnel.ReceiveTransitionPlan, clusterUID string) error {
+	view, err := snapshot.Transition().View()
+	if err != nil {
+		return err
+	}
+	expected, err := receiveTransitionSpec(plan, clusterUID, view.Round.PlanHash)
+	if err != nil {
+		return err
+	}
+	expected.Phase = view.Round.Phase
+	if view.RollbackRequested && view.Round.Phase != handover.Abort {
+		expected.FromGeneration, expected.ToGeneration = expected.ToGeneration, expected.FromGeneration
+		for i := range expected.Members {
+			m := &expected.Members[i]
+			m.FromKey, m.ToKey = m.ToKey, m.FromKey
+			m.FromPeerKey, m.ToPeerKey = m.ToPeerKey, m.FromPeerKey
+		}
+	}
+	if !reflect.DeepEqual(expected, view.Round.Spec) {
+		return fmt.Errorf("receiver journal round does not match its public transport plan")
+	}
+	return nil
 }
 
 func (r *meshReconciler) buildReceiveTransitionPlan(ctx context.Context, machine *unstructured.Unstructured, prepared *preparedRemoteReceivers, now time.Time) (tunnel.ReceiveTransitionPlan, error) {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -112,7 +113,63 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 		t.Fatal(err)
 	}
 	original := object.DeepCopy()
-	for _, fault := range []string{"unsupported-field", "trailing-data", "route-outside-source"} {
+	for _, direction := range []string{"forward", "abort", "rollback"} {
+		t.Run(direction, func(t *testing.T) {
+			current, err := store.Load(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rolled := false
+			for {
+				v, err := current.Transition().View()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := r.ensureReceiveTransition(ctx, machine, store, nil, nil, handover.Policy{}, now); err != nil {
+					t.Fatalf("could not resume committed %s/%s: %v", direction, v.Round.Phase, err)
+				}
+				if v.Complete {
+					break
+				}
+				at := v.Round.IssuedAt.Add(time.Second)
+				var next handover.Transition
+				if !rolled && ((direction == "abort" && v.Round.Phase == handover.Prepare) || (direction == "rollback" && v.Round.Phase == handover.Switch)) {
+					next, err = current.Transition().Rollback(at)
+					rolled = true
+				} else {
+					if v.Round.Phase == handover.Drain {
+						at = v.DrainUntil.Add(time.Millisecond)
+					}
+					digest, digestErr := v.Round.Digest()
+					if digestErr != nil {
+						t.Fatal(digestErr)
+					}
+					proofs := make([]handover.AuthenticatedReceipt, 0, len(v.Round.Members))
+					for _, m := range v.Round.Members {
+						proofs = append(proofs, handover.AuthenticatedReceipt{AuthenticatedNodeUID: m.NodeUID, Receipt: handover.Receipt{RoundHash: digest, NodeUID: m.NodeUID, DeviceID: m.DeviceID, FromKey: m.FromKey, ToKey: m.ToKey, FromPeerKey: m.FromPeerKey, ToPeerKey: m.ToPeerKey, ObservedAt: at}})
+					}
+					next, err = current.Transition().Advance(at, proofs)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				current, err = store.Commit(ctx, current, next)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			object, err = k.CoreV1().ConfigMaps(machine.GetNamespace()).Get(ctx, store.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			object.Data = original.DeepCopy().Data
+			object, err = k.CoreV1().ConfigMaps(machine.GetNamespace()).Update(ctx, object, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	for _, fault := range []string{"unsupported-field", "trailing-data", "route-outside-source", "node-binding", "device-binding", "key-binding", "peer-binding", "from-generation", "to-generation", "transition-identity"} {
 		t.Run(fault, func(t *testing.T) {
 			var changed map[string]any
 			if err := json.Unmarshal(snapshot.Plan(), &changed); err != nil {
@@ -144,6 +201,29 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 			spec.PlanHash = fmt.Sprintf("%x", sha256.Sum256(planRaw))
 			spec.TransitionUID = string(machine.GetUID()) + ":" + spec.PlanHash
 			spec.ToGeneration = "receivers:" + spec.PlanHash
+			spec.Members = append([]handover.Member(nil), spec.Members...)
+			switch fault {
+			case "node-binding":
+				spec.Members[0].NodeUID = "another-node"
+			case "device-binding":
+				spec.Members[0].DeviceID += "-other"
+			case "key-binding", "peer-binding":
+				key, err := wgtypes.GeneratePrivateKey()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if fault == "key-binding" {
+					spec.Members[0].FromKey = key.PublicKey().String()
+				} else {
+					spec.Members[0].FromPeerKey = key.PublicKey().String()
+				}
+			case "from-generation":
+				spec.FromGeneration = "legacy:another-document"
+			case "to-generation":
+				spec.ToGeneration = "receivers:another-document"
+			case "transition-identity":
+				spec.TransitionUID = "another-transition"
+			}
 			transition, err := handover.NewTransition(spec, now, handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: 10 * time.Second, DrainInterval: 5 * time.Second})
 			if err != nil {
 				t.Fatal(err)

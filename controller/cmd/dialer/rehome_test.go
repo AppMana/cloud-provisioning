@@ -162,3 +162,36 @@ func TestANeverHandshakenPeerIsNotACandidate(t *testing.T) {
 		t.Error("the transit set moved to a peer that has never completed a handshake")
 	}
 }
+
+func TestRenderedPendingCloudPeerCannotCarrySiteTransit(t *testing.T) {
+	data := map[string][]byte{
+		tunnel.NodePublicKeyPrefix + "site":     []byte("site-key"),
+		tunnel.NodeTunnelAddressPrefix + "site": []byte("10.100.0.1/24"),
+		tunnel.PeerPublicKeyPrefix + "self":     []byte("self-key"),
+		tunnel.PeerRouteHostsPrefix + "self":    []byte("10.100.0.128"),
+		tunnel.PeerAllowedIPsPrefix + "self":    []byte("10.100.0.128/32"),
+		tunnel.PeerPublicKeyPrefix + "other":    []byte("other-cloud-key"),
+		tunnel.PeerRouteHostsPrefix + "other":   []byte("10.100.0.129"),
+		tunnel.PeerAllowedIPsPrefix + "other":   []byte("10.100.0.129/32"),
+		tunnel.PeerEndpointPrefix + "other":     []byte(tunnel.PeerEndpointPending),
+	}
+	peers, err := tunnel.RemotePeers(data, "10.100.0.128", []string{"10.101.0.9"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	got := rehomeTransit(peers, func(key string) (time.Time, bool) {
+		if key == "other-cloud-key" {
+			return now, true
+		}
+		return time.Time{}, false
+	}, now)
+	for _, peer := range got {
+		if peer.PublicKey == "other-cloud-key" && (len(peer.Transit) > 0 || len(peer.TransitHosts) > 0 || containsString(peer.WGAllowedIPs, "10.101.0.9/32")) {
+			t.Fatal("cloud peer became the site transit relay")
+		}
+		if peer.PublicKey == "site-key" && !containsString(peer.Transit, "10.101.0.9/32") {
+			t.Fatal("site transit ownership was removed")
+		}
+	}
+}

@@ -493,6 +493,7 @@ func RemotePeers(data map[string][]byte, selfTunnelAddr string, apiServers []str
 			Endpoint:     endpoint,
 			WGAllowedIPs: SplitList(string(data[PeerAllowedIPsPrefix+name])),
 			RouteHosts:   routeHosts,
+			Remote:       true,
 		}
 		peer, err := projectNativeNetwork(data, selfName, name, peer)
 		if err != nil {

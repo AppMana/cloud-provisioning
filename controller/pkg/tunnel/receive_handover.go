@@ -47,12 +47,14 @@ func PlanReceiveHandover(meshID string, previous, desired PeerListDoc, native []
 	}
 	permissions := map[string]map[string]bool{}
 	roles := map[string]bool{}
+	type owner struct {
+		prefix netip.Prefix
+		key    string
+		remote bool
+	}
+	var overlapOwners []owner
 	for _, doc := range []PeerListDoc{previous, desired} {
 		seen := map[string]bool{}
-		type owner struct {
-			prefix netip.Prefix
-			key    string
-		}
 		var owners []owner
 		for _, peer := range doc.Peers {
 			key, err := base64.StdEncoding.DecodeString(peer.PublicKey)
@@ -67,19 +69,16 @@ func PlanReceiveHandover(meshID string, previous, desired PeerListDoc, native []
 				return ReceiveHandover{}, fmt.Errorf("peer changed site/cloud role")
 			}
 			roles[peer.PublicKey] = peer.Remote
-			if peer.Remote {
-				continue
-			}
-			if permissions[peer.PublicKey] == nil {
+			if !peer.Remote && permissions[peer.PublicKey] == nil {
 				permissions[peer.PublicKey] = map[string]bool{}
 			}
 			for _, raw := range peer.WGAllowedIPs {
 				prefix, err := netip.ParsePrefix(raw)
 				if err != nil || prefix != prefix.Masked() || prefix.Bits() == 0 || prefix.Addr().Is4In6() || !prefix.Addr().IsGlobalUnicast() {
-					return ReceiveHandover{}, fmt.Errorf("invalid site source prefix %q", raw)
+					return ReceiveHandover{}, fmt.Errorf("invalid peer source prefix %q", raw)
 				}
 				for _, boundary := range native {
-					if prefix.Overlaps(boundary) {
+					if !peer.Remote && prefix.Overlaps(boundary) {
 						return ReceiveHandover{}, fmt.Errorf("site receiver overlaps a protected native prefix")
 					}
 				}
@@ -88,8 +87,20 @@ func PlanReceiveHandover(meshID string, previous, desired PeerListDoc, native []
 						return ReceiveHandover{}, fmt.Errorf("ambiguous source ownership within one generation")
 					}
 				}
-				owners = append(owners, owner{prefix, peer.PublicKey})
-				permissions[peer.PublicKey][prefix.String()] = true
+				// Old receivers remain active while the desired generation is
+				// prepared. That overlap must not transfer authority between
+				// site and cloud peers, even across document generations.
+				for _, prior := range overlapOwners {
+					if prior.remote != peer.Remote && prefix.Overlaps(prior.prefix) {
+						return ReceiveHandover{}, fmt.Errorf("source ownership crosses site/cloud boundary during handover")
+					}
+				}
+				entry := owner{prefix, peer.PublicKey, peer.Remote}
+				owners = append(owners, entry)
+				overlapOwners = append(overlapOwners, entry)
+				if !peer.Remote {
+					permissions[peer.PublicKey][prefix.String()] = true
+				}
 			}
 		}
 	}

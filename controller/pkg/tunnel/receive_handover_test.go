@@ -91,3 +91,59 @@ func TestReceivePreparationDistinguishesEmptyFromMissingState(t *testing.T) {
 		}
 	}
 }
+
+func TestReceivePreparationValidatesCloudOwnership(t *testing.T) {
+	a, b := receiverTestKey(8), receiverTestKey(16)
+	empty := PeerListDoc{Peers: []PeerSpec{}}
+	for _, test := range []struct {
+		name  string
+		peers []PeerSpec
+	}{
+		{"site before cloud", []PeerSpec{{PublicKey: a, WGAllowedIPs: []string{"10.90.0.0/24"}}, {PublicKey: b, Remote: true, WGAllowedIPs: []string{"10.90.0.10/32"}}}},
+		{"cloud before site", []PeerSpec{{PublicKey: b, Remote: true, WGAllowedIPs: []string{"10.90.0.0/24"}}, {PublicKey: a, WGAllowedIPs: []string{"10.90.0.10/32"}}}},
+		{"cloud owners", []PeerSpec{{PublicKey: a, Remote: true, WGAllowedIPs: []string{"2001:db8:1::/64"}}, {PublicKey: b, Remote: true, WGAllowedIPs: []string{"2001:db8:1::10/128"}}}},
+		{"malformed cloud prefix", []PeerSpec{{PublicKey: a, Remote: true, WGAllowedIPs: []string{"invalid"}}}},
+		{"cloud default route", []PeerSpec{{PublicKey: a, Remote: true, WGAllowedIPs: []string{"::/0"}}}},
+		{"cloud host bits", []PeerSpec{{PublicKey: a, Remote: true, WGAllowedIPs: []string{"172.29.0.10/24"}}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			invalid := PeerListDoc{Peers: test.peers}
+			for _, pair := range [][2]PeerListDoc{{empty, invalid}, {invalid, empty}} {
+				plan, err := PlanReceiveHandover("mesh", pair[0], pair[1], nil)
+				if err == nil {
+					t.Fatal("unsafe cloud ownership accepted")
+				}
+				if !reflect.DeepEqual(plan, ReceiveHandover{}) {
+					t.Fatal("rejected input returned a partial plan")
+				}
+			}
+		})
+	}
+}
+
+func TestReceivePreparationPreservesProtectedCloudPeers(t *testing.T) {
+	doc := PeerListDoc{Peers: []PeerSpec{
+		{PublicKey: receiverTestKey(8), WGAllowedIPs: []string{"10.90.0.10/32"}},
+		{PublicKey: receiverTestKey(16), Remote: true, WGAllowedIPs: []string{"172.29.0.10/32", "2001:db8:2::10/128"}},
+	}}
+	native := []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24"), netip.MustParsePrefix("2001:db8:2::/80")}
+	plan, err := PlanReceiveHandover("mesh", doc, doc, native)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(plan.Desired, doc) || len(plan.Receivers) != 1 || plan.Receivers[0].PublicKey != doc.Peers[0].PublicKey {
+		t.Fatal("protected cloud peer changed or became a site receiver")
+	}
+}
+
+func TestReceivePreparationRejectsCrossGenerationTrustTransfer(t *testing.T) {
+	for _, prefixes := range [][2]string{{"10.90.0.0/24", "10.90.0.10/32"}, {"2001:db8:1::/64", "2001:db8:1::10/128"}} {
+		site := PeerListDoc{Peers: []PeerSpec{{PublicKey: receiverTestKey(8), WGAllowedIPs: []string{prefixes[0]}}}}
+		cloud := PeerListDoc{Peers: []PeerSpec{{PublicKey: receiverTestKey(16), Remote: true, WGAllowedIPs: []string{prefixes[1]}}}}
+		for _, pair := range [][2]PeerListDoc{{site, cloud}, {cloud, site}} {
+			if _, err := PlanReceiveHandover("mesh", pair[0], pair[1], nil); err == nil {
+				t.Fatal("overlapping generations transferred site/cloud source authority")
+			}
+		}
+	}
+}

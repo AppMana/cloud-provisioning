@@ -16,11 +16,8 @@ the adoption path resolves this node's own Secret from. */}}
 {{- /*
 ssh-authorized-keys: the logins --join-ssh-authorized-keys asks for.
 
-That flag says "on every new node", and the reconciler renders its
-value into every pattern, but for a long time only k0s read it: an
-operator who set the flag and ran kubeadm, k3s or RKE2 got no keys and
-no error. Shared here so a pattern cannot be written that quietly
-drops it.
+The reconciler supplies these keys to every join pattern. Sharing the
+rendering keeps authorized logins consistent across distributions.
 
 Rendered only when there are keys. A bare "ssh_authorized_keys:" with
 nothing under it is a null, not an empty list, and the default is no
@@ -37,6 +34,14 @@ ssh_authorized_keys:
 {{- end }}
 
 {{- define "wg-dialer-files" }}
+  - path: /etc/systemd/networkd.conf.d/90-cloud-provisioning.conf
+    permissions: '0644'
+    content: |
+      # The dialer and CNI own their routes and policy rules. Preserve them
+      # when networkd restarts; their owners reconcile and remove stale state.
+      [Network]
+      ManageForeignRoutingPolicyRules=no
+      ManageForeignRoutes=no
   - path: /etc/wg-dialer/peers.json
     permissions: '0600'
     content: |

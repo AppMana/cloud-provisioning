@@ -6,6 +6,14 @@ configuration and WireGuard identity; CAPA owns the AWS instance lifecycle.
 The on-premises tunnel endpoints initiate UDP connections to each worker's
 public address. The control-plane API remains private.
 
+Linux worker bootstrap installs a `networkd.conf.d` drop-in with
+`ManageForeignRoutingPolicyRules=no` and `ManageForeignRoutes=no`. The tunnel
+and CNI manage their own routing state; systemd-networkd must preserve that
+state across service restarts. This is host-wide configuration on newly
+provisioned workers, not a change to existing cluster hosts. Bootstrap does not
+restart networkd. Existing workers require a separately qualified migration;
+upgrading the controller does not rewrite their bootstrap files.
+
 This configuration targets CAPA **v2.12.1** with pre-existing infrastructure and
 an externally managed control plane. It does not grant CAPA permission to create
 VPCs, load balancers, NAT gateways, EKS clusters or IAM roles. A different CAPA

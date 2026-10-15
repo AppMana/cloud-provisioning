@@ -43,7 +43,7 @@ for name in [state['nodeRoleName'], state['capaRoleName']] + ([state['gatewayRun
     checks.append(('iam', 'get-role', {'RoleName': name}, ('NoSuchEntity',), 'Role'))
 checks.append(('iam', 'get-instance-profile', {'InstanceProfileName': state['instanceProfileName']},
                ('NoSuchEntity',), 'InstanceProfile'))
-for key in ('publisherRepository', 'calicoWindowsRepository', 'windowsGPUPluginRepository', 'windowsGPUProbeRepository'):
+for key in ('linuxControllerRepository', 'linuxDialerRepository', 'publisherRepository', 'calicoWindowsRepository', 'windowsGPUPluginRepository', 'windowsGPUProbeRepository'):
     if state.get(key):
         checks.append(('ecr', 'describe-repositories', {'repositoryNames': [state[key]['name']]},
                        ('RepositoryNotFoundException',), 'repositories'))

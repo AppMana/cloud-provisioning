@@ -92,6 +92,10 @@ func TestNativeReceivePreparation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ports, _, err := tunnel.AssignReceivePorts(plan.Receivers, map[string]int{}, []int{51821, 51822})
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(func() {
 		for _, path := range plan.Receivers {
 			if link, err := netlink.LinkByName(path.Interface); err == nil {
@@ -106,19 +110,41 @@ func TestNativeReceivePreparation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer devices.Close()
-	first, err := prepareReceivePaths(devices, "native-mesh", root, before, after, nil, 1400, 518)
+	first, err := prepareReceivePaths(devices, "native-mesh", root, before, after, nil, 1400, 518, ports)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(first) != 2 || first[0].PublicKey == first[1].PublicKey || first[0].ListenPort == first[1].ListenPort {
 		t.Fatal("receivers do not have distinct identities and ports")
 	}
-	second, err := prepareReceivePaths(devices, "native-mesh", root, before, after, nil, 1400, 518)
+	second, err := prepareReceivePaths(devices, "native-mesh", root, before, after, nil, 1400, 518, ports)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(first, second) {
 		t.Fatal("repeated preparation changed receiver bindings")
+	}
+	changedPorts := map[string]int{}
+	for key, port := range ports {
+		changedPorts[key] = port + 10
+	}
+	if _, err := prepareReceivePaths(devices, "native-mesh", root, before, after, nil, 1400, 518, changedPorts); err == nil {
+		t.Fatal("live listener port moved without retirement")
+	}
+	// Recreating a device reuses the controller's reserved listener and key.
+	deleted, err := netlink.LinkByName(first[0].Interface)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := netlink.LinkDel(deleted); err != nil {
+		t.Fatal(err)
+	}
+	recreated, err := prepareReceivePaths(devices, "native-mesh", root, before, after, nil, 1400, 518, ports)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(first, recreated) {
+		t.Fatal("device recreation changed reserved public binding")
 	}
 	for _, binding := range first {
 		link, err := netlink.LinkByName(binding.Interface)
@@ -134,7 +160,7 @@ func TestNativeReceivePreparation(t *testing.T) {
 		}
 	}
 	// Omitting a receiver from a later preparation must not retire its device.
-	if _, err := prepareReceivePaths(devices, "native-mesh", root, after, after, nil, 1400, 518); err != nil {
+	if _, err := prepareReceivePaths(devices, "native-mesh", root, after, after, nil, 1400, 518, map[string]int{b.PublicKey().String(): ports[b.PublicKey().String()]}); err != nil {
 		t.Fatal(err)
 	}
 	for _, binding := range first {
@@ -155,13 +181,13 @@ func TestNativeReceivePreparation(t *testing.T) {
 	}
 	// A stale previous document cannot remove live permissions.
 	narrowed := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: b.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.10/32"}}}}
-	if _, err := prepareReceivePaths(devices, "native-mesh", root, narrowed, narrowed, nil, 1400, 518); err == nil {
+	if _, err := prepareReceivePaths(devices, "native-mesh", root, narrowed, narrowed, nil, 1400, 518, map[string]int{b.PublicKey().String(): ports[b.PublicKey().String()]}); err == nil {
 		t.Fatal("stale document withdrew live IPv6 permissions")
 	}
-	if _, err := prepareReceivePaths(devices, "native-mesh", a, before, after, nil, 1400, 518); err == nil {
+	if _, err := prepareReceivePaths(devices, "native-mesh", a, before, after, nil, 1400, 518, ports); err == nil {
 		t.Fatal("changed root key overwrote live identities")
 	}
-	final, err := prepareReceivePaths(devices, "native-mesh", root, before, after, nil, 1400, 518)
+	final, err := prepareReceivePaths(devices, "native-mesh", root, before, after, nil, 1400, 518, ports)
 	if err != nil {
 		t.Fatal(err)
 	}

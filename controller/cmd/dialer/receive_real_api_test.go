@@ -138,7 +138,7 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := tunnel.ReceivePrepare{Version: 1, MeshUID: string(before.UID), NodeName: "cp", NodeUID: nodeUID, BootID: node.Status.NodeInfo.BootID, RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(baseRaw), Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: newPeer.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.10/32"}}}}, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}}
+	request := tunnel.ReceivePrepare{Version: 1, MeshUID: string(before.UID), NodeName: "cp", NodeUID: nodeUID, BootID: node.Status.NodeInfo.BootID, RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(baseRaw), Ports: map[string]int{oldPeer.PublicKey().String(): 51821, newPeer.PublicKey().String(): 51822}, Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: newPeer.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.10/32"}}}}, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}}
 	requestRaw, _ := json.Marshal(request)
 	patchData(map[string][]byte{tunnel.ReceivePrepareKey: requestRaw})
 	if err := reconcile(ctx, worker, devices, cfg); err != nil {
@@ -198,7 +198,7 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 		t.Fatalf("stale readiness write was not rejected: %v", err)
 	}
 	if err := reconcileReceivePreparation(ctx, worker, stale, "cp", root, func(req tunnel.ReceivePrepare, previous tunnel.PeerListDoc) ([]receiveBinding, error) {
-		return prepareReceivePaths(devices, req.MeshUID, root, previous, req.Desired, req.Native, 1400, 518)
+		return prepareReceivePaths(devices, req.MeshUID, root, previous, req.Desired, req.Native, 1400, 518, req.Ports)
 	}); err == nil {
 		t.Fatal("stale preparation snapshot published readiness")
 	}

@@ -74,6 +74,9 @@ func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, se
 	if err != nil {
 		return err
 	}
+	if err := tunnel.ValidateReceivePorts(plan.Receivers, request.Ports); err != nil {
+		return err
+	}
 	node, err := k.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -87,6 +90,11 @@ func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, se
 	}
 	if err := tunnel.ValidateReceiveBindings(plan.Receivers, request.RootPublicKey, bindings); err != nil {
 		return err
+	}
+	for _, binding := range bindings {
+		if binding.ListenPort != request.Ports[binding.PeerPublicKey] {
+			return fmt.Errorf("prepared listener does not match its assigned port")
+		}
 	}
 	current, err := k.CoreV1().Secrets(secret.Namespace).Get(ctx, secret.Name, metav1.GetOptions{})
 	if err != nil {

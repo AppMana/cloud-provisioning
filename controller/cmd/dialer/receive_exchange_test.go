@@ -104,6 +104,14 @@ func TestNativeReceiveExchange(t *testing.T) {
 		t.Fatal(err)
 	}
 	intent := tunnel.ReceivePrepare{Version: 1, MeshUID: request.MeshID, NodeName: "worker", NodeUID: "node-uid", BootID: bootID, RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(base), Desired: request.Desired, Native: request.Native}
+	plan, err := tunnel.PlanReceiveHandover(intent.MeshUID, request.Previous, intent.Desired, intent.Native)
+	if err != nil {
+		t.Fatal(err)
+	}
+	intent.Ports, _, err = tunnel.AssignReceivePorts(plan.Receivers, map[string]int{}, []int{51821, 51822})
+	if err != nil {
+		t.Fatal(err)
+	}
 	intentRaw, err := json.Marshal(intent)
 	if err != nil {
 		t.Fatal(err)
@@ -112,7 +120,7 @@ func TestNativeReceiveExchange(t *testing.T) {
 	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker", UID: "node-uid"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{BootID: bootID}}}
 	api := fake.NewClientset(secret, node)
 	prepare := func(intent tunnel.ReceivePrepare, previous tunnel.PeerListDoc) ([]receiveBinding, error) {
-		return prepareReceivePaths(devices, intent.MeshUID, root, previous, intent.Desired, intent.Native, 1400, 518)
+		return prepareReceivePaths(devices, intent.MeshUID, root, previous, intent.Desired, intent.Native, 1400, 518, intent.Ports)
 	}
 	var receipt tunnel.ReceiveReady
 	for attempt := 0; attempt < 2; attempt++ {

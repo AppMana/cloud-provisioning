@@ -1727,7 +1727,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			if mtu == 0 {
 				mtu = underlayMTU()
 			}
-			return prepareReceivePaths(wg, request.MeshUID, privateKey, previous, request.Desired, request.Native, mtu, cfg.fwmark)
+			return prepareReceivePaths(wg, request.MeshUID, privateKey, previous, request.Desired, request.Native, mtu, cfg.fwmark, request.Ports)
 		}); err != nil {
 			return fmt.Errorf("preparing receive paths: %w", err)
 		}

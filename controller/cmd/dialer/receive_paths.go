@@ -37,16 +37,19 @@ func receiverAlias(mesh, peer string) string {
 
 // prepareReceivePaths creates independent accept tries without installing
 // addresses, routes, or policy rules. Keys derive from the persisted node key;
-// restarting the process preserves live listener ports. A recreated interface
-// may receive a new port and must be republished before traffic is activated.
+// explicit controller reservations preserve listener ports across recreation.
+// Preparation never selects an ephemeral port or silently moves a live port.
 // This operation only adds permissions. Withdrawal requires a separate drain
 // protocol; an incomplete previous document must not implicitly withdraw them.
-func prepareReceivePaths(devices receiverDevices, mesh string, root wgtypes.Key, previous, desired tunnel.PeerListDoc, native []netip.Prefix, mtu, mark int) ([]receiveBinding, error) {
+func prepareReceivePaths(devices receiverDevices, mesh string, root wgtypes.Key, previous, desired tunnel.PeerListDoc, native []netip.Prefix, mtu, mark int, ports map[string]int) ([]receiveBinding, error) {
 	if root == (wgtypes.Key{}) || mtu < 1280 || mtu > 65535 || mark <= 0 {
 		return nil, fmt.Errorf("receiver preparation requires a private identity, valid MTU, and positive firewall mark")
 	}
 	plan, err := tunnel.PlanReceiveHandover(mesh, previous, desired, native)
 	if err != nil {
+		return nil, err
+	}
+	if err := tunnel.ValidateReceivePorts(plan.Receivers, ports); err != nil {
 		return nil, err
 	}
 	// Check every existing device before preparing any of the new devices.
@@ -64,6 +67,9 @@ func prepareReceivePaths(devices receiverDevices, mesh string, root wgtypes.Key,
 		live, err := devices.Device(path.Interface)
 		if err != nil {
 			return nil, err
+		}
+		if live.ListenPort != 0 && live.ListenPort != ports[path.PublicKey] {
+			return nil, fmt.Errorf("receiver listener port changed without retirement")
 		}
 		if err := validateReceiverState(live, receiverKey(root, mesh, path.PublicKey), path); err != nil {
 			return nil, err
@@ -109,10 +115,14 @@ func prepareReceivePaths(devices receiverDevices, mesh string, root wgtypes.Key,
 		if err != nil {
 			return nil, err
 		}
+		if live.ListenPort != 0 && live.ListenPort != ports[path.PublicKey] {
+			return nil, fmt.Errorf("receiver listener port changed during preparation")
+		}
 		if err := validateReceiverState(live, key, path); err != nil {
 			return nil, err
 		}
-		want := wgtypes.Config{PrivateKey: &key, FirewallMark: &mark, Peers: []wgtypes.PeerConfig{{PublicKey: peer, AllowedIPs: allowed, ReplaceAllowedIPs: true}}}
+		port := ports[path.PublicKey]
+		want := wgtypes.Config{PrivateKey: &key, ListenPort: &port, FirewallMark: &mark, Peers: []wgtypes.PeerConfig{{PublicKey: peer, AllowedIPs: allowed, ReplaceAllowedIPs: true}}}
 		if delta, changed := deviceDelta(want, live); changed {
 			if err := devices.ConfigureDevice(path.Interface, delta); err != nil {
 				return nil, err
@@ -128,7 +138,7 @@ func prepareReceivePaths(devices receiverDevices, mesh string, root wgtypes.Key,
 		if err != nil {
 			return nil, err
 		}
-		if live.PrivateKey != key || live.ListenPort <= 0 || live.FirewallMark != mark || len(live.Peers) != 1 || live.Peers[0].PublicKey != peer {
+		if live.PrivateKey != key || live.ListenPort != port || live.FirewallMark != mark || len(live.Peers) != 1 || live.Peers[0].PublicKey != peer {
 			return nil, fmt.Errorf("receiver kernel identity did not match preparation")
 		}
 		actual, wanted := prefixSet(live.Peers[0].AllowedIPs), prefixSet(allowed)

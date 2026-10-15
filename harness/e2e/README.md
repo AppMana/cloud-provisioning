@@ -245,7 +245,8 @@ routes and policy rules. It rejects identity replacement and implicit source
 withdrawal. The reconciliation loop invokes preparation only when its adoption
 Secret contains an explicit `receive-prepare.json` request. That request binds
 the node, kernel boot and root public identity, mesh identity, current `peers.json` hash,
-future peer document, and native network boundaries. Preparation publishes
+future peer document, native network boundaries, and exact per-peer UDP ports.
+Preparation publishes
 `receive-ready.json` with public kernel bindings and the exact request hash;
 it does not change `peers.json` or the applied-list acknowledgment. The local
 kernel boot ID must match both the request and current Node status before
@@ -258,7 +259,12 @@ provider binding, and clears stale readiness when the proposal changes. Its
 result retains the target, adoption version, and request/base hashes alongside
 the public bindings. The main controller loop does not yet invoke this handler;
 activation orchestration must gate agent support and supply verified native
-network boundaries. The standalone test
+network boundaries and a permitted listener-port pool. Port reservations are
+stored with the proposal in `receive-ports.json` and remain occupied until
+explicit retirement, including reservations for peers absent from a later
+proposal. A live receiver cannot change ports during preparation; recreation
+uses its reserved port. Kernel-selected ephemeral ports are not accepted as
+prepared transport. The standalone test
 does not establish publication, activation, retirement, or reboot recovery.
 
 To send packets through receivers created by that runtime code, pass

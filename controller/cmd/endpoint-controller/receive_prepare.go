@@ -28,12 +28,13 @@ type preparedRemoteReceivers struct {
 
 // prepareRemoteReceivePaths stages the controller's current future document
 // without changing the remote's active peers.json. The caller supplies verified
-// native network boundaries; nil means unknown and cannot authorize preparation.
+// native network boundaries and a permitted UDP listener pool. Unknown policy
+// cannot authorize preparation. Port reservations survive proposal changes.
 // A nil result means preparation is pending. Returned bindings are preparation
 // evidence only, never permission to move traffic or release old endpoints.
 // Activation orchestration must gate entry into this phase on agent support.
-func (r *meshReconciler) prepareRemoteReceivePaths(ctx context.Context, expected *unstructured.Unstructured, native []netip.Prefix) (*preparedRemoteReceivers, error) {
-	if expected == nil || expected.GetUID() == "" || expected.GetNamespace() != r.secretNamespace || native == nil {
+func (r *meshReconciler) prepareRemoteReceivePaths(ctx context.Context, expected *unstructured.Unstructured, native []netip.Prefix, portPool []int) (*preparedRemoteReceivers, error) {
+	if expected == nil || expected.GetUID() == "" || expected.GetNamespace() != r.secretNamespace || native == nil || portPool == nil {
 		return nil, fmt.Errorf("receiver preparation requires a scoped Machine and verified native boundaries")
 	}
 	machine := &unstructured.Unstructured{}
@@ -114,10 +115,31 @@ func (r *meshReconciler) prepareRemoteReceivePaths(ctx context.Context, expected
 	if err := json.Unmarshal(futureRaw, &future); err != nil {
 		return nil, err
 	}
-	if _, err := tunnel.PlanReceiveHandover(string(mesh.UID), previous, future, native); err != nil {
+	plan, err := tunnel.PlanReceiveHandover(string(mesh.UID), previous, future, native)
+	if err != nil {
 		return nil, err
 	}
-	request := tunnel.ReceivePrepare{Version: 1, MeshUID: string(mesh.UID), NodeName: node.Name, NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, RootPublicKey: root, BaseHash: tunnel.HashPeerList(baseRaw), Desired: future, Native: native}
+	reservations := tunnel.ReceivePortReservations{Version: 1, MeshUID: string(mesh.UID), NodeUID: string(node.UID), RootPublicKey: root, Ports: map[string]int{}}
+	if raw, found := adoption.Data[tunnel.ReceivePortsKey]; found {
+		if err := json.Unmarshal(raw, &reservations); err != nil {
+			return nil, fmt.Errorf("invalid receive port reservations")
+		}
+		if reservations.Version != 1 || reservations.MeshUID != string(mesh.UID) || reservations.NodeUID != string(node.UID) || reservations.RootPublicKey != root || reservations.Ports == nil {
+			return nil, fmt.Errorf("receive port reservation identity changed")
+		}
+	} else if len(adoption.Data[tunnel.ReceivePrepareKey]) > 0 {
+		return nil, fmt.Errorf("existing receive proposal has no port reservations")
+	}
+	ports, retained, err := tunnel.AssignReceivePorts(plan.Receivers, reservations.Ports, portPool)
+	if err != nil {
+		return nil, err
+	}
+	reservations.Ports = retained
+	reservationRaw, err := json.Marshal(reservations)
+	if err != nil {
+		return nil, err
+	}
+	request := tunnel.ReceivePrepare{Version: 1, MeshUID: string(mesh.UID), NodeName: node.Name, NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, RootPublicKey: root, BaseHash: tunnel.HashPeerList(baseRaw), Desired: future, Native: native, Ports: ports}
 	raw, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -147,9 +169,10 @@ func (r *meshReconciler) prepareRemoteReceivePaths(ctx context.Context, expected
 	if currentNode.UID != node.UID || currentNode.Status.NodeInfo.BootID != node.Status.NodeInfo.BootID || currentNode.Spec.ProviderID != provider || !currentReady || currentNode.DeletionTimestamp != nil {
 		return nil, fmt.Errorf("receiver Node changed during preparation")
 	}
-	if !bytes.Equal(adoption.Data[tunnel.ReceivePrepareKey], raw) {
+	if !bytes.Equal(adoption.Data[tunnel.ReceivePrepareKey], raw) || !bytes.Equal(adoption.Data[tunnel.ReceivePortsKey], reservationRaw) {
 		patch := client.MergeFromWithOptions(adoption.DeepCopy(), client.MergeFromWithOptimisticLock{})
 		adoption.Data[tunnel.ReceivePrepareKey] = raw
+		adoption.Data[tunnel.ReceivePortsKey] = reservationRaw
 		delete(adoption.Data, tunnel.ReceiveReadyKey)
 		if err := r.Patch(ctx, adoption, patch); err != nil {
 			return nil, err

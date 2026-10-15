@@ -19,7 +19,7 @@ import (
 )
 
 func TestReceiveReadinessIsBoundToPreparedRequest(t *testing.T) {
-	for _, fault := range []string{"none", "malformed", "version", "root", "base", "missing-native", "node", "desired", "prepare-error", "missing-binding", "wrong-interface", "root-binding", "stale-secret", "stale-version", "stale-base", "stale-request", "replaced-node", "patch-conflict", "old-boot", "node-boot", "reboot-during-preparation"} {
+	for _, fault := range []string{"none", "malformed", "version", "root", "base", "missing-native", "node", "desired", "prepare-error", "missing-binding", "wrong-interface", "root-binding", "stale-secret", "stale-version", "stale-base", "stale-request", "replaced-node", "patch-conflict", "old-boot", "node-boot", "reboot-during-preparation", "missing-ports", "unrequested-port"} {
 		t.Run(fault, func(t *testing.T) {
 			ctx := context.Background()
 			bootID, err := localReceiveBootID()
@@ -29,8 +29,10 @@ func TestReceiveReadinessIsBoundToPreparedRequest(t *testing.T) {
 			root, _ := wgtypes.GeneratePrivateKey()
 			peer, _ := wgtypes.GeneratePrivateKey()
 			base := []byte(`{"peers":[]}`)
-			request := tunnel.ReceivePrepare{Version: 1, MeshUID: "mesh-uid", NodeName: "worker", NodeUID: "node-uid", BootID: bootID, RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(base), Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: peer.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.10/32"}}}}, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}}
+			request := tunnel.ReceivePrepare{Version: 1, MeshUID: "mesh-uid", NodeName: "worker", NodeUID: "node-uid", BootID: bootID, RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(base), Ports: map[string]int{peer.PublicKey().String(): 51821}, Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: peer.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.10/32"}}}}, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}}
 			switch fault {
+			case "missing-ports":
+				request.Ports = nil
 			case "old-boot":
 				request.BootID = "old-boot"
 			case "version":
@@ -87,6 +89,8 @@ func TestReceiveReadinessIsBoundToPreparedRequest(t *testing.T) {
 				path := plan.Receivers[0]
 				bindings := []receiveBinding{{Interface: path.Interface, PeerPublicKey: path.PublicKey, PublicKey: receiverKey(root, req.MeshUID, path.PublicKey).PublicKey().String(), ListenPort: 51821}}
 				switch fault {
+				case "unrequested-port":
+					bindings[0].ListenPort = 51900
 				case "missing-binding":
 					bindings = nil
 				case "wrong-interface":
@@ -131,7 +135,7 @@ func TestReceiveReadinessIsBoundToPreparedRequest(t *testing.T) {
 					t.Fatal("invalid or stale preparation published readiness")
 				}
 				switch fault {
-				case "malformed", "version", "root", "base", "missing-native", "node", "desired", "old-boot", "node-boot":
+				case "malformed", "version", "root", "base", "missing-native", "node", "desired", "old-boot", "node-boot", "missing-ports":
 					if calls != 0 {
 						t.Fatal("invalid request reached kernel preparation")
 					}

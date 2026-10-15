@@ -11,6 +11,7 @@ import (
 const (
 	ReceivePrepareKey = "receive-prepare.json"
 	ReceiveReadyKey   = "receive-ready.json"
+	ReceivePortsKey   = "receive-ports.json"
 )
 
 // ReceivePrepare requests additive preparation while peers.json remains the
@@ -26,6 +27,7 @@ type ReceivePrepare struct {
 	BaseHash      string         `json:"baseHash"`
 	Desired       PeerListDoc    `json:"desired"`
 	Native        []netip.Prefix `json:"native"`
+	Ports         map[string]int `json:"ports"`
 }
 
 // ReceiveBinding contains public connection details read back from the kernel.
@@ -104,11 +106,17 @@ func ValidateReceiveReadiness(target ReceiveTarget, baseRaw, requestRaw, receipt
 	if err != nil {
 		return nil, err
 	}
+	if err := ValidateReceivePorts(plan.Receivers, request.Ports); err != nil {
+		return nil, err
+	}
 	if err := ValidateReceiveBindings(plan.Receivers, target.RootPublicKey, receipt.Bindings); err != nil {
 		return nil, err
 	}
 	result := make(map[string]ReceiveBinding, len(receipt.Bindings))
 	for _, binding := range receipt.Bindings {
+		if binding.ListenPort != request.Ports[binding.PeerPublicKey] {
+			return nil, fmt.Errorf("receiver listen port differs from the requested transport")
+		}
 		result[binding.PeerPublicKey] = binding
 	}
 	return result, nil
@@ -142,4 +150,14 @@ func ValidateReceiveBindings(paths []ReceivePath, root string, bindings []Receiv
 		seenPorts[binding.ListenPort] = true
 	}
 	return nil
+}
+
+// ReceivePortReservations are durable until acknowledged receiver retirement.
+// They are scoped to the mesh, node and root identity rather than to one boot.
+type ReceivePortReservations struct {
+	Version       int            `json:"version"`
+	MeshUID       string         `json:"meshUID"`
+	NodeUID       string         `json:"nodeUID"`
+	RootPublicKey string         `json:"rootPublicKey"`
+	Ports         map[string]int `json:"ports"`
 }

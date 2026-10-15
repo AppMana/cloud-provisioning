@@ -39,7 +39,7 @@ func (c *receivePreparationRaceClient) Patch(ctx context.Context, obj client.Obj
 }
 
 func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t *testing.T) {
-	for _, fault := range []string{"none", "unacknowledged", "not-ready", "missing-boot", "provider", "node-ref", "machine-uid", "retiring", "unknown-native", "native-collision", "adoption-race"} {
+	for _, fault := range []string{"none", "unacknowledged", "not-ready", "missing-boot", "provider", "node-ref", "machine-uid", "retiring", "unknown-native", "native-collision", "adoption-race", "unknown-ports", "exhausted-ports"} {
 		t.Run(fault, func(t *testing.T) {
 			ctx := context.Background()
 			machine := &unstructured.Unstructured{}
@@ -60,6 +60,7 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 				tunnel.PeerPublicKeyPrefix + "worker": []byte(preparationKey(24)), tunnel.PeerRouteHostsPrefix + "worker": []byte("10.100.0.128"), tunnel.PeerAllowedIPsPrefix + "worker": []byte("10.100.0.128/32"),
 			}}
 			native := []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}
+			pool := []int{51821, 51822, 51823, 51824}
 			expected := machine.DeepCopy()
 			switch fault {
 			case "unacknowledged":
@@ -80,6 +81,10 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 				native = nil
 			case "native-collision":
 				native = []netip.Prefix{netip.MustParsePrefix("10.101.128.0/24")}
+			case "unknown-ports":
+				pool = nil
+			case "exhausted-ports":
+				pool = []int{51821}
 			}
 			r, c := dualStackReconciler(t, "", machine, node, mesh, adoption)
 			if fault == "adoption-race" {
@@ -92,7 +97,7 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 					return c.Update(ctx, changed)
 				}}
 			}
-			bindings, err := r.prepareRemoteReceivePaths(ctx, expected, native)
+			bindings, err := r.prepareRemoteReceivePaths(ctx, expected, native, pool)
 			current := &corev1.Secret{}
 			if getErr := c.Get(ctx, client.ObjectKeyFromObject(adoption), current); getErr != nil {
 				t.Fatal(getErr)
@@ -126,6 +131,18 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			if err := json.Unmarshal(current.Data[tunnel.ReceivePrepareKey], &request); err != nil {
 				t.Fatal(err)
 			}
+			var reservations tunnel.ReceivePortReservations
+			if err := json.Unmarshal(current.Data[tunnel.ReceivePortsKey], &reservations); err != nil {
+				t.Fatal(err)
+			}
+			if reservations.NodeUID != request.NodeUID || reservations.RootPublicKey != request.RootPublicKey || reservations.MeshUID != request.MeshUID {
+				t.Fatal("port reservations lost target identity")
+			}
+			for key, port := range request.Ports {
+				if reservations.Ports[key] != port {
+					t.Fatal("proposal did not atomically reserve its listener ports")
+				}
+			}
 			plan, err := tunnel.PlanReceiveHandover(request.MeshUID, previous, request.Desired, native)
 			if err != nil {
 				t.Fatal(err)
@@ -139,7 +156,7 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 				t.Fatal(err)
 			}
 			readyVersion := current.ResourceVersion
-			bindings, err = r.prepareRemoteReceivePaths(ctx, expected, native)
+			bindings, err = r.prepareRemoteReceivePaths(ctx, expected, native, pool)
 			if err != nil || bindings == nil || len(bindings.Bindings) != 2 {
 				t.Fatalf("valid preparation not accepted: %v", err)
 			}
@@ -157,7 +174,7 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			if err := c.Update(ctx, mesh); err != nil {
 				t.Fatal(err)
 			}
-			bindings, err = r.prepareRemoteReceivePaths(ctx, expected, native)
+			bindings, err = r.prepareRemoteReceivePaths(ctx, expected, native, pool)
 			if err != nil || bindings != nil {
 				t.Fatalf("changed proposal reused readiness: %v", err)
 			}

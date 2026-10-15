@@ -7,7 +7,7 @@ import (
 )
 
 func TestReceiveReadinessRequiresCurrentBootRequestAndBindings(t *testing.T) {
-	for _, fault := range []string{"none", "not-ready", "target-boot", "receipt-boot", "request-boot", "secret", "node", "mesh", "root", "request-hash", "base", "unsafe-desired", "missing-native", "missing-binding", "extra-binding", "duplicate-port", "duplicate-key", "root-key", "site-key", "interface", "peer", "bad-port", "unknown-field", "trailing"} {
+	for _, fault := range []string{"none", "not-ready", "target-boot", "receipt-boot", "request-boot", "secret", "node", "mesh", "root", "request-hash", "base", "unsafe-desired", "missing-native", "missing-binding", "extra-binding", "duplicate-port", "duplicate-key", "root-key", "site-key", "interface", "peer", "bad-port", "unknown-field", "trailing", "missing-ports", "wrong-port"} {
 		t.Run(fault, func(t *testing.T) {
 			target := ReceiveTarget{MeshUID: "mesh", SecretUID: "secret", NodeName: "worker", NodeUID: "node", BootID: "boot-1", RootPublicKey: receiverTestKey(40), Ready: true}
 			previous := PeerListDoc{Peers: []PeerSpec{{PublicKey: receiverTestKey(8), WGAllowedIPs: []string{"10.90.0.10/32"}}}}
@@ -22,8 +22,16 @@ func TestReceiveReadinessRequiresCurrentBootRequestAndBindings(t *testing.T) {
 			for i, path := range plan.Receivers {
 				bindings[i] = ReceiveBinding{Interface: path.Interface, PeerPublicKey: path.PublicKey, PublicKey: receiverTestKey(byte(24 + 8*i)), ListenPort: 51820 + i}
 			}
+			request.Ports = map[string]int{}
+			for _, binding := range bindings {
+				request.Ports[binding.PeerPublicKey] = binding.ListenPort
+			}
 			receipt := ReceiveReady{Version: 1, MeshUID: target.MeshUID, SecretUID: target.SecretUID, NodeName: target.NodeName, NodeUID: target.NodeUID, BootID: target.BootID, RootPublicKey: target.RootPublicKey, BaseHash: request.BaseHash, Bindings: bindings}
 			switch fault {
+			case "missing-ports":
+				request.Ports = nil
+			case "wrong-port":
+				request.Ports[receipt.Bindings[0].PeerPublicKey] = 51900
 			case "not-ready":
 				target.Ready = false
 			case "target-boot":

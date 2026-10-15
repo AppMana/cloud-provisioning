@@ -1729,6 +1729,8 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			}
 			_, err := prepareSiteReceiveClient(wg, string(meshSecret.UID), privateKey, root, binding, doc, doc, mtu, cfg.fwmark)
 			return err
+		}, func(plan tunnel.SiteReceiveClient) (time.Time, error) {
+			return siteReceiveHandshake(wg, privateKey, plan, cfg.fwmark, time.Now())
 		}); err != nil {
 			return fmt.Errorf("preparing site receive paths: %w", err)
 		}

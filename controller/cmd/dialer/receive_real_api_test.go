@@ -210,12 +210,21 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 			}
 			sitePlan = prepared
 			return nil
+		}, func(plan tunnel.SiteReceiveClient) (time.Time, error) {
+			return siteReceiveHandshake(devices, newPeer, plan, 518, time.Now())
 		}); err != nil {
 			t.Fatal(err)
 		}
 		if calls != 1 {
 			t.Fatal("site did not consume cloud readiness")
 		}
+	}
+	unready, err := secrets.Get(ctx, "worker-tunnel-peers", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unready.Data[tunnel.SiteReceiveReadyKey(newPeer.PublicKey().String())]) != 0 {
+		t.Fatal("site published transport readiness without a handshake")
 	}
 	siteDevice, err := devices.Device(sitePlan.Interface)
 	if err != nil {

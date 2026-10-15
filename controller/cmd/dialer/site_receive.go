@@ -17,6 +17,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -119,7 +120,7 @@ func prepareSiteReceiveClient(devices receiverDevices, mesh string, siteKey wgty
 // adoption Secrets the site already reads for forwarding acknowledgements.
 // It prepares only additional devices; it neither switches routes nor publishes
 // a forwarding acknowledgement. Missing readiness leaves the legacy path active.
-func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface, mesh *corev1.Secret, nodeName string, siteKey wgtypes.Key, prepare func(string, receiveBinding, tunnel.PeerListDoc) error) error {
+func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface, mesh *corev1.Secret, nodeName string, siteKey wgtypes.Key, prepare func(string, receiveBinding, tunnel.PeerListDoc) error, observe ...func(tunnel.SiteReceiveClient) (time.Time, error)) error {
 	if mesh.UID == "" || mesh.DeletionTimestamp != nil || siteKey == (wgtypes.Key{}) || strings.TrimSpace(string(mesh.Data[tunnel.NodePublicKeyPrefix+nodeName])) != siteKey.PublicKey().String() {
 		return fmt.Errorf("site receive preparation requires the published local identity")
 	}
@@ -210,6 +211,74 @@ func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface
 		if err := prepare(root, binding, doc); err != nil {
 			return err
 		}
+		if len(observe) == 0 {
+			continue
+		}
+		plan, err := tunnel.PlanSiteReceiveClient(string(mesh.UID), siteKey.PublicKey().String(), root, binding, doc, doc)
+		if err != nil {
+			return err
+		}
+		handshake, err := observe[0](plan)
+		if err != nil {
+			return err
+		}
+		if handshake.IsZero() {
+			continue
+		}
+		if err := publishSiteReceiveReady(ctx, k, mesh, latest, nodeName, plan, handshake); err != nil {
+			return err
+		}
+
 	}
 	return nil
+}
+
+func publishSiteReceiveReady(ctx context.Context, k kubernetes.Interface, mesh, adoption *corev1.Secret, nodeName string, plan tunnel.SiteReceiveClient, handshake time.Time) error {
+	now := time.Now()
+	if handshake.IsZero() || handshake.After(now) || now.Sub(handshake) > receiveHandshakeMaxAge {
+		return fmt.Errorf("site receiver handshake is not current")
+	}
+	boot, err := localReceiveBootID()
+	if err != nil {
+		return err
+	}
+	node, err := k.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	ready := false
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
+			ready = true
+		}
+	}
+	if node.UID == "" || node.DeletionTimestamp != nil || node.Status.NodeInfo.BootID != boot || !ready {
+		return fmt.Errorf("site receiver local node identity is unavailable")
+	}
+	current, err := k.CoreV1().Secrets(mesh.Namespace).Get(ctx, mesh.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if current.UID != mesh.UID || current.ResourceVersion != mesh.ResourceVersion || current.DeletionTimestamp != nil {
+		return fmt.Errorf("site receiver mesh changed before readiness publication")
+	}
+	hash, err := tunnel.SitePeerHash(mesh.Data)
+	if err != nil {
+		return err
+	}
+	receipt := tunnel.SiteReceiveReady{Version: 1, MeshUID: string(mesh.UID), SecretUID: string(adoption.UID), RequestHash: tunnel.HashPeerList(adoption.Data[tunnel.ReceivePrepareKey]), SiteHash: hash, NodeName: nodeName, NodeUID: string(node.UID), BootID: boot, Client: plan, HandshakeAt: handshake}
+	raw, err := json.Marshal(receipt)
+	if err != nil {
+		return err
+	}
+	key := tunnel.SiteReceiveReadyKey(plan.SitePublicKey)
+	if bytes.Equal(adoption.Data[key], raw) {
+		return nil
+	}
+	patch, err := json.Marshal(map[string]any{"metadata": map[string]any{"uid": adoption.UID, "resourceVersion": adoption.ResourceVersion}, "data": map[string][]byte{key: raw}})
+	if err != nil {
+		return err
+	}
+	_, err = k.CoreV1().Secrets(adoption.Namespace).Patch(ctx, adoption.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+	return err
 }

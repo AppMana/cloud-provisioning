@@ -2,10 +2,12 @@ package tunnel
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/netip"
+	"time"
 )
 
 const (
@@ -160,4 +162,23 @@ type ReceivePortReservations struct {
 	NodeUID       string         `json:"nodeUID"`
 	RootPublicKey string         `json:"rootPublicKey"`
 	Ports         map[string]int `json:"ports"`
+}
+
+// SiteReceiveReady records authenticated transport preparation only. It does
+// not acknowledge forwarding, authorize route changes, or release retention.
+type SiteReceiveReady struct {
+	Version     int               `json:"version"`
+	MeshUID     string            `json:"meshUID"`
+	SecretUID   string            `json:"secretUID"`
+	RequestHash string            `json:"requestHash"`
+	SiteHash    string            `json:"siteHash"`
+	NodeName    string            `json:"nodeName"`
+	NodeUID     string            `json:"nodeUID"`
+	BootID      string            `json:"bootID"`
+	Client      SiteReceiveClient `json:"client"`
+	HandshakeAt time.Time         `json:"handshakeAt"`
+}
+
+func SiteReceiveReadyKey(publicKey string) string {
+	return fmt.Sprintf("receive-site-ready-%x", sha256.Sum256([]byte(publicKey)))
 }

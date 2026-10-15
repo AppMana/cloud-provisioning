@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"github.com/vishvananda/netlink"
@@ -124,5 +125,63 @@ func TestNativeSiteReceiveExchange(t *testing.T) {
 	}
 	if err := result.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Verify the transport observation after the parent packet experiment has
+// exchanged traffic, without changing any device or routing state.
+func TestNativeSiteReceiveHandshake(t *testing.T) {
+	path := os.Getenv("CLDT_NATIVE_SITE_RECEIVE_HANDSHAKE")
+	if path == "" {
+		t.Skip("requires isolated site packet experiment")
+	}
+	for _, kind := range []string{"net", "mnt"} {
+		self, err := os.Readlink("/proc/self/ns/" + kind)
+		if err != nil {
+			t.Fatal(err)
+		}
+		init, err := os.Readlink("/proc/1/ns/" + kind)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if self == init {
+			t.Fatal("refusing guest host namespace")
+		}
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var request struct {
+		KeyFile    string `json:"keyFile"`
+		ResultFile string `json:"resultFile"`
+	}
+	if err := json.Unmarshal(raw, &request); err != nil {
+		t.Fatal(err)
+	}
+	raw, err = os.ReadFile(request.KeyFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := wgtypes.ParseKey(strings.TrimSpace(string(raw)))
+	if err != nil {
+		t.Fatal("invalid site identity")
+	}
+	raw, err = os.ReadFile(request.ResultFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plan tunnel.SiteReceiveClient
+	if err := json.Unmarshal(raw, &plan); err != nil {
+		t.Fatal(err)
+	}
+	devices, err := wgctrl.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer devices.Close()
+	handshake, err := siteReceiveHandshake(devices, key, plan, 518, time.Now())
+	if err != nil || handshake.IsZero() {
+		t.Fatalf("prepared transport has no current handshake: %v", err)
 	}
 }

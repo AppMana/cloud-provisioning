@@ -650,12 +650,15 @@ func removeDevice(iface string) {
 // must survive process exit so routes through another node remain usable.
 // Removing the device retires only routes through that device.
 func retireUnpublishedEndpoint(cfg config) {
-	for _, path := range []string{siteForwardingCachePath(cfg), siteReceiveCachePath(cfg)} {
-		if err := removeDurableCache(path); err != nil {
-			fmt.Fprintf(os.Stderr, "forgetting unpublished endpoint recovery: %v\n", err)
-			return
-		}
+	if err := forgetEndpointForwarding(cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "forgetting endpoint recovery: %v\n", err)
+		return
 	}
+	if err := removeDurableCache(siteReceiveCachePath(cfg)); err != nil {
+		fmt.Fprintf(os.Stderr, "forgetting receiver recovery: %v\n", err)
+		return
+	}
+
 	removeDevice(cfg.iface)
 }
 
@@ -1234,8 +1237,10 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		localAddresses = siteTunnelAddresses(secret, cfg.nodeName)
 		ownAddresses = tunnel.SplitList(string(secret.Data[tunnel.NodeAddressesPrefix+cfg.nodeName]), string(secret.Data[tunnel.SiteAddressesPrefix+cfg.nodeName]))
 		if localAddress == "" {
-			if err := removeDurableCache(siteForwardingCachePath(cfg)); err != nil {
-				return err
+			if cfg.siteRecovery == nil {
+				if err := forgetEndpointForwarding(cfg); err != nil {
+					return err
+				}
 			}
 			if err := removeDurableCache(siteReceiveCachePath(cfg)); err != nil {
 				return fmt.Errorf("forgetting departed site preparation: %w", err)
@@ -1262,7 +1267,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 			if err := clearTunnelSourceRoutes(cfg.routeTable); err != nil {
 				return err
 			}
-			return reconcileSiteTransit(ctx, cfg, clientset, secret)
+			return reconcileSiteTransit(ctx, cfg, clientset, secret, key)
 		}
 		peers, err = loadPeersFromSecret(secret)
 		if err != nil {
@@ -1702,7 +1707,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		}
 	}
 	if meshSecret != nil && cfg.siteRecovery == nil {
-		if err := saveSiteForwardingCache(cfg, privateKey, meshSecret, siteNotReady, peerAcked); err != nil {
+		if err := saveSiteForwardingCache(cfg, privateKey, meshSecret, siteNotReady, peerAcked, nil); err != nil {
 			return fmt.Errorf("persisting site forwarding before changes: %w", err)
 		}
 	}
@@ -2091,7 +2096,14 @@ func notReadyNodes(ctx context.Context, clientset *kubernetes.Clientset) map[str
 // that terminates no tunnel. The next hop and peer rendering use the same
 // election (tunnel.SiteTransit), keeping route selection consistent with
 // the peer whose entry accepts this node's prefixes.
-func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes.Clientset, secret *corev1.Secret) error {
+func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes.Clientset, secret *corev1.Secret, key wgtypes.Key) error {
+	if cfg.siteRecovery != nil {
+		transit, err := tunnel.SiteTransit(secret.Data, cfg.siteRecovery.NotReady)
+		if err != nil {
+			return err
+		}
+		return installSiteTransit(cfg, transit, cfg.siteRecovery.Own)
+	}
 	node, err := clientset.CoreV1().Nodes().Get(ctx, cfg.nodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -2100,7 +2112,8 @@ func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes
 	if err != nil {
 		return err
 	}
-	transit, err := tunnel.SiteTransit(secret.Data, notReadyNodes(ctx, clientset))
+	observedNotReady := notReadyNodes(ctx, clientset)
+	transit, err := tunnel.SiteTransit(secret.Data, observedNotReady)
 	if err != nil {
 		return err
 	}
@@ -2109,6 +2122,12 @@ func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes
 		if a.Type == corev1.NodeInternalIP && a.Address != "" {
 			own = append(own, a.Address)
 		}
+	}
+	if err := validateSiteTransit(transit); err != nil {
+		return err
+	}
+	if err := saveSiteForwardingCache(cfg, key, secret, observedNotReady, map[string]bool{}, own); err != nil {
+		return err
 	}
 	if err := installSiteTransit(cfg, transit, own); err != nil {
 		return err
@@ -2127,6 +2146,9 @@ func reconcileSiteTransit(ctx context.Context, cfg config, clientset *kubernetes
 // kernel would otherwise pick the outgoing device's address, which on a
 // node known by an identity on another device is one no remote permits.
 func installSiteTransit(cfg config, transit *tunnel.TransitSpec, own []string) error {
+	if err := validateSiteTransit(transit); err != nil {
+		return err
+	}
 	if err := ensureRouteRule(cfg.routeTable, cfg.fwmark); err != nil {
 		return fmt.Errorf("ensuring the rule for table %d: %w", cfg.routeTable, err)
 	}

@@ -20,7 +20,7 @@ func TestSiteForwardingCacheIdentityAndRelayObservations(t *testing.T) {
 	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: cfg.secretNamespace, Name: cfg.secretName, UID: "mesh-uid", ResourceVersion: "1"}, Data: map[string][]byte{tunnel.NodePublicKeyPrefix + cfg.nodeName: []byte(key.PublicKey().String()), tunnel.NodeTunnelAddressPrefix + cfg.nodeName: []byte("10.88.0.4/32")}}
 	unavailable := map[string]bool{"other-site": true}
 	applied := map[string]bool{"cloud-a": true, "cloud-b": false}
-	if err := saveSiteForwardingCache(cfg, key, mesh, unavailable, applied); err != nil {
+	if err := saveSiteForwardingCache(cfg, key, mesh, unavailable, applied, nil); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := os.ReadFile(siteForwardingCachePath(cfg))
@@ -78,11 +78,51 @@ func TestSiteForwardingCacheIdentityAndRelayObservations(t *testing.T) {
 		})
 	}
 	mesh.UID = ""
-	if err := saveSiteForwardingCache(cfg, key, mesh, nil, map[string]bool{}); err == nil {
+	if err := saveSiteForwardingCache(cfg, key, mesh, nil, map[string]bool{}, nil); err == nil {
 		t.Fatal("unversioned state accepted")
 	}
 	after, _ := os.ReadFile(siteForwardingCachePath(cfg))
 	if !bytes.Equal(raw, after) {
 		t.Fatal("rejected input replaced recovery state")
+	}
+}
+
+func TestTransitForwardingRecoverySurvivesEndpointShutdown(t *testing.T) {
+	key, _ := wgtypes.GeneratePrivateKey()
+	cfg := config{iface: "site", secretNamespace: "system", secretName: "mesh", nodeName: "site-node", privateKeyFile: filepath.Join(t.TempDir(), "key"), routeTable: 518, fwmark: 518}
+	if err := os.WriteFile(cfg.privateKeyFile, []byte(key.String()), 0600); err != nil {
+		t.Fatal(err)
+	}
+	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: cfg.secretNamespace, Name: cfg.secretName, UID: "mesh-uid", ResourceVersion: "1"}, Data: map[string][]byte{}}
+	if err := saveSiteForwardingCache(cfg, key, mesh, map[string]bool{"unavailable-relay": true}, map[string]bool{}, []string{"10.101.0.1", "fd10::1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := forgetEndpointForwarding(cfg); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := readSiteForwardingCache(cfg, key)
+	if err != nil || !saved.Transit || len(saved.Own) != 2 || !saved.NotReady["unavailable-relay"] {
+		t.Fatal("shutdown lost transit observations", err)
+	}
+	for _, fault := range []string{"source", "mode", "endpoint"} {
+		t.Run(fault, func(t *testing.T) {
+			raw, _ := json.Marshal(saved)
+			var broken siteForwardingCache
+			if err := json.Unmarshal(raw, &broken); err != nil {
+				t.Fatal(err)
+			}
+			switch fault {
+			case "source":
+				broken.Own = []string{"invalid"}
+			case "mode":
+				broken.Transit = false
+			case "endpoint":
+				broken.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName] = []byte("10.88.0.4/32")
+			}
+			invalid, _ := json.Marshal(broken)
+			if _, err := decodeSiteForwardingCache(invalid, cfg, key); err == nil {
+				t.Fatal("invalid transit recovery accepted")
+			}
+		})
 	}
 }

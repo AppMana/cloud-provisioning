@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -19,6 +21,8 @@ import (
 // Observations that selected relay egress are retained; offline recovery must
 // neither infer new acknowledgements nor elect a different relay.
 type siteForwardingCache struct {
+	Transit    bool              `json:"transit,omitempty"`
+	Own        []string          `json:"own,omitempty"`
 	Version    int               `json:"version"`
 	Namespace  string            `json:"namespace"`
 	SecretName string            `json:"secretName"`
@@ -54,11 +58,28 @@ func decodeSiteForwardingCache(raw []byte, cfg config, key wgtypes.Key) (*siteFo
 	if saved.Version != 1 || saved.Namespace == "" || saved.Namespace != cfg.secretNamespace || saved.SecretName == "" || saved.SecretName != cfg.secretName || saved.MeshUID == "" || saved.NodeName == "" || saved.NodeName != cfg.nodeName || key == (wgtypes.Key{}) || saved.PublicKey != key.PublicKey().String() || saved.Interface != cfg.iface || saved.Table != cfg.routeTable || saved.Mark != cfg.fwmark || saved.Data == nil || saved.PeerAcked == nil {
 		return nil, fmt.Errorf("site forwarding cache scope or identity mismatch")
 	}
-	if string(saved.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName]) != saved.PublicKey || len(saved.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName]) == 0 {
+	if !saved.Transit && (string(saved.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName]) != saved.PublicKey || len(saved.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName]) == 0) {
 		return nil, fmt.Errorf("site forwarding cache is not a published endpoint")
 	}
 	if _, err := tunnel.SitePeers(saved.Data); err != nil {
 		return nil, err
+	}
+	if saved.Transit {
+		if strings.TrimSpace(string(saved.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName])) != "" || len(saved.Own) == 0 {
+			return nil, fmt.Errorf("transit recovery has an endpoint or no local addresses")
+		}
+		for _, addr := range saved.Own {
+			if net.ParseIP(addr) == nil {
+				return nil, fmt.Errorf("invalid transit recovery source")
+			}
+		}
+		transit, err := tunnel.SiteTransit(saved.Data, saved.NotReady)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateSiteTransit(transit); err != nil {
+			return nil, err
+		}
 	}
 	return &saved, nil
 }
@@ -75,11 +96,11 @@ func readSiteForwardingCache(cfg config, key wgtypes.Key) (*siteForwardingCache,
 	return decodeSiteForwardingCache(raw, cfg, key)
 }
 
-func saveSiteForwardingCache(cfg config, key wgtypes.Key, mesh *corev1.Secret, notReady, peerAcked map[string]bool) error {
+func saveSiteForwardingCache(cfg config, key wgtypes.Key, mesh *corev1.Secret, notReady, peerAcked map[string]bool, own []string) error {
 	if mesh.UID == "" || mesh.ResourceVersion == "" || mesh.DeletionTimestamp != nil || mesh.Namespace != cfg.secretNamespace || mesh.Name != cfg.secretName || len(cfg.receiveRoutes) != 0 {
 		return fmt.Errorf("site forwarding recovery requires a live legacy endpoint snapshot")
 	}
-	saved := siteForwardingCache{Version: 1, Namespace: cfg.secretNamespace, SecretName: cfg.secretName, MeshUID: string(mesh.UID), NodeName: cfg.nodeName, PublicKey: key.PublicKey().String(), Interface: cfg.iface, Table: cfg.routeTable, Mark: cfg.fwmark, Data: mesh.Data, NotReady: notReady, PeerAcked: peerAcked}
+	saved := siteForwardingCache{Transit: strings.TrimSpace(string(mesh.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName])) == "", Own: own, Version: 1, Namespace: cfg.secretNamespace, SecretName: cfg.secretName, MeshUID: string(mesh.UID), NodeName: cfg.nodeName, PublicKey: key.PublicKey().String(), Interface: cfg.iface, Table: cfg.routeTable, Mark: cfg.fwmark, Data: mesh.Data, NotReady: notReady, PeerAcked: peerAcked}
 	raw, err := json.Marshal(saved)
 	if err != nil {
 		return err
@@ -92,4 +113,19 @@ func saveSiteForwardingCache(cfg config, key wgtypes.Key, mesh *corev1.Secret, n
 
 func (saved *siteForwardingCache) secret() *corev1.Secret {
 	return &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: saved.Namespace, Name: saved.SecretName, UID: types.UID(saved.MeshUID)}, Data: saved.Data}
+}
+
+// An unpublished endpoint may still need its durable transit routes.
+func forgetEndpointForwarding(cfg config) error {
+	if path := siteForwardingCachePath(cfg); path != "" {
+		if raw, err := os.ReadFile(cfg.privateKeyFile); err == nil {
+			if key, err := wgtypes.ParseKey(strings.TrimSpace(string(raw))); err == nil {
+				if saved, err := readSiteForwardingCache(cfg, key); err == nil && saved.Transit {
+					return nil
+				}
+			}
+		}
+		return removeDurableCache(path)
+	}
+	return nil
 }

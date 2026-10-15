@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/netip"
 	"os"
@@ -537,6 +538,118 @@ func TestNativeReceiveRealAPI(t *testing.T) {
 	}
 	if _, err := netlink.LinkByName(siteCfg.iface); !isLinkNotFound(err) {
 		t.Fatal("retired endpoint resurrected", err)
+	}
+	// A transit-only node keeps its observed relay and source addresses across
+	// route loss and process exit, without recreating a tunnel endpoint.
+	lan := &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: "site-recovery"}}
+	if err := netlink.LinkAdd(lan); err != nil {
+		t.Fatal(err)
+	}
+	if err := netlink.LinkSetUp(lan); err != nil {
+		t.Fatal(err)
+	}
+	var gateways, sources []string
+	families := map[bool]bool{}
+	for _, address := range node.Status.Addresses {
+		if address.Type != "InternalIP" {
+			continue
+		}
+		ip := net.ParseIP(address.Address)
+		if ip == nil {
+			t.Fatal("invalid node fixture address")
+		}
+		bits := 64
+		if ip.To4() != nil {
+			ip = ip.To4()
+			bits = 24
+		}
+		families[ip.To4() != nil] = true
+		sources = append(sources, ip.String())
+		addr, err := netlink.ParseAddr(fmt.Sprintf("%s/%d", ip, bits))
+		if err != nil {
+			t.Fatal(err)
+		}
+		addr.Flags = 2 // IFA_F_NODAD
+		if err := netlink.AddrAdd(lan, addr); err != nil {
+			t.Fatal(err)
+		}
+		gateway := append(net.IP(nil), ip...)
+		gateway[len(gateway)-1] ^= 64
+		gateways = append(gateways, gateway.String())
+	}
+	if len(families) != 2 {
+		t.Fatal("requires dual-stack site identity")
+	}
+	mesh, err = secrets.Get(ctx, "mesh", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	meshPatch, _ = json.Marshal(map[string]any{"metadata": map[string]any{"uid": mesh.UID, "resourceVersion": mesh.ResourceVersion}, "data": map[string][]byte{
+		tunnel.NodeTunnelAddressPrefix + "cp":    nil,
+		tunnel.SiteAddressesPrefix + "cp":        []byte(strings.Join(sources, ",")),
+		tunnel.NodePublicKeyPrefix + "relay":     []byte(oldPeer.PublicKey().String()),
+		tunnel.NodeTunnelAddressPrefix + "relay": []byte("10.88.0.5/32"),
+		tunnel.NodeAddressesPrefix + "relay":     []byte(strings.Join(gateways, ",")),
+		tunnel.PeerPublicKeyPrefix + "worker":    []byte(root.PublicKey().String()),
+		tunnel.PeerEndpointPrefix + "worker":     []byte("198.51.100.10:51820"),
+		tunnel.PeerAllowedIPsPrefix + "worker":   []byte("10.88.0.3/32,fd88::3/128"),
+		tunnel.PeerRouteHostsPrefix + "worker":   []byte("10.88.0.3,fd88::3"),
+	}})
+	if _, err := secrets.Patch(ctx, "mesh", types.MergePatchType, meshPatch, metav1.PatchOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcile(ctx, worker, devices, siteCfg); err != nil {
+		t.Fatal("initial transit", err)
+	}
+	transitRoutes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: siteCfg.routeTable}, netlink.RT_FILTER_TABLE)
+	if err != nil || len(transitRoutes) != 2 {
+		t.Fatal("dual-stack transit routes missing", err)
+	}
+	for _, route := range transitRoutes {
+		if route.Src == nil || route.Gw == nil || route.LinkIndex != lan.Attrs().Index {
+			t.Fatal("transit lacks source or gateway")
+		}
+	}
+	mesh, err = secrets.Get(ctx, "mesh", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	transitRules, err := netlink.RuleList(netlink.FAMILY_ALL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, invalid := range []string{"0.0.0.0/0", "::/0", "invalid"} {
+		if err := installSiteTransit(siteCfg, &tunnel.TransitSpec{Via: gateways[0], Blocks: []string{invalid}}, sources); err == nil {
+			t.Fatal("unsafe transit input accepted")
+		}
+		current, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: siteCfg.routeTable}, netlink.RT_FILTER_TABLE)
+		if err != nil || !reflect.DeepEqual(transitRoutes, current) {
+			t.Fatal("rejected transit changed routes", err)
+		}
+		currentRules, err := netlink.RuleList(netlink.FAMILY_ALL)
+		if err != nil || !reflect.DeepEqual(transitRules, currentRules) {
+			t.Fatal("rejected transit changed policy", err)
+		}
+	}
+	retireUnpublishedEndpoint(siteCfg)
+	for i := range transitRoutes {
+		if err := netlink.RouteDel(&transitRoutes[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := reconcile(ctx, disconnected, devices, siteCfg); err != nil {
+		t.Fatal("offline transit reconstruction", err)
+	}
+	restoredTransit, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: siteCfg.routeTable}, netlink.RT_FILTER_TABLE)
+	if err != nil || !reflect.DeepEqual(transitRoutes, restoredTransit) {
+		t.Fatal("offline transit changed source or relay", err)
+	}
+	if _, err := netlink.LinkByName(siteCfg.iface); !isLinkNotFound(err) {
+		t.Fatal("transit recovery created an endpoint", err)
+	}
+	meshAfter, err = secrets.Get(ctx, "mesh", metav1.GetOptions{})
+	if err != nil || meshAfter.ResourceVersion != mesh.ResourceVersion {
+		t.Fatal("offline transit published acknowledgement", err)
 	}
 	t.Log("Real API receiver preparation, offline site forwarding reconstruction, and authoritative withdrawal recovery passed")
 }

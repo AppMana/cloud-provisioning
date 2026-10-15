@@ -555,7 +555,9 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 	if err != nil {
 		return 0, err
 	}
-	changed := pruneDeparted(secret.Data, r.membership(nodes.Items), now, r.endpointRetention, r.convergedMachines(ctx, secret.Data)) || remoteChanged
+	// Persist the current election before newly selected endpoints can enter it.
+	changed := tunnel.PinRelay(secret.Data)
+	changed = pruneDeparted(secret.Data, r.membership(nodes.Items), now, r.endpointRetention, r.convergedMachines(ctx, secret.Data)) || remoteChanged || changed
 
 	// Existing allocations stay put; new nodes take the next free host
 	// in the tunnel subnet. A retired address is not free, and neither
@@ -740,6 +742,9 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 			}
 			changed = true
 		}
+	}
+	if tunnel.PinRelay(secret.Data) {
+		changed = true
 	}
 	// Every control plane's address, for the remote's node-local load
 	// balancer: a k0s worker fans its API traffic across all control

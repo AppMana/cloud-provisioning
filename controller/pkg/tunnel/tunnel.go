@@ -533,9 +533,7 @@ type TransitSpec struct {
 // still carries the node's own entry routes it directly, whatever
 // else it declares: the accept trie has one owner per prefix, and
 // egressing via the relay against a direct-owning list is dropped at
-// the remote (measured: 78 seconds of a relayed node's return
-// traffic dying after a placement shrink, acknowledged fresh the
-// whole time).
+// the remote.
 func DocRelaysNode(doc PeerListDoc, publicKey string, addrs []string) bool {
 	covered := map[string]bool{}
 	for _, p := range doc.Peers {
@@ -570,15 +568,22 @@ func DocRelaysNode(doc PeerListDoc, publicKey string, addrs []string) bool {
 	return true
 }
 
-// relayLess keeps both renderers on the same election. A retained endpoint
-// must yield transit to its replacement; otherwise its own site addresses
-// stay on its own peer and the retirement acknowledgment can never succeed.
-// Retained peers remain candidates when no selected endpoint is published.
+// relayLess shares one election across both renderers: selected endpoints,
+// then the pinned identity, then tunnel address. Retained peers remain fallback
+// candidates when no selected endpoint is published.
 func relayLess(data map[string][]byte, aName, aAddr, bName, bAddr string) bool {
 	aDeparted := len(data[NodeDepartedAtPrefix+aName]) != 0
 	bDeparted := len(data[NodeDepartedAtPrefix+bName]) != 0
 	if aDeparted != bDeparted {
 		return !aDeparted
+	}
+	preferred := strings.TrimSpace(string(data[RelayPublicKeyKey]))
+	if preferred != "" {
+		aPreferred := strings.TrimSpace(string(data[NodePublicKeyPrefix+aName])) == preferred
+		bPreferred := strings.TrimSpace(string(data[NodePublicKeyPrefix+bName])) == preferred
+		if aPreferred != bPreferred {
+			return aPreferred
+		}
 	}
 	return LessIP(aAddr, bAddr)
 }
@@ -586,12 +591,8 @@ func relayLess(data map[string][]byte, aName, aAddr, bName, bAddr string) bool {
 // SiteTransit derives the transit a no-tunnel site node installs for
 // itself, from the same data and the same election as RemotePeers.
 //
-// The relay it picks is, by construction, the peer whose entry carries
-// this node's own prefixes in every remote's accept list, so its
-// sources are accepted at the far end. Having a protocol carry this
-// choice instead was tried, and left windows in which the choice was
-// in flight while the routes it replaced were already gone; a shared
-// derivation has no window.
+// For a given mesh snapshot, both site and remote projections select the same
+// relay. Publication and application on different nodes remain asynchronous.
 //
 // Returns nil when no published endpoint exists: there is nothing to
 // carry the traffic, and no route is better than a guessed one.

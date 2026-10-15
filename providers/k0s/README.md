@@ -1,4 +1,6 @@
-# k0s Windows Traefik configuration replacement
+# k0s provider patches
+
+## Windows Traefik configuration replacement
 
 `windows-traefik.patch` targets k0s `v1.36.2+k0s.0`, commit
 `bdf1c22c23a5af23ec6a1ff764179f6a6cf6f7dc`.
@@ -76,3 +78,37 @@ runtime components from the network during startup. Verify its hash and version
 natively on both Windows versions, then test service restart, API backend updates
 and fresh CAPI boots. Keep the previous executable available for rollback during
 existing-worker testing.
+
+## Native Linux default routes for API egress
+
+`native-linux-egress.patch` targets these upstream controller revisions:
+
+| Release | Commit |
+| --- | --- |
+| `v1.36.2+k0s.0` | `bdf1c22c23a5af23ec6a1ff764179f6a6cf6f7dc` |
+| `v1.36.4+k0s.1` | `c37fe960bdee93ca14c5a5b9f2ab9700f8e82e60` |
+
+The native Konnectivity manifest retains the existing node-address agents and
+adds `konnectivity-agent-default-route-linux`, using the same distribution
+image, ServiceAccount and projected credentials. Its Linux-only placement and
+separate health/admin ports, 18095/18096, allow it to coexist with node agents.
+The controller selects `destHost,defaultRoute`, without the random `default`
+fallback that can send Service traffic through an unsuitable Windows host.
+An unavailable default-route pool therefore fails unmatched connections rather
+than selecting a node-address agent. Windows kubelet destinations retain their
+explicit host routing.
+
+```sh
+git -C <k0s-checkout> apply --check <absolute-path>/native-linux-egress.patch
+git -C <k0s-checkout> apply <absolute-path>/native-linux-egress.patch
+cd <k0s-checkout>
+go test ./pkg/component/controller
+```
+
+Build and qualify a distinct controller release containing the patch. Source
+and manifest tests do not establish native Service reachability, uninterrupted
+upgrade, or mixed-OS support. Exercise webhook requests through every API
+server, Windows kubelet access, default-agent loss/recovery and controller
+restart before promotion. The distribution must own and reconcile the new
+agent manifest; installing an equivalent DaemonSet from the test harness does
+not qualify this product change. See [API egress qualification](../../docs/k0s-windows-egress.md).

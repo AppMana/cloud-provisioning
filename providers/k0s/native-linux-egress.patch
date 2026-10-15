@@ -1,0 +1,218 @@
+diff --git a/pkg/component/controller/konnectivity.go b/pkg/component/controller/konnectivity.go
+index 817ca737..c7fe5d27 100644
+--- a/pkg/component/controller/konnectivity.go
++++ b/pkg/component/controller/konnectivity.go
+@@ -158,7 +158,7 @@ func (k *Konnectivity) serverArgs(count uint) []string {
+ 		"--delete-existing-uds-file":  "true",
+ 		"--server-count":              strconv.FormatUint(uint64(count), 10),
+ 		"--server-id":                 k.K0sVars.InvocationID,
+-		"--proxy-strategies":          "destHost,defaultRoute,default",
++		"--proxy-strategies":          "destHost,defaultRoute",
+ 		"--cipher-suites":             constant.AllowedTLS12CipherSuiteNames(),
+ 	}.ToArgs()
+ }
+diff --git a/pkg/component/controller/konnectivity_egress_test.go b/pkg/component/controller/konnectivity_egress_test.go
+new file mode 100644
+index 00000000..c27c8308
+--- /dev/null
++++ b/pkg/component/controller/konnectivity_egress_test.go
+@@ -0,0 +1,66 @@
++// SPDX-FileCopyrightText: 2026 k0s authors
++// SPDX-License-Identifier: Apache-2.0
++
++package controller
++
++import (
++	"github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
++	"github.com/k0sproject/k0s/pkg/component/prober"
++	"github.com/k0sproject/k0s/pkg/config"
++	"github.com/sirupsen/logrus"
++	"github.com/stretchr/testify/require"
++	appsv1 "k8s.io/api/apps/v1"
++	corev1 "k8s.io/api/core/v1"
++	rbacv1 "k8s.io/api/rbac/v1"
++	"k8s.io/cli-runtime/pkg/resource"
++	"k8s.io/client-go/kubernetes/scheme"
++	"testing"
++)
++
++func TestKonnectivityLinuxDefaultRoute(t *testing.T) {
++	for _, hostNetwork := range []bool{false, true} {
++		t.Run(map[bool]string{false: "pod-network", true: "host-network"}[hostNetwork], func(t *testing.T) {
++			cfg := v1beta1.DefaultClusterConfig()
++			cfg.Spec.Network.NodeLocalLoadBalancing = &v1beta1.NodeLocalLoadBalancing{Enabled: hostNetwork, Type: v1beta1.NllbTypeTraefik, Traefik: v1beta1.DefaultTraefik()}
++			dir := t.TempDir()
++			agent := KonnectivityAgent{ManifestsDir: dir, KonnectivityServerHost: "192.0.2.1", EventEmitter: prober.NewEventEmitter(), log: logrus.NewEntry(logrus.New())}
++			require.NoError(t, agent.writeKonnectivityAgent(cfg, 3))
++			objects, err := resource.NewLocalBuilder().WithScheme(scheme.Scheme, corev1.SchemeGroupVersion, appsv1.SchemeGroupVersion, rbacv1.SchemeGroupVersion).Path(true, dir).Flatten().Do().Infos()
++			require.NoError(t, err)
++			sets := map[string]*appsv1.DaemonSet{}
++			for _, obj := range objects {
++				if ds, ok := obj.Object.(*appsv1.DaemonSet); ok {
++					sets[ds.Name] = ds
++				}
++			}
++			native := sets["konnectivity-agent"]
++			require.NotNil(t, native)
++			require.Contains(t, native.Spec.Template.Spec.Containers[0].Args, "--agent-identifiers=host=$(NODE_IP)")
++			require.Empty(t, native.Spec.Template.Spec.NodeSelector)
++			linux := sets["konnectivity-agent-default-route-linux"]
++			require.NotNil(t, linux, "Service egress must have a native Linux-only default-route agent")
++			require.Equal(t, map[string]string{"kubernetes.io/os": "linux"}, linux.Spec.Template.Spec.NodeSelector)
++			require.Equal(t, corev1.Linux, linux.Spec.Template.Spec.OS.Name)
++			require.Nil(t, linux.Spec.Template.Spec.SecurityContext.WindowsOptions)
++			require.Equal(t, hostNetwork, linux.Spec.Template.Spec.HostNetwork)
++			require.Equal(t, native.Spec.Template.Spec.ServiceAccountName, linux.Spec.Template.Spec.ServiceAccountName)
++			require.Equal(t, native.Spec.Template.Spec.Volumes, linux.Spec.Template.Spec.Volumes)
++			c := linux.Spec.Template.Spec.Containers[0]
++			require.Equal(t, native.Spec.Template.Spec.Containers[0].Image, c.Image)
++			require.Contains(t, c.Args, "--agent-identifiers=default-route=true")
++			require.Contains(t, c.Args, "--agent-id=default-route-linux-$(NODE_IP)")
++			require.Contains(t, c.Args, "--health-server-port=18095")
++			require.Contains(t, c.Args, "--admin-server-port=18096")
++			require.EqualValues(t, 18095, c.ReadinessProbe.HTTPGet.Port.IntValue())
++			require.EqualValues(t, 18095, c.LivenessProbe.HTTPGet.Port.IntValue())
++			require.NotEqual(t, native.Spec.Selector, linux.Spec.Selector)
++		})
++	}
++}
++
++func TestKonnectivityRejectsUnmatchedWindowsFallback(t *testing.T) {
++	server := Konnectivity{Spec: v1beta1.DefaultKonnectivitySpec(), K0sVars: &config.CfgVars{}}
++	args := server.serverArgs(3)
++	require.Contains(t, args, "--proxy-strategies=destHost,defaultRoute")
++	require.NotContains(t, args, "--proxy-strategies=destHost,defaultRoute,default")
++}
+diff --git a/pkg/component/controller/konnectivityagent.go b/pkg/component/controller/konnectivityagent.go
+index 575524e5..eade5d18 100644
+--- a/pkg/component/controller/konnectivityagent.go
++++ b/pkg/component/controller/konnectivityagent.go
+@@ -200,6 +200,25 @@ type konnectivityAgentConfig struct {
+ 	HostNetwork     bool
+ }
+ 
++// Keep node-address agents on both operating systems for kubelet access.
++// Linux agents separately carry unmatched destinations such as Service IPs,
++// which Windows host-network agents cannot reach.
++type konnectivityAgentVariant struct {
++	konnectivityAgentConfig
++	Name         string
++	Identifiers  string
++	AgentID      string
++	HealthPort   int
++	DefaultRoute bool
++}
++
++func (cfg konnectivityAgentConfig) Agents() []konnectivityAgentVariant {
++	return []konnectivityAgentVariant{
++		{konnectivityAgentConfig: cfg, Name: "konnectivity-agent", Identifiers: "host=$(NODE_IP)", AgentID: "$(NODE_IP)", HealthPort: 8093},
++		{konnectivityAgentConfig: cfg, Name: "konnectivity-agent-default-route-linux", Identifiers: "default-route=true", AgentID: "default-route-linux-$(NODE_IP)", HealthPort: 18095, DefaultRoute: true},
++	}
++}
++
+ const konnectivityAgentTemplate = `
+ apiVersion: rbac.authorization.k8s.io/v1
+ kind: ClusterRoleBinding
+@@ -223,6 +242,7 @@ metadata:
+   namespace: kube-system
+   labels:
+     kubernetes.io/cluster-service: "true"
++{{- range .Agents }}
+ ---
+ apiVersion: apps/v1
+ # Alternatively, you can deploy the agents as Deployments. It is not necessary
+@@ -230,25 +250,38 @@ apiVersion: apps/v1
+ kind: DaemonSet
+ metadata:
+   labels:
+-    k8s-app: konnectivity-agent
++    k8s-app: {{ .Name }}
+   namespace: kube-system
+-  name: konnectivity-agent
++  name: {{ .Name }}
+ spec:
+   selector:
+     matchLabels:
+-      k8s-app: konnectivity-agent
++      k8s-app: {{ .Name }}
++  {{- if .DefaultRoute }}
++  updateStrategy:
++    type: RollingUpdate
++    rollingUpdate:
++      maxUnavailable: 1
++      maxSurge: 0
++  {{- end }}
+   template:
+     metadata:
+       labels:
+-        k8s-app: konnectivity-agent
++        k8s-app: {{ .Name }}
+       annotations:
+         prometheus.io/scrape: 'true'
+-        prometheus.io/port: '8093'
++        prometheus.io/port: '{{ .HealthPort }}'
+     spec:
++      {{- if .DefaultRoute }}
++      os:
++        name: linux
++      nodeSelector:
++        kubernetes.io/os: linux
++      {{- end }}
+       securityContext:
+         runAsNonRoot: true
+         supplementalGroups: [0]` /* in order to read the projected service account token */ + `
+-        {{- if .HostNetwork }}
++        {{- if and .HostNetwork (not .DefaultRoute) }}
+         windowsOptions:
+           hostProcess: true
+           runAsUserName: NT AUTHORITY\Local service
+@@ -279,8 +312,12 @@ spec:
+             - --proxy-server-host={{ .ProxyServerHost }}
+             - --proxy-server-port={{ .ProxyServerPort }}
+             - --service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token
+-            - --agent-identifiers=host=$(NODE_IP)
+-            - --agent-id=$(NODE_IP)
++            - --agent-identifiers={{ .Identifiers }}
++            - --agent-id={{ .AgentID }}
++            {{- if .DefaultRoute }}
++            - --health-server-port={{ .HealthPort }}
++            - --admin-server-port=18096
++            {{- end }}
+           securityContext:
+             allowPrivilegeEscalation: false
+             capabilities:
+@@ -292,13 +329,13 @@ spec:
+               name: konnectivity-agent-token
+           livenessProbe:
+             httpGet:
+-              port: 8093
++              port: {{ .HealthPort }}
+               path: /healthz
+             initialDelaySeconds: 15
+             timeoutSeconds: 15
+           readinessProbe:` /* helps to quickly identify pods with connection issues */ + `
+             httpGet:
+-              port: 8093
++              port: {{ .HealthPort }}
+               path: /readyz
+             initialDelaySeconds: 15
+             timeoutSeconds: 15
+@@ -310,4 +347,5 @@ spec:
+               - serviceAccountToken:
+                   path: konnectivity-agent-token
+                   audience: system:konnectivity-server
++{{- end }}
+ `
+diff --git a/pkg/component/controller/konnectivityagent_test.go b/pkg/component/controller/konnectivityagent_test.go
+index 93bfb664..868fbe12 100644
+--- a/pkg/component/controller/konnectivityagent_test.go
++++ b/pkg/component/controller/konnectivityagent_test.go
+@@ -90,7 +90,7 @@ func loadDaemonSet(t *testing.T, manifestsDir string) *appsv1.DaemonSet {
+ 		Infos()
+ 	require.NoError(t, err)
+ 
+-	require.Len(t, objects, 3)
++	require.Len(t, objects, 4)
+ 	daemonSet, ok := objects[2].Object.(*appsv1.DaemonSet)
+ 	require.Truef(t, ok, "unexpected type: %T", objects[2].Object)
+ 	return daemonSet

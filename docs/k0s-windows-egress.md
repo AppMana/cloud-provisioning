@@ -1,20 +1,31 @@
 # k0s API egress with Windows workers
 
 Mixed Windows/Linux k0s sites must validate API-server access to admission
-webhooks separately from node readiness and Windows pod traffic. The tested
-k0s 1.36.2 site uses Konnectivity for cluster egress. Its servers select agents
+webhooks separately from node readiness and Windows pod traffic.
+k0s 1.36.2 uses Konnectivity for cluster egress. Its servers select agents
 using `destHost,defaultRoute,default`; the native agents advertise their node IP.
 A Service address does not match those node identities. Without a default-route
 advertiser, the fallback can select a Windows agent that cannot reach the Service.
 
 Kubernetes documents that [Windows hosts cannot access Service IPs](https://kubernetes.io/docs/tasks/debug/debug-cluster/windows/#network-troubleshooting). The [Konnectivity strategies](https://pkg.go.dev/sigs.k8s.io/apiserver-network-proxy/pkg/server/proxystrategies)
 distinguish destination-host matching, explicit default-route agents and random
-healthy backends. Native Windows 2022/2025 host probes and agent logs recorded
-webhook timeouts; Linux controller hosts reached the same webhook.
+healthy backends. Service egress must select agents with native Service
+reachability while preserving node-specific routing for Windows kubelets.
 
-## Linux default-route addon
+## Native controller fix
 
-The harness can derive an additional Linux-only DaemonSet from the live distro
+The [native k0s patch](../providers/k0s/README.md#native-linux-default-routes-for-api-egress)
+adds Linux default-route agents through the distribution's existing manifest
+owner and removes the server's random fallback. Existing mixed-OS node agents
+keep their identities and remain responsible for explicit kubelet destinations.
+Qualify a rebuilt controller with this patch; native runtime and upgrade
+validation remain required. A harness-installed addon does not qualify the
+controller fix.
+
+## Legacy diagnostic addon
+
+For diagnosis on an unpatched test site, the harness can derive an additional
+Linux-only DaemonSet from the live distro
 agent. It preserves the native mixed-OS agents and their node-IP identities,
 which remain necessary for Windows kubelet access. The addon inherits the
 native image, environment, service account and projected credential mounts.
@@ -72,4 +83,4 @@ kubectl --context TEST_CONTEXT -n kube-system delete \
 ```
 
 The addon does not resolve Windows VFP fragmentation or intermittent GPU process
-startup. These observations do not qualify Windows support for release.
+startup. It does not qualify Windows support for release.

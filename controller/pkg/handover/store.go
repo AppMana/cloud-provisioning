@@ -3,6 +3,7 @@ package handover
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -11,6 +12,7 @@ import (
 )
 
 const journalKey = "transition.json"
+const planKey = "plan.json"
 
 // Store must use controller-owned ConfigMaps, inaccessible to receipt writers.
 // API resourceVersion and UID protect against concurrent writes and recreation.
@@ -27,6 +29,14 @@ type Snapshot struct {
 
 func (s Snapshot) Transition() Transition { return s.transition }
 
+// Plan returns the exact public plan committed with this transition, if any.
+func (s Snapshot) Plan() []byte {
+	if s.object == nil {
+		return nil
+	}
+	return []byte(s.object.Data[planKey])
+}
+
 func (s Store) snapshot(object *corev1.ConfigMap) (Snapshot, error) {
 	if object.Name != s.Name || object.UID == "" || object.ResourceVersion == "" {
 		return Snapshot{}, fmt.Errorf("invalid journal object identity")
@@ -42,6 +52,14 @@ func (s Store) snapshot(object *corev1.ConfigMap) (Snapshot, error) {
 	if v.Round.ClusterUID != s.ClusterUID {
 		return Snapshot{}, fmt.Errorf("journal belongs to another cluster")
 	}
+	if t.j.PlanRequired && object.Data[planKey] == "" {
+		return Snapshot{}, fmt.Errorf("journal public plan is missing")
+	}
+	if plan, present := object.Data[planKey]; present {
+		if plan == "" || fmt.Sprintf("%x", sha256.Sum256([]byte(plan))) != v.Round.PlanHash {
+			return Snapshot{}, fmt.Errorf("journal public plan does not match its committed hash")
+		}
+	}
 	return Snapshot{transition: t, object: object.DeepCopy()}, nil
 }
 func (s Store) configured() error {
@@ -51,8 +69,31 @@ func (s Store) configured() error {
 	return nil
 }
 func (s Store) Create(ctx context.Context, t Transition) (Snapshot, error) {
+	return s.create(ctx, t, nil)
+}
+
+// CreateWithPlan commits the public plan and initial round atomically. The
+// plan remains part of the versioned object throughout all phase transitions.
+func (s Store) CreateWithPlan(ctx context.Context, t Transition, plan []byte) (Snapshot, error) {
+	if len(plan) == 0 {
+		return Snapshot{}, fmt.Errorf("public handover plan is required")
+	}
+	v, err := t.View()
+	if err != nil {
+		return Snapshot{}, err
+	}
+	if fmt.Sprintf("%x", sha256.Sum256(plan)) != v.Round.PlanHash {
+		return Snapshot{}, fmt.Errorf("public handover plan hash differs")
+	}
+	t.j.PlanRequired = true
+	return s.create(ctx, t, plan)
+}
+func (s Store) create(ctx context.Context, t Transition, plan []byte) (Snapshot, error) {
 	if e := s.configured(); e != nil {
 		return Snapshot{}, e
+	}
+	if t.j.PlanRequired && len(plan) == 0 {
+		return Snapshot{}, fmt.Errorf("journal requires its public plan")
 	}
 	raw, e := t.Bytes()
 	if e != nil {
@@ -61,11 +102,15 @@ func (s Store) Create(ctx context.Context, t Transition) (Snapshot, error) {
 	if len(t.j.Events) != 0 || t.j.Initial.ClusterUID != s.ClusterUID {
 		return Snapshot{}, fmt.Errorf("journal creation requires a new transition for this cluster")
 	}
-	object, e := s.ConfigMaps.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: s.Name}, Data: map[string]string{journalKey: string(raw)}}, metav1.CreateOptions{})
+	data := map[string]string{journalKey: string(raw)}
+	if plan != nil {
+		data[planKey] = string(plan)
+	}
+	object, e := s.ConfigMaps.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: s.Name}, Data: data}, metav1.CreateOptions{})
 	if e != nil {
 		return Snapshot{}, e
 	}
-	if object.Data[journalKey] != string(raw) {
+	if object.Data[journalKey] != string(raw) || (plan != nil && object.Data[planKey] != string(plan)) {
 		return Snapshot{}, fmt.Errorf("persisted journal differs from requested state")
 	}
 	return s.snapshot(object)
@@ -123,7 +168,7 @@ func (s Store) Commit(ctx context.Context, previous Snapshot, next Transition) (
 	if e != nil {
 		return Snapshot{}, e
 	}
-	if updated.Data[journalKey] != string(raw) {
+	if updated.Data[journalKey] != string(raw) || updated.Data[planKey] != previous.object.Data[planKey] {
 		return Snapshot{}, fmt.Errorf("persisted journal differs from requested state")
 	}
 	return s.snapshot(updated)

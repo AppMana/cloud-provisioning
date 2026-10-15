@@ -34,10 +34,11 @@ type event struct {
 	Next     *Round    `json:"next,omitempty"`
 }
 type journal struct {
-	Version int     `json:"version"`
-	Policy  Policy  `json:"policy"`
-	Initial Round   `json:"initial"`
-	Events  []event `json:"events"`
+	Version      int     `json:"version"`
+	PlanRequired bool    `json:"planRequired,omitempty"`
+	Policy       Policy  `json:"policy"`
+	Initial      Round   `json:"initial"`
+	Events       []event `json:"events"`
 }
 
 // Transition is immutable through its public API. Candidate operations must be

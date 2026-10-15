@@ -92,6 +92,13 @@ bundle. Both profiles remain required; aliases must not be used to count one
 cluster's measurements twice. Evidence with older row IDs must be explicitly
 mapped and reviewed before it can satisfy the gate.
 
+Each site/family campaign also requires `agent-upgrade` evidence. Record
+`upgradeFrom` as the full immutable predecessor commit and set
+`upgradeObserved` only after observing that transition to the candidate.
+A restart of the same version does not satisfy this row. Upgrade measurements
+require continuous management observation and zero retained packet failures;
+bounded fault-recovery results cannot substitute for an uninterrupted upgrade.
+
 1. Freeze binaries, chart and multi-architecture image digests, CAPI/CAPA,
    k0s, both Calico variants and AWS VPC CNI versions. Prove ARM64 runtime,
    not merely an image manifest. Rebuild after any code change.

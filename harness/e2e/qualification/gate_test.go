@@ -12,9 +12,50 @@ func complete() Evidence {
 		if strings.Contains(id, "/ipv6/") {
 			family = "ipv6"
 		}
-		e.Rows = append(e.Rows, Row{ID: id, Candidate: e.Candidate, Status: "passed", Artifact: "result.json", SHA256: strings.Repeat("b", 64), Attempts: 100, RecoverySeconds: 30, DurationSeconds: 86400, Workers: 2, CloudCNI: "aws-vpc", PodFamily: family, ManagementContinuous: true, AutonomousRollback: true, FaultInjected: true})
+		e.Rows = append(e.Rows, Row{ID: id, Candidate: e.Candidate, Status: "passed", Artifact: "result.json", SHA256: strings.Repeat("b", 64), Attempts: 100, RecoverySeconds: 30, DurationSeconds: 86400, Workers: 2, CloudCNI: "aws-vpc", PodFamily: family, ManagementContinuous: true, AutonomousRollback: true, FaultInjected: true, UpgradeFrom: strings.Repeat("d", 40), UpgradeObserved: true})
 	}
 	return e
+}
+
+func TestUpgradeRequiresPredecessorAndContinuousSuccess(t *testing.T) {
+	count := 0
+	for _, id := range RequiredRows() {
+		if !strings.HasSuffix(id, "/agent-upgrade") {
+			continue
+		}
+		count++
+		for _, bad := range []string{"missing-predecessor", "same-version", "unobserved", "packet-loss", "management-loss", "unobserved-management"} {
+			t.Run(id+"/"+bad, func(t *testing.T) {
+				e := complete()
+				for i := range e.Rows {
+					if e.Rows[i].ID != id {
+						continue
+					}
+					r := &e.Rows[i]
+					switch bad {
+					case "missing-predecessor":
+						r.UpgradeFrom = ""
+					case "same-version":
+						r.UpgradeFrom = e.Candidate
+					case "unobserved":
+						r.UpgradeObserved = false
+					case "packet-loss":
+						r.Failures = 1
+					case "management-loss":
+						r.ManagementFailures = 1
+					case "unobserved-management":
+						r.ManagementContinuous = false
+					}
+				}
+				if len(Check(e)) == 0 {
+					t.Fatal("accepted incomplete upgrade evidence")
+				}
+			})
+		}
+	}
+	if count != 4 {
+		t.Fatalf("want both sites and families, got %d", count)
+	}
 }
 
 func TestNetworkManagerRestartRequiresBoundedObservedFault(t *testing.T) {

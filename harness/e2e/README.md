@@ -22,9 +22,10 @@ explicitly; normal SDK operation does not adopt or remove it automatically.
 The explicit nil-runtime compatibility path remains for legacy callers/tests
 and does not provide these ownership guarantees.
 
-This module pins published Labcontainers commit `43833b0979f7`; no local SDK
-workspace or SDK replace directive is needed. The local product controller
-module remains a dependency in this repository.
+This module pins its published Labcontainers dependency in [go.mod](go.mod);
+no local SDK workspace or SDK replace directive is needed. Build the SDK daemon
+and VM wrapper from that same revision. The local product controller module
+remains a dependency in this repository.
 
 From this module, test the published dependency with:
 

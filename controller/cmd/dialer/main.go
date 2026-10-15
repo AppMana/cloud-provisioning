@@ -1589,16 +1589,9 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 		// peers belongs to whichever was configured last: overlapping
 		// peers would take each other's traffic, and which one won
 		// would depend on map ordering.
-		// An entry that cannot be permitted is dropped, not fatal. The
-		// guards below say what must never enter the accept list, and
-		// leaving one out is exactly the safe outcome; abandoning the
-		// pass is not, because it leaves every other peer unconfigured
-		// and every route uninstalled over a single entry. That is how
-		// a site whose endpoint is not behind NAT ended up with a
-		// tunnel that handshook and carried nothing: the endpoint's own
-		// address is legitimately both its peer endpoint and a node
-		// address the mesh publishes, so the entry recurred every pass
-		// and every pass gave up on reaching it.
+		// Reject an unsafe entry without abandoning other peers. A published
+		// node address may also be its public tunnel endpoint; the guards must
+		// exclude that route while preserving the rest of the accept list.
 		var allowedIPs []net.IPNet
 		for _, cidr := range p.WGAllowedIPs {
 			ipNet, err := parseAllowedIP(cidr, localAddrs, endpointHosts, cfg.fwmark > 0)
@@ -1607,12 +1600,10 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 				continue
 			}
 			allowedIPs = append(allowedIPs, ipNet)
-			// Anything wider than a host is the pod space behind this
-			// peer, which this node may have to forward to. Not while
-			// relayed: its sources belong to the transit peer. The accept list above is
-			// untouched, because remotes that have not read the new
-			// list yet still send here directly.
-			if ones, bits := ipNet.Mask.Size(); ones != bits {
+			// Pod allocations can be host-sized, including native AWS /32s.
+			// Explicit RouteHosts distinguish node addresses from pod space.
+			// A relayed peer's pod routes belong to the transit peer instead.
+			if !isPeerNodeAddress(p, ipNet) {
 				if relayThis {
 					relayDsts = append(relayDsts, ipNet)
 				} else {
@@ -1913,31 +1904,9 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 		}
 	}
 
-	// The route for the pod space behind each peer.
-	//
-	// This node tells the rest of its site that the remote's blocks are
-	// reachable through it, so their traffic arrives here. Whether it
-	// can then forward that traffic depended entirely on this node
-	// having its own session with the remote, and if that session is
-	// down the node attracts traffic it cannot deliver. Measured: the
-	// site had "remote block via the endpoint" and the endpoint had no
-	// route to the block at all.
-	//
-	// It carries the tunnel that block is behind, so it is the route,
-	// not a fallback behind whatever the network happens to distribute.
-	// This used to go in at metric 1024 so that any distributed route
-	// won, which is correct reasoning for a node that has no tunnel and
-	// exactly wrong here: the route the network distributes for a remote
-	// block is another endpoint's transit advertisement, and that
-	// endpoint's own best route is this node. Two endpoints each
-	// deferred to the other and the packet crossed the LAN until its TTL
-	// ran out, with the tunnel that could have delivered it up and idle
-	// on both of them. Captured on w1: request in on the tunnel, out to
-	// cp on eth1, reply back in from cp, out to cp again, repeating.
-	//
-	// Preferring the local tunnel cannot loop, because it terminates
-	// here: every endpoint prefers its own, and a node with no tunnel
-	// still learns the block over BGP from whichever endpoint has one.
+	// Prefer the local tunnel for each peer's pod allocation. Deferring to
+	// another endpoint's BGP advertisement can create a forwarding loop
+	// between endpoints. Nodes without tunnels learn the transit route over BGP.
 	for _, block := range blocks {
 		dst := block
 		desired[dst.String()] = true

@@ -158,8 +158,19 @@ the config's `rootfs.diff_ids`. Compare blob modification/change times and nativ
 snapshot creation/update times with the provider's instance launch time. Compare
 runtime hashes, inodes and change times with the capture receipt as well: matching
 mtime alone does not prove that k0s skipped extraction. The
-[reuse validator](../harness/e2e/observe/linux_cache_reuse.py) and its native fixture
-implement these checks. This proves reuse of those cached artifacts; it does not
+[reuse validator](../harness/e2e/observe/linux_cache_reuse.py) and
+[native collector](../harness/e2e/observe/linux_cache_reuse_native.py) implement
+these checks. Stage the collector alongside `linux_cache.py`,
+`linux_cache_native.py`, and `linux_cache_reuse.py`, then run it before harness
+imports with `--recipe`, `--binding`, `--candidate-image`, and a new absolute
+`--operation` directory. The provider must supply an independently observed
+instance binding containing `imageID` and timezone-qualified `launchTime`, after
+checking the claim, Machine, Node, instance and campaign ownership. The collector
+reads the captured receipt, local content, active containerd image inventory and
+overlayfs snapshot metadata; it never pulls or imports. It rejects missing or
+ambiguous native manifests, mismatched content hashes, and a different captured
+recipe or architecture. It cannot itself establish that no earlier harness
+imports occurred; preserve launch and orchestration evidence for that boundary. This proves reuse of those cached artifacts; it does not
 prove zero registry requests or reduced startup cost. Run the intended GPU
 workload and lifecycle checks separately. Validate executable staging independently from image capture and fresh-worker
 reuse. Neither replaces GPU cache, replacement or

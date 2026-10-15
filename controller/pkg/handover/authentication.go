@@ -28,6 +28,8 @@ type PodReceiptAuthenticator struct {
 	// These are trusted release inputs, never learned from a submitting pod.
 	// ImageID is explicit because runtimes may report the manifest index or
 	// an architecture-specific manifest. Image alone is only desired state.
+	// The admitted agent must use the image entrypoint. A command override,
+	// including the host-binary fallback, needs separate executable admission.
 	ContainerName string
 	Image         string
 	ImageID       string
@@ -86,8 +88,8 @@ func (a PodReceiptAuthenticator) Authenticate(ctx context.Context, bearer string
 	if err != nil || string(daemon.UID) != a.DaemonSetUID || daemon.DeletionTimestamp != nil {
 		return fail("daemon identity is no longer current")
 	}
-	if !receiptContainerImage(daemon.Spec.Template.Spec.Containers, a.ContainerName, a.Image) || !receiptContainerImage(pod.Spec.Containers, a.ContainerName, a.Image) {
-		return fail("daemon or pod agent image differs from the admitted release")
+	if !receiptImageEntrypoint(daemon.Spec.Template.Spec.Containers, a.ContainerName, a.Image) || !receiptImageEntrypoint(pod.Spec.Containers, a.ContainerName, a.Image) {
+		return fail("daemon or pod agent image or entrypoint differs from the admitted release")
 	}
 	currentImage := false
 	for _, status := range pod.Status.ContainerStatuses {
@@ -120,10 +122,10 @@ func (a PodReceiptAuthenticator) Authenticate(ctx context.Context, bearer string
 	return AuthenticatedReceipt{AuthenticatedNodeUID: nodeUID, Receipt: receipt}, nil
 }
 
-func receiptContainerImage(containers []corev1.Container, name, image string) bool {
+func receiptImageEntrypoint(containers []corev1.Container, name, image string) bool {
 	for _, container := range containers {
 		if container.Name == name {
-			return container.Image == image
+			return container.Image == image && len(container.Command) == 0
 		}
 	}
 	return false

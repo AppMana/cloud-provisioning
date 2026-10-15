@@ -92,7 +92,12 @@ and submitting pod must request that image, and its container must be running
 and Ready with the expected image ID. Supply architecture-specific runtime IDs
 from trusted release artifacts, not from the submitting pod's status. This
 checks the container image; a container executing a mounted host binary still
-requires separate executable-version admission.
+requires separate executable-version admission. Receipt authentication therefore
+rejects command overrides in both the DaemonSet template and the submitting
+pod, including the cloud host-binary fallback. The admitted release must run
+its image entrypoint; pinning the fallback container's image does not admit the
+host executable. This restriction does not itself attest mounted executable
+contents or enable transition execution.
 `Transition` now persists and replays prepare, switch, drain, and retire history.
 Rollback during prepare aborts B; rollback after switching selects A, drains B,
 and retires B. Expired rounds require explicit renewal and fresh receipts. Drain

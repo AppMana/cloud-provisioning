@@ -114,6 +114,39 @@ func TestPodReceiptAuthenticationRealAPI(t *testing.T) {
 	}
 	verifyAuthenticatedAdvancement(t, verifier, nodes, []string{bearer, otherBearer})
 
+	// The image can remain pinned while its entrypoint is replaced with an
+	// older host executable. Its image ID cannot admit that executable.
+	daemon.Spec.Template.Spec.Containers[0].Command = []string{"/host-bin/wg-dialer"}
+	daemon, err = api.AppsV1().DaemonSets(ns).Update(ctx, daemon, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reject("daemon-host-command", bearer, verifier, receipt, boot)
+	daemon.Spec.Template.Spec.Containers[0].Command = nil
+	daemon, err = api.AppsV1().DaemonSets(ns).Update(ctx, daemon, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Pod commands are immutable: create an actual old-command pod while the
+	// current DaemonSet already requests the image entrypoint again.
+	hostPod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "host-command", Labels: labels, OwnerReferences: pods[0].OwnerReferences}, Spec: *pods[0].Spec.DeepCopy()}
+	hostPod.Spec.Containers[0].Command = []string{"/host-bin/wg-dialer"}
+	hostPod.Spec.Containers[0].VolumeMounts = append(hostPod.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{Name: "host-bin", MountPath: "/host-bin"})
+	hostPod.Spec.Volumes = append(hostPod.Spec.Volumes, corev1.Volume{Name: "host-bin", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/usr/local/bin"}}})
+	hostPod, err = api.CoreV1().Pods(ns).Create(ctx, hostPod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostPod.Status = *pods[0].Status.DeepCopy()
+	hostPod, err = api.CoreV1().Pods(ns).UpdateStatus(ctx, hostPod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reject("pod-host-command", mint(hostPod, verifier.Audience), verifier, receipt, boot)
+	if _, err := verifier.Authenticate(ctx, bearer, receipt, boot); err != nil {
+		t.Fatal("image entrypoint agent no longer authenticates", err)
+	}
+
 	// An existing Ready pod and its token survive a DaemonSet image update.
 	// That old process must not authorize phases for the new desired version.
 	daemon.Spec.Template.Spec.Containers[0].Image = "example.invalid/dialer@sha256:" + strings.Repeat("b", 64)

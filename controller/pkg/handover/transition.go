@@ -154,6 +154,7 @@ func (t Transition) View() (View, error) {
 				expected.Members = append([]Member(nil), expected.Members...)
 				for i := range expected.Members {
 					expected.Members[i].FromKey, expected.Members[i].ToKey = expected.Members[i].ToKey, expected.Members[i].FromKey
+					expected.Members[i].FromPeerKey, expected.Members[i].ToPeerKey = expected.Members[i].ToPeerKey, expected.Members[i].FromPeerKey
 				}
 				expected.Phase = Switch
 			default:
@@ -259,6 +260,7 @@ func (t Transition) Rollback(now time.Time) (Transition, error) {
 		spec.Members = append([]Member(nil), spec.Members...)
 		for i := range spec.Members {
 			spec.Members[i].FromKey, spec.Members[i].ToKey = spec.Members[i].ToKey, spec.Members[i].FromKey
+			spec.Members[i].FromPeerKey, spec.Members[i].ToPeerKey = spec.Members[i].ToPeerKey, spec.Members[i].FromPeerKey
 		}
 		spec.Phase = Switch
 	default:

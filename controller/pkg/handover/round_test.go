@@ -20,7 +20,7 @@ func fixture(t *testing.T) Round {
 		}
 		return p.PublicKey().String()
 	}
-	r, e := NewRound(Spec{ClusterUID: "cluster-uid", TransitionUID: "transition-uid", PlanHash: strings.Repeat("a", 64), FromGeneration: "A", ToGeneration: "B", Phase: Prepare, Members: []Member{{"node-2", key(), key()}, {"node-1", key(), key()}}}, epoch, time.Minute, 10*time.Second)
+	r, e := NewRound(Spec{ClusterUID: "cluster-uid", TransitionUID: "transition-uid", PlanHash: strings.Repeat("a", 64), FromGeneration: "A", ToGeneration: "B", Phase: Prepare, Members: []Member{{NodeUID: "node-2", FromKey: key(), ToKey: key()}, {NodeUID: "node-1", FromKey: key(), ToKey: key()}}}, epoch, time.Minute, 10*time.Second)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -34,7 +34,7 @@ func receipts(t *testing.T, r Round, at time.Time) []AuthenticatedReceipt {
 	}
 	out := []AuthenticatedReceipt{}
 	for _, m := range r.Members {
-		out = append(out, AuthenticatedReceipt{m.NodeUID, Receipt{hash, m.NodeUID, m.FromKey, m.ToKey, at}})
+		out = append(out, AuthenticatedReceipt{m.NodeUID, Receipt{RoundHash: hash, NodeUID: m.NodeUID, FromKey: m.FromKey, ToKey: m.ToKey, ObservedAt: at, DeviceID: m.DeviceID, FromPeerKey: m.FromPeerKey, ToPeerKey: m.ToPeerKey}})
 	}
 	return out
 }

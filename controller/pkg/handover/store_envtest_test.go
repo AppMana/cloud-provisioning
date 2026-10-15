@@ -35,56 +35,61 @@ func TestStoreAPIServerCAS(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	s := Store{ConfigMaps: client.CoreV1().ConfigMaps("handover-test"), Name: "transition", ClusterUID: "cluster-uid"}
-	tr := transitionFixture(t)
-	original, e := s.Create(ctx, tr)
-	if e != nil {
-		t.Fatal(e)
-	}
-	if _, e := s.Create(ctx, tr); !apierrors.IsAlreadyExists(e) {
-		t.Fatalf("create overwrote state: %v", e)
-	}
-	candidate := step(t, tr, epoch.Add(time.Second))
-	committed, e := s.Commit(ctx, original, candidate)
-	if e != nil {
-		t.Fatal(e)
-	}
-	if _, e := s.Commit(ctx, original, candidate); !apierrors.IsConflict(e) {
-		t.Fatalf("stale writer accepted: %v", e)
-	}
-	loaded, e := s.Load(ctx)
-	if e != nil {
-		t.Fatal(e)
-	}
-	if view(t, loaded.Transition()).Round.Phase != Switch {
-		t.Fatal("restart lost phase")
-	}
-	advanced := step(t, candidate, epoch.Add(2*time.Second))
-	if _, e := s.Commit(ctx, original, advanced); e == nil {
-		t.Fatal("multiple events committed")
-	}
-	raw, _ := candidate.Bytes()
-	rewritten, e := DecodeTransition(raw)
-	if e != nil {
-		t.Fatal(e)
-	}
-	rewritten.j.Policy.DrainInterval = time.Second
-	rewritten = step(t, rewritten, epoch.Add(2*time.Second))
-	if _, e := s.Commit(ctx, committed, rewritten); e == nil {
-		t.Fatal("history rewrite accepted")
-	}
-	foreign := s
-	foreign.ClusterUID = "another-cluster"
-	if _, e := foreign.Load(ctx); e == nil {
-		t.Fatal("foreign cluster adopted")
-	}
-	if e = s.ConfigMaps.Delete(ctx, s.Name, metav1.DeleteOptions{}); e != nil {
-		t.Fatal(e)
-	}
-	if _, e = s.Create(ctx, tr); e != nil {
-		t.Fatal(e)
-	}
-	if _, e = s.Commit(ctx, committed, advanced); e == nil {
-		t.Fatal("deleted/recreated journal accepted stale UID")
+	for _, model := range []string{"generation", "transport"} {
+		s := Store{ConfigMaps: client.CoreV1().ConfigMaps("handover-test"), Name: "transition-" + model, ClusterUID: "cluster-uid"}
+		tr := transitionFixture(t)
+		if model == "transport" {
+			tr = transportFixture(t)
+		}
+		original, e := s.Create(ctx, tr)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if _, e := s.Create(ctx, tr); !apierrors.IsAlreadyExists(e) {
+			t.Fatalf("create overwrote state: %v", e)
+		}
+		candidate := step(t, tr, epoch.Add(time.Second))
+		committed, e := s.Commit(ctx, original, candidate)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if _, e := s.Commit(ctx, original, candidate); !apierrors.IsConflict(e) {
+			t.Fatalf("stale writer accepted: %v", e)
+		}
+		loaded, e := s.Load(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if view(t, loaded.Transition()).Round.Phase != Switch {
+			t.Fatal("restart lost phase")
+		}
+		advanced := step(t, candidate, epoch.Add(2*time.Second))
+		if _, e := s.Commit(ctx, original, advanced); e == nil {
+			t.Fatal("multiple events committed")
+		}
+		raw, _ := candidate.Bytes()
+		rewritten, e := DecodeTransition(raw)
+		if e != nil {
+			t.Fatal(e)
+		}
+		rewritten.j.Policy.DrainInterval = time.Second
+		rewritten = step(t, rewritten, epoch.Add(2*time.Second))
+		if _, e := s.Commit(ctx, committed, rewritten); e == nil {
+			t.Fatal("history rewrite accepted")
+		}
+		foreign := s
+		foreign.ClusterUID = "another-cluster"
+		if _, e := foreign.Load(ctx); e == nil {
+			t.Fatal("foreign cluster adopted")
+		}
+		if e = s.ConfigMaps.Delete(ctx, s.Name, metav1.DeleteOptions{}); e != nil {
+			t.Fatal(e)
+		}
+		if _, e = s.Create(ctx, tr); e != nil {
+			t.Fatal(e)
+		}
+		if _, e = s.Commit(ctx, committed, advanced); e == nil {
+			t.Fatal("deleted/recreated journal accepted stale UID")
+		}
 	}
 }

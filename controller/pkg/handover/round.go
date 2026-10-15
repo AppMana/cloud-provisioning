@@ -33,6 +33,11 @@ type Member struct {
 	NodeUID string `json:"nodeUID"`
 	FromKey string `json:"fromKey"`
 	ToKey   string `json:"toKey"`
+	// Transport fields bind an individual path when a node has several
+	// devices, or keeps its local key while changing the remote peer key.
+	DeviceID    string `json:"deviceID,omitempty"`
+	FromPeerKey string `json:"fromPeerKey,omitempty"`
+	ToPeerKey   string `json:"toPeerKey,omitempty"`
 }
 
 // Spec refers to the hash of the complete immutable, validated public graph.
@@ -60,11 +65,14 @@ type Round struct {
 }
 
 type Receipt struct {
-	RoundHash  string    `json:"roundHash"`
-	NodeUID    string    `json:"nodeUID"`
-	FromKey    string    `json:"fromKey"`
-	ToKey      string    `json:"toKey"`
-	ObservedAt time.Time `json:"observedAt"`
+	RoundHash   string    `json:"roundHash"`
+	NodeUID     string    `json:"nodeUID"`
+	FromKey     string    `json:"fromKey"`
+	ToKey       string    `json:"toKey"`
+	ObservedAt  time.Time `json:"observedAt"`
+	DeviceID    string    `json:"deviceID,omitempty"`
+	FromPeerKey string    `json:"fromPeerKey,omitempty"`
+	ToPeerKey   string    `json:"toPeerKey,omitempty"`
 }
 
 // AuthenticatedReceipt is constructed by the transport's authentication layer.
@@ -122,25 +130,62 @@ func (r Round) canonical() (Round, error) {
 		return Round{}, fmt.Errorf("empty handover membership")
 	}
 	r.Members = append([]Member(nil), r.Members...)
-	nodes := map[string]bool{}
-	keys := map[wgtypes.Key]bool{}
+	transports := r.Members[0].DeviceID != ""
+	members := map[[2]string]bool{}
+	legacyKeys := map[wgtypes.Key]bool{}
+	owners := map[wgtypes.Key]string{}
+	pairs := map[[2]wgtypes.Key]bool{}
 	for i, m := range r.Members {
-		if !token(m.NodeUID) || nodes[m.NodeUID] {
-			return Round{}, fmt.Errorf("invalid or duplicate node UID")
+		id := [2]string{m.NodeUID, m.DeviceID}
+		if !token(m.NodeUID) || members[id] || (m.DeviceID != "") != transports {
+			return Round{}, fmt.Errorf("invalid or duplicate handover member")
 		}
-		nodes[m.NodeUID] = true
-		values := []*string{&m.FromKey, &m.ToKey}
-		for _, value := range values {
-			key, e := wgtypes.ParseKey(*value)
-			if e != nil || key == (wgtypes.Key{}) || keys[key] {
-				return Round{}, fmt.Errorf("invalid or reused generation device key")
+		members[id] = true
+		if transports {
+			if !token(m.DeviceID) {
+				return Round{}, fmt.Errorf("invalid transport identity")
 			}
-			keys[key] = true
+		} else if m.FromPeerKey != "" || m.ToPeerKey != "" {
+			return Round{}, fmt.Errorf("peer identities require a transport identity")
+		}
+		local := [2]*string{&m.FromKey, &m.ToKey}
+		remote := [2]*string{&m.FromPeerKey, &m.ToPeerKey}
+		for generation, value := range local {
+			key, e := wgtypes.ParseKey(*value)
+			if e != nil || key == (wgtypes.Key{}) {
+				return Round{}, fmt.Errorf("invalid generation device key")
+			}
 			*value = key.String()
+			if !transports {
+				if legacyKeys[key] {
+					return Round{}, fmt.Errorf("reused generation device key")
+				}
+				legacyKeys[key] = true
+				continue
+			}
+			if owner, found := owners[key]; found && owner != m.NodeUID {
+				return Round{}, fmt.Errorf("device key belongs to another node")
+			}
+			owners[key] = m.NodeUID
+			peer, e := wgtypes.ParseKey(*remote[generation])
+			if e != nil || peer == (wgtypes.Key{}) || peer == key {
+				return Round{}, fmt.Errorf("invalid transport peer key")
+			}
+			*remote[generation] = peer.String()
+			pair := [2]wgtypes.Key{key, peer}
+			if pairs[pair] {
+				return Round{}, fmt.Errorf("reused transport key pair")
+			}
+			pairs[pair] = true
 		}
 		r.Members[i] = m
 	}
-	sort.Slice(r.Members, func(i, j int) bool { return r.Members[i].NodeUID < r.Members[j].NodeUID })
+	sort.Slice(r.Members, func(i, j int) bool {
+		if r.Members[i].NodeUID != r.Members[j].NodeUID {
+			return r.Members[i].NodeUID < r.Members[j].NodeUID
+		}
+		return r.Members[i].DeviceID < r.Members[j].DeviceID
+	})
 	r.IssuedAt = r.IssuedAt.UTC()
 	r.ExpiresAt = r.ExpiresAt.UTC()
 	return r, nil
@@ -184,19 +229,20 @@ func (r Round) Ready(now time.Time, receipts []AuthenticatedReceipt) error {
 	if len(receipts) != len(r.Members) {
 		return fmt.Errorf("incomplete handover receipts")
 	}
-	members := map[string]Member{}
+	members := map[[2]string]Member{}
 	for _, m := range r.Members {
-		members[m.NodeUID] = m
+		members[[2]string{m.NodeUID, m.DeviceID}] = m
 	}
-	seen := map[string]bool{}
+	seen := map[[2]string]bool{}
 	for _, authenticated := range receipts {
 		receipt := authenticated.Receipt
-		member, ok := members[receipt.NodeUID]
-		if !ok || seen[receipt.NodeUID] || authenticated.AuthenticatedNodeUID != receipt.NodeUID {
+		id := [2]string{receipt.NodeUID, receipt.DeviceID}
+		member, ok := members[id]
+		if !ok || seen[id] || authenticated.AuthenticatedNodeUID != receipt.NodeUID {
 			return fmt.Errorf("receipt node identity mismatch or duplicate")
 		}
-		seen[receipt.NodeUID] = true
-		if receipt.RoundHash != digest || receipt.FromKey != member.FromKey || receipt.ToKey != member.ToKey {
+		seen[id] = true
+		if receipt.RoundHash != digest || receipt.FromKey != member.FromKey || receipt.ToKey != member.ToKey || receipt.FromPeerKey != member.FromPeerKey || receipt.ToPeerKey != member.ToPeerKey {
 			return fmt.Errorf("receipt does not bind the current round and devices")
 		}
 		if receipt.ObservedAt.Before(r.IssuedAt) || receipt.ObservedAt.After(now) || now.Sub(receipt.ObservedAt) > r.MaxReceiptAge {

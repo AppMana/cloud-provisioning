@@ -252,8 +252,13 @@ kernel boot ID must match both the request and current Node status before
 publication. `ValidateReceiveReadiness` requires an independently observed ready
 target, the same boot and request identities, and complete, distinct listener
 bindings. It validates preparation only; it cannot authorize traffic movement
-or retirement. The controller
-does not yet produce these requests or consume readiness. The standalone test
+or retirement. The controller's `prepareRemoteReceivePaths` handler stages a
+proposal only from an acknowledged forwarding base, checks the Machine/Node
+provider binding, and clears stale readiness when the proposal changes. Its
+result retains the target, adoption version, and request/base hashes alongside
+the public bindings. The main controller loop does not yet invoke this handler;
+activation orchestration must gate agent support and supply verified native
+network boundaries. The standalone test
 does not establish publication, activation, retirement, or reboot recovery.
 
 To send packets through receivers created by that runtime code, pass

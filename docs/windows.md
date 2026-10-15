@@ -36,38 +36,29 @@ For CAPI webhook timeouts on mixed-OS k0s sites, see
 [API egress diagnosis and the Linux routing canary](k0s-windows-egress.md).
 Node readiness and successful Windows exec do not establish webhook reachability.
 
-Use the [ordinary-pod matrix observer](../harness/e2e/observe/README.md) with the
-explicit Node UIDs from the lifecycle stage under test. Finite successful samples
-do not supersede earlier failures. Packet captures must inspect both request and response directions. The original samplers were collected and removed, and all 13 original Nodes
-remained Ready. This is baseline-failure evidence, not a completed GPU or CAPI
-lifecycle test. The original checksum settings, recorded MTUs and Pod identities were preserved;
-no offload change is included in worker images or bootstrap. The same six native sampler processes ran across
-all phases at a requested 10 ms interval. Disabling this offload did not eliminate
-loss, including traffic involving the changed worker. These bounded observations
-do not establish a change in failure rate or identify the dropping component. Phase counts are checked against original terminal logs; full logs also retain
-preflight and adapter-restart transitions. On Windows 2022,
-one request correlates with VFP `Invalid Packet` at `0xE0006096`; another
-correlates with TCP/IP `Not locally destined` at `0xE0004136`. The third timeout
-has no receiver-side capture in that run. The VFP drop-only bytes differ from
-ten earlier appearances only in the inner IPv4 traffic class (`0x00` to `0x74`)
-and its checksum; IPv4 and UDP checksums remain valid. This is a diagnostic lead,
-not an established cause or mitigation. The earlier captured VFP drop had no
-traffic-class change.
+Use the [ordinary-pod matrix observer](../harness/e2e/observe/README.md) with
+explicit Node UIDs for each lifecycle stage. Preserve failed requests and the
+pre-change Pod identities, MTUs and checksum settings. Successful samples do
+not supersede earlier failures or qualify GPU and CAPI lifecycle behavior.
 
-Keep raw ETL and native drop metadata alongside the ordinary PCAP, and export
+Packet captures must inspect request and response directions. Retain native
+VFP and TCP/IP drop metadata, including `Invalid Packet` (`0xE0006096`) and
+`Not locally destined` (`0xE0004136`), alongside packet bytes. A changed IPv4
+traffic class or a valid checksum alone does not identify the dropping
+component or establish a mitigation.
+
+Keep raw ETL alongside ordinary PCAP exports. Use
 `pktmon etl2pcap capture.etl --drop-only --out drops.pcapng` when comparing bytes
 at the drop. PCAP conversion loses drop-report and stack-path information;
 see [Microsoft's conversion reference](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/pktmon-etl2pcap).
-The parser preserves the native component/reason and reports traffic-class
-changes without treating them as proof of causation.
+The parser preserves native component/reason information and reports
+traffic-class changes without treating them as proof of causation.
 
-On the tested Windows 2025 build, the
-native tool's documented argument sequence with `-1` preservation values also
-disabled two unrelated optimization settings; the attempted reversal returned
-error 87. Do not bake this command into images or startup scripts. Calico
-recreated the disposable probe endpoint, removing the modified port and restoring
-every observed flow setting to its original value. This provides no
-evidence that reordered-fragment support fixes packet loss.
+Do not bake offload or reordered-fragment setting changes into worker images
+or startup scripts. Native VFP commands can change unrelated settings, and
+preservation arguments do not guarantee a reversible operation across Windows
+builds. Qualify any proposed change on disposable endpoints with complete
+before/after read-back and retained failure observations.
 
 ## Guest bootstrap selection
 

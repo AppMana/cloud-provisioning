@@ -99,6 +99,15 @@ backends; compare them across test builds with distinct
 `-ldflags '-X github.com/k0sproject/k0s/pkg/build.Version=VERSION'` values.
 Matching manifests establish metadata stability, not native runtime continuity.
 
+Inspect the manifest served at the current kubelet `staticPodURL` separately
+from its API mirror Pod. During replacement, the API can temporarily retain
+the previous mirror's labels and hash while reporting the new container's
+status. Wait for the mirror hash to match the native static Pod before using
+it as a restart baseline. Retain the native sandbox UID, container ID and
+served manifest across the restart; a Ready API mirror alone does not prove
+identity continuity. Record management failures during reconciliation as well
+as after it.
+
 ## Worker releases with patched controllers
 
 Give patched controllers a version beginning with their upstream release, such

@@ -31,6 +31,14 @@ Module tests and a bare k0s build do not prove that the installed API-server,
 kubelet and containerd contain the fix. Verify all three component hashes
 against the build manifest rather than relying on the outer k0s version.
 
+For live transfer checks, verify the exact stdout length and digest as well as
+the command status. An older SPDY client can report success after truncated
+output. Retain baseline, candidate and restored-runtime measurements through
+the same API and workload identities. Measure upgrade continuity separately
+from steady-state transfers: restarting a worker can replace its node-local
+load balancer and interrupt management streams even when workload containers
+remain running. A passing transfer after startup does not qualify that restart.
+
 ## Worker releases with patched controllers
 
 Give patched controllers a version beginning with their upstream release, such

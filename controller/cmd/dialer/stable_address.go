@@ -194,6 +194,23 @@ func prepareStableAddressOwner(devices receiverDevices, request stableAddressOwn
 	if current.Attrs().Index != owner.Attrs().Index || current.Type() != "dummy" || current.Attrs().Alias != binding.Alias || current.Attrs().Flags&net.FlagUp == 0 {
 		return binding, fmt.Errorf("stable owner changed during preparation")
 	}
+	return verifyStableAddressOwner(request)
+}
+
+// Verification outside prepare must never repair an allocation or create its
+// owner: a missing source address cannot justify retiring another generation.
+func verifyStableAddressOwner(request stableAddressOwnerRequest) (stableAddressOwnerBinding, error) {
+	binding, err := stableAddressIdentity(request)
+	if err != nil {
+		return binding, err
+	}
+	current, err := netlink.LinkByName(binding.Interface)
+	if err != nil {
+		return binding, err
+	}
+	if current.Type() != "dummy" || current.Attrs().Alias != binding.Alias || current.Attrs().Flags&net.FlagUp == 0 {
+		return binding, fmt.Errorf("stable address owner identity or state changed")
+	}
 	addresses, err := netlink.AddrList(current, netlink.FAMILY_ALL)
 	if err != nil {
 		return binding, err

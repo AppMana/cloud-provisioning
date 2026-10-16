@@ -16,16 +16,21 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-// receiveRoutePhase implements the direct-routing switch and drain operations.
+// receiveLinuxPhase implements direct-routing generation handover operations.
 // Admission, durable checkpointing and the host lock belong to executeReceivePhase.
-// It does not prepare or retire transports; unsupported phases cannot produce a
-// receipt. own must be the caller-admitted stable source-address allocation.
-func receiveRoutePhase(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, own []string, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
+// own contains admitted route source addresses; allocated contains the distinct
+// tunnel allocation for the stable address owner. Neither comes from kernel discovery.
+func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, own, allocated []string, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if view.Complete || (view.Round.Phase != handover.Switch && view.Round.Phase != handover.Drain) {
+	if view.Complete {
 		return fmt.Errorf("native receiver route backend does not implement this phase")
+	}
+	switch view.Round.Phase {
+	case handover.Prepare, handover.Switch, handover.Drain, handover.Retire, handover.Abort:
+	default:
+		return fmt.Errorf("unsupported native receiver phase")
 	}
 	if devices == nil || key == (wgtypes.Key{}) || nodeUID == "" {
 		return fmt.Errorf("native receiver route phase requires local identity")
@@ -35,7 +40,7 @@ func receiveRoutePhase(ctx context.Context, devices receiverDevices, cfg config,
 		return err
 	}
 	expected.Phase = view.Round.Phase
-	if view.RollbackRequested {
+	if view.RollbackRequested && view.Round.Phase != handover.Abort {
 		expected.FromGeneration, expected.ToGeneration = expected.ToGeneration, expected.FromGeneration
 		for i := range expected.Members {
 			m := &expected.Members[i]
@@ -58,6 +63,7 @@ func receiveRoutePhase(ctx context.Context, devices receiverDevices, cfg config,
 		desired[raw] = true
 	}
 	legacyPeers := map[string]tunnel.PeerSpec{}
+	targetLegacyPeers := map[string]tunnel.PeerSpec{}
 	var all []tunnel.ReceiveTransitionPlan
 	var receiverPlans []tunnel.ReceiveTransitionPlan
 	for machineUID, p := range intent.Plans {
@@ -112,7 +118,10 @@ func receiveRoutePhase(ctx context.Context, devices receiverDevices, cfg config,
 					desired[raw] = true
 				}
 			}
-			if legacy || machineUID == plan.MachineUID {
+			if machineUID == plan.MachineUID {
+				targetLegacyPeers[peer.PublicKey] = peer
+			}
+			if legacy || (machineUID == plan.MachineUID && view.Round.Phase != handover.Retire) {
 				legacyPeers[peer.PublicKey] = peer
 			}
 		}
@@ -140,7 +149,8 @@ func receiveRoutePhase(ctx context.Context, devices receiverDevices, cfg config,
 		return fmt.Errorf("native receiver selections differ from admitted plans")
 	}
 	_, targetLegacy := intent.Legacy[plan.MachineUID]
-	if targetLegacy != view.RollbackRequested {
+	wantLegacy := view.RollbackRequested || view.Round.Phase == handover.Prepare || view.Round.Phase == handover.Abort
+	if targetLegacy != wantLegacy {
 		return fmt.Errorf("native route direction differs from committed phase")
 	}
 	live, err := devices.Device(cfg.iface)
@@ -177,8 +187,27 @@ func receiveRoutePhase(ctx context.Context, devices receiverDevices, cfg config,
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := verifyReceivePhasePaths(devices, cfg, key, plan, nodeUID); err != nil {
-		return err
+	allocation := stableAddressOwnerRequest{MeshUID: plan.MeshUID, NodeUID: nodeUID, LegacyInterface: cfg.iface, RootPublicKey: key.PublicKey().String(), Addresses: allocated}
+	if view.Round.Phase == handover.Prepare {
+		if err := verifyReceiveRouteInstallation(cfg, hosts, nil, own); err != nil {
+			return err
+		}
+		if _, err := prepareStableAddressOwner(devices, allocation); err != nil {
+			return err
+		}
+		if err := prepareReceivePhasePaths(devices, cfg, key, plan, nodeUID); err != nil {
+			return err
+		}
+	} else {
+		if _, err := verifyStableAddressOwner(allocation); err != nil && !(view.Round.Phase == handover.Abort && isLinkNotFound(err)) {
+			return err
+		}
+	}
+	retiringReceivers := view.Round.Phase == handover.Abort || (view.Round.Phase == handover.Retire && targetLegacy)
+	if !retiringReceivers {
+		if err := verifyReceivePhasePaths(devices, cfg, key, plan, nodeUID); err != nil {
+			return err
+		}
 	}
 	if view.Round.Phase == handover.Switch {
 		if err := preflightReceiveRoutePhase(cfg, allRoutes[nodeUID], own); err != nil {
@@ -191,58 +220,118 @@ func receiveRoutePhase(ctx context.Context, devices receiverDevices, cfg config,
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	// Deletion never repairs routes to make its safety checks pass.
+	if err := verifyReceiveRouteInstallation(cfg, hosts, nil, own); err != nil {
+		return err
+	}
+	if retiringReceivers {
+		selections, err := receivePhaseSelections(key, plan, nodeUID)
+		if err != nil {
+			return err
+		}
+		for _, selection := range selections {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if err := retireReceiveDevice(devices, selection); err != nil {
+				return err
+			}
+		}
+		for _, selection := range selections {
+			if _, err := netlink.LinkByName(selection.Interface); !isLinkNotFound(err) {
+				return fmt.Errorf("retired receiver is still present: %v", err)
+			}
+		}
+	} else if view.Round.Phase == handover.Retire {
+		for _, peer := range targetLegacyPeers {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if err := withdrawLegacyReceivePeer(devices, cfg.iface, key.PublicKey().String(), peer.PublicKey, peer.WGAllowedIPs); err != nil {
+				return err
+			}
+		}
+		current, err := devices.Device(cfg.iface)
+		if err != nil {
+			return err
+		}
+		for _, peer := range current.Peers {
+			if _, retired := targetLegacyPeers[peer.PublicKey.String()]; retired {
+				return fmt.Errorf("retired legacy peer is still present")
+			}
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if _, err := verifyStableAddressOwner(allocation); err != nil && !(view.Round.Phase == handover.Abort && isLinkNotFound(err)) {
+		return err
+	}
 	return verifyReceiveRouteInstallation(cfg, hosts, nil, own)
 }
 
 // A cloud participant can have retained receive paths with no desired egress.
 // Verify those members too before the execution boundary can issue their receipts.
-func verifyReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.Key, plan tunnel.ReceiveTransitionPlan, nodeUID string) error {
+func receivePhaseSelections(key wgtypes.Key, plan tunnel.ReceiveTransitionPlan, nodeUID string) ([]receiveRouteSelection, error) {
 	var selections []receiveRouteSelection
 	if nodeUID == plan.CloudNodeUID {
 		var base tunnel.PeerListDoc
 		if err := json.Unmarshal(plan.Base, &base); err != nil {
-			return err
+			return nil, err
 		}
 		paths, err := tunnel.PlanReceiveHandover(plan.MeshUID, base, plan.Desired, plan.Native)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, path := range paths.Receivers {
 			binding := plan.Bindings[path.PublicKey]
 			if binding.PublicKey != receiverKey(key, plan.MeshUID, path.PublicKey).PublicKey().String() {
-				return fmt.Errorf("receiver phase key differs from local derivation")
-			}
-			live, err := devices.Device(binding.Interface)
-			if err != nil {
-				return err
-			}
-			if live.ListenPort != binding.ListenPort {
-				return fmt.Errorf("receiver phase listener differs from reserved port")
+				return nil, fmt.Errorf("receiver phase key differs from local derivation")
 			}
 			selections = append(selections, receiveRouteSelection{Interface: binding.Interface, Alias: receiverAlias(plan.MeshUID, path.PublicKey), PublicKey: binding.PublicKey, PeerPublicKey: path.PublicKey, AllowedSources: path.AllowedSources})
 		}
 	} else {
 		site, found := plan.Sites[key.PublicKey().String()]
 		if !found || site.NodeUID != nodeUID {
-			return fmt.Errorf("native site receive identity is missing")
+			return nil, fmt.Errorf("native site receive identity is missing")
 		}
+		routes, err := tunnel.PlanReceiveRoutes(plan)
+		if err != nil {
+			return nil, err
+		}
+		for _, selection := range routes[nodeUID] {
+			selections = append(selections, selection)
+			break
+		}
+	}
+	if len(selections) == 0 {
+		return nil, fmt.Errorf("native phase has no local receive paths")
+	}
+	return selections, nil
+}
+
+func verifyReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.Key, plan tunnel.ReceiveTransitionPlan, nodeUID string) error {
+	selections, err := receivePhaseSelections(key, plan, nodeUID)
+	if err != nil {
+		return err
+	}
+	if nodeUID != plan.CloudNodeUID {
+		site := plan.Sites[key.PublicKey().String()]
 		handshake, err := siteReceiveHandshake(devices, key, site.Client, cfg.fwmark, time.Now())
 		if err != nil || handshake.IsZero() {
 			return fmt.Errorf("native site receive transport is not ready: %v", err)
 		}
-		routes, err := tunnel.PlanReceiveRoutes(plan)
-		if err != nil {
-			return err
-		}
-		for _, selection := range routes[nodeUID] {
-			selections = append(selections, selection)
-			break // A site has one receive client for this cloud journal.
-		}
-	}
-	if len(selections) == 0 {
-		return fmt.Errorf("native phase has no local receive paths")
 	}
 	for _, selection := range selections {
+		if nodeUID == plan.CloudNodeUID {
+			live, err := devices.Device(selection.Interface)
+			if err != nil {
+				return err
+			}
+			if live.ListenPort != plan.Bindings[selection.PeerPublicKey].ListenPort {
+				return fmt.Errorf("receiver phase listener differs from reserved port")
+			}
+		}
 		if len(selection.AllowedSources) == 0 {
 			return fmt.Errorf("native receive path has no source permissions")
 		}
@@ -255,6 +344,43 @@ func verifyReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.Ke
 		check.receiveRoutes = map[string]receiveRouteSelection{raw: selection}
 		if _, err := validateReceiveRouteSelections(check, []net.IPNet{*prefix}, nil); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func prepareReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.Key, plan tunnel.ReceiveTransitionPlan, nodeUID string) error {
+	mtu := cfg.mtu
+	if mtu == 0 {
+		mtu = underlayMTU()
+	}
+	if nodeUID == plan.CloudNodeUID {
+		var base tunnel.PeerListDoc
+		if err := json.Unmarshal(plan.Base, &base); err != nil {
+			return err
+		}
+		bindings, err := prepareReceivePaths(devices, plan.MeshUID, key, base, plan.Desired, plan.Native, mtu, cfg.fwmark, plan.Ports)
+		if err != nil {
+			return err
+		}
+		actual := map[string]tunnel.ReceiveBinding{}
+		for _, binding := range bindings {
+			actual[binding.PeerPublicKey] = binding
+		}
+		if !reflect.DeepEqual(actual, plan.Bindings) {
+			return fmt.Errorf("prepared receivers differ from committed bindings")
+		}
+	} else {
+		site, found := plan.Sites[key.PublicKey().String()]
+		if !found || site.NodeUID != nodeUID {
+			return fmt.Errorf("missing site preparation identity")
+		}
+		client, err := prepareSiteReceiveClient(devices, plan.MeshUID, key, plan.RootPublicKey, plan.Bindings[key.PublicKey().String()], plan.SiteDesired, plan.SiteDesired, mtu, cfg.fwmark)
+		if err != nil {
+			return err
+		}
+		if !reflect.DeepEqual(client, site.Client) {
+			return fmt.Errorf("prepared site receiver differs from committed binding")
 		}
 	}
 	return nil

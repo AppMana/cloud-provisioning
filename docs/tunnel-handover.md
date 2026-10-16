@@ -205,8 +205,8 @@ handover in normal reconciliation, or undo native work when intent changes.
 All native writers must honor the lock and durable phase state before this
 boundary can be used for coordinated switching.
 
-The Linux direct-route phase component implements forward and reverse switch,
-and read-only drain verification. It reuses the route installer with a scope
+The Linux direct-route phase component implements prepare, forward and reverse
+switch, drain, abort and peer-scoped retirement. It reuses the route installer with a scope
 derived from all admitted journals: destinations outside that scope survive in
 both the private and main tables. Receiver selections must match the combined
 plans; the target's direction must match the committed round. The legacy key,
@@ -215,11 +215,26 @@ drain. Every target receive path is checked, including retained paths that do
 not own desired egress. Foreign route shapes, devices and more-specific shadows block a switch
 before route replacement. Drain checks never repair missing routes.
 
-This component does not implement prepare, abort or retirement and rejects
-those phases. Relay routes and unresolved route claims are not supported by
-scoped installation. Caller-admitted stable source addresses, phase admission,
-durable state, receipt transport and normal-loop dispatch remain necessary;
-the native route component alone cannot enable a coordinated deployment.
+Prepare first verifies legacy route selection, then uses the existing stable
+address and receiver preparation operations. It requires exact committed
+bindings and authenticated receive paths before succeeding. Other phases only
+verify the stable allocation; they cannot repair a missing address to justify
+deleting a transport. Abort tolerates an absent stable owner when preparation
+never created it, but rejects an existing owner with invalid state.
+
+Forward retirement removes only the target's legacy peers, preserving the
+shared device and unrelated peers. Abort and reverse retirement remove the
+target's dedicated receivers. Both verify replacement routing before deletion,
+respect route dependencies in every table, and recheck routing afterward.
+Retries never invoke preparation or recreate removed peers and devices.
+
+Relay routes, unresolved route claims, and participants without an admitted
+direct legacy path remain unsupported. Caller-admitted route source addresses
+and tunnel allocations are separate inputs. Phase admission, durable state,
+receipt transport and normal-loop dispatch remain necessary; the native
+component alone cannot enable a coordinated deployment. Cloud-side native
+component evidence does not qualify site-side execution or uninterrupted
+end-to-end traffic.
 
 ## Platform implementation boundaries
 

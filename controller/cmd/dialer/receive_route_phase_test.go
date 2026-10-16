@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"reflect"
 	"strings"
@@ -94,18 +95,29 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	advance(start.Add(time.Second))
-	reverse := request.Action == "rollback" || request.Action == "rollback-drain"
-	if reverse {
-		tr, err = tr.Rollback(start.Add(2 * time.Second))
+	reverse := request.Action == "rollback" || request.Action == "rollback-drain" || request.Action == "rollback-retire"
+	switch request.Action {
+	case "prepare":
+	case "abort":
+		tr, err = tr.Rollback(start.Add(time.Second))
 		if err != nil {
 			t.Fatal(err)
 		}
-	}
-	if request.Action == "drain" || request.Action == "rollback-drain" {
-		advance(start.Add(3 * time.Second))
-	}
-	if request.Action != "switch" && request.Action != "drain" && !reverse {
+	case "switch", "drain", "retire", "rollback", "rollback-drain", "rollback-retire":
+		advance(start.Add(time.Second))
+		if reverse {
+			tr, err = tr.Rollback(start.Add(2 * time.Second))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		if request.Action == "drain" || request.Action == "retire" || request.Action == "rollback-drain" || request.Action == "rollback-retire" {
+			advance(start.Add(3 * time.Second))
+		}
+		if request.Action == "retire" || request.Action == "rollback-retire" {
+			advance(start.Add(4 * time.Second))
+		}
+	default:
 		t.Fatal("unsupported test action")
 	}
 	view, err := tr.View()
@@ -117,11 +129,11 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		t.Fatal(err)
 	}
 	intent := tunnel.ReceiveJournalRoutes{Plans: map[string]tunnel.ReceiveTransitionPlan{plan.MachineUID: plan}, Legacy: map[string]tunnel.ReceiveTransitionPlan{}, Receivers: receivers}
-	if reverse {
+	if reverse || request.Action == "prepare" || request.Action == "abort" {
 		intent.Legacy[plan.MachineUID] = plan
 		intent.Receivers = map[string]map[string]tunnel.ReceiveRouteSelection{}
 	}
-	cfg := config{iface: "wglegacy", nodeName: plan.CloudNodeName, routeTable: 518, fwmark: 518}
+	cfg := config{iface: "wglegacy", nodeName: plan.CloudNodeName, routeTable: 518, fwmark: 518, mtu: 1400}
 	// Protect an unrelated worker route in both the private and main tables.
 	legacy, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
@@ -143,6 +155,25 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	hasUnrelated := false
+	for _, peer := range before.Peers {
+		for _, prefix := range peer.AllowedIPs {
+			hasUnrelated = hasUnrelated || prefix.String() == addr.IPNet.String()
+		}
+	}
+	if !hasUnrelated {
+		extra, err := wgtypes.GeneratePrivateKey()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := devices.ConfigureDevice(cfg.iface, wgtypes.Config{Peers: []wgtypes.PeerConfig{{PublicKey: extra.PublicKey(), AllowedIPs: []net.IPNet{*addr.IPNet}}}}); err != nil {
+			t.Fatal(err)
+		}
+		before, err = devices.Device(cfg.iface)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	if view.Round.Phase == handover.Switch {
 		routes, err := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
 		if err != nil {
@@ -160,7 +191,7 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 			if err := devices.ConfigureDevice(binding.Interface, wgtypes.Config{ListenPort: &port}); err != nil {
 				t.Fatal(err)
 			}
-			err := receiveRoutePhase(context.Background(), devices, cfg, key, nil, plan, view, plan.CloudNodeUID, intent)
+			err := receiveLinuxPhase(context.Background(), devices, cfg, key, nil, []string{"10.88.0.3/32"}, plan, view, plan.CloudNodeUID, intent)
 			if err == nil || !strings.Contains(err.Error(), "listener differs") {
 				t.Fatal("phase ignored changed retained receiver", err)
 			}
@@ -191,7 +222,7 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		if err := netlink.RouteAdd(&foreign); err != nil {
 			t.Fatal(err)
 		}
-		if err := receiveRoutePhase(context.Background(), devices, cfg, key, nil, plan, view, plan.CloudNodeUID, intent); err == nil {
+		if err := receiveLinuxPhase(context.Background(), devices, cfg, key, nil, []string{"10.88.0.3/32"}, plan, view, plan.CloudNodeUID, intent); err == nil {
 			t.Fatal("switch overwrote foreign route collision")
 		}
 		current, err := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
@@ -214,15 +245,135 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := receiveRoutePhase(context.Background(), devices, cfg, key, nil, plan, view, plan.CloudNodeUID, intent); err != nil {
-		t.Fatal(err)
+	var phaseDevices receiverDevices = devices
+	retiring := view.Round.Phase == handover.Retire || view.Round.Phase == handover.Abort
+	if retiring {
+		phaseDevices = retirementOnlyDevices{receiverDevices: devices}
+		selections, err := receivePhaseSelections(key, plan, plan.CloudNodeUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		indexes := map[string]int{}
+		states := map[string]*wgtypes.Device{}
+		for _, selection := range selections {
+			link, err := netlink.LinkByName(selection.Interface)
+			if err != nil {
+				t.Fatal(err)
+			}
+			indexes[selection.Interface] = link.Attrs().Index
+			states[selection.Interface], err = devices.Device(selection.Interface)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		assertUnchanged := func() {
+			t.Helper()
+			current, err := devices.Device(cfg.iface)
+			if err != nil || current.PrivateKey != before.PrivateKey || !samePeerConfiguration(before.Peers, current.Peers) {
+				t.Fatal("rejected retirement changed legacy peers", err)
+			}
+			for name, saved := range states {
+				link, err := netlink.LinkByName(name)
+				if err != nil || link.Attrs().Index != indexes[name] {
+					t.Fatal("rejected retirement changed receiver device", err)
+				}
+				current, err := devices.Device(name)
+				if err != nil || current.PrivateKey != saved.PrivateKey || !samePeerConfiguration(saved.Peers, current.Peers) {
+					t.Fatal("rejected retirement changed receiver peers", err)
+				}
+			}
+		}
+		allocation := stableAddressOwnerRequest{MeshUID: plan.MeshUID, NodeUID: plan.CloudNodeUID, LegacyInterface: cfg.iface, RootPublicKey: key.PublicKey().String(), Addresses: []string{"10.88.0.3/32"}}
+		binding, err := verifyStableAddressOwner(allocation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		owner, err := netlink.LinkByName(binding.Interface)
+		if err != nil {
+			t.Fatal(err)
+		}
+		address, err := netlink.ParseAddr(binding.Addresses[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := netlink.AddrDel(owner, address); err != nil {
+			t.Fatal(err)
+		}
+		if err := receiveLinuxPhase(context.Background(), phaseDevices, cfg, key, nil, allocation.Addresses, plan, view, plan.CloudNodeUID, intent); err == nil {
+			t.Fatal("retirement accepted a missing stable address")
+		}
+		if _, err := verifyStableAddressOwner(allocation); err == nil {
+			t.Fatal("retirement repaired the stable address")
+		}
+		assertUnchanged()
+		if err := netlink.AddrAdd(owner, address); err != nil {
+			t.Fatal(err)
+		}
+		dependentLink := legacy
+		if reverse || request.Action == "abort" {
+			selections, err := receivePhaseSelections(key, plan, plan.CloudNodeUID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dependentLink, err = netlink.LinkByName(selections[0].Interface)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		destination, err := netlink.ParseAddr("10.90.0.10/32")
+		if err != nil {
+			t.Fatal(err)
+		}
+		dependency := netlink.Route{LinkIndex: dependentLink.Attrs().Index, Dst: destination.IPNet, Table: 333, Scope: netlink.SCOPE_LINK}
+		if err := netlink.RouteAdd(&dependency); err != nil {
+			t.Fatal(err)
+		}
+		if err := receiveLinuxPhase(context.Background(), phaseDevices, cfg, key, nil, allocation.Addresses, plan, view, plan.CloudNodeUID, intent); err == nil {
+			t.Fatal("retirement ignored another table's route dependency")
+		}
+		assertUnchanged()
+		if err := netlink.RouteDel(&dependency); err != nil {
+			t.Fatal("retirement removed the blocking route", err)
+		}
+	}
+	for attempt := 0; ; attempt++ {
+		err := receiveLinuxPhase(context.Background(), phaseDevices, cfg, key, nil, []string{"10.88.0.3/32"}, plan, view, plan.CloudNodeUID, intent)
+		if err == nil {
+			break
+		}
+		if view.Round.Phase != handover.Prepare || attempt >= 50 || !strings.Contains(err.Error(), "no current authenticated transport") {
+			t.Fatal(err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if retiring {
+		if err := receiveLinuxPhase(context.Background(), phaseDevices, cfg, key, nil, []string{"10.88.0.3/32"}, plan, view, plan.CloudNodeUID, intent); err != nil {
+			t.Fatal("retirement retry", err)
+		}
 	}
 	after, err := devices.Device(cfg.iface)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if before.PrivateKey != after.PrivateKey || !samePeerConfiguration(before.Peers, after.Peers) {
-		t.Fatal("route phase changed legacy receive permissions")
+	expectedPeers := before.Peers
+	if view.Round.Phase == handover.Retire && !reverse {
+		var base tunnel.PeerListDoc
+		if err := json.Unmarshal(plan.Base, &base); err != nil {
+			t.Fatal(err)
+		}
+		expectedPeers = nil
+		for _, peer := range before.Peers {
+			retired := false
+			for _, old := range base.Peers {
+				retired = retired || (!old.Remote && old.PublicKey == peer.PublicKey.String())
+			}
+			if !retired {
+				expectedPeers = append(expectedPeers, peer)
+			}
+		}
+	}
+	if before.PrivateKey != after.PrivateKey || !samePeerConfiguration(expectedPeers, after.Peers) {
+		t.Fatal("native phase changed unrelated legacy receive permissions")
 	}
 	for _, want := range unrelated {
 		routes, err := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Table: want.Table}, netlink.RT_FILTER_TABLE)
@@ -263,7 +414,7 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		if err := netlink.RouteDel(removed); err != nil {
 			t.Fatal(err)
 		}
-		if err := receiveRoutePhase(context.Background(), devices, cfg, key, nil, plan, view, plan.CloudNodeUID, intent); err == nil {
+		if err := receiveLinuxPhase(context.Background(), devices, cfg, key, nil, []string{"10.88.0.3/32"}, plan, view, plan.CloudNodeUID, intent); err == nil {
 			t.Fatal("drain accepted missing selected route")
 		}
 		current, err := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
@@ -297,4 +448,19 @@ func samePeerConfiguration(a, b []wgtypes.Peer) bool {
 		}
 	}
 	return true
+}
+
+// Retire/abort retries are forbidden from recreating keys or peers.
+type retirementOnlyDevices struct{ receiverDevices }
+
+func (d retirementOnlyDevices) ConfigureDevice(name string, cfg wgtypes.Config) error {
+	if cfg.PrivateKey != nil || cfg.ListenPort != nil || cfg.FirewallMark != nil || cfg.ReplacePeers {
+		return fmt.Errorf("retirement attempted device reconfiguration")
+	}
+	for _, peer := range cfg.Peers {
+		if !peer.Remove {
+			return fmt.Errorf("retirement attempted peer preparation")
+		}
+	}
+	return d.receiverDevices.ConfigureDevice(name, cfg)
 }

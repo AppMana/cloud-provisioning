@@ -1,0 +1,58 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: vpc-resource-mutating-webhook-configuration
+webhooks:
+- name: mpod.vpc.k8s.aws
+  failurePolicy: Fail
+  timeoutSeconds: 5
+  matchConditions:
+  - name: aws-windows-only
+    expression: object != null && has(object.spec.nodeSelector) && 'kubernetes.io/os'
+      in object.spec.nodeSelector && object.spec.nodeSelector['kubernetes.io/os']
+      == 'windows' && 'cloud-provisioning.appmana.com/cni' in object.spec.nodeSelector
+      && object.spec.nodeSelector['cloud-provisioning.appmana.com/cni'] == 'aws-vpc'
+      && 'cloud-provisioning.appmana.com/role' in object.spec.nodeSelector && object.spec.nodeSelector['cloud-provisioning.appmana.com/role']
+      == 'cloud-worker'
+  - name: workload-network
+    expression: '!has(object.spec.hostNetwork) || !object.spec.hostNetwork'
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: vpc-resource-validating-webhook-configuration
+webhooks:
+- name: vnode.vpc.k8s.aws
+  failurePolicy: Fail
+  timeoutSeconds: 5
+  matchConditions:
+  - name: aws-windows-only
+    expression: (object != null && has(object.metadata.labels) && 'kubernetes.io/os'
+      in object.metadata.labels && object.metadata.labels['kubernetes.io/os'] == 'windows'
+      && 'cloud-provisioning.appmana.com/cni' in object.metadata.labels && object.metadata.labels['cloud-provisioning.appmana.com/cni']
+      == 'aws-vpc' && 'cloud-provisioning.appmana.com/role' in object.metadata.labels
+      && object.metadata.labels['cloud-provisioning.appmana.com/role'] == 'cloud-worker')
+      || (oldObject != null && has(oldObject.metadata.labels) && 'kubernetes.io/os'
+      in oldObject.metadata.labels && oldObject.metadata.labels['kubernetes.io/os']
+      == 'windows' && 'cloud-provisioning.appmana.com/cni' in oldObject.metadata.labels
+      && oldObject.metadata.labels['cloud-provisioning.appmana.com/cni'] == 'aws-vpc'
+      && 'cloud-provisioning.appmana.com/role' in oldObject.metadata.labels && oldObject.metadata.labels['cloud-provisioning.appmana.com/role']
+      == 'cloud-worker')
+- name: vpod.vpc.k8s.aws
+  failurePolicy: Fail
+  timeoutSeconds: 5
+  matchConditions:
+  - name: aws-windows-only
+    expression: (object != null && has(object.spec.nodeSelector) && 'kubernetes.io/os'
+      in object.spec.nodeSelector && object.spec.nodeSelector['kubernetes.io/os']
+      == 'windows' && 'cloud-provisioning.appmana.com/cni' in object.spec.nodeSelector
+      && object.spec.nodeSelector['cloud-provisioning.appmana.com/cni'] == 'aws-vpc'
+      && 'cloud-provisioning.appmana.com/role' in object.spec.nodeSelector && object.spec.nodeSelector['cloud-provisioning.appmana.com/role']
+      == 'cloud-worker') || (oldObject != null && has(oldObject.spec.nodeSelector)
+      && 'kubernetes.io/os' in oldObject.spec.nodeSelector && oldObject.spec.nodeSelector['kubernetes.io/os']
+      == 'windows' && 'cloud-provisioning.appmana.com/cni' in oldObject.spec.nodeSelector
+      && oldObject.spec.nodeSelector['cloud-provisioning.appmana.com/cni'] == 'aws-vpc'
+      && 'cloud-provisioning.appmana.com/role' in oldObject.spec.nodeSelector && oldObject.spec.nodeSelector['cloud-provisioning.appmana.com/role']
+      == 'cloud-worker')
+  - name: workload-network
+    expression: '!has(object.spec.hostNetwork) || !object.spec.hostNetwork'

@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpc-resource-local-controller
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/os: linux
+        cloud-provisioning.appmana.com/cni: aws-vpc
+        cloud-provisioning.appmana.com/role: cloud-worker
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: vpc-resource-controller
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+        - key: cloud-provisioning.appmana.com/internet-facing
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        - name: aws-iam-token
+          $patch: delete
+      containers:
+        - name: controller
+          args:
+            - --cluster-name=$(CLUSTER_NAME)
+            - --vpc-id=$(VPC_ID)
+            - --leader-elect
+            - --metrics-bind-address=:8443
+            - --introspect-bind-addr=:22775
+            - --node-selector=kubernetes.io/os=windows,cloud-provisioning.appmana.com/cni=aws-vpc,cloud-provisioning.appmana.com/role=cloud-worker
+          env:
+            - name: CLUSTER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: aws-windows-ipam-settings
+                  key: clusterName
+            - name: VPC_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: aws-windows-ipam-settings
+                  key: vpcID

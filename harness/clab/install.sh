@@ -121,12 +121,11 @@ ensure_cni_plugins() {
 }
 
 echo "--- building ---"
-( cd "$REPO_DIR" && docker build -q --target dialer -t cldt-dialer:e2e -f controller/Dockerfile . >/dev/null \
-  && docker build -q --target endpoint-controller -t cldt-controller:e2e -f controller/Dockerfile . >/dev/null ) \
+bash "$REPO_DIR/controller/build-binaries.sh" "$OUT/binaries" all amd64 || fail "product binaries"
+IMAGE_BINARIES=$(cd "$OUT/binaries" && pwd)
+( cd "$REPO_DIR" && docker build -q --platform linux/amd64 --build-context "binaries=$IMAGE_BINARIES" --target dialer -t cldt-dialer:e2e -f controller/Dockerfile . >/dev/null \
+  && docker build -q --platform linux/amd64 --build-context "binaries=$IMAGE_BINARIES" --target endpoint-controller -t cldt-controller:e2e -f controller/Dockerfile . >/dev/null ) \
   || fail "image build"
-mkdir -p "$OUT/binaries"
-( cd "$REPO_DIR/controller" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-  go build -o "$OUT/binaries/wg-dialer-linux-amd64" ./cmd/dialer ) || fail "dialer binary"
 BIN_SHA=$(sha256sum "$OUT/binaries/wg-dialer-linux-amd64" | awk '{print $1}')
 echo "  dialer $BIN_SHA"
 

@@ -264,10 +264,9 @@ handshake_established() {
 }
 
 echo "--- build: controller image, dialer image, dialer release binary ---"
-docker build -q --target dialer -t cldt-dialer:e2e -f "$REPO_DIR/controller/Dockerfile" "$REPO_DIR" >/dev/null
-docker build -q --target endpoint-controller -t cldt-controller:e2e -f "$REPO_DIR/controller/Dockerfile" "$REPO_DIR" >/dev/null
-mkdir -p "$LOG_DIR/binaries"
-( cd "$REPO_DIR/controller" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$LOG_DIR/binaries/wg-dialer-linux-amd64" ./cmd/dialer )
+bash "$REPO_DIR/controller/build-binaries.sh" "$LOG_DIR/binaries" all amd64
+docker build -q --platform linux/amd64 --build-context "binaries=$LOG_DIR/binaries" --target dialer -t cldt-dialer:e2e -f "$REPO_DIR/controller/Dockerfile" "$REPO_DIR" >/dev/null
+docker build -q --platform linux/amd64 --build-context "binaries=$LOG_DIR/binaries" --target endpoint-controller -t cldt-controller:e2e -f "$REPO_DIR/controller/Dockerfile" "$REPO_DIR" >/dev/null
 BIN_SHA=$(sha256sum "$LOG_DIR/binaries/wg-dialer-linux-amd64" | awk '{print $1}')
 
 echo "--- kind cluster: a control plane and two workers, docker socket mounted so CAPD can manage sibling containers ---"

@@ -87,11 +87,21 @@ type Options struct {
 
 // Build compiles the images and the first-boot binary.
 func (p *Product) Build(ctx context.Context) (dialerSHA string, err error) {
+	binDir, err := filepath.Abs(filepath.Join(p.WorkDir, "binaries"))
+	if err != nil {
+		return "", err
+	}
+	build := exec.CommandContext(ctx, "bash", "controller/build-binaries.sh", binDir, "all", "amd64")
+	build.Dir = p.RepoDir
+	if out, err := build.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("building product binaries: %w: %s", err, out)
+	}
 	for target, tag := range map[string]string{
 		"dialer":              DialerImage,
 		"endpoint-controller": ControllerImage,
 	} {
 		cmd := exec.CommandContext(ctx, "docker", "build", "-q",
+			"--platform", "linux/amd64", "--build-context", "binaries="+binDir,
 			"--target", target, "-t", tag, "-f", "controller/Dockerfile", ".")
 		cmd.Dir = p.RepoDir
 		if out, err := cmd.CombinedOutput(); err != nil {
@@ -112,23 +122,7 @@ func (p *Product) Build(ctx context.Context) (dialerSHA string, err error) {
 		}
 	}
 
-	// Absolute, because the build runs with its working directory in
-	// the controller module: a relative output path would land
-	// wherever that is rather than where the caller asked.
-	binDir, err := filepath.Abs(filepath.Join(p.WorkDir, "binaries"))
-	if err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		return "", err
-	}
 	binary := filepath.Join(binDir, "wg-dialer-linux-amd64")
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", binary, "./cmd/dialer")
-	cmd.Dir = filepath.Join(p.RepoDir, "controller")
-	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH=amd64")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("building the dialer: %w: %s", err, out)
-	}
 
 	body, err := os.ReadFile(binary)
 	if err != nil {

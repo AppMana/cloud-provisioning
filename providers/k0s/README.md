@@ -11,8 +11,13 @@ The server lets clients drain buffered output before closing, and clients
 reject a missing command status instead of reporting success.
 
 The k0s module patch alone does not update its embedded executables. Build
-the API-server from the same Kubernetes revision using the upstream
-Makefile and the distribution's build flags. Containerd also needs the
+both the API-server and kubelet from the same Kubernetes revision using the
+upstream Makefile and the distribution's build flags. With
+`ExtendWebSocketsToKubelet`, nodes advertise WebSocket support and the API
+server forwards exec requests to the kubelet's stream translator. Updating
+only the API-server leaves that path unpatched. Replace the embedded kubelet
+on every worker platform, including Windows, and on controllers that also
+run workloads. Containerd also needs the
 patched CRI-streaming server: the 2.3.5 integration is pinned at
 `7b2fc110dd8a63fdc87a6809c256066c1082d7c1`. Use k0s's existing ZIP builder
 and embedding targets to assemble the complete controller and worker
@@ -21,8 +26,10 @@ packager below preserves official runtime bytes and cannot package this
 runtime replacement.
 
 Qualify the complete packages with native exec/attach transfers over SPDY
-and WebSocket. Module tests and a bare k0s build do not prove that the
-installed API-server and containerd contain the fix.
+and WebSocket, including translation at the API-server and at the kubelet.
+Module tests and a bare k0s build do not prove that the installed API-server,
+kubelet and containerd contain the fix. Verify all three component hashes
+against the build manifest rather than relying on the outer k0s version.
 
 ## Worker releases with patched controllers
 

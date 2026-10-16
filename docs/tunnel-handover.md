@@ -205,6 +205,17 @@ and preserve legacy destinations. This planner neither discovers missing
 journals nor decides which committed phases select receiver routes, and remains
 separate from normal reconciliation until those responsibilities are integrated.
 
+Journal route planning derives generation selection from replayed committed
+history. Prepare and abort select the legacy generation; switch, drain and
+retire select the round's destination generation, including reverse-direction
+rollback. Completed journals retain their verified serving generation. Legacy
+plans remain explicit outputs alongside aggregated receiver routes, so an empty
+receiver map is not permission to withdraw legacy forwarding. All journals are
+checked for conflicts before phase filtering. Expiry does not reverse selected
+intent; the separate execution boundary still requires a current executable
+round before native work. This planner does not establish native completion or
+supply the missing normal-reconciliation integration.
+
 After installation, receiver route read-back revalidates device identity,
 permissions, authenticated transport and policy rules. Each selected destination
 must have one direct unicast route through the selected device with the expected

@@ -56,6 +56,27 @@ func TestNativeApplyLifecycle(t *testing.T) {
 	if err = n.Verify(doc); err != nil {
 		t.Fatal(err)
 	}
+	// A route and working host connectivity do not prove that decrypted
+	// packets can be forwarded to native CNI endpoints.
+	for _, family := range []winipcfg.AddressFamily{windows.AF_INET, windows.AF_INET6} {
+		row, err := n.adapter.LUID().IPInterface(family)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !row.ForwardingEnabled {
+			t.Fatal("owned tunnel adapter cannot forward packets")
+		}
+		row.ForwardingEnabled = false
+		if err := row.Set(); err != nil {
+			t.Fatal(err)
+		}
+		if n.Verify(doc) == nil {
+			t.Fatal("disabled forwarding accepted")
+		}
+		if err := n.Apply(doc, 0); err != nil {
+			t.Fatal("forwarding drift repair failed", err)
+		}
+	}
 	// Native generation experiments observed Apply reporting success while
 	// the requested address was absent. The identity cache must not hide drift.
 	if err = n.adapter.LUID().DeleteIPAddress(local); err != nil {

@@ -110,6 +110,10 @@ func (n *Native) Apply(doc tunnel.PeersFileDoc, port uint16) error {
 		row.Metric = 5
 		row.WeakHostSend = true
 		row.WeakHostReceive = true
+		// Decrypted native pod packets are transit traffic, not traffic
+		// addressed to the tunnel identity. Enable routing on this owned
+		// adapter only; physical and CNI interfaces keep their own policy.
+		row.ForwardingEnabled = true
 		// As in upstream WireGuard's configureInterface: tunnel identities
 		// come from the controller's allocation, not link-local discovery.
 		// Configure this before adding addresses; optimistic DAD is still
@@ -172,6 +176,15 @@ func (n *Native) Verify(doc tunnel.PeersFileDoc) error {
 	}
 	if address.DadState != winipcfg.DadStatePreferred {
 		return fmt.Errorf("tunnel identity address is not preferred: DAD state %d", address.DadState)
+	}
+	for _, family := range []winipcfg.AddressFamily{windows.AF_INET, windows.AF_INET6} {
+		row, err := n.adapter.LUID().IPInterface(family)
+		if err != nil {
+			return fmt.Errorf("reading tunnel forwarding state: %w", err)
+		}
+		if !row.ForwardingEnabled {
+			return fmt.Errorf("tunnel forwarding is disabled for address family %d", family)
+		}
 	}
 	observed, err := n.KernelRoutes()
 	if err != nil {

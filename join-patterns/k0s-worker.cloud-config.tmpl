@@ -22,6 +22,18 @@ write_files:
     content: |
       {{ .joinToken }}
 runcmd:
+{{- if index . "k0sWorkerVersion" }}
+  - |
+    set -e
+    case "$(uname -m)" in
+      aarch64|arm64) sha='{{ .k0sWorkerSHA256Arm64 }}' ;;
+      x86_64|amd64) sha='{{ .k0sWorkerSHA256Amd64 }}' ;;
+      *) echo 'Unsupported baked k0s worker architecture' >&2; exit 1 ;;
+    esac
+    [ -n "$sha" ] || { echo 'No baked k0s checksum for this architecture' >&2; exit 1; }
+    echo "$sha  /usr/local/bin/k0s" | sha256sum -c -
+    [ "$(/usr/local/bin/k0s version)" = '{{ .k0sWorkerVersion }}' ] || { echo 'Baked k0s worker version mismatch' >&2; exit 1; }
+{{- end }}
 {{- template "dialer-install" . }}
   # Gate on the API's TCP port rather than ICMP: minimal cloud images
   # may ship no ping at all, and cloud firewalls routinely drop ICMP
@@ -60,6 +72,7 @@ runcmd:
     done
     rm -rf /tmp/cni-plugins /tmp/cni-plugins.tgz
   {{- end }}
+  {{- if not (index . "k0sWorkerVersion") }}
   - |
     set -e
     if [ "$(k0s version 2>/dev/null || true)" != '{{ .k0sVersion }}' ]; then
@@ -67,6 +80,7 @@ runcmd:
       K0S_VERSION='{{ .k0sVersion }}' sh /tmp/install-k0s.sh
       rm -f /tmp/install-k0s.sh
     fi
+  {{- end }}
   # k0s resolves node IPs by looking up the instance's own hostname
   # rather than inspecting interfaces. On AWS that hostname maps only
   # to the private IPv4 in /etc/hosts, so a dual-stack cluster's
@@ -77,6 +91,6 @@ runcmd:
   - |
     set -e
 {{- template "node-ip-arg" . }}
-    k0s install worker --token-file /etc/k0s/join-token --kubelet-extra-args="{{ .kubeletExtraArgs }} $NODE_IP_ARG $PROVIDER_ID_ARG"
-  - k0s start
+    {{ if index . "k0sWorkerVersion" }}/usr/local/bin/{{ end }}k0s install worker --token-file /etc/k0s/join-token --kubelet-extra-args="{{ .kubeletExtraArgs }} $NODE_IP_ARG $PROVIDER_ID_ARG"
+  - {{ if index . "k0sWorkerVersion" }}/usr/local/bin/{{ end }}k0s start
 {{- template "bootstrap-sentinel" . }}

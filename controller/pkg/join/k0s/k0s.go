@@ -78,6 +78,7 @@ type Provider struct {
 	//	releases-api overrides GitHubReleasesAPI (hermetic e2e)
 	//	worker-release explicitly selects the upstream worker release for
 	//	controllers built with a local suffix; their observed base must match
+	//	worker-version and worker-sha256-{amd64,arm64} admit baked Linux workers
 	ConfigNamespace string
 	ConfigName      string
 }
@@ -99,6 +100,11 @@ func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
 	k0sVersion, err := p.introspectK0sVersion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("introspecting k0s version: %w", err)
+	}
+
+	workerValues, err := p.linuxWorkerValues(ctx, k0sVersion)
+	if err != nil {
+		return nil, err
 	}
 
 	tokenID, err := randomToken(6)
@@ -144,14 +150,18 @@ func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
 		return nil, err
 	}
 
-	return map[string]any{
+	values := map[string]any{
 		"joinToken":  joinToken,
 		"k0sVersion": k0sVersion,
 		// apiEndpoint is the common contract every join pattern gates
 		// on before joining: the host:port a new node must actually
 		// reach.
 		"apiEndpoint": apiEndpoint,
-	}, nil
+	}
+	for key, value := range workerValues {
+		values[key] = value
+	}
+	return values, nil
 }
 
 // hostPort extracts "host:port" from the API address URL.

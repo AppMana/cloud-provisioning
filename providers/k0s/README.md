@@ -90,10 +90,33 @@ observations, mixed builds, malformed versions and a different base fail
 selection. Without this explicit setting, custom controller versions remain
 rejected. An unreadable configuration also stops selection.
 
-This selects the upstream Linux worker release used by the normal bootstrap
-path. A patched Windows worker still requires `windowsBootstrap.workerVersion`
-and `windowsBootstrap.workerSHA256`, with that same upstream base. Qualify those
-controller and worker artifacts together before enabling provisioning.
+This selects the upstream release used by the normal Linux bootstrap path.
+To use a complete patched Linux worker baked into an image, add `worker-version`
+and `worker-sha256-amd64` and/or `worker-sha256-arm64` to that same Secret.
+The version must retain the exact selected upstream base, and each configured
+checksum must be a 64-digit SHA-256 of the complete executable. For example:
+
+```yaml
+stringData:
+  worker-release: v1.36.4+k0s.1
+  worker-version: v1.36.4+k0s.1.custom.1
+  worker-sha256-amd64: REPLACE_WITH_VERIFIED_COMPLETE_EXECUTABLE_SHA256
+  worker-sha256-arm64: REPLACE_WITH_VERIFIED_COMPLETE_EXECUTABLE_SHA256
+```
+
+Bake the corresponding executable at `/usr/local/bin/k0s`. Bootstrap validates
+its checksum before executing it, checks its exact version before installing
+the tunnel or worker service, and uses that absolute path for installation and
+startup. Missing executables, unconfigured architectures, incorrect hashes or
+versions fail bootstrap; an explicit override never falls back to downloading
+an upstream worker. Omit both version and checksum keys to retain the existing
+upstream installation path. These settings affect new bootstrap data and do
+not upgrade existing workers.
+
+A patched Windows worker still requires `windowsBootstrap.workerVersion` and
+`windowsBootstrap.workerSHA256`, with that same upstream base. Qualify the
+controller and worker artifacts together, including fresh CAPI boots on each
+admitted architecture, before enabling provisioning.
 
 ## Empty optional manifests with patches enabled
 

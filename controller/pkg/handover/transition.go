@@ -193,6 +193,32 @@ func (t Transition) View() (View, error) {
 	return v, nil
 }
 
+// Extends accepts the same committed history or any number of appended events.
+// It rejects regression and forks, including a newly minted initial round for
+// the same plan. Callers must separately authenticate storage and object identity.
+func (t Transition) Extends(previous Transition) error {
+	old, err := previous.Bytes()
+	if err != nil {
+		return err
+	}
+	if _, err := t.View(); err != nil {
+		return err
+	}
+	if len(t.j.Events) < len(previous.j.Events) {
+		return fmt.Errorf("transition regresses committed history")
+	}
+	prefix := t.j
+	prefix.Events = prefix.Events[:len(previous.j.Events)]
+	raw, err := (Transition{prefix}).Bytes()
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(old, raw) {
+		return fmt.Errorf("transition rewrites committed history")
+	}
+	return nil
+}
+
 func (t Transition) append(ev event) (Transition, error) {
 	j := t.j
 	j.Events = append(append([]event(nil), j.Events...), ev)

@@ -46,8 +46,9 @@ func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store han
 	if err != nil {
 		return fail(err)
 	}
-	if plan.Namespace != scope.Namespace || plan.MeshName != scope.MeshName || plan.MeshUID != scope.MeshUID || plan.MachineUID != scope.MachineUID {
-		return fail(fmt.Errorf("receiver journal differs from admitted mesh or machine"))
+	uid, err := receiveJournalParticipant(plan, scope, nodeName, key)
+	if err != nil {
+		return fail(err)
 	}
 	mesh, err := api.CoreV1().Secrets(scope.Namespace).Get(ctx, scope.MeshName, metav1.GetOptions{})
 	if err != nil {
@@ -62,15 +63,6 @@ func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store han
 	}
 	if string(adoption.UID) != plan.AdoptionUID || adoption.DeletionTimestamp != nil {
 		return fail(fmt.Errorf("receiver journal adoption identity changed"))
-	}
-	uid := ""
-	if key.PublicKey().String() == plan.RootPublicKey && nodeName == plan.CloudNodeName {
-		uid = plan.CloudNodeUID
-	} else if site, found := plan.Sites[key.PublicKey().String()]; found && site.NodeName == nodeName {
-		uid = site.NodeUID
-	}
-	if uid == "" {
-		return fail(fmt.Errorf("local identity is not a journal participant"))
 	}
 	boot, err := localReceiveBootID()
 	if err != nil {
@@ -96,4 +88,20 @@ func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store han
 		return fail(fmt.Errorf("receiver journal changed during admission"))
 	}
 	return admittedReceiveJournal{Snapshot: snapshot, Plan: plan, NodeUID: uid, BootID: boot}, nil
+}
+
+func receiveJournalParticipant(plan tunnel.ReceiveTransitionPlan, scope receiveJournalScope, nodeName string, key wgtypes.Key) (string, error) {
+	if scope.Namespace == "" || scope.MeshName == "" || scope.MeshUID == "" || scope.MachineUID == "" || nodeName == "" || key == (wgtypes.Key{}) || plan.Namespace != scope.Namespace || plan.MeshName != scope.MeshName || plan.MeshUID != scope.MeshUID || plan.MachineUID != scope.MachineUID {
+		return "", fmt.Errorf("receiver journal differs from admitted mesh or machine")
+	}
+	uid := ""
+	if key.PublicKey().String() == plan.RootPublicKey && nodeName == plan.CloudNodeName {
+		uid = plan.CloudNodeUID
+	} else if site, found := plan.Sites[key.PublicKey().String()]; found && site.NodeName == nodeName {
+		uid = site.NodeUID
+	}
+	if uid == "" {
+		return "", fmt.Errorf("local identity is not a journal participant")
+	}
+	return uid, nil
 }

@@ -1,7 +1,6 @@
 package handover
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -149,25 +148,15 @@ func (s Store) Commit(ctx context.Context, previous Snapshot, next Transition) (
 	if e != nil {
 		return Snapshot{}, e
 	}
-	old, e := checked.transition.Bytes()
-	if e != nil {
+	if len(next.j.Events) != len(checked.transition.j.Events)+1 {
+		return Snapshot{}, fmt.Errorf("commit requires exactly one successor event")
+	}
+	if e := next.Extends(checked.transition); e != nil {
 		return Snapshot{}, e
 	}
 	raw, e := next.Bytes()
 	if e != nil {
 		return Snapshot{}, e
-	}
-	if len(next.j.Events) != len(checked.transition.j.Events)+1 {
-		return Snapshot{}, fmt.Errorf("commit requires exactly one successor event")
-	}
-	prefix := next.j
-	prefix.Events = prefix.Events[:len(prefix.Events)-1]
-	prefixRaw, e := (Transition{prefix}).Bytes()
-	if e != nil {
-		return Snapshot{}, e
-	}
-	if !bytes.Equal(old, prefixRaw) {
-		return Snapshot{}, fmt.Errorf("candidate rewrites committed transition history")
 	}
 	object := previous.object.DeepCopy()
 	if object.Data == nil {

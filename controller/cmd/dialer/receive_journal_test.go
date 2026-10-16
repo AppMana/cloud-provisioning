@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/netip"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -160,6 +162,123 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 			t.Fatal("read-only admission changed journal")
 		}
 	}
+	t.Run("durable-recovery", func(t *testing.T) {
+		cfg := config{iface: "wgtest", nodeName: "cloud", privateKeyFile: filepath.Join(t.TempDir(), "key")}
+		path := filepath.Join(filepath.Dir(cfg.privateKeyFile), cfg.iface+".reconcile.lock."+store.Name+".json")
+		if _, err := checkpointReceiveJournal(ctx, api, store, scope, cfg, root); err != nil {
+			t.Fatal(err)
+		}
+		info, err := os.Stat(path)
+		if err != nil || info.Mode().Perm() != 0600 {
+			t.Fatalf("checkpoint permissions: %v", err)
+		}
+		// The recovery reader uses no API client.
+		restored, err := readReceiveJournalCheckpoint(path, handover.Store{Name: store.Name, ClusterUID: store.ClusterUID}, scope, cfg.nodeName, root)
+		if err != nil || restored.Snapshot.Metadata().UID != snapshot.Metadata().UID {
+			t.Fatalf("offline recovery: %v", err)
+		}
+		lock, err := lockReconciliation(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, conflict := checkpointReceiveJournal(ctx, api, store, scope, cfg, root)
+		lock.Close()
+		if conflict == nil {
+			t.Fatal("checkpoint ignored native reconciliation lock")
+		}
+		view, err := snapshot.Transition().View()
+		if err != nil {
+			t.Fatal(err)
+		}
+		hash, err := view.Round.Digest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now()
+		var proofs []handover.AuthenticatedReceipt
+		for _, member := range view.Round.Members {
+			proofs = append(proofs, handover.AuthenticatedReceipt{AuthenticatedNodeUID: member.NodeUID, Receipt: handover.Receipt{RoundHash: hash, NodeUID: member.NodeUID, DeviceID: member.DeviceID, FromKey: member.FromKey, ToKey: member.ToKey, FromPeerKey: member.FromPeerKey, ToPeerKey: member.ToPeerKey, ObservedAt: now}})
+		}
+		next, err := snapshot.Transition().Advance(now, proofs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.Commit(ctx, snapshot, next); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := checkpointReceiveJournal(ctx, api, store, scope, cfg, root); err != nil {
+			t.Fatal(err)
+		}
+		good, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := checkpointReceiveJournal(ctx, nil, store, scope, cfg, root); err == nil {
+			t.Fatal("offline checkpoint refresh claimed live admission")
+		}
+		preserved, err := os.ReadFile(path)
+		if err != nil || !bytes.Equal(preserved, good) {
+			t.Fatal("failed live admission changed recovery state")
+		}
+		advanced, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		regressed := advanced.DeepCopy()
+		regressed.Data = original.Data
+		regressed, err = store.ConfigMaps.Update(ctx, regressed, metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := checkpointReceiveJournal(ctx, api, store, scope, cfg, root); err == nil {
+			t.Fatal("admitted a regressed live journal")
+		}
+		unchanged, err := os.ReadFile(path)
+		if err != nil || !bytes.Equal(unchanged, good) {
+			t.Fatal("rejected regression changed durable state")
+		}
+		regressed.Data = advanced.Data
+		if _, err := store.ConfigMaps.Update(ctx, regressed, metav1.UpdateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		for _, fault := range []string{"truncated", "boot", "key", "node", "scope"} {
+			t.Run(fault, func(t *testing.T) {
+				bad := good[:len(good)/2]
+				if fault != "truncated" {
+					var saved receiveJournalCheckpoint
+					if err := json.Unmarshal(good, &saved); err != nil {
+						t.Fatal(err)
+					}
+					switch fault {
+					case "boot":
+						saved.BootID = "another-boot"
+					case "key":
+						saved.PublicKey = site.PublicKey().String()
+					case "node":
+						saved.NodeUID = "replacement"
+					case "scope":
+						saved.Scope.MeshUID = "another-mesh"
+					}
+					bad, err = json.Marshal(saved)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := os.WriteFile(path, bad, 0600); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := checkpointReceiveJournal(ctx, api, store, scope, cfg, root); err == nil {
+					t.Fatal("invalid checkpoint fell back to live admission")
+				}
+				if err := os.WriteFile(path, good, 0600); err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
+		if _, err := checkpointReceiveJournal(ctx, api, store, scope, cfg, root); err != nil {
+			t.Fatal(err)
+		}
+	})
 	for _, fault := range []string{"mesh", "namespace", "machine", "cluster", "local-key", "node-name", "boot", "not-ready"} {
 		t.Run(fault, func(t *testing.T) {
 			badScope, badStore, key, name := scope, store, root, "cloud"

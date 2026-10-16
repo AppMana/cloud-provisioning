@@ -140,6 +140,21 @@ boot ID and readiness, and rejects a journal changed during those reads. It is
 not connected to normal reconciliation. Admission does not execute a phase or
 persist recovery state, and these API reads cannot fence changes after admission.
 
+The checkpoint component records an admitted journal on the existing private
+identity mount under the reconciliation lock, using the atomic durable cache
+writer. Recovery validates its cluster, mesh, machine, node, key and boot, then
+replays the committed history and validates the public plan. Refresh accepts
+only the same journal incarnation and an unchanged or extended history;
+regression, replacement and forks fail without replacing the checkpoint.
+Resource versions are opaque and are not ordered numerically. A valid rollback
+or renewal extends history even though it may revisit an earlier phase.
+
+Checkpointed intent is not evidence of completed native work. It cannot issue
+receipts, advance a phase, or establish that egress already switched. Corrupt
+state and boot changes require explicit recovery; they must not fall back to
+legacy forwarding. The checkpoint component is not yet connected to normal
+reconciliation or a native phase executor.
+
 ## Platform implementation boundaries
 
 The shared protocol owns generation identity, phase validation, peer graph

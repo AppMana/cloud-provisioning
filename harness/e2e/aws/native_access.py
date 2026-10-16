@@ -124,7 +124,7 @@ def main():
     if args.calico_site:
         exclusion = calico_exclusion(state, pod_range)
         existing = subprocess.run(['docker', 'exec', args.runner, 'docker', 'exec', 'clab-cldt-bastion',
-            'kubectl', '--server=https://10.101.0.1:6443', 'get', 'ippools.crd.projectcalico.org', '-o', 'json'],
+            'kubectl', 'get', 'ippools.crd.projectcalico.org', '-o', 'json'],
             check=True, capture_output=True, text=True)
         for pool in json.loads(existing.stdout)['items']:
             same = pool['metadata']['name'] == exclusion['metadata']['name']
@@ -135,7 +135,7 @@ def main():
                 raise RuntimeError('AWS subnet overlaps an existing Calico pool')
         objects.append(exclusion)
     subprocess.run(['docker', 'exec', '-i', args.runner, 'docker', 'exec', '-i', 'clab-cldt-bastion',
-                    'kubectl', '--server=https://10.101.0.1:6443', 'apply', '-f', '-'],
+                    'kubectl', 'apply', '-f', '-'],
                    input=json.dumps({'apiVersion': 'v1', 'kind': 'List', 'items': objects}),
                    check=True, text=True, capture_output=True)
     print('Configured single-ENI ' + args.family + ' IPAM and read-only allocation observation for the isolated run')

@@ -1,0 +1,403 @@
+diff --git a/cmd/controller/controller.go b/cmd/controller/controller.go
+--- a/cmd/controller/controller.go
++++ b/cmd/controller/controller.go
+@@ -324,7 +324,6 @@
+ 			K0sVars:      c.K0sVars,
+ 			LogLevel:     c.LogLevels.Konnectivity,
+ 			EventEmitter: prober.NewEventEmitter(),
+-			ServerCount:  numActiveControllers.Peek,
+ 		})
+ 	}
+ 
+@@ -587,7 +586,6 @@
+ 			ManifestsDir:           c.K0sVars.ManifestsDir,
+ 			KonnectivityServerHost: cmp.Or(nodeConfig.Spec.API.ExternalHost(), nodeConfig.Spec.API.Address),
+ 			EventEmitter:           prober.NewEventEmitter(),
+-			ServerCount:            numActiveControllers.Peek,
+ 		})
+ 	}
+ 
+diff --git a/pkg/component/controller/konnectivity.go b/pkg/component/controller/konnectivity.go
+--- a/pkg/component/controller/konnectivity.go
++++ b/pkg/component/controller/konnectivity.go
+@@ -31,10 +31,9 @@
+ 
+ // Konnectivity implements the component interface for konnectivity server
+ type Konnectivity struct {
+-	Spec        *v1beta1.KonnectivitySpec // FIXME: This should be reconciled via dynamic config
+-	K0sVars     *config.CfgVars
+-	LogLevel    string
+-	ServerCount func() (uint, <-chan struct{})
++	Spec     *v1beta1.KonnectivitySpec // FIXME: This should be reconciled via dynamic config
++	K0sVars  *config.CfgVars
++	LogLevel string
+ 
+ 	supervisor     *supervisor.Supervisor
+ 	executablePath string
+@@ -43,8 +42,6 @@
+ 	log *logrus.Entry
+ 
+ 	*prober.EventEmitter
+-
+-	stop func()
+ }
+ 
+ var _ manager.Component = (*Konnectivity)(nil)
+@@ -86,58 +83,14 @@
+ 
+ // Run ..
+ func (k *Konnectivity) Start(ctx context.Context) error {
+-	serverCount, serverCountChanged := k.ServerCount()
+-
+-	if err := k.runServer(ctx, serverCount); err != nil {
++	if err := k.runServer(ctx); err != nil {
+ 		k.EmitWithPayload("failed to start konnectivity server", err)
+ 		return fmt.Errorf("failed to start konnectivity server: %w", err)
+ 	}
+-
+-	ctx, cancel := context.WithCancel(context.Background())
+-	done := make(chan struct{})
+-
+-	go func() {
+-		defer close(done)
+-		var retry <-chan time.Time
+-		for {
+-			select {
+-			case <-serverCountChanged:
+-				prevServerCount := serverCount
+-				serverCount, serverCountChanged = k.ServerCount()
+-				// Never drop below one server: the agent treats zero as one internally anyways.
+-				serverCount = max(1, serverCount)
+-				// restart only if the server count actually changed
+-				if serverCount == prevServerCount {
+-					continue
+-				}
+-
+-			case <-retry:
+-				k.Emit("retrying to start konnectivity server")
+-				k.log.Info("Retrying to start konnectivity server")
+-
+-			case <-ctx.Done():
+-				k.Emit("stopped konnectivity server")
+-				k.log.Info("stopping konnectivity server reconfig loop")
+-				return
+-			}
+-
+-			retry = nil
+-
+-			if err := k.runServer(ctx, serverCount); err != nil {
+-				k.EmitWithPayload("failed to start konnectivity server", err)
+-				k.log.WithError(err).Errorf("Failed to start konnectivity server")
+-				retry = time.After(10 * time.Second)
+-				continue
+-			}
+-		}
+-	}()
+-
+-	k.stop = func() { cancel(); <-done }
+-
+ 	return nil
+ }
+ 
+-func (k *Konnectivity) serverArgs(count uint) []string {
++func (k *Konnectivity) serverArgs() []string {
+ 	return stringmap.StringMap{
+ 		"--uds-name":                  filepath.Join(k.K0sVars.KonnectivitySocketDir, "konnectivity-server.sock"),
+ 		"--cluster-cert":              filepath.Join(k.K0sVars.CertRootDir, "server.crt"),
+@@ -158,37 +111,28 @@
+ 		"--v":                         k.LogLevel,
+ 		"--enable-profiling":          "false",
+ 		"--delete-existing-uds-file":  "true",
+-		"--server-count":              strconv.FormatUint(uint64(count), 10),
++		"--enable-lease-controller":   "true",
+ 		"--server-id":                 k.K0sVars.InvocationID,
+ 		"--proxy-strategies":          "destHost,defaultRoute",
+ 		"--cipher-suites":             constant.AllowedTLS12CipherSuiteNames(),
+ 	}.ToArgs()
+ }
+ 
+-func (k *Konnectivity) runServer(ctx context.Context, count uint) error {
+-	// Stop supervisor
+-	if k.supervisor != nil {
+-		k.EmitWithPayload("restarting konnectivity server due to server count change",
+-			map[string]any{"serverCount": count})
+-		if err := k.supervisor.Stop(); err != nil {
+-			k.log.WithError(err).Error("Failed to stop executable")
+-		}
+-	}
+-
++func (k *Konnectivity) runServer(ctx context.Context) error {
+ 	k.supervisor = &supervisor.Supervisor{
+ 		Name:    "konnectivity",
+ 		BinPath: k.executablePath,
+ 		DataDir: k.K0sVars.DataDir,
+ 		RunDir:  k.K0sVars.RunDir,
+-		Args:    k.serverArgs(count),
++		Args:    k.serverArgs(),
+ 		UID:     k.uid,
+ 	}
+ 	err := k.supervisor.Supervise(ctx)
+ 	if err != nil {
+-		k.supervisor = nil // not to make the next loop to try to stop it first
++		k.supervisor = nil
+ 		return err
+ 	}
+-	k.EmitWithPayload("started konnectivity server", map[string]any{"serverCount": count})
++	k.Emit("started konnectivity server")
+ 
+ 	return nil
+ }
+@@ -211,10 +155,6 @@
+ 
+ // Stop stops
+ func (k *Konnectivity) Stop() error {
+-	if k.stop != nil {
+-		logrus.Debug("stopping konnectivity component")
+-		k.stop()
+-	}
+ 	if k.supervisor == nil {
+ 		return nil
+ 	}
+diff --git a/pkg/component/controller/konnectivity_egress_test.go b/pkg/component/controller/konnectivity_egress_test.go
+--- a/pkg/component/controller/konnectivity_egress_test.go
++++ b/pkg/component/controller/konnectivity_egress_test.go
+@@ -24,7 +24,7 @@
+ 			cfg.Spec.Network.NodeLocalLoadBalancing = &v1beta1.NodeLocalLoadBalancing{Enabled: hostNetwork, Type: v1beta1.NllbTypeTraefik, Traefik: v1beta1.DefaultTraefik()}
+ 			dir := t.TempDir()
+ 			agent := KonnectivityAgent{ManifestsDir: dir, KonnectivityServerHost: "192.0.2.1", EventEmitter: prober.NewEventEmitter(), log: logrus.NewEntry(logrus.New())}
+-			require.NoError(t, agent.writeKonnectivityAgent(cfg, 3))
++			require.NoError(t, agent.writeKonnectivityAgent(cfg))
+ 			objects, err := resource.NewLocalBuilder().WithScheme(scheme.Scheme, corev1.SchemeGroupVersion, appsv1.SchemeGroupVersion, rbacv1.SchemeGroupVersion).Path(true, dir).Flatten().Do().Infos()
+ 			require.NoError(t, err)
+ 			sets := map[string]*appsv1.DaemonSet{}
+@@ -60,7 +60,7 @@
+ 
+ func TestKonnectivityRejectsUnmatchedWindowsFallback(t *testing.T) {
+ 	server := Konnectivity{Spec: v1beta1.DefaultKonnectivitySpec(), K0sVars: &config.CfgVars{}}
+-	args := server.serverArgs(3)
++	args := server.serverArgs()
+ 	require.Contains(t, args, "--proxy-strategies=destHost,defaultRoute")
+ 	require.NotContains(t, args, "--proxy-strategies=destHost,defaultRoute,default")
+ }
+diff --git a/pkg/component/controller/konnectivity_leases_test.go b/pkg/component/controller/konnectivity_leases_test.go
+new file mode 100644
+--- /dev/null
++++ b/pkg/component/controller/konnectivity_leases_test.go
+@@ -0,0 +1,60 @@
++// SPDX-FileCopyrightText: 2026 k0s authors
++// SPDX-License-Identifier: Apache-2.0
++
++package controller
++
++import (
++	"github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
++	"github.com/k0sproject/k0s/pkg/component/prober"
++	"github.com/k0sproject/k0s/pkg/config"
++	"github.com/sirupsen/logrus"
++	"github.com/stretchr/testify/require"
++	appsv1 "k8s.io/api/apps/v1"
++	corev1 "k8s.io/api/core/v1"
++	rbacv1 "k8s.io/api/rbac/v1"
++	"k8s.io/cli-runtime/pkg/resource"
++	"k8s.io/client-go/kubernetes/scheme"
++	"testing"
++)
++
++func TestKonnectivityLeaseDiscovery(t *testing.T) {
++	server := Konnectivity{Spec: v1beta1.DefaultKonnectivitySpec(), K0sVars: &config.CfgVars{}}
++	args := server.serverArgs()
++	require.Contains(t, args, "--enable-lease-controller=true")
++	for _, arg := range args {
++		require.NotContains(t, arg, "--server-count=")
++	}
++	for _, hostNetwork := range []bool{false, true} {
++		cfg := v1beta1.DefaultClusterConfig()
++		cfg.Spec.Network.NodeLocalLoadBalancing = &v1beta1.NodeLocalLoadBalancing{Enabled: hostNetwork, Type: v1beta1.NllbTypeTraefik, Traefik: v1beta1.DefaultTraefik()}
++		dir := t.TempDir()
++		agent := KonnectivityAgent{ManifestsDir: dir, KonnectivityServerHost: "api.example.test", EventEmitter: prober.NewEventEmitter(), log: logrus.NewEntry(logrus.New())}
++		require.NoError(t, agent.writeKonnectivityAgent(cfg))
++		objects, err := resource.NewLocalBuilder().WithScheme(scheme.Scheme, corev1.SchemeGroupVersion, appsv1.SchemeGroupVersion, rbacv1.SchemeGroupVersion).Path(true, dir).Flatten().Do().Infos()
++		require.NoError(t, err)
++		agents, roles, bindings := 0, 0, 0
++		for _, obj := range objects {
++			switch v := obj.Object.(type) {
++			case *appsv1.DaemonSet:
++				agents++
++				require.Contains(t, v.Spec.Template.Spec.Containers[0].Args, "--count-server-leases=true")
++				for _, env := range v.Spec.Template.Spec.Containers[0].Env {
++					require.NotEqual(t, "K0S_CONTROLLER_COUNT", env.Name)
++				}
++				require.Equal(t, "konnectivity-agent", v.Spec.Template.Spec.ServiceAccountName)
++			case *rbacv1.Role:
++				roles++
++				require.Equal(t, "kube-system", v.Namespace)
++				require.Equal(t, []rbacv1.PolicyRule{{APIGroups: []string{"coordination.k8s.io"}, Resources: []string{"leases"}, Verbs: []string{"get", "list", "watch"}}}, v.Rules)
++			case *rbacv1.RoleBinding:
++				bindings++
++				require.Equal(t, "kube-system", v.Namespace)
++				require.Equal(t, rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: "system:konnectivity-agent"}, v.RoleRef)
++				require.Equal(t, []rbacv1.Subject{{Kind: "ServiceAccount", Name: "konnectivity-agent", Namespace: "kube-system"}}, v.Subjects)
++			}
++		}
++		require.Equal(t, 2, agents)
++		require.Equal(t, 1, roles)
++		require.Equal(t, 1, bindings)
++	}
++}
+diff --git a/pkg/component/controller/konnectivityagent.go b/pkg/component/controller/konnectivityagent.go
+--- a/pkg/component/controller/konnectivityagent.go
++++ b/pkg/component/controller/konnectivityagent.go
+@@ -23,7 +23,6 @@
+ type KonnectivityAgent struct {
+ 	ManifestsDir           string
+ 	KonnectivityServerHost string
+-	ServerCount            func() (uint, <-chan struct{})
+ 
+ 	configChangeChan chan *v1beta1.ClusterConfig
+ 	log              *logrus.Entry
+@@ -45,7 +44,6 @@
+ func (k *KonnectivityAgent) Start(ctx context.Context) error {
+ 
+ 	go func() {
+-		serverCount, serverCountChanged := k.ServerCount()
+ 
+ 		var clusterConfig *v1beta1.ClusterConfig
+ 		var retry <-chan time.Time
+@@ -54,16 +52,6 @@
+ 			case config := <-k.configChangeChan:
+ 				clusterConfig = config
+ 
+-			case <-serverCountChanged:
+-				prevServerCount := serverCount
+-				serverCount, serverCountChanged = k.ServerCount()
+-				// Never drop below one server: the agent treats zero as one internally anyways.
+-				serverCount = max(1, serverCount)
+-				// write only if the server count actually changed
+-				if serverCount == prevServerCount {
+-					continue
+-				}
+-
+ 			case <-retry:
+ 				k.log.Info("Retrying to write konnectivity agent manifest")
+ 
+@@ -78,7 +66,7 @@
+ 				continue
+ 			}
+ 
+-			if err := k.writeKonnectivityAgent(clusterConfig, serverCount); err != nil {
++			if err := k.writeKonnectivityAgent(clusterConfig); err != nil {
+ 				k.log.Errorf("failed to write konnectivity agent manifest: %v", err)
+ 				retry = time.After(10 * time.Second)
+ 				continue
+@@ -100,7 +88,7 @@
+ 	return nil
+ }
+ 
+-func (k *KonnectivityAgent) writeKonnectivityAgent(clusterConfig *v1beta1.ClusterConfig, serverCount uint) error {
++func (k *KonnectivityAgent) writeKonnectivityAgent(clusterConfig *v1beta1.ClusterConfig) error {
+ 	konnectivityDir := filepath.Join(k.ManifestsDir, "konnectivity")
+ 	err := dir.Init(konnectivityDir, constant.ManifestsDirMode)
+ 	if err != nil {
+@@ -111,7 +99,6 @@
+ 		ProxyServerHost: k.KonnectivityServerHost,
+ 		ProxyServerPort: uint16(clusterConfig.Spec.Konnectivity.AgentPort),
+ 		Image:           clusterConfig.Spec.Images.Konnectivity.URI(),
+-		ServerCount:     serverCount,
+ 		PullPolicy:      clusterConfig.Spec.Images.DefaultPullPolicy,
+ 	}
+ 
+@@ -197,7 +184,6 @@
+ 	ProxyServerHost string
+ 	ProxyServerPort uint16
+ 	Image           string
+-	ServerCount     uint
+ 	PullPolicy      string
+ 	HostNetwork     bool
+ }
+@@ -244,6 +230,30 @@
+   namespace: kube-system
+   labels:
+     kubernetes.io/cluster-service: "true"
++---
++apiVersion: rbac.authorization.k8s.io/v1
++kind: Role
++metadata:
++  name: system:konnectivity-agent
++  namespace: kube-system
++rules:
++  - apiGroups: ["coordination.k8s.io"]
++    resources: ["leases"]
++    verbs: ["get", "list", "watch"]
++---
++apiVersion: rbac.authorization.k8s.io/v1
++kind: RoleBinding
++metadata:
++  name: system:konnectivity-agent
++  namespace: kube-system
++roleRef:
++  apiGroup: rbac.authorization.k8s.io
++  kind: Role
++  name: system:konnectivity-agent
++subjects:
++  - kind: ServiceAccount
++    name: konnectivity-agent
++    namespace: kube-system
+ {{- range .Agents }}
+ ---
+ apiVersion: apps/v1
+@@ -299,11 +309,6 @@
+           imagePullPolicy: {{ .PullPolicy }}
+           name: konnectivity-agent
+           env:
+-              # the variable is not in a use
+-              # we need it to have agent restarted on server count change
+-              - name: K0S_CONTROLLER_COUNT
+-                value: "{{ .ServerCount }}"
+-
+               - name: NODE_IP
+                 valueFrom:
+                   fieldRef:
+@@ -316,6 +321,7 @@
+             - --service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token
+             - --agent-identifiers={{ .Identifiers }}
+             - --agent-id={{ .AgentID }}
++            - --count-server-leases=true
+             {{- if .DefaultRoute }}
+             - --health-server-port={{ .HealthPort }}
+             - --admin-server-port=18096
+diff --git a/pkg/component/controller/konnectivityagent_test.go b/pkg/component/controller/konnectivityagent_test.go
+--- a/pkg/component/controller/konnectivityagent_test.go
++++ b/pkg/component/controller/konnectivityagent_test.go
+@@ -63,13 +63,13 @@
+ 							AgentPort:       9876,
+ 						},
+ 					},
+-				}, 1))
++				}))
+ 
+ 				daemonSet := loadDaemonSet(t, manifestsDir)
+ 				containers := daemonSet.Spec.Template.Spec.Containers
+ 				require.Len(t, containers, 1)
+ 				args := containers[0].Args
+-				require.Len(t, args, 7)
++				require.Len(t, args, 8)
+ 				assert.Equal(t, "--proxy-server-host="+expectedHost, args[2])
+ 				assert.Equal(t, "--proxy-server-port="+expectedPort, args[3])
+ 			})
+@@ -90,8 +90,12 @@
+ 		Infos()
+ 	require.NoError(t, err)
+ 
+-	require.Len(t, objects, 4)
+-	daemonSet, ok := objects[2].Object.(*appsv1.DaemonSet)
+-	require.Truef(t, ok, "unexpected type: %T", objects[2].Object)
+-	return daemonSet
++	require.Len(t, objects, 6)
++	for _, object := range objects {
++		if ds, ok := object.Object.(*appsv1.DaemonSet); ok && ds.Name == "konnectivity-agent" {
++			return ds
++		}
++	}
++	t.Fatal("node-address agent DaemonSet missing")
++	return nil
+ }

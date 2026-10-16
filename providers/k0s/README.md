@@ -180,3 +180,34 @@ server, Windows kubelet access, default-agent loss/recovery and controller
 restart before promotion. The distribution must own and reconcile the new
 agent manifest; installing an equivalent DaemonSet from the test harness does
 not qualify this product change. See [API egress qualification](../../docs/k0s-windows-egress.md).
+
+## Konnectivity lease discovery
+
+`konnectivity-leases.patch` applies to `v1.36.4+k0s.1` after
+`native-linux-egress.patch`. It adapts the lease-discovery change proposed by
+[fooxlj07 in upstream PR #7438](https://github.com/k0sproject/k0s/pull/7438)
+(head `3129898a57cedc4867d60ec80119a1868d8b686b`, closed without merging).
+The relevant controller-count failure is described in
+[upstream issue #8416](https://github.com/k0sproject/k0s/issues/8416).
+
+The server publishes its lease using Konnectivity's built-in lease controller.
+Both node-address and Linux default-route agents count those leases. k0s no
+longer restarts the server or changes the agent pod template when its active
+controller count changes. The patch retains existing authentication resources
+and grants the agent ServiceAccount read-only lease access in `kube-system`.
+The embedded Konnectivity v0.36.0 supports these flags.
+
+```sh
+git -C <k0s-checkout> apply --check <absolute-path>/konnectivity-leases.patch
+git -C <k0s-checkout> apply <absolute-path>/konnectivity-leases.patch
+cd <k0s-checkout>
+go test ./pkg/component/controller ./cmd/controller
+```
+
+Lease discovery changes membership semantics: older controllers do not publish
+these leases. Qualify mixed-version transitions and rollback before enabling
+it on an existing cluster. Native validation must verify server leases, agent
+RBAC, stable agent pod identities across membership changes, Windows kubelet
+access, Service egress, and continuous management availability. This patch does
+not make a restarted API-server endpoint continuously available or qualify a
+single-controller runtime upgrade.

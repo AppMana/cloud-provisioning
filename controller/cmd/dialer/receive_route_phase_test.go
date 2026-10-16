@@ -464,3 +464,46 @@ func (d retirementOnlyDevices) ConfigureDevice(name string, cfg wgtypes.Config) 
 	}
 	return d.receiverDevices.ConfigureDevice(name, cfg)
 }
+
+func TestDirectSiteLegacyPeerRejectsUnsupportedSourceTransfers(t *testing.T) {
+	for _, tc := range []struct {
+		name                         string
+		before, after                []string
+		remote, omitCloud, wantError bool
+	}{
+		{name: "unchanged dual stack", before: []string{"10.90.0.0/24", "2001:db8:1::/64"}, after: []string{"10.90.0.0/24", "2001:db8:1::/64"}},
+		{name: "narrower desired sources", before: []string{"10.90.0.0/24"}, after: []string{"10.90.0.128/25"}},
+		{name: "retained old sender", before: []string{"10.90.0.0/24"}},
+		{name: "new site", after: []string{"10.90.0.0/24"}, wantError: true},
+		{name: "bare retained peer gains workload", before: []string{"10.88.0.2/32"}, after: []string{"10.88.0.2/32", "10.90.0.0/24"}, wantError: true},
+		{name: "larger source block", before: []string{"10.90.0.0/25"}, after: []string{"10.90.0.0/24"}, wantError: true},
+		{name: "new IPv6 source", before: []string{"10.90.0.0/24"}, after: []string{"10.90.0.0/24", "2001:db8:1::/64"}, wantError: true},
+		{name: "cloud role is not site", before: []string{"10.90.0.0/24"}, remote: true, wantError: true},
+		{name: "missing reverse peer", before: []string{"10.90.0.0/24"}, omitCloud: true, wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: "site", WGAllowedIPs: tc.before, Remote: tc.remote}, {PublicKey: "relay", WGAllowedIPs: []string{"10.91.0.0/24"}}}}
+			raw, err := json.Marshal(base)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cloud := tunnel.PeerSpec{PublicKey: "cloud", Remote: true, WGAllowedIPs: []string{"172.29.0.2/32"}, Endpoint: "198.51.100.1:51820"}
+			plan := tunnel.ReceiveTransitionPlan{Base: raw, RootPublicKey: "cloud", Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: "site", WGAllowedIPs: tc.after}}}, SiteDesired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{cloud}}}
+			if tc.omitCloud {
+				plan.SiteDesired.Peers = nil
+			}
+			before, _ := json.Marshal(plan)
+			peer, err := receiveDirectSiteLegacyPeer(plan, "site")
+			if (err != nil) != tc.wantError {
+				t.Fatalf("peer=%+v err=%v", peer, err)
+			}
+			if err == nil && !reflect.DeepEqual(peer, cloud) {
+				t.Fatal("changed legacy cloud peer")
+			}
+			after, _ := json.Marshal(plan)
+			if string(before) != string(after) {
+				t.Fatal("modified committed plan")
+			}
+		})
+	}
+}

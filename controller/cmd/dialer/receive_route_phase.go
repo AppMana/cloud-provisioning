@@ -90,13 +90,13 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 				}
 			}
 		} else {
-			for _, site := range p.Sites {
+			for public, site := range p.Sites {
 				if site.NodeUID == nodeUID {
-					for _, peer := range p.SiteDesired.Peers {
-						if peer.PublicKey == p.RootPublicKey {
-							old = append(old, peer)
-						}
+					peer, err := receiveDirectSiteLegacyPeer(p, public)
+					if err != nil {
+						return err
 					}
+					old = append(old, peer)
 				}
 			}
 		}
@@ -445,4 +445,59 @@ func preflightReceiveRoutePhase(cfg config, receivers map[string]receiveRouteSel
 		}
 	}
 	return nil
+}
+
+// receiveDirectSiteLegacyPeer rejects source expansion that the committed legacy
+// cloud peer cannot accept. A local peer and a handshake alone cannot prove this.
+// This is a necessary check, not proof of source-sensitive site forwarding.
+// Source transfers and relayed sites require a separate admitted legacy routing
+// plan; the direct backend must reject them before any native mutation.
+func receiveDirectSiteLegacyPeer(p tunnel.ReceiveTransitionPlan, public string) (tunnel.PeerSpec, error) {
+	fail := func() (tunnel.PeerSpec, error) {
+		return tunnel.PeerSpec{}, fmt.Errorf("site requires an admitted legacy source path; direct receiver backend cannot carry this transition")
+	}
+	var base tunnel.PeerListDoc
+	if err := json.Unmarshal(p.Base, &base); err != nil {
+		return tunnel.PeerSpec{}, err
+	}
+	var sources []netip.Prefix
+	for _, peer := range base.Peers {
+		if peer.PublicKey != public || peer.Remote {
+			continue
+		}
+		for _, raw := range peer.WGAllowedIPs {
+			prefix, err := netip.ParsePrefix(raw)
+			if err != nil {
+				return fail()
+			}
+			sources = append(sources, prefix)
+		}
+	}
+	if len(sources) == 0 {
+		return fail()
+	}
+	for _, peer := range p.Desired.Peers {
+		if peer.PublicKey != public || peer.Remote {
+			continue
+		}
+		for _, raw := range peer.WGAllowedIPs {
+			prefix, err := netip.ParsePrefix(raw)
+			if err != nil {
+				return fail()
+			}
+			covered := false
+			for _, previous := range sources {
+				covered = covered || (previous.Bits() <= prefix.Bits() && previous.Contains(prefix.Addr()))
+			}
+			if !covered {
+				return fail()
+			}
+		}
+	}
+	for _, peer := range p.SiteDesired.Peers {
+		if peer.PublicKey == p.RootPublicKey {
+			return peer, nil
+		}
+	}
+	return fail()
 }

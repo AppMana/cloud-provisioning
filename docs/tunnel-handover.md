@@ -229,7 +229,12 @@ respect route dependencies in every table, and recheck routing afterward.
 Retries never invoke preparation or recreate removed peers and devices.
 
 Relay routes, unresolved route claims, and participants without an admitted
-direct legacy path remain unsupported. Caller-admitted route source addresses
+direct legacy path remain unsupported. Before native mutation, a site must have
+a site-role peer in the committed legacy cloud document, and each desired source
+prefix must fit within that peer's legacy permissions. A retained tunnel-only
+peer or a successful handshake does not authorize new workload sources. This
+check is necessary but does not prove source-sensitive relay forwarding.
+Caller-admitted route source addresses
 and tunnel allocations are separate inputs. Phase admission, durable state,
 receipt transport and normal-loop dispatch remain necessary; the native
 component alone cannot enable a coordinated deployment. Cloud-side native

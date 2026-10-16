@@ -66,7 +66,12 @@ supported Windows version. The tests exercise real HTTP listeners, reuse after
 an HTTP request, occupied-port failure and retry, and rejected configurations.
 
 Rebuild the complete runtime package and verify existing static-pod UIDs and
-container identities through a guarded worker restart. Reuse depends on the
+container identities throughout the guarded restart and subsequent reconciliation,
+not only in the first successful API snapshot. Compare the complete manifest,
+including metadata: the node-local balancer carries the k0s build version in
+`app.kubernetes.io/version`, and changing that label changes kubelet's identity
+hash even when the PodSpec and listener URL are identical. Listener reuse alone
+does not preserve the pod across such a version change. Reuse depends on the
 previous generated configuration remaining available; it does not establish
 identity preservation after a reboot that clears the runtime directory or a
 rollback to an unpatched executable. It also does not preserve active exec

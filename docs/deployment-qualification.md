@@ -260,6 +260,21 @@ overrides.
 
 ## Continuous management observations
 
+Runtime maintenance is distinct from a cloud-provisioning agent upgrade.
+An explicitly scoped kubelet or container-runtime restart may interrupt exec
+and logs on the maintained worker, with recovery within 60 seconds. API health,
+management access to other nodes, and existing workload traffic must remain
+uninterrupted. Record the affected Node UID, operation window, every failed
+request, and the first successful recovery for each affected management lane.
+Observe activation and rollback as well as the candidate restart, and retain
+the autonomous rollback limit of five minutes.
+
+Keep runtime-maintenance evidence separate from campaign rows requiring zero
+management failures. This allowance does not apply to agent upgrades, endpoint
+changes or ordinary reconciliation, and does not turn a failed continuous
+management observation into a passing `agent-upgrade` result. A maintenance
+rehearsal alone does not qualify deployment.
+
 `harness/e2e/observe/management.py` samples each explicitly named API directly,
 plus Kubernetes exec and logs to each bound ordinary probe pod. Supply repeated
 `--server` and `--target pod=NodeUID` arguments, an explicit bastion and namespace,

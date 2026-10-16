@@ -104,6 +104,49 @@ class RuntimePreparation(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'do not replay'):
             self.prepare()
 
+    def test_patched_containerd_build_is_accepted(self):
+        self.native_version = 'containerd github.com/containerd/containerd/v2 v2.3.5+streamfix.1 fixture'
+        self.assertEqual(self.prepare()['containerdVersion'], self.native_version)
+
+    def interrupt_after_staging(self):
+        self.native_version = 'invalid native output'
+        with self.assertRaisesRegex(ValueError, 'containerd 2'):
+            self.prepare()
+        self.native_version = 'containerd github.com/containerd/containerd/v2 v2.3.5+streamfix.1 fixture'
+
+    def test_explicit_resume_verifies_existing_bytes_without_rewriting(self):
+        self.interrupt_after_staging()
+        files = [self.root/'var/lib/k0s/bin'/name for name in COMPONENTS]
+        before = [(p.stat().st_ino, p.stat().st_mtime_ns, p.read_bytes()) for p in files]
+        receipt = prepare(self.runtime, self.manifest, self.root, self.native_run, resume=True)
+        self.assertEqual(before, [(p.stat().st_ino, p.stat().st_mtime_ns, p.read_bytes()) for p in files])
+        self.assertEqual(receipt, self.prepare())
+
+    def test_resume_rejects_missing_or_changed_original_staging(self):
+        with self.assertRaisesRegex(ValueError, 'No interrupted'):
+            prepare(self.runtime, self.manifest, self.root, self.native_run, resume=True)
+        self.interrupt_after_staging()
+        target = self.root/'var/lib/k0s/bin/containerd'
+        target.write_bytes(b'changed')
+        with self.assertRaisesRegex(ValueError, 'identity changed'):
+            prepare(self.runtime, self.manifest, self.root, self.native_run, resume=True)
+        self.assertEqual(target.read_bytes(), b'changed')
+        target.unlink()
+        with self.assertRaisesRegex(ValueError, 'incomplete'):
+            prepare(self.runtime, self.manifest, self.root, self.native_run, resume=True)
+        self.assertFalse((self.metadata/'linux-runtime.json').exists())
+
+    def test_resume_rejects_changed_intent(self):
+        self.interrupt_after_staging()
+        intent = self.metadata/'linux-runtime.intent.json'
+        original = json.loads(intent.read_text())
+        original['workerSHA256'] = '0'*64
+        intent.write_text(json.dumps(original))
+        with self.assertRaisesRegex(ValueError, 'intent differs'):
+            prepare(self.runtime, self.manifest, self.root, self.native_run, resume=True)
+        self.assertEqual(json.loads(intent.read_text()), original)
+        self.assertFalse((self.metadata/'linux-runtime.json').exists())
+
     def test_modified_prepared_file_is_rejected_without_repair(self):
         self.prepare()
         binary = self.root/'var/lib/k0s/bin/containerd'

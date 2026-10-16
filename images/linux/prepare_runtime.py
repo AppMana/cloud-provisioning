@@ -43,7 +43,7 @@ def payload(archive, name):
     return archive.read(entries[0])
 
 
-def prepare(runtime, manifest_path, root=pathlib.Path('/'), run=subprocess.run):
+def prepare(runtime, manifest_path, root=pathlib.Path('/'), run=subprocess.run, *, resume=False):
     metadata = root/'etc/cloud-provisioning-image'
     worker = root/'usr/local/bin/k0s'
     data = root/'var/lib/k0s'
@@ -102,15 +102,28 @@ def prepare(runtime, manifest_path, root=pathlib.Path('/'), run=subprocess.run):
                 raise ValueError('Prepared runtime file identity, timestamp or mode changed')
         return receipt
     if intent.exists():
-        raise ValueError('Inspect the original incomplete runtime preparation; do not replay it')
-    if binaries.exists() and (not binaries.is_dir() or any(binaries.iterdir())):
-        raise ValueError('Refuse an unrecorded runtime binary directory')
-    publish(intent, (json.dumps(expected, indent=2)+'\n').encode(), 0o600)
-    binaries.mkdir(parents=True, exist_ok=True)
-    for name, body in contents.items():
-        publish(binaries/name, body, 0o750, mtime_ns)
+        if not resume:
+            raise ValueError('Inspect the original incomplete runtime preparation; do not replay it')
+        if json.loads(intent.read_text()) != expected:
+            raise ValueError('Interrupted staging intent differs from requested inputs')
+        if not binaries.is_dir() or sorted(x.name for x in binaries.iterdir()) != sorted(COMPONENTS):
+            raise ValueError('Interrupted staging is incomplete; no binaries were rewritten')
+        for name, body in contents.items():
+            target = binaries/name
+            if (target.is_symlink() or not target.is_file() or target.read_bytes() != body
+                    or target.stat().st_mtime_ns != mtime_ns or stat.S_IMODE(target.stat().st_mode) != 0o750):
+                raise ValueError('Interrupted staging file identity changed; no binaries were rewritten')
+    else:
+        if resume:
+            raise ValueError('No interrupted staging intent to resume')
+        if binaries.exists() and (not binaries.is_dir() or any(binaries.iterdir())):
+            raise ValueError('Refuse an unrecorded runtime binary directory')
+        publish(intent, (json.dumps(expected, indent=2)+'\n').encode(), 0o600)
+        binaries.mkdir(parents=True, exist_ok=True)
+        for name, body in contents.items():
+            publish(binaries/name, body, 0o750, mtime_ns)
     result = run([str(binaries/'containerd'), '--version'], capture_output=True, text=True, check=True)
-    if not re.search(r'^containerd\s+\S+\s+v?2\.\d+\.\d+(?:\s|$)', result.stdout.strip()):
+    if not re.search(r'^containerd\s+\S+\s+v?2\.\d+\.\d+(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\s|$)', result.stdout.strip()):
         raise ValueError('Require a native containerd 2 executable')
     receipt = dict(expected, containerdVersion=result.stdout.strip(),
                    preparedAt=datetime.datetime.now(datetime.timezone.utc).isoformat())
@@ -122,10 +135,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runtime-archive', type=pathlib.Path, required=True)
     parser.add_argument('--runtime-manifest', type=pathlib.Path, required=True)
+    parser.add_argument('--resume', action='store_true', help='Verify complete interrupted staging and finish its receipt without rewriting binaries')
     args = parser.parse_args()
     if os.geteuid() != 0 or os.uname().sysname != 'Linux':
         parser.error('Run as root in an unjoined Linux image builder')
-    print(json.dumps(prepare(args.runtime_archive, args.runtime_manifest)))
+    print(json.dumps(prepare(args.runtime_archive, args.runtime_manifest, resume=args.resume)))
 
 
 if __name__ == '__main__':

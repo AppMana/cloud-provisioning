@@ -2123,7 +2123,7 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 			fmt.Fprintf(os.Stderr, "moved %s out of the main table: the dialer's routes are not the network's to learn\n", route.Dst)
 		}
 	}
-	return nil
+	return verifyReceiveRouteInstallation(cfg, routeHosts, blocks, own)
 }
 
 // notReadyNodes is the set of node names whose Ready condition the API

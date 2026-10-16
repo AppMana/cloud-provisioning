@@ -194,6 +194,14 @@ Route selections bind the complete prepared receive-permission set, including
 permissions retained during drain. Before changing routes or policy rules, the
 Linux installer rejects missing, expanded, or withdrawn kernel permissions;
 coverage of the selected destination alone is insufficient.
+After installation, receiver route read-back revalidates device identity,
+permissions, authenticated transport and policy rules. Each selected destination
+must have one direct unicast route through the selected device with the expected
+source, without gateway, multipath or encapsulation redirection. Unselected
+more-specific routes fail verification. Read-back never repairs state: a failed
+observation cannot become a successful phase receipt through hidden mutation.
+This proves the configured table at observation time; arbitrary source-sensitive
+or external policy routing still requires site and packet qualification.
 After legacy-device retirement, the route installer accepts only a complete
 receiver-only destination set with no unresolved claims or relay state. It
 skips legacy main-table migration when that device is absent and rejects a

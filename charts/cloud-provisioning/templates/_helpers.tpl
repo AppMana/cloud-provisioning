@@ -80,7 +80,7 @@ responsible for removing names when machines disappear. */}}
 {{- range .role.rules -}}
 {{- if and (deepEqual .apiGroups (list "")) (deepEqual .resources (list "configmaps")) (deepEqual .verbs (list "get")) (not .nonResourceURLs) -}}
 {{- range .resourceNames -}}
-{{- if regexMatch "^receive-transition-[0-9a-f]{32}$" . -}}
+{{- if regexMatch "^receive-(transition|inventory)-[0-9a-f]{32}$" . -}}
 {{- $names = append $names . -}}
 {{- end -}}
 {{- end -}}

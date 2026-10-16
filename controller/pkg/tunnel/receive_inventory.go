@@ -1,0 +1,157 @@
+package tunnel
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"io"
+	"slices"
+	"strings"
+
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
+
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
+)
+
+const receiveInventoryKey = "inventory.json"
+
+// ReceiveInventory is controller-owned discovery, not native completion. Entries
+// are reserved before journal creation and cannot be removed by ordinary
+// reconciliation. A missing reserved journal must never be treated as absence of
+// handover intent. Agents need named read access, never write or list permission.
+type ReceiveInventory struct {
+	Version     int      `json:"version"`
+	ClusterUID  string   `json:"clusterUID"`
+	Namespace   string   `json:"namespace"`
+	MeshName    string   `json:"meshName"`
+	MeshUID     string   `json:"meshUID"`
+	MachineUIDs []string `json:"machineUIDs"`
+}
+
+func ReceiveInventoryName(meshUID string) string {
+	sum := sha256.Sum256([]byte(meshUID))
+	return fmt.Sprintf("receive-inventory-%x", sum[:16])
+}
+
+func (v ReceiveInventory) validate() error {
+	if v.Version != 1 || v.ClusterUID == "" || v.Namespace == "" || v.MeshName == "" || v.MeshUID == "" || v.MachineUIDs == nil {
+		return fmt.Errorf("receiver inventory requires complete mesh and cluster identity")
+	}
+	previous := ""
+	for _, uid := range v.MachineUIDs {
+		if uid == "" || strings.TrimSpace(uid) != uid || uid <= previous {
+			return fmt.Errorf("receiver inventory machine identities must be unique and sorted")
+		}
+		previous = uid
+	}
+	return nil
+}
+
+// ReadReceiveInventory requires the expected mesh incarnation from admitted
+// configuration. Kubernetes resource versions remain opaque; callers re-read
+// this exact object after loading journals to detect inventory changes.
+func ReadReceiveInventory(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID, namespace, meshName, meshUID string) (ReceiveInventory, *corev1.ConfigMap, error) {
+	fail := func(err error) (ReceiveInventory, *corev1.ConfigMap, error) { return ReceiveInventory{}, nil, err }
+	expected := ReceiveInventory{Version: 1, ClusterUID: clusterUID, Namespace: namespace, MeshName: meshName, MeshUID: meshUID, MachineUIDs: []string{}}
+	if err := expected.validate(); err != nil {
+		return fail(err)
+	}
+	if maps == nil {
+		return fail(fmt.Errorf("receiver inventory requires API storage"))
+	}
+	object, err := maps.Get(ctx, ReceiveInventoryName(meshUID), metav1.GetOptions{})
+	if err != nil {
+		return fail(err)
+	}
+	if object.Name != ReceiveInventoryName(meshUID) || object.Namespace != namespace || object.UID == "" || object.ResourceVersion == "" || object.DeletionTimestamp != nil {
+		return fail(fmt.Errorf("receiver inventory identity changed or is deleting"))
+	}
+	var inventory ReceiveInventory
+	decoder := json.NewDecoder(bytes.NewBufferString(object.Data[receiveInventoryKey]))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&inventory); err != nil {
+		return fail(err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		return fail(fmt.Errorf("trailing receiver inventory data"))
+	}
+	if err := inventory.validate(); err != nil {
+		return fail(err)
+	}
+	if inventory.ClusterUID != clusterUID || inventory.Namespace != namespace || inventory.MeshName != meshName || inventory.MeshUID != meshUID {
+		return fail(fmt.Errorf("receiver inventory belongs to another mesh or cluster"))
+	}
+	return inventory, object, nil
+}
+
+// ReserveReceiveJournal only appends immutable Machine identities. Publication
+// precedes journal creation, so a crash cannot leave an executable journal out
+// of discovery. Concurrent updates return the API conflict for reconciliation to
+// reload; they never overwrite another reservation. Cleanup requires a separate
+// protocol after every participant has durably retired its references.
+func ReserveReceiveJournal(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, mesh *corev1.Secret, machineUID string, owners []metav1.OwnerReference) error {
+	if mesh == nil || mesh.UID == "" || mesh.ResourceVersion == "" || mesh.DeletionTimestamp != nil || machineUID == "" || strings.TrimSpace(machineUID) != machineUID || maps == nil {
+		return fmt.Errorf("receiver reservation requires live identities and API storage")
+	}
+	inventory, object, err := ReadReceiveInventory(ctx, maps, clusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
+	creating := apierrors.IsNotFound(err)
+	if err != nil && !creating {
+		return err
+	}
+	if creating {
+		// Absence is only a first-use condition when no journal for this mesh
+		// exists. Recreating a deleted index from today's Machine list could
+		// silently drop retired Machines whose routes are still in use.
+		objects, err := maps.List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		for _, object := range objects.Items {
+			if !strings.HasPrefix(object.Name, "receive-transition-") {
+				continue
+			}
+			store := handover.Store{ConfigMaps: maps, Name: object.Name, ClusterUID: clusterUID}
+			snapshot, err := store.Load(ctx)
+			if err != nil {
+				return fmt.Errorf("cannot establish first-use receiver inventory: %w", err)
+			}
+			plan, err := DecodeReceiveTransition(snapshot, clusterUID)
+			if err != nil {
+				return err
+			}
+			if plan.MeshUID == string(mesh.UID) {
+				return fmt.Errorf("receiver inventory is missing for an existing journal")
+			}
+		}
+		inventory = ReceiveInventory{Version: 1, ClusterUID: clusterUID, Namespace: mesh.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUIDs: []string{}}
+		object = &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ReceiveInventoryName(string(mesh.UID)), Namespace: mesh.Namespace, OwnerReferences: owners}}
+	}
+	if slices.Contains(inventory.MachineUIDs, machineUID) {
+		return nil
+	}
+	inventory.MachineUIDs = append(inventory.MachineUIDs, machineUID)
+	slices.Sort(inventory.MachineUIDs)
+	if err := inventory.validate(); err != nil {
+		return err
+	}
+	raw, err := json.Marshal(inventory)
+	if err != nil {
+		return err
+	}
+	if object.Data == nil {
+		object.Data = map[string]string{}
+	}
+	object.Data[receiveInventoryKey] = string(raw)
+	if creating {
+		_, err = maps.Create(ctx, object, metav1.CreateOptions{})
+	} else {
+		_, err = maps.Update(ctx, object, metav1.UpdateOptions{})
+	}
+	return err
+}

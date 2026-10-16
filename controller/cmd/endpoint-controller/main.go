@@ -1666,7 +1666,8 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 // it renders the Role with only the peer Secret's name and this method
 // carries the rest, derived from the same machine list that drives the
 // adoption Secrets themselves. Online chart upgrades preserve the current
-// named grants; this reconciliation removes grants for departed machines.
+// named grants; this reconciliation removes grants for departed machines,
+// except journals still reserved by the controller-owned handover inventory.
 func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 	if r.dialerServiceAccount == "" {
 		return nil
@@ -1689,6 +1690,30 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 				return fmt.Errorf("journal read access requires a machine UID")
 			}
 			journals = append(journals, tunnel.ReceiveTransitionName(string(machines.Items[i].GetUID())))
+		}
+	}
+	if r.receivePreparation != nil && r.receivePreparation.Journal != nil {
+		mesh := &corev1.Secret{}
+		if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, mesh); err != nil {
+			return err
+		}
+		if mesh.UID == "" || mesh.DeletionTimestamp != nil {
+			return fmt.Errorf("journal read access requires a live mesh identity")
+		}
+		inventory, _, err := tunnel.ReadReceiveInventory(ctx, r.receiveJournal.ConfigMaps, r.receiveJournal.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		journals = append(journals, tunnel.ReceiveInventoryName(string(mesh.UID)))
+		for _, uid := range inventory.MachineUIDs {
+			name := tunnel.ReceiveTransitionName(uid)
+			found := false
+			for _, current := range journals {
+				found = found || current == name
+			}
+			if !found {
+				journals = append(journals, name)
+			}
 		}
 	}
 	sort.Strings(adoption)

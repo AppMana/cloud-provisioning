@@ -56,6 +56,21 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 	if machine == nil || machine.GetUID() == "" || machine.GetNamespace() != r.secretNamespace || store.Name != tunnel.ReceiveTransitionName(string(machine.GetUID())) {
 		return nil, fmt.Errorf("receiver journal requires a scoped machine identity")
 	}
+	mesh := &corev1.Secret{}
+	if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, mesh); err != nil {
+		return nil, err
+	}
+	currentMachine := &unstructured.Unstructured{}
+	currentMachine.SetGroupVersionKind(machine.GetObjectKind().GroupVersionKind())
+	if err := r.reader.Get(ctx, client.ObjectKeyFromObject(machine), currentMachine); err != nil {
+		return nil, err
+	}
+	if currentMachine.GetUID() != machine.GetUID() {
+		return nil, fmt.Errorf("receiver inventory machine identity changed")
+	}
+	if err := tunnel.ReserveReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, mesh, string(machine.GetUID()), r.owners()); err != nil {
+		return nil, err
+	}
 	existing, err := store.Load(ctx)
 	if err == nil {
 		plan, err := tunnel.DecodeReceiveTransition(existing, store.ClusterUID)

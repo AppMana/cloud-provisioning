@@ -91,7 +91,8 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 	}
 	role.Rules[0].ResourceNames = append(role.Rules[0].ResourceNames, "worker-a-tunnel-peers", "worker-b-tunnel-peers")
 	journalName := tunnel.ReceiveTransitionName("worker-a-uid")
-	role.Rules = append(role.Rules, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: []string{journalName}})
+	indexName := tunnel.ReceiveInventoryName("mesh-uid")
+	role.Rules = append(role.Rules, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: []string{journalName, indexName}})
 	if err := admin.Update(ctx, role); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +101,7 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, name := range []string{journalName, "unrelated-journal"} {
+	for _, name := range []string{journalName, indexName, "unrelated-journal"} {
 		if err := admin.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: key.Namespace}, Data: map[string]string{"transition.json": "controller-owned"}}); err != nil {
 			t.Fatal(err)
 		}
@@ -127,23 +128,25 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 		if err := dialer.Get(ctx, types.NamespacedName{Namespace: key.Namespace, Name: "unrelated"}, &corev1.Secret{}); !apierrors.IsForbidden(err) {
 			t.Fatalf("unrelated secret access: %v", err)
 		}
-		journal := &corev1.ConfigMap{}
-		if err := dialer.Get(ctx, types.NamespacedName{Namespace: key.Namespace, Name: journalName}, journal); err != nil {
-			t.Fatal("journal read access interrupted:", err)
-		}
-		before := journal.DeepCopy()
-		journal.Data["transition.json"] = "forged"
-		for verb, mutate := range map[string]func() error{
-			"update": func() error { return dialer.Update(ctx, journal) },
-			"patch":  func() error { return dialer.Patch(ctx, journal, client.MergeFrom(before)) },
-			"delete": func() error { return dialer.Delete(ctx, journal) },
-			"create": func() error {
-				return dialer.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: tunnel.ReceiveTransitionName("forged"), Namespace: key.Namespace}})
-			},
-			"list": func() error { return dialer.List(ctx, &corev1.ConfigMapList{}, client.InNamespace(key.Namespace)) },
-		} {
-			if err := mutate(); !apierrors.IsForbidden(err) {
-				t.Fatalf("journal %s was not forbidden: %v", verb, err)
+		for _, protectedName := range []string{journalName, indexName} {
+			journal := &corev1.ConfigMap{}
+			if err := dialer.Get(ctx, types.NamespacedName{Namespace: key.Namespace, Name: protectedName}, journal); err != nil {
+				t.Fatal("journal read access interrupted:", err)
+			}
+			before := journal.DeepCopy()
+			journal.Data["transition.json"] = "forged"
+			for verb, mutate := range map[string]func() error{
+				"update": func() error { return dialer.Update(ctx, journal) },
+				"patch":  func() error { return dialer.Patch(ctx, journal, client.MergeFrom(before)) },
+				"delete": func() error { return dialer.Delete(ctx, journal) },
+				"create": func() error {
+					return dialer.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: tunnel.ReceiveTransitionName("forged"), Namespace: key.Namespace}})
+				},
+				"list": func() error { return dialer.List(ctx, &corev1.ConfigMapList{}, client.InNamespace(key.Namespace)) },
+			} {
+				if err := mutate(); !apierrors.IsForbidden(err) {
+					t.Fatalf("journal %s was not forbidden: %v", verb, err)
+				}
 			}
 		}
 		if err := dialer.Get(ctx, types.NamespacedName{Namespace: key.Namespace, Name: "unrelated-journal"}, &corev1.ConfigMap{}); !apierrors.IsForbidden(err) {
@@ -171,7 +174,7 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 	if err := admin.Get(ctx, key, role); err != nil {
 		t.Fatal(err)
 	}
-	if len(role.Rules) != 2 || !equalStrings(role.Rules[0].ResourceNames, []string{"cloud-provisioning-peers", "worker-a-tunnel-peers", "worker-b-tunnel-peers"}) || !equalStrings(role.Rules[1].ResourceNames, []string{journalName}) {
+	if len(role.Rules) != 2 || !equalStrings(role.Rules[0].ResourceNames, []string{"cloud-provisioning-peers", "worker-a-tunnel-peers", "worker-b-tunnel-peers"}) || !equalStrings(role.Rules[1].ResourceNames, []string{indexName, journalName}) {
 		t.Fatalf("upgrade changed grants: %+v", role.Rules)
 	}
 }

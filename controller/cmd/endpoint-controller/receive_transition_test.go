@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
@@ -57,6 +59,22 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	defer func() { r.receivePreparation.Journal = nil }()
 	store := r.receiveJournal
 	store.Name = tunnel.ReceiveTransitionName(string(machine.GetUID()))
+	// Verify publication ordering at the real API write boundary: no journal
+	// may be created before discovery contains its immutable Machine identity.
+	r.receiveJournal.ConfigMaps = inventoryCheckedCreates{ConfigMapInterface: store.ConfigMaps, check: func(ctx context.Context, object *corev1.ConfigMap) error {
+		if object.Name != store.Name {
+			return nil
+		}
+		mesh := &corev1.Secret{}
+		if err := r.reader.Get(ctx, client.ObjectKey{Namespace: r.secretNamespace, Name: r.secretName}, mesh); err != nil {
+			return err
+		}
+		inventory, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
+		if err != nil || !slices.Contains(inventory.MachineUIDs, string(machine.GetUID())) {
+			return fmt.Errorf("journal creation preceded its reservation: %v", err)
+		}
+		return nil
+	}}
 	now := time.Now()
 	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
 		t.Fatalf("normal adoption reconciliation did not commit a prepared plan: %v", err)
@@ -79,6 +97,7 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	if plan.MachineUID != string(machine.GetUID()) || len(plan.Sites) != 2 {
 		t.Fatal("journal lost controller plan")
 	}
+	verifyReceiveInventory(t, r, string(machine.GetUID()))
 	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
 		t.Fatalf("normal reconciliation could not resume its journal: %v", err)
 	}

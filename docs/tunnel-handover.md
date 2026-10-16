@@ -132,6 +132,23 @@ writable channel. This read access does not authorize native execution or
 provide a receipt collector. Removing a Machine removes its named journal
 grant; an empty Machine set never produces namespace-wide ConfigMap access.
 
+Journal discovery uses a controller-owned ConfigMap bound to the mesh and
+cluster identities. Normal controller reconciliation reserves each immutable
+Machine UID before creating its journal. Reservations only accumulate; deleting
+a Machine does not remove its journal from discovery or revoke named read
+access. Concurrent reservations use resource-version conflict detection, and
+corrupt inventory blocks publication. A missing inventory cannot be recreated
+automatically when an existing journal for that mesh remains. Retiring inventory
+entries requires a separate protocol after all participants have released their
+references; ordinary reconciliation does not perform that cleanup.
+
+Agents receive named get-only access to the inventory and its journals. Helm
+upgrades preserve those grants without granting ConfigMap write or list access.
+Agent discovery must still bind the inventory incarnation, load every reserved
+journal, and revalidate the inventory revision before executing combined route
+intent. This complete-set admission is not yet connected to the agent loop;
+reservations and read access alone do not authorize a phase.
+
 Controller recovery and agent admission share a strict journal decoder. It
 binds the public plan to the committed round, journal name and namespace, and
 rejects deleting journals. The read-only agent admission component also checks

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"sort"
 	"testing"
@@ -13,8 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 )
 
@@ -47,7 +50,7 @@ func TestTheDialerRoleNamesExactlyTheSecretsTheDialerTouches(t *testing.T) {
 	}
 
 	meshSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "peers", Namespace: "cloud-provisioning"},
+		ObjectMeta: metav1.ObjectMeta{Name: "peers", Namespace: "cloud-provisioning", UID: "mesh-uid"},
 	}
 	// The Role as the chart's static floor renders it: the verbs are
 	// right, the scope is the whole namespace.
@@ -107,6 +110,7 @@ func TestTheDialerRoleNamesExactlyTheSecretsTheDialerTouches(t *testing.T) {
 	// as the controller's transition builder and must exclude this machine.
 	want[0].ResourceNames = []string{"peers", tunnel.AdoptionSecretName("foreign"), tunnel.AdoptionSecretName("remote1"), tunnel.AdoptionSecretName("remote2")}
 	r.receivePreparation = &receivePreparationPolicy{Journal: &receiveJournalPolicy{}}
+	r.receiveJournal = handover.Store{ConfigMaps: kubefake.NewClientset().CoreV1().ConfigMaps(r.secretNamespace), ClusterUID: "cluster"}
 	if err := r.ensureDialerRole(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +118,8 @@ func TestTheDialerRoleNamesExactlyTheSecretsTheDialerTouches(t *testing.T) {
 	if err := c.Get(context.Background(), key, got); err != nil {
 		t.Fatal(err)
 	}
-	names := []string{tunnel.ReceiveTransitionName("uid-remote1"), tunnel.ReceiveTransitionName("uid-remote2")}
+	indexName := tunnel.ReceiveInventoryName(string(meshSecret.UID))
+	names := []string{indexName, tunnel.ReceiveTransitionName("uid-remote1"), tunnel.ReceiveTransitionName("uid-remote2")}
 	sort.Strings(names)
 	want = append(want, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: names})
 	if !reflect.DeepEqual(got.Rules, want) {
@@ -127,6 +132,13 @@ func TestTheDialerRoleNamesExactlyTheSecretsTheDialerTouches(t *testing.T) {
 	if err := c.Get(context.Background(), key, got); err != nil || got.ResourceVersion != version {
 		t.Fatal("unchanged journal grants were rewritten", err)
 	}
+	raw, err := json.Marshal(tunnel.ReceiveInventory{Version: 1, ClusterUID: "cluster", Namespace: r.secretNamespace, MeshName: meshSecret.Name, MeshUID: string(meshSecret.UID), MachineUIDs: []string{"uid-remote1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.receiveJournal.ConfigMaps.Create(context.Background(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: indexName, Namespace: r.secretNamespace, UID: "inventory-uid", ResourceVersion: "1"}, Data: map[string]string{"inventory.json": string(raw)}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range []string{"remote1", "remote2"} {
 		if err := c.Delete(context.Background(), machineOf(name)); err != nil {
 			t.Fatal(err)
@@ -137,11 +149,11 @@ func TestTheDialerRoleNamesExactlyTheSecretsTheDialerTouches(t *testing.T) {
 		if err := c.Get(context.Background(), key, got); err != nil {
 			t.Fatal(err)
 		}
-		if name == "remote1" && (len(got.Rules) != 2 || !reflect.DeepEqual(got.Rules[1].ResourceNames, []string{tunnel.ReceiveTransitionName("uid-remote2")})) {
-			t.Fatal("deleted machine retained journal read access")
+		if name == "remote1" && (len(got.Rules) != 2 || !reflect.DeepEqual(got.Rules[1].ResourceNames, names)) {
+			t.Fatal("reserved journal lost read access after machine deletion")
 		}
-		if name == "remote2" && len(got.Rules) != 1 {
-			t.Fatal("empty journal membership retained or broadened ConfigMap access")
+		if name == "remote2" && (len(got.Rules) != 2 || !reflect.DeepEqual(got.Rules[1].ResourceNames, []string{indexName, tunnel.ReceiveTransitionName("uid-remote1")})) {
+			t.Fatal("journal access differs from retained inventory")
 		}
 	}
 }

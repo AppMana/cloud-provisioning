@@ -17,8 +17,12 @@ controller before deployment; source tests do not qualify a running binary.
 
 ## Windows Traefik configuration replacement
 
-`windows-traefik.patch` targets k0s `v1.36.2+k0s.0`, commit
-`bdf1c22c23a5af23ec6a1ff764179f6a6cf6f7dc`.
+`windows-traefik.patch` targets these upstream worker revisions:
+
+| Release | Commit |
+| --- | --- |
+| `v1.36.2+k0s.0` | `bdf1c22c23a5af23ec6a1ff764179f6a6cf6f7dc` |
+| `v1.36.4+k0s.1` | `c37fe960bdee93ca14c5a5b9f2ab9700f8e82e60` |
 
 The native Traefik node-local balancer writes its public configuration with
 POSIX mode `0444`. On Windows this sets the read-only file attribute, preventing
@@ -51,7 +55,9 @@ Run `nllb.test.exe` through the VM's native management channel with the same
 `-test.run` expression. Testing this patch does not replace a rebuilt-worker
 rollout, API backend-change/failover tests, or fresh prepared-image CAPI boots.
 Prepared-image boots remain a separate qualification from an existing-worker
-binary rollout.
+binary rollout. Cross-compilation does not exercise Windows file replacement;
+execute the tests natively for each source version and Windows version being
+qualified.
 
 ## Build a complete Windows worker
 

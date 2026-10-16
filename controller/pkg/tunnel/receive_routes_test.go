@@ -46,11 +46,17 @@ func TestReceiveRoutesFollowDesiredOwnerAndPreserveNativePaths(t *testing.T) {
 		t.Fatalf("unexpected routes: %+v", routes)
 	}
 	for _, selection := range routes["cloud"] {
+		if !reflect.DeepEqual(selection.AllowedSources, []string{"10.90.0.0/24", "2001:db8:1::/64"}) {
+			t.Fatal("cloud receive source permissions not bound")
+		}
 		if selection.PeerPublicKey != site || selection.PublicKey != p.Bindings[site].PublicKey || selection.Interface != p.Bindings[site].Interface {
 			t.Fatal("cloud route uses the old or another peer")
 		}
 	}
 	for _, selection := range routes["site"] {
+		if !reflect.DeepEqual(selection.AllowedSources, p.Sites[site].Client.AllowedSources) {
+			t.Fatal("site receive source permissions not bound")
+		}
 		if selection.PublicKey != site || selection.PeerPublicKey != p.Bindings[site].PublicKey || selection.Interface != p.Sites[site].Client.Interface {
 			t.Fatal("site route uses another cloud transport")
 		}
@@ -108,5 +114,29 @@ func TestReceiveRoutesRejectIncompleteOrExpandedPlans(t *testing.T) {
 				t.Fatal("unsafe route plan accepted")
 			}
 		})
+	}
+}
+
+func TestReceiveRoutesBindRetainedDrainPermissions(t *testing.T) {
+	p := routeTransitionFixture(t)
+	var previous PeerListDoc
+	if err := json.Unmarshal(p.Base, &previous); err != nil {
+		t.Fatal(err)
+	}
+	previous.Peers = append(previous.Peers, PeerSpec{PublicKey: receiverTestKey(16), WGAllowedIPs: []string{"10.91.0.0/24"}})
+	var err error
+	p.Base, err = json.Marshal(previous)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routes, err := PlanReceiveRoutes(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := []string{"10.90.0.0/24", "10.91.0.0/24", "2001:db8:1::/64"}
+	for _, selection := range routes["cloud"] {
+		if !reflect.DeepEqual(selection.AllowedSources, expected) {
+			t.Fatal("selection discarded receive permissions needed during drain")
+		}
 	}
 }

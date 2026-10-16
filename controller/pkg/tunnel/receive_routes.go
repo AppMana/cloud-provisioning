@@ -6,15 +6,17 @@ import (
 	"fmt"
 	"net/netip"
 	"reflect"
+	"slices"
 )
 
 // ReceiveRouteSelection identifies an already prepared device. It carries no
 // permission to configure peers, expand source ranges, or retire old devices.
 type ReceiveRouteSelection struct {
-	Interface     string `json:"interface"`
-	Alias         string `json:"alias"`
-	PublicKey     string `json:"publicKey"`
-	PeerPublicKey string `json:"peerPublicKey"`
+	Interface      string   `json:"interface"`
+	Alias          string   `json:"alias"`
+	PublicKey      string   `json:"publicKey"`
+	PeerPublicKey  string   `json:"peerPublicKey"`
+	AllowedSources []string `json:"allowedSources"`
 }
 
 // PlanReceiveRoutes derives desired egress by Node UID from the committed
@@ -47,6 +49,10 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 	}
 	cloudRoutes := map[string]ReceiveRouteSelection{}
 	result := map[string]map[string]ReceiveRouteSelection{p.CloudNodeUID: cloudRoutes}
+	sources := map[string][]string{}
+	for _, receiver := range preparation.Receivers {
+		sources[receiver.PublicKey] = receiver.AllowedSources
+	}
 	sites := 0
 	for _, peer := range p.Desired.Peers {
 		if peer.Remote {
@@ -62,12 +68,12 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 			return nil, fmt.Errorf("site receiver differs from the committed peer document: %v", err)
 		}
 		sum := sha256.Sum256([]byte(p.MeshUID + "\x00" + peer.PublicKey))
-		selection := ReceiveRouteSelection{Interface: binding.Interface, Alias: fmt.Sprintf("cloud-provisioning:receive:v1:%x", sum), PublicKey: binding.PublicKey, PeerPublicKey: peer.PublicKey}
+		selection := ReceiveRouteSelection{Interface: binding.Interface, Alias: fmt.Sprintf("cloud-provisioning:receive:v1:%x", sum), PublicKey: binding.PublicKey, PeerPublicKey: peer.PublicKey, AllowedSources: slices.Clone(sources[peer.PublicKey])}
 		if err := addReceiveRoutes(cloudRoutes, peer, selection); err != nil {
 			return nil, err
 		}
 		sum = sha256.Sum256([]byte(p.MeshUID + "\x00" + peer.PublicKey + "\x00" + p.RootPublicKey))
-		selection = ReceiveRouteSelection{Interface: client.Interface, Alias: fmt.Sprintf("cloud-provisioning:receive-client:v1:%x", sum), PublicKey: peer.PublicKey, PeerPublicKey: binding.PublicKey}
+		selection = ReceiveRouteSelection{Interface: client.Interface, Alias: fmt.Sprintf("cloud-provisioning:receive-client:v1:%x", sum), PublicKey: peer.PublicKey, PeerPublicKey: binding.PublicKey, AllowedSources: slices.Clone(client.AllowedSources)}
 		routes := map[string]ReceiveRouteSelection{}
 		for _, cloud := range p.SiteDesired.Peers {
 			if cloud.PublicKey == p.RootPublicKey {

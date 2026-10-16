@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"slices"
 	"strings"
 	"time"
 
@@ -58,6 +59,9 @@ func validateReceiveRouteSelections(cfg config, hosts, blocks []net.IPNet) (map[
 			return nil, fmt.Errorf("selected receiver cryptographic identity changed")
 		}
 		peer := device.Peers[0]
+		if !receiveSourcesMatch(selection.AllowedSources, peer.AllowedIPs) {
+			return nil, fmt.Errorf("selected receiver source permissions differ from the committed plan")
+		}
 		now := time.Now()
 		if peer.Endpoint == nil || peer.LastHandshakeTime.IsZero() || peer.LastHandshakeTime.After(now) || now.Sub(peer.LastHandshakeTime) > receiveHandshakeMaxAge {
 			return nil, fmt.Errorf("selected receiver has no current authenticated transport")
@@ -75,4 +79,36 @@ func validateReceiveRouteSelections(cfg config, hosts, blocks []net.IPNet) (map[
 		result[raw] = link.Attrs().Index
 	}
 	return result, nil
+}
+
+// Route coverage alone cannot detect a device that also accepts spoofed sources.
+// Compare the complete canonical permission set, including retained drain paths.
+func receiveSourcesMatch(expected []string, actual []net.IPNet) bool {
+	if len(expected) == 0 || len(expected) != len(actual) {
+		return false
+	}
+	canonical := func(raw []string) ([]string, bool) {
+		result := make([]string, 0, len(raw))
+		seen := map[netip.Prefix]bool{}
+		for _, value := range raw {
+			p, err := netip.ParsePrefix(value)
+			if err != nil || p != p.Masked() || p.Bits() == 0 || p.Addr().Is4In6() || !p.Addr().IsGlobalUnicast() || seen[p] {
+				return nil, false
+			}
+			seen[p] = true
+			result = append(result, p.String())
+		}
+		slices.Sort(result)
+		return result, true
+	}
+	want, valid := canonical(expected)
+	if !valid {
+		return false
+	}
+	raw := make([]string, len(actual))
+	for i, p := range actual {
+		raw[i] = p.String()
+	}
+	got, valid := canonical(raw)
+	return valid && slices.Equal(want, got)
 }

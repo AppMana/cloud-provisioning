@@ -126,6 +126,10 @@ explicitly. Avoid OS branches in the protocol state machine.
 
 Linux needs dedicated route ownership for each generation and a verified
 egress switch that preserves WireGuard's outer-packet routing exemption.
+Route selections bind the complete prepared receive-permission set, including
+permissions retained during drain. Before changing routes or policy rules, the
+Linux installer rejects missing, expanded, or withdrawn kernel permissions;
+coverage of the selected destination alone is insufficient.
 Windows needs independent adapter lifetimes, route and source-address behavior,
 and HNS/VFP isolation checks on Server 2022 and Server 2025. The current
 single-device `Apply`/`Close` contract is insufficient to represent preparation,

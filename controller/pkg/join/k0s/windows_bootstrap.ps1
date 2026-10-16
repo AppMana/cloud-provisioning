@@ -1,5 +1,22 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+function Install-WorkerManagementFirewall {
+    param([string]$Name, [string]$NodeAddress, [string]$Interface)
+    $address = [Net.IPAddress]::Parse($NodeAddress).ToString()
+    if (!(Get-NetIPAddress -IPAddress $address -ErrorAction SilentlyContinue)) { throw 'Worker management address is not assigned locally' }
+    Get-NetAdapter -Name $Interface -ErrorAction Stop | Out-Null
+    $localRule = $Name + '-local-management'
+    $meshRule = $Name + '-mesh-kubelet'
+    foreach ($rule in @($localRule, $meshRule)) {
+        if (Get-NetFirewallRule -Name $rule -ErrorAction SilentlyContinue) { throw 'Refusing to overwrite an existing management firewall rule' }
+    }
+    # HNS NodePort routing can recirculate connections to the node's own IP.
+    # These packets require inbound permission even though the caller is local.
+    New-NetFirewallRule -Name $localRule -DisplayName $localRule -Direction Inbound -Action Allow -Profile Any -Protocol TCP -LocalAddress $address -RemoteAddress $address -LocalPort 10250,8093 | Out-Null
+    # Site management arrives through the authenticated tunnel. Health probes
+    # remain local; only the authenticated kubelet API is exposed on the mesh.
+    New-NetFirewallRule -Name $meshRule -DisplayName $meshRule -Direction Inbound -Action Allow -Profile Any -Protocol TCP -InterfaceAlias $Interface -LocalPort 10250 | Out-Null
+}
 $plan = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PLAN_BASE64__')) | ConvertFrom-Json
 $root = 'C:\ProgramData\CloudProvisioning'
 $mesh = Join-Path $root $plan.interface
@@ -41,6 +58,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Setting tunnel service recovery failed' }
 New-NetFirewallRule -Name ($name+'-udp') -DisplayName ($name+'-udp') -Direction Inbound -Action Allow -Protocol UDP -LocalPort $plan.listenPort | Out-Null
 Start-Service $name
 (Get-Service $name).WaitForStatus('Running',[TimeSpan]::FromSeconds(60))
+Install-WorkerManagementFirewall -Name $name -NodeAddress $nodeAddress -Interface $plan.interface
 # k0s owns its distribution-default runtime, CNI installation and load balancer.
 # Pass one string as kubelet-extra-args; no shell evaluates the supplied values.
 $extra = ($plan.kubeletExtraArgs+' --node-ip='+$nodeAddress+' --provider-id='+$providerID+' --hostname-override='+$plan.machineName).Trim()

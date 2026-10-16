@@ -76,11 +76,18 @@ type Provider struct {
 	// into the operator's generic surface. Recognized keys:
 	//
 	//	releases-api overrides GitHubReleasesAPI (hermetic e2e)
+	//	worker-release explicitly selects the upstream worker release for
+	//	controllers built with a local suffix; their observed base must match
 	ConfigNamespace string
 	ConfigName      string
 }
 
 const defaultGitHubReleasesAPI = "https://api.github.com/repos/k0sproject/k0s/releases"
+
+const k0sReleaseExpression = `v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?\+k0s\.[0-9]+`
+
+var upstreamK0sRelease = regexp.MustCompile(`^` + k0sReleaseExpression + `$`)
+var observedK0sRelease = regexp.MustCompile(`^(` + k0sReleaseExpression + `)(?:\.[0-9A-Za-z-]+)*$`)
 
 // JoinValues implements join.ClusterJoinProvider.
 func (p *Provider) JoinValues(ctx context.Context) (map[string]any, error) {
@@ -182,6 +189,10 @@ func (p *Provider) clusterCACert(ctx context.Context) ([]byte, error) {
 // release tag/asset name k0s publishes (e.g. "v1.36.2+k0s.0");
 // resolveK0sReleaseTag turns it into the real, download-able tag.
 func (p *Provider) introspectK0sVersion(ctx context.Context) (string, error) {
+	workerRelease, err := p.configuredWorkerRelease(ctx)
+	if err != nil {
+		return "", err
+	}
 	if p.Reader != nil {
 		controls := &unstructured.UnstructuredList{}
 		controls.SetGroupVersionKind(schema.GroupVersionKind{Group: "autopilot.k0sproject.io", Version: "v1beta2", Kind: "ControlNodeList"})
@@ -193,16 +204,29 @@ func (p *Provider) introspectK0sVersion(ctx context.Context) (string, error) {
 			selected := ""
 			for _, control := range controls.Items {
 				value, _, _ := unstructured.NestedString(control.Object, "status", "k0sVersion")
-				if !regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?\+k0s\.[0-9]+$`).MatchString(value) {
+				match := observedK0sRelease.FindStringSubmatch(value)
+				if match == nil {
 					return "", fmt.Errorf("control node %s reports invalid k0sVersion %q", control.GetName(), value)
+				}
+				if workerRelease == "" && value != match[1] {
+					return "", fmt.Errorf("patched control node %s requires an explicit worker-release", control.GetName())
+				}
+				if workerRelease != "" && match[1] != workerRelease {
+					return "", fmt.Errorf("control node %s base release %s differs from configured worker-release %s", control.GetName(), match[1], workerRelease)
 				}
 				if selected != "" && selected != value {
 					return "", fmt.Errorf("control nodes report mixed k0s versions %s and %s; cannot choose an exact worker release", selected, value)
 				}
 				selected = value
 			}
+			if workerRelease != "" {
+				return workerRelease, nil
+			}
 			return selected, nil
 		}
+	}
+	if workerRelease != "" {
+		return "", fmt.Errorf("configured worker-release requires observed k0s ControlNode versions")
 	}
 
 	nodes, err := p.Client.CoreV1().Nodes().List(ctx, metav1.ListOptions{Limit: 1})
@@ -214,6 +238,30 @@ func (p *Provider) introspectK0sVersion(ctx context.Context) (string, error) {
 	}
 	kubeletVersion := nodes.Items[0].Status.NodeInfo.KubeletVersion
 	return resolveK0sReleaseTag(ctx, p.githubReleasesAPI(ctx), kubeletVersion)
+}
+
+func (p *Provider) configuredWorkerRelease(ctx context.Context) (string, error) {
+	if p.ConfigName == "" {
+		return "", nil
+	}
+	if p.Client == nil {
+		return "", fmt.Errorf("reading k0s provider configuration requires a Kubernetes client")
+	}
+	cfg, err := p.Client.CoreV1().Secrets(p.ConfigNamespace).Get(ctx, p.ConfigName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("reading k0s provider configuration: %w", err)
+	}
+	value, configured := cfg.Data["worker-release"]
+	if !configured {
+		return "", nil
+	}
+	if !upstreamK0sRelease.Match(value) {
+		return "", fmt.Errorf("worker-release must identify an exact upstream k0s release")
+	}
+	return string(value), nil
 }
 
 func (p *Provider) githubReleasesAPI(ctx context.Context) string {

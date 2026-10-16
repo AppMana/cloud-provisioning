@@ -15,10 +15,7 @@ import (
 	runtimefake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// The first fixture was captured from the real kube-router VM site after
-// GitHub release enumeration returned 403 during remote re-addition; the
-// second from a production single-controller cluster whose release carries
-// a +k0s.1 suffix the kubelet version does not.
+// ControlNode status includes the release counter omitted by kubelet versions.
 func TestObservedControlNodesProvideTheExactInstalledRelease(t *testing.T) {
 	for _, observed := range []struct{ file, release string }{
 		{"testdata/controlnodes-v1.34.1.json", "v1.34.1+k0s.0"},

@@ -1,5 +1,23 @@
 # k0s provider patches
 
+## Worker releases with patched controllers
+
+Give patched controllers a version beginning with their upstream release, such
+as `v1.36.4+k0s.1.egress.2`. To provision workers against that controller build,
+set `worker-release` to `v1.36.4+k0s.1` in the existing `k0s-provider-config`
+Secret in the controller's namespace. Preserve any other configured keys.
+
+The join provider requires every observed Autopilot `ControlNode` to report
+the same complete controller version and the configured upstream base. Missing
+observations, mixed builds, malformed versions and a different base fail
+selection. Without this explicit setting, custom controller versions remain
+rejected. An unreadable configuration also stops selection.
+
+This selects the upstream Linux worker release used by the normal bootstrap
+path. A patched Windows worker still requires `windowsBootstrap.workerVersion`
+and `windowsBootstrap.workerSHA256`, with that same upstream base. Qualify those
+controller and worker artifacts together before enabling provisioning.
+
 ## Empty optional manifests with patches enabled
 
 `empty-manifest-patches.patch` targets k0s `v1.36.4+k0s.1`, commit

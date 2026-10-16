@@ -54,7 +54,6 @@ func TestWindowsSecretsManagerEnvelope(t *testing.T) {
 	if settings.Prefix != "aws.cluster.x-k8s.io/abc-123" || settings.Region != "us-west-2" || settings.Chunks != 2 {
 		t.Fatal("settings changed")
 	}
-	// These are native-consumer requirements observed with real binary chunks:
 	// AWS Tools returns a MemoryStream; PowerShell 5 needs a UTF-8 BOM on disk.
 	if !bytes.Contains(body, []byte("$response.SecretBinary.CopyTo($compressed)")) || !bytes.Contains(body, []byte("Text.UTF8Encoding($true)")) {
 		t.Fatal("native binary/UTF-8 contract missing")

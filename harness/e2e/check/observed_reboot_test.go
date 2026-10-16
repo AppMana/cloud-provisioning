@@ -58,9 +58,8 @@ func (p *rebootReplay) Resolve(_ context.Context, from, _ string) error {
 	return p.failure(from, "", DNS)
 }
 
-// The native returned matrix failed 15 probes before a later pass recovered.
-// Replay that observed outcome sequence to ensure convergence and its observer
-// retain every failure. This does not simulate the cause or native timing.
+// Replay failed observations followed by convergence to verify that the
+// observer retains every failure. This does not simulate causes or timing.
 func TestObservedRebootFailuresRemainVisibleAfterConvergence(t *testing.T) {
 	raw, err := os.ReadFile("testdata/k0s-kuberouter-reboot-convergence.json")
 	if err != nil {

@@ -141,8 +141,7 @@ func TestResolverIncludesNativeWorkerAPIIngress(t *testing.T) {
 }
 
 func TestResolverIncludesObservedKonnectivityPortWithWorkerScope(t *testing.T) {
-	// Native Windows TCP 8132 and kubectl exec recovered when this exact
-	// worker /32 ingress was temporarily permitted on the gateway's group.
+	// Konnectivity ingress must be restricted to the attached worker's /32.
 	r, record, _ := resolverFixture(t)
 	r.APIPort = 6443
 	record.Plan.TCPPorts = []uint16{8132, 6443, 8132}

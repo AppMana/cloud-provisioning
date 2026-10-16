@@ -71,8 +71,8 @@ func validateMachine(m Machine) error {
 	return nil
 }
 
-// PlanGateway implements the subnet-Ethernet path observed with native Calico
-// VXLAN on Windows 2022/2025. It is also usable for other guests that require
+// PlanGateway describes the subnet-Ethernet path for Calico VXLAN on Windows
+// 2022/2025. It is also usable for other guests that require
 // native Ethernet; the caller supplies the CNI protocol instead of an OS branch.
 // The initial capability deliberately requires a shared subnet. Cross-subnet
 // routing and IPv6 provider forwarding require their own live qualification.

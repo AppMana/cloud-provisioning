@@ -45,8 +45,7 @@ func TestTheInfrastructureClusterIsReported(t *testing.T) {
 	}
 }
 
-// The retained MicroK8s campaign was Ready with an obsolete 6443 endpoint.
-// Readiness must not prevent correcting the port to the observed 16443 API.
+// Readiness must not prevent correcting a stale API endpoint port.
 func TestReadyInfrastructureEndpointCanBeCorrected(t *testing.T) {
 	k := &fakeKube{clusterReady: "true"}
 	c := &Controller{Kube: k.client()}

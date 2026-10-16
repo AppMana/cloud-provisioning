@@ -13,9 +13,8 @@ import (
 )
 
 func TestObservedExpiredBootstrapDownload(t *testing.T) {
-	// Native failed Linux boot: signed 2026-09-07 05:17:27 UTC for four
-	// hours; cloud-init fetched it on September 8 and received HTTP 403.
-	// Object host and signature are synthetic; no live credential is a fixture.
+	// Reject downloads after the signing window without leaking URL details.
+	// Object host and signature are synthetic.
 	now := time.Date(2026, 9, 8, 1, 53, 14, 0, time.UTC)
 	expired := "https://example.invalid/dialer?X-Amz-Date=20260907T051727Z&X-Amz-Expires=14400&X-Amz-Signature=do-not-log"
 	if err := validateDownloadExpiry(expired, now); err == nil || strings.Contains(err.Error(), "do-not-log") || strings.Contains(err.Error(), "example.invalid") {

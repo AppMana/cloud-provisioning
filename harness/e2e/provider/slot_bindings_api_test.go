@@ -75,9 +75,8 @@ func verifyPooledBindings(t *testing.T, ctx context.Context, ns string) {
 
 }
 
-// The native four-worker campaign exposed namespace-wide starvation when one
-// allocation returned capacity pending. Exercise that planning boundary with
-// real UID/version writes; this test does not boot or modify any VM.
+// A capacity-pending allocation must not starve other namespace allocations.
+// Exercise the planning boundary with real UID/version writes, without VMs.
 func verifyCapacityEligibility(t *testing.T, ctx context.Context, k *kube.Client, ns string) {
 	t.Helper()
 	names := []string{"capacity-0", "capacity-1", "capacity-2"}

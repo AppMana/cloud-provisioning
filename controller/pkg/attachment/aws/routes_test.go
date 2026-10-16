@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// Field shapes come from the real cldt-windows-v2 EC2 route table and ENI.
+// Preserve EC2 route-table and network-interface field shapes in the fake.
 type ec2 struct {
 	sourceCheck, missingCheck, foreignInterface, loseCheckResponse bool
 	modifications                                                  []bool

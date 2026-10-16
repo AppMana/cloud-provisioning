@@ -139,6 +139,11 @@ Route selections bind the complete prepared receive-permission set, including
 permissions retained during drain. Before changing routes or policy rules, the
 Linux installer rejects missing, expanded, or withdrawn kernel permissions;
 coverage of the selected destination alone is insufficient.
+After legacy-device retirement, the route installer accepts only a complete
+receiver-only destination set with no unresolved claims or relay state. It
+skips legacy main-table migration when that device is absent and rejects a
+non-WireGuard interface occupying its name. This does not authorize retirement;
+the coordinated phase executor must establish that it is safe first.
 Windows needs independent adapter lifetimes, route and source-address behavior,
 and HNS/VFP isolation checks on Server 2022 and Server 2025. The current
 single-device `Apply`/`Close` contract is insufficient to represent preparation,

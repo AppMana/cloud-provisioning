@@ -1958,12 +1958,33 @@ func disposeRouteHost(marked, isEndpointHost, peerCanCarry bool) routeHostDispos
 // handshake can also remove the path needed to read corrective peer state.
 func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relay *tunnel.TransitSpec, relayDsts []net.IPNet, own []string) error {
 	link, err := netlink.LinkByName(cfg.iface)
-	if err != nil {
+	if err != nil && !isLinkNotFound(err) {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
+	}
+	if err != nil {
+		link = nil
+	}
+	if link != nil && len(cfg.receiveRoutes) != 0 && link.Type() != "wireguard" {
+		return fmt.Errorf("legacy receiver generation name is occupied by a non-WireGuard interface")
 	}
 	selected, err := validateReceiveRouteSelections(cfg, routeHosts, blocks)
 	if err != nil {
 		return err
+	}
+	// A retired generation is optional only when every direct destination has
+	// an authenticated prepared receiver. Unresolved claims and relay state still
+	// require the legacy path; reject before touching policy rules or routes.
+	if link == nil {
+		if len(selected) == 0 || len(claimedHosts) != 0 || relay != nil || len(relayDsts) != 0 {
+			return fmt.Errorf("missing legacy device with incomplete receiver-only routing")
+		}
+		for _, destinations := range [][]net.IPNet{routeHosts, blocks} {
+			for _, dst := range destinations {
+				if _, found := selected[dst.String()]; !found {
+					return fmt.Errorf("destination %s still requires the retired legacy device", dst.String())
+				}
+			}
+		}
 	}
 	routeLink := func(dst net.IPNet) int {
 		if index, found := selected[dst.String()]; found {
@@ -2065,6 +2086,10 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 		// truth. The connected route for the tunnel subnet is the
 		// kernel's (proto kernel) and the CNI router's own entries
 		// carry its protocol, so neither is touched.
+		// No legacy interface exists to migrate from after retirement.
+		if link == nil {
+			continue
+		}
 		inMain, err := netlink.RouteListFiltered(family,
 			&netlink.Route{LinkIndex: link.Attrs().Index, Table: unix.RT_TABLE_MAIN},
 			netlink.RT_FILTER_OIF|netlink.RT_FILTER_TABLE)

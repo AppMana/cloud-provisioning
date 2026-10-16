@@ -105,11 +105,12 @@ func TestNativeReceiveRouteSwitch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fault := range []string{"alias", "peer", "permission", "unknown-destination", "expanded-source"} {
+	for _, fault := range []string{"alias", "peer", "permission", "unknown-destination", "expanded-source", "unselected-destination", "unresolved-claim", "legacy-name-collision"} {
 		broken := cfg
 		selection := request.Selection
 		destination := request.Destination
 		hosts := []net.IPNet{*dst}
+		var claimed []net.IPNet
 		switch fault {
 		case "alias":
 			selection.Alias += "wrong"
@@ -125,13 +126,42 @@ func TestNativeReceiveRouteSwitch(t *testing.T) {
 			if err := devices.ConfigureDevice(selection.Interface, wgtypes.Config{Peers: []wgtypes.PeerConfig{{PublicKey: before.Peers[0].PublicKey, ReplaceAllowedIPs: true, AllowedIPs: expanded}}}); err != nil {
 				t.Fatal(err)
 			}
+		case "legacy-name-collision":
+			if _, err := netlink.LinkByName(cfg.iface); !isLinkNotFound(err) {
+				continue
+			}
+			foreign := &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: cfg.iface}}
+			if err := netlink.LinkAdd(foreign); err != nil {
+				t.Fatal(err)
+			}
+		case "unselected-destination", "unresolved-claim":
+			// These cases apply after the surrounding experiment retires the
+			// legacy device. They must fail before any routing mutation.
+			if _, err := netlink.LinkByName(cfg.iface); !isLinkNotFound(err) {
+				continue
+			}
+			_, other, _ := net.ParseCIDR("10.92.0.10/32")
+			if fault == "unselected-destination" {
+				hosts = append(hosts, *other)
+			} else {
+				claimed = []net.IPNet{*other}
+			}
 		case "unknown-destination":
 			destination = "10.91.0.10/32"
 		}
 		broken.receiveRoutes = map[string]receiveRouteSelection{destination: selection}
-		selectionErr := installRoutes(broken, hosts, nil, nil, nil, nil, nil)
+		selectionErr := installRoutes(broken, hosts, claimed, nil, nil, nil, nil)
 		if fault == "expanded-source" {
 			if err := devices.ConfigureDevice(selection.Interface, wgtypes.Config{Peers: []wgtypes.PeerConfig{{PublicKey: before.Peers[0].PublicKey, ReplaceAllowedIPs: true, AllowedIPs: before.Peers[0].AllowedIPs}}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if fault == "legacy-name-collision" {
+			foreign, err := netlink.LinkByName(cfg.iface)
+			if err != nil || foreign.Type() != "dummy" {
+				t.Fatalf("foreign interface was changed: %v", err)
+			}
+			if err := netlink.LinkDel(foreign); err != nil {
 				t.Fatal(err)
 			}
 		}

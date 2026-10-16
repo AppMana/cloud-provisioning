@@ -194,6 +194,17 @@ Route selections bind the complete prepared receive-permission set, including
 permissions retained during drain. Before changing routes or policy rules, the
 Linux installer rejects missing, expanded, or withdrawn kernel permissions;
 coverage of the selected destination alone is insufficient.
+The shared route-set planner combines independently admitted worker plans by
+Node UID. It preserves each worker's destinations on every participating site,
+including retained senders, and rejects overlapping destination ownership,
+conflicting node incarnations, cross-node key reuse and inconsistent device
+identities. Cloud-node ownership is exclusive to one Machine journal. Each
+individual plan is validated before aggregation; input ordering does not choose
+which worker wins a conflict. The caller must supply the complete active set
+and preserve legacy destinations. This planner neither discovers missing
+journals nor decides which committed phases select receiver routes, and remains
+separate from normal reconciliation until those responsibilities are integrated.
+
 After installation, receiver route read-back revalidates device identity,
 permissions, authenticated transport and policy rules. Each selected destination
 must have one direct unicast route through the selected device with the expected

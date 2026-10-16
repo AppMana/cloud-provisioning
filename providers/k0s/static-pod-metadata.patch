@@ -1,0 +1,119 @@
+diff --git a/pkg/component/worker/nllb/envoy.go b/pkg/component/worker/nllb/envoy.go
+index b70d258f..0205bdfd 100644
+--- a/pkg/component/worker/nllb/envoy.go
++++ b/pkg/component/worker/nllb/envoy.go
+@@ -17,7 +17,6 @@ import (
+ 	"github.com/k0sproject/k0s/internal/pkg/file"
+ 	k0snet "github.com/k0sproject/k0s/internal/pkg/net"
+ 	"github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
+-	"github.com/k0sproject/k0s/pkg/applier"
+ 	"github.com/k0sproject/k0s/pkg/component/worker"
+ 	workerconfig "github.com/k0sproject/k0s/pkg/component/worker/config"
+ 
+@@ -260,7 +259,7 @@ func makePodManifest(params *envoyParams, podParams *envoyPodParams) corev1.Pod
+ 		ObjectMeta: metav1.ObjectMeta{
+ 			Name:      "nllb",
+ 			Namespace: metav1.NamespaceSystem,
+-			Labels:    applier.CommonLabels("nllb"),
++			Labels:    staticPodLabels(),
+ 		},
+ 		Spec: corev1.PodSpec{
+ 			HostNetwork: true,
+diff --git a/pkg/component/worker/nllb/metadata.go b/pkg/component/worker/nllb/metadata.go
+new file mode 100644
+index 00000000..cde449c3
+--- /dev/null
++++ b/pkg/component/worker/nllb/metadata.go
+@@ -0,0 +1,16 @@
++// SPDX-FileCopyrightText: 2026 k0s authors
++// SPDX-License-Identifier: Apache-2.0
++
++package nllb
++
++import "github.com/k0sproject/k0s/pkg/applier"
++
++func staticPodLabels() applier.Meta {
++	labels := applier.CommonLabels("nllb")
++	// Kubelet hashes the complete static Pod, including labels. The k0s
++	// build version does not identify the proxy image and must not replace
++	// an unchanged load balancer when only the supervising binary changes.
++	// The actual proxy image remains part of the PodSpec and its identity.
++	delete(labels, "app.kubernetes.io/version")
++	return labels
++}
+diff --git a/pkg/component/worker/nllb/metadata_test.go b/pkg/component/worker/nllb/metadata_test.go
+new file mode 100644
+index 00000000..e0709c5c
+--- /dev/null
++++ b/pkg/component/worker/nllb/metadata_test.go
+@@ -0,0 +1,49 @@
++// SPDX-FileCopyrightText: 2026 k0s authors
++// SPDX-License-Identifier: Apache-2.0
++
++package nllb
++
++import (
++	"crypto/sha256"
++	"encoding/json"
++	"testing"
++
++	"github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
++	"github.com/k0sproject/k0s/pkg/applier"
++	"github.com/stretchr/testify/require"
++	corev1 "k8s.io/api/core/v1"
++)
++
++func TestStaticPodBuildMetadata(t *testing.T) {
++	for _, backend := range []struct {
++		name     string
++		manifest func(string) *corev1.Pod
++	}{
++		{"envoy", func(version string) *corev1.Pod {
++			pod := makePodManifest(&envoyParams{apiServerBindPort: 7443}, &envoyPodParams{
++				image: v1beta1.ImageSpec{Image: "example.invalid/envoy", Version: version},
++			})
++			return &pod
++		}},
++		{"traefik", func(version string) *corev1.Pod {
++			return makeTraefikPodManifest(&traefikPodParams{
++				image: v1beta1.ImageSpec{Image: "example.invalid/traefik", Version: version},
++			}, &traefikInstallConfig{apiServerBindPort: 7443})
++		}},
++	} {
++		t.Run(backend.name, func(t *testing.T) {
++			pod := backend.manifest("v1")
++			require.NotContains(t, pod.Labels, "app.kubernetes.io/version")
++			require.Equal(t, "nllb", pod.Labels["app.kubernetes.io/component"])
++			require.Equal(t, "k0s", pod.Labels["app.kubernetes.io/managed-by"])
++			// Other resources retain their existing version metadata.
++			require.Contains(t, applier.CommonLabels("other"), "app.kubernetes.io/version")
++			body, err := json.Marshal(pod)
++			require.NoError(t, err)
++			changed, err := json.Marshal(backend.manifest("v2"))
++			require.NoError(t, err)
++			require.NotEqual(t, sha256.Sum256(body), sha256.Sum256(changed), "proxy image changes must remain identity changes")
++			t.Logf("manifest-sha256 %s %x", backend.name, sha256.Sum256(body))
++		})
++	}
++}
+diff --git a/pkg/component/worker/nllb/traefik.go b/pkg/component/worker/nllb/traefik.go
+index bfc0c751..1f472d55 100644
+--- a/pkg/component/worker/nllb/traefik.go
++++ b/pkg/component/worker/nllb/traefik.go
+@@ -16,7 +16,6 @@ import (
+ 	"github.com/k0sproject/k0s/internal/pkg/file"
+ 	k0snet "github.com/k0sproject/k0s/internal/pkg/net"
+ 	"github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
+-	"github.com/k0sproject/k0s/pkg/applier"
+ 	"github.com/k0sproject/k0s/pkg/component/worker"
+ 	workerconfig "github.com/k0sproject/k0s/pkg/component/worker/config"
+ 
+@@ -232,7 +231,7 @@ func makeTraefikPodManifest(podParams *traefikPodParams, installConfig *traefikI
+ 		ObjectMeta: metav1.ObjectMeta{
+ 			Name:      "nllb",
+ 			Namespace: metav1.NamespaceSystem,
+-			Labels:    applier.CommonLabels("nllb"),
++			Labels:    staticPodLabels(),
+ 		},
+ 		Spec: corev1.PodSpec{
+ 			HostNetwork: true,

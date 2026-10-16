@@ -77,6 +77,28 @@ identity preservation after a reboot that clears the runtime directory or a
 rollback to an unpatched executable. It also does not preserve active exec
 streams through a kubelet restart. Qualify management continuity separately.
 
+## Static-pod metadata across build changes
+
+`static-pod-metadata.patch` targets the same k0s base as the listener patch.
+Apply both when packaging a runtime that must keep an unchanged node-local
+balancer across supervisor build changes. The metadata patch omits the k0s
+supervisor version label from Envoy and Traefik static Pods. It retains their
+component and ownership labels and leaves other resources' version labels
+unchanged. The proxy's actual image remains in the PodSpec, so changing that
+image still changes the Pod identity.
+
+Removing the old version label is itself a manifest change. The first upgrade
+from an unpatched runtime, or rollback to one, can therefore replace the Pod.
+This patch does not qualify that transition or preserve exec streams during a
+kubelet restart. Fresh workers and subsequent patched-to-patched upgrades need
+native identity and continuity measurements before deployment qualification.
+
+Run `go test ./pkg/component/worker/nllb` after applying the patch. The
+`TestStaticPodBuildMetadata` test reports complete manifest digests for both
+backends; compare them across test builds with distinct
+`-ldflags '-X github.com/k0sproject/k0s/pkg/build.Version=VERSION'` values.
+Matching manifests establish metadata stability, not native runtime continuity.
+
 ## Worker releases with patched controllers
 
 Give patched controllers a version beginning with their upstream release, such

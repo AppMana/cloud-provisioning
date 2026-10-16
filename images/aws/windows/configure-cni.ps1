@@ -4,6 +4,7 @@ param([Parameter(Mandatory=$true)][string]$Settings)
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $null=& "$PSScriptRoot\verify-cni.ps1" -Recipe "$PSScriptRoot\cni-artifacts.json"
+$recipe=Get-Content -LiteralPath "$PSScriptRoot\cni-artifacts.json" -Raw | ConvertFrom-Json
 $plan=Get-Content -LiteralPath $Settings -Raw | ConvertFrom-Json
 $podGateway='vpc'
 if ($plan.PSObject.Properties.Name -contains 'podGateway') { $podGateway=[string]$plan.podGateway }
@@ -40,6 +41,24 @@ function Contains($Prefix,[Net.IPAddress]$Address) {
     }
     return $true
 }
+function HostRoutes($Values,$VPCs,$Exclusions,$Service) {
+    $result=@()
+    foreach ($value in @($Values)) {
+        $route=Prefix ([string]$value)
+        foreach ($blocked in @('0.0.0.0/8','127.0.0.0/8','169.254.0.0/16','224.0.0.0/3')+@($VPCs)+@($Service.text)) {
+            $network=Prefix $blocked
+            if ((Contains $network $route.address) -or (Contains $route $network.address)) { throw 'Host route overlaps local, VPC, Service or non-unicast scope' }
+        }
+        $covered=$false
+        foreach ($value in @($Exclusions)) {
+            $network=Prefix $value
+            if ($network.bits -le $route.bits -and (Contains $network $route.address)) { $covered=$true }
+        }
+        if (!$covered) { throw 'Host route requires an explicit covering SNAT exclusion' }
+        $result+=$route.text
+    }
+    return @($result | Sort-Object -Unique)
+}
 $service=Prefix $plan.serviceCIDR
 $dns=IPv4 $plan.clusterDNS
 if (!(Contains $service $dns)) { throw 'Cluster DNS is outside the Service CIDR' }
@@ -63,6 +82,14 @@ foreach ($cidr in $vpc) {
     $network=Prefix $cidr
     if ((Contains $network $service.address) -or (Contains $service $network.address)) { throw 'VPC and Service CIDRs overlap' }
 }
+$hostRoutes=@()
+if ($plan.PSObject.Properties.Name -contains 'hostRouteCIDRs' -and @($plan.hostRouteCIDRs).Count) {
+    if ($podGateway -cne 'vpc') { throw 'Host route policies require the VPC pod gateway' }
+    if ($recipe.PSObject.Properties.Name -notcontains 'features' -or 'hostRouteCIDRs' -cnotin @($recipe.features)) { throw 'Prepared CNI recipe does not support host route policies' }
+    $hostRoutes=@(HostRoutes $plan.hostRouteCIDRs $vpc $exclusions $service)
+    $owners=@(Get-CimInstance Win32_Service | Where-Object { $_.Name -like 'cloud-provisioning-*' -and $_.State -eq 'Running' -and $_.PathName -match '(?:^|\s)--native-pod-routing(?:=true)?(?:\s|$)' })
+    if ($owners.Count -ne 1) { throw 'Host route policies require one running native pod routing service' }
+}
 $adapters=@(Get-NetAdapter -Physical | Where-Object { ($_.MacAddress -replace '-',':') -ieq $mac })
 if ($adapters.Count -ne 1) { throw 'Primary ENI does not identify exactly one physical adapter' }
 $index=$adapters[0].ifIndex
@@ -76,6 +103,7 @@ $config=[ordered]@{
     gatewayIPAddress=$podGatewayAddress;vpcCIDRs=@(@($vpc)+@($exclusions)+@($service.text) | Sort-Object -Unique)
     serviceCIDR=$service.text;dns=[ordered]@{nameservers=@($dns.ToString());search=@(('{%namespace%}.svc.'+$domain),('svc.'+$domain),$domain)}
 }
+if ($hostRoutes.Count) { $config.hostRouteCIDRs=$hostRoutes }
 $json=$config | ConvertTo-Json -Depth 5
 $directory='C:\etc\cni\net.d'
 $destination=Join-Path $directory 'vpc-bridge.conf'

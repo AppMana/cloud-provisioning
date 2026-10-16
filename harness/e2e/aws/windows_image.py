@@ -21,6 +21,7 @@ p.add_argument('--worker',type=pathlib.Path,help='packaged k0s Windows executabl
 p.add_argument('--worker-sha256')
 p.add_argument('--worker-version')
 p.add_argument('--cache-recipe',type=pathlib.Path,help='verified recipe for an already unpacked Windows runtime cache')
+p.add_argument('--cni-recipe',type=pathlib.Path,help='explicit checksum recipe for the CNI archive; defaults to the published recipe')
 p.add_argument('--cni-archive',type=pathlib.Path,help='AWS Windows CNI archive matching the pinned product recipe')
 p.add_argument('--supersede-cache-sha256',help='explicitly replace this unprepared cache intent on a stopped builder; preserve its history')
 a=p.parse_args();os.umask(0o077)
@@ -38,9 +39,10 @@ if worker and a.phase not in ['revise','prepare']:raise RuntimeError('worker art
 state_path=a.work_dir/'resources.json';s=json.loads(state_path.read_text())
 repo=pathlib.Path(__file__).resolve().parents[3]
 cni={}
+if a.cni_recipe and not a.cni_archive:raise RuntimeError('--cni-recipe requires --cni-archive')
 if a.cni_archive:
  if a.phase not in ['revise','prepare']:raise RuntimeError('CNI archive applies only to revise/prepare')
- cni=json.loads((repo/'images/aws/windows/cni-artifacts.json').read_text())
+ cni=json.loads((a.cni_recipe or repo/'images/aws/windows/cni-artifacts.json').read_text())
  if hashlib.sha256(a.cni_archive.read_bytes()).hexdigest()!=cni['archiveSHA256']:raise RuntimeError('AWS CNI archive checksum mismatch')
 if s.get('cleanedUp'):raise RuntimeError('run is cleaned up')
 def save():state_path.write_text(json.dumps(s,indent=2)+'\n')
@@ -118,7 +120,7 @@ for year,id in ids.items():
    image=aws('ec2','describe-images',ImageIds=[record['imageID']])['Images'][0]
    if image['State']!='available' or image['Public'] or image['OwnerId']!=s['account'] or {t['Key']:t['Value'] for t in image.get('Tags',[])}.get('cloud-provisioning-test')!=s['runID']:raise RuntimeError('previous image must be available, private and owned before revision')
    s.setdefault(history_key,{}).setdefault(year,[]).append(dict(record,instanceID=id))
-   record={'revisionOf':record['imageID'],'workerSHA256':record.get('workerSHA256'),'requestedSHA256':sha,'requestedWorker':worker,'requestedCacheRecipe':cache,'requestedCNIRecipe':cni,'revisionRequestedAt':datetime.datetime.now(datetime.timezone.utc).isoformat()}
+   record={'revisionOf':record['imageID'],'workerSHA256':record.get('workerSHA256'),'requestedSHA256':sha,'requestedWorker':worker,'requestedCacheRecipe':cache,'requestedCNIRecipe':cni,'previousCNIRecipe':record.get('cniRecipe',{}),'revisionRequestedAt':datetime.datetime.now(datetime.timezone.utc).isoformat()}
    s[builds_key][year]=record;save()
   if state=='stopped':
    # The old diagnostic userdata must not rerun after EC2Launch's state reset.
@@ -199,7 +201,9 @@ $verified | ConvertTo-Json -Compress
   script=script.replace('__RECORD_GPU__', '$verified | Add-Member -NotePropertyName gpu -NotePropertyValue $gpu' if a.variant=='gpu' else '')
   script=script.replace('__VERIFY_CACHE__', r'$cache=& "$r\image-stage\verify-cache.ps1" -Recipe "$r\image-stage\cache-recipe.json" | ConvertFrom-Json' if cache else '')
   script=script.replace('__RECORD_CACHE__', '$verified | Add-Member -NotePropertyName cache -NotePropertyValue $cache' if cache else '')
-  script=script.replace('__PREPARE_CNI__', r'''$null=& "$r\image-stage\prepare-cni.ps1" -Archive "$r\image-stage\EKS-Artifacts.zip" -Recipe "$r\image-stage\cni-artifacts.json"
+  script=script.replace('__PREPARE_CNI__', r'''$previousCNI=@{}
+if(Test-Path "$r\image-stage\previous-cni-artifacts.json") { $previousCNI.PreviousRecipe="$r\image-stage\previous-cni-artifacts.json" }
+$null=& "$r\image-stage\prepare-cni.ps1" @previousCNI -Archive "$r\image-stage\EKS-Artifacts.zip" -Recipe "$r\image-stage\cni-artifacts.json"
 $cni=& "$r\image-stage\verify-cni.ps1" -Recipe "$r\image-stage\cni-artifacts.json" | ConvertFrom-Json''' if cni else "if (Test-Path (Join-Path $r 'aws-vpc-cni-image.json')) { throw 'Explicitly supply the existing CNI archive' }")
   script=script.replace('__KEEP_CNI__', "$keep+='aws-vpc-cni-image.json'" if cni else '')
   script=script.replace('__RECORD_CNI__', '$verified | Add-Member -NotePropertyName cni -NotePropertyValue $cni' if cni else '')
@@ -209,7 +213,9 @@ $cni=& "$r\image-stage\verify-cni.ps1" -Recipe "$r\image-stage\cni-artifacts.jso
    if a.variant=='gpu':z.write(repo/'images/windows/verify-nvidia.ps1','verify-nvidia.ps1')
    if cni:
     z.write(a.cni_archive,'EKS-Artifacts.zip')
-    for name in ['cni-artifacts.json','prepare-cni.ps1','verify-cni.ps1']:z.write(repo/'images/aws/windows'/name,name)
+    z.writestr('cni-artifacts.json',json.dumps(cni))
+    if record.get('previousCNIRecipe') and record['previousCNIRecipe']!=cni:z.writestr('previous-cni-artifacts.json',json.dumps(record['previousCNIRecipe']))
+    for name in ['prepare-cni.ps1','verify-cni.ps1']:z.write(repo/'images/aws/windows'/name,name)
    if cache:
     z.writestr('cache-recipe.json',json.dumps(cache));z.write(repo/'images/windows/verify-cache.ps1','verify-cache.ps1');z.write(repo/'images/windows/inspect-cache.ps1','inspect-cache.ps1');z.write(repo/'images/windows/cache-runtime.ps1','cache-runtime.ps1')
    if worker:

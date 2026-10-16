@@ -217,7 +217,7 @@ class WindowsImageAuthorization(unittest.TestCase):
 
 
 class WindowsImageRevision(unittest.TestCase):
-    def revise(self, owned=True, worker_only=False, gpu_cache=False, supersede=None):
+    def revise(self, owned=True, worker_only=False, gpu_cache=False, supersede=None, cni=None):
         import hashlib
         import runpy
         import sys
@@ -228,6 +228,12 @@ class WindowsImageRevision(unittest.TestCase):
         state={'account':'123','region':'us-west-2','runID':'cldt-test','vpcID':'vpc-owned',
                'windowsProbeInstances':{y:{'instanceID':'i-'+y} for y in ['2022','2025']},
                'windowsImageBuilds':{y:{'imageID':'ami-'+y,'tunnelSHA256':'a'*64,'generalizeRequestedAt':'before'} for y in ['2022','2025']}}
+        if cni:
+            (root/'cni.zip').write_bytes(b'candidate archive')
+            cni_recipe=dict(archiveSHA256=hashlib.sha256((root/'cni.zip').read_bytes()).hexdigest(),pluginSHA256='c'*64,connectorSHA256='d'*64,features=['hostRouteCIDRs'])
+            if cni=='bad-hash':cni_recipe['archiveSHA256']='0'*64
+            (root/'cni.json').write_text(json.dumps(cni_recipe))
+            for record in state['windowsImageBuilds'].values():record['cniRecipe']=dict(archiveSHA256='e'*64,pluginSHA256='f'*64,connectorSHA256='d'*64)
         if worker_only:
             (root/'worker.exe').write_bytes(b'new worker artifact')
             for record in state['windowsImageBuilds'].values():
@@ -265,6 +271,7 @@ class WindowsImageRevision(unittest.TestCase):
             return subprocess.CompletedProcess(args,0,json.dumps(result),'')
         error=None
         argv=[str(SCRIPT),'--work-dir',str(root),'--awsnode','/unused','--phase','revise','--service',str(root/'service.exe')]
+        if cni:argv+=['--cni-archive',str(root/'cni.zip'),'--cni-recipe',str(root/'cni.json')]
         if worker_only:
             argv+=['--worker',str(root/'worker.exe'),'--worker-sha256',hashlib.sha256((root/'worker.exe').read_bytes()).hexdigest(),'--worker-version','v1.36.2+k0s.0.appmana.1']
         if gpu_cache:
@@ -287,6 +294,21 @@ class WindowsImageRevision(unittest.TestCase):
         self.assertEqual([op for op,inputs in mutations],['modify-instance-attribute','start-instances']*2)
         for op,inputs in mutations:
             if op=='modify-instance-attribute':self.assertEqual(inputs['UserData'],{'Value':''})
+
+    def test_cni_revision_retains_previous_ownership_recipe(self):
+        root,mutations,error=self.revise(cni='valid')
+        self.assertIsNone(error)
+        state=json.loads((root/'resources.json').read_text())
+        for year in ['2022','2025']:
+            record=state['windowsImageBuilds'][year]
+            self.assertEqual(record['previousCNIRecipe'],state['windowsImageBuildHistory'][year][0]['cniRecipe'])
+            self.assertEqual(record['requestedCNIRecipe']['features'],['hostRouteCIDRs'])
+            self.assertNotEqual(record['previousCNIRecipe']['pluginSHA256'],record['requestedCNIRecipe']['pluginSHA256'])
+
+    def test_cni_revision_rejects_wrong_archive_before_mutation(self):
+        root,mutations,error=self.revise(cni='bad-hash')
+        self.assertIn('checksum mismatch',str(error))
+        self.assertEqual(mutations,[])
 
     def test_revision_requires_owned_previous_capture(self):
         root,mutations,error=self.revise(owned=False)

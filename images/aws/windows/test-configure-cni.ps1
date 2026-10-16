@@ -4,7 +4,7 @@ Set-StrictMode -Version Latest
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'configure-cni.ps1'),[ref]$tokens,[ref]$errors)
 if ($errors.Count) { throw 'CNI initializer has parse errors' }
-foreach ($name in @('IPv4','Prefix','Contains')) {
+foreach ($name in @('IPv4','Prefix','Contains','HostRoutes')) {
     $definition=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$false)
     if (!$definition) { throw 'Input guard missing' }
     . ([ScriptBlock]::Create($definition.Extent.Text))
@@ -34,3 +34,16 @@ foreach ($case in @(
     $checks++
 }
 "Passed $checks IPv4 input and prefix boundary checks"
+
+$service=Prefix '10.96.0.0/12'
+$routes=@(HostRoutes @('10.244.0.0/16','10.10.0.0/24','10.244.0.0/16') @('172.29.0.0/24') @('10.244.0.0/16','10.10.0.0/24') $service)
+if ($routes.Count -ne 2) { throw 'Host route deduplication failed' }
+foreach ($bad in @('0.0.0.0/0','127.0.0.0/8','126.0.0.0/7','169.254.0.0/16','224.0.0.0/3','192.0.0.0/2','172.29.0.0/25','10.96.0.0/16','10.244.0.1/16')) {
+    $rejected=$false
+    try { $null=HostRoutes @($bad) @('172.29.0.0/24') @('10.0.0.0/8') $service } catch { $rejected=$true }
+    if (!$rejected) { throw "Accepted unsafe host route: $bad" }
+}
+$rejected=$false
+try { $null=HostRoutes @('10.244.0.0/16') @('172.29.0.0/24') @('10.244.0.0/24') $service } catch { $rejected=$true }
+if (!$rejected) { throw 'Accepted host route with insufficient SNAT exclusion coverage' }
+Write-Output 'Host route boundaries and source-preservation prerequisites passed'

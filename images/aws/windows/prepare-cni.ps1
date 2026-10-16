@@ -1,7 +1,8 @@
 # Stage AWS's native CNI assets in a fresh, unjoined k0s image.
 param(
     [Parameter(Mandatory=$true)][string]$Archive,
-    [Parameter(Mandatory=$true)][string]$Recipe
+    [Parameter(Mandatory=$true)][string]$Recipe,
+    [string]$PreviousRecipe
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
@@ -22,6 +23,17 @@ if (@(Get-ChildItem 'C:\etc\cni\net.d' -File -ErrorAction SilentlyContinue).Coun
 $kubeconfig='C:\var\lib\k0s\kubelet.conf'
 $previous=[Environment]::GetEnvironmentVariable('KUBECONFIG','Machine')
 if ($previous -and $previous -ne $kubeconfig) { throw 'Existing machine kubeconfig belongs to another installation' }
+# A revision may replace only a complete installation matching an explicitly
+# supplied previous recipe. Verification runs before any destination changes.
+$previousVerified=$false
+if ($PreviousRecipe) {
+    $currentVerified=$false
+    try { $null=& "$PSScriptRoot\verify-cni.ps1" -Recipe $Recipe; $currentVerified=$true } catch { }
+    if (!$currentVerified) {
+        $null=& "$PSScriptRoot\verify-cni.ps1" -Recipe $PreviousRecipe
+        $previousVerified=$true
+    }
+}
 $targets=@(
     @{ entry='EKS-Artifacts/vpc-bridge.exe'; path='C:\opt\cni\bin\vpc-bridge.exe'; sha=$inputRecipe.pluginSHA256 },
     @{ entry='EKS-Artifacts/aws-vpc-cni-k8s-connector.exe'; path='C:\Program Files\Amazon\EKS\bin\aws-vpc-cni-k8s-connector.exe'; sha=$inputRecipe.connectorSHA256 }
@@ -36,7 +48,7 @@ foreach ($target in $targets) {
         if ($parent -eq $path) { break }
         $path=$parent
     }
-    if ((Test-Path -LiteralPath $target.path) -and (Get-FileHash -LiteralPath $target.path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $target.sha) { throw 'AWS CNI destination already contains a different artifact' }
+    if ((Test-Path -LiteralPath $target.path) -and (Get-FileHash -LiteralPath $target.path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $target.sha -and !$previousVerified) { throw 'AWS CNI destination already contains a different artifact' }
 }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $staging=Join-Path $root ('aws-cni-stage-'+[Guid]::NewGuid().ToString('N'))

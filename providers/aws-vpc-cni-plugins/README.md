@@ -24,3 +24,14 @@ The published image recipe still selects the upstream binary. Integrating a
 patched binary requires pinned artifact provenance, native endpoint lifecycle
 verification, source-preserving cross-site traffic, and unchanged VPC and
 management connectivity on both supported Windows versions.
+
+The Windows initializer accepts `hostRouteCIDRs` only with the default `vpc`
+pod gateway, a running native pod-routing tunnel service, and a checksum-pinned
+recipe listing `hostRouteCIDRs` in `features`. Every prefix must be covered by
+an explicit SNAT exclusion and must not overlap VPC or Service ranges. The
+initializer still refuses to replace an existing, different CNI configuration.
+
+The image workflow accepts `--cni-recipe` alongside `--cni-archive` for a
+candidate artifact. Revisions retain the previous recipe and require native
+verification of the existing installation before replacing owned binaries.
+Published recipes remain the default when no candidate recipe is supplied.

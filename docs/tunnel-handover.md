@@ -126,6 +126,15 @@ explicitly. Avoid OS branches in the protocol state machine.
 
 Linux needs dedicated route ownership for each generation and a verified
 egress switch that preserves WireGuard's outer-packet routing exemption.
+The Linux `prepareStableAddressOwner` component creates an address-only dummy
+device bound to mesh UID, Node UID, root public key, and the allocated host
+addresses. Initial preparation requires those addresses on the admitted legacy
+WireGuard device and rejects ownership conflicts. It leaves legacy addresses
+intact; the stable owner can survive generation-device deletion and recover
+missing addresses from the same admitted allocation. It is not connected to
+normal reconciliation: coordinated retirement, allocation release, and phase
+fencing must be integrated before enabling it. Native component tests do not
+establish CNI compatibility or deployment qualification.
 Route selections bind the complete prepared receive-permission set, including
 permissions retained during drain. Before changing routes or policy rules, the
 Linux installer rejects missing, expanded, or withdrawn kernel permissions;

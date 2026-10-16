@@ -30,6 +30,15 @@ type Snapshot struct {
 
 func (s Snapshot) Transition() Transition { return s.transition }
 
+// Metadata returns an independent copy for scope and incarnation checks. It
+// exposes no mutable reference to the snapshot used by compare-and-swap.
+func (s Snapshot) Metadata() metav1.ObjectMeta {
+	if s.object == nil {
+		return metav1.ObjectMeta{}
+	}
+	return *s.object.ObjectMeta.DeepCopy()
+}
+
 // Plan returns the exact public plan committed with this transition, if any.
 func (s Snapshot) Plan() []byte {
 	if s.object == nil {

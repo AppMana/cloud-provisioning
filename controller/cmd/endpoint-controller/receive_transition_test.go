@@ -56,7 +56,7 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	r.receivePreparation.Journal = &receiveJournalPolicy{RoundLifetime: metav1.Duration{Duration: time.Minute}, MaxReceiptAge: metav1.Duration{Duration: 10 * time.Second}, DrainInterval: metav1.Duration{Duration: 5 * time.Second}}
 	defer func() { r.receivePreparation.Journal = nil }()
 	store := r.receiveJournal
-	store.Name = receiveTransitionName(string(machine.GetUID()))
+	store.Name = tunnel.ReceiveTransitionName(string(machine.GetUID()))
 	now := time.Now()
 	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
 		t.Fatalf("normal adoption reconciliation did not commit a prepared plan: %v", err)

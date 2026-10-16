@@ -132,6 +132,14 @@ writable channel. This read access does not authorize native execution or
 provide a receipt collector. Removing a Machine removes its named journal
 grant; an empty Machine set never produces namespace-wide ConfigMap access.
 
+Controller recovery and agent admission share a strict journal decoder. It
+binds the public plan to the committed round, journal name and namespace, and
+rejects deleting journals. The read-only agent admission component also checks
+live mesh and adoption object identities, the participant's local key, Node UID,
+boot ID and readiness, and rejects a journal changed during those reads. It is
+not connected to normal reconciliation. Admission does not execute a phase or
+persist recovery state, and these API reads cannot fence changes after admission.
+
 ## Platform implementation boundaries
 
 The shared protocol owns generation identity, phase validation, peer graph

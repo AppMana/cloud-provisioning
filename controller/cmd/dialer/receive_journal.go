@@ -1,0 +1,99 @@
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+)
+
+// Scope comes from admitted configuration and live API object identities, not
+// readiness payloads. The store must read controller-owned, read-only journals.
+type receiveJournalScope struct {
+	Namespace, MeshName, MeshUID, MachineUID string
+}
+
+type admittedReceiveJournal struct {
+	Snapshot handover.Snapshot
+	Plan     tunnel.ReceiveTransitionPlan
+	NodeUID  string
+	BootID   string
+}
+
+// loadReceiveJournal performs read-only admission. It does not execute a phase,
+// persist recovery state, or issue a receipt. The phase executor must hold the
+// native reconciliation lock and revalidate identities before acting; API reads
+// cannot fence a node restart or a journal update that happens afterward.
+func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, nodeName string, key wgtypes.Key) (admittedReceiveJournal, error) {
+	fail := func(err error) (admittedReceiveJournal, error) { return admittedReceiveJournal{}, err }
+	if api == nil || scope.Namespace == "" || scope.MeshName == "" || scope.MeshUID == "" || scope.MachineUID == "" || nodeName == "" || key == (wgtypes.Key{}) || store.Name != tunnel.ReceiveTransitionName(scope.MachineUID) {
+		return fail(fmt.Errorf("receiver journal requires admitted scope and local identity"))
+	}
+	snapshot, err := store.Load(ctx)
+	if err != nil {
+		return fail(err)
+	}
+	metadata := snapshot.Metadata()
+	if metadata.Namespace != scope.Namespace || metadata.DeletionTimestamp != nil {
+		return fail(fmt.Errorf("receiver journal scope changed or is being deleted"))
+	}
+	plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
+	if err != nil {
+		return fail(err)
+	}
+	if plan.Namespace != scope.Namespace || plan.MeshName != scope.MeshName || plan.MeshUID != scope.MeshUID || plan.MachineUID != scope.MachineUID {
+		return fail(fmt.Errorf("receiver journal differs from admitted mesh or machine"))
+	}
+	mesh, err := api.CoreV1().Secrets(scope.Namespace).Get(ctx, scope.MeshName, metav1.GetOptions{})
+	if err != nil {
+		return fail(err)
+	}
+	if string(mesh.UID) != scope.MeshUID || mesh.DeletionTimestamp != nil {
+		return fail(fmt.Errorf("receiver journal mesh identity changed"))
+	}
+	adoption, err := api.CoreV1().Secrets(scope.Namespace).Get(ctx, plan.AdoptionName, metav1.GetOptions{})
+	if err != nil {
+		return fail(err)
+	}
+	if string(adoption.UID) != plan.AdoptionUID || adoption.DeletionTimestamp != nil {
+		return fail(fmt.Errorf("receiver journal adoption identity changed"))
+	}
+	uid := ""
+	if key.PublicKey().String() == plan.RootPublicKey && nodeName == plan.CloudNodeName {
+		uid = plan.CloudNodeUID
+	} else if site, found := plan.Sites[key.PublicKey().String()]; found && site.NodeName == nodeName {
+		uid = site.NodeUID
+	}
+	if uid == "" {
+		return fail(fmt.Errorf("local identity is not a journal participant"))
+	}
+	boot, err := localReceiveBootID()
+	if err != nil {
+		return fail(err)
+	}
+	node, err := api.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return fail(err)
+	}
+	ready := false
+	for _, condition := range node.Status.Conditions {
+		ready = ready || condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue
+	}
+	if string(node.UID) != uid || node.Status.NodeInfo.BootID != boot || node.DeletionTimestamp != nil || !ready {
+		return fail(fmt.Errorf("receiver journal participant identity, boot or readiness changed"))
+	}
+	current, err := store.Load(ctx)
+	if err != nil {
+		return fail(err)
+	}
+	latest := current.Metadata()
+	if latest.UID != metadata.UID || latest.ResourceVersion != metadata.ResourceVersion || latest.DeletionTimestamp != nil {
+		return fail(fmt.Errorf("receiver journal changed during admission"))
+	}
+	return admittedReceiveJournal{Snapshot: snapshot, Plan: plan, NodeUID: uid, BootID: boot}, nil
+}

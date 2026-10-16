@@ -1,0 +1,270 @@
+package main
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"net/netip"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
+)
+
+type changingJournalReader struct {
+	typedcore.ConfigMapInterface
+	reads  int
+	change func() error
+}
+
+func (r *changingJournalReader) Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1.ConfigMap, error) {
+	r.reads++
+	if r.reads == 2 {
+		if err := r.change(); err != nil {
+			return nil, err
+		}
+	}
+	return r.ConfigMapInterface.Get(ctx, name, opts)
+}
+
+func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
+	if os.Getenv("KUBEBUILDER_ASSETS") == "" {
+		t.Skip("requires real API binaries")
+	}
+	e := &envtest.Environment{}
+	cfg, err := e.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := e.Stop(); err != nil {
+			t.Error(err)
+		}
+	})
+	api, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	namespace, err := api.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "journal-admission"}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	boot, err := localReceiveBootID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes := map[string]*corev1.Node{}
+	for _, name := range []string{"cloud", "site"} {
+		node, err := api.CoreV1().Nodes().Create(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		node.Status.NodeInfo.BootID = boot
+		node.Status.Conditions = []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}
+		nodes[name], err = api.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	mesh, err := api.CoreV1().Secrets(namespace.Name).Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mesh"}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	adoption, err := api.CoreV1().Secrets(namespace.Name).Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: tunnel.AdoptionSecretName("worker")}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, _ := wgtypes.GeneratePrivateKey()
+	site, _ := wgtypes.GeneratePrivateKey()
+	peer := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: site.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.0/24"}}}}
+	base, _ := json.Marshal(peer)
+	preparation, err := tunnel.PlanReceiveHandover(string(mesh.UID), peer, peer, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding := tunnel.ReceiveBinding{Interface: preparation.Receivers[0].Interface, PeerPublicKey: site.PublicKey().String(), PublicKey: receiverKey(root, string(mesh.UID), site.PublicKey().String()).PublicKey().String(), ListenPort: 51821}
+	siteDoc := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: root.PublicKey().String(), Remote: true, Endpoint: "198.51.100.1:51820", WGAllowedIPs: []string{"172.29.0.1/32"}}}}
+	client, err := tunnel.PlanSiteReceiveClient(string(mesh.UID), site.PublicKey().String(), root.PublicKey().String(), binding, siteDoc, siteDoc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: namespace.Name, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineName: "worker", MachineUID: "machine-uid", AdoptionName: adoption.Name, AdoptionUID: string(adoption.UID), CloudNodeName: "cloud", CloudNodeUID: string(nodes["cloud"].UID), RootPublicKey: root.PublicKey().String(), Base: base, Desired: peer, SiteDesired: siteDoc, Native: []netip.Prefix{}, Ports: map[string]int{site.PublicKey().String(): 51821}, Bindings: map[string]tunnel.ReceiveBinding{site.PublicKey().String(): binding}, Sites: map[string]tunnel.ReceiveTransitionSite{site.PublicKey().String(): {NodeName: "site", NodeUID: string(nodes["site"].UID), Client: client}}}
+	raw, _ := json.Marshal(plan)
+	store := handover.Store{ConfigMaps: api.CoreV1().ConfigMaps(namespace.Name), ClusterUID: "admitted-cluster", Name: tunnel.ReceiveTransitionName(plan.MachineUID), OwnerReferences: []metav1.OwnerReference{{APIVersion: "apps/v1", Kind: "Deployment", Name: "controller", UID: "controller-uid"}}}
+	spec, err := tunnel.ReceiveTransitionSpec(plan, store.ClusterUID, fmt.Sprintf("%x", sha256.Sum256(raw)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	transition, err := handover.NewTransition(spec, time.Now(), handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: 10 * time.Second, DrainInterval: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := store.CreateWithPlan(ctx, transition, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A valid payload and matching hash do not permit moving a journal to
+	// another machine name or namespace.
+	original, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fault := range []string{"journal-name", "journal-namespace"} {
+		t.Run(fault, func(t *testing.T) {
+			copyStore := store
+			copyNamespace := namespace.Name
+			if fault == "journal-name" {
+				copyStore.Name = tunnel.ReceiveTransitionName("another-machine")
+			} else {
+				other, err := api.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other-journal-scope"}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				copyNamespace = other.Name
+				copyStore.ConfigMaps = api.CoreV1().ConfigMaps(copyNamespace)
+			}
+			if _, err := copyStore.ConfigMaps.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: copyStore.Name, Namespace: copyNamespace}, Data: original.Data}, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			copied, err := copyStore.Load(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := tunnel.DecodeReceiveTransition(copied, copyStore.ClusterUID); err == nil {
+				t.Fatal("admitted a journal copied outside its public scope")
+			}
+		})
+	}
+	metadata := snapshot.Metadata()
+	metadata.OwnerReferences[0].Name = "changed"
+	if snapshot.Metadata().OwnerReferences[0].Name != "controller" {
+		t.Fatal("metadata accessor mutated committed snapshot")
+	}
+	scope := receiveJournalScope{Namespace: namespace.Name, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUID: plan.MachineUID}
+	for name, key := range map[string]wgtypes.Key{"cloud": root, "site": site} {
+		admitted, err := loadReceiveJournal(ctx, api, store, scope, name, key)
+		if err != nil || admitted.NodeUID != string(nodes[name].UID) || admitted.BootID != boot {
+			t.Fatalf("valid %s admission failed: %v", name, err)
+		}
+		if admitted.Snapshot.Metadata().ResourceVersion != snapshot.Metadata().ResourceVersion {
+			t.Fatal("read-only admission changed journal")
+		}
+	}
+	for _, fault := range []string{"mesh", "namespace", "machine", "cluster", "local-key", "node-name", "boot", "not-ready"} {
+		t.Run(fault, func(t *testing.T) {
+			badScope, badStore, key, name := scope, store, root, "cloud"
+			switch fault {
+			case "mesh":
+				badScope.MeshUID = "replaced"
+			case "namespace":
+				badScope.Namespace = "elsewhere"
+			case "machine":
+				badScope.MachineUID = "replaced"
+			case "cluster":
+				badStore.ClusterUID = "another-cluster"
+			case "local-key":
+				key, _ = wgtypes.GeneratePrivateKey()
+			case "node-name":
+				name = "site"
+			case "boot", "not-ready":
+				node, err := api.CoreV1().Nodes().Get(ctx, "cloud", metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if fault == "boot" {
+					node.Status.NodeInfo.BootID = "old-boot"
+				} else {
+					node.Status.Conditions[0].Status = corev1.ConditionFalse
+				}
+				if _, err := api.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() {
+					node, err := api.CoreV1().Nodes().Get(ctx, "cloud", metav1.GetOptions{})
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					node.Status.NodeInfo.BootID = boot
+					node.Status.Conditions[0].Status = corev1.ConditionTrue
+					if _, err := api.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{}); err != nil {
+						t.Error(err)
+					}
+				})
+			}
+			if _, err := loadReceiveJournal(ctx, api, badStore, badScope, name, key); err == nil {
+				t.Fatal("admitted changed identity")
+			}
+		})
+	}
+	raced := store
+	raced.ConfigMaps = &changingJournalReader{ConfigMapInterface: store.ConfigMaps, change: func() error {
+		cm, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		cm.Labels = map[string]string{"changed": "true"}
+		_, err = store.ConfigMaps.Update(ctx, cm, metav1.UpdateOptions{})
+		return err
+	}}
+	if _, err := loadReceiveJournal(ctx, api, raced, scope, "cloud", root); err == nil {
+		t.Fatal("admitted a journal changed between reads")
+	}
+	if err := api.CoreV1().Nodes().Delete(ctx, "cloud", metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	replacement, err := api.CoreV1().Nodes().Create(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "cloud"}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacement.Status = nodes["cloud"].Status
+	if _, err := api.CoreV1().Nodes().UpdateStatus(ctx, replacement, metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadReceiveJournal(ctx, api, store, scope, "cloud", root); err == nil {
+		t.Fatal("replacement node adopted the previous incarnation's journal")
+	}
+	// Use the still-valid site participant so node replacement cannot mask
+	// rejection of a replaced adoption object or a deleting journal.
+	if _, err := loadReceiveJournal(ctx, api, store, scope, "site", site); err != nil {
+		t.Fatal(err)
+	}
+	if err := api.CoreV1().Secrets(namespace.Name).Delete(ctx, adoption.Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.CoreV1().Secrets(namespace.Name).Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: adoption.Name}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadReceiveJournal(ctx, api, store, scope, "site", site); err == nil {
+		t.Fatal("replacement adoption object admitted an old journal")
+	}
+	cm, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cm.Finalizers = []string{"testing.example.com/retain"}
+	if _, err := store.ConfigMaps.Update(ctx, cm, metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.ConfigMaps.Delete(ctx, store.Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	deleting, err := store.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tunnel.DecodeReceiveTransition(deleting, store.ClusterUID); err == nil {
+		t.Fatal("shared decoder admitted a deleting journal")
+	}
+
+}

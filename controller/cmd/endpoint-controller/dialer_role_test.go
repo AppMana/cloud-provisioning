@@ -114,7 +114,7 @@ func TestTheDialerRoleNamesExactlyTheSecretsTheDialerTouches(t *testing.T) {
 	if err := c.Get(context.Background(), key, got); err != nil {
 		t.Fatal(err)
 	}
-	names := []string{receiveTransitionName("uid-remote1"), receiveTransitionName("uid-remote2")}
+	names := []string{tunnel.ReceiveTransitionName("uid-remote1"), tunnel.ReceiveTransitionName("uid-remote2")}
 	sort.Strings(names)
 	want = append(want, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: names})
 	if !reflect.DeepEqual(got.Rules, want) {
@@ -137,7 +137,7 @@ func TestTheDialerRoleNamesExactlyTheSecretsTheDialerTouches(t *testing.T) {
 		if err := c.Get(context.Background(), key, got); err != nil {
 			t.Fatal(err)
 		}
-		if name == "remote1" && (len(got.Rules) != 2 || !reflect.DeepEqual(got.Rules[1].ResourceNames, []string{receiveTransitionName("uid-remote2")})) {
+		if name == "remote1" && (len(got.Rules) != 2 || !reflect.DeepEqual(got.Rules[1].ResourceNames, []string{tunnel.ReceiveTransitionName("uid-remote2")})) {
 			t.Fatal("deleted machine retained journal read access")
 		}
 		if name == "remote2" && len(got.Rules) != 1 {

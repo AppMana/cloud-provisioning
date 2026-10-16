@@ -1688,7 +1688,7 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 			if machines.Items[i].GetUID() == "" {
 				return fmt.Errorf("journal read access requires a machine UID")
 			}
-			journals = append(journals, receiveTransitionName(string(machines.Items[i].GetUID())))
+			journals = append(journals, tunnel.ReceiveTransitionName(string(machines.Items[i].GetUID())))
 		}
 	}
 	sort.Strings(adoption)

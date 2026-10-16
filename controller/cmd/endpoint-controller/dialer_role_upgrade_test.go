@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -88,7 +90,7 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 		t.Fatalf("unexpected initial grants: %+v", role.Rules)
 	}
 	role.Rules[0].ResourceNames = append(role.Rules[0].ResourceNames, "worker-a-tunnel-peers", "worker-b-tunnel-peers")
-	journalName := receiveTransitionName("worker-a-uid")
+	journalName := tunnel.ReceiveTransitionName("worker-a-uid")
 	role.Rules = append(role.Rules, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: []string{journalName}})
 	if err := admin.Update(ctx, role); err != nil {
 		t.Fatal(err)
@@ -136,7 +138,7 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 			"patch":  func() error { return dialer.Patch(ctx, journal, client.MergeFrom(before)) },
 			"delete": func() error { return dialer.Delete(ctx, journal) },
 			"create": func() error {
-				return dialer.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: receiveTransitionName("forged"), Namespace: key.Namespace}})
+				return dialer.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: tunnel.ReceiveTransitionName("forged"), Namespace: key.Namespace}})
 			},
 			"list": func() error { return dialer.List(ctx, &corev1.ConfigMapList{}, client.InNamespace(key.Namespace)) },
 		} {
@@ -157,7 +159,7 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 		ResourceNames: []string{"unrelated", "foreign-tunnel-peers"},
 	})
 	role.Rules = append(role.Rules,
-		rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get", "patch"}, ResourceNames: []string{receiveTransitionName("foreign")}},
+		rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get", "patch"}, ResourceNames: []string{tunnel.ReceiveTransitionName("foreign")}},
 		rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: []string{"unrelated-journal"}},
 	)
 	if err := admin.Update(ctx, role); err != nil {

@@ -5,6 +5,9 @@ results do not qualify changed binaries or a different cloud CNI.
 
 ## Safety controls
 
+- The Linux dialer rejects a non-WireGuard interface before changing its
+  addresses or MTU, and refuses to delete it during retirement. It validates
+  the entire requested address list before creating or changing a tunnel.
 - `acceptance matrix` refuses to create probes when required preconditions fail.
 - BGP preflight requires the documented site mesh and checks every additional
   peer for cloud exclusion. External router peers can retain the Linux-only

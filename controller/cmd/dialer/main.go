@@ -638,6 +638,10 @@ func removeDevice(iface string) {
 	if err != nil {
 		return
 	}
+	if link.Type() != "wireguard" {
+		fmt.Fprintf(os.Stderr, "refusing to remove non-WireGuard interface %s (%s)\n", iface, link.Type())
+		return
+	}
 	if err := netlink.LinkDel(link); err != nil {
 		fmt.Fprintf(os.Stderr, "removing %s on shutdown: %v\n", iface, err)
 	}
@@ -912,6 +916,15 @@ func publishNodeInfo(ctx context.Context, clientset *kubernetes.Clientset, cfg c
 // its address, and brings it up. Called every reconcile pass
 // (idempotent, self-healing if the address is removed from under it).
 func ensureLink(cfg config, localAddresses []string) error {
+	// Validate the complete address request before creating or changing a link.
+	addresses := make([]*netlink.Addr, len(localAddresses))
+	for i, localAddress := range localAddresses {
+		addr, err := netlink.ParseAddr(localAddress)
+		if err != nil {
+			return fmt.Errorf("parsing local address %q: %w", localAddress, err)
+		}
+		addresses[i] = addr
+	}
 	mtu := cfg.mtu
 	if mtu == 0 {
 		mtu = underlayMTU()
@@ -934,12 +947,12 @@ func ensureLink(cfg config, localAddresses []string) error {
 		}
 	}
 
+	if link.Type() != "wireguard" {
+		return fmt.Errorf("refusing to configure non-WireGuard interface %s (%s)", cfg.iface, link.Type())
+	}
 	want := map[string]bool{}
-	for _, localAddress := range localAddresses {
-		addr, err := netlink.ParseAddr(localAddress)
-		if err != nil {
-			return fmt.Errorf("parsing local address %q: %w", localAddress, err)
-		}
+	for i, addr := range addresses {
+		localAddress := localAddresses[i]
 		// IPv6 without duplicate address detection: the tunnel is a
 		// point-to-point device with no neighbour to collide with, and a
 		// tentative address can neither source nor receive until

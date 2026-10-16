@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -90,7 +91,7 @@ func TestPodReceiptAuthenticationRealAPI(t *testing.T) {
 		return result.Status.Token
 	}
 	bearer := mint(pods[0], verifier.Audience)
-	receipt := Receipt{NodeUID: string(nodes[0].UID)}
+	receipt := Receipt{AgentContainerID: "containerd://running-agent", NodeUID: string(nodes[0].UID), ObservedAt: time.Now()}
 	boot := nodes[0].Status.NodeInfo.BootID
 	proof, err := verifier.Authenticate(ctx, bearer, receipt, boot)
 	if err != nil || proof.AuthenticatedNodeUID != receipt.NodeUID || proof.Receipt != receipt {
@@ -109,10 +110,49 @@ func TestPodReceiptAuthenticationRealAPI(t *testing.T) {
 		})
 	}
 	otherBearer := mint(pods[1], verifier.Audience)
-	if _, err := verifier.Authenticate(ctx, otherBearer, Receipt{NodeUID: string(nodes[1].UID)}, nodes[1].Status.NodeInfo.BootID); err != nil {
+	if _, err := verifier.Authenticate(ctx, otherBearer, Receipt{AgentContainerID: "containerd://running-agent", NodeUID: string(nodes[1].UID), ObservedAt: time.Now()}, nodes[1].Status.NodeInfo.BootID); err != nil {
 		t.Fatal("second daemon could not authenticate its own node", err)
 	}
 	verifyAuthenticatedAdvancement(t, verifier, nodes, []string{bearer, otherBearer})
+
+	// A container restart preserves the Pod token, image and Node boot ID.
+	// Observations made by the previous container must not authorize a phase.
+	originalStatus := pods[0].Status.DeepCopy()
+	pods[0].Status.ContainerStatuses[0].ContainerID = "containerd://restarted-agent"
+	pods[0].Status.ContainerStatuses[0].RestartCount++
+	started := metav1.NewTime(receipt.ObservedAt.Truncate(time.Second).Add(time.Second))
+	pods[0].Status.ContainerStatuses[0].State.Running.StartedAt = started
+	pods[0], err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pods[0], metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reject("observation-before-container-restart", bearer, verifier, receipt, boot)
+	retimed := receipt
+	retimed.ObservedAt = started.Time.Add(time.Second)
+	reject("previous-container-current-timestamp", bearer, verifier, retimed, boot)
+	missingIdentity := retimed
+	missingIdentity.AgentContainerID = ""
+	reject("missing-container-identity", bearer, verifier, missingIdentity, boot)
+	oldObservation := receipt
+	oldObservation.AgentContainerID = "containerd://restarted-agent"
+	reject("current-container-old-observation", bearer, verifier, oldObservation, boot)
+	fresh := receipt
+	fresh.AgentContainerID = "containerd://restarted-agent"
+	fresh.ObservedAt = started.Time.Add(time.Second)
+	if _, err := verifier.Authenticate(ctx, bearer, fresh, boot); err != nil {
+		t.Fatal("current container observation rejected", err)
+	}
+	pods[0].Status.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{}
+	pods[0], err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pods[0], metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reject("missing-container-start", bearer, verifier, fresh, boot)
+	pods[0].Status = *originalStatus
+	pods[0], err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pods[0], metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// The image can remain pinned while its entrypoint is replaced with an
 	// older host executable. Its image ID cannot admit that executable.

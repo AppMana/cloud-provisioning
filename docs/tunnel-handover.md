@@ -98,6 +98,13 @@ pod, including the cloud host-binary fallback. The admitted release must run
 its image entrypoint; pinning the fallback container's image does not admit the
 host executable. This restriction does not itself attest mounted executable
 contents or enable transition execution.
+Receipts also carry `agentContainerID`, which must match the admitted container's
+current runtime ID. The observation must not predate its known start time.
+Pod credentials and Node boot IDs can remain valid across container restarts;
+neither permits replaying a previous container's observation. The sender must
+read its current container identity and repeat native verification after a
+restart. These API checks do not fence a restart after authentication; native
+phase execution and transition fencing remain separate requirements.
 `Transition` now persists and replays prepare, switch, drain, and retire history.
 Rollback during prepare aborts B; rollback after switching selects A, drains B,
 and retires B. Expired rounds require explicit renewal and fresh receipts. Drain

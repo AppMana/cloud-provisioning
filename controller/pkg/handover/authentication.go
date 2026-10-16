@@ -95,6 +95,10 @@ func (a PodReceiptAuthenticator) Authenticate(ctx context.Context, bearer string
 	for _, status := range pod.Status.ContainerStatuses {
 		if status.Name == a.ContainerName {
 			currentImage = status.ImageID == a.ImageID && status.Ready && status.ContainerID != "" && status.State.Running != nil
+			if currentImage && (receipt.AgentContainerID == "" || receipt.AgentContainerID != status.ContainerID ||
+				status.State.Running.StartedAt.IsZero() || receipt.ObservedAt.Before(status.State.Running.StartedAt.Time)) {
+				return fail("observation does not belong to the current agent container")
+			}
 			break
 		}
 	}

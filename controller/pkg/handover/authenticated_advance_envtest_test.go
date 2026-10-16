@@ -70,13 +70,13 @@ func verifyAuthenticatedAdvancement(t *testing.T, verifier PodReceiptAuthenticat
 	}
 	submissions := []PodReceipt{}
 	for _, m := range view.Round.Members {
-		submissions = append(submissions, PodReceipt{BearerToken: tokens[m.NodeUID], BootID: boots[m.NodeUID], Receipt: Receipt{RoundHash: digest, NodeUID: m.NodeUID, FromKey: m.FromKey, ToKey: m.ToKey, DeviceID: m.DeviceID, FromPeerKey: m.FromPeerKey, ToPeerKey: m.ToPeerKey, ObservedAt: time.Now()}})
+		submissions = append(submissions, PodReceipt{BearerToken: tokens[m.NodeUID], BootID: boots[m.NodeUID], Receipt: Receipt{AgentContainerID: "containerd://running-agent", RoundHash: digest, NodeUID: m.NodeUID, FromKey: m.FromKey, ToKey: m.ToKey, DeviceID: m.DeviceID, FromPeerKey: m.FromPeerKey, ToPeerKey: m.ToPeerKey, ObservedAt: time.Now()}})
 	}
 	baseline, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fault := range []string{"partial", "duplicate", "cross-node-token", "wrong-boot", "wrong-round", "wrong-device", "stale-observation", "future-observation", "missing-policy"} {
+	for _, fault := range []string{"partial", "duplicate", "cross-node-token", "wrong-boot", "wrong-round", "wrong-device", "stale-observation", "future-observation", "missing-policy", "old-container", "missing-container"} {
 		t.Run("advance-"+fault, func(t *testing.T) {
 			batch := append([]PodReceipt(nil), submissions...)
 			configured := policies
@@ -97,6 +97,10 @@ func verifyAuthenticatedAdvancement(t *testing.T, verifier PodReceiptAuthenticat
 				batch[0].Receipt.ObservedAt = now.Add(-time.Minute)
 			case "future-observation":
 				batch[0].Receipt.ObservedAt = now.Add(time.Hour)
+			case "old-container":
+				batch[0].Receipt.AgentContainerID = "containerd://previous-agent"
+			case "missing-container":
+				batch[0].Receipt.AgentContainerID = ""
 			case "missing-policy":
 				configured = map[string]PodReceiptAuthenticator{}
 			}
@@ -195,7 +199,7 @@ func verifyAuthenticatedAdvancement(t *testing.T, verifier PodReceiptAuthenticat
 		batch := func() []PodReceipt {
 			result := []PodReceipt{}
 			for _, member := range v.Round.Members {
-				result = append(result, PodReceipt{BearerToken: tokens[member.NodeUID], BootID: boots[member.NodeUID], Receipt: Receipt{RoundHash: hash, NodeUID: member.NodeUID, DeviceID: member.DeviceID, FromKey: member.FromKey, ToKey: member.ToKey, FromPeerKey: member.FromPeerKey, ToPeerKey: member.ToPeerKey, ObservedAt: time.Now()}})
+				result = append(result, PodReceipt{BearerToken: tokens[member.NodeUID], BootID: boots[member.NodeUID], Receipt: Receipt{AgentContainerID: "containerd://running-agent", RoundHash: hash, NodeUID: member.NodeUID, DeviceID: member.DeviceID, FromKey: member.FromKey, ToKey: member.ToKey, FromPeerKey: member.FromPeerKey, ToPeerKey: member.ToPeerKey, ObservedAt: time.Now()}})
 			}
 			return result
 		}

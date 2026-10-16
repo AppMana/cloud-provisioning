@@ -65,14 +65,17 @@ type Round struct {
 }
 
 type Receipt struct {
-	RoundHash   string    `json:"roundHash"`
-	NodeUID     string    `json:"nodeUID"`
-	FromKey     string    `json:"fromKey"`
-	ToKey       string    `json:"toKey"`
-	ObservedAt  time.Time `json:"observedAt"`
-	DeviceID    string    `json:"deviceID,omitempty"`
-	FromPeerKey string    `json:"fromPeerKey,omitempty"`
-	ToPeerKey   string    `json:"toPeerKey,omitempty"`
+	// AgentContainerID identifies the process incarnation that made the native
+	// observation. Pod-bound credentials alone survive container restarts.
+	AgentContainerID string    `json:"agentContainerID,omitempty"`
+	RoundHash        string    `json:"roundHash"`
+	NodeUID          string    `json:"nodeUID"`
+	FromKey          string    `json:"fromKey"`
+	ToKey            string    `json:"toKey"`
+	ObservedAt       time.Time `json:"observedAt"`
+	DeviceID         string    `json:"deviceID,omitempty"`
+	FromPeerKey      string    `json:"fromPeerKey,omitempty"`
+	ToPeerKey        string    `json:"toPeerKey,omitempty"`
 }
 
 // AuthenticatedReceipt is constructed by the transport's authentication layer.

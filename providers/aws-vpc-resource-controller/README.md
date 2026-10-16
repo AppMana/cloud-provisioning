@@ -20,6 +20,8 @@ Apply and build from a clean checkout of the pinned revision:
 /path/to/providers/aws-vpc-resource-controller/apply.sh .
 GOTOOLCHAIN=go1.26.0 CGO_ENABLED=0 go test ./pkg/node/manager
 GOTOOLCHAIN=go1.26.0 CGO_ENABLED=0 go build -trimpath -o controller .
+docker build -f /path/to/providers/aws-vpc-resource-controller/Dockerfile \
+  -t your-registry/aws-windows-ipam:build .
 ```
 
 The node selector does not scope admission webhooks. Deployment must also limit

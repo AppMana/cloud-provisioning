@@ -73,7 +73,7 @@ for owned in images:
             if {t['Key']: t['Value'] for t in item.get('Tags', [])}.get('cloud-provisioning-test') != s['runID']:
                 raise RuntimeError('prepared snapshot ownership tag mismatch')
             aws('ec2', 'delete-snapshot', '--snapshot-id', snapshot, absent_ok=True)
-for key in ('linuxControllerRepository', 'linuxDialerRepository', 'publisherRepository', 'calicoWindowsRepository', 'windowsGPUPluginRepository', 'windowsGPUProbeRepository'):
+for key in ('windowsIPAMRepository', 'linuxControllerRepository', 'linuxDialerRepository', 'publisherRepository', 'calicoWindowsRepository', 'windowsGPUPluginRepository', 'windowsGPUProbeRepository'):
     if not s.get(key):
         continue
     repo = s[key]

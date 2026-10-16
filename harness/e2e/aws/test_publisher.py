@@ -166,6 +166,19 @@ class PublisherTest(unittest.TestCase):
         self.assertTrue(policy['Statement'][1]['Resource'].endswith('/cldt-test/endpoint-controller'))
         self.assertNotIn('ecr:PutImage',policy['Statement'][1]['Action'])
 
+    def test_ipam_publication_uses_scoped_pull_credentials(self):
+        root,calls,published,error=self.exercise(component='aws-windows-ipam')
+        self.assertIsNone(error)
+        state=json.loads((root/'resources.json').read_text())
+        self.assertEqual(state['publisherImage'],'original-publisher')
+        self.assertTrue(state['windowsIPAMImage'].endswith('/aws-windows-ipam@sha256:abc'))
+        self.assertEqual(published[0]['metadata']['namespace'],'kube-system')
+        self.assertEqual(published[0]['metadata']['name'],'cldt-test-ipam-pull')
+        request=next(args for args,kw in calls if args[0]=='aws' and args[4]=='get-federation-token')
+        policy=json.loads(json.loads(request[request.index('--cli-input-json')+1])['Policy'])
+        self.assertTrue(policy['Statement'][1]['Resource'].endswith('/cldt-test/aws-windows-ipam'))
+        self.assertNotIn('ecr:PutImage',policy['Statement'][1]['Action'])
+
     def test_gpu_plugin_gets_only_its_repository_pull_access(self):
         root,calls,published,error=self.exercise(component='windows-gpu-device-plugin', archive=True)
         self.assertIsNone(error)

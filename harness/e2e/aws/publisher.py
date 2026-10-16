@@ -20,6 +20,7 @@ artifact.add_argument('--layout', type=pathlib.Path)
 artifact.add_argument('--archive', type=pathlib.Path, help='Docker image tar archive')
 artifact.add_argument('--renew-pull-only', action='store_true', help='renew access to the recorded immutable image without pushing it again')
 COMPONENTS = {
+    'aws-windows-ipam': ('windowsIPAM', 'kube-system', 'ipam-pull'),
     'endpoint-controller': ('linuxController', 'cloud-provisioning', 'controller-pull'),
     'linux-dialer': ('linuxDialer', 'cloud-provisioning', 'dialer-pull'),
     'windows-publisher': ('publisher', 'cloud-provisioning', 'publisher-pull'),

@@ -15,6 +15,7 @@ class RepositoryAbsenceTest(unittest.TestCase):
             root=pathlib.Path(directory)
             state=dict(cleanedUp=True,region='us-west-2',account='123',vpcID='vpc-test',runID='cldt-test',nodeRoleName='node',capaRoleName='capa',instanceProfileName='profile',publisherRepository={'name':'cldt-test/windows-publisher'},calicoWindowsRepository={'name':'cldt-test/calico-node-windows'})
             (root/'resources.json').write_text(json.dumps(state));names=[]
+            state['windowsIPAMRepository']={'name':'cldt-test/aws-windows-ipam'}
             state['linuxControllerRepository']={'name':'cldt-test/endpoint-controller'}
             state['linuxDialerRepository']={'name':'cldt-test/linux-dialer'}
             state['windowsGPUProbeRepository']={'name':'cldt-test/windows-gpu-probe'}
@@ -40,7 +41,7 @@ class RepositoryAbsenceTest(unittest.TestCase):
             return names
 
     def test_all_recorded_repositories_must_be_absent(self):
-        self.assertEqual(self.exercise(),['cldt-test/endpoint-controller','cldt-test/linux-dialer','cldt-test/windows-publisher','cldt-test/calico-node-windows','cldt-test/windows-gpu-device-plugin','cldt-test/windows-gpu-probe'])
+        self.assertEqual(self.exercise(),['cldt-test/aws-windows-ipam','cldt-test/endpoint-controller','cldt-test/linux-dialer','cldt-test/windows-publisher','cldt-test/calico-node-windows','cldt-test/windows-gpu-device-plugin','cldt-test/windows-gpu-probe'])
 
     def test_linux_repositories_cannot_be_ignored(self):
         for name in ['endpoint-controller','linux-dialer']:
@@ -54,5 +55,9 @@ class RepositoryAbsenceTest(unittest.TestCase):
 
     def test_gpu_repository_cannot_be_ignored(self):
         self.assertIn('cldt-test/windows-gpu-device-plugin',self.exercise('cldt-test/windows-gpu-device-plugin'))
+
+
+    def test_ipam_repository_cannot_be_ignored(self):
+        self.exercise('cldt-test/aws-windows-ipam')
 
 if __name__=='__main__':unittest.main()

@@ -28,6 +28,7 @@ spec:
           $patch: delete
       containers:
         - name: controller
+          image: controller:unconfigured
           args:
             - --cluster-name=$(CLUSTER_NAME)
             - --vpc-id=$(VPC_ID)

@@ -21,7 +21,12 @@ import (
 
 // Advertisements follow successful forwarding, including after offline replay.
 func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl.Client, cfg config, speaker *transitSpeaker) error {
-	if err := reconcile(ctx, k, devices, cfg); err != nil {
+	lock, err := lockReconciliation(cfg)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+	if err := reconcileLocked(ctx, k, devices, cfg); err != nil {
 		return err
 	}
 	return reconcileTransit(ctx, k, cfg, speaker)

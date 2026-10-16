@@ -153,6 +153,15 @@ including default and multipath routes. It does not remove those routes itself.
 This component also remains disconnected from normal reconciliation: a fenced
 executor must verify replacement routing and committed drain receipts, and
 persist retirement so the ordinary publisher cannot recreate the old peer.
+Linux reconciliation serializes recovery reads, forwarding changes, receipts
+and BGP updates using a per-interface kernel file lock on the existing shared
+identity mount. Shutdown cleanup takes the same lock. The bootstrap claim still
+determines which peer source should be active; the lock prevents overlapping
+passes from observing and applying different snapshots concurrently. The lock
+file is retained across owners, and process exit releases the kernel lock.
+All participating binaries must implement this serialization before it can
+fence native phase execution. It does not replace journal authorization or
+durable phase state.
 Windows needs independent adapter lifetimes, route and source-address behavior,
 and HNS/VFP isolation checks on Server 2022 and Server 2025. The current
 single-device `Apply`/`Close` contract is insufficient to represent preparation,

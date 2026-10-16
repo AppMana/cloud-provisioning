@@ -331,10 +331,16 @@ func main() {
 			// endpoint across restarts; remove its interface only after the cluster
 			// unpublishes it and ends retention.
 			if cfg.secretName != "" {
+				lock, lockErr := lockReconciliation(cfg)
+				if lockErr != nil {
+					fmt.Fprintf(os.Stderr, "preserving endpoint during concurrent reconciliation: %v\n", lockErr)
+					return
+				}
 				if published, err := nodeStillPublished(clientset, cfg); err == nil && !published {
 					fmt.Fprintf(os.Stderr, "removing %s on the way out: this node is no longer a published endpoint\n", cfg.iface)
 					retireUnpublishedEndpoint(cfg)
 				}
+				lock.Close()
 			}
 			return
 		}
@@ -1179,6 +1185,16 @@ func claimHeld(path string, poll time.Duration) (bool, string) {
 // device config, host routes, and (transit role only) the masquerade
 // rule.
 func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.Client, cfg config) error {
+	lock, err := lockReconciliation(cfg)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+	return reconcileLocked(ctx, clientset, wg, cfg)
+}
+
+// Caller holds the shared host lock through recovery, forwarding and receipts.
+func reconcileLocked(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.Client, cfg config) error {
 	var siteNotReady map[string]bool
 	var (
 		localAddress string
@@ -1241,7 +1257,7 @@ func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.
 					saved, cacheErr := readSiteForwardingCache(cfg, key)
 					if cacheErr == nil {
 						cfg.siteRecovery = saved
-						return reconcile(ctx, nil, wg, cfg)
+						return reconcileLocked(ctx, nil, wg, cfg)
 					}
 					if !errors.Is(cacheErr, os.ErrNotExist) {
 						return fmt.Errorf("reading site forwarding recovery: %w", cacheErr)

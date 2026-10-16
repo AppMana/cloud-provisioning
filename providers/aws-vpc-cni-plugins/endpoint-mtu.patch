@@ -1,0 +1,235 @@
+diff --git a/plugins/vpc-bridge/config/mtu_test.go b/plugins/vpc-bridge/config/mtu_test.go
+new file mode 100644
+index 0000000..29e3b71
+--- /dev/null
++++ b/plugins/vpc-bridge/config/mtu_test.go
+@@ -0,0 +1,26 @@
++package config
++
++import (
++	"fmt"
++	"testing"
++
++	cniSkel "github.com/containernetworking/cni/pkg/skel"
++)
++
++func TestPodMTUAdmission(t *testing.T) {
++	for _, tc := range []struct {
++		raw   string
++		valid bool
++	}{
++		{"0", true}, {"1280", true}, {"1370", true}, {"1420", true},
++		{"1279", false}, {"-1", false}, {"65536", false}, {"1370.5", false}, {`"1370"`, false},
++	} {
++		t.Run(tc.raw, func(t *testing.T) {
++			raw := fmt.Sprintf(`{"eniMACAddress":"02:00:00:00:00:01","podMTU":%s}`, tc.raw)
++			_, err := New(&cniSkel.CmdArgs{StdinData: []byte(raw)}, false)
++			if (err == nil) != tc.valid {
++				t.Fatalf("valid=%v error=%v", tc.valid, err)
++			}
++		})
++	}
++}
+diff --git a/plugins/vpc-bridge/config/netconfig.go b/plugins/vpc-bridge/config/netconfig.go
+index 85a1dfb..0d9e344 100644
+--- a/plugins/vpc-bridge/config/netconfig.go
++++ b/plugins/vpc-bridge/config/netconfig.go
+@@ -35,6 +35,7 @@ type NetConfig struct {
+ 	ENIIPAddresses   []net.IPNet
+ 	VPCCIDRs         []net.IPNet
+ 	HostRouteCIDRs   []net.IPNet
++	PodMTU           uint16
+ 	BridgeType       string
+ 	BridgeNetNSPath  string
+ 	IPAddresses      []net.IPNet
+@@ -56,6 +57,7 @@ type netConfigJSON struct {
+ 	ENIIPAddresses   []string `json:"eniIPAddresses"`
+ 	VPCCIDRs         []string `json:"vpcCIDRs"`
+ 	HostRouteCIDRs   []string `json:"hostRouteCIDRs"`
++	PodMTU           uint16   `json:"podMTU"`
+ 	BridgeType       string   `json:"bridgeType"`
+ 	BridgeNetNSPath  string   `json:"bridgeNetNSPath"`
+ 	IPAddresses      []string `json:"ipAddresses"`
+@@ -100,6 +102,10 @@ func New(args *cniSkel.CmdArgs, isAddCmd bool) (*NetConfig, error) {
+ 		return nil, fmt.Errorf("missing required parameter ENIName or ENIMACAddress")
+ 	}
+ 
++	if config.PodMTU != 0 && config.PodMTU < 1280 {
++		return nil, fmt.Errorf("podMTU must be omitted or at least 1280")
++	}
++
+ 	// Set defaults.
+ 	if config.BridgeType == "" {
+ 		config.BridgeType = BridgeTypeL3
+@@ -116,6 +122,7 @@ func New(args *cniSkel.CmdArgs, isAddCmd bool) (*NetConfig, error) {
+ 	// Populate NetConfig.
+ 	netConfig := NetConfig{
+ 		NetConf:         config.NetConf,
++		PodMTU:          config.PodMTU,
+ 		ENIName:         config.ENIName,
+ 		BridgeType:      config.BridgeType,
+ 		BridgeNetNSPath: config.BridgeNetNSPath,
+diff --git a/plugins/vpc-bridge/network/bridge_linux.go b/plugins/vpc-bridge/network/bridge_linux.go
+index 73c87a7..6d791da 100644
+--- a/plugins/vpc-bridge/network/bridge_linux.go
++++ b/plugins/vpc-bridge/network/bridge_linux.go
+@@ -49,6 +49,9 @@ type BridgeBuilder struct{}
+ 
+ // FindOrCreateNetwork creates a new container network.
+ func (nb *BridgeBuilder) FindOrCreateNetwork(nw *Network) error {
++	if nw.PodMTU != 0 {
++		return fmt.Errorf("podMTU is supported only by the Windows endpoint backend")
++	}
+ 	var err error
+ 
+ 	bridgeName := fmt.Sprintf(bridgeNameFormat, nw.Name, nw.SharedENI.GetLinkIndex())
+diff --git a/plugins/vpc-bridge/network/bridge_windows.go b/plugins/vpc-bridge/network/bridge_windows.go
+index 6d5e978..80018fd 100644
+--- a/plugins/vpc-bridge/network/bridge_windows.go
++++ b/plugins/vpc-bridge/network/bridge_windows.go
+@@ -170,6 +170,9 @@ func (nb *BridgeBuilder) FindOrCreateEndpoint(nw *Network, ep *Endpoint) error {
+ 	endpointName := nb.generateHNSEndpointName(ep, namespaceIdentifier)
+ 	hcnEndpoint, err := hcn.GetEndpointByName(endpointName)
+ 	if err == nil {
++		if err := verifyEndpointMTU(hcnEndpoint, nw.PodMTU); err != nil {
++			return err
++		}
+ 		log.Infof("Found existing HCN endpoint %s.", endpointName)
+ 		if nsType == infraContainerNS || nsType == hcnNamespace {
+ 			// This is a benign duplicate create call for an existing endpoint.
+@@ -207,6 +210,12 @@ func (nb *BridgeBuilder) FindOrCreateEndpoint(nw *Network, ep *Endpoint) error {
+ 		},
+ 	}
+ 
++	if nw.PodMTU != 0 {
++		if err := nb.addEndpointPolicy(hcnEndpoint, hcn.EndpointPolicyType("InterfaceParameters"), endpointMTUSettings{Mtu: nw.PodMTU}); err != nil {
++			return err
++		}
++	}
++
+ 	// Set the endpoint IP address.
+ 	pl, _ := ep.IPAddresses[0].Mask.Size()
+ 	hcnEndpoint.IpConfigurations = []hcn.IpConfig{
+@@ -322,6 +331,13 @@ func (nb *BridgeBuilder) FindOrCreateEndpoint(nw *Network, ep *Endpoint) error {
+ 		return err
+ 	}
+ 
++	if err := verifyEndpointMTU(hcnResponse, nw.PodMTU); err != nil {
++		if cleanupErr := hcnResponse.Delete(); cleanupErr != nil {
++			return fmt.Errorf("%v; endpoint cleanup failed: %v", err, cleanupErr)
++		}
++		return err
++	}
++
+ 	log.Infof("Received HCN endpoint response: %+v.", hcnResponse)
+ 
+ 	// Attach the HCN endpoint to the container's network namespace.
+diff --git a/plugins/vpc-bridge/network/mtu_windows.go b/plugins/vpc-bridge/network/mtu_windows.go
+new file mode 100644
+index 0000000..48b7678
+--- /dev/null
++++ b/plugins/vpc-bridge/network/mtu_windows.go
+@@ -0,0 +1,38 @@
++package network
++
++import (
++	"encoding/json"
++	"fmt"
++
++	"github.com/Microsoft/hcsshim/hcn"
++)
++
++// InterfaceParameters is the HCN endpoint policy introduced in schema 2.4.
++// It configures the workload interface, not the shared ENI or management vNIC.
++type endpointMTUSettings struct {
++	Mtu uint16
++}
++
++func verifyEndpointMTU(endpoint *hcn.HostComputeEndpoint, mtu uint16) error {
++	if mtu == 0 {
++		return nil
++	}
++	count := 0
++	for _, policy := range endpoint.Policies {
++		if policy.Type != hcn.EndpointPolicyType("InterfaceParameters") {
++			continue
++		}
++		count++
++		var settings endpointMTUSettings
++		if err := json.Unmarshal(policy.Settings, &settings); err != nil {
++			return fmt.Errorf("invalid endpoint interface parameters: %w", err)
++		}
++		if settings.Mtu != mtu {
++			return fmt.Errorf("existing endpoint MTU policy %d differs from requested %d", settings.Mtu, mtu)
++		}
++	}
++	if count != 1 {
++		return fmt.Errorf("expected exactly one endpoint MTU policy, found %d", count)
++	}
++	return nil
++}
+diff --git a/plugins/vpc-bridge/network/mtu_windows_test.go b/plugins/vpc-bridge/network/mtu_windows_test.go
+new file mode 100644
+index 0000000..c0a97d8
+--- /dev/null
++++ b/plugins/vpc-bridge/network/mtu_windows_test.go
+@@ -0,0 +1,35 @@
++package network
++
++import (
++	"encoding/json"
++	"testing"
++
++	"github.com/Microsoft/hcsshim/hcn"
++)
++
++func TestEndpointMTUReadback(t *testing.T) {
++	for _, tc := range []struct {
++		name     string
++		settings []string
++		mtu      uint16
++		valid    bool
++	}{
++		{"disabled preserves existing", []string{`{"Mtu":1450}`}, 0, true},
++		{"matching policy", []string{`{"Mtu":1370}`}, 1370, true},
++		{"missing policy", nil, 1370, false},
++		{"wrong policy", []string{`{"Mtu":1450}`}, 1370, false},
++		{"missing MTU", []string{`{}`}, 1370, false},
++		{"malformed", []string{`{"Mtu":"1370"}`}, 1370, false},
++		{"ambiguous", []string{`{"Mtu":1370}`, `{"Mtu":1370}`}, 1370, false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			ep := &hcn.HostComputeEndpoint{}
++			for _, raw := range tc.settings {
++				ep.Policies = append(ep.Policies, hcn.EndpointPolicy{Type: "InterfaceParameters", Settings: json.RawMessage(raw)})
++			}
++			if err := verifyEndpointMTU(ep, tc.mtu); (err == nil) != tc.valid {
++				t.Fatalf("valid=%v error=%v", tc.valid, err)
++			}
++		})
++	}
++}
+diff --git a/plugins/vpc-bridge/network/network.go b/plugins/vpc-bridge/network/network.go
+index 033f126..f326494 100644
+--- a/plugins/vpc-bridge/network/network.go
++++ b/plugins/vpc-bridge/network/network.go
+@@ -40,6 +40,7 @@ type Network struct {
+ 	GatewayIPAddress    net.IP
+ 	VPCCIDRs            []net.IPNet
+ 	HostRouteCIDRs      []net.IPNet
++	PodMTU              uint16
+ 	DNSServers          []string
+ 	DNSSuffixSearchList []string
+ 	ServiceCIDR         string
+diff --git a/plugins/vpc-bridge/plugin/commands.go b/plugins/vpc-bridge/plugin/commands.go
+index 0f75f80..ae3fb8d 100644
+--- a/plugins/vpc-bridge/plugin/commands.go
++++ b/plugins/vpc-bridge/plugin/commands.go
+@@ -63,6 +63,7 @@ func (plugin *Plugin) Add(args *cniSkel.CmdArgs) error {
+ 		GatewayIPAddress:    netConfig.GatewayIPAddress,
+ 		VPCCIDRs:            netConfig.VPCCIDRs,
+ 		HostRouteCIDRs:      netConfig.HostRouteCIDRs,
++		PodMTU:              netConfig.PodMTU,
+ 		DNSServers:          netConfig.DNS.Nameservers,
+ 		DNSSuffixSearchList: netConfig.DNS.Search,
+ 	}

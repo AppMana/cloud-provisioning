@@ -44,3 +44,22 @@ The image workflow accepts `--cni-recipe` alongside `--cni-archive` for a
 candidate artifact. Revisions retain the previous recipe and require native
 verification of the existing installation before replacing owned binaries.
 Published recipes remain the default when no candidate recipe is supplied.
+
+`endpoint-mtu.patch` adds an optional Windows `podMTU` setting. Zero or an
+omitted value preserves upstream behavior. A nonzero value must be an integer
+from 1280 through 65535. CNI endpoint creation requests the HCN
+`InterfaceParameters` policy and checks its returned MTU before attachment.
+Reusing an endpoint requires exactly one matching policy; incompatible existing
+endpoints are rejected. Linux rejects a nonzero setting before network creation.
+
+The Windows initializer additionally requires a checksum-pinned recipe listing
+`podMTU` in `features` and one running native pod-routing service. The requested
+MTU must fit the smallest MTU of that service's tunnel interfaces. The initializer
+retains its refusal to replace a different existing CNI configuration.
+
+Run `go test ./plugins/vpc-bridge/config` for numeric admission and the Windows
+`TestEndpointMTUReadback` test for policy validation. Policy readback alone does
+not prove the workload interface MTU. Before enabling this option in a published
+recipe, verify native endpoint creation, attachment, workload interface MTU,
+reuse, deletion, and cross-site packet delivery on both supported Windows
+versions. The option is disabled in the published recipe.

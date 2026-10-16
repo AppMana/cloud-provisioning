@@ -41,6 +41,12 @@ function Contains($Prefix,[Net.IPAddress]$Address) {
     }
     return $true
 }
+function PodMTU($Value,[int]$TunnelMTU) {
+    if ($Value -isnot [int] -and $Value -isnot [long]) { throw 'Pod MTU must be an integer' }
+    if ($Value -eq 0) { return 0 }
+    if ($Value -lt 1280 -or $Value -gt 65535 -or $Value -gt $TunnelMTU) { throw 'Pod MTU exceeds the tunnel budget or is below the dual-stack minimum' }
+    return [int]$Value
+}
 function HostRoutes($Values,$VPCs,$Exclusions,$Service) {
     $result=@()
     foreach ($value in @($Values)) {
@@ -64,6 +70,19 @@ $dns=IPv4 $plan.clusterDNS
 if (!(Contains $service $dns)) { throw 'Cluster DNS is outside the Service CIDR' }
 $domain=[string]$plan.clusterDomain
 if ($domain.Length -gt 253 -or $domain -cnotmatch '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$') { throw 'Invalid cluster DNS domain' }
+$podMTU=0
+if ($plan.PSObject.Properties.Name -contains 'podMTU') {
+    $podMTU=PodMTU $plan.podMTU 65535
+    if ($podMTU) {
+        if ($recipe.PSObject.Properties.Name -notcontains 'features' -or 'podMTU' -cnotin @($recipe.features)) { throw 'Prepared CNI recipe does not support pod MTU policies' }
+        $owners=@(Get-CimInstance Win32_Service | Where-Object { $_.Name -match '^cloud-provisioning-cldt[0-9a-f]{8}$' -and $_.State -eq 'Running' -and $_.PathName -match '(?:^|\s)--native-pod-routing(?:=true)?(?:\s|$)' })
+        if ($owners.Count -ne 1) { throw 'Pod MTU requires one running native pod routing service' }
+        $alias=$owners[0].Name.Substring('cloud-provisioning-'.Length)
+        $interfaces=@(Get-NetIPInterface -InterfaceAlias $alias -ErrorAction Stop)
+        if (!$interfaces.Count) { throw 'Owned tunnel interfaces are unavailable' }
+        $podMTU=PodMTU $podMTU ([int]($interfaces | Measure-Object -Property NlMtu -Minimum).Minimum)
+    }
+}
 if (!@($plan.snatExcludedCIDRs).Count) { throw 'Explicit site SNAT exclusions are required' }
 $exclusions=@($plan.snatExcludedCIDRs | ForEach-Object { (Prefix $_).text })
 $base='http://169.254.169.254/latest'
@@ -104,6 +123,7 @@ $config=[ordered]@{
     serviceCIDR=$service.text;dns=[ordered]@{nameservers=@($dns.ToString());search=@(('{%namespace%}.svc.'+$domain),('svc.'+$domain),$domain)}
 }
 if ($hostRoutes.Count) { $config.hostRouteCIDRs=$hostRoutes }
+if ($podMTU) { $config.podMTU=$podMTU }
 $json=$config | ConvertTo-Json -Depth 5
 $directory='C:\etc\cni\net.d'
 $destination=Join-Path $directory 'vpc-bridge.conf'

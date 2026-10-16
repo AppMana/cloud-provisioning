@@ -4,7 +4,7 @@ Set-StrictMode -Version Latest
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'configure-cni.ps1'),[ref]$tokens,[ref]$errors)
 if ($errors.Count) { throw 'CNI initializer has parse errors' }
-foreach ($name in @('IPv4','Prefix','Contains','HostRoutes')) {
+foreach ($name in @('IPv4','Prefix','Contains','HostRoutes','PodMTU')) {
     $definition=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$false)
     if (!$definition) { throw 'Input guard missing' }
     . ([ScriptBlock]::Create($definition.Extent.Text))
@@ -47,3 +47,12 @@ $rejected=$false
 try { $null=HostRoutes @('10.244.0.0/16') @('172.29.0.0/24') @('10.244.0.0/24') $service } catch { $rejected=$true }
 if (!$rejected) { throw 'Accepted host route with insufficient SNAT exclusion coverage' }
 Write-Output 'Host route boundaries and source-preservation prerequisites passed'
+foreach ($case in @(@(1370,1370),@(1280,1370),@(0,1370))) {
+    if ((PodMTU $case[0] $case[1]) -ne $case[0]) { throw 'Valid pod MTU rejected' }
+}
+foreach ($case in @(@(1420,1370),@(1279,1370),@(-1,1370),@(65536,65536),@('1370',1370),@(1370.5,1420))) {
+    $rejected=$false
+    try { $null=PodMTU $case[0] $case[1] } catch { $rejected=$true }
+    if (!$rejected) { throw 'Unsafe pod MTU accepted' }
+}
+Write-Output 'Pod MTU bounds and tunnel budget checks passed'

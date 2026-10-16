@@ -152,8 +152,13 @@ or renewal extends history even though it may revisit an earlier phase.
 Checkpointed intent is not evidence of completed native work. It cannot issue
 receipts, advance a phase, or establish that egress already switched. Corrupt
 state and boot changes require explicit recovery; they must not fall back to
-legacy forwarding. The checkpoint component is not yet connected to normal
-reconciliation or a native phase executor.
+legacy forwarding. Normal reconciliation and shutdown cleanup inspect the
+checkpoint inventory under the shared lock before reading legacy inputs or
+changing forwarding. Any persisted handover state blocks those legacy writers,
+including corrupt, unreadable or unknown-version state. They preserve native
+state for phase-aware recovery instead of replaying an older peer cache. This
+guard does not execute phases; checkpoint admission and native phase dispatch
+still need to be connected to the normal loop before enabling handover.
 
 The agent execution boundary holds the reconciliation lock through checkpoint
 admission, a platform phase callback, live identity revalidation and receipt

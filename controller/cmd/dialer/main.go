@@ -331,9 +331,9 @@ func main() {
 			// endpoint across restarts; remove its interface only after the cluster
 			// unpublishes it and ends retention.
 			if cfg.secretName != "" {
-				lock, lockErr := lockReconciliation(cfg)
+				lock, lockErr := lockLegacyReconciliation(cfg)
 				if lockErr != nil {
-					fmt.Fprintf(os.Stderr, "preserving endpoint during concurrent reconciliation: %v\n", lockErr)
+					fmt.Fprintf(os.Stderr, "preserving endpoint during shutdown: %v\n", lockErr)
 					return
 				}
 				if published, err := nodeStillPublished(clientset, cfg); err == nil && !published {
@@ -1185,7 +1185,7 @@ func claimHeld(path string, poll time.Duration) (bool, string) {
 // device config, host routes, and (transit role only) the masquerade
 // rule.
 func reconcile(ctx context.Context, clientset *kubernetes.Clientset, wg *wgctrl.Client, cfg config) error {
-	lock, err := lockReconciliation(cfg)
+	lock, err := lockLegacyReconciliation(cfg)
 	if err != nil {
 		return err
 	}

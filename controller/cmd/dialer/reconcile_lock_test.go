@@ -140,3 +140,64 @@ func TestReconciliationLockRejectsUnsafePaths(t *testing.T) {
 		}
 	}
 }
+
+func TestLegacyReconciliationPreservesHandoverRecovery(t *testing.T) {
+	for _, kind := range []string{"corrupt", "directory", "dangling-symlink", "unknown-version"} {
+		t.Run(kind, func(t *testing.T) {
+			cfg := config{iface: "locktest", peersFile: filepath.Join(t.TempDir(), "peers.json")}
+			path := filepath.Join(filepath.Dir(cfg.peersFile), cfg.iface+".reconcile.lock.receive-transition-test.json")
+			var err error
+			switch kind {
+			case "directory":
+				err = os.Mkdir(path, 0700)
+			case "dangling-symlink":
+				err = os.Symlink("missing", path)
+			case "unknown-version":
+				err = os.WriteFile(path, []byte(`{"version":999}`), 0600)
+			default:
+				err = os.WriteFile(path, []byte("incomplete"), 0600)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			before, err := os.Lstat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for range 2 {
+				for _, apply := range []func() error{
+					func() error { return reconcile(context.Background(), nil, nil, cfg) },
+					func() error { return reconcileNode(context.Background(), nil, nil, cfg, nil) },
+					func() error {
+						lock, err := lockLegacyReconciliation(cfg)
+						if lock != nil {
+							lock.Close()
+						}
+						return err
+					},
+				} {
+					if err := apply(); !errors.Is(err, errReceivePhaseRequired) {
+						t.Fatalf("legacy writer bypassed recovery: %v", err)
+					}
+				}
+			}
+			after, err := os.Lstat(path)
+			if err != nil || !os.SameFile(before, after) {
+				t.Fatal("legacy writer changed recovery state", err)
+			}
+			// The guard must release the lock so phase-aware recovery can proceed.
+			lock, err := lockReconciliation(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			lock.Close()
+			// A different tunnel on the same host has an independent lifetime.
+			cfg.iface = "other"
+			lock, err = lockLegacyReconciliation(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			lock.Close()
+		})
+	}
+}

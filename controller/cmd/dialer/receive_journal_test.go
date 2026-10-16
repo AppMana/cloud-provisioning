@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/netip"
 	"os"
@@ -168,6 +169,14 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 		path := filepath.Join(filepath.Dir(cfg.privateKeyFile), cfg.iface+".reconcile.lock."+store.Name+".json")
 		if _, err := checkpointReceiveJournal(ctx, api, store, scope, cfg, root); err != nil {
 			t.Fatal(err)
+		}
+		for _, apply := range []func() error{
+			func() error { return reconcile(ctx, nil, nil, cfg) },
+			func() error { return reconcileNode(ctx, nil, nil, cfg, nil) },
+		} {
+			if err := apply(); !errors.Is(err, errReceivePhaseRequired) {
+				t.Fatalf("legacy writer entered after durable admission: %v", err)
+			}
 		}
 		info, err := os.Stat(path)
 		if err != nil || info.Mode().Perm() != 0600 {

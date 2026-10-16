@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,32 @@ import (
 
 	"golang.org/x/sys/unix"
 )
+
+var errReceivePhaseRequired = errors.New("persisted receiver handover requires phase-aware reconciliation")
+
+// Legacy writers must not replay peer caches, mutate BGP, or remove a device
+// after a phase executor has persisted intent. Inspect under the same lock as
+// checkpoint publication. Even malformed state must block legacy fallback;
+// only phase-aware recovery can determine what is safe to apply next.
+func lockLegacyReconciliation(cfg config) (*os.File, error) {
+	lock, err := lockReconciliation(cfg)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(filepath.Dir(lock.Name()))
+	if err != nil {
+		lock.Close()
+		return nil, fmt.Errorf("reading receiver recovery inventory: %w", err)
+	}
+	prefix := filepath.Base(lock.Name()) + "."
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), prefix) {
+			lock.Close()
+			return nil, fmt.Errorf("%w: %s", errReceivePhaseRequired, entry.Name())
+		}
+	}
+	return lock, nil
+}
 
 // The lock lives beside identity/recovery files on the existing shared host
 // mount, so bootstrap and pod processes serialize reads as well as mutations.

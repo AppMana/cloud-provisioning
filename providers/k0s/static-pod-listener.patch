@@ -1,0 +1,284 @@
+diff --git a/cmd/worker/worker.go b/cmd/worker/worker.go
+index cbef4617..e332ca9d 100644
+--- a/cmd/worker/worker.go
++++ b/cmd/worker/worker.go
+@@ -247,7 +247,7 @@ func (c *Command) Start(ctx context.Context, nodeName apitypes.NodeName, kubelet
+ 			return errors.New("node-local load balancing cannot be used in a single-node cluster")
+ 		}
+ 
+-		sp := worker.NewStaticPods()
++		sp := worker.NewStaticPods(c.K0sVars.RunDir)
+ 		reconciler, err := nllb.NewReconciler(c.K0sVars, sp, c.WorkerProfile, *workerConfig.DeepCopy())
+ 		if err != nil {
+ 			return fmt.Errorf("failed to create node-local load balancer reconciler: %w", err)
+diff --git a/pkg/component/worker/static_pods.go b/pkg/component/worker/static_pods.go
+index e7495e7e..012245b0 100644
+--- a/pkg/component/worker/static_pods.go
++++ b/pkg/component/worker/static_pods.go
+@@ -12,6 +12,9 @@ import (
+ 	"net"
+ 	"net/http"
+ 	"net/url"
++	"os"
++	"path/filepath"
++	"strconv"
+ 	"strings"
+ 	"sync"
+ 	"sync/atomic"
+@@ -74,7 +77,8 @@ type staticPod struct {
+ // staticPods implements the StaticPods interface, as well as the Component
+ // interface, so that it can be hooked in as a k0s component.
+ type staticPods struct {
+-	log logrus.FieldLogger // initially set, immutable
++	log               logrus.FieldLogger // initially set, immutable
++	kubeletConfigPath string             // initially set, immutable
+ 
+ 	mu        sync.Mutex
+ 	lifecycle staticPodsLifecycle
+@@ -88,14 +92,16 @@ type staticPods struct {
+ 
+ var _ manager.Ready = (*staticPods)(nil)
+ 
+-// NewStaticPods creates a new static_pods component.
+-func NewStaticPods() interface {
++// NewStaticPods creates a new static_pods component. It reuses the manifest
++// listener recorded in the generated kubelet configuration beneath runDir.
++func NewStaticPods(runDir string) interface {
+ 	StaticPods
+ 	manager.Component
+ } {
+ 	staticPods := &staticPods{
+-		log:         logrus.WithFields(logrus.Fields{"component": "static_pods"}),
+-		claimedPods: make(map[staticPodID]*staticPod),
++		kubeletConfigPath: filepath.Join(runDir, "kubelet", "config.yaml"),
++		log:               logrus.WithFields(logrus.Fields{"component": "static_pods"}),
++		claimedPods:       make(map[staticPodID]*staticPod),
+ 	}
+ 	staticPods.contentPtr.Store(generateContent(nil))
+ 	return staticPods
+@@ -320,6 +326,42 @@ func (s *staticPods) Init(context.Context) error {
+ 	return nil
+ }
+ 
++func (s *staticPods) previousListenerAddress() (string, error) {
++	data, err := os.ReadFile(s.kubeletConfigPath)
++	if errors.Is(err, os.ErrNotExist) {
++		return "127.0.0.1:", nil
++	}
++	if err != nil {
++		return "", fmt.Errorf("read previous kubelet configuration: %w", err)
++	}
++	// Read only the generated URL; the rest of the kubelet configuration is
++	// owned and validated by the kubelet component.
++	var config struct {
++		Kind         string `json:"kind"`
++		StaticPodURL string `json:"staticPodURL"`
++	}
++	if err := yaml.Unmarshal(data, &config); err != nil {
++		return "", fmt.Errorf("decode previous kubelet configuration: %w", err)
++	}
++	if config.Kind != "KubeletConfiguration" {
++		return "", errors.New("previous kubelet configuration has an unexpected kind")
++	}
++	if config.StaticPodURL == "" {
++		return "127.0.0.1:", nil // NLLB was not enabled in the previous config.
++	}
++	u, err := url.Parse(config.StaticPodURL)
++	if err != nil {
++		return "", errors.New("invalid staticPodURL in previous kubelet configuration")
++	}
++	port, err := strconv.Atoi(u.Port())
++	address := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
++	if err != nil || port < 1 || port > 65535 ||
++		config.StaticPodURL != "http://"+address+"/manifests" {
++		return "", errors.New("unsupported staticPodURL in previous kubelet configuration")
++	}
++	return address, nil
++}
++
+ func (s *staticPods) Start(ctx context.Context) error {
+ 	s.mu.Lock()
+ 	defer s.mu.Unlock()
+@@ -333,8 +375,15 @@ func (s *staticPods) Start(ctx context.Context) error {
+ 		return staticPodsAlready(lifecycle)
+ 	}
+ 
+-	// Open a TCP port to listen for incoming HTTP requests.
+-	listener, err := net.Listen("tcp", "127.0.0.1:") // FIXME: Support IPv6 / dual-stack?
++	// Kubelet includes the manifest URL in static-pod identities. Reuse the
++	// previous generated config's address so a worker restart does not replace
++	// unchanged pods. An occupied address must fail rather than silently rebind.
++	address, err := s.previousListenerAddress()
++	if err != nil {
++		s.transition(staticPodsStarting, staticPodsInitialized)
++		return err
++	}
++	listener, err := net.Listen("tcp", address) // FIXME: Support IPv6 / dual-stack?
+ 	if err != nil {
+ 		s.transition(staticPodsStarting, staticPodsInitialized)
+ 		return err
+diff --git a/pkg/component/worker/static_pods_listener_test.go b/pkg/component/worker/static_pods_listener_test.go
+new file mode 100644
+index 00000000..42ed2166
+--- /dev/null
++++ b/pkg/component/worker/static_pods_listener_test.go
+@@ -0,0 +1,137 @@
++// SPDX-FileCopyrightText: 2026 k0s authors
++// SPDX-License-Identifier: Apache-2.0
++
++package worker
++
++import (
++	"encoding/json"
++	"io"
++	"net/http"
++	"os"
++	"path/filepath"
++	"testing"
++	"time"
++
++	"github.com/stretchr/testify/require"
++)
++
++func listenerTestServer(t *testing.T, runDir string) *staticPods {
++	t.Helper()
++	server := NewStaticPods(runDir).(*staticPods)
++	require.NoError(t, server.Init(t.Context()))
++	t.Cleanup(func() {
++		if server.peekLifecycle() == staticPodsStarted {
++			require.NoError(t, server.Stop())
++		}
++	})
++	return server
++}
++
++func recordKubeletManifestURL(t *testing.T, runDir, address string) {
++	t.Helper()
++	directory := filepath.Join(runDir, "kubelet")
++	require.NoError(t, os.MkdirAll(directory, 0700))
++	config, err := json.Marshal(map[string]string{"apiVersion": "kubelet.config.k8s.io/v1beta1", "kind": "KubeletConfiguration", "staticPodURL": address})
++	require.NoError(t, err)
++	require.NoError(t, os.WriteFile(filepath.Join(directory, "config.yaml"), config, 0600))
++}
++
++func TestStaticPodsPreservesManifestURL(t *testing.T) {
++	runDir := t.TempDir()
++	first := listenerTestServer(t, runDir)
++	require.NoError(t, first.Start(t.Context()))
++	pod, err := first.ClaimStaticPod("default", "dummy-test")
++	require.NoError(t, err)
++	require.NoError(t, pod.SetManifest(dummyPod))
++	address, err := first.ManifestURL()
++	require.NoError(t, err)
++	original := fetchStaticManifest(t, address.String())
++	recordKubeletManifestURL(t, runDir, address.String())
++	require.NoError(t, first.Stop())
++	second := listenerTestServer(t, runDir)
++	require.NoError(t, second.Start(t.Context()))
++	t.Cleanup(func() { require.NoError(t, second.Stop()) })
++	actual, err := second.ManifestURL()
++	require.NoError(t, err)
++	require.Equal(t, address.String(), actual.String())
++	pod, err = second.ClaimStaticPod("default", "dummy-test")
++	require.NoError(t, err)
++	require.NoError(t, pod.SetManifest(dummyPod))
++	body := fetchStaticManifest(t, actual.String())
++	require.Equal(t, original, body, "unchanged manifest and URL preserve kubelet's existing identity inputs")
++}
++
++func TestStaticPodsOccupiedPreviousListener(t *testing.T) {
++	runDir := t.TempDir()
++	first := listenerTestServer(t, runDir)
++	require.NoError(t, first.Start(t.Context()))
++	address, err := first.ManifestURL()
++	require.NoError(t, err)
++	recordKubeletManifestURL(t, runDir, address.String())
++	second := listenerTestServer(t, runDir)
++	err = second.Start(t.Context())
++	if err == nil {
++		require.NoError(t, second.Stop())
++	}
++	require.Error(t, err, "an occupied previous address must not silently change static-pod identities")
++	require.NoError(t, first.Stop())
++	require.NoError(t, second.Start(t.Context()), "a failed bind must leave the component retryable")
++	t.Cleanup(func() { require.NoError(t, second.Stop()) })
++	actual, err := second.ManifestURL()
++	require.NoError(t, err)
++	require.Equal(t, address.String(), actual.String())
++}
++
++func TestStaticPodsRejectsInvalidPreviousURL(t *testing.T) {
++	for _, address := range []string{"http://0.0.0.0:12345/manifests", "http://127.0.0.2:12345/manifests", "https://127.0.0.1:12345/manifests", "http://user:password@127.0.0.1:12345/manifests", "http://127.0.0.1:12345/other", "http://127.0.0.1:0/manifests", "http://127.0.0.1:65536/manifests", "http://127.0.0.1/manifests", "http://127.0.0.1:12345/manifests?x=y", "http://127.0.0.1:12345/manifests#fragment"} {
++		t.Run(address, func(t *testing.T) {
++			runDir := t.TempDir()
++			recordKubeletManifestURL(t, runDir, address)
++			server := listenerTestServer(t, runDir)
++			err := server.Start(t.Context())
++			if err == nil {
++				require.NoError(t, server.Stop())
++			}
++			require.Error(t, err)
++		})
++	}
++}
++
++func fetchStaticManifest(t *testing.T, address string) []byte {
++	t.Helper()
++	client := &http.Client{Timeout: 5 * time.Second}
++	response, err := client.Get(address)
++	require.NoError(t, err)
++	defer response.Body.Close()
++	require.Equal(t, http.StatusOK, response.StatusCode)
++	body, err := io.ReadAll(response.Body)
++	require.NoError(t, err)
++	return body
++}
++
++func TestStaticPodsPreviousConfigFailures(t *testing.T) {
++	for _, data := range []string{"", "null", "[broken", "kind: Secret\nstaticPodURL: http://127.0.0.1:12345/manifests\n"} {
++		t.Run(data, func(t *testing.T) {
++			runDir := t.TempDir()
++			recordKubeletManifestURL(t, runDir, "")
++			require.NoError(t, os.WriteFile(filepath.Join(runDir, "kubelet", "config.yaml"), []byte(data), 0600))
++			server := listenerTestServer(t, runDir)
++			require.Error(t, server.Start(t.Context()))
++		})
++	}
++	t.Run("unreadable", func(t *testing.T) {
++		runDir := t.TempDir()
++		require.NoError(t, os.MkdirAll(filepath.Join(runDir, "kubelet", "config.yaml"), 0700))
++		require.Error(t, listenerTestServer(t, runDir).Start(t.Context()))
++	})
++	t.Run("previously-disabled", func(t *testing.T) {
++		runDir := t.TempDir()
++		recordKubeletManifestURL(t, runDir, "")
++		server := listenerTestServer(t, runDir)
++		require.NoError(t, server.Start(t.Context()))
++		address, err := server.ManifestURL()
++		require.NoError(t, err)
++		require.Equal(t, "127.0.0.1", address.Hostname())
++		require.NotEmpty(t, address.Port())
++	})
++}
+diff --git a/pkg/component/worker/static_pods_test.go b/pkg/component/worker/static_pods_test.go
+index fdb26398..318bf8cb 100644
+--- a/pkg/component/worker/static_pods_test.go
++++ b/pkg/component/worker/static_pods_test.go
+@@ -40,7 +40,7 @@ spec:
+ `
+ 
+ func TestStaticPods_Provisioning(t *testing.T) {
+-	underTest := NewStaticPods()
++	underTest := NewStaticPods(t.TempDir())
+ 	underTest.(*staticPods).log, _ = newTestLogger(t)
+ 
+ 	t.Run("content_is_initlially_empty", func(t *testing.T) {
+@@ -163,7 +163,7 @@ func TestStaticPods_Provisioning(t *testing.T) {
+ func TestStaticPods_Lifecycle(t *testing.T) {
+ 	log, logs := newTestLogger(t)
+ 
+-	underTest := NewStaticPods().(*staticPods)
++	underTest := NewStaticPods(t.TempDir()).(*staticPods)
+ 	underTest.log = log
+ 	podUnderTest, err := underTest.ClaimStaticPod(metav1.NamespaceDefault, "dummy-test")
+ 	require.NoError(t, err)

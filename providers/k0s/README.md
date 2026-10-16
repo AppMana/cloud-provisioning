@@ -39,6 +39,39 @@ from steady-state transfers: restarting a worker can replace its node-local
 load balancer and interrupt management streams even when workload containers
 remain running. A passing transfer after startup does not qualify that restart.
 
+## Static-pod identity across worker restarts
+
+`static-pod-listener.patch` targets `v1.36.4+k0s.1`, commit
+`c37fe960bdee93ca14c5a5b9f2ab9700f8e82e60`. Kubelet includes the HTTP
+manifest source URL in static-pod identities. Choosing a new listener port on
+each worker start therefore replaces an unchanged node-local load-balancer pod.
+
+The patch reuses the loopback listener address recorded in the generated
+kubelet configuration. A first start, or a previous configuration without a
+static-pod URL, still allocates a port normally. Invalid previous configuration
+or an occupied port fails startup rather than silently changing pod identities.
+The manifest contents and kubelet's identity calculation remain unchanged.
+
+```sh
+git -C <k0s-checkout> apply --check <absolute-path>/static-pod-listener.patch
+git -C <k0s-checkout> apply <absolute-path>/static-pod-listener.patch
+cd <k0s-checkout>
+go test ./pkg/component/worker ./pkg/component/worker/nllb ./cmd/worker
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go test -c \
+  -o worker.test.exe ./pkg/component/worker
+```
+
+Execute `worker.test.exe -test.run=^TestStaticPods -test.timeout=2m` on each
+supported Windows version. The tests exercise real HTTP listeners, reuse after
+an HTTP request, occupied-port failure and retry, and rejected configurations.
+
+Rebuild the complete runtime package and verify existing static-pod UIDs and
+container identities through a guarded worker restart. Reuse depends on the
+previous generated configuration remaining available; it does not establish
+identity preservation after a reboot that clears the runtime directory or a
+rollback to an unpatched executable. It also does not preserve active exec
+streams through a kubelet restart. Qualify management continuity separately.
+
 ## Worker releases with patched controllers
 
 Give patched controllers a version beginning with their upstream release, such

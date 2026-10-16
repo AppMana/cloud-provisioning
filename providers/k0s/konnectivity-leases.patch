@@ -183,7 +183,7 @@ diff --git a/pkg/component/controller/konnectivity_leases_test.go b/pkg/componen
 new file mode 100644
 --- /dev/null
 +++ b/pkg/component/controller/konnectivity_leases_test.go
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,61 @@
 +// SPDX-FileCopyrightText: 2026 k0s authors
 +// SPDX-License-Identifier: Apache-2.0
 +
@@ -224,6 +224,7 @@ new file mode 100644
 +			case *appsv1.DaemonSet:
 +				agents++
 +				require.Contains(t, v.Spec.Template.Spec.Containers[0].Args, "--count-server-leases=true")
++				require.Contains(t, v.Spec.Template.Spec.Containers[0].Args, "--sync-forever=true")
 +				for _, env := range v.Spec.Template.Spec.Containers[0].Env {
 +					require.NotEqual(t, "K0S_CONTROLLER_COUNT", env.Name)
 +				}
@@ -357,11 +358,12 @@ diff --git a/pkg/component/controller/konnectivityagent.go b/pkg/component/contr
                - name: NODE_IP
                  valueFrom:
                    fieldRef:
-@@ -316,6 +321,7 @@
+@@ -316,6 +321,8 @@
              - --service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token
              - --agent-identifiers={{ .Identifiers }}
              - --agent-id={{ .AgentID }}
 +            - --count-server-leases=true
++            - --sync-forever=true
              {{- if .DefaultRoute }}
              - --health-server-port={{ .HealthPort }}
              - --admin-server-port=18096
@@ -380,7 +382,7 @@ diff --git a/pkg/component/controller/konnectivityagent_test.go b/pkg/component/
  				require.Len(t, containers, 1)
  				args := containers[0].Args
 -				require.Len(t, args, 7)
-+				require.Len(t, args, 8)
++				require.Len(t, args, 9)
  				assert.Equal(t, "--proxy-server-host="+expectedHost, args[2])
  				assert.Equal(t, "--proxy-server-port="+expectedPort, args[3])
  			})

@@ -191,7 +191,10 @@ The relevant controller-count failure is described in
 [upstream issue #8416](https://github.com/k0sproject/k0s/issues/8416).
 
 The server publishes its lease using Konnectivity's built-in lease controller.
-Both node-address and Linux default-route agents count those leases. k0s no
+Both node-address and Linux default-route agents count those leases and keep
+discovering servers with `--sync-forever=true`. Continued discovery prevents an
+incomplete lease count during rolling upgrades from suppressing connections
+to older controllers. k0s no
 longer restarts the server or changes the agent pod template when its active
 controller count changes. The patch retains existing authentication resources
 and grants the agent ServiceAccount read-only lease access in `kube-system`.

@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: aws-vpc-cni-windows
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: aws-vpc-cni-windows
+  template:
+    metadata:
+      labels:
+        app: aws-vpc-cni-windows
+    spec:
+      os:
+        name: windows
+      nodeSelector:
+        kubernetes.io/os: windows
+        kubernetes.io/arch: amd64
+        cloud-provisioning.appmana.com/role: cloud-worker
+        cloud-provisioning.appmana.com/cni: aws-vpc
+      hostNetwork: true
+      automountServiceAccountToken: false
+      securityContext:
+        windowsOptions:
+          hostProcess: true
+          runAsUserName: 'NT AUTHORITY\SYSTEM'
+      tolerations:
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoSchedule
+        - key: cloud-provisioning.appmana.com/internet-facing
+          operator: Exists
+          effect: NoSchedule
+      initContainers:
+        - name: configure
+          image: mcr.microsoft.com/oss/kubernetes/windows-host-process-containers-base-image:v1.0.0@sha256:b4c9637e032f667c52d1eccfa31ad8c63f1b035e8639f3f48a510536bf34032b
+          command: ['C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe']
+          args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', 'C:\aws-cni\configure-cni.ps1', '-Settings', 'C:\aws-cni-settings\settings.json']
+          volumeMounts:
+            - name: scripts
+              mountPath: 'C:\aws-cni'
+              readOnly: true
+            - name: settings
+              mountPath: 'C:\aws-cni-settings'
+              readOnly: true
+      containers:
+        - name: installed
+          image: mcr.microsoft.com/oss/kubernetes/windows-host-process-containers-base-image:v1.0.0@sha256:b4c9637e032f667c52d1eccfa31ad8c63f1b035e8639f3f48a510536bf34032b
+          command: ['C:\Windows\System32\ping.exe', '-t', '127.0.0.1']
+      volumes:
+        - name: scripts
+          configMap:
+            name: aws-vpc-cni-windows-scripts
+        - name: settings
+          configMap:
+            name: aws-vpc-cni-windows-settings

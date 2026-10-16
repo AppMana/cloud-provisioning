@@ -414,6 +414,34 @@ Image-layer verification does not prove networking: fresh workers still need
 node-specific CNI configuration, the scoped AWS Windows IPAM controller, and
 the [mixed-CNI lifecycle and traffic checks](../docs/hybrid-cni.md).
 
+`aws/windows/kustomization.yaml` deploys the AWS Windows CNI initializer as a
+HostProcess DaemonSet. It selects only Windows AMD64 nodes with both the
+`cloud-provisioning.appmana.com/role=cloud-worker` and
+`cloud-provisioning.appmana.com/cni=aws-vpc` labels. Its init container verifies
+the prepared image, discovers the primary ENI through IMDSv2, and writes the
+native plugin's configuration before its regular container starts. It does
+not allocate addresses, create HNS networks, install services, or replace an
+existing differing CNI configuration. AWS IPAM and the native plugin retain
+those responsibilities.
+
+In an environment overlay, replace the generated
+`aws-vpc-cni-windows-settings` ConfigMap's `settings.json` entry with an object
+containing `serviceCIDR`, `clusterDNS`, `clusterDomain`, and
+`snatExcludedCIDRs` (an array). Read the Service CIDR from the cluster's
+ServiceCIDR objects, DNS settings from the selected k0s worker configuration,
+and site exclusions from the existing native AWS CNI configuration. This
+initializer supports IPv4 Windows networking; it rejects default-route
+exclusions and ambiguous primary-interface gateways. Its empty base settings
+must be replaced before use. Cluster credentials are not mounted into the
+initializer; the native connector uses the worker's kubelet credentials.
+
+The installed configuration is retained when the DaemonSet is removed.
+Changing a live network configuration requires a separate migration; an
+initializer restart accepts only the same configuration. Run
+`aws/windows/test-configure-cni.ps1` for input-boundary checks, then qualify
+fresh claims and ordinary pod traffic on each Windows version. A Ready
+initializer alone does not prove IP allocation or application connectivity.
+
 The [Windows capture helper](../docs/windows.md#private-aws-image-capture) cleans
 run-owned diagnostic state, dispatches EC2Launch Sysprep, captures private AMIs
 and authorizes the exact candidates for the isolated CAPA role. Capture does

@@ -144,6 +144,15 @@ receiver-only destination set with no unresolved claims or relay state. It
 skips legacy main-table migration when that device is absent and rejects a
 non-WireGuard interface occupying its name. This does not authorize retirement;
 the coordinated phase executor must establish that it is safe first.
+Legacy retirement is peer-scoped because one site device can serve several
+cloud workers. The Linux withdrawal component removes only the admitted peer,
+preserving the shared device, addresses, listener and other peer configuration.
+It rejects identity or permission drift, overlapping permissions on another
+legacy peer, and legacy routes in any table that overlap the retiring sources,
+including default and multipath routes. It does not remove those routes itself.
+This component also remains disconnected from normal reconciliation: a fenced
+executor must verify replacement routing and committed drain receipts, and
+persist retirement so the ordinary publisher cannot recreate the old peer.
 Windows needs independent adapter lifetimes, route and source-address behavior,
 and HNS/VFP isolation checks on Server 2022 and Server 2025. The current
 single-device `Apply`/`Close` contract is insufficient to represent preparation,

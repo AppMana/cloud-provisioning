@@ -258,7 +258,7 @@ Start-ScheduledTask -TaskName $task
    if not record.get('cacheVerification',{}).get('passed'):raise RuntimeError('Cache capture requires native preparation evidence')
    if record['cacheVerification'].get('checks',{}).get('dataDirectoryInheritsPermissions') is not True:raise RuntimeError('Cache capture requires native data-directory permission evidence')
    name+='-cache-'+record['cacheRecipe']['sha256'][:12]
-  result=aws('ec2','create-image',InstanceId=id,Name=name,Description='Private test candidate: k0s 1.36.2 Windows native tunnel and secure CAPA consumer',NoReboot=True,TagSpecifications=[{'ResourceType':'image','Tags':tags},{'ResourceType':'snapshot','Tags':tags}])
+  result=aws('ec2','create-image',InstanceId=id,Name=name,Description='Private test candidate: Windows native tunnel and secure CAPA consumer',NoReboot=True,TagSpecifications=[{'ResourceType':'image','Tags':tags},{'ResourceType':'snapshot','Tags':tags}])
   record['imageID']=result['ImageId'];record['imageState']='pending'
   s.setdefault('retiredImages',[]).append({'id':result['ImageId'],'snapshots':[]})
   save();print(year+' private test candidate capture requested: '+result['ImageId'])

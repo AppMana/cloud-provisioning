@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"reflect"
+	"sort"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -39,6 +40,7 @@ func TestTheDialerRoleNamesExactlyTheSecretsTheDialerTouches(t *testing.T) {
 		m := &unstructured.Unstructured{}
 		m.SetGroupVersionKind(machineGVK)
 		m.SetName(name)
+		m.SetUID(types.UID("uid-" + name))
 		m.SetNamespace("cloud-provisioning")
 		m.SetLabels(map[string]string{"cloud-provisioning.appmana.com/role": "cloud-worker"})
 		return m
@@ -95,6 +97,52 @@ func TestTheDialerRoleNamesExactlyTheSecretsTheDialerTouches(t *testing.T) {
 	}}
 	if !reflect.DeepEqual(got.Rules, want) {
 		t.Fatalf("dialer Role rules:\n got %+v\nwant %+v", got.Rules, want)
+	}
+	foreign := machineOf("foreign")
+	foreign.SetNamespace("elsewhere")
+	if err := c.Create(context.Background(), foreign); err != nil {
+		t.Fatal(err)
+	}
+	// Keep the existing adoption scope; journals require the same namespace
+	// as the controller's transition builder and must exclude this machine.
+	want[0].ResourceNames = []string{"peers", tunnel.AdoptionSecretName("foreign"), tunnel.AdoptionSecretName("remote1"), tunnel.AdoptionSecretName("remote2")}
+	r.receivePreparation = &receivePreparationPolicy{Journal: &receiveJournalPolicy{}}
+	if err := r.ensureDialerRole(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	key := types.NamespacedName{Namespace: role.Namespace, Name: role.Name}
+	if err := c.Get(context.Background(), key, got); err != nil {
+		t.Fatal(err)
+	}
+	names := []string{receiveTransitionName("uid-remote1"), receiveTransitionName("uid-remote2")}
+	sort.Strings(names)
+	want = append(want, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: names})
+	if !reflect.DeepEqual(got.Rules, want) {
+		t.Fatalf("journal grants differ: %+v", got.Rules)
+	}
+	version := got.ResourceVersion
+	if err := r.ensureDialerRole(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Get(context.Background(), key, got); err != nil || got.ResourceVersion != version {
+		t.Fatal("unchanged journal grants were rewritten", err)
+	}
+	for _, name := range []string{"remote1", "remote2"} {
+		if err := c.Delete(context.Background(), machineOf(name)); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.ensureDialerRole(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if err := c.Get(context.Background(), key, got); err != nil {
+			t.Fatal(err)
+		}
+		if name == "remote1" && (len(got.Rules) != 2 || !reflect.DeepEqual(got.Rules[1].ResourceNames, []string{receiveTransitionName("uid-remote2")})) {
+			t.Fatal("deleted machine retained journal read access")
+		}
+		if name == "remote2" && len(got.Rules) != 1 {
+			t.Fatal("empty journal membership retained or broadened ConfigMap access")
+		}
 	}
 }
 

@@ -73,3 +73,18 @@ responsible for removing names when machines disappear. */}}
 {{- end -}}
 {{- toYaml (uniq $names) -}}
 {{- end -}}
+
+{{/* Preserve only the controller's named, read-only handover grants. */}}
+{{- define "cloud-provisioning.dialerJournalNames" -}}
+{{- $names := list -}}
+{{- range .role.rules -}}
+{{- if and (deepEqual .apiGroups (list "")) (deepEqual .resources (list "configmaps")) (deepEqual .verbs (list "get")) (not .nonResourceURLs) -}}
+{{- range .resourceNames -}}
+{{- if regexMatch "^receive-transition-[0-9a-f]{32}$" . -}}
+{{- $names = append $names . -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- toYaml (sortAlpha (uniq $names)) -}}
+{{- end -}}

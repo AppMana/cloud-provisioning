@@ -88,11 +88,18 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 		t.Fatalf("unexpected initial grants: %+v", role.Rules)
 	}
 	role.Rules[0].ResourceNames = append(role.Rules[0].ResourceNames, "worker-a-tunnel-peers", "worker-b-tunnel-peers")
+	journalName := receiveTransitionName("worker-a-uid")
+	role.Rules = append(role.Rules, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: []string{journalName}})
 	if err := admin.Update(ctx, role); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"worker-a-tunnel-peers", "worker-b-tunnel-peers", "unrelated"} {
 		if err := admin.Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: key.Namespace}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{journalName, "unrelated-journal"} {
+		if err := admin.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: key.Namespace}, Data: map[string]string{"transition.json": "controller-owned"}}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -118,6 +125,28 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 		if err := dialer.Get(ctx, types.NamespacedName{Namespace: key.Namespace, Name: "unrelated"}, &corev1.Secret{}); !apierrors.IsForbidden(err) {
 			t.Fatalf("unrelated secret access: %v", err)
 		}
+		journal := &corev1.ConfigMap{}
+		if err := dialer.Get(ctx, types.NamespacedName{Namespace: key.Namespace, Name: journalName}, journal); err != nil {
+			t.Fatal("journal read access interrupted:", err)
+		}
+		before := journal.DeepCopy()
+		journal.Data["transition.json"] = "forged"
+		for verb, mutate := range map[string]func() error{
+			"update": func() error { return dialer.Update(ctx, journal) },
+			"patch":  func() error { return dialer.Patch(ctx, journal, client.MergeFrom(before)) },
+			"delete": func() error { return dialer.Delete(ctx, journal) },
+			"create": func() error {
+				return dialer.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: receiveTransitionName("forged"), Namespace: key.Namespace}})
+			},
+			"list": func() error { return dialer.List(ctx, &corev1.ConfigMapList{}, client.InNamespace(key.Namespace)) },
+		} {
+			if err := mutate(); !apierrors.IsForbidden(err) {
+				t.Fatalf("journal %s was not forbidden: %v", verb, err)
+			}
+		}
+		if err := dialer.Get(ctx, types.NamespacedName{Namespace: key.Namespace, Name: "unrelated-journal"}, &corev1.ConfigMap{}); !apierrors.IsForbidden(err) {
+			t.Fatalf("unrelated ConfigMap access: %v", err)
+		}
 	}
 	check()
 	// An unrelated rule must not be copied into the upgraded grant. The live
@@ -127,6 +156,10 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 		Verbs:         []string{"get", "list", "patch"},
 		ResourceNames: []string{"unrelated", "foreign-tunnel-peers"},
 	})
+	role.Rules = append(role.Rules,
+		rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get", "patch"}, ResourceNames: []string{receiveTransitionName("foreign")}},
+		rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: []string{"unrelated-journal"}},
+	)
 	if err := admin.Update(ctx, role); err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +169,7 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 	if err := admin.Get(ctx, key, role); err != nil {
 		t.Fatal(err)
 	}
-	if len(role.Rules) != 1 || !equalStrings(role.Rules[0].ResourceNames, []string{"cloud-provisioning-peers", "worker-a-tunnel-peers", "worker-b-tunnel-peers"}) {
+	if len(role.Rules) != 2 || !equalStrings(role.Rules[0].ResourceNames, []string{"cloud-provisioning-peers", "worker-a-tunnel-peers", "worker-b-tunnel-peers"}) || !equalStrings(role.Rules[1].ResourceNames, []string{journalName}) {
 		t.Fatalf("upgrade changed grants: %+v", role.Rules)
 	}
 }

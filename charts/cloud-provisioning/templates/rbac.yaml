@@ -351,6 +351,14 @@ rules:
       {{- $name := include "cloud-provisioning.name" . }}
       {{- $live := lookup "rbac.authorization.k8s.io/v1" "Role" .Release.Namespace $name }}
       {{- include "cloud-provisioning.dialerSecretNames" (dict "name" $name "role" $live) | nindent 6 }}
+  {{- $journals := include "cloud-provisioning.dialerJournalNames" (dict "role" $live) | fromYamlArray }}
+  {{- if $journals }}
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get"]
+    resourceNames:
+      {{- toYaml $journals | nindent 6 }}
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

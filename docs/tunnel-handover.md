@@ -124,6 +124,14 @@ rejected; callers must reload authoritative state before recomputing. Receipt
 writers must lack access to this storage: persisted authentication is a trusted
 controller assertion. Publish only a successfully committed snapshot.
 
+When journal policy is configured, the controller grants agents `get` on the
+selected Machines' UID-derived journal names in its namespace. Agents receive
+no journal list or write permission. An online Helm upgrade preserves only
+canonical named read grants; ordinary readiness Secrets remain a separate
+writable channel. This read access does not authorize native execution or
+provide a receipt collector. Removing a Machine removes its named journal
+grant; an empty Machine set never produces namespace-wide ConfigMap access.
+
 ## Platform implementation boundaries
 
 The shared protocol owns generation identity, phase validation, peer graph

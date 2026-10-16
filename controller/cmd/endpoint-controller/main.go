@@ -28,6 +28,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -1680,16 +1681,29 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 		return fmt.Errorf("listing machines to scope the dialer Role: %w", err)
 	}
 	adoption := make([]string, 0, len(machines.Items))
+	journals := make([]string, 0, len(machines.Items))
 	for i := range machines.Items {
 		adoption = append(adoption, tunnel.AdoptionSecretName(machines.Items[i].GetName()))
+		if r.receivePreparation != nil && r.receivePreparation.Journal != nil && machines.Items[i].GetNamespace() == r.secretNamespace {
+			if machines.Items[i].GetUID() == "" {
+				return fmt.Errorf("journal read access requires a machine UID")
+			}
+			journals = append(journals, receiveTransitionName(string(machines.Items[i].GetUID())))
+		}
 	}
 	sort.Strings(adoption)
+	sort.Strings(journals)
 	desired := []rbacv1.PolicyRule{{
 		APIGroups:     []string{""},
 		Resources:     []string{"secrets"},
 		Verbs:         []string{"get", "patch"},
 		ResourceNames: append([]string{r.secretName}, adoption...),
 	}}
+	if len(journals) != 0 {
+		// Preparation receipts are writable by agents. Phase authority lives in
+		// separate controller-owned journals that agents may only read by name.
+		desired = append(desired, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: journals})
+	}
 
 	role := &rbacv1.Role{}
 	key := types.NamespacedName{Namespace: r.secretNamespace, Name: r.dialerServiceAccount}
@@ -1703,11 +1717,7 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 	if err := r.reader.Get(ctx, key, role); err != nil {
 		return fmt.Errorf("reading the dialer Role: %w", err)
 	}
-	if len(role.Rules) == 1 && equalStrings(role.Rules[0].APIGroups, desired[0].APIGroups) &&
-		equalStrings(role.Rules[0].Resources, desired[0].Resources) &&
-		equalStrings(role.Rules[0].Verbs, desired[0].Verbs) &&
-		equalStrings(role.Rules[0].ResourceNames, desired[0].ResourceNames) &&
-		len(role.Rules[0].NonResourceURLs) == 0 {
+	if reflect.DeepEqual(role.Rules, desired) {
 		return nil
 	}
 	role.Rules = desired

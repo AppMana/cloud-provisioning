@@ -1,0 +1,171 @@
+diff --git a/plugins/vpc-bridge/config/host_routes_test.go b/plugins/vpc-bridge/config/host_routes_test.go
+new file mode 100644
+index 0000000..2532e1f
+--- /dev/null
++++ b/plugins/vpc-bridge/config/host_routes_test.go
+@@ -0,0 +1,57 @@
++package config
++
++import (
++	"encoding/json"
++	cniSkel "github.com/containernetworking/cni/pkg/skel"
++	"testing"
++)
++
++func TestHostRouteScope(t *testing.T) {
++	for _, tc := range []struct {
++		name   string
++		routes []string
++		want   int
++		bad    bool
++	}{
++		{name: "default remains disabled"},
++		{name: "remote site and pods", routes: []string{"10.244.0.0/16", "10.10.0.0/24", "10.244.0.0/16"}, want: 2},
++		{name: "default", routes: []string{"0.0.0.0/0"}, bad: true},
++		{name: "ENI subnet", routes: []string{"172.29.0.0/25"}, bad: true},
++		{name: "ENI subnet subset", routes: []string{"172.29.0.64/26"}, bad: true},
++		{name: "ENI subnet superset", routes: []string{"172.29.0.0/16"}, bad: true},
++		{name: "noncanonical", routes: []string{"10.244.0.1/16"}, bad: true},
++		{name: "IPv6", routes: []string{"2001:db8::/64"}, bad: true},
++		{name: "loopback", routes: []string{"127.0.0.0/8"}, bad: true},
++		{name: "includes loopback", routes: []string{"126.0.0.0/7"}, bad: true},
++		{name: "includes multicast", routes: []string{"192.0.0.0/2"}, bad: true},
++		{name: "link local", routes: []string{"169.254.0.0/16"}, bad: true},
++		{name: "invalid", routes: []string{"not-a-prefix"}, bad: true},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			raw, err := json.Marshal(map[string]interface{}{"cniVersion": "0.4.0", "name": "test", "type": "vpc-bridge", "eniMACAddress": "02:00:00:00:00:01", "eniIPAddresses": []string{"172.29.0.57/25"}, "hostRouteCIDRs": tc.routes})
++			if err != nil {
++				t.Fatal(err)
++			}
++			cfg, err := New(&cniSkel.CmdArgs{StdinData: raw}, false)
++			if tc.bad {
++				if err == nil {
++					t.Fatal("unsafe host route accepted")
++				}
++				return
++			}
++			if err != nil {
++				t.Fatal(err)
++			}
++			if len(cfg.HostRouteCIDRs) != tc.want {
++				t.Fatalf("routes=%v", cfg.HostRouteCIDRs)
++			}
++		})
++	}
++}
++
++func TestHostRoutesRequireENIScope(t *testing.T) {
++	_, err := New(&cniSkel.CmdArgs{StdinData: []byte(`{"eniMACAddress":"02:00:00:00:00:01","hostRouteCIDRs":["10.244.0.0/16"]}`)}, false)
++	if err == nil {
++		t.Fatal("host route accepted without ENI subnet scope")
++	}
++}
+diff --git a/plugins/vpc-bridge/config/netconfig.go b/plugins/vpc-bridge/config/netconfig.go
+index a928b67..85a1dfb 100644
+--- a/plugins/vpc-bridge/config/netconfig.go
++++ b/plugins/vpc-bridge/config/netconfig.go
+@@ -34,6 +34,7 @@ type NetConfig struct {
+ 	ENIMACAddress    net.HardwareAddr
+ 	ENIIPAddresses   []net.IPNet
+ 	VPCCIDRs         []net.IPNet
++	HostRouteCIDRs   []net.IPNet
+ 	BridgeType       string
+ 	BridgeNetNSPath  string
+ 	IPAddresses      []net.IPNet
+@@ -54,6 +55,7 @@ type netConfigJSON struct {
+ 	ENIMACAddress    string   `json:"eniMACAddress"`
+ 	ENIIPAddresses   []string `json:"eniIPAddresses"`
+ 	VPCCIDRs         []string `json:"vpcCIDRs"`
++	HostRouteCIDRs   []string `json:"hostRouteCIDRs"`
+ 	BridgeType       string   `json:"bridgeType"`
+ 	BridgeNetNSPath  string   `json:"bridgeNetNSPath"`
+ 	IPAddresses      []string `json:"ipAddresses"`
+@@ -149,6 +151,38 @@ func New(args *cniSkel.CmdArgs, isAddCmd bool) (*NetConfig, error) {
+ 		}
+ 	}
+ 
++	// Explicit off-VPC IPv4 destinations routed through the Windows host.
++	// Never divert the ENI subnet, the default route, or non-unicast traffic.
++	if len(config.HostRouteCIDRs) > 0 && len(netConfig.ENIIPAddresses) == 0 {
++		return nil, fmt.Errorf("host routes require explicit ENI IP addresses for subnet validation")
++	}
++	seenHostRoutes := make(map[string]bool)
++	for _, value := range config.HostRouteCIDRs {
++		ip, prefix, err := net.ParseCIDR(value)
++		if err != nil {
++			return nil, fmt.Errorf("invalid host route CIDR %q", value)
++		}
++		ones, bits := prefix.Mask.Size()
++		if bits != 32 || ones == 0 || !ip.Equal(prefix.IP) || !ip.IsGlobalUnicast() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
++			return nil, fmt.Errorf("host route must be a canonical non-default unicast IPv4 prefix: %q", value)
++		}
++		for _, reserved := range []string{"0.0.0.0/8", "127.0.0.0/8", "169.254.0.0/16", "224.0.0.0/3"} {
++			_, blocked, _ := net.ParseCIDR(reserved)
++			if prefix.Contains(blocked.IP) || blocked.Contains(prefix.IP) {
++				return nil, fmt.Errorf("host route overlaps non-unicast or local scope: %q", value)
++			}
++		}
++		for _, eni := range netConfig.ENIIPAddresses {
++			if prefix.Contains(eni.IP) || eni.Contains(prefix.IP) {
++				return nil, fmt.Errorf("host route overlaps ENI subnet: %q", value)
++			}
++		}
++		if !seenHostRoutes[prefix.String()] {
++			netConfig.HostRouteCIDRs = append(netConfig.HostRouteCIDRs, *prefix)
++			seenHostRoutes[prefix.String()] = true
++		}
++	}
++
+ 	// Parse the bridge type.
+ 	if config.BridgeType != BridgeTypeL2 && config.BridgeType != BridgeTypeL3 {
+ 		return nil, fmt.Errorf("invalid BridgeType %s", config.BridgeType)
+diff --git a/plugins/vpc-bridge/network/bridge_windows.go b/plugins/vpc-bridge/network/bridge_windows.go
+index 98883c2..cb52b2f 100644
+--- a/plugins/vpc-bridge/network/bridge_windows.go
++++ b/plugins/vpc-bridge/network/bridge_windows.go
+@@ -300,6 +300,20 @@ func (nb *BridgeBuilder) FindOrCreateEndpoint(nw *Network, ep *Endpoint) error {
+ 		}
+ 	}
+ 
++	// Reuse the service-routing mechanism for explicitly selected remote
++	// networks. Endpoint creation/deletion remains owned by this CNI plugin.
++	for _, prefix := range nw.HostRouteCIDRs {
++		if prefix.String() == nw.ServiceCIDR {
++			continue
++		}
++		err = nb.addEndpointPolicy(hcnEndpoint, hcn.SDNRoute, hcn.SDNRoutePolicySetting{
++			DestinationPrefix: prefix.String(), NeedEncap: true,
++		})
++		if err != nil {
++			return fmt.Errorf("add host route endpoint policy: %w", err)
++		}
++	}
++
+ 	// Create the HCN endpoint.
+ 	log.Infof("Creating HCN endpoint: %+v", hcnEndpoint)
+ 	hcnResponse, err := hcnEndpoint.Create()
+diff --git a/plugins/vpc-bridge/network/network.go b/plugins/vpc-bridge/network/network.go
+index d15404d..033f126 100644
+--- a/plugins/vpc-bridge/network/network.go
++++ b/plugins/vpc-bridge/network/network.go
+@@ -39,6 +39,7 @@ type Network struct {
+ 	ENIIPAddresses      []net.IPNet
+ 	GatewayIPAddress    net.IP
+ 	VPCCIDRs            []net.IPNet
++	HostRouteCIDRs      []net.IPNet
+ 	DNSServers          []string
+ 	DNSSuffixSearchList []string
+ 	ServiceCIDR         string
+diff --git a/plugins/vpc-bridge/plugin/commands.go b/plugins/vpc-bridge/plugin/commands.go
+index 5902753..0f75f80 100644
+--- a/plugins/vpc-bridge/plugin/commands.go
++++ b/plugins/vpc-bridge/plugin/commands.go
+@@ -62,6 +62,7 @@ func (plugin *Plugin) Add(args *cniSkel.CmdArgs) error {
+ 		ENIIPAddresses:      netConfig.ENIIPAddresses,
+ 		GatewayIPAddress:    netConfig.GatewayIPAddress,
+ 		VPCCIDRs:            netConfig.VPCCIDRs,
++		HostRouteCIDRs:      netConfig.HostRouteCIDRs,
+ 		DNSServers:          netConfig.DNS.Nameservers,
+ 		DNSSuffixSearchList: netConfig.DNS.Search,
+ 	}

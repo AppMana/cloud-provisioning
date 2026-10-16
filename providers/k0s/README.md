@@ -185,8 +185,9 @@ not qualify this product change. See [API egress qualification](../../docs/k0s-w
 
 `konnectivity-discovery-preparation.patch` applies to `v1.36.4+k0s.1` after
 `native-linux-egress.patch`. It enables `--sync-forever=true` on both agent
-variants without changing server headers, lease mode, or existing membership
-handling. Build a distinct preparation release and let the elected k0s
+variants without changing server headers or server lease mode. It removes the
+agent's count-change watcher and the count-only environment variable so
+membership fluctuations no longer replace otherwise healthy agent pods. Build a distinct preparation release and let the elected k0s
 controller reconcile its agent manifests. Install that release on every
 controller so a leadership change cannot restore the old agent template.
 Verify every agent's effective arguments and readiness, then exercise leader

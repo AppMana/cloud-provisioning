@@ -1,18 +1,119 @@
+diff --git a/cmd/controller/controller.go b/cmd/controller/controller.go
+--- a/cmd/controller/controller.go
++++ b/cmd/controller/controller.go
+@@ -587,7 +587,6 @@
+ 			ManifestsDir:           c.K0sVars.ManifestsDir,
+ 			KonnectivityServerHost: cmp.Or(nodeConfig.Spec.API.ExternalHost(), nodeConfig.Spec.API.Address),
+ 			EventEmitter:           prober.NewEventEmitter(),
+-			ServerCount:            numActiveControllers.Peek,
+ 		})
+ 	}
+ 
 diff --git a/pkg/component/controller/konnectivity_egress_test.go b/pkg/component/controller/konnectivity_egress_test.go
 --- a/pkg/component/controller/konnectivity_egress_test.go
 +++ b/pkg/component/controller/konnectivity_egress_test.go
-@@ -31,6 +31,7 @@
+@@ -24,13 +24,17 @@
+ 			cfg.Spec.Network.NodeLocalLoadBalancing = &v1beta1.NodeLocalLoadBalancing{Enabled: hostNetwork, Type: v1beta1.NllbTypeTraefik, Traefik: v1beta1.DefaultTraefik()}
+ 			dir := t.TempDir()
+ 			agent := KonnectivityAgent{ManifestsDir: dir, KonnectivityServerHost: "192.0.2.1", EventEmitter: prober.NewEventEmitter(), log: logrus.NewEntry(logrus.New())}
+-			require.NoError(t, agent.writeKonnectivityAgent(cfg, 3))
++			require.NoError(t, agent.writeKonnectivityAgent(cfg))
+ 			objects, err := resource.NewLocalBuilder().WithScheme(scheme.Scheme, corev1.SchemeGroupVersion, appsv1.SchemeGroupVersion, rbacv1.SchemeGroupVersion).Path(true, dir).Flatten().Do().Infos()
+ 			require.NoError(t, err)
+ 			sets := map[string]*appsv1.DaemonSet{}
  			for _, obj := range objects {
  				if ds, ok := obj.Object.(*appsv1.DaemonSet); ok {
  					sets[ds.Name] = ds
 +					require.Contains(t, ds.Spec.Template.Spec.Containers[0].Args, "--sync-forever=true")
++					for _, env := range ds.Spec.Template.Spec.Containers[0].Env {
++						require.NotEqual(t, "K0S_CONTROLLER_COUNT", env.Name)
++					}
  				}
  			}
  			native := sets["konnectivity-agent"]
 diff --git a/pkg/component/controller/konnectivityagent.go b/pkg/component/controller/konnectivityagent.go
 --- a/pkg/component/controller/konnectivityagent.go
 +++ b/pkg/component/controller/konnectivityagent.go
-@@ -316,6 +316,7 @@
+@@ -23,7 +23,6 @@
+ type KonnectivityAgent struct {
+ 	ManifestsDir           string
+ 	KonnectivityServerHost string
+-	ServerCount            func() (uint, <-chan struct{})
+ 
+ 	configChangeChan chan *v1beta1.ClusterConfig
+ 	log              *logrus.Entry
+@@ -45,7 +44,6 @@
+ func (k *KonnectivityAgent) Start(ctx context.Context) error {
+ 
+ 	go func() {
+-		serverCount, serverCountChanged := k.ServerCount()
+ 
+ 		var clusterConfig *v1beta1.ClusterConfig
+ 		var retry <-chan time.Time
+@@ -54,16 +52,6 @@
+ 			case config := <-k.configChangeChan:
+ 				clusterConfig = config
+ 
+-			case <-serverCountChanged:
+-				prevServerCount := serverCount
+-				serverCount, serverCountChanged = k.ServerCount()
+-				// Never drop below one server: the agent treats zero as one internally anyways.
+-				serverCount = max(1, serverCount)
+-				// write only if the server count actually changed
+-				if serverCount == prevServerCount {
+-					continue
+-				}
+-
+ 			case <-retry:
+ 				k.log.Info("Retrying to write konnectivity agent manifest")
+ 
+@@ -78,7 +66,7 @@
+ 				continue
+ 			}
+ 
+-			if err := k.writeKonnectivityAgent(clusterConfig, serverCount); err != nil {
++			if err := k.writeKonnectivityAgent(clusterConfig); err != nil {
+ 				k.log.Errorf("failed to write konnectivity agent manifest: %v", err)
+ 				retry = time.After(10 * time.Second)
+ 				continue
+@@ -100,7 +88,7 @@
+ 	return nil
+ }
+ 
+-func (k *KonnectivityAgent) writeKonnectivityAgent(clusterConfig *v1beta1.ClusterConfig, serverCount uint) error {
++func (k *KonnectivityAgent) writeKonnectivityAgent(clusterConfig *v1beta1.ClusterConfig) error {
+ 	konnectivityDir := filepath.Join(k.ManifestsDir, "konnectivity")
+ 	err := dir.Init(konnectivityDir, constant.ManifestsDirMode)
+ 	if err != nil {
+@@ -111,7 +99,6 @@
+ 		ProxyServerHost: k.KonnectivityServerHost,
+ 		ProxyServerPort: uint16(clusterConfig.Spec.Konnectivity.AgentPort),
+ 		Image:           clusterConfig.Spec.Images.Konnectivity.URI(),
+-		ServerCount:     serverCount,
+ 		PullPolicy:      clusterConfig.Spec.Images.DefaultPullPolicy,
+ 	}
+ 
+@@ -197,7 +184,6 @@
+ 	ProxyServerHost string
+ 	ProxyServerPort uint16
+ 	Image           string
+-	ServerCount     uint
+ 	PullPolicy      string
+ 	HostNetwork     bool
+ }
+@@ -299,11 +285,6 @@
+           imagePullPolicy: {{ .PullPolicy }}
+           name: konnectivity-agent
+           env:
+-              # the variable is not in a use
+-              # we need it to have agent restarted on server count change
+-              - name: K0S_CONTROLLER_COUNT
+-                value: "{{ .ServerCount }}"
+-
+               - name: NODE_IP
+                 valueFrom:
+                   fieldRef:
+@@ -316,6 +297,7 @@
              - --service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token
              - --agent-identifiers={{ .Identifiers }}
              - --agent-id={{ .AgentID }}
@@ -23,7 +124,14 @@ diff --git a/pkg/component/controller/konnectivityagent.go b/pkg/component/contr
 diff --git a/pkg/component/controller/konnectivityagent_test.go b/pkg/component/controller/konnectivityagent_test.go
 --- a/pkg/component/controller/konnectivityagent_test.go
 +++ b/pkg/component/controller/konnectivityagent_test.go
-@@ -69,7 +69,7 @@
+@@ -63,13 +63,13 @@
+ 							AgentPort:       9876,
+ 						},
+ 					},
+-				}, 1))
++				}))
+ 
+ 				daemonSet := loadDaemonSet(t, manifestsDir)
  				containers := daemonSet.Spec.Template.Spec.Containers
  				require.Len(t, containers, 1)
  				args := containers[0].Args

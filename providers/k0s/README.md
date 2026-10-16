@@ -208,8 +208,15 @@ go test ./pkg/component/controller ./cmd/controller
 ```
 
 Lease discovery changes membership semantics: older controllers do not publish
-these leases. Qualify mixed-version transitions and rollback before enabling
-it on an existing cluster. Native validation must verify server leases, agent
+these leases, and older agents stop discovery when the last server-count header
+is satisfied. A lease-enabled server uses the upstream default header count of
+one. Existing agents must therefore have continuous discovery enabled before
+any server switches to lease mode. Enabling it only in the new release's
+manifest does not establish that ordering: only the elected k0s controller
+applies manifests, so a non-leading controller can switch its server first.
+Qualify an agent-first transition and resource rollback before enabling this
+patch on an existing cluster. Restoring the executable alone does not prove
+restoration of the agent manifests, lease permissions, or membership. Native validation must verify server leases, agent
 RBAC, stable agent pod identities across membership changes, Windows kubelet
 access, Service egress, and continuous management availability. This patch does
 not make a restarted API-server endpoint continuously available or qualify a

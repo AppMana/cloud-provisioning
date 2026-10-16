@@ -507,3 +507,26 @@ func TestDirectSiteLegacyPeerRejectsUnsupportedSourceTransfers(t *testing.T) {
 		})
 	}
 }
+
+func TestDirectSiteLegacyPeerUsesAdmittedWorkloadSources(t *testing.T) {
+	key, err := wgtypes.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	public := key.PublicKey().String()
+	cloudKey, err := wgtypes.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cloud := tunnel.PeerSpec{PublicKey: cloudKey.PublicKey().String(), WGAllowedIPs: []string{"172.29.0.1/32"}}
+	base, _ := json.Marshal(tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: public, WGAllowedIPs: []string{"10.10.0.1/32"}}}})
+	path := &tunnel.ReceiveSiteLegacy{Sources: []string{"10.10.0.1/32"}, PeerPublicKey: public}
+	p := tunnel.ReceiveTransitionPlan{Base: base, RootPublicKey: cloud.PublicKey, SiteDesired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{cloud}}, Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: public, WGAllowedIPs: []string{"10.10.0.1/32", "10.90.0.0/24"}}}}, Sites: map[string]tunnel.ReceiveTransitionSite{public: {Legacy: path}}}
+	if peer, err := receiveDirectSiteLegacyPeer(p, public); err != nil || !reflect.DeepEqual(peer, cloud) {
+		t.Fatalf("admitted direct path: %+v %v", peer, err)
+	}
+	path.Sources = append(path.Sources, "10.90.0.0/24")
+	if _, err := receiveDirectSiteLegacyPeer(p, public); err == nil {
+		t.Fatal("accepted source not owned in legacy generation")
+	}
+}

@@ -27,7 +27,8 @@ type ReceiveTransitionPlan struct {
 }
 
 type ReceiveTransitionSite struct {
-	NodeName string            `json:"nodeName"`
-	NodeUID  string            `json:"nodeUID"`
-	Client   SiteReceiveClient `json:"client"`
+	NodeName string             `json:"nodeName"`
+	NodeUID  string             `json:"nodeUID"`
+	Client   SiteReceiveClient  `json:"client"`
+	Legacy   *ReceiveSiteLegacy `json:"legacy,omitempty"`
 }

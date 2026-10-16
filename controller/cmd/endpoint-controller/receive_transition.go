@@ -178,12 +178,20 @@ func (r *meshReconciler) buildReceiveTransitionPlan(ctx context.Context, machine
 		return fail(fmt.Errorf("receiver site preparation is pending"))
 	}
 	plan := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: r.secretNamespace, MeshName: mesh.Name, MachineName: machine.GetName(), AdoptionName: adoption.Name, CloudNodeName: node.Name, MeshUID: string(mesh.UID), MachineUID: string(machine.GetUID()), AdoptionUID: string(adoption.UID), CloudNodeUID: target.NodeUID, RootPublicKey: target.RootPublicKey, Base: append([]byte(nil), base...), Desired: request.Desired, Native: request.Native, Ports: request.Ports, Bindings: bindings, Sites: map[string]tunnel.ReceiveTransitionSite{}}
+	var previous tunnel.PeerListDoc
+	if err := json.Unmarshal(base, &previous); err != nil {
+		return fail(err)
+	}
 	for public := range bindings {
 		var receipt tunnel.SiteReceiveReady
 		if err := json.Unmarshal(adoption.Data[tunnel.SiteReceiveReadyKey(public)], &receipt); err != nil {
 			return fail(err)
 		}
-		plan.Sites[public] = tunnel.ReceiveTransitionSite{NodeName: receipt.NodeName, NodeUID: receipt.NodeUID, Client: receipt.Client}
+		legacy, err := tunnel.PlanReceiveSiteLegacy(mesh.Data, receipt.NodeName, public, plan.RootPublicKey, previous)
+		if err != nil {
+			return fail(err)
+		}
+		plan.Sites[public] = tunnel.ReceiveTransitionSite{NodeName: receipt.NodeName, NodeUID: receipt.NodeUID, Client: receipt.Client, Legacy: &legacy}
 	}
 	if len(plan.Sites) == 0 {
 		return fail(fmt.Errorf("receiver transition has no site paths"))

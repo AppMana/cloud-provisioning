@@ -79,6 +79,11 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 		routes := map[string]ReceiveRouteSelection{}
 		for _, cloud := range p.SiteDesired.Peers {
 			if cloud.PublicKey == p.RootPublicKey {
+				if site.Legacy != nil {
+					if err := ValidateReceiveSiteLegacy(*site.Legacy, path.PublicKey, previous, cloud); err != nil {
+						return nil, err
+					}
+				}
 				if err := addReceiveRoutes(routes, cloud, selection); err != nil {
 					return nil, err
 				}

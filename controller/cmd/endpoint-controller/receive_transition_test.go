@@ -97,6 +97,14 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	if plan.MachineUID != string(machine.GetUID()) || len(plan.Sites) != 2 {
 		t.Fatal("journal lost controller plan")
 	}
+	legacy := plan.Sites[preparationKey(16)].Legacy
+	if legacy == nil || legacy.PeerPublicKey != preparationKey(8) || legacy.Transit == nil || legacy.Transit.Via != "10.101.0.1" {
+		t.Fatal("journal lost the old relay while the desired mesh selected another site")
+	}
+	retained := plan.Sites[preparationKey(8)].Legacy
+	if retained == nil || retained.PeerPublicKey != preparationKey(8) || retained.Transit != nil {
+		t.Fatal("journal lost the retained site's direct legacy path")
+	}
 	verifyReceiveInventory(t, r, string(machine.GetUID()))
 	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
 		t.Fatalf("normal reconciliation could not resume its journal: %v", err)

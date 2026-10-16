@@ -460,6 +460,20 @@ func receiveDirectSiteLegacyPeer(p tunnel.ReceiveTransitionPlan, public string) 
 	if err := json.Unmarshal(p.Base, &base); err != nil {
 		return tunnel.PeerSpec{}, err
 	}
+	if legacy := p.Sites[public].Legacy; legacy != nil {
+		for _, peer := range p.SiteDesired.Peers {
+			if peer.PublicKey == p.RootPublicKey {
+				if err := tunnel.ValidateReceiveSiteLegacy(*legacy, public, base, peer); err != nil {
+					return tunnel.PeerSpec{}, err
+				}
+				if legacy.Transit != nil {
+					return fail()
+				}
+				return peer, nil
+			}
+		}
+		return fail()
+	}
 	var sources []netip.Prefix
 	for _, peer := range base.Peers {
 		if peer.PublicKey != public || peer.Remote {

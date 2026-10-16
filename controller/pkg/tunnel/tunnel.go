@@ -615,25 +615,37 @@ func SiteTransit(data map[string][]byte, notReady map[string]bool) (*TransitSpec
 		}
 	}
 
-	// The relay's reachable address. An owning relay publishes it under
-	// its node entry; a retained relay's addresses have already moved
-	// to the site entry, and it is still the relay and still reachable.
-	via := ""
-	if addrs := SplitList(string(data[NodeAddressesPrefix+relay.name])); len(addrs) > 0 {
-		via = addrs[0]
-	} else if addrs := SplitList(string(data[SiteAddressesPrefix+relay.name])); len(addrs) > 0 {
-		via = addrs[0]
-	}
-	if via == "" {
-		return nil, nil
-	}
-
-	transit := &TransitSpec{Via: via, ViaOtherFamily: otherFamilyVia(data, relay.name, via)}
-	seen := map[string]bool{}
 	peers, err := sitePeers(data, false)
 	if err != nil {
 		return nil, err
 	}
+	return siteTransitThrough(data, relay.name, peers), nil
+}
+
+// siteTransitThrough projects an explicitly selected relay. Handover uses the
+// owner in the applied cloud document; ordinary reconciliation uses the election.
+func siteTransitThrough(data map[string][]byte, relay string, peers []PeerSpec) *TransitSpec {
+	// The relay's reachable address. An owning relay publishes it under
+	// its node entry; a retained relay's addresses have already moved
+	// to the site entry, and it is still the relay and still reachable.
+	via := ""
+	if addrs := SplitList(string(data[NodeAddressesPrefix+relay])); len(addrs) > 0 {
+		via = addrs[0]
+	} else if addrs := SplitList(string(data[SiteAddressesPrefix+relay])); len(addrs) > 0 {
+		via = addrs[0]
+	}
+	if via == "" {
+		return nil
+	}
+
+	transit := &TransitSpec{Via: via, ViaOtherFamily: otherFamilyVia(data, relay, via)}
+	setTransitDestinations(transit, peers)
+	return transit
+}
+
+func setTransitDestinations(transit *TransitSpec, peers []PeerSpec) {
+	transit.Hosts, transit.Blocks = nil, nil
+	seen := map[string]bool{}
 	for _, peer := range peers {
 		hosts := peer.AllRouteHosts()
 		hostSet := map[string]bool{}
@@ -659,7 +671,6 @@ func SiteTransit(data map[string][]byte, notReady map[string]bool) (*TransitSpec
 	}
 	sort.Strings(transit.Hosts)
 	sort.Strings(transit.Blocks)
-	return transit, nil
 }
 
 // otherFamilyVia is the relay's next hop in the family Via is not. For

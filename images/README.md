@@ -389,8 +389,27 @@ the cloud adapter.
 `windows/prepare-tunnel.ps1` stages the checksum-pinned native service executable.
 For AWS, compose these shared layers with
 `aws/windows/prepare-bootstrap.ps1`, which bakes the pinned AWS PowerShell
-modules used by CAPA’s secure Windows consumer. The
-[Windows capture helper](../docs/windows.md#private-aws-image-capture) cleans
+modules used by CAPA’s secure Windows consumer.
+
+For AWS VPC CNI Windows workers, `aws/windows/cni-artifacts.json` pins AWS's
+published Image Builder artifact archive and its native `vpc-bridge` plugin
+and Kubernetes connector. Fetch that archive during image construction and run
+`aws/windows/prepare-cni.ps1 -Archive <archive> -Recipe <recipe>` on an unjoined
+image. It extracts only those two binaries, verifies their hashes, and sets the
+connector's machine `KUBECONFIG` to k0s's future kubelet credential path. No
+credentials are baked. It refuses a different pre-existing binary or CNI
+configuration; it does not invoke the EKS bootstrap that installs its own
+runtime and kubelet services.
+
+Run `aws/windows/verify-cni.ps1 -Recipe <recipe>` before capture and preserve
+`C:\ProgramData\CloudProvisioning\aws-vpc-cni-image.json` in the image. The
+native `aws/windows/test-cni.ps1 -Archive <archive>` regression test requires
+an unjoined builder without this layer and leaves the verified layer installed.
+Image-layer verification does not prove networking: fresh workers still need
+node-specific CNI configuration, the scoped AWS Windows IPAM controller, and
+the [mixed-CNI lifecycle and traffic checks](../docs/hybrid-cni.md).
+
+The [Windows capture helper](../docs/windows.md#private-aws-image-capture) cleans
 run-owned diagnostic state, dispatches EC2Launch Sysprep, captures private AMIs
 and authorizes the exact candidates for the isolated CAPA role. Capture does
 not qualify first boot, Kubernetes joining or GPU support. See the

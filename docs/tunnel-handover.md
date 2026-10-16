@@ -51,6 +51,14 @@ receipt, receipt for a different phase, or changed membership must not advance
 the transition. Concurrent placement changes must be serialized or explicitly
 supersede the pending plan without creating a third live generation.
 
+Round membership includes every site in the union of previous and desired
+receive paths. A site removed from desired placement can still send traffic
+until its switch and drain are verified; desired-site receipts alone cannot
+authorize its retirement. Cloud egress selects only desired owners, while
+retained senders keep their independent return paths and participate in every
+phase, including rollback. Missing retained-site identity or readiness blocks
+preparation, and recovery rejects a journal that omitted that participant.
+
 An unavailable participant prevents a planned seamless transition from
 advancing. Forced removal or failure recovery needs a separate policy and
 cannot claim uninterrupted traffic to the unavailable participant. A timer

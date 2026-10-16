@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"sort"
 	"strings"
 	"time"
 
@@ -195,9 +196,8 @@ func (r *meshReconciler) prepareRemoteReceivePaths(ctx context.Context, expected
 	return &preparedRemoteReceivers{Target: target, MeshVersion: mesh.ResourceVersion, AdoptionVersion: adoption.ResourceVersion, RequestHash: tunnel.HashPeerList(raw), BaseHash: request.BaseHash, Bindings: bindings}, nil
 }
 
-// Require the desired site's authenticated transport before returning prepared
-// receivers to activation orchestration. Old receive-only devices stay retained;
-// they do not become required egress paths merely because they remain in union.
+// Require every site's authenticated transport, including retained senders.
+// A site leaving desired placement still participates in switch/drain/retire.
 func (r *meshReconciler) siteReceivePathsReady(ctx context.Context, mesh, adoption *corev1.Secret, request tunnel.ReceivePrepare, bindings map[string]tunnel.ReceiveBinding, now time.Time) (bool, error) {
 	sitePeers, err := tunnel.SitePeers(mesh.Data)
 	if err != nil {
@@ -219,19 +219,18 @@ func (r *meshReconciler) siteReceivePathsReady(ctx context.Context, mesh, adopti
 		}
 		names[public] = strings.TrimPrefix(key, tunnel.NodePublicKeyPrefix)
 	}
-	for _, peer := range request.Desired.Peers {
-		if peer.Remote {
-			continue
-		}
-		name := names[peer.PublicKey]
+	keys := make([]string, 0, len(bindings))
+	for public := range bindings {
+		keys = append(keys, public)
+	}
+	sort.Strings(keys)
+	for _, public := range keys {
+		name := names[public]
 		if name == "" {
-			return false, fmt.Errorf("desired site receiver has no current node")
+			return false, fmt.Errorf("participating site receiver has no current node")
 		}
-		binding, found := bindings[peer.PublicKey]
-		if !found {
-			return false, fmt.Errorf("desired site receiver has no cloud binding")
-		}
-		raw := adoption.Data[tunnel.SiteReceiveReadyKey(peer.PublicKey)]
+		binding := bindings[public]
+		raw := adoption.Data[tunnel.SiteReceiveReadyKey(public)]
 		if len(raw) == 0 {
 			return false, nil
 		}
@@ -248,7 +247,7 @@ func (r *meshReconciler) siteReceivePathsReady(ctx context.Context, mesh, adopti
 		if !ready || node.UID == "" || node.Status.NodeInfo.BootID == "" || node.DeletionTimestamp != nil {
 			return false, nil
 		}
-		plan, err := tunnel.PlanSiteReceiveClient(string(mesh.UID), peer.PublicKey, request.RootPublicKey, binding, siteDoc, siteDoc)
+		plan, err := tunnel.PlanSiteReceiveClient(string(mesh.UID), public, request.RootPublicKey, binding, siteDoc, siteDoc)
 		if err != nil {
 			return false, err
 		}

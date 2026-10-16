@@ -69,14 +69,14 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	if err != nil {
 		t.Fatal(err)
 	}
-	if view.Round.Phase != handover.Prepare || view.Complete || len(view.Round.Members) != 2 {
+	if view.Round.Phase != handover.Prepare || view.Complete || len(view.Round.Members) != 4 {
 		t.Fatal("journal did not begin with both transport endpoints in prepare")
 	}
 	var plan tunnel.ReceiveTransitionPlan
 	if err := json.Unmarshal(snapshot.Plan(), &plan); err != nil {
 		t.Fatal(err)
 	}
-	if plan.MachineUID != string(machine.GetUID()) || len(plan.Sites) != 1 {
+	if plan.MachineUID != string(machine.GetUID()) || len(plan.Sites) != 2 {
 		t.Fatal("journal lost controller plan")
 	}
 	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
@@ -148,6 +148,18 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 					for _, m := range v.Round.Members {
 						proofs = append(proofs, handover.AuthenticatedReceipt{AuthenticatedNodeUID: m.NodeUID, Receipt: handover.Receipt{RoundHash: digest, NodeUID: m.NodeUID, DeviceID: m.DeviceID, FromKey: m.FromKey, ToKey: m.ToKey, FromPeerKey: m.FromPeerKey, ToPeerKey: m.ToPeerKey, ObservedAt: at}})
 					}
+					partial := make([]handover.AuthenticatedReceipt, 0, len(proofs))
+					for _, proof := range proofs {
+						if proof.AuthenticatedNodeUID != "retained-uid" {
+							partial = append(partial, proof)
+						}
+					}
+					if len(partial) == len(proofs) {
+						t.Fatal("round omitted the retained sender")
+					}
+					if _, err := current.Transition().Advance(at, partial); err == nil {
+						t.Fatalf("advanced %s/%s without retained sender proof", direction, v.Round.Phase)
+					}
 					next, err = current.Transition().Advance(at, proofs)
 				}
 				if err != nil {
@@ -169,7 +181,7 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 			}
 		})
 	}
-	for _, fault := range []string{"unsupported-field", "trailing-data", "route-outside-source", "node-binding", "device-binding", "key-binding", "peer-binding", "from-generation", "to-generation", "transition-identity"} {
+	for _, fault := range []string{"unsupported-field", "trailing-data", "missing-retained-site", "route-outside-source", "node-binding", "device-binding", "key-binding", "peer-binding", "from-generation", "to-generation", "transition-identity"} {
 		t.Run(fault, func(t *testing.T) {
 			var changed map[string]any
 			if err := json.Unmarshal(snapshot.Plan(), &changed); err != nil {
@@ -178,6 +190,8 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 			switch fault {
 			case "unsupported-field":
 				changed["futureRoutePolicy"] = "required"
+			case "missing-retained-site":
+				delete(changed["sites"].(map[string]any), preparationKey(8))
 			case "route-outside-source":
 				var invalid tunnel.ReceiveTransitionPlan
 				if err := json.Unmarshal(snapshot.Plan(), &invalid); err != nil {
@@ -204,7 +218,12 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 			spec.Members = append([]handover.Member(nil), spec.Members...)
 			switch fault {
 			case "node-binding":
-				spec.Members[0].NodeUID = "another-node"
+				originalNode := spec.Members[0].NodeUID
+				for i := range spec.Members {
+					if spec.Members[i].NodeUID == originalNode {
+						spec.Members[i].NodeUID = "another-node"
+					}
+				}
 			case "device-binding":
 				spec.Members[0].DeviceID += "-other"
 			case "key-binding", "peer-binding":

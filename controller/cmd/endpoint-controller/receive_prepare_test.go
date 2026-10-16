@@ -57,7 +57,8 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			base, _ := json.Marshal(previous)
 			adoption := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: tunnel.AdoptionSecretName(machine.GetName()), Namespace: machine.GetNamespace(), UID: "adoption-uid", Annotations: map[string]string{tunnel.AppliedListAnnotation: tunnel.HashPeerList(base)}}, Data: map[string][]byte{tunnel.CloudPeersKey: base}}
 			mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "peers", Namespace: machine.GetNamespace(), UID: "mesh-uid"}, Data: map[string][]byte{
-				tunnel.NodePublicKeyPrefix + "site": []byte(preparationKey(16)), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.100.0.2/24"), tunnel.NodeAddressesPrefix + "site": []byte("10.101.0.2"), tunnel.NodePodCIDRsPrefix + "site": []byte("10.101.128.0/26"),
+				tunnel.NodePublicKeyPrefix + "retained-site": []byte(preparationKey(8)),
+				tunnel.NodePublicKeyPrefix + "site":          []byte(preparationKey(16)), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.100.0.2/24"), tunnel.NodeAddressesPrefix + "site": []byte("10.101.0.2"), tunnel.NodePodCIDRsPrefix + "site": []byte("10.101.128.0/26"),
 				tunnel.PeerEndpointPrefix + "worker": []byte("198.51.100.10:51820"), tunnel.PeerPublicKeyPrefix + "worker": []byte(preparationKey(24)), tunnel.PeerRouteHostsPrefix + "worker": []byte("10.100.0.128"), tunnel.PeerAllowedIPsPrefix + "worker": []byte("10.100.0.128/32"),
 			}}
 			native := []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}
@@ -88,7 +89,8 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 				pool = []int{51821}
 			}
 			siteNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "site", UID: "site-uid"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{BootID: "site-boot"}, Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}}}
-			r, c := dualStackReconciler(t, "", machine, node, siteNode, mesh, adoption)
+			retainedNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "retained-site", UID: "retained-uid"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{BootID: "retained-boot"}, Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}}}
+			r, c := dualStackReconciler(t, "", machine, node, siteNode, retainedNode, mesh, adoption)
 			if fault == "adoption-race" {
 				r.Client = &receivePreparationRaceClient{Client: c, beforePatch: func(ctx context.Context) error {
 					changed := &corev1.Secret{}
@@ -204,6 +206,17 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 				t.Fatal(err)
 			}
 			siteReceipt := tunnel.SiteReceiveReady{Version: 1, MeshUID: string(mesh.UID), SecretUID: string(current.UID), RequestHash: receipt.RequestHash, SiteHash: siteHash, NodeName: "site", NodeUID: "site-uid", BootID: "site-boot", Client: sitePlan, HandshakeAt: time.Now().Add(-time.Second)}
+			retainedReceipt := siteReceipt
+			retainedReceipt.NodeName, retainedReceipt.NodeUID, retainedReceipt.BootID = retainedNode.Name, string(retainedNode.UID), retainedNode.Status.NodeInfo.BootID
+			for _, binding := range receipt.Bindings {
+				if binding.PeerPublicKey == preparationKey(8) {
+					retainedReceipt.Client, err = tunnel.PlanSiteReceiveClient(string(mesh.UID), preparationKey(8), request.RootPublicKey, binding, siteDoc, siteDoc)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			current.Data[tunnel.SiteReceiveReadyKey(preparationKey(8))], _ = json.Marshal(retainedReceipt)
 			for _, fault := range []string{"boot", "node", "request", "permissions", "expired", "future", "none"} {
 				bad := siteReceipt
 				switch fault {
@@ -231,6 +244,20 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 					}
 				}
 			}
+			// A valid desired receiver alone cannot authorize draining a sender
+			// removed from desired placement. Its receipt remains mandatory.
+			retainedRaw := current.Data[tunnel.SiteReceiveReadyKey(preparationKey(8))]
+			delete(current.Data, tunnel.SiteReceiveReadyKey(preparationKey(8)))
+			if err := c.Update(ctx, current); err != nil {
+				t.Fatal(err)
+			}
+			if result, err := r.prepareRemoteReceivePaths(ctx, expected, native, pool); err != nil || result != nil {
+				t.Fatalf("missing retained sender readiness did not remain pending: %v", err)
+			}
+			current.Data[tunnel.SiteReceiveReadyKey(preparationKey(8))] = retainedRaw
+			if err := c.Update(ctx, current); err != nil {
+				t.Fatal(err)
+			}
 			readyVersion := current.ResourceVersion
 			bindings, err = r.prepareRemoteReceivePaths(ctx, expected, native, pool)
 			if err != nil || bindings == nil || len(bindings.Bindings) != 2 {
@@ -247,7 +274,7 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			if err != nil {
 				t.Fatal(err)
 			}
-			if string(publicPlan.Base) != string(base) || publicPlan.MachineUID != string(expected.GetUID()) || publicPlan.CloudNodeUID != string(node.UID) || len(publicPlan.Sites) != 1 || publicPlan.Sites[preparationKey(16)].NodeUID != "site-uid" {
+			if string(publicPlan.Base) != string(base) || publicPlan.MachineUID != string(expected.GetUID()) || publicPlan.CloudNodeUID != string(node.UID) || len(publicPlan.Sites) != 2 || publicPlan.Sites[preparationKey(16)].NodeUID != "site-uid" || publicPlan.Sites[preparationKey(8)].NodeUID != "retained-uid" {
 				t.Fatal("public transition plan lost validated configuration or identity")
 			}
 			stalePrepared := *bindings

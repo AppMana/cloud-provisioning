@@ -26,11 +26,13 @@ func routeTransitionFixture(t *testing.T) ReceiveTransitionPlan {
 		p.Bindings[path.PublicKey] = ReceiveBinding{Interface: path.Interface, PeerPublicKey: path.PublicKey, PublicKey: receiverTestKey(byte(40 + 8*i)), ListenPort: 51821 + i}
 		p.Ports[path.PublicKey] = 51821 + i
 	}
-	client, err := PlanSiteReceiveClient(p.MeshUID, site, root, p.Bindings[site], p.SiteDesired, p.SiteDesired)
-	if err != nil {
-		t.Fatal(err)
+	for _, identity := range []struct{ key, uid string }{{site, "site"}, {old, "retained"}} {
+		client, err := PlanSiteReceiveClient(p.MeshUID, identity.key, root, p.Bindings[identity.key], p.SiteDesired, p.SiteDesired)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p.Sites[identity.key] = ReceiveTransitionSite{NodeName: identity.uid + "-node", NodeUID: identity.uid, Client: client}
 	}
-	p.Sites[site] = ReceiveTransitionSite{NodeName: "site-node", NodeUID: "site", Client: client}
 	return p
 }
 
@@ -42,8 +44,13 @@ func TestReceiveRoutesFollowDesiredOwnerAndPreserveNativePaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	site := receiverTestKey(16)
-	if len(routes) != 2 || len(routes["cloud"]) != 4 || len(routes["site"]) != 2 {
+	if len(routes) != 3 || len(routes["cloud"]) != 4 || len(routes["site"]) != 2 || len(routes["retained"]) != 2 {
 		t.Fatalf("unexpected routes: %+v", routes)
+	}
+	for _, selection := range routes["retained"] {
+		if selection.PublicKey != receiverTestKey(8) || selection.PeerPublicKey != p.Bindings[receiverTestKey(8)].PublicKey {
+			t.Fatal("retained sender lost its independent path")
+		}
 	}
 	for _, selection := range routes["cloud"] {
 		if !reflect.DeepEqual(selection.AllowedSources, []string{"10.90.0.0/24", "2001:db8:1::/64"}) {
@@ -74,7 +81,7 @@ func TestReceiveRoutesFollowDesiredOwnerAndPreserveNativePaths(t *testing.T) {
 }
 
 func TestReceiveRoutesRejectIncompleteOrExpandedPlans(t *testing.T) {
-	for _, fault := range []string{"missing-site-document", "native-overlap", "route-outside-source", "broad-host", "site-route-outside-source", "missing-site", "duplicate-node", "extra-site", "client-permission", "client-endpoint", "binding-port", "binding-interface"} {
+	for _, fault := range []string{"missing-site-document", "native-overlap", "route-outside-source", "broad-host", "site-route-outside-source", "missing-site", "missing-retained-site", "duplicate-node", "extra-site", "client-permission", "client-endpoint", "binding-port", "binding-interface"} {
 		t.Run(fault, func(t *testing.T) {
 			p := routeTransitionFixture(t)
 			key := receiverTestKey(16)
@@ -92,11 +99,13 @@ func TestReceiveRoutesRejectIncompleteOrExpandedPlans(t *testing.T) {
 				p.SiteDesired.Peers[0].RouteHosts = []string{"172.29.0.2"}
 			case "missing-site":
 				delete(p.Sites, key)
+			case "missing-retained-site":
+				delete(p.Sites, receiverTestKey(8))
 			case "duplicate-node":
 				site.NodeUID = p.CloudNodeUID
 				p.Sites[key] = site
 			case "extra-site":
-				p.Sites[receiverTestKey(8)] = site
+				p.Sites[receiverTestKey(64)] = site
 			case "client-permission":
 				site.Client.AllowedSources = []string{"0.0.0.0/0"}
 				p.Sites[key] = site

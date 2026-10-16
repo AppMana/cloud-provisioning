@@ -49,31 +49,33 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 	}
 	cloudRoutes := map[string]ReceiveRouteSelection{}
 	result := map[string]map[string]ReceiveRouteSelection{p.CloudNodeUID: cloudRoutes}
-	sources := map[string][]string{}
-	for _, receiver := range preparation.Receivers {
-		sources[receiver.PublicKey] = receiver.AllowedSources
-	}
-	sites := 0
+	desired := map[string]PeerSpec{}
 	for _, peer := range p.Desired.Peers {
-		if peer.Remote {
-			continue // Native cloud-to-cloud paths do not become site tunnels.
+		if !peer.Remote {
+			desired[peer.PublicKey] = peer
 		}
-		site, found := p.Sites[peer.PublicKey]
+	}
+	// Retained sites can still send on the old path. They must participate in
+	// switch/drain/retire even when they no longer own desired cloud egress.
+	for _, path := range preparation.Receivers {
+		site, found := p.Sites[path.PublicKey]
 		if !found || site.NodeUID == "" || site.NodeName == "" || result[site.NodeUID] != nil {
 			return nil, fmt.Errorf("missing or duplicate receiver site identity")
 		}
-		binding := p.Bindings[peer.PublicKey]
-		client, err := PlanSiteReceiveClient(p.MeshUID, peer.PublicKey, p.RootPublicKey, binding, p.SiteDesired, p.SiteDesired)
+		binding := p.Bindings[path.PublicKey]
+		client, err := PlanSiteReceiveClient(p.MeshUID, path.PublicKey, p.RootPublicKey, binding, p.SiteDesired, p.SiteDesired)
 		if err != nil || !reflect.DeepEqual(client, site.Client) {
 			return nil, fmt.Errorf("site receiver differs from the committed peer document: %v", err)
 		}
-		sum := sha256.Sum256([]byte(p.MeshUID + "\x00" + peer.PublicKey))
-		selection := ReceiveRouteSelection{Interface: binding.Interface, Alias: fmt.Sprintf("cloud-provisioning:receive:v1:%x", sum), PublicKey: binding.PublicKey, PeerPublicKey: peer.PublicKey, AllowedSources: slices.Clone(sources[peer.PublicKey])}
-		if err := addReceiveRoutes(cloudRoutes, peer, selection); err != nil {
-			return nil, err
+		sum := sha256.Sum256([]byte(p.MeshUID + "\x00" + path.PublicKey))
+		selection := ReceiveRouteSelection{Interface: binding.Interface, Alias: fmt.Sprintf("cloud-provisioning:receive:v1:%x", sum), PublicKey: binding.PublicKey, PeerPublicKey: path.PublicKey, AllowedSources: slices.Clone(path.AllowedSources)}
+		if peer, wanted := desired[path.PublicKey]; wanted {
+			if err := addReceiveRoutes(cloudRoutes, peer, selection); err != nil {
+				return nil, err
+			}
 		}
-		sum = sha256.Sum256([]byte(p.MeshUID + "\x00" + peer.PublicKey + "\x00" + p.RootPublicKey))
-		selection = ReceiveRouteSelection{Interface: client.Interface, Alias: fmt.Sprintf("cloud-provisioning:receive-client:v1:%x", sum), PublicKey: peer.PublicKey, PeerPublicKey: binding.PublicKey, AllowedSources: slices.Clone(client.AllowedSources)}
+		sum = sha256.Sum256([]byte(p.MeshUID + "\x00" + path.PublicKey + "\x00" + p.RootPublicKey))
+		selection = ReceiveRouteSelection{Interface: client.Interface, Alias: fmt.Sprintf("cloud-provisioning:receive-client:v1:%x", sum), PublicKey: path.PublicKey, PeerPublicKey: binding.PublicKey, AllowedSources: slices.Clone(client.AllowedSources)}
 		routes := map[string]ReceiveRouteSelection{}
 		for _, cloud := range p.SiteDesired.Peers {
 			if cloud.PublicKey == p.RootPublicKey {
@@ -83,9 +85,8 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 			}
 		}
 		result[site.NodeUID] = routes
-		sites++
 	}
-	if sites == 0 || sites != len(p.Sites) {
+	if len(preparation.Receivers) == 0 || len(preparation.Receivers) != len(p.Sites) {
 		return nil, fmt.Errorf("receiver plan has missing or extra site paths")
 	}
 	return result, nil

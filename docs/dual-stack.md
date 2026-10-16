@@ -81,3 +81,20 @@ These are checked read-only by `cmd/acceptance preconditions` (see
 | Address ranges | Tunnel ranges disjoint from pools, Service and node addresses, and remote cloud networks outside the autodetection CIDRs | A peer's accept list would otherwise claim an address the cluster already uses. |
 
 For k0s the pod MTU is `spec.network.calico.mtu`.
+
+For a site with native AWS workers, choose a common workload MTU that fits
+every participating tunnel and workload-facing interface. A smaller destination
+pod interface can also return an ICMP fragmentation-needed error: lowering only
+the site's MTU can move a cold-path UDP failure to the cloud-to-site direction.
+TCP success and a warmed path-MTU cache do not qualify the UDP path.
+
+Configure each CNI through its existing owner: k0s Calico uses
+`spec.network.calico.mtu`, Linux AWS VPC CNI uses `POD_MTU` (rendered by
+`aws/vpc_cni.py --pod-mtu`), and the patched Windows VPC CNI uses the optional
+`podMTU` setting described in the [plugin documentation](../providers/aws-vpc-cni-plugins/README.md).
+Do not lower the physical management interface MTU to configure workloads.
+Changing a template does not update existing pod interfaces. Verify fresh pods'
+actual interface MTUs on every platform, preserve existing-workload continuity,
+and test the first UDP datagram on new directed paths before repeat traffic.
+These native CNI runtime checks require retained observations; a successful
+configuration preflight alone does not establish them.

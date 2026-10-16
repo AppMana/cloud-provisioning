@@ -48,6 +48,28 @@ unconditional-reconcile experiment. Git blame attributes the selective predicate
 to `b5bd25ec` and subsequent patch context to `a4429b98`. The source branches carry
 the newer implementation so build inputs and reviewed Kubernetes code agree.
 
+### Persistent native-CNI configuration
+
+For AWS VPC CNI workers, select a proxy entrypoint that discovers the HNS network
+from the native CNI configuration. An entrypoint that waits for a network named
+`Calico` cannot initialize the proxy on these workers.
+
+Persist the immutable image in k0s `spec.images.windows.kubeproxy` on every
+controller. A Pod-level image override does not update the DaemonSet template or
+survive Pod replacement. For a controlled rollout, use
+`spec.network.kubeProxy.patches` to set the Windows DaemonSet's update strategy to
+`OnDelete` before changing its image. Verify the rendered template, then replace
+only the selected canary pods. With static configuration, changing the file alone
+does not reload the running controller's configuration; the applied manifest and
+the configuration used at the next controller start must agree.
+
+Validate image compatibility against the actual HostProcess runtime on both
+Windows versions. An LTSC 2022 packaging base does not by itself require a
+separate Windows 2025 manifest. Verify fresh Pod startup and proxy rule
+synchronization, then exercise Service and DNS traffic under continuous management
+monitoring. Pod Ready alone does not prove proxy initialization when the container
+has no readiness probe.
+
 ## Windows acceptance image set
 
 The [k0s 1.36 / Calico 3.32 candidate image set](../images/windows/candidates/k0s-1.36-calico-3.32.json)

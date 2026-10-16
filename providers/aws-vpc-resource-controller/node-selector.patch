@@ -1,0 +1,228 @@
+diff --git a/main.go b/main.go
+index 27e1e7b..aa77672 100644
+--- a/main.go
++++ b/main.go
+@@ -51,6 +51,7 @@ import (
+ 	appsv1 "k8s.io/api/apps/v1"
+ 	corev1 "k8s.io/api/core/v1"
+ 	"k8s.io/apimachinery/pkg/fields"
++	"k8s.io/apimachinery/pkg/labels"
+ 	"k8s.io/apimachinery/pkg/runtime"
+ 	"k8s.io/client-go/kubernetes"
+ 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+@@ -112,6 +113,7 @@ func main() {
+ 	var healthCheckTimeout int
+ 	var enableWindowsPrefixDelegation bool
+ 	var region string
++	var nodeSelectorText string
+ 	var vpcID string
+ 	var nodeWorkerCount int
+ 	var userClientQPS int
+@@ -171,7 +173,13 @@ func main() {
+ 	flag.IntVar(&maxNodeConcurrentReconciles, "max-node-reconcile", 10, "The maximum number of concurrent reconciles for node controller")
+ 	flag.BoolVar(&disableController, "disable-controller", false, "A flag to disable the controller.")
+ 
++	flag.StringVar(&nodeSelectorText, "node-selector", "", "Only manage nodes matching this label selector; empty selects all nodes")
+ 	flag.Parse()
++	nodeSelector, err := labels.Parse(nodeSelectorText)
++	if err != nil {
++		fmt.Fprintf(os.Stderr, "invalid node selector: %v\n", err)
++		os.Exit(1)
++	}
+ 
+ 	// Dev mode logging disabled by default, to enable set the enableDevLogging argument
+ 	logLvl := zapRaw.NewAtomicLevelAt(0)
+@@ -363,7 +371,7 @@ func main() {
+ 		nodeManagerWorkers := asyncWorkers.NewDefaultWorkerPool("node async workers",
+ 			nodeWorkerCount, 1, ctrl.Log.WithName("node async workers"), ctx)
+ 		nodeManager, err := manager.NewNodeManager(ctrl.Log.WithName("node manager"), resourceManager,
+-			apiWrapper, nodeManagerWorkers, controllerConditions, clusterName, version.GitVersion, healthzHandler)
++			apiWrapper, nodeManagerWorkers, controllerConditions, clusterName, version.GitVersion, healthzHandler, nodeSelector)
+ 
+ 		if err != nil {
+ 			ctrl.Log.Error(err, "failed to init node manager")
+diff --git a/pkg/node/manager/manager.go b/pkg/node/manager/manager.go
+index 560e4c4..e3b019c 100644
+--- a/pkg/node/manager/manager.go
++++ b/pkg/node/manager/manager.go
+@@ -40,6 +40,7 @@ import (
+ 
+ 	"github.com/go-logr/logr"
+ 	v1 "k8s.io/api/core/v1"
++	"k8s.io/apimachinery/pkg/labels"
+ )
+ 
+ type manager struct {
+@@ -59,6 +60,7 @@ type manager struct {
+ 	controllerVersion string
+ 	stopHealthCheckAt time.Time
+ 	clusterName       string
++	nodeSelector      labels.Selector
+ }
+ 
+ // Manager to perform operation on list of managed/un-managed node
+@@ -103,7 +105,7 @@ const pausingHealthCheckDuration = 10 * time.Minute
+ 
+ // NewNodeManager returns a new node manager
+ func NewNodeManager(logger logr.Logger, resourceManager resource.ResourceManager,
+-	wrapper api.Wrapper, worker asyncWorker.Worker, conditions condition.Conditions, clusterName string, controllerVersion string, healthzHandler *rcHealthz.HealthzHandler) (Manager, error) {
++	wrapper api.Wrapper, worker asyncWorker.Worker, conditions condition.Conditions, clusterName string, controllerVersion string, healthzHandler *rcHealthz.HealthzHandler, nodeSelector labels.Selector) (Manager, error) {
+ 
+ 	manager := &manager{
+ 		resourceManager:   resourceManager,
+@@ -114,6 +116,7 @@ func NewNodeManager(logger logr.Logger, resourceManager resource.ResourceManager
+ 		conditions:        conditions,
+ 		controllerVersion: controllerVersion,
+ 		clusterName:       clusterName,
++		nodeSelector:      nodeSelector,
+ 	}
+ 
+ 	// add health check on subpath for node manager
+@@ -225,6 +228,9 @@ func (m *manager) AddNode(nodeName string) error {
+ }
+ 
+ func (m *manager) CreateCNINodeIfNotExisting(node *v1.Node) error {
++	if !m.matchesNodeSelector(node) {
++		return nil
++	}
+ 	if cniNode, err := m.wrapper.K8sAPI.GetCNINode(
+ 		types.NamespacedName{Name: node.Name},
+ 	); err != nil {
+@@ -273,6 +279,11 @@ func (m *manager) UpdateNode(nodeName string) error {
+ 
+ 	switch status {
+ 	case UnManagedToManaged:
++		if m.nodeSelector != nil && !m.nodeSelector.Empty() {
++			if err := m.CreateCNINodeIfNotExisting(k8sNode); err != nil {
++				return err
++			}
++		}
+ 		log.Info("node was previously un-managed, will be added as managed node now")
+ 		cachedNode = node.NewManagedNode(m.Log, k8sNode.Name,
+ 			GetNodeInstanceID(k8sNode), GetNodeOS(k8sNode), m.wrapper.K8sAPI, m.wrapper.EC2API)
+@@ -470,8 +481,15 @@ func (m *manager) performAsyncOperation(job interface{}) (ctrl.Result, error) {
+ 	return ctrl.Result{}, nil
+ }
+ 
++func (m *manager) matchesNodeSelector(node *v1.Node) bool {
++	return m.nodeSelector == nil || m.nodeSelector.Matches(labels.Set(node.Labels))
++}
++
+ // isSelectedForManagement returns true if the node should be managed by the controller
+ func (m *manager) isSelectedForManagement(v1node *v1.Node) (bool, error) {
++	if !m.matchesNodeSelector(v1node) {
++		return false, nil
++	}
+ 	os := GetNodeOS(v1node)
+ 	instanceID := GetNodeInstanceID(v1node)
+ 
+diff --git a/pkg/node/manager/manager_test.go b/pkg/node/manager/manager_test.go
+index fd6c917..d319ce2 100644
+--- a/pkg/node/manager/manager_test.go
++++ b/pkg/node/manager/manager_test.go
+@@ -39,6 +39,7 @@ import (
+ 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+ 	"k8s.io/apimachinery/pkg/api/resource"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/apimachinery/pkg/labels"
+ 	"k8s.io/apimachinery/pkg/runtime/schema"
+ 	"k8s.io/apimachinery/pkg/types"
+ 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+@@ -168,7 +169,7 @@ func Test_GetNewManager(t *testing.T) {
+ 	mock := NewMock(ctrl, map[string]node.Node{})
+ 
+ 	mock.MockWorker.EXPECT().StartWorkerPool(gomock.Any()).Return(nil)
+-	manager, err := NewNodeManager(zap.New(), nil, api.Wrapper{}, mock.MockWorker, mock.MockConditions, mockClusterName, "v1.3.1", healthzHandler)
++	manager, err := NewNodeManager(zap.New(), nil, api.Wrapper{}, mock.MockWorker, mock.MockConditions, mockClusterName, "v1.3.1", healthzHandler, nil)
+ 
+ 	assert.NotNil(t, manager)
+ 	assert.NoError(t, err)
+@@ -182,7 +183,7 @@ func Test_GetNewManager_Error(t *testing.T) {
+ 	mock := NewMock(ctrl, map[string]node.Node{})
+ 
+ 	mock.MockWorker.EXPECT().StartWorkerPool(gomock.Any()).Return(mockError)
+-	manager, err := NewNodeManager(zap.New(), nil, api.Wrapper{}, mock.MockWorker, mock.MockConditions, mockClusterName, "v1.3.1", healthzHandler)
++	manager, err := NewNodeManager(zap.New(), nil, api.Wrapper{}, mock.MockWorker, mock.MockConditions, mockClusterName, "v1.3.1", healthzHandler, nil)
+ 
+ 	assert.NotNil(t, manager)
+ 	assert.Error(t, err, mockError)
+@@ -991,3 +992,79 @@ func Test_TrunkEnabledInCNINode(t *testing.T) {
+ 		})
+ 	}
+ }
++
++func TestNodeSelectorWindowsIPAM(t *testing.T) {
++	for _, tc := range []struct {
++		name          string
++		selectedLabel string
++		want          bool
++	}{
++		{"matching cloud worker", "aws-vpc", true},
++		{"site worker", "calico-site", false},
++		{"unlabelled worker", "", false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			ctrl := gomock.NewController(t)
++			defer ctrl.Finish()
++			mock := NewMock(ctrl, map[string]node.Node{})
++			mock.Manager.nodeSelector = labels.SelectorFromSet(labels.Set{"network.example/cni": "aws-vpc"})
++			candidate := v1Node.DeepCopy()
++			candidate.Labels = map[string]string{config.NodeLabelOS: config.OSWindows}
++			if tc.selectedLabel != "" {
++				candidate.Labels["network.example/cni"] = tc.selectedLabel
++			}
++			if tc.want {
++				mock.MockConditions.EXPECT().IsWindowsIPAMEnabled().Return(true)
++			}
++			got, err := mock.Manager.isSelectedForManagement(candidate)
++			assert.NoError(t, err)
++			assert.Equal(t, tc.want, got)
++		})
++	}
++}
++
++func TestNodeSelectorExcludedNodeDoesNotCreateResources(t *testing.T) {
++	ctrl := gomock.NewController(t)
++	defer ctrl.Finish()
++	mock := NewMock(ctrl, map[string]node.Node{})
++	mock.Manager.nodeSelector = labels.SelectorFromSet(labels.Set{"network.example/cni": "aws-vpc"})
++	candidate := v1Node.DeepCopy()
++	candidate.Labels = map[string]string{config.NodeLabelOS: config.OSWindows}
++	mock.MockK8sAPI.EXPECT().GetNode(nodeName).Return(candidate, nil)
++	assert.NoError(t, mock.Manager.AddNode(nodeName))
++	cached, found := mock.Manager.GetNode(nodeName)
++	assert.True(t, found)
++	assert.False(t, cached.IsManaged())
++	// An excluded node must not query/create a CNINode, submit allocation work,
++	// or invoke an AWS client. The mocks intentionally permit none of those.
++}
++
++func TestNodeSelectorLabelAdditionUsesExistingInitialization(t *testing.T) {
++	ctrl := gomock.NewController(t)
++	defer ctrl.Finish()
++	mock := NewMock(ctrl, map[string]node.Node{nodeName: unManagedNode})
++	mock.Manager.nodeSelector = labels.SelectorFromSet(labels.Set{"network.example/cni": "aws-vpc"})
++	candidate := v1Node.DeepCopy()
++	candidate.Labels = map[string]string{config.NodeLabelOS: config.OSWindows, "network.example/cni": "aws-vpc"}
++	mock.MockK8sAPI.EXPECT().GetNode(nodeName).Return(candidate, nil)
++	mock.MockConditions.EXPECT().IsWindowsIPAMEnabled().Return(true)
++	gomock.InOrder(
++		mock.MockK8sAPI.EXPECT().GetCNINode(types.NamespacedName{Name: nodeName}).Return(nil, apierrors.NewNotFound(schema.GroupResource{Resource: "cninodes"}, nodeName)),
++		mock.MockK8sAPI.EXPECT().CreateCNINode(candidate, mock.Manager.clusterName, gomock.Any()).Return(nil),
++		mock.MockK8sAPI.EXPECT().GetCNINode(types.NamespacedName{Name: nodeName}).Return(&rcV1alpha1.CNINode{}, nil),
++	)
++	mock.MockWorker.EXPECT().SubmitJob(gomock.All(NewAsyncOperationMatcher(AsyncOperationJob{op: Init, nodeName: nodeName, node: managedNode})))
++	assert.NoError(t, mock.Manager.UpdateNode(nodeName))
++}
++
++func TestNodeSelectorLabelRemovalUsesExistingRetirement(t *testing.T) {
++	ctrl := gomock.NewController(t)
++	defer ctrl.Finish()
++	mock := NewMock(ctrl, map[string]node.Node{nodeName: managedNode})
++	mock.Manager.nodeSelector = labels.SelectorFromSet(labels.Set{"network.example/cni": "aws-vpc"})
++	candidate := v1Node.DeepCopy()
++	candidate.Labels = map[string]string{config.NodeLabelOS: config.OSWindows}
++	mock.MockK8sAPI.EXPECT().GetNode(nodeName).Return(candidate, nil)
++	mock.MockWorker.EXPECT().SubmitJob(gomock.All(NewAsyncOperationMatcher(AsyncOperationJob{op: Delete, nodeName: nodeName, node: managedNode})))
++	assert.NoError(t, mock.Manager.UpdateNode(nodeName))
++}

@@ -1,5 +1,29 @@
 # k0s provider patches
 
+## Exec and attach stream completion
+
+`exec-streaming.patch` targets k0s `v1.36.4+k0s.1`, commit
+`c37fe960bdee93ca14c5a5b9f2ab9700f8e82e60`. It pins the API-server,
+client-go and streaming modules to the Kubernetes 1.36.4 backport at
+`c274d6abd2003705d0c71504aeb0fbccda470a48` of
+[upstream PR #142461](https://github.com/kubernetes/kubernetes/pull/142461).
+The server lets clients drain buffered output before closing, and clients
+reject a missing command status instead of reporting success.
+
+The k0s module patch alone does not update its embedded executables. Build
+the API-server from the same Kubernetes revision using the upstream
+Makefile and the distribution's build flags. Containerd also needs the
+patched CRI-streaming server: the 2.3.5 integration is pinned at
+`7b2fc110dd8a63fdc87a6809c256066c1082d7c1`. Use k0s's existing ZIP builder
+and embedding targets to assemble the complete controller and worker
+packages, retaining component hashes and distinct versions. The Windows
+packager below preserves official runtime bytes and cannot package this
+runtime replacement.
+
+Qualify the complete packages with native exec/attach transfers over SPDY
+and WebSocket. Module tests and a bare k0s build do not prove that the
+installed API-server and containerd contain the fix.
+
 ## Worker releases with patched controllers
 
 Give patched controllers a version beginning with their upstream release, such

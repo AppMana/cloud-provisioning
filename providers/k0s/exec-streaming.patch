@@ -1,0 +1,61 @@
+diff --git a/go.mod b/go.mod
+index 9daf4a58..e8b9b5fc 100644
+--- a/go.mod
++++ b/go.mod
+@@ -303,9 +303,9 @@ replace (
+ 	k8s.io/api => k8s.io/api v0.36.4
+ 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.36.4
+ 	k8s.io/apimachinery => k8s.io/apimachinery v0.36.4
+-	k8s.io/apiserver => k8s.io/apiserver v0.36.4
++	k8s.io/apiserver => github.com/AppMana/forks-kubernetes-kube-proxy-windows-ipv6/staging/src/k8s.io/apiserver v0.0.0-20261016100539-c274d6abd200
+ 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.36.4
+-	k8s.io/client-go => k8s.io/client-go v0.36.4
++	k8s.io/client-go => github.com/AppMana/forks-kubernetes-kube-proxy-windows-ipv6/staging/src/k8s.io/client-go v0.0.0-20261016100539-c274d6abd200
+ 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.36.4
+ 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.36.4
+ 	k8s.io/code-generator => k8s.io/code-generator v0.36.4
+@@ -332,3 +332,5 @@ replace (
+ 	k8s.io/sample-cli-plugin => k8s.io/sample-cli-plugin v0.36.4
+ 	k8s.io/sample-controller => k8s.io/sample-controller v0.36.4
+ )
++
++replace k8s.io/streaming => github.com/AppMana/forks-kubernetes-kube-proxy-windows-ipv6/staging/src/k8s.io/streaming v0.0.0-20261016100539-c274d6abd200
+diff --git a/go.sum b/go.sum
+index 3b4b4ec5..ad4d30d4 100644
+--- a/go.sum
++++ b/go.sum
+@@ -9,6 +9,12 @@ filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
+ filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
+ github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 h1:He8afgbRMd7mFxO99hRNu+6tazq8nFF9lIwo9JFroBk=
+ github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6/go.mod h1:8o94RPi1/7XTJvwPpRSzSUedZrtlirdB3r9Z20bi2f8=
++github.com/AppMana/forks-kubernetes-kube-proxy-windows-ipv6/staging/src/k8s.io/apiserver v0.0.0-20261016100539-c274d6abd200 h1:LZRurJ/ou3XNcDXgm94qvNCc2K6Z2IcAtIB/nxJ1CD4=
++github.com/AppMana/forks-kubernetes-kube-proxy-windows-ipv6/staging/src/k8s.io/apiserver v0.0.0-20261016100539-c274d6abd200/go.mod h1:8BCHw+J60Zptxo+NXtlBPNGgWlwteT7m/PQsK1SayOM=
++github.com/AppMana/forks-kubernetes-kube-proxy-windows-ipv6/staging/src/k8s.io/client-go v0.0.0-20261016100539-c274d6abd200 h1:y2vJOL8F6svMCMuwLAgPo8CWES2bvk9fPlFP42NYp+I=
++github.com/AppMana/forks-kubernetes-kube-proxy-windows-ipv6/staging/src/k8s.io/client-go v0.0.0-20261016100539-c274d6abd200/go.mod h1:4o6spzaSBuM3ox+KElSron0EFkVJGK8opezTNuPo0Kw=
++github.com/AppMana/forks-kubernetes-kube-proxy-windows-ipv6/staging/src/k8s.io/streaming v0.0.0-20261016100539-c274d6abd200 h1:MTQBfmQHScfnB3L6FEBv7odI/0KlgeR7gg4/CgmwftQ=
++github.com/AppMana/forks-kubernetes-kube-proxy-windows-ipv6/staging/src/k8s.io/streaming v0.0.0-20261016100539-c274d6abd200/go.mod h1:tJ6S2bZa2HxIBauguBbCWSCYyd93Grfz1+z3tcOvlDE=
+ github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c h1:udKWzYgxTojEKWjV8V+WSxDXJ4NFATAsZjh8iIbsQIg=
+ github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
+ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
+@@ -829,12 +835,8 @@ k8s.io/apiextensions-apiserver v0.36.4 h1:SfvCVt+4CqKWvzuVytYDT5g9hyb9MztoiYELIk
+ k8s.io/apiextensions-apiserver v0.36.4/go.mod h1:JT9V2Ju7ys1FY4zbSpmX9XOvKB3/BwsODc4hFQEa+Xo=
+ k8s.io/apimachinery v0.36.4 h1:PT2UzkupGuAx/+xT5XjiMJ1WGpY3fn9/hdAvjweRet4=
+ k8s.io/apimachinery v0.36.4/go.mod h1:p2I2dipt7JHG+quVwQ1d02d28O4GdDi77RByQ13MTpk=
+-k8s.io/apiserver v0.36.4 h1:AtKjaf2eUiX5G6TfF2IOlhuUuvMsHh49Ivr1+4fZ2gA=
+-k8s.io/apiserver v0.36.4/go.mod h1:RyiGghXP67hb0Ll+7iLJ6GGv2JpEzCn7ljbiA+L3cJ0=
+ k8s.io/cli-runtime v0.36.4 h1:OHvManCwP1k9GiC5tXRFxHhzZIQQFCsrHlt7OspKo3w=
+ k8s.io/cli-runtime v0.36.4/go.mod h1:qQSj2FJgQos6GHpS/ge7wTdQMZm9XFWlesWgV6h7qZY=
+-k8s.io/client-go v0.36.4 h1:MDvfDNvMSt0Br94SK8neviVlwL9qifw9B26hJCpD1K0=
+-k8s.io/client-go v0.36.4/go.mod h1:pNK4WKELbwlEDvtbE8l22lEZL5THYF61H5EealokZmA=
+ k8s.io/cloud-provider v0.36.4 h1:jXBib2dHksJutPLOWGnXZT8Pybp3KVAxonDu44ZOvY8=
+ k8s.io/cloud-provider v0.36.4/go.mod h1:xzo4kao6+IzVPErmNKsy6Pw/3+4DmyZ1oS/gn42sMF8=
+ k8s.io/cluster-bootstrap v0.36.4 h1:5M50BP7ICe69bZX5hpIt5aWRzvTmc5/aL7hC5syPqJc=
+@@ -875,8 +877,6 @@ k8s.io/metrics v0.36.4 h1:jcIx58xCk9NIvoeoh2q1jQidXtNMKlNi2rgJF4QV+uU=
+ k8s.io/metrics v0.36.4/go.mod h1:pMqC7NtvrNkLiIN38BLqBhizp2DDJdwupqZSQSzP9HI=
+ k8s.io/mount-utils v0.36.4 h1:dmCrrFDdcj56q1GuHJw228Ri62iBzMvt8PbPFHS91pA=
+ k8s.io/mount-utils v0.36.4/go.mod h1:f4k8GAu4zHwLuBqdyAHTNG2I7rAey5B+Zr3UI7HoNfE=
+-k8s.io/streaming v0.36.4 h1:RS5YlhrdBN2pKGVjgygGntdu6SNdsduyjGWGe3cX0vo=
+-k8s.io/streaming v0.36.4/go.mod h1:tJ6S2bZa2HxIBauguBbCWSCYyd93Grfz1+z3tcOvlDE=
+ k8s.io/utils v0.0.0-20260319190234-28399d86e0b5 h1:kBawHLSnx/mYHmRnNUf9d4CpjREbeZuxoSGOX/J+aYM=
+ k8s.io/utils v0.0.0-20260319190234-28399d86e0b5/go.mod h1:xDxuJ0whA3d0I4mf/C4ppKHxXynQ+fxnkmQH0vTHnuk=
+ modernc.org/cc/v4 v4.28.2 h1:3tQ0lf2ADtoby2EtSP+J7IE2SHwEJdP8ioR59wx7XpY=

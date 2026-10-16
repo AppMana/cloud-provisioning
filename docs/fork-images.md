@@ -52,6 +52,13 @@ For AWS VPC CNI workers, select a proxy entrypoint that discovers the HNS networ
 from the native CNI configuration. An entrypoint that waits for a network named
 `Calico` cannot initialize the proxy on these workers.
 
+For native VPC networking, the entrypoint must derive its enabled DSR default
+from the validated CNI identity. Keep the Calico default separate.
+`KUBEPROXY_ENABLE_DSR=true` explicitly enables DSR, while
+`KUBEPROXY_DISABLE_DSR=true` takes precedence over both the default and the
+enable setting. Validate the image's default with neither override present,
+checking the running proxy arguments as well as Service and DNS traffic.
+
 Persist the immutable image in k0s `spec.images.windows.kubeproxy` on every
 controller. A Pod-level image override does not update the DaemonSet template or
 survive Pod replacement. For a controlled rollout, use

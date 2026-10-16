@@ -21,9 +21,9 @@ import (
 
 // Options are the product settings the cluster is qualified against.
 type Options struct {
-	// TunnelMTU is the MTU of the tunnel devices: the endpoint's underlay
-	// MTU less WireGuard's 80 bytes, which is 1420 on a 1500-byte LAN and
-	// the remote dialer's fixed MTU.
+	// TunnelMTU is the smallest observed tunnel MTU on the qualified path,
+	// including the remote's egress-derived budget. The 1420 default requires
+	// a sufficiently large underlay; smaller egresses require an explicit value.
 	TunnelMTU int
 	// TunnelIPv4 and TunnelIPv6 are the tunnel address ranges: the chart's
 	// tunnel subnet and tunnel.ipv6Prefix.

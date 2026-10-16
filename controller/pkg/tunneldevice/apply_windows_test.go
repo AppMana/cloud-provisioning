@@ -100,6 +100,24 @@ func testNativeApplyLifecycle(t *testing.T, nativePods bool) {
 		if !row.ForwardingEnabled {
 			t.Fatal("owned tunnel adapter cannot forward packets")
 		}
+		originalMTU := row.NLMTU
+		row.NLMTU--
+		if err := row.Set(); err != nil {
+			t.Fatal(err)
+		}
+		if n.Verify(doc) == nil {
+			t.Fatal("tunnel MTU drift accepted")
+		}
+		if err := n.Apply(doc, 0); err != nil {
+			t.Fatal(err)
+		}
+		row, err = n.adapter.LUID().IPInterface(family)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if row.NLMTU != originalMTU {
+			t.Fatal("tunnel MTU drift was not repaired")
+		}
 		row.ForwardingEnabled = false
 		if err := row.Set(); err != nil {
 			t.Fatal(err)

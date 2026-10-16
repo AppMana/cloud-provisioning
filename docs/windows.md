@@ -328,7 +328,13 @@ passing canary observation does not qualify the candidate as a baked image.
 WireGuardNT adapter. It consumes the existing `tunnel.PeersFileDoc` contract;
 allowed IPs and node host routes remain separate. The backend owns a dedicated
 adapter, sets its addresses and routes, and removes obsolete routes without
-modifying the physical NIC or CNI. Its current MTU is 1420.
+modifying the physical NIC or CNI. Its MTU is the smallest peer egress interface
+MTU minus 80 bytes, capped at 1420. Listening peers without a configured endpoint
+use the operational default egress interfaces. Reconciliation verifies and
+repairs this budget when egress or adapter settings change. Underlays below
+1360 are rejected because they cannot carry the minimum dual-stack tunnel MTU.
+The CNI owner must separately configure workload MTUs for the smallest tunnel
+budget on their path; changing the tunnel does not update existing pod interfaces.
 
 This backend is exercised by `cmd/tunnelprobe` and the host service described
 below. The publisher and bootstrap controller deliver peer updates on joined

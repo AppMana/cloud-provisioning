@@ -80,6 +80,10 @@ func (n *Native) Apply(doc tunnel.PeersFileDoc, port uint16) error {
 	if err != nil {
 		return err
 	}
+	mtu, err := n.mtu(p)
+	if err != nil {
+		return fmt.Errorf("deriving tunnel MTU: %w", err)
+	}
 	if n.address.IsValid() && n.address != p.Address {
 		return fmt.Errorf("adapter identity address is immutable")
 	}
@@ -123,7 +127,7 @@ func (n *Native) Apply(doc tunnel.PeersFileDoc, port uint16) error {
 		if e != nil {
 			return e
 		}
-		row.NLMTU = 1420
+		row.NLMTU = mtu
 		row.UseAutomaticMetric = false
 		row.Metric = 5
 		row.WeakHostSend = true
@@ -188,6 +192,10 @@ func (n *Native) Verify(doc tunnel.PeersFileDoc) error {
 	if err != nil {
 		return err
 	}
+	mtu, err := n.mtu(p)
+	if err != nil {
+		return fmt.Errorf("verifying tunnel MTU: %w", err)
+	}
 	address, err := n.adapter.LUID().IPAddress(p.Address.Addr())
 	if err != nil {
 		return fmt.Errorf("reading tunnel identity address: %w", err)
@@ -202,6 +210,9 @@ func (n *Native) Verify(doc tunnel.PeersFileDoc) error {
 		}
 		if !row.ForwardingEnabled {
 			return fmt.Errorf("tunnel forwarding is disabled for address family %d", family)
+		}
+		if row.NLMTU != mtu {
+			return fmt.Errorf("tunnel MTU %d differs from transport budget %d for address family %d", row.NLMTU, mtu, family)
 		}
 	}
 	observed, err := n.KernelRoutes()

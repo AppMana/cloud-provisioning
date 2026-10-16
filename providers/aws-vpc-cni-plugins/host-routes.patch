@@ -121,9 +121,27 @@ index a928b67..85a1dfb 100644
  	if config.BridgeType != BridgeTypeL2 && config.BridgeType != BridgeTypeL3 {
  		return nil, fmt.Errorf("invalid BridgeType %s", config.BridgeType)
 diff --git a/plugins/vpc-bridge/network/bridge_windows.go b/plugins/vpc-bridge/network/bridge_windows.go
-index 98883c2..cb52b2f 100644
+index 98883c2..6d5e978 100644
 --- a/plugins/vpc-bridge/network/bridge_windows.go
 +++ b/plugins/vpc-bridge/network/bridge_windows.go
+@@ -85,7 +85,7 @@ func (nb *BridgeBuilder) FindOrCreateNetwork(nw *Network) error {
+ 	if err == nil {
+ 		log.Infof("Found existing HCN network %s.", networkName)
+ 		nw.NetworkID = hcnNetwork.Id
+-		return nil
++		return nb.enableHostRouteForwarding(nw)
+ 	}
+ 
+ 	// Initialize the HCN network.
+@@ -134,7 +134,7 @@ func (nb *BridgeBuilder) FindOrCreateNetwork(nw *Network) error {
+ 	log.Infof("Received HCN response: %+v.", hcnResponse)
+ 
+ 	nw.NetworkID = hcnResponse.Id
+-	return nil
++	return nb.enableHostRouteForwarding(nw)
+ }
+ 
+ // DeleteNetwork deletes an existing HCN network.
 @@ -300,6 +300,20 @@ func (nb *BridgeBuilder) FindOrCreateEndpoint(nw *Network, ep *Endpoint) error {
  		}
  	}
@@ -145,6 +163,171 @@ index 98883c2..cb52b2f 100644
  	// Create the HCN endpoint.
  	log.Infof("Creating HCN endpoint: %+v", hcnEndpoint)
  	hcnResponse, err := hcnEndpoint.Create()
+diff --git a/plugins/vpc-bridge/network/forwarding_windows.go b/plugins/vpc-bridge/network/forwarding_windows.go
+new file mode 100644
+index 0000000..aa886a3
+--- /dev/null
++++ b/plugins/vpc-bridge/network/forwarding_windows.go
+@@ -0,0 +1,52 @@
++package network
++
++import (
++	"context"
++	_ "embed"
++	"encoding/base64"
++	"encoding/json"
++	"fmt"
++	"os/exec"
++	"time"
++	"unicode/utf16"
++)
++
++//go:embed forwarding_windows.ps1
++var hostForwardingScript string
++
++// enableHostRouteForwarding runs only for explicit host routes. HNS owns the
++// management vNIC lifecycle; reconcile its active IPv4 forwarding before ADD
++// creates or reuses an endpoint. Do not disable forwarding on individual DEL:
++// other endpoints can still depend on the shared network.
++func (nb *BridgeBuilder) enableHostRouteForwarding(nw *Network) error {
++	if len(nw.HostRouteCIDRs) == 0 {
++		return nil
++	}
++	if nw.SharedENI == nil || len(nw.ENIIPAddresses) == 0 || nw.NetworkID == "" {
++		return fmt.Errorf("host routes require an identified HNS network and ENI")
++	}
++	scope, err := json.Marshal(map[string]string{
++		"id": nw.NetworkID, "name": nb.generateHNSNetworkName(nw),
++		"ip": nw.ENIIPAddresses[0].IP.String(), "mac": nw.SharedENI.GetMACAddress().String(),
++	})
++	if err != nil {
++		return err
++	}
++	script := "$scope = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + base64.StdEncoding.EncodeToString(scope) + "')) | ConvertFrom-Json\n" + hostForwardingScript
++	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
++	defer cancel()
++	output, err := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShell(script)).CombinedOutput()
++	if err != nil {
++		return fmt.Errorf("configure HNS host forwarding: %w: %s", err, output)
++	}
++	return nil
++}
++
++func encodePowerShell(script string) string {
++	units := utf16.Encode([]rune(script))
++	bytes := make([]byte, 2*len(units))
++	for i, unit := range units {
++		bytes[2*i], bytes[2*i+1] = byte(unit), byte(unit>>8)
++	}
++	return base64.StdEncoding.EncodeToString(bytes)
++}
+diff --git a/plugins/vpc-bridge/network/forwarding_windows.ps1 b/plugins/vpc-bridge/network/forwarding_windows.ps1
+new file mode 100644
+index 0000000..2510e99
+--- /dev/null
++++ b/plugins/vpc-bridge/network/forwarding_windows.ps1
+@@ -0,0 +1,48 @@
++$ErrorActionPreference = 'Stop'
++Set-StrictMode -Version Latest
++try {
++    function Assert-Network {
++        $networks = @(Get-HnsNetwork | Where-Object { $_.ID -eq $scope.id })
++        if ($networks.Count -ne 1) { throw 'HNS network identity missing or ambiguous' }
++        $network = $networks[0]
++        if ($network.Name -ne $scope.name -or $network.Type -ne 'L2Bridge' -or
++            $network.ManagementIP -ne $scope.ip) { throw 'HNS network ownership mismatch' }
++        return $network
++    }
++    function Normalize-Mac($value) { return ($value -replace '[:-]', '').ToLowerInvariant() }
++    $network = Assert-Network
++    $mac = Normalize-Mac $scope.mac
++    if ($mac -notmatch '^[0-9a-f]{12}$') { throw 'Invalid ENI MAC' }
++    $physical = @(Get-NetAdapter -IncludeHidden | Where-Object {
++        $_.Name -eq $network.NetworkAdapterName -and $_.HardwareInterface -and
++        (Normalize-Mac $_.MacAddress) -eq $mac
++    })
++    if ($physical.Count -ne 1) { throw 'HNS physical ENI ownership mismatch' }
++    function Get-OwnedHostAdapter {
++        $addresses = @(Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
++            $_.IPAddress -eq $scope.ip -and $_.AddressState -eq 'Preferred'
++        })
++        if ($addresses.Count -ne 1) { throw 'HNS management address missing or ambiguous' }
++        $adapters = @(Get-NetAdapter -IncludeHidden | Where-Object {
++            $_.InterfaceIndex -eq $addresses[0].InterfaceIndex -and
++            $_.Virtual -and -not $_.HardwareInterface -and
++            (Normalize-Mac $_.MacAddress) -eq $mac
++        })
++        if ($adapters.Count -ne 1) { throw 'HNS host vNIC ownership mismatch' }
++        return $adapters[0]
++    }
++    $adapter = Get-OwnedHostAdapter
++    $before = @(Get-NetIPInterface -InterfaceIndex $adapter.InterfaceIndex -AddressFamily IPv4 -PolicyStore ActiveStore)
++    if ($before.Count -ne 1) { throw 'Host IPv4 interface missing or ambiguous' }
++    if ($before[0].Forwarding -ne 'Enabled') {
++        Set-NetIPInterface -InterfaceIndex $adapter.InterfaceIndex -AddressFamily IPv4 -PolicyStore ActiveStore -Forwarding Enabled
++    }
++    $null = Assert-Network
++    $afterAdapter = Get-OwnedHostAdapter
++    if ($afterAdapter.InterfaceGuid -ne $adapter.InterfaceGuid) { throw 'HNS host vNIC changed during forwarding setup' }
++    $after = @(Get-NetIPInterface -InterfaceIndex $adapter.InterfaceIndex -AddressFamily IPv4 -PolicyStore ActiveStore)
++    if ($after.Count -ne 1 -or $after[0].Forwarding -ne 'Enabled') { throw 'Host IPv4 forwarding verification failed' }
++} catch {
++    [Console]::Error.WriteLine($_.Exception.Message)
++    exit 1
++}
+diff --git a/plugins/vpc-bridge/network/forwarding_windows_test.go b/plugins/vpc-bridge/network/forwarding_windows_test.go
+new file mode 100644
+index 0000000..683c794
+--- /dev/null
++++ b/plugins/vpc-bridge/network/forwarding_windows_test.go
+@@ -0,0 +1,47 @@
++package network
++
++import (
++	"encoding/json"
++	"os/exec"
++	"testing"
++)
++
++func TestHostForwardingOwnership(t *testing.T) {
++	for _, tc := range []struct {
++		name    string
++		success bool
++		sets    int
++	}{
++		{"enable", true, 1}, {"idempotent", true, 0},
++		{"foreign-network", false, 0}, {"foreign-ip", false, 0}, {"foreign-type", false, 0},
++		{"foreign-mac", false, 0}, {"physical-target", false, 0}, {"ambiguous-ip", false, 0},
++		{"replaced", false, 1}, {"readback-failure", false, 1},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "test-forwarding.ps1", "-Case", tc.name)
++			out, err := cmd.Output()
++			if (err == nil) != tc.success {
++				t.Fatalf("unexpected result: %v; output: %s", err, out)
++			}
++			var result struct {
++				Sets  int `json:"sets"`
++				Reads int `json:"reads"`
++			}
++			if err := json.Unmarshal(out, &result); err != nil {
++				t.Fatal(err)
++			}
++			if result.Sets != tc.sets {
++				t.Fatalf("mutations=%d, want %d", result.Sets, tc.sets)
++			}
++			if tc.success && result.Reads != 2 {
++				t.Fatalf("forwarding was not read before and after setup")
++			}
++		})
++	}
++}
++
++func TestHostForwardingOmitted(t *testing.T) {
++	if err := (&BridgeBuilder{}).enableHostRouteForwarding(&Network{}); err != nil {
++		t.Fatal(err)
++	}
++}
 diff --git a/plugins/vpc-bridge/network/network.go b/plugins/vpc-bridge/network/network.go
 index d15404d..033f126 100644
 --- a/plugins/vpc-bridge/network/network.go
@@ -157,6 +340,52 @@ index d15404d..033f126 100644
  	DNSServers          []string
  	DNSSuffixSearchList []string
  	ServiceCIDR         string
+diff --git a/plugins/vpc-bridge/network/test-forwarding.ps1 b/plugins/vpc-bridge/network/test-forwarding.ps1
+new file mode 100644
+index 0000000..464f3fb
+--- /dev/null
++++ b/plugins/vpc-bridge/network/test-forwarding.ps1
+@@ -0,0 +1,40 @@
++param([string]$Case = 'enable')
++$ErrorActionPreference = 'Stop'
++$scope = @{ id='net-id'; name='vpcbr020000000001'; ip='172.29.0.18'; mac='02:00:00:00:00:01' }
++$global:sets = 0
++$global:reads = 0
++$global:forwarding = if ($Case -eq 'idempotent') { 'Enabled' } else { 'Disabled' }
++function Get-HnsNetwork {
++    $id = if ($Case -eq 'foreign-network') {'other-id'} else {'net-id'}
++    $ip = if ($Case -eq 'foreign-ip') {'172.29.0.19'} else {'172.29.0.18'}
++    $type = if ($Case -eq 'foreign-type') {'Overlay'} else {'L2Bridge'}
++    [pscustomobject]@{ ID=$id; Name='vpcbr020000000001'; Type=$type; ManagementIP=$ip; NetworkAdapterName='Ethernet' }
++}
++function Get-NetAdapter {
++    param([switch]$IncludeHidden)
++    [pscustomobject]@{Name='Ethernet'; InterfaceIndex=7; InterfaceGuid='physical'; MacAddress='02-00-00-00-00-01'; Virtual=$false; HardwareInterface=$true}
++    $mac = if ($Case -eq 'foreign-mac') {'02-00-00-00-00-02'} else {'02-00-00-00-00-01'}
++    $guid = if ($Case -eq 'replaced' -and $global:sets -gt 0) {'replacement'} else {'owned'}
++    [pscustomobject]@{Name='Host vNIC'; InterfaceIndex=9; InterfaceGuid=$guid; MacAddress=$mac; Virtual=$true; HardwareInterface=($Case -eq 'physical-target')}
++    [pscustomobject]@{Name='Tunnel'; InterfaceIndex=11; InterfaceGuid='tunnel'; MacAddress=''; Virtual=$true; HardwareInterface=$false}
++}
++function Get-NetIPAddress {
++    param($AddressFamily)
++    [pscustomobject]@{InterfaceIndex=9; IPAddress='172.29.0.18'; AddressState='Preferred'}
++    if ($Case -eq 'ambiguous-ip') { [pscustomobject]@{InterfaceIndex=10; IPAddress='172.29.0.18'; AddressState='Preferred'} }
++}
++function Get-NetIPInterface {
++    param($InterfaceIndex,$AddressFamily,$PolicyStore)
++    if ($InterfaceIndex -ne 9 -or $AddressFamily -ne 'IPv4' -or $PolicyStore -ne 'ActiveStore') { throw 'Unscoped interface read' }
++    $global:reads++
++    [pscustomobject]@{Forwarding=$global:forwarding}
++}
++function Set-NetIPInterface {
++    param($InterfaceIndex,$AddressFamily,$PolicyStore,$Forwarding)
++    if ($InterfaceIndex -ne 9 -or $AddressFamily -ne 'IPv4' -or $PolicyStore -ne 'ActiveStore' -or $Forwarding -ne 'Enabled') { throw 'Unscoped mutation' }
++    $global:sets++
++    if ($Case -ne 'readback-failure') { $global:forwarding='Enabled' }
++}
++# Export counters even if the production script exits on a rejection.
++try { & "$PSScriptRoot/forwarding_windows.ps1"; if ($LASTEXITCODE) { exit $LASTEXITCODE } }
++finally { [Console]::Out.WriteLine((@{sets=$global:sets;reads=$global:reads} | ConvertTo-Json -Compress)) }
 diff --git a/plugins/vpc-bridge/plugin/commands.go b/plugins/vpc-bridge/plugin/commands.go
 index 5902753..0f75f80 100644
 --- a/plugins/vpc-bridge/plugin/commands.go

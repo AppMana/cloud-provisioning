@@ -12,13 +12,22 @@ An omitted or empty list preserves upstream behavior.
 Prefixes must be canonical unicast IPv4 networks, exclude local-scope and
 multicast ranges, and not overlap any configured ENI subnet. Default routes are
 rejected. Duplicate prefixes are collapsed. The host must independently have
-working routes and forwarding for these destinations; this extension does not
-establish a tunnel or authorize changing host networking.
+working routes and tunnel forwarding for these destinations. With explicit host
+routes, CNI ADD enables and verifies active IPv4 forwarding on the HNS management
+vNIC before creating or reusing an endpoint. It requires the exact HNS network
+identity, L2Bridge type, configured management address, physical ENI MAC, and a
+unique matching virtual host adapter. Foreign, ambiguous, and changing interfaces
+are rejected. Physical adapter settings, IPv6, routes, and default gateways are
+not modified. Individual endpoint deletion does not disable shared forwarding;
+HNS retains ownership of the management vNIC lifecycle.
 
 Apply to a clean checkout using `./apply.sh /path/to/amazon-vpc-cni-plugins`.
 Build with the upstream Windows target and `enablek8sconnector` tag. Use a
 concrete Go toolchain version compatible with the upstream module declaration.
-Run `go test ./plugins/vpc-bridge/config` to verify prefix admission.
+Run `go test ./plugins/vpc-bridge/config` to verify prefix admission. On Windows,
+run `go test ./plugins/vpc-bridge/network -run TestHostForwarding` for forwarding
+ownership, idempotency, and readback rejection tests. These mock cmdlets; native
+CNI provisioning and packet tests are still required to qualify actual traffic.
 
 The published image recipe still selects the upstream binary. Integrating a
 patched binary requires pinned artifact provenance, native endpoint lifecycle

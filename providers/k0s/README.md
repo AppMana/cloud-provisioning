@@ -67,21 +67,26 @@ version. The following builds its executable without rebuilding bundled runtimes
 
 ```sh
 make DOCKER= GO=go GO_ENV_REQUISITES= EMBEDDED_BINS_BUILDMODE=none \
-  VERSION=v1.36.2+k0s.0.appmana.1 k0s.exe
+  VERSION=v1.36.4+k0s.1.winfix.1 k0s.exe
 ```
 
 That output alone is a bare worker. `package-windows.py` attaches the embedded
-runtime ZIP from a checksum-verified official executable. For this source version
-the upstream asset is `k0s-v1.36.2+k0s.0-amd64.exe`, SHA-256
-`81d05aec71b1d34a8d8ae73641293c8b2f45abf9aaa2d55e332ed41103654c65`.
+runtime ZIP from a checksum-verified official executable. Use the asset matching
+the source release:
+
+| Upstream asset | SHA-256 |
+| --- | --- |
+| `k0s-v1.36.2+k0s.0-amd64.exe` | `81d05aec71b1d34a8d8ae73641293c8b2f45abf9aaa2d55e332ed41103654c65` |
+| `k0s-v1.36.4+k0s.1-amd64.exe` | `13806ad31bfce926ce8bbfbf073231a87fb5e97b9b9ed5dc5c4525101c3dc919` |
+
 Obtain it from the matching official k0s release and verify the bare build's hash
-independently before packaging:
+independently before packaging. For the 1.36.4 build above:
 
 ```sh
 python3 providers/k0s/package-windows.py \
   --bare /path/to/patched-checkout/k0s.exe --bare-sha256 VERIFIED_BUILD_SHA256 \
   --upstream /path/to/official-k0s.exe \
-  --upstream-sha256 81d05aec71b1d34a8d8ae73641293c8b2f45abf9aaa2d55e332ed41103654c65 \
+  --upstream-sha256 13806ad31bfce926ce8bbfbf073231a87fb5e97b9b9ed5dc5c4525101c3dc919 \
   --output /path/to/new-package-directory
 python3 -m unittest discover -s providers/k0s -p 'test_*.py'
 ```

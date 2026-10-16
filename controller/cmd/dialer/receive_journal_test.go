@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -278,6 +279,175 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 		if _, err := checkpointReceiveJournal(ctx, api, store, scope, cfg, root); err != nil {
 			t.Fatal(err)
 		}
+	})
+	t.Run("phase-execution-boundary", func(t *testing.T) {
+		cfg := config{iface: "wgphase", nodeName: "cloud", privateKeyFile: filepath.Join(t.TempDir(), "key")}
+		calls := 0
+		verify := func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, uid string) error {
+			calls++
+			if uid != string(nodes["cloud"].UID) || plan.MachineUID != scope.MachineUID || view.Round.Phase != handover.Switch {
+				t.Fatal("wrong phase or participant passed to native verifier")
+			}
+			if lock, err := lockReconciliation(cfg); err == nil {
+				lock.Close()
+				t.Fatal("native verification did not retain reconciliation lock")
+			}
+			return nil
+		}
+		receipts, err := executeReceivePhase(ctx, api, store, scope, cfg, root, "container-incarnation", verify)
+		if err != nil || len(receipts) != 1 || calls != 1 {
+			t.Fatalf("execution boundary: receipts=%d calls=%d error=%v", len(receipts), calls, err)
+		}
+		current, err := store.Load(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		v, err := current.Transition().View()
+		if err != nil {
+			t.Fatal(err)
+		}
+		hash, err := v.Round.Digest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if receipts[0].BearerToken != "" || receipts[0].BootID != boot || receipts[0].Receipt.RoundHash != hash || receipts[0].Receipt.AgentContainerID != "container-incarnation" {
+			t.Fatal("receipt lost observation binding")
+		}
+		for _, fault := range []string{"native-error", "cancel", "journal-race", "node-race"} {
+			t.Run(fault, func(t *testing.T) {
+				runCtx, cancel := context.WithCancel(ctx)
+				defer cancel()
+				native := func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string) error {
+					switch fault {
+					case "native-error":
+						return fmt.Errorf("native readback failed")
+					case "cancel":
+						cancel()
+					case "journal-race":
+						cm, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+						if err != nil {
+							return err
+						}
+						cm.Labels = map[string]string{"phase-race": "true"}
+						_, err = store.ConfigMaps.Update(ctx, cm, metav1.UpdateOptions{})
+						return err
+					case "node-race":
+						node, err := api.CoreV1().Nodes().Get(ctx, "cloud", metav1.GetOptions{})
+						if err != nil {
+							return err
+						}
+						node.Status.NodeInfo.BootID = "changed-boot"
+						_, err = api.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+						return err
+					}
+					return nil
+				}
+				got, err := executeReceivePhase(runCtx, api, store, scope, cfg, root, "container-incarnation", native)
+				if err == nil || len(got) != 0 {
+					t.Fatal("failed or superseded native work produced receipts")
+				}
+				if fault == "node-race" {
+					node, err := api.CoreV1().Nodes().Get(ctx, "cloud", metav1.GetOptions{})
+					if err != nil {
+						t.Fatal(err)
+					}
+					node.Status.NodeInfo.BootID = boot
+					if _, err := api.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{}); err != nil {
+						t.Fatal(err)
+					}
+				}
+				lock, err := lockReconciliation(cfg)
+				if err != nil {
+					t.Fatal("execution leaked lock", err)
+				}
+				lock.Close()
+			})
+		}
+		// Delay the final API revalidation past the observation's receipt age.
+		// The returned timestamp must not relabel old native work as fresh.
+		slow := store
+		slow.ConfigMaps = &changingJournalReader{ConfigMapInterface: store.ConfigMaps, reads: -2, change: func() error { time.Sleep(11 * time.Second); return nil }}
+		if got, err := executeReceivePhase(ctx, api, slow, scope, cfg, root, "container-incarnation", verify); err == nil || !strings.Contains(err.Error(), "aged out") || len(got) != 0 {
+			t.Fatalf("aged native observation produced receipts: %v", err)
+		}
+		before, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		advance := func(tr handover.Transition, at time.Time) handover.Transition {
+			v, err := tr.View()
+			if err != nil {
+				t.Fatal(err)
+			}
+			hash, err := v.Round.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var proofs []handover.AuthenticatedReceipt
+			for _, m := range v.Round.Members {
+				proofs = append(proofs, handover.AuthenticatedReceipt{AuthenticatedNodeUID: m.NodeUID, Receipt: handover.Receipt{RoundHash: hash, NodeUID: m.NodeUID, DeviceID: m.DeviceID, FromKey: m.FromKey, ToKey: m.ToKey, FromPeerKey: m.FromPeerKey, ToPeerKey: m.ToPeerKey, ObservedAt: at}})
+			}
+			next, err := tr.Advance(at, proofs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return next
+		}
+		for _, fault := range []string{"expired", "future", "drain-too-early", "complete"} {
+			t.Run(fault, func(t *testing.T) {
+				now := time.Now()
+				start := now.Add(-10 * time.Second)
+				policy := handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: 10 * time.Second, DrainInterval: time.Second}
+				if fault == "expired" {
+					start = now.Add(-2 * time.Minute)
+				}
+				if fault == "future" {
+					start = now.Add(time.Minute)
+				}
+				if fault == "drain-too-early" {
+					policy.DrainInterval = time.Minute
+				}
+				tr, err := handover.NewTransition(spec, start, policy)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if fault == "drain-too-early" || fault == "complete" {
+					tr = advance(tr, start.Add(time.Second))
+					tr = advance(tr, start.Add(2*time.Second))
+				}
+				if fault == "complete" {
+					tr = advance(tr, start.Add(3*time.Second))
+					tr = advance(tr, start.Add(4*time.Second))
+				}
+				raw, err := tr.Bytes()
+				if err != nil {
+					t.Fatal(err)
+				}
+				changed, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				changed.Data["transition.json"] = string(raw)
+				changed, err = store.ConfigMaps.Update(ctx, changed, metav1.UpdateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				fresh := cfg
+				fresh.privateKeyFile = filepath.Join(t.TempDir(), "key")
+				called := false
+				if got, err := executeReceivePhase(ctx, api, store, scope, fresh, root, "container-incarnation", func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string) error {
+					called = true
+					return nil
+				}); err == nil || called || len(got) != 0 {
+					t.Fatal("invalid round reached native work")
+				}
+				changed.Data = before.DeepCopy().Data
+				if _, err := store.ConfigMaps.Update(ctx, changed, metav1.UpdateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
+
 	})
 	for _, fault := range []string{"mesh", "namespace", "machine", "cluster", "local-key", "node-name", "boot", "not-ready"} {
 		t.Run(fault, func(t *testing.T) {

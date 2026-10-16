@@ -155,6 +155,22 @@ state and boot changes require explicit recovery; they must not fall back to
 legacy forwarding. The checkpoint component is not yet connected to normal
 reconciliation or a native phase executor.
 
+The agent execution boundary holds the reconciliation lock through checkpoint
+admission, a platform phase callback, live identity revalidation and receipt
+construction. It rejects completed, future or expired rounds before invoking
+the callback and does not start drain verification before the committed drain
+deadline. Native work receives the round's expiry as a context deadline. Failed
+work, cancellation, changed journal revisions or changed identities suppress
+all local receipts. The observation time is captured when native verification
+returns; API revalidation cannot refresh its age. Receipts contain no bearer
+credential and still require authenticated transport and controller validation.
+
+The phase callback must independently apply and verify every local member's
+native state. The execution boundary does not implement that backend, enable
+handover in normal reconciliation, or undo native work when intent changes.
+All native writers must honor the lock and durable phase state before this
+boundary can be used for coordinated switching.
+
 ## Platform implementation boundaries
 
 The shared protocol owns generation identity, phase validation, peer graph

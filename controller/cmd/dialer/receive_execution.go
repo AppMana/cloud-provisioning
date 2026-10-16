@@ -1,0 +1,113 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"k8s.io/client-go/kubernetes"
+)
+
+// receiveNativePhase must apply the exact committed direction and independently
+// read back every local member's devices, routes and phase conditions. Returning
+// nil asserts that native verification completed; merely accepting configuration
+// is insufficient. Platform implementations must reject unsupported phases.
+type receiveNativePhase func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string) error
+
+// executeReceivePhase holds the existing host lock from recovery admission to
+// native verification and receipt construction. It is an execution boundary,
+// not a native backend or receipt transport. Callers must not call it while
+// already holding the same lock. Normal reconciliation is not wired here yet.
+//
+// A changed journal after native work suppresses receipts; it does not undo
+// that work or infer rollback. The next pass must admit the newer committed
+// history. Every other writer must honor the same lock and durable phase state.
+func executeReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase) ([]handover.PodReceipt, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if native == nil || containerID == "" || scope.MachineUID == "" || store.Name != tunnel.ReceiveTransitionName(scope.MachineUID) {
+		return nil, fmt.Errorf("phase execution requires native verification and admitted identities")
+	}
+	lock, err := lockReconciliation(cfg)
+	if err != nil {
+		return nil, err
+	}
+	defer lock.Close()
+	admitted, err := checkpointReceiveJournalLocked(ctx, api, store, scope, cfg, key, lock.Name()+"."+store.Name+".json")
+	if err != nil {
+		return nil, err
+	}
+	view, err := executableReceiveRound(admitted.Snapshot, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if view.Round.Phase == handover.Drain && (view.DrainUntil.IsZero() || time.Now().Before(view.DrainUntil)) {
+		return nil, fmt.Errorf("native drain verification cannot start before committed drain deadline")
+	}
+	phaseCtx, cancel := context.WithDeadline(ctx, view.Round.ExpiresAt)
+	defer cancel()
+	if err := native(phaseCtx, admitted.Plan, view, admitted.NodeUID); err != nil {
+		return nil, err
+	}
+	observed := time.Now()
+	if err := phaseCtx.Err(); err != nil {
+		return nil, err
+	}
+	// Re-read live object identities and the exact journal revision. Native
+	// execution can outlast a phase, deletion, replacement or boot transition.
+	current, err := loadReceiveJournal(phaseCtx, api, store, scope, cfg.nodeName, key)
+	if err != nil {
+		return nil, err
+	}
+	before, after := admitted.Snapshot.Metadata(), current.Snapshot.Metadata()
+	if before.UID != after.UID || before.ResourceVersion != after.ResourceVersion || admitted.NodeUID != current.NodeUID || admitted.BootID != current.BootID {
+		return nil, fmt.Errorf("handover changed during native phase execution")
+	}
+	if err := phaseCtx.Err(); err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	view, err = executableReceiveRound(current.Snapshot, now)
+	if err != nil {
+		return nil, err
+	}
+	if now.Sub(observed) > view.Round.MaxReceiptAge {
+		return nil, fmt.Errorf("native observation aged out during identity revalidation")
+	}
+	if view.Round.Phase == handover.Drain && (view.DrainUntil.IsZero() || observed.Before(view.DrainUntil)) {
+		return nil, fmt.Errorf("native drain verification precedes committed drain deadline")
+	}
+	digest, err := view.Round.Digest()
+	if err != nil {
+		return nil, err
+	}
+	var receipts []handover.PodReceipt
+	for _, member := range view.Round.Members {
+		if member.NodeUID != current.NodeUID {
+			continue
+		}
+		receipts = append(receipts, handover.PodReceipt{BootID: current.BootID, Receipt: handover.Receipt{AgentContainerID: containerID, RoundHash: digest, NodeUID: member.NodeUID, DeviceID: member.DeviceID, FromKey: member.FromKey, ToKey: member.ToKey, FromPeerKey: member.FromPeerKey, ToPeerKey: member.ToPeerKey, ObservedAt: observed}})
+	}
+	if len(receipts) == 0 {
+		return nil, fmt.Errorf("native phase has no local members")
+	}
+	return receipts, nil
+}
+
+func executableReceiveRound(snapshot handover.Snapshot, now time.Time) (handover.View, error) {
+	view, err := snapshot.Transition().View()
+	if err != nil {
+		return handover.View{}, err
+	}
+	if view.Complete || now.Before(view.Round.IssuedAt) || !now.Before(view.Round.ExpiresAt) {
+		return handover.View{}, fmt.Errorf("handover round is complete, not yet valid or expired")
+	}
+	return view, nil
+}

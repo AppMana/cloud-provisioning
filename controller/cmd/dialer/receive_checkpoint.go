@@ -89,7 +89,12 @@ func checkpointReceiveJournal(ctx context.Context, api kubernetes.Interface, sto
 		return fail(err)
 	}
 	defer lock.Close()
-	path := lock.Name() + "." + store.Name + ".json"
+	return checkpointReceiveJournalLocked(ctx, api, store, scope, cfg, key, lock.Name()+"."+store.Name+".json")
+}
+
+// Caller holds the native reconciliation lock through any subsequent action.
+func checkpointReceiveJournalLocked(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, path string) (admittedReceiveJournal, error) {
+	fail := func(err error) (admittedReceiveJournal, error) { return admittedReceiveJournal{}, err }
 	previous, readErr := readReceiveJournalCheckpoint(path, store, scope, cfg.nodeName, key)
 	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
 		return fail(readErr)

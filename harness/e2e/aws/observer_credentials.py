@@ -46,7 +46,7 @@ def renewal(state, runner, cluster_uid, call=command):
     if not inner or inner == outer:
         raise ValueError('shared Docker daemon rejected')
     prefix = ['docker', 'exec', '-i', runner, 'docker', 'exec', '-i', 'clab-cldt-bastion',
-              'kubectl', '--server=https://10.101.0.1:6443', '--request-timeout=30s']
+              'kubectl', '--request-timeout=30s']
 
     def kube(*args, body=None):
         raw = call(prefix + list(args), body)

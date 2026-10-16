@@ -23,6 +23,8 @@ class FakeCommands:
 
     def __call__(self, argv, body=None):
         self.calls.append(argv)
+        if 'kubectl' in argv:
+            assert not any(arg.startswith('--server') for arg in argv), 'use the selected lab kubeconfig endpoint'
         if argv[:2] == ['docker', 'inspect']:
             return json.dumps([{'HostConfig': {'NetworkMode': 'host' if self.mode == 'host-network' else 'bridge',
                                              'PidMode': ''}, 'Mounts': []}])

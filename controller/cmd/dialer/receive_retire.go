@@ -79,11 +79,7 @@ func withdrawLegacyReceivePeer(devices receiverDevices, iface, publicKey, peerKe
 		return err
 	}
 	for _, route := range routes {
-		usesLegacy := route.LinkIndex == link.Attrs().Index
-		for _, hop := range route.MultiPath {
-			usesLegacy = usesLegacy || hop.LinkIndex == link.Attrs().Index
-		}
-		if !usesLegacy {
+		if !receiveRouteUsesLink(route, link.Attrs().Index) {
 			continue
 		}
 		if route.Dst == nil {

@@ -238,6 +238,17 @@ including default and multipath routes. It does not remove those routes itself.
 This component also remains disconnected from normal reconciliation: a fenced
 executor must verify replacement routing and committed drain receipts, and
 persist retirement so the ordinary publisher cannot recreate the old peer.
+
+Dedicated receiver retirement verifies the interface alias, local and peer keys,
+and exact receive permissions before removing its peer and device. Any address,
+additional peer, or route dependency blocks removal. The sole route exception is
+Linux's automatic local-table IPv6 multicast route for that device; manually
+configured multicast routes still block deletion. Retries tolerate an already
+removed peer or absent interface, but reject a different device reusing the name.
+The caller must authorize abort or reverse drain, hold the reconciliation lock,
+and verify replacement forwarding. This component is not yet called by normal
+reconciliation.
+
 Linux reconciliation serializes recovery reads, forwarding changes, receipts
 and BGP updates using a per-interface kernel file lock on the existing shared
 identity mount. Shutdown cleanup takes the same lock. The bootstrap claim still

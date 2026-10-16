@@ -34,6 +34,18 @@ class PrepareK0s(unittest.TestCase):
         self.assertEqual(target.stat().st_mode & 0o777, 0o755)
         self.assertTrue(all(args[0] == 'systemctl' or args[1:] == ['version'] for args in self.calls))
 
+    def test_patched_build_requires_exact_native_version_and_digest(self):
+        self.version = 'v1.36.4+k0s.1.stream.4'
+        result = prepare(self.artifact, self.sha, self.version, self.root, self.execute)
+        self.assertEqual(result['version'], self.version)
+        self.assertEqual(result['sha256'], self.sha)
+
+    def test_invalid_build_suffix_is_rejected_before_execution(self):
+        for suffix in ['.', '.bad/suffix', ".bad'", '.bad\n', '.bad_suffix']:
+            with self.subTest(suffix=suffix), self.assertRaisesRegex(ValueError, 'exact k0s release'):
+                prepare(self.artifact, self.sha, 'v1.36.4+k0s.1'+suffix, self.root, self.execute)
+        self.assertEqual(self.calls, [])
+
     def test_checksum_and_native_version_must_match_before_installation(self):
         with self.assertRaisesRegex(ValueError, 'checksum'):
             prepare(self.artifact, '0'*64, self.version, self.root, self.execute)

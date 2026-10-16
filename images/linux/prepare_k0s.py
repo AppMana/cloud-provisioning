@@ -18,7 +18,7 @@ import tempfile
 def prepare(artifact, sha256, version, root=pathlib.Path('/'), run=subprocess.run):
     if not re.fullmatch('[a-f0-9]{64}', sha256):
         raise ValueError('Require the artifact SHA256')
-    if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+\+k0s\.[0-9]+', version):
+    if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+\+k0s\.[0-9]+(?:\.[0-9A-Za-z-]+)*', version):
         raise ValueError('Require an exact k0s release')
     for directory in ['etc/k0s', 'var/lib/k0s']:
         path = root/directory

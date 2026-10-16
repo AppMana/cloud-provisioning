@@ -113,6 +113,9 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := tunnel.ReserveReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, mesh, plan.MachineUID, store.OwnerReferences); err != nil {
+		t.Fatal(err)
+	}
 	snapshot, err := store.CreateWithPlan(ctx, transition, raw)
 	if err != nil {
 		t.Fatal(err)
@@ -164,6 +167,9 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 			t.Fatal("read-only admission changed journal")
 		}
 	}
+	t.Run("complete-set-admission", func(t *testing.T) {
+		verifyReceiveSetAdmission(t, api, store, scope, mesh, plan, site)
+	})
 	t.Run("durable-recovery", func(t *testing.T) {
 		cfg := config{iface: "wgtest", nodeName: "cloud", privateKeyFile: filepath.Join(t.TempDir(), "key")}
 		path := filepath.Join(filepath.Dir(cfg.privateKeyFile), cfg.iface+".reconcile.lock."+store.Name+".json")
@@ -292,7 +298,7 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 	t.Run("phase-execution-boundary", func(t *testing.T) {
 		cfg := config{iface: "wgphase", nodeName: "cloud", privateKeyFile: filepath.Join(t.TempDir(), "key")}
 		calls := 0
-		verify := func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, uid string) error {
+		verify := func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, uid string, routes tunnel.ReceiveJournalRoutes) error {
 			calls++
 			if uid != string(nodes["cloud"].UID) || plan.MachineUID != scope.MachineUID || view.Round.Phase != handover.Switch {
 				t.Fatal("wrong phase or participant passed to native verifier")
@@ -326,7 +332,7 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 			t.Run(fault, func(t *testing.T) {
 				runCtx, cancel := context.WithCancel(ctx)
 				defer cancel()
-				native := func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string) error {
+				native := func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string, tunnel.ReceiveJournalRoutes) error {
 					switch fault {
 					case "native-error":
 						return fmt.Errorf("native readback failed")
@@ -375,8 +381,16 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 		// Delay the final API revalidation past the observation's receipt age.
 		// The returned timestamp must not relabel old native work as fresh.
 		slow := store
-		slow.ConfigMaps = &changingJournalReader{ConfigMapInterface: store.ConfigMaps, reads: -2, change: func() error { time.Sleep(11 * time.Second); return nil }}
-		if got, err := executeReceivePhase(ctx, api, slow, scope, cfg, root, "container-incarnation", verify); err == nil || !strings.Contains(err.Error(), "aged out") || len(got) != 0 {
+		slowReader := &changingJournalReader{ConfigMapInterface: store.ConfigMaps, reads: -1000, change: func() error { time.Sleep(11 * time.Second); return nil }}
+		slow.ConfigMaps = slowReader
+		slowVerify := func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, uid string, routes tunnel.ReceiveJournalRoutes) error {
+			if err := verify(ctx, plan, view, uid, routes); err != nil {
+				return err
+			}
+			slowReader.reads = 1
+			return nil
+		}
+		if got, err := executeReceivePhase(ctx, api, slow, scope, cfg, root, "container-incarnation", slowVerify); err == nil || !strings.Contains(err.Error(), "aged out") || len(got) != 0 {
 			t.Fatalf("aged native observation produced receipts: %v", err)
 		}
 		before, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
@@ -444,7 +458,7 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 				fresh := cfg
 				fresh.privateKeyFile = filepath.Join(t.TempDir(), "key")
 				called := false
-				if got, err := executeReceivePhase(ctx, api, store, scope, fresh, root, "container-incarnation", func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string) error {
+				if got, err := executeReceivePhase(ctx, api, store, scope, fresh, root, "container-incarnation", func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string, tunnel.ReceiveJournalRoutes) error {
 					called = true
 					return nil
 				}); err == nil || called || len(got) != 0 {

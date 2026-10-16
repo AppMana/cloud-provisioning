@@ -14,8 +14,10 @@ import (
 // receiveNativePhase must apply the exact committed direction and independently
 // read back every local member's devices, routes and phase conditions. Returning
 // nil asserts that native verification completed; merely accepting configuration
-// is insufficient. Platform implementations must reject unsupported phases.
-type receiveNativePhase func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string) error
+// is insufficient. The combined route intent includes other workers and must
+// preserve their selection; only the target plan authorizes phase-specific
+// preparation or retirement. Platform implementations must reject unsupported phases.
+type receiveNativePhase func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string, tunnel.ReceiveJournalRoutes) error
 
 // executeReceivePhase holds the existing host lock from recovery admission to
 // native verification and receipt construction. It is an execution boundary,
@@ -37,10 +39,14 @@ func executeReceivePhase(ctx context.Context, api kubernetes.Interface, store ha
 		return nil, err
 	}
 	defer lock.Close()
-	admitted, err := checkpointReceiveJournalLocked(ctx, api, store, scope, cfg, key, lock.Name()+"."+store.Name+".json")
+	set, err := loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
 	if err != nil {
 		return nil, err
 	}
+	if err := checkpointReceiveSetLocked(ctx, api, store, scope, cfg, key, lock.Name(), set); err != nil {
+		return nil, err
+	}
+	admitted := set.Local[scope.MachineUID]
 	view, err := executableReceiveRound(admitted.Snapshot, time.Now())
 	if err != nil {
 		return nil, err
@@ -51,9 +57,37 @@ func executeReceivePhase(ctx context.Context, api kubernetes.Interface, store ha
 	if view.Round.Phase == handover.Drain && (view.DrainUntil.IsZero() || time.Now().Before(view.DrainUntil)) {
 		return nil, fmt.Errorf("native drain verification cannot start before committed drain deadline")
 	}
-	phaseCtx, cancel := context.WithDeadline(ctx, view.Round.ExpiresAt)
+	deadline := view.Round.ExpiresAt
+	for _, member := range set.Local {
+		other, err := member.Snapshot.Transition().View()
+		if err != nil {
+			return nil, err
+		}
+		// Reapplying combined routes can affect another local worker. Its
+		// unfinished intent cannot authorize new native work after expiry.
+		if other.Complete {
+			continue
+		}
+		if time.Now().Before(other.Round.IssuedAt) || !time.Now().Before(other.Round.ExpiresAt) {
+			return nil, fmt.Errorf("another local handover round is not currently executable")
+		}
+		if other.Round.ExpiresAt.Before(deadline) {
+			deadline = other.Round.ExpiresAt
+		}
+	}
+	phaseCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
-	if err := native(phaseCtx, admitted.Plan, view, admitted.NodeUID); err != nil {
+	beforeNative, err := loadReceiveSet(phaseCtx, api, store, scope, cfg.nodeName, key)
+	if err != nil {
+		return nil, err
+	}
+	if !sameReceiveSet(set, beforeNative) {
+		return nil, fmt.Errorf("handover set changed before native phase execution")
+	}
+	if err := phaseCtx.Err(); err != nil {
+		return nil, err
+	}
+	if err := native(phaseCtx, admitted.Plan, view, admitted.NodeUID, set.Routes); err != nil {
 		return nil, err
 	}
 	observed := time.Now()
@@ -62,14 +96,14 @@ func executeReceivePhase(ctx context.Context, api kubernetes.Interface, store ha
 	}
 	// Re-read live object identities and the exact journal revision. Native
 	// execution can outlast a phase, deletion, replacement or boot transition.
-	current, err := loadReceiveJournal(phaseCtx, api, store, scope, cfg.nodeName, key)
+	afterNative, err := loadReceiveSet(phaseCtx, api, store, scope, cfg.nodeName, key)
 	if err != nil {
 		return nil, err
 	}
-	before, after := admitted.Snapshot.Metadata(), current.Snapshot.Metadata()
-	if before.UID != after.UID || before.ResourceVersion != after.ResourceVersion || admitted.NodeUID != current.NodeUID || admitted.BootID != current.BootID {
+	if !sameReceiveSet(set, afterNative) {
 		return nil, fmt.Errorf("handover changed during native phase execution")
 	}
+	current := afterNative.Local[scope.MachineUID]
 	if err := phaseCtx.Err(); err != nil {
 		return nil, err
 	}

@@ -144,9 +144,21 @@ references; ordinary reconciliation does not perform that cleanup.
 
 Agents receive named get-only access to the inventory and its journals. Helm
 upgrades preserve those grants without granting ConfigMap write or list access.
-Agent discovery must still bind the inventory incarnation, load every reserved
-journal, and revalidate the inventory revision before executing combined route
-intent. This complete-set admission is not yet connected to the agent loop;
+The agent phase boundary loads every reserved journal, validates the combined
+route graph, and admits the local participants against live identities. It
+rechecks every journal and the inventory revision before native execution and
+after native verification. Missing entries or changed revisions reject the
+whole observation. Native execution receives the combined route intent while
+only the target journal authorizes phase-specific preparation or retirement.
+Unfinished local rounds must all be current, and the earliest expiry bounds
+combined native work. Completed journals retain their serving intent.
+
+Before native work, the boundary durably records the inventory incarnation,
+membership and local identity, together with every locally relevant journal.
+Inventory shrinkage, replacement, corrupt checkpoints and omitted local journal
+checkpoints block execution. Recovery cannot silently discard another worker
+by accepting a shorter list. This admission is connected to the phase execution
+boundary, but normal-loop dispatch and the native phase backend remain pending;
 reservations and read access alone do not authorize a phase.
 
 Controller recovery and agent admission share a strict journal decoder. It

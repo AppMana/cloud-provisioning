@@ -183,8 +183,16 @@ not qualify this product change. See [API egress qualification](../../docs/k0s-w
 
 ## Konnectivity lease discovery
 
-`konnectivity-leases.patch` applies to `v1.36.4+k0s.1` after
-`native-linux-egress.patch`. It adapts the lease-discovery change proposed by
+`konnectivity-discovery-preparation.patch` applies to `v1.36.4+k0s.1` after
+`native-linux-egress.patch`. It enables `--sync-forever=true` on both agent
+variants without changing server headers, lease mode, or existing membership
+handling. Build a distinct preparation release and let the elected k0s
+controller reconcile its agent manifests. Install that release on every
+controller so a leadership change cannot restore the old agent template.
+Verify every agent's effective arguments and readiness, then exercise leader
+changes and rollback before proceeding.
+
+`konnectivity-leases.patch` applies after the preparation patch. It adapts the lease-discovery change proposed by
 [fooxlj07 in upstream PR #7438](https://github.com/k0sproject/k0s/pull/7438)
 (head `3129898a57cedc4867d60ec80119a1868d8b686b`, closed without merging).
 The relevant controller-count failure is described in
@@ -201,6 +209,11 @@ and grants the agent ServiceAccount read-only lease access in `kube-system`.
 The embedded Konnectivity v0.36.0 supports these flags.
 
 ```sh
+# Preparation release (with the existing native egress patch applied):
+git -C <k0s-checkout> apply --check <absolute-path>/konnectivity-discovery-preparation.patch
+git -C <k0s-checkout> apply <absolute-path>/konnectivity-discovery-preparation.patch
+
+# Lease-mode release, only after the preparation rollout has been qualified:
 git -C <k0s-checkout> apply --check <absolute-path>/konnectivity-leases.patch
 git -C <k0s-checkout> apply <absolute-path>/konnectivity-leases.patch
 cd <k0s-checkout>

@@ -1,0 +1,34 @@
+diff --git a/pkg/component/controller/konnectivity_egress_test.go b/pkg/component/controller/konnectivity_egress_test.go
+--- a/pkg/component/controller/konnectivity_egress_test.go
++++ b/pkg/component/controller/konnectivity_egress_test.go
+@@ -31,6 +31,7 @@
+ 			for _, obj := range objects {
+ 				if ds, ok := obj.Object.(*appsv1.DaemonSet); ok {
+ 					sets[ds.Name] = ds
++					require.Contains(t, ds.Spec.Template.Spec.Containers[0].Args, "--sync-forever=true")
+ 				}
+ 			}
+ 			native := sets["konnectivity-agent"]
+diff --git a/pkg/component/controller/konnectivityagent.go b/pkg/component/controller/konnectivityagent.go
+--- a/pkg/component/controller/konnectivityagent.go
++++ b/pkg/component/controller/konnectivityagent.go
+@@ -316,6 +316,7 @@
+             - --service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token
+             - --agent-identifiers={{ .Identifiers }}
+             - --agent-id={{ .AgentID }}
++            - --sync-forever=true
+             {{- if .DefaultRoute }}
+             - --health-server-port={{ .HealthPort }}
+             - --admin-server-port=18096
+diff --git a/pkg/component/controller/konnectivityagent_test.go b/pkg/component/controller/konnectivityagent_test.go
+--- a/pkg/component/controller/konnectivityagent_test.go
++++ b/pkg/component/controller/konnectivityagent_test.go
+@@ -69,7 +69,7 @@
+ 				containers := daemonSet.Spec.Template.Spec.Containers
+ 				require.Len(t, containers, 1)
+ 				args := containers[0].Args
+-				require.Len(t, args, 7)
++				require.Len(t, args, 8)
+ 				assert.Equal(t, "--proxy-server-host="+expectedHost, args[2])
+ 				assert.Equal(t, "--proxy-server-port="+expectedPort, args[3])
+ 			})

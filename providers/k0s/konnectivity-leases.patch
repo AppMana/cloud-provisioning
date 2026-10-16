@@ -170,7 +170,7 @@ diff --git a/pkg/component/controller/konnectivity_egress_test.go b/pkg/componen
  			objects, err := resource.NewLocalBuilder().WithScheme(scheme.Scheme, corev1.SchemeGroupVersion, appsv1.SchemeGroupVersion, rbacv1.SchemeGroupVersion).Path(true, dir).Flatten().Do().Infos()
  			require.NoError(t, err)
  			sets := map[string]*appsv1.DaemonSet{}
-@@ -60,7 +60,7 @@
+@@ -61,7 +61,7 @@
  
  func TestKonnectivityRejectsUnmatchedWindowsFallback(t *testing.T) {
  	server := Konnectivity{Spec: v1beta1.DefaultKonnectivitySpec(), K0sVars: &config.CfgVars{}}
@@ -358,15 +358,14 @@ diff --git a/pkg/component/controller/konnectivityagent.go b/pkg/component/contr
                - name: NODE_IP
                  valueFrom:
                    fieldRef:
-@@ -316,6 +321,8 @@
+@@ -316,6 +321,7 @@
              - --service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token
              - --agent-identifiers={{ .Identifiers }}
              - --agent-id={{ .AgentID }}
 +            - --count-server-leases=true
-+            - --sync-forever=true
+             - --sync-forever=true
              {{- if .DefaultRoute }}
              - --health-server-port={{ .HealthPort }}
-             - --admin-server-port=18096
 diff --git a/pkg/component/controller/konnectivityagent_test.go b/pkg/component/controller/konnectivityagent_test.go
 --- a/pkg/component/controller/konnectivityagent_test.go
 +++ b/pkg/component/controller/konnectivityagent_test.go
@@ -381,7 +380,7 @@ diff --git a/pkg/component/controller/konnectivityagent_test.go b/pkg/component/
  				containers := daemonSet.Spec.Template.Spec.Containers
  				require.Len(t, containers, 1)
  				args := containers[0].Args
--				require.Len(t, args, 7)
+-				require.Len(t, args, 8)
 +				require.Len(t, args, 9)
  				assert.Equal(t, "--proxy-server-host="+expectedHost, args[2])
  				assert.Equal(t, "--proxy-server-port="+expectedPort, args[3])

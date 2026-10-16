@@ -8,6 +8,11 @@ results do not qualify changed binaries or a different cloud CNI.
 - The Linux dialer rejects a non-WireGuard interface before changing its
   addresses or MTU, and refuses to delete it during retirement. It validates
   the entire requested address list before creating or changing a tunnel.
+- Tunnel policy setup checks both IP families before adding rules. Conflicting
+  marks, masks, selectors, actions, tables or priorities fail without replacing
+  foreign policy. Teardown matches the configured mark and lookup shape rather
+  than deleting every exemption at the shared priority. These ownership checks
+  do not qualify arbitrary higher-priority policy routing on a deployment site.
 - `acceptance matrix` refuses to create probes when required preconditions fail.
 - BGP preflight requires the documented site mesh and checks every additional
   peer for cloud exclusion. External router peers can retain the Linux-only

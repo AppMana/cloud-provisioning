@@ -35,7 +35,7 @@ func TestUnpublishedEndpointShutdownPreservesTransit(t *testing.T) {
 				t.Fatal(err)
 			}
 			cfg := config{iface: "retired-wg", routeTable: 517, fwmark: 517}
-			t.Cleanup(func() { removeRouteRule(cfg.routeTable) })
+			t.Cleanup(func() { removeRouteRule(cfg.routeTable, cfg.fwmark) })
 			if err := installSiteTransit(cfg, &tunnel.TransitSpec{Via: tc.relay, Hosts: []string{tc.remote}}, []string{addr.IP.String()}); err != nil {
 				t.Fatal(err)
 			}
@@ -49,7 +49,7 @@ func TestUnpublishedEndpointShutdownPreservesTransit(t *testing.T) {
 			check()
 			// Both a retired device and an already absent device occur when
 			// a transit-only dialer stops during a rolling update.
-			wg := &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: cfg.iface}}
+			wg := &netlink.GenericLink{LinkAttrs: netlink.LinkAttrs{Name: cfg.iface}, LinkType: "wireguard"}
 			if err := netlink.LinkAdd(wg); err != nil {
 				t.Fatal(err)
 			}
@@ -60,6 +60,16 @@ func TestUnpublishedEndpointShutdownPreservesTransit(t *testing.T) {
 			}
 			check()
 			retireUnpublishedEndpoint(cfg)
+			check()
+			foreign := &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: cfg.iface}}
+			if err := netlink.LinkAdd(foreign); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { netlink.LinkDel(foreign) })
+			retireUnpublishedEndpoint(cfg)
+			if live, err := netlink.LinkByName(cfg.iface); err != nil || live.Type() != "dummy" {
+				t.Fatalf("foreign interface changed: %v", err)
+			}
 			check()
 		})
 	}

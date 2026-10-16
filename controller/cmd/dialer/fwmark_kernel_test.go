@@ -87,7 +87,7 @@ func TestTheTunnelsOwnPacketsEscapeAForeignMarkClassifier(t *testing.T) {
 	if err := ensureRouteRule(table, fwmark); err != nil {
 		t.Fatalf("ensureRouteRule: %v", err)
 	}
-	defer removeRouteRule(table)
+	defer removeRouteRule(table, fwmark)
 
 	// The question the kernel answers, not the rule list this process
 	// believes it wrote: where does a packet carrying the tunnel's

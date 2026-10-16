@@ -2338,43 +2338,42 @@ const exemptRulePriority = 1
 // very addresses the tunnel dials: everything except the tunnel's
 // outers may ride the tunnel.
 func ensureRouteRule(table, fwmark int) error {
+	var pending []netlink.Rule
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
-		if fwmark > 0 {
-			exempt, err := netlink.RuleListFiltered(family, &netlink.Rule{Priority: exemptRulePriority}, netlink.RT_FILTER_PRIORITY)
-			if err != nil {
-				return fmt.Errorf("listing rules: %w", err)
-			}
-			ours := false
-			for i := range exempt {
-				if exempt[i].Mark == uint32(fwmark) {
-					ours = true
-					break
-				}
-			}
-			if !ours {
-				rule := netlink.NewRule()
-				rule.Family = family
-				rule.Table = unix.RT_TABLE_MAIN
-				rule.Priority = exemptRulePriority
-				rule.Mark = uint32(fwmark)
-				if err := netlink.RuleAdd(rule); err != nil && !os.IsExist(err) {
-					return fmt.Errorf("adding the mark exemption rule: %w", err)
-				}
-			}
+		if err := validateTunnelRuleActions(family, table, fwmark); err != nil {
+			return err
 		}
-		rules, err := netlink.RuleListFiltered(family, &netlink.Rule{Table: table}, netlink.RT_FILTER_TABLE)
+		rules, err := netlink.RuleList(family)
 		if err != nil {
-			return fmt.Errorf("listing rules: %w", err)
+			return err
 		}
-		if len(rules) > 0 {
-			continue
+		missing, err := planTunnelRules(rules, family, table, fwmark)
+		if err != nil {
+			return err
 		}
-		rule := netlink.NewRule()
-		rule.Family = family
-		rule.Table = table
-		rule.Priority = table
-		if err := netlink.RuleAdd(rule); err != nil && !os.IsExist(err) {
-			return fmt.Errorf("adding the rule for table %d: %w", table, err)
+		pending = append(pending, missing...)
+	}
+	// Check both families before adding anything. A conflicting foreign rule
+	// must not cause a partially installed policy on the other family.
+	for i := range pending {
+		if err := netlink.RuleAdd(&pending[i]); err != nil && !os.IsExist(err) {
+			return err
+		}
+	}
+	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
+		if err := validateTunnelRuleActions(family, table, fwmark); err != nil {
+			return err
+		}
+		rules, err := netlink.RuleList(family)
+		if err != nil {
+			return err
+		}
+		missing, err := planTunnelRules(rules, family, table, fwmark)
+		if err != nil {
+			return err
+		}
+		if len(missing) != 0 {
+			return fmt.Errorf("tunnel policy rules missing after installation")
 		}
 	}
 	return nil
@@ -2383,7 +2382,13 @@ func ensureRouteRule(table, fwmark int) error {
 // removeRouteRule is ensureRouteRule's teardown half, for the path that
 // removes the device: the table's routes die with the interface, and
 // the rule pointing at the empty table goes here.
-func removeRouteRule(table int) {
+func removeRouteRule(table, fwmark int) {
+	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
+		if err := validateTunnelRuleActions(family, table, fwmark); err != nil {
+			fmt.Fprintf(os.Stderr, "preserving ambiguous tunnel policy: %v\n", err)
+			return
+		}
+	}
 	if err := clearTunnelSourceRoutes(table); err != nil {
 		fmt.Fprintf(os.Stderr, "removing tunnel source routes: %v\n", err)
 	}
@@ -2393,19 +2398,21 @@ func removeRouteRule(table int) {
 			continue
 		}
 		for i := range rules {
+			if !matchesTunnelRule(rules[i], family, table, table, 0) {
+				continue
+			}
 			if err := netlink.RuleDel(&rules[i]); err != nil {
 				fmt.Fprintf(os.Stderr, "removing the rule for table %d: %v\n", table, err)
 			}
 		}
-		// The mark exemption goes with it: it exists only to serve the
-		// table's routes. Matched by carrying a mark at our priority;
-		// unmarked rules there belong to someone else.
+		// Remove only this tunnel's exact mark exemption. Other marks and
+		// constrained rules at the same priority belong to other policy owners.
 		exempt, err := netlink.RuleListFiltered(family, &netlink.Rule{Priority: exemptRulePriority}, netlink.RT_FILTER_PRIORITY)
 		if err != nil {
 			continue
 		}
 		for i := range exempt {
-			if exempt[i].Mark == 0 {
+			if fwmark <= 0 || !matchesTunnelRule(exempt[i], family, unix.RT_TABLE_MAIN, exemptRulePriority, uint32(fwmark)) {
 				continue
 			}
 			if err := netlink.RuleDel(&exempt[i]); err != nil {

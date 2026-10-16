@@ -44,7 +44,7 @@ func TestRetainedTunnelRoutesRespectPacketSource(t *testing.T) {
 				}
 			}
 			cfg := config{iface: wg.Attrs().Name, routeTable: 517, fwmark: 517}
-			t.Cleanup(func() { removeRouteRule(cfg.routeTable) })
+			t.Cleanup(func() { removeRouteRule(cfg.routeTable, cfg.fwmark) })
 			_, host, _ := net.ParseCIDR(tc.remote)
 			physical, _, _ := net.ParseCIDR(tc.physical)
 			tunnelAddr, _, _ := net.ParseCIDR(tc.tunnel)

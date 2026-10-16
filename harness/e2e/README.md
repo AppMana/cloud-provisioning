@@ -118,8 +118,10 @@ upstream `v1beta1.ClusterImages` type. The CLI accepts the same native object's
 JSON via `--k0s-images` and `--k0s-images-sha256`. No parallel image schema is
 introduced. Calico CNI/node/controllers and kube-proxy must have explicit
 SHA256 pins in their native `ImageSpec.Version` (`tag@sha256:...`), and
-`DefaultPullPolicy` must be `Never`. Prepare and preload the aligned images;
-the fixture does not infer fork provenance or compatibility from a tag.
+`DefaultPullPolicy` must explicitly select `Always`, `IfNotPresent`, or `Never`
+to match the deployment being tested. Preload the aligned images for `Never`;
+provide registry access for policies that permit pulls. The fixture preserves
+the selected policy and does not infer fork provenance or compatibility from a tag.
 Both native Windows image groups are also required with pinned CNI/node,
 kube-proxy and pause images: k0s can enable Windows manifests dynamically when
 a Windows worker joins, so leaving those fields unset would permit implicit

@@ -55,8 +55,10 @@ func ValidateImages(network string, images *native.ClusterImages) error {
 	if !calico {
 		return nil
 	}
-	if images.DefaultPullPolicy != "Never" {
-		return fmt.Errorf("k0s Calico profiles require images.default_pull_policy=Never and preloaded images")
+	switch images.DefaultPullPolicy {
+	case "Always", "IfNotPresent", "Never":
+	default:
+		return fmt.Errorf("k0s Calico profiles require an explicit native image pull policy: Always, IfNotPresent, or Never")
 	}
 	if images.Calico == nil {
 		return fmt.Errorf("explicit Calico images are required")

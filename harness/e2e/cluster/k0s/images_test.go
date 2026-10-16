@@ -37,7 +37,7 @@ func TestCalicoImagePinsAreRequiredBeforeGuestMutation(t *testing.T) {
 	}{
 		{"missing node", func(i *native.ClusterImages) { i.Calico.Node = nil }},
 		{"tag only", func(i *native.ClusterImages) { i.Calico.CNI.Version = "latest" }},
-		{"pull enabled", func(i *native.ClusterImages) { i.DefaultPullPolicy = "IfNotPresent" }},
+		{"invalid pull policy", func(i *native.ClusterImages) { i.DefaultPullPolicy = "Sometimes" }},
 		{"partial Windows", func(i *native.ClusterImages) { i.Calico.Windows = &native.CalicoWindowsImageSpec{} }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -51,25 +51,30 @@ func TestCalicoImagePinsAreRequiredBeforeGuestMutation(t *testing.T) {
 }
 
 func TestNativeImageSettingsSurviveConfigWithoutMutation(t *testing.T) {
-	images := pinnedTestImages()
-	images.CoreDNS = &native.ImageSpec{Image: "example.invalid/dns", Version: "explicit"}
-	before := images.DeepCopy()
-	node := &configNode{}
-	d := cluster.Deps{Topology: lab.Default(), Rig: configRig{node: node}, Network: "calico", K0sImages: images}
-	if err := (Builder{}).config(context.Background(), d, d.Topology.MustNode("cp")); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(images, before) {
-		t.Fatal("mutated native caller settings")
-	}
-	var decoded struct {
-		Spec struct{ Images *native.ClusterImages }
-	}
-	if err := yaml.Unmarshal(node.config, &decoded); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(decoded.Spec.Images, images) {
-		t.Fatalf("native images changed: %+v", decoded.Spec.Images)
+	for _, policy := range []string{"Always", "IfNotPresent", "Never"} {
+		t.Run(policy, func(t *testing.T) {
+			images := pinnedTestImages()
+			images.DefaultPullPolicy = policy
+			images.CoreDNS = &native.ImageSpec{Image: "example.invalid/dns", Version: "explicit"}
+			before := images.DeepCopy()
+			node := &configNode{}
+			d := cluster.Deps{Topology: lab.Default(), Rig: configRig{node: node}, Network: "calico", K0sImages: images}
+			if err := (Builder{}).config(context.Background(), d, d.Topology.MustNode("cp")); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(images, before) {
+				t.Fatal("mutated native caller settings")
+			}
+			var decoded struct {
+				Spec struct{ Images *native.ClusterImages }
+			}
+			if err := yaml.Unmarshal(node.config, &decoded); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(decoded.Spec.Images, images) {
+				t.Fatalf("native images changed: %+v", decoded.Spec.Images)
+			}
+		})
 	}
 }
 

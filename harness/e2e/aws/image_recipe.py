@@ -4,6 +4,18 @@ import re
 import copy
 
 
+def cni_evidence(evidence, recipe, year):
+    """Match native AWS CNI image readback to the requested artifact recipe."""
+    if (not isinstance(evidence, dict) or evidence.get('schemaVersion') != 1
+            or evidence.get('windowsBuild') != {'2022': 20348, '2025': 26100}[year]
+            or evidence.get('kubeconfigPath') != r'C:\var\lib\k0s\kubelet.conf'
+            or any(not re.fullmatch('[a-f0-9]{64}', str(recipe.get(key, '')))
+                   or evidence.get(key) != recipe[key]
+                   for key in ['archiveSHA256', 'pluginSHA256', 'connectorSHA256'])):
+        raise ValueError('AWS CNI image verification differs from the requested recipe')
+    return evidence
+
+
 def worker_artifact(path, sha256, version):
     if path is None and sha256 is None and version is None:
         return {}

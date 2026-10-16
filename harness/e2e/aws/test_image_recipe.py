@@ -57,5 +57,23 @@ class GPUReceipt(unittest.TestCase):
                 gpu_base_identity(actual_builder,actual_base,sha,worker)
 
 
+class CNIReceipt(unittest.TestCase):
+    def test_capture_requires_matching_native_os_paths_and_artifacts(self):
+        recipe = dict(archiveSHA256='a'*64, pluginSHA256='b'*64, connectorSHA256='c'*64)
+        evidence = dict(recipe, schemaVersion=1, windowsBuild=26100,
+                        kubeconfigPath=r'C:\var\lib\k0s\kubelet.conf')
+        self.assertEqual(image_recipe.cni_evidence(evidence, recipe, '2025'), evidence)
+        for change in [dict(windowsBuild=20348), dict(schemaVersion=2),
+                       dict(kubeconfigPath=r'C:\k\config'), dict(archiveSHA256='d'*64),
+                       dict(pluginSHA256='d'*64), dict(connectorSHA256='d'*64)]:
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                image_recipe.cni_evidence(dict(evidence, **change), recipe, '2025')
+        for invalid in [None, {}, []]:
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                image_recipe.cni_evidence(invalid, recipe, '2025')
+        with self.assertRaises(ValueError):
+            image_recipe.cni_evidence(evidence, dict(recipe, pluginSHA256='bad'), '2025')
+
+
 if __name__ == '__main__':
     unittest.main()

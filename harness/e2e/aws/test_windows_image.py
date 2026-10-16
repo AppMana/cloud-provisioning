@@ -10,7 +10,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3]))
 SCRIPT=pathlib.Path(__file__).with_name('windows_image.py')
 
 class WindowsImageCapture(unittest.TestCase):
-    def run_capture(self, instance_state='stopped', owned=True, gpu=False, evidence=None, worker_sha='b'*64, cache=False, cache_permissions=True):
+    def run_capture(self, instance_state='stopped', owned=True, gpu=False, evidence=None, worker_sha='b'*64, cache=False, cache_permissions=True, cni=False, cni_verified=True):
         temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup)
         root=pathlib.Path(temp.name)
         state={'account':'123','region':'us-west-2','runID':'owned-run','vpcID':'vpc-owned',
@@ -30,6 +30,13 @@ class WindowsImageCapture(unittest.TestCase):
                 record['cacheRecipe']=make_recipe(runtime,snapshot['registeredImages'],year)
                 record['requestedCacheRecipe']=record['cacheRecipe']
                 record['cacheVerification']={'passed':True,'checks':{'dataDirectoryInheritsPermissions':cache_permissions}}
+        if cni:
+            for year,record in state['windowsImageBuilds'].items():
+                recipe=dict(archiveSHA256='d'*64,pluginSHA256='e'*64,connectorSHA256='f'*64)
+                record['cniRecipe']=recipe
+                record['requestedCNIRecipe']=recipe
+                if cni_verified:
+                    record['cniVerification']=dict(recipe,schemaVersion=1,windowsBuild={'2022':20348,'2025':26100}[year],kubeconfigPath=r'C:\var\lib\k0s\kubelet.conf')
         (root/'resources.json').write_text(json.dumps(state))
         aws=root/'aws'
         aws.write_text('''#!/usr/bin/env python3
@@ -63,6 +70,17 @@ else:sys.exit(2)
 
     def test_running_builder_is_not_captured(self):
         root,result=self.run_capture(instance_state='running')
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse((root/'creates.jsonl').exists())
+
+    def test_cni_layer_gets_distinct_capture_identity(self):
+        root,result=self.run_capture(cni=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        for line in (root/'creates.jsonl').read_text().splitlines():
+            self.assertTrue(json.loads(line)['Name'].endswith('-cni-'+('d'*12)))
+
+    def test_cni_capture_requires_native_verification(self):
+        root,result=self.run_capture(cni=True,cni_verified=False)
         self.assertNotEqual(result.returncode,0)
         self.assertFalse((root/'creates.jsonl').exists())
 

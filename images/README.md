@@ -405,6 +405,11 @@ Run `aws/windows/verify-cni.ps1 -Recipe <recipe>` before capture and preserve
 `C:\ProgramData\CloudProvisioning\aws-vpc-cni-image.json` in the image. The
 native `aws/windows/test-cni.ps1 -Archive <archive>` regression test requires
 an unjoined builder without this layer and leaves the verified layer installed.
+Pass `--cni-archive <archive>` to the existing Windows capture helper's `revise`
+and `prepare` phases to compose this layer. Preparation runs the product scripts
+and preserves the receipt; capture checks the native OS and artifact identities
+and includes the CNI archive hash in the AMI name. Subsequent revisions must
+explicitly retain the CNI archive.
 Image-layer verification does not prove networking: fresh workers still need
 node-specific CNI configuration, the scoped AWS Windows IPAM controller, and
 the [mixed-CNI lifecycle and traffic checks](../docs/hybrid-cni.md).

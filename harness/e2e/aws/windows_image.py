@@ -8,7 +8,7 @@ from image_policy import owned_image, retained_linux_arns
 import argparse,datetime,hashlib,json,os,pathlib,re,subprocess,sys,zipfile
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3]))
 from images.windows.cache import validate_recipe, verify_preparation
-from image_recipe import worker_artifact, same_recipe, gpu_evidence, gpu_base_identity, supersede_cache_revision
+from image_recipe import worker_artifact, same_recipe, gpu_evidence, gpu_base_identity, supersede_cache_revision, cni_evidence
 
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--work-dir',required=True,type=pathlib.Path)
@@ -21,6 +21,7 @@ p.add_argument('--worker',type=pathlib.Path,help='packaged k0s Windows executabl
 p.add_argument('--worker-sha256')
 p.add_argument('--worker-version')
 p.add_argument('--cache-recipe',type=pathlib.Path,help='verified recipe for an already unpacked Windows runtime cache')
+p.add_argument('--cni-archive',type=pathlib.Path,help='AWS Windows CNI archive matching the pinned product recipe')
 p.add_argument('--supersede-cache-sha256',help='explicitly replace this unprepared cache intent on a stopped builder; preserve its history')
 a=p.parse_args();os.umask(0o077)
 years=list(dict.fromkeys(a.windows_version or ['2022','2025']))
@@ -36,6 +37,11 @@ worker=worker_artifact(a.worker,a.worker_sha256,a.worker_version)
 if worker and a.phase not in ['revise','prepare']:raise RuntimeError('worker artifact applies only to revise/prepare')
 state_path=a.work_dir/'resources.json';s=json.loads(state_path.read_text())
 repo=pathlib.Path(__file__).resolve().parents[3]
+cni={}
+if a.cni_archive:
+ if a.phase not in ['revise','prepare']:raise RuntimeError('CNI archive applies only to revise/prepare')
+ cni=json.loads((repo/'images/aws/windows/cni-artifacts.json').read_text())
+ if hashlib.sha256(a.cni_archive.read_bytes()).hexdigest()!=cni['archiveSHA256']:raise RuntimeError('AWS CNI archive checksum mismatch')
 if s.get('cleanedUp'):raise RuntimeError('run is cleaned up')
 def save():state_path.write_text(json.dumps(s,indent=2)+'\n')
 def aws(service,operation,**inputs):
@@ -86,6 +92,10 @@ def node(year,*args,input=None):
 for year,id in ids.items():
  record=s.setdefault(builds_key,{}).setdefault(year,{})
  state=instances[id]['State']['Name']
+ if a.phase in ['revise','prepare'] and record.get('cniRecipe') and not cni:raise RuntimeError('Explicitly supply the existing CNI archive')
+ if a.phase in ['generalize','capture']:
+  if record.get('requestedCNIRecipe') and record.get('cniRecipe')!=record['requestedCNIRecipe']:raise RuntimeError('CNI revision must pass native preparation before capture')
+  if record.get('cniRecipe'):cni_evidence(record.get('cniVerification'),record['cniRecipe'],year)
  if a.phase=='revise':
   if not a.service or not a.service.is_file():raise RuntimeError('revision requires --service artifact')
   sha=hashlib.sha256(a.service.read_bytes()).hexdigest()
@@ -102,13 +112,13 @@ for year,id in ids.items():
    if image['State']!='available' or image['Public'] or image['OwnerId']!=s['account'] or {t['Key']:t['Value'] for t in image.get('Tags',[])}.get('cloud-provisioning-test')!=s['runID']:raise RuntimeError('previous capture must remain available, private and owned')
    record=replacement;s[builds_key][year]=record;save()
   if record.get('revisionRequestedAt') and not record.get('preparedAt'):
-   if record.get('requestedSHA256')!=sha or record.get('requestedWorker',{})!=worker or record.get('requestedCacheRecipe',{})!=cache:raise RuntimeError('another image revision is already in progress')
+   if record.get('requestedSHA256')!=sha or record.get('requestedWorker',{})!=worker or record.get('requestedCacheRecipe',{})!=cache or record.get('requestedCNIRecipe',{})!=cni:raise RuntimeError('another image revision is already in progress')
   else:
-   if state!='stopped' or not record.get('imageID') or (same_recipe(record,sha,worker) and record.get('cacheRecipe',{})==cache):raise RuntimeError('revision requires a stopped captured builder and a changed service, worker or cache recipe')
+   if state!='stopped' or not record.get('imageID') or (same_recipe(record,sha,worker) and record.get('cacheRecipe',{})==cache and record.get('cniRecipe',{})==cni):raise RuntimeError('revision requires a stopped captured builder and a changed service, worker, cache or CNI recipe')
    image=aws('ec2','describe-images',ImageIds=[record['imageID']])['Images'][0]
    if image['State']!='available' or image['Public'] or image['OwnerId']!=s['account'] or {t['Key']:t['Value'] for t in image.get('Tags',[])}.get('cloud-provisioning-test')!=s['runID']:raise RuntimeError('previous image must be available, private and owned before revision')
    s.setdefault(history_key,{}).setdefault(year,[]).append(dict(record,instanceID=id))
-   record={'revisionOf':record['imageID'],'workerSHA256':record.get('workerSHA256'),'requestedSHA256':sha,'requestedWorker':worker,'requestedCacheRecipe':cache,'revisionRequestedAt':datetime.datetime.now(datetime.timezone.utc).isoformat()}
+   record={'revisionOf':record['imageID'],'workerSHA256':record.get('workerSHA256'),'requestedSHA256':sha,'requestedWorker':worker,'requestedCacheRecipe':cache,'requestedCNIRecipe':cni,'revisionRequestedAt':datetime.datetime.now(datetime.timezone.utc).isoformat()}
    s[builds_key][year]=record;save()
   if state=='stopped':
    # The old diagnostic userdata must not rerun after EC2Launch's state reset.
@@ -142,7 +152,7 @@ for year,id in ids.items():
    base=s.get('windowsImageBuilds',{}).get(year,{})
    builder=s[builders_key][year]
    gpu_base_identity(builder,base,sha,worker)
-  if record.get('revisionRequestedAt') and (record.get('requestedSHA256')!=sha or record.get('requestedWorker',{})!=worker or record.get('requestedCacheRecipe',{})!=cache):raise RuntimeError('preparation artifacts differ from requested revision')
+  if record.get('revisionRequestedAt') and (record.get('requestedSHA256')!=sha or record.get('requestedWorker',{})!=worker or record.get('requestedCacheRecipe',{})!=cache or record.get('requestedCNIRecipe',{})!=cni):raise RuntimeError('preparation artifacts differ from requested revision')
   archive=a.work_dir/(artifact_name(year,'-image-stage.zip'));root=r'C:\ProgramData\CloudProvisioning'
   script=r'''$ErrorActionPreference='Stop'
 $r='C:\ProgramData\CloudProvisioning'
@@ -160,8 +170,10 @@ if ((Get-AuthenticodeSignature "$r\wireguard.dll").Status -ne 'Valid') { throw '
 if (@(Get-NetAdapter | Where-Object Name -Match '^cldt[0-9a-f]{8}$').Count) { throw 'Diagnostic adapter remains' }
 __VERIFY_GPU__
 __VERIFY_CACHE__
+__PREPARE_CNI__
 $keep=@('k0s.exe','wireguard.dll','wireguard-nt-LICENSE.txt','image-preparation.json','windows-tunnel.exe','tunnel-image.json','image-verification.json')
 __KEEP_GPU__
+__KEEP_CNI__
 # This is the run-owned application's diagnostic directory, never a user profile.
 # Preserve only image recipe assets; peer documents, archives and scripts go away.
 foreach ($entry in Get-ChildItem -LiteralPath $r -Force) {
@@ -172,6 +184,7 @@ foreach ($entry in Get-ChildItem -LiteralPath $r -Force) {
 }
 __RECORD_GPU__
 __RECORD_CACHE__
+__RECORD_CNI__
 $verified | Add-Member -NotePropertyName tunnelSHA256 -NotePropertyValue '__SHA__'
 $verified | Add-Member -NotePropertyName diagnosticStateRemoved -NotePropertyValue $true
 $verified | Add-Member -NotePropertyName awsToolsVersion -NotePropertyValue '5.0.268'
@@ -186,10 +199,17 @@ $verified | ConvertTo-Json -Compress
   script=script.replace('__RECORD_GPU__', '$verified | Add-Member -NotePropertyName gpu -NotePropertyValue $gpu' if a.variant=='gpu' else '')
   script=script.replace('__VERIFY_CACHE__', r'$cache=& "$r\image-stage\verify-cache.ps1" -Recipe "$r\image-stage\cache-recipe.json" | ConvertFrom-Json' if cache else '')
   script=script.replace('__RECORD_CACHE__', '$verified | Add-Member -NotePropertyName cache -NotePropertyValue $cache' if cache else '')
+  script=script.replace('__PREPARE_CNI__', r'''$null=& "$r\image-stage\prepare-cni.ps1" -Archive "$r\image-stage\EKS-Artifacts.zip" -Recipe "$r\image-stage\cni-artifacts.json"
+$cni=& "$r\image-stage\verify-cni.ps1" -Recipe "$r\image-stage\cni-artifacts.json" | ConvertFrom-Json''' if cni else "if (Test-Path (Join-Path $r 'aws-vpc-cni-image.json')) { throw 'Explicitly supply the existing CNI archive' }")
+  script=script.replace('__KEEP_CNI__', "$keep+='aws-vpc-cni-image.json'" if cni else '')
+  script=script.replace('__RECORD_CNI__', '$verified | Add-Member -NotePropertyName cni -NotePropertyValue $cni' if cni else '')
   script=script.replace('ConvertTo-Json', 'ConvertTo-Json -Depth 8')
   with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
    z.write(a.service,'windows-tunnel.exe');z.write(repo/'images/windows/prepare-tunnel.ps1','prepare-tunnel.ps1');z.write(repo/'images/windows/verify-k0s.ps1','verify-k0s.ps1');z.writestr('prepare.ps1',script)
    if a.variant=='gpu':z.write(repo/'images/windows/verify-nvidia.ps1','verify-nvidia.ps1')
+   if cni:
+    z.write(a.cni_archive,'EKS-Artifacts.zip')
+    for name in ['cni-artifacts.json','prepare-cni.ps1','verify-cni.ps1']:z.write(repo/'images/aws/windows'/name,name)
    if cache:
     z.writestr('cache-recipe.json',json.dumps(cache));z.write(repo/'images/windows/verify-cache.ps1','verify-cache.ps1');z.write(repo/'images/windows/inspect-cache.ps1','inspect-cache.ps1');z.write(repo/'images/windows/cache-runtime.ps1','cache-runtime.ps1')
    if worker:
@@ -197,6 +217,9 @@ $verified | ConvertTo-Json -Compress
   node(year,'-put',root+r'\image-stage.zip',input=archive.read_bytes())
   output=node(year,'--','powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-Command',rf"Expand-Archive -Force '{root}\image-stage.zip' '{root}\image-stage'; & '{root}\image-stage\prepare.ps1'")
   evidence=json.loads(output.decode('utf-8-sig').strip())
+  if cni:
+   record['cniVerification']=cni_evidence(evidence.get('cni'),cni,year)
+   record['cniRecipe']=cni
   if a.variant=='gpu':
    record['gpu']=gpu_evidence(evidence.get('gpu'),year)
    if evidence.get('k0sSHA256')!=base.get('workerSHA256') or evidence.get('k0s')!=base.get('workerVersion'):
@@ -249,6 +272,8 @@ Start-ScheduledTask -TaskName $task
   worker_sha=record.get('workerSHA256','')
   if not re.fullmatch(r'[a-f0-9]{64}',worker_sha):raise RuntimeError('capture requires the verified worker artifact identity')
   name=s['runID']+'-'+year+'-'+record['tunnelSHA256'][:12]+'-k0s-'+worker_sha[:12]
+  if record.get('cniRecipe'):
+   name+='-cni-'+record['cniRecipe']['archiveSHA256'][:12]
   if a.variant=='gpu':
    name+='-gpu-'+record['gpu']['packageSHA256'][:12]
    tags.append({'Key':'cloud-provisioning-image-variant','Value':'gpu'})

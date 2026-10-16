@@ -14,9 +14,10 @@ import (
 )
 
 type Native struct {
-	adapter *driver.Adapter
-	routes  map[netip.Prefix]bool
-	address netip.Prefix
+	adapter          *driver.Adapter
+	nativePodRouting bool
+	routes           map[netip.Prefix]bool
+	address          netip.Prefix
 }
 
 var _ Device = (*Native)(nil)
@@ -32,6 +33,23 @@ func New(name string) (*Native, error) {
 		return nil, err
 	}
 	return &Native{adapter: adapter, routes: map[netip.Prefix]bool{}}, nil
+}
+
+// NewNativePodRouting selects native prefix routing for an explicitly configured
+// cloud worker. It does not alter physical interfaces or CNI endpoint policies.
+func NewNativePodRouting(name string) (*Native, error) {
+	n, err := New(name)
+	if err != nil {
+		return nil, err
+	}
+	n.nativePodRouting = true
+	return n, nil
+}
+func (n *Native) compile(doc tunnel.PeersFileDoc) (Plan, error) {
+	if n.nativePodRouting {
+		return CompileNativePodRouting(doc)
+	}
+	return Compile(doc)
 }
 func (n *Native) Close() error { return n.adapter.Close() }
 
@@ -58,7 +76,7 @@ func nextHop(p netip.Prefix) netip.Addr {
 	return netip.IPv6Unspecified()
 }
 func (n *Native) Apply(doc tunnel.PeersFileDoc, port uint16) error {
-	p, err := Compile(doc)
+	p, err := n.compile(doc)
 	if err != nil {
 		return err
 	}
@@ -166,7 +184,7 @@ func (n *Native) Apply(doc tunnel.PeersFileDoc, port uint16) error {
 // Verify observes kernel routes before the host renews an applied receipt.
 // Windows-created multicast/link-local routes are outside our ownership.
 func (n *Native) Verify(doc tunnel.PeersFileDoc) error {
-	p, err := Compile(doc)
+	p, err := n.compile(doc)
 	if err != nil {
 		return err
 	}

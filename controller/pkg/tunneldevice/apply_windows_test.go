@@ -15,18 +15,23 @@ import (
 // Exercise the real backend, including route drift repair, on a dedicated
 // adapter. Exact test addresses must be unused before any mutation.
 func TestNativeApplyLifecycle(t *testing.T) {
+	t.Run("host", func(t *testing.T) { testNativeApplyLifecycle(t, false) })
+	t.Run("native-pods", func(t *testing.T) { testNativeApplyLifecycle(t, true) })
+}
+func testNativeApplyLifecycle(t *testing.T, nativePods bool) {
 	if os.Getenv("CLDT_NATIVE_PEER_CONTINUITY") != "1" {
 		t.Skip("requires disposable Windows VM administrator")
 	}
 	local := netip.MustParsePrefix("192.0.2.220/32")
 	remote := netip.MustParsePrefix("192.0.2.221/32")
+	podPrefix := netip.MustParsePrefix("198.51.100.224/28")
 	routes, err := winipcfg.GetIPForwardTable2(windows.AF_INET)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, r := range routes {
 		p := r.DestinationPrefix.Prefix()
-		if p == local || p == remote {
+		if p == local || p == remote || (nativePods && p.Bits() > 0 && p.Overlaps(podPrefix)) {
 			t.Fatal("test address already has a route")
 		}
 	}
@@ -35,7 +40,11 @@ func TestNativeApplyLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	name := "cldt" + hex.EncodeToString(nonce[:])
-	n, err := New(name)
+	newDevice := New
+	if nativePods {
+		newDevice = NewNativePodRouting
+	}
+	n, err := newDevice(name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,12 +58,37 @@ func TestNativeApplyLifecycle(t *testing.T) {
 	doc.LocalAddress = local.String()
 	doc.Peers[0].Endpoint = "127.0.0.1:9"
 	doc.Peers[0].WGAllowedIPs = []string{remote.String()}
+	if nativePods {
+		doc.Peers[0].WGAllowedIPs = append(doc.Peers[0].WGAllowedIPs, podPrefix.String())
+	}
 	doc.Peers[0].RouteHosts = []string{remote.String()}
 	if err = n.Apply(doc, 0); err != nil {
 		t.Fatal(err)
 	}
 	if err = n.Verify(doc); err != nil {
 		t.Fatal(err)
+	}
+	if nativePods {
+		routes, err := n.KernelRoutes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, route := range routes {
+			found = found || route == podPrefix
+		}
+		if !found {
+			t.Fatal("native pod prefix not installed")
+		}
+		if err := n.adapter.LUID().DeleteRoute(podPrefix, nextHop(podPrefix)); err != nil {
+			t.Fatal(err)
+		}
+		if n.Verify(doc) == nil {
+			t.Fatal("missing native pod route accepted")
+		}
+		if err := n.Apply(doc, 0); err != nil {
+			t.Fatal(err)
+		}
 	}
 	// A route and working host connectivity do not prove that decrypted
 	// packets can be forwarded to native CNI endpoints.
@@ -147,7 +181,7 @@ func TestNativeApplyLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range actual {
-		if p == remote {
+		if p == remote || (nativePods && p == podPrefix) {
 			t.Fatal("retired route remains")
 		}
 	}

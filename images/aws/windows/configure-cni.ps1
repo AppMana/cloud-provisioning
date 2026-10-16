@@ -5,6 +5,13 @@ $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $null=& "$PSScriptRoot\verify-cni.ps1" -Recipe "$PSScriptRoot\cni-artifacts.json"
 $plan=Get-Content -LiteralPath $Settings -Raw | ConvertFrom-Json
+$podGateway='vpc'
+if ($plan.PSObject.Properties.Name -contains 'podGateway') { $podGateway=[string]$plan.podGateway }
+if ($podGateway -cnotin @('vpc','host')) { throw 'Pod gateway must be vpc or host' }
+if ($podGateway -ceq 'host') {
+    $owners=@(Get-CimInstance Win32_Service | Where-Object { $_.Name -like 'cloud-provisioning-*' -and $_.State -eq 'Running' -and $_.PathName -match '(?:^|\s)--native-pod-routing(?:=true)?(?:\s|$)' })
+    if ($owners.Count -ne 1) { throw 'Host pod gateway requires one running native pod routing service' }
+}
 function IPv4([string]$Value) {
     if ($Value -notmatch '^([0-9]{1,3}\.){3}[0-9]{1,3}$') { throw 'Expected an IPv4 address' }
     $ip=[Net.IPAddress]::Parse($Value)
@@ -62,10 +69,11 @@ $index=$adapters[0].ifIndex
 if (@(Get-NetIPAddress -InterfaceIndex $index -AddressFamily IPv4 | Where-Object IPAddress -EQ $ip.ToString()).Count -ne 1) { throw 'Primary ENI address is not configured on its adapter' }
 $gateways=@(Get-NetRoute -InterfaceIndex $index -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' | Select-Object -ExpandProperty NextHop -Unique)
 if ($gateways.Count -ne 1 -or !(Contains $subnet (IPv4 $gateways[0]))) { throw 'Primary ENI gateway is missing or ambiguous' }
+$podGatewayAddress=if ($podGateway -ceq 'host') { $ip.ToString() } else { $gateways[0] }
 $config=[ordered]@{
     cniVersion='0.4.0';name='vpc';type='vpc-bridge';capabilities=[ordered]@{portMappings=$true};disableCheck=$true
     eniMACAddress=$mac.ToLowerInvariant();eniIPAddresses=@($ip.ToString()+'/'+$subnet.bits)
-    gatewayIPAddress=$gateways[0];vpcCIDRs=@(@($vpc)+@($exclusions)+@($service.text) | Sort-Object -Unique)
+    gatewayIPAddress=$podGatewayAddress;vpcCIDRs=@(@($vpc)+@($exclusions)+@($service.text) | Sort-Object -Unique)
     serviceCIDR=$service.text;dns=[ordered]@{nameservers=@($dns.ToString());search=@(('{%namespace%}.svc.'+$domain),('svc.'+$domain),$domain)}
 }
 $json=$config | ConvertTo-Json -Depth 5

@@ -34,6 +34,7 @@ $tokenFile = Join-Path $mesh 'join-token'
 [IO.File]::WriteAllText($tokenFile,$plan.joinToken,$utf8)
 $name = 'cloud-provisioning-' + $plan.interface
 $command = '"'+$tunnel+'" --service-name '+$name+' --interface '+$plan.interface+' --listen-port '+$plan.listenPort+' --peers-file "'+$mesh+'\peers.json" --updates-file "'+$mesh+'\updates.json" --cache-file "'+$mesh+'\cache.json" --request-file "'+$mesh+'\request.json" --receipt-file "'+$mesh+'\receipt.json"'
+if ($plan.nativePodRouting) { $command += ' --native-pod-routing' }
 New-Service -Name $name -BinaryPathName $command -StartupType Automatic | Out-Null
 & sc.exe failure $name reset= 86400 actions= restart/5000/restart/10000/restart/30000 | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Setting tunnel service recovery failed' }

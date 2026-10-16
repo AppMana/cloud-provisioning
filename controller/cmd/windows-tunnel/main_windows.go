@@ -24,6 +24,7 @@ type options struct {
 	request, receipt                      string
 	port                                  uint
 	apiProxyOnly                          bool
+	nativePodRouting                      bool
 	apiProxyPort                          uint
 	poll                                  time.Duration
 }
@@ -38,7 +39,11 @@ func (h handler) run(ctx context.Context, ready chan<- struct{}) error {
 	if err != nil {
 		return fmt.Errorf("reading bootstrap identity: %w", err)
 	}
-	dev, err := tunneldevice.New(h.options.iface)
+	newDevice := tunneldevice.New
+	if h.options.nativePodRouting {
+		newDevice = tunneldevice.NewNativePodRouting
+	}
+	dev, err := newDevice(h.options.iface)
 	if err != nil {
 		return fmt.Errorf("creating native adapter: %w", err)
 	}
@@ -155,6 +160,7 @@ func main() {
 	flag.UintVar(&opts.apiProxyPort, "api-proxy-port", 0, "loopback TCP port for the independent API balancer")
 	flag.StringVar(&opts.request, "request-file", "", "protected publisher delivery envelope")
 	flag.StringVar(&opts.receipt, "receipt-file", "", "protected host application receipt")
+	flag.BoolVar(&opts.nativePodRouting, "native-pod-routing", false, "route verified native pod prefixes through the owned tunnel adapter")
 	flag.Parse()
 	if (opts.request == "") != (opts.receipt == "") {
 		log.Fatal("request and receipt paths must be configured together")

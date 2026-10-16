@@ -30,6 +30,7 @@ dialerCloud:
   hostBinary: /host-bin/wg-dialer
 
 windowsBootstrap:
+  nativePodRouting: false # requires matching native CNI gateway configuration and qualification
   tunnelSHA256: ""  # enables the k0s prepared-image Windows bootstrap renderer
   workerVersion: "" # optional patched build of the same base k0s release
   workerSHA256: ""  # required with workerVersion; exact baked executable hash

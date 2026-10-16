@@ -435,6 +435,16 @@ exclusions and ambiguous primary-interface gateways. Its empty base settings
 must be replaced before use. Cluster credentials are not mounted into the
 initializer; the native connector uses the worker's kubelet credentials.
 
+The optional `podGateway` setting defaults to `vpc`. The experimental `host`
+mode selects the primary ENI address as the pod gateway and requires exactly
+one running tunnel service configured with `--native-pod-routing`. Enable
+that service mode for new workers with `windowsBootstrap.nativePodRouting`
+and a matching pinned tunnel executable. It installs the controller's verified
+remote prefixes on the owned tunnel adapter, while the controller excludes
+same-VPC destinations from tunnel projection. The CNI plugin still creates
+and owns its HNS network. Qualify host-gateway pod traffic on fresh workers;
+this option is not a live-network migration mechanism.
+
 The installed configuration is retained when the DaemonSet is removed.
 Changing a live network configuration requires a separate migration; an
 initializer restart accepts only the same configuration. Run

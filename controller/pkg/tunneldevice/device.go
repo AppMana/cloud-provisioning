@@ -124,3 +124,36 @@ func VerifyRoutes(desired []netip.Prefix, owned map[netip.Prefix]bool, observed 
 	}
 	return nil
 }
+
+// CompileNativePodRouting uses the same verified peer ownership as the Linux
+// routed dataplane. Native-network destinations have already been removed by
+// controller projection; they must continue to use the provider underlay.
+func CompileNativePodRouting(doc tunnel.PeersFileDoc) (Plan, error) {
+	p, err := Compile(doc)
+	if err != nil {
+		return p, err
+	}
+	routes := map[netip.Prefix]bool{}
+	for _, route := range p.Routes {
+		routes[route] = true
+	}
+	for _, peer := range p.Peers {
+		for _, prefix := range peer.Allowed {
+			if prefix.Bits() == 0 || !prefix.Addr().IsGlobalUnicast() || prefix.Addr().IsLoopback() || prefix.Addr().IsLinkLocalUnicast() || prefix.Contains(p.Address.Addr()) {
+				return Plan{}, fmt.Errorf("native pod route must be explicit remote unicast ownership")
+			}
+			for _, remote := range p.Peers {
+				if remote.Endpoint.IsValid() && prefix.Bits() < prefix.Addr().BitLen() && prefix.Contains(remote.Endpoint.Addr()) {
+					return Plan{}, fmt.Errorf("native pod route would intercept a tunnel endpoint")
+				}
+			}
+			routes[prefix] = true
+		}
+	}
+	p.Routes = nil
+	for route := range routes {
+		p.Routes = append(p.Routes, route)
+	}
+	sort.Slice(p.Routes, func(i, j int) bool { return p.Routes[i].String() < p.Routes[j].String() })
+	return p, nil
+}

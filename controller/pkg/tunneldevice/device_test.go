@@ -116,3 +116,29 @@ func TestKernelRoutesRejectMissingOrStaleOwnedRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestNativePodRoutingIsExplicitAndRejectsBroadOwnership(t *testing.T) {
+	doc := fixture(t)
+	hostOnly, err := Compile(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routed, err := CompileNativePodRouting(doc)
+	if err != nil || len(hostOnly.Routes) != 1 || len(routed.Routes) != 2 {
+		t.Fatalf("native routing selection: %v %v", routed.Routes, err)
+	}
+	for _, invalid := range []string{"0.0.0.0/0", "10.254.0.0/24", "127.0.0.0/8", "169.254.0.0/16", "224.0.0.0/4", "192.0.2.0/24"} {
+		t.Run(invalid, func(t *testing.T) {
+			bad := fixture(t)
+			bad.Peers[0].WGAllowedIPs = append(bad.Peers[0].WGAllowedIPs, invalid)
+			if _, err := CompileNativePodRouting(bad); err == nil {
+				t.Fatal("unsafe routed ownership accepted")
+			}
+		})
+	}
+	doc.Peers[0].WGAllowedIPs = []string{"10.254.0.2/32"}
+	routed, err = CompileNativePodRouting(doc)
+	if err != nil || len(routed.Routes) != 1 {
+		t.Fatalf("withdrawn prefix retained: %v %v", routed.Routes, err)
+	}
+}

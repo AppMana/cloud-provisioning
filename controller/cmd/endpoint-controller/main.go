@@ -2221,6 +2221,7 @@ func main() {
 		windowsPublisherImage     string
 		windowsPublisherAPIServer string
 		windowsTunnelSHA256       string
+		windowsNativePodRouting   bool
 		windowsWorkerVersion      string
 		windowsWorkerSHA256       string
 		dialerCloudImage          string
@@ -2260,6 +2261,7 @@ func main() {
 	flag.IntVar(&transitBGPPort, "transit-bgp-port", 0, "port for the speaker each tunnel endpoint runs, telling the rest of the site which remote nodes are reachable through it. 0 leaves it off, which is right when every node that needs a remote terminates a tunnel of its own. Not 179: a node whose CNI speaks BGP is already there")
 	flag.IntVar(&transitBGPASN, "transit-bgp-asn", 64512, "autonomous system for that speaker; match the cluster's own")
 	flag.StringVar(&ownerDeployment, "owner-deployment", "", "this controller's own Deployment name; everything it creates at runtime (both DaemonSets, the peer and adoption Secrets) is owned by it, so an uninstall garbage-collects them instead of orphaning a tunnel interface on every endpoint node")
+	flag.BoolVar(&windowsNativePodRouting, "windows-native-pod-routing", false, "enable native pod prefix routing in prepared Windows workers")
 	flag.StringVar(&windowsTunnelSHA256, "windows-tunnel-sha256", "", "enable prepared-image k0s Windows bootstrap with this tunnel executable SHA256")
 	flag.StringVar(&windowsWorkerVersion, "windows-worker-version", "", "exact baked k0s Windows worker build; must retain the cluster's base release")
 	flag.StringVar(&windowsWorkerSHA256, "windows-worker-sha256", "", "baked k0s worker SHA256; required with windows-worker-version")
@@ -2596,8 +2598,8 @@ func main() {
 		}
 
 		bootstrapRenderers := map[string]join.BootstrapRenderer{"linux": join.PatternBootstrap{Path: joinTemplatePath, Format: bootstrap.CloudConfig}}
-		if (windowsWorkerVersion == "") != (windowsWorkerSHA256 == "") || (windowsWorkerVersion != "" && windowsTunnelSHA256 == "") {
-			fmt.Fprintln(os.Stderr, "Windows worker override requires version, SHA256 and enabled Windows bootstrap")
+		if (windowsNativePodRouting && windowsTunnelSHA256 == "") || (windowsWorkerVersion == "") != (windowsWorkerSHA256 == "") || (windowsWorkerVersion != "" && windowsTunnelSHA256 == "") {
+			fmt.Fprintln(os.Stderr, "Windows bootstrap options require a pinned tunnel executable; worker overrides also require paired version and SHA256")
 			os.Exit(1)
 		}
 		if windowsTunnelSHA256 != "" {
@@ -2605,7 +2607,7 @@ func main() {
 				fmt.Fprintln(os.Stderr, "Windows bootstrap requires k0s and a Windows publisher image")
 				os.Exit(1)
 			}
-			bootstrapRenderers["windows"] = joink0s.WindowsBootstrap{ServiceSHA256: windowsTunnelSHA256, WorkerVersion: windowsWorkerVersion, WorkerSHA256: windowsWorkerSHA256}
+			bootstrapRenderers["windows"] = joink0s.WindowsBootstrap{NativePodRouting: windowsNativePodRouting, ServiceSHA256: windowsTunnelSHA256, WorkerVersion: windowsWorkerVersion, WorkerSHA256: windowsWorkerSHA256}
 		}
 		joinReconciler := &join.Reconciler{
 			Client:         mgr.GetClient(),

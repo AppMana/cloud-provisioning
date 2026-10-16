@@ -21,12 +21,14 @@ var windowsScript string
 // WindowsBootstrap consumes prepared image assets. Platform identity comes
 // from infrastructure values; this distribution renderer has no cloud API code.
 type WindowsBootstrap struct {
-	ServiceSHA256 string
-	WorkerVersion string
-	WorkerSHA256  string
+	NativePodRouting bool
+	ServiceSHA256    string
+	WorkerVersion    string
+	WorkerSHA256     string
 }
 
 type windowsPlan struct {
+	NativePodRouting   bool                `json:"nativePodRouting"`
 	MachineName        string              `json:"machineName"`
 	Interface          string              `json:"interface"`
 	K0sVersion         string              `json:"k0sVersion"`
@@ -44,7 +46,7 @@ type windowsPlan struct {
 
 func (w WindowsBootstrap) Render(values map[string]any) (bootstrap.Data, error) {
 	str := func(key string) string { v, _ := values[key].(string); return v }
-	p := windowsPlan{MachineName: str("machineName"), Interface: str("interfaceName"), K0sVersion: str("k0sVersion"), JoinToken: str("joinToken"), KubeletExtraArgs: str("kubeletExtraArgs"), APIEndpoint: str("apiEndpoint"), NodeAddress: str("nodeAddress"), ProviderID: str("providerID"), IdentityPowerShell: str("providerIdentityPowerShell"), ServiceSHA256: w.ServiceSHA256}
+	p := windowsPlan{NativePodRouting: w.NativePodRouting, MachineName: str("machineName"), Interface: str("interfaceName"), K0sVersion: str("k0sVersion"), JoinToken: str("joinToken"), KubeletExtraArgs: str("kubeletExtraArgs"), APIEndpoint: str("apiEndpoint"), NodeAddress: str("nodeAddress"), ProviderID: str("providerID"), IdentityPowerShell: str("providerIdentityPowerShell"), ServiceSHA256: w.ServiceSHA256}
 	if !regexp.MustCompile(`^[a-fA-F0-9]{64}$`).MatchString(w.ServiceSHA256) {
 		return bootstrap.Data{}, fmt.Errorf("Windows image requires a pinned tunnel service SHA256")
 	}
@@ -91,7 +93,11 @@ func (w WindowsBootstrap) Render(values map[string]any) (bootstrap.Data, error) 
 	// Windows installs only explicit host routes; a shared tunnel /24 must not
 	// install a connected subnet route on every remote.
 	p.Peers.LocalAddress = netip.PrefixFrom(address.Addr(), address.Addr().BitLen()).String()
-	if _, err = tunneldevice.Compile(p.Peers); err != nil {
+	compile := tunneldevice.Compile
+	if w.NativePodRouting {
+		compile = tunneldevice.CompileNativePodRouting
+	}
+	if _, err = compile(p.Peers); err != nil {
 		return bootstrap.Data{}, err
 	}
 	raw, err := json.Marshal(p)

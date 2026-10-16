@@ -137,3 +137,27 @@ func TestWindowsBootstrapConsumesPublishedRemotePeers(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestWindowsNativePodRoutingReachesServicePlan(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		result, err := (WindowsBootstrap{ServiceSHA256: strings.Repeat("a", 64), NativePodRouting: enabled}).Render(windowsValues(t))
+		if err != nil {
+			t.Fatal(err)
+		}
+		match := regexp.MustCompile(`FromBase64String\('([^']+)'\)`).FindSubmatch(result.Value)
+		raw, err := base64.StdEncoding.DecodeString(string(match[1]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var plan windowsPlan
+		if err := json.Unmarshal(raw, &plan); err != nil {
+			t.Fatal(err)
+		}
+		if plan.NativePodRouting != enabled {
+			t.Fatal("routing mode lost during bootstrap rendering")
+		}
+		if !strings.Contains(string(result.Value), "if ($plan.nativePodRouting) { $command += ' --native-pod-routing' }") {
+			t.Fatal("service ignores native routing mode")
+		}
+	}
+}

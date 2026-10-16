@@ -1,3 +1,6 @@
+{{- if and .Values.windowsBootstrap.nativePodRouting (not .Values.windowsBootstrap.tunnelSHA256) }}
+{{- fail "Windows native pod routing requires a pinned tunnel executable" }}
+{{- end }}
 {{- if and .Values.awsPodObserver.credentialsSecret .Values.awsPodObserver.credentialsFileSecret }}
 {{- fail "Choose either AWS observer environment credentials or rotating file credentials" }}
 {{- end }}
@@ -170,6 +173,9 @@ spec:
             {{- end }}
             {{- with .Values.imagePullSecrets }}
             - "--dialer-image-pull-secret={{ (first .).name }}"
+            {{- end }}
+            {{- if .Values.windowsBootstrap.nativePodRouting }}
+            - "--windows-native-pod-routing=true"
             {{- end }}
             {{- with .Values.windowsBootstrap.tunnelSHA256 }}
             - {{ printf "--windows-tunnel-sha256=%s" . | quote }}

@@ -16,19 +16,50 @@ func transportPathMTU(destination netip.Addr, owned winipcfg.LUID) (uint32, erro
 	if err := address.SetAddr(destination); err != nil {
 		return 0, err
 	}
-	var route winipcfg.MibIPforwardRow2
-	status, _, _ := getBestTransportRoute.Call(0, 0, 0, uintptr(unsafe.Pointer(&address)), 0, uintptr(unsafe.Pointer(&route)), uintptr(unsafe.Pointer(&source)))
-	if status != 0 {
-		return 0, fmt.Errorf("looking up transport route: %w", windows.Errno(status))
-	}
-	if route.InterfaceLUID == owned {
-		return 0, fmt.Errorf("transport endpoint routes through the owned tunnel")
-	}
 	family := winipcfg.AddressFamily(windows.AF_INET)
 	if destination.Is6() {
 		family = windows.AF_INET6
 	}
-	row, err := route.InterfaceLUID.IPInterface(family)
+	// Match WireGuardNT's SocketResolvePeerEndpoint: its UDP socket excludes
+	// the owned adapter even when a tunnel route covers the endpoint address.
+	routes, err := winipcfg.GetIPForwardTable2(family)
+	if err != nil {
+		return 0, err
+	}
+	var selected winipcfg.LUID
+	bestBits := -1
+	var bestMetric uint32
+	for _, candidate := range routes {
+		prefix := candidate.DestinationPrefix.Prefix()
+		if candidate.InterfaceLUID == owned || !prefix.Contains(destination) || prefix.Bits() < bestBits {
+			continue
+		}
+		iface, err := candidate.InterfaceLUID.Interface()
+		if err != nil || iface.OperStatus != winipcfg.IfOperStatusUp {
+			continue
+		}
+		ip, err := candidate.InterfaceLUID.IPInterface(family)
+		if err != nil {
+			continue
+		}
+		metric := candidate.Metric + ip.Metric
+		if prefix.Bits() == bestBits && metric > bestMetric {
+			continue
+		}
+		selected, bestBits, bestMetric = candidate.InterfaceLUID, prefix.Bits(), metric
+	}
+	if selected == 0 {
+		return 0, fmt.Errorf("no operational transport route outside the owned tunnel")
+	}
+	var route winipcfg.MibIPforwardRow2
+	status, _, _ := getBestTransportRoute.Call(uintptr(unsafe.Pointer(&selected)), 0, 0, uintptr(unsafe.Pointer(&address)), 0, uintptr(unsafe.Pointer(&route)), uintptr(unsafe.Pointer(&source)))
+	if status != 0 {
+		return 0, fmt.Errorf("looking up transport route: %w", windows.Errno(status))
+	}
+	// WireGuardNT binds the datagram's packet-info interface to selected.
+	// With weak-host routing, GetBestRoute2 can return a different route LUID;
+	// that does not change the interface used by the transport socket.
+	row, err := selected.IPInterface(family)
 	if err != nil {
 		return 0, fmt.Errorf("reading transport interface MTU: %w", err)
 	}

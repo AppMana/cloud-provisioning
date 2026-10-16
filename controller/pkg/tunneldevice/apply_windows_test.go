@@ -56,7 +56,13 @@ func testNativeApplyLifecycle(t *testing.T, nativePods bool) {
 	t.Log("owned adapter", name)
 	doc := fixture(t)
 	doc.LocalAddress = local.String()
-	doc.Peers[0].Endpoint = "127.0.0.1:9"
+	// The transport address is also covered by an owned route. WireGuardNT
+	// must keep using the external underlay after Apply installs that route.
+	doc.Peers[0].Endpoint = netip.AddrPortFrom(remote.Addr(), 9).String()
+	underlayMTU, err := transportPathMTU(remote.Addr(), n.adapter.LUID())
+	if err != nil {
+		t.Fatal(err)
+	}
 	doc.Peers[0].WGAllowedIPs = []string{remote.String()}
 	if nativePods {
 		doc.Peers[0].WGAllowedIPs = append(doc.Peers[0].WGAllowedIPs, podPrefix.String())
@@ -67,6 +73,9 @@ func testNativeApplyLifecycle(t *testing.T, nativePods bool) {
 	}
 	if err = n.Verify(doc); err != nil {
 		t.Fatal(err)
+	}
+	if got, err := transportPathMTU(remote.Addr(), n.adapter.LUID()); err != nil || got != underlayMTU {
+		t.Fatalf("owned route changed transport MTU: got %d, %v; want %d", got, err, underlayMTU)
 	}
 	if nativePods {
 		routes, err := n.KernelRoutes()

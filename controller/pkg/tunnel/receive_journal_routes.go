@@ -12,6 +12,7 @@ import (
 type ReceiveJournalRoutes struct {
 	Receivers map[string]map[string]ReceiveRouteSelection
 	Legacy    map[string]ReceiveTransitionPlan
+	Plans     map[string]ReceiveTransitionPlan
 }
 
 // PlanReceiveJournalRoutes validates the complete caller-admitted journal set
@@ -66,7 +67,10 @@ func PlanReceiveJournalRoutes(snapshots []handover.Snapshot, clusterUID string) 
 	if err != nil {
 		return fail(err)
 	}
-	result := ReceiveJournalRoutes{Receivers: map[string]map[string]ReceiveRouteSelection{}, Legacy: legacy}
+	result := ReceiveJournalRoutes{Receivers: map[string]map[string]ReceiveRouteSelection{}, Legacy: legacy, Plans: map[string]ReceiveTransitionPlan{}}
+	for _, plan := range plans {
+		result.Plans[plan.MachineUID] = plan
+	}
 	for node := range all {
 		result.Receivers[node] = map[string]ReceiveRouteSelection{}
 	}

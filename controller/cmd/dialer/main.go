@@ -112,7 +112,10 @@ type config struct {
 	// Set only by validated receiver activation; absent entries keep the
 	// legacy interface. The map does not add destinations or alter peers.
 	receiveRoutes map[string]receiveRouteSelection
-	siteRecovery  *siteForwardingCache
+	// A phase owns only these destinations. Nil retains ordinary whole-table
+	// reconciliation; a non-nil scope must be derived from admitted journals.
+	receiveRouteScope map[string]bool
+	siteRecovery      *siteForwardingCache
 
 	// transitMasqueradeSource, when set (a CIDR, the tunnel subnet),
 	// makes this node a transit for tunnel peers reaching cluster
@@ -1973,6 +1976,9 @@ func disposeRouteHost(marked, isEndpointHost, peerCanCarry bool) routeHostDispos
 // Withdrawing a still-claimed API route before a NATed peer completes its
 // handshake can also remove the path needed to read corrective peer state.
 func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relay *tunnel.TransitSpec, relayDsts []net.IPNet, own []string) error {
+	if err := validateReceiveRouteScope(cfg, routeHosts, claimedHosts, blocks, relay, relayDsts); err != nil {
+		return err
+	}
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil && !isLinkNotFound(err) {
 		return fmt.Errorf("looking up %s for route setup: %w", cfg.iface, err)
@@ -1980,7 +1986,7 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	if err != nil {
 		link = nil
 	}
-	if link != nil && len(cfg.receiveRoutes) != 0 && link.Type() != "wireguard" {
+	if link != nil && (len(cfg.receiveRoutes) != 0 || cfg.receiveRouteScope != nil) && link.Type() != "wireguard" {
 		return fmt.Errorf("legacy receiver generation name is occupied by a non-WireGuard interface")
 	}
 	selected, err := validateReceiveRouteSelections(cfg, routeHosts, blocks)
@@ -2086,6 +2092,9 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 			if route.Dst == nil || route.Protocol == unix.RTPROT_KERNEL {
 				continue
 			}
+			if cfg.receiveRouteScope != nil && !cfg.receiveRouteScope[route.Dst.String()] {
+				continue
+			}
 			if desired[route.Dst.String()] || claimed[route.Dst.String()] {
 				continue
 			}
@@ -2115,6 +2124,9 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 		for i := range inMain {
 			route := inMain[i]
 			if route.Dst == nil || route.Protocol != unix.RTPROT_BOOT {
+				continue
+			}
+			if cfg.receiveRouteScope != nil && !cfg.receiveRouteScope[route.Dst.String()] {
 				continue
 			}
 			if err := netlink.RouteDel(&route); err != nil {

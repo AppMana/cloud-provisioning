@@ -205,6 +205,22 @@ handover in normal reconciliation, or undo native work when intent changes.
 All native writers must honor the lock and durable phase state before this
 boundary can be used for coordinated switching.
 
+The Linux direct-route phase component implements forward and reverse switch,
+and read-only drain verification. It reuses the route installer with a scope
+derived from all admitted journals: destinations outside that scope survive in
+both the private and main tables. Receiver selections must match the combined
+plans; the target's direction must match the committed round. The legacy key,
+receive permissions and authenticated path remain required during switch and
+drain. Every target receive path is checked, including retained paths that do
+not own desired egress. Foreign route shapes, devices and more-specific shadows block a switch
+before route replacement. Drain checks never repair missing routes.
+
+This component does not implement prepare, abort or retirement and rejects
+those phases. Relay routes and unresolved route claims are not supported by
+scoped installation. Caller-admitted stable source addresses, phase admission,
+durable state, receipt transport and normal-loop dispatch remain necessary;
+the native route component alone cannot enable a coordinated deployment.
+
 ## Platform implementation boundaries
 
 The shared protocol owns generation identity, phase validation, peer graph

@@ -14,12 +14,29 @@ import (
 // input-interface or external policy routing. Packet qualification remains
 // necessary before a platform phase verifier can claim end-to-end forwarding.
 func verifyReceiveRouteInstallation(cfg config, hosts, blocks []net.IPNet, own []string) error {
-	if len(cfg.receiveRoutes) == 0 {
+	if len(cfg.receiveRoutes) == 0 && cfg.receiveRouteScope == nil {
 		return nil
 	}
 	selected, err := validateReceiveRouteSelections(cfg, hosts, blocks)
 	if err != nil {
 		return err
+	}
+	if cfg.receiveRouteScope != nil {
+		for _, list := range [][]net.IPNet{hosts, blocks} {
+			for _, dst := range list {
+				if _, receiver := selected[dst.String()]; receiver {
+					continue
+				}
+				legacy, err := netlink.LinkByName(cfg.iface)
+				if err != nil {
+					return err
+				}
+				if legacy.Type() != "wireguard" {
+					return fmt.Errorf("selected legacy route device is not WireGuard")
+				}
+				selected[dst.String()] = legacy.Attrs().Index
+			}
+		}
 	}
 	local := localIPs()
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
@@ -40,6 +57,13 @@ func verifyReceiveRouteInstallation(cfg config, hosts, blocks []net.IPNet, own [
 		routes, err := netlink.RouteListFiltered(family, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
 		if err != nil {
 			return err
+		}
+		for _, route := range routes {
+			if route.Dst != nil && cfg.receiveRouteScope[route.Dst.String()] {
+				if _, desired := selected[route.Dst.String()]; !desired {
+					return fmt.Errorf("withdrawn receiver destination still has a route")
+				}
+			}
 		}
 		for raw, index := range selected {
 			prefix, err := netip.ParsePrefix(raw)

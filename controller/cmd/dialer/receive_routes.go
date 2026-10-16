@@ -112,3 +112,26 @@ func receiveSourcesMatch(expected []string, actual []net.IPNet) bool {
 	got, valid := canonical(raw)
 	return valid && slices.Equal(want, got)
 }
+
+func validateReceiveRouteScope(cfg config, hosts, claims, blocks []net.IPNet, relay *tunnel.TransitSpec, relayDsts []net.IPNet) error {
+	if cfg.receiveRouteScope == nil {
+		return nil
+	}
+	if len(cfg.receiveRouteScope) == 0 || len(claims) != 0 || relay != nil || len(relayDsts) != 0 {
+		return fmt.Errorf("scoped receiver routes require explicit direct destinations without unresolved claims")
+	}
+	for raw, owned := range cfg.receiveRouteScope {
+		prefix, err := netip.ParsePrefix(raw)
+		if err != nil || !owned || prefix != prefix.Masked() || prefix.Bits() == 0 || prefix.Addr().Is4In6() || !prefix.Addr().IsGlobalUnicast() {
+			return fmt.Errorf("invalid receiver route scope")
+		}
+	}
+	for _, list := range [][]net.IPNet{hosts, blocks} {
+		for _, dst := range list {
+			if !cfg.receiveRouteScope[dst.String()] {
+				return fmt.Errorf("destination exceeds admitted receiver route scope")
+			}
+		}
+	}
+	return nil
+}

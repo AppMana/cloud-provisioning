@@ -43,10 +43,8 @@ The workflow uses a repository-specific read-only deploy key to read the private
 Kubernetes fork. The key is stored as `KUBERNETES_SOURCE_DEPLOY_KEY` in the builder
 repository's Actions secrets.
 
-The selective HNS reconciliation in the image-builder patches supersedes an older
-unconditional-reconcile experiment. Git blame attributes the selective predicate
-to `b5bd25ec` and subsequent patch context to `a4429b98`. The source branches carry
-the newer implementation so build inputs and reviewed Kubernetes code agree.
+Keep the selective HNS reconciliation in the pinned source and image-builder
+patches aligned so the published binary matches the reviewed implementation.
 
 ### Persistent native-CNI configuration
 
@@ -92,9 +90,9 @@ These three networking images alone are a partial cache recipe. Use these exact
 references in the acceptance DaemonSets, and install matching Linux Calico
 components and CRDs before testing the combined cluster.
 
-This set is a candidate for HostProcess testing on both OS versions. The current
-live harness remains on its recorded Calico 3.32.0 baseline. VM image baking,
-fresh-clone cache reuse, and CNI acceptance for this new set remain pending.
+This set is a candidate for HostProcess testing on both OS versions. Qualification
+requires VM image baking, fresh-clone cache reuse, and native CNI acceptance for
+the exact image set.
 
 ## Promotion gates
 

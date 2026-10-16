@@ -359,9 +359,8 @@ executable alongside the signed WireGuardNT DLL on a test VM, and set
 `CLDT_NATIVE_PEER_CONTINUITY=1` before running
 `-test.run ^TestNativeApplyLifecycle$ -test.v`. It checks address/route repair
 and rejection of duplicate ownership without disrupting the existing adapter.
-The retired shared-address acceptance experiment is preserved in the native
-address report's evidence archive. Use the stable-owner experiment for
-generation lifetimes and retain the active duplicate-owner rejection regression.
+Use the stable-owner experiment for generation lifetimes and retain the active
+duplicate-owner rejection regression.
 
 Build the instrumented probe from `controller`:
 

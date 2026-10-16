@@ -266,8 +266,9 @@ on the build host and stage it with the scripts. The helper
 uses containerd 2.3.2's native Windows matcher to unpack existing content; it
 never contacts a registry or creates a workload. Local `ctr pull` wraps its
 matcher in `platforms.Only()`, which loses Windows version preference ordering
-in the pinned platforms library. Removing the bare platform override alone
-fixed Calico CNI but left Konnectivity unready on the observed 2025 builder.
+in the pinned platforms library. Verify native unpacking and readiness for every
+required component; removing a platform override alone does not establish a
+usable cache on both Windows versions.
 
 Invoke preparation with the staged file paths and recorded helper digest:
 

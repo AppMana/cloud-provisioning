@@ -99,14 +99,13 @@ startup latency matters, then verify it survives image generalization and boot.
 
 ## Native validation
 
-The strict concurrent UDP gate remains open: the two runs received 89/90 and
-298/300 exact echoes. A UDP-only repeat received all 300. The missing packets'
-cause is unestablished; the isolated repeat does not prove that TCP load caused
-the losses. Preserve these failures when evaluating support.
+Require loss-free concurrent UDP traffic and retain every failed attempt. A
+passing UDP-only repeat does not qualify concurrent traffic or establish the
+cause of earlier losses. Record exact binary and image hashes with each result.
 
-The internal reason and a mitigation remain unproven. All original offload settings were restored. Adapter restarts reset workload MTU to 1500, requiring explicit restoration to
-1370 before each traffic phase in that image version. Use the binary and image hashes in
-that receipt to distinguish it from the earlier image. The periodic scheduler
-rechecks one active endpoint per five-second tick; this repairs drift eventually
-and does not establish a fix for the UDP drops. The [trace correlator](../../harness/e2e/observe/README.md)
-includes regression fixtures from both OS versions.
+Verify actual workload MTU after adapter restarts and restore any diagnostic
+offload changes before measuring the candidate. The periodic scheduler rechecks
+one active endpoint per five-second tick; eventual drift repair does not prove
+uninterrupted packet delivery. The [trace correlator](../../harness/e2e/observe/README.md)
+includes regression fixtures from both OS versions. Native traffic and lifecycle
+qualification remain required before promotion.

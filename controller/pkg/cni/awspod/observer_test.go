@@ -251,3 +251,50 @@ func TestRejectInvalidNativeIPv6Host(t *testing.T) {
 		})
 	}
 }
+
+func TestWindowsSecondaryIPAllocationAndWithdrawal(t *testing.T) {
+	for _, scenario := range []string{"valid", "secondary-eni", "missing-index", "ipv6", "unknown-os", "foreign-owner"} {
+		t.Run(scenario, func(t *testing.T) {
+			o, m, api := fixture(t)
+			ctx := context.Background()
+			node := &corev1.Node{}
+			if err := o.Reader.Get(ctx, client.ObjectKey{Name: "worker"}, node); err != nil {
+				t.Fatal(err)
+			}
+			node.Labels[corev1.LabelOSStable] = "windows"
+			attachment := api.eni["Attachment"].(map[string]any)
+			attachment["DeviceIndex"] = 0
+			switch scenario {
+			case "secondary-eni":
+				attachment["DeviceIndex"] = 1
+			case "missing-index":
+				delete(attachment, "DeviceIndex")
+			case "ipv6":
+				o.Config.Family = "ipv6"
+				o.Config.PodRanges = []string{"2001:db8:1::/64"}
+			case "unknown-os":
+				node.Labels[corev1.LabelOSStable] = "other"
+			case "foreign-owner":
+				api.eni["OwnerId"] = "foreign"
+			}
+			if err := o.Reader.(client.Client).Update(ctx, node); err != nil {
+				t.Fatal(err)
+			}
+			allocation, err := o.AllocationsFor(ctx, m, "worker")
+			if scenario != "valid" {
+				if err == nil {
+					t.Fatal("unqualified Windows allocation accepted")
+				}
+				return
+			}
+			if err != nil || len(allocation.PodPrefixes) != 1 || allocation.PodPrefixes[0].String() != "172.29.0.11/32" || len(allocation.NativePrefixes) != 2 {
+				t.Fatalf("Windows primary ENI allocation: %+v %v", allocation, err)
+			}
+			api.eni["PrivateIpAddresses"] = []any{map[string]any{"PrivateIpAddress": "172.29.0.10", "Primary": true}}
+			allocation, err = o.AllocationsFor(ctx, m, "worker")
+			if err != nil || len(allocation.PodPrefixes) != 0 || len(allocation.NativePrefixes) != 1 {
+				t.Fatalf("Windows released secondary IP retained: %+v %v", allocation, err)
+			}
+		})
+	}
+}

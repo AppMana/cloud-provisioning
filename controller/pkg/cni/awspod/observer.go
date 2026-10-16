@@ -108,9 +108,12 @@ func (o *Observer) AllocationsFor(ctx context.Context, expected *unstructured.Un
 			NextToken         string
 			NetworkInterfaces []struct {
 				NetworkInterfaceId, OwnerId, VpcId, SubnetId, Status string
-				Attachment                                           struct{ InstanceId, Status string }
-				TagSet                                               []struct{ Key, Value string }
-				PrivateIpAddresses                                   []struct {
+				Attachment                                           struct {
+					InstanceId, Status string
+					DeviceIndex        *int
+				}
+				TagSet             []struct{ Key, Value string }
+				PrivateIpAddresses []struct {
 					PrivateIpAddress string
 					Primary          bool
 				}
@@ -136,6 +139,9 @@ func (o *Observer) AllocationsFor(ctx context.Context, expected *unstructured.Un
 			}
 			if eni.NetworkInterfaceId == "" || seenENI[eni.NetworkInterfaceId] || !owned || !subnet || eni.OwnerId != o.Config.Account || eni.VpcId != o.Config.VPC || eni.Status != "in-use" || eni.Attachment.InstanceId != instance || eni.Attachment.Status != "attached" {
 				return nil, fmt.Errorf("foreign, duplicate or detached EC2 interface")
+			}
+			if node.Labels[corev1.LabelOSStable] == "windows" && (eni.Attachment.DeviceIndex == nil || *eni.Attachment.DeviceIndex != 0 || len(seenENI) != 0) {
+				return nil, fmt.Errorf("Windows secondary IP allocation requires one primary ENI")
 			}
 			seenENI[eni.NetworkInterfaceId] = true
 			for _, ip := range eni.PrivateIpAddresses {
@@ -244,8 +250,17 @@ func (o *Observer) binding(ctx context.Context, expected *unstructured.Unstructu
 	if err := o.Reader.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
 		return nil, nil, err
 	}
-	if node.UID == "" || (boundUID != "" && string(node.UID) != boundUID) || node.DeletionTimestamp != nil || node.Spec.ProviderID != provider || node.Labels[NodeLabel] != NodeValue || node.Labels["cloud-provisioning.appmana.com/role"] != "cloud-worker" || node.Labels["kubernetes.io/os"] != "linux" {
+	if node.UID == "" || (boundUID != "" && string(node.UID) != boundUID) || node.DeletionTimestamp != nil || node.Spec.ProviderID != provider || node.Labels[NodeLabel] != NodeValue || node.Labels["cloud-provisioning.appmana.com/role"] != "cloud-worker" {
 		return nil, nil, fmt.Errorf("Node allocation binding absent or changed")
+	}
+	switch node.Labels[corev1.LabelOSStable] {
+	case "linux":
+	case "windows":
+		if o.Config.Family != "ipv4" {
+			return nil, nil, fmt.Errorf("Windows allocation observation requires IPv4 secondary IP mode")
+		}
+	default:
+		return nil, nil, fmt.Errorf("unsupported Node operating system for AWS allocations")
 	}
 	if boundUID == "" {
 		// CAPI v1beta2's MachineNodeReference contains only a name. Bind the

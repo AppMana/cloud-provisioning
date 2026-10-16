@@ -1,5 +1,20 @@
 # k0s provider patches
 
+## Empty optional manifests with patches enabled
+
+`empty-manifest-patches.patch` targets k0s `v1.36.4+k0s.1`, commit
+`c37fe960bdee93ca14c5a5b9f2ab9700f8e82e60`. Its manifest patcher treats
+comment-only and empty YAML documents as resources missing a `kind`. Optional
+Calico templates produce these documents when a resource is disabled, so
+enabling Calico patches can cause rendering errors for unrelated templates.
+
+The patch preserves documents that decode to YAML null without applying
+resource patches to them. Nonempty malformed resources still fail. Apply it to
+the matching source checkout and run `go test ./internal/pkg/patches
+./internal/pkg/templatewriter ./pkg/component/controller`. Tests include the
+distribution's actual optional Calico templates. Rebuild and qualify the
+controller before deployment; source tests do not qualify a running binary.
+
 ## Windows Traefik configuration replacement
 
 `windows-traefik.patch` targets k0s `v1.36.2+k0s.0`, commit

@@ -1,0 +1,91 @@
+diff --git a/internal/pkg/patches/patches.go b/internal/pkg/patches/patches.go
+index 51fd4c5d..476c96fe 100644
+--- a/internal/pkg/patches/patches.go
++++ b/internal/pkg/patches/patches.go
+@@ -54,6 +54,11 @@ func applyToDoc(doc []byte, patches v1beta1.Patches) ([]byte, error) {
+ 	if err != nil {
+ 		return nil, fmt.Errorf("failed to parse manifest document: %w", err)
+ 	}
++	// Optional templates can render only a separator or comments. Such YAML
++	// documents have no resource to patch; preserve them as with no patches.
++	if bytes.Equal(bytes.TrimSpace(jsonDoc), []byte("null")) {
++		return doc, nil
++	}
+ 	if err := obj.UnmarshalJSON(jsonDoc); err != nil {
+ 		return nil, fmt.Errorf("failed to decode manifest document: %w", err)
+ 	}
+diff --git a/internal/pkg/patches/patches_test.go b/internal/pkg/patches/patches_test.go
+index 794e8195..a070d3a6 100644
+--- a/internal/pkg/patches/patches_test.go
++++ b/internal/pkg/patches/patches_test.go
+@@ -241,3 +241,24 @@ func TestApply_OrderedMultiPatch(t *testing.T) {
+ 	require.True(t, found)
+ 	assert.EqualValues(t, 7, replicas)
+ }
++
++func TestApply_EmptyRenderedDocuments(t *testing.T) {
++	customizations := v1beta1.Patches{{
++		Target: v1beta1.PatchTarget{Kind: "ConfigMap", Name: "my-config"},
++		Patch:  v1beta1.PatchSpec{Type: v1beta1.MergePatchType, Content: `{"data":{"key":"patched"}}`},
++	}}
++	for _, empty := range []string{"---\n", "---\n# Optional resource disabled\n", "null\n", "~\n"} {
++		t.Run(empty, func(t *testing.T) {
++			out, err := patches.Apply([]byte(empty), customizations)
++			require.NoError(t, err)
++			value, err := yaml.YAMLToJSON(out)
++			require.NoError(t, err)
++			require.Equal(t, "null", string(value))
++			out, err = patches.Apply([]byte(empty+"---\n"+cmManifest), customizations)
++			require.NoError(t, err)
++			require.Contains(t, string(out), "patched")
++		})
++	}
++	_, err := patches.Apply([]byte("metadata:\n  name: missing-kind\n"), customizations)
++	require.Error(t, err, "nonempty malformed resources must still fail")
++}
+diff --git a/internal/pkg/templatewriter/templatewriter_test.go b/internal/pkg/templatewriter/templatewriter_test.go
+index cd2bbdb8..c8ad5d92 100644
+--- a/internal/pkg/templatewriter/templatewriter_test.go
++++ b/internal/pkg/templatewriter/templatewriter_test.go
+@@ -5,10 +5,12 @@ package templatewriter_test
+ 
+ import (
+ 	"bytes"
++	"io/fs"
+ 	"testing"
+ 
+ 	"github.com/k0sproject/k0s/internal/pkg/templatewriter"
+ 	"github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
++	"github.com/k0sproject/k0s/static"
+ 
+ 	"github.com/stretchr/testify/assert"
+ 	"github.com/stretchr/testify/require"
+@@ -16,6 +18,28 @@ import (
+ 	"sigs.k8s.io/yaml"
+ )
+ 
++func TestTemplateWriter_OptionalCalicoManifestsWithPatches(t *testing.T) {
++	for _, name := range []string{"ConfigMap/calico-config.yaml", "DaemonSet/calico-node-windows.yaml", "IPAMConfig/default.yaml"} {
++		t.Run(name, func(t *testing.T) {
++			contents, err := fs.ReadFile(static.CalicoManifests, name)
++			require.NoError(t, err)
++			tw := templatewriter.TemplateWriter{
++				Name: name, Template: string(contents),
++				Data: map[string]any{"IncludeWindows": false, "Mode": "bird"},
++				Patches: v1beta1.Patches{{
++					Target: v1beta1.PatchTarget{Kind: "DaemonSet", Name: "calico-node"},
++					Patch:  v1beta1.PatchSpec{Type: v1beta1.MergePatchType, Content: `{"spec":{"template":{"spec":{"nodeSelector":{"kubernetes.io/os":"linux"}}}}}`},
++				}},
++			}
++			var out bytes.Buffer
++			require.NoError(t, tw.WriteToBuffer(&out))
++			value, err := yaml.YAMLToJSON(out.Bytes())
++			require.NoError(t, err)
++			require.Equal(t, "null", string(value), "disabled templates must not create resources")
++		})
++	}
++}
++
+ const tmpl = `apiVersion: apps/v1
+ kind: Deployment
+ metadata:

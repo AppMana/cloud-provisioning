@@ -96,6 +96,9 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 		} else {
 			for public, site := range p.Sites {
 				if site.NodeUID == nodeUID {
+					if site.Forward != nil && site.Forward.Transit != nil {
+						return fmt.Errorf("native phase requires desired relay and receiver source-exception support")
+					}
 					peer, err := receiveSiteLegacyPeer(p, public)
 					if err != nil {
 						return err

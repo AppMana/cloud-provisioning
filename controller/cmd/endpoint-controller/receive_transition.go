@@ -191,7 +191,11 @@ func (r *meshReconciler) buildReceiveTransitionPlan(ctx context.Context, machine
 		if err != nil {
 			return fail(err)
 		}
-		plan.Sites[public] = tunnel.ReceiveTransitionSite{NodeName: receipt.NodeName, NodeUID: receipt.NodeUID, Client: receipt.Client, Legacy: &legacy}
+		forward, err := tunnel.PlanReceiveSitePath(mesh.Data, receipt.NodeName, public, plan.RootPublicKey, plan.Desired)
+		if err != nil {
+			return fail(err)
+		}
+		plan.Sites[public] = tunnel.ReceiveTransitionSite{NodeName: receipt.NodeName, NodeUID: receipt.NodeUID, Client: receipt.Client, Legacy: &legacy, Forward: &forward}
 	}
 	if len(plan.Sites) == 0 {
 		return fail(fmt.Errorf("receiver transition has no site paths"))

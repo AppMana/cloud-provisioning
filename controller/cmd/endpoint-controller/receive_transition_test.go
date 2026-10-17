@@ -111,6 +111,14 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	if retained.Tunnel == nil || !slices.Equal(retained.Tunnel.Addresses, []string{"10.100.0.1/24"}) || len(retained.Tunnel.Hosts) != 0 {
 		t.Fatal("direct site's journal lost its allocation or added a source exception")
 	}
+	forward := plan.Sites[preparationKey(16)].Forward
+	if forward == nil || forward.PeerPublicKey != preparationKey(16) || forward.Transit != nil {
+		t.Fatal("journal did not bind the new relay's direct desired path")
+	}
+	retainedForward := plan.Sites[preparationKey(8)].Forward
+	if retainedForward == nil || retainedForward.PeerPublicKey != preparationKey(8) || retainedForward.Transit != nil {
+		t.Fatal("journal did not preserve the external site's desired direct ownership")
+	}
 	verifyReceiveInventory(t, r, string(machine.GetUID()))
 	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
 		t.Fatalf("normal reconciliation could not resume its journal: %v", err)

@@ -47,6 +47,17 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 	if err := ValidateReceiveBindings(preparation.Receivers, p.RootPublicKey, bindings); err != nil {
 		return nil, err
 	}
+	hasForward := false
+	for _, site := range p.Sites {
+		hasForward = hasForward || site.Forward != nil
+	}
+	if hasForward {
+		for _, site := range p.Sites {
+			if site.Forward == nil {
+				return nil, fmt.Errorf("desired site forwarding projection is incomplete")
+			}
+		}
+	}
 	cloudRoutes := map[string]ReceiveRouteSelection{}
 	result := map[string]map[string]ReceiveRouteSelection{p.CloudNodeUID: cloudRoutes}
 	desired := map[string]PeerSpec{}
@@ -83,6 +94,9 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 					if err := ValidateReceiveSiteLegacy(*site.Legacy, path.PublicKey, previous, cloud); err != nil {
 						return nil, err
 					}
+				}
+				if err := ValidateReceiveSiteForward(site, path.PublicKey, p.Desired, cloud); err != nil {
+					return nil, err
 				}
 				if err := addReceiveRoutes(routes, cloud, selection); err != nil {
 					return nil, err

@@ -31,4 +31,5 @@ type ReceiveTransitionSite struct {
 	NodeUID  string             `json:"nodeUID"`
 	Client   SiteReceiveClient  `json:"client"`
 	Legacy   *ReceiveSiteLegacy `json:"legacy,omitempty"`
+	Forward  *ReceiveSitePath   `json:"forward,omitempty"`
 }

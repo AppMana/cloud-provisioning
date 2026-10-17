@@ -8,8 +8,9 @@ import (
 )
 
 // PlanReceiveSourceRoutes derives the complete site source-exception selection
-// from an admitted journal route set. Legacy journals retain their exceptions;
-// receiver-selected journals withdraw them. Allocation identity must agree
+// from an admitted journal route set. Each selected generation
+// supplies its own exceptions; a desired relay can still need a bare receiver
+// for tunnel-address sources. Allocation identity must agree
 // across workers even when their phases differ. Old plans without an explicit
 // tunnel projection cannot authorize this operation.
 //
@@ -87,8 +88,15 @@ func PlanReceiveSourceRoutes(intent ReceiveJournalRoutes) (map[string]ReceiveSit
 				current = ReceiveSiteTunnel{Addresses: slices.Clone(tunnel.Addresses), Hosts: []string{}}
 				hostSets[site.NodeUID] = map[string]bool{}
 			}
-			if legacy {
-				for _, host := range tunnel.Hosts {
+			selected := tunnel
+			if !legacy {
+				selected = nil
+				if site.Forward != nil {
+					selected = site.Forward.Tunnel
+				}
+			}
+			if selected != nil {
+				for _, host := range selected.Hosts {
 					hostSets[site.NodeUID][host] = true
 				}
 			}

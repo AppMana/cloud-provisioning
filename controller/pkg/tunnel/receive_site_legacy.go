@@ -8,19 +8,29 @@ import (
 	"strings"
 )
 
-// ReceiveSiteLegacy binds workload sources to the old cloud-side cryptokey
-// owner. Transit is nil for a direct path and contains only this worker's
-// destinations; other workers may still use different legacy relays.
-type ReceiveSiteLegacy struct {
+// ReceiveSitePath binds workload sources to a generation's cloud-side
+// cryptokey owner. Transit is nil for a direct path and contains only this
+// worker's destinations; other workers may use different relays.
+type ReceiveSitePath struct {
 	Sources       []string           `json:"sources"`
 	PeerPublicKey string             `json:"peerPublicKey"`
 	Transit       *TransitSpec       `json:"transit,omitempty"`
 	Tunnel        *ReceiveSiteTunnel `json:"tunnel,omitempty"`
 }
 
+// ReceiveSiteLegacy preserves the original public API name. Both generations
+// use the same source-ownership and next-hop contract.
+type ReceiveSiteLegacy = ReceiveSitePath
+
 // PlanReceiveSiteLegacy uses the acknowledged cloud document, not the current
 // relay election. The caller must bind base to the worker's applied hash.
 func PlanReceiveSiteLegacy(data map[string][]byte, node, public, cloud string, base PeerListDoc) (ReceiveSiteLegacy, error) {
+	return PlanReceiveSitePath(data, node, public, cloud, base)
+}
+
+// PlanReceiveSitePath binds forwarding to the supplied generation, independently
+// of the mutable relay election. The caller must commit the generation with it.
+func PlanReceiveSitePath(data map[string][]byte, node, public, cloud string, base PeerListDoc) (ReceiveSitePath, error) {
 	fail := func(reason string) (ReceiveSiteLegacy, error) {
 		return ReceiveSiteLegacy{}, fmt.Errorf("legacy site path: %s", reason)
 	}

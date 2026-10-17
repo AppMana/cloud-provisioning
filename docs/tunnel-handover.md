@@ -272,6 +272,11 @@ incarnation are revalidated around the operation. This does not admit a new peer
 generation or advance an unfinished phase. Cloud-neighbor projection and API
 reachability before live admission remain prerequisites for full reboot recovery.
 Idle transport rekey latency also requires separate recovery-deadline qualification.
+The native active-traffic recovery test uses distinct workload namespaces and
+IPv4/IPv6 request/reply probes, verifies encrypted traffic before receiver loss,
+and requires sustained replies plus a new authenticated session afterward.
+Its bounded receiver-loss check is separate from idle eventual restoration and
+from full worker reboot, API bootstrap and application continuity qualification.
 
 The Linux direct-route phase component implements prepare, forward and reverse
 switch, drain, abort and peer-scoped retirement. It reuses the route installer with a scope

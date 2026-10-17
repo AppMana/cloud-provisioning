@@ -23,6 +23,14 @@ import (
 // This checks eventual device restoration, not the deployment recovery deadline.
 // Idle WireGuard rekey latency must be qualified separately with workload traffic.
 func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
+	nativeRestoreCompletedReceivePaths(t, false)
+}
+
+func TestNativeRestoreCompletedReceiveTraffic(t *testing.T) {
+	nativeRestoreCompletedReceivePaths(t, true)
+}
+
+func nativeRestoreCompletedReceivePaths(t *testing.T, traffic bool) {
 	if os.Getenv("CLDT_RESTORE_RECEIVE_PATHS") != "1" {
 		t.Skip("requires isolated VM mount and network namespaces")
 	}
@@ -91,6 +99,10 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 	must(err)
 	wait(restore)
 	verifyNativeCloudPolicyRecovery(t, devices, cfg, root, plan, view, intent)
+	if traffic {
+		verifyNativeReceiveTrafficRecovery(t, devices, cfg, binding.Interface, client.Interface, restore)
+		return
+	}
 	siteCfg := cfg
 	siteCfg.nodeName = "site"
 	siteCfg.iface = "sitelegacy"

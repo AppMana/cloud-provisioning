@@ -14,6 +14,10 @@ import (
 // asynchronous switch. Read progress only from admitted controller journals;
 // receiver handshakes and prepare receipts do not prove forwarding completion.
 func verifyReceiveRelayDependencies(intent tunnel.ReceiveJournalRoutes, nodeUID, target string, targetView handover.View, now time.Time) error {
+	return visitReceiveRelayDependencies(intent, nodeUID, target, targetView, now, nil)
+}
+
+func visitReceiveRelayDependencies(intent tunnel.ReceiveJournalRoutes, nodeUID, target string, targetView handover.View, now time.Time, check func(tunnel.ReceiveTransitionSite, handover.Receipt) error) error {
 	fail := func(reason string) error { return fmt.Errorf("relay forwarding dependency: %s", reason) }
 	for machine, plan := range intent.Plans {
 		_, legacy := intent.Legacy[machine]
@@ -69,6 +73,13 @@ func verifyReceiveRelayDependencies(intent tunnel.ReceiveJournalRoutes, nodeUID,
 			}
 			if err := view.Round.ValidateReceipts(now, proofs); err != nil {
 				return fail("selected relay observation is stale or does not bind this round")
+			}
+			if check != nil {
+				for _, proof := range proofs {
+					if err := check(owner, proof.Receipt); err != nil {
+						return err
+					}
+				}
 			}
 		}
 	}

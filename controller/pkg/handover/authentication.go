@@ -123,6 +123,10 @@ func (a PodReceiptAuthenticator) Authenticate(ctx context.Context, bearer string
 	if !podReady || !nodeReady {
 		return fail("pod or node is not Ready")
 	}
+	receipt.ObservedBootID = bootID
+	receipt.AgentPodName = podName
+	receipt.AgentPodUID = podUID
+	receipt.AgentContainerName = a.ContainerName
 	return AuthenticatedReceipt{AuthenticatedNodeUID: nodeUID, Receipt: receipt}, nil
 }
 

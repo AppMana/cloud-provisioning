@@ -94,8 +94,31 @@ func TestPodReceiptAuthenticationRealAPI(t *testing.T) {
 	receipt := Receipt{AgentContainerID: "containerd://running-agent", NodeUID: string(nodes[0].UID), ObservedAt: time.Now()}
 	boot := nodes[0].Status.NodeInfo.BootID
 	proof, err := verifier.Authenticate(ctx, bearer, receipt, boot)
-	if err != nil || proof.AuthenticatedNodeUID != receipt.NodeUID || proof.Receipt != receipt {
+	expected := receipt
+	expected.ObservedBootID, expected.AgentPodName, expected.AgentPodUID, expected.AgentContainerName = boot, pods[0].Name, string(pods[0].UID), verifier.ContainerName
+	if err != nil || proof.AuthenticatedNodeUID != receipt.NodeUID || proof.Receipt != expected {
 		t.Fatal("valid pod credential did not authenticate its node", err)
+	}
+	if err := VerifyObservationIncarnation(ctx, api, ns, nodes[0].Name, proof.Receipt); err != nil {
+		t.Fatal("current dependency rejected", err)
+	}
+	spoofed := receipt
+	spoofed.ObservedBootID, spoofed.AgentPodName, spoofed.AgentPodUID, spoofed.AgentContainerName = "invented-boot", "invented-pod", "invented-uid", "invented-container"
+	if got, err := verifier.Authenticate(ctx, bearer, spoofed, boot); err != nil || got.Receipt != expected {
+		t.Fatal("untrusted identity was not replaced by authenticated identity", err)
+	}
+	nodes[0].Status.NodeInfo.BootID = "replacement-boot"
+	nodes[0], err = api.CoreV1().Nodes().UpdateStatus(ctx, nodes[0], metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyObservationIncarnation(ctx, api, ns, nodes[0].Name, proof.Receipt); err == nil {
+		t.Fatal("persisted dependency survived node reboot")
+	}
+	nodes[0].Status.NodeInfo.BootID = boot
+	nodes[0], err = api.CoreV1().Nodes().UpdateStatus(ctx, nodes[0], metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
 	}
 	reject := func(name, token string, policy PodReceiptAuthenticator, candidate Receipt, observedBoot string) {
 		t.Helper()
@@ -134,6 +157,9 @@ func TestPodReceiptAuthenticationRealAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	reject("observation-before-container-restart", bearer, verifier, receipt, boot)
+	if err := VerifyObservationIncarnation(ctx, api, ns, nodes[0].Name, proof.Receipt); err == nil {
+		t.Fatal("persisted dependency survived agent restart")
+	}
 	retimed := receipt
 	retimed.ObservedAt = started.Time.Add(time.Second)
 	reject("previous-container-current-timestamp", bearer, verifier, retimed, boot)
@@ -146,8 +172,10 @@ func TestPodReceiptAuthenticationRealAPI(t *testing.T) {
 	fresh := receipt
 	fresh.AgentContainerID = "containerd://restarted-agent"
 	fresh.ObservedAt = started.Time.Add(time.Second)
-	if _, err := verifier.Authenticate(ctx, bearer, fresh, boot); err != nil {
+	if current, err := verifier.Authenticate(ctx, bearer, fresh, boot); err != nil {
 		t.Fatal("current container observation rejected", err)
+	} else if err := VerifyObservationIncarnation(ctx, api, ns, nodes[0].Name, current.Receipt); err != nil {
+		t.Fatal("fresh dependency after restart rejected", err)
 	}
 	pods[0].Status.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{}
 	pods[0], err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pods[0], metav1.UpdateOptions{})

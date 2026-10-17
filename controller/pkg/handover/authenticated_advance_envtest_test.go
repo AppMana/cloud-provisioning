@@ -130,6 +130,26 @@ func verifyAuthenticatedAdvancement(t *testing.T, verifier PodReceiptAuthenticat
 		if err != nil || !reflect.DeepEqual(v.Round, view.Round) || len(v.Observed) != i+1 {
 			t.Fatal("partial progress advanced or lost its round", err)
 		}
+		reloaded, err := store.Load(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		persisted, err := reloaded.Transition().View()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, receipt := range persisted.Observed {
+			if receipt.ObservedBootID != boots[receipt.NodeUID] || receipt.AgentPodName == "" || receipt.AgentPodUID == "" || receipt.AgentContainerName != verifier.ContainerName {
+				t.Fatal("journal lost authenticated incarnation")
+			}
+			for _, node := range nodes {
+				if string(node.UID) == receipt.NodeUID {
+					if err := VerifyObservationIncarnation(ctx, verifier.API, verifier.Namespace, node.Name, receipt); err != nil {
+						t.Fatal("persisted incarnation cannot be verified", err)
+					}
+				}
+			}
+		}
 	}
 	next, err := store.AdvanceWithPodReceipts(ctx, digest, submissions, policies)
 	if err != nil {

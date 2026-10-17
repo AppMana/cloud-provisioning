@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -78,6 +79,20 @@ func TestRelaySwitchRequiresCurrentSuccessorObservation(t *testing.T) {
 		intent.Views["worker"] = v
 		if err := verifyReceiveRelayDependencies(intent, predecessor, "worker", v, now); err != nil {
 			t.Fatal("verified successor rejected", err)
+		}
+		checks := 0
+		restarted := func(owner tunnel.ReceiveTransitionSite, receipt handover.Receipt) error {
+			checks++
+			if owner.NodeUID != successor || receipt.NodeUID != successor {
+				t.Fatal("checked the wrong relay")
+			}
+			return fmt.Errorf("relay restarted")
+		}
+		if err := visitReceiveRelayDependencies(intent, predecessor, "worker", v, now, restarted); err == nil || checks != 1 {
+			t.Fatal("restarted relay did not block follower", err, checks)
+		}
+		if err := visitReceiveRelayDependencies(intent, successor, "worker", v, now, restarted); err != nil || checks != 1 {
+			t.Fatal("direct owner unexpectedly depends on follower", err, checks)
 		}
 		if err := verifyReceiveRelayDependencies(intent, predecessor, "worker", v, at.Add(30*time.Second)); err == nil {
 			t.Fatal("stale successor accepted")

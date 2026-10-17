@@ -65,6 +65,13 @@ type Round struct {
 }
 
 type Receipt struct {
+	// These fields are stamped by authentication from live API objects, not
+	// trusted from submissions. Persisting them permits dependency consumers
+	// to reject observations from a replaced pod or an earlier node boot.
+	ObservedBootID     string `json:"observedBootID,omitempty"`
+	AgentPodName       string `json:"agentPodName,omitempty"`
+	AgentPodUID        string `json:"agentPodUID,omitempty"`
+	AgentContainerName string `json:"agentContainerName,omitempty"`
 	// AgentContainerID identifies the process incarnation that made the native
 	// observation. Pod-bound credentials alone survive container restarts.
 	AgentContainerID string    `json:"agentContainerID,omitempty"`

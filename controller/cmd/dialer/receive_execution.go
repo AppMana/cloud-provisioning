@@ -113,6 +113,18 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 	if err := phaseCtx.Err(); err != nil {
 		return nil, err
 	}
+	checkRelay := func(owner tunnel.ReceiveTransitionSite, receipt handover.Receipt) error {
+		return handover.VerifyObservationIncarnation(phaseCtx, api, scope.Namespace, owner.NodeName, receipt)
+	}
+	checkDependencies := func(routes tunnel.ReceiveJournalRoutes) error {
+		if completedReadback || view.Round.Phase != handover.Switch {
+			return nil
+		}
+		return visitReceiveRelayDependencies(routes, admitted.NodeUID, scope.MachineUID, view, time.Now(), checkRelay)
+	}
+	if err := checkDependencies(set.Routes); err != nil {
+		return nil, err
+	}
 	if err := native(phaseCtx, admitted.Plan, view, admitted.NodeUID, set.Routes); err != nil {
 		return nil, err
 	}
@@ -128,6 +140,9 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 	}
 	if !sameReceiveSet(set, afterNative) {
 		return nil, fmt.Errorf("handover changed during native phase execution")
+	}
+	if err := checkDependencies(afterNative.Routes); err != nil {
+		return nil, err
 	}
 	current := afterNative.Local[scope.MachineUID]
 	if err := phaseCtx.Err(); err != nil {

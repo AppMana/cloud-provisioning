@@ -277,6 +277,28 @@ request and incomplete attempt; an expected interruption remains a measured
 interruption. Report maintenance acceptance separately from release eligibility.
 Do not remove failed samples or relax a gate to represent an exception.
 
+Each individual test description must carry its own scope and limitations; a
+reference to this table alone is insufficient. Use these fields in the private
+test artifact before starting the test:
+
+- **Fault and scope:** injection method, affected identities, candidate and
+  dependency versions, topology, and required qualification row, if any.
+- **Availability contract:** permitted interruption by observation lane, lanes
+  that must remain uninterrupted, and the explicitly approved maintenance
+  scope. Permission for one endpoint does not extend to other nodes or lanes.
+- **Recovery measurement:** injection time origin, usable recovery condition,
+  deadline, and observation period after recovery. One successful request does
+  not establish sustained recovery; keep subsequent failures in the result.
+- **Safety and cleanup:** abort condition, autonomous rollback coverage and
+  deadline, preserved foreign state, and expected resource cleanup.
+- **Limitations:** untested combinations, sampling gaps and resolution,
+  intentional target replacement, prerequisites, and conclusions this test
+  cannot establish.
+
+After execution, attach raw evidence and separate the observed outcome from
+release eligibility. Record skipped or blocked injections as incomplete, not
+passed; do not silently replace the planned fault with an easier operation.
+
 | Scenario | Required behavior and permitted interruption | Evidence limitations |
 | --- | --- | --- |
 | Local MTU controller maintenance | Restart one controller at a time; its direct API endpoint may be unavailable for at most 60 seconds. Other API endpoints and existing workloads must remain available. Verify recovery before advancing. | This local maintenance allowance does not qualify production migration or satisfy zero-management-failure rows. Static configuration validation does not prove coordinated rollback. Verify rendered CNI configuration and fresh pod MTU; existing pods can retain their old MTU. |
@@ -293,6 +315,8 @@ Do not remove failed samples or relax a gate to represent an exception.
 | Allocation churn, pod recreation and worker replacement | Observe allocation withdrawal and replacement through usable traffic, with no failures in required campaign lanes. Record intentional target lifecycle changes separately. | A replacement's readiness does not prove stale routes disappeared. Pin identities and use stable Services where testing continuity across pod-IP changes. |
 | Last-worker deletion | Delete through the provisioning lifecycle and verify final route withdrawal and resource release without existing-site regressions. | Empty Kubernetes listings do not prove AWS cleanup; inspect cloud resources. Do not bypass finalizers to make the test finish. |
 | Credential expiry and producer outage | Cross a real expiry boundary; verify projected credentials and actual observation requests. On renewal failure, preserve previous allocations and report observation failure. | Successful Secret publication does not prove projection or AWS authorization. A shorter run does not establish 24-hour credential continuity. |
+| Cloud bootstrap and stale ownership | Create workers through provisioning and CAPI, then verify authenticated site connectivity, Node registration, native CNI readiness and usable pod traffic. For obsolete owners, use normal lifecycle deletion and verify withdrawal before accepting reused addresses. Preserve existing-site connectivity. | A running instance, Ready infrastructure object or downloaded agent is not a working Kubernetes worker. Cleanup followed by recovery does not prove the original bootstrap met its deadline. Distinguish stale ownership from a live address collision; never remove a live owner's state merely to make provisioning pass. |
+| Sustained operation | Observe the same candidate for at least 24 hours with continuous management and workload measurements, including credential renewal and actual requests across expiry. | Adding disconnected short runs does not establish a continuous soak. A successful soak does not substitute for fault injection, and an unobserved interval cannot be inferred healthy from later readiness. |
 
 For every row, name untested combinations explicitly, including IP family,
 architecture, CNI, operating system, endpoint placement and site profile. Keep

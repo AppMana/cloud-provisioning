@@ -101,6 +101,26 @@ func TestNativeScopedTunnelSourcesPreserveOtherWorkers(t *testing.T) {
 	}
 	// Empty scoped intent must preserve outside-scope routes and their selectors.
 	for _, hosts := range [][]net.IPNet{owned, nil, owned[:1], owned, nil, owned} {
+		before := snapshot(false)
+		staged, err := preflightReceiveSourceSwitch(cfg, addresses, hosts, owned)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(before, snapshot(false)) {
+			t.Fatal("switch preflight mutated policy")
+		}
+		if err := reconcileTunnelSourceRoutes(cfg, addresses, staged); err != nil {
+			t.Fatal(err)
+		}
+		// An interrupted switch can retry without losing the staged union.
+		retry, err := preflightReceiveSourceSwitch(cfg, addresses, hosts, owned)
+		if err != nil || !reflect.DeepEqual(staged, retry) {
+			t.Fatal("staged switch is not retryable", err)
+		}
+		if err := verifyTunnelSourceRoutes(cfg, addresses, staged); err != nil {
+			t.Fatal(err)
+		}
+		checkPreserved()
 		if err := reconcileTunnelSourceRoutes(cfg, addresses, hosts); err != nil {
 			t.Fatal(err)
 		}
@@ -116,6 +136,9 @@ func TestNativeScopedTunnelSourcesPreserveOtherWorkers(t *testing.T) {
 		t.Fatal(err)
 	}
 	before := snapshot(false)
+	if _, err := preflightReceiveSourceSwitch(cfg, addresses, nil, owned); err == nil {
+		t.Fatal("switch accepted uncommitted destination")
+	}
 	if err := verifyTunnelSourceRoutes(cfg, addresses, owned); err == nil {
 		t.Fatal("unexpected scoped host was hidden as unrelated")
 	}
@@ -150,6 +173,9 @@ func TestNativeScopedTunnelSourcesPreserveOtherWorkers(t *testing.T) {
 				}
 			}
 			before := snapshot(false)
+			if _, err := preflightReceiveSourceSwitch(cfg, input, hosts, owned); err == nil {
+				t.Fatal("switch accepted unadmitted state")
+			}
 			if err := reconcileTunnelSourceRoutes(cfg, input, hosts); err == nil {
 				t.Fatal("scoped reconcile changed unadmitted state")
 			}

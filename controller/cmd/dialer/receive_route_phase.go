@@ -16,7 +16,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-// receiveLinuxPhase implements direct-routing generation handover operations.
+// receiveLinuxPhase implements generation handover operations.
 // Admission, durable checkpointing and the host lock belong to executeReceivePhase.
 // own contains admitted route source addresses; allocated contains the distinct
 // tunnel allocation for the stable address owner. Neither comes from kernel discovery.
@@ -57,8 +57,8 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 		return fmt.Errorf("native phase participant differs: %v", err)
 	}
 	cfg.receiveRoutes = intent.Receivers[nodeUID]
-	// Relay activation still requires the phase-specific source exception plan.
-	cfg.receiveRelayRoutes = nil
+	cfg.receiveRelayRoutes = map[string]string{}
+	allLegacyRelays := map[string]string{}
 	cfg.receiveRouteScope = map[string]bool{}
 	desired := map[string]bool{}
 	for raw := range cfg.receiveRoutes {
@@ -81,6 +81,8 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 			cfg.receiveRouteScope[raw] = true
 		}
 		var old []tunnel.PeerSpec
+		var relay *tunnel.TransitSpec
+		requireLegacyPeer := true
 		if nodeUID == p.CloudNodeUID {
 			var base tunnel.PeerListDoc
 			if err := json.Unmarshal(p.Base, &base); err != nil {
@@ -94,9 +96,19 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 		} else {
 			for public, site := range p.Sites {
 				if site.NodeUID == nodeUID {
-					peer, err := receiveDirectSiteLegacyPeer(p, public)
+					peer, err := receiveSiteLegacyPeer(p, public)
 					if err != nil {
 						return err
+					}
+					if site.Legacy != nil && site.Legacy.Transit != nil {
+						if site.Legacy.Tunnel == nil || intent.Sources == nil {
+							return fmt.Errorf("relayed phase requires committed source exceptions")
+						}
+						relay = site.Legacy.Transit
+						requireLegacyPeer = len(site.Legacy.Tunnel.Hosts) != 0
+						if err := validateReceiveSiteSources(p, public); err != nil {
+							return err
+						}
 					}
 					old = append(old, peer)
 				}
@@ -116,6 +128,16 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 			}
 			for _, raw := range destinations {
 				cfg.receiveRouteScope[raw] = true
+				if relay != nil {
+					_, dst, err := net.ParseCIDR(raw)
+					if err != nil || relay.Gateway(dst.IP) == nil {
+						return fmt.Errorf("legacy relay lacks a destination gateway")
+					}
+					allLegacyRelays[raw] = relay.Gateway(dst.IP).String()
+					if legacy {
+						cfg.receiveRelayRoutes[raw] = allLegacyRelays[raw]
+					}
+				}
 				if legacy {
 					desired[raw] = true
 				}
@@ -123,7 +145,7 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 			if machineUID == plan.MachineUID {
 				targetLegacyPeers[peer.PublicKey] = peer
 			}
-			if legacy || (machineUID == plan.MachineUID && view.Round.Phase != handover.Retire) {
+			if requireLegacyPeer && (legacy || (machineUID == plan.MachineUID && view.Round.Phase != handover.Retire)) {
 				legacyPeers[peer.PublicKey] = peer
 			}
 		}
@@ -189,6 +211,15 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	sourceAddresses, sourceHosts, admittedSourceHosts, err := receivePhaseSources(intent, nodeUID, allocated)
+	if err != nil {
+		return err
+	}
+	if view.Round.Phase != handover.Switch {
+		if err := verifyTunnelSourceRoutes(cfg, sourceAddresses, sourceHosts); err != nil {
+			return err
+		}
+	}
 	allocation := stableAddressOwnerRequest{MeshUID: plan.MeshUID, NodeUID: nodeUID, LegacyInterface: cfg.iface, RootPublicKey: key.PublicKey().String(), Addresses: allocated}
 	if view.Round.Phase == handover.Prepare {
 		if err := verifyReceiveRouteInstallation(cfg, hosts, nil, own); err != nil {
@@ -212,14 +243,29 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 		}
 	}
 	if view.Round.Phase == handover.Switch {
-		if err := preflightReceiveRoutePhase(cfg, allRoutes[nodeUID], own); err != nil {
+		if err := preflightReceiveRoutePhase(cfg, allRoutes[nodeUID], own, allLegacyRelays); err != nil {
+			return err
+		}
+		staged, err := preflightReceiveSourceSwitch(cfg, sourceAddresses, sourceHosts, admittedSourceHosts)
+		if err != nil {
+			return err
+		}
+		// Add rollback exceptions before changing egress, but retain forward
+		// exceptions until the replacement egress is installed.
+		if err := reconcileTunnelSourceRoutes(cfg, sourceAddresses, staged); err != nil {
 			return err
 		}
 		if err := installRoutes(cfg, hosts, nil, nil, nil, nil, own); err != nil {
 			return err
 		}
+		if err := reconcileTunnelSourceRoutes(cfg, sourceAddresses, sourceHosts); err != nil {
+			return err
+		}
 	}
 	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := verifyTunnelSourceRoutes(cfg, sourceAddresses, sourceHosts); err != nil {
 		return err
 	}
 	// Deletion never repairs routes to make its safety checks pass.
@@ -483,8 +529,15 @@ func preflightReceiveRoutePhase(cfg config, receivers map[string]receiveRouteSel
 // Source transfers and relayed sites require a separate admitted legacy routing
 // plan; the direct backend must reject them before any native mutation.
 func receiveDirectSiteLegacyPeer(p tunnel.ReceiveTransitionPlan, public string) (tunnel.PeerSpec, error) {
+	if legacy := p.Sites[public].Legacy; legacy != nil && legacy.Transit != nil {
+		return tunnel.PeerSpec{}, fmt.Errorf("site requires a relayed legacy path")
+	}
+	return receiveSiteLegacyPeer(p, public)
+}
+
+func receiveSiteLegacyPeer(p tunnel.ReceiveTransitionPlan, public string) (tunnel.PeerSpec, error) {
 	fail := func() (tunnel.PeerSpec, error) {
-		return tunnel.PeerSpec{}, fmt.Errorf("site requires an admitted legacy source path; direct receiver backend cannot carry this transition")
+		return tunnel.PeerSpec{}, fmt.Errorf("site requires an admitted legacy source path")
 	}
 	var base tunnel.PeerListDoc
 	if err := json.Unmarshal(p.Base, &base); err != nil {
@@ -495,9 +548,6 @@ func receiveDirectSiteLegacyPeer(p tunnel.ReceiveTransitionPlan, public string) 
 			if peer.PublicKey == p.RootPublicKey {
 				if err := tunnel.ValidateReceiveSiteLegacy(*legacy, public, base, peer); err != nil {
 					return tunnel.PeerSpec{}, err
-				}
-				if legacy.Transit != nil {
-					return fail()
 				}
 				return peer, nil
 			}

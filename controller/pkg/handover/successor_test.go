@@ -166,4 +166,41 @@ func verifyStoredSuccessor(t *testing.T, store Store, previous Snapshot) {
 	if secondArchive.Metadata().Name == archived.Metadata().Name {
 		t.Fatal("two generations shared an archive name")
 	}
+	if err := store.CheckHistory(ctx, loaded, previous); err != nil {
+		t.Fatalf("first generation history: %v", err)
+	}
+	secondSpec := view(t, transportFixture(t)).Round.Spec
+	secondSpec.TransitionUID = "successor-transition-2"
+	secondSpec.FromGeneration, secondSpec.ToGeneration = view(t, loaded.Transition()).ServingGeneration, "successor-generation-2"
+	secondPlan := []byte(`{"version":2,"transport":"second-successor-test"}`)
+	secondSpec.PlanHash = fmt.Sprintf("%x", sha256.Sum256(secondPlan))
+	for i, member := range view(t, loaded.Transition()).Round.Members {
+		secondSpec.Members[i].FromKey, secondSpec.Members[i].FromPeerKey = member.ToKey, member.ToPeerKey
+	}
+	latest, err := store.ReplaceCompleted(ctx, loaded, secondSpec, secondPlan, epoch.Add(time.Minute), policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, checkpoint := range []Snapshot{loaded, previous, earlier} {
+		if err := store.CheckHistory(ctx, latest, checkpoint); err != nil {
+			t.Fatalf("missed generation history: %v", err)
+		}
+	}
+	if err := store.CheckHistory(ctx, next, previous); err == nil {
+		t.Fatal("accepted obsolete live admission after history lookup")
+	}
+	if err := store.ConfigMaps.Delete(ctx, archived.Metadata().Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CheckHistory(ctx, latest, previous); err == nil {
+		t.Fatal("accepted a missing intermediate archive")
+	}
+	recreated := archived.object.DeepCopy()
+	recreated.UID, recreated.ResourceVersion = "", ""
+	if _, err := store.ConfigMaps.Create(ctx, recreated, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CheckHistory(ctx, latest, previous); err == nil {
+		t.Fatal("accepted an intermediate archive recreated with identical bytes")
+	}
 }

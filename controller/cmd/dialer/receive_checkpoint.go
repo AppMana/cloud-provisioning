@@ -117,7 +117,8 @@ func readReceiveJournalCheckpointForAdmission(path string, store handover.Store,
 // existing bootstrap/pod reconciliation lock. It is not a native phase executor.
 // Corrupt or superseded recovery state blocks admission rather than falling back
 // to the legacy peer cache. A new boot requires successful live admission and
-// extending journal history before replacement; old observations remain fenced.
+// extending journal history before replacement. A generation boundary also
+// requires the complete pinned archive chain; old observations remain fenced.
 func checkpointReceiveJournal(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key) (admittedReceiveJournal, error) {
 	fail := func(err error) (admittedReceiveJournal, error) { return admittedReceiveJournal{}, err }
 	if scope.MachineUID == "" || store.Name != tunnel.ReceiveTransitionName(scope.MachineUID) {
@@ -143,7 +144,7 @@ func checkpointReceiveJournalLocked(ctx context.Context, api kubernetes.Interfac
 		return fail(err)
 	}
 	if readErr == nil {
-		if err := admitted.Snapshot.Extends(previous.Snapshot); err != nil {
+		if err := store.CheckHistory(ctx, admitted.Snapshot, previous.Snapshot); err != nil {
 			return fail(err)
 		}
 	}

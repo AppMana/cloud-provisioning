@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -51,12 +52,11 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 		}, func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes, key wgtypes.Key) error {
 			return restoreCompletedReceiveState(ctx, devices, cfg, key, plan, view, nodeUID, intent)
 		})
-		if err != nil {
-			return err
-		}
 		if handled {
-			return reconcileReceiveNeighbors(ctx, k, cfg, func(ctx context.Context, key wgtypes.Key, peers []tunnel.PeerSpec, own []string) error {
-				return installReceiveNeighbors(ctx, devices, cfg, key, peers, own)
+			// Ordinary neighbors have independent live admission. Do not starve
+			// their recovery while phase verification waits for their routes.
+			neighborErr := reconcileReceiveNeighbors(ctx, k, cfg, func(ctx context.Context, key wgtypes.Key, peers []tunnel.PeerSpec, own []string) error {
+				return restoreReceiveNeighbors(ctx, devices, cfg, key, peers, own)
 			}, func(ctx context.Context, key wgtypes.Key, mesh *corev1.Secret, peers []tunnel.PeerSpec, check func() error) error {
 				roots := make(map[string]bool, len(peers))
 				for _, peer := range peers {
@@ -64,6 +64,10 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 				}
 				return reconcileDurableSiteReceiversScoped(ctx, k, devices, cfg, mesh, key, &siteReceiveScope{roots: roots, check: check})
 			})
+			return errors.Join(err, neighborErr)
+		}
+		if err != nil {
+			return err
 		}
 	}
 	lock, err := lockLegacyReconciliation(cfg)

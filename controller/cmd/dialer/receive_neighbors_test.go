@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -57,7 +58,7 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 	mesh.Data[tunnel.PeerRouteHostsPrefix+"joining"] = []byte("172.29.0.2")
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: mesh.Namespace, Name: "neighbor-agent", UID: "neighbor-pod"}, Spec: corev1.PodSpec{NodeName: "site"}, Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://initial", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}}}}}
 	objects := []runtime.Object{mesh, index, journal, adoption, node, pod, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system", UID: types.UID(store.ClusterUID)}}}
-	for _, fault := range []string{"valid", "complete", "mesh-before", "mesh-after", "journal-after", "cluster-after", "inventory-after", "boot", "agent", "agent-after", "checkpoint", "overlap", "missing-inventory", "native", "prepare-after"} {
+	for _, fault := range []string{"valid", "complete", "previous-boot", "previous-boot-stale-api", "empty-boot", "mesh-before", "mesh-after", "journal-after", "cluster-after", "inventory-after", "boot", "agent", "agent-after", "checkpoint", "overlap", "missing-inventory", "native", "prepare-after"} {
 		t.Run(fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -72,6 +73,18 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 			k := fake.NewClientset(copies...)
 			cfg := config{iface: "wgneighbors", nodeName: "site", secretNamespace: mesh.Namespace, secretName: mesh.Name, receiptMeshName: mesh.Name, receiptPodName: pod.Name, receiptPodUID: string(pod.UID), privateKeyFile: filepath.Join(t.TempDir(), "key")}
 			must(os.WriteFile(cfg.privateKeyFile, []byte(site.String()), 0600))
+			checkpointPath := filepath.Join(filepath.Dir(cfg.privateKeyFile), cfg.iface+".reconcile.lock.neighbors.json")
+			var oldCheckpoint []byte
+			if fault == "previous-boot" || fault == "previous-boot-stale-api" || fault == "empty-boot" {
+				boot := "previous-boot"
+				if fault == "empty-boot" {
+					boot = ""
+				}
+				oldCheckpoint, err = json.Marshal(receiveNeighborCheckpoint{Version: 1, InventoryUID: string(index.UID), MeshUID: string(mesh.UID), MeshVersion: "old", NodeUID: string(node.UID), BootID: boot, PublicKey: site.PublicKey().String(), Peers: []tunnel.PeerSpec{}})
+				must(err)
+				must(os.WriteFile(checkpointPath, oldCheckpoint, 0600))
+			}
+
 			changeMesh := func() error {
 				current, err := k.CoreV1().Secrets(mesh.Namespace).Get(ctx, mesh.Name, metav1.GetOptions{})
 				if err != nil {
@@ -119,7 +132,7 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 					current.ResourceVersion += "-changed"
 					return false, nil, k.Tracker().Update(corev1.SchemeGroupVersion.WithResource("secrets"), current, mesh.Namespace)
 				})
-			case "boot":
+			case "boot", "previous-boot-stale-api":
 				current := node.DeepCopy()
 				current.Status.NodeInfo.BootID = "different"
 				_, err := k.CoreV1().Nodes().UpdateStatus(ctx, current, metav1.UpdateOptions{})
@@ -196,8 +209,17 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 				return check()
 			}
 			err := reconcileReceiveNeighbors(ctx, k, cfg, native, prepare)
-			if fault == "valid" || fault == "complete" {
+			if fault == "valid" || fault == "complete" || fault == "previous-boot" {
 				must(err)
+				if fault == "previous-boot" {
+					raw, err := os.ReadFile(checkpointPath)
+					must(err)
+					var checkpoint receiveNeighborCheckpoint
+					must(json.Unmarshal(raw, &checkpoint))
+					if checkpoint.BootID != node.Status.NodeInfo.BootID || len(checkpoint.Peers) != 1 {
+						t.Fatal("live recovery did not replace old-boot intent with current projection")
+					}
+				}
 				if calls != 1 || preparations != 1 {
 					t.Fatal("valid neighbor not installed and prepared")
 				}
@@ -239,6 +261,13 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 			} else {
 				if err == nil {
 					t.Fatal("unsafe neighbor admission succeeded")
+				}
+				if fault == "previous-boot-stale-api" || fault == "empty-boot" {
+					current, err := os.ReadFile(checkpointPath)
+					must(err)
+					if !bytes.Equal(current, oldCheckpoint) {
+						t.Fatal("failed boot admission replaced neighbor checkpoint")
+					}
 				}
 				want := 0
 				if fault == "mesh-after" || fault == "journal-after" || fault == "agent-after" || fault == "cluster-after" || fault == "inventory-after" || fault == "native" || fault == "prepare-after" {

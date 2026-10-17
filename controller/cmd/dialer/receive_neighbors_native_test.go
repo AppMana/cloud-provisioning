@@ -125,6 +125,20 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 	cfg := config{iface: "neighbors", routeTable: 517, fwmark: 517, keepaliveSecs: 5}
 	verifyNativePolicyRecovery(t, devices, cfg, root, protected, protectedRoute)
 	probe(existing)
+	// Recovery must make its routes ready before the broader policy repair can
+	// validate the whole mesh. It must not reinstall shared lookup rules itself.
+	peer := tunnel.PeerSpec{PublicKey: neighbor.String(), Remote: true, Endpoint: "127.0.0.1:51823", WGAllowedIPs: []string{"10.77.0.3/32", "10.77.1.0/24", "10.77.1.4/32"}, RouteHosts: []string{"10.77.0.3"}}
+	removeRouteRule(cfg.routeTable, cfg.fwmark)
+	if err := installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}); err == nil {
+		t.Fatal("ordinary installation accepted missing shared policy")
+	}
+	must(restoreReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}))
+	if err := verifyReceivePolicyRules(cfg); err == nil {
+		t.Fatal("partition recovery installed shared lookup rules")
+	}
+	must(ensureRouteRule(cfg.routeTable, cfg.fwmark))
+	probe(existing)
+	probe(joining)
 	stop := make(chan struct{})
 	done := make(chan struct{ attempts, failures int }, 1)
 	go func() {
@@ -151,7 +165,7 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 		}
 		t.Logf("protected stream: %d attempts, %d failures", result.attempts, result.failures)
 	}()
-	peer := tunnel.PeerSpec{PublicKey: neighbor.String(), Remote: true, Endpoint: "127.0.0.1:51823", WGAllowedIPs: []string{"10.77.0.3/32", "10.77.1.0/24", "10.77.1.4/32"}, RouteHosts: []string{"10.77.0.3"}}
+
 	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}))
 	probe(joining)
 	// Reapplication must preserve both established sessions and foreign routes.
@@ -168,8 +182,14 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 		defer conn.Close()
 		probe(conn)
 	})
-	for _, fault := range []string{"reserved-source", "changed-source", "foreign-route", "covering-route", "main-route", "cancelled"} {
+	for _, fault := range []string{"reserved-source", "changed-source", "foreign-route", "foreign-rule", "covering-route", "main-route", "cancelled"} {
 		t.Run(fault, func(t *testing.T) {
+			must := func(err error) {
+				t.Helper()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
 			candidate := peer
 			ctx := context.Background()
 			switch fault {
@@ -182,6 +202,11 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 				r := netlink.Route{LinkIndex: link.Attrs().Index, Dst: dst, Table: 517, Scope: netlink.SCOPE_LINK, Protocol: unix.RTPROT_STATIC, Priority: 42}
 				must(netlink.RouteAdd(&r))
 				defer netlink.RouteDel(&r)
+			case "foreign-rule":
+				rule := netlink.NewRule()
+				rule.Family, rule.Table, rule.Priority = netlink.FAMILY_V4, cfg.routeTable, cfg.routeTable+10
+				must(netlink.RuleAdd(rule))
+				defer netlink.RuleDel(rule)
 			case "main-route":
 				_, dst, _ := net.ParseCIDR("10.77.0.3/32")
 				r := netlink.Route{LinkIndex: link.Attrs().Index, Dst: dst, Table: unix.RT_TABLE_MAIN, Scope: netlink.SCOPE_LINK, Protocol: unix.RTPROT_BOOT}
@@ -199,6 +224,9 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 			}
 			if err := installReceiveNeighbors(ctx, devices, cfg, root, []tunnel.PeerSpec{candidate}, []string{"10.77.0.1"}); err == nil {
 				t.Fatal("unsafe change accepted")
+			}
+			if err := restoreReceiveNeighbors(ctx, devices, cfg, root, []tunnel.PeerSpec{candidate}, []string{"10.77.0.1"}); err == nil {
+				t.Fatal("unsafe recovery accepted")
 			}
 		})
 		probe(joining)

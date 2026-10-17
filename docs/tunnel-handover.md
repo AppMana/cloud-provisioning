@@ -256,9 +256,15 @@ Every unfinished local round must still be executable, and active switches must
 retain their live relay dependencies; maintenance uses the earliest local expiry.
 Shared lookup rules remain the responsibility of the separately admitted
 live-mesh policy reconciler. Final phase verification still requires them.
-Ordinary-neighbor recovery and cloud policy admission remain prerequisites for
-full reboot recovery. Idle transport rekey latency also requires separate
-recovery-deadline qualification.
+Ordinary site neighbors retain independent live admission even when journal
+verification fails. Their recovery can restore the admitted peer and route
+partition while shared lookup rules remain absent; it does not install those
+rules or issue a whole-mesh forwarding acknowledgement. The original phase
+error remains visible until phase verification succeeds. Earlier-boot neighbor
+checkpoints require fresh complete-set admission against the current local boot;
+cached peers are never replayed. Cloud-neighbor projection and cloud policy
+admission remain prerequisites for full reboot recovery. Idle transport rekey
+latency also requires separate recovery-deadline qualification.
 
 The Linux direct-route phase component implements prepare, forward and reverse
 switch, drain, abort and peer-scoped retirement. It reuses the route installer with a scope

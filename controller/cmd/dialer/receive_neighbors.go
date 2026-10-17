@@ -186,6 +186,8 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		}
 		return ctx.Err()
 	}
+	// Earlier-boot intent is admissible only after the complete live journal
+	// set has verified the current local boot. Cached peers are never replayed.
 	saved := receiveNeighborCheckpoint{Version: 1, InventoryUID: string(set.Metadata.UID), MeshUID: string(mesh.UID), MeshVersion: mesh.ResourceVersion, NodeUID: local.NodeUID, BootID: local.BootID, PublicKey: key.PublicKey().String(), Peers: peers}
 	path := lock.Name() + ".neighbors.json"
 	if raw, err := os.ReadFile(path); err == nil {
@@ -199,7 +201,7 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		if err := decoder.Decode(&trailing); err != io.EOF {
 			return fmt.Errorf("trailing neighbor checkpoint data")
 		}
-		if previous.Version != 1 || previous.InventoryUID != saved.InventoryUID || previous.MeshUID != saved.MeshUID || previous.NodeUID != saved.NodeUID || previous.BootID != saved.BootID || previous.PublicKey != saved.PublicKey || previous.Peers == nil {
+		if previous.Version != 1 || previous.InventoryUID != saved.InventoryUID || previous.MeshUID != saved.MeshUID || previous.NodeUID != saved.NodeUID || previous.BootID == "" || previous.PublicKey != saved.PublicKey || previous.Peers == nil {
 			return fmt.Errorf("neighbor checkpoint identity changed")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {

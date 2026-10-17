@@ -18,6 +18,16 @@ import (
 // journal inventory and mesh publication before calling. It cannot retire a
 // peer, withdraw existing source authorization, or recreate the root device.
 func installReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, peers []tunnel.PeerSpec, own []string) error {
+	return reconcileReceiveNeighborPartition(ctx, devices, cfg, key, peers, own, false)
+}
+
+// Recovery repairs only this independently admitted partition. Shared policy
+// rules can remain absent until the full live-mesh policy verifier admits them.
+func restoreReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, peers []tunnel.PeerSpec, own []string) error {
+	return reconcileReceiveNeighborPartition(ctx, devices, cfg, key, peers, own, true)
+}
+
+func reconcileReceiveNeighborPartition(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, peers []tunnel.PeerSpec, own []string, recovery bool) error {
 	if len(peers) == 0 {
 		return nil
 	}
@@ -143,7 +153,7 @@ func installReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg c
 			return err
 		}
 		missing, err := planTunnelRules(rules, family, cfg.routeTable, cfg.fwmark)
-		if err != nil || len(missing) != 0 {
+		if err != nil || (!recovery && len(missing) != 0) {
 			return fmt.Errorf("neighbor requires intact existing tunnel policy: %v", err)
 		}
 		routes, err := netlink.RouteListFiltered(family, &netlink.Route{Table: unix.RT_TABLE_MAIN, LinkIndex: link.Attrs().Index}, netlink.RT_FILTER_TABLE|netlink.RT_FILTER_OIF)
@@ -173,7 +183,7 @@ func installReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg c
 			return err
 		}
 	}
-	if err := installRoutes(cfg, destinations, nil, nil, nil, nil, own); err != nil {
+	if err := installRoutesWithPolicy(cfg, destinations, nil, nil, nil, nil, own, !recovery); err != nil {
 		return err
 	}
 	after, err := devices.Device(cfg.iface)

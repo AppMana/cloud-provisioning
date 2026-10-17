@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -385,4 +386,62 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 			}
 		})
 	}
+	t.Run("source-withdrawal-preserves-deletion-intent", func(t *testing.T) {
+		// A rejected shrink must preserve ownership across retries and subsequent
+		// deletion. This uses simulated native mutation, not packet continuity.
+		for _, source := range []string{"172.29.99.1/32", "2001:db8:99::1/128"} {
+			t.Run(source, func(t *testing.T) {
+				copies := make([]runtime.Object, 0, len(objects))
+				for _, object := range objects {
+					copies = append(copies, object.DeepCopyObject())
+				}
+				k := fake.NewClientset(copies...)
+				cfg := config{iface: "wgneighbors", nodeName: "site", secretNamespace: mesh.Namespace, secretName: mesh.Name, receiptMeshName: mesh.Name, receiptPodName: pod.Name, receiptPodUID: string(pod.UID), privateKeyFile: filepath.Join(t.TempDir(), "key")}
+				must(os.WriteFile(cfg.privateKeyFile, []byte(site.String()), 0600))
+				path := filepath.Join(filepath.Dir(cfg.privateKeyFile), cfg.iface+".reconcile.lock.neighbors.json")
+				prior := tunnel.PeerSpec{PublicKey: neighbor.PublicKey().String(), Remote: true, Endpoint: "198.51.100.2:51820", WGAllowedIPs: []string{"172.29.0.2/32", source}}
+				raw, err := json.Marshal(receiveNeighborCheckpoint{Version: 1, InventoryUID: string(index.UID), MeshUID: string(mesh.UID), MeshVersion: "old", NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, PublicKey: site.PublicKey().String(), Peers: []tunnel.PeerSpec{prior}})
+				must(err)
+				must(os.WriteFile(path, raw, 0600))
+				rejectNative := func(context.Context, wgtypes.Key, []tunnel.PeerSpec, []string, []tunnel.PeerSpec, []string, func() error) error {
+					t.Fatal("unsupported shrink reached native mutation")
+					return nil
+				}
+				for attempt := 0; attempt < 2; attempt++ {
+					if err := reconcileReceiveNeighbors(ctx, k, cfg, rejectNative, nil); err == nil {
+						t.Fatal("source withdrawal accepted without a transition")
+					}
+					actual, err := os.ReadFile(path)
+					must(err)
+					if !bytes.Equal(actual, raw) {
+						t.Fatal("rejected withdrawal replaced ownership checkpoint")
+					}
+					if _, err := os.Stat(path + ".retiring"); !os.IsNotExist(err) {
+						t.Fatal("rejected withdrawal created retirement intent", err)
+					}
+				}
+				current, err := k.CoreV1().Secrets(mesh.Namespace).Get(ctx, mesh.Name, metav1.GetOptions{})
+				must(err)
+				for _, prefix := range []string{tunnel.PeerPublicKeyPrefix, tunnel.PeerEndpointPrefix, tunnel.PeerAllowedIPsPrefix, tunnel.PeerRouteHostsPrefix} {
+					delete(current.Data, prefix+"joining")
+				}
+				current.ResourceVersion += "-deleted"
+				_, err = k.CoreV1().Secrets(mesh.Namespace).Update(ctx, current, metav1.UpdateOptions{})
+				must(err)
+				calls := 0
+				retire := func(_ context.Context, _ wgtypes.Key, peers []tunnel.PeerSpec, _ []string, retiring []tunnel.PeerSpec, _ []string, commit func() error) error {
+					calls++
+					if len(peers) != 0 || len(retiring) != 1 || retiring[0].PublicKey != prior.PublicKey || !reflect.DeepEqual(retiring[0].WGAllowedIPs, prior.WGAllowedIPs) {
+						t.Fatalf("lost previous source permissions: %+v", retiring)
+					}
+					return commit()
+				}
+				must(reconcileReceiveNeighbors(ctx, k, cfg, retire, nil))
+				if calls != 1 {
+					t.Fatal("deletion did not reach native retirement")
+				}
+			})
+		}
+	})
+
 }

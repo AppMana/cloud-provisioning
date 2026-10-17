@@ -220,6 +220,9 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 			legacy = false
 			prior = previous.Retiring
 		}
+		if err := validateReceiveNeighborSourceGrowth(prior, peers); err != nil {
+			return err
+		}
 		for _, peer := range prior {
 			if !known[peer.PublicKey] {
 				previousPeers = append(previousPeers, peer)
@@ -238,6 +241,9 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 			}
 			old, err := tunnel.SitePeers(cached.Data)
 			if err != nil {
+				return err
+			}
+			if err := validateReceiveNeighborSourceGrowth(old, peers); err != nil {
 				return err
 			}
 			known := map[string]bool{}
@@ -300,4 +306,30 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	}
 	retirement.Retiring = nil
 	return writeDurableJSON(path+".retiring", retirement)
+}
+
+// Native ordinary-peer reconciliation accepts growth only. Reject unsupported
+// withdrawal before replacing durable intent, including after a failed attempt:
+// later whole-peer retirement still needs the exact previous permissions.
+func validateReceiveNeighborSourceGrowth(previous, desired []tunnel.PeerSpec) error {
+	wanted := make(map[string]map[string]bool, len(desired))
+	for _, peer := range desired {
+		sources := make(map[string]bool, len(peer.WGAllowedIPs))
+		for _, source := range peer.WGAllowedIPs {
+			sources[source] = true
+		}
+		wanted[peer.PublicKey] = sources
+	}
+	for _, peer := range previous {
+		sources, retained := wanted[peer.PublicKey]
+		if !retained {
+			continue
+		}
+		for _, source := range peer.WGAllowedIPs {
+			if !sources[source] {
+				return fmt.Errorf("withdrawing existing neighbor source authorization requires a separate transition")
+			}
+		}
+	}
+	return nil
 }

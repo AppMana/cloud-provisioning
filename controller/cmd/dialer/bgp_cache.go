@@ -23,6 +23,7 @@ import (
 
 // Advertisements follow successful forwarding, including after offline replay.
 func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl.Client, cfg config, speaker *transitSpeaker) error {
+	cfg.receiveRecoveryDevices = devices
 	if cfg.receiptURL != "" {
 		if k == nil {
 			return fmt.Errorf("receiver dispatch requires an in-cluster API client")

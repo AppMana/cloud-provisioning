@@ -21,12 +21,13 @@ import (
 )
 
 type receiveBootState struct {
-	Config  config
-	Key     wgtypes.Key
-	Plan    tunnel.ReceiveTransitionPlan
-	View    handover.View
-	Routes  tunnel.ReceiveJournalRoutes
-	NodeUID string
+	Config    config
+	Key       wgtypes.Key
+	Plan      tunnel.ReceiveTransitionPlan
+	View      handover.View
+	Routes    tunnel.ReceiveJournalRoutes
+	NodeUID   string
+	Endpoints map[string]string
 }
 
 type receiveBootPending struct{ error }
@@ -63,7 +64,19 @@ func recoverReceiveBoot(ctx context.Context, devices receiverDevices, cfg config
 			}
 		}()
 		if err := restoreCompletedReceiveState(ctx, devices, state.Config, state.Key, state.Plan, state.View, state.NodeUID, state.Routes); err != nil {
-			return err
+			if len(state.Endpoints) == 0 {
+				return err
+			}
+			selections, selectionErr := receiveEndpointSelections(state.Routes, state.NodeUID)
+			if selectionErr != nil {
+				return selectionErr
+			}
+			if hintErr := restoreReceiveBootEndpoints(devices, state.Config, selections, state.Endpoints, check); hintErr != nil {
+				return hintErr
+			}
+			if err := restoreCompletedReceiveState(ctx, devices, state.Config, state.Key, state.Plan, state.View, state.NodeUID, state.Routes); err != nil {
+				return err
+			}
 		}
 		groups, err := planSelectedCloudReceivePolicy(state.Config, state.Key, state.Plan, state.View, state.NodeUID, state.Routes)
 		if err != nil {
@@ -196,6 +209,18 @@ func admitReceiveBoot(ctx context.Context, cfg config, native func(receiveBootSt
 		return true, fmt.Errorf("boot recovery cannot advance unfinished intent")
 	}
 	state := receiveBootState{Config: cfg, Key: key, Plan: recovered.Plan, View: view, Routes: routes, NodeUID: inventory.NodeUID}
+	selections, err := receiveEndpointSelections(routes, inventory.NodeUID)
+	if err != nil {
+		return true, err
+	}
+	endpoints, endpointRaw, err := readReceiveBootEndpoints(observationPath, files[observationPath], selections)
+	if err != nil {
+		return true, err
+	}
+	state.Endpoints = endpoints
+	if endpointRaw != nil {
+		files[receiveBootEndpointsPath(observationPath)] = endpointRaw
+	}
 	check := func() error {
 		if err := ctx.Err(); err != nil {
 			return err

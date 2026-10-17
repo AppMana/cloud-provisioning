@@ -24,18 +24,22 @@ import (
 // This checks eventual device restoration, not the deployment recovery deadline.
 // Idle WireGuard rekey latency must be qualified separately with workload traffic.
 func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
-	nativeRestoreCompletedReceivePaths(t, false, false)
+	nativeRestoreCompletedReceivePaths(t, false, false, false)
 }
 
 func TestNativeRestoreCompletedReceiveTraffic(t *testing.T) {
-	nativeRestoreCompletedReceivePaths(t, true, false)
+	nativeRestoreCompletedReceivePaths(t, true, false, false)
 }
 
 func TestNativeRestoreCompletedReceiveBoot(t *testing.T) {
-	nativeRestoreCompletedReceivePaths(t, true, true)
+	nativeRestoreCompletedReceivePaths(t, true, true, false)
 }
 
-func nativeRestoreCompletedReceivePaths(t *testing.T, traffic, bootRecovery bool) {
+func TestNativeRestoreCompletedReceiveIdleBoot(t *testing.T) {
+	nativeRestoreCompletedReceivePaths(t, true, true, true)
+}
+
+func nativeRestoreCompletedReceivePaths(t *testing.T, traffic, bootRecovery, endpointRecovery bool) {
 	if os.Getenv("CLDT_RESTORE_RECEIVE_PATHS") != "1" {
 		t.Skip("requires isolated VM mount and network namespaces")
 	}
@@ -114,6 +118,22 @@ func nativeRestoreCompletedReceivePaths(t *testing.T, traffic, bootRecovery bool
 			host.nodeName = ""
 			host.peersFile = filepath.Join(t.TempDir(), "peers.json")
 			writeReceiveBootFixture(t, host, root, plan, false)
+			if endpointRecovery {
+				endpoints, err := captureReceiveBootEndpoints(devices, cfg, intent, plan.CloudNodeUID, time.Now())
+				must(err)
+				selections, err := receiveEndpointSelections(intent, plan.CloudNodeUID)
+				must(err)
+				before, err := devices.Device(binding.Interface)
+				must(err)
+				must(restoreReceiveBootEndpoints(devices, cfg, selections, map[string]string{pub: "192.0.2.99:51820"}, func() error { return nil }))
+				after, err := devices.Device(binding.Interface)
+				must(err)
+				if after.Peers[0].Endpoint.String() != before.Peers[0].Endpoint.String() || after.Peers[0].PersistentKeepaliveInterval != before.Peers[0].PersistentKeepaliveInterval {
+					t.Fatal("endpoint hints overwrote a live peer")
+				}
+				path := filepath.Join(filepath.Dir(host.peersFile), host.iface+".reconcile.lock."+tunnel.ReceiveTransitionName(plan.MachineUID)+".json")
+				must(writeReceiveBootEndpoints(receiveNativeObservationPath(path, tunnel.ReceiveTransitionName(plan.MachineUID)), endpoints))
+			}
 			// The host defaults differ from the agent's verified routing scope.
 			host.routeTable, host.fwmark, host.mtu = 517, 517, 1420
 			host.pollInterval = 30 * time.Second
@@ -152,6 +172,11 @@ func nativeRestoreCompletedReceivePaths(t *testing.T, traffic, bootRecovery bool
 				}
 				return nil
 			}
+		}
+		if endpointRecovery {
+			must(fault())
+			wait(restore, time.Minute)
+			return
 		}
 		verifyNativeReceiveTrafficRecovery(t, devices, cfg, binding.Interface, client.Interface, restore, fault, restoreInterval)
 		return

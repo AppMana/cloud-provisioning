@@ -122,8 +122,9 @@ type config struct {
 	receiveRelayRoutes map[string]string
 	// A phase owns only these destinations. Nil retains ordinary whole-table
 	// reconciliation; a non-nil scope must be derived from admitted journals.
-	receiveRouteScope map[string]bool
-	siteRecovery      *siteForwardingCache
+	receiveRouteScope      map[string]bool
+	siteRecovery           *siteForwardingCache
+	receiveRecoveryDevices receiverDevices
 
 	// transitMasqueradeSource, when set (a CIDR, the tunnel subnet),
 	// makes this node a transit for tunnel peers reaching cluster

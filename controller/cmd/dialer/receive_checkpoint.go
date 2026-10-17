@@ -196,7 +196,21 @@ func checkpointReceiveNativeObservation(ctx context.Context, api kubernetes.Inte
 		return err
 	}
 	path := lockPath + "." + store.Name + ".json"
-	return writeDurableJSON(receiveNativeObservationPath(path, store.Name), saved)
+	observationPath := receiveNativeObservationPath(path, store.Name)
+	var endpoints map[string]string
+	if cfg.receiveRecoveryDevices != nil {
+		endpoints, err = captureReceiveBootEndpoints(cfg.receiveRecoveryDevices, cfg, set.Routes, admitted.NodeUID, time.Now())
+		if err != nil {
+			return err
+		}
+	}
+	if err := writeDurableJSON(observationPath, saved); err != nil {
+		return err
+	}
+	if cfg.receiveRecoveryDevices != nil {
+		return writeReceiveBootEndpoints(observationPath, endpoints)
+	}
+	return nil
 }
 
 // Keep the strict journal checkpoint format unchanged for older agents. The

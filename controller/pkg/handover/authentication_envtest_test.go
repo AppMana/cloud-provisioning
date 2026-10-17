@@ -114,6 +114,13 @@ func TestPodReceiptAuthenticationRealAPI(t *testing.T) {
 		t.Fatal("second daemon could not authenticate its own node", err)
 	}
 	verifyAuthenticatedAdvancement(t, verifier, nodes, []string{bearer, otherBearer})
+	verifyReceiptTransport(t, verifier, nodes, []string{bearer, otherBearer})
+	for i := range pods {
+		pods[i], err = api.CoreV1().Pods(ns).Get(ctx, pods[i].Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	// A container restart preserves the Pod token, image and Node boot ID.
 	// Observations made by the previous container must not authorize a phase.

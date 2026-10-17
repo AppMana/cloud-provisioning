@@ -17,9 +17,12 @@ const planKey = "plan.json"
 // API resourceVersion and UID protect against concurrent writes and recreation.
 // It does not retry conflicts: reload authoritative state before recomputing.
 type Store struct {
-	ConfigMaps      typedcore.ConfigMapInterface
-	Name            string
-	ClusterUID      string
+	ConfigMaps typedcore.ConfigMapInterface
+	Name       string
+	ClusterUID string
+	// ExpectedUID, when set by admission, rejects a journal recreated between
+	// validation and an authenticated observation or advancement.
+	ExpectedUID     string
 	OwnerReferences []metav1.OwnerReference
 }
 type Snapshot struct {
@@ -49,6 +52,9 @@ func (s Snapshot) Plan() []byte {
 func (s Store) snapshot(object *corev1.ConfigMap) (Snapshot, error) {
 	if object.Name != s.Name || object.UID == "" || object.ResourceVersion == "" {
 		return Snapshot{}, fmt.Errorf("invalid journal object identity")
+	}
+	if s.ExpectedUID != "" && string(object.UID) != s.ExpectedUID {
+		return Snapshot{}, fmt.Errorf("journal incarnation differs from admission")
 	}
 	t, e := DecodeTransition([]byte(object.Data[journalKey]))
 	if e != nil {

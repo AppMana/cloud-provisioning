@@ -345,6 +345,16 @@ IPv4 peer's packet stream. Its WireGuard transport is IPv4; it does not measure
 IPv6 transport, an unaffected IPv6 stream, CAPI cleanup, live-site management
 continuity or AWS bootstrap. Those remain separate cases.
 
+Site receiver preparation preserves validated public ownership snapshots in a
+separate `.owners` directory before replacing a cache or preparing a device.
+These snapshots are not offline recovery inputs, installation receipts, or
+deletion authorization. Test crash recovery and live withdrawal separately:
+retirement must verify current authority, exact device ownership and absence of
+route or address dependencies before removing a device and its sysctl policy.
+Retaining a snapshot alone does not satisfy last-worker deletion. Records from
+earlier binaries may already be missing, and retained snapshots require pruning
+only after verified retirement; neither case is qualified by cache unit tests.
+
 For k0s controller maintenance, observe exec and logs through the controllers
 that remain running as well as the endpoint being restarted. Count-driven
 Konnectivity reconciliation can restart otherwise healthy proxy servers and

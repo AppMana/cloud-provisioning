@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -58,6 +59,59 @@ func decodeSiteReceiveCache(raw []byte, cfg config, key wgtypes.Key) (siteReceiv
 		}
 	}
 	return cached, nil
+}
+
+// Keep ownership evidence separate from replayable preparation state. An older
+// binary can still read the v1 cache; neither it nor offline recovery consumes
+// these records. A record is native intent, not proof of installation or live
+// authority to delete a device. Retirement must independently admit the owner
+// withdrawal and verify the exact kernel state and absence of dependencies.
+func preserveSiteReceiveOwnership(path string, cached siteReceiveCache, cfg config, key wgtypes.Key) error {
+	raw, err := json.Marshal(cached)
+	if err != nil {
+		return err
+	}
+	if _, err := decodeSiteReceiveCache(raw, cfg, key); err != nil {
+		return err
+	}
+	if len(cached.Bindings) == 0 {
+		return nil
+	}
+	directory := path + ".owners"
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		return err
+	}
+	info, err := os.Lstat(directory)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() || info.Mode().Perm() != 0700 {
+		return fmt.Errorf("site receiver ownership directory must be a private directory")
+	}
+	parent, err := os.Open(filepath.Dir(directory))
+	if err != nil {
+		return err
+	}
+	err = parent.Sync()
+	parent.Close()
+	if err != nil {
+		return err
+	}
+	name := filepath.Join(directory, fmt.Sprintf("%x.json", sha256.Sum256(raw)))
+	if info, err := os.Lstat(name); err == nil && !info.Mode().IsRegular() {
+		return fmt.Errorf("site receiver ownership record must be a regular file")
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if previous, err := os.ReadFile(name); err == nil {
+		if !bytes.Equal(bytes.TrimSpace(previous), raw) {
+			return fmt.Errorf("site receiver ownership record changed")
+		}
+		return nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return writeDurableJSON(name, cached)
 }
 
 func restoreSiteReceiveCache(cfg config, devices receiverDevices, key wgtypes.Key) error {
@@ -116,6 +170,11 @@ func reconcileDurableSiteReceiversScoped(ctx context.Context, k kubernetes.Inter
 		if err != nil {
 			return err
 		}
+		// Preserve the previous identities before a changed publication can
+		// replace their only durable record, including a now-empty mesh.
+		if err := preserveSiteReceiveOwnership(path, previous, cfg, key); err != nil {
+			return err
+		}
 		if previous.MeshUID == cached.MeshUID && reflect.DeepEqual(previous.Peers, cached.Peers) {
 			cached.Bindings = previous.Bindings
 		}
@@ -134,6 +193,14 @@ func reconcileDurableSiteReceiversScoped(ctx context.Context, k kubernetes.Inter
 	}
 	seen := map[string]bool{}
 	err = reconcileSiteReceivePreparationScoped(ctx, k, mesh, cfg.nodeName, key, scope, func(root string, binding receiveBinding, doc tunnel.PeerListDoc) error {
+		intent := cached
+		intent.Peers = doc
+		intent.Bindings = map[string]receiveBinding{root: binding}
+		// Persist intent first: a crash after native preparation must not leave
+		// an owned device whose identity is absent from every durable record.
+		if err := preserveSiteReceiveOwnership(path, intent, cfg, key); err != nil {
+			return err
+		}
 		mtu := cfg.mtu
 		if mtu == 0 {
 			mtu = underlayMTU()

@@ -115,3 +115,57 @@ func TestAdmittedSitePreparationCannotReplaceLegacyRecovery(t *testing.T) {
 		t.Fatal("admitted records entered offline recovery", err)
 	}
 }
+
+func TestRemovedSiteReceiverRetainsOwnershipEvidence(t *testing.T) {
+	key, _ := wgtypes.GeneratePrivateKey()
+	cloud, _ := wgtypes.GeneratePrivateKey()
+	receiver, _ := wgtypes.GeneratePrivateKey()
+	cfg := config{iface: "site", secretNamespace: "test", secretName: "mesh", nodeName: "site", privateKeyFile: filepath.Join(t.TempDir(), "key")}
+	prior := siteReceiveCache{Version: 1, Namespace: "test", SecretName: "mesh", MeshUID: "mesh", NodeName: "site", PublicKey: key.PublicKey().String(), Peers: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: cloud.PublicKey().String(), Remote: true, Endpoint: "198.51.100.10:51820", WGAllowedIPs: []string{"172.29.0.10/32"}}}}, Bindings: map[string]receiveBinding{cloud.PublicKey().String(): {PeerPublicKey: key.PublicKey().String(), PublicKey: receiver.PublicKey().String(), ListenPort: 51821}}}
+	path := siteReceiveCachePath(cfg) + ".admitted"
+	if err := writeDurableJSON(path, prior); err != nil {
+		t.Fatal(err)
+	}
+	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mesh", Namespace: "test", UID: "mesh", ResourceVersion: "2"}, Data: map[string][]byte{tunnel.NodePublicKeyPrefix + "site": []byte(key.PublicKey().String())}}
+	api := fake.NewClientset(mesh)
+	scope := &siteReceiveScope{roots: map[string]bool{}, check: func() error { return nil }}
+	for i := 0; i < 2; i++ {
+		if err := reconcileDurableSiteReceiversScoped(context.Background(), api, nil, cfg, mesh, key, scope); err != nil {
+			t.Fatal(err)
+		}
+	}
+	records, err := filepath.Glob(path + ".owners/*.json")
+	if err != nil || len(records) != 1 {
+		t.Fatalf("lost or duplicated ownership records: %v %v", records, err)
+	}
+	raw, err := os.ReadFile(records[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	preserved, err := decodeSiteReceiveCache(raw, cfg, key)
+	if err != nil || len(preserved.Bindings) != 1 || preserved.Bindings[cloud.PublicKey().String()].PublicKey != receiver.PublicKey().String() {
+		t.Fatalf("ownership evidence changed: %+v %v", preserved, err)
+	}
+	// Retention must not resurrect withdrawn preparation during offline boot.
+	if err := restoreSiteReceiveCache(cfg, nil, key); err != nil {
+		t.Fatal(err)
+	}
+	if err := preserveSiteReceiveOwnership(path, prior, cfg, key); err != nil {
+		t.Fatal("idempotent preservation", err)
+	}
+	if err := os.WriteFile(records[0], []byte("changed"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := preserveSiteReceiveOwnership(path, prior, cfg, key); err == nil {
+		t.Fatal("overwrote changed ownership evidence")
+	}
+	if err := os.Remove(records[0]); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(t.TempDir(), "foreign"), records[0]); err != nil {
+		t.Fatal(err)
+	}
+	if err := preserveSiteReceiveOwnership(path, prior, cfg, key); err == nil {
+		t.Fatal("accepted symlink ownership record")
+	}
+}

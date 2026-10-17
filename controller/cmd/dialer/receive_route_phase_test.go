@@ -307,6 +307,9 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		if err := receiveLinuxPhase(context.Background(), verifier, cfg, key, nil, addresses, plan, view, nodeUID, intent); err != nil {
 			t.Fatal(err)
 		}
+		if request.NodeName != "" {
+			checkNativeReceiveAdvertisements(t, verifier, cfg, key, nodeUID, plan, intent)
+		}
 		if request.CompletedReadback {
 			afterRoutes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, 0)
 			if err != nil || !reflect.DeepEqual(beforeRoutes, afterRoutes) {

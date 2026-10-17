@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/netip"
 	"testing"
 
 	api "github.com/osrg/gobgp/v3/api"
@@ -163,11 +164,19 @@ func TestTransitSpeaker_AChangedPreferenceIsSpokenAgain(t *testing.T) {
 // advertisedMED reads one prefix's path back out of the speaker's own
 // table and returns the MED it carries.
 func advertisedMED(ctx context.Context, t *transitSpeaker, prefix string) (uint32, error) {
+	destination, err := netip.ParsePrefix(prefix)
+	if err != nil {
+		return 0, err
+	}
+	afi := api.Family_AFI_IP
+	if destination.Addr().Is6() {
+		afi = api.Family_AFI_IP6
+	}
 	med := uint32(0)
 	found := false
-	err := t.server.ListPath(ctx, &api.ListPathRequest{
+	err = t.server.ListPath(ctx, &api.ListPathRequest{
 		TableType: api.TableType_GLOBAL,
-		Family:    &api.Family{Afi: api.Family_AFI_IP, Safi: api.Family_SAFI_UNICAST},
+		Family:    &api.Family{Afi: afi, Safi: api.Family_SAFI_UNICAST},
 	}, func(d *api.Destination) {
 		if d.Prefix != prefix {
 			return

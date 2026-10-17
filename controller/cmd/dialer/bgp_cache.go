@@ -31,7 +31,20 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 			if err != nil {
 				return err
 			}
-			return receiveLinuxPhase(ctx, devices, cfg, key, own, allocated, plan, view, nodeUID, intent)
+			if err := receiveLinuxPhase(ctx, devices, cfg, key, own, allocated, plan, view, nodeUID, intent); err != nil {
+				return err
+			}
+			// A crash can occur after readiness was published but before the
+			// first advertisement cache was saved. Recover only from a live
+			// graph that matches the existing forwarding snapshot exactly.
+			if speaker != nil && cfg.secretName != "" {
+				if _, err := os.Stat(transitAdvertisementCachePath(cfg)); os.IsNotExist(err) {
+					if _, _, err := refreshTransitAdvertisementCache(ctx, k, cfg, speaker); err != nil {
+						return err
+					}
+				}
+			}
+			return reconcileReceiveAdvertisements(ctx, devices, cfg, speaker, plan.MachineUID, nodeUID, intent)
 		})
 		if err != nil || handled {
 			return err
@@ -134,25 +147,8 @@ func recoverTransitAdvertisements(ctx context.Context, cfg config, speaker *tran
 	if path == "" {
 		return apiErr
 	}
-	raw, err := os.ReadFile(path)
+	cached, forwarding, err := readTransitAdvertisements(cfg, speaker)
 	if err != nil {
-		return fmt.Errorf("BGP recovery unavailable after API failure: %w", err)
-	}
-	var cached transitAdvertisementCache
-	d := json.NewDecoder(bytes.NewReader(raw))
-	d.DisallowUnknownFields()
-	if err := d.Decode(&cached); err != nil {
-		return err
-	}
-	var extra any
-	if err := d.Decode(&extra); err != io.EOF {
-		return fmt.Errorf("trailing BGP recovery data")
-	}
-	forwarding, err := forwardingForAdvertisements(cfg)
-	if err != nil {
-		return err
-	}
-	if err := validateTransitAdvertisementCache(cached, cfg, speaker, forwarding); err != nil {
 		return err
 	}
 	routes, _, err := transitAdvertisementPlan(forwarding.Data, cfg.nodeName)
@@ -160,4 +156,33 @@ func recoverTransitAdvertisements(ctx context.Context, cfg config, speaker *tran
 		return err
 	}
 	return speaker.reconcile(ctx, cached.Peers, routes)
+}
+
+func readTransitAdvertisements(cfg config, speaker *transitSpeaker) (transitAdvertisementCache, *siteForwardingCache, error) {
+	fail := func(err error) (transitAdvertisementCache, *siteForwardingCache, error) {
+		return transitAdvertisementCache{}, nil, err
+	}
+	path := transitAdvertisementCachePath(cfg)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fail(fmt.Errorf("BGP recovery unavailable: %w", err))
+	}
+	var cached transitAdvertisementCache
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&cached); err != nil {
+		return fail(err)
+	}
+	var extra any
+	if err := d.Decode(&extra); err != io.EOF {
+		return fail(fmt.Errorf("trailing BGP recovery data"))
+	}
+	forwarding, err := forwardingForAdvertisements(cfg)
+	if err != nil {
+		return fail(err)
+	}
+	if err := validateTransitAdvertisementCache(cached, cfg, speaker, forwarding); err != nil {
+		return fail(err)
+	}
+	return cached, forwarding, nil
 }

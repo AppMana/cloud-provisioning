@@ -15,6 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestBGPRecoveryRequiresMatchingForwardingAndSpeaker(t *testing.T) {
@@ -95,5 +96,34 @@ func TestBGPRecoveryRequiresMatchingForwardingAndSpeaker(t *testing.T) {
 	after, err := os.ReadFile(transitAdvertisementCachePath(cfg))
 	if err != nil || !bytes.Equal(raw, after) {
 		t.Fatal("rejected BGP update changed recovery", err)
+	}
+}
+
+func TestBGPFirstCacheRequiresMatchingLiveForwarding(t *testing.T) {
+	key, _ := wgtypes.GeneratePrivateKey()
+	cfg := config{iface: "site", secretNamespace: "system", secretName: "mesh", nodeName: "site-node", privateKeyFile: filepath.Join(t.TempDir(), "key"), routeTable: 518, fwmark: 518, bgpListenPort: 11790}
+	if err := os.WriteFile(cfg.privateKeyFile, []byte(key.String()), 0600); err != nil {
+		t.Fatal(err)
+	}
+	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: cfg.secretNamespace, Name: cfg.secretName, UID: "mesh-uid", ResourceVersion: "1"}, Data: map[string][]byte{tunnel.NodePublicKeyPrefix + cfg.nodeName: []byte(key.PublicKey().String()), tunnel.NodeTunnelAddressPrefix + cfg.nodeName: []byte("10.88.0.4/32")}}
+	if err := saveSiteForwardingCache(cfg, key, mesh, nil, map[string]bool{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	speaker := &transitSpeaker{asn: 64512, nextHop: "10.101.0.1"}
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "neighbor"}, Status: corev1.NodeStatus{Addresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: "10.101.0.2"}}}}
+	changed := mesh.DeepCopy()
+	changed.Data[tunnel.NodeTunnelAddressPrefix+"other"] = []byte("10.88.0.5/32")
+	if _, _, err := refreshTransitAdvertisementCache(context.Background(), fake.NewClientset(changed, node), cfg, speaker); err == nil {
+		t.Fatal("accepted changed live graph")
+	}
+	if _, err := os.Stat(transitAdvertisementCachePath(cfg)); !os.IsNotExist(err) {
+		t.Fatal("rejection created cache", err)
+	}
+	if _, _, err := refreshTransitAdvertisementCache(context.Background(), fake.NewClientset(mesh, node), cfg, speaker); err != nil {
+		t.Fatal(err)
+	}
+	cached, _, err := readTransitAdvertisements(cfg, speaker)
+	if err != nil || len(cached.Peers) != 1 || cached.Peers[0] != "10.101.0.2" {
+		t.Fatal("failed to recover first cache", cached, err)
 	}
 }

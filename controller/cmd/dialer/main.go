@@ -709,17 +709,35 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 	if cfg.secretName == "" {
 		return nil
 	}
+	site, routes, err := refreshTransitAdvertisementCache(ctx, clientset, cfg, speaker)
+	if err != nil {
+		if observation, ok := err.(*transitObservationError); ok {
+			return recoverTransitAdvertisements(ctx, cfg, speaker, observation.err)
+		}
+		return err
+	}
+	return speaker.reconcile(ctx, site, routes)
+}
+
+type transitObservationError struct{ err error }
+
+func (e *transitObservationError) Error() string { return e.err.Error() }
+func (e *transitObservationError) Unwrap() error { return e.err }
+
+// Refresh only the recovery metadata. Callers must independently verify the
+// selected forwarding generation before announcing any of these routes.
+func refreshTransitAdvertisementCache(ctx context.Context, clientset kubernetes.Interface, cfg config, speaker *transitSpeaker) ([]string, []transitRoute, error) {
 	secret, err := clientset.CoreV1().Secrets(cfg.secretNamespace).Get(ctx, cfg.secretName, metav1.GetOptions{})
 	if err != nil {
-		return recoverTransitAdvertisements(ctx, cfg, speaker, err)
+		return nil, nil, &transitObservationError{err}
 	}
 	routes, notSite, err := transitAdvertisementPlan(secret.Data, cfg.nodeName)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return recoverTransitAdvertisements(ctx, cfg, speaker, err)
+		return nil, nil, &transitObservationError{err}
 	}
 	site := []string{}
 	for _, node := range nodes.Items {
@@ -734,9 +752,9 @@ func reconcileTransit(ctx context.Context, clientset kubernetes.Interface, cfg c
 		}
 	}
 	if err := saveTransitAdvertisements(cfg, speaker, secret, site); err != nil {
-		return err
+		return nil, nil, err
 	}
-	return speaker.reconcile(ctx, site, routes)
+	return site, routes, nil
 }
 
 func transitAdvertisementPlan(data map[string][]byte, nodeName string) ([]transitRoute, map[string]bool, error) {

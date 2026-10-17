@@ -10,8 +10,8 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-// restoreCompletedReceivePaths runs only through live, locked terminal
-// maintenance admission. It reuses additive preparation for the selected
+// restoreCompletedReceivePaths runs through locked terminal maintenance
+// admission or verified terminal boot recovery. It reuses additive preparation for the selected
 // receivers. It never recreates a legacy peer, selects egress, or retires devices.
 func restoreCompletedReceivePaths(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
 	if err := ctx.Err(); err != nil {
@@ -61,8 +61,8 @@ func restoreCompletedReceivePaths(ctx context.Context, devices receiverDevices, 
 	return verifyReceivePhasePaths(devices, cfg, key, plan, nodeUID)
 }
 
-// restoreCompletedReceiveState is called only under the executor's live
-// completed-journal admission and host lock. Generation admission precedes
+// restoreCompletedReceiveState requires the host lock and either live terminal
+// admission or the previously verified terminal boot inventory. Generation admission precedes
 // allocation recovery; phase verification still requires native transport.
 func restoreCompletedReceiveState(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
 	if err := restoreCompletedReceivePaths(ctx, devices, cfg, key, plan, view, nodeUID, intent); err != nil {

@@ -70,6 +70,11 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 			return err
 		}
 	}
+	if k == nil && cfg.peersFile != "" && cfg.receiptURL == "" {
+		if handled, err := recoverReceiveBoot(ctx, devices, cfg); handled || err != nil {
+			return err
+		}
+	}
 	lock, err := lockLegacyReconciliation(cfg)
 	if err != nil {
 		return err

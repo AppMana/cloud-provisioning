@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,12 +35,24 @@ type receiveJournalCheckpoint struct {
 
 // Historical local evidence, never a receipt or authorization to execute a
 // phase. A changed checkpoint or boot cannot inherit this observation.
+type receiveRecoveryNetwork struct {
+	Interface        string `json:"interface"`
+	RouteTable       int    `json:"routeTable"`
+	FWMark           int    `json:"fwmark"`
+	MTU              int    `json:"mtu"`
+	ListenPort       int    `json:"listenPort"`
+	KeepaliveSeconds int    `json:"keepaliveSeconds"`
+}
+
 type receiveNativeObservation struct {
-	JournalSHA256    string    `json:"journalSHA256"`
-	BootID           string    `json:"bootID"`
-	AgentPodUID      string    `json:"agentPodUID"`
-	AgentContainerID string    `json:"agentContainerID"`
-	ObservedAt       time.Time `json:"observedAt"`
+	InventorySHA256  string                  `json:"inventorySHA256,omitempty"`
+	LocalMachineUIDs []string                `json:"localMachineUIDs,omitempty"`
+	Network          *receiveRecoveryNetwork `json:"network,omitempty"`
+	JournalSHA256    string                  `json:"journalSHA256"`
+	BootID           string                  `json:"bootID"`
+	AgentPodUID      string                  `json:"agentPodUID"`
+	AgentContainerID string                  `json:"agentContainerID"`
+	ObservedAt       time.Time               `json:"observedAt"`
 }
 
 type recoveredReceiveJournal struct {
@@ -52,8 +65,9 @@ func readReceiveJournalCheckpoint(path string, store handover.Store, scope recei
 	return readReceiveJournalCheckpointForAdmission(path, store, scope, nodeName, key, false)
 }
 
-// Only live admission may examine earlier-boot intent. The offline reader above
-// must keep rejecting it; decoding alone never authorizes native work.
+// Live admission and verified terminal boot recovery may examine earlier-boot
+// intent. The general offline reader stays boot-strict; decoding alone never
+// authorizes native work.
 func readReceiveJournalCheckpointForAdmission(path string, store handover.Store, scope receiveJournalScope, nodeName string, key wgtypes.Key, allowPreviousBoot bool) (recoveredReceiveJournal, error) {
 	fail := func(err error) (recoveredReceiveJournal, error) { return recoveredReceiveJournal{}, err }
 	raw, err := os.ReadFile(path)
@@ -145,8 +159,9 @@ func checkpointReceiveJournalLocked(ctx context.Context, api kubernetes.Interfac
 }
 
 // Caller retains the executor lock after native verification and live set
-// revalidation. Recording evidence does not enable offline native mutation.
-func checkpointReceiveNativeObservation(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath, containerID string, observed time.Time, admitted admittedReceiveJournal) error {
+// revalidation. Boot recovery separately admits the complete persisted binding.
+func checkpointReceiveNativeObservation(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath, containerID string, observed time.Time, set admittedReceiveSet) error {
+	admitted := set.Local[scope.MachineUID]
 	view, err := admitted.Snapshot.Transition().View()
 	if err != nil || !view.Complete || admitted.Plan.CloudNodeUID != admitted.NodeUID || admitted.Plan.RootPublicKey != key.PublicKey().String() {
 		return fmt.Errorf("native recovery observation requires a completed cloud journal")
@@ -159,7 +174,24 @@ func checkpointReceiveNativeObservation(ctx context.Context, api kubernetes.Inte
 	if err != nil {
 		return err
 	}
-	saved := receiveNativeObservation{JournalSHA256: fmt.Sprintf("%x", sha256.Sum256(raw)), BootID: admitted.BootID, AgentPodUID: cfg.receiptPodUID, AgentContainerID: containerID, ObservedAt: observed}
+	inventory := receiveInventoryCheckpoint{Version: 1, InventoryUID: string(set.Metadata.UID), Inventory: set.Inventory, NodeName: cfg.nodeName, NodeUID: admitted.NodeUID, BootID: admitted.BootID, PublicKey: key.PublicKey().String()}
+	expected, err := json.Marshal(inventory)
+	if err != nil {
+		return err
+	}
+	inventoryRaw, err := os.ReadFile(lockPath + ".inventory.json")
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(expected, inventoryRaw) {
+		return fmt.Errorf("native observation inventory differs from durable admission")
+	}
+	var local []string
+	for uid := range set.Local {
+		local = append(local, uid)
+	}
+	slices.Sort(local)
+	saved := receiveNativeObservation{InventorySHA256: fmt.Sprintf("%x", sha256.Sum256(inventoryRaw)), LocalMachineUIDs: local, Network: &receiveRecoveryNetwork{Interface: cfg.iface, RouteTable: cfg.routeTable, FWMark: cfg.fwmark, MTU: cfg.mtu, ListenPort: cfg.listenPort, KeepaliveSeconds: cfg.keepaliveSecs}, JournalSHA256: fmt.Sprintf("%x", sha256.Sum256(raw)), BootID: admitted.BootID, AgentPodUID: cfg.receiptPodUID, AgentContainerID: containerID, ObservedAt: observed}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -169,9 +201,11 @@ func checkpointReceiveNativeObservation(ctx context.Context, api kubernetes.Inte
 
 // Keep the strict journal checkpoint format unchanged for older agents. The
 // separate filename is outside the inventory's reserved journal-file prefix,
-// while still falling under the shared lock's legacy-writer fence.
+// while still falling under the shared lock's legacy-writer fence. Use a new
+// observation filename so agents with the older strict observation schema can
+// still roll back without trying to decode these additional boot bindings.
 func receiveNativeObservationPath(path, journalName string) string {
-	return strings.TrimSuffix(path, "."+journalName+".json") + ".native-" + journalName + ".json"
+	return strings.TrimSuffix(path, "."+journalName+".json") + ".native-v2-" + journalName + ".json"
 }
 
 func readReceiveNativeObservation(path, journalName string, saved receiveJournalCheckpoint, snapshot handover.Snapshot) (*receiveNativeObservation, error) {

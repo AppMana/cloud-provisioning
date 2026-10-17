@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
@@ -23,14 +24,18 @@ import (
 // This checks eventual device restoration, not the deployment recovery deadline.
 // Idle WireGuard rekey latency must be qualified separately with workload traffic.
 func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
-	nativeRestoreCompletedReceivePaths(t, false)
+	nativeRestoreCompletedReceivePaths(t, false, false)
 }
 
 func TestNativeRestoreCompletedReceiveTraffic(t *testing.T) {
-	nativeRestoreCompletedReceivePaths(t, true)
+	nativeRestoreCompletedReceivePaths(t, true, false)
 }
 
-func nativeRestoreCompletedReceivePaths(t *testing.T, traffic bool) {
+func TestNativeRestoreCompletedReceiveBoot(t *testing.T) {
+	nativeRestoreCompletedReceivePaths(t, true, true)
+}
+
+func nativeRestoreCompletedReceivePaths(t *testing.T, traffic, bootRecovery bool) {
 	if os.Getenv("CLDT_RESTORE_RECEIVE_PATHS") != "1" {
 		t.Skip("requires isolated VM mount and network namespaces")
 	}
@@ -100,7 +105,55 @@ func nativeRestoreCompletedReceivePaths(t *testing.T, traffic bool) {
 	wait(restore)
 	verifyNativeCloudPolicyRecovery(t, devices, cfg, root, plan, view, intent)
 	if traffic {
-		verifyNativeReceiveTrafficRecovery(t, devices, cfg, binding.Interface, client.Interface, restore)
+		var fault func() error
+		var restoreInterval time.Duration
+		if bootRecovery {
+			must(ensureRouteRule(cfg.routeTable, cfg.fwmark))
+			must(receiveLinuxPhase(context.Background(), devices, cfg, root, nil, plan.CloudAddresses, plan, view, plan.CloudNodeUID, intent))
+			host := cfg
+			host.nodeName = ""
+			host.peersFile = filepath.Join(t.TempDir(), "peers.json")
+			writeReceiveBootFixture(t, host, root, plan, false)
+			// The host defaults differ from the agent's verified routing scope.
+			host.routeTable, host.fwmark, host.mtu = 517, 517, 1420
+			host.pollInterval = 30 * time.Second
+			restoreInterval = host.pollInterval
+			restore = func() error {
+				handled, err := recoverReceiveBoot(context.Background(), devices, host)
+				if !handled {
+					return fmt.Errorf("boot recovery fell through to legacy")
+				}
+				return err
+			}
+			allocation, err := stableAddressIdentity(stableAddressOwnerRequest{MeshUID: plan.MeshUID, NodeUID: plan.CloudNodeUID, LegacyInterface: cfg.iface, RootPublicKey: plan.RootPublicKey, Addresses: plan.CloudAddresses})
+			must(err)
+			fault = func() error {
+				for _, name := range []string{binding.Interface, cfg.iface, allocation.Interface} {
+					link, err := netlink.LinkByName(name)
+					if err != nil {
+						return err
+					}
+					if err := netlink.LinkDel(link); err != nil {
+						return err
+					}
+				}
+				for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
+					rules, err := netlink.RuleList(family)
+					if err != nil {
+						return err
+					}
+					for i := range rules {
+						if matchesTunnelRule(rules[i], family, cfg.routeTable, cfg.routeTable, 0) || matchesTunnelRule(rules[i], family, unix.RT_TABLE_MAIN, exemptRulePriority, uint32(cfg.fwmark)) {
+							if err := netlink.RuleDel(&rules[i]); err != nil {
+								return err
+							}
+						}
+					}
+				}
+				return nil
+			}
+		}
+		verifyNativeReceiveTrafficRecovery(t, devices, cfg, binding.Interface, client.Interface, restore, fault, restoreInterval)
 		return
 	}
 	siteCfg := cfg

@@ -15,7 +15,7 @@ import (
 // The remote endpoint keeps its original WireGuard UDP socket in the isolated
 // transport namespace, but its workload sockets live in a separate namespace.
 // Echoes therefore cannot bypass encryption through a local-address route.
-func verifyNativeReceiveTrafficRecovery(t *testing.T, devices receiverDevices, cfg config, receiver, client string, restore func() error) {
+func verifyNativeReceiveTrafficRecovery(t *testing.T, devices receiverDevices, cfg config, receiver, client string, restore func() error, fault func() error, restoreInterval time.Duration) {
 	t.Helper()
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -111,15 +111,24 @@ func verifyNativeReceiveTrafficRecovery(t *testing.T, devices receiverDevices, c
 	if len(before.Peers) != 1 || before.Peers[0].ReceiveBytes == 0 {
 		t.Fatal("baseline lacks encrypted receive traffic")
 	}
-	lost, err := netlink.LinkByName(receiver)
-	must(err)
 	started := time.Now()
-	must(netlink.LinkDel(lost))
+	if fault == nil {
+		lost, err := netlink.LinkByName(receiver)
+		must(err)
+		must(netlink.LinkDel(lost))
+	} else {
+		must(fault())
+	}
 	deadline := started.Add(60 * time.Second)
 	consecutive := 0
 	var firstSuccess time.Duration
+	var nextRestore time.Time
+	var restoreErr error
 	for {
-		restoreErr := restore()
+		if !time.Now().Before(nextRestore) {
+			restoreErr = restore()
+			nextRestore = time.Now().Add(restoreInterval)
+		}
 		healthy := restoreErr == nil
 		for j := range lanes {
 			if err := exchange(&lanes[j]); err != nil {

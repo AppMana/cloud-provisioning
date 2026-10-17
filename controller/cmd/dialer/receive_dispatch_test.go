@@ -147,7 +147,7 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 			}))
 			defer server.Close()
 			directory := t.TempDir()
-			cfg := config{iface: "wgdispatch", nodeName: plan.CloudNodeName, peersSecretNamespace: mesh.Namespace, peersFile: filepath.Join(directory, "peers.json"), receiptURL: server.URL, receiptMeshName: mesh.Name, receiptCAFile: filepath.Join(directory, "ca.crt"), receiptTokenFile: filepath.Join(directory, "token"), receiptPodName: "agent", receiptPodUID: "pod"}
+			cfg := config{iface: "wgdispatch", routeTable: 518, fwmark: 518, mtu: 1400, listenPort: 51820, keepaliveSecs: 15, nodeName: plan.CloudNodeName, peersSecretNamespace: mesh.Namespace, peersFile: filepath.Join(directory, "peers.json"), receiptURL: server.URL, receiptMeshName: mesh.Name, receiptCAFile: filepath.Join(directory, "ca.crt"), receiptTokenFile: filepath.Join(directory, "token"), receiptPodName: "agent", receiptPodUID: "pod"}
 			allocation := plan.CloudAddresses[0]
 			if fault == "allocation" {
 				allocation = "172.29.0.2/32"
@@ -233,6 +233,7 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 					t.Fatalf("native observation persisted without successful completed verification: %s", fault)
 				}
 				if fault == "complete" {
+					verifyRecordedReceiveBoot(t, cfg, plan, root)
 					before, err := os.ReadFile(path)
 					if err != nil {
 						t.Fatal(err)

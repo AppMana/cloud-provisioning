@@ -10,7 +10,7 @@ import (
 )
 
 // restoreReceiveRoot restores only the shared device identity. Its caller must
-// hold live journal admission and the host lock. Peer, address and route writers
+// hold terminal recovery authority and the host lock. Peer, address and route writers
 // retain their separate authorities. Owned unnumbered roots use the existing
 // receive-device reverse-path policy without weakening other interfaces.
 func restoreReceiveRoot(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, meshUID, nodeUID string) error {

@@ -198,17 +198,33 @@ Checkpointed intent is not evidence of completed native work. It cannot issue
 receipts, advance a phase, or establish that egress already switched.
 After successful completed-cloud native verification and live set revalidation,
 the executor may record a historical native observation in a separate file. It
-binds the exact serialized journal, local boot, agent Pod UID, container ID and
-observation time; the current agent incarnation is checked before recording it.
-The checkpoint format remains unchanged for older agents. An unchanged
+binds the exact serialized journal and inventory, local journal membership,
+network settings, boot, agent Pod UID, container ID and observation time; the
+current agent incarnation is checked before recording it.
+The checkpoint format remains unchanged for older agents. Boot-bound
+observations use a separate versioned filename so older observation readers
+remain usable during rollback. An unchanged
 checkpoint on the same boot retains this observation. A new journal revision
 or boot does not inherit it. Malformed observations are rejected; an observation
-bound to a different journal digest or boot is ignored. This historical evidence
-does not authorize offline mutation, phase advancement or receipts. The host bootstrap path still needs
-phase-aware recovery that can establish API connectivity before live admission.
+bound to a different journal digest or boot is ignored. Historical evidence
+never authorizes phase advancement or receipts.
 
-Corrupt state remains an error. A boot change requires live admission and fresh
-native verification; it must not fall back to legacy forwarding. Checkpoint refresh
+The file-only cloud host service can restore a previously verified terminal
+selection after a boot change. This recovery requires the exact saved inventory,
+one local cloud journal, matching local key and allocation, and the recorded
+network configuration. Missing verification, unfinished intent, additional local
+journals and unaccounted checkpoint files block recovery. The general offline
+checkpoint reader remains boot-strict; this separate admission path permits only
+the recorded terminal cloud selection. It reuses native restoration and policy
+collision checks under the shared lock, revalidates durable inputs, and never
+publishes receipts, advertisements or a new journal generation. Same-boot host
+reconciliation leaves control with the live agent. Once API connectivity returns,
+the agent must perform live admission and current-boot verification. This path
+does not recover unfinished transitions or ordinary cloud-neighbor partitions.
+
+Corrupt state remains an error. A boot change never permits legacy cache replay;
+live admission remains required for ordinary agent execution and new observations.
+Checkpoint refresh
 alone does not restore lost devices or routes, including those selected by a
 completed journal. Normal reconciliation and shutdown cleanup inspect the
 checkpoint inventory under the shared lock before reading legacy inputs or
@@ -281,8 +297,8 @@ legacy or receiver egress; existing root peers and selected receiver routes must
 pass the shared policy reconciler's native checks before missing lookup rules
 are installed. Cluster, mesh, adoption publication, journal inventory and agent
 incarnation are revalidated around the operation. This does not admit a new peer
-generation or advance an unfinished phase. Cloud-neighbor projection and API
-reachability before live admission remain prerequisites for full reboot recovery.
+generation or advance an unfinished phase. Cloud-neighbor projection, unfinished-transition recovery and end-to-end API
+bootstrap qualification remain prerequisites for full reboot recovery.
 Idle transport rekey latency also requires separate recovery-deadline qualification.
 The native active-traffic recovery test uses distinct workload namespaces and
 IPv4/IPv6 request/reply probes, verifies encrypted traffic before receiver loss,

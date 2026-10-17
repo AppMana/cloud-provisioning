@@ -143,9 +143,6 @@ func admitReceivePolicyRepair(ctx context.Context, api kubernetes.Interface, cfg
 // phase or apply a new peer generation. The published document must still be
 // one of the journal's two exact documents; the journal selects the active one.
 func planCloudReceivePolicy(cfg config, key wgtypes.Key, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes, adoption *corev1.Secret) ([]receiveAdvertisementGroup, error) {
-	if key == (wgtypes.Key{}) || !view.Complete || nodeUID != plan.CloudNodeUID || cfg.nodeName != plan.CloudNodeName || key.PublicKey().String() != plan.RootPublicKey || !reflect.DeepEqual(intent.Plans[plan.MachineUID], plan) || !reflect.DeepEqual(intent.Views[plan.MachineUID], view) {
-		return nil, fmt.Errorf("cloud policy recovery requires exact completed local intent")
-	}
 	if adoption == nil || string(adoption.UID) != plan.AdoptionUID || adoption.Name != plan.AdoptionName || adoption.Namespace != plan.Namespace || adoption.ResourceVersion == "" || adoption.DeletionTimestamp != nil {
 		return nil, fmt.Errorf("cloud policy recovery adoption identity differs")
 	}
@@ -164,6 +161,17 @@ func planCloudReceivePolicy(cfg config, key wgtypes.Key, plan tunnel.ReceiveTran
 	}
 	if !reflect.DeepEqual(published, base) && !reflect.DeepEqual(published, plan.Desired) {
 		return nil, fmt.Errorf("cloud policy recovery publication differs from committed documents")
+	}
+	return planSelectedCloudReceivePolicy(cfg, key, plan, view, nodeUID, intent)
+}
+
+func planSelectedCloudReceivePolicy(cfg config, key wgtypes.Key, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) ([]receiveAdvertisementGroup, error) {
+	if key == (wgtypes.Key{}) || !view.Complete || nodeUID != plan.CloudNodeUID || cfg.nodeName != plan.CloudNodeName || key.PublicKey().String() != plan.RootPublicKey || !reflect.DeepEqual(intent.Plans[plan.MachineUID], plan) || !reflect.DeepEqual(intent.Views[plan.MachineUID], view) {
+		return nil, fmt.Errorf("cloud policy recovery requires exact completed local intent")
+	}
+	var base tunnel.PeerListDoc
+	if err := json.Unmarshal(plan.Base, &base); err != nil {
+		return nil, err
 	}
 	if view.ServingGeneration != "legacy:"+tunnel.HashPeerList(plan.Base) && view.ServingGeneration != "receivers:"+view.Round.PlanHash {
 		return nil, fmt.Errorf("cloud policy recovery generation differs")

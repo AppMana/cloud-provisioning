@@ -62,6 +62,33 @@ class DualStackCluster(Cluster):
 
 
 class MatrixTest(unittest.TestCase):
+    def test_explicit_service_mapping_preserves_pod_identity_and_uses_service_dns(self):
+        class MappedCluster(Cluster):
+            service_names = {'linux': 'svc-linux'}
+
+            def get(self, kind, name):
+                obj = super().get(kind, 'linux' if kind == 'service' and name == 'svc-linux' else name)
+                if kind == 'service' and name == 'svc-linux':
+                    obj['metadata'] = dict(name=name, uid='service-' + name)
+                return obj
+
+            def curl(self, source, arguments, body=None, timeout=30):
+                self.urls.append(arguments[-1])
+                arguments = arguments[:-1] + [arguments[-1].replace('svc-linux.', 'linux.')]
+                return super().curl(source, arguments, body, timeout)
+
+        cluster = MappedCluster()
+        cluster.urls = []
+        sources = snapshot(cluster, cluster.targets)
+        self.assertEqual(sources[0]['pod'], 'linux')
+        self.assertEqual(sources[0]['service'], 'svc-linux')
+        self.assertEqual(sources[0]['serviceUID'], 'service-svc-linux')
+        report = run(cluster, cluster.targets, 'test', tries=1, udp_sizes=(64,))
+        self.assertTrue(report['ok'])
+        self.assertTrue(any('svc-linux.test.svc.cluster.local' in url for url in cluster.urls))
+        cluster.service_names = {}
+        self.assertNotEqual(snapshot(cluster, cluster.targets), sources)
+
     def test_explicit_family_selects_registered_addresses_independently_of_primary(self):
         import ipaddress
         cluster = DualStackCluster()

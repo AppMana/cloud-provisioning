@@ -23,6 +23,7 @@ DEFAULT_UDP_SIZES = (64, 1280, 1340, 1400, 1800)
 class Kubectl:
     def __init__(self, server, bastion, namespace):
         self.bastion, self.namespace = bastion, namespace
+        self.service_names = {}
         self.command = ["docker", "exec", "-i", bastion, "kubectl",
                         "--server=" + server, "-n", namespace]
 
@@ -64,7 +65,8 @@ def snapshot(kube, targets, family=None):
     for name, node_uid in targets:
         pod = kube.get("pod", name)
         node = kube.get("node", pod["spec"]["nodeName"])
-        service = kube.get("service", name)
+        service_name = getattr(kube, 'service_names', {}).get(name, name)
+        service = kube.get("service", service_name)
         if not node_uid or node["metadata"]["uid"] != node_uid:
             raise ValueError("target Node identity changed: " + name)
         if not ready(pod) or not ready(node):
@@ -97,6 +99,8 @@ def snapshot(kube, targets, family=None):
             node=node["metadata"]["name"], nodeUID=node_uid, os=os_name,
             container=containers[0]["name"], containerID=container["containerID"],
             podIP=address, serviceUID=service["metadata"]["uid"], serviceIP=service_ip))
+        if service_name != name:
+            result[-1]['service'] = service_name
         if family is not None:
             result[-1]['addressFamily'] = family
     if len({r["nodeUID"] for r in result}) != len(result):
@@ -132,7 +136,7 @@ def run(kube, targets, namespace, tries=10, udp_sizes=DEFAULT_UDP_SIZES, udp_onl
                     receivedSHA256=hashlib.sha256(body).hexdigest(),
                     ok=code == 0 and body == payload))
             for kind, address in (() if udp_only else (("service", host(target["serviceIP"])),
-                    ("dns", target["pod"] + "." + namespace + ".svc.cluster.local"))):
+                    ("dns", target.get("service", target["pod"]) + "." + namespace + ".svc.cluster.local"))):
                 body, code = kube.curl(source, ["http://" + address + ":8080/hostname"])
                 rows.append(dict(identity, kind=kind, exitCode=code,
                     ok=code == 0 and body.strip() == target["pod"].encode()))

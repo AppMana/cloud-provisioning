@@ -160,6 +160,7 @@ def main():
     p.add_argument('--bastion', required=True)
     p.add_argument('--namespace', required=True)
     p.add_argument('--target', action='append', required=True, help='pod=NodeUID')
+    p.add_argument('--service', action='append', default=[], help='pod=existing-Service-name')
     p.add_argument('--output', type=pathlib.Path, required=True)
     p.add_argument('--duration', type=float, default=600)
     p.add_argument('--interval', type=float, default=1)
@@ -169,6 +170,11 @@ def main():
     if any(len(t) != 2 or not all(t) for t in targets):
         p.error('each target requires pod=NodeUID')
     kube = Kubectl(a.server[0], a.bastion, a.namespace)
+    for value in a.service:
+        pod, separator, service = value.partition('=')
+        if not separator or not service or pod not in {t[0] for t in targets} or pod in kube.service_names:
+            p.error('each service mapping requires a distinct target pod=Service-name')
+        kube.service_names[pod] = service
     result = observe(kube, a.server, targets, a.output, a.duration, a.interval, a.max_gap)
     print(json.dumps(result))
     raise SystemExit(0 if result['ok'] else 1)

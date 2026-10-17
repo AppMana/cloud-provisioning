@@ -54,7 +54,7 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 	port, mark := 51821, 517
 	must(devices.ConfigureDevice("neighbors", wgtypes.Config{PrivateKey: &root, ListenPort: &port, FirewallMark: &mark}))
 	_, target, _ := net.ParseCIDR("10.77.0.1/32")
-	makeSender := func(name, address string, port int) (wgtypes.Key, *net.UDPConn) {
+	makeSender := func(name, address string, port int) (wgtypes.Key, *net.UDPConn, netns.NsHandle) {
 		t.Helper()
 		private, err := wgtypes.GeneratePrivateKey()
 		must(err)
@@ -79,10 +79,10 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 			must(err)
 		})
 		t.Cleanup(func() { conn.Close() })
-		return private.PublicKey(), conn
+		return private.PublicKey(), conn, child
 	}
-	protected, existing := makeSender("protected", "10.77.0.2", 51822)
-	neighbor, joining := makeSender("joining", "10.77.0.3", 51823)
+	protected, existing, _ := makeSender("protected", "10.77.0.2", 51822)
+	neighbor, joining, joiningNS := makeSender("joining", "10.77.0.3", 51823)
 	_, protectedPrefix, _ := net.ParseCIDR("10.77.0.2/32")
 	must(devices.ConfigureDevice("neighbors", wgtypes.Config{Peers: []wgtypes.PeerConfig{{PublicKey: protected, Endpoint: &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 51822}, AllowedIPs: []net.IPNet{*protectedPrefix}}}}))
 	protectedRoute := netlink.Route{LinkIndex: link.Attrs().Index, Dst: protectedPrefix, Src: net.ParseIP("10.77.0.1"), Table: 517, Scope: netlink.SCOPE_LINK, Protocol: unix.RTPROT_BOOT}
@@ -153,8 +153,19 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}))
 	probe(joining)
 	// Reapplication must preserve both established sessions and foreign routes.
+	// A node's pod CIDR can arrive after its initial host-only publication.
+	peer.WGAllowedIPs = append(peer.WGAllowedIPs, "10.77.2.0/24")
 	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}))
 	probe(joining)
+	inNamespace(t, joiningNS, parent, func() {
+		link, err := netlink.LinkByName("joining")
+		must(err)
+		addAddrs(t, link, "10.77.2.3/32")
+		conn, err := net.DialUDP("udp4", &net.UDPAddr{IP: net.ParseIP("10.77.2.3")}, &net.UDPAddr{IP: target.IP, Port: 17777})
+		must(err)
+		defer conn.Close()
+		probe(conn)
+	})
 	for _, fault := range []string{"reserved-source", "changed-source", "foreign-route", "covering-route", "main-route", "cancelled"} {
 		t.Run(fault, func(t *testing.T) {
 			candidate := peer

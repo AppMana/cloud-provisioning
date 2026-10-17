@@ -16,7 +16,7 @@ import (
 // installReceiveNeighbors applies an admitted ordinary peer partition. The
 // caller holds the reconciliation lock and persists/revalidates its complete
 // journal inventory and mesh publication before calling. It cannot retire a
-// peer, change existing source authorization, or recreate the root device.
+// peer, withdraw existing source authorization, or recreate the root device.
 func installReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, peers []tunnel.PeerSpec, own []string) error {
 	if len(peers) == 0 {
 		return nil
@@ -100,8 +100,13 @@ func installReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg c
 		if len(allowed) == 0 {
 			return fmt.Errorf("neighbor has no source authorization")
 		}
-		if old, found := current[public]; found && !receiveSourcesMatch(peer.WGAllowedIPs, old.AllowedIPs) {
-			return fmt.Errorf("changing existing neighbor source authorization requires a separate transition")
+		if old, found := current[public]; found {
+			desired := prefixSet(allowed)
+			for raw := range prefixSet(old.AllowedIPs) {
+				if !desired[raw] {
+					return fmt.Errorf("withdrawing existing neighbor source authorization requires a separate transition")
+				}
+			}
 		}
 		wanted = append(wanted, wgtypes.PeerConfig{PublicKey: public, Endpoint: endpoint, AllowedIPs: allowed, ReplaceAllowedIPs: true, PersistentKeepaliveInterval: &keepalive})
 	}
@@ -183,7 +188,7 @@ func installReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg c
 		for _, peer := range after.Peers {
 			if peer.PublicKey == old.PublicKey {
 				previous, current := prefixSet(old.AllowedIPs), prefixSet(peer.AllowedIPs)
-				found = len(current) == len(previous)
+				found = selected[old.PublicKey] || len(current) == len(previous)
 				for raw := range previous {
 					found = found && current[raw]
 				}

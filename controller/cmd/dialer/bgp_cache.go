@@ -27,6 +27,9 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 			return fmt.Errorf("receiver dispatch requires an in-cluster API client")
 		}
 		handled, err := dispatchReceivePhases(ctx, k, cfg, func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes, key wgtypes.Key) error {
+			if err := reconcileReceivePolicy(ctx, k, devices, cfg, key, plan, view, nodeUID, intent); err != nil {
+				return err
+			}
 			own, allocated, err := tunnel.ReceiveLocalNetwork(plan, nodeUID)
 			if err != nil {
 				return err

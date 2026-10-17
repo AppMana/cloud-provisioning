@@ -187,6 +187,40 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 					t.Fatal("valid neighbor not installed")
 				}
 				must(reconcileReceiveNeighbors(ctx, k, cfg, native))
+				// Shared-rule repair uses the same real-API-created inventory,
+				// including a completed journal, but gets its route authority
+				// from the current mesh instead of cached phase receipts.
+				currentMesh, err := k.CoreV1().Secrets(mesh.Namespace).Get(ctx, mesh.Name, metav1.GetOptions{})
+				must(err)
+				currentMesh.Data[tunnel.PeerPublicKeyPrefix+"worker"] = []byte(plan.RootPublicKey)
+				currentMesh.Data[tunnel.PeerEndpointPrefix+"worker"] = []byte("198.51.100.1:51820")
+				currentMesh.Data[tunnel.PeerAllowedIPsPrefix+"worker"] = []byte("172.29.0.1/32")
+				currentMesh.Data[tunnel.PeerRouteHostsPrefix+"worker"] = []byte("")
+				_, err = k.CoreV1().Secrets(mesh.Namespace).Update(ctx, currentMesh, metav1.UpdateOptions{})
+				must(err)
+				localStore := store
+				localStore.ConfigMaps = k.CoreV1().ConfigMaps(mesh.Namespace)
+				scope := receiveJournalScope{Namespace: mesh.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUID: plan.MachineUID}
+				set, err := loadReceiveSet(ctx, k, localStore, scope, cfg.nodeName, site)
+				must(err)
+				view, err := set.Local[plan.MachineUID].Snapshot.Transition().View()
+				must(err)
+				for _, drift := range []bool{false, true} {
+					calls := 0
+					err := admitReceivePolicyRepair(ctx, k, cfg, site, plan, view, string(node.UID), set.Routes, func(groups []receiveAdvertisementGroup, check func() error) error {
+						calls++
+						if len(groups) != 2 {
+							t.Fatal("policy repair omitted a published worker")
+						}
+						if drift {
+							must(changeMesh())
+						}
+						return check()
+					})
+					if calls != 1 || (err != nil) != drift {
+						t.Fatalf("policy admission calls=%d drift=%v error=%v", calls, drift, err)
+					}
+				}
 			} else {
 				if err == nil {
 					t.Fatal("unsafe neighbor admission succeeded")

@@ -17,6 +17,15 @@ func verifyReceiveRouteInstallation(cfg config, hosts, blocks []net.IPNet, own [
 	if len(cfg.receiveRoutes) == 0 && len(cfg.receiveRelayRoutes) == 0 && cfg.receiveRouteScope == nil {
 		return nil
 	}
+	if err := verifyReceivePolicyRules(cfg); err != nil {
+		return err
+	}
+	return verifyReceiveRouteDestinations(cfg, hosts, blocks, own)
+}
+
+// Destination readback is also used before restoring missing shared policy rules.
+// It never mutates native state or treats missing policy as a healthy path.
+func verifyReceiveRouteDestinations(cfg config, hosts, blocks []net.IPNet, own []string) error {
 	selected, err := validateReceiveRouteSelections(cfg, hosts, blocks)
 	if err != nil {
 		return err
@@ -47,20 +56,6 @@ func verifyReceiveRouteInstallation(cfg config, hosts, blocks []net.IPNet, own [
 	}
 	local := localIPs()
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
-		if err := validateTunnelRuleActions(family, cfg.routeTable, cfg.fwmark); err != nil {
-			return err
-		}
-		rules, err := netlink.RuleList(family)
-		if err != nil {
-			return err
-		}
-		missing, err := planTunnelRules(rules, family, cfg.routeTable, cfg.fwmark)
-		if err != nil {
-			return err
-		}
-		if len(missing) != 0 {
-			return fmt.Errorf("receiver policy rules are missing")
-		}
 		routes, err := netlink.RouteListFiltered(family, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
 		if err != nil {
 			return err
@@ -118,4 +113,24 @@ func receiveRoutePriority(dst *net.IPNet) int {
 		return 1024
 	}
 	return 0
+}
+
+func verifyReceivePolicyRules(cfg config) error {
+	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
+		if err := validateTunnelRuleActions(family, cfg.routeTable, cfg.fwmark); err != nil {
+			return err
+		}
+		rules, err := netlink.RuleList(family)
+		if err != nil {
+			return err
+		}
+		missing, err := planTunnelRules(rules, family, cfg.routeTable, cfg.fwmark)
+		if err != nil {
+			return err
+		}
+		if len(missing) != 0 {
+			return fmt.Errorf("receiver policy rules are missing")
+		}
+	}
+	return nil
 }

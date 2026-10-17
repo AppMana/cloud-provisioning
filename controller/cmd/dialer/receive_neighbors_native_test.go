@@ -122,6 +122,9 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 		}
 	}
 	probe(existing)
+	cfg := config{iface: "neighbors", routeTable: 517, fwmark: 517, keepaliveSecs: 5}
+	verifyNativePolicyRecovery(t, devices, cfg, root, protected, protectedRoute)
+	probe(existing)
 	stop := make(chan struct{})
 	done := make(chan struct{ attempts, failures int }, 1)
 	go func() {
@@ -148,7 +151,6 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 		}
 		t.Logf("protected stream: %d attempts, %d failures", result.attempts, result.failures)
 	}()
-	cfg := config{iface: "neighbors", routeTable: 517, fwmark: 517, keepaliveSecs: 5}
 	peer := tunnel.PeerSpec{PublicKey: neighbor.String(), Remote: true, Endpoint: "127.0.0.1:51823", WGAllowedIPs: []string{"10.77.0.3/32", "10.77.1.0/24", "10.77.1.4/32"}, RouteHosts: []string{"10.77.0.3"}}
 	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}))
 	probe(joining)

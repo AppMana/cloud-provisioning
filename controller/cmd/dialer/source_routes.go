@@ -57,30 +57,41 @@ func clearTunnelSourceRoutes(table int, iface ...string) error {
 	return verifyTunnelSourceSelection(table, companion, index, nil, nil)
 }
 
-// Reconcile the complete source-exception set in one pass. Callers must supply
-// every active family and destination; omission withdraws its prior exception.
+// Reconcile source exceptions in one pass. With no journal scope, omission
+// withdraws a prior exception. A scoped phase owns only hosts within its admitted
+// destination prefixes and preserves other workers' existing selectors/routes.
 func reconcileTunnelSourceRoutes(cfg config, localAddresses []string, hosts []net.IPNet) error {
-	if len(hosts) == 0 {
+	if len(hosts) == 0 && cfg.receiveRouteScope == nil {
 		return clearTunnelSourceRoutes(cfg.routeTable, cfg.iface)
 	}
 	table, err := tunnelSourceTable(cfg.routeTable)
 	if err != nil {
 		return err
 	}
+	if err := validateTunnelSourceScope(cfg, hosts); err != nil {
+		return err
+	}
 	sources, desired, err := planTunnelSourceRoutes(localAddresses, hosts)
 	if err != nil {
 		return err
 	}
+	index := 0
 	link, err := netlink.LinkByName(cfg.iface)
+	if err != nil && !(len(hosts) == 0 && isLinkNotFound(err)) {
+		return err
+	}
+	if err == nil {
+		index = link.Attrs().Index
+	}
+	existingRules, existingRoutes, err := inspectTunnelSourceState(cfg.routeTable, table, index)
 	if err != nil {
 		return err
 	}
-	existingRules, existingRoutes, err := inspectTunnelSourceState(cfg.routeTable, table, link.Attrs().Index)
-	if err != nil {
+	if err := preserveUnscopedTunnelSources(cfg, localAddresses, sources, desired, existingRules, existingRoutes); err != nil {
 		return err
 	}
 	for i := range hosts {
-		route := &netlink.Route{Dst: &hosts[i], LinkIndex: link.Attrs().Index, Scope: netlink.SCOPE_LINK, Table: table}
+		route := &netlink.Route{Dst: &hosts[i], LinkIndex: index, Scope: netlink.SCOPE_LINK, Table: table}
 		if err := netlink.RouteReplace(route); err != nil {
 			return fmt.Errorf("installing tunnel source route: %w", err)
 		}
@@ -118,27 +129,16 @@ func reconcileTunnelSourceRoutes(cfg config, localAddresses []string, hosts []ne
 			return err
 		}
 	}
-	return verifyTunnelSourceSelection(cfg.routeTable, table, link.Attrs().Index, sources, desired)
+	return verifyTunnelSourceSelection(cfg.routeTable, table, index, sources, desired)
 }
 
 func planTunnelSourceRoutes(localAddresses []string, hosts []net.IPNet) (map[int]*net.IPNet, map[string]bool, error) {
 	if len(hosts) == 0 {
 		return map[int]*net.IPNet{}, map[string]bool{}, nil
 	}
-	sources := map[int]*net.IPNet{}
-	for _, raw := range localAddresses {
-		prefix, err := netip.ParsePrefix(raw)
-		if err != nil || prefix.Bits() == 0 || !prefix.Addr().IsGlobalUnicast() || prefix.Addr().Is4In6() {
-			return nil, nil, fmt.Errorf("parsing tunnel source %q: explicit unicast allocation required", raw)
-		}
-		family, bits := netlink.FAMILY_V6, 128
-		if prefix.Addr().Is4() {
-			family, bits = netlink.FAMILY_V4, 32
-		}
-		if sources[family] != nil {
-			return nil, nil, fmt.Errorf("multiple tunnel sources for one address family")
-		}
-		sources[family] = &net.IPNet{IP: prefix.Addr().AsSlice(), Mask: net.CIDRMask(bits, bits)}
+	sources, err := tunnelSourceAllocations(localAddresses)
+	if err != nil {
+		return nil, nil, err
 	}
 	desired := map[string]bool{}
 	desiredFamilies := map[int]bool{}
@@ -162,4 +162,23 @@ func planTunnelSourceRoutes(localAddresses []string, hosts []net.IPNet) (map[int
 		}
 	}
 	return sources, desired, nil
+}
+
+func tunnelSourceAllocations(localAddresses []string) (map[int]*net.IPNet, error) {
+	sources := map[int]*net.IPNet{}
+	for _, raw := range localAddresses {
+		prefix, err := netip.ParsePrefix(raw)
+		if err != nil || prefix.Bits() == 0 || !prefix.Addr().IsGlobalUnicast() || prefix.Addr().Is4In6() {
+			return nil, fmt.Errorf("parsing tunnel source %q: explicit unicast allocation required", raw)
+		}
+		family, bits := netlink.FAMILY_V6, 128
+		if prefix.Addr().Is4() {
+			family, bits = netlink.FAMILY_V4, 32
+		}
+		if sources[family] != nil {
+			return nil, fmt.Errorf("multiple tunnel sources for one address family")
+		}
+		sources[family] = &net.IPNet{IP: prefix.Addr().AsSlice(), Mask: net.CIDRMask(bits, bits)}
+	}
+	return sources, nil
 }

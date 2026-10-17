@@ -7,12 +7,16 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// Read-only verification of the complete source-exception projection. Callers
+// Read-only verification of the source-exception projection. Scoped calls also
+// require outside-scope routes to retain their valid shared selectors. Callers
 // must derive allocations and destinations from admitted state, never from the
 // observed kernel routes. Missing state is an error, not permission to repair.
 func verifyTunnelSourceRoutes(cfg config, localAddresses []string, hosts []net.IPNet) error {
 	table, err := tunnelSourceTable(cfg.routeTable)
 	if err != nil {
+		return err
+	}
+	if err := validateTunnelSourceScope(cfg, hosts); err != nil {
 		return err
 	}
 	sources, desired, err := planTunnelSourceRoutes(localAddresses, hosts)
@@ -26,6 +30,15 @@ func verifyTunnelSourceRoutes(cfg config, localAddresses []string, hosts []net.I
 	}
 	if err == nil {
 		index = link.Attrs().Index
+	}
+	if cfg.receiveRouteScope != nil {
+		rules, routes, err := inspectTunnelSourceState(cfg.routeTable, table, index)
+		if err != nil {
+			return err
+		}
+		if err := preserveUnscopedTunnelSources(cfg, localAddresses, sources, desired, rules, routes); err != nil {
+			return err
+		}
 	}
 	return verifyTunnelSourceSelection(cfg.routeTable, table, index, sources, desired)
 }

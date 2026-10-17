@@ -343,7 +343,15 @@ read-back compares the complete selector and destination sets to caller-admitted
 allocations and hosts. Missing, extra, or substituted entries fail verification;
 observation never invokes reconciliation. Ordinary reconciliation and cleanup
 also verify their final result. Coordinated phases must supply the complete
-journal-derived input before using this observation as receipt evidence. Unselected
+journal-derived input before using this observation as receipt evidence.
+
+Scoped source updates own only hosts within the admitted journal destination
+prefixes. They preserve outside-scope host routes without reinstalling them and
+retain the shared selectors those routes already use. A missing or different
+selector blocks the operation rather than authorizing repair of another worker.
+Even empty scoped intent preserves those outside routes. Final read-back checks
+that the preserved snapshot remains intact. Unexpected hosts inside an owned
+block remain in scope and cannot evade verification as unrelated traffic. Unselected
 more-specific routes fail verification. Read-back never repairs state: a failed
 observation cannot become a successful phase receipt through hidden mutation.
 This proves the configured table at observation time; arbitrary source-sensitive

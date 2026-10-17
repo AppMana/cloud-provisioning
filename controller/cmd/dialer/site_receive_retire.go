@@ -134,11 +134,11 @@ func retireMissingSiteReceivers(ctx context.Context, api kubernetes.Interface, c
 			return err
 		}
 	}
-	if len(removable) > 0 {
-		if err := check(); err != nil {
-			return err
-		}
-	}
+	// Native retirement has verified absence while the caller still holds the
+	// host lock. Commit that fact even if the admission deadline has now elapsed:
+	// this only removes obsolete local evidence, not kernel state. A subsequent
+	// preparation must write fresh ownership intent before recreating a device.
+	// Re-admitting here can starve this commit under client-side rate limiting.
 	for _, name := range removable {
 		if err := removeDurableCache(name); err != nil {
 			return err

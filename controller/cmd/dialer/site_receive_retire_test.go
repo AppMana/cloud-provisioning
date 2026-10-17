@@ -17,7 +17,7 @@ import (
 // Native deletion is simulated here; the dedicated receiver native test covers
 // exact ownership, route/address dependencies and idempotent kernel deletion.
 func TestSiteReceiverRetirementAdmission(t *testing.T) {
-	for _, fault := range []string{"none", "live-owner", "reserved-owner", "inventory", "publication", "native", "digest"} {
+	for _, fault := range []string{"none", "live-owner", "reserved-owner", "inventory", "publication", "native", "digest", "cancel-after-native"} {
 		t.Run(fault, func(t *testing.T) {
 			site, _ := wgtypes.GeneratePrivateKey()
 			root, _ := wgtypes.GeneratePrivateKey()
@@ -57,6 +57,8 @@ func TestSiteReceiverRetirementAdmission(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			calls := 0
 			retire := func(selections []receiveRouteSelection) error {
 				calls++
@@ -66,11 +68,14 @@ func TestSiteReceiverRetirementAdmission(t *testing.T) {
 				if fault == "native" {
 					return errors.New("foreign route")
 				}
+				if fault == "cancel-after-native" {
+					cancel()
+				}
 				return nil
 			}
-			err := retireMissingSiteReceivers(context.Background(), fake.NewClientset(live), cfg, mesh, site, path, scope, retire)
+			err := retireMissingSiteReceivers(ctx, fake.NewClientset(live), cfg, mesh, site, path, scope, retire)
 			remaining, _ := filepath.Glob(path + ".owners/*.json")
-			if fault == "none" {
+			if fault == "none" || fault == "cancel-after-native" {
 				if err != nil || calls != 1 || len(remaining) != 0 {
 					t.Fatalf("retirement: calls=%d retained=%d err=%v", calls, len(remaining), err)
 				}

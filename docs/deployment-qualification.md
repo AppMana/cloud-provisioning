@@ -354,9 +354,11 @@ route or address dependencies before removing a device and its sysctl policy.
 Under an admitted journal inventory, withdrawn ordinary receiver owners use
 the dedicated-device retirement guard. Both journal generations and published
 owners remain protected. Ownership records are removed only after guarded
-retirement and a subsequent live admission check; failed retirement retains
-them for retry. Legacy preparation without an admitted journal inventory does
-not use this cleanup path.
+retirement verifies device absence under the host lock; failed retirement
+retains them for retry. Local record cleanup can finish after the admission
+deadline, but every native deletion still requires fresh live admission.
+Legacy preparation without an admitted journal inventory does not use this
+cleanup path.
 Retaining a snapshot alone does not satisfy last-worker deletion. Records from
 earlier binaries may already be missing, and retained snapshots require pruning
 only after verified retirement; neither case is qualified by cache unit tests.

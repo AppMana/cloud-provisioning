@@ -269,3 +269,31 @@ func verifyReceiptTransport(t *testing.T, verifier PodReceiptAuthenticator, node
 		})
 	}
 }
+
+func TestReceiptBatchExpiryPreservesFreshParticipants(t *testing.T) {
+	now := time.Now()
+	stale, fresh := [2]string{"old", "device"}, [2]string{"fresh", "device"}
+	batch := receiptBatch{expires: now.Add(time.Minute), maxAge: 30 * time.Second, entries: map[[2]string]PodReceipt{
+		stale: {BearerToken: "expired-token", Receipt: Receipt{ObservedAt: now.Add(-30 * time.Second)}},
+		fresh: {BearerToken: "fresh-token", Receipt: Receipt{ObservedAt: now.Add(-5 * time.Second)}},
+	}}
+	if !batch.prune(now) || len(batch.entries) != 1 || batch.entries[fresh].BearerToken != "fresh-token" {
+		t.Fatal("expiry discarded a fresh participant")
+	}
+	if _, found := batch.entries[stale]; found {
+		t.Fatal("expired credential retained")
+	}
+	// A new observation can join the retained participant without replaying
+	// credentials from the expired observation.
+	batch.entries[stale] = PodReceipt{BearerToken: "replacement-token", Receipt: Receipt{ObservedAt: now}}
+	if !batch.prune(now.Add(20*time.Second)) || len(batch.entries) != 2 {
+		t.Fatal("fresh observations cannot accumulate")
+	}
+	if batch.prune(now.Add(30*time.Second)) || len(batch.entries) != 0 {
+		t.Fatal("observation expiry retained credentials")
+	}
+	batch.entries[fresh] = PodReceipt{BearerToken: "fresh-token", Receipt: Receipt{ObservedAt: now.Add(59 * time.Second)}}
+	if batch.prune(batch.expires) || len(batch.entries) != 0 {
+		t.Fatal("round expiry retained credentials")
+	}
+}

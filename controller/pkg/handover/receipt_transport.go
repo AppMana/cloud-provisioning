@@ -26,7 +26,23 @@ type ReceiptResolver func(context.Context, string) (Store, map[string]PodReceipt
 type receiptBatch struct {
 	uid, round string
 	expires    time.Time
+	maxAge     time.Duration
 	entries    map[[2]string]PodReceipt
+}
+
+// Prune each credential at its own observation deadline. Expiring one member
+// must not discard newer authenticated observations from other participants.
+func (b receiptBatch) prune(now time.Time) bool {
+	if !now.Before(b.expires) || b.maxAge <= 0 {
+		clear(b.entries)
+		return false
+	}
+	for key, entry := range b.entries {
+		if !now.Before(entry.Receipt.ObservedAt.Add(b.maxAge)) {
+			delete(b.entries, key)
+		}
+	}
+	return len(b.entries) > 0
 }
 
 // ReceiptHandler collects independently authenticated observations. Credentials
@@ -68,7 +84,7 @@ func (h *ReceiptHandler) Run(ctx context.Context) {
 			select {
 			case h.gate <- struct{}{}:
 				for key, batch := range h.batches {
-					if !now.Before(batch.expires) {
+					if !batch.prune(now) {
 						delete(h.batches, key)
 					}
 				}
@@ -139,7 +155,7 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	for key, batch := range h.batches {
-		if !now.Before(batch.expires) {
+		if !batch.prune(now) {
 			delete(h.batches, key)
 		}
 	}
@@ -169,7 +185,7 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	batch := h.batches[request.MachineUID]
 	if batch.uid != string(snapshot.Metadata().UID) || batch.round != digest {
-		batch = receiptBatch{uid: string(snapshot.Metadata().UID), round: digest, expires: view.Round.ExpiresAt, entries: map[[2]string]PodReceipt{}}
+		batch = receiptBatch{uid: string(snapshot.Metadata().UID), round: digest, expires: view.Round.ExpiresAt, maxAge: view.Round.MaxReceiptAge, entries: map[[2]string]PodReceipt{}}
 	}
 	if _, exists := h.batches[request.MachineUID]; !exists && len(h.batches) >= h.limit {
 		reject(http.StatusServiceUnavailable)
@@ -183,19 +199,9 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reject(http.StatusConflict)
 		return
 	}
-	for key, entry := range batch.entries {
-		if time.Since(entry.Receipt.ObservedAt) > view.Round.MaxReceiptAge {
-			delete(batch.entries, key)
-		}
-	}
+	batch.prune(time.Now())
 	for _, entry := range request.Receipts {
 		batch.entries[[2]string{entry.Receipt.NodeUID, entry.Receipt.DeviceID}] = entry
-	}
-	batch.expires = view.Round.ExpiresAt
-	for _, entry := range batch.entries {
-		if expiry := entry.Receipt.ObservedAt.Add(view.Round.MaxReceiptAge); expiry.Before(batch.expires) {
-			batch.expires = expiry
-		}
 	}
 	h.batches[request.MachineUID] = batch
 	if len(batch.entries) != len(view.Round.Members) {

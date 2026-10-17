@@ -463,6 +463,9 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 				if fault == "expired" {
 					start = now.Add(-2 * time.Minute)
 				}
+				if fault == "complete" {
+					start = now.Add(-2 * time.Minute)
+				}
 				if fault == "future" {
 					start = now.Add(time.Minute)
 				}
@@ -502,6 +505,25 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 					return nil
 				}); err == nil || called || len(got) != 0 {
 					t.Fatal("invalid round reached native work")
+				}
+				readbackCalls := 0
+				readbackErr := verifyCompletedReceivePhase(ctx, api, store, scope, fresh, root, "container-incarnation", func(_ context.Context, _ tunnel.ReceiveTransitionPlan, v handover.View, _ string, _ tunnel.ReceiveJournalRoutes) error {
+					readbackCalls++
+					if !v.Complete {
+						t.Fatal("readback received unfinished intent")
+					}
+					return nil
+				})
+				if fault == "complete" {
+					if readbackErr != nil || readbackCalls != 1 {
+						t.Fatalf("expired terminal journal was not verified: %v", readbackErr)
+					}
+					current, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+					if err != nil || current.ResourceVersion != changed.ResourceVersion {
+						t.Fatal("terminal readback changed the journal", err)
+					}
+				} else if readbackErr == nil || readbackCalls != 0 {
+					t.Fatal("unfinished journal entered terminal readback")
 				}
 				changed.Data = before.DeepCopy().Data
 				if _, err := store.ConfigMaps.Update(ctx, changed, metav1.UpdateOptions{}); err != nil {

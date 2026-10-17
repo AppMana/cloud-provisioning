@@ -121,10 +121,7 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		if err != nil {
 			return true, err
 		}
-		if view.Complete {
-			continue
-		}
-		receipts, err := executeReceivePhase(ctx, api, store, scope, cfg, key, containerID, func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
+		verify := func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
 			_, expected, err := tunnel.ReceiveLocalNetwork(plan, nodeUID)
 			if err != nil {
 				return err
@@ -133,7 +130,14 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 				return fmt.Errorf("bootstrap tunnel allocation differs from committed plan")
 			}
 			return native(ctx, plan, view, nodeUID, intent, key)
-		})
+		}
+		if view.Complete {
+			if err := verifyCompletedReceivePhase(ctx, api, store, scope, cfg, key, containerID, verify); err != nil {
+				failures = append(failures, err)
+			}
+			continue
+		}
+		receipts, err := executeReceivePhase(ctx, api, store, scope, cfg, key, containerID, verify)
 		if err != nil {
 			failures = append(failures, err)
 			continue

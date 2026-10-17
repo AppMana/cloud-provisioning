@@ -74,11 +74,37 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 		t.Fatal(err)
 	}
 	objects := []runtime.Object{mesh, index, adoption, node, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system", UID: types.UID(store.ClusterUID)}}, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: mesh.Namespace, Name: store.Name, UID: "dispatch-journal", ResourceVersion: "1"}, Data: map[string]string{"transition.json": string(encoded), "plan.json": string(raw)}}}
-	for _, fault := range []string{"valid", "allocation", "pod", "credential", "native"} {
+	for _, fault := range []string{"valid", "allocation", "pod", "credential", "native", "complete", "complete-native"} {
 		t.Run("dispatch-"+fault, func(t *testing.T) {
 			copies := []runtime.Object{}
 			for _, obj := range objects {
 				copies = append(copies, obj.DeepCopyObject())
+			}
+			terminal := fault == "complete" || fault == "complete-native"
+			if terminal {
+				finished, err := tr.Rollback(time.Now())
+				if err != nil {
+					t.Fatal(err)
+				}
+				v, _ := finished.View()
+				digest, _ := v.Round.Digest()
+				var proofs []handover.AuthenticatedReceipt
+				for _, m := range v.Round.Members {
+					proofs = append(proofs, handover.AuthenticatedReceipt{AuthenticatedNodeUID: m.NodeUID, Receipt: handover.Receipt{RoundHash: digest, NodeUID: m.NodeUID, DeviceID: m.DeviceID, FromKey: m.FromKey, ToKey: m.ToKey, FromPeerKey: m.FromPeerKey, ToPeerKey: m.ToPeerKey, ObservedAt: time.Now()}})
+				}
+				finished, err = finished.Advance(time.Now(), proofs)
+				if err != nil {
+					t.Fatal(err)
+				}
+				encoded, err := finished.Bytes()
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, obj := range copies {
+					if journal, ok := obj.(*corev1.ConfigMap); ok && journal.Name == store.Name {
+						journal.Data["transition.json"] = string(encoded)
+					}
+				}
 			}
 			copies = append(copies, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: mesh.Namespace, Name: "agent", UID: "pod"}, Spec: corev1.PodSpec{NodeName: plan.CloudNodeName}, Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://agent", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.Now()}}}}}})
 			k := fake.NewClientset(copies...)
@@ -123,15 +149,19 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 					lock.Close()
 					t.Error("native execution escaped shared host lock")
 				}
-				if uid != plan.CloudNodeUID || key != root || v.Round.Phase != handover.Prepare {
+				phase := handover.Prepare
+				if terminal {
+					phase = handover.Abort
+				}
+				if uid != plan.CloudNodeUID || key != root || v.Round.Phase != phase || v.Complete != terminal {
 					t.Error("native dispatch changed admitted identity")
 				}
-				if fault == "native" {
+				if fault == "native" || fault == "complete-native" {
 					return fmt.Errorf("native observation failed")
 				}
 				return nil
 			})
-			if !handled || (err == nil) != (fault == "valid") {
+			if !handled || (err == nil) != (fault == "valid" || fault == "complete") {
 				t.Fatalf("handled=%v error=%v", handled, err)
 			}
 			if fault == "valid" {
@@ -152,7 +182,10 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 					t.Fatal("failed dispatch emitted receipts")
 				default:
 				}
-				if fault != "native" && nativeCalls != 0 {
+				if terminal && nativeCalls != 1 {
+					t.Fatal("completed journal was skipped instead of verified")
+				}
+				if fault != "native" && !terminal && nativeCalls != 0 {
 					t.Fatal("invalid identity reached native mutation")
 				}
 			}

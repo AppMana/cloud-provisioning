@@ -39,15 +39,16 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		}
 	}
 	var request struct {
-		Plan           tunnel.ReceiveTransitionPlan `json:"plan"`
-		KeyFile        string                       `json:"keyFile"`
-		Action         string                       `json:"action"`
-		NodeName       string                       `json:"nodeName"`
-		Setup          bool                         `json:"setup"`
-		StateFile      string                       `json:"stateFile"`
-		ExpectWait     bool                         `json:"expectWait"`
-		CloudAddresses []string                     `json:"cloudAddresses"`
-		ContinuityOnly bool                         `json:"continuityOnly"`
+		Plan              tunnel.ReceiveTransitionPlan `json:"plan"`
+		KeyFile           string                       `json:"keyFile"`
+		Action            string                       `json:"action"`
+		NodeName          string                       `json:"nodeName"`
+		Setup             bool                         `json:"setup"`
+		StateFile         string                       `json:"stateFile"`
+		ExpectWait        bool                         `json:"expectWait"`
+		CloudAddresses    []string                     `json:"cloudAddresses"`
+		ContinuityOnly    bool                         `json:"continuityOnly"`
+		CompletedReadback bool                         `json:"completedReadback"`
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -140,6 +141,13 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if request.CompletedReadback {
+		terminal, err := tr.View()
+		if err != nil || (terminal.Round.Phase != handover.Retire && terminal.Round.Phase != handover.Abort) {
+			t.Fatal("terminal fixture requires retirement or abort", err)
+		}
+		advance(time.Now())
+	}
 	view, err := tr.View()
 	if err != nil {
 		t.Fatal(err)
@@ -171,7 +179,7 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		cloudAddresses = []string{"10.88.0.3/32"}
 	}
 	publish := func(nodeUID string) {
-		if request.StateFile == "" {
+		if request.StateFile == "" || view.Complete {
 			return
 		}
 		digest, err := view.Round.Digest()
@@ -282,8 +290,32 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 			}
 			return
 		}
-		if err := receiveLinuxPhase(context.Background(), devices, cfg, key, nil, addresses, plan, view, nodeUID, intent); err != nil {
+		var verifier receiverDevices = devices
+		var beforeRoutes []netlink.Route
+		var beforeAddresses []netlink.Addr
+		if request.CompletedReadback {
+			verifier = readOnlyReceiveDevices{devices}
+			beforeRoutes, err = netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			beforeAddresses, err = netlink.AddrList(nil, netlink.FAMILY_ALL)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := receiveLinuxPhase(context.Background(), verifier, cfg, key, nil, addresses, plan, view, nodeUID, intent); err != nil {
 			t.Fatal(err)
+		}
+		if request.CompletedReadback {
+			afterRoutes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, 0)
+			if err != nil || !reflect.DeepEqual(beforeRoutes, afterRoutes) {
+				t.Fatal("terminal readback mutated routes", err)
+			}
+			afterAddresses, err := netlink.AddrList(nil, netlink.FAMILY_ALL)
+			if err != nil || !reflect.DeepEqual(beforeAddresses, afterAddresses) {
+				t.Fatal("terminal readback mutated addresses", err)
+			}
 		}
 		publish(nodeUID)
 		return
@@ -607,6 +639,12 @@ func samePeerConfiguration(a, b []wgtypes.Peer) bool {
 
 // Retire/abort retries are forbidden from recreating keys or peers.
 type retirementOnlyDevices struct{ receiverDevices }
+
+type readOnlyReceiveDevices struct{ receiverDevices }
+
+func (d readOnlyReceiveDevices) ConfigureDevice(string, wgtypes.Config) error {
+	return fmt.Errorf("terminal readback attempted a WireGuard mutation")
+}
 
 func (d retirementOnlyDevices) ConfigureDevice(name string, cfg wgtypes.Config) error {
 	if cfg.PrivateKey != nil || cfg.ListenPort != nil || cfg.FirewallMark != nil || cfg.ReplacePeers {

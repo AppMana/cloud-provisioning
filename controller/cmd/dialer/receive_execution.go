@@ -16,18 +16,28 @@ import (
 // nil asserts that native verification completed; merely accepting configuration
 // is insufficient. The combined route intent includes other workers and must
 // preserve their selection; only the target plan authorizes phase-specific
-// preparation or retirement. Platform implementations must reject unsupported phases.
+// preparation or retirement. A complete view permits readback only: no device,
+// route or peer mutations. Platforms must reject unsupported phases.
 type receiveNativePhase func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string, tunnel.ReceiveJournalRoutes) error
 
 // executeReceivePhase holds the existing host lock from recovery admission to
 // native verification and receipt construction. It is an execution boundary,
 // not a native backend or receipt transport. Callers must not call it while
-// already holding the same lock. Normal reconciliation is not wired here yet.
+// already holding the same lock.
 //
 // A changed journal after native work suppresses receipts; it does not undo
 // that work or infer rollback. The next pass must admit the newer committed
 // history. Every other writer must honor the same lock and durable phase state.
 func executeReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase) ([]handover.PodReceipt, error) {
+	return runReceivePhase(ctx, api, store, scope, cfg, key, containerID, native, false)
+}
+
+func verifyCompletedReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase) error {
+	_, err := runReceivePhase(ctx, api, store, scope, cfg, key, containerID, native, true)
+	return err
+}
+
+func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase, completedReadback bool) ([]handover.PodReceipt, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -47,9 +57,19 @@ func executeReceivePhase(ctx context.Context, api kubernetes.Interface, store ha
 		return nil, err
 	}
 	admitted := set.Local[scope.MachineUID]
-	view, err := executableReceiveRound(admitted.Snapshot, time.Now())
+	view, err := admitted.Snapshot.Transition().View()
 	if err != nil {
 		return nil, err
+	}
+	if completedReadback {
+		if !view.Complete {
+			return nil, fmt.Errorf("completed readback requires a terminal journal")
+		}
+	} else {
+		view, err = executableReceiveRound(admitted.Snapshot, time.Now())
+		if err != nil {
+			return nil, err
+		}
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -58,7 +78,13 @@ func executeReceivePhase(ctx context.Context, api kubernetes.Interface, store ha
 		return nil, fmt.Errorf("native drain verification cannot start before committed drain deadline")
 	}
 	deadline := view.Round.ExpiresAt
+	if completedReadback {
+		deadline = time.Now().Add(30 * time.Second)
+	}
 	for _, member := range set.Local {
+		if completedReadback {
+			break
+		} // Readback cannot extend another worker's mutation authority.
 		other, err := member.Snapshot.Transition().View()
 		if err != nil {
 			return nil, err
@@ -106,6 +132,9 @@ func executeReceivePhase(ctx context.Context, api kubernetes.Interface, store ha
 	current := afterNative.Local[scope.MachineUID]
 	if err := phaseCtx.Err(); err != nil {
 		return nil, err
+	}
+	if completedReadback {
+		return nil, nil
 	}
 	now := time.Now()
 	view, err = executableReceiveRound(current.Snapshot, now)

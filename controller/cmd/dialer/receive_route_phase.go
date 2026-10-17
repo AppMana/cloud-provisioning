@@ -25,8 +25,8 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if view.Complete {
-		return fmt.Errorf("native receiver route backend does not implement this phase")
+	if view.Complete && view.Round.Phase != handover.Retire && view.Round.Phase != handover.Abort {
+		return fmt.Errorf("native terminal readback requires a retired or aborted phase")
 	}
 	switch view.Round.Phase {
 	case handover.Prepare, handover.Switch, handover.Drain, handover.Retire, handover.Abort:
@@ -326,6 +326,9 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 			return err
 		}
 		for _, selection := range selections {
+			if view.Complete {
+				break
+			}
 			if err := ctx.Err(); err != nil {
 				return err
 			}
@@ -340,6 +343,9 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 		}
 	} else if view.Round.Phase == handover.Retire {
 		for _, peer := range targetLegacyPeers {
+			if view.Complete {
+				break
+			}
 			if err := ctx.Err(); err != nil {
 				return err
 			}

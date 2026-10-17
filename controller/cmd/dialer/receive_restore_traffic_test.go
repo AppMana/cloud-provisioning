@@ -124,10 +124,12 @@ func verifyNativeReceiveTrafficRecovery(t *testing.T, devices receiverDevices, c
 	var firstSuccess time.Duration
 	var nextRestore time.Time
 	var restoreErr error
+	var bootRetry receiveBootRetry
 	for {
 		if !time.Now().Before(nextRestore) {
 			restoreErr = restore()
-			nextRestore = time.Now().Add(restoreInterval)
+			now := time.Now()
+			nextRestore = now.Add(bootRetry.delay(restoreErr, restoreInterval, now))
 		}
 		healthy := restoreErr == nil
 		for j := range lanes {

@@ -5,12 +5,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -27,11 +29,39 @@ type receiveBootState struct {
 	NodeUID string
 }
 
+type receiveBootPending struct{ error }
+
+func (e receiveBootPending) Unwrap() error { return e.error }
+
+// Only previously admitted boot restoration gets a short retry window. Every
+// retry releases the lock and repeats admission; it grants no new permissions.
+type receiveBootRetry struct{ started time.Time }
+
+func (r *receiveBootRetry) delay(err error, normal time.Duration, now time.Time) time.Duration {
+	var pending receiveBootPending
+	if !errors.As(err, &pending) {
+		r.started = time.Time{}
+		return normal
+	}
+	if r.started.IsZero() {
+		r.started = now
+	}
+	if now.Sub(r.started) < time.Minute && normal > time.Second {
+		return time.Second
+	}
+	return normal
+}
+
 // This restores previously verified terminal state after kernel state was lost
 // across a boot. It cannot select a new generation, replay retirement, publish
 // receipts or replace live admission. The host's ordinary peer cache stays fenced.
 func recoverReceiveBoot(ctx context.Context, devices receiverDevices, cfg config) (bool, error) {
-	return admitReceiveBoot(ctx, cfg, func(state receiveBootState, check func() error) error {
+	return admitReceiveBoot(ctx, cfg, func(state receiveBootState, check func() error) (result error) {
+		defer func() {
+			if result != nil && ctx.Err() == nil {
+				result = receiveBootPending{result}
+			}
+		}()
 		if err := restoreCompletedReceiveState(ctx, devices, state.Config, state.Key, state.Plan, state.View, state.NodeUID, state.Routes); err != nil {
 			return err
 		}

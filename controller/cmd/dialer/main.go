@@ -338,10 +338,13 @@ func main() {
 	defer speaker.stop(context.Background())
 	ticker := time.NewTicker(cfg.pollInterval)
 	defer ticker.Stop()
+	var bootRetry receiveBootRetry
 	for {
-		if err := reconcileNode(ctx, clientset, wg, cfg, speaker); err != nil {
+		err := reconcileNode(ctx, clientset, wg, cfg, speaker)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "reconcile: %v\n", err)
 		}
+		ticker.Reset(bootRetry.delay(err, cfg.pollInterval, time.Now()))
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():

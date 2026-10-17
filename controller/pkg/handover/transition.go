@@ -35,11 +35,12 @@ type event struct {
 	Next     *Round    `json:"next,omitempty"`
 }
 type journal struct {
-	Version      int     `json:"version"`
-	PlanRequired bool    `json:"planRequired,omitempty"`
-	Policy       Policy  `json:"policy"`
-	Initial      Round   `json:"initial"`
-	Events       []event `json:"events"`
+	Version      int          `json:"version"`
+	Predecessor  *Predecessor `json:"predecessor,omitempty"`
+	PlanRequired bool         `json:"planRequired,omitempty"`
+	Policy       Policy       `json:"policy"`
+	Initial      Round        `json:"initial"`
+	Events       []event      `json:"events"`
 }
 
 // Transition is immutable through its public API. Candidate operations must be
@@ -93,8 +94,14 @@ func (t Transition) Bytes() ([]byte, error) {
 // or a persisted desired phase into evidence of a completed native operation.
 func (t Transition) View() (View, error) {
 	p := t.j.Policy
-	if t.j.Version != 1 || p.RoundLifetime <= 0 || p.MaxReceiptAge <= 0 || p.MaxReceiptAge > p.RoundLifetime || p.DrainInterval <= 0 {
+	if (t.j.Version != 1 && t.j.Version != 2) || p.RoundLifetime <= 0 || p.MaxReceiptAge <= 0 || p.MaxReceiptAge > p.RoundLifetime || p.DrainInterval <= 0 {
 		return View{}, fmt.Errorf("invalid transition version or policy")
+	}
+	if (t.j.Version == 1 && t.j.Predecessor != nil) || (t.j.Version == 2 && (t.j.Predecessor == nil || !t.j.Predecessor.valid())) {
+		return View{}, fmt.Errorf("invalid predecessor binding")
+	}
+	if t.j.Predecessor != nil && t.j.Initial.FromGeneration != t.j.Predecessor.ServingGeneration {
+		return View{}, fmt.Errorf("successor does not start from archived serving generation")
 	}
 	initial, e := t.j.Initial.canonical()
 	if e != nil {

@@ -41,7 +41,7 @@ func (s Store) ArchiveCompleted(ctx context.Context, previous Snapshot) (Snapsho
 	if current.object.DeletionTimestamp != nil || !reflect.DeepEqual(current.object, previous.object) {
 		return fail(fmt.Errorf("journal changed before archival"))
 	}
-	identity := sha256.Sum256([]byte(string(previous.object.UID)))
+	identity := sha256.Sum256([]byte(string(previous.object.UID) + ":" + journalDigest(previous)))
 	archive := previous.object.DeepCopy()
 	archive.ObjectMeta = metav1.ObjectMeta{
 		Name:      fmt.Sprintf("handover-archive-%x", identity[:16]),
@@ -61,9 +61,18 @@ func (s Store) ArchiveCompleted(ctx context.Context, previous Snapshot) (Snapsho
 	if err != nil {
 		return fail(err)
 	}
+	// Metadata-only source updates do not change the terminal history. Keep
+	// the provenance of the first exact archive instead of making that archive
+	// permanently block a later compare-and-swap attempt.
+	expectedAnnotations := archive.Annotations
+	const sourceVersion = "handover.cloud-provisioning.io/source-resource-version"
+	if !token(stored.Annotations[sourceVersion]) {
+		return fail(fmt.Errorf("archive source version is missing"))
+	}
+	expectedAnnotations[sourceVersion] = stored.Annotations[sourceVersion]
 	if stored.DeletionTimestamp != nil || stored.Immutable == nil || !*stored.Immutable ||
 		stored.Namespace != archive.Namespace || len(stored.OwnerReferences) != 0 ||
-		!reflect.DeepEqual(stored.Annotations, archive.Annotations) ||
+		!reflect.DeepEqual(stored.Annotations, expectedAnnotations) ||
 		!reflect.DeepEqual(stored.Data, archive.Data) || !reflect.DeepEqual(stored.BinaryData, archive.BinaryData) {
 		return fail(fmt.Errorf("archive differs from the completed journal"))
 	}

@@ -241,6 +241,10 @@ func verifyCompletedArchives(t *testing.T, store Store) {
 			if _, err := s.ArchiveCompleted(ctx, live); err == nil {
 				t.Fatal("accepted foreign archive")
 			}
+			if err := s.ConfigMaps.Delete(ctx, archived.Metadata().Name, metav1.DeleteOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			verifyStoredSuccessor(t, s, live)
 		})
 	}
 }

@@ -58,6 +58,9 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		if err != nil {
 			return true, err
 		}
+		if err := inventory.CheckJournal(uid, string(snapshot.Metadata().UID)); err != nil {
+			return true, err
+		}
 		plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
 		if err != nil {
 			return true, err

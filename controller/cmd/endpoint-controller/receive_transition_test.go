@@ -97,7 +97,13 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	}
 	// Verify publication ordering at the real API write boundary: no journal
 	// may be created before discovery contains its immutable Machine identity.
-	r.receiveJournal.ConfigMaps = inventoryCheckedCreates{ConfigMapInterface: store.ConfigMaps, check: func(ctx context.Context, object *corev1.ConfigMap) error {
+	failCreate, failPublish := true, true
+	r.receiveJournal.ConfigMaps = inventoryCheckedCreates{ConfigMapInterface: inventoryRacingUpdate{ConfigMapInterface: store.ConfigMaps, before: func() error {
+		if failPublish {
+			return fmt.Errorf("injected publication interruption")
+		}
+		return nil
+	}}, check: func(ctx context.Context, object *corev1.ConfigMap) error {
 		if object.Name != store.Name {
 			return nil
 		}
@@ -109,14 +115,80 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 		if err != nil || !slices.Contains(inventory.MachineUIDs, string(machine.GetUID())) {
 			return fmt.Errorf("journal creation preceded its reservation: %v", err)
 		}
+		if inventory.CheckJournal(string(machine.GetUID()), "unpublished") == nil {
+			return fmt.Errorf("pending journal was executable")
+		}
+		if failCreate {
+			return fmt.Errorf("injected creation interruption")
+		}
 		return nil
 	}}
 	now := time.Now()
+	if err := r.ensureAdoptionConfig(ctx, machine); err == nil {
+		t.Fatal("creation interruption did not reach caller")
+	}
+	if _, err := store.Load(ctx); !apierrors.IsNotFound(err) {
+		t.Fatal("interrupted creation left a journal", err)
+	}
+	// Recovery must use the durable prepared plan even after readiness has
+	// disappeared; pending inventory prevents agents refreshing those receipts.
+	adoption := &corev1.Secret{}
+	adoptionKey := client.ObjectKey{Namespace: machine.GetNamespace(), Name: tunnel.AdoptionSecretName(machine.GetName())}
+	if err := r.reader.Get(ctx, adoptionKey, adoption); err != nil {
+		t.Fatal(err)
+	}
+	ready := slices.Clone(adoption.Data[tunnel.ReceiveReadyKey])
+	delete(adoption.Data, tunnel.ReceiveReadyKey)
+	if err := r.Update(ctx, adoption); err != nil {
+		t.Fatal(err)
+	}
+	failCreate = false
+	crashStore := r.receiveJournal
+	crashStore.Name = store.Name
+	crashPolicy, err := r.receivePreparation.Journal.policy()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.ensureReceiveTransition(ctx, machine, crashStore, native, ports, crashPolicy, now.Add(-2*time.Minute)); err == nil {
+		t.Fatal("publication interruption did not reach caller")
+	}
+	unpublished, err := store.Load(ctx)
+	if err != nil {
+		t.Fatal("reserved plan did not recover journal creation", err)
+	}
+	meshBeforePublish := &corev1.Secret{}
+	if err := r.reader.Get(ctx, client.ObjectKey{Namespace: r.secretNamespace, Name: r.secretName}, meshBeforePublish); err != nil {
+		t.Fatal(err)
+	}
+	beforePublish, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, r.secretNamespace, r.secretName, string(meshBeforePublish.UID))
+	if err != nil || beforePublish.CheckJournal(string(machine.GetUID()), string(unpublished.Metadata().UID)) == nil {
+		t.Fatal("unpublished journal admitted", err)
+	}
+	failPublish = false
 	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
 		t.Fatalf("normal adoption reconciliation did not commit a prepared plan: %v", err)
 	}
 	snapshot, err := store.Load(ctx)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Metadata().UID != unpublished.Metadata().UID || !bytes.Equal(snapshot.Plan(), unpublished.Plan()) {
+		t.Fatal("publication recovery replaced the journal")
+	}
+	oldView, _ := unpublished.Transition().View()
+	newView, _ := snapshot.Transition().View()
+	if !now.After(oldView.Round.ExpiresAt) || !newView.Round.ExpiresAt.After(now) || oldView.Round.Nonce == newView.Round.Nonce || snapshot.Transition().Extends(unpublished.Transition()) != nil {
+		t.Fatal("expired unpublished round was not renewed without regressing history")
+	}
+	published, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, r.secretNamespace, r.secretName, string(meshBeforePublish.UID))
+	if err != nil || published.CheckJournal(string(machine.GetUID()), string(snapshot.Metadata().UID)) != nil || len(published.Publications[string(machine.GetUID())].Plan) != 0 {
+		t.Fatal("publication failed to pin UID and discard seed", err)
+	}
+	if err := r.reader.Get(ctx, adoptionKey, adoption); err != nil {
+		t.Fatal(err)
+	}
+	adoption.Data[tunnel.ReceiveReadyKey] = ready
+	if err := r.Update(ctx, adoption); err != nil {
 		t.Fatal(err)
 	}
 	view, err := snapshot.Transition().View()
@@ -369,5 +441,16 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	}
 	if err := r.ensureAdoptionConfig(ctx, machine); err == nil {
 		t.Fatal("normal reconciliation accepted a corrupted journal plan")
+	}
+	// A published journal may have authorized native work. Deletion must not
+	// resurrect its initial round, even though preparation is still available.
+	if err := store.ConfigMaps.Delete(ctx, store.Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.ensureAdoptionConfig(ctx, machine); err == nil {
+		t.Fatal("deleted published journal was recreated")
+	}
+	if _, err := store.Load(ctx); !apierrors.IsNotFound(err) {
+		t.Fatal("deleted journal reappeared", err)
 	}
 }

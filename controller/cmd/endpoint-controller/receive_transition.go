@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/netip"
+	"slices"
 	"strings"
 	"time"
 
@@ -82,10 +85,25 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 		if err := tunnel.ReserveReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, mesh, string(machine.GetUID()), r.owners()); err != nil {
 			return nil, err
 		}
+		existing, err = tunnel.PublishReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, mesh, existing, now)
+		if err != nil {
+			return nil, err
+		}
 		return &existing, nil
 	}
 	if !apierrors.IsNotFound(err) {
 		return nil, err
+	}
+	inventory, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	if err == nil && slices.Contains(inventory.MachineUIDs, string(machine.GetUID())) {
+		publication, found := inventory.Publications[string(machine.GetUID())]
+		if !found || publication.JournalUID != "" || len(publication.Plan) == 0 {
+			return nil, fmt.Errorf("reserved journal disappeared without an unpublished preparation")
+		}
+		return r.createPreparedReceiveJournal(ctx, machine, store, mesh, publication.Plan, policy, now)
 	}
 	prepared, err := r.prepareRemoteReceivePaths(ctx, machine, native, ports)
 	if err != nil || prepared == nil {
@@ -98,6 +116,23 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 	raw, err := json.Marshal(plan)
 	if err != nil {
 		return nil, err
+	}
+	return r.createPreparedReceiveJournal(ctx, machine, store, mesh, raw, policy, now)
+}
+
+func (r *meshReconciler) createPreparedReceiveJournal(ctx context.Context, machine *unstructured.Unstructured, store handover.Store, mesh *corev1.Secret, raw []byte, policy handover.Policy, now time.Time) (*handover.Snapshot, error) {
+	var plan tunnel.ReceiveTransitionPlan
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&plan); err != nil {
+		return nil, err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		return nil, fmt.Errorf("trailing reserved preparation data")
+	}
+	if plan.MachineUID != string(machine.GetUID()) || plan.MachineName != machine.GetName() || plan.Namespace != mesh.Namespace || plan.MeshUID != string(mesh.UID) || plan.MeshName != mesh.Name {
+		return nil, fmt.Errorf("reserved preparation scope changed")
 	}
 	hash := fmt.Sprintf("%x", sha256.Sum256(raw))
 	spec, err := tunnel.ReceiveTransitionSpec(plan, store.ClusterUID, hash)
@@ -112,11 +147,15 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 	// Reserving earlier would fence those agents on a missing journal before
 	// they could publish the readiness needed to construct it. Preserve the
 	// reservation-before-creation invariant once the complete plan is ready.
-	if err := tunnel.ReserveReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, mesh, string(machine.GetUID()), r.owners()); err != nil {
+	if err := tunnel.ReservePreparedReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, mesh, string(machine.GetUID()), r.owners(), raw); err != nil {
 		return nil, err
 	}
 	store.OwnerReferences = r.owners()
 	persisted, err := store.CreateWithPlan(ctx, transition, raw)
+	if err != nil {
+		return nil, err
+	}
+	persisted, err = tunnel.PublishReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, mesh, persisted, now)
 	if err != nil {
 		return nil, err
 	}

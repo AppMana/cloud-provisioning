@@ -74,11 +74,34 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 		t.Fatal(err)
 	}
 	objects := []runtime.Object{mesh, index, adoption, node, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system", UID: types.UID(store.ClusterUID)}}, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: mesh.Namespace, Name: store.Name, UID: "dispatch-journal", ResourceVersion: "1"}, Data: map[string]string{"transition.json": string(encoded), "plan.json": string(raw)}}}
-	for _, fault := range []string{"valid", "allocation", "pod", "credential", "native", "complete", "complete-native"} {
+	for _, fault := range []string{"valid", "allocation", "pod", "credential", "native", "complete", "complete-native", "publication-pending", "publication-replaced"} {
 		t.Run("dispatch-"+fault, func(t *testing.T) {
 			copies := []runtime.Object{}
 			for _, obj := range objects {
 				copies = append(copies, obj.DeepCopyObject())
+			}
+			for _, obj := range copies {
+				cm, ok := obj.(*corev1.ConfigMap)
+				if !ok || cm.Name != index.Name {
+					continue
+				}
+				var inventory tunnel.ReceiveInventory
+				if err := json.Unmarshal([]byte(cm.Data["inventory.json"]), &inventory); err != nil {
+					t.Fatal(err)
+				}
+				publication := tunnel.ReceiveJournalPublication{JournalUID: "dispatch-journal"}
+				if fault == "publication-pending" {
+					publication = tunnel.ReceiveJournalPublication{Plan: raw}
+				}
+				if fault == "publication-replaced" {
+					publication.JournalUID = "previous-journal"
+				}
+				inventory.Publications = map[string]tunnel.ReceiveJournalPublication{plan.MachineUID: publication}
+				encoded, err := json.Marshal(inventory)
+				if err != nil {
+					t.Fatal(err)
+				}
+				cm.Data["inventory.json"] = string(encoded)
 			}
 			terminal := fault == "complete" || fault == "complete-native"
 			if terminal {

@@ -25,12 +25,34 @@ const receiveInventoryKey = "inventory.json"
 // reconciliation. A missing reserved journal must never be treated as absence of
 // handover intent. Agents need named read access, never write or list permission.
 type ReceiveInventory struct {
-	Version     int      `json:"version"`
-	ClusterUID  string   `json:"clusterUID"`
-	Namespace   string   `json:"namespace"`
-	MeshName    string   `json:"meshName"`
-	MeshUID     string   `json:"meshUID"`
-	MachineUIDs []string `json:"machineUIDs"`
+	Version      int                                  `json:"version"`
+	ClusterUID   string                               `json:"clusterUID"`
+	Namespace    string                               `json:"namespace"`
+	MeshName     string                               `json:"meshName"`
+	MeshUID      string                               `json:"meshUID"`
+	MachineUIDs  []string                             `json:"machineUIDs"`
+	Publications map[string]ReceiveJournalPublication `json:"publications,omitempty"`
+}
+
+// ReceiveJournalPublication stores either the prepared public plan or the
+// published journal UID, never both. Pending plans grant no mutation authority.
+// Inventory written before publication tracking remains readable, but missing
+// legacy journals have no recoverable seed and must not be recreated.
+type ReceiveJournalPublication struct {
+	Plan       json.RawMessage `json:"plan,omitempty"`
+	JournalUID string          `json:"journalUID,omitempty"`
+}
+
+// CheckJournal admits old inventory entries as before, but new publications
+// require the exact committed API incarnation. Pending plans are not executable.
+func (v ReceiveInventory) CheckJournal(machineUID, journalUID string) error {
+	if !slices.Contains(v.MachineUIDs, machineUID) {
+		return fmt.Errorf("journal is not reserved")
+	}
+	if p, found := v.Publications[machineUID]; found && (p.JournalUID == "" || p.JournalUID != journalUID) {
+		return fmt.Errorf("journal publication is pending or its incarnation changed")
+	}
+	return nil
 }
 
 func ReceiveInventoryName(meshUID string) string {
@@ -48,6 +70,11 @@ func (v ReceiveInventory) validate() error {
 			return fmt.Errorf("receiver inventory machine identities must be unique and sorted")
 		}
 		previous = uid
+	}
+	for uid, p := range v.Publications {
+		if !slices.Contains(v.MachineUIDs, uid) || (len(p.Plan) == 0) == (p.JournalUID == "") {
+			return fmt.Errorf("invalid journal publication state")
+		}
 	}
 	return nil
 }
@@ -96,6 +123,17 @@ func ReadReceiveInventory(ctx context.Context, maps typedcore.ConfigMapInterface
 // reload; they never overwrite another reservation. Cleanup requires a separate
 // protocol after every participant has durably retired its references.
 func ReserveReceiveJournal(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, mesh *corev1.Secret, machineUID string, owners []metav1.OwnerReference) error {
+	return reserveReceiveJournal(ctx, maps, clusterUID, mesh, machineUID, owners, nil)
+}
+
+func ReservePreparedReceiveJournal(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, mesh *corev1.Secret, machineUID string, owners []metav1.OwnerReference, plan []byte) error {
+	if len(plan) == 0 {
+		return fmt.Errorf("prepared journal requires a public plan")
+	}
+	return reserveReceiveJournal(ctx, maps, clusterUID, mesh, machineUID, owners, plan)
+}
+
+func reserveReceiveJournal(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, mesh *corev1.Secret, machineUID string, owners []metav1.OwnerReference, plan []byte) error {
 	if mesh == nil || mesh.UID == "" || mesh.ResourceVersion == "" || mesh.DeletionTimestamp != nil || machineUID == "" || strings.TrimSpace(machineUID) != machineUID || maps == nil {
 		return fmt.Errorf("receiver reservation requires live identities and API storage")
 	}
@@ -133,7 +171,19 @@ func ReserveReceiveJournal(ctx context.Context, maps typedcore.ConfigMapInterfac
 		object = &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ReceiveInventoryName(string(mesh.UID)), Namespace: mesh.Namespace, OwnerReferences: owners}}
 	}
 	if slices.Contains(inventory.MachineUIDs, machineUID) {
+		if len(plan) > 0 {
+			p, found := inventory.Publications[machineUID]
+			if !found || p.JournalUID != "" || !bytes.Equal(p.Plan, plan) {
+				return fmt.Errorf("journal reservation already exists with different publication state")
+			}
+		}
 		return nil
+	}
+	if len(plan) > 0 {
+		if inventory.Publications == nil {
+			inventory.Publications = map[string]ReceiveJournalPublication{}
+		}
+		inventory.Publications[machineUID] = ReceiveJournalPublication{Plan: bytes.Clone(plan)}
 	}
 	inventory.MachineUIDs = append(inventory.MachineUIDs, machineUID)
 	slices.Sort(inventory.MachineUIDs)

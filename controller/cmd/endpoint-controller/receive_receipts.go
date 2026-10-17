@@ -123,6 +123,9 @@ func (r *meshReconciler) resolveReceiveReceipts(ctx context.Context, api kuberne
 		return fail(err)
 	}
 	metadata := snapshot.Metadata()
+	if err := inventory.CheckJournal(machineUID, string(metadata.UID)); err != nil {
+		return fail(err)
+	}
 	if metadata.DeletionTimestamp != nil || metadata.Namespace != r.secretNamespace {
 		return fail(fmt.Errorf("receipt journal scope changed"))
 	}

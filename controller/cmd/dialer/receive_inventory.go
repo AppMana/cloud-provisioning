@@ -49,6 +49,9 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 		if err != nil {
 			return fail(fmt.Errorf("loading reserved receiver journal %s: %w", currentStore.Name, err))
 		}
+		if err := inventory.CheckJournal(uid, string(snapshot.Metadata().UID)); err != nil {
+			return fail(err)
+		}
 		plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
 		if err != nil {
 			return fail(err)
@@ -166,6 +169,11 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 			return fmt.Errorf("receiver inventory checkpoint identity changed")
 		}
 		previous := ""
+		for uid, p := range a.Publications {
+			if p.JournalUID != "" && b.Publications[uid].JournalUID != p.JournalUID {
+				return fmt.Errorf("journal publication regressed or changed incarnation")
+			}
+		}
 		for _, uid := range a.MachineUIDs {
 			if uid == "" || uid <= previous || !slices.Contains(b.MachineUIDs, uid) {
 				return fmt.Errorf("receiver inventory regressed or checkpoint is invalid")

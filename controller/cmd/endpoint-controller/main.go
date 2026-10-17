@@ -1729,6 +1729,9 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 		// separate controller-owned journals that agents may only read by name.
 		desired = append(desired, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: journals})
 	}
+	if r.receivePreparation != nil && r.receivePreparation.Journal != nil && r.receivePreparation.Journal.Receipts != nil && r.receivePreparation.Journal.Receipts.Endpoint != "" {
+		desired = append(desired, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get"}})
+	}
 
 	role := &rbacv1.Role{}
 	key := types.NamespacedName{Namespace: r.secretNamespace, Name: r.dialerServiceAccount}
@@ -1864,6 +1867,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 		},
 	}
 
+	r.configureReceiptAgent(desired)
 	existing := &appsv1.DaemonSet{}
 	err := r.reader.Get(ctx, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, existing)
 	if apierrors.IsNotFound(err) {
@@ -2203,6 +2207,7 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 		c := &desired.Spec.Template.Spec.Containers[0]
 		c.Args = append(c.Args, "--install-host-binary=/host-bin/wg-dialer")
 	}
+	r.configureReceiptAgent(desired)
 
 	existing := &appsv1.DaemonSet{}
 	err := r.reader.Get(ctx, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, existing)

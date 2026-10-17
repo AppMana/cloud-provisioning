@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"strings"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
+	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -178,6 +180,10 @@ func (r *meshReconciler) buildReceiveTransitionPlan(ctx context.Context, machine
 		return fail(fmt.Errorf("receiver site preparation is pending"))
 	}
 	plan := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: r.secretNamespace, MeshName: mesh.Name, MachineName: machine.GetName(), AdoptionName: adoption.Name, CloudNodeName: node.Name, MeshUID: string(mesh.UID), MachineUID: string(machine.GetUID()), AdoptionUID: string(adoption.UID), CloudNodeUID: target.NodeUID, RootPublicKey: target.RootPublicKey, Base: append([]byte(nil), base...), Desired: request.Desired, Native: request.Native, Ports: request.Ports, Bindings: bindings, Sites: map[string]tunnel.ReceiveTransitionSite{}}
+	plan.CloudAddresses = receiveMachineAddresses(currentMachine)
+	if len(plan.CloudAddresses) == 0 {
+		return fail(fmt.Errorf("receiver plan requires the machine's allocated tunnel identity"))
+	}
 	var previous tunnel.PeerListDoc
 	if err := json.Unmarshal(base, &previous); err != nil {
 		return fail(err)
@@ -195,7 +201,7 @@ func (r *meshReconciler) buildReceiveTransitionPlan(ctx context.Context, machine
 		if err != nil {
 			return fail(err)
 		}
-		plan.Sites[public] = tunnel.ReceiveTransitionSite{NodeName: receipt.NodeName, NodeUID: receipt.NodeUID, Client: receipt.Client, Legacy: &legacy, Forward: &forward}
+		plan.Sites[public] = tunnel.ReceiveTransitionSite{NodeName: receipt.NodeName, NodeUID: receipt.NodeUID, RouteSources: tunnel.ReceiveSiteRouteSources(mesh.Data, receipt.NodeName), Client: receipt.Client, Legacy: &legacy, Forward: &forward}
 	}
 	if len(plan.Sites) == 0 {
 		return fail(fmt.Errorf("receiver transition has no site paths"))
@@ -211,4 +217,14 @@ func (r *meshReconciler) buildReceiveTransitionPlan(ctx context.Context, machine
 	// Node and Secret snapshots above remain explicit in the plan and round.
 	// Runtime admission must revalidate them; journal creation does not fence nodes.
 	return plan, nil
+}
+
+func receiveMachineAddresses(machine *unstructured.Unstructured) []string {
+	var result []string
+	for _, annotation := range []string{join.WireGuardAddrAnnotation, join.WireGuardAddr6Annotation} {
+		if address := strings.TrimSpace(machine.GetAnnotations()[annotation]); address != "" {
+			result = append(result, address)
+		}
+	}
+	return result
 }

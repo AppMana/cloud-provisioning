@@ -14,9 +14,12 @@ Deployment patch invalid. */ -}}
 {{- if and .Values.awsGateway.configMap .Values.awsPodObserver.configMap }}
 {{- fail "AWS pod observer and Windows gateway require separate qualified deployments" }}
 {{- end }}
-{{- $receipts := dig "journal" "receipts" (dict) .Values.tunnel.receivePreparation }}
+{{- $receivePolicy := deepCopy .Values.tunnel.receivePreparation }}
+{{- $receipts := dig "journal" "receipts" (dict) $receivePolicy }}
 {{- if $receipts }}
 {{- $_ := required "Receipt serving requires tunnel.receiptTLSSecret" .Values.tunnel.receiptTLSSecret }}
+{{- $_ := set $receipts "trustSecret" .Values.tunnel.receiptTLSSecret }}
+{{- $_ := set $receipts "endpoint" (printf "https://%s-receipts.%s.svc:%s/v1/receipts" (include "cloud-provisioning.controllerName" .) .Release.Namespace (last (splitList ":" $receipts.bindAddress))) }}
 {{- if or (ne $receipts.certFile "/etc/cloud-provisioning/receipts/tls.crt") (ne $receipts.keyFile "/etc/cloud-provisioning/receipts/tls.key") }}
 {{- fail "Receipt TLS files must use the mounted /etc/cloud-provisioning/receipts directory" }}
 {{- end }}
@@ -186,7 +189,7 @@ spec:
             - "--tunnel-endpoint-retention={{ . }}"
             {{- end }}
             - "--tunnel-ipv6-prefix={{ .Values.tunnel.ipv6Prefix }}"
-            {{- with .Values.tunnel.receivePreparation }}
+            {{- with $receivePolicy }}
             - {{ printf "--receive-preparation-policy=%s" (toJson .) | quote }}
             {{- end }}
             {{- with .Values.dialerBinary.arm64.url }}

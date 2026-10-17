@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -79,6 +80,44 @@ func TestAgentDaemonSetsConvergeAfterImageUpgrade(t *testing.T) {
 				current := read()
 				if current.Generation != after.Generation || current.ResourceVersion != after.ResourceVersion {
 					t.Fatalf("unchanged reconcile wrote a new revision: generation %d -> %d, resourceVersion %s -> %s", after.Generation, current.Generation, after.ResourceVersion, current.ResourceVersion)
+				}
+			}
+			if tc.name != "remote-windows" {
+				r.receivePreparation = &receivePreparationPolicy{Journal: &receiveJournalPolicy{Receipts: &receiveReceiptPolicy{Endpoint: "https://controller.test/v1/receipts", TrustSecret: "receipt-trust"}}}
+				defer func() { r.receivePreparation = nil }()
+				if err := tc.ensure(ctx); err != nil {
+					t.Fatal(err)
+				}
+				configured := read()
+				if configured.Spec.Template.Spec.DNSPolicy != corev1.DNSClusterFirstWithHostNet {
+					t.Fatal("host-network agent cannot resolve receipt Service through cluster DNS")
+				}
+				agent := configured.Spec.Template.Spec.Containers[0]
+				if !strings.Contains(strings.Join(agent.Args, " "), "--receive-mesh-name=peers") {
+					t.Fatal("agent lacks receipt dispatch configuration")
+				}
+				found := false
+				for _, volume := range configured.Spec.Template.Spec.Volumes {
+					if volume.Name != "receive-credentials" {
+						continue
+					}
+					if volume.Projected == nil || len(volume.Projected.Sources) != 2 {
+						t.Fatal("missing credential projections")
+					}
+					token, trust := volume.Projected.Sources[0].ServiceAccountToken, volume.Projected.Sources[1].Secret
+					if token == nil || token.Audience != receiveReceiptAudience || token.Path != "token" || trust == nil || trust.Name != "receipt-trust" || len(trust.Items) != 1 || trust.Items[0].Key != "ca.crt" {
+						t.Fatal("agent projection exposes wrong credential or serving private key")
+					}
+					found = true
+				}
+				if !found {
+					t.Fatal("receipt projection absent")
+				}
+				if err := tc.ensure(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if read().ResourceVersion != configured.ResourceVersion {
+					t.Fatal("receipt projection causes repeated rollouts")
 				}
 			}
 		})

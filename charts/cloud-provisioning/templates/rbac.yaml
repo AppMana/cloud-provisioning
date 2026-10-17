@@ -366,6 +366,11 @@ rules:
       {{- $live := lookup "rbac.authorization.k8s.io/v1" "Role" .Release.Namespace $name }}
       {{- include "cloud-provisioning.dialerSecretNames" (dict "name" $name "role" $live) | nindent 6 }}
   {{- $journals := include "cloud-provisioning.dialerJournalNames" (dict "role" $live) | fromYamlArray }}
+  {{- if dig "journal" "receipts" (dict) .Values.tunnel.receivePreparation }}
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+  {{- end }}
   {{- if $journals }}
   - apiGroups: [""]
     resources: ["configmaps"]
@@ -400,6 +405,12 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["get", "list", "watch"]
+  {{- if dig "journal" "receipts" (dict) .Values.tunnel.receivePreparation }}
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    resourceNames: ["kube-system"]
+    verbs: ["get"]
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

@@ -87,7 +87,8 @@ tunnel:
   # (architecture -> pinned runtime image ID). TLS files must be tls.crt/tls.key
   # under /etc/cloud-provisioning/receipts. Agents require matching CA trust.
   receivePreparation: {}
-  # Existing TLS Secret for the optional receipt service. The certificate must
+  # Existing TLS Secret containing tls.crt, tls.key and ca.crt. Agents project
+  # only ca.crt alongside a separate audience-bound token. The certificate must
   # cover <controller-name>-receipts.<namespace>.svc. Restart on certificate rotation.
   receiptTLSSecret: ""
   # Node selector (k=v,k2=v2) choosing which local nodes terminate

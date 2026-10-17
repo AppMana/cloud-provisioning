@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/netip"
 	"reflect"
+	"slices"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
@@ -34,6 +35,12 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 	}
 	if devices == nil || key == (wgtypes.Key{}) || nodeUID == "" {
 		return fmt.Errorf("native receiver route phase requires local identity")
+	}
+	if plan.CloudAddresses != nil {
+		expectedOwn, expectedAllocation, err := tunnel.ReceiveLocalNetwork(plan, nodeUID)
+		if err != nil || !slices.Equal(own, expectedOwn) || !slices.Equal(allocated, expectedAllocation) {
+			return fmt.Errorf("native route sources or allocation differ from committed plan")
+		}
 	}
 	expected, err := tunnel.ReceiveTransitionSpec(plan, view.Round.ClusterUID, view.Round.PlanHash)
 	if err != nil {

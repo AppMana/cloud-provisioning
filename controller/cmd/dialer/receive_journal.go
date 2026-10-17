@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
@@ -60,6 +61,9 @@ func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store han
 	}
 	hasTunnelProjection := false
 	for public, site := range plan.Sites {
+		if site.RouteSources != nil && !slices.Equal(site.RouteSources, tunnel.ReceiveSiteRouteSources(mesh.Data, site.NodeName)) {
+			return fail(fmt.Errorf("receiver site route sources changed after journal creation"))
+		}
 		if site.Legacy == nil || site.Legacy.Tunnel == nil {
 			continue
 		}

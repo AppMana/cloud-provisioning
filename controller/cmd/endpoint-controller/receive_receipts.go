@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -31,9 +33,17 @@ type receiveReceiptPolicy struct {
 	CertFile    string            `json:"certFile"`
 	KeyFile     string            `json:"keyFile"`
 	ImageIDs    map[string]string `json:"imageIDs"`
+	Endpoint    string            `json:"endpoint,omitempty"`
+	TrustSecret string            `json:"trustSecret,omitempty"`
 }
 
 func (p receiveReceiptPolicy) validate() error {
+	if p.Endpoint != "" || p.TrustSecret != "" {
+		u, err := url.Parse(p.Endpoint)
+		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || p.TrustSecret == "" {
+			return fmt.Errorf("receipt agents require a direct HTTPS endpoint and CA Secret")
+		}
+	}
 	_, port, err := net.SplitHostPort(p.BindAddress)
 	number, portErr := strconv.Atoi(port)
 	if err != nil || portErr != nil || number < 1 || number > 65535 || p.CertFile == "" || p.KeyFile == "" || len(p.ImageIDs) == 0 {
@@ -56,6 +66,31 @@ func (p receiveReceiptPolicy) validate() error {
 		}
 	}
 	return nil
+}
+
+func (r *meshReconciler) configureReceiptAgent(daemon *appsv1.DaemonSet) {
+	if r.receivePreparation == nil || r.receivePreparation.Journal == nil || r.receivePreparation.Journal.Receipts == nil {
+		return
+	}
+	p := r.receivePreparation.Journal.Receipts
+	if p.Endpoint == "" {
+		return
+	}
+	// These agents use host networking, but the receipt service is addressed
+	// through cluster DNS. The ordinary ClusterFirst fallback uses host DNS.
+	daemon.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
+	const directory = "/var/run/cloud-provisioning/receipts"
+	agent := &daemon.Spec.Template.Spec.Containers[0]
+	agent.Args = append(agent.Args, "--receipt-url="+p.Endpoint, "--receipt-ca-file="+directory+"/ca.crt", "--receipt-token-file="+directory+"/token", "--receive-mesh-name="+r.secretName)
+	agent.Env = append(agent.Env,
+		corev1.EnvVar{Name: "POD_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"}}},
+		corev1.EnvVar{Name: "POD_UID", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.uid"}}})
+	agent.VolumeMounts = append(agent.VolumeMounts, corev1.VolumeMount{Name: "receive-credentials", MountPath: directory, ReadOnly: true})
+	expiry := int64(600)
+	daemon.Spec.Template.Spec.Volumes = append(daemon.Spec.Template.Spec.Volumes, corev1.Volume{Name: "receive-credentials", VolumeSource: corev1.VolumeSource{Projected: &corev1.ProjectedVolumeSource{Sources: []corev1.VolumeProjection{
+		{ServiceAccountToken: &corev1.ServiceAccountTokenProjection{Audience: receiveReceiptAudience, ExpirationSeconds: &expiry, Path: "token"}},
+		{Secret: &corev1.SecretProjection{LocalObjectReference: corev1.LocalObjectReference{Name: p.TrustSecret}, Items: []corev1.KeyToPath{{Key: "ca.crt", Path: "ca.crt"}}}},
+	}}}})
 }
 
 // resolveReceiveReceipts admits the target from the controller-owned inventory
@@ -106,6 +141,9 @@ func (r *meshReconciler) resolveReceiveReceipts(ctx context.Context, api kuberne
 	if string(machine.GetUID()) != machineUID || machine.GetDeletionTimestamp() != nil {
 		return fail(fmt.Errorf("receipt machine incarnation changed"))
 	}
+	if len(plan.CloudAddresses) == 0 || !slices.Equal(plan.CloudAddresses, receiveMachineAddresses(machine)) || strings.TrimSpace(string(mesh.Data[tunnel.PeerPublicKeyPrefix+plan.MachineName])) != plan.RootPublicKey {
+		return fail(fmt.Errorf("receipt cloud allocation or root identity changed"))
+	}
 	if err := attachment.CheckPeerPublication(ctx, r.reader, machine); err != nil {
 		return fail(err)
 	}
@@ -126,6 +164,9 @@ func (r *meshReconciler) resolveReceiveReceipts(ctx context.Context, api kuberne
 	policies := map[string]handover.PodReceiptAuthenticator{}
 	nodes := map[string]string{plan.CloudNodeName: plan.CloudNodeUID}
 	for public, site := range plan.Sites {
+		if len(site.RouteSources) == 0 || !slices.Equal(site.RouteSources, tunnel.ReceiveSiteRouteSources(mesh.Data, site.NodeName)) {
+			return fail(fmt.Errorf("receipt site route sources changed"))
+		}
 		if strings.TrimSpace(string(mesh.Data[tunnel.NodePublicKeyPrefix+site.NodeName])) != public || site.Legacy == nil || site.Legacy.Tunnel == nil {
 			return fail(fmt.Errorf("receipt site source identity is missing or changed"))
 		}

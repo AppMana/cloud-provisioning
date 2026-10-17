@@ -70,12 +70,14 @@ type config struct {
 	// once by cloud-init) and the Secret, once it exists and is
 	// non-empty, overrides the peer list. That is how post-join config
 	// corrections reach a node whose userdata is immutable.
-	secretNamespace      string
-	secretName           string
-	peersFile            string
-	peersSecretNamespace string
-	peersSecretName      string
-	machineNameFile      string
+	secretNamespace                                              string
+	secretName                                                   string
+	peersFile                                                    string
+	peersSecretNamespace                                         string
+	peersSecretName                                              string
+	machineNameFile                                              string
+	receiptURL, receiptCAFile, receiptTokenFile, receiptMeshName string
+	receiptPodName, receiptPodUID                                string
 
 	nodeName       string
 	bgpListenPort  int
@@ -230,6 +232,12 @@ func main() {
 	flag.StringVar(&cfg.peersSecretNamespace, "peers-secret-namespace", "", "optional (with --peers-file): namespace of a Secret whose peers.json key overrides the file's peer list once readable: the adoption/reconciliation path")
 	flag.StringVar(&cfg.peersSecretName, "peers-secret-name", "", "optional (with --peers-file): name of the peer-list override Secret")
 	flag.StringVar(&cfg.machineNameFile, "machine-name-file", "", "optional (with --peers-file): file holding this machine's CAPI Machine name (written by cloud-init); the peer-list override Secret's name is derived from it: an alternative to --peers-secret-name that lets one shared DaemonSet spec serve per-machine Secrets")
+	flag.StringVar(&cfg.receiptURL, "receipt-url", "", "optional HTTPS controller receipt endpoint")
+	flag.StringVar(&cfg.receiptCAFile, "receipt-ca-file", "", "trusted receipt serving CA file")
+	flag.StringVar(&cfg.receiptTokenFile, "receipt-token-file", "", "projected receipt-audience pod token file")
+	flag.StringVar(&cfg.receiptMeshName, "receive-mesh-name", "", "mesh Secret for journal discovery")
+	flag.StringVar(&cfg.receiptPodName, "receipt-pod-name", os.Getenv("POD_NAME"), "current agent pod name")
+	flag.StringVar(&cfg.receiptPodUID, "receipt-pod-uid", os.Getenv("POD_UID"), "current agent pod UID")
 	flag.IntVar(&cfg.bgpListenPort, "transit-bgp-port", 0, "listen port for advertising the remote node addresses reachable through this node, so a node at this site that terminates no tunnel can still route to them. 0 disables it. Not 179: a node whose CNI speaks BGP already has something there")
 	flag.IntVar(&cfg.bgpASN, "transit-bgp-asn", 64512, "autonomous system for the transit advertisement; match the cluster's own")
 	flag.StringVar(&cfg.bgpNextHop, "transit-bgp-next-hop", "", "this node's address, advertised as the next hop for the remote nodes. Required when a transit port is set")

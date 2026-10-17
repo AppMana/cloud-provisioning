@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -21,6 +22,21 @@ import (
 
 // Advertisements follow successful forwarding, including after offline replay.
 func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl.Client, cfg config, speaker *transitSpeaker) error {
+	if cfg.receiptURL != "" {
+		if k == nil {
+			return fmt.Errorf("receiver dispatch requires an in-cluster API client")
+		}
+		handled, err := dispatchReceivePhases(ctx, k, cfg, func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes, key wgtypes.Key) error {
+			own, allocated, err := tunnel.ReceiveLocalNetwork(plan, nodeUID)
+			if err != nil {
+				return err
+			}
+			return receiveLinuxPhase(ctx, devices, cfg, key, own, allocated, plan, view, nodeUID, intent)
+		})
+		if err != nil || handled {
+			return err
+		}
+	}
 	lock, err := lockLegacyReconciliation(cfg)
 	if err != nil {
 		return err

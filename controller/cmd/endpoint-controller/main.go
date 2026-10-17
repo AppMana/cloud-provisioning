@@ -2351,7 +2351,7 @@ func main() {
 	nodeGroups := flag.Bool("experimental-node-groups", false, "enable experimental node groups in the mesh namespace; requires the group CRD and drain RBAC")
 	awsPodConfig := flag.String("aws-pod-config", "", "optional scoped AWS VPC CNI allocation observer JSON file")
 	awsPodCredentialsFile := flag.String("aws-pod-credentials-file", "", "optional rotating STS credential JSON file; overrides ambient credentials for the AWS pod observer")
-	receivePolicyJSON := flag.String("receive-preparation-policy", "", "experimental additive receiver preparation JSON with nativeCIDRs and permitted ports; freezes active peer updates and does not switch traffic")
+	receivePolicyJSON := flag.String("receive-preparation-policy", "", "experimental receiver policy JSON with nativeCIDRs and permitted ports; optional journal enables fenced handover and explicit expiry recovery")
 	gatewayConfig := flag.String("aws-gateway-config", "", "optional path to AWS Windows Calico gateway scope JSON")
 	flag.Parse()
 	receivePolicy, policyErr := parseReceivePreparationPolicy(*receivePolicyJSON, wireGuardListenPort)

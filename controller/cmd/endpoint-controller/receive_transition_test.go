@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -294,6 +295,7 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 				if _, err := r.ensureReceiveTransition(ctx, machine, store, nil, nil, handover.Policy{}, now); err != nil {
 					t.Fatalf("could not resume committed %s/%s: %v", direction, v.Round.Phase, err)
 				}
+				verifyExpiredReceiveRecovery(t, ctx, store, current)
 				if v.Complete {
 					break
 				}
@@ -452,5 +454,98 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	}
 	if _, err := store.Load(ctx); !apierrors.IsNotFound(err) {
 		t.Fatal("deleted journal reappeared", err)
+	}
+}
+
+// Exercise recovery against real API resource versions for every forward and
+// reverse phase, without modifying the journal used by the progression fixture.
+func verifyExpiredReceiveRecovery(t *testing.T, ctx context.Context, source handover.Store, snapshot handover.Snapshot) {
+	t.Helper()
+	object, err := source.ConfigMaps.Get(ctx, source.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	object.ObjectMeta = metav1.ObjectMeta{GenerateName: "recovery-", Namespace: object.Namespace}
+	object, err = source.ConfigMaps.Create(ctx, object, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := source
+	store.Name = object.Name
+	defer store.ConfigMaps.Delete(ctx, store.Name, metav1.DeleteOptions{})
+	before, err := store.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := snapshot.Transition().View()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, trial := range []struct {
+		mode string
+		at   time.Time
+	}{
+		{"", v.Round.ExpiresAt}, {"rollback", v.Round.ExpiresAt.Add(-time.Nanosecond)},
+	} {
+		if err := recoverExpiredReceiveRound(ctx, store, before, trial.mode, trial.at); err != nil {
+			t.Fatal(err)
+		}
+		unchanged, err := store.Load(ctx)
+		if err != nil || unchanged.Metadata().ResourceVersion != before.Metadata().ResourceVersion {
+			t.Fatal("manual or unexpired journal mutated", err)
+		}
+	}
+	if err := recoverExpiredReceiveRound(ctx, store, before, "rollback", v.Round.ExpiresAt); err != nil {
+		t.Fatal(err)
+	}
+	after, err := store.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Complete {
+		if after.Metadata().ResourceVersion != before.Metadata().ResourceVersion {
+			t.Fatal("completed journal mutated")
+		}
+		return
+	}
+	got, err := after.Transition().View()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := v.Round.Spec
+	reverse := !v.RollbackRequested && (v.Round.Phase == handover.Prepare || v.Round.Phase == handover.Switch || v.Round.Phase == handover.Drain)
+	if reverse {
+		if v.Round.Phase == handover.Prepare {
+			expected.Phase = handover.Abort
+		} else {
+			expected.Phase = handover.Switch
+			expected.FromGeneration, expected.ToGeneration = expected.ToGeneration, expected.FromGeneration
+			expected.Members = slices.Clone(expected.Members)
+			for i := range expected.Members {
+				m := &expected.Members[i]
+				m.FromKey, m.ToKey = m.ToKey, m.FromKey
+				m.FromPeerKey, m.ToPeerKey = m.ToPeerKey, m.FromPeerKey
+			}
+		}
+	}
+	if !reflect.DeepEqual(expected, got.Round.Spec) || got.Complete || len(got.Observed) != 0 || got.Round.Nonce == v.Round.Nonce || got.RollbackRequested != (v.RollbackRequested || reverse) {
+		t.Fatalf("incorrect recovery from %s rollback=%v: %+v", v.Round.Phase, v.RollbackRequested, got)
+	}
+	if !bytes.Equal(before.Plan(), after.Plan()) || before.Metadata().UID != after.Metadata().UID || after.Transition().Extends(before.Transition()) != nil {
+		t.Fatal("recovery replaced journal identity, plan or history")
+	}
+	if err := recoverExpiredReceiveRound(ctx, store, before, "rollback", v.Round.ExpiresAt); !apierrors.IsConflict(err) {
+		t.Fatal("stale recovery did not conflict", err)
+	}
+	if err := recoverExpiredReceiveRound(ctx, store, after, "rollback", got.Round.ExpiresAt); err != nil {
+		t.Fatal(err)
+	}
+	renewed, err := store.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rv, err := renewed.Transition().View()
+	if err != nil || !reflect.DeepEqual(rv.Round.Spec, got.Round.Spec) || rv.RollbackRequested != got.RollbackRequested || rv.Round.Nonce == got.Round.Nonce {
+		t.Fatal("repeated recovery reversed direction or reused round", err)
 	}
 }

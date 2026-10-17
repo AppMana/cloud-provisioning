@@ -49,7 +49,43 @@ func (r *meshReconciler) reconcileReceivePreparation(ctx context.Context, machin
 	}
 	store := r.receiveJournal
 	store.Name = tunnel.ReceiveTransitionName(string(machine.GetUID()))
-	_, err = r.ensureReceiveTransition(ctx, machine, store, p.NativeCIDRs, p.Ports, policy, time.Now())
+	now := time.Now()
+	snapshot, err := r.ensureReceiveTransition(ctx, machine, store, p.NativeCIDRs, p.Ports, policy, now)
+	if err != nil || snapshot == nil {
+		return err
+	}
+	return recoverExpiredReceiveRound(ctx, store, *snapshot, p.Journal.ExpiryRecovery, now)
+}
+
+// recoverExpiredReceiveRound is opt-in controller policy, separate from journal
+// discovery. Recovery appends one fenced event; it never supplies phase receipts.
+func recoverExpiredReceiveRound(ctx context.Context, store handover.Store, snapshot handover.Snapshot, mode string, now time.Time) error {
+	if mode == "" {
+		return nil
+	}
+	if mode != "rollback" {
+		return fmt.Errorf("unsupported receiver expiry recovery policy")
+	}
+	transition := snapshot.Transition()
+	view, err := transition.View()
+	if err != nil {
+		return err
+	}
+	if view.Complete || now.Before(view.Round.ExpiresAt) {
+		return nil
+	}
+	var next handover.Transition
+	if !view.RollbackRequested && (view.Round.Phase == handover.Prepare || view.Round.Phase == handover.Switch || view.Round.Phase == handover.Drain) {
+		next, err = transition.Rollback(now)
+	} else {
+		// Retirement is irreversible. Already requested rollback must retain its
+		// direction, including abort, while collecting fresh observations.
+		next, err = transition.Renew(now)
+	}
+	if err != nil {
+		return err
+	}
+	_, err = store.Commit(ctx, snapshot, next)
 	return err
 }
 

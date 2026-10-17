@@ -13,7 +13,7 @@ import (
 )
 
 // receivePreparationPolicy is operator-supplied network policy, not inferred
-// permission to open a firewall. It enables additive preparation only.
+// permission to open a firewall. Journal execution requires explicit policy.
 type receivePreparationPolicy struct {
 	NativeCIDRs []netip.Prefix        `json:"nativeCIDRs"`
 	Ports       []int                 `json:"ports"`
@@ -21,13 +21,17 @@ type receivePreparationPolicy struct {
 }
 
 type receiveJournalPolicy struct {
-	RoundLifetime metav1.Duration       `json:"roundLifetime"`
-	MaxReceiptAge metav1.Duration       `json:"maxReceiptAge"`
-	DrainInterval metav1.Duration       `json:"drainInterval"`
-	Receipts      *receiveReceiptPolicy `json:"receipts,omitempty"`
+	RoundLifetime  metav1.Duration       `json:"roundLifetime"`
+	MaxReceiptAge  metav1.Duration       `json:"maxReceiptAge"`
+	DrainInterval  metav1.Duration       `json:"drainInterval"`
+	ExpiryRecovery string                `json:"expiryRecovery,omitempty"`
+	Receipts       *receiveReceiptPolicy `json:"receipts,omitempty"`
 }
 
 func (p receiveJournalPolicy) policy() (handover.Policy, error) {
+	if p.ExpiryRecovery != "" && p.ExpiryRecovery != "rollback" {
+		return handover.Policy{}, fmt.Errorf("journal expiryRecovery must be empty or rollback")
+	}
 	v := handover.Policy{RoundLifetime: p.RoundLifetime.Duration, MaxReceiptAge: p.MaxReceiptAge.Duration, DrainInterval: p.DrainInterval.Duration}
 	if v.RoundLifetime <= 0 || v.MaxReceiptAge <= 0 || v.MaxReceiptAge > v.RoundLifetime || v.DrainInterval <= 0 {
 		return handover.Policy{}, fmt.Errorf("journal requires positive explicit round, receipt and drain durations; receipt age must not exceed round lifetime")

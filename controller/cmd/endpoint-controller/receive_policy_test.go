@@ -9,6 +9,8 @@ func TestReceivePreparationPolicy(t *testing.T) {
 	}{
 		{"disabled", "", true},
 		{"journal", `{"nativeCIDRs":["172.29.0.0/24"],"ports":[51821],"journal":{"roundLifetime":"5m","maxReceiptAge":"1m","drainInterval":"3m"}}`, true},
+		{"journal-recovery", `{"nativeCIDRs":["172.29.0.0/24"],"ports":[51821],"journal":{"roundLifetime":"5m","maxReceiptAge":"1m","drainInterval":"3m","expiryRecovery":"rollback"}}`, true},
+		{"journal-unknown-recovery", `{"nativeCIDRs":["172.29.0.0/24"],"ports":[51821],"journal":{"roundLifetime":"5m","maxReceiptAge":"1m","drainInterval":"3m","expiryRecovery":"advance"}}`, false},
 		{"journal-missing-drain", `{"nativeCIDRs":["172.29.0.0/24"],"ports":[51821],"journal":{"roundLifetime":"5m","maxReceiptAge":"1m"}}`, false},
 		{"journal-stale-receipts", `{"nativeCIDRs":["172.29.0.0/24"],"ports":[51821],"journal":{"roundLifetime":"1m","maxReceiptAge":"5m","drainInterval":"3m"}}`, false},
 		{"journal-duration", `{"nativeCIDRs":["172.29.0.0/24"],"ports":[51821],"journal":{"roundLifetime":"invalid","maxReceiptAge":"1m","drainInterval":"3m"}}`, false},

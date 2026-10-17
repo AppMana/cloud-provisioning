@@ -115,7 +115,15 @@ restart. These API checks do not fence a restart after authentication; native
 phase execution and transition fencing remain separate requirements.
 `Transition` now persists and replays prepare, switch, drain, and retire history.
 Rollback during prepare aborts B; rollback after switching selects A, drains B,
-and retires B. Expired rounds require explicit renewal and fresh receipts. Drain
+and retires B. Expired rounds require explicit recovery and fresh receipts.
+The receiver policy optionally accepts `journal.expiryRecovery: "rollback"`.
+With this setting the controller requests rollback when a published prepare,
+switch, or drain round expires. Already requested rollback and irreversible
+retirement renew their current phase and direction. Recovery appends a fenced
+journal event with a fresh nonce; it never advances from missing receipts or
+changes the committed plan. Completed journals remain unchanged. Omitting this
+setting retains manual recovery. The controller checks on its normal
+reconciliation cadence; API outages can delay recovery. Drain
 receipts must be observed after the configured drain deadline.
 
 `Store` saves each successor in a controller-owned ConfigMap using Kubernetes

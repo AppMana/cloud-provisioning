@@ -90,6 +90,7 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 	_, err = prepareSiteReceiveClient(devices, plan.MeshUID, site, plan.RootPublicKey, binding, siteDoc, siteDoc, 1400, 518)
 	must(err)
 	wait(restore)
+	verifyNativeCloudPolicyRecovery(t, devices, cfg, root, plan, view, intent)
 	siteCfg := cfg
 	siteCfg.nodeName = "site"
 	siteCfg.iface = "sitelegacy"

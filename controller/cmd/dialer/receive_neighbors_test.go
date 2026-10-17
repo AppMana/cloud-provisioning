@@ -25,7 +25,7 @@ import (
 // Exercise the production admission boundary with journal objects produced by
 // the real-API fixture. The native callback is simulated; packet behavior is
 // measured separately by TestNativeReceiveNeighbors.
-func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, store handover.Store, mesh *corev1.Secret, plan tunnel.ReceiveTransitionPlan, site wgtypes.Key) {
+func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, store handover.Store, mesh *corev1.Secret, plan tunnel.ReceiveTransitionPlan, site, root wgtypes.Key) {
 	t.Helper()
 	ctx := context.Background()
 	must := func(err error) {
@@ -256,6 +256,47 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 					})
 					if calls != 1 || (err != nil) != drift {
 						t.Fatalf("policy admission calls=%d drift=%v error=%v", calls, drift, err)
+					}
+				}
+
+				if fault == "complete" {
+					// The cloud agent uses the adoption namespace and has no
+					// site secret name. Exercise live revalidation with its
+					// actual journal participant, not a site identity.
+					cloudNode, err := api.CoreV1().Nodes().Get(ctx, plan.CloudNodeName, metav1.GetOptions{})
+					must(err)
+					_, err = k.CoreV1().Nodes().Create(ctx, cloudNode, metav1.CreateOptions{})
+					must(err)
+					cloudPod := pod.DeepCopy()
+					cloudPod.Name, cloudPod.UID, cloudPod.Spec.NodeName = "cloud-agent", "cloud-pod", plan.CloudNodeName
+					_, err = k.CoreV1().Pods(mesh.Namespace).Create(ctx, cloudPod, metav1.CreateOptions{})
+					must(err)
+					currentAdoption, err := k.CoreV1().Secrets(mesh.Namespace).Get(ctx, plan.AdoptionName, metav1.GetOptions{})
+					must(err)
+					currentAdoption.Data = map[string][]byte{tunnel.CloudPeersKey: plan.Base}
+					_, err = k.CoreV1().Secrets(mesh.Namespace).Update(ctx, currentAdoption, metav1.UpdateOptions{})
+					must(err)
+					cloudCfg := config{nodeName: plan.CloudNodeName, peersSecretNamespace: mesh.Namespace, receiptMeshName: mesh.Name, receiptPodName: cloudPod.Name, receiptPodUID: string(cloudPod.UID)}
+					cloudSet, err := loadReceiveSet(ctx, k, localStore, scope, cloudCfg.nodeName, root)
+					must(err)
+					for _, drift := range []bool{false, true} {
+						calls := 0
+						err := admitReceivePolicyRepair(ctx, k, cloudCfg, root, plan, view, string(cloudNode.UID), cloudSet.Routes, func(groups []receiveAdvertisementGroup, check func() error) error {
+							calls++
+							if len(groups) == 0 || !groups[0].legacy {
+								t.Fatal("cloud terminal rollback projection missing")
+							}
+							if drift {
+								changed := currentAdoption.DeepCopy()
+								changed.ResourceVersion += "-changed"
+								_, err := k.CoreV1().Secrets(mesh.Namespace).Update(ctx, changed, metav1.UpdateOptions{})
+								must(err)
+							}
+							return check()
+						})
+						if calls != 1 || (err != nil) != drift {
+							t.Fatalf("cloud policy calls=%d drift=%v error=%v", calls, drift, err)
+						}
 					}
 				}
 			} else {

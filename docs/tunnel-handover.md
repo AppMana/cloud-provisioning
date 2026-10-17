@@ -262,9 +262,16 @@ partition while shared lookup rules remain absent; it does not install those
 rules or issue a whole-mesh forwarding acknowledgement. The original phase
 error remains visible until phase verification succeeds. Earlier-boot neighbor
 checkpoints require fresh complete-set admission against the current local boot;
-cached peers are never replayed. Cloud-neighbor projection and cloud policy
-admission remain prerequisites for full reboot recovery. Idle transport rekey
-latency also requires separate recovery-deadline qualification.
+cached peers are never replayed.
+Cloud policy maintenance admits a completed local journal and a live adoption
+publication matching one of its committed peer documents. The journal selects
+legacy or receiver egress; existing root peers and selected receiver routes must
+pass the shared policy reconciler's native checks before missing lookup rules
+are installed. Cluster, mesh, adoption publication, journal inventory and agent
+incarnation are revalidated around the operation. This does not admit a new peer
+generation or advance an unfinished phase. Cloud-neighbor projection and API
+reachability before live admission remain prerequisites for full reboot recovery.
+Idle transport rekey latency also requires separate recovery-deadline qualification.
 
 The Linux direct-route phase component implements prepare, forward and reverse
 switch, drain, abort and peer-scoped retirement. It reuses the route installer with a scope

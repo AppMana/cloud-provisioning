@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,6 +66,33 @@ func TestAgentDaemonSetsConvergeAfterImageUpgrade(t *testing.T) {
 				t.Fatal(err)
 			}
 			before := read()
+			if tc.name != "remote-windows" {
+				assertAgentSysctlAccess(t, before)
+				// Reconcile a previously deployed template without the host
+				// sysctl mount; NET_ADMIN alone cannot write container /proc/sys.
+				old := before.DeepCopy()
+				for i, v := range old.Spec.Template.Spec.Volumes {
+					if v.Name == "sysctl-net" {
+						old.Spec.Template.Spec.Volumes = append(old.Spec.Template.Spec.Volumes[:i], old.Spec.Template.Spec.Volumes[i+1:]...)
+						break
+					}
+				}
+				agent := &old.Spec.Template.Spec.Containers[0]
+				for i, m := range agent.VolumeMounts {
+					if m.Name == "sysctl-net" {
+						agent.VolumeMounts = append(agent.VolumeMounts[:i], agent.VolumeMounts[i+1:]...)
+						break
+					}
+				}
+				if err := c.Update(ctx, old); err != nil {
+					t.Fatal(err)
+				}
+				if err := tc.ensure(ctx); err != nil {
+					t.Fatal(err)
+				}
+				before = read()
+				assertAgentSysctlAccess(t, before)
+			}
 			tc.upgrade()
 			if err := tc.ensure(ctx); err != nil {
 				t.Fatal(err)
@@ -122,4 +150,24 @@ func TestAgentDaemonSetsConvergeAfterImageUpgrade(t *testing.T) {
 			}
 		})
 	}
+}
+
+func assertAgentSysctlAccess(t *testing.T, ds *appsv1.DaemonSet) {
+	t.Helper()
+	pod := ds.Spec.Template.Spec
+	agent := pod.Containers[0]
+	if !pod.HostNetwork || agent.SecurityContext == nil || (agent.SecurityContext.Privileged != nil && *agent.SecurityContext.Privileged) {
+		t.Fatal("agent must use host networking without requiring privileged mode")
+	}
+	for _, mount := range agent.VolumeMounts {
+		if mount.MountPath != tunnel.HostSysctlNet || mount.ReadOnly {
+			continue
+		}
+		for _, volume := range pod.Volumes {
+			if volume.Name == mount.Name && volume.HostPath != nil && volume.HostPath.Path == "/proc/sys/net" && volume.HostPath.Type != nil && *volume.HostPath.Type == corev1.HostPathDirectory {
+				return
+			}
+		}
+	}
+	t.Fatal("agent cannot write the host network sysctls required by receive preparation")
 }

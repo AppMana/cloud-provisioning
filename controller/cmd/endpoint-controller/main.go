@@ -2179,6 +2179,7 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 								// here are still only ever read.
 								{Name: "wg-dialer-config", MountPath: "/etc/wg-dialer"},
 								{Name: "host-bin", MountPath: "/host-bin"},
+								{Name: "sysctl-net", MountPath: tunnel.HostSysctlNet},
 							},
 						},
 					},
@@ -2193,6 +2194,12 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 							Name: "host-bin",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{Path: "/usr/local/bin", Type: &hostPathDirectory},
+							},
+						},
+						{
+							Name: "sysctl-net",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/proc/sys/net", Type: &hostPathDirectory},
 							},
 						},
 					},

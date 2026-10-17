@@ -301,6 +301,18 @@ evidence and commit messages, rather than turning these descriptions into a run
 log. Missing observations, interrupted samplers and recovery beyond the stated
 deadline remain incomplete or failed even if a later manual check succeeds.
 
+For k0s controller maintenance, observe exec and logs through the controllers
+that remain running as well as the endpoint being restarted. Count-driven
+Konnectivity reconciliation can restart otherwise healthy proxy servers and
+agent pods when the active controller count changes. Healthy `/readyz`
+responses on those controllers do not establish uninterrupted kubelet access.
+The local API-endpoint maintenance allowance does not waive these other
+management failures. Qualify the existing [two-stage discovery
+migration](../providers/k0s/README.md#konnectivity-lease-discovery), including
+agent-first ordering and resource rollback, before relying on isolated
+controller maintenance. Enabling the new mode only on the restarted controller
+does not prove that the remaining controllers have stopped count-driven churn.
+
 Runtime maintenance is distinct from a cloud-provisioning agent upgrade.
 An explicitly scoped kubelet or container-runtime restart may interrupt exec
 and logs on the maintained worker, with recovery within 60 seconds. API health,

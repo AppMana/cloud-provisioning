@@ -193,6 +193,43 @@ func setCNIMTU(ds *appsv1.DaemonSet, mtu int) {
 	}
 }
 
+func TestPodMTURequiresAnExplicitUsableBudget(t *testing.T) {
+	for _, tc := range []struct {
+		name, field string
+		ok          bool
+	}{
+		{"missing", "", false},
+		{"null", `,"mtu":null`, false},
+		{"automatic", `,"mtu":0`, false},
+		{"negative", `,"mtu":-1`, false},
+		{"below-dual-stack-minimum", `,"mtu":1279`, false},
+		{"minimum", `,"mtu":1280`, true},
+		{"fits", `,"mtu":1420`, true},
+		{"exceeds-path", `,"mtu":1450`, false},
+		{"overflow", `,"mtu":65536`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ds := &appsv1.DaemonSet{}
+			ds.Spec.Template.Spec.InitContainers = []corev1.Container{{Name: "install-cni", Env: []corev1.EnvVar{{Name: "CNI_NETWORK_CONFIG", Value: `{"plugins":[{"type":"calico"` + tc.field + `}]}`}}}}
+			got := podMTU(context.Background(), nil, ds, 1420)
+			if got.OK != tc.ok || !got.Required {
+				t.Fatalf("MTU admission: %+v; want OK=%t", got, tc.ok)
+			}
+		})
+	}
+}
+
+func TestPodMTURejectsInvalidTunnelBudget(t *testing.T) {
+	for _, mtu := range []int{-1, 0, 1279, 65536} {
+		t.Run(itoa(mtu), func(t *testing.T) {
+			got := podMTU(context.Background(), nil, nil, mtu)
+			if got.OK || !got.Required || !strings.Contains(got.Detail, "tunnel MTU") {
+				t.Fatalf("invalid tunnel budget admitted: %+v", got)
+			}
+		})
+	}
+}
+
 func itoa(n int) string {
 	raw, _ := json.Marshal(n)
 	return string(raw)

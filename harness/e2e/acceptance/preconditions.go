@@ -237,9 +237,19 @@ func autodetection(name, mode, method string, tunnel netip.Prefix) Check {
 // sets don't-fragment loses every one.
 func podMTU(ctx context.Context, c client.Reader, ds *appsv1.DaemonSet, tunnelMTU int) Check {
 	check := Check{Name: "pod-mtu", Required: true}
+	if tunnelMTU < 1280 || tunnelMTU > 65535 {
+		check.Detail = fmt.Sprintf("tunnel MTU %d is outside the usable dual-stack range 1280–65535", tunnelMTU)
+		return check
+	}
 	mtu, source, err := cniMTU(ctx, c, ds)
 	if err != nil {
 		check.Detail = err.Error()
+		return check
+	}
+	// Automatic or absent MTUs do not establish the pod interface budget.
+	// Qualification requires an explicit value that also supports IPv6.
+	if mtu < 1280 || mtu > 65535 {
+		check.Detail = fmt.Sprintf("CNI MTU %d (%s) does not establish a usable dual-stack budget; configure an explicit MTU between 1280 and %d", mtu, source, tunnelMTU)
 		return check
 	}
 	check.OK = mtu <= tunnelMTU

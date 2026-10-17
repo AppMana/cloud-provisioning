@@ -54,7 +54,7 @@ func clearTunnelSourceRoutes(table int, iface ...string) error {
 			return err
 		}
 	}
-	return nil
+	return verifyTunnelSourceSelection(table, companion, index, nil, nil)
 }
 
 // Reconcile the complete source-exception set in one pass. Callers must supply
@@ -67,36 +67,9 @@ func reconcileTunnelSourceRoutes(cfg config, localAddresses []string, hosts []ne
 	if err != nil {
 		return err
 	}
-	sources := map[int]*net.IPNet{}
-	for _, raw := range localAddresses {
-		prefix, err := netip.ParsePrefix(raw)
-		if err != nil || prefix.Bits() == 0 || !prefix.Addr().IsGlobalUnicast() || prefix.Addr().Is4In6() {
-			return fmt.Errorf("parsing tunnel source %q: explicit unicast allocation required", raw)
-		}
-		family, bits := netlink.FAMILY_V6, 128
-		if prefix.Addr().Is4() {
-			family, bits = netlink.FAMILY_V4, 32
-		}
-		if sources[family] != nil {
-			return fmt.Errorf("multiple tunnel sources for one address family")
-		}
-		sources[family] = &net.IPNet{IP: prefix.Addr().AsSlice(), Mask: net.CIDRMask(bits, bits)}
-	}
-	desired := map[string]bool{}
-	desiredFamilies := map[int]bool{}
-	// Validate both families before touching the kernel. A complete projection
-	// prevents one family's reconcile from withdrawing the other family's path.
-	for _, host := range hosts {
-		ones, size := host.Mask.Size()
-		family := netlink.FAMILY_V6
-		if host.IP.To4() != nil {
-			family = netlink.FAMILY_V4
-		}
-		if ones != size || (size != 32 && size != 128) || (family == netlink.FAMILY_V4) != (size == 32) || !host.IP.IsGlobalUnicast() || sources[family] == nil {
-			return fmt.Errorf("tunnel source route %s must be a same-family single host with an allocated source", host.String())
-		}
-		desired[host.String()] = true
-		desiredFamilies[family] = true
+	sources, desired, err := planTunnelSourceRoutes(localAddresses, hosts)
+	if err != nil {
+		return err
 	}
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
@@ -116,14 +89,14 @@ func reconcileTunnelSourceRoutes(cfg config, localAddresses []string, hosts []ne
 	var stale []netlink.Rule
 	for _, existing := range existingRules {
 		family := existing.Family
-		if desiredFamilies[family] && !found[family] && existing.Src.String() == sources[family].String() {
+		if sources[family] != nil && !found[family] && existing.Src.String() == sources[family].String() {
 			found[family] = true
 		} else {
 			stale = append(stale, existing)
 		}
 	}
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
-		if !desiredFamilies[family] || found[family] {
+		if sources[family] == nil || found[family] {
 			continue
 		}
 		rule := netlink.NewRule()
@@ -145,5 +118,48 @@ func reconcileTunnelSourceRoutes(cfg config, localAddresses []string, hosts []ne
 			return err
 		}
 	}
-	return nil
+	return verifyTunnelSourceSelection(cfg.routeTable, table, link.Attrs().Index, sources, desired)
+}
+
+func planTunnelSourceRoutes(localAddresses []string, hosts []net.IPNet) (map[int]*net.IPNet, map[string]bool, error) {
+	if len(hosts) == 0 {
+		return map[int]*net.IPNet{}, map[string]bool{}, nil
+	}
+	sources := map[int]*net.IPNet{}
+	for _, raw := range localAddresses {
+		prefix, err := netip.ParsePrefix(raw)
+		if err != nil || prefix.Bits() == 0 || !prefix.Addr().IsGlobalUnicast() || prefix.Addr().Is4In6() {
+			return nil, nil, fmt.Errorf("parsing tunnel source %q: explicit unicast allocation required", raw)
+		}
+		family, bits := netlink.FAMILY_V6, 128
+		if prefix.Addr().Is4() {
+			family, bits = netlink.FAMILY_V4, 32
+		}
+		if sources[family] != nil {
+			return nil, nil, fmt.Errorf("multiple tunnel sources for one address family")
+		}
+		sources[family] = &net.IPNet{IP: prefix.Addr().AsSlice(), Mask: net.CIDRMask(bits, bits)}
+	}
+	desired := map[string]bool{}
+	desiredFamilies := map[int]bool{}
+	// Validate both families before touching the kernel. A complete projection
+	// prevents one family's reconcile from withdrawing the other family's path.
+	for _, host := range hosts {
+		ones, size := host.Mask.Size()
+		family := netlink.FAMILY_V6
+		if host.IP.To4() != nil {
+			family = netlink.FAMILY_V4
+		}
+		if ones != size || (size != 32 && size != 128) || (family == netlink.FAMILY_V4) != (size == 32) || !host.IP.IsGlobalUnicast() || sources[family] == nil {
+			return nil, nil, fmt.Errorf("tunnel source route %s must be a same-family single host with an allocated source", host.String())
+		}
+		desired[host.String()] = true
+		desiredFamilies[family] = true
+	}
+	for family := range sources {
+		if !desiredFamilies[family] {
+			delete(sources, family)
+		}
+	}
+	return sources, desired, nil
 }

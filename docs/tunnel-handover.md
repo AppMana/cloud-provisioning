@@ -320,7 +320,12 @@ routes through the supplied device are eligible for reconciliation. Raw kernel
 actions are checked because the typed netlink reader can omit them. Conflicting
 selectors, duplicate rules, and foreign route shapes stop the operation without
 repair. Cleanup without a live device identity requires the source table to be
-empty; teardown preserves the remaining policy if that check fails. Unselected
+empty; teardown preserves the remaining policy if that check fails. Source
+read-back compares the complete selector and destination sets to caller-admitted
+allocations and hosts. Missing, extra, or substituted entries fail verification;
+observation never invokes reconciliation. Ordinary reconciliation and cleanup
+also verify their final result. Coordinated phases must supply the complete
+journal-derived input before using this observation as receipt evidence. Unselected
 more-specific routes fail verification. Read-back never repairs state: a failed
 observation cannot become a successful phase receipt through hidden mutation.
 This proves the configured table at observation time; arbitrary source-sensitive

@@ -313,7 +313,14 @@ one family cannot implicitly withdraw the other's exception. It validates every
 allocation and host family before mutation, installs exceptions before moving
 general traffic to a relay, and removes them after direct routing is restored.
 The exception remains specific to the tunnel source address; physical-source
-encapsulation traffic follows the relay. Unselected
+encapsulation traffic follows the relay. Before changing source exceptions or
+clearing them, both families are inspected for collisions at the reserved rule
+priority and companion table. Only host-source lookup rules and direct host
+routes through the supplied device are eligible for reconciliation. Raw kernel
+actions are checked because the typed netlink reader can omit them. Conflicting
+selectors, duplicate rules, and foreign route shapes stop the operation without
+repair. Cleanup without a live device identity requires the source table to be
+empty; teardown preserves the remaining policy if that check fails. Unselected
 more-specific routes fail verification. Read-back never repairs state: a failed
 observation cannot become a successful phase receipt through hidden mutation.
 This proves the configured table at observation time; arbitrary source-sensitive

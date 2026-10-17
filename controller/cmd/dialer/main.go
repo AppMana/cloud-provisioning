@@ -2418,6 +2418,7 @@ func removeRouteRule(table, fwmark int) {
 	}
 	if err := clearTunnelSourceRoutes(table); err != nil {
 		fmt.Fprintf(os.Stderr, "removing tunnel source routes: %v\n", err)
+		return
 	}
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
 		rules, err := netlink.RuleListFiltered(family, &netlink.Rule{Table: table}, netlink.RT_FILTER_TABLE)

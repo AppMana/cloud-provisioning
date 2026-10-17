@@ -65,6 +65,10 @@ func planTunnelRules(rules []netlink.Rule, family, table, fwmark int) ([]netlink
 // Check that omitted field directly; a blackhole with the same mark and table
 // must never be mistaken for the exemption that keeps encrypted packets alive.
 func validateTunnelRuleActions(family, table, fwmark int) error {
+	return validatePolicyRuleActions(family, table, fwmark, false)
+}
+
+func validatePolicyRuleActions(family, table, fwmark int, source bool) error {
 	req := nl.NewNetlinkRequest(unix.RTM_GETRULE, unix.NLM_F_DUMP|unix.NLM_F_REQUEST)
 	req.AddData(nl.NewIfInfomsg(family))
 	messages, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWRULE)
@@ -95,9 +99,12 @@ func validateTunnelRuleActions(family, table, fwmark int) error {
 		if msg.Type != unix.FR_ACT_TO_TBL {
 			return fmt.Errorf("non-lookup policy action collides with tunnel priority %d", priority)
 		}
-		// Reject selectors outside the unqualified lookup shape, including
+		// Reject selectors outside the permitted lookup shape, including
 		// attributes this version of the typed reader does not understand.
 		for _, attr := range attrs {
+			if source && attr.Attr.Type == unix.FRA_SRC {
+				continue
+			}
 			switch attr.Attr.Type {
 			case nl.FRA_PRIORITY, nl.FRA_TABLE, nl.FRA_FWMARK, nl.FRA_FWMASK, nl.FRA_PROTOCOL, nl.FRA_SUPPRESS_IFGROUP, nl.FRA_SUPPRESS_PREFIXLEN:
 			default:

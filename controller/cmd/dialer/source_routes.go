@@ -22,29 +22,36 @@ func tunnelSourceTable(table int) (int, error) {
 	return table + tunnelSourceTableOffset, nil
 }
 
-func clearTunnelSourceRoutes(table int) error {
+func clearTunnelSourceRoutes(table int, iface ...string) error {
 	companion, err := tunnelSourceTable(table)
 	if err != nil {
 		return err
 	}
-	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
-		rules, err := netlink.RuleListFiltered(family, &netlink.Rule{Table: companion}, netlink.RT_FILTER_TABLE)
-		if err != nil {
+	index := 0
+	if len(iface) > 1 {
+		return fmt.Errorf("ambiguous source route device")
+	}
+	if len(iface) == 1 {
+		link, err := netlink.LinkByName(iface[0])
+		if err != nil && !isLinkNotFound(err) {
 			return err
 		}
-		for i := range rules {
-			if err := netlink.RuleDel(&rules[i]); err != nil {
-				return err
-			}
+		if err == nil {
+			index = link.Attrs().Index
 		}
-		routes, err := netlink.RouteListFiltered(family, &netlink.Route{Table: companion}, netlink.RT_FILTER_TABLE)
-		if err != nil {
+	}
+	rules, routes, err := inspectTunnelSourceState(table, companion, index)
+	if err != nil {
+		return err
+	}
+	for i := range rules {
+		if err := netlink.RuleDel(&rules[i]); err != nil {
 			return err
 		}
-		for i := range routes {
-			if err := netlink.RouteDel(&routes[i]); err != nil {
-				return err
-			}
+	}
+	for i := range routes {
+		if err := netlink.RouteDel(&routes[i]); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -54,7 +61,7 @@ func clearTunnelSourceRoutes(table int) error {
 // every active family and destination; omission withdraws its prior exception.
 func reconcileTunnelSourceRoutes(cfg config, localAddresses []string, hosts []net.IPNet) error {
 	if len(hosts) == 0 {
-		return clearTunnelSourceRoutes(cfg.routeTable)
+		return clearTunnelSourceRoutes(cfg.routeTable, cfg.iface)
 	}
 	table, err := tunnelSourceTable(cfg.routeTable)
 	if err != nil {
@@ -95,6 +102,10 @@ func reconcileTunnelSourceRoutes(cfg config, localAddresses []string, hosts []ne
 	if err != nil {
 		return err
 	}
+	existingRules, existingRoutes, err := inspectTunnelSourceState(cfg.routeTable, table, link.Attrs().Index)
+	if err != nil {
+		return err
+	}
 	for i := range hosts {
 		route := &netlink.Route{Dst: &hosts[i], LinkIndex: link.Attrs().Index, Scope: netlink.SCOPE_LINK, Table: table}
 		if err := netlink.RouteReplace(route); err != nil {
@@ -103,17 +114,12 @@ func reconcileTunnelSourceRoutes(cfg config, localAddresses []string, hosts []ne
 	}
 	found := map[int]bool{}
 	var stale []netlink.Rule
-	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
-		rules, err := netlink.RuleListFiltered(family, &netlink.Rule{Table: table}, netlink.RT_FILTER_TABLE)
-		if err != nil {
-			return err
-		}
-		for _, existing := range rules {
-			if desiredFamilies[family] && !found[family] && existing.Family == family && existing.Priority == cfg.routeTable-1 && existing.Src != nil && existing.Src.String() == sources[family].String() && existing.Dst == nil && existing.Mark == 0 && !existing.Invert && existing.IifName == "" && existing.OifName == "" {
-				found[family] = true
-			} else {
-				stale = append(stale, existing)
-			}
+	for _, existing := range existingRules {
+		family := existing.Family
+		if desiredFamilies[family] && !found[family] && existing.Src.String() == sources[family].String() {
+			found[family] = true
+		} else {
+			stale = append(stale, existing)
 		}
 	}
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
@@ -131,18 +137,12 @@ func reconcileTunnelSourceRoutes(cfg config, localAddresses []string, hosts []ne
 			return err
 		}
 	}
-	for _, f := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
-		routes, err := netlink.RouteListFiltered(f, &netlink.Route{Table: table}, netlink.RT_FILTER_TABLE)
-		if err != nil {
-			return err
+	for i := range existingRoutes {
+		if desired[existingRoutes[i].Dst.String()] {
+			continue
 		}
-		for i := range routes {
-			if routes[i].Dst != nil && desired[routes[i].Dst.String()] {
-				continue
-			}
-			if err := netlink.RouteDel(&routes[i]); err != nil {
-				return err
-			}
+		if err := netlink.RouteDel(&existingRoutes[i]); err != nil {
+			return err
 		}
 	}
 	return nil

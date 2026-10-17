@@ -83,7 +83,7 @@ func bgpDualStackConfig(d cluster.Deps, n lab.Node) (*native.ClusterConfig, erro
 	selection := matrix.Selection{
 		Distribution:       matrix.DistributionK0s,
 		KubernetesVersion:  kubernetesVersion(),
-		DistributionBinary: matrix.ArtifactPin{Version: Version, SHA256: d.K0sBinarySHA256},
+		DistributionBinary: matrix.ArtifactPin{Version: expectedVersion(d), SHA256: d.K0sBinarySHA256, SourceRevision: d.K0sSourceRevision},
 		CNI:                matrix.CNICalicoBGP,
 	}
 	if err := shared.ConfigureNetwork(config, selection); err != nil {

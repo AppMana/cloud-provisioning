@@ -64,6 +64,10 @@ type Deps struct {
 	// fresh k0s site never downloads or substitutes an upstream release.
 	K0sBinary       string
 	K0sBinarySHA256 string
+	// K0sVersion defaults to the builder's upstream release. Fork builds
+	// provide their exact version and full source commit for SDK validation.
+	K0sVersion        string
+	K0sSourceRevision string
 	// K0sImages passes upstream image configuration through unchanged.
 	K0sImages *nativek0s.ClusterImages
 	// K3sBinary and K3sBinarySHA256 likewise identify a prepared k3s build.

@@ -34,6 +34,24 @@ func init() { cluster.Register(Builder{}) }
 // changes under the matrix makes two runs incomparable.
 const Version = "v1.36.4+k0s.1"
 
+func expectedVersion(d cluster.Deps) string {
+	if d.K0sVersion != "" {
+		return d.K0sVersion
+	}
+	return Version
+}
+
+func verifyVersion(ctx context.Context, d cluster.Deps, name string) error {
+	version, err := d.Rig.Node(name).Exec(ctx, "k0s", "version")
+	if err != nil {
+		return fmt.Errorf("reading %s k0s version: %w", name, err)
+	}
+	if strings.TrimSpace(string(version)) != expectedVersion(d) {
+		return fmt.Errorf("%s k0s version %q does not match %s", name, strings.TrimSpace(string(version)), expectedVersion(d))
+	}
+	return nil
+}
+
 // Builder builds a k0s site.
 type Builder struct{}
 
@@ -69,6 +87,11 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 	if err := validateSiteConfig(d); err != nil {
 		return err
 	}
+	if d.Network == BGPDualStack {
+		if _, err := bgpDualStackConfig(d, cps[0]); err != nil {
+			return err
+		}
+	}
 	binary, err := b.binary(ctx, d)
 	if err != nil {
 		return err
@@ -77,6 +100,12 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 		if err := d.Rig.Node(n.Name).Put(ctx, bytes.NewReader(binary),
 			"/usr/local/bin/k0s", 0o755); err != nil {
 			return fmt.Errorf("carrying k0s onto %s: %w", n.Name, err)
+		}
+	}
+
+	for _, n := range cluster.SiteNodes(d.Topology) {
+		if err := verifyVersion(ctx, d, n.Name); err != nil {
+			return err
 		}
 	}
 
@@ -346,15 +375,17 @@ func (b Builder) binary(ctx context.Context, d cluster.Deps) ([]byte, error) {
 
 // Reuse verifies the installed version and distribution-owned network.
 func (Builder) Reuse(ctx context.Context, d cluster.Deps) error {
+	if expectedVersion(d) != Version && d.K0sBinarySHA256 == "" {
+		return fmt.Errorf("reusing a k0s fork requires its expected binary SHA256")
+	}
 	pin, err := installedBinary(ctx, d)
 	if err != nil {
 		return err
 	}
 	d.K0sBinarySHA256 = pin
 	for _, node := range cluster.SiteNodes(d.Topology) {
-		version, err := d.Rig.Node(node.Name).Exec(ctx, "k0s", "version")
-		if err != nil || strings.TrimSpace(string(version)) != Version {
-			return fmt.Errorf("%s k0s version does not match %s", node.Name, Version)
+		if err := verifyVersion(ctx, d, node.Name); err != nil {
+			return err
 		}
 		if node.Role == lab.ControlPlane {
 			config, err := d.Rig.Node(node.Name).Exec(ctx, "cat", "/etc/k0s/k0s.yaml")

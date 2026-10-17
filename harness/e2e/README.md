@@ -109,6 +109,13 @@ cloud provisioning assertions remain here.
 Fresh k0s builds require an explicitly prepared binary and its content pin:
 `cluster.Deps.K0sBinary` and `K0sBinarySHA256`, or the lab command's
 `--k0s-binary /absolute/path/to/k0s --k0s-binary-sha256 <64-hex-digest>`.
+For a fork, also supply `--k0s-version <exact-version>` and
+`--k0s-source-revision <full-source-commit>`. The dual-stack BGP profile passes
+these through the SDK artifact pin validator; its Kubernetes base version stays
+pinned. Every staged or reused node must report the selected version. Reusing a
+fork also requires its expected checksum, rather than trusting an observed
+checksum as the expected artifact. These identity checks do not qualify embedded
+components, native architecture execution, restart continuity or networking.
 There is no automatic upstream binary download or fallback to a cached build.
 Prepare the intended AppMana fork artifact before running a fork scenario.
 Reuse of an existing installation does not require a new binary.

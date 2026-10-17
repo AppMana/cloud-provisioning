@@ -5,12 +5,16 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
+	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
+	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 )
 
 func TestBinaryRequiresPreparedContentPin(t *testing.T) {
@@ -52,3 +56,49 @@ func TestKubeletArgumentsAreOneNativeArgument(t *testing.T) {
 		t.Fatalf("native argument = %q, want %q", got, want)
 	}
 }
+
+// A content pin alone does not prove that bytes identify the selected release.
+// Simulated staging proves pre-start rejection, not guest execution or health.
+func TestBuildRejectsWrongStagedVersionBeforeStartingRuntime(t *testing.T) {
+	body := []byte("prepared bytes")
+	filename := filepath.Join(t.TempDir(), "k0s")
+	if err := os.WriteFile(filename, body, 0600); err != nil {
+		t.Fatal(err)
+	}
+	n := &stagedVersionNode{t: t}
+	d := cluster.Deps{Topology: lab.Default(), Rig: stagedVersionRig{node: n},
+		K0sBinary: filename, K0sBinarySHA256: fmt.Sprintf("%x", sha256.Sum256(body))}
+	if err := (Builder{}).Build(context.Background(), d); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("expected pre-start version rejection, got %v", err)
+	}
+	if n.staged == 0 {
+		t.Fatal("did not exercise staging")
+	}
+}
+
+type stagedVersionNode struct {
+	rig.Node
+	t      *testing.T
+	staged int
+}
+
+func (n *stagedVersionNode) Put(_ context.Context, _ io.Reader, path string, _ fs.FileMode) error {
+	if path != "/usr/local/bin/k0s" {
+		n.t.Fatalf("configured runtime before version admission: %s", path)
+	}
+	n.staged++
+	return nil
+}
+func (n *stagedVersionNode) Exec(_ context.Context, args ...string) ([]byte, error) {
+	if strings.Join(args, " ") != "k0s version" {
+		n.t.Fatalf("unexpected runtime command: %v", args)
+	}
+	return []byte("v1.35.0+k0s.1"), nil
+}
+
+type stagedVersionRig struct {
+	rig.Rig
+	node *stagedVersionNode
+}
+
+func (r stagedVersionRig) Node(string) rig.Node { return r.node }

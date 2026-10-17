@@ -69,6 +69,8 @@ func runLab() {
 	var (
 		distro                 = flag.String("distro", "", "also build the site cluster with this distribution")
 		k0sBinary              = flag.String("k0s-binary", "", "prepared host k0s binary for a fresh k0s site; no automatic download")
+		k0sVersion             = flag.String("k0s-version", k0s.Version, "expected version of the prepared or installed k0s binary")
+		k0sSourceRevision      = flag.String("k0s-source-revision", "", "full source commit for a prepared k0s fork build")
 		k0sBinarySHA256        = flag.String("k0s-binary-sha256", "", "required SHA256 of --k0s-binary")
 		k0sImagesPath          = flag.String("k0s-images", "", "prepared native k0s ClusterImages JSON; required for fresh Calico profiles")
 		k0sImagesSHA256        = flag.String("k0s-images-sha256", "", "required SHA256 of --k0s-images")
@@ -332,6 +334,7 @@ func runLab() {
 		d := cluster.Deps{
 			Topology: topo, Rig: r, WorkDir: *workDir, Network: selected.BuilderNetwork,
 			K0sBinary: *k0sBinary, K0sBinarySHA256: *k0sBinarySHA256,
+			K0sVersion: *k0sVersion, K0sSourceRevision: *k0sSourceRevision,
 			K0sImages: k0sImages,
 			K3sBinary: *k3sBinary, K3sBinarySHA256: *k3sBinarySHA256,
 			RKE2ArtifactsDirectory: *rke2Artifacts, RKE2InstallerSHA256: *rke2InstallerSHA256,

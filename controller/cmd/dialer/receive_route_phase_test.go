@@ -39,13 +39,15 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		}
 	}
 	var request struct {
-		Plan       tunnel.ReceiveTransitionPlan `json:"plan"`
-		KeyFile    string                       `json:"keyFile"`
-		Action     string                       `json:"action"`
-		NodeName   string                       `json:"nodeName"`
-		Setup      bool                         `json:"setup"`
-		StateFile  string                       `json:"stateFile"`
-		ExpectWait bool                         `json:"expectWait"`
+		Plan           tunnel.ReceiveTransitionPlan `json:"plan"`
+		KeyFile        string                       `json:"keyFile"`
+		Action         string                       `json:"action"`
+		NodeName       string                       `json:"nodeName"`
+		Setup          bool                         `json:"setup"`
+		StateFile      string                       `json:"stateFile"`
+		ExpectWait     bool                         `json:"expectWait"`
+		CloudAddresses []string                     `json:"cloudAddresses"`
+		ContinuityOnly bool                         `json:"continuityOnly"`
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -164,6 +166,10 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		}
 	}
 	cfg := config{iface: "wglegacy", nodeName: plan.CloudNodeName, routeTable: 518, fwmark: 518, mtu: 1400}
+	cloudAddresses := request.CloudAddresses
+	if len(cloudAddresses) == 0 {
+		cloudAddresses = []string{"10.88.0.3/32"}
+	}
 	publish := func(nodeUID string) {
 		if request.StateFile == "" {
 			return
@@ -192,8 +198,10 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if request.NodeName != "" || request.Setup {
-		nodeUID, addresses := plan.CloudNodeUID, []string{"10.88.0.3/32"}
+	// Continuity runs exclude the deliberate foreign-route and missing-state
+	// injections below; those assertions remain enabled in the default mode.
+	if request.NodeName != "" || request.Setup || request.ContinuityOnly {
+		nodeUID, addresses := plan.CloudNodeUID, cloudAddresses
 		if request.NodeName != "" {
 			site, found := plan.Sites[key.PublicKey().String()]
 			if !found || site.NodeName != request.NodeName || site.Legacy == nil || site.Legacy.Tunnel == nil {
@@ -337,7 +345,7 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 			if err := devices.ConfigureDevice(binding.Interface, wgtypes.Config{ListenPort: &port}); err != nil {
 				t.Fatal(err)
 			}
-			err := receiveLinuxPhase(context.Background(), devices, cfg, key, nil, []string{"10.88.0.3/32"}, plan, view, plan.CloudNodeUID, intent)
+			err := receiveLinuxPhase(context.Background(), devices, cfg, key, nil, cloudAddresses, plan, view, plan.CloudNodeUID, intent)
 			if err == nil || !strings.Contains(err.Error(), "listener differs") {
 				t.Fatal("phase ignored changed retained receiver", err)
 			}
@@ -368,7 +376,7 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		if err := netlink.RouteAdd(&foreign); err != nil {
 			t.Fatal(err)
 		}
-		if err := receiveLinuxPhase(context.Background(), devices, cfg, key, nil, []string{"10.88.0.3/32"}, plan, view, plan.CloudNodeUID, intent); err == nil {
+		if err := receiveLinuxPhase(context.Background(), devices, cfg, key, nil, cloudAddresses, plan, view, plan.CloudNodeUID, intent); err == nil {
 			t.Fatal("switch overwrote foreign route collision")
 		}
 		current, err := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
@@ -429,7 +437,7 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 				}
 			}
 		}
-		allocation := stableAddressOwnerRequest{MeshUID: plan.MeshUID, NodeUID: plan.CloudNodeUID, LegacyInterface: cfg.iface, RootPublicKey: key.PublicKey().String(), Addresses: []string{"10.88.0.3/32"}}
+		allocation := stableAddressOwnerRequest{MeshUID: plan.MeshUID, NodeUID: plan.CloudNodeUID, LegacyInterface: cfg.iface, RootPublicKey: key.PublicKey().String(), Addresses: cloudAddresses}
 		binding, err := verifyStableAddressOwner(allocation)
 		if err != nil {
 			t.Fatal(err)
@@ -483,7 +491,7 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		}
 	}
 	for attempt := 0; ; attempt++ {
-		err := receiveLinuxPhase(context.Background(), phaseDevices, cfg, key, nil, []string{"10.88.0.3/32"}, plan, view, plan.CloudNodeUID, intent)
+		err := receiveLinuxPhase(context.Background(), phaseDevices, cfg, key, nil, cloudAddresses, plan, view, plan.CloudNodeUID, intent)
 		if err == nil {
 			break
 		}
@@ -493,7 +501,7 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	if retiring {
-		if err := receiveLinuxPhase(context.Background(), phaseDevices, cfg, key, nil, []string{"10.88.0.3/32"}, plan, view, plan.CloudNodeUID, intent); err != nil {
+		if err := receiveLinuxPhase(context.Background(), phaseDevices, cfg, key, nil, cloudAddresses, plan, view, plan.CloudNodeUID, intent); err != nil {
 			t.Fatal("retirement retry", err)
 		}
 	}
@@ -560,7 +568,7 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		if err := netlink.RouteDel(removed); err != nil {
 			t.Fatal(err)
 		}
-		if err := receiveLinuxPhase(context.Background(), devices, cfg, key, nil, []string{"10.88.0.3/32"}, plan, view, plan.CloudNodeUID, intent); err == nil {
+		if err := receiveLinuxPhase(context.Background(), devices, cfg, key, nil, cloudAddresses, plan, view, plan.CloudNodeUID, intent); err == nil {
 			t.Fatal("drain accepted missing selected route")
 		}
 		current, err := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)

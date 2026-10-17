@@ -124,6 +124,20 @@ func prepareSiteReceiveClient(devices receiverDevices, mesh string, siteKey wgty
 // It prepares only additional devices; it neither switches routes nor publishes
 // a forwarding acknowledgement. Missing readiness leaves the legacy path active.
 func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface, mesh *corev1.Secret, nodeName string, siteKey wgtypes.Key, prepare func(string, receiveBinding, tunnel.PeerListDoc) error, observe ...func(tunnel.SiteReceiveClient) (time.Time, error)) error {
+	return reconcileSiteReceivePreparationScoped(ctx, k, mesh, nodeName, siteKey, nil, prepare, observe...)
+}
+
+// A scope admits only ordinary peers under the journal executor's host lock.
+// Its live inventory check must succeed before preparing or acknowledging a path.
+type siteReceiveScope struct {
+	roots map[string]bool
+	check func() error
+}
+
+func reconcileSiteReceivePreparationScoped(ctx context.Context, k kubernetes.Interface, mesh *corev1.Secret, nodeName string, siteKey wgtypes.Key, scope *siteReceiveScope, prepare func(string, receiveBinding, tunnel.PeerListDoc) error, observe ...func(tunnel.SiteReceiveClient) (time.Time, error)) error {
+	if scope != nil && (scope.roots == nil || scope.check == nil) {
+		return fmt.Errorf("scoped receive preparation requires admitted roots and live revalidation")
+	}
 	if mesh.UID == "" || mesh.DeletionTimestamp != nil || siteKey == (wgtypes.Key{}) || strings.TrimSpace(string(mesh.Data[tunnel.NodePublicKeyPrefix+nodeName])) != siteKey.PublicKey().String() {
 		return fmt.Errorf("site receive preparation requires the published local identity")
 	}
@@ -140,6 +154,10 @@ func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface
 	}
 	sort.Strings(machines)
 	for _, machine := range machines {
+		root := strings.TrimSpace(string(mesh.Data[tunnel.PeerPublicKeyPrefix+machine]))
+		if scope != nil && !scope.roots[root] {
+			continue
+		}
 		adoption, err := k.CoreV1().Secrets(mesh.Namespace).Get(ctx, tunnel.AdoptionSecretName(machine), metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			continue
@@ -172,7 +190,6 @@ func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface
 				ready = true
 			}
 		}
-		root := strings.TrimSpace(string(mesh.Data[tunnel.PeerPublicKeyPrefix+machine]))
 		target := tunnel.ReceiveTarget{MeshUID: string(mesh.UID), SecretUID: string(adoption.UID), NodeName: node.Name, NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, RootPublicKey: root, Ready: ready && node.DeletionTimestamp == nil}
 		bindings, err := tunnel.ValidateReceiveReadiness(target, base, requestRaw, receiptRaw)
 		if err != nil {
@@ -211,6 +228,11 @@ func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface
 		if currentNode.UID != node.UID || currentNode.Status.NodeInfo.BootID != node.Status.NodeInfo.BootID || currentNode.DeletionTimestamp != nil || !stillReady {
 			return fmt.Errorf("site receiver cloud node changed")
 		}
+		if scope != nil {
+			if err := scope.check(); err != nil {
+				return err
+			}
+		}
 		if err := prepare(root, binding, doc); err != nil {
 			return err
 		}
@@ -227,6 +249,11 @@ func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface
 		}
 		if handshake.IsZero() {
 			continue
+		}
+		if scope != nil {
+			if err := scope.check(); err != nil {
+				return err
+			}
 		}
 		if err := publishSiteReceiveReady(ctx, k, mesh, latest, nodeName, plan, handshake); err != nil {
 			return err

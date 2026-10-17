@@ -90,12 +90,21 @@ func restoreSiteReceiveCache(cfg config, devices receiverDevices, key wgtypes.Ke
 }
 
 func reconcileDurableSiteReceivers(ctx context.Context, k kubernetes.Interface, devices receiverDevices, cfg config, mesh *corev1.Secret, key wgtypes.Key) error {
+	return reconcileDurableSiteReceiversScoped(ctx, k, devices, cfg, mesh, key, nil)
+}
+
+func reconcileDurableSiteReceiversScoped(ctx context.Context, k kubernetes.Interface, devices receiverDevices, cfg config, mesh *corev1.Secret, key wgtypes.Key, scope *siteReceiveScope) error {
 	if mesh == nil || mesh.Namespace != cfg.secretNamespace || mesh.Name != cfg.secretName || mesh.UID == "" || mesh.ResourceVersion == "" || mesh.DeletionTimestamp != nil {
 		return fmt.Errorf("site receiver requires a live scoped mesh")
 	}
 	path := siteReceiveCachePath(cfg)
 	if path == "" {
 		return fmt.Errorf("site receiver preparation requires durable host storage")
+	}
+	if scope != nil {
+		// Retained journals forbid legacy offline replay. Keep admitted preparation
+		// inputs separate from the legacy cache; recovery requires fresh admission.
+		path += ".admitted"
 	}
 	peers, err := tunnel.SitePeers(mesh.Data)
 	if err != nil {
@@ -124,7 +133,7 @@ func reconcileDurableSiteReceivers(ctx context.Context, k kubernetes.Interface, 
 		return writeDurableJSON(path, cached)
 	}
 	seen := map[string]bool{}
-	err = reconcileSiteReceivePreparation(ctx, k, mesh, cfg.nodeName, key, func(root string, binding receiveBinding, doc tunnel.PeerListDoc) error {
+	err = reconcileSiteReceivePreparationScoped(ctx, k, mesh, cfg.nodeName, key, scope, func(root string, binding receiveBinding, doc tunnel.PeerListDoc) error {
 		mtu := cfg.mtu
 		if mtu == 0 {
 			mtu = underlayMTU()

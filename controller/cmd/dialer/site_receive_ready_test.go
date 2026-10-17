@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/netip"
 	"testing"
+	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -16,7 +18,7 @@ import (
 )
 
 func TestSitePreparesOnlyCurrentCloudReceivers(t *testing.T) {
-	for _, fault := range []string{"none", "no-request", "no-receipt", "unapplied", "wrong-root", "reboot", "unready", "replaced-mesh", "changed-mesh", "wrong-local-key", "wrong-port", "node-changes-before-prepare", "proposal-changes-before-prepare"} {
+	for _, fault := range []string{"none", "no-request", "no-receipt", "unapplied", "wrong-root", "reboot", "unready", "replaced-mesh", "changed-mesh", "wrong-local-key", "wrong-port", "node-changes-before-prepare", "proposal-changes-before-prepare", "scoped", "reserved", "scope-before", "scope-after"} {
 		t.Run(fault, func(t *testing.T) {
 			site, _ := wgtypes.GeneratePrivateKey()
 			root, _ := wgtypes.GeneratePrivateKey()
@@ -90,15 +92,34 @@ func TestSitePreparesOnlyCurrentCloudReceivers(t *testing.T) {
 				return false, nil, nil
 			})
 			calls := 0
-			err = reconcileSiteReceivePreparation(context.Background(), k, mesh, "site", site, func(cloud string, b receiveBinding, got tunnel.PeerListDoc) error {
+			var scope *siteReceiveScope
+			var observe []func(tunnel.SiteReceiveClient) (time.Time, error)
+			scopeChecks := 0
+			if fault == "scoped" || fault == "reserved" || fault == "scope-before" || fault == "scope-after" {
+				scope = &siteReceiveScope{roots: map[string]bool{root.PublicKey().String(): fault != "reserved"}, check: func() error {
+					scopeChecks++
+					if fault == "scope-before" || fault == "scope-after" && scopeChecks == 2 {
+						return errors.New("inventory changed")
+					}
+					return nil
+				}}
+				if fault == "scope-after" {
+					observe = append(observe, func(tunnel.SiteReceiveClient) (time.Time, error) { return time.Now(), nil })
+				}
+			}
+			err = reconcileSiteReceivePreparationScoped(context.Background(), k, mesh, "site", site, scope, func(cloud string, b receiveBinding, got tunnel.PeerListDoc) error {
 				calls++
 				_, err := tunnel.PlanSiteReceiveClient(string(mesh.UID), pub, cloud, b, got, got)
 				return err
-			})
-			pending := fault == "no-request" || fault == "no-receipt" || fault == "unapplied"
-			if fault == "none" {
+			}, observe...)
+			pending := fault == "no-request" || fault == "no-receipt" || fault == "unapplied" || fault == "reserved"
+			if fault == "none" || fault == "scoped" {
 				if err != nil || calls != 1 {
 					t.Fatalf("valid receipt: calls=%d err=%v", calls, err)
+				}
+			} else if fault == "scope-after" {
+				if err == nil || calls != 1 || scopeChecks != 2 {
+					t.Fatalf("post-native drift: calls=%d checks=%d err=%v", calls, scopeChecks, err)
 				}
 			} else if pending {
 				if err != nil || calls != 0 {
@@ -106,6 +127,9 @@ func TestSitePreparesOnlyCurrentCloudReceivers(t *testing.T) {
 				}
 			} else if err == nil || calls != 0 {
 				t.Fatalf("invalid receipt reached kernel: calls=%d err=%v", calls, err)
+			}
+			if fault == "reserved" && (adoptionReads != 0 || scopeChecks != 0) {
+				t.Fatal("reserved worker entered preparation")
 			}
 			for _, action := range k.Actions() {
 				if action.GetVerb() != "get" {

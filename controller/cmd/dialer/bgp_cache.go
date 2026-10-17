@@ -55,6 +55,12 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 		if handled {
 			return reconcileReceiveNeighbors(ctx, k, cfg, func(ctx context.Context, key wgtypes.Key, peers []tunnel.PeerSpec, own []string) error {
 				return installReceiveNeighbors(ctx, devices, cfg, key, peers, own)
+			}, func(ctx context.Context, key wgtypes.Key, mesh *corev1.Secret, peers []tunnel.PeerSpec, check func() error) error {
+				roots := make(map[string]bool, len(peers))
+				for _, peer := range peers {
+					roots[peer.PublicKey] = true
+				}
+				return reconcileDurableSiteReceiversScoped(ctx, k, devices, cfg, mesh, key, &siteReceiveScope{roots: roots, check: check})
 			})
 		}
 	}

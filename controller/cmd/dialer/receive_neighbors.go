@@ -13,11 +13,14 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
 type receiveNeighborNative func(context.Context, wgtypes.Key, []tunnel.PeerSpec, []string) error
+
+type receiveNeighborPreparation func(context.Context, wgtypes.Key, *corev1.Secret, []tunnel.PeerSpec, func() error) error
 
 type receiveNeighborCheckpoint struct {
 	Version      int               `json:"version"`
@@ -33,7 +36,7 @@ type receiveNeighborCheckpoint struct {
 // Ordinary peers have independent forwarding authority. This operation keeps
 // every journal and local phase fence, and never issues a phase receipt or a
 // whole-mesh readiness acknowledgement for its partial work.
-func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cfg config, native receiveNeighborNative) error {
+func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cfg config, native receiveNeighborNative, prepare receiveNeighborPreparation) error {
 	if cfg.secretName == "" {
 		return nil
 	} // Cloud documents need their own projection.
@@ -213,6 +216,14 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	}
 	if err := native(ctx, key, peers, tunnel.ReceiveSiteRouteSources(mesh.Data, cfg.nodeName)); err != nil {
 		return err
+	}
+	if err := check(); err != nil {
+		return err
+	}
+	if prepare != nil {
+		if err := prepare(ctx, key, mesh, peers, check); err != nil {
+			return err
+		}
 	}
 	return check()
 }

@@ -57,7 +57,7 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 	mesh.Data[tunnel.PeerRouteHostsPrefix+"joining"] = []byte("172.29.0.2")
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: mesh.Namespace, Name: "neighbor-agent", UID: "neighbor-pod"}, Spec: corev1.PodSpec{NodeName: "site"}, Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://initial", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}}}}}
 	objects := []runtime.Object{mesh, index, journal, adoption, node, pod, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system", UID: types.UID(store.ClusterUID)}}}
-	for _, fault := range []string{"valid", "complete", "mesh-before", "mesh-after", "journal-after", "cluster-after", "inventory-after", "boot", "agent", "agent-after", "checkpoint", "overlap", "missing-inventory", "native"} {
+	for _, fault := range []string{"valid", "complete", "mesh-before", "mesh-after", "journal-after", "cluster-after", "inventory-after", "boot", "agent", "agent-after", "checkpoint", "overlap", "missing-inventory", "native", "prepare-after"} {
 		t.Run(fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -180,13 +180,28 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 				}
 				return nil
 			}
-			err := reconcileReceiveNeighbors(ctx, k, cfg, native)
+			preparations := 0
+			prepare := func(ctx context.Context, key wgtypes.Key, admitted *corev1.Secret, peers []tunnel.PeerSpec, check func() error) error {
+				preparations++
+				if key != site || admitted.UID != mesh.UID || len(peers) != 1 || peers[0].PublicKey != neighbor.PublicKey().String() {
+					t.Fatal("preparation received unadmitted peers")
+				}
+				if lock, err := lockReconciliation(cfg); err == nil {
+					lock.Close()
+					t.Fatal("preparation ran without host lock")
+				}
+				if fault == "prepare-after" {
+					return changeMesh()
+				}
+				return check()
+			}
+			err := reconcileReceiveNeighbors(ctx, k, cfg, native, prepare)
 			if fault == "valid" || fault == "complete" {
 				must(err)
-				if calls != 1 {
-					t.Fatal("valid neighbor not installed")
+				if calls != 1 || preparations != 1 {
+					t.Fatal("valid neighbor not installed and prepared")
 				}
-				must(reconcileReceiveNeighbors(ctx, k, cfg, native))
+				must(reconcileReceiveNeighbors(ctx, k, cfg, native, nil))
 				// Shared-rule repair uses the same real-API-created inventory,
 				// including a completed journal, but gets its route authority
 				// from the current mesh instead of cached phase receipts.
@@ -226,8 +241,11 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 					t.Fatal("unsafe neighbor admission succeeded")
 				}
 				want := 0
-				if fault == "mesh-after" || fault == "journal-after" || fault == "agent-after" || fault == "cluster-after" || fault == "inventory-after" || fault == "native" {
+				if fault == "mesh-after" || fault == "journal-after" || fault == "agent-after" || fault == "cluster-after" || fault == "inventory-after" || fault == "native" || fault == "prepare-after" {
 					want = 1
+				}
+				if fault != "prepare-after" && preparations != 0 {
+					t.Fatal("failed admission reached preparation")
 				}
 				if calls != want {
 					t.Fatalf("native calls=%d, want %d: %v", calls, want, err)

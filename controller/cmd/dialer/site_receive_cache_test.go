@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -8,6 +10,9 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestSiteReceiveCacheRejectsInvalidRecoveryBeforeDevices(t *testing.T) {
@@ -75,5 +80,38 @@ func TestSiteReceiveCacheRejectsInvalidRecoveryBeforeDevices(t *testing.T) {
 	}
 	if err := restoreSiteReceiveCache(cfg, nil, key); err != nil {
 		t.Fatal("removed preparation cannot recover", err)
+	}
+}
+
+func TestAdmittedSitePreparationCannotReplaceLegacyRecovery(t *testing.T) {
+	key, _ := wgtypes.GeneratePrivateKey()
+	cfg := config{iface: "site", secretNamespace: "test", secretName: "mesh", nodeName: "site", privateKeyFile: filepath.Join(t.TempDir(), "key")}
+	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mesh", Namespace: "test", UID: "mesh", ResourceVersion: "1"}, Data: map[string][]byte{tunnel.NodePublicKeyPrefix + "site": []byte(key.PublicKey().String())}}
+	k := fake.NewClientset(mesh)
+	legacy := []byte("legacy recovery remains independently owned")
+	path := siteReceiveCachePath(cfg)
+	if err := os.WriteFile(path, legacy, 0600); err != nil {
+		t.Fatal(err)
+	}
+	scope := &siteReceiveScope{roots: map[string]bool{}, check: func() error { return nil }}
+	if err := reconcileDurableSiteReceiversScoped(context.Background(), k, nil, cfg, mesh, key, scope); err != nil {
+		t.Fatal(err)
+	}
+	actual, err := os.ReadFile(path)
+	if err != nil || !bytes.Equal(actual, legacy) {
+		t.Fatal("scoped preparation replaced legacy recovery", err)
+	}
+	admitted, err := os.ReadFile(path + ".admitted")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := decodeSiteReceiveCache(admitted, cfg, key); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := restoreSiteReceiveCache(cfg, nil, key); err != nil {
+		t.Fatal("admitted records entered offline recovery", err)
 	}
 }

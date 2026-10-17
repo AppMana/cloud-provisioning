@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"net/netip"
 	"os"
 	"reflect"
 	"testing"
@@ -50,9 +51,9 @@ func TestNativeReceivePeerRetirement(t *testing.T) {
 	}
 	for _, family := range []string{"ipv4", "ipv6"} {
 		t.Run(family, func(t *testing.T) {
-			source, other, own, broad := "10.90.0.10/32", "10.91.0.0/24", "10.88.0.3/32", "10.90.0.0/24"
+			source, other, own, broad := "10.90.0.10/32", "10.91.0.0/24", "10.90.0.3/24", "10.90.0.0/24"
 			if family == "ipv6" {
-				source, other, own, broad = "fd90::10/128", "fd91::/64", "fd88::3/128", "fd90::/64"
+				source, other, own, broad = "fd90::10/128", "fd91::/64", "fd90::3/64", "fd90::/64"
 			}
 			link := &netlink.GenericLink{LinkAttrs: netlink.LinkAttrs{Name: "retire0"}, LinkType: "wireguard"}
 			if err := netlink.LinkAdd(link); err != nil {
@@ -73,7 +74,7 @@ func TestNativeReceivePeerRetirement(t *testing.T) {
 				t.Fatal(err)
 			}
 			retire := func(key string, sources []string) error {
-				return withdrawLegacyReceivePeer(devices, "retire0", key, first.PublicKey().String(), sources)
+				return withdrawLegacyReceivePeer(devices, "retire0", key, first.PublicKey().String(), sources, own)
 			}
 			assertBoth := func() {
 				t.Helper()
@@ -82,6 +83,10 @@ func TestNativeReceivePeerRetirement(t *testing.T) {
 					t.Fatalf("rejection changed membership: %v", err)
 				}
 			}
+			if err := withdrawLegacyReceivePeer(devices, "retire0", root.PublicKey().String(), first.PublicKey().String(), []string{source}); err == nil {
+				t.Fatal("connected route accepted without committed allocation")
+			}
+			assertBoth()
 			if err := retire(second.PublicKey().String(), []string{source}); err == nil {
 				t.Fatal("accepted wrong local key")
 			}
@@ -175,6 +180,51 @@ func TestNativeReceivePeerRetirement(t *testing.T) {
 				if !reflect.DeepEqual(addresses, remainingAddresses) || !reflect.DeepEqual(routes, remainingRoutes) {
 					t.Fatal("retirement changed addresses or routes")
 				}
+			}
+		})
+	}
+}
+
+func TestSharedConnectedRouteRequiresExactAllocationAndKernelShape(t *testing.T) {
+	prefix := netip.MustParsePrefix("10.90.0.3/24")
+	address, _ := netlink.ParseAddr(prefix.String())
+	_, dst, _ := net.ParseCIDR(prefix.Masked().String())
+	valid := netlink.Route{LinkIndex: 7, Table: unix.RT_TABLE_MAIN, Protocol: unix.RTPROT_KERNEL, Type: unix.RTN_UNICAST, Family: netlink.FAMILY_V4, Scope: netlink.SCOPE_LINK, Dst: dst, Src: net.ParseIP("10.90.0.3")}
+	for _, fault := range []string{"none", "table", "protocol", "type", "device", "source", "gateway", "metric", "scope", "multipath", "no-address", "wrong-allocation", "wrong-width", "noprefixroute"} {
+		t.Run(fault, func(t *testing.T) {
+			route := valid
+			allocation := []netip.Prefix{prefix}
+			addresses := []netlink.Addr{*address}
+			switch fault {
+			case "table":
+				route.Table = 777
+			case "protocol":
+				route.Protocol = unix.RTPROT_BOOT
+			case "type":
+				route.Type = unix.RTN_LOCAL
+			case "device":
+				route.LinkIndex++
+			case "source":
+				route.Src = net.ParseIP("10.90.0.4")
+			case "gateway":
+				route.Gw = net.ParseIP("10.90.0.1")
+			case "metric":
+				route.Priority = 42
+			case "scope":
+				route.Scope = netlink.SCOPE_HOST
+			case "multipath":
+				route.MultiPath = []*netlink.NexthopInfo{{LinkIndex: 7}}
+			case "no-address":
+				addresses = nil
+			case "wrong-allocation":
+				allocation[0] = netip.MustParsePrefix("10.90.0.4/24")
+			case "wrong-width":
+				allocation[0] = netip.MustParsePrefix("10.90.0.3/16")
+			case "noprefixroute":
+				addresses[0].Flags |= unix.IFA_F_NOPREFIXROUTE
+			}
+			if got := receiveSharedConnectedRoute(route, 7, allocation, addresses); got != (fault == "none") {
+				t.Fatalf("exception=%v", got)
 			}
 		})
 	}

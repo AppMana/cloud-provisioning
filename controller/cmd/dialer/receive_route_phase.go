@@ -349,7 +349,7 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if err := withdrawLegacyReceivePeer(devices, cfg.iface, key.PublicKey().String(), peer.PublicKey, peer.WGAllowedIPs); err != nil {
+			if err := withdrawLegacyReceivePeer(devices, cfg.iface, key.PublicKey().String(), peer.PublicKey, peer.WGAllowedIPs, allocated...); err != nil {
 				return err
 			}
 		}

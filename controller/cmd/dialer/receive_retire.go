@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"net/netip"
 	"slices"
 
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
@@ -14,7 +16,7 @@ import (
 // committed drain receipts, with replacement routes already verified. This
 // operation supplies neither that authorization nor permission to delete the
 // shared interface. Normal reconciliation must not republish a retired peer.
-func withdrawLegacyReceivePeer(devices receiverDevices, iface, publicKey, peerKey string, sources []string) error {
+func withdrawLegacyReceivePeer(devices receiverDevices, iface, publicKey, peerKey string, sources []string, allocated ...string) error {
 	local, err := wgtypes.ParseKey(publicKey)
 	if err != nil || local == (wgtypes.Key{}) {
 		return fmt.Errorf("legacy retirement requires a device identity")
@@ -50,6 +52,20 @@ func withdrawLegacyReceivePeer(devices receiverDevices, iface, publicKey, peerKe
 	if live.PublicKey != local {
 		return fmt.Errorf("legacy retirement device identity changed")
 	}
+	// Only allocation prefixes admitted by the phase executor can explain a
+	// shared connected route. Kernel discovery alone does not grant an exception.
+	addresses, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+	if err != nil {
+		return err
+	}
+	admitted := make([]netip.Prefix, 0, len(allocated))
+	for _, raw := range allocated {
+		prefix, err := netip.ParsePrefix(raw)
+		if err != nil || prefix.Bits() == 0 || prefix.Addr().Is4In6() || !prefix.Addr().IsGlobalUnicast() {
+			return fmt.Errorf("invalid retirement allocation")
+		}
+		admitted = append(admitted, prefix)
+	}
 	found := false
 	for _, current := range live.Peers {
 		if current.PublicKey == peer {
@@ -80,6 +96,9 @@ func withdrawLegacyReceivePeer(devices receiverDevices, iface, publicKey, peerKe
 	}
 	for _, route := range routes {
 		if !receiveRouteUsesLink(route, link.Attrs().Index) {
+			continue
+		}
+		if receiveSharedConnectedRoute(route, link.Attrs().Index, admitted, addresses) {
 			continue
 		}
 		if route.Dst == nil {
@@ -147,4 +166,36 @@ func withdrawLegacyReceivePeer(devices receiverDevices, iface, publicKey, peerKe
 		return fmt.Errorf("legacy membership changed during retirement")
 	}
 	return nil
+}
+
+// The address-created route belongs to the shared device, not to an individual
+// peer. The caller has already verified the replacement policy routes. Keep
+// this route and its address for other workers; all explicit routes still fence
+// peer removal, including broader routes in foreign tables.
+func receiveSharedConnectedRoute(route netlink.Route, index int, allocated []netip.Prefix, addresses []netlink.Addr) bool {
+	if route.LinkIndex != index || route.Table != unix.RT_TABLE_MAIN || route.Protocol != unix.RTPROT_KERNEL || route.Type != unix.RTN_UNICAST || route.Dst == nil || len(route.Gw) != 0 || len(route.MultiPath) != 0 || route.Via != nil || route.Encap != nil || route.NewDst != nil || route.Tos != 0 || route.Flags != 0 {
+		return false
+	}
+	for _, prefix := range allocated {
+		if route.Dst.String() != prefix.Masked().String() {
+			continue
+		}
+		if prefix.Addr().Is4() {
+			if route.Family != netlink.FAMILY_V4 || route.Scope != netlink.SCOPE_LINK || route.Priority != 0 || !route.Src.Equal(net.ParseIP(prefix.Addr().String())) {
+				continue
+			}
+		} else if route.Family != netlink.FAMILY_V6 || route.Scope != netlink.SCOPE_UNIVERSE || route.Priority != 256 || len(route.Src) != 0 {
+			continue
+		}
+		for _, address := range addresses {
+			if address.IPNet == nil {
+				continue
+			}
+			bits, _ := address.Mask.Size()
+			if bits == prefix.Bits() && address.IP.Equal(net.ParseIP(prefix.Addr().String())) && address.Flags&unix.IFA_F_NOPREFIXROUTE == 0 {
+				return true
+			}
+		}
+	}
+	return false
 }

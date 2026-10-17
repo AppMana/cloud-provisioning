@@ -307,7 +307,13 @@ preflight accept only the admitted legacy gateway or generation devices, and
 routes outside the journal scope remain unchanged. Ownership checks use Linux's
 IPv6 default unicast metric of 1024 and IPv4 metric of zero. Relay route support
 does not enable native relay phases until their source-specific tunnel exceptions
-are also derived and verified from the full journal set. Unselected
+are also derived and verified from the full journal set. Ordinary source-exception
+reconciliation takes all tunnel allocations and host destinations together, so
+one family cannot implicitly withdraw the other's exception. It validates every
+allocation and host family before mutation, installs exceptions before moving
+general traffic to a relay, and removes them after direct routing is restored.
+The exception remains specific to the tunnel source address; physical-source
+encapsulation traffic follows the relay. Unselected
 more-specific routes fail verification. Read-back never repairs state: a failed
 observation cannot become a successful phase receipt through hidden mutation.
 This proves the configured table at observation time; arbitrary source-sensitive

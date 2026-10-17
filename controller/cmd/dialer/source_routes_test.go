@@ -23,9 +23,24 @@ func TestTunnelSourceRoutesRejectUnsafePlansBeforeKernelAccess(t *testing.T) {
 		{"different address family", "10.100.0.1/24", "same-family single host", 517, *v6},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := reconcileTunnelSourceRoutes(config{iface: "must-not-be-used", routeTable: tc.table}, tc.address, []net.IPNet{tc.host}); err == nil || !strings.Contains(err.Error(), tc.want) {
+			if err := reconcileTunnelSourceRoutes(config{iface: "must-not-be-used", routeTable: tc.table}, []string{tc.address}, []net.IPNet{tc.host}); err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("want validation error %q before kernel access, got %v", tc.want, err)
 			}
 		})
+	}
+}
+
+func TestTunnelSourceRoutesValidateEveryAllocationBeforeKernelAccess(t *testing.T) {
+	_, v4, _ := net.ParseCIDR("10.100.0.160/32")
+	_, v6, _ := net.ParseCIDR("fd20::160/128")
+	for _, addresses := range [][]string{
+		nil, {"10.100.0.1/24"}, {"fd20::1/64"}, {"10.100.0.1/24", "invalid"},
+		{"10.100.0.1/24", "fd20::1/64", "10.100.0.2/24"},
+		{"10.100.0.1/0", "fd20::1/64"}, {"10.100.0.1/24", "::ffff:10.100.0.1/128"},
+	} {
+		err := reconcileTunnelSourceRoutes(config{iface: "must-not-be-used", routeTable: 518}, addresses, []net.IPNet{*v4, *v6})
+		if err == nil || (!strings.Contains(err.Error(), "source") && !strings.Contains(err.Error(), "single host")) {
+			t.Fatalf("allocation validation: %v", err)
+		}
 	}
 }

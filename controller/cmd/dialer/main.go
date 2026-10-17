@@ -1627,10 +1627,10 @@ func reconcileLocked(ctx context.Context, clientset *kubernetes.Clientset, wg *w
 	// Only packets explicitly sourced from our tunnel address may use
 	// a retained bare peer. Destination alone does not identify source.
 	var tunnelSourceHosts []net.IPNet
-	var tunnelSubnet *net.IPNet
-	if cfg.transitMasqueradeSource != "" {
-		if _, subnet, err := net.ParseCIDR(cfg.transitMasqueradeSource); err == nil {
-			tunnelSubnet = subnet
+	var tunnelSubnets []*net.IPNet
+	for _, raw := range append(append([]string(nil), localAddresses...), cfg.transitMasqueradeSource) {
+		if _, subnet, err := net.ParseCIDR(raw); err == nil {
+			tunnelSubnets = append(tunnelSubnets, subnet)
 		}
 	}
 	for _, p := range peers {
@@ -1709,8 +1709,11 @@ func reconcileLocked(ctx context.Context, clientset *kubernetes.Clientset, wg *w
 				continue
 			}
 			if relayThis {
-				if tunnelSubnet != nil && tunnelSubnet.Contains(ipNet.IP) {
-					tunnelSourceHosts = append(tunnelSourceHosts, ipNet)
+				for _, subnet := range tunnelSubnets {
+					if subnet.Contains(ipNet.IP) {
+						tunnelSourceHosts = append(tunnelSourceHosts, ipNet)
+						break
+					}
 				}
 				// Carried by the relay instead, and pruned from this
 				// tunnel: this remote's applied list no longer accepts
@@ -1785,7 +1788,7 @@ func reconcileLocked(ctx context.Context, clientset *kubernetes.Clientset, wg *w
 
 	// Install the explicit-source exception before moving general egress.
 	if len(tunnelSourceHosts) > 0 {
-		if err := reconcileTunnelSourceRoutes(cfg, localAddress, tunnelSourceHosts); err != nil {
+		if err := reconcileTunnelSourceRoutes(cfg, localAddresses, tunnelSourceHosts); err != nil {
 			return err
 		}
 	}
@@ -1794,7 +1797,7 @@ func reconcileLocked(ctx context.Context, clientset *kubernetes.Clientset, wg *w
 	}
 	// On promotion, restore normal routes before removing the exception.
 	if len(tunnelSourceHosts) == 0 {
-		if err := reconcileTunnelSourceRoutes(cfg, localAddress, nil); err != nil {
+		if err := reconcileTunnelSourceRoutes(cfg, localAddresses, nil); err != nil {
 			return err
 		}
 	}

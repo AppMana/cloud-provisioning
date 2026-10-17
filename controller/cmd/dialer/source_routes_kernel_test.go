@@ -65,7 +65,7 @@ func TestRetainedTunnelRoutesRespectPacketSource(t *testing.T) {
 			check(physical, 0, wg.Attrs().Index)
 			// Retain direct access only for the source accepted by the bare peer.
 			for i := 0; i < 2; i++ { // reconciliation must not accumulate rules.
-				if err := reconcileTunnelSourceRoutes(cfg, tc.tunnel, []net.IPNet{*host}); err != nil {
+				if err := reconcileTunnelSourceRoutes(cfg, []string{tc.tunnel}, []net.IPNet{*host}); err != nil {
 					t.Fatal(err)
 				}
 				if err := installRoutes(cfg, nil, nil, nil, &tunnel.TransitSpec{Via: tc.relay}, []net.IPNet{*host}, nil); err != nil {
@@ -89,7 +89,7 @@ func TestRetainedTunnelRoutesRespectPacketSource(t *testing.T) {
 			if err := installRoutes(cfg, []net.IPNet{*host}, nil, nil, nil, nil, nil); err != nil {
 				t.Fatal(err)
 			}
-			if err := reconcileTunnelSourceRoutes(cfg, tc.tunnel, nil); err != nil {
+			if err := reconcileTunnelSourceRoutes(cfg, []string{tc.tunnel}, nil); err != nil {
 				t.Fatal(err)
 			}
 			check(physical, 0, wg.Attrs().Index)
@@ -99,5 +99,144 @@ func TestRetainedTunnelRoutesRespectPacketSource(t *testing.T) {
 				t.Fatalf("stale source rules: %+v, %v", rules, err)
 			}
 		})
+	}
+}
+
+func TestTunnelSourceRoutesKeepBothFamilies(t *testing.T) {
+	if os.Getenv("CLDT_DUAL_SOURCE_NETNS") != "1" {
+		t.Skip("requires isolated guest network and mount namespaces")
+	}
+	for _, kind := range []string{"net", "mnt"} {
+		self, err := os.Readlink("/proc/self/ns/" + kind)
+		if err != nil {
+			t.Fatal(err)
+		}
+		host, err := os.Readlink("/proc/1/ns/" + kind)
+		if err != nil || self == host {
+			t.Fatal("refusing guest host namespace")
+		}
+	}
+	lan := &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: "dual-source-lan"}}
+	wg := &netlink.Wireguard{LinkAttrs: netlink.LinkAttrs{Name: "dual-source-wg"}}
+	for _, link := range []netlink.Link{lan, wg} {
+		if err := netlink.LinkAdd(link); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { netlink.LinkDel(link) })
+		if err := netlink.LinkSetUp(link); err != nil {
+			t.Fatal(err)
+		}
+	}
+	allocations := []string{"10.100.0.1/24", "fd20::1/64"}
+	physical := []string{"10.10.0.11/24", "fd10::11/64"}
+	remote := []string{"10.100.0.160/32", "fd20::160/128"}
+	gateways := []string{"10.10.0.10", "fd10::10"}
+	var hosts []net.IPNet
+	var own []string
+	for i := range allocations {
+		for j, raw := range []string{physical[i], allocations[i]} {
+			addr, err := netlink.ParseAddr(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			addr.Flags = 2 // IFA_F_NODAD
+			if err := netlink.AddrAdd([]netlink.Link{lan, wg}[j], addr); err != nil {
+				t.Fatal(err)
+			}
+			if j == 0 {
+				own = append(own, addr.IP.String())
+			}
+		}
+		_, dst, _ := net.ParseCIDR(remote[i])
+		hosts = append(hosts, *dst)
+	}
+	cfg := config{iface: wg.Attrs().Name, routeTable: 518, fwmark: 518, receiveRouteScope: map[string]bool{remote[0]: true, remote[1]: true}}
+	t.Cleanup(func() { clearTunnelSourceRoutes(cfg.routeTable); removeRouteRule(cfg.routeTable, cfg.fwmark) })
+	if err := installRoutes(cfg, hosts, nil, nil, nil, nil, own); err != nil {
+		t.Fatal(err)
+	}
+	check := func(relayed6 bool) {
+		t.Helper()
+		table, _ := tunnelSourceTable(cfg.routeTable)
+		for i := range hosts {
+			family := netlink.FAMILY_V4
+			if i == 1 {
+				family = netlink.FAMILY_V6
+			}
+			for j, raw := range []string{physical[i], allocations[i]} {
+				source, _, _ := net.ParseCIDR(raw)
+				paths, err := netlink.RouteGetWithOptions(hosts[i].IP, &netlink.RouteGetOptions{SrcAddr: source})
+				want := wg.Attrs().Index
+				if j == 0 && (i == 0 || relayed6) {
+					want = lan.Attrs().Index
+				}
+				if err != nil || len(paths) != 1 || paths[0].LinkIndex != want {
+					t.Fatalf("family %d source %s: %+v %v, want link %d", family, source, paths, err, want)
+				}
+			}
+			rules, err := netlink.RuleListFiltered(family, &netlink.Rule{Table: table}, netlink.RT_FILTER_TABLE)
+			count := 1
+			if i == 1 && !relayed6 {
+				count = 0
+			}
+			if err != nil || len(rules) != count {
+				t.Fatalf("family %d rules: %+v %v", family, rules, err)
+			}
+			routes, err := netlink.RouteListFiltered(family, &netlink.Route{Table: table}, netlink.RT_FILTER_TABLE)
+			if err != nil || len(routes) != count {
+				t.Fatalf("family %d routes: %+v %v", family, routes, err)
+			}
+		}
+	}
+	for repeat := 0; repeat < 2; repeat++ {
+		if err := reconcileTunnelSourceRoutes(cfg, allocations, hosts); err != nil {
+			t.Fatal(err)
+		}
+		cfg.receiveRelayRoutes = map[string]string{remote[0]: gateways[0], remote[1]: gateways[1]}
+		if err := installRoutes(cfg, hosts, nil, nil, nil, nil, own); err != nil {
+			t.Fatal(err)
+		}
+		check(true)
+	}
+	// Restore the ordinary IPv6 path before dropping only its exception.
+	cfg.receiveRelayRoutes = map[string]string{remote[0]: gateways[0]}
+	if err := installRoutes(cfg, hosts, nil, nil, nil, nil, own); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcileTunnelSourceRoutes(cfg, allocations, hosts[:1]); err != nil {
+		t.Fatal(err)
+	}
+	check(false)
+	// A retry may restore both families, without losing the still-active IPv4 path.
+	if err := reconcileTunnelSourceRoutes(cfg, allocations, hosts); err != nil {
+		t.Fatal(err)
+	}
+	cfg.receiveRelayRoutes = map[string]string{remote[0]: gateways[0], remote[1]: gateways[1]}
+	if err := installRoutes(cfg, hosts, nil, nil, nil, nil, own); err != nil {
+		t.Fatal(err)
+	}
+	check(true)
+	// The complete input must validate before either family's rules are touched.
+	if err := reconcileTunnelSourceRoutes(cfg, []string{allocations[0], "invalid"}, hosts); err == nil {
+		t.Fatal("accepted invalid second family")
+	}
+	check(true)
+	cfg.receiveRelayRoutes = nil
+	if err := installRoutes(cfg, hosts, nil, nil, nil, nil, own); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconcileTunnelSourceRoutes(cfg, allocations, nil); err != nil {
+		t.Fatal(err)
+	}
+	table, _ := tunnelSourceTable(cfg.routeTable)
+	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
+		rules, err := netlink.RuleListFiltered(family, &netlink.Rule{Table: table}, netlink.RT_FILTER_TABLE)
+		if err != nil || len(rules) != 0 {
+			t.Fatalf("source rules survived promotion: %+v %v", rules, err)
+		}
+		routes, err := netlink.RouteListFiltered(family, &netlink.Route{Table: table}, netlink.RT_FILTER_TABLE)
+		if err != nil || len(routes) != 0 {
+			t.Fatalf("source routes survived promotion: %+v %v", routes, err)
+		}
 	}
 }

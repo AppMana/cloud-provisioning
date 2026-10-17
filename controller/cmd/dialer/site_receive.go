@@ -134,6 +134,7 @@ func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface
 // Its live inventory check must succeed before preparing or acknowledging a path.
 type siteReceiveScope struct {
 	roots map[string]bool
+	plans []tunnel.ReceiveTransitionPlan
 	check func() error
 }
 

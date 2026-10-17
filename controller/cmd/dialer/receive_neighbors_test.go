@@ -213,7 +213,7 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 				return nil
 			}
 			preparations := 0
-			prepare := func(ctx context.Context, key wgtypes.Key, admitted *corev1.Secret, peers []tunnel.PeerSpec, check func() error) error {
+			prepare := func(ctx context.Context, key wgtypes.Key, admitted *corev1.Secret, peers []tunnel.PeerSpec, plans []tunnel.ReceiveTransitionPlan, check func() error) error {
 				preparations++
 				if key != site || admitted.UID != mesh.UID || len(peers) != 1 || peers[0].PublicKey != neighbor.PublicKey().String() {
 					t.Fatal("preparation received unadmitted peers")

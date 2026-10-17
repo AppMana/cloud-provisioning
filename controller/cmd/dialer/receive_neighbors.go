@@ -20,7 +20,7 @@ import (
 
 type receiveNeighborNative func(context.Context, wgtypes.Key, []tunnel.PeerSpec, []string, []tunnel.PeerSpec, []string, func() error) error
 
-type receiveNeighborPreparation func(context.Context, wgtypes.Key, *corev1.Secret, []tunnel.PeerSpec, func() error) error
+type receiveNeighborPreparation func(context.Context, wgtypes.Key, *corev1.Secret, []tunnel.PeerSpec, []tunnel.ReceiveTransitionPlan, func() error) error
 
 type receiveNeighborCheckpoint struct {
 	Version      int               `json:"version"`
@@ -291,7 +291,7 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		return err
 	}
 	if prepare != nil {
-		if err := prepare(ctx, key, mesh, peers, check); err != nil {
+		if err := prepare(ctx, key, mesh, peers, plans, check); err != nil {
 			return err
 		}
 	}

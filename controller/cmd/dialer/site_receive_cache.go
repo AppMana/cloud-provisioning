@@ -191,6 +191,16 @@ func reconcileDurableSiteReceiversScoped(ctx context.Context, k kubernetes.Inter
 		}
 		return writeDurableJSON(path, cached)
 	}
+	// Withdraw replay authority before native retirement; the ownership archive
+	// retains the old identities across a crash or a failed native guard.
+	if err := save(); err != nil {
+		return err
+	}
+	if err := retireMissingSiteReceivers(ctx, k, cfg, mesh, key, path, scope, func(selections []receiveRouteSelection) error {
+		return retireRecordedSiteReceiver(devices, cfg, selections)
+	}); err != nil {
+		return err
+	}
 	seen := map[string]bool{}
 	err = reconcileSiteReceivePreparationScoped(ctx, k, mesh, cfg.nodeName, key, scope, func(root string, binding receiveBinding, doc tunnel.PeerListDoc) error {
 		intent := cached

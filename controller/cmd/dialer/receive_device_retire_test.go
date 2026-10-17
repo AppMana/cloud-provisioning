@@ -67,8 +67,9 @@ func TestNativeDedicatedReceiverRetirement(t *testing.T) {
 					t.Fatal(err)
 				}
 				public := peer.PublicKey()
+				mark := 517
 				if fault != "foreign-device" {
-					if err := devices.ConfigureDevice(selection.Interface, wgtypes.Config{PrivateKey: &local, Peers: []wgtypes.PeerConfig{{PublicKey: public, AllowedIPs: []net.IPNet{*prefix}}}}); err != nil {
+					if err := devices.ConfigureDevice(selection.Interface, wgtypes.Config{PrivateKey: &local, FirewallMark: &mark, Peers: []wgtypes.PeerConfig{{PublicKey: public, AllowedIPs: []net.IPNet{*prefix}}}}); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -122,7 +123,7 @@ func TestNativeDedicatedReceiverRetirement(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				retireErr := retireReceiveDevice(devices, selection)
+				retireErr := retireRecordedSiteReceiver(devices, config{fwmark: 517}, []receiveRouteSelection{selection})
 				if fault == "none" || fault == "empty-peer" {
 					if retireErr != nil {
 						t.Fatal(retireErr)
@@ -130,7 +131,7 @@ func TestNativeDedicatedReceiverRetirement(t *testing.T) {
 					if _, err := netlink.LinkByName(selection.Interface); !isLinkNotFound(err) {
 						t.Fatal("receiver remains")
 					}
-					if err := retireReceiveDevice(devices, selection); err != nil {
+					if err := retireRecordedSiteReceiver(devices, config{fwmark: 517}, []receiveRouteSelection{selection}); err != nil {
 						t.Fatal("idempotent retirement", err)
 					}
 					foreign := &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: selection.Interface}}
@@ -138,7 +139,7 @@ func TestNativeDedicatedReceiverRetirement(t *testing.T) {
 						t.Fatal(err)
 					}
 					t.Cleanup(func() { netlink.LinkDel(foreign) })
-					if err := retireReceiveDevice(devices, selection); err == nil {
+					if err := retireRecordedSiteReceiver(devices, config{fwmark: 517}, []receiveRouteSelection{selection}); err == nil {
 						t.Fatal("retry deleted replacement interface")
 					}
 					if current, err := netlink.LinkByName(selection.Interface); err != nil || current.Type() != "dummy" {

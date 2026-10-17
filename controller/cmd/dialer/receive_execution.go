@@ -16,8 +16,9 @@ import (
 // nil asserts that native verification completed; merely accepting configuration
 // is insufficient. The combined route intent includes other workers and must
 // preserve their selection; only the target plan authorizes phase-specific
-// preparation or retirement. A complete view permits readback only: no device,
-// route or peer mutations. Platforms must reject unsupported phases.
+// preparation or retirement. Completed phase verification is read-only. An
+// explicit maintenance callback may restore only the selected transport, never
+// replay retirement or issue receipts. Platforms must reject unsupported phases.
 type receiveNativePhase func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string, tunnel.ReceiveJournalRoutes) error
 
 // executeReceivePhase holds the existing host lock from recovery admission to
@@ -30,6 +31,13 @@ type receiveNativePhase func(context.Context, tunnel.ReceiveTransitionPlan, hand
 // history. Every other writer must honor the same lock and durable phase state.
 func executeReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase) ([]handover.PodReceipt, error) {
 	return runReceivePhase(ctx, api, store, scope, cfg, key, containerID, native, false)
+}
+
+// Maintenance uses the same live admission, complete-set checkpoint, host lock
+// and post-action fencing as verification, but never emits phase receipts.
+func maintainCompletedReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase) error {
+	_, err := runReceivePhase(ctx, api, store, scope, cfg, key, containerID, native, true)
+	return err
 }
 
 func verifyCompletedReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase) error {

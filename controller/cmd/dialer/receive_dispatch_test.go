@@ -74,7 +74,7 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 		t.Fatal(err)
 	}
 	objects := []runtime.Object{mesh, index, adoption, node, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system", UID: types.UID(store.ClusterUID)}}, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: mesh.Namespace, Name: store.Name, UID: "dispatch-journal", ResourceVersion: "1"}, Data: map[string]string{"transition.json": string(encoded), "plan.json": string(raw)}}}
-	for _, fault := range []string{"valid", "allocation", "pod", "credential", "native", "complete", "complete-native", "publication-pending", "publication-replaced"} {
+	for _, fault := range []string{"valid", "allocation", "pod", "credential", "native", "complete", "complete-native", "complete-maintenance", "publication-pending", "publication-replaced"} {
 		t.Run("dispatch-"+fault, func(t *testing.T) {
 			copies := []runtime.Object{}
 			for _, obj := range objects {
@@ -103,7 +103,7 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 				}
 				cm.Data["inventory.json"] = string(encoded)
 			}
-			terminal := fault == "complete" || fault == "complete-native"
+			terminal := fault == "complete" || fault == "complete-native" || fault == "complete-maintenance"
 			if terminal {
 				finished, err := tr.Rollback(time.Now())
 				if err != nil {
@@ -165,7 +165,7 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 			if fault == "pod" {
 				cfg.receiptPodUID = "old-pod"
 			}
-			nativeCalls := 0
+			nativeCalls, maintenanceCalls := 0, 0
 			handled, err := dispatchReceivePhases(ctx, k, cfg, func(_ context.Context, p tunnel.ReceiveTransitionPlan, v handover.View, uid string, intent tunnel.ReceiveJournalRoutes, key wgtypes.Key) error {
 				nativeCalls++
 				if lock, err := lockReconciliation(cfg); err == nil {
@@ -183,7 +183,23 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 					return fmt.Errorf("native observation failed")
 				}
 				return nil
+			}, func(_ context.Context, p tunnel.ReceiveTransitionPlan, v handover.View, uid string, intent tunnel.ReceiveJournalRoutes, key wgtypes.Key) error {
+				maintenanceCalls++
+				if !terminal || !v.Complete || uid != plan.CloudNodeUID || key != root {
+					t.Fatal("maintenance received nonterminal or foreign intent")
+				}
+				if lock, err := lockReconciliation(cfg); err == nil {
+					lock.Close()
+					t.Fatal("maintenance escaped host lock")
+				}
+				if fault == "complete-maintenance" {
+					return fmt.Errorf("maintenance failed")
+				}
+				return nil
 			})
+			if (terminal && maintenanceCalls != 1) || (!terminal && maintenanceCalls != 0) {
+				t.Fatal("maintenance dispatch differs from terminal admission")
+			}
 			if !handled || (err == nil) != (fault == "valid" || fault == "complete") {
 				t.Fatalf("handled=%v error=%v", handled, err)
 			}
@@ -205,7 +221,10 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 					t.Fatal("failed dispatch emitted receipts")
 				default:
 				}
-				if terminal && nativeCalls != 1 {
+				if fault == "complete-maintenance" && nativeCalls != 0 {
+					t.Fatal("failed maintenance reached verification")
+				}
+				if terminal && fault != "complete-maintenance" && nativeCalls != 1 {
 					t.Fatal("completed journal was skipped instead of verified")
 				}
 				if fault != "native" && !terminal && nativeCalls != 0 {

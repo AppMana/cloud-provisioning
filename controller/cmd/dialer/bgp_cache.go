@@ -48,6 +48,8 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 				}
 			}
 			return reconcileReceiveAdvertisements(ctx, devices, cfg, speaker, plan.MachineUID, nodeUID, intent)
+		}, func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes, key wgtypes.Key) error {
+			return restoreCompletedReceivePaths(ctx, devices, cfg, key, plan, view, nodeUID, intent)
 		})
 		if err != nil {
 			return err

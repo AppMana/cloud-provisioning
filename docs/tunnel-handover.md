@@ -223,6 +223,17 @@ handover in normal reconciliation, or undo native work when intent changes.
 All native writers must honor the lock and durable phase state before this
 boundary can be used for coordinated switching.
 
+Completed journals use a separate maintenance callback under the same live
+inventory admission, checkpoint and host lock as native verification. Forward
+completion can recreate its selected receiver or site-client device using the
+committed keys, reserved port, endpoint and source permissions. Existing foreign
+devices remain conflicts. Maintenance requires a fresh authenticated handshake
+before verification proceeds, does not emit phase receipts, and never replays
+retirement. Legacy-selected completion does not recreate retired receivers.
+This operation does not restore root devices, stable addresses, routes or policy;
+those remain prerequisites for full native verification after a reboot. Idle
+transport rekey latency also requires separate recovery-deadline qualification.
+
 The Linux direct-route phase component implements prepare, forward and reverse
 switch, drain, abort and peer-scoped retirement. It reuses the route installer with a scope
 derived from all admitted journals: destinations outside that scope survive in

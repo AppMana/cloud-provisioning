@@ -21,7 +21,7 @@ type receiveDispatchNative func(context.Context, tunnel.ReceiveTransitionPlan, h
 // A local reserved journal owns forwarding even after completion. Never fall
 // through to legacy reconciliation on an API, credential, admission or native
 // failure. Retiring inventory and restoring ordinary publishers is separate.
-func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg config, native receiveDispatchNative) (bool, error) {
+func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg config, native, maintain receiveDispatchNative) (bool, error) {
 	namespace := cfg.secretNamespace
 	if namespace == "" {
 		namespace = cfg.peersSecretNamespace
@@ -124,18 +124,32 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		if err != nil {
 			return true, err
 		}
-		verify := func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
-			_, expected, err := tunnel.ReceiveLocalNetwork(plan, nodeUID)
-			if err != nil {
-				return err
+		wrap := func(action receiveDispatchNative) receiveNativePhase {
+			return func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
+				_, expected, err := tunnel.ReceiveLocalNetwork(plan, nodeUID)
+				if err != nil {
+					return err
+				}
+				if cfg.peersFile != "" && !slices.Equal(allocated, expected) {
+					return fmt.Errorf("bootstrap tunnel allocation differs from committed plan")
+				}
+				return action(ctx, plan, view, nodeUID, intent, key)
 			}
-			if cfg.peersFile != "" && !slices.Equal(allocated, expected) {
-				return fmt.Errorf("bootstrap tunnel allocation differs from committed plan")
-			}
-			return native(ctx, plan, view, nodeUID, intent, key)
 		}
+		verify := wrap(native)
 		if view.Complete {
-			if err := verifyCompletedReceivePhase(ctx, api, store, scope, cfg, key, containerID, verify); err != nil {
+			// Restore and verify under one admission and host lock so no other
+			// reconciler can interleave with selected-transport restoration.
+			completed := verify
+			if maintain != nil {
+				completed = func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
+					if err := wrap(maintain)(ctx, plan, view, nodeUID, intent); err != nil {
+						return err
+					}
+					return verify(ctx, plan, view, nodeUID, intent)
+				}
+			}
+			if err := maintainCompletedReceivePhase(ctx, api, store, scope, cfg, key, containerID, completed); err != nil {
 				failures = append(failures, err)
 			}
 			continue

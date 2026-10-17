@@ -237,6 +237,24 @@ foreign gateways, relayed hosts used as gateways, changed destinations, and a
 missing gateway family. Source allocation comes from the bound mesh snapshot;
 this projection is configuration, not an applied-route receipt.
 
+New plans also record each site's tunnel allocations and exact legacy
+source-exception hosts. A host is eligible only within an allocated tunnel
+subnet, in this worker's explicit host destinations, and in a family whose
+allocated source is accepted by the site's old direct cloud peer. Missing old
+permissions do not invent an exception for a new site. A direct legacy path
+must already accept its allocated tunnel sources. Journal admission checks the
+published site keys and allocations again and rejects a mesh revision change
+during those reads.
+
+Source projection combines all admitted journals, retaining exceptions for
+legacy-selected workers and withdrawing them for receiver-selected workers.
+Allocations must agree for a site across workers and cannot belong to different
+sites. Older journals without this projection remain readable, but mixed or
+incomplete source projections cannot authorize shared-table reconciliation.
+The execution boundary passes the validated projection to native callbacks;
+relay phase integration must still preserve exceptions for workers outside the
+journal set and establish native source read-back before issuing receipts.
+
 Native relay routes and unresolved route claims remain unsupported. The direct
 backend requires the admitted source owner to be the local site. For older
 plans without a legacy projection, each desired source prefix must fit within

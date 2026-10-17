@@ -101,9 +101,15 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	if legacy == nil || legacy.PeerPublicKey != preparationKey(8) || legacy.Transit == nil || legacy.Transit.Via != "10.101.0.1" {
 		t.Fatal("journal lost the old relay while the desired mesh selected another site")
 	}
+	if legacy.Tunnel == nil || !slices.Equal(legacy.Tunnel.Addresses, []string{"10.100.0.2/24"}) || len(legacy.Tunnel.Hosts) != 0 {
+		t.Fatal("new site's journal invented old direct tunnel permission")
+	}
 	retained := plan.Sites[preparationKey(8)].Legacy
 	if retained == nil || retained.PeerPublicKey != preparationKey(8) || retained.Transit != nil {
 		t.Fatal("journal lost the retained site's direct legacy path")
+	}
+	if retained.Tunnel == nil || !slices.Equal(retained.Tunnel.Addresses, []string{"10.100.0.1/24"}) || len(retained.Tunnel.Hosts) != 0 {
+		t.Fatal("direct site's journal lost its allocation or added a source exception")
 	}
 	verifyReceiveInventory(t, r, string(machine.GetUID()))
 	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {

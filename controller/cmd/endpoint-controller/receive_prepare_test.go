@@ -53,13 +53,14 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			_ = unstructured.SetNestedField(machine.Object, "cloud-node", "status", "nodeRef", "name")
 			_ = unstructured.SetNestedField(machine.Object, "node-uid", "status", "nodeRef", "uid")
 			node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "cloud-node", UID: "node-uid"}, Spec: corev1.NodeSpec{ProviderID: "aws:///test/i-worker"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{BootID: "boot-1"}, Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}}}
-			previous := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: preparationKey(8), WGAllowedIPs: []string{"10.101.0.1/32", "10.101.0.2/32", "10.101.128.0/26"}, RouteHosts: []string{"10.101.0.1", "10.101.0.2"}, TransitHosts: []string{"10.101.0.2"}, Transit: []string{"10.101.0.2/32", "10.101.128.0/26"}}}}
+			previous := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: preparationKey(8), WGAllowedIPs: []string{"10.100.0.1/32", "10.101.0.1/32", "10.101.0.2/32", "10.101.128.0/26"}, RouteHosts: []string{"10.101.0.1", "10.101.0.2"}, TransitHosts: []string{"10.101.0.2"}, Transit: []string{"10.101.0.2/32", "10.101.128.0/26"}}}}
 			base, _ := json.Marshal(previous)
 			adoption := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: tunnel.AdoptionSecretName(machine.GetName()), Namespace: machine.GetNamespace(), UID: "adoption-uid", Annotations: map[string]string{tunnel.AppliedListAnnotation: tunnel.HashPeerList(base)}}, Data: map[string][]byte{tunnel.CloudPeersKey: base}}
 			mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "peers", Namespace: machine.GetNamespace(), UID: "mesh-uid"}, Data: map[string][]byte{
-				tunnel.NodePublicKeyPrefix + "retained-site": []byte(preparationKey(8)),
-				tunnel.SiteAddressesPrefix + "retained-site": []byte("10.101.0.1"),
-				tunnel.NodePublicKeyPrefix + "site":          []byte(preparationKey(16)), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.100.0.2/24"), tunnel.NodeAddressesPrefix + "site": []byte("10.101.0.2"), tunnel.NodePodCIDRsPrefix + "site": []byte("10.101.128.0/26"),
+				tunnel.NodePublicKeyPrefix + "retained-site":     []byte(preparationKey(8)),
+				tunnel.SiteAddressesPrefix + "retained-site":     []byte("10.101.0.1"),
+				tunnel.NodeTunnelAddressPrefix + "retained-site": []byte("10.100.0.1/24"),
+				tunnel.NodePublicKeyPrefix + "site":              []byte(preparationKey(16)), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.100.0.2/24"), tunnel.NodeAddressesPrefix + "site": []byte("10.101.0.2"), tunnel.NodePodCIDRsPrefix + "site": []byte("10.101.128.0/26"),
 				tunnel.PeerEndpointPrefix + "worker": []byte("198.51.100.10:51820"), tunnel.PeerPublicKeyPrefix + "worker": []byte(preparationKey(24)), tunnel.PeerRouteHostsPrefix + "worker": []byte("10.100.0.128"), tunnel.PeerAllowedIPsPrefix + "worker": []byte("10.100.0.128/32"),
 			}}
 			native := []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}

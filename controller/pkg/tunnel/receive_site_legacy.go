@@ -12,9 +12,10 @@ import (
 // owner. Transit is nil for a direct path and contains only this worker's
 // destinations; other workers may still use different legacy relays.
 type ReceiveSiteLegacy struct {
-	Sources       []string     `json:"sources"`
-	PeerPublicKey string       `json:"peerPublicKey"`
-	Transit       *TransitSpec `json:"transit,omitempty"`
+	Sources       []string           `json:"sources"`
+	PeerPublicKey string             `json:"peerPublicKey"`
+	Transit       *TransitSpec       `json:"transit,omitempty"`
+	Tunnel        *ReceiveSiteTunnel `json:"tunnel,omitempty"`
 }
 
 // PlanReceiveSiteLegacy uses the acknowledged cloud document, not the current
@@ -78,6 +79,17 @@ func PlanReceiveSiteLegacy(data map[string][]byte, node, public, cloud string, b
 			return fail("legacy relay has no next hop")
 		}
 	}
+	var addresses []string
+	for _, prefix := range []string{NodeTunnelAddressPrefix, NodeTunnelAddress6Prefix} {
+		if raw := strings.TrimSpace(string(data[prefix+node])); raw != "" {
+			addresses = append(addresses, raw)
+		}
+	}
+	exception, err := planReceiveSiteTunnel(addresses, public, base, worker[0], result.Transit != nil)
+	if err != nil {
+		return fail(err.Error())
+	}
+	result.Tunnel = &exception
 	if err := ValidateReceiveSiteLegacy(result, public, base, worker[0]); err != nil {
 		return fail(err.Error())
 	}
@@ -87,6 +99,12 @@ func PlanReceiveSiteLegacy(data map[string][]byte, node, public, cloud string, b
 // ValidateReceiveSiteLegacy checks the immutable projection at journal admission.
 // Source allocation itself is admitted by the controller's mesh snapshot.
 func ValidateReceiveSiteLegacy(path ReceiveSiteLegacy, public string, base PeerListDoc, cloud PeerSpec) error {
+	if path.Tunnel != nil {
+		expected, err := planReceiveSiteTunnel(path.Tunnel.Addresses, public, base, cloud, path.Transit != nil)
+		if err != nil || !reflect.DeepEqual(expected, *path.Tunnel) {
+			return fmt.Errorf("legacy tunnel exception differs from admitted source permissions: %v", err)
+		}
+	}
 	owner, err := receiveLegacySourceOwner(base, path.Sources)
 	if err != nil {
 		return err

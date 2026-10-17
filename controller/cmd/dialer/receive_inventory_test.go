@@ -122,6 +122,10 @@ func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store han
 		if plan.MachineUID != first.MachineUID || view.Round.Phase != handover.Prepare || uid != siteInfo.NodeUID {
 			t.Fatal("wrong target passed to native callback")
 		}
+		sources, found := routes.Sources[uid]
+		if !found || len(sources.Addresses) != 1 || sources.Addresses[0] != "10.90.0.2/24" || len(sources.Hosts) != 0 {
+			t.Fatal("native callback lost the admitted site allocation or invented source exceptions")
+		}
 		selection, found := routes.Receivers[uid]["172.29.0.2/32"]
 		if !found || selection.Interface != client.Interface || len(routes.Receivers[uid]) != 1 || len(routes.Legacy) != 1 || routes.Legacy[first.MachineUID].MachineUID != first.MachineUID {
 			t.Fatal("combined intent lost the other worker or selected the preparing worker")

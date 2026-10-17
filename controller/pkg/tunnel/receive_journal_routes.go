@@ -13,6 +13,7 @@ type ReceiveJournalRoutes struct {
 	Receivers map[string]map[string]ReceiveRouteSelection
 	Legacy    map[string]ReceiveTransitionPlan
 	Plans     map[string]ReceiveTransitionPlan
+	Sources   map[string]ReceiveSiteTunnel
 }
 
 // PlanReceiveJournalRoutes validates the complete caller-admitted journal set
@@ -81,6 +82,21 @@ func PlanReceiveJournalRoutes(snapshots []handover.Snapshot, clusterUID string) 
 		}
 		for node, routes := range active {
 			result.Receivers[node] = routes
+		}
+	}
+	// Old journals remain readable, but a partially upgraded source projection
+	// cannot authorize a shared-table update. Once any plan carries allocations,
+	// the complete set must have a consistent explicit projection.
+	hasSources := false
+	for _, plan := range plans {
+		for _, site := range plan.Sites {
+			hasSources = hasSources || (site.Legacy != nil && site.Legacy.Tunnel != nil)
+		}
+	}
+	if hasSources {
+		result.Sources, err = PlanReceiveSourceRoutes(result)
+		if err != nil {
+			return fail(err)
 		}
 	}
 	return result, nil

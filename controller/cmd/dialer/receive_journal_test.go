@@ -103,6 +103,14 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	plan := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: namespace.Name, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineName: "worker", MachineUID: "machine-uid", AdoptionName: adoption.Name, AdoptionUID: string(adoption.UID), CloudNodeName: "cloud", CloudNodeUID: string(nodes["cloud"].UID), RootPublicKey: root.PublicKey().String(), Base: base, Desired: peer, SiteDesired: siteDoc, Native: []netip.Prefix{}, Ports: map[string]int{site.PublicKey().String(): 51821}, Bindings: map[string]tunnel.ReceiveBinding{site.PublicKey().String(): binding}, Sites: map[string]tunnel.ReceiveTransitionSite{site.PublicKey().String(): {NodeName: "site", NodeUID: string(nodes["site"].UID), Client: client}}}
+	member := plan.Sites[site.PublicKey().String()]
+	member.Legacy = &tunnel.ReceiveSiteLegacy{Sources: []string{"10.90.0.0/24"}, PeerPublicKey: site.PublicKey().String(), Tunnel: &tunnel.ReceiveSiteTunnel{Addresses: []string{"10.90.0.2/24"}, Hosts: []string{}}}
+	plan.Sites[site.PublicKey().String()] = member
+	mesh.Data = map[string][]byte{tunnel.NodePublicKeyPrefix + "site": []byte(site.PublicKey().String()), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.90.0.2/24")}
+	mesh, err = api.CoreV1().Secrets(namespace.Name).Update(ctx, mesh, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	raw, _ := json.Marshal(plan)
 	store := handover.Store{ConfigMaps: api.CoreV1().ConfigMaps(namespace.Name), ClusterUID: "admitted-cluster", Name: tunnel.ReceiveTransitionName(plan.MachineUID), OwnerReferences: []metav1.OwnerReference{{APIVersion: "apps/v1", Kind: "Deployment", Name: "controller", UID: "controller-uid"}}}
 	spec, err := tunnel.ReceiveTransitionSpec(plan, store.ClusterUID, fmt.Sprintf("%x", sha256.Sum256(raw)))
@@ -167,6 +175,36 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 			t.Fatal("read-only admission changed journal")
 		}
 	}
+	t.Run("live-tunnel-allocation", func(t *testing.T) {
+		for _, fault := range []string{"address", "missing", "key"} {
+			changed, err := api.CoreV1().Secrets(namespace.Name).Get(ctx, mesh.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch fault {
+			case "address":
+				changed.Data[tunnel.NodeTunnelAddressPrefix+"site"] = []byte("10.90.0.3/24")
+			case "missing":
+				delete(changed.Data, tunnel.NodeTunnelAddressPrefix+"site")
+			case "key":
+				changed.Data[tunnel.NodePublicKeyPrefix+"site"] = []byte(root.PublicKey().String())
+			}
+			changed, err = api.CoreV1().Secrets(namespace.Name).Update(ctx, changed, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for name, key := range map[string]wgtypes.Key{"cloud": root, "site": site} {
+				if _, err := loadReceiveJournal(ctx, api, store, scope, name, key); err == nil {
+					t.Fatalf("admitted %s with changed %s", name, fault)
+				}
+			}
+			changed.Data = mesh.DeepCopy().Data
+			mesh, err = api.CoreV1().Secrets(namespace.Name).Update(ctx, changed, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
 	t.Run("complete-set-admission", func(t *testing.T) {
 		verifyReceiveSetAdmission(t, api, store, scope, mesh, plan, site)
 	})

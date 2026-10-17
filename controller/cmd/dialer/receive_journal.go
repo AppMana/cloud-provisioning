@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -57,6 +58,19 @@ func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store han
 	if string(mesh.UID) != scope.MeshUID || mesh.DeletionTimestamp != nil {
 		return fail(fmt.Errorf("receiver journal mesh identity changed"))
 	}
+	hasTunnelProjection := false
+	for public, site := range plan.Sites {
+		if site.Legacy == nil || site.Legacy.Tunnel == nil {
+			continue
+		}
+		hasTunnelProjection = true
+		if strings.TrimSpace(string(mesh.Data[tunnel.NodePublicKeyPrefix+site.NodeName])) != public {
+			return fail(fmt.Errorf("receiver site key changed after journal creation"))
+		}
+		if err := tunnel.ValidateReceiveSiteTunnelAllocation(*site.Legacy.Tunnel, mesh.Data, site.NodeName); err != nil {
+			return fail(err)
+		}
+	}
 	adoption, err := api.CoreV1().Secrets(scope.Namespace).Get(ctx, plan.AdoptionName, metav1.GetOptions{})
 	if err != nil {
 		return fail(err)
@@ -78,6 +92,15 @@ func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store han
 	}
 	if string(node.UID) != uid || node.Status.NodeInfo.BootID != boot || node.DeletionTimestamp != nil || !ready {
 		return fail(fmt.Errorf("receiver journal participant identity, boot or readiness changed"))
+	}
+	if hasTunnelProjection {
+		currentMesh, err := api.CoreV1().Secrets(scope.Namespace).Get(ctx, scope.MeshName, metav1.GetOptions{})
+		if err != nil {
+			return fail(err)
+		}
+		if currentMesh.UID != mesh.UID || currentMesh.ResourceVersion != mesh.ResourceVersion || currentMesh.DeletionTimestamp != nil {
+			return fail(fmt.Errorf("receiver mesh allocation changed during admission"))
+		}
 	}
 	current, err := store.Load(ctx)
 	if err != nil {

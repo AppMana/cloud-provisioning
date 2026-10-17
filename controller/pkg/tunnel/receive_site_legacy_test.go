@@ -9,13 +9,13 @@ import (
 func legacySiteFixture() (map[string][]byte, PeerListDoc, string, string) {
 	old, site, cloud := receiverTestKey(8), receiverTestKey(16), receiverTestKey(24)
 	data := map[string][]byte{
-		NodePublicKeyPrefix + "old": []byte(old), SiteAddressesPrefix + "old": []byte("10.10.0.1,2001:db8:1::1"),
+		NodePublicKeyPrefix + "old": []byte(old), NodeTunnelAddressPrefix + "old": []byte("10.88.0.1/24"), SiteAddressesPrefix + "old": []byte("10.10.0.1,2001:db8:1::1"),
 		NodePublicKeyPrefix + "site": []byte(site), NodeAddressesPrefix + "site": []byte("10.10.0.2,2001:db8:1::2"), NodePodCIDRsPrefix + "site": []byte("10.90.0.0/24,2001:db8:90::/64"), NodeTunnelAddressPrefix + "site": []byte("10.88.0.2/24"),
 		RelayPublicKeyKey:              []byte(site),
 		PeerPublicKeyPrefix + "worker": []byte(cloud), PeerEndpointPrefix + "worker": []byte("198.51.100.1:51820"), PeerAllowedIPsPrefix + "worker": []byte("172.29.0.1/32,2001:db8:2::1/128,172.30.0.0/24"), PeerRouteHostsPrefix + "worker": []byte("172.29.0.1,2001:db8:2::1"),
 		PeerPublicKeyPrefix + "other": []byte(receiverTestKey(32)), PeerEndpointPrefix + "other": []byte("198.51.100.2:51820"), PeerAllowedIPsPrefix + "other": []byte("172.29.0.2/32"), PeerRouteHostsPrefix + "other": []byte("172.29.0.2"),
 	}
-	base := PeerListDoc{Peers: []PeerSpec{{PublicKey: old, WGAllowedIPs: []string{"10.10.0.1/32", "2001:db8:1::1/128", "10.10.0.2/32", "2001:db8:1::2/128", "10.90.0.0/24", "2001:db8:90::/64"}, RouteHosts: []string{"10.10.0.1", "2001:db8:1::1", "10.10.0.2", "2001:db8:1::2"}, TransitHosts: []string{"10.10.0.2", "2001:db8:1::2"}}}}
+	base := PeerListDoc{Peers: []PeerSpec{{PublicKey: old, WGAllowedIPs: []string{"10.88.0.1/32", "10.10.0.1/32", "2001:db8:1::1/128", "10.10.0.2/32", "2001:db8:1::2/128", "10.90.0.0/24", "2001:db8:90::/64"}, RouteHosts: []string{"10.10.0.1", "2001:db8:1::1", "10.10.0.2", "2001:db8:1::2"}, TransitHosts: []string{"10.10.0.2", "2001:db8:1::2"}}}}
 	return data, base, site, cloud
 }
 
@@ -59,10 +59,10 @@ func TestReceiveSiteLegacyRejectsUnboundSourcesAndNextHops(t *testing.T) {
 			case "unaccepted-source":
 				data[NodeAddressesPrefix+"site"] = []byte("10.10.0.3")
 			case "split-owner":
-				base.Peers[0].WGAllowedIPs = base.Peers[0].WGAllowedIPs[:4]
+				base.Peers[0].WGAllowedIPs = base.Peers[0].WGAllowedIPs[:5]
 				base.Peers = append(base.Peers, PeerSpec{PublicKey: site, WGAllowedIPs: []string{"10.90.0.0/24", "2001:db8:90::/64"}})
 			case "partial-pod-block":
-				base.Peers[0].WGAllowedIPs[4] = "10.90.0.0/25"
+				base.Peers[0].WGAllowedIPs[5] = "10.90.0.0/25"
 			case "missing-relay":
 				delete(data, NodePublicKeyPrefix+"old")
 			case "duplicate-relay":
@@ -70,7 +70,7 @@ func TestReceiveSiteLegacyRejectsUnboundSourcesAndNextHops(t *testing.T) {
 			case "missing-gateway":
 				delete(data, SiteAddressesPrefix+"old")
 			case "unaccepted-gateway":
-				base.Peers[0].WGAllowedIPs[0] = "10.10.0.9/32"
+				base.Peers[0].WGAllowedIPs[1] = "10.10.0.9/32"
 			case "relayed-gateway":
 				data[SiteAddressesPrefix+"old"] = []byte("10.10.0.2,2001:db8:1::2")
 			case "missing-family":

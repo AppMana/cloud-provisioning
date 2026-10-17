@@ -39,7 +39,7 @@ func retireReceiveDevice(devices receiverDevices, selection receiveRouteSelectio
 	}
 	link, err := netlink.LinkByName(selection.Interface)
 	if isLinkNotFound(err) {
-		return nil
+		return removeReceiveSysctlPolicy(selection.Interface, selection.Alias)
 	}
 	if err != nil {
 		return err
@@ -102,7 +102,7 @@ func retireReceiveDevice(devices receiverDevices, selection receiveRouteSelectio
 	if _, err := netlink.LinkByName(selection.Interface); !isLinkNotFound(err) {
 		return fmt.Errorf("receiver absence not established after retirement: %v", err)
 	}
-	return nil
+	return removeReceiveSysctlPolicy(selection.Interface, selection.Alias)
 }
 
 // Linux installs this address-independent multicast route when a device comes

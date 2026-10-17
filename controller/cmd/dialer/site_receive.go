@@ -44,6 +44,9 @@ func prepareSiteReceiveClient(devices receiverDevices, mesh string, siteKey wgty
 		if !isLinkNotFound(err) {
 			return tunnel.SiteReceiveClient{}, err
 		}
+		if err := persistReceiveSysctlPolicy(plan.Interface, alias); err != nil {
+			return tunnel.SiteReceiveClient{}, err
+		}
 		attrs := netlink.NewLinkAttrs()
 		attrs.Name = plan.Interface
 		attrs.MTU = mtu

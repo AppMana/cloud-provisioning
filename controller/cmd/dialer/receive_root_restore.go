@@ -34,6 +34,9 @@ func restoreReceiveRoot(ctx context.Context, devices receiverDevices, cfg config
 		if mtu < 1280 || mtu > 65535 {
 			return fmt.Errorf("root recovery requires a valid MTU")
 		}
+		if err := persistReceiveSysctlPolicy(cfg.iface, alias); err != nil {
+			return err
+		}
 		link, err = createWireGuardLink(cfg, mtu)
 		if err != nil {
 			return err

@@ -156,6 +156,20 @@ func assertAgentSysctlAccess(t *testing.T, ds *appsv1.DaemonSet) {
 	t.Helper()
 	pod := ds.Spec.Template.Spec
 	agent := pod.Containers[0]
+	policyMounted := false
+	for _, mount := range agent.VolumeMounts {
+		if mount.MountPath != tunnel.HostSysctlDirectory || mount.ReadOnly {
+			continue
+		}
+		for _, volume := range pod.Volumes {
+			if volume.Name == mount.Name && volume.HostPath != nil && volume.HostPath.Path == "/etc/sysctl.d" {
+				policyMounted = true
+			}
+		}
+	}
+	if !policyMounted || !strings.Contains(strings.Join(agent.Args, "\n"), "--receive-sysctl-directory="+tunnel.HostSysctlDirectory) {
+		t.Fatal("agent cannot publish owned-interface policy for the host sysctl loader")
+	}
 	if !pod.HostNetwork || agent.SecurityContext == nil || (agent.SecurityContext.Privileged != nil && *agent.SecurityContext.Privileged) {
 		t.Fatal("agent must use host networking without requiring privileged mode")
 	}

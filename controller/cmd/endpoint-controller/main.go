@@ -1872,6 +1872,7 @@ func (r *meshReconciler) ensureDialerDaemonSet(ctx context.Context) error {
 		},
 	}
 
+	configureReceiveSysctlPolicy(desired)
 	r.configureReceiptAgent(desired)
 	existing := &appsv1.DaemonSet{}
 	err := r.reader.Get(ctx, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, existing)
@@ -2219,6 +2220,7 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 		c := &desired.Spec.Template.Spec.Containers[0]
 		c.Args = append(c.Args, "--install-host-binary=/host-bin/wg-dialer")
 	}
+	configureReceiveSysctlPolicy(desired)
 	r.configureReceiptAgent(desired)
 
 	existing := &appsv1.DaemonSet{}

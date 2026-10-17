@@ -89,6 +89,9 @@ func prepareReceivePaths(devices receiverDevices, mesh string, root wgtypes.Key,
 			if !isLinkNotFound(err) {
 				return nil, err
 			}
+			if err := persistReceiveSysctlPolicy(path.Interface, receiverAlias(mesh, path.PublicKey)); err != nil {
+				return nil, err
+			}
 			attrs := netlink.NewLinkAttrs()
 			attrs.Name, attrs.Alias, attrs.MTU = path.Interface, receiverAlias(mesh, path.PublicKey), mtu
 			if err := netlink.LinkAdd(&netlink.GenericLink{LinkAttrs: attrs, LinkType: "wireguard"}); err != nil {

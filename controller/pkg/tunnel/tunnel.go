@@ -741,6 +741,9 @@ func TunnelAddress6(prefix6, addr4 string) (string, error) {
 // it name it here.
 const HostSysctlNet = "/host/proc/sys/net"
 
+// HostSysctlDirectory carries explicit owned-interface policy for host udev.
+const HostSysctlDirectory = "/host/etc/sysctl.d"
+
 // siteNodeNames lists the site nodes that terminate no tunnel, in a
 // stable order so the accept list does not change shape between passes.
 func siteNodeNames(data map[string][]byte) []string {

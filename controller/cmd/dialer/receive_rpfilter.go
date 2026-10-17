@@ -25,6 +25,9 @@ func ensureReceiveReversePathFiltering(name, alias string) error {
 	if err := checkOwner(); err != nil {
 		return err
 	}
+	if err := persistReceiveSysctlPolicy(name, alias); err != nil {
+		return err
+	}
 	const prefix = "ipv4/conf/"
 	read := func(name string) (int, error) {
 		raw, err := readSysctl(prefix + name + "/rp_filter")

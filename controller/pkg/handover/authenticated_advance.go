@@ -24,6 +24,16 @@ type PodReceipt struct {
 // This never retries a conflict, renews an expired round, or publishes an
 // uncommitted successor. A caller may publish only the returned snapshot.
 func (s Store) AdvanceWithPodReceipts(ctx context.Context, expectedRoundHash string, submissions []PodReceipt, policies map[string]PodReceiptAuthenticator) (Snapshot, error) {
+	return s.commitPodReceipts(ctx, expectedRoundHash, submissions, policies, true)
+}
+
+// ObserveWithPodReceipts authenticates partial native completion and commits it
+// for same-round dependencies. It neither advances nor extends the round.
+func (s Store) ObserveWithPodReceipts(ctx context.Context, expectedRoundHash string, submissions []PodReceipt, policies map[string]PodReceiptAuthenticator) (Snapshot, error) {
+	return s.commitPodReceipts(ctx, expectedRoundHash, submissions, policies, false)
+}
+
+func (s Store) commitPodReceipts(ctx context.Context, expectedRoundHash string, submissions []PodReceipt, policies map[string]PodReceiptAuthenticator, advance bool) (Snapshot, error) {
 	previous, err := s.Load(ctx)
 	if err != nil {
 		return Snapshot{}, err
@@ -36,7 +46,7 @@ func (s Store) AdvanceWithPodReceipts(ctx context.Context, expectedRoundHash str
 	if err != nil || expectedRoundHash == "" || digest != expectedRoundHash || view.Complete {
 		return Snapshot{}, fmt.Errorf("receipt submission does not target the current unfinished round")
 	}
-	if len(submissions) != len(view.Round.Members) {
+	if len(submissions) == 0 || len(submissions) > len(view.Round.Members) || (advance && len(submissions) != len(view.Round.Members)) {
 		return Snapshot{}, fmt.Errorf("receipt submission does not cover the complete round")
 	}
 	members := make(map[[2]string]bool, len(view.Round.Members))
@@ -59,7 +69,12 @@ func (s Store) AdvanceWithPodReceipts(ctx context.Context, expectedRoundHash str
 	}
 	// Time is sampled after authentication: slow API calls cannot extend a
 	// round's validity or turn an observation that aged out into current proof.
-	next, err := previous.Transition().Advance(time.Now(), proofs)
+	var next Transition
+	if advance {
+		next, err = previous.Transition().Advance(time.Now(), proofs)
+	} else {
+		next, err = previous.Transition().Observe(time.Now(), proofs)
+	}
 	if err != nil {
 		return Snapshot{}, err
 	}

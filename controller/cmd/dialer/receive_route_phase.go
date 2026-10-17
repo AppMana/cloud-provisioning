@@ -211,6 +211,11 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 	if targetLegacy != wantLegacy {
 		return fmt.Errorf("native route direction differs from committed phase")
 	}
+	if view.Round.Phase == handover.Switch {
+		if err := verifyReceiveRelayDependencies(intent, nodeUID, plan.MachineUID, view, time.Now()); err != nil {
+			return err
+		}
+	}
 	live, err := devices.Device(cfg.iface)
 	if err != nil {
 		return err

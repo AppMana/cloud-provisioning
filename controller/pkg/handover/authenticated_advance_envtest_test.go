@@ -23,7 +23,7 @@ func (r receiptRaceConfigMaps) Update(ctx context.Context, object *corev1.Config
 	if err != nil {
 		return nil, err
 	}
-	current.Annotations = map[string]string{"concurrent-writer": "updated"}
+	current.Annotations = map[string]string{"concurrent-writer": current.ResourceVersion}
 	if _, err := r.ConfigMapInterface.Update(ctx, current, options); err != nil {
 		return nil, err
 	}
@@ -104,6 +104,11 @@ func verifyAuthenticatedAdvancement(t *testing.T, verifier PodReceiptAuthenticat
 			case "missing-policy":
 				configured = map[string]PodReceiptAuthenticator{}
 			}
+			if fault != "partial" {
+				if _, err := store.ObserveWithPodReceipts(ctx, digest, batch, configured); err == nil {
+					t.Fatal("invalid observation changed the journal")
+				}
+			}
 			if _, err := store.AdvanceWithPodReceipts(ctx, digest, batch, configured); err == nil {
 				t.Fatal("invalid batch advanced the journal")
 			}
@@ -116,6 +121,16 @@ func verifyAuthenticatedAdvancement(t *testing.T, verifier PodReceiptAuthenticat
 			}
 		})
 	}
+	for i := range submissions {
+		observed, err := store.ObserveWithPodReceipts(ctx, digest, submissions[i:i+1], policies)
+		if err != nil {
+			t.Fatal(err)
+		}
+		v, err := observed.Transition().View()
+		if err != nil || !reflect.DeepEqual(v.Round, view.Round) || len(v.Observed) != i+1 {
+			t.Fatal("partial progress advanced or lost its round", err)
+		}
+	}
 	next, err := store.AdvanceWithPodReceipts(ctx, digest, submissions, policies)
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +139,7 @@ func verifyAuthenticatedAdvancement(t *testing.T, verifier PodReceiptAuthenticat
 	if err != nil {
 		t.Fatal(err)
 	}
-	if advanced.Round.Phase != Switch || advanced.Round.Nonce == view.Round.Nonce {
+	if advanced.Round.Phase != Switch || advanced.Round.Nonce == view.Round.Nonce || len(advanced.Observed) != 0 {
 		t.Fatal("verified batch did not commit exactly the next round")
 	}
 	persisted, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
@@ -166,6 +181,9 @@ func verifyAuthenticatedAdvancement(t *testing.T, verifier PodReceiptAuthenticat
 		t.Fatal(err)
 	}
 	racing.ConfigMaps = receiptRaceConfigMaps{store.ConfigMaps}
+	if _, err := racing.ObserveWithPodReceipts(ctx, digest, submissions[:1], policies); !apierrors.IsConflict(err) {
+		t.Fatal("observation ignored concurrent writer", err)
+	}
 	if _, err := racing.AdvanceWithPodReceipts(ctx, digest, submissions, policies); !apierrors.IsConflict(err) {
 		t.Fatal("receipt advancement retried or ignored a concurrent writer", err)
 	}

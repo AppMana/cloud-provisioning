@@ -39,9 +39,13 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 		}
 	}
 	var request struct {
-		Plan    tunnel.ReceiveTransitionPlan `json:"plan"`
-		KeyFile string                       `json:"keyFile"`
-		Action  string                       `json:"action"`
+		Plan       tunnel.ReceiveTransitionPlan `json:"plan"`
+		KeyFile    string                       `json:"keyFile"`
+		Action     string                       `json:"action"`
+		NodeName   string                       `json:"nodeName"`
+		Setup      bool                         `json:"setup"`
+		StateFile  string                       `json:"stateFile"`
+		ExpectWait bool                         `json:"expectWait"`
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -120,6 +124,20 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 	default:
 		t.Fatal("unsupported test action")
 	}
+	if request.StateFile != "" {
+		stored, err := os.ReadFile(request.StateFile)
+		if err == nil {
+			tr, err = handover.DecodeTransition(stored)
+		} else if os.IsNotExist(err) {
+			stored, err = tr.Bytes()
+			if err == nil {
+				err = os.WriteFile(request.StateFile, stored, 0600)
+			}
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	view, err := tr.View()
 	if err != nil {
 		t.Fatal(err)
@@ -128,12 +146,140 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	intent := tunnel.ReceiveJournalRoutes{Plans: map[string]tunnel.ReceiveTransitionPlan{plan.MachineUID: plan}, Legacy: map[string]tunnel.ReceiveTransitionPlan{}, Receivers: receivers}
+	intent := tunnel.ReceiveJournalRoutes{Views: map[string]handover.View{plan.MachineUID: view}, Plans: map[string]tunnel.ReceiveTransitionPlan{plan.MachineUID: plan}, Legacy: map[string]tunnel.ReceiveTransitionPlan{}, Receivers: receivers}
 	if reverse || request.Action == "prepare" || request.Action == "abort" {
 		intent.Legacy[plan.MachineUID] = plan
 		intent.Receivers = map[string]map[string]tunnel.ReceiveRouteSelection{}
+		for node := range receivers {
+			intent.Receivers[node] = map[string]tunnel.ReceiveRouteSelection{}
+		}
+	}
+	for _, site := range plan.Sites {
+		if site.Legacy != nil && site.Legacy.Tunnel != nil {
+			intent.Sources, err = tunnel.PlanReceiveSourceRoutes(intent)
+			if err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
 	}
 	cfg := config{iface: "wglegacy", nodeName: plan.CloudNodeName, routeTable: 518, fwmark: 518, mtu: 1400}
+	publish := func(nodeUID string) {
+		if request.StateFile == "" {
+			return
+		}
+		digest, err := view.Round.Digest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now()
+		var proofs []handover.AuthenticatedReceipt
+		for _, m := range view.Round.Members {
+			if m.NodeUID != nodeUID {
+				continue
+			}
+			proofs = append(proofs, handover.AuthenticatedReceipt{AuthenticatedNodeUID: nodeUID, Receipt: handover.Receipt{NodeUID: nodeUID, DeviceID: m.DeviceID, RoundHash: digest, FromKey: m.FromKey, ToKey: m.ToKey, FromPeerKey: m.FromPeerKey, ToPeerKey: m.ToPeerKey, ObservedAt: now}})
+		}
+		next, err := tr.Observe(now, proofs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stored, err := next.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(request.StateFile, stored, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if request.NodeName != "" || request.Setup {
+		nodeUID, addresses := plan.CloudNodeUID, []string{"10.88.0.3/32"}
+		if request.NodeName != "" {
+			site, found := plan.Sites[key.PublicKey().String()]
+			if !found || site.NodeName != request.NodeName || site.Legacy == nil || site.Legacy.Tunnel == nil {
+				t.Fatal("site fixture lacks committed identity or allocation")
+			}
+			cfg.nodeName, cfg.iface = site.NodeName, "wglegacytest"
+			nodeUID, addresses = site.NodeUID, site.Legacy.Tunnel.Addresses
+		}
+		if request.Setup {
+			// Establish the experiment's initial applied generation, using the
+			// same route operations as normal reconciliation. Phase execution
+			// below never repairs a fixture or substitutes for product behavior.
+			var peers []tunnel.PeerSpec
+			var sourceHosts []net.IPNet
+			cfg.receiveRouteScope = map[string]bool{}
+			if request.NodeName == "" {
+				var base tunnel.PeerListDoc
+				if err := json.Unmarshal(plan.Base, &base); err != nil {
+					t.Fatal(err)
+				}
+				for _, peer := range base.Peers {
+					if !peer.Remote {
+						peers = append(peers, peer)
+					}
+				}
+			} else {
+				peer, err := receiveSiteLegacyPeer(plan, key.PublicKey().String())
+				if err != nil {
+					t.Fatal(err)
+				}
+				peers = append(peers, peer)
+				site := plan.Sites[key.PublicKey().String()]
+				cfg.receiveRelayRoutes = map[string]string{}
+				if site.Legacy.Transit != nil {
+					for raw := range receivers[nodeUID] {
+						_, dst, _ := net.ParseCIDR(raw)
+						cfg.receiveRelayRoutes[raw] = site.Legacy.Transit.Gateway(dst.IP).String()
+					}
+				}
+				for _, raw := range site.Legacy.Tunnel.Hosts {
+					_, dst, _ := net.ParseCIDR(raw)
+					sourceHosts = append(sourceHosts, *dst)
+				}
+			}
+			for _, peer := range peers {
+				for _, raw := range peer.WGAllowedIPs {
+					cfg.receiveRouteScope[raw] = true
+				}
+				for _, raw := range peer.AllRouteHosts() {
+					cfg.receiveRouteScope[tunnel.HostCIDR(raw)] = true
+				}
+			}
+			var hosts []net.IPNet
+			for raw := range cfg.receiveRouteScope {
+				_, dst, _ := net.ParseCIDR(raw)
+				hosts = append(hosts, *dst)
+			}
+			if err := installRoutes(cfg, hosts, nil, nil, nil, nil, nil); err != nil {
+				t.Fatal(err)
+			}
+			if err := reconcileTunnelSourceRoutes(cfg, addresses, sourceHosts); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+		if request.ExpectWait {
+			before, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = receiveLinuxPhase(context.Background(), devices, cfg, key, nil, addresses, plan, view, nodeUID, intent)
+			if err == nil || !strings.Contains(err.Error(), "relay forwarding dependency") {
+				t.Fatal("unsafe switch did not wait for its relay", err)
+			}
+			after, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
+			if err != nil || !reflect.DeepEqual(before, after) {
+				t.Fatal("waiting switch changed workload routes", err)
+			}
+			return
+		}
+		if err := receiveLinuxPhase(context.Background(), devices, cfg, key, nil, addresses, plan, view, nodeUID, intent); err != nil {
+			t.Fatal(err)
+		}
+		publish(nodeUID)
+		return
+	}
 	// Protect an unrelated worker route in both the private and main tables.
 	legacy, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
@@ -430,6 +576,7 @@ func TestNativeReceiveRoutePhase(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	publish(plan.CloudNodeUID)
 }
 
 func samePeerConfiguration(a, b []wgtypes.Peer) bool {

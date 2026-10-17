@@ -10,6 +10,7 @@ import (
 // entries must be compiled alongside Receivers; an empty receiver map does not
 // authorize deleting the legacy routes. Keys in Legacy are immutable Machine UIDs.
 type ReceiveJournalRoutes struct {
+	Views     map[string]handover.View
 	Receivers map[string]map[string]ReceiveRouteSelection
 	Legacy    map[string]ReceiveTransitionPlan
 	Plans     map[string]ReceiveTransitionPlan
@@ -32,6 +33,7 @@ func PlanReceiveJournalRoutes(snapshots []handover.Snapshot, clusterUID string) 
 	plans := make([]ReceiveTransitionPlan, 0, len(snapshots))
 	var selected []ReceiveTransitionPlan
 	legacy := map[string]ReceiveTransitionPlan{}
+	views := map[string]handover.View{}
 	for _, snapshot := range snapshots {
 		plan, err := DecodeReceiveTransition(snapshot, clusterUID)
 		if err != nil {
@@ -41,6 +43,7 @@ func PlanReceiveJournalRoutes(snapshots []handover.Snapshot, clusterUID string) 
 		if err != nil {
 			return fail(err)
 		}
+		views[plan.MachineUID] = view
 		generation := view.ServingGeneration
 		if !view.Complete {
 			switch view.Round.Phase {
@@ -68,7 +71,7 @@ func PlanReceiveJournalRoutes(snapshots []handover.Snapshot, clusterUID string) 
 	if err != nil {
 		return fail(err)
 	}
-	result := ReceiveJournalRoutes{Receivers: map[string]map[string]ReceiveRouteSelection{}, Legacy: legacy, Plans: map[string]ReceiveTransitionPlan{}}
+	result := ReceiveJournalRoutes{Views: views, Receivers: map[string]map[string]ReceiveRouteSelection{}, Legacy: legacy, Plans: map[string]ReceiveTransitionPlan{}}
 	for _, plan := range plans {
 		result.Plans[plan.MachineUID] = plan
 	}

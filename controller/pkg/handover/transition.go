@@ -21,6 +21,7 @@ type operation string
 
 const (
 	advance  operation = "advance"
+	observe  operation = "observe"
 	rollback operation = "rollback"
 	renew    operation = "renew"
 )
@@ -45,6 +46,7 @@ type journal struct {
 // committed before their rounds are published or any native action is taken.
 type Transition struct{ j journal }
 type View struct {
+	Observed          []Receipt // authenticated observations for this exact current round
 	Round             Round
 	RollbackRequested bool
 	Complete          bool
@@ -110,6 +112,36 @@ func (t Transition) View() (View, error) {
 		}
 		expected := v.Round.Spec
 		switch ev.Operation {
+		case observe:
+			if ev.Next != nil {
+				return View{}, fmt.Errorf("observation cannot replace the committed round")
+			}
+			proofs := make([]AuthenticatedReceipt, len(ev.Receipts))
+			for i, receipt := range ev.Receipts {
+				proofs[i] = AuthenticatedReceipt{AuthenticatedNodeUID: receipt.NodeUID, Receipt: receipt}
+			}
+			if e = v.Round.ValidateReceipts(ev.At, proofs); e != nil {
+				return View{}, e
+			}
+			byMember := map[[2]string]Receipt{}
+			for _, receipt := range v.Observed {
+				byMember[[2]string{receipt.NodeUID, receipt.DeviceID}] = receipt
+			}
+			for _, receipt := range ev.Receipts {
+				id := [2]string{receipt.NodeUID, receipt.DeviceID}
+				if old, found := byMember[id]; found && receipt.ObservedAt.Before(old.ObservedAt) {
+					return View{}, fmt.Errorf("observation regresses member evidence")
+				}
+				byMember[id] = receipt
+			}
+			v.Observed = nil
+			for _, member := range v.Round.Members {
+				if receipt, found := byMember[[2]string{member.NodeUID, member.DeviceID}]; found {
+					v.Observed = append(v.Observed, receipt)
+				}
+			}
+			last = ev.At
+			continue
 		case advance:
 			proofs := make([]AuthenticatedReceipt, len(ev.Receipts))
 			for i, r := range ev.Receipts {
@@ -188,6 +220,7 @@ func (t Transition) View() (View, error) {
 			nonces[next.Nonce] = true
 			v.Round = next
 		}
+		v.Observed = nil
 		last = ev.At
 	}
 	return v, nil
@@ -227,6 +260,27 @@ func (t Transition) append(ev event) (Transition, error) {
 		return Transition{}, e
 	}
 	return next, nil
+}
+
+// Observe records authenticated partial progress without advancing or renewing.
+// Publication still requires the controller's storage compare-and-swap.
+func (t Transition) Observe(now time.Time, receipts []AuthenticatedReceipt) (Transition, error) {
+	v, err := t.View()
+	if err != nil {
+		return Transition{}, err
+	}
+	if v.Complete {
+		return Transition{}, fmt.Errorf("transition is complete")
+	}
+	if err := v.Round.ValidateReceipts(now, receipts); err != nil {
+		return Transition{}, err
+	}
+	ev := event{Operation: observe, At: now.UTC(), Receipts: make([]Receipt, len(receipts))}
+	for i, proof := range receipts {
+		ev.Receipts[i] = proof.Receipt
+		ev.Receipts[i].ObservedAt = ev.Receipts[i].ObservedAt.UTC()
+	}
+	return t.append(ev)
 }
 
 func (t Transition) Advance(now time.Time, receipts []AuthenticatedReceipt) (Transition, error) {

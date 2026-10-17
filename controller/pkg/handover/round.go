@@ -217,6 +217,16 @@ func (r Round) Digest() (string, error) {
 // authorize retirement without durable phase history and a drain policy.
 // Missing, duplicate, unknown or invalid receipts fail the entire round.
 func (r Round) Ready(now time.Time, receipts []AuthenticatedReceipt) error {
+	return r.validateReceipts(now, receipts, true)
+}
+
+// ValidateReceipts validates a nonempty subset of current round observations.
+// It does not authenticate them, complete the round, or authorize retirement.
+func (r Round) ValidateReceipts(now time.Time, receipts []AuthenticatedReceipt) error {
+	return r.validateReceipts(now, receipts, false)
+}
+
+func (r Round) validateReceipts(now time.Time, receipts []AuthenticatedReceipt, complete bool) error {
 	normalized, e := r.canonical()
 	if e != nil {
 		return e
@@ -229,7 +239,7 @@ func (r Round) Ready(now time.Time, receipts []AuthenticatedReceipt) error {
 	if e != nil {
 		return e
 	}
-	if len(receipts) != len(r.Members) {
+	if len(receipts) == 0 || len(receipts) > len(r.Members) || (complete && len(receipts) != len(r.Members)) {
 		return fmt.Errorf("incomplete handover receipts")
 	}
 	members := map[[2]string]Member{}

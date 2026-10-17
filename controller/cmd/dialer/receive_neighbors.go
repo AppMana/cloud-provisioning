@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
@@ -32,6 +33,9 @@ type receiveNeighborCheckpoint struct {
 	PublicKey    string            `json:"publicKey"`
 	Peers        []tunnel.PeerSpec `json:"peers"`
 	Retiring     []tunnel.PeerSpec `json:"retiring,omitempty"`
+	// Candidates is used only in the retirement sidecar while native growth
+	// is unresolved; the rollback-readable main checkpoint stays unchanged.
+	Candidates []tunnel.PeerSpec `json:"candidates,omitempty"`
 }
 
 // Ordinary peers have independent forwarding authority. This operation keeps
@@ -212,21 +216,21 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		if err := decoder.Decode(&trailing); err != io.EOF {
 			return fmt.Errorf("trailing neighbor checkpoint data")
 		}
-		if previous.Version != 1 || previous.InventoryUID != saved.InventoryUID || previous.MeshUID != saved.MeshUID || previous.NodeUID != saved.NodeUID || previous.BootID == "" || previous.PublicKey != saved.PublicKey || previous.Peers == nil || (source == path && len(previous.Retiring) != 0) {
+		if previous.Version != 1 || previous.InventoryUID != saved.InventoryUID || previous.MeshUID != saved.MeshUID || previous.NodeUID != saved.NodeUID || previous.BootID == "" || previous.PublicKey != saved.PublicKey || previous.Peers == nil || (source == path && (len(previous.Retiring) != 0 || len(previous.Candidates) != 0)) {
 			return fmt.Errorf("neighbor checkpoint identity changed")
 		}
 		prior := previous.Peers
 		if source != path {
 			legacy = false
-			prior = previous.Retiring
+			prior = append(slices.Clone(previous.Retiring), previous.Candidates...)
 		}
 		if err := validateReceiveNeighborSourceGrowth(prior, peers); err != nil {
 			return err
 		}
 		for _, peer := range prior {
-			if !known[peer.PublicKey] {
+			if identity := neighborPermissionIdentity(peer); !known[identity] {
 				previousPeers = append(previousPeers, peer)
-				known[peer.PublicKey] = true
+				known[identity] = true
 			}
 		}
 	}
@@ -248,11 +252,12 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 			}
 			known := map[string]bool{}
 			for _, peer := range previousPeers {
-				known[peer.PublicKey] = true
+				known[neighborPermissionIdentity(peer)] = true
 			}
 			for _, peer := range old {
-				if !known[peer.PublicKey] {
+				if identity := neighborPermissionIdentity(peer); !known[identity] {
 					previousPeers = append(previousPeers, peer)
+					known[identity] = true
 				}
 			}
 		} else if !errors.Is(err, os.ErrNotExist) {
@@ -260,6 +265,20 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		}
 	}
 	retirement := saved
+	// Native installation may fail before or after changing source permissions.
+	// Keep each exact admitted possibility until successful native readback.
+	wanted := map[string]bool{}
+	for _, peer := range peers {
+		wanted[peer.PublicKey] = true
+	}
+	candidates := map[string]bool{}
+	for _, peer := range append(slices.Clone(previousPeers), peers...) {
+		identity := neighborPermissionIdentity(peer)
+		if wanted[peer.PublicKey] && !candidates[identity] {
+			retirement.Candidates = append(retirement.Candidates, peer)
+			candidates[identity] = true
+		}
+	}
 	retirement.Retiring, err = tunnel.PlanReceiveNeighborRetirements(previousPeers, peers, plans)
 	if err != nil {
 		return err
@@ -296,16 +315,20 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	if err := check(); err != nil {
 		return err
 	}
+	// Successful native readback resolves installation ambiguity even if the
+	// separately prepared receiver later fails. Do not retain obsolete variants
+	// as deletion authority after confirming the new permissions.
+	retirement.Retiring = nil
+	retirement.Candidates = nil
+	if err := writeDurableJSON(path+".retiring", retirement); err != nil {
+		return err
+	}
 	if prepare != nil {
 		if err := prepare(ctx, key, mesh, peers, plans, check); err != nil {
 			return err
 		}
 	}
-	if err := check(); err != nil {
-		return err
-	}
-	retirement.Retiring = nil
-	return writeDurableJSON(path+".retiring", retirement)
+	return check()
 }
 
 // Native ordinary-peer reconciliation accepts growth only. Reject unsupported
@@ -332,4 +355,12 @@ func validateReceiveNeighborSourceGrowth(previous, desired []tunnel.PeerSpec) er
 		}
 	}
 	return nil
+}
+
+// Endpoints may roam; retirement authority is the exact key and source set.
+func neighborPermissionIdentity(peer tunnel.PeerSpec) string {
+	sources := slices.Clone(peer.WGAllowedIPs)
+	slices.Sort(sources)
+	raw, _ := json.Marshal(sources)
+	return peer.PublicKey + string(raw)
 }

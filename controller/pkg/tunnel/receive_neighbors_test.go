@@ -126,3 +126,21 @@ func TestReceiveNeighborsRejectConflictingAuthorization(t *testing.T) {
 		})
 	}
 }
+
+func TestReceiveNeighborRetirementPreservesExactGrowthVariants(t *testing.T) {
+	plans := routeSetFixture(t)
+	old := neighborFixture()
+	grown := old
+	grown.WGAllowedIPs = append(append([]string{}, old.WGAllowedIPs...), "172.29.99.1/32")
+	got, err := PlanReceiveNeighborRetirements([]PeerSpec{old, grown}, []PeerSpec{}, plans)
+	if err != nil || !reflect.DeepEqual(got, []PeerSpec{old, grown}) {
+		t.Fatalf("lost exact variants: %+v %v", got, err)
+	}
+	foreign := neighborFixture()
+	foreign.PublicKey = receiverTestKey(121)
+	foreign.WGAllowedIPs = []string{"172.29.99.1/32"}
+	foreign.RouteHosts = nil
+	if _, err := PlanReceiveNeighborRetirements([]PeerSpec{old, grown, foreign}, []PeerSpec{}, plans); err == nil {
+		t.Fatal("variant union stole a different owner's sources")
+	}
+}

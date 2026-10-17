@@ -273,6 +273,35 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 			t.Fatal("retired source owner remains installed")
 		}
 	}
+	// Interrupted growth must permit deletion of either recorded exact state,
+	// while an unrecorded subset or superset remains foreign. This isolated
+	// kernel test does not establish VM reboot or cloud lifecycle continuity.
+	grown := peer
+	grown.WGAllowedIPs = append(append([]string{}, peer.WGAllowedIPs...), "10.77.0.30/32")
+	variants := []tunnel.PeerSpec{peer, grown}
+	for _, installed := range []tunnel.PeerSpec{peer, grown} {
+		must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{installed}, []string{"10.77.0.1"}))
+		must(retireReceiveNeighbors(context.Background(), devices, cfg, root, variants, []string{"10.77.0.1"}, allocated))
+		must(retireReceiveNeighbors(context.Background(), devices, cfg, root, variants, []string{"10.77.0.1"}, allocated))
+	}
+	foreignGrowth := peer
+	foreignGrowth.WGAllowedIPs = append(append([]string{}, grown.WGAllowedIPs...), "10.77.0.31/32")
+	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{foreignGrowth}, []string{"10.77.0.1"}))
+	if err := retireReceiveNeighbors(context.Background(), devices, cfg, root, variants, []string{"10.77.0.1"}, allocated); err == nil {
+		t.Fatal("unrecorded growth was accepted as a recorded variant")
+	}
+	unchanged, err := devices.Device(cfg.iface)
+	must(err)
+	foundForeign := false
+	for _, current := range unchanged.Peers {
+		if current.PublicKey == neighbor {
+			foundForeign = receiveSourcesMatch(foreignGrowth.WGAllowedIPs, current.AllowedIPs)
+		}
+	}
+	if !foundForeign {
+		t.Fatal("rejected retirement changed unrecorded permissions")
+	}
+	must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{foreignGrowth}, []string{"10.77.0.1"}, allocated))
 	replacement, replaced, _ := makeSender("replacement", "10.77.0.3", 51824)
 	peer.PublicKey = replacement.String()
 	peer.Endpoint = "127.0.0.1:51824"

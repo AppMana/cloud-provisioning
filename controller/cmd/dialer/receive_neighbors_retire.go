@@ -32,7 +32,8 @@ func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg co
 	}
 	cfg.receiveRouteScope = map[string]bool{}
 	cfg.receiveRoutes, cfg.receiveRelayRoutes = nil, nil
-	owners := map[wgtypes.Key]tunnel.PeerSpec{}
+	owners := map[wgtypes.Key][]tunnel.PeerSpec{}
+	selected := map[wgtypes.Key]tunnel.PeerSpec{}
 	sourceOwners := map[netip.Prefix]wgtypes.Key{}
 	var prefixes []netip.Prefix
 	for _, peer := range retiring {
@@ -40,28 +41,38 @@ func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg co
 		if err != nil || public == key.PublicKey() || public == (wgtypes.Key{}) || !peer.Remote || len(peer.Transit) != 0 || len(peer.TransitHosts) != 0 || len(peer.WGAllowedIPs) == 0 {
 			return fmt.Errorf("invalid retiring neighbor identity")
 		}
-		if _, duplicate := owners[public]; duplicate {
-			return fmt.Errorf("duplicate retiring neighbor")
-		}
-		owners[public] = peer
+		owners[public] = append(owners[public], peer)
+		selected[public] = peer
+		seenSources := map[netip.Prefix]bool{}
 		for _, raw := range peer.WGAllowedIPs {
 			prefix, err := netip.ParsePrefix(raw)
-			if err != nil || prefix != prefix.Masked() || !prefix.Addr().IsGlobalUnicast() || prefix.Addr().Is4In6() || prefix.Bits() == 0 {
+			if err != nil || prefix != prefix.Masked() || !prefix.Addr().IsGlobalUnicast() || prefix.Addr().Is4In6() || prefix.Bits() == 0 || seenSources[prefix] {
 				return fmt.Errorf("invalid retiring neighbor source")
 			}
+			seenSources[prefix] = true
 			for previous, owner := range sourceOwners {
-				if prefix == previous || (prefix.Overlaps(previous) && owner != public) {
+				if prefix.Overlaps(previous) && owner != public {
 					return fmt.Errorf("retiring neighbor sources overlap")
 				}
 			}
+			if _, found := sourceOwners[prefix]; !found {
+				prefixes = append(prefixes, prefix)
+			}
 			sourceOwners[prefix] = public
-			prefixes = append(prefixes, prefix)
 			cfg.receiveRouteScope[raw] = true
 		}
 	}
 	for _, peer := range live.Peers {
-		if owner, retiring := owners[peer.PublicKey]; retiring {
-			if !receiveSourcesMatch(owner.WGAllowedIPs, peer.AllowedIPs) {
+		if variants, retiring := owners[peer.PublicKey]; retiring {
+			matched := false
+			for _, owner := range variants {
+				if receiveSourcesMatch(owner.WGAllowedIPs, peer.AllowedIPs) {
+					selected[peer.PublicKey] = owner
+					matched = true
+					break
+				}
+			}
+			if !matched {
 				return fmt.Errorf("retiring neighbor source permissions changed")
 			}
 			continue
@@ -134,7 +145,7 @@ func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg co
 	if err := installRoutesWithPolicy(cfg, nil, nil, nil, nil, nil, own, false); err != nil {
 		return err
 	}
-	for _, peer := range retiring {
+	for _, peer := range selected {
 		if err := ctx.Err(); err != nil {
 			return err
 		}

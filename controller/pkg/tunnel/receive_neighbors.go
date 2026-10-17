@@ -26,7 +26,42 @@ func PlanReceiveNeighborRetirements(previous, desired []PeerSpec, plans []Receiv
 			absent = append(absent, peer)
 		}
 	}
-	return PlanReceiveNeighborPeers(absent, plans)
+	// Validate every exact possibility, then their combined scope. Repeated
+	// keys represent interrupted growth, not permission to accept arbitrary
+	// subsets during native retirement.
+	merged := make([]PeerSpec, 0)
+	result := make([]PeerSpec, 0, len(absent))
+	positions := map[string]int{}
+	for _, peer := range absent {
+		admitted, err := PlanReceiveNeighborPeers([]PeerSpec{peer}, plans)
+		if err != nil {
+			return nil, err
+		}
+		if len(admitted) == 0 {
+			continue
+		}
+		peer = admitted[0]
+		result = append(result, peer)
+		if at, found := positions[peer.PublicKey]; found {
+			for _, source := range peer.WGAllowedIPs {
+				if !slices.Contains(merged[at].WGAllowedIPs, source) {
+					merged[at].WGAllowedIPs = append(merged[at].WGAllowedIPs, source)
+				}
+			}
+			for _, host := range peer.RouteHosts {
+				if !slices.Contains(merged[at].RouteHosts, host) {
+					merged[at].RouteHosts = append(merged[at].RouteHosts, host)
+				}
+			}
+		} else {
+			positions[peer.PublicKey] = len(merged)
+			merged = append(merged, peer)
+		}
+	}
+	if _, err := PlanReceiveNeighborPeers(merged, plans); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // PlanReceiveNeighborPeers separates ordinary site peers from journal-owned

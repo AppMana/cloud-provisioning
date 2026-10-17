@@ -332,9 +332,11 @@ Journal-owned peers remain excluded. Changed kernel source permissions or
 foreign routes depending on the retiring peer block withdrawal. A successful
 whole-peer deletion does not qualify source narrowing on a still-published peer,
 allocation churn, or retirement of independently prepared receiver devices.
-The isolated native neighbor test measures direct IPv4 address reuse and an
-unaffected peer's packet stream; it does not measure CAPI cleanup, live-site
-management continuity, IPv6, or AWS bootstrap. Those remain separate cases.
+The isolated native neighbor test measures direct IPv4 and IPv6 address reuse,
+shared connected-subnet preservation, foreign-route rejection and an unaffected
+IPv4 peer's packet stream. Its WireGuard transport is IPv4; it does not measure
+IPv6 transport, an unaffected IPv6 stream, CAPI cleanup, live-site management
+continuity or AWS bootstrap. Those remain separate cases.
 
 For k0s controller maintenance, observe exec and logs through the controllers
 that remain running as well as the endpoint being restarted. Count-driven

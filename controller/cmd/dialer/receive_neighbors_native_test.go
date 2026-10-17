@@ -46,7 +46,7 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 	link := &netlink.GenericLink{LinkAttrs: netlink.LinkAttrs{Name: "neighbors"}, LinkType: "wireguard"}
 	must(netlink.LinkAdd(link))
 	defer netlink.LinkDel(link)
-	addAddrs(t, link, "10.77.0.1/32")
+	addAddrs(t, link, "10.77.0.1/24")
 	must(netlink.LinkSetUp(link))
 	devices, err := wgctrl.New()
 	must(err)
@@ -70,12 +70,16 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 		inNamespace(t, child, parent, func() {
 			live, err := netlink.LinkByName(name)
 			must(err)
-			addAddrs(t, live, address+"/32")
+			mask, network := "/32", "udp4"
+			if net.ParseIP(address).To4() == nil {
+				mask, network = "/128", "udp6"
+			}
+			addAddrs(t, live, address+mask)
 			must(netlink.LinkSetUp(live))
 			must(netlink.RouteAdd(&netlink.Route{LinkIndex: live.Attrs().Index, Dst: target, Scope: netlink.SCOPE_LINK}))
 			must(setSysctl("ipv4/conf/all/rp_filter", "0"))
 			must(setSysctl("ipv4/conf/"+name+"/rp_filter", "0"))
-			conn, err = net.DialUDP("udp4", &net.UDPAddr{IP: net.ParseIP(address)}, &net.UDPAddr{IP: target.IP, Port: 17777})
+			conn, err = net.DialUDP(network, &net.UDPAddr{IP: net.ParseIP(address)}, &net.UDPAddr{IP: target.IP, Port: 17777})
 			must(err)
 		})
 		t.Cleanup(func() { conn.Close() })
@@ -245,9 +249,23 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 	}
 	probe(joining)
 	must(netlink.RouteDel(&foreign))
-	must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}, nil))
+	if err := retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}, nil); err == nil {
+		t.Fatal("retirement adopted an unadmitted connected subnet")
+	}
+	probe(joining)
+	allocated := []string{"10.77.0.1/24"}
+	must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}, allocated))
 	// Repeating a partially or fully completed deletion must be harmless.
-	must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}, nil))
+	must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}, allocated))
+	connected, err := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Table: unix.RT_TABLE_MAIN, LinkIndex: link.Attrs().Index}, netlink.RT_FILTER_TABLE|netlink.RT_FILTER_OIF)
+	must(err)
+	shared := false
+	for _, route := range connected {
+		shared = shared || (route.Dst != nil && route.Dst.String() == "10.77.0.0/24" && route.Protocol == unix.RTPROT_KERNEL)
+	}
+	if !shared {
+		t.Fatal("neighbor retirement removed the shared connected route")
+	}
 	device, err := devices.Device(cfg.iface)
 	must(err)
 	for _, current := range device.Peers {
@@ -260,4 +278,49 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 	peer.Endpoint = "127.0.0.1:51824"
 	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}))
 	probe(replaced)
+	// IPv6 uses the same authenticated underlay but has distinct kernel route
+	// normalization and connected-subnet ownership. Keep the IPv4 stream active.
+	addAddrs(t, link, "fd77::1/64")
+	_, target, _ = net.ParseCIDR("fd77::1/128")
+	listener6, err := net.ListenUDP("udp6", &net.UDPAddr{IP: target.IP, Port: 17777})
+	must(err)
+	defer listener6.Close()
+	go func() {
+		buffer := make([]byte, 128)
+		for {
+			n, remote, err := listener6.ReadFromUDP(buffer)
+			if err != nil {
+				return
+			}
+			_, _ = listener6.WriteToUDP(buffer[:n], remote)
+		}
+	}()
+	old6, sender6, _ := makeSender("old6", "fd77::3", 51825)
+	peer6 := tunnel.PeerSpec{PublicKey: old6.String(), Remote: true, Endpoint: "127.0.0.1:51825", WGAllowedIPs: []string{"fd77::3/128"}, RouteHosts: []string{"fd77::3"}}
+	own6 := []string{"10.77.0.1", "fd77::1"}
+	allocated6 := []string{"10.77.0.1/24", "fd77::1/64"}
+	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer6}, own6))
+	probe(sender6)
+	_, retired6, _ := net.ParseCIDR("fd77::3/128")
+	foreign6 := netlink.Route{LinkIndex: link.Attrs().Index, Dst: retired6, Table: 999, Protocol: unix.RTPROT_STATIC}
+	must(netlink.RouteAdd(&foreign6))
+	if err := retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer6}, own6, allocated6); err == nil {
+		t.Fatal("IPv6 retirement ignored a foreign route dependency")
+	}
+	probe(sender6)
+	must(netlink.RouteDel(&foreign6))
+	if err := retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer6}, own6, nil); err == nil {
+		t.Fatal("IPv6 retirement adopted an unadmitted connected subnet")
+	}
+	probe(sender6)
+	must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer6}, own6, allocated6))
+	must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer6}, own6, allocated6))
+	new6, replacement6, _ := makeSender("new6", "fd77::3", 51826)
+	peer6.PublicKey, peer6.Endpoint = new6.String(), "127.0.0.1:51826"
+	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer6}, own6))
+	probe(replacement6)
+	if exchange(sender6) == nil {
+		t.Fatal("retired IPv6 owner can still send traffic")
+	}
+	probe(replacement6)
 }

@@ -107,7 +107,15 @@ func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg co
 		if route.Dst == nil {
 			return fmt.Errorf("neighbor retirement is blocked by a default route")
 		}
-		if route.Table == cfg.routeTable && cfg.receiveRouteScope[route.Dst.String()] && route.Scope == netlink.SCOPE_LINK && route.Flags == 0 {
+		// Linux normalizes IPv6 unicast routes to universe scope even when
+		// RouteReplace requested link scope. Require the actual family-specific
+		// shape; the preceding preflight still checks protocol, metric, source,
+		// interface and next-hop ownership.
+		scope := netlink.SCOPE_LINK
+		if route.Family == netlink.FAMILY_V6 {
+			scope = netlink.SCOPE_UNIVERSE
+		}
+		if route.Table == cfg.routeTable && cfg.receiveRouteScope[route.Dst.String()] && route.Scope == scope && route.Flags == 0 {
 			continue // The ownership preflight validated this exact route.
 		}
 		prefix, err := netip.ParsePrefix(route.Dst.String())
@@ -116,7 +124,7 @@ func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg co
 		}
 		for _, retired := range prefixes {
 			if prefix.Overlaps(retired) {
-				return fmt.Errorf("neighbor retirement depends on an unowned route")
+				return fmt.Errorf("neighbor retirement depends on unowned route %s in table %d (protocol=%d scope=%d flags=%d)", route.Dst, route.Table, route.Protocol, route.Scope, route.Flags)
 			}
 		}
 	}

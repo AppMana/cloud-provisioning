@@ -182,8 +182,13 @@ persist recovery state, and these API reads cannot fence changes after admission
 
 The checkpoint component records an admitted journal on the existing private
 identity mount under the reconciliation lock, using the atomic durable cache
-writer. Recovery validates its cluster, mesh, machine, node, key and boot, then
-replays the committed history and validates the public plan. Refresh accepts
+writer. Offline recovery validates its cluster, mesh, machine, node, key and
+current boot, then replays the committed history and validates the public plan.
+Live refresh may inspect intent saved during an earlier boot, but replaces it
+only after API admission confirms the same Node UID, its current local boot,
+readiness, mesh and adoption identities, and an unchanged or extended journal.
+The complete inventory and every local journal must pass admission; an interrupted
+refresh cannot omit another worker. Refresh accepts
 only the same journal incarnation and an unchanged or extended history;
 regression, replacement and forks fail without replacing the checkpoint.
 Resource versions are opaque and are not ordered numerically. A valid rollback
@@ -191,8 +196,10 @@ or renewal extends history even though it may revisit an earlier phase.
 
 Checkpointed intent is not evidence of completed native work. It cannot issue
 receipts, advance a phase, or establish that egress already switched. Corrupt
-state and boot changes require explicit recovery; they must not fall back to
-legacy forwarding. Normal reconciliation and shutdown cleanup inspect the
+state remains an error. A boot change requires live admission and fresh native
+verification; it must not fall back to legacy forwarding. Checkpoint refresh
+alone does not restore lost devices or routes, including those selected by a
+completed journal. Normal reconciliation and shutdown cleanup inspect the
 checkpoint inventory under the shared lock before reading legacy inputs or
 changing forwarding. Any persisted handover state blocks those legacy writers,
 including corrupt, unreadable or unknown-version state. They preserve native

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -141,6 +142,86 @@ func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store han
 			t.Fatalf("missing private complete-set checkpoint %s: %v", suffix, err)
 		}
 	}
+	t.Run("live-boot-recovery-of-complete-set", func(t *testing.T) {
+		paths := []string{lockPath + ".inventory.json", lockPath + "." + store.Name + ".json", lockPath + "." + otherStore.Name + ".json"}
+		originals := map[string][]byte{}
+		for _, path := range paths {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			originals[path] = raw
+		}
+		defer func() {
+			for path, raw := range originals {
+				if err := os.WriteFile(path, raw, 0600); err != nil {
+					t.Error(err)
+				}
+			}
+		}()
+		previousBoot := func(path string) []byte {
+			t.Helper()
+			var saved map[string]json.RawMessage
+			if err := json.Unmarshal(originals[path], &saved); err != nil {
+				t.Fatal(err)
+			}
+			saved["bootID"] = json.RawMessage(`"previous-boot"`)
+			raw, err := json.Marshal(saved)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			return raw
+		}
+		oldIndex := previousBoot(paths[0])
+		previousBoot(paths[1])
+		previousBoot(paths[2])
+		before := calls
+		if got, err := executeReceivePhase(ctx, nil, store, scope, cfg, site, "container", verify); err == nil || len(got) != 0 || calls != before {
+			t.Fatal("boot recovery executed without API admission")
+		}
+		// Simulate a crash after updating one local journal but before the rest
+		// of the set. A missing second journal must still fence all native work.
+		if err := os.WriteFile(paths[1], originals[paths[1]], 0600); err != nil {
+			t.Fatal(err)
+		}
+		broken := store
+		broken.ConfigMaps = receiveSetReader{ConfigMapInterface: store.ConfigMaps, before: func(name string) error {
+			if name == otherStore.Name {
+				return apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, name)
+			}
+			return nil
+		}}
+		if got, err := executeReceivePhase(ctx, api, broken, scope, cfg, site, "container", verify); err == nil || len(got) != 0 || calls != before {
+			t.Fatal("incomplete boot recovery executed native work")
+		}
+		raw, err := os.ReadFile(paths[0])
+		if err != nil || !bytes.Equal(raw, oldIndex) {
+			t.Fatal("failed boot recovery advanced inventory", err)
+		}
+		got, err := executeReceivePhase(ctx, api, store, scope, cfg, site, "container", verify)
+		if err != nil || len(got) != 1 || calls != before+1 {
+			t.Fatal("live complete set could not resume interrupted boot admission", err)
+		}
+		boot, err := localReceiveBootID()
+		if err != nil || got[0].BootID != boot {
+			t.Fatal("fresh verification retained old receipt boot", err)
+		}
+		for _, path := range paths {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var saved struct {
+				BootID string `json:"bootID"`
+			}
+			if err := json.Unmarshal(raw, &saved); err != nil || saved.BootID != boot {
+				t.Fatal("checkpoint set retained earlier boot", err)
+			}
+		}
+	})
 	t.Run("missing-other-journal", func(t *testing.T) {
 		broken := store
 		broken.ConfigMaps = receiveSetReader{ConfigMapInterface: store.ConfigMaps, before: func(name string) error {

@@ -166,7 +166,7 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 			return fmt.Errorf("trailing receiver inventory checkpoint data")
 		}
 		a, b := saved.Inventory, admitted.Inventory
-		if saved.Version != 1 || saved.InventoryUID != string(admitted.Metadata.UID) || saved.NodeName != cfg.nodeName || saved.NodeUID != target.NodeUID || saved.BootID != target.BootID || saved.PublicKey != key.PublicKey().String() || a.Version != b.Version || a.ClusterUID != b.ClusterUID || a.Namespace != b.Namespace || a.MeshName != b.MeshName || a.MeshUID != b.MeshUID || a.MachineUIDs == nil {
+		if saved.Version != 1 || saved.InventoryUID != string(admitted.Metadata.UID) || saved.NodeName != cfg.nodeName || saved.NodeUID != target.NodeUID || saved.BootID == "" || saved.PublicKey != key.PublicKey().String() || a.Version != b.Version || a.ClusterUID != b.ClusterUID || a.Namespace != b.Namespace || a.MeshName != b.MeshName || a.MeshUID != b.MeshUID || a.MachineUIDs == nil {
 			return fmt.Errorf("receiver inventory checkpoint identity changed")
 		}
 		previous := ""
@@ -196,6 +196,9 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 			return fmt.Errorf("receiver inventory omitted a checkpointed local journal")
 		}
 	}
+	// Each local journal is re-admitted against the current live Node boot
+	// below before the inventory checkpoint adopts that boot. An interrupted
+	// rewrite may contain both boots; history and inventory identity still fence it.
 	for _, uid := range admitted.Inventory.MachineUIDs {
 		member, local := admitted.Local[uid]
 		if !local {

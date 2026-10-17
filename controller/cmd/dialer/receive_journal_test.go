@@ -302,6 +302,66 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 		if _, err := store.ConfigMaps.Update(ctx, regressed, metav1.UpdateOptions{}); err != nil {
 			t.Fatal(err)
 		}
+		t.Run("previous-boot-needs-live-admission", func(t *testing.T) {
+			var saved receiveJournalCheckpoint
+			if err := json.Unmarshal(good, &saved); err != nil {
+				t.Fatal(err)
+			}
+			saved.BootID = "previous-boot"
+			previousBoot, err := json.Marshal(saved)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, previousBoot, 0600); err != nil {
+				t.Fatal(err)
+			}
+			defer os.WriteFile(path, good, 0600)
+			if _, err := readReceiveJournalCheckpoint(path, store, scope, cfg.nodeName, root); err == nil {
+				t.Fatal("offline recovery admitted an earlier boot")
+			}
+			if _, err := checkpointReceiveJournal(ctx, nil, store, scope, cfg, root); err == nil {
+				t.Fatal("earlier boot refreshed without API admission")
+			}
+			checkUnchanged := func() {
+				t.Helper()
+				raw, err := os.ReadFile(path)
+				if err != nil || !bytes.Equal(raw, previousBoot) {
+					t.Fatal("failed boot admission rewrote checkpoint", err)
+				}
+			}
+			checkUnchanged()
+			currentNode, err := api.CoreV1().Nodes().Get(ctx, cfg.nodeName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			currentNode.Status.NodeInfo.BootID = "previous-boot"
+			currentNode, err = api.CoreV1().Nodes().UpdateStatus(ctx, currentNode, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := checkpointReceiveJournal(ctx, api, store, scope, cfg, root); err == nil {
+				t.Fatal("stale API boot admitted")
+			}
+			checkUnchanged()
+			currentNode.Status.NodeInfo.BootID = boot
+			if _, err := api.CoreV1().Nodes().UpdateStatus(ctx, currentNode, metav1.UpdateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			before, err := store.Load(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := checkpointReceiveJournal(ctx, api, store, scope, cfg, root); err != nil {
+				t.Fatal("live earlier-boot intent could not resume", err)
+			}
+			if _, err := readReceiveJournalCheckpoint(path, store, scope, cfg.nodeName, root); err != nil {
+				t.Fatal("checkpoint did not adopt admitted current boot", err)
+			}
+			after, err := store.Load(ctx)
+			if err != nil || after.Metadata().ResourceVersion != before.Metadata().ResourceVersion {
+				t.Fatal("boot admission changed journal or supplied receipts", err)
+			}
+		})
 		for _, fault := range []string{"truncated", "boot", "key", "node", "scope"} {
 			t.Run(fault, func(t *testing.T) {
 				bad := good[:len(good)/2]
@@ -312,7 +372,7 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 					}
 					switch fault {
 					case "boot":
-						saved.BootID = "another-boot"
+						saved.BootID = ""
 					case "key":
 						saved.PublicKey = site.PublicKey().String()
 					case "node":

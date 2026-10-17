@@ -34,6 +34,12 @@ type recoveredReceiveJournal struct {
 }
 
 func readReceiveJournalCheckpoint(path string, store handover.Store, scope receiveJournalScope, nodeName string, key wgtypes.Key) (recoveredReceiveJournal, error) {
+	return readReceiveJournalCheckpointForAdmission(path, store, scope, nodeName, key, false)
+}
+
+// Only live admission may examine earlier-boot intent. The offline reader above
+// must keep rejecting it; decoding alone never authorizes native work.
+func readReceiveJournalCheckpointForAdmission(path string, store handover.Store, scope receiveJournalScope, nodeName string, key wgtypes.Key, allowPreviousBoot bool) (recoveredReceiveJournal, error) {
 	fail := func(err error) (recoveredReceiveJournal, error) { return recoveredReceiveJournal{}, err }
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -53,7 +59,7 @@ func readReceiveJournalCheckpoint(path string, store handover.Store, scope recei
 	if err != nil {
 		return fail(err)
 	}
-	if saved.Version != 1 || saved.Scope != scope || saved.ClusterUID != store.ClusterUID || saved.NodeName != nodeName || saved.NodeUID == "" || saved.BootID != boot || key == (wgtypes.Key{}) || saved.PublicKey != key.PublicKey().String() {
+	if saved.Version != 1 || saved.Scope != scope || saved.ClusterUID != store.ClusterUID || saved.NodeName != nodeName || saved.NodeUID == "" || (saved.BootID == "" || (!allowPreviousBoot && saved.BootID != boot)) || key == (wgtypes.Key{}) || saved.PublicKey != key.PublicKey().String() {
 		return fail(fmt.Errorf("receiver checkpoint identity or boot changed"))
 	}
 	snapshot, err := store.RestoreCheckpoint(saved.Journal)
@@ -77,8 +83,8 @@ func readReceiveJournalCheckpoint(path string, store handover.Store, scope recei
 // checkpointReceiveJournal serializes admission and durable recording with the
 // existing bootstrap/pod reconciliation lock. It is not a native phase executor.
 // Corrupt or superseded recovery state blocks admission rather than falling back
-// to the legacy peer cache. A new boot requires explicit live recovery before
-// replacing the checkpoint; it cannot reuse an old native observation.
+// to the legacy peer cache. A new boot requires successful live admission and
+// extending journal history before replacement; old observations remain fenced.
 func checkpointReceiveJournal(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key) (admittedReceiveJournal, error) {
 	fail := func(err error) (admittedReceiveJournal, error) { return admittedReceiveJournal{}, err }
 	if scope.MachineUID == "" || store.Name != tunnel.ReceiveTransitionName(scope.MachineUID) {
@@ -95,7 +101,7 @@ func checkpointReceiveJournal(ctx context.Context, api kubernetes.Interface, sto
 // Caller holds the native reconciliation lock through any subsequent action.
 func checkpointReceiveJournalLocked(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, path string) (admittedReceiveJournal, error) {
 	fail := func(err error) (admittedReceiveJournal, error) { return admittedReceiveJournal{}, err }
-	previous, readErr := readReceiveJournalCheckpoint(path, store, scope, cfg.nodeName, key)
+	previous, readErr := readReceiveJournalCheckpointForAdmission(path, store, scope, cfg.nodeName, key, true)
 	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
 		return fail(readErr)
 	}

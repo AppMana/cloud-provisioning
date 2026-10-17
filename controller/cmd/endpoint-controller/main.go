@@ -1227,6 +1227,11 @@ func (r *meshReconciler) refreshAdoptionConfigs(ctx context.Context) error {
 		if err := r.ensureCNINodeAddressForMachine(ctx, &machines.Items[i]); err != nil {
 			failed = append(failed, machines.Items[i].GetName())
 			ctrl.LoggerFrom(ctx).Error(err, "could not re-assert a remote's CNI address", "machine", machines.Items[i].GetName())
+			// Existing published intent still needs expiry recovery when normal
+			// CNI work fails. Never start preparation through this error path.
+			if recoveryErr := r.recoverPublishedReceiveTransition(ctx, &machines.Items[i], time.Now()); recoveryErr != nil {
+				ctrl.LoggerFrom(ctx).Error(recoveryErr, "could not recover a remote's published handover", "machine", machines.Items[i].GetName())
+			}
 			continue
 		}
 		if err := r.ensureAdoptionConfig(ctx, &machines.Items[i]); err != nil {

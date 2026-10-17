@@ -123,7 +123,10 @@ retirement renew their current phase and direction. Recovery appends a fenced
 journal event with a fresh nonce; it never advances from missing receipts or
 changes the committed plan. Completed journals remain unchanged. Omitting this
 setting retains manual recovery. The controller checks on its normal
-reconciliation cadence; API outages can delay recovery. Drain
+reconciliation cadence; API outages can delay recovery. A failed CNI address
+repair does not suppress recovery of an already-published journal. That fallback
+requires its pinned publication UID, never creates or publishes new intent, and
+still reports the CNI failure. Drain
 receipts must be observed after the configured drain deadline.
 
 `Store` saves each successor in a controller-owned ConfigMap using Kubernetes

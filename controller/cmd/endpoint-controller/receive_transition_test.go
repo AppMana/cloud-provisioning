@@ -280,6 +280,7 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 		t.Fatal(err)
 	}
 	original := object.DeepCopy()
+	t.Run("CNI-failure-recovery", func(t *testing.T) { verifyReceiveCNIFailureRecovery(t, r, machine, store, snapshot) })
 	for _, direction := range []string{"forward", "abort", "rollback"} {
 		t.Run(direction, func(t *testing.T) {
 			current, err := store.Load(ctx)

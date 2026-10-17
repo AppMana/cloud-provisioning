@@ -57,6 +57,47 @@ func (r *meshReconciler) reconcileReceivePreparation(ctx context.Context, machin
 	return recoverExpiredReceiveRound(ctx, store, *snapshot, p.Journal.ExpiryRecovery, now)
 }
 
+// recoverPublishedReceiveTransition can run when ordinary CNI reconciliation
+// fails. It must not prepare devices, create journals, or publish pending intent.
+func (r *meshReconciler) recoverPublishedReceiveTransition(ctx context.Context, machine *unstructured.Unstructured, now time.Time) error {
+	p := r.receivePreparation
+	if p == nil || p.Journal == nil || p.Journal.ExpiryRecovery == "" {
+		return nil
+	}
+	if _, err := p.Journal.policy(); err != nil {
+		return err
+	}
+	if machine == nil {
+		return fmt.Errorf("receiver recovery requires a machine identity")
+	}
+	store := r.receiveJournal
+	store.Name = tunnel.ReceiveTransitionName(string(machine.GetUID()))
+	mesh, err := r.receiveTransitionIdentity(ctx, machine, store)
+	if err != nil {
+		return err
+	}
+	inventory, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	publication, found := inventory.Publications[string(machine.GetUID())]
+	if !found || publication.JournalUID == "" {
+		return nil
+	}
+	store.ExpectedUID = publication.JournalUID
+	snapshot, err := store.Load(ctx)
+	if err != nil {
+		return err
+	}
+	if err := checkReceiveTransitionIdentity(snapshot, store.ClusterUID, machine, mesh); err != nil {
+		return err
+	}
+	return recoverExpiredReceiveRound(ctx, store, snapshot, p.Journal.ExpiryRecovery, now)
+}
+
 // recoverExpiredReceiveRound is opt-in controller policy, separate from journal
 // discovery. Recovery appends one fenced event; it never supplies phase receipts.
 func recoverExpiredReceiveRound(ctx context.Context, store handover.Store, snapshot handover.Snapshot, mode string, now time.Time) error {
@@ -94,29 +135,14 @@ func recoverExpiredReceiveRound(ctx context.Context, store handover.Store, snaps
 // Callers must authenticate fresh phase receipts and apply native actions only
 // from committed rounds. A completed journal must be archived before reuse.
 func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *unstructured.Unstructured, store handover.Store, native []netip.Prefix, ports []int, policy handover.Policy, now time.Time) (*handover.Snapshot, error) {
-	if machine == nil || machine.GetUID() == "" || machine.GetNamespace() != r.secretNamespace || store.Name != tunnel.ReceiveTransitionName(string(machine.GetUID())) {
-		return nil, fmt.Errorf("receiver journal requires a scoped machine identity")
-	}
-	mesh := &corev1.Secret{}
-	if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, mesh); err != nil {
+	mesh, err := r.receiveTransitionIdentity(ctx, machine, store)
+	if err != nil {
 		return nil, err
-	}
-	currentMachine := &unstructured.Unstructured{}
-	currentMachine.SetGroupVersionKind(machine.GetObjectKind().GroupVersionKind())
-	if err := r.reader.Get(ctx, client.ObjectKeyFromObject(machine), currentMachine); err != nil {
-		return nil, err
-	}
-	if currentMachine.GetUID() != machine.GetUID() {
-		return nil, fmt.Errorf("receiver inventory machine identity changed")
 	}
 	existing, err := store.Load(ctx)
 	if err == nil {
-		plan, err := tunnel.DecodeReceiveTransition(existing, store.ClusterUID)
-		if err != nil {
+		if err := checkReceiveTransitionIdentity(existing, store.ClusterUID, machine, mesh); err != nil {
 			return nil, err
-		}
-		if plan.MachineUID != string(machine.GetUID()) || plan.MachineName != machine.GetName() || plan.Namespace != r.secretNamespace || plan.MeshUID != string(mesh.UID) || plan.MeshName != mesh.Name {
-			return nil, fmt.Errorf("receiver journal belongs to another machine")
 		}
 		if err := tunnel.ReserveReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, mesh, string(machine.GetUID()), r.owners()); err != nil {
 			return nil, err
@@ -309,4 +335,34 @@ func receiveMachineAddresses(machine *unstructured.Unstructured) []string {
 		}
 	}
 	return result
+}
+
+func (r *meshReconciler) receiveTransitionIdentity(ctx context.Context, machine *unstructured.Unstructured, store handover.Store) (*corev1.Secret, error) {
+	if machine == nil || machine.GetUID() == "" || machine.GetNamespace() != r.secretNamespace || store.Name != tunnel.ReceiveTransitionName(string(machine.GetUID())) {
+		return nil, fmt.Errorf("receiver journal requires a scoped machine identity")
+	}
+	mesh := &corev1.Secret{}
+	if err := r.reader.Get(ctx, types.NamespacedName{Namespace: r.secretNamespace, Name: r.secretName}, mesh); err != nil {
+		return nil, err
+	}
+	currentMachine := &unstructured.Unstructured{}
+	currentMachine.SetGroupVersionKind(machine.GetObjectKind().GroupVersionKind())
+	if err := r.reader.Get(ctx, client.ObjectKeyFromObject(machine), currentMachine); err != nil {
+		return nil, err
+	}
+	if currentMachine.GetUID() != machine.GetUID() {
+		return nil, fmt.Errorf("receiver inventory machine identity changed")
+	}
+	return mesh, nil
+}
+
+func checkReceiveTransitionIdentity(snapshot handover.Snapshot, clusterUID string, machine *unstructured.Unstructured, mesh *corev1.Secret) error {
+	plan, err := tunnel.DecodeReceiveTransition(snapshot, clusterUID)
+	if err != nil {
+		return err
+	}
+	if plan.MachineUID != string(machine.GetUID()) || plan.MachineName != machine.GetName() || plan.Namespace != mesh.Namespace || plan.MeshUID != string(mesh.UID) || plan.MeshName != mesh.Name {
+		return fmt.Errorf("receiver journal belongs to another machine")
+	}
+	return nil
 }

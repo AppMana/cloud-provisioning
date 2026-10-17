@@ -343,6 +343,38 @@ access, Service egress, and continuous management availability. This patch does
 not make a restarted API-server endpoint continuously available or qualify a
 single-controller runtime upgrade.
 
+## Preparing a complete maintenance runtime
+
+Build discovery preparation from the complete patch set so it retains the
+worker restart and streaming fixes. Apply these patches in order to
+`v1.36.4+k0s.1` (`c37fe960bdee93ca14c5a5b9f2ab9700f8e82e60`):
+
+1. `empty-manifest-patches.patch`
+2. `windows-traefik.patch`
+3. `native-linux-egress.patch`
+4. `exec-streaming.patch`
+5. `static-pod-listener.patch`
+6. `static-pod-metadata.patch`
+7. `konnectivity-discovery-preparation.patch`
+8. `calico-cni-api-endpoint.patch`
+
+Keep lease-mode activation separate until preparation has been qualified.
+Run the controller, worker, worker/nllb and both command packages' tests against
+this combined source tree. Cross-compile each supervisor on the build host,
+then use the upstream ZIP and embedding targets to append its matching runtime
+payload. Verify the complete payload inventory and each component hash on every
+platform; a rebuilt supervisor alone does not update embedded executables.
+
+The complete streaming payload includes both the API-server and kubelet from
+Kubernetes revision `f76f8bc3ff781afa28e0dded98227515f9c25e2c` and containerd
+revision `7b2fc110dd8a63fdc87a6809c256066c1082d7c1`. The Kubernetes revision adds
+translator integration tests to the production changes pinned by
+`exec-streaming.patch`. Preserve the distribution's other runtime components.
+Record source and payload digests, architecture and the outer runtime version
+with each package. A build or native version readback is not deployment
+qualification: runtime replacement, first-upgrade static-pod changes, rollback,
+CNI endpoint reachability and reboot recovery still need native observations.
+
 ## Calico CNI API access during boot
 
 `calico-cni-api-endpoint.patch` targets `v1.36.4+k0s.1`. It configures

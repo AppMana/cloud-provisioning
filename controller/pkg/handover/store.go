@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +32,33 @@ type Snapshot struct {
 }
 
 func (s Snapshot) Transition() Transition { return s.transition }
+
+// ContinuesExecution accepts only unchanged state or appended observations in
+// the same journal incarnation. Observations do not change native authority.
+// Renewals, phase changes, history rewrites and other object changes still fence
+// an in-flight execution. This is not a replacement for write-side CAS or live
+// participant, deadline and receipt-incarnation checks.
+func (s Snapshot) ContinuesExecution(previous Snapshot) error {
+	if s.object == nil || previous.object == nil || s.object.UID == "" || s.object.ResourceVersion == "" || previous.object.ResourceVersion == "" || s.object.DeletionTimestamp != nil || previous.object.DeletionTimestamp != nil {
+		return fmt.Errorf("execution requires live journal snapshots")
+	}
+	a, b := s.object.DeepCopy(), previous.object.DeepCopy()
+	a.ResourceVersion, b.ResourceVersion = "", ""
+	a.ManagedFields, b.ManagedFields = nil, nil
+	a.Data[journalKey] = b.Data[journalKey]
+	if !reflect.DeepEqual(a, b) {
+		return fmt.Errorf("journal identity, metadata or public plan changed")
+	}
+	if err := s.transition.Extends(previous.transition); err != nil {
+		return err
+	}
+	for _, event := range s.transition.j.Events[len(previous.transition.j.Events):] {
+		if event.Operation != observe {
+			return fmt.Errorf("journal execution authority changed")
+		}
+	}
+	return nil
+}
 
 // Metadata returns an independent copy for scope and incarnation checks. It
 // exposes no mutable reference to the snapshot used by compare-and-swap.

@@ -209,6 +209,11 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 	t.Run("complete-set-admission", func(t *testing.T) {
 		verifyReceiveSetAdmission(t, api, store, scope, mesh, plan, site)
 	})
+	// Concurrent receipt tests append observations using real API CAS writes.
+	snapshot, err = store.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Run("durable-recovery", func(t *testing.T) {
 		cfg := config{iface: "wgtest", nodeName: "cloud", privateKeyFile: filepath.Join(t.TempDir(), "key")}
 		path := filepath.Join(filepath.Dir(cfg.privateKeyFile), cfg.iface+".reconcile.lock."+store.Name+".json")

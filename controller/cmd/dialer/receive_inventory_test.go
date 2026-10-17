@@ -154,6 +154,62 @@ func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store han
 			t.Fatal("missing other worker permitted native work")
 		}
 	})
+	// Receipt writers may append while a different participant is checking the
+	// same round. Exercise real API CAS writes both during admission and after
+	// native verification; neither may starve that participant's receipt.
+	for _, target := range []handover.Store{store, otherStore} {
+		for _, during := range []string{"read", "native"} {
+			t.Run("observation-during-"+during+"-"+target.Name, func(t *testing.T) {
+				appendObservation := func() error {
+					current, err := target.Load(ctx)
+					if err != nil {
+						return err
+					}
+					v, err := current.Transition().View()
+					if err != nil {
+						return err
+					}
+					hash, err := v.Round.Digest()
+					if err != nil {
+						return err
+					}
+					m := v.Round.Members[0]
+					at := time.Now()
+					proof := handover.AuthenticatedReceipt{AuthenticatedNodeUID: m.NodeUID, Receipt: handover.Receipt{RoundHash: hash, NodeUID: m.NodeUID, DeviceID: m.DeviceID, FromKey: m.FromKey, ToKey: m.ToKey, FromPeerKey: m.FromPeerKey, ToPeerKey: m.ToPeerKey, ObservedAt: at}}
+					next, err := current.Transition().Observe(at, []handover.AuthenticatedReceipt{proof})
+					if err != nil {
+						return err
+					}
+					_, err = target.Commit(ctx, current, next)
+					return err
+				}
+				raced, native := store, verify
+				count := 0
+				if during == "read" {
+					raced.ConfigMaps = receiveSetReader{ConfigMapInterface: store.ConfigMaps, before: func(name string) error {
+						if name == target.Name {
+							count++
+							if count == 2 {
+								return appendObservation()
+							}
+						}
+						return nil
+					}}
+				} else {
+					native = func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, uid string, routes tunnel.ReceiveJournalRoutes) error {
+						if err := verify(ctx, plan, view, uid, routes); err != nil {
+							return err
+						}
+						return appendObservation()
+					}
+				}
+				before := calls
+				if got, err := executeReceivePhase(ctx, api, raced, scope, cfg, site, "container", native); err != nil || len(got) != 1 || calls != before+1 {
+					t.Fatalf("concurrent observation prevented execution or receipt: %v", err)
+				}
+			})
+		}
+	}
 	for _, target := range []string{otherStore.Name, originalIndex.Name} {
 		t.Run("changed-during-read-"+target, func(t *testing.T) {
 			count := 0

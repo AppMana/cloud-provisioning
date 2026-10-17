@@ -132,7 +132,7 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 	if err := phaseCtx.Err(); err != nil {
 		return nil, err
 	}
-	// Re-read live object identities and the exact journal revision. Native
+	// Re-read live object identities and journal execution authority. Native
 	// execution can outlast a phase, deletion, replacement or boot transition.
 	afterNative, err := loadReceiveSet(phaseCtx, api, store, scope, cfg.nodeName, key)
 	if err != nil {

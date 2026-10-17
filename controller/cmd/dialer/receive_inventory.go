@@ -28,7 +28,7 @@ type admittedReceiveSet struct {
 }
 
 // Load every controller-reserved journal, not only the target Machine. A missing
-// entry or a changing revision invalidates the whole observation. Local members
+// entry or changed execution authority invalidates the observation. Local members
 // also undergo live key, Node, boot and adoption admission. This is read-only;
 // neither index membership nor a route plan proves native phase completion.
 func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, nodeName string, key wgtypes.Key) (admittedReceiveSet, error) {
@@ -70,10 +70,11 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 			if err != nil {
 				return fail(err)
 			}
-			if !sameReceiveRevision(snapshot.Metadata(), admitted.Snapshot.Metadata()) {
+			if admitted.Snapshot.ContinuesExecution(snapshot) != nil {
 				return fail(fmt.Errorf("reserved journal changed during local admission"))
 			}
 			result.Local[uid] = admitted
+			snapshot = admitted.Snapshot
 		}
 		result.Journals[uid] = snapshot
 		snapshots = append(snapshots, snapshot)
@@ -93,7 +94,7 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 		if err != nil {
 			return fail(err)
 		}
-		if !sameReceiveRevision(result.Journals[uid].Metadata(), current.Metadata()) {
+		if current.ContinuesExecution(result.Journals[uid]) != nil {
 			return fail(fmt.Errorf("receiver journal set changed during admission"))
 		}
 	}
@@ -117,7 +118,7 @@ func sameReceiveSet(a, b admittedReceiveSet) bool {
 	}
 	for uid, snapshot := range a.Journals {
 		other, found := b.Journals[uid]
-		if !found || !sameReceiveRevision(snapshot.Metadata(), other.Metadata()) {
+		if !found || other.ContinuesExecution(snapshot) != nil {
 			return false
 		}
 	}
@@ -206,7 +207,7 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 		if err != nil {
 			return err
 		}
-		if !sameReceiveRevision(member.Snapshot.Metadata(), saved.Snapshot.Metadata()) || saved.NodeUID != member.NodeUID || saved.BootID != member.BootID {
+		if saved.Snapshot.ContinuesExecution(member.Snapshot) != nil || saved.NodeUID != member.NodeUID || saved.BootID != member.BootID {
 			return fmt.Errorf("receiver set changed while checkpointing")
 		}
 	}

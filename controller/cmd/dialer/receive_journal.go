@@ -110,11 +110,10 @@ func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store han
 	if err != nil {
 		return fail(err)
 	}
-	latest := current.Metadata()
-	if latest.UID != metadata.UID || latest.ResourceVersion != metadata.ResourceVersion || latest.DeletionTimestamp != nil {
+	if current.ContinuesExecution(snapshot) != nil {
 		return fail(fmt.Errorf("receiver journal changed during admission"))
 	}
-	return admittedReceiveJournal{Snapshot: snapshot, Plan: plan, NodeUID: uid, BootID: boot}, nil
+	return admittedReceiveJournal{Snapshot: current, Plan: plan, NodeUID: uid, BootID: boot}, nil
 }
 
 func receiveJournalParticipant(plan tunnel.ReceiveTransitionPlan, scope receiveJournalScope, nodeName string, key wgtypes.Key) (string, error) {

@@ -1,0 +1,20 @@
+{{- $receipts := dig "journal" "receipts" (dict) .Values.tunnel.receivePreparation }}
+{{- if $receipts }}
+{{- $port := last (splitList ":" $receipts.bindAddress) | int }}
+{{- if or (lt $port 1) (gt $port 65535) }}
+{{- fail "Receipt service requires an explicit numeric serving port" }}
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cloud-provisioning.controllerName" . }}-receipts
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: {{ include "cloud-provisioning.controllerName" . }}
+  ports:
+    - name: https-receipts
+      port: {{ $port }}
+      targetPort: {{ $port }}
+      protocol: TCP
+{{- end }}

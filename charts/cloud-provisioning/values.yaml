@@ -76,13 +76,20 @@ cluster:
 # Calico, Cilium, Flannel and kube-router are understood.
 
 tunnel:
-  # Experimental additive preparation only: {nativeCIDRs: [...], ports: [...]}.
+  # Experimental receiver preparation: {nativeCIDRs: [...], ports: [...]}.
   # Supply complete protected cloud network ranges and UDP ports already
   # permitted by the worker security groups. Requires receiver-capable agents.
-  # Freezes active peer updates and retains endpoints; does not switch traffic.
+  # Freezes ordinary peer updates and retains endpoints. Without journal receipt
+  # serving, preparation is additive and does not switch traffic.
   # Optional journal: {roundLifetime: <duration>, maxReceiptAge: <duration>,
-  # drainInterval: <duration>} persists the initial phase without advancing it.
+  # drainInterval: <duration>} persists the initial phase. Optional journal.receipts
+  # enables authenticated advancement: bindAddress, certFile, keyFile, imageIDs
+  # (architecture -> pinned runtime image ID). TLS files must be tls.crt/tls.key
+  # under /etc/cloud-provisioning/receipts. Agents require matching CA trust.
   receivePreparation: {}
+  # Existing TLS Secret for the optional receipt service. The certificate must
+  # cover <controller-name>-receipts.<namespace>.svc. Restart on certificate rotation.
+  receiptTLSSecret: ""
   # Node selector (k=v,k2=v2) choosing which local nodes terminate
   # tunnels. Empty selects every Linux worker; control planes are
   # excluded unless named explicitly. Only the selected nodes get a

@@ -29,6 +29,11 @@ rules:
     resourceNames: ["kube-system"]
     verbs: ["get"]
   {{- end }}
+  {{- if dig "journal" "receipts" (dict) .Values.tunnel.receivePreparation }}
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+  {{- end }}
   {{- if .Values.experimentalNodeGroups }}
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodegroupclaims"]
@@ -173,6 +178,15 @@ rules:
     verbs: ["create", "delete"]
   {{- end }}
   # The leader-election recorder writes Events only in the release namespace.
+  {{- if dig "journal" "receipts" (dict) .Values.tunnel.receivePreparation }}
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    resourceNames: [{{ include "cloud-provisioning.name" . | quote }}]
+    verbs: ["get"]
+  {{- end }}
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["create", "update", "patch"]

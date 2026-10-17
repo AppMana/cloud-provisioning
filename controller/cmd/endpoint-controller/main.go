@@ -2560,6 +2560,22 @@ func main() {
 			fmt.Fprintf(os.Stderr, "receiver journal configuration: %v\n", err)
 			os.Exit(1)
 		}
+		if receiptPolicy := receivePolicy.Journal.Receipts; receiptPolicy != nil {
+			if mesh.dialerCloudImage != "" {
+				fmt.Fprintln(os.Stderr, "receipt advancement requires image-entrypoint cloud agents")
+				os.Exit(1)
+			}
+			handler, err := handover.NewReceiptHandler(func(ctx context.Context, machineUID string) (handover.Store, map[string]handover.PodReceiptAuthenticator, error) {
+				return mesh.resolveReceiveReceipts(ctx, api, *receiptPolicy, machineUID)
+			}, 128)
+			if err == nil {
+				err = mgr.Add(&receiveReceiptServer{policy: *receiptPolicy, handler: handler})
+			}
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "receiver receipt configuration: %v\n", err)
+				os.Exit(1)
+			}
+		}
 	}
 	meshController := ctrl.NewControllerManagedBy(mgr).
 		Named("mesh").

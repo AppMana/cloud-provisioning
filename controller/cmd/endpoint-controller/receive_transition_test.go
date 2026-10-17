@@ -120,6 +120,7 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 		t.Fatal("journal did not preserve the external site's desired direct ownership")
 	}
 	verifyReceiveInventory(t, r, string(machine.GetUID()))
+	verifyReceiveReceiptAdmission(t, r, snapshot, plan)
 	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
 		t.Fatalf("normal reconciliation could not resume its journal: %v", err)
 	}

@@ -21,9 +21,10 @@ type receivePreparationPolicy struct {
 }
 
 type receiveJournalPolicy struct {
-	RoundLifetime metav1.Duration `json:"roundLifetime"`
-	MaxReceiptAge metav1.Duration `json:"maxReceiptAge"`
-	DrainInterval metav1.Duration `json:"drainInterval"`
+	RoundLifetime metav1.Duration       `json:"roundLifetime"`
+	MaxReceiptAge metav1.Duration       `json:"maxReceiptAge"`
+	DrainInterval metav1.Duration       `json:"drainInterval"`
+	Receipts      *receiveReceiptPolicy `json:"receipts,omitempty"`
 }
 
 func (p receiveJournalPolicy) policy() (handover.Policy, error) {
@@ -54,6 +55,11 @@ func parseReceivePreparationPolicy(raw, legacyPort string) (*receivePreparationP
 	if p.Journal != nil {
 		if _, err := p.Journal.policy(); err != nil {
 			return nil, err
+		}
+		if p.Journal.Receipts != nil {
+			if err := p.Journal.Receipts.validate(); err != nil {
+				return nil, err
+			}
 		}
 	}
 	seen := map[netip.Prefix]bool{}

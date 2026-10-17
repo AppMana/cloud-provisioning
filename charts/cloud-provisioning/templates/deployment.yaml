@@ -14,6 +14,13 @@ Deployment patch invalid. */ -}}
 {{- if and .Values.awsGateway.configMap .Values.awsPodObserver.configMap }}
 {{- fail "AWS pod observer and Windows gateway require separate qualified deployments" }}
 {{- end }}
+{{- $receipts := dig "journal" "receipts" (dict) .Values.tunnel.receivePreparation }}
+{{- if $receipts }}
+{{- $_ := required "Receipt serving requires tunnel.receiptTLSSecret" .Values.tunnel.receiptTLSSecret }}
+{{- if or (ne $receipts.certFile "/etc/cloud-provisioning/receipts/tls.crt") (ne $receipts.keyFile "/etc/cloud-provisioning/receipts/tls.key") }}
+{{- fail "Receipt TLS files must use the mounted /etc/cloud-provisioning/receipts directory" }}
+{{- end }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -57,8 +64,13 @@ spec:
       securityContext:
         fsGroup: 65532
       {{- end }}
-      {{- if or .Values.awsGateway.configMap .Values.awsPodObserver.configMap }}
+      {{- if or .Values.awsGateway.configMap .Values.awsPodObserver.configMap $receipts }}
       volumes:
+        {{- if $receipts }}
+        - name: receipt-tls
+          secret:
+            secretName: {{ .Values.tunnel.receiptTLSSecret | quote }}
+        {{- end }}
         {{- with .Values.awsPodObserver.configMap }}
         - name: aws-pod-scope
           configMap:
@@ -83,19 +95,19 @@ spec:
         - name: controller
           image: {{ include "cloud-provisioning.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.awsGateway.configMap }}
+          {{- if or .Values.awsGateway.configMap .Values.awsPodObserver.configMap $receipts }}
           volumeMounts:
+            {{- if $receipts }}
+            - name: receipt-tls
+              mountPath: /etc/cloud-provisioning/receipts
+              readOnly: true
+            {{- end }}
+            {{- if .Values.awsGateway.configMap }}
             - name: aws-gateway-scope
               mountPath: /etc/cloud-provisioning/gateway
               readOnly: true
-          {{- with .Values.awsGateway.credentialsSecret }}
-          envFrom:
-            - secretRef:
-                name: {{ . | quote }}
-          {{- end }}
-          {{- end }}
-          {{- if .Values.awsPodObserver.configMap }}
-          volumeMounts:
+            {{- end }}
+            {{- if .Values.awsPodObserver.configMap }}
             - name: aws-pod-scope
               mountPath: /etc/cloud-provisioning/aws-pods
               readOnly: true
@@ -104,6 +116,16 @@ spec:
               mountPath: /etc/cloud-provisioning/aws-credentials
               readOnly: true
             {{- end }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.awsGateway.configMap }}
+          {{- with .Values.awsGateway.credentialsSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ . | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.awsPodObserver.configMap }}
           {{- with .Values.awsPodObserver.credentialsSecret }}
           envFrom:
             - secretRef:

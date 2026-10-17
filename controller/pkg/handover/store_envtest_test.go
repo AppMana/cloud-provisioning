@@ -144,4 +144,103 @@ func TestStoreAPIServerCAS(t *testing.T) {
 			t.Fatal("deleted/recreated journal accepted stale UID")
 		}
 	}
+	t.Run("completed-archives", func(t *testing.T) {
+		verifyCompletedArchives(t, Store{ConfigMaps: client.CoreV1().ConfigMaps("handover-test"), ClusterUID: "cluster-uid"})
+	})
+}
+
+// Real API coverage: completion, immutable bytes, retry after a lost response,
+// stale source rejection and archive-name collision. This does not exercise
+// native forwarding, generation publication or crash recovery on a host.
+func verifyCompletedArchives(t *testing.T, store Store) {
+	t.Helper()
+	ctx := context.Background()
+	for _, direction := range []string{"forward", "abort", "rollback"} {
+		t.Run(direction, func(t *testing.T) {
+			s := store
+			s.Name = "archive-source-" + direction
+			tr := transportFixture(t)
+			plan := []byte(`{"version":1,"transport":"archive-test"}`)
+			spec := view(t, tr).Round.Spec
+			spec.PlanHash = fmt.Sprintf("%x", sha256.Sum256(plan))
+			tr, err := NewTransition(spec, epoch, tr.j.Policy)
+			if err != nil {
+				t.Fatal(err)
+			}
+			current, err := s.CreateWithPlan(ctx, tr, plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.ArchiveCompleted(ctx, current); err == nil {
+				t.Fatal("archived unfinished transition")
+			}
+			rolled := false
+			for !view(t, current.Transition()).Complete {
+				v := view(t, current.Transition())
+				at := v.Round.IssuedAt.Add(time.Second)
+				var next Transition
+				if !rolled && ((direction == "abort" && v.Round.Phase == Prepare) || (direction == "rollback" && v.Round.Phase == Switch)) {
+					next, err = current.Transition().Rollback(at)
+					if err != nil {
+						t.Fatal(err)
+					}
+					rolled = true
+				} else {
+					if at.Before(v.DrainUntil) {
+						at = v.DrainUntil
+					}
+					next = step(t, current.Transition(), at)
+				}
+				current, err = s.Commit(ctx, current, next)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			archived, err := s.ArchiveCompleted(ctx, current)
+			if err != nil {
+				t.Fatal(err)
+			}
+			again, err := s.ArchiveCompleted(ctx, current)
+			if err != nil || again.Metadata().UID != archived.Metadata().UID {
+				t.Fatalf("retry changed archive: %v", err)
+			}
+			if !bytes.Equal(archived.Plan(), current.Plan()) || archived.object.Data[journalKey] != current.object.Data[journalKey] {
+				t.Fatal("archive lost exact state")
+			}
+			changed := archived.object.DeepCopy()
+			changed.Data[planKey] = "replacement"
+			if _, err := s.ConfigMaps.Update(ctx, changed, metav1.UpdateOptions{}); err == nil {
+				t.Fatal("API accepted archive data mutation")
+			}
+			live, err := s.Load(ctx)
+			if err != nil || live.Metadata().ResourceVersion != current.Metadata().ResourceVersion {
+				t.Fatalf("archival changed source: %v", err)
+			}
+			object := live.object.DeepCopy()
+			object.Annotations = map[string]string{"changed": "true"}
+			if _, err := s.ConfigMaps.Update(ctx, object, metav1.UpdateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.ArchiveCompleted(ctx, current); err == nil {
+				t.Fatal("accepted stale source")
+			}
+			if err := s.ConfigMaps.Delete(ctx, archived.Metadata().Name, metav1.DeleteOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			collision := archived.object.DeepCopy()
+			collision.UID, collision.ResourceVersion = "", ""
+			collision.Data[planKey] = "foreign-plan"
+			live, err = s.Load(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			collision.Annotations["handover.cloud-provisioning.io/source-resource-version"] = live.Metadata().ResourceVersion
+			if _, err := s.ConfigMaps.Create(ctx, collision, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.ArchiveCompleted(ctx, live); err == nil {
+				t.Fatal("accepted foreign archive")
+			}
+		})
+	}
 }

@@ -2022,6 +2022,12 @@ func disposeRouteHost(marked, isEndpointHost, peerCanCarry bool) routeHostDispos
 // Withdrawing a still-claimed API route before a NATed peer completes its
 // handshake can also remove the path needed to read corrective peer state.
 func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relay *tunnel.TransitSpec, relayDsts []net.IPNet, own []string) error {
+	return installRoutesWithPolicy(cfg, routeHosts, claimedHosts, blocks, relay, relayDsts, own, true)
+}
+
+// Completed-journal route recovery leaves shared rule repair to its separately
+// admitted live-mesh reconciler. Ordinary route installation retains its rules.
+func installRoutesWithPolicy(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, relay *tunnel.TransitSpec, relayDsts []net.IPNet, own []string, repairPolicy bool) error {
 	if err := validateReceiveRouteScope(cfg, routeHosts, claimedHosts, blocks, relay, relayDsts); err != nil {
 		return err
 	}
@@ -2075,8 +2081,10 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	// config.routeTable: a route in main is an ownership claim to any
 	// router that learns alien routes there, and these routes are this
 	// node's private knowledge, not claims.
-	if err := ensureRouteRule(cfg.routeTable, cfg.fwmark); err != nil {
-		return fmt.Errorf("ensuring the rule for table %d: %w", cfg.routeTable, err)
+	if repairPolicy {
+		if err := ensureRouteRule(cfg.routeTable, cfg.fwmark); err != nil {
+			return fmt.Errorf("ensuring the rule for table %d: %w", cfg.routeTable, err)
+		}
 	}
 	claimed := map[string]bool{}
 	for _, host := range claimedHosts {
@@ -2190,6 +2198,9 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 			}
 			fmt.Fprintf(os.Stderr, "moved %s out of the main table: the dialer's routes are not the network's to learn\n", route.Dst)
 		}
+	}
+	if !repairPolicy {
+		return verifyReceiveRouteDestinations(cfg, routeHosts, blocks, own)
 	}
 	return verifyReceiveRouteInstallation(cfg, routeHosts, blocks, own)
 }

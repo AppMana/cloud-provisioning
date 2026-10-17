@@ -30,22 +30,22 @@ type receiveNativePhase func(context.Context, tunnel.ReceiveTransitionPlan, hand
 // that work or infer rollback. The next pass must admit the newer committed
 // history. Every other writer must honor the same lock and durable phase state.
 func executeReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase) ([]handover.PodReceipt, error) {
-	return runReceivePhase(ctx, api, store, scope, cfg, key, containerID, native, false)
+	return runReceivePhase(ctx, api, store, scope, cfg, key, containerID, native, false, false)
 }
 
 // Maintenance uses the same live admission, complete-set checkpoint, host lock
 // and post-action fencing as verification, but never emits phase receipts.
 func maintainCompletedReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase) error {
-	_, err := runReceivePhase(ctx, api, store, scope, cfg, key, containerID, native, true)
+	_, err := runReceivePhase(ctx, api, store, scope, cfg, key, containerID, native, true, true)
 	return err
 }
 
 func verifyCompletedReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase) error {
-	_, err := runReceivePhase(ctx, api, store, scope, cfg, key, containerID, native, true)
+	_, err := runReceivePhase(ctx, api, store, scope, cfg, key, containerID, native, true, false)
 	return err
 }
 
-func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase, completedReadback bool) ([]handover.PodReceipt, error) {
+func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase, completedReadback, completedMaintenance bool) ([]handover.PodReceipt, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 		deadline = time.Now().Add(30 * time.Second)
 	}
 	for _, member := range set.Local {
-		if completedReadback {
+		if completedReadback && !completedMaintenance {
 			break
 		} // Readback cannot extend another worker's mutation authority.
 		other, err := member.Snapshot.Transition().View()
@@ -125,6 +125,17 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 		return handover.VerifyObservationIncarnation(phaseCtx, api, scope.Namespace, owner.NodeName, receipt)
 	}
 	checkDependencies := func(routes tunnel.ReceiveJournalRoutes) error {
+		if completedMaintenance {
+			for uid := range set.Local {
+				other := routes.Views[uid]
+				if !other.Complete && other.Round.Phase == handover.Switch {
+					if err := visitReceiveRelayDependencies(routes, admitted.NodeUID, uid, other, time.Now(), checkRelay); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		}
 		if completedReadback || view.Round.Phase != handover.Switch {
 			return nil
 		}

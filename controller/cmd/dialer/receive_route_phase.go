@@ -22,6 +22,24 @@ import (
 // own contains admitted route source addresses; allocated contains the distinct
 // tunnel allocation for the stable address owner. Neither comes from kernel discovery.
 func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, own, allocated []string, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
+	return reconcileReceiveLinuxPhase(ctx, devices, cfg, key, own, allocated, plan, view, nodeUID, intent, false)
+}
+
+// Maintenance restores the admitted combined route selection without replaying
+// retirement. The executor bounds authority by every local unfinished round and
+// verifies its live relay dependencies before and after this callback.
+func restoreCompletedReceiveRoutes(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, own, allocated []string, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
+	if !view.Complete || !reflect.DeepEqual(intent.Views[plan.MachineUID], view) {
+		return fmt.Errorf("route restoration requires exact completed journal intent")
+	}
+	return reconcileReceiveLinuxPhase(ctx, devices, cfg, key, own, allocated, plan, view, nodeUID, intent, true)
+}
+
+func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, own, allocated []string, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes, restore bool) error {
+	verifyInstalled := verifyReceiveRouteInstallation
+	if restore {
+		verifyInstalled = verifyReceiveRouteDestinations
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -261,14 +279,14 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 	if err != nil {
 		return err
 	}
-	if view.Round.Phase != handover.Switch {
+	if view.Round.Phase != handover.Switch && !restore {
 		if err := verifyTunnelSourceRoutes(cfg, sourceAddresses, sourceHosts); err != nil {
 			return err
 		}
 	}
 	allocation := stableAddressOwnerRequest{MeshUID: plan.MeshUID, NodeUID: nodeUID, LegacyInterface: cfg.iface, RootPublicKey: key.PublicKey().String(), Addresses: allocated}
 	if view.Round.Phase == handover.Prepare {
-		if err := verifyReceiveRouteInstallation(cfg, hosts, nil, own); err != nil {
+		if err := verifyInstalled(cfg, hosts, nil, own); err != nil {
 			return err
 		}
 		if _, err := prepareStableAddressOwner(devices, allocation); err != nil {
@@ -288,7 +306,7 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 			return err
 		}
 	}
-	if view.Round.Phase == handover.Switch {
+	if view.Round.Phase == handover.Switch || restore {
 		if err := preflightReceiveRoutePhase(cfg, allRoutes[nodeUID], own, allLegacyRelays, allForwardRelays); err != nil {
 			return err
 		}
@@ -298,12 +316,14 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 		}
 		// Add rollback exceptions before changing egress, but retain forward
 		// exceptions until the replacement egress is installed.
-		stageCfg := cfg
-		stageCfg.receiveSourceRoutes = stagedReceivers
-		if err := reconcileTunnelSourceRoutes(stageCfg, sourceAddresses, staged); err != nil {
-			return err
+		if !restore {
+			stageCfg := cfg
+			stageCfg.receiveSourceRoutes = stagedReceivers
+			if err := reconcileTunnelSourceRoutes(stageCfg, sourceAddresses, staged); err != nil {
+				return err
+			}
 		}
-		if err := installRoutes(cfg, hosts, nil, nil, nil, nil, own); err != nil {
+		if err := installRoutesWithPolicy(cfg, hosts, nil, nil, nil, nil, own, !restore); err != nil {
 			return err
 		}
 		if err := reconcileTunnelSourceRoutes(cfg, sourceAddresses, sourceHosts); err != nil {
@@ -317,7 +337,7 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 		return err
 	}
 	// Deletion never repairs routes to make its safety checks pass.
-	if err := verifyReceiveRouteInstallation(cfg, hosts, nil, own); err != nil {
+	if err := verifyInstalled(cfg, hosts, nil, own); err != nil {
 		return err
 	}
 	if retiringReceivers {
@@ -369,7 +389,7 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 	if _, err := verifyStableAddressOwner(allocation); err != nil && !(view.Round.Phase == handover.Abort && isLinkNotFound(err)) {
 		return err
 	}
-	return verifyReceiveRouteInstallation(cfg, hosts, nil, own)
+	return verifyInstalled(cfg, hosts, nil, own)
 }
 
 // A cloud participant can have retained receive paths with no desired egress.

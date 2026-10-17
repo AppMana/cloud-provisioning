@@ -8,12 +8,14 @@ import (
 	"net/netip"
 	"os"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -69,14 +71,22 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 	spec.Phase = handover.Retire
 	view := handover.View{Round: handover.Round{Spec: spec}, Complete: true, ServingGeneration: spec.ToGeneration}
 	intent := tunnel.ReceiveJournalRoutes{Plans: map[string]tunnel.ReceiveTransitionPlan{plan.MachineUID: plan}, Views: map[string]handover.View{plan.MachineUID: view}, Legacy: map[string]tunnel.ReceiveTransitionPlan{}}
-	cfg := config{iface: "legacy", nodeName: "cloud", mtu: 1400, fwmark: 518}
+	intent.Receivers, err = tunnel.PlanReceiveRoutes(plan)
+	must(err)
+	intent.Sources, err = tunnel.PlanReceiveSourceRoutes(intent)
+	must(err)
+	cfg := config{iface: "legacy", nodeName: "cloud", mtu: 1400, fwmark: 518, routeTable: 518}
 	restore := func() error {
 		return restoreCompletedReceiveState(context.Background(), devices, cfg, root, plan, view, "cloud-uid", intent)
 	}
-	wait := func(action func() error) {
+	wait := func(action func() error, limits ...time.Duration) {
 		t.Helper()
 		started := time.Now()
-		deadline := started.Add(3 * time.Minute)
+		limit := 10 * time.Second
+		if len(limits) != 0 {
+			limit = limits[0]
+		}
+		deadline := started.Add(limit)
 		for {
 			err := action()
 			if err == nil {
@@ -102,15 +112,74 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 		return restoreCompletedReceiveState(context.Background(), devices, siteCfg, site, plan, view, "site-uid", intent)
 	}
 	wait(restoreSite)
-	routes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, 0)
+	// Recreated devices have new indices. Compare route identity by device name
+	// while retaining every selector and attribute in the kernel route record.
+	routeSnapshot := func() []string {
+		t.Helper()
+		routes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, 0)
+		must(err)
+		var result []string
+		for _, route := range routes {
+			name := ""
+			if route.LinkIndex != 0 {
+				link, err := netlink.LinkByIndex(route.LinkIndex)
+				must(err)
+				name = link.Attrs().Name
+			}
+			route.LinkIndex = 0
+			raw, err := json.Marshal(route)
+			must(err)
+			result = append(result, name+string(raw))
+		}
+		sort.Strings(result)
+		return result
+	}
+	// The transport/root/address callback cannot authorize shared policy repair.
+	if err := verifyReceivePolicyRules(cfg); err == nil {
+		t.Fatal("maintenance installed shared policy rules")
+	}
+	must(ensureRouteRule(cfg.routeTable, cfg.fwmark))
+	verify := func() error {
+		return receiveLinuxPhase(context.Background(), devices, cfg, root, nil, plan.CloudAddresses, plan, view, "cloud-uid", intent)
+	}
+	must(verify())
+	owned, err := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
 	must(err)
+	if len(owned) == 0 {
+		t.Fatal("fixture has no selected routes")
+	}
+	original := owned[0]
+	foreignRoute := original
+	foreignRoute.Protocol = unix.RTPROT_STATIC
+	must(netlink.RouteReplace(&foreignRoute))
+	conflict := routeSnapshot()
+	if err := restore(); err == nil {
+		t.Fatal("maintenance adopted conflicting route ownership")
+	}
+	if !reflect.DeepEqual(conflict, routeSnapshot()) {
+		t.Fatal("rejected maintenance changed routes")
+	}
+	must(netlink.RouteDel(&foreignRoute))
+	if err := verify(); err == nil {
+		t.Fatal("readback accepted missing route")
+	}
+	wait(restore)
+	must(verify())
+	// This route lies outside all journal destinations and must survive repair.
+	protected := &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: "protected"}}
+	must(netlink.LinkAdd(protected))
+	must(netlink.LinkSetUp(protected))
+	destination, err := netlink.ParseIPNet("192.0.2.42/32")
+	must(err)
+	must(netlink.RouteAdd(&netlink.Route{LinkIndex: protected.Attrs().Index, Table: cfg.routeTable, Dst: destination, Scope: netlink.SCOPE_LINK, Protocol: unix.RTPROT_STATIC}))
+	routes := routeSnapshot()
 	rules, err := netlink.RuleList(netlink.FAMILY_ALL)
 	must(err)
 	// Lose each selected device in turn while the other endpoint remains live.
 	cloudLink, err := netlink.LinkByName(binding.Interface)
 	must(err)
 	must(netlink.LinkDel(cloudLink))
-	wait(restore)
+	wait(restore, 3*time.Minute)
 	siteLink, err := netlink.LinkByName(client.Interface)
 	must(err)
 	must(netlink.LinkDel(siteLink))
@@ -121,8 +190,7 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 	if rootDevice.PublicKey != root.PublicKey() || len(rootDevice.Peers) != 0 {
 		t.Fatal("restoration changed root identity or recreated retired peers")
 	}
-	afterRoutes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, 0)
-	must(err)
+	afterRoutes := routeSnapshot()
 	afterRules, err := netlink.RuleList(netlink.FAMILY_ALL)
 	must(err)
 	if !reflect.DeepEqual(routes, afterRoutes) || !reflect.DeepEqual(rules, afterRules) {

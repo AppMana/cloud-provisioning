@@ -59,7 +59,7 @@ func restoreCompletedReceiveState(ctx context.Context, devices receiverDevices, 
 	if view.RollbackRequested || view.Round.Phase == handover.Abort {
 		return nil
 	}
-	_, allocated, err := tunnel.ReceiveLocalNetwork(plan, nodeUID)
+	own, allocated, err := tunnel.ReceiveLocalNetwork(plan, nodeUID)
 	if err != nil {
 		return err
 	}
@@ -70,5 +70,8 @@ func restoreCompletedReceiveState(ctx context.Context, devices receiverDevices, 
 		return err
 	}
 	_, err = reconcileStableAddressOwner(devices, stableAddressOwnerRequest{MeshUID: plan.MeshUID, NodeUID: nodeUID, LegacyInterface: cfg.iface, RootPublicKey: key.PublicKey().String(), Addresses: allocated}, true)
-	return err
+	if err != nil {
+		return err
+	}
+	return restoreCompletedReceiveRoutes(ctx, devices, cfg, key, own, allocated, plan, view, nodeUID, intent)
 }

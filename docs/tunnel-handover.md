@@ -239,8 +239,16 @@ root WireGuard device with the admitted key, configured mark and listener, but
 never replays its peers. Existing root peers and addresses are preserved; foreign
 identity, alias, port or mark conflicts remain errors. A newly created root has
 an identity-bound alias so recovery can recognize an interrupted initialization.
-Selected legacy peers, routes and policy still require restoration for full
-native verification after a reboot. Idle transport rekey latency also requires separate
+Forward-completed maintenance reapplies the combined destination and source-route
+selection through the phase planner, preserving routes outside the admitted
+scope and rejecting ownership conflicts before replacement. It restores only
+the selected source exceptions, without staging an obsolete rollback path.
+Every unfinished local round must still be executable, and active switches must
+retain their live relay dependencies; maintenance uses the earliest local expiry.
+Shared lookup rules remain the responsibility of the separately admitted
+live-mesh policy reconciler. Final phase verification still requires them.
+Selected legacy-peer recreation and cloud policy admission remain prerequisites
+for full reboot recovery. Idle transport rekey latency also requires separate
 recovery-deadline qualification.
 
 The Linux direct-route phase component implements prepare, forward and reverse

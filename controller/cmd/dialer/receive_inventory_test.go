@@ -411,6 +411,66 @@ func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store han
 			if got, err := executeReceivePhase(ctx, api, store, scope, fresh, site, "container", verify); err == nil || !strings.Contains(err.Error(), "another local handover") || len(got) != 0 || calls != before {
 				t.Fatal("inactive other worker allowed combined route execution", err)
 			}
+			// A completed target must not borrow mutation authority from an
+			// expired or future unfinished worker in the shared route set.
+			target, err := store.Load(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			terminal, err := target.Transition().Rollback(time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, err := terminal.View()
+			if err != nil {
+				t.Fatal(err)
+			}
+			digest, err := v.Round.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var proofs []handover.AuthenticatedReceipt
+			for _, member := range v.Round.Members {
+				proofs = append(proofs, handover.AuthenticatedReceipt{AuthenticatedNodeUID: member.NodeUID, Receipt: handover.Receipt{RoundHash: digest, NodeUID: member.NodeUID, DeviceID: member.DeviceID, FromKey: member.FromKey, ToKey: member.ToKey, FromPeerKey: member.FromPeerKey, ToPeerKey: member.ToPeerKey, ObservedAt: time.Now()}})
+			}
+			terminal, err = terminal.Advance(time.Now(), proofs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			terminalRaw, err := terminal.Bytes()
+			if err != nil {
+				t.Fatal(err)
+			}
+			targetCM, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			targetData := targetCM.DeepCopy().Data
+			targetCM.Data["transition.json"] = string(terminalRaw)
+			if _, err := store.ConfigMaps.Update(ctx, targetCM, metav1.UpdateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			maintenanceCfg := cfg
+			maintenanceCfg.privateKeyFile = filepath.Join(t.TempDir(), "key")
+			invoked := false
+			native := func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string, tunnel.ReceiveJournalRoutes) error {
+				invoked = true
+				return nil
+			}
+			if err := maintainCompletedReceivePhase(ctx, api, store, scope, maintenanceCfg, site, "container", native); err == nil || !strings.Contains(err.Error(), "another local handover") || invoked {
+				t.Fatal("terminal maintenance borrowed inactive worker authority", err)
+			}
+			if err := verifyCompletedReceivePhase(ctx, api, store, scope, maintenanceCfg, site, "container", native); err != nil || !invoked {
+				t.Fatal("read-only terminal verification was blocked by inactive worker", err)
+			}
+			targetCM, err = store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			targetCM.Data = targetData
+			if _, err := store.ConfigMaps.Update(ctx, targetCM, metav1.UpdateOptions{}); err != nil {
+				t.Fatal(err)
+			}
 			current, err = store.ConfigMaps.Get(ctx, otherStore.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)

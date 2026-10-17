@@ -14,12 +14,19 @@ import (
 // input-interface or external policy routing. Packet qualification remains
 // necessary before a platform phase verifier can claim end-to-end forwarding.
 func verifyReceiveRouteInstallation(cfg config, hosts, blocks []net.IPNet, own []string) error {
-	if len(cfg.receiveRoutes) == 0 && cfg.receiveRouteScope == nil {
+	if len(cfg.receiveRoutes) == 0 && len(cfg.receiveRelayRoutes) == 0 && cfg.receiveRouteScope == nil {
 		return nil
 	}
 	selected, err := validateReceiveRouteSelections(cfg, hosts, blocks)
 	if err != nil {
 		return err
+	}
+	relays, err := validateReceiveRelayRoutes(cfg, hosts, blocks)
+	if err != nil {
+		return err
+	}
+	for raw, index := range relays {
+		selected[raw] = index
 	}
 	if cfg.receiveRouteScope != nil {
 		for _, list := range [][]net.IPNet{hosts, blocks} {
@@ -92,7 +99,7 @@ func verifyReceiveRouteInstallation(cfg config, hosts, blocks []net.IPNet, own [
 				}
 				count++
 				source := transitSource(route.Dst.IP, own, local)
-				if route.LinkIndex != index || route.Type != unix.RTN_UNICAST || len(route.Gw) != 0 || len(route.MultiPath) != 0 || route.Via != nil || route.Encap != nil || route.NewDst != nil || route.Tos != 0 || !route.Src.Equal(source) {
+				if route.LinkIndex != index || route.Type != unix.RTN_UNICAST || route.Priority != receiveRoutePriority(route.Dst) || !route.Gw.Equal(net.ParseIP(cfg.receiveRelayRoutes[raw])) || len(route.MultiPath) != 0 || route.Via != nil || route.Encap != nil || route.NewDst != nil || route.Tos != 0 || !route.Src.Equal(source) {
 					return fmt.Errorf("installed receiver route differs from selected destination %s", raw)
 				}
 			}
@@ -102,4 +109,13 @@ func verifyReceiveRouteInstallation(cfg config, hosts, blocks []net.IPNet, own [
 		}
 	}
 	return nil
+}
+
+// Linux normalizes a zero IPv6 unicast metric to IP6_RT_PRIO_USER. Use the
+// resulting kernel value for both writes and ownership checks.
+func receiveRoutePriority(dst *net.IPNet) int {
+	if dst != nil && dst.IP.To4() == nil {
+		return 1024
+	}
+	return 0
 }

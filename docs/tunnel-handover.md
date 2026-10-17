@@ -298,7 +298,16 @@ supply the missing normal-reconciliation integration.
 After installation, receiver route read-back revalidates device identity,
 permissions, authenticated transport and policy rules. Each selected destination
 must have one direct unicast route through the selected device with the expected
-source, without gateway, multipath or encapsulation redirection. Unselected
+source, without gateway, multipath or encapsulation redirection. A separately
+admitted legacy relay selection instead requires its exact gateway and underlay
+link. Gateway lookup must resolve to one directly connected, active non-tunnel
+interface; recursive or ambiguous resolution is rejected before mutation.
+Different worker destinations can retain different relays. Forward and reverse
+preflight accept only the admitted legacy gateway or generation devices, and
+routes outside the journal scope remain unchanged. Ownership checks use Linux's
+IPv6 default unicast metric of 1024 and IPv4 metric of zero. Relay route support
+does not enable native relay phases until their source-specific tunnel exceptions
+are also derived and verified from the full journal set. Unselected
 more-specific routes fail verification. Read-back never repairs state: a failed
 observation cannot become a successful phase receipt through hidden mutation.
 This proves the configured table at observation time; arbitrary source-sensitive

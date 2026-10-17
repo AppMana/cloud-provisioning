@@ -57,6 +57,8 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 		return fmt.Errorf("native phase participant differs: %v", err)
 	}
 	cfg.receiveRoutes = intent.Receivers[nodeUID]
+	// Relay activation still requires the phase-specific source exception plan.
+	cfg.receiveRelayRoutes = nil
 	cfg.receiveRouteScope = map[string]bool{}
 	desired := map[string]bool{}
 	for raw := range cfg.receiveRoutes {
@@ -389,13 +391,35 @@ func prepareReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.K
 // Only the admitted legacy device or the exact prepared receiver may already
 // own a scoped destination. Reject foreign routes and more-specific shadows
 // before installRoutes can replace anything. Unrelated destinations survive.
-func preflightReceiveRoutePhase(cfg config, receivers map[string]receiveRouteSelection, own []string) error {
+func preflightReceiveRoutePhase(cfg config, receivers map[string]receiveRouteSelection, own []string, admittedRelays ...map[string]string) error {
 	legacy, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
 		return err
 	}
 	if legacy.Type() != "wireguard" {
 		return fmt.Errorf("legacy route device is not WireGuard")
+	}
+	if len(admittedRelays) > 1 {
+		return fmt.Errorf("competing legacy relay selections")
+	}
+	relayCfg := cfg
+	if len(admittedRelays) == 1 {
+		relayCfg.receiveRelayRoutes = admittedRelays[0]
+	}
+	// A destination may currently use its old relay while the desired selection
+	// is a receiver. Admission binds both possibilities; neither is inferred.
+	relayCfg.receiveRoutes = nil
+	var relayHosts []net.IPNet
+	for raw := range relayCfg.receiveRelayRoutes {
+		_, dst, err := net.ParseCIDR(raw)
+		if err != nil {
+			return err
+		}
+		relayHosts = append(relayHosts, *dst)
+	}
+	relayIndices, err := validateReceiveRelayRoutes(relayCfg, relayHosts, nil)
+	if err != nil {
+		return err
 	}
 	local := localIPs()
 	seen := map[string]bool{}
@@ -422,10 +446,16 @@ func preflightReceiveRoutePhase(cfg config, receivers map[string]receiveRouteSel
 				}
 				continue
 			}
-			if seen[raw] || route.Type != unix.RTN_UNICAST || route.Protocol != unix.RTPROT_BOOT || route.Priority != 0 || len(route.Gw) != 0 || len(route.MultiPath) != 0 || route.Via != nil || route.Encap != nil || route.NewDst != nil || route.Tos != 0 || !route.Src.Equal(transitSource(route.Dst.IP, own, local)) {
-				return fmt.Errorf("scoped destination has conflicting route ownership")
+			if seen[raw] || route.Type != unix.RTN_UNICAST || route.Protocol != unix.RTPROT_BOOT || route.Priority != receiveRoutePriority(route.Dst) || len(route.MultiPath) != 0 || route.Via != nil || route.Encap != nil || route.NewDst != nil || route.Tos != 0 || !route.Src.Equal(transitSource(route.Dst.IP, own, local)) {
+				return fmt.Errorf("scoped destination has conflicting route ownership: %s protocol=%d priority=%d source=%s expected-source=%s", raw, route.Protocol, route.Priority, route.Src, transitSource(route.Dst.IP, own, local))
 			}
 			seen[raw] = true
+			if len(route.Gw) != 0 {
+				if route.LinkIndex != relayIndices[raw] || !route.Gw.Equal(net.ParseIP(relayCfg.receiveRelayRoutes[raw])) {
+					return fmt.Errorf("scoped route uses an unadmitted relay")
+				}
+				continue
+			}
 			if route.LinkIndex == legacy.Attrs().Index {
 				continue
 			}

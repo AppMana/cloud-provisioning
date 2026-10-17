@@ -112,6 +112,8 @@ type config struct {
 	// Set only by validated receiver activation; absent entries keep the
 	// legacy interface. The map does not add destinations or alter peers.
 	receiveRoutes map[string]receiveRouteSelection
+	// Per-destination legacy relay next hops from the admitted journal set.
+	receiveRelayRoutes map[string]string
 	// A phase owns only these destinations. Nil retains ordinary whole-table
 	// reconciliation; a non-nil scope must be derived from admitted journals.
 	receiveRouteScope map[string]bool
@@ -1993,6 +1995,10 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	if err != nil {
 		return err
 	}
+	relays, err := validateReceiveRelayRoutes(cfg, routeHosts, blocks)
+	if err != nil {
+		return err
+	}
 	// A retired generation is optional only when every direct destination has
 	// an authenticated prepared receiver. Unresolved claims and relay state still
 	// require the legacy path; reject before touching policy rules or routes.
@@ -2014,6 +2020,13 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 		}
 		return link.Attrs().Index
 	}
+	local := localIPs()
+	makeRoute := func(dst *net.IPNet) *netlink.Route {
+		if index, found := relays[dst.String()]; found {
+			return &netlink.Route{LinkIndex: index, Dst: dst, Gw: net.ParseIP(cfg.receiveRelayRoutes[dst.String()]), Src: transitSource(dst.IP, own, local), Table: cfg.routeTable, Priority: receiveRoutePriority(dst)}
+		}
+		return &netlink.Route{LinkIndex: routeLink(*dst), Dst: dst, Src: transitSource(dst.IP, own, local), Scope: netlink.SCOPE_LINK, Table: cfg.routeTable, Priority: receiveRoutePriority(dst)}
+	}
 	// The dialer's own table, consulted ahead of main. See
 	// config.routeTable: a route in main is an ownership claim to any
 	// router that learns alien routes there, and these routes are this
@@ -2028,12 +2041,11 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	// This node's own traffic leaves from its node address (own), the
 	// source every remote accepts from it whichever endpoint carries it,
 	// so a connection survives the endpoint set changing under it.
-	local := localIPs()
 	desired := map[string]bool{}
 	for _, host := range routeHosts {
 		dst := host
 		desired[dst.String()] = true
-		route := &netlink.Route{LinkIndex: routeLink(dst), Dst: &dst, Src: transitSource(dst.IP, own, local), Scope: netlink.SCOPE_LINK, Table: cfg.routeTable}
+		route := makeRoute(&dst)
 		if err := netlink.RouteReplace(route); err != nil {
 			return fmt.Errorf("adding route %s dev %s: %w", dst.String(), cfg.iface, err)
 		}
@@ -2045,7 +2057,7 @@ func installRoutes(cfg config, routeHosts, claimedHosts, blocks []net.IPNet, rel
 	for _, block := range blocks {
 		dst := block
 		desired[dst.String()] = true
-		route := &netlink.Route{LinkIndex: routeLink(dst), Dst: &dst, Src: transitSource(dst.IP, own, local), Scope: netlink.SCOPE_LINK, Table: cfg.routeTable}
+		route := makeRoute(&dst)
 		if err := netlink.RouteReplace(route); err != nil {
 			return fmt.Errorf("adding pod route %s: %w", dst.String(), err)
 		}

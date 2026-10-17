@@ -398,6 +398,11 @@ workload and management continuity during the resulting DaemonSet rollout.
 Changing local load-balancer configuration still requires the existing worker
 configuration rollout; the CNI manifest cannot start that proxy itself.
 Worker-specific profile overrides and rollback require their own checks.
+Before rollout, check authenticated API discovery through the selected endpoint
+on every participating node using its existing CNI CA and credentials, without
+logging credential values. Keep TLS verification enabled. This read-only check
+can establish steady-state reachability only; the boot test must still show that
+the local proxy becomes usable before CNI cleanup and creation need it.
 Repeat full reboot tests with a stable workload Service, preserving all failed
 requests and measuring both Node and workload recovery. Removing the Service
 routing dependency does not remove other host boot or CNI delays.

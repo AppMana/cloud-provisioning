@@ -31,20 +31,25 @@ func verifyTunnelSourceRoutes(cfg config, localAddresses []string, hosts []net.I
 	if err == nil {
 		index = link.Attrs().Index
 	}
+	indices, err := tunnelSourceReceiverIndices(cfg, hosts)
+	if err != nil {
+		return err
+	}
 	if cfg.receiveRouteScope != nil {
-		rules, routes, err := inspectTunnelSourceState(cfg.routeTable, table, index)
+		rules, routes, err := inspectConfiguredTunnelSources(cfg, table, index)
 		if err != nil {
 			return err
 		}
+		preserveUnscopedSourceIndices(cfg, indices, routes)
 		if err := preserveUnscopedTunnelSources(cfg, localAddresses, sources, desired, rules, routes); err != nil {
 			return err
 		}
 	}
-	return verifyTunnelSourceSelection(cfg.routeTable, table, index, sources, desired)
+	return verifyTunnelSourceSelection(cfg.routeTable, table, index, sources, desired, indices)
 }
 
-func verifyTunnelSourceSelection(base, table, index int, sources map[int]*net.IPNet, desired map[string]bool) error {
-	rules, routes, err := inspectTunnelSourceState(base, table, index)
+func verifyTunnelSourceSelection(base, table, index int, sources map[int]*net.IPNet, desired map[string]bool, receivers ...map[string]int) error {
+	rules, routes, err := inspectTunnelSourceState(base, table, index, receivers...)
 	if err != nil {
 		return err
 	}
@@ -65,6 +70,15 @@ func verifyTunnelSourceSelection(base, table, index int, sources map[int]*net.IP
 	seen := map[string]bool{}
 	for _, route := range routes {
 		raw := route.Dst.String()
+		expectedIndex := index
+		for _, indices := range receivers {
+			if indices[raw] > 0 {
+				expectedIndex = indices[raw]
+			}
+		}
+		if route.LinkIndex != expectedIndex {
+			return fmt.Errorf("tunnel source receiver differs from selected generation")
+		}
 		if !desired[raw] || seen[raw] {
 			return fmt.Errorf("tunnel source destination differs from desired state")
 		}

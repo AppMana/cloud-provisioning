@@ -24,7 +24,7 @@ func matchesTunnelSourceRule(rule netlink.Rule, family, table, priority int) boo
 // the owned host-source shape. Table or priority collisions are never repaired
 // by deleting the conflicting policy. A missing device authorizes no route
 // deletion; its owned routes should already have disappeared with the device.
-func inspectTunnelSourceState(base, table, index int) ([]netlink.Rule, []netlink.Route, error) {
+func inspectTunnelSourceState(base, table, index int, alternates ...map[string]int) ([]netlink.Rule, []netlink.Route, error) {
 	var ownedRules []netlink.Rule
 	var ownedRoutes []netlink.Route
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
@@ -45,7 +45,13 @@ func inspectTunnelSourceState(base, table, index int) ([]netlink.Rule, []netlink
 			return nil, nil, err
 		}
 		for _, route := range routes {
-			if route.Dst == nil || index <= 0 || route.LinkIndex != index || route.Type != unix.RTN_UNICAST || route.Protocol != unix.RTPROT_BOOT || route.Priority != receiveRoutePriority(route.Dst) || len(route.Src) != 0 || len(route.Gw) != 0 || len(route.MultiPath) != 0 || route.Via != nil || route.Encap != nil || route.NewDst != nil || route.Tos != 0 {
+			ownedIndex := index > 0 && route.LinkIndex == index
+			if route.Dst != nil {
+				for _, byDestination := range alternates {
+					ownedIndex = ownedIndex || (route.LinkIndex > 0 && route.LinkIndex == byDestination[route.Dst.String()])
+				}
+			}
+			if route.Dst == nil || !ownedIndex || route.Type != unix.RTN_UNICAST || route.Protocol != unix.RTPROT_BOOT || route.Priority != receiveRoutePriority(route.Dst) || len(route.Src) != 0 || len(route.Gw) != 0 || len(route.MultiPath) != 0 || route.Via != nil || route.Encap != nil || route.NewDst != nil || route.Tos != 0 {
 				return nil, nil, fmt.Errorf("foreign route collides with tunnel source exception")
 			}
 			dst, err := netip.ParsePrefix(route.Dst.String())

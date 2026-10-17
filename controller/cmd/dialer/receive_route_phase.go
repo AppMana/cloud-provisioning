@@ -56,9 +56,15 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 	if err != nil || uid != nodeUID {
 		return fmt.Errorf("native phase participant differs: %v", err)
 	}
-	cfg.receiveRoutes = intent.Receivers[nodeUID]
+	cfg.receiveRoutes = map[string]receiveRouteSelection{}
+	for raw, selected := range intent.Receivers[nodeUID] {
+		cfg.receiveRoutes[raw] = selected
+	}
+	cfg.receiveSourceRoutes = map[string]receiveRouteSelection{}
+	cfg.receiveSourceCandidates = map[string]receiveRouteSelection{}
 	cfg.receiveRelayRoutes = map[string]string{}
 	allLegacyRelays := map[string]string{}
+	allForwardRelays := map[string]string{}
 	cfg.receiveRouteScope = map[string]bool{}
 	desired := map[string]bool{}
 	for raw := range cfg.receiveRoutes {
@@ -96,8 +102,31 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 		} else {
 			for public, site := range p.Sites {
 				if site.NodeUID == nodeUID {
-					if site.Forward != nil && site.Forward.Transit != nil {
-						return fmt.Errorf("native phase requires desired relay and receiver source-exception support")
+					if site.Forward != nil {
+						_, legacySelected := intent.Legacy[machineUID]
+						for _, raw := range site.Forward.Tunnel.Hosts {
+							selection, found := routes[nodeUID][raw]
+							if !found {
+								return fmt.Errorf("source exception lacks its committed receiver")
+							}
+							cfg.receiveSourceCandidates[raw] = selection
+							if !legacySelected {
+								cfg.receiveSourceRoutes[raw] = selection
+							}
+						}
+						if site.Forward.Transit != nil {
+							for raw := range routes[nodeUID] {
+								_, dst, err := net.ParseCIDR(raw)
+								if err != nil || site.Forward.Transit.Gateway(dst.IP) == nil {
+									return fmt.Errorf("desired relay lacks destination gateway")
+								}
+								allForwardRelays[raw] = site.Forward.Transit.Gateway(dst.IP).String()
+								if !legacySelected {
+									cfg.receiveRelayRoutes[raw] = allForwardRelays[raw]
+									delete(cfg.receiveRoutes, raw)
+								}
+							}
+						}
 					}
 					peer, err := receiveSiteLegacyPeer(p, public)
 					if err != nil {
@@ -109,8 +138,10 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 						}
 						relay = site.Legacy.Transit
 						requireLegacyPeer = len(site.Legacy.Tunnel.Hosts) != 0
-						if err := validateReceiveSiteSources(p, public); err != nil {
-							return err
+						if site.Forward == nil {
+							if err := validateReceiveSiteSources(p, public); err != nil {
+								return err
+							}
 						}
 					}
 					old = append(old, peer)
@@ -172,7 +203,7 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 			expectedRoutes = routes[nodeUID]
 		}
 	}
-	if len(expectedRoutes) != len(cfg.receiveRoutes) || (len(expectedRoutes) != 0 && !reflect.DeepEqual(expectedRoutes, cfg.receiveRoutes)) {
+	if len(expectedRoutes) != len(intent.Receivers[nodeUID]) || (len(expectedRoutes) != 0 && !reflect.DeepEqual(expectedRoutes, intent.Receivers[nodeUID])) {
 		return fmt.Errorf("native receiver selections differ from admitted plans")
 	}
 	_, targetLegacy := intent.Legacy[plan.MachineUID]
@@ -246,16 +277,18 @@ func receiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config,
 		}
 	}
 	if view.Round.Phase == handover.Switch {
-		if err := preflightReceiveRoutePhase(cfg, allRoutes[nodeUID], own, allLegacyRelays); err != nil {
+		if err := preflightReceiveRoutePhase(cfg, allRoutes[nodeUID], own, allLegacyRelays, allForwardRelays); err != nil {
 			return err
 		}
-		staged, err := preflightReceiveSourceSwitch(cfg, sourceAddresses, sourceHosts, admittedSourceHosts)
+		staged, stagedReceivers, err := preflightReceiveSourceSwitchPlan(cfg, sourceAddresses, sourceHosts, admittedSourceHosts)
 		if err != nil {
 			return err
 		}
 		// Add rollback exceptions before changing egress, but retain forward
 		// exceptions until the replacement egress is installed.
-		if err := reconcileTunnelSourceRoutes(cfg, sourceAddresses, staged); err != nil {
+		stageCfg := cfg
+		stageCfg.receiveSourceRoutes = stagedReceivers
+		if err := reconcileTunnelSourceRoutes(stageCfg, sourceAddresses, staged); err != nil {
 			return err
 		}
 		if err := installRoutes(cfg, hosts, nil, nil, nil, nil, own); err != nil {
@@ -448,27 +481,29 @@ func preflightReceiveRoutePhase(cfg config, receivers map[string]receiveRouteSel
 	if legacy.Type() != "wireguard" {
 		return fmt.Errorf("legacy route device is not WireGuard")
 	}
-	if len(admittedRelays) > 1 {
-		return fmt.Errorf("competing legacy relay selections")
+	if len(admittedRelays) > 2 {
+		return fmt.Errorf("too many admitted relay generations")
 	}
-	relayCfg := cfg
-	if len(admittedRelays) == 1 {
-		relayCfg.receiveRelayRoutes = admittedRelays[0]
+	if len(admittedRelays) == 0 {
+		admittedRelays = []map[string]string{cfg.receiveRelayRoutes}
 	}
-	// A destination may currently use its old relay while the desired selection
-	// is a receiver. Admission binds both possibilities; neither is inferred.
-	relayCfg.receiveRoutes = nil
-	var relayHosts []net.IPNet
-	for raw := range relayCfg.receiveRelayRoutes {
-		_, dst, err := net.ParseCIDR(raw)
+	relayIndices := make([]map[string]int, len(admittedRelays))
+	for i, relays := range admittedRelays {
+		relayCfg := cfg
+		relayCfg.receiveRelayRoutes, relayCfg.receiveRoutes = relays, nil
+		var hosts []net.IPNet
+		for raw := range relays {
+			_, dst, err := net.ParseCIDR(raw)
+			if err != nil {
+				return err
+			}
+			hosts = append(hosts, *dst)
+		}
+		indices, err := validateReceiveRelayRoutes(relayCfg, hosts, nil)
 		if err != nil {
 			return err
 		}
-		relayHosts = append(relayHosts, *dst)
-	}
-	relayIndices, err := validateReceiveRelayRoutes(relayCfg, relayHosts, nil)
-	if err != nil {
-		return err
+		relayIndices[i] = indices
 	}
 	local := localIPs()
 	seen := map[string]bool{}
@@ -500,7 +535,11 @@ func preflightReceiveRoutePhase(cfg config, receivers map[string]receiveRouteSel
 			}
 			seen[raw] = true
 			if len(route.Gw) != 0 {
-				if route.LinkIndex != relayIndices[raw] || !route.Gw.Equal(net.ParseIP(relayCfg.receiveRelayRoutes[raw])) {
+				admitted := false
+				for i, relays := range admittedRelays {
+					admitted = admitted || (route.LinkIndex == relayIndices[i][raw] && route.Gw.Equal(net.ParseIP(relays[raw])))
+				}
+				if !admitted {
 					return fmt.Errorf("scoped route uses an unadmitted relay")
 				}
 				continue

@@ -124,6 +124,10 @@ func TestNativeReceiveRelayRouteSwitch(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				forward := map[string]string{tc.destination: tc.other, tc.second: tc.other}
+				if err := preflightReceiveRoutePhase(cfg, nil, own, cfg.receiveRelayRoutes, forward); err != nil {
+					t.Fatal("committed second relay generation rejected", err)
+				}
 				if err := verifyReceiveRouteInstallation(cfg, hosts, nil, own); err == nil {
 					t.Fatal("readback accepted foreign gateway")
 				}

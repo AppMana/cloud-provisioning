@@ -19,8 +19,9 @@ type ReceiveRouteSelection struct {
 	AllowedSources []string `json:"allowedSources"`
 }
 
-// PlanReceiveRoutes derives desired egress by Node UID from the committed
-// public plan. This is configuration, not authorization to execute a phase:
+// PlanReceiveRoutes derives receiver bindings by Node UID from the committed
+// public plan. A site's Forward.Transit overrides workload egress; its receiver
+// can still carry source exceptions. This is configuration, not phase authority:
 // callers still require a committed round, current identities and native proof.
 func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRouteSelection, error) {
 	if p.Version != 1 || p.MeshUID == "" || p.CloudNodeUID == "" || p.Native == nil || p.SiteDesired.Peers == nil {

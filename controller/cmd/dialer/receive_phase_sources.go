@@ -57,7 +57,11 @@ func receivePhaseSources(intent tunnel.ReceiveJournalRoutes, node string, alloca
 			if site.NodeUID != node {
 				continue
 			}
-			for _, raw := range site.Legacy.Tunnel.Hosts {
+			hosts := append([]string(nil), site.Legacy.Tunnel.Hosts...)
+			if site.Forward != nil {
+				hosts = append(hosts, site.Forward.Tunnel.Hosts...)
+			}
+			for _, raw := range hosts {
 				if seen[raw] {
 					continue
 				}
@@ -130,51 +134,60 @@ func validateReceiveSiteSources(p tunnel.ReceiveTransitionPlan, public string) e
 // and selectors bound to the committed plan. Never derive authority from live
 // state. Outside-scope policy must already be valid and remains unchanged.
 func preflightReceiveSourceSwitch(cfg config, addresses []string, desired, admitted []net.IPNet) ([]net.IPNet, error) {
+	hosts, _, err := preflightReceiveSourceSwitchPlan(cfg, addresses, desired, admitted)
+	return hosts, err
+}
+
+func preflightReceiveSourceSwitchPlan(cfg config, addresses []string, desired, admitted []net.IPNet) ([]net.IPNet, map[string]receiveRouteSelection, error) {
 	if cfg.receiveRouteScope == nil {
-		return nil, fmt.Errorf("source switch requires journal scope")
+		return nil, nil, fmt.Errorf("source switch requires journal scope")
 	}
 	if err := validateTunnelSourceScope(cfg, admitted); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := validateTunnelSourceScope(cfg, desired); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	allocations, err := tunnelSourceAllocations(addresses)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	_, permitted, err := planTunnelSourceRoutes(addresses, admitted)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sources, wanted, err := planTunnelSourceRoutes(addresses, desired)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for raw := range wanted {
 		if !permitted[raw] {
-			return nil, fmt.Errorf("source switch exceeds committed exceptions")
+			return nil, nil, fmt.Errorf("source switch exceeds committed exceptions")
 		}
 	}
 	table, err := tunnelSourceTable(cfg.routeTable)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	rules, routes, err := inspectTunnelSourceState(cfg.routeTable, table, link.Attrs().Index)
+	rules, routes, err := inspectConfiguredTunnelSources(cfg, table, link.Attrs().Index)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := preserveUnscopedTunnelSources(cfg, addresses, sources, map[string]bool{}, rules, routes); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, rule := range rules {
 		if allocations[rule.Family] == nil || rule.Src.String() != allocations[rule.Family].String() {
-			return nil, fmt.Errorf("source switch found another allocation")
+			return nil, nil, fmt.Errorf("source switch found another allocation")
 		}
+	}
+	selected := map[string]receiveRouteSelection{}
+	for raw, selection := range cfg.receiveSourceRoutes {
+		selected[raw] = selection
 	}
 	for _, route := range routes {
 		if !tunnelSourceInScope(cfg.receiveRouteScope, *route.Dst) {
@@ -182,7 +195,10 @@ func preflightReceiveSourceSwitch(cfg config, addresses []string, desired, admit
 		}
 		raw := route.Dst.String()
 		if !permitted[raw] {
-			return nil, fmt.Errorf("source switch found an uncommitted destination")
+			return nil, nil, fmt.Errorf("source switch found an uncommitted destination")
+		}
+		if !wanted[raw] && route.LinkIndex != link.Attrs().Index {
+			selected[raw] = cfg.receiveSourceCandidates[raw]
 		}
 		wanted[raw] = true
 	}
@@ -196,5 +212,5 @@ func preflightReceiveSourceSwitch(cfg config, addresses []string, desired, admit
 		_, host, _ := net.ParseCIDR(raw)
 		staged = append(staged, *host)
 	}
-	return staged, nil
+	return staged, selected, nil
 }

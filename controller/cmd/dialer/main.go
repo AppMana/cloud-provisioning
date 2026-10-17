@@ -112,7 +112,11 @@ type config struct {
 	// Set only by validated receiver activation; absent entries keep the
 	// legacy interface. The map does not add destinations or alter peers.
 	receiveRoutes map[string]receiveRouteSelection
-	// Per-destination legacy relay next hops from the admitted journal set.
+	// Source exceptions select independently of workload egress. Candidates
+	// admit either generation during a switch; routes select the final receiver.
+	receiveSourceRoutes     map[string]receiveRouteSelection
+	receiveSourceCandidates map[string]receiveRouteSelection
+	// Per-destination selected relay next hops from the admitted journal set.
 	receiveRelayRoutes map[string]string
 	// A phase owns only these destinations. Nil retains ordinary whole-table
 	// reconciliation; a non-nil scope must be derived from admitted journals.

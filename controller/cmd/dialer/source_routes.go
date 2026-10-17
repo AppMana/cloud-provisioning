@@ -62,6 +62,9 @@ func clearTunnelSourceRoutes(table int, iface ...string) error {
 // destination prefixes and preserves other workers' existing selectors/routes.
 func reconcileTunnelSourceRoutes(cfg config, localAddresses []string, hosts []net.IPNet) error {
 	if len(hosts) == 0 && cfg.receiveRouteScope == nil {
+		if len(cfg.receiveSourceRoutes) != 0 || len(cfg.receiveSourceCandidates) != 0 {
+			return fmt.Errorf("source receiver cleanup requires journal scope")
+		}
 		return clearTunnelSourceRoutes(cfg.routeTable, cfg.iface)
 	}
 	table, err := tunnelSourceTable(cfg.routeTable)
@@ -83,15 +86,24 @@ func reconcileTunnelSourceRoutes(cfg config, localAddresses []string, hosts []ne
 	if err == nil {
 		index = link.Attrs().Index
 	}
-	existingRules, existingRoutes, err := inspectTunnelSourceState(cfg.routeTable, table, index)
+	indices, err := tunnelSourceReceiverIndices(cfg, hosts)
+	if err != nil {
+		return err
+	}
+	existingRules, existingRoutes, err := inspectConfiguredTunnelSources(cfg, table, index)
 	if err != nil {
 		return err
 	}
 	if err := preserveUnscopedTunnelSources(cfg, localAddresses, sources, desired, existingRules, existingRoutes); err != nil {
 		return err
 	}
+	preserveUnscopedSourceIndices(cfg, indices, existingRoutes)
 	for i := range hosts {
-		route := &netlink.Route{Dst: &hosts[i], LinkIndex: index, Scope: netlink.SCOPE_LINK, Table: table}
+		selected := index
+		if receiver := indices[hosts[i].String()]; receiver > 0 {
+			selected = receiver
+		}
+		route := &netlink.Route{Dst: &hosts[i], LinkIndex: selected, Scope: netlink.SCOPE_LINK, Table: table}
 		if err := netlink.RouteReplace(route); err != nil {
 			return fmt.Errorf("installing tunnel source route: %w", err)
 		}
@@ -129,7 +141,7 @@ func reconcileTunnelSourceRoutes(cfg config, localAddresses []string, hosts []ne
 			return err
 		}
 	}
-	return verifyTunnelSourceSelection(cfg.routeTable, table, index, sources, desired)
+	return verifyTunnelSourceSelection(cfg.routeTable, table, index, sources, desired, indices)
 }
 
 func planTunnelSourceRoutes(localAddresses []string, hosts []net.IPNet) (map[int]*net.IPNet, map[string]bool, error) {

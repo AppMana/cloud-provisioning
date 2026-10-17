@@ -3,11 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -15,8 +18,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// This records admitted intent, not completed native work. Recovery cannot
-// issue a receipt, infer a completed switch, or advance an expired phase.
+// The journal records admitted intent. An optional historical native observation
+// records separate successful readback; neither authorizes phase advancement
+// or receipt publication during recovery.
 type receiveJournalCheckpoint struct {
 	Version    int                 `json:"version"`
 	Scope      receiveJournalScope `json:"scope"`
@@ -28,9 +32,20 @@ type receiveJournalCheckpoint struct {
 	Journal    json.RawMessage     `json:"journal"`
 }
 
+// Historical local evidence, never a receipt or authorization to execute a
+// phase. A changed checkpoint or boot cannot inherit this observation.
+type receiveNativeObservation struct {
+	JournalSHA256    string    `json:"journalSHA256"`
+	BootID           string    `json:"bootID"`
+	AgentPodUID      string    `json:"agentPodUID"`
+	AgentContainerID string    `json:"agentContainerID"`
+	ObservedAt       time.Time `json:"observedAt"`
+}
+
 type recoveredReceiveJournal struct {
-	Snapshot handover.Snapshot
-	Plan     tunnel.ReceiveTransitionPlan
+	Snapshot          handover.Snapshot
+	Plan              tunnel.ReceiveTransitionPlan
+	NativeObservation *receiveNativeObservation
 }
 
 func readReceiveJournalCheckpoint(path string, store handover.Store, scope receiveJournalScope, nodeName string, key wgtypes.Key) (recoveredReceiveJournal, error) {
@@ -77,7 +92,11 @@ func readReceiveJournalCheckpointForAdmission(path string, store handover.Store,
 	if uid != saved.NodeUID {
 		return fail(fmt.Errorf("receiver checkpoint participant changed"))
 	}
-	return recoveredReceiveJournal{Snapshot: snapshot, Plan: plan}, nil
+	observation, err := readReceiveNativeObservation(path, store.Name, saved, snapshot)
+	if err != nil {
+		return fail(err)
+	}
+	return recoveredReceiveJournal{Snapshot: snapshot, Plan: plan, NativeObservation: observation}, nil
 }
 
 // checkpointReceiveJournal serializes admission and durable recording with the
@@ -123,4 +142,64 @@ func checkpointReceiveJournalLocked(ctx context.Context, api kubernetes.Interfac
 		return fail(err)
 	}
 	return admitted, nil
+}
+
+// Caller retains the executor lock after native verification and live set
+// revalidation. Recording evidence does not enable offline native mutation.
+func checkpointReceiveNativeObservation(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath, containerID string, observed time.Time, admitted admittedReceiveJournal) error {
+	view, err := admitted.Snapshot.Transition().View()
+	if err != nil || !view.Complete || admitted.Plan.CloudNodeUID != admitted.NodeUID || admitted.Plan.RootPublicKey != key.PublicKey().String() {
+		return fmt.Errorf("native recovery observation requires a completed cloud journal")
+	}
+	observation := handover.Receipt{NodeUID: admitted.NodeUID, ObservedBootID: admitted.BootID, AgentPodName: cfg.receiptPodName, AgentPodUID: cfg.receiptPodUID, AgentContainerName: "dialer", AgentContainerID: containerID, ObservedAt: observed}
+	if err := handover.VerifyObservationIncarnation(ctx, api, scope.Namespace, cfg.nodeName, observation); err != nil {
+		return err
+	}
+	raw, err := admitted.Snapshot.Checkpoint()
+	if err != nil {
+		return err
+	}
+	saved := receiveNativeObservation{JournalSHA256: fmt.Sprintf("%x", sha256.Sum256(raw)), BootID: admitted.BootID, AgentPodUID: cfg.receiptPodUID, AgentContainerID: containerID, ObservedAt: observed}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	path := lockPath + "." + store.Name + ".json"
+	return writeDurableJSON(receiveNativeObservationPath(path, store.Name), saved)
+}
+
+// Keep the strict journal checkpoint format unchanged for older agents. The
+// separate filename is outside the inventory's reserved journal-file prefix,
+// while still falling under the shared lock's legacy-writer fence.
+func receiveNativeObservationPath(path, journalName string) string {
+	return strings.TrimSuffix(path, "."+journalName+".json") + ".native-" + journalName + ".json"
+}
+
+func readReceiveNativeObservation(path, journalName string, saved receiveJournalCheckpoint, snapshot handover.Snapshot) (*receiveNativeObservation, error) {
+	raw, err := os.ReadFile(receiveNativeObservationPath(path, journalName))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var observation receiveNativeObservation
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&observation); err != nil {
+		return nil, err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		return nil, fmt.Errorf("trailing native observation data")
+	}
+	// A new checkpoint invalidates previous evidence without deleting it. This
+	// also makes an interrupted journal/observation update fail closed.
+	if observation.JournalSHA256 != fmt.Sprintf("%x", sha256.Sum256(saved.Journal)) || observation.BootID != saved.BootID {
+		return nil, nil
+	}
+	view, err := snapshot.Transition().View()
+	if err != nil || !view.Complete || observation.AgentPodUID == "" || observation.AgentContainerID == "" || observation.ObservedAt.IsZero() || observation.ObservedAt.After(time.Now()) {
+		return nil, fmt.Errorf("receiver native observation differs from terminal intent")
+	}
+	return &observation, nil
 }

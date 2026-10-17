@@ -168,6 +168,11 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 		return nil, err
 	}
 	if completedReadback {
+		if cfg.peersFile != "" && current.NodeUID == current.Plan.CloudNodeUID {
+			if err := checkpointReceiveNativeObservation(phaseCtx, api, store, scope, cfg, key, lock.Name(), containerID, observed, current); err != nil {
+				return nil, err
+			}
+		}
 		return nil, nil
 	}
 	now := time.Now()

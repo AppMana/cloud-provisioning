@@ -195,17 +195,29 @@ Resource versions are opaque and are not ordered numerically. A valid rollback
 or renewal extends history even though it may revisit an earlier phase.
 
 Checkpointed intent is not evidence of completed native work. It cannot issue
-receipts, advance a phase, or establish that egress already switched. Corrupt
-state remains an error. A boot change requires live admission and fresh native
-verification; it must not fall back to legacy forwarding. Checkpoint refresh
+receipts, advance a phase, or establish that egress already switched.
+After successful completed-cloud native verification and live set revalidation,
+the executor may record a historical native observation in a separate file. It
+binds the exact serialized journal, local boot, agent Pod UID, container ID and
+observation time; the current agent incarnation is checked before recording it.
+The checkpoint format remains unchanged for older agents. An unchanged
+checkpoint on the same boot retains this observation. A new journal revision
+or boot does not inherit it. Malformed observations are rejected; an observation
+bound to a different journal digest or boot is ignored. This historical evidence
+does not authorize offline mutation, phase advancement or receipts. The host bootstrap path still needs
+phase-aware recovery that can establish API connectivity before live admission.
+
+Corrupt state remains an error. A boot change requires live admission and fresh
+native verification; it must not fall back to legacy forwarding. Checkpoint refresh
 alone does not restore lost devices or routes, including those selected by a
 completed journal. Normal reconciliation and shutdown cleanup inspect the
 checkpoint inventory under the shared lock before reading legacy inputs or
 changing forwarding. Any persisted handover state blocks those legacy writers,
 including corrupt, unreadable or unknown-version state. They preserve native
 state for phase-aware recovery instead of replaying an older peer cache. This
-guard does not execute phases; checkpoint admission and native phase dispatch
-still need to be connected to the normal loop before enabling handover.
+guard does not execute phases. Agents with receipt configuration use the
+phase dispatcher in their reconciliation loop; the file-only host service
+cannot use that live-admission path before API connectivity exists.
 
 The agent execution boundary holds the reconciliation lock through checkpoint
 admission, a platform phase callback, live identity revalidation and receipt

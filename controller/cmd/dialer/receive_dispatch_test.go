@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -74,7 +76,7 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 		t.Fatal(err)
 	}
 	objects := []runtime.Object{mesh, index, adoption, node, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system", UID: types.UID(store.ClusterUID)}}, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: mesh.Namespace, Name: store.Name, UID: "dispatch-journal", ResourceVersion: "1"}, Data: map[string]string{"transition.json": string(encoded), "plan.json": string(raw)}}}
-	for _, fault := range []string{"valid", "allocation", "pod", "credential", "native", "complete", "complete-native", "complete-maintenance", "publication-pending", "publication-replaced"} {
+	for _, fault := range []string{"valid", "allocation", "pod", "credential", "native", "complete", "complete-native", "complete-maintenance", "complete-pod-race", "complete-container-race", "publication-pending", "publication-replaced"} {
 		t.Run("dispatch-"+fault, func(t *testing.T) {
 			copies := []runtime.Object{}
 			for _, obj := range objects {
@@ -103,7 +105,7 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 				}
 				cm.Data["inventory.json"] = string(encoded)
 			}
-			terminal := fault == "complete" || fault == "complete-native" || fault == "complete-maintenance"
+			terminal := strings.HasPrefix(fault, "complete")
 			if terminal {
 				finished, err := tr.Rollback(time.Now())
 				if err != nil {
@@ -129,7 +131,7 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 					}
 				}
 			}
-			copies = append(copies, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: mesh.Namespace, Name: "agent", UID: "pod"}, Spec: corev1.PodSpec{NodeName: plan.CloudNodeName}, Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://agent", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.Now()}}}}}})
+			copies = append(copies, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: mesh.Namespace, Name: "agent", UID: "pod"}, Spec: corev1.PodSpec{NodeName: plan.CloudNodeName}, Status: corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}, ContainerStatuses: []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://agent", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.Now()}}}}}})
 			k := fake.NewClientset(copies...)
 			delivered := make(chan handover.ReceiptRequest, 1)
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -179,6 +181,20 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 				if uid != plan.CloudNodeUID || key != root || v.Round.Phase != phase || v.Complete != terminal {
 					t.Error("native dispatch changed admitted identity")
 				}
+				if fault == "complete-pod-race" || fault == "complete-container-race" {
+					pod, err := k.CoreV1().Pods(mesh.Namespace).Get(ctx, cfg.receiptPodName, metav1.GetOptions{})
+					if err != nil {
+						t.Fatal(err)
+					}
+					if fault == "complete-pod-race" {
+						pod.UID = "replacement"
+					} else {
+						pod.Status.ContainerStatuses[0].ContainerID = "replacement"
+					}
+					if _, err := k.CoreV1().Pods(mesh.Namespace).Update(ctx, pod, metav1.UpdateOptions{}); err != nil {
+						t.Fatal(err)
+					}
+				}
 				if fault == "native" || fault == "complete-native" {
 					return fmt.Errorf("native observation failed")
 				}
@@ -202,6 +218,128 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 			}
 			if !handled || (err == nil) != (fault == "valid" || fault == "complete") {
 				t.Fatalf("handled=%v error=%v", handled, err)
+			}
+
+			if terminal {
+				localStore := store
+				localStore.ConfigMaps = k.CoreV1().ConfigMaps(mesh.Namespace)
+				localScope := receiveJournalScope{Namespace: mesh.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUID: plan.MachineUID}
+				path := filepath.Join(directory, cfg.iface+".reconcile.lock."+store.Name+".json")
+				saved, readErr := readReceiveJournalCheckpoint(path, localStore, localScope, cfg.nodeName, root)
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				if (saved.NativeObservation != nil) != (fault == "complete") {
+					t.Fatalf("native observation persisted without successful completed verification: %s", fault)
+				}
+				if fault == "complete" {
+					before, err := os.ReadFile(path)
+					if err != nil {
+						t.Fatal(err)
+					}
+					var oldFormat receiveJournalCheckpoint
+					decoder := json.NewDecoder(bytes.NewReader(before))
+					decoder.DisallowUnknownFields()
+					if err := decoder.Decode(&oldFormat); err != nil {
+						t.Fatal("native observation changed strict checkpoint format", err)
+					}
+
+					if _, err := checkpointReceiveJournal(ctx, k, localStore, localScope, cfg, root); err != nil {
+						t.Fatal(err)
+					}
+
+					currentSet, err := loadReceiveSet(ctx, k, localStore, localScope, cfg.nodeName, root)
+					if err != nil {
+						t.Fatal(err)
+					}
+					lock, err := lockReconciliation(cfg)
+					if err != nil {
+						t.Fatal(err)
+					}
+					err = checkpointReceiveSetLocked(ctx, k, localStore, localScope, cfg, root, lock.Name(), currentSet)
+					lock.Close()
+					if err != nil {
+						t.Fatal("native observation disrupted inventory checkpointing", err)
+					}
+					retained, err := readReceiveJournalCheckpoint(path, localStore, localScope, cfg.nodeName, root)
+					if err != nil || retained.NativeObservation == nil {
+						t.Fatal("unchanged checkpoint lost native observation", err)
+					}
+					after, err := os.ReadFile(path)
+					if err != nil || !bytes.Equal(before, after) {
+						t.Fatal("unchanged live admission lost native observation", err)
+					}
+
+					currentJournal, err := localStore.ConfigMaps.Get(ctx, localStore.Name, metav1.GetOptions{})
+					if err != nil {
+						t.Fatal(err)
+					}
+					currentJournal.ResourceVersion += "-changed"
+					if _, err := localStore.ConfigMaps.Update(ctx, currentJournal, metav1.UpdateOptions{}); err != nil {
+						t.Fatal(err)
+					}
+					if _, err := checkpointReceiveJournal(ctx, k, localStore, localScope, cfg, root); err != nil {
+						t.Fatal(err)
+					}
+					changedCheckpoint, err := readReceiveJournalCheckpoint(path, localStore, localScope, cfg.nodeName, root)
+					if err != nil || changedCheckpoint.NativeObservation != nil {
+						t.Fatal("changed checkpoint inherited native observation", err)
+					}
+					for _, invalid := range []string{"digest", "boot", "pod", "container", "future", "previous-boot", "trailing"} {
+						var record receiveJournalCheckpoint
+						if err := json.Unmarshal(before, &record); err != nil {
+							t.Fatal(err)
+						}
+						observation := *saved.NativeObservation
+						switch invalid {
+						case "digest":
+							observation.JournalSHA256 = "changed"
+						case "boot":
+							observation.BootID = "changed"
+						case "pod":
+							observation.AgentPodUID = ""
+						case "container":
+							observation.AgentContainerID = ""
+						case "future":
+							observation.ObservedAt = time.Now().Add(time.Hour)
+						case "previous-boot":
+							record.BootID = "previous"
+							observation.BootID = "previous"
+						}
+						testPath := filepath.Join(t.TempDir(), "checkpoint.json")
+						if err := writeDurableJSON(testPath, record); err != nil {
+							t.Fatal(err)
+						}
+						if err := writeDurableJSON(receiveNativeObservationPath(testPath, localStore.Name), observation); err != nil {
+							t.Fatal(err)
+						}
+						if invalid == "trailing" {
+							file, err := os.OpenFile(receiveNativeObservationPath(testPath, localStore.Name), os.O_APPEND|os.O_WRONLY, 0600)
+							if err != nil {
+								t.Fatal(err)
+							}
+							_, err = file.WriteString(" {}")
+							closeErr := file.Close()
+							if err != nil || closeErr != nil {
+								t.Fatal(err, closeErr)
+							}
+						}
+						got, err := readReceiveJournalCheckpoint(testPath, localStore, localScope, cfg.nodeName, root)
+						if invalid == "digest" || invalid == "boot" {
+							if err != nil || got.NativeObservation != nil {
+								t.Fatalf("stale native observation inherited: %s: %v", invalid, err)
+							}
+						} else if err == nil {
+							t.Fatalf("unsafe native observation accepted offline: %s", invalid)
+						}
+						if invalid == "previous-boot" {
+							historical, err := readReceiveJournalCheckpointForAdmission(testPath, localStore, localScope, cfg.nodeName, root, true)
+							if err != nil || historical.NativeObservation == nil {
+								t.Fatal("live admission lost valid historical observation", err)
+							}
+						}
+					}
+				}
 			}
 			if fault == "valid" {
 				if nativeCalls != 1 {

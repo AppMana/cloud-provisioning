@@ -134,6 +134,9 @@ func prepareReceivePaths(devices receiverDevices, mesh string, root wgtypes.Key,
 		if err := netlink.LinkSetUp(link); err != nil {
 			return nil, err
 		}
+		if err := ensureReceiveReversePathFiltering(path.Interface, receiverAlias(mesh, path.PublicKey)); err != nil {
+			return nil, err
+		}
 		live, err = devices.Device(path.Interface)
 		if err != nil {
 			return nil, err

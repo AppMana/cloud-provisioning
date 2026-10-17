@@ -425,6 +425,9 @@ func verifyReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.Ke
 		}
 	}
 	for _, selection := range selections {
+		if err := verifyReceiveReversePathFiltering(selection.Interface); err != nil {
+			return err
+		}
 		if nodeUID == plan.CloudNodeUID {
 			live, err := devices.Device(selection.Interface)
 			if err != nil {

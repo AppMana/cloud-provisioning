@@ -97,6 +97,9 @@ func prepareSiteReceiveClient(devices receiverDevices, mesh string, siteKey wgty
 	if err := netlink.LinkSetUp(link); err != nil {
 		return tunnel.SiteReceiveClient{}, err
 	}
+	if err := ensureReceiveReversePathFiltering(plan.Interface, alias); err != nil {
+		return tunnel.SiteReceiveClient{}, err
+	}
 	live, err = devices.Device(plan.Interface)
 	if err != nil {
 		return tunnel.SiteReceiveClient{}, err

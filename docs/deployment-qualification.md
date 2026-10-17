@@ -268,6 +268,39 @@ overrides.
 
 ## Continuous management observations
 
+### Failure scenario descriptions
+
+Every failure test description must state the injected fault, affected resources
+and identities, observation lanes, recovery deadline, allowed interruption, and
+limitations of the evidence. Record these before injection. Retain every failed
+request and incomplete attempt; an expected interruption remains a measured
+interruption. Report maintenance acceptance separately from release eligibility.
+Do not remove failed samples or relax a gate to represent an exception.
+
+| Scenario | Required behavior and permitted interruption | Evidence limitations |
+| --- | --- | --- |
+| Local MTU controller maintenance | Restart one controller at a time; its direct API endpoint may be unavailable for at most 60 seconds. Other API endpoints and existing workloads must remain available. Verify recovery before advancing. | This local maintenance allowance does not qualify production migration or satisfy zero-management-failure rows. Static configuration validation does not prove coordinated rollback. Verify rendered CNI configuration and fresh pod MTU; existing pods can retain their old MTU. |
+| Kubelet or container-runtime maintenance | Exec/log access on the maintained worker may be interrupted for at most 60 seconds; API health, other nodes and existing workload traffic remain uninterrupted. | A running workload does not establish exec/log continuity. This exception does not apply to agent upgrades or ordinary reconciliation. |
+| Agent upgrade | Observe a distinct immutable predecessor becoming the candidate on every intended node with zero management and workload failures. | Same-version restarts, desired image references and rollout status alone do not prove an upgrade or its continuity. |
+| Worker reboot and idle boot recovery | Measure from reboot injection through usable networking and workload recovery; require recovery within 60 seconds and preserve unaffected site/API availability. Observe exec/log loss on the rebooted worker explicitly. | A network-namespace restoration test does not establish VM boot time, workload recovery or the reboot gate. Fresh traffic can hide idle recovery delays. Missing or stale endpoint hints and changed NAT mappings require separate cases; a hint alone cannot authorize routes without authenticated recovery. |
+| Endpoint failover | Inject loss of the selected endpoint; recover cloud traffic within 60 seconds with zero management or existing-site failures. | One endpoint placement or address family does not qualify another. Report changed addresses and NAT mappings separately. |
+| API loss | Block the declared control-path access; retain established forwarding and recover affected cloud traffic within 60 seconds. Keep independent API health and site observations running. | Distinguish deliberately blocked client requests from API-server failures. Losing controller access is not evidence for losing every API endpoint or the management observer. |
+| Controller restart | Restart the declared controller and recover affected cloud traffic within 60 seconds without management or existing-site failures. | Reconciliation recovery does not establish host reboot recovery, leader failover or continuity during a binary upgrade. |
+| Cloud network-manager restart | Restart the actual owner of cloud networking; recover cloud traffic within 60 seconds, preserving foreign routes, addresses and policy and zero management/site failures. | Restarting only the provisioning agent does not exercise the network manager. Qualification is specific to the tested manager and configuration. |
+| Route collision | Introduce a declared foreign route or policy conflict; reject unsafe mutation and preserve existing connectivity and ownership. | One collision shape does not cover other tables, priorities, marks or either untested IP family. Rejection alone does not demonstrate continued forwarding. |
+| MTU blackhole | Inject the declared path-MTU fault; recover cloud traffic within 60 seconds with zero management/site failures. Measure large traffic in both directions. | Small probes and warmed PMTU caches can conceal a first-packet failure. State payload sizes, DF behavior, cache state and each path's MTU; retries cannot erase the initial loss. |
+| Autonomous migration rollback | Deny the declared management paths and let the local guard restore owned changes within five minutes, without console intervention. Maintain management/site observations. | Restored files or a successful guard receipt do not prove restored networking. Verify effective routes, CNI and workloads. Independent per-node guards do not establish safe multi-controller sequencing or quorum preservation. |
+| Allocation churn, pod recreation and worker replacement | Observe allocation withdrawal and replacement through usable traffic, with no failures in required campaign lanes. Record intentional target lifecycle changes separately. | A replacement's readiness does not prove stale routes disappeared. Pin identities and use stable Services where testing continuity across pod-IP changes. |
+| Last-worker deletion | Delete through the provisioning lifecycle and verify final route withdrawal and resource release without existing-site regressions. | Empty Kubernetes listings do not prove AWS cleanup; inspect cloud resources. Do not bypass finalizers to make the test finish. |
+| Credential expiry and producer outage | Cross a real expiry boundary; verify projected credentials and actual observation requests. On renewal failure, preserve previous allocations and report observation failure. | Successful Secret publication does not prove projection or AWS authorization. A shorter run does not establish 24-hour credential continuity. |
+
+For every row, name untested combinations explicitly, including IP family,
+architecture, CNI, operating system, endpoint placement and site profile. Keep
+run timestamps, actual identities, measurements and failure narratives in private
+evidence and commit messages, rather than turning these descriptions into a run
+log. Missing observations, interrupted samplers and recovery beyond the stated
+deadline remain incomplete or failed even if a later manual check succeeds.
+
 Runtime maintenance is distinct from a cloud-provisioning agent upgrade.
 An explicitly scoped kubelet or container-runtime restart may interrupt exec
 and logs on the maintained worker, with recovery within 60 seconds. API health,

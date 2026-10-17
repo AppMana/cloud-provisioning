@@ -70,17 +70,17 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 	if currentMachine.GetUID() != machine.GetUID() {
 		return nil, fmt.Errorf("receiver inventory machine identity changed")
 	}
-	if err := tunnel.ReserveReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, mesh, string(machine.GetUID()), r.owners()); err != nil {
-		return nil, err
-	}
 	existing, err := store.Load(ctx)
 	if err == nil {
 		plan, err := tunnel.DecodeReceiveTransition(existing, store.ClusterUID)
 		if err != nil {
 			return nil, err
 		}
-		if plan.MachineUID != string(machine.GetUID()) || plan.MachineName != machine.GetName() || plan.Namespace != r.secretNamespace {
+		if plan.MachineUID != string(machine.GetUID()) || plan.MachineName != machine.GetName() || plan.Namespace != r.secretNamespace || plan.MeshUID != string(mesh.UID) || plan.MeshName != mesh.Name {
 			return nil, fmt.Errorf("receiver journal belongs to another machine")
+		}
+		if err := tunnel.ReserveReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, mesh, string(machine.GetUID()), r.owners()); err != nil {
+			return nil, err
 		}
 		return &existing, nil
 	}
@@ -106,6 +106,13 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 	}
 	transition, err := handover.NewTransition(spec, now, policy)
 	if err != nil {
+		return nil, err
+	}
+	// Preparation is additive and still needs ordinary agent reconciliation.
+	// Reserving earlier would fence those agents on a missing journal before
+	// they could publish the readiness needed to construct it. Preserve the
+	// reservation-before-creation invariant once the complete plan is ready.
+	if err := tunnel.ReserveReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, mesh, string(machine.GetUID()), r.owners()); err != nil {
 		return nil, err
 	}
 	store.OwnerReferences = r.owners()

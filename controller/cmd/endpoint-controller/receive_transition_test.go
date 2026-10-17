@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
@@ -59,6 +60,41 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	defer func() { r.receivePreparation.Journal = nil }()
 	store := r.receiveJournal
 	store.Name = tunnel.ReceiveTransitionName(string(machine.GetUID()))
+	for _, missing := range []string{tunnel.ReceiveReadyKey, tunnel.SiteReceiveReadyKey(preparationKey(8))} {
+		adoption := &corev1.Secret{}
+		key := client.ObjectKey{Namespace: machine.GetNamespace(), Name: tunnel.AdoptionSecretName(machine.GetName())}
+		if err := r.reader.Get(ctx, key, adoption); err != nil {
+			t.Fatal(err)
+		}
+		ready := slices.Clone(adoption.Data[missing])
+		if len(ready) == 0 {
+			t.Fatal("fixture lacks readiness to remove")
+		}
+		delete(adoption.Data, missing)
+		if err := r.Update(ctx, adoption); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.reconcileReceivePreparation(ctx, machine); err != nil {
+			t.Fatal("pending preparation failed", err)
+		}
+		mesh := &corev1.Secret{}
+		if err := r.reader.Get(ctx, client.ObjectKey{Namespace: r.secretNamespace, Name: r.secretName}, mesh); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID)); !apierrors.IsNotFound(err) {
+			t.Fatal("pending preparation fenced ordinary agents", err)
+		}
+		if _, err := store.Load(ctx); !apierrors.IsNotFound(err) {
+			t.Fatal("pending preparation created a journal", err)
+		}
+		if err := r.reader.Get(ctx, key, adoption); err != nil {
+			t.Fatal(err)
+		}
+		adoption.Data[missing] = ready
+		if err := r.Update(ctx, adoption); err != nil {
+			t.Fatal(err)
+		}
+	}
 	// Verify publication ordering at the real API write boundary: no journal
 	// may be created before discovery contains its immutable Machine identity.
 	r.receiveJournal.ConfigMaps = inventoryCheckedCreates{ConfigMapInterface: store.ConfigMaps, check: func(ctx context.Context, object *corev1.ConfigMap) error {
@@ -97,6 +133,22 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	if plan.MachineUID != string(machine.GetUID()) || len(plan.Sites) != 2 {
 		t.Fatal("journal lost controller plan")
 	}
+	t.Run("replaced-mesh-cannot-reserve-old-journal", func(t *testing.T) {
+		mesh := &corev1.Secret{}
+		if err := r.reader.Get(ctx, client.ObjectKey{Namespace: r.secretNamespace, Name: r.secretName}, mesh); err != nil {
+			t.Fatal(err)
+		}
+		mesh.UID = "replacement-mesh"
+		reader := fake.NewClientBuilder().WithScheme(r.Scheme()).WithObjects(mesh, machine.DeepCopy()).Build()
+		replaced := *r
+		replaced.Client, replaced.reader = reader, reader
+		if _, err := replaced.ensureReceiveTransition(ctx, machine, store, native, ports, handover.Policy{}, now); err == nil {
+			t.Fatal("resumed a journal from the previous mesh")
+		}
+		if _, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID)); !apierrors.IsNotFound(err) {
+			t.Fatal("old journal reserved in replacement mesh", err)
+		}
+	})
 	legacy := plan.Sites[preparationKey(16)].Legacy
 	if legacy == nil || legacy.PeerPublicKey != preparationKey(8) || legacy.Transit == nil || legacy.Transit.Via != "10.101.0.1" {
 		t.Fatal("journal lost the old relay while the desired mesh selected another site")

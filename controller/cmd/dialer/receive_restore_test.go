@@ -24,22 +24,26 @@ import (
 // This checks eventual device restoration, not the deployment recovery deadline.
 // Idle WireGuard rekey latency must be qualified separately with workload traffic.
 func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
-	nativeRestoreCompletedReceivePaths(t, false, false, false)
+	nativeRestoreCompletedReceivePaths(t, false, false, "")
 }
 
 func TestNativeRestoreCompletedReceiveTraffic(t *testing.T) {
-	nativeRestoreCompletedReceivePaths(t, true, false, false)
+	nativeRestoreCompletedReceivePaths(t, true, false, "")
 }
 
 func TestNativeRestoreCompletedReceiveBoot(t *testing.T) {
-	nativeRestoreCompletedReceivePaths(t, true, true, false)
+	nativeRestoreCompletedReceivePaths(t, true, true, "")
 }
 
 func TestNativeRestoreCompletedReceiveIdleBoot(t *testing.T) {
-	nativeRestoreCompletedReceivePaths(t, true, true, true)
+	nativeRestoreCompletedReceivePaths(t, true, true, "current")
 }
 
-func nativeRestoreCompletedReceivePaths(t *testing.T, traffic, bootRecovery, endpointRecovery bool) {
+func TestNativeRestoreCompletedReceiveStaleEndpoint(t *testing.T) {
+	nativeRestoreCompletedReceivePaths(t, true, true, "stale")
+}
+
+func nativeRestoreCompletedReceivePaths(t *testing.T, traffic, bootRecovery bool, endpointRecovery string) {
 	if os.Getenv("CLDT_RESTORE_RECEIVE_PATHS") != "1" {
 		t.Skip("requires isolated VM mount and network namespaces")
 	}
@@ -118,7 +122,7 @@ func nativeRestoreCompletedReceivePaths(t *testing.T, traffic, bootRecovery, end
 			host.nodeName = ""
 			host.peersFile = filepath.Join(t.TempDir(), "peers.json")
 			writeReceiveBootFixture(t, host, root, plan, false)
-			if endpointRecovery {
+			if endpointRecovery != "" {
 				endpoints, err := captureReceiveBootEndpoints(devices, cfg, intent, plan.CloudNodeUID, time.Now())
 				must(err)
 				selections, err := receiveEndpointSelections(intent, plan.CloudNodeUID)
@@ -132,6 +136,9 @@ func nativeRestoreCompletedReceivePaths(t *testing.T, traffic, bootRecovery, end
 					t.Fatal("endpoint hints overwrote a live peer")
 				}
 				path := filepath.Join(filepath.Dir(host.peersFile), host.iface+".reconcile.lock."+tunnel.ReceiveTransitionName(plan.MachineUID)+".json")
+				if endpointRecovery == "stale" {
+					endpoints[pub] = "192.0.2.99:51820"
+				}
 				must(writeReceiveBootEndpoints(receiveNativeObservationPath(path, tunnel.ReceiveTransitionName(plan.MachineUID)), endpoints))
 			}
 			// The host defaults differ from the agent's verified routing scope.
@@ -173,8 +180,32 @@ func nativeRestoreCompletedReceivePaths(t *testing.T, traffic, bootRecovery, end
 				return nil
 			}
 		}
-		if endpointRecovery {
+		if endpointRecovery != "" {
 			must(fault())
+			if endpointRecovery == "stale" {
+				if err := restore(); err == nil {
+					t.Fatal("stale endpoint authorized unauthenticated recovery")
+				}
+				live, err := devices.Device(binding.Interface)
+				must(err)
+				if !live.Peers[0].LastHandshakeTime.IsZero() {
+					t.Fatal("unexpected authentication from stale hint")
+				}
+				link, err := netlink.LinkByName(binding.Interface)
+				must(err)
+				routes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: cfg.routeTable, LinkIndex: link.Attrs().Index}, netlink.RT_FILTER_TABLE|netlink.RT_FILTER_OIF)
+				must(err)
+				if len(routes) != 0 {
+					t.Fatal("stale endpoint authorized routes", routes)
+				}
+				// A separate peer restart supplies a fresh authenticated source.
+				// This is the injected fault scenario, not a recovery action.
+				siteLink, err := netlink.LinkByName(client.Interface)
+				must(err)
+				must(netlink.LinkDel(siteLink))
+				_, err = prepareSiteReceiveClient(devices, plan.MeshUID, site, plan.RootPublicKey, binding, siteDoc, siteDoc, 1400, 518)
+				must(err)
+			}
 			wait(restore, time.Minute)
 			return
 		}

@@ -46,8 +46,13 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 			}
 			return reconcileReceiveAdvertisements(ctx, devices, cfg, speaker, plan.MachineUID, nodeUID, intent)
 		})
-		if err != nil || handled {
+		if err != nil {
 			return err
+		}
+		if handled {
+			return reconcileReceiveNeighbors(ctx, k, cfg, func(ctx context.Context, key wgtypes.Key, peers []tunnel.PeerSpec, own []string) error {
+				return installReceiveNeighbors(ctx, devices, cfg, key, peers, own)
+			})
 		}
 	}
 	lock, err := lockLegacyReconciliation(cfg)

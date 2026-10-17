@@ -167,6 +167,7 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 	}
 	scope := receiveJournalScope{Namespace: namespace.Name, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUID: plan.MachineUID}
 	verifyReceiveDispatch(t, api, store, mesh, plan, root)
+	verifyReceiveNeighborAdmission(t, api, store, mesh, plan, site)
 	for name, key := range map[string]wgtypes.Key{"cloud": root, "site": site} {
 		admitted, err := loadReceiveJournal(ctx, api, store, scope, name, key)
 		if err != nil || admitted.NodeUID != string(nodes[name].UID) || admitted.BootID != boot {

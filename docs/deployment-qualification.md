@@ -325,6 +325,16 @@ evidence and commit messages, rather than turning these descriptions into a run
 log. Missing observations, interrupted samplers and recovery beyond the stated
 deadline remain incomplete or failed even if a later manual check succeeds.
 
+When receive journals reserve part of a site mesh, ordinary peer retirement
+requires both a complete current publication and durable prior ownership.
+Journal-owned peers remain excluded. Changed kernel source permissions or
+foreign routes depending on the retiring peer block withdrawal. A successful
+whole-peer deletion does not qualify source narrowing on a still-published peer,
+allocation churn, or retirement of independently prepared receiver devices.
+The isolated native neighbor test measures direct IPv4 address reuse and an
+unaffected peer's packet stream; it does not measure CAPI cleanup, live-site
+management continuity, IPv6, or AWS bootstrap. Those remain separate cases.
+
 For k0s controller maintenance, observe exec and logs through the controllers
 that remain running as well as the endpoint being restarted. Count-driven
 Konnectivity reconciliation can restart otherwise healthy proxy servers and

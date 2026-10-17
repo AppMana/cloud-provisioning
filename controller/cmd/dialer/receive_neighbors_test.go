@@ -75,6 +75,25 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 			must(os.WriteFile(cfg.privateKeyFile, []byte(site.String()), 0600))
 			checkpointPath := filepath.Join(filepath.Dir(cfg.privateKeyFile), cfg.iface+".reconcile.lock.neighbors.json")
 			var oldCheckpoint []byte
+			var cachedRetiredKey string
+			if fault == "native" {
+				retired, err := wgtypes.GeneratePrivateKey()
+				must(err)
+				oldCheckpoint, err = json.Marshal(receiveNeighborCheckpoint{Version: 1, InventoryUID: string(index.UID), MeshUID: string(mesh.UID), MeshVersion: "old", NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, PublicKey: site.PublicKey().String(), Peers: []tunnel.PeerSpec{{PublicKey: retired.PublicKey().String(), Remote: true, Endpoint: "198.51.100.99:51820", WGAllowedIPs: []string{"172.29.99.1/32"}}}})
+				must(err)
+				must(os.WriteFile(checkpointPath, oldCheckpoint, 0600))
+				cachedKey, err := wgtypes.GeneratePrivateKey()
+				must(err)
+				cachedRetiredKey = cachedKey.PublicKey().String()
+				cachedMesh := mesh.DeepCopy()
+				cachedMesh.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName] = []byte(site.PublicKey().String())
+				cachedMesh.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName] = []byte("10.100.0.1/24")
+				cachedMesh.Data[tunnel.PeerPublicKeyPrefix+"retired"] = []byte(cachedRetiredKey)
+				cachedMesh.Data[tunnel.PeerEndpointPrefix+"retired"] = []byte("198.51.100.98:51820")
+				cachedMesh.Data[tunnel.PeerAllowedIPsPrefix+"retired"] = []byte("172.29.99.2/32")
+				cachedMesh.Data[tunnel.PeerRouteHostsPrefix+"retired"] = []byte("172.29.99.2")
+				must(saveSiteForwardingCache(cfg, site, cachedMesh, nil, map[string]bool{}, nil))
+			}
 			if fault == "previous-boot" || fault == "previous-boot-stale-api" || fault == "empty-boot" {
 				boot := "previous-boot"
 				if fault == "empty-boot" {
@@ -150,7 +169,7 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 				must(k.CoreV1().ConfigMaps(mesh.Namespace).Delete(ctx, index.Name, metav1.DeleteOptions{}))
 			}
 			calls := 0
-			native := func(ctx context.Context, key wgtypes.Key, peers []tunnel.PeerSpec, own []string) error {
+			native := func(ctx context.Context, key wgtypes.Key, peers []tunnel.PeerSpec, own []string, retiring []tunnel.PeerSpec, allocated []string, commitRetirement func() error) error {
 				calls++
 				if key != site || len(peers) != 1 || peers[0].PublicKey != neighbor.PublicKey().String() {
 					t.Fatal("native received a different identity or partition")
@@ -319,6 +338,49 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 				}
 				if calls != want {
 					t.Fatalf("native calls=%d, want %d: %v", calls, want, err)
+				}
+				if fault == "native" {
+					// The failed native operation must not discard the previous
+					// owner, including across another reconciliation attempt.
+					for attempt := 0; attempt < 2; attempt++ {
+						raw, err := os.ReadFile(checkpointPath + ".retiring")
+						must(err)
+						var saved, prior receiveNeighborCheckpoint
+						must(json.Unmarshal(raw, &saved))
+						must(json.Unmarshal(oldCheckpoint, &prior))
+						if saved.Version != 1 || len(saved.Retiring) != 2 || saved.Retiring[0].PublicKey != prior.Peers[0].PublicKey || saved.Retiring[1].PublicKey != cachedRetiredKey || len(saved.Peers) != 1 {
+							t.Fatal("failed installation discarded old ownership")
+						}
+						mainRaw, err := os.ReadFile(checkpointPath)
+						must(err)
+						var original map[string]json.RawMessage
+						must(json.Unmarshal(mainRaw, &original))
+						if _, added := original["retiring"]; added || string(original["version"]) != "1" {
+							t.Fatal("retirement changed the rollback binary's checkpoint format")
+						}
+						if attempt == 0 {
+							must(os.Remove(siteForwardingCachePath(cfg)))
+						}
+						if err := reconcileReceiveNeighbors(ctx, k, cfg, native, nil); err == nil {
+							t.Fatal("failed native retry accepted")
+						}
+					}
+					for attempt := 0; attempt < 2; attempt++ {
+						completeRetirement := func(ctx context.Context, key wgtypes.Key, peers []tunnel.PeerSpec, own []string, retiring []tunnel.PeerSpec, allocated []string, commit func() error) error {
+							want := 2
+							if attempt == 1 {
+								want = 0
+							}
+							if len(retiring) != want {
+								t.Fatalf("retirement replay after later installation failure: got %d, want %d", len(retiring), want)
+							}
+							must(commit())
+							return errors.New("replacement installation failed")
+						}
+						if err := reconcileReceiveNeighbors(ctx, k, cfg, completeRetirement, nil); err == nil {
+							t.Fatal("failed replacement installation accepted")
+						}
+					}
 				}
 			}
 		})

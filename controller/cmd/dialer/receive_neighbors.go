@@ -18,7 +18,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type receiveNeighborNative func(context.Context, wgtypes.Key, []tunnel.PeerSpec, []string) error
+type receiveNeighborNative func(context.Context, wgtypes.Key, []tunnel.PeerSpec, []string, []tunnel.PeerSpec, []string, func() error) error
 
 type receiveNeighborPreparation func(context.Context, wgtypes.Key, *corev1.Secret, []tunnel.PeerSpec, func() error) error
 
@@ -31,6 +31,7 @@ type receiveNeighborCheckpoint struct {
 	BootID       string            `json:"bootID"`
 	PublicKey    string            `json:"publicKey"`
 	Peers        []tunnel.PeerSpec `json:"peers"`
+	Retiring     []tunnel.PeerSpec `json:"retiring,omitempty"`
 }
 
 // Ordinary peers have independent forwarding authority. This operation keeps
@@ -190,7 +191,17 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	// set has verified the current local boot. Cached peers are never replayed.
 	saved := receiveNeighborCheckpoint{Version: 1, InventoryUID: string(set.Metadata.UID), MeshUID: string(mesh.UID), MeshVersion: mesh.ResourceVersion, NodeUID: local.NodeUID, BootID: local.BootID, PublicKey: key.PublicKey().String(), Peers: peers}
 	path := lock.Name() + ".neighbors.json"
-	if raw, err := os.ReadFile(path); err == nil {
+	var previousPeers []tunnel.PeerSpec
+	legacy := true
+	known := map[string]bool{}
+	for _, source := range []string{path, path + ".retiring"} {
+		raw, err := os.ReadFile(source)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
 		var previous receiveNeighborCheckpoint
 		decoder := json.NewDecoder(bytes.NewReader(raw))
 		decoder.DisallowUnknownFields()
@@ -201,13 +212,59 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		if err := decoder.Decode(&trailing); err != io.EOF {
 			return fmt.Errorf("trailing neighbor checkpoint data")
 		}
-		if previous.Version != 1 || previous.InventoryUID != saved.InventoryUID || previous.MeshUID != saved.MeshUID || previous.NodeUID != saved.NodeUID || previous.BootID == "" || previous.PublicKey != saved.PublicKey || previous.Peers == nil {
+		if previous.Version != 1 || previous.InventoryUID != saved.InventoryUID || previous.MeshUID != saved.MeshUID || previous.NodeUID != saved.NodeUID || previous.BootID == "" || previous.PublicKey != saved.PublicKey || previous.Peers == nil || (source == path && len(previous.Retiring) != 0) {
 			return fmt.Errorf("neighbor checkpoint identity changed")
 		}
-	} else if !errors.Is(err, os.ErrNotExist) {
+		prior := previous.Peers
+		if source != path {
+			legacy = false
+			prior = previous.Retiring
+		}
+		for _, peer := range prior {
+			if !known[peer.PublicKey] {
+				previousPeers = append(previousPeers, peer)
+				known[peer.PublicKey] = true
+			}
+		}
+	}
+	// The old checkpoint recorded only the latest attempted publication. On
+	// migration, the identity-bound legacy forwarding cache can recover peers
+	// omitted by that attempt. It cannot authorize mutation or replay old routes.
+	if legacy {
+		cached, err := readSiteForwardingCache(cfg, key)
+		if err == nil {
+			if cached.MeshUID != saved.MeshUID {
+				return fmt.Errorf("neighbor forwarding cache mesh identity changed")
+			}
+			old, err := tunnel.SitePeers(cached.Data)
+			if err != nil {
+				return err
+			}
+			known := map[string]bool{}
+			for _, peer := range previousPeers {
+				known[peer.PublicKey] = true
+			}
+			for _, peer := range old {
+				if !known[peer.PublicKey] {
+					previousPeers = append(previousPeers, peer)
+				}
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	retirement := saved
+	retirement.Retiring, err = tunnel.PlanReceiveNeighborRetirements(previousPeers, peers, plans)
+	if err != nil {
 		return err
 	}
 	if err := check(); err != nil {
+		return err
+	}
+	// Keep retirement intent separate so a rollback binary can still read the
+	// unchanged v1 neighbor checkpoint. Persist it first: replacing the main
+	// checkpoint must never erase the only record of a withdrawn owner.
+	if err := writeDurableJSON(path+".retiring", retirement); err != nil {
 		return err
 	}
 	if err := writeDurableJSON(path, saved); err != nil {
@@ -216,7 +273,18 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	if err := check(); err != nil {
 		return err
 	}
-	if err := native(ctx, key, peers, tunnel.ReceiveSiteRouteSources(mesh.Data, cfg.nodeName)); err != nil {
+	var allocated []string
+	if site := local.Plan.Sites[key.PublicKey().String()]; site.Legacy != nil && site.Legacy.Tunnel != nil {
+		allocated = site.Legacy.Tunnel.Addresses
+	}
+	commitRetirement := func() error {
+		if err := check(); err != nil {
+			return err
+		}
+		retirement.Retiring = nil
+		return writeDurableJSON(path+".retiring", retirement)
+	}
+	if err := native(ctx, key, peers, tunnel.ReceiveSiteRouteSources(mesh.Data, cfg.nodeName), retirement.Retiring, allocated, commitRetirement); err != nil {
 		return err
 	}
 	if err := check(); err != nil {
@@ -227,5 +295,9 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 			return err
 		}
 	}
-	return check()
+	if err := check(); err != nil {
+		return err
+	}
+	retirement.Retiring = nil
+	return writeDurableJSON(path+".retiring", retirement)
 }

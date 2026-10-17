@@ -235,4 +235,29 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 		must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}))
 		time.Sleep(2 * time.Millisecond)
 	}
+	// An obsolete neighbor may release its address only after all dependent
+	// routes are proven owned. The unaffected peer's stream stays running.
+	_, retiredDst, _ := net.ParseCIDR("10.77.0.3/32")
+	foreign := netlink.Route{LinkIndex: link.Attrs().Index, Dst: retiredDst, Table: 999, Scope: netlink.SCOPE_LINK, Protocol: unix.RTPROT_STATIC}
+	must(netlink.RouteAdd(&foreign))
+	if err := retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}, nil); err == nil {
+		t.Fatal("retirement removed a peer with a foreign route dependency")
+	}
+	probe(joining)
+	must(netlink.RouteDel(&foreign))
+	must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}, nil))
+	// Repeating a partially or fully completed deletion must be harmless.
+	must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}, nil))
+	device, err := devices.Device(cfg.iface)
+	must(err)
+	for _, current := range device.Peers {
+		if current.PublicKey == neighbor {
+			t.Fatal("retired source owner remains installed")
+		}
+	}
+	replacement, replaced, _ := makeSender("replacement", "10.77.0.3", 51824)
+	peer.PublicKey = replacement.String()
+	peer.Endpoint = "127.0.0.1:51824"
+	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}))
+	probe(replaced)
 }

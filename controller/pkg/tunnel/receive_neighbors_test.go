@@ -10,6 +10,40 @@ func neighborFixture() PeerSpec {
 	return PeerSpec{PublicKey: receiverTestKey(120), Remote: true, Endpoint: "198.51.100.9:51820", WGAllowedIPs: []string{"172.29.0.9/32", "2001:db8:2::9/128"}, RouteHosts: []string{"172.29.0.9", "2001:db8:2::9"}}
 }
 
+func TestReceiveNeighborRetirementIntent(t *testing.T) {
+	plans := routeSetFixture(t)
+	old := neighborFixture()
+	replacement := old
+	replacement.PublicKey = receiverTestKey(121)
+	previous := []PeerSpec{plans[0].SiteDesired.Peers[0], old, plans[1].SiteDesired.Peers[0]}
+	// Address reuse must retain the old owner's identity for explicit retirement;
+	// neither reserved worker belongs in that retirement set.
+	got, err := PlanReceiveNeighborRetirements(previous, []PeerSpec{replacement}, plans)
+	if err != nil || !reflect.DeepEqual(got, []PeerSpec{old}) {
+		t.Fatalf("lost retiring owner or included journal owner: %+v %v", got, err)
+	}
+	got[0].WGAllowedIPs[0] = "changed"
+	if old.WGAllowedIPs[0] != "172.29.0.9/32" {
+		t.Fatal("retirement intent aliases previous publication")
+	}
+	got, err = PlanReceiveNeighborRetirements(previous, []PeerSpec{old}, plans)
+	if err != nil || len(got) != 0 {
+		t.Fatal("still-published owner was retired", err)
+	}
+	got, err = PlanReceiveNeighborRetirements(previous, []PeerSpec{}, plans)
+	if err != nil || len(got) != 1 {
+		t.Fatal("last ordinary owner was not retained for retirement", err)
+	}
+	if _, err := PlanReceiveNeighborRetirements(previous, nil, plans); err == nil {
+		t.Fatal("missing publication authorized retirement")
+	}
+	old.WGAllowedIPs = []string{"172.29.0.1/32"}
+	old.RouteHosts = nil
+	if _, err := PlanReceiveNeighborRetirements([]PeerSpec{old}, []PeerSpec{}, plans); err == nil {
+		t.Fatal("retirement overlapped a reserved worker")
+	}
+}
+
 func TestReceiveNeighborsPreserveJournalOwnership(t *testing.T) {
 	plans := routeSetFixture(t)
 	peer := neighborFixture()

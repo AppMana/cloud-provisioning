@@ -56,7 +56,15 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 		if handled {
 			// Ordinary neighbors have independent live admission. Do not starve
 			// their recovery while phase verification waits for their routes.
-			neighborErr := reconcileReceiveNeighbors(ctx, k, cfg, func(ctx context.Context, key wgtypes.Key, peers []tunnel.PeerSpec, own []string) error {
+			neighborErr := reconcileReceiveNeighbors(ctx, k, cfg, func(ctx context.Context, key wgtypes.Key, peers []tunnel.PeerSpec, own []string, retiring []tunnel.PeerSpec, allocated []string, commitRetirement func() error) error {
+				if err := retireReceiveNeighbors(ctx, devices, cfg, key, retiring, own, allocated); err != nil {
+					return err
+				}
+				// Persist withdrawal before a new owner can acquire the same
+				// source. A failed later installation must not replay deletion.
+				if err := commitRetirement(); err != nil {
+					return err
+				}
 				return restoreReceiveNeighbors(ctx, devices, cfg, key, peers, own)
 			}, func(ctx context.Context, key wgtypes.Key, mesh *corev1.Secret, peers []tunnel.PeerSpec, check func() error) error {
 				roots := make(map[string]bool, len(peers))

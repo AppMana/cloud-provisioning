@@ -7,6 +7,28 @@ import (
 	"slices"
 )
 
+// PlanReceiveNeighborRetirements retains previously admitted ordinary peers
+// that are absent from the complete current publication. The result is intent,
+// not permission to delete kernel state: native retirement must still match the
+// exact device, peer permissions and owned routes. Both journal generations
+// remain excluded even after their transitions complete.
+func PlanReceiveNeighborRetirements(previous, desired []PeerSpec, plans []ReceiveTransitionPlan) ([]PeerSpec, error) {
+	if _, err := PlanReceiveNeighborPeers(desired, plans); err != nil {
+		return nil, err
+	}
+	wanted := make(map[string]bool, len(desired))
+	for _, peer := range desired {
+		wanted[peer.PublicKey] = true
+	}
+	absent := make([]PeerSpec, 0)
+	for _, peer := range previous {
+		if !wanted[peer.PublicKey] {
+			absent = append(absent, peer)
+		}
+	}
+	return PlanReceiveNeighborPeers(absent, plans)
+}
+
 // PlanReceiveNeighborPeers separates ordinary site peers from journal-owned
 // identities and destinations. It does not release a journal or authorize a
 // native mutation: callers must admit the complete live inventory, serialize

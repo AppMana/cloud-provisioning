@@ -68,6 +68,12 @@ func stableAddressIdentity(request stableAddressOwnerRequest) (stableAddressOwne
 // authorized retirement. A matching owner can recover missing addresses after
 // restart, including when the old generation device is already absent.
 func prepareStableAddressOwner(devices receiverDevices, request stableAddressOwnerRequest) (stableAddressOwnerBinding, error) {
+	return reconcileStableAddressOwner(devices, request, false)
+}
+
+// Recovery is authorized only by live completed-journal admission. Preparation
+// continues to require native allocation evidence before a handover begins.
+func reconcileStableAddressOwner(devices receiverDevices, request stableAddressOwnerRequest, recoverAllocation bool) (stableAddressOwnerBinding, error) {
 	binding, err := stableAddressIdentity(request)
 	if err != nil {
 		return binding, err
@@ -109,7 +115,7 @@ func prepareStableAddressOwner(devices receiverDevices, request stableAddressOwn
 			return binding, fmt.Errorf("legacy tunnel public identity differs")
 		}
 	}
-	if owner == nil && legacy == nil {
+	if owner == nil && legacy == nil && !recoverAllocation {
 		return binding, fmt.Errorf("stable allocation has no current native owner")
 	}
 	links, err := netlink.LinkList()
@@ -149,7 +155,7 @@ func prepareStableAddressOwner(devices receiverDevices, request stableAddressOwn
 	}
 	if owner == nil {
 		for address := range wanted {
-			if !present[address] {
+			if !present[address] && !recoverAllocation {
 				return binding, fmt.Errorf("requested address is not assigned to the legacy tunnel")
 			}
 		}

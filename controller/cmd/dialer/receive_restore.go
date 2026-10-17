@@ -48,3 +48,24 @@ func restoreCompletedReceivePaths(ctx context.Context, devices receiverDevices, 
 	}
 	return verifyReceivePhasePaths(devices, cfg, key, plan, nodeUID)
 }
+
+// restoreCompletedReceiveState is called only under the executor's live
+// completed-journal admission and host lock. Transport validation establishes
+// the selected generation before recovering its committed local allocation.
+func restoreCompletedReceiveState(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
+	if err := restoreCompletedReceivePaths(ctx, devices, cfg, key, plan, view, nodeUID, intent); err != nil {
+		return err
+	}
+	if view.RollbackRequested || view.Round.Phase == handover.Abort {
+		return nil
+	}
+	_, allocated, err := tunnel.ReceiveLocalNetwork(plan, nodeUID)
+	if err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	_, err = reconcileStableAddressOwner(devices, stableAddressOwnerRequest{MeshUID: plan.MeshUID, NodeUID: nodeUID, LegacyInterface: cfg.iface, RootPublicKey: key.PublicKey().String(), Addresses: allocated}, true)
+	return err
+}

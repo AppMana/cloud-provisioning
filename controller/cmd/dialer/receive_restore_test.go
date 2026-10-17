@@ -51,10 +51,17 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 	preparation, err := tunnel.PlanReceiveHandover("restore-mesh", peers, peers, nil)
 	must(err)
 	binding := tunnel.ReceiveBinding{Interface: preparation.Receivers[0].Interface, PeerPublicKey: pub, PublicKey: receiverKey(root, "restore-mesh", pub).PublicKey().String(), ListenPort: 51821}
-	siteDoc := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: root.PublicKey().String(), Remote: true, Endpoint: "198.51.100.1:51820", WGAllowedIPs: []string{"172.29.0.1/32", "fd29::1/128"}}}}
+	siteDoc := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: root.PublicKey().String(), Remote: true, Endpoint: "198.51.100.1:51820", RouteHosts: []string{"172.29.0.1", "fd29::1"}, WGAllowedIPs: []string{"172.29.0.1/32", "fd29::1/128"}}}}
 	client, err := tunnel.PlanSiteReceiveClient("restore-mesh", pub, root.PublicKey().String(), binding, siteDoc, siteDoc)
 	must(err)
 	plan := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: "test", MeshName: "mesh", MeshUID: "restore-mesh", MachineName: "worker", MachineUID: "worker-uid", AdoptionName: tunnel.AdoptionSecretName("worker"), AdoptionUID: "adoption-uid", CloudNodeName: "cloud", CloudNodeUID: "cloud-uid", RootPublicKey: root.PublicKey().String(), Base: base, Native: []netip.Prefix{}, Desired: peers, SiteDesired: siteDoc, Ports: map[string]int{pub: 51821}, Bindings: map[string]tunnel.ReceiveBinding{pub: binding}, Sites: map[string]tunnel.ReceiveTransitionSite{pub: {NodeName: "site", NodeUID: "site-uid", Client: client}}}
+	plan.CloudAddresses = []string{"172.29.0.1/32", "fd29::1/128"}
+	local := plan.Sites[pub]
+	local.RouteSources = []string{"10.90.0.2", "fd90::2"}
+	local.Legacy = &tunnel.ReceiveSiteLegacy{Sources: []string{"10.90.0.0/24", "10.90.0.2/32", "fd90::/64", "fd90::2/128"}, PeerPublicKey: pub, Tunnel: &tunnel.ReceiveSiteTunnel{Addresses: []string{"10.90.0.2/24", "fd90::2/64"}, Hosts: []string{}}}
+	forward := *local.Legacy
+	local.Forward = &forward
+	plan.Sites[pub] = local
 	raw, err := json.Marshal(plan)
 	must(err)
 	spec, err := tunnel.ReceiveTransitionSpec(plan, "cluster", fmt.Sprintf("%x", sha256.Sum256(raw)))
@@ -64,12 +71,8 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 	intent := tunnel.ReceiveJournalRoutes{Plans: map[string]tunnel.ReceiveTransitionPlan{plan.MachineUID: plan}, Views: map[string]handover.View{plan.MachineUID: view}, Legacy: map[string]tunnel.ReceiveTransitionPlan{}}
 	cfg := config{iface: "legacy", nodeName: "cloud", mtu: 1400, fwmark: 518}
 	restore := func() error {
-		return restoreCompletedReceivePaths(context.Background(), devices, cfg, root, plan, view, "cloud-uid", intent)
+		return restoreCompletedReceiveState(context.Background(), devices, cfg, root, plan, view, "cloud-uid", intent)
 	}
-	routes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, 0)
-	must(err)
-	rules, err := netlink.RuleList(netlink.FAMILY_ALL)
-	must(err)
 	wait := func(action func() error) {
 		t.Helper()
 		started := time.Now()
@@ -95,9 +98,13 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 	siteCfg := cfg
 	siteCfg.nodeName = "site"
 	restoreSite := func() error {
-		return restoreCompletedReceivePaths(context.Background(), devices, siteCfg, site, plan, view, "site-uid", intent)
+		return restoreCompletedReceiveState(context.Background(), devices, siteCfg, site, plan, view, "site-uid", intent)
 	}
 	wait(restoreSite)
+	routes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, 0)
+	must(err)
+	rules, err := netlink.RuleList(netlink.FAMILY_ALL)
+	must(err)
 	// Lose each selected device in turn while the other endpoint remains live.
 	cloudLink, err := netlink.LinkByName(binding.Interface)
 	must(err)

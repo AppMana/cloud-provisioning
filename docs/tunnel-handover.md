@@ -230,9 +230,14 @@ committed keys, reserved port, endpoint and source permissions. Existing foreign
 devices remain conflicts. Maintenance requires a fresh authenticated handshake
 before verification proceeds, does not emit phase receipts, and never replays
 retirement. Legacy-selected completion does not recreate retired receivers.
-This operation does not restore root devices, stable addresses, routes or policy;
-those remain prerequisites for full native verification after a reboot. Idle
-transport rekey latency also requires separate recovery-deadline qualification.
+After forward transport verification, maintenance restores the committed stable
+address owner, including when a reboot removed both that owner and the legacy
+tunnel. Recovery retains allocation and foreign-address checks; ordinary prepare
+still requires native ownership evidence. Allocation recovery creates only host
+addresses on its dedicated owner and does not recreate legacy transport. Root
+devices, routes and policy still require restoration for full native verification
+after a reboot. Idle transport rekey latency also requires separate
+recovery-deadline qualification.
 
 The Linux direct-route phase component implements prepare, forward and reverse
 switch, drain, abort and peer-scoped retirement. It reuses the route installer with a scope

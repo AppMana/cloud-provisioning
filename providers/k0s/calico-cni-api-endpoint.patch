@@ -1,0 +1,163 @@
+diff --git a/pkg/component/controller/calico.go b/pkg/component/controller/calico.go
+index 2e821daf..a2f0d5c7 100644
+--- a/pkg/component/controller/calico.go
++++ b/pkg/component/controller/calico.go
+@@ -77,6 +77,7 @@ type calicoNodeConfig struct {
+ }
+ 
+ type calicoClusterConfig struct {
++	CNIAPIServer         *k0snet.HostPort
+ 	MTU                  int
+ 	Mode                 calicoMode
+ 	VxlanPort            int
+@@ -293,6 +294,33 @@ func (c *Calico) processConfigChanges(newConfig *calicoConfig, patches v1beta1.P
+ }
+ 
+ func (c *Calico) getConfig(clusterConfig *v1beta1.ClusterConfig) (*calicoClusterConfig, error) {
++	apiServer := c.nodeConfig.APIServer
++	nllb := clusterConfig.Spec.Network.NodeLocalLoadBalancing
++	if nllb.IsEnabled() {
++		var port int32
++		switch nllb.Type {
++		case v1beta1.NllbTypeEnvoyProxy:
++			if nllb.EnvoyProxy == nil {
++				return nil, fmt.Errorf("Calico CNI requires configured Envoy API endpoint")
++			}
++			port = nllb.EnvoyProxy.APIServerBindPort
++		case v1beta1.NllbTypeTraefik:
++			if nllb.Traefik == nil {
++				return nil, fmt.Errorf("Calico CNI requires configured Traefik API endpoint")
++			}
++			port = nllb.Traefik.APIServerBindPort
++		default:
++			return nil, fmt.Errorf("unsupported Calico CNI node-local load balancer %q", nllb.Type)
++		}
++		if port < 1 || port > 65535 {
++			return nil, fmt.Errorf("invalid Calico CNI API port %d", port)
++		}
++		var err error
++		apiServer, err = k0snet.NewHostPort("localhost", uint16(port))
++		if err != nil {
++			return nil, err
++		}
++	}
+ 	ipv6AutoDetectionMethod := clusterConfig.Spec.Network.Calico.IPAutodetectionMethod
+ 	if clusterConfig.Spec.Network.Calico.IPv6AutodetectionMethod != "" {
+ 		ipv6AutoDetectionMethod = clusterConfig.Spec.Network.Calico.IPv6AutodetectionMethod
+@@ -301,6 +329,7 @@ func (c *Calico) getConfig(clusterConfig *v1beta1.ClusterConfig) (*calicoCluster
+ 	primaryAFIPv4 := c.primaryAddressFamily == v1beta1.PrimaryFamilyIPv4
+ 	isDualStack := clusterConfig.Spec.Network.DualStack.Enabled
+ 	config := calicoClusterConfig{
++		CNIAPIServer:               apiServer,
+ 		MTU:                        clusterConfig.Spec.Network.Calico.MTU,
+ 		VxlanPort:                  clusterConfig.Spec.Network.Calico.VxlanPort,
+ 		VxlanVNI:                   clusterConfig.Spec.Network.Calico.VxlanVNI,
+diff --git a/pkg/component/controller/calico_cni_endpoint_test.go b/pkg/component/controller/calico_cni_endpoint_test.go
+new file mode 100644
+index 00000000..4bad5270
+--- /dev/null
++++ b/pkg/component/controller/calico_cni_endpoint_test.go
+@@ -0,0 +1,85 @@
++// SPDX-FileCopyrightText: 2026 k0s authors
++// SPDX-License-Identifier: Apache-2.0
++
++package controller
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
++	"github.com/stretchr/testify/require"
++	appsv1 "k8s.io/api/apps/v1"
++	corev1 "k8s.io/api/core/v1"
++	"k8s.io/utils/ptr"
++	"sigs.k8s.io/yaml"
++)
++
++// Manifest validation proves endpoint selection, not host boot timing or native
++// CNI readiness. Keep reboot and Service continuity as separate runtime tests.
++func TestCalicoCNIAPIEndpoint(t *testing.T) {
++	for _, mode := range []string{"direct", "external", "ipv6", "envoy", "traefik", "invalid-port", "missing-proxy", "unknown-proxy"} {
++		t.Run(mode, func(t *testing.T) {
++			cfg := v1beta1.DefaultClusterConfig()
++			cfg.Spec.API.Address = "192.0.2.10"
++			cfg.Spec.Network.Provider = "calico"
++			cfg.Spec.Network.Calico = v1beta1.DefaultCalico()
++			host, port := "192.0.2.10", "6443"
++			switch mode {
++			case "external":
++				cfg.Spec.API.ExternalAddress = "api.example.test:8443"
++				host, port = "api.example.test", "8443"
++			case "ipv6":
++				cfg.Spec.API.ExternalAddress = "2001:db8::10"
++				host = "2001:db8::10"
++			case "envoy", "invalid-port", "missing-proxy", "unknown-proxy":
++				cfg.Spec.Network.NodeLocalLoadBalancing = &v1beta1.NodeLocalLoadBalancing{Enabled: true, Type: v1beta1.NllbTypeEnvoyProxy, EnvoyProxy: v1beta1.DefaultEnvoyProxy()}
++				cfg.Spec.Network.NodeLocalLoadBalancing.EnvoyProxy.APIServerBindPort = 17443
++				host, port = "localhost", "17443"
++				if mode == "invalid-port" {
++					cfg.Spec.Network.NodeLocalLoadBalancing.EnvoyProxy.APIServerBindPort = 65536
++				}
++				if mode == "missing-proxy" {
++					cfg.Spec.Network.NodeLocalLoadBalancing.EnvoyProxy = nil
++				}
++				if mode == "unknown-proxy" {
++					cfg.Spec.Network.NodeLocalLoadBalancing.Type = "unknown"
++				}
++			case "traefik":
++				cfg.Spec.Network.NodeLocalLoadBalancing = &v1beta1.NodeLocalLoadBalancing{Enabled: true, Type: v1beta1.NllbTypeTraefik, Traefik: v1beta1.DefaultTraefik()}
++				cfg.Spec.Network.NodeLocalLoadBalancing.Traefik.APIServerBindPort = 27443
++				host, port = "localhost", "27443"
++			}
++			c, err := NewCalico(cfg, t.TempDir(), func() (*bool, <-chan struct{}) { return ptr.To(true), nil })
++			require.NoError(t, err)
++			config, err := c.getConfig(cfg)
++			if mode == "invalid-port" || mode == "missing-proxy" || mode == "unknown-proxy" {
++				require.Error(t, err)
++				return
++			}
++			require.NoError(t, err)
++			require.NoError(t, c.Init(t.Context()))
++			require.NoError(t, c.processConfigChanges(&calicoConfig{&c.nodeConfig, config, true}, nil))
++			raw, err := os.ReadFile(filepath.Join(c.manifestsDir, "calico", "calico-DaemonSet-calico-node.yaml"))
++			require.NoError(t, err)
++			var ds appsv1.DaemonSet
++			require.NoError(t, yaml.Unmarshal(raw, &ds))
++			require.True(t, ds.Spec.Template.Spec.HostNetwork)
++			var installer *corev1.Container
++			for i := range ds.Spec.Template.Spec.InitContainers {
++				if ds.Spec.Template.Spec.InitContainers[i].Name == "install-cni" {
++					installer = &ds.Spec.Template.Spec.InitContainers[i]
++				}
++			}
++			require.NotNil(t, installer)
++			env := map[string]string{}
++			for _, e := range installer.Env {
++				require.NotContains(t, env, e.Name)
++				env[e.Name] = e.Value
++			}
++			require.Equal(t, host, env["KUBERNETES_SERVICE_HOST"])
++			require.Equal(t, port, env["KUBERNETES_SERVICE_PORT"])
++		})
++	}
++}
+diff --git a/static/manifests/calico/DaemonSet/calico-node.yaml b/static/manifests/calico/DaemonSet/calico-node.yaml
+index 79175bcd..039822d2 100644
+--- a/static/manifests/calico/DaemonSet/calico-node.yaml
++++ b/static/manifests/calico/DaemonSet/calico-node.yaml
+@@ -59,6 +59,13 @@ spec:
+                 optional: true
+           */ -}}
+           env:
++            {{- if .CNIAPIServer }}
++            # CNI ADD/DEL must reach the API before Service routing is restored.
++            - name: KUBERNETES_SERVICE_HOST
++              value: "{{ .CNIAPIServer.Host }}"
++            - name: KUBERNETES_SERVICE_PORT
++              value: "{{ .CNIAPIServer.Port }}"
++            {{- end }}
+             # Name of the CNI config file to create.
+             - name: CNI_CONF_NAME
+               value: "10-calico.conflist"

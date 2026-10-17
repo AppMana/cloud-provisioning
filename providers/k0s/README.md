@@ -342,3 +342,30 @@ RBAC, stable agent pod identities across membership changes, Windows kubelet
 access, Service egress, and continuous management availability. This patch does
 not make a restarted API-server endpoint continuously available or qualify a
 single-controller runtime upgrade.
+
+## Calico CNI API access during boot
+
+`calico-cni-api-endpoint.patch` targets `v1.36.4+k0s.1`. It configures
+Linux `install-cni` to write its kubeconfig against the existing control-plane
+endpoint, or the configured Envoy/Traefik localhost API port when node-local
+load balancing is enabled. CNI cleanup and creation can then contact the API
+before kube-proxy has restored Kubernetes Service routing. The patch uses the
+existing CA and credentials; it does not disable TLS verification or pin an API
+group to bypass discovery.
+
+Apply this patch to the runtime source and run
+`go test ./pkg/component/controller -run TestCalico`. The tests render and decode
+the real DaemonSet for direct IPv4, external DNS, IPv6 and both local proxy
+variants, including custom ports and invalid proxy configuration. These checks
+establish endpoint selection, not native CNI startup, TLS reachability or the
+60-second boot-recovery bound.
+
+Roll out through the runtime's manifest owner. Verify the generated CNI
+kubeconfig's server on each worker without exposing its credentials, and observe
+workload and management continuity during the resulting DaemonSet rollout.
+Changing local load-balancer configuration still requires the existing worker
+configuration rollout; the CNI manifest cannot start that proxy itself.
+Worker-specific profile overrides and rollback require their own checks.
+Repeat full reboot tests with a stable workload Service, preserving all failed
+requests and measuring both Node and workload recovery. Removing the Service
+routing dependency does not remove other host boot or CNI delays.

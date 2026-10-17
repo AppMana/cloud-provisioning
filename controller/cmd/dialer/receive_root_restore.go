@@ -11,7 +11,8 @@ import (
 
 // restoreReceiveRoot restores only the shared device identity. Its caller must
 // hold live journal admission and the host lock. Peer, address and route writers
-// retain their separate authorities; this function never changes those objects.
+// retain their separate authorities. Owned unnumbered roots use the existing
+// receive-device reverse-path policy without weakening other interfaces.
 func restoreReceiveRoot(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, meshUID, nodeUID string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -75,6 +76,19 @@ func restoreReceiveRoot(ctx context.Context, devices receiverDevices, cfg config
 	}
 	if live.PublicKey != key.PublicKey() || live.FirewallMark != cfg.fwmark || (cfg.listenPort != 0 && live.ListenPort != cfg.listenPort) {
 		return fmt.Errorf("root recovery identity readback differs")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// Older roots have no alias. Bind only after key, mark and port admission;
+	// an empty-key or foreign-identity device was rejected above.
+	if link.Attrs().Alias == "" {
+		if err := netlink.LinkSetAlias(link, alias); err != nil {
+			return err
+		}
+	}
+	if err := ensureReceiveReversePathFiltering(cfg.iface, alias); err != nil {
+		return err
 	}
 	return ctx.Err()
 }

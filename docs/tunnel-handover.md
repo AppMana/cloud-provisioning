@@ -230,8 +230,8 @@ committed keys, reserved port, endpoint and source permissions. Existing foreign
 devices remain conflicts. Maintenance requires a fresh authenticated handshake
 before verification proceeds, does not emit phase receipts, and never replays
 retirement. Legacy-selected completion does not recreate retired receivers.
-After forward transport verification, maintenance restores the committed stable
-address owner, including when a reboot removed both that owner and the legacy
+Maintenance restores the committed stable address owner, including when a reboot
+removed both that owner and the legacy
 tunnel. Recovery retains allocation and foreign-address checks; ordinary prepare
 still requires native ownership evidence. Allocation recovery creates only host
 addresses on its dedicated owner. Maintenance also recreates a missing shared
@@ -239,7 +239,16 @@ root WireGuard device with the admitted key, configured mark and listener, but
 never replays its peers. Existing root peers and addresses are preserved; foreign
 identity, alias, port or mark conflicts remain errors. A newly created root has
 an identity-bound alias so recovery can recognize an interrupted initialization.
-Forward-completed maintenance reapplies the combined destination and source-route
+An existing unaliased root is bound only after its key, mark and port match.
+Unnumbered roots reuse receiver RPF handling, preserving the effective reverse-
+path policy on other interfaces before changing the global floor.
+For legacy-selected journals, maintenance rebuilds only the selected peer
+partition from the committed base and site projection. It preserves unrelated
+peers and refuses source ownership conflicts, unexpected source withdrawals,
+preshared keys and changed fixed endpoints. It uses the existing peer delta
+planner, then requires authenticated legacy transport before route verification.
+A relayed site without direct source exceptions does not recreate a direct peer.
+Completed maintenance reapplies the combined destination and source-route
 selection through the phase planner, preserving routes outside the admitted
 scope and rejecting ownership conflicts before replacement. It restores only
 the selected source exceptions, without staging an obsolete rollback path.
@@ -247,8 +256,8 @@ Every unfinished local round must still be executable, and active switches must
 retain their live relay dependencies; maintenance uses the earliest local expiry.
 Shared lookup rules remain the responsibility of the separately admitted
 live-mesh policy reconciler. Final phase verification still requires them.
-Selected legacy-peer recreation and cloud policy admission remain prerequisites
-for full reboot recovery. Idle transport rekey latency also requires separate
+Ordinary-neighbor recovery and cloud policy admission remain prerequisites for
+full reboot recovery. Idle transport rekey latency also requires separate
 recovery-deadline qualification.
 
 The Linux direct-route phase component implements prepare, forward and reverse

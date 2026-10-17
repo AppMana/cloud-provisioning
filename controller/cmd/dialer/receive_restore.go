@@ -29,16 +29,28 @@ func restoreCompletedReceivePaths(ctx context.Context, devices receiverDevices, 
 	if selectedLegacy != (view.RollbackRequested || view.Round.Phase == handover.Abort) || (selectedLegacy && !reflect.DeepEqual(legacy, plan)) {
 		return fmt.Errorf("transport restoration selection differs from completed journal")
 	}
-	if selectedLegacy {
-		return nil
-	} // Receivers were retired; never revive them.
 	expected, err := tunnel.ReceiveTransitionSpec(plan, view.Round.ClusterUID, view.Round.PlanHash)
 	if err != nil {
 		return err
 	}
-	expected.Phase = handover.Retire
-	if !reflect.DeepEqual(expected, view.Round.Spec) || view.ServingGeneration != view.Round.ToGeneration {
+	expected.Phase = view.Round.Phase
+	if view.RollbackRequested && view.Round.Phase != handover.Abort {
+		expected.FromGeneration, expected.ToGeneration = expected.ToGeneration, expected.FromGeneration
+		for i := range expected.Members {
+			member := &expected.Members[i]
+			member.FromKey, member.ToKey = member.ToKey, member.FromKey
+			member.FromPeerKey, member.ToPeerKey = member.ToPeerKey, member.FromPeerKey
+		}
+	}
+	serving := expected.ToGeneration
+	if view.Round.Phase == handover.Abort {
+		serving = expected.FromGeneration
+	}
+	if !reflect.DeepEqual(expected, view.Round.Spec) || view.ServingGeneration != serving {
 		return fmt.Errorf("transport restoration generation differs")
+	}
+	if selectedLegacy {
+		return nil // Receivers were retired; never revive them.
 	}
 	if err := prepareReceivePhasePaths(devices, cfg, key, plan, nodeUID); err != nil {
 		return err
@@ -50,14 +62,11 @@ func restoreCompletedReceivePaths(ctx context.Context, devices receiverDevices, 
 }
 
 // restoreCompletedReceiveState is called only under the executor's live
-// completed-journal admission and host lock. Transport validation establishes
-// the selected generation before recovering its committed local allocation.
+// completed-journal admission and host lock. Generation admission precedes
+// allocation recovery; phase verification still requires native transport.
 func restoreCompletedReceiveState(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes) error {
 	if err := restoreCompletedReceivePaths(ctx, devices, cfg, key, plan, view, nodeUID, intent); err != nil {
 		return err
-	}
-	if view.RollbackRequested || view.Round.Phase == handover.Abort {
-		return nil
 	}
 	own, allocated, err := tunnel.ReceiveLocalNetwork(plan, nodeUID)
 	if err != nil {
@@ -67,6 +76,9 @@ func restoreCompletedReceiveState(ctx context.Context, devices receiverDevices, 
 		return err
 	}
 	if err := restoreReceiveRoot(ctx, devices, cfg, key, plan.MeshUID, nodeUID); err != nil {
+		return err
+	}
+	if err := restoreReceiveLegacyPeers(ctx, devices, cfg, key, nodeUID, intent); err != nil {
 		return err
 	}
 	_, err = reconcileStableAddressOwner(devices, stableAddressOwnerRequest{MeshUID: plan.MeshUID, NodeUID: nodeUID, LegacyInterface: cfg.iface, RootPublicKey: key.PublicKey().String(), Addresses: allocated}, true)

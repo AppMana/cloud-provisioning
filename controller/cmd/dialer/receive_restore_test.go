@@ -46,24 +46,9 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 	must(err)
 	site, err := wgtypes.GeneratePrivateKey()
 	must(err)
+	plan := receiveRestoreTestPlan(t, root, site)
 	pub := site.PublicKey().String()
-	peers := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: pub, WGAllowedIPs: []string{"10.90.0.0/24", "fd90::/64"}}}}
-	base, err := json.Marshal(peers)
-	must(err)
-	preparation, err := tunnel.PlanReceiveHandover("restore-mesh", peers, peers, nil)
-	must(err)
-	binding := tunnel.ReceiveBinding{Interface: preparation.Receivers[0].Interface, PeerPublicKey: pub, PublicKey: receiverKey(root, "restore-mesh", pub).PublicKey().String(), ListenPort: 51821}
-	siteDoc := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: root.PublicKey().String(), Remote: true, Endpoint: "198.51.100.1:51820", RouteHosts: []string{"172.29.0.1", "fd29::1"}, WGAllowedIPs: []string{"172.29.0.1/32", "fd29::1/128"}}}}
-	client, err := tunnel.PlanSiteReceiveClient("restore-mesh", pub, root.PublicKey().String(), binding, siteDoc, siteDoc)
-	must(err)
-	plan := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: "test", MeshName: "mesh", MeshUID: "restore-mesh", MachineName: "worker", MachineUID: "worker-uid", AdoptionName: tunnel.AdoptionSecretName("worker"), AdoptionUID: "adoption-uid", CloudNodeName: "cloud", CloudNodeUID: "cloud-uid", RootPublicKey: root.PublicKey().String(), Base: base, Native: []netip.Prefix{}, Desired: peers, SiteDesired: siteDoc, Ports: map[string]int{pub: 51821}, Bindings: map[string]tunnel.ReceiveBinding{pub: binding}, Sites: map[string]tunnel.ReceiveTransitionSite{pub: {NodeName: "site", NodeUID: "site-uid", Client: client}}}
-	plan.CloudAddresses = []string{"172.29.0.1/32", "fd29::1/128"}
-	local := plan.Sites[pub]
-	local.RouteSources = []string{"10.90.0.2", "fd90::2"}
-	local.Legacy = &tunnel.ReceiveSiteLegacy{Sources: []string{"10.90.0.0/24", "10.90.0.2/32", "fd90::/64", "fd90::2/128"}, PeerPublicKey: pub, Tunnel: &tunnel.ReceiveSiteTunnel{Addresses: []string{"10.90.0.2/24", "fd90::2/64"}, Hosts: []string{}}}
-	forward := *local.Legacy
-	local.Forward = &forward
-	plan.Sites[pub] = local
+	binding, siteDoc, client := plan.Bindings[pub], plan.SiteDesired, plan.Sites[pub].Client
 	raw, err := json.Marshal(plan)
 	must(err)
 	spec, err := tunnel.ReceiveTransitionSpec(plan, "cluster", fmt.Sprintf("%x", sha256.Sum256(raw)))
@@ -200,14 +185,24 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 	must(err)
 	must(netlink.LinkDel(cloudLink))
 	// Rollback selection must never revive the now-retired receiver.
+	view.Round.Members = append([]handover.Member(nil), view.Round.Members...)
 	view.RollbackRequested = true
+	view.Round.FromGeneration, view.Round.ToGeneration = view.Round.ToGeneration, view.Round.FromGeneration
+	for i := range view.Round.Members {
+		member := &view.Round.Members[i]
+		member.FromKey, member.ToKey = member.ToKey, member.FromKey
+		member.FromPeerKey, member.ToPeerKey = member.ToPeerKey, member.FromPeerKey
+	}
+	view.ServingGeneration = view.Round.ToGeneration
 	intent.Views[plan.MachineUID] = view
 	intent.Legacy[plan.MachineUID] = plan
-	must(restore())
+	must(restoreCompletedReceivePaths(context.Background(), devices, cfg, root, plan, view, "cloud-uid", intent))
 	if _, err := netlink.LinkByName(binding.Interface); !isLinkNotFound(err) {
 		t.Fatal("rollback resurrected receiver", err)
 	}
 	view.RollbackRequested = false
+	view.Round.Spec = spec
+	view.ServingGeneration = spec.ToGeneration
 	intent.Views[plan.MachineUID] = view
 	delete(intent.Legacy, plan.MachineUID)
 	attrs := netlink.NewLinkAttrs()
@@ -221,4 +216,33 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 	if foreign.Type() != "dummy" {
 		t.Fatal("foreign device replaced")
 	}
+}
+
+func receiveRestoreTestPlan(t *testing.T, root, site wgtypes.Key) tunnel.ReceiveTransitionPlan {
+	t.Helper()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	pub := site.PublicKey().String()
+	peers := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: pub, WGAllowedIPs: []string{"10.90.0.0/24", "fd90::/64"}}}}
+	base, err := json.Marshal(peers)
+	must(err)
+	preparation, err := tunnel.PlanReceiveHandover("restore-mesh", peers, peers, nil)
+	must(err)
+	binding := tunnel.ReceiveBinding{Interface: preparation.Receivers[0].Interface, PeerPublicKey: pub, PublicKey: receiverKey(root, "restore-mesh", pub).PublicKey().String(), ListenPort: 51821}
+	siteDoc := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: root.PublicKey().String(), Remote: true, Endpoint: "198.51.100.1:51820", RouteHosts: []string{"172.29.0.1", "fd29::1"}, WGAllowedIPs: []string{"172.29.0.1/32", "fd29::1/128"}}}}
+	client, err := tunnel.PlanSiteReceiveClient("restore-mesh", pub, root.PublicKey().String(), binding, siteDoc, siteDoc)
+	must(err)
+	plan := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: "test", MeshName: "mesh", MeshUID: "restore-mesh", MachineName: "worker", MachineUID: "worker-uid", AdoptionName: tunnel.AdoptionSecretName("worker"), AdoptionUID: "adoption-uid", CloudNodeName: "cloud", CloudNodeUID: "cloud-uid", RootPublicKey: root.PublicKey().String(), Base: base, Native: []netip.Prefix{}, Desired: peers, SiteDesired: siteDoc, Ports: map[string]int{pub: 51821}, Bindings: map[string]tunnel.ReceiveBinding{pub: binding}, Sites: map[string]tunnel.ReceiveTransitionSite{pub: {NodeName: "site", NodeUID: "site-uid", Client: client}}}
+	plan.CloudAddresses = []string{"172.29.0.1/32", "fd29::1/128"}
+	local := plan.Sites[pub]
+	local.RouteSources = []string{"10.90.0.2", "fd90::2"}
+	local.Legacy = &tunnel.ReceiveSiteLegacy{Sources: []string{"10.90.0.0/24", "10.90.0.2/32", "fd90::/64", "fd90::2/128"}, PeerPublicKey: pub, Tunnel: &tunnel.ReceiveSiteTunnel{Addresses: []string{"10.90.0.2/24", "fd90::2/64"}, Hosts: []string{}}}
+	forward := *local.Legacy
+	local.Forward = &forward
+	plan.Sites[pub] = local
+	return plan
 }

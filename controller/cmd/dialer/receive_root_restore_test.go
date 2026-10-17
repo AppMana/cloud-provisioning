@@ -77,6 +77,7 @@ func TestNativeRestoreReceiveRoot(t *testing.T) {
 				return
 			}
 			must(err)
+			must(verifyReceiveReversePathFiltering(cfg.iface))
 			link, err := netlink.LinkByName(cfg.iface)
 			must(err)
 			// Existing peers and addresses survive repeated maintenance.
@@ -88,6 +89,9 @@ func TestNativeRestoreReceiveRoot(t *testing.T) {
 			address, err := netlink.ParseAddr("10.77.0.1/32")
 			must(err)
 			must(netlink.AddrAdd(link, address))
+			// Older roots predate ownership aliases; their exact identity must
+			// still be admitted without changing peers or addresses.
+			must(netlink.LinkSetAlias(link, ""))
 			before, err = devices.Device(cfg.iface)
 			must(err)
 			addresses, err := netlink.AddrList(link, netlink.FAMILY_ALL)

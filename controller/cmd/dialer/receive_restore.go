@@ -66,6 +66,9 @@ func restoreCompletedReceiveState(ctx context.Context, devices receiverDevices, 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if err := restoreReceiveRoot(ctx, devices, cfg, key, plan.MeshUID, nodeUID); err != nil {
+		return err
+	}
 	_, err = reconcileStableAddressOwner(devices, stableAddressOwnerRequest{MeshUID: plan.MeshUID, NodeUID: nodeUID, LegacyInterface: cfg.iface, RootPublicKey: key.PublicKey().String(), Addresses: allocated}, true)
 	return err
 }

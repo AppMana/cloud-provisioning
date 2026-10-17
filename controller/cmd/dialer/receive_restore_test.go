@@ -97,6 +97,7 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 	wait(restore)
 	siteCfg := cfg
 	siteCfg.nodeName = "site"
+	siteCfg.iface = "sitelegacy"
 	restoreSite := func() error {
 		return restoreCompletedReceiveState(context.Background(), devices, siteCfg, site, plan, view, "site-uid", intent)
 	}
@@ -115,8 +116,10 @@ func TestNativeRestoreCompletedReceivePaths(t *testing.T) {
 	must(netlink.LinkDel(siteLink))
 	wait(restoreSite)
 	wait(restore)
-	if _, err := netlink.LinkByName(cfg.iface); !isLinkNotFound(err) {
-		t.Fatal("restoration recreated legacy root", err)
+	rootDevice, err := devices.Device(cfg.iface)
+	must(err)
+	if rootDevice.PublicKey != root.PublicKey() || len(rootDevice.Peers) != 0 {
+		t.Fatal("restoration changed root identity or recreated retired peers")
 	}
 	afterRoutes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, 0)
 	must(err)

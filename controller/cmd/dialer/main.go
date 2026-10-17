@@ -953,6 +953,25 @@ func publishNodeInfo(ctx context.Context, clientset *kubernetes.Clientset, cfg c
 	return nil
 }
 
+// createWireGuardLink does not adopt an existing device or configure addresses,
+// peers, forwarding settings or routes. LinkAdd conflicts remain errors.
+func createWireGuardLink(cfg config, mtu int) (netlink.Link, error) {
+	attrs := netlink.NewLinkAttrs()
+	attrs.Name, attrs.MTU = cfg.iface, mtu
+	link := &netlink.GenericLink{LinkAttrs: attrs, LinkType: "wireguard"}
+	if err := netlink.LinkAdd(link); err != nil {
+		return nil, fmt.Errorf("creating %s: %w", cfg.iface, err)
+	}
+	current, err := netlink.LinkByName(cfg.iface)
+	if err != nil {
+		return nil, fmt.Errorf("looking up %s after create: %w", cfg.iface, err)
+	}
+	if current.Type() != "wireguard" || current.Attrs().Index != link.Attrs().Index {
+		return nil, fmt.Errorf("created WireGuard interface changed")
+	}
+	return current, nil
+}
+
 // ensureLink creates the WireGuard link if it doesn't exist, assigns
 // its address, and brings it up. Called every reconcile pass
 // (idempotent, self-healing if the address is removed from under it).
@@ -975,19 +994,11 @@ func ensureLink(cfg config, localAddresses []string) error {
 		if !isLinkNotFound(err) {
 			return fmt.Errorf("looking up %s: %w", cfg.iface, err)
 		}
-		attrs := netlink.NewLinkAttrs()
-		attrs.Name = cfg.iface
-		attrs.MTU = mtu
-		wgLink := &netlink.GenericLink{LinkAttrs: attrs, LinkType: "wireguard"}
-		if err := netlink.LinkAdd(wgLink); err != nil {
-			return fmt.Errorf("creating %s: %w", cfg.iface, err)
-		}
-		link, err = netlink.LinkByName(cfg.iface)
+		link, err = createWireGuardLink(cfg, mtu)
 		if err != nil {
-			return fmt.Errorf("looking up %s after create: %w", cfg.iface, err)
+			return err
 		}
 	}
-
 	if link.Type() != "wireguard" {
 		return fmt.Errorf("refusing to configure non-WireGuard interface %s (%s)", cfg.iface, link.Type())
 	}

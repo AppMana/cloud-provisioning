@@ -234,9 +234,13 @@ After forward transport verification, maintenance restores the committed stable
 address owner, including when a reboot removed both that owner and the legacy
 tunnel. Recovery retains allocation and foreign-address checks; ordinary prepare
 still requires native ownership evidence. Allocation recovery creates only host
-addresses on its dedicated owner and does not recreate legacy transport. Root
-devices, routes and policy still require restoration for full native verification
-after a reboot. Idle transport rekey latency also requires separate
+addresses on its dedicated owner. Maintenance also recreates a missing shared
+root WireGuard device with the admitted key, configured mark and listener, but
+never replays its peers. Existing root peers and addresses are preserved; foreign
+identity, alias, port or mark conflicts remain errors. A newly created root has
+an identity-bound alias so recovery can recognize an interrupted initialization.
+Selected legacy peers, routes and policy still require restoration for full
+native verification after a reboot. Idle transport rekey latency also requires separate
 recovery-deadline qualification.
 
 The Linux direct-route phase component implements prepare, forward and reverse

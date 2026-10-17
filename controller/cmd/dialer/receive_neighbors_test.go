@@ -444,70 +444,92 @@ func verifyReceiveNeighborAdmission(t *testing.T, api kubernetes.Interface, stor
 		}
 	})
 
-	t.Run("failed-growth-preserves-deletion-variants", func(t *testing.T) {
-		// A native failure can leave either old or attempted source permissions.
-		// Simulated callbacks establish durable intent only, not live withdrawal.
-		copies := make([]runtime.Object, 0, len(objects))
-		for _, object := range objects {
-			copies = append(copies, object.DeepCopyObject())
-		}
-		k := fake.NewClientset(copies...)
-		cfg := config{iface: "wgneighbors", nodeName: "site", secretNamespace: mesh.Namespace, secretName: mesh.Name, receiptMeshName: mesh.Name, receiptPodName: pod.Name, receiptPodUID: string(pod.UID), privateKeyFile: filepath.Join(t.TempDir(), "key")}
-		must(os.WriteFile(cfg.privateKeyFile, []byte(site.String()), 0600))
-		path := filepath.Join(filepath.Dir(cfg.privateKeyFile), cfg.iface+".reconcile.lock.neighbors.json")
-		prior := tunnel.PeerSpec{PublicKey: neighbor.PublicKey().String(), Remote: true, Endpoint: "198.51.100.2:51820", WGAllowedIPs: []string{"172.29.0.2/32"}}
-		raw, err := json.Marshal(receiveNeighborCheckpoint{Version: 1, InventoryUID: string(index.UID), MeshUID: string(mesh.UID), MeshVersion: "old", NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, PublicKey: site.PublicKey().String(), Peers: []tunnel.PeerSpec{prior}})
-		must(err)
-		must(os.WriteFile(path, raw, 0600))
-		current, err := k.CoreV1().Secrets(mesh.Namespace).Get(ctx, mesh.Name, metav1.GetOptions{})
-		must(err)
-		current.Data[tunnel.PeerAllowedIPsPrefix+"joining"] = []byte("172.29.0.2/32,172.29.99.1/32")
-		current.ResourceVersion += "-growth"
-		_, err = k.CoreV1().Secrets(mesh.Namespace).Update(ctx, current, metav1.UpdateOptions{})
-		must(err)
-		attempted := false
-		fail := func(_ context.Context, _ wgtypes.Key, peers []tunnel.PeerSpec, _ []string, _ []tunnel.PeerSpec, _ []string, commit func() error) error {
-			attempted = true
-			if len(peers) != 1 || len(peers[0].WGAllowedIPs) != 2 {
-				t.Fatalf("growth did not reach native callback: %+v", peers)
+	for _, added := range []string{"172.29.99.1/32", "2001:db8:99::1/128"} {
+		for _, resolved := range []bool{false, true} {
+			name := "native-interrupted"
+			if resolved {
+				name = "native-confirmed-receiver-failed"
 			}
-			must(commit())
-			return errors.New("native installation interrupted")
+			t.Run("growth-deletion/"+added+"/"+name, func(t *testing.T) {
+				// A native failure can leave either old or attempted source permissions.
+				// Simulated callbacks establish durable intent only, not live withdrawal.
+				copies := make([]runtime.Object, 0, len(objects))
+				for _, object := range objects {
+					copies = append(copies, object.DeepCopyObject())
+				}
+				k := fake.NewClientset(copies...)
+				cfg := config{iface: "wgneighbors", nodeName: "site", secretNamespace: mesh.Namespace, secretName: mesh.Name, receiptMeshName: mesh.Name, receiptPodName: pod.Name, receiptPodUID: string(pod.UID), privateKeyFile: filepath.Join(t.TempDir(), "key")}
+				must(os.WriteFile(cfg.privateKeyFile, []byte(site.String()), 0600))
+				path := filepath.Join(filepath.Dir(cfg.privateKeyFile), cfg.iface+".reconcile.lock.neighbors.json")
+				prior := tunnel.PeerSpec{PublicKey: neighbor.PublicKey().String(), Remote: true, Endpoint: "198.51.100.2:51820", WGAllowedIPs: []string{"172.29.0.2/32"}}
+				raw, err := json.Marshal(receiveNeighborCheckpoint{Version: 1, InventoryUID: string(index.UID), MeshUID: string(mesh.UID), MeshVersion: "old", NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, PublicKey: site.PublicKey().String(), Peers: []tunnel.PeerSpec{prior}})
+				must(err)
+				must(os.WriteFile(path, raw, 0600))
+				current, err := k.CoreV1().Secrets(mesh.Namespace).Get(ctx, mesh.Name, metav1.GetOptions{})
+				must(err)
+				current.Data[tunnel.PeerAllowedIPsPrefix+"joining"] = []byte("172.29.0.2/32," + added)
+				current.ResourceVersion += "-growth"
+				_, err = k.CoreV1().Secrets(mesh.Namespace).Update(ctx, current, metav1.UpdateOptions{})
+				must(err)
+				attempted := false
+				fail := func(_ context.Context, _ wgtypes.Key, peers []tunnel.PeerSpec, _ []string, _ []tunnel.PeerSpec, _ []string, commit func() error) error {
+					attempted = true
+					if len(peers) != 1 || len(peers[0].WGAllowedIPs) != 2 {
+						t.Fatalf("growth did not reach native callback: %+v", peers)
+					}
+					must(commit())
+					return errors.New("native installation interrupted")
+				}
+				for attempt := 0; attempt < 2; attempt++ {
+					if err := reconcileReceiveNeighbors(ctx, k, cfg, fail, nil); err == nil {
+						t.Fatal("failed native installation reported success")
+					}
+				}
+				if !attempted {
+					t.Fatal("did not inject native failure")
+				}
+
+				if resolved {
+					preparationFailure := errors.New("receiver preparation interrupted after native readback")
+					nativeSuccess := func(_ context.Context, _ wgtypes.Key, _ []tunnel.PeerSpec, _ []string, _ []tunnel.PeerSpec, _ []string, commit func() error) error {
+						return commit()
+					}
+					preparation := func(context.Context, wgtypes.Key, *corev1.Secret, []tunnel.PeerSpec, []tunnel.ReceiveTransitionPlan, func() error) error {
+						return preparationFailure
+					}
+					if err := reconcileReceiveNeighbors(ctx, k, cfg, nativeSuccess, preparation); !errors.Is(err, preparationFailure) {
+						t.Fatalf("did not reach receiver failure: %v", err)
+					}
+				}
+				current, err = k.CoreV1().Secrets(mesh.Namespace).Get(ctx, mesh.Name, metav1.GetOptions{})
+				must(err)
+				for _, prefix := range []string{tunnel.PeerPublicKeyPrefix, tunnel.PeerEndpointPrefix, tunnel.PeerAllowedIPsPrefix, tunnel.PeerRouteHostsPrefix} {
+					delete(current.Data, prefix+"joining")
+				}
+				current.ResourceVersion += "-deleted"
+				_, err = k.CoreV1().Secrets(mesh.Namespace).Update(ctx, current, metav1.UpdateOptions{})
+				must(err)
+				must(reconcileReceiveNeighbors(ctx, k, cfg, func(_ context.Context, _ wgtypes.Key, _ []tunnel.PeerSpec, _ []string, retiring []tunnel.PeerSpec, _ []string, commit func() error) error {
+					old, grown := false, false
+					for _, peer := range retiring {
+						old = old || reflect.DeepEqual(peer.WGAllowedIPs, prior.WGAllowedIPs)
+						grown = grown || len(peer.WGAllowedIPs) == 2
+					}
+					if old == resolved || !grown {
+						t.Fatalf("incorrect deletion candidates after native readback=%v: %+v", resolved, retiring)
+					}
+					return commit()
+				}, nil))
+				settled, err := os.ReadFile(path + ".retiring")
+				must(err)
+				var checkpoint receiveNeighborCheckpoint
+				must(json.Unmarshal(settled, &checkpoint))
+				if len(checkpoint.Candidates) != 0 || len(checkpoint.Retiring) != 0 {
+					t.Fatal("successful readback retained obsolete deletion candidates")
+				}
+			})
+
 		}
-		for attempt := 0; attempt < 2; attempt++ {
-			if err := reconcileReceiveNeighbors(ctx, k, cfg, fail, nil); err == nil {
-				t.Fatal("failed native installation reported success")
-			}
-		}
-		if !attempted {
-			t.Fatal("did not inject native failure")
-		}
-		current, err = k.CoreV1().Secrets(mesh.Namespace).Get(ctx, mesh.Name, metav1.GetOptions{})
-		must(err)
-		for _, prefix := range []string{tunnel.PeerPublicKeyPrefix, tunnel.PeerEndpointPrefix, tunnel.PeerAllowedIPsPrefix, tunnel.PeerRouteHostsPrefix} {
-			delete(current.Data, prefix+"joining")
-		}
-		current.ResourceVersion += "-deleted"
-		_, err = k.CoreV1().Secrets(mesh.Namespace).Update(ctx, current, metav1.UpdateOptions{})
-		must(err)
-		must(reconcileReceiveNeighbors(ctx, k, cfg, func(_ context.Context, _ wgtypes.Key, _ []tunnel.PeerSpec, _ []string, retiring []tunnel.PeerSpec, _ []string, commit func() error) error {
-			old, grown := false, false
-			for _, peer := range retiring {
-				old = old || reflect.DeepEqual(peer.WGAllowedIPs, prior.WGAllowedIPs)
-				grown = grown || len(peer.WGAllowedIPs) == 2
-			}
-			if !old || !grown {
-				t.Fatalf("lost exact old or attempted permissions: %+v", retiring)
-			}
-			return commit()
-		}, nil))
-		settled, err := os.ReadFile(path + ".retiring")
-		must(err)
-		var checkpoint receiveNeighborCheckpoint
-		must(json.Unmarshal(settled, &checkpoint))
-		if len(checkpoint.Candidates) != 0 || len(checkpoint.Retiring) != 0 {
-			t.Fatal("successful readback retained obsolete deletion candidates")
-		}
-	})
+	}
 
 }

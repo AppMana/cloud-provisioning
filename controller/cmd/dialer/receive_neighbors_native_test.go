@@ -276,32 +276,42 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 	// Interrupted growth must permit deletion of either recorded exact state,
 	// while an unrecorded subset or superset remains foreign. This isolated
 	// kernel test does not establish VM reboot or cloud lifecycle continuity.
-	grown := peer
-	grown.WGAllowedIPs = append(append([]string{}, peer.WGAllowedIPs...), "10.77.0.30/32")
-	variants := []tunnel.PeerSpec{peer, grown}
-	for _, installed := range []tunnel.PeerSpec{peer, grown} {
-		must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{installed}, []string{"10.77.0.1"}))
-		must(retireReceiveNeighbors(context.Background(), devices, cfg, root, variants, []string{"10.77.0.1"}, allocated))
-		must(retireReceiveNeighbors(context.Background(), devices, cfg, root, variants, []string{"10.77.0.1"}, allocated))
-	}
-	foreignGrowth := peer
-	foreignGrowth.WGAllowedIPs = append(append([]string{}, grown.WGAllowedIPs...), "10.77.0.31/32")
-	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{foreignGrowth}, []string{"10.77.0.1"}))
-	if err := retireReceiveNeighbors(context.Background(), devices, cfg, root, variants, []string{"10.77.0.1"}, allocated); err == nil {
-		t.Fatal("unrecorded growth was accepted as a recorded variant")
-	}
-	unchanged, err := devices.Device(cfg.iface)
-	must(err)
-	foundForeign := false
-	for _, current := range unchanged.Peers {
-		if current.PublicKey == neighbor {
-			foundForeign = receiveSourcesMatch(foreignGrowth.WGAllowedIPs, current.AllowedIPs)
+	verifyGrowthRetirement := func(peer tunnel.PeerSpec, own, allocated []string, added, foreign string) {
+		t.Helper()
+		public, err := wgtypes.ParseKey(peer.PublicKey)
+		must(err)
+		grown := peer
+		grown.WGAllowedIPs = append(append([]string{}, peer.WGAllowedIPs...), added)
+		variants := []tunnel.PeerSpec{peer, grown}
+		for _, installed := range variants {
+			must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{installed}, own))
+			must(retireReceiveNeighbors(context.Background(), devices, cfg, root, variants, own, allocated))
+			must(retireReceiveNeighbors(context.Background(), devices, cfg, root, variants, own, allocated))
+		}
+		for _, sources := range [][]string{append(append([]string{}, grown.WGAllowedIPs...), foreign), {added}} {
+			unrecorded := peer
+			unrecorded.WGAllowedIPs = sources
+			unrecorded.RouteHosts = nil
+			unrecorded.RouteHost = ""
+			must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{unrecorded}, own))
+			if err := retireReceiveNeighbors(context.Background(), devices, cfg, root, variants, own, allocated); err == nil {
+				t.Fatalf("unrecorded permissions accepted: %v", sources)
+			}
+			unchanged, err := devices.Device(cfg.iface)
+			must(err)
+			found := false
+			for _, current := range unchanged.Peers {
+				if current.PublicKey == public {
+					found = receiveSourcesMatch(sources, current.AllowedIPs)
+				}
+			}
+			if !found {
+				t.Fatal("rejected retirement changed unrecorded permissions")
+			}
+			must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{unrecorded}, own, allocated))
 		}
 	}
-	if !foundForeign {
-		t.Fatal("rejected retirement changed unrecorded permissions")
-	}
-	must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{foreignGrowth}, []string{"10.77.0.1"}, allocated))
+	verifyGrowthRetirement(peer, []string{"10.77.0.1"}, allocated, "10.77.0.30/32", "10.77.0.31/32")
 	replacement, replaced, _ := makeSender("replacement", "10.77.0.3", 51824)
 	peer.PublicKey = replacement.String()
 	peer.Endpoint = "127.0.0.1:51824"
@@ -344,6 +354,7 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 	probe(sender6)
 	must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer6}, own6, allocated6))
 	must(retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer6}, own6, allocated6))
+	verifyGrowthRetirement(peer6, own6, allocated6, "fd77::30/128", "fd77::31/128")
 	new6, replacement6, _ := makeSender("new6", "fd77::3", 51826)
 	peer6.PublicKey, peer6.Endpoint = new6.String(), "127.0.0.1:51826"
 	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer6}, own6))

@@ -523,6 +523,28 @@ func prepareReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.K
 // own a scoped destination. Reject foreign routes and more-specific shadows
 // before installRoutes can replace anything. Unrelated destinations survive.
 func preflightReceiveRoutePhase(cfg config, receivers map[string]receiveRouteSelection, own []string, admittedRelays ...map[string]string) error {
+	return preflightReceiveRouteGenerations(cfg, []map[string]receiveRouteSelection{receivers}, true, own, admittedRelays...)
+}
+
+// Callers must admit both graphs from committed journal history. A predecessor
+// receiver is not the legacy root device; allowLegacy is explicit so a successor
+// cannot silently fall back to that retired transport. This check never mutates.
+func preflightReceiveRouteGenerations(cfg config, generations []map[string]receiveRouteSelection, allowLegacy bool, own []string, admittedRelays ...map[string]string) error {
+	if len(generations) == 0 || len(generations) > 2 {
+		return fmt.Errorf("route preflight requires one or two admitted receiver generations")
+	}
+	identities := map[string]receiveRouteSelection{}
+	for _, generation := range generations {
+		for raw, selection := range generation {
+			if !cfg.receiveRouteScope[raw] {
+				return fmt.Errorf("receiver generation exceeds admitted route scope")
+			}
+			if old, found := identities[selection.Interface]; found && !reflect.DeepEqual(old, selection) {
+				return fmt.Errorf("receiver generations disagree on device ownership")
+			}
+			identities[selection.Interface] = selection
+		}
+	}
 	legacy, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
 		return err
@@ -593,21 +615,38 @@ func preflightReceiveRoutePhase(cfg config, receivers map[string]receiveRouteSel
 				}
 				continue
 			}
-			if route.LinkIndex == legacy.Attrs().Index {
+			if allowLegacy && route.LinkIndex == legacy.Attrs().Index {
 				continue
 			}
-			selection, found := receivers[raw]
-			if !found {
-				return fmt.Errorf("scoped route uses an unadmitted device")
+			admitted := false
+			for _, generation := range generations {
+				selection, found := generation[raw]
+				if !found {
+					continue
+				}
+				link, err := netlink.LinkByName(selection.Interface)
+				if isLinkNotFound(err) {
+					continue
+				} // A retired, unselected generation may be absent on retry.
+				if err != nil {
+					return err
+				}
+				if link.Attrs().Index != route.LinkIndex {
+					continue
+				}
+				check := cfg
+				check.receiveRoutes = map[string]receiveRouteSelection{raw: selection}
+				indices, err := validateReceiveRouteSelections(check, []net.IPNet{*route.Dst}, nil)
+				if err != nil {
+					return err
+				}
+				admitted = indices[raw] == route.LinkIndex
+				if admitted {
+					break
+				}
 			}
-			check := cfg
-			check.receiveRoutes = map[string]receiveRouteSelection{raw: selection}
-			indices, err := validateReceiveRouteSelections(check, []net.IPNet{*route.Dst}, nil)
-			if err != nil {
-				return err
-			}
-			if indices[raw] != route.LinkIndex {
-				return fmt.Errorf("scoped route uses a different receiver")
+			if !admitted {
+				return fmt.Errorf("scoped route uses an unadmitted receiver generation")
 			}
 		}
 	}

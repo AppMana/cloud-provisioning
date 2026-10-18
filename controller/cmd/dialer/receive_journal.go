@@ -149,6 +149,10 @@ func sameReceiveParticipantNode(a, b *corev1.Node) bool {
 		node = node.DeepCopy()
 		node.ResourceVersion = ""
 		node.ManagedFields = nil
+		// Cached images change during pulls and garbage collection. They do not
+		// identify the running agent; observation authentication separately
+		// checks its Pod, container incarnation and admitted runtime image.
+		node.Status.Images = nil
 		for i := range node.Status.Conditions {
 			node.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
 			// Reporters may refresh a network or pressure transition timestamp

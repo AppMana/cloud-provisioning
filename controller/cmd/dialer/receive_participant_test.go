@@ -9,7 +9,7 @@ import (
 )
 
 // Source comparison only: this does not prove native cleanup or receipt
-// completion. Informational timestamp refreshes are permitted; condition
+// completion. Timestamp and image-cache refreshes are permitted; condition
 // values, Ready transitions and all forwarding inputs remain fenced.
 func TestReceiveParticipantHeartbeatComparison(t *testing.T) {
 	now := metav1.Now()
@@ -30,10 +30,11 @@ func TestReceiveParticipantHeartbeatComparison(t *testing.T) {
 	heartbeat.Status.Conditions[0].LastHeartbeatTime = metav1.NewTime(now.Add(time.Second))
 	heartbeat.Status.Conditions[1].LastTransitionTime = metav1.NewTime(now.Add(time.Second))
 	heartbeat.ManagedFields = []metav1.ManagedFieldsEntry{{Manager: "kubelet", Time: &now}}
+	heartbeat.Status.Images = []corev1.ContainerImage{{Names: []string{"test.invalid/agent@sha256:cached"}, SizeBytes: 1234}}
 	if !sameReceiveParticipantNode(before, heartbeat) {
 		t.Fatal("routine heartbeat invalidated retirement source")
 	}
-	if before.ResourceVersion != "1" || !before.Status.Conditions[0].LastHeartbeatTime.Equal(&now) || heartbeat.ResourceVersion != "2" {
+	if before.ResourceVersion != "1" || !before.Status.Conditions[0].LastHeartbeatTime.Equal(&now) || heartbeat.ResourceVersion != "2" || len(before.Status.Images) != 0 || len(heartbeat.Status.Images) != 1 {
 		t.Fatal("comparison mutated its source")
 	}
 	for name, change := range map[string]func(*corev1.Node){

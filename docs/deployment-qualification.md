@@ -409,6 +409,11 @@ an acceptance criterion.
 | Sustained operation | Observe the same candidate for at least 24 hours with continuous management and workload measurements, including credential renewal and actual requests across expiry. | Adding disconnected short runs does not establish a continuous soak. A successful soak does not substitute for fault injection, and an unobserved interval cannot be inferred healthy from later readiness. |
 | Resource pressure during rollout | Retain the same management and workload availability requirements while measuring controller CPU, memory and storage pressure through activation and rollback. | Ready nodes and unchanged process IDs do not prove API availability. A short healthy baseline does not establish rollout headroom. Record actual VM resources; changing capacity requires a fresh observation and cannot turn the earlier failure into a pass. Correlation with pressure does not establish the failure's cause. |
 
+Node image-cache additions, removals and reordering must not invalidate retirement
+admission. Cached images do not identify the running agent: retain independent
+Pod, container and runtime-image authentication. A source-comparison regression
+does not qualify cleanup during a live image pull or garbage-collection cycle.
+
 When multiple receivers fail in one reconciliation pass, retain earlier execution
 or delivery errors alongside any later API or identity-read failure. Exercise this
 with a rejected cleanup followed by a failed read for another receiver. A synthetic

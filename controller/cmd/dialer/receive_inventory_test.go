@@ -129,12 +129,26 @@ func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store han
 	if _, err := otherStore.Commit(ctx, snapshot, next); err != nil {
 		t.Fatal(err)
 	}
+	firstSnapshot, err := store.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstView, err := firstSnapshot.Transition().View()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// API setup can consume more than the difference between round lifetimes.
+	// Assert the actual earliest committed expiry, not creation order.
+	expectedDeadline := now.Add(45 * time.Second)
+	if firstView.Round.ExpiresAt.Before(expectedDeadline) {
+		expectedDeadline = firstView.Round.ExpiresAt
+	}
 	cfg := config{iface: "wgset", nodeName: "site", privateKeyFile: filepath.Join(t.TempDir(), "key")}
 	calls := 0
 	verify := func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, uid string, routes tunnel.ReceiveJournalRoutes) error {
 		calls++
-		if deadline, ok := ctx.Deadline(); !ok || !deadline.Equal(now.Add(45*time.Second)) {
-			t.Fatal("combined work did not use the earliest local round expiry")
+		if deadline, ok := ctx.Deadline(); !ok || !deadline.Equal(expectedDeadline) {
+			t.Fatalf("combined work deadline %s (present=%v), want earliest committed expiry %s", deadline, ok, expectedDeadline)
 		}
 		if plan.MachineUID != first.MachineUID || view.Round.Phase != handover.Prepare || uid != siteInfo.NodeUID {
 			t.Fatal("wrong target passed to native callback")

@@ -248,6 +248,19 @@ from a single-platform reference to an index tests artifact selection and
 rollout continuity, but does not satisfy the version-changing `agent-upgrade`
 requirement by itself.
 
+Apply platform coverage checks to the cluster's prerequisite images as well:
+kube-proxy, the selected CNI and its init containers, pause, and API-access
+proxies must support every node platform on which their owners schedule them.
+A SHA-256 pin can identify an amd64-only manifest even when its upstream tag
+has an ARM64 variant. Inspect the effective owner configuration and rendered
+workloads, retain the platform descriptors, and verify native execution on new
+workers. Node registration and successful dialer startup do not establish CNI
+or Service readiness. An executable-format failure is a failed bootstrap;
+preserve it and withdraw test workers through their normal lifecycle. Correct
+the persistent image owner before a fresh campaign. Registry descriptors alone
+do not qualify native execution, and a corrected image reference does not waive
+workload or management continuity checks during its rollout.
+
 Exercise image resolution with both warm and empty caches, and after switching
 between a platform reference and its index. A low-level container-store listing
 does not prove kubelet can resolve a local alias with pull policy `Never`.

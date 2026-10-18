@@ -108,4 +108,5 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 			}
 		})
 	}
+	verifyReceiveRetirementDispatch(t, api, store, scope, key, pod)
 }

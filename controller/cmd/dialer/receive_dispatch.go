@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -16,12 +17,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// Retirement backends must verify every local cleanup obligation. No backend
+// means no retirement receipt; phase maintenance is never a fallback.
+type receiveDispatchRetirement func(context.Context, handover.Store, receiveJournalScope, wgtypes.Key, string, admittedReceiveRetirement) error
+
 type receiveDispatchNative func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string, tunnel.ReceiveJournalRoutes, wgtypes.Key) error
 
 // A local reserved journal owns forwarding even after completion. Never fall
 // through to legacy reconciliation on an API, credential, admission or native
-// failure. Retiring inventory and restoring ordinary publishers is separate.
-func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg config, native, maintain receiveDispatchNative) (bool, error) {
+// failure. Releasing reservations and restoring ordinary publishers is separate.
+func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg config, native, maintain receiveDispatchNative, retirement ...receiveDispatchRetirement) (bool, error) {
 	namespace := cfg.secretNamespace
 	if namespace == "" {
 		namespace = cfg.peersSecretNamespace
@@ -52,6 +57,7 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		return true, err
 	}
 	var targets []string
+	retiring := map[string]bool{}
 	for _, uid := range inventory.MachineUIDs {
 		store.Name = tunnel.ReceiveTransitionName(uid)
 		snapshot, err := store.Load(ctx)
@@ -71,6 +77,19 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		local := plan.CloudNodeName == cfg.nodeName
 		for _, site := range plan.Sites {
 			local = local || site.NodeName == cfg.nodeName
+		}
+		if len(inventory.Publications[uid].Retirement) != 0 {
+			withdrawal, err := attachment.ReadReceiveWithdrawal(inventory, uid, snapshot, mesh)
+			if err != nil {
+				return true, err
+			}
+			// Retained followers and surviving cloud workers may not be participants
+			// in this worker's receiver journal. Persisted consumers own this decision.
+			local = false
+			for _, consumer := range withdrawal.Consumers {
+				local = local || consumer.NodeName == cfg.nodeName
+			}
+			retiring[uid] = true
 		}
 		if local {
 			targets = append(targets, uid)
@@ -115,6 +134,23 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		token, err := os.ReadFile(cfg.receiptTokenFile)
 		if err != nil {
 			return true, fmt.Errorf("reading projected receipt credential failed")
+		}
+		if retiring[uid] {
+			if len(retirement) != 1 || retirement[0] == nil {
+				failures = append(failures, fmt.Errorf("retirement requires a complete native cleanup backend"))
+				continue
+			}
+			receipts, err := executeReceiveRetirement(ctx, api, store, scope, cfg, key, containerID, func(ctx context.Context, lockPath string, admitted admittedReceiveRetirement) error {
+				return retirement[0](ctx, store, scope, key, lockPath, admitted)
+			})
+			if err != nil {
+				failures = append(failures, err)
+				continue
+			}
+			if err := transport.Submit(ctx, strings.TrimSpace(string(token)), handover.ReceiptRequest{MachineUID: uid, RoundHash: receipts[0].Receipt.RoundHash, Receipts: receipts}); err != nil {
+				failures = append(failures, err)
+			}
+			continue
 		}
 		snapshot, err := store.Load(ctx)
 		if err != nil {

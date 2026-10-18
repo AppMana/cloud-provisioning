@@ -81,6 +81,9 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	}
 	scope := receiveJournalScope{Namespace: namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID)}
 	for _, uid := range inventory.MachineUIDs {
+		if len(inventory.Publications[uid].Retirement) != 0 {
+			continue
+		}
 		store.Name = tunnel.ReceiveTransitionName(uid)
 		snapshot, err := store.Load(ctx)
 		if err != nil {
@@ -129,7 +132,11 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	var peers []tunnel.PeerSpec
 	plans := make([]tunnel.ReceiveTransitionPlan, 0, len(set.Routes.Plans))
 	for _, uid := range set.Inventory.MachineUIDs {
-		plans = append(plans, set.Routes.Plans[uid])
+		plan, err := tunnel.DecodeReceiveTransition(set.Journals[uid], store.ClusterUID)
+		if err != nil {
+			return err
+		}
+		plans = append(plans, plan)
 	}
 	if cloud {
 		if !slices.Equal(allocation, local.Plan.CloudAddresses) || len(allocation) == 0 {

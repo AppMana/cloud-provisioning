@@ -200,6 +200,18 @@ func planSelectedCloudReceivePolicy(cfg config, key wgtypes.Key, plan tunnel.Rec
 	owners := map[netip.Prefix]string{}
 	var groups []receiveAdvertisementGroup
 	for _, peer := range selected.Peers {
+		withdrawn := false
+		for _, retired := range intent.Withdrawn {
+			if retired.RootPublicKey == peer.PublicKey {
+				if !peer.Remote {
+					return nil, fmt.Errorf("withdrawn cloud peer has site permissions")
+				}
+				withdrawn = true
+			}
+		}
+		if withdrawn {
+			continue
+		}
 		g := receiveAdvertisementGroup{peer: peer, config: cfg, legacy: legacy || peer.Remote}
 		g.config.receiveRouteScope = map[string]bool{}
 		g.config.receiveRoutes = map[string]receiveRouteSelection{}

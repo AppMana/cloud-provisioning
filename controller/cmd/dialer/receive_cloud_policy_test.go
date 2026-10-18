@@ -19,7 +19,7 @@ import (
 
 func TestCloudReceivePolicyProjection(t *testing.T) {
 	for _, legacy := range []bool{false, true} {
-		for _, fault := range []string{"valid", "desired-publication", "identity", "publication", "replacement", "unfinished", "receiver", "generation", "trailing"} {
+		for _, fault := range []string{"valid", "desired-publication", "withdrawn-remote", "identity", "publication", "replacement", "unfinished", "receiver", "generation", "trailing"} {
 			t.Run(fmt.Sprintf("legacy-%t/%s", legacy, fault), func(t *testing.T) {
 				root, err := wgtypes.GeneratePrivateKey()
 				if err != nil {
@@ -30,6 +30,25 @@ func TestCloudReceivePolicyProjection(t *testing.T) {
 					t.Fatal(err)
 				}
 				plan := receiveRestoreTestPlan(t, root, site)
+				var retiredPublic string
+				if fault == "withdrawn-remote" {
+					retired, err := wgtypes.GeneratePrivateKey()
+					if err != nil {
+						t.Fatal(err)
+					}
+					retiredPublic = retired.PublicKey().String()
+					peer := tunnel.PeerSpec{Remote: true, PublicKey: retiredPublic, WGAllowedIPs: []string{"172.31.0.1/32"}}
+					plan.Desired.Peers = append(plan.Desired.Peers, peer)
+					var base tunnel.PeerListDoc
+					if err := json.Unmarshal(plan.Base, &base); err != nil {
+						t.Fatal(err)
+					}
+					base.Peers = append(base.Peers, peer)
+					plan.Base, err = json.Marshal(base)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
 				plan.Desired.APIServers = []string{"https://192.0.2.10:6443"}
 				raw, err := json.Marshal(plan)
 				if err != nil {
@@ -42,6 +61,9 @@ func TestCloudReceivePolicyProjection(t *testing.T) {
 				spec.Phase = handover.Retire
 				view := handover.View{Round: handover.Round{Spec: spec}, Complete: true, ServingGeneration: spec.ToGeneration}
 				intent := tunnel.ReceiveJournalRoutes{Plans: map[string]tunnel.ReceiveTransitionPlan{plan.MachineUID: plan}, Views: map[string]handover.View{}, Legacy: map[string]tunnel.ReceiveTransitionPlan{}}
+				if retiredPublic != "" {
+					intent.Withdrawn = map[string]tunnel.ReceiveTransitionPlan{"retired": {MachineUID: "retired", RootPublicKey: retiredPublic}}
+				}
 				intent.Receivers, err = tunnel.PlanReceiveRoutes(plan)
 				if err != nil {
 					t.Fatal(err)
@@ -76,7 +98,7 @@ func TestCloudReceivePolicyProjection(t *testing.T) {
 				}
 				intent.Views[plan.MachineUID] = view
 				groups, err := planCloudReceivePolicy(cfg, root, plan, view, plan.CloudNodeUID, intent, adoption)
-				if fault != "valid" && fault != "desired-publication" {
+				if fault != "valid" && fault != "desired-publication" && fault != "withdrawn-remote" {
 					if err == nil {
 						t.Fatal("unsafe projection accepted")
 					}

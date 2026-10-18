@@ -67,6 +67,23 @@ func TestReceiveAdvertisementsFollowAllocationGeneration(t *testing.T) {
 			}
 		}
 	}
+	t.Run("stale-withdrawn-cache", func(t *testing.T) {
+		retired, err := wgtypes.GeneratePrivateKey()
+		if err != nil {
+			t.Fatal(err)
+		}
+		intent.Withdrawn = map[string]tunnel.ReceiveTransitionPlan{"retired": {MachineUID: "retired", RootPublicKey: retired.PublicKey().String()}}
+		data[tunnel.PeerPublicKeyPrefix+"retired"] = []byte(retired.PublicKey().String())
+		data[tunnel.PeerAllowedIPsPrefix+"retired"] = []byte("172.31.0.1/32")
+		defer func() {
+			intent.Withdrawn = nil
+			delete(data, tunnel.PeerPublicKeyPrefix+"retired")
+			delete(data, tunnel.PeerAllowedIPsPrefix+"retired")
+		}()
+		if _, err := planReceiveAdvertisements(config{nodeName: "site"}, saved, "site-uid", intent); err == nil {
+			t.Fatal("stale cache revived a withdrawn advertisement")
+		}
+	})
 	// Synthetic admitted views: no ancestry, kernel or BGP qualification.
 	old := p
 	old.ReceiverGeneration = "old"

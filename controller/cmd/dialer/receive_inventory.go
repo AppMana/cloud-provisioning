@@ -20,11 +20,12 @@ import (
 )
 
 type admittedReceiveSet struct {
-	Inventory tunnel.ReceiveInventory
-	Metadata  metav1.ObjectMeta
-	Journals  map[string]handover.Snapshot
-	Local     map[string]admittedReceiveJournal
-	Routes    tunnel.ReceiveJournalRoutes
+	Inventory   tunnel.ReceiveInventory
+	Metadata    metav1.ObjectMeta
+	Journals    map[string]handover.Snapshot
+	Local       map[string]admittedReceiveJournal
+	Routes      tunnel.ReceiveJournalRoutes
+	Retirements map[string]admittedReceiveRetirement
 }
 
 // Load every controller-reserved journal, not only the target Machine. A missing
@@ -42,7 +43,10 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 	}
 	for _, publication := range inventory.Publications {
 		if len(publication.Retirement) != 0 {
-			return fail(fmt.Errorf("receiver retirement intent requires withdrawal reconciliation"))
+			if len(inventory.Publications[scope.MachineUID].Retirement) != 0 {
+				return fail(fmt.Errorf("receiver retirement intent requires withdrawal reconciliation"))
+			}
+			return loadSurvivingReceiveSet(ctx, api, store, scope, nodeName, key, inventory, object.ObjectMeta)
 		}
 	}
 	result := admittedReceiveSet{Inventory: inventory, Metadata: *object.ObjectMeta.DeepCopy(), Journals: map[string]handover.Snapshot{}, Local: map[string]admittedReceiveJournal{}}
@@ -143,6 +147,15 @@ func sameReceiveSet(a, b admittedReceiveSet) bool {
 			return false
 		}
 	}
+	if len(a.Retirements) != len(b.Retirements) {
+		return false
+	}
+	for uid, before := range a.Retirements {
+		after, found := b.Retirements[uid]
+		if !found || !sameReceiveRetirement(before, after) {
+			return false
+		}
+	}
 	for uid, member := range a.Local {
 		other, found := b.Local[uid]
 		if !found || other.NodeUID != member.NodeUID || other.BootID != member.BootID {
@@ -175,6 +188,16 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 	if err := validateReceiveInventoryCheckpoint(path, next); err != nil {
 		return err
 	}
+	// Retirement checkpoints retain withdrawn local histories and fence old
+	// boot recovery before active histories can be refreshed.
+	for uid, retired := range admitted.Retirements {
+		retiredStore, retiredScope := store, scope
+		retiredStore.Name, retiredScope.MachineUID = tunnel.ReceiveTransitionName(uid), uid
+		retiredStore.ExpectedUID = string(retired.Journals[uid].Metadata().UID)
+		if err := checkpointReceiveRetirementLocked(ctx, api, retiredStore, retiredScope, cfg, key, lockPath, retired); err != nil {
+			return err
+		}
+	}
 	// Also preserve journals from an interrupted first checkpoint of the set.
 	entries, err := os.ReadDir(filepath.Dir(lockPath))
 	if err != nil {
@@ -183,6 +206,15 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 	expected := map[string]bool{}
 	for uid := range admitted.Local {
 		expected[filepath.Base(lockPath)+"."+tunnel.ReceiveTransitionName(uid)+".json"] = true
+	}
+	for _, retired := range admitted.Retirements {
+		for _, plan := range retired.Plans {
+			memberScope := scope
+			memberScope.MachineUID = plan.MachineUID
+			if _, err := receiveJournalParticipant(plan, memberScope, cfg.nodeName, key); err == nil {
+				expected[filepath.Base(lockPath)+"."+tunnel.ReceiveTransitionName(plan.MachineUID)+".json"] = true
+			}
+		}
 	}
 	for _, entry := range entries {
 		if strings.HasPrefix(entry.Name(), filepath.Base(lockPath)+".receive-transition-") && !expected[entry.Name()] {

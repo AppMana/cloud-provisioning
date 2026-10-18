@@ -624,4 +624,8 @@ func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store han
 			t.Fatal("replacement inventory inherited durable admission", err)
 		}
 	})
+	t.Run("survivor-during-retirement", func(t *testing.T) {
+		verifySurvivorReceiveAdmission(t, api, store, scope, otherStore, site, firstRoot)
+	})
+
 }

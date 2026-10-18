@@ -56,6 +56,11 @@ func planReceiveAdvertisements(cfg config, saved *siteForwardingCache, nodeUID s
 		if !peer.Remote {
 			continue
 		}
+		for _, withdrawn := range intent.Withdrawn {
+			if peer.PublicKey == withdrawn.RootPublicKey {
+				return nil, fmt.Errorf("advertisement cache still contains a withdrawn worker")
+			}
+		}
 		g := receiveAdvertisementGroup{peer: peer, config: cfg, own: tunnel.ReceiveSiteRouteSources(saved.Data, cfg.nodeName), legacy: true}
 		g.config.receiveRouteScope = map[string]bool{}
 		g.config.receiveRoutes = map[string]receiveRouteSelection{}

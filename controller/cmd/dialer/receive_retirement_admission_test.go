@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
@@ -24,42 +23,8 @@ import (
 func verifyReceiveRetirementAdmission(t *testing.T, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, site wgtypes.Key) {
 	t.Helper()
 	ctx := context.Background()
-	snapshot, err := store.Load(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for steps := 0; ; steps++ {
-		if steps > 10 {
-			t.Fatal("fixture transition did not complete")
-		}
-		view, err := snapshot.Transition().View()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if view.Complete {
-			break
-		}
-		at := view.Round.IssuedAt.Add(time.Second)
-		if view.Round.Phase == handover.Drain {
-			at = view.DrainUntil
-		}
-		hash, err := view.Round.Digest()
-		if err != nil {
-			t.Fatal(err)
-		}
-		var proofs []handover.AuthenticatedReceipt
-		for _, m := range view.Round.Members {
-			proofs = append(proofs, handover.AuthenticatedReceipt{AuthenticatedNodeUID: m.NodeUID, Receipt: handover.Receipt{RoundHash: hash, NodeUID: m.NodeUID, DeviceID: m.DeviceID, FromKey: m.FromKey, ToKey: m.ToKey, FromPeerKey: m.FromPeerKey, ToPeerKey: m.ToPeerKey, ObservedAt: at}})
-		}
-		next, err := snapshot.Transition().Advance(at, proofs)
-		if err != nil {
-			t.Fatal(err)
-		}
-		snapshot, err = store.Commit(ctx, snapshot, next)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
+	snapshot := completeReceiveTestJournal(t, store)
+	var err error
 	snapshot, err = store.FreezeCompleted(ctx, snapshot)
 	if err != nil {
 		t.Fatal(err)

@@ -39,40 +39,16 @@ func planReceiveNeighborRetirements(previous, desired []PeerSpec, plans []Receiv
 			absent = append(absent, peer)
 		}
 	}
-	// Validate every exact possibility, then their combined scope. Repeated
-	// keys represent interrupted growth, not permission to accept arbitrary
-	// subsets during native retirement.
-	merged := make([]PeerSpec, 0)
+	// Historical attempts may reuse destinations without ever coexisting in
+	// the kernel. Validate each exact intent against protected journal state;
+	// native retirement must verify actual owners before changing anything.
 	result := make([]PeerSpec, 0, len(absent))
-	positions := map[string]int{}
 	for _, peer := range absent {
 		admitted, err := planReceiveNeighborPeers([]PeerSpec{peer}, plans, cloudRoot)
 		if err != nil {
 			return nil, err
 		}
-		if len(admitted) == 0 {
-			continue
-		}
-		peer = admitted[0]
-		result = append(result, peer)
-		if at, found := positions[peer.PublicKey]; found {
-			for _, source := range peer.WGAllowedIPs {
-				if !slices.Contains(merged[at].WGAllowedIPs, source) {
-					merged[at].WGAllowedIPs = append(merged[at].WGAllowedIPs, source)
-				}
-			}
-			for _, host := range peer.RouteHosts {
-				if !slices.Contains(merged[at].RouteHosts, host) {
-					merged[at].RouteHosts = append(merged[at].RouteHosts, host)
-				}
-			}
-		} else {
-			positions[peer.PublicKey] = len(merged)
-			merged = append(merged, peer)
-		}
-	}
-	if _, err := planReceiveNeighborPeers(merged, plans, cloudRoot); err != nil {
-		return nil, err
+		result = append(result, admitted...)
 	}
 	return result, nil
 }

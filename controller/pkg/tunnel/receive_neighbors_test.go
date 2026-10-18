@@ -188,7 +188,12 @@ func TestReceiveNeighborRetirementPreservesExactGrowthVariants(t *testing.T) {
 	foreign.PublicKey = receiverTestKey(121)
 	foreign.WGAllowedIPs = []string{"172.29.99.1/32"}
 	foreign.RouteHosts = nil
-	if _, err := PlanReceiveNeighborRetirements([]PeerSpec{old, grown, foreign}, []PeerSpec{}, plans); err == nil {
-		t.Fatal("variant union stole a different owner's sources")
+	historical := []PeerSpec{old, grown, foreign}
+	got, err = PlanReceiveNeighborRetirements(historical, []PeerSpec{}, plans)
+	if err != nil || !reflect.DeepEqual(got, historical) {
+		t.Fatalf("lost overlapping historical attempts: %+v %v", got, err)
+	}
+	if _, err := PlanReceiveNeighborPeers([]PeerSpec{grown, foreign}, plans); err == nil {
+		t.Fatal("overlapping desired owners accepted")
 	}
 }

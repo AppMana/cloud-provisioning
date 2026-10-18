@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"os"
+	"reflect"
 	"runtime"
 	"testing"
 	"time"
@@ -288,6 +289,68 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 			must(retireReceiveNeighbors(context.Background(), devices, cfg, root, variants, own, allocated))
 			must(retireReceiveNeighbors(context.Background(), devices, cfg, root, variants, own, allocated))
 		}
+		// Failed replacements can leave absent keys sharing historical
+		// addresses. Check either exact installed owner and idempotent retry.
+		// This isolated test does not qualify cloud lifecycle continuity.
+		attemptKey, err := wgtypes.GeneratePrivateKey()
+		must(err)
+		attempt := grown
+		attempt.PublicKey = attemptKey.PublicKey().String()
+		historical := append(append([]tunnel.PeerSpec{}, variants...), attempt)
+		for _, installed := range []tunnel.PeerSpec{grown, attempt} {
+			must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{installed}, own))
+			must(retireReceiveNeighbors(context.Background(), devices, cfg, root, historical, own, allocated))
+			must(retireReceiveNeighbors(context.Background(), devices, cfg, root, historical, own, allocated))
+			remaining, err := devices.Device(cfg.iface)
+			must(err)
+			for _, current := range remaining.Peers {
+				if current.PublicKey.String() == installed.PublicKey {
+					t.Fatal("historical owner remains installed")
+				}
+			}
+		}
+		// A broader live prefix can coexist with a more-specific WireGuard
+		// prefix. Reject both recorded and foreign competing owners before
+		// changing any routes or permissions; removal is not recovery here.
+		must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{grown}, own))
+		_, covering, err := net.ParseCIDR(added)
+		must(err)
+		bits, width := covering.Mask.Size()
+		covering.Mask = net.CIDRMask(bits-1, width)
+		covering.IP = covering.IP.Mask(covering.Mask)
+		conflict := attempt
+		conflict.WGAllowedIPs = []string{covering.String()}
+		conflict.RouteHosts = nil
+		conflict.RouteHost = ""
+		conflict.Endpoint = ""
+		must(devices.ConfigureDevice(cfg.iface, wgtypes.Config{Peers: []wgtypes.PeerConfig{{PublicKey: attemptKey.PublicKey(), AllowedIPs: []net.IPNet{*covering}}}}))
+		routesBefore, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, netlink.RT_FILTER_TABLE)
+		must(err)
+		for _, intent := range [][]tunnel.PeerSpec{variants, append(append([]tunnel.PeerSpec{}, variants...), conflict)} {
+			if err := retireReceiveNeighbors(context.Background(), devices, cfg, root, intent, own, allocated); err == nil {
+				t.Fatal("retirement accepted competing live source owners")
+			}
+			current, err := devices.Device(cfg.iface)
+			must(err)
+			matches := 0
+			for _, live := range current.Peers {
+				for _, expected := range []tunnel.PeerSpec{grown, conflict} {
+					if live.PublicKey.String() == expected.PublicKey && receiveSourcesMatch(expected.WGAllowedIPs, live.AllowedIPs) {
+						matches++
+					}
+				}
+			}
+			if matches != 2 {
+				t.Fatal("rejected conflict changed live permissions")
+			}
+			routesAfter, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, netlink.RT_FILTER_TABLE)
+			must(err)
+			if !reflect.DeepEqual(routesBefore, routesAfter) {
+				t.Fatal("rejected conflict changed routes")
+			}
+		}
+		must(devices.ConfigureDevice(cfg.iface, wgtypes.Config{Peers: []wgtypes.PeerConfig{{PublicKey: attemptKey.PublicKey(), Remove: true}}}))
+		must(retireReceiveNeighbors(context.Background(), devices, cfg, root, variants, own, allocated))
 		for _, sources := range [][]string{append(append([]string{}, grown.WGAllowedIPs...), foreign), {added}} {
 			unrecorded := peer
 			unrecorded.WGAllowedIPs = sources

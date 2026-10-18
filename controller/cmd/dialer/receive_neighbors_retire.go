@@ -34,7 +34,8 @@ func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg co
 	cfg.receiveRoutes, cfg.receiveRelayRoutes = nil, nil
 	owners := map[wgtypes.Key][]tunnel.PeerSpec{}
 	selected := map[wgtypes.Key]tunnel.PeerSpec{}
-	sourceOwners := map[netip.Prefix]wgtypes.Key{}
+	sourcePrefixes := map[netip.Prefix]bool{}
+	liveOwners := map[netip.Prefix]wgtypes.Key{}
 	var prefixes []netip.Prefix
 	for _, peer := range retiring {
 		public, err := wgtypes.ParseKey(peer.PublicKey)
@@ -42,7 +43,6 @@ func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg co
 			return fmt.Errorf("invalid retiring neighbor identity")
 		}
 		owners[public] = append(owners[public], peer)
-		selected[public] = peer
 		seenSources := map[netip.Prefix]bool{}
 		for _, raw := range peer.WGAllowedIPs {
 			prefix, err := netip.ParsePrefix(raw)
@@ -50,15 +50,10 @@ func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg co
 				return fmt.Errorf("invalid retiring neighbor source")
 			}
 			seenSources[prefix] = true
-			for previous, owner := range sourceOwners {
-				if prefix.Overlaps(previous) && owner != public {
-					return fmt.Errorf("retiring neighbor sources overlap")
-				}
-			}
-			if _, found := sourceOwners[prefix]; !found {
+			if !sourcePrefixes[prefix] {
 				prefixes = append(prefixes, prefix)
 			}
-			sourceOwners[prefix] = public
+			sourcePrefixes[prefix] = true
 			cfg.receiveRouteScope[raw] = true
 		}
 	}
@@ -74,6 +69,20 @@ func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg co
 			}
 			if !matched {
 				return fmt.Errorf("retiring neighbor source permissions changed")
+			}
+			// Overlapping historical intent is harmless only when the actual
+			// retiring owners do not compete for source authorization.
+			for _, allowed := range peer.AllowedIPs {
+				prefix, err := netip.ParsePrefix(allowed.String())
+				if err != nil {
+					return err
+				}
+				for previous, owner := range liveOwners {
+					if owner != peer.PublicKey && prefix.Overlaps(previous) {
+						return fmt.Errorf("retiring live neighbor sources overlap")
+					}
+				}
+				liveOwners[prefix] = peer.PublicKey
 			}
 			continue
 		}

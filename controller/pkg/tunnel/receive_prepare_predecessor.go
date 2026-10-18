@@ -61,10 +61,25 @@ func (r ReceivePrepare) ValidatePredecessor(snapshot handover.Snapshot) (Receive
 	if r.Version != 1 || r.ReceiverGeneration == "" || r.ReceiverGeneration == plan.ReceiverGeneration || r.MeshUID != plan.MeshUID || r.NodeName != plan.CloudNodeName || r.NodeUID != plan.CloudNodeUID || r.RootPublicKey != plan.RootPublicKey || r.BaseHash != HashPeerList(plan.Base) {
 		return fail(fmt.Errorf("successor preparation identity differs from its predecessor"))
 	}
-	for _, port := range r.Ports {
-		for _, occupied := range plan.Ports {
-			if port == occupied {
-				return fail(fmt.Errorf("successor preparation reuses a predecessor listener"))
+	// A terminal rollback can still serve the previous receiver graph. Neither
+	// graph's identity or listeners may be reused by additive preparation, even
+	// when the attempted generation has already been retired.
+	graphs := []ReceiveTransitionPlan{plan}
+	if plan.PreviousReceiver != nil {
+		if plan.PreviousReceiver.Plan == nil {
+			return fail(fmt.Errorf("successor preparation has no previous receiver graph"))
+		}
+		graphs = append(graphs, *plan.PreviousReceiver.Plan)
+	}
+	for _, graph := range graphs {
+		if r.ReceiverGeneration == graph.ReceiverGeneration {
+			return fail(fmt.Errorf("successor preparation reuses a predecessor generation"))
+		}
+		for _, port := range r.Ports {
+			for _, occupied := range graph.Ports {
+				if port == occupied {
+					return fail(fmt.Errorf("successor preparation reuses a predecessor listener"))
+				}
 			}
 		}
 	}

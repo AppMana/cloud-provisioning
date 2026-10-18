@@ -205,6 +205,7 @@ func TestSuccessorReceiverGraphFollowsArchivedServingGeneration(t *testing.T) {
 						if err != nil || !reflect.DeepEqual(sitePeers, selected.SiteDesired) {
 							t.Fatal("terminal successor lost serving site permissions", err)
 						}
+						verifyPreparationPreservesReceiverGenerations(t, current, next)
 						break
 					}
 					at := view.Round.IssuedAt.Add(time.Second)
@@ -292,6 +293,47 @@ func TestPreviousReceiverRejectsIdentityConflicts(t *testing.T) {
 			}
 			if _, err := PlanReceiveRoutes(next); err == nil {
 				t.Fatal("unsafe previous graph accepted")
+			}
+		})
+	}
+}
+
+// Admission must reject reuse before additive native work. Existing forwarding
+// must remain untouched (zero allowed interruption); rejection is synchronous,
+// with no phase advancement or rollback required. These simulated-storage tests
+// do not measure native device ownership, traffic, API races or recovery time.
+func verifyPreparationPreservesReceiverGenerations(t *testing.T, snapshot handover.Snapshot, plan ReceiveTransitionPlan) {
+	t.Helper()
+	ref, err := NewReceivePreparePredecessor(snapshot, "cluster")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fault := range []string{"none", "current-generation", "previous-generation", "current-port", "previous-port"} {
+		t.Run("preparation-"+fault, func(t *testing.T) {
+			r := ReceivePrepare{Version: 1, Predecessor: &ref, ReceiverGeneration: strings.Repeat("c", 64), MeshUID: plan.MeshUID, NodeName: plan.CloudNodeName, NodeUID: plan.CloudNodeUID, RootPublicKey: plan.RootPublicKey, BaseHash: HashPeerList(plan.Base), Ports: map[string]int{}}
+			switch fault {
+			case "current-generation":
+				r.ReceiverGeneration = plan.ReceiverGeneration
+			case "previous-generation":
+				r.ReceiverGeneration = plan.PreviousReceiver.Plan.ReceiverGeneration
+			case "current-port", "previous-port":
+				ports := plan.Ports
+				if fault == "previous-port" {
+					ports = plan.PreviousReceiver.Plan.Ports
+				}
+				for key, port := range ports {
+					r.Ports[key] = port
+				}
+				if len(r.Ports) == 0 {
+					t.Fatal("fixture has no listeners")
+				}
+			}
+			_, err := r.ValidatePredecessor(snapshot)
+			if fault == "none" && err != nil {
+				t.Fatal("fresh generation rejected", err)
+			}
+			if fault != "none" && err == nil {
+				t.Fatal("preparation admitted receiver reuse", fault)
 			}
 		})
 	}

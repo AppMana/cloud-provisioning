@@ -34,3 +34,29 @@ func TestReceiveBootRetryIsBoundedAndPreservesOrdinaryPolling(t *testing.T) {
 		t.Fatal("retry marker lost original failure")
 	}
 }
+
+// Synthetic elapsed-time scheduling only. This does not prove API capacity,
+// native execution time, receipt convergence or traffic continuity.
+func TestReceiptReconciliationCadence(t *testing.T) {
+	start := time.Now()
+	for _, tc := range []struct {
+		name     string
+		receipts bool
+		elapsed  time.Duration
+		err      error
+		want     time.Duration
+	}{
+		{"receipt-fast", true, 3 * time.Second, nil, 7 * time.Second},
+		{"receipt-overrun", true, 20 * time.Second, nil, time.Nanosecond},
+		{"receipt-rejected", true, 6 * time.Second, fmt.Errorf("admission changed"), 4 * time.Second},
+		{"legacy-idle", false, 20 * time.Second, nil, 10 * time.Second},
+		{"boot-backoff", true, 20 * time.Second, receiveBootPending{fmt.Errorf("pending")}, time.Second},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var retry receiveBootRetry
+			if got := retry.reconciliationDelay(tc.err, 10*time.Second, start, start.Add(tc.elapsed), tc.receipts); got != tc.want {
+				t.Fatalf("delay %s, want %s", got, tc.want)
+			}
+		})
+	}
+}

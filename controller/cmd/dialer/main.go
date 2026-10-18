@@ -341,11 +341,12 @@ func main() {
 	defer ticker.Stop()
 	var bootRetry receiveBootRetry
 	for {
+		started := time.Now()
 		err := reconcileNode(ctx, clientset, wg, cfg, speaker)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "reconcile: %v\n", err)
 		}
-		ticker.Reset(bootRetry.delay(err, cfg.pollInterval, time.Now()))
+		ticker.Reset(bootRetry.reconciliationDelay(err, cfg.pollInterval, started, time.Now(), cfg.receiptURL != ""))
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():

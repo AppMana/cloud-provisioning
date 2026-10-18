@@ -294,3 +294,21 @@ func admitReceiveBoot(ctx context.Context, cfg config, native func(receiveBootSt
 	}
 	return true, check()
 }
+
+// reconciliationDelay preserves explicit boot retry backoff while scheduling
+// receipt refreshes from the start of the preceding reconciliation.
+func (r *receiveBootRetry) reconciliationDelay(err error, normal time.Duration, started, finished time.Time, receipts bool) time.Duration {
+	delay := r.delay(err, normal, finished)
+	var pending receiveBootPending
+	if !receipts || errors.As(err, &pending) {
+		return delay
+	}
+	// Reconciliation remains serial. An overrun schedules the next pass
+	// immediately rather than adding another full idle interval; Reset needs
+	// a positive duration. Each pass still repeats live admission.
+	elapsed := finished.Sub(started)
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	return max(time.Nanosecond, delay-elapsed)
+}

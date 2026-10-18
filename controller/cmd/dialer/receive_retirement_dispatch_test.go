@@ -33,7 +33,7 @@ import (
 // delivery is exercised, but the token and native callback are synthetic. No
 // kernel absence, token authentication or controller completion is proved here.
 // A retained keyless follower must be discovered without receiver membership.
-func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, key wgtypes.Key, pod *corev1.Pod) {
+func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, key wgtypes.Key, pod *corev1.Pod, finalized ...bool) {
 	t.Helper()
 	ctx := context.Background()
 	mesh, err := api.CoreV1().Secrets(scope.Namespace).Get(ctx, scope.MeshName, metav1.GetOptions{})
@@ -48,7 +48,11 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fault := range []string{"none", "follower", "missing-backend", "native-error", "container-race", "delivery-failure", "later-api-error", "priority-api-error"} {
+	faults := []string{"none", "follower", "missing-backend", "native-error", "container-race", "delivery-failure", "later-api-error", "priority-api-error"}
+	if len(finalized) == 1 && finalized[0] {
+		faults = []string{"finalized"}
+	}
+	for _, fault := range faults {
 		t.Run("retirement-dispatch/"+fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -208,7 +212,7 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 			if (fault == "later-api-error" || fault == "priority-api-error") && (!errors.Is(err, laterError) || !strings.Contains(err.Error(), "retirement requires a complete native cleanup backend")) {
 				t.Fatalf("lost an earlier dispatch failure: %v", err)
 			}
-			success := fault == "none" || fault == "follower"
+			success := fault == "none" || fault == "follower" || fault == "finalized"
 			if !handled || (err == nil) != success || phaseCalls != 0 {
 				t.Fatal("wrong dispatch outcome", handled, err, phaseCalls)
 			}
@@ -219,7 +223,7 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 			if calls != expectedCalls {
 				t.Fatal("native path not exercised", calls, err)
 			}
-			expectDelivery := success || fault == "delivery-failure"
+			expectDelivery := success && fault != "finalized" || fault == "delivery-failure"
 			select {
 			case receipt := <-delivered:
 				if !expectDelivery || receipt.MachineUID != scope.MachineUID || len(receipt.Receipts) != 1 || receipt.Receipts[0].BearerToken != "" || receipt.Receipts[0].Receipt.DeviceID != "" {

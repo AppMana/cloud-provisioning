@@ -534,6 +534,21 @@ admission. Filesystem tests use synthetic evidence and simulated boot identities
 They establish regression rejection and read-only admission, not authenticated
 finalization, native absence, actual reboot recovery, or reservation release.
 
+For a finalized withdrawal, the agent validates historical evidence against the
+frozen journal's observation policy before local execution and again afterward.
+It still admits the current agent incarnation, holds the host lock, persists the
+retirement fence, performs native cleanup/readback and re-admits current source
+state. Success suppresses receipt renewal; it does not skip local cleanup or
+release reservations. A policy mismatch or changed evidence fails closed.
+Real-API execution tests use synthetic legacy finalization with old timestamps
+and boot identities, reject malformed evidence before native execution, and
+reject native errors or agent/inventory changes afterward. A TLS dispatch test
+checks that successful finalized maintenance sends no receipt. Native callbacks
+and finalization authentication in these agent fixtures are synthetic; actual
+token authentication is covered separately. These tests do not qualify live
+cleanup latency, reboot recovery, mixed-version rollout or rollback. Controller
+finalization writes remain disabled until compatible deployment is qualified.
+
 Finalization remains a separate protocol: persist an irreversible retirement
 record before removing active reservations, retain durable host fences against
 old boot recovery, and admit new ownership only after matching release evidence.

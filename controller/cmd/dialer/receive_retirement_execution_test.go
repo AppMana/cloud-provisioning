@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,7 +28,7 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fault := range []string{"none", "native-error", "pod-before", "pod-after", "mesh-after", "inventory-after", "cancelled", "cancelled-after"} {
+	for _, fault := range []string{"none", "native-error", "pod-before", "pod-after", "mesh-after", "inventory-after", "cancelled", "cancelled-after", "finalized", "finalized-native-error", "finalized-pod-after", "finalized-inventory-after", "finalized-corrupt"} {
 		t.Run("retirement-execution/"+fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -47,6 +48,9 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 			if fault == "cancelled" {
 				cancel()
 			}
+			if strings.HasPrefix(fault, "finalized") {
+				seedReceiveFinalization(t, api, store, scope, fault == "finalized-corrupt")
+			}
 			called := false
 			receipts, runErr := executeReceiveRetirement(runCtx, api, store, scope, cfg, key, "containerd://agent", func(_ context.Context, lockPath string, admitted admittedReceiveRetirement) error {
 				called = true
@@ -61,9 +65,9 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 				case "cancelled-after":
 					cancel()
 					return nil
-				case "native-error":
+				case "native-error", "finalized-native-error":
 					return errors.New("cleanup did not verify")
-				case "pod-after":
+				case "pod-after", "finalized-pod-after":
 					pod.Status.ContainerStatuses[0].ContainerID = "containerd://replacement"
 					pod, err = api.CoreV1().Pods(scope.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
 					return err
@@ -75,7 +79,7 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 					mesh.Annotations = map[string]string{"execution-race": fault}
 					_, e = api.CoreV1().Secrets(scope.Namespace).Update(ctx, mesh, metav1.UpdateOptions{})
 					return e
-				case "inventory-after":
+				case "inventory-after", "finalized-inventory-after":
 					index, e := store.ConfigMaps.Get(ctx, admitted.Metadata.Name, metav1.GetOptions{})
 					if e != nil {
 						return e
@@ -86,14 +90,21 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 				}
 				return nil
 			})
+			if fault == "finalized" {
+				must(runErr)
+				if !called || len(receipts) != 0 {
+					t.Fatal("finalized maintenance skipped native checks or renewed receipts")
+				}
+				return
+			}
 			if fault != "none" {
 				if runErr == nil || len(receipts) != 0 {
 					t.Fatal("failed cleanup emitted receipt")
 				}
-				if fault != "pod-before" && fault != "cancelled" && !called {
+				if fault != "pod-before" && fault != "cancelled" && fault != "finalized-corrupt" && !called {
 					t.Fatal("fault was not exercised", runErr)
 				}
-				if (fault == "pod-before" || fault == "cancelled") && called {
+				if (fault == "pod-before" || fault == "cancelled" || fault == "finalized-corrupt") && called {
 					t.Fatal("invalid agent reached native callback")
 				}
 				return
@@ -109,4 +120,8 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 		})
 	}
 	verifyReceiveRetirementDispatch(t, api, store, scope, key, pod)
+	t.Run("finalized-dispatch", func(t *testing.T) {
+		seedReceiveFinalization(t, api, store, scope, false)
+		verifyReceiveRetirementDispatch(t, api, store, scope, key, pod, true)
+	})
 }

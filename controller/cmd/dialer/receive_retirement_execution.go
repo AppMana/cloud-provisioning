@@ -23,6 +23,8 @@ type receiveRetirementNative func(context.Context, string, admittedReceiveRetire
 // verification and renewed identity/source checks. The controller independently
 // authenticates and ages it. Source changes suppress receipts without undoing
 // cleanup; retry must admit the current state. Call without holding the host lock.
+// Verified finalization returns no receipts after the same local cleanup checks;
+// historical evidence never substitutes for current native verification.
 func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveRetirementNative) (result []handover.PodReceipt, resultErr error) {
 	timing := newReceiveTiming(cfg.receiptURL != "", "retirement")
 	defer func() { timing.finish(resultErr == nil) }()
@@ -44,6 +46,10 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	admitted, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
 	if err != nil {
 		return nil, fmt.Errorf("initial admission: %w", err)
+	}
+	finalized, err := receiveRetirementFinalized(ctx, api, store, scope, admitted)
+	if err != nil {
+		return nil, fmt.Errorf("finalization admission: %w", err)
 	}
 	receipt := handover.Receipt{NodeUID: admitted.NodeUID, ObservedBootID: admitted.BootID, AgentPodName: cfg.receiptPodName, AgentPodUID: cfg.receiptPodUID, AgentContainerName: "dialer", AgentContainerID: containerID, ObservedAt: time.Now()}
 	verifyAgent := func() error {
@@ -87,6 +93,21 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	}
 	if !sameReceiveRetirement(admitted, current) {
 		return nil, fmt.Errorf("retirement changed during native cleanup")
+	}
+	if finalized {
+		verified, err := receiveRetirementFinalized(ctx, api, store, scope, current)
+		if err != nil {
+			return nil, fmt.Errorf("post-cleanup finalization: %w", err)
+		}
+		if !verified {
+			return nil, fmt.Errorf("retirement finalization disappeared during cleanup")
+		}
+		if err := verifyAgent(); err != nil {
+			return nil, err
+		}
+		// Successful local maintenance is not a new distributed completion.
+		// Keep all reservations and checkpoints; send no historical receipt.
+		return nil, ctx.Err()
 	}
 	timing.step("post-native-binding")
 	refreshed, err := attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(current.Metadata.UID), current.Journals[scope.MachineUID], current.Mesh)

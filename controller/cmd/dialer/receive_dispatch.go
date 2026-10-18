@@ -167,6 +167,11 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 				failures = append(failures, fmt.Errorf("receiver %s retirement execution: %w", uid, err))
 				continue
 			}
+			if len(receipts) == 0 {
+				// Finalized retirement still verified local native cleanup but
+				// does not renew the controller's historical completion.
+				continue
+			}
 			deliveries.submit(func() error {
 				delivery := newReceiveTiming(true, "retirement-delivery")
 				delivery.step("request")

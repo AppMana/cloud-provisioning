@@ -32,6 +32,10 @@ type ReceiveInventory struct {
 	MeshUID      string                               `json:"meshUID"`
 	MachineUIDs  []string                             `json:"machineUIDs"`
 	Publications map[string]ReceiveJournalPublication `json:"publications,omitempty"`
+	// Released retains permanent retired-owner records outside active routing
+	// reservations. Only the conditional release protocol may move a finalized
+	// publication here. A released Machine UID can never be reserved again.
+	Released map[string]ReceiveJournalPublication `json:"released,omitempty"`
 }
 
 // ReceiveJournalPublication stores either the prepared public plan or the
@@ -95,6 +99,22 @@ func (v ReceiveInventory) validate() error {
 		}
 		if len(p.Retirement) > 0 && (p.JournalUID == "" || !json.Valid(p.Retirement) || bytes.Equal(bytes.TrimSpace(p.Retirement), []byte("null"))) {
 			return fmt.Errorf("retirement requires a published journal and non-null intent")
+		}
+	}
+	for uid, p := range v.Released {
+		if uid == "" || strings.TrimSpace(uid) != uid || slices.Contains(v.MachineUIDs, uid) {
+			return fmt.Errorf("released journal overlaps active ownership or lacks identity")
+		}
+		if _, present := v.Publications[uid]; present {
+			return fmt.Errorf("released journal remains actively published")
+		}
+		if p.JournalUID == "" || len(p.Plan) != 0 || len(p.RetirementFinalization) == 0 {
+			return fmt.Errorf("released journal requires finalized publication")
+		}
+		for _, record := range []json.RawMessage{p.Retirement, p.RetirementCompletion, p.RetirementFinalization} {
+			if !json.Valid(record) || bytes.TrimSpace(record)[0] != '{' {
+				return fmt.Errorf("released journal requires retained object evidence")
+			}
 		}
 	}
 	return nil
@@ -190,6 +210,9 @@ func reserveReceiveJournal(ctx context.Context, maps typedcore.ConfigMapInterfac
 		}
 		inventory = ReceiveInventory{Version: 1, ClusterUID: clusterUID, Namespace: mesh.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUIDs: []string{}}
 		object = &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: ReceiveInventoryName(string(mesh.UID)), Namespace: mesh.Namespace, OwnerReferences: owners}}
+	}
+	if _, released := inventory.Released[machineUID]; released {
+		return fmt.Errorf("released Machine identity cannot be reserved again")
 	}
 	if slices.Contains(inventory.MachineUIDs, machineUID) {
 		if len(plan) > 0 {

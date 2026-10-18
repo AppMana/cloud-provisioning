@@ -584,6 +584,26 @@ consumer reboot, mixed-version readers and rollback. Current completion records
 and the source-returning verifier do not implement this protocol. Do not shrink
 inventory, delete journals or discard host checkpoints to bypass it.
 
+The storage release primitive atomically moves an exact finalized publication
+from active inventory membership into `released`, retaining withdrawal,
+completion, finalization and journal incarnation as a permanent retired-owner
+record. Reservation and publication must reject that Machine UID thereafter.
+The frozen journal remains stored. Release requires the exact admitted inventory
+revision and a caller-supplied check of live release authority immediately before
+CAS; storage does not authenticate that authority. Conflicts are not retried.
+An ambiguous response requires re-admission before an identical retry, which
+must repeat the authority check and cannot replace the retained evidence.
+
+Real-API storage tests exercise invalid or changed evidence, denied authority,
+concurrent reservation, cancellation, lost response, identical retry, attempted
+resurrection and preservation of unrelated ownership. Their finalization and
+release authority are synthetic. They do not prove consumer fencing, native
+absence, safe address reuse, reboot recovery or live release. The primitive has
+no live controller caller. Released-inventory admission and durable agent
+recovery must be implemented and qualified before activation; existing checkpoint
+shrinkage rejection remains in force. Older strict readers reject `released`,
+so compatible deployment and rollback are prerequisites.
+
 Agent reconciliation timing diagnostics report fixed operation/stage labels,
 elapsed milliseconds and success only, with at most sixteen stages per record.
 They must not include configuration, object identities, credentials or error text.

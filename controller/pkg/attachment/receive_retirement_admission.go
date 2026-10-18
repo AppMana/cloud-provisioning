@@ -28,6 +28,16 @@ type ReceiveRetirementSet struct {
 // must recheck again around authentication or mutation; sequential API reads
 // are not an atomic cluster snapshot.
 func ReadReceiveRetirementSet(ctx context.Context, api kubernetes.Interface, store handover.Store, namespace, meshName, meshUID, machineUID string) (ReceiveRetirementSet, error) {
+	return readReceiveRetirementSetStage(ctx, api, store, namespace, meshName, meshUID, machineUID, true)
+}
+
+// ReadPreparedReceiveRetirementSet performs the same full-inventory validation
+// before publication. It grants no agent execution or native cleanup authority.
+func ReadPreparedReceiveRetirementSet(ctx context.Context, api kubernetes.Interface, store handover.Store, namespace, meshName, meshUID, machineUID string) (ReceiveRetirementSet, error) {
+	return readReceiveRetirementSetStage(ctx, api, store, namespace, meshName, meshUID, machineUID, false)
+}
+
+func readReceiveRetirementSetStage(ctx context.Context, api kubernetes.Interface, store handover.Store, namespace, meshName, meshUID, machineUID string, withdrawn bool) (ReceiveRetirementSet, error) {
 	fail := func(err error) (ReceiveRetirementSet, error) { return ReceiveRetirementSet{}, err }
 	if api == nil || store.ConfigMaps == nil || machineUID == "" || store.Name != tunnel.ReceiveTransitionName(machineUID) {
 		return fail(fmt.Errorf("retirement requires live reserved scope"))
@@ -95,7 +105,7 @@ func ReadReceiveRetirementSet(ctx context.Context, api kubernetes.Interface, sto
 	if !found {
 		return fail(fmt.Errorf("retiring journal is not reserved"))
 	}
-	result.Withdrawal, err = ReadReceiveWithdrawal(inventory, machineUID, snapshot, mesh)
+	result.Withdrawal, err = readReceiveWithdrawalStage(inventory, machineUID, snapshot, mesh, withdrawn)
 	if err != nil {
 		return fail(err)
 	}

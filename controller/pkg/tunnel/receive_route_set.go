@@ -66,6 +66,31 @@ func PlanReceiveRouteSet(plans []ReceiveTransitionPlan) (map[string]map[string]R
 		if err != nil {
 			return nil, err
 		}
+		// Previous destinations remain owned during preparation and rollback,
+		// even when they are absent from the forward route selection.
+		for _, site := range plan.Sites {
+			for _, peer := range plan.PreviousSitePeers().Peers {
+				if peer.PublicKey != plan.RootPublicKey {
+					continue
+				}
+				oldRoutes := map[string]ReceiveRouteSelection{}
+				if err := addReceiveRoutes(oldRoutes, peer, ReceiveRouteSelection{}); err != nil {
+					return nil, err
+				}
+				for raw := range oldRoutes {
+					prefix, err := netip.ParsePrefix(raw)
+					if err != nil {
+						return nil, err
+					}
+					for _, old := range destinations[site.NodeUID] {
+						if old.machine != plan.MachineUID && old.prefix.Overlaps(prefix) {
+							return nil, fmt.Errorf("previous journal destinations overlap another owner")
+						}
+					}
+					destinations[site.NodeUID] = append(destinations[site.NodeUID], destination{prefix, plan.MachineUID})
+				}
+			}
+		}
 		for key, site := range plan.Sites {
 			if err := bindNode(site.NodeUID, site.NodeName, key, "site"); err != nil {
 				return nil, err

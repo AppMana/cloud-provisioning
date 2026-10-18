@@ -21,10 +21,21 @@ type ReceiveTransitionPlan struct {
 	Base           []byte                           `json:"base"`
 	Desired        PeerListDoc                      `json:"desired"`
 	SiteDesired    PeerListDoc                      `json:"siteDesired"`
+	SiteBase       *PeerListDoc                     `json:"siteBase,omitempty"`
 	Native         []netip.Prefix                   `json:"native"`
 	Ports          map[string]int                   `json:"ports"`
 	Bindings       map[string]ReceiveBinding        `json:"bindings"`
 	Sites          map[string]ReceiveTransitionSite `json:"sites"`
+}
+
+// PreviousSitePeers preserves old journals, which committed only one site
+// document. New transitions can bind old permissions independently of desired
+// allocations. The returned document is read-only input to planners.
+func (p ReceiveTransitionPlan) PreviousSitePeers() PeerListDoc {
+	if p.SiteBase != nil {
+		return *p.SiteBase
+	}
+	return p.SiteDesired
 }
 
 type ReceiveTransitionSite struct {

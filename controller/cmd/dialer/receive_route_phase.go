@@ -500,7 +500,7 @@ func prepareReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.K
 		if !found || site.NodeUID != nodeUID {
 			return fmt.Errorf("missing site preparation identity")
 		}
-		client, err := prepareSiteReceiveClient(devices, plan.MeshUID, key, plan.RootPublicKey, plan.Bindings[key.PublicKey().String()], plan.SiteDesired, plan.SiteDesired, mtu, cfg.fwmark)
+		client, err := prepareSiteReceiveClient(devices, plan.MeshUID, key, plan.RootPublicKey, plan.Bindings[key.PublicKey().String()], plan.PreviousSitePeers(), plan.SiteDesired, mtu, cfg.fwmark)
 		if err != nil {
 			return err
 		}
@@ -627,7 +627,7 @@ func receiveSiteLegacyPeer(p tunnel.ReceiveTransitionPlan, public string) (tunne
 		return tunnel.PeerSpec{}, err
 	}
 	if legacy := p.Sites[public].Legacy; legacy != nil {
-		for _, peer := range p.SiteDesired.Peers {
+		for _, peer := range p.PreviousSitePeers().Peers {
 			if peer.PublicKey == p.RootPublicKey {
 				if err := tunnel.ValidateReceiveSiteLegacy(*legacy, public, base, peer); err != nil {
 					return tunnel.PeerSpec{}, err
@@ -671,7 +671,7 @@ func receiveSiteLegacyPeer(p tunnel.ReceiveTransitionPlan, public string) (tunne
 			}
 		}
 	}
-	for _, peer := range p.SiteDesired.Peers {
+	for _, peer := range p.PreviousSitePeers().Peers {
 		if peer.PublicKey == p.RootPublicKey {
 			return peer, nil
 		}

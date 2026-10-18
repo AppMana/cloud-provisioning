@@ -30,6 +30,18 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 	if p.Version != 1 || p.MeshUID == "" || p.CloudNodeUID == "" || p.Native == nil || p.SiteDesired.Peers == nil {
 		return nil, fmt.Errorf("receiver routes require a complete transport plan")
 	}
+	oldCloudFound := false
+	for _, peer := range p.PreviousSitePeers().Peers {
+		if peer.PublicKey == p.RootPublicKey {
+			oldCloudFound = true
+			if err := addReceiveRoutes(map[string]ReceiveRouteSelection{}, peer, ReceiveRouteSelection{}); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if !oldCloudFound {
+		return nil, fmt.Errorf("previous site document lacks the cloud identity")
+	}
 	var previous PeerListDoc
 	if err := json.Unmarshal(p.Base, &previous); err != nil {
 		return nil, err
@@ -78,7 +90,7 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 			return nil, fmt.Errorf("missing or duplicate receiver site identity")
 		}
 		binding := p.Bindings[path.PublicKey]
-		client, err := PlanSiteReceiveClient(p.MeshUID, path.PublicKey, p.RootPublicKey, binding, p.SiteDesired, p.SiteDesired)
+		client, err := PlanSiteReceiveClient(p.MeshUID, path.PublicKey, p.RootPublicKey, binding, p.PreviousSitePeers(), p.SiteDesired)
 		if err != nil || !reflect.DeepEqual(client, site.Client) {
 			return nil, fmt.Errorf("site receiver differs from the committed peer document: %v", err)
 		}
@@ -95,7 +107,17 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 		for _, cloud := range p.SiteDesired.Peers {
 			if cloud.PublicKey == p.RootPublicKey {
 				if site.Legacy != nil {
-					if err := ValidateReceiveSiteLegacy(*site.Legacy, path.PublicKey, previous, cloud); err != nil {
+					var oldCloud *PeerSpec
+					for _, peer := range p.PreviousSitePeers().Peers {
+						if peer.PublicKey == p.RootPublicKey {
+							copy := peer
+							oldCloud = &copy
+						}
+					}
+					if oldCloud == nil {
+						return nil, fmt.Errorf("legacy site cloud identity is missing")
+					}
+					if err := ValidateReceiveSiteLegacy(*site.Legacy, path.PublicKey, previous, *oldCloud); err != nil {
 						return nil, err
 					}
 				}

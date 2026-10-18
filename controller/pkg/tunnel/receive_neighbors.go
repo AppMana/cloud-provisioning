@@ -123,20 +123,22 @@ func PlanReceiveNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan) (
 		for _, binding := range plan.Bindings {
 			transport[binding.PublicKey] = true
 		}
-		found := false
-		for _, peer := range plan.SiteDesired.Peers {
-			if peer.PublicKey != plan.RootPublicKey {
-				continue
+		for _, document := range []PeerListDoc{plan.PreviousSitePeers(), plan.SiteDesired} {
+			found := false
+			for _, peer := range document.Peers {
+				if peer.PublicKey != plan.RootPublicKey {
+					continue
+				}
+				found = true
+				prefixes, err := neighborPeerPrefixes(peer)
+				if err != nil {
+					return nil, err
+				}
+				protected = append(protected, prefixes...)
 			}
-			found = true
-			prefixes, err := neighborPeerPrefixes(peer)
-			if err != nil {
-				return nil, err
+			if !found {
+				return nil, fmt.Errorf("reserved worker has no destination projection")
 			}
-			protected = append(protected, prefixes...)
-		}
-		if !found {
-			return nil, fmt.Errorf("reserved worker has no destination projection")
 		}
 	}
 	seen := map[string]bool{}

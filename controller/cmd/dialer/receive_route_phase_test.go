@@ -721,6 +721,11 @@ func TestDirectSiteLegacyPeerUsesAdmittedWorkloadSources(t *testing.T) {
 	if peer, err := receiveDirectSiteLegacyPeer(p, public); err != nil || !reflect.DeepEqual(peer, cloud) {
 		t.Fatalf("admitted direct path: %+v %v", peer, err)
 	}
+	p.SiteBase = &tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{cloud}}
+	p.SiteDesired.Peers[0].WGAllowedIPs = []string{"172.29.0.1/32", "10.244.159.0/26", "2001:db8:159::/64"}
+	if peer, err := receiveDirectSiteLegacyPeer(p, public); err != nil || !reflect.DeepEqual(peer, cloud) {
+		t.Fatalf("desired allocation changed legacy permissions: %+v %v", peer, err)
+	}
 	path.Sources = append(path.Sources, "10.90.0.0/24")
 	if _, err := receiveDirectSiteLegacyPeer(p, public); err == nil {
 		t.Fatal("accepted source not owned in legacy generation")

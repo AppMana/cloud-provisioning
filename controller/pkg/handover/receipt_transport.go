@@ -53,11 +53,12 @@ func (b receiptBatch) prune(now time.Time) bool {
 // Each controller process may have its own collector: journal CAS remains the
 // authority, and no conflict is retried with an already assembled batch.
 type ReceiptHandler struct {
-	resolve ReceiptCollectionResolver
-	limit   int
-	gate    chan struct{}
-	batches map[string]receiptBatch
-	stopped bool
+	resolve        ReceiptCollectionResolver
+	limit          int
+	gate           chan struct{}
+	admissionSlots chan struct{}
+	batches        map[string]receiptBatch
+	stopped        bool
 }
 
 func NewReceiptHandler(resolve ReceiptResolver, maxPending int) (*ReceiptHandler, error) {
@@ -125,13 +126,17 @@ type ReceiptCollection struct {
 	Observe     func(context.Context, []PodReceipt) error
 	Complete    func(context.Context, []PodReceipt) error
 }
+
+// ReceiptCollectionResolver performs read-only source admission. It may run
+// concurrently for different requests. Observe and Complete remain serialized
+// and must revalidate their admitted source before mutation.
 type ReceiptCollectionResolver func(context.Context, string) (ReceiptCollection, error)
 
 func NewReceiptCollectionHandler(resolve ReceiptCollectionResolver, maxPending int) (*ReceiptHandler, error) {
 	if resolve == nil || maxPending < 1 {
 		return nil, fmt.Errorf("receipt transport requires admission and a positive pending limit")
 	}
-	return &ReceiptHandler{resolve: resolve, limit: maxPending, gate: make(chan struct{}, 1), batches: map[string]receiptBatch{}}, nil
+	return &ReceiptHandler{resolve: resolve, limit: maxPending, gate: make(chan struct{}, 1), admissionSlots: make(chan struct{}, 8), batches: map[string]receiptBatch{}}, nil
 }
 
 // Run expires credentials even when agents stop sending, and drops every
@@ -217,8 +222,8 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Do not build an unbounded queue retaining bearer tokens during API stalls.
 	stage = "contention"
 	select {
-	case h.gate <- struct{}{}:
-		defer func() { <-h.gate }()
+	case h.admissionSlots <- struct{}{}:
+		defer func() { <-h.admissionSlots }()
 	default:
 		// No admission or mutation has started. Let agents redeliver this
 		// observation within its original lifetime instead of rerunning native
@@ -230,6 +235,26 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	r = r.WithContext(ctx)
+	// Source resolution can require many independent API reads. Bound that
+	// work without serializing it behind another consumer's reads. Only the
+	// bounded admitted set can wait to authenticate or mutate the collection.
+	stage = "source"
+	target, err := h.resolve(ctx, request.MachineUID)
+	stage = "contention"
+	select {
+	case h.gate <- struct{}{}:
+		defer func() { <-h.gate }()
+	case <-ctx.Done():
+		if err != nil {
+			stage = "source"
+			reject(http.StatusConflict)
+			return
+		}
+		// Resolution is read-only; Observe and Complete have not run.
+		w.Header().Set("Retry-After", "1")
+		reject(http.StatusServiceUnavailable)
+		return
+	}
 	stage = "shutdown"
 	if h.stopped {
 		reject(http.StatusServiceUnavailable)
@@ -242,9 +267,12 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	stage = "source"
-	target, err := h.resolve(r.Context(), request.MachineUID)
 	if err != nil {
 		delete(h.batches, request.MachineUID)
+		reject(http.StatusConflict)
+		return
+	}
+	if ctx.Err() != nil {
 		reject(http.StatusConflict)
 		return
 	}

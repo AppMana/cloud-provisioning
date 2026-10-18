@@ -140,8 +140,14 @@ func TestReceiptCollectorSignalsBusyBeforeAdmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.gate <- struct{}{}
-	defer func() { <-h.gate }()
+	for range cap(h.admissionSlots) {
+		h.admissionSlots <- struct{}{}
+	}
+	defer func() {
+		for range cap(h.admissionSlots) {
+			<-h.admissionSlots
+		}
+	}()
 	digest := strings.Repeat("a", 64)
 	body, _ := json.Marshal(ReceiptRequest{MachineUID: "machine", RoundHash: digest, Receipts: []PodReceipt{{Receipt: Receipt{RoundHash: digest}}}})
 	r := httptest.NewRequest(http.MethodPost, "https://controller/receipts", bytes.NewReader(body))
@@ -161,10 +167,13 @@ func TestReceiptConcurrentDelivery(t *testing.T) {
 		members = append(members, ReceiptMember{NodeUID: fmt.Sprintf("node-%d", i)})
 	}
 	completed := make(chan struct{}, 1)
+	entered := make(chan struct{}, len(members))
+	release := make(chan struct{})
 	h, err := NewReceiptCollectionHandler(func(ctx context.Context, _ string) (ReceiptCollection, error) {
-		// Hold the real collector gate while modeling an admission API read.
+		// Independent source reads must overlap; mutations remain serialized.
+		entered <- struct{}{}
 		select {
-		case <-time.After(50 * time.Millisecond):
+		case <-release:
 		case <-ctx.Done():
 			return ReceiptCollection{}, ctx.Err()
 		}
@@ -205,6 +214,22 @@ func TestReceiptConcurrentDelivery(t *testing.T) {
 		go func() {
 			results <- client.Submit(ctx, "private-token", ReceiptRequest{MachineUID: "machine", RoundHash: digest, Receipts: []PodReceipt{{BootID: "boot", Receipt: Receipt{NodeUID: member.NodeUID, AgentContainerID: "container", RoundHash: digest, ObservedAt: observed}}}})
 		}()
+	}
+	admitted := 0
+	deadline := time.NewTimer(time.Second)
+waitAdmission:
+	for admitted < len(members) {
+		select {
+		case <-entered:
+			admitted++
+		case <-deadline.C:
+			break waitAdmission
+		}
+	}
+	deadline.Stop()
+	close(release)
+	if admitted != len(members) {
+		t.Errorf("source admission serialized: %d of %d entered", admitted, len(members))
 	}
 	for range members {
 		if err := <-results; err != nil {
@@ -499,5 +524,35 @@ func TestReceiptBatchExpiryPreservesFreshParticipants(t *testing.T) {
 	batch.entries[fresh] = PodReceipt{BearerToken: "fresh-token", Receipt: Receipt{ObservedAt: now.Add(59 * time.Second)}}
 	if batch.prune(batch.expires) || len(batch.entries) != 0 {
 		t.Fatal("round expiry retained credentials")
+	}
+}
+
+// Waiting behind a mutation consumes the same request deadline. Resolving a
+// source does not authorize a callback after cancellation, or retain a token.
+func TestReceiptAdmissionWaitHonorsCancellation(t *testing.T) {
+	digest := strings.Repeat("c", 64)
+	resolved, observed := false, false
+	h, err := NewReceiptCollectionHandler(func(context.Context, string) (ReceiptCollection, error) {
+		resolved = true
+		return ReceiptCollection{UID: "journal", Digest: digest, ExpiresAt: time.Now().Add(time.Minute), MaxAge: time.Minute,
+			Members:  []ReceiptMember{{NodeUID: "node"}},
+			Observe:  func(context.Context, []PodReceipt) error { observed = true; return nil },
+			Complete: func(context.Context, []PodReceipt) error { t.Error("cancelled request completed"); return nil },
+		}, nil
+	}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.gate <- struct{}{}
+	defer func() { <-h.gate }()
+	body, _ := json.Marshal(ReceiptRequest{MachineUID: "machine", RoundHash: digest, Receipts: []PodReceipt{{Receipt: Receipt{NodeUID: "node", RoundHash: digest, ObservedAt: time.Now()}}}})
+	r := httptest.NewRequest(http.MethodPost, "https://controller/receipts", bytes.NewReader(body))
+	r.Header.Set("Authorization", "Bearer private-token")
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Millisecond)
+	defer cancel()
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r.WithContext(ctx))
+	if !resolved || observed || w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") != "1" || len(h.batches) != 0 || len(h.admissionSlots) != 0 {
+		t.Fatalf("cancelled admission retained work: resolved=%v observed=%v status=%d", resolved, observed, w.Code)
 	}
 }

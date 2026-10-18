@@ -414,6 +414,15 @@ admission. Cached images do not identify the running agent: retain independent
 Pod, container and runtime-image authentication. A source-comparison regression
 does not qualify cleanup during a live image pull or garbage-collection cycle.
 
+Receipt collection permits at most eight concurrent read-only source resolutions.
+Authentication, batch changes and completion remain serialized and must recheck
+the resolved source; concurrent reads do not authorize stale writes. Saturated
+admission returns a retryable busy response before callbacks run. Waiting for the
+mutation gate consumes the same request deadline and cancellation must suppress
+callbacks. Synthetic concurrency tests establish overlap, bounded admission and
+error behavior only, not live API throughput or authenticated retirement within
+the observation lifetime.
+
 When multiple receivers fail in one reconciliation pass, retain earlier execution
 or delivery errors alongside any later API or identity-read failure. Exercise this
 with a rejected cleanup followed by a failed read for another receiver. A synthetic

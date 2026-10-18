@@ -191,9 +191,11 @@ func verifyReceiveRetirementAdmission(t *testing.T, api kubernetes.Interface, st
 	for _, fault := range []string{"mesh", "inventory", "journal", "node"} {
 		t.Run("retirement-race-"+fault, func(t *testing.T) {
 			raced := store
-			// First read is the index, second the journal. Inject on the third
-			// read, after local Node admission, when the journal is rechecked.
-			raced.ConfigMaps = &changingJournalReader{ConfigMapInterface: store.ConfigMaps, reads: -1, change: func() error {
+			// Shared admission reads index/journal and rechecks both first.
+			// Inject on the fifth read, after local Node admission, when the
+			// agent rechecks the journal again. Earlier Node changes belong
+			// to the initial snapshot and are not a concurrent admission race.
+			raced.ConfigMaps = &changingJournalReader{ConfigMapInterface: store.ConfigMaps, reads: -3, change: func() error {
 				switch fault {
 				case "mesh":
 					m, err := api.CoreV1().Secrets(scope.Namespace).Get(ctx, scope.MeshName, metav1.GetOptions{})

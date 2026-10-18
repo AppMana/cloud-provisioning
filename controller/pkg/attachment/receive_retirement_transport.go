@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -21,8 +22,25 @@ func NewReceiveRetirementReceiptCollection(ctx context.Context, api kubernetes.I
 	if api == nil || store.ConfigMaps == nil || mesh == nil || recheck == nil || maxAge <= 0 {
 		return fail(fmt.Errorf("retirement collection requires live admission and bounded observation age"))
 	}
+	plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
+	if err != nil {
+		return fail(err)
+	}
+	shared, err := ReadReceiveRetirementSet(ctx, api, store, mesh.Namespace, mesh.Name, string(mesh.UID), plan.MachineUID)
+	if err != nil {
+		return fail(err)
+	}
+	if string(shared.Metadata.UID) != inventoryUID || shared.MeshMetadata.ResourceVersion != mesh.ResourceVersion {
+		return fail(fmt.Errorf("retirement collection source changed"))
+	}
+	if err := shared.Journals[plan.MachineUID].ContinuesExecution(snapshot); err != nil {
+		return fail(err)
+	}
 	check := func(ctx context.Context) error {
-		return recheckReceiveRetirementSource(ctx, api, store, mesh, snapshot, recheck)
+		if err := recheck(); err != nil {
+			return err
+		}
+		return shared.Recheck(ctx, api, store)
 	}
 	if err := check(ctx); err != nil {
 		return fail(err)
@@ -59,7 +77,9 @@ func NewReceiveRetirementReceiptCollection(ctx context.Context, api kubernetes.I
 		return scope.validateBatch(entries, time.Now(), maxAge, false)
 	}
 	target.Complete = func(ctx context.Context, entries []handover.PodReceipt) error {
-		return RecordReceiveRetirementWithPodReceipts(ctx, api, store, inventoryUID, scope.Digest(), mesh, snapshot, entries, policies, maxAge, recheck)
+		return RecordReceiveRetirementWithPodReceipts(ctx, api, store, inventoryUID, scope.Digest(), mesh, snapshot, entries, policies, maxAge, func() error {
+			return check(ctx)
+		})
 	}
 	return target, nil
 }

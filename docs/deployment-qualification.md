@@ -423,6 +423,13 @@ callbacks. Synthetic concurrency tests establish overlap, bounded admission and
 error behavior only, not live API throughput or authenticated retirement within
 the observation lifetime.
 
+A rejected consumer observation must not discard other consumers' independently
+admitted receipts. Retained receipts keep their original timestamps and expiry;
+completion must still authenticate every consumer and recheck current source
+and identities. Exercise a rejected submission between two valid consumers and
+verify that its credential is never retained. Synthetic accumulation tests do
+not prove that live consumers can deliver within the shared freshness window.
+
 Version-three retirement completion records exclude all completion evidence
 from their inventory authority hash, so recording or refreshing a sibling
 completion does not invalidate an otherwise current proof. Journal identities,

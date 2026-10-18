@@ -317,7 +317,10 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	stage = "observation"
 	err = target.Observe(r.Context(), request.Receipts)
 	if err != nil {
-		delete(h.batches, request.MachineUID)
+		// Reject this subset without erasing independently admitted consumers.
+		// A stale or unauthenticated submission must not reset their progress.
+		// Retained observations keep their original expiry; Complete still
+		// authenticates the entire batch against current source and identities.
 		reject(http.StatusConflict)
 		return
 	}

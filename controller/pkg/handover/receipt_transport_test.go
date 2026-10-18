@@ -556,3 +556,67 @@ func TestReceiptAdmissionWaitHonorsCancellation(t *testing.T) {
 		t.Fatalf("cancelled admission retained work: resolved=%v observed=%v status=%d", resolved, observed, w.Code)
 	}
 }
+
+// A rejected consumer must not erase another consumer's independently admitted
+// observation. Synthetic callbacks cover accumulation only; production Complete
+// still authenticates the entire batch and rechecks source, identity and age.
+func TestReceiptRejectedObservationPreservesOtherConsumers(t *testing.T) {
+	digest := strings.Repeat("c", 64)
+	now := time.Now()
+	completed := false
+	h, err := NewReceiptCollectionHandler(func(context.Context, string) (ReceiptCollection, error) {
+		return ReceiptCollection{UID: "journal", Digest: digest, ExpiresAt: now.Add(time.Minute), MaxAge: 30 * time.Second,
+			Members: []ReceiptMember{{NodeUID: "first"}, {NodeUID: "second"}},
+			Observe: func(_ context.Context, entries []PodReceipt) error {
+				if entries[0].BearerToken == "rejected-token" {
+					return fmt.Errorf("observation rejected")
+				}
+				return nil
+			},
+			Complete: func(_ context.Context, entries []PodReceipt) error {
+				if len(entries) != 2 {
+					t.Fatal("incomplete batch")
+				}
+				for _, entry := range entries {
+					if entry.BearerToken != "accepted-token" || !entry.Receipt.ObservedAt.Equal(now) {
+						t.Fatal("rejected credential retained or observation refreshed")
+					}
+				}
+				completed = true
+				return nil
+			},
+		}, nil
+	}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	submit := func(node, bearer string) int {
+		body, _ := json.Marshal(ReceiptRequest{MachineUID: "machine", RoundHash: digest, Receipts: []PodReceipt{{Receipt: Receipt{NodeUID: node, RoundHash: digest, ObservedAt: now}}}})
+		r := httptest.NewRequest(http.MethodPost, "https://controller/receipts", bytes.NewReader(body))
+		r.Header.Set("Authorization", "Bearer "+bearer)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w.Code
+	}
+	if status := submit("first", "accepted-token"); status != http.StatusAccepted {
+		t.Fatalf("first status %d", status)
+	}
+	if status := submit("second", "rejected-token"); status != http.StatusConflict {
+		t.Fatalf("rejected status %d", status)
+	}
+	if len(h.batches["machine"].entries) != 1 {
+		t.Fatal("rejected observation discarded another consumer's admitted evidence")
+	}
+	if status := submit("first", "rejected-token"); status != http.StatusConflict {
+		t.Fatalf("rejected replacement status %d", status)
+	}
+	if entry := h.batches["machine"].entries[[2]string{"first", ""}]; entry.BearerToken != "accepted-token" || !entry.Receipt.ObservedAt.Equal(now) {
+		t.Fatal("rejected replacement changed previously admitted evidence")
+	}
+	if status := submit("second", "accepted-token"); status != http.StatusNoContent || !completed {
+		t.Fatalf("replacement did not complete: status %d", status)
+	}
+	if len(h.batches) != 0 {
+		t.Fatal("completed batch retained credentials")
+	}
+}

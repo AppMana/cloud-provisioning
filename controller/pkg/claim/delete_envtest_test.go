@@ -52,7 +52,8 @@ func TestRealAPITeardownDeletionRaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Run("standalone-receiver-removal", func(t *testing.T) { verifyStandaloneReceiveDeletion(t, api, core) })
+	t.Run("standalone-receiver-removal", func(t *testing.T) { verifyStandaloneReceiveDeletion(t, api, core, false) })
+	t.Run("standalone-receiver-completion", func(t *testing.T) { verifyStandaloneReceiveDeletion(t, api, core, true) })
 	ctx := context.Background()
 	for _, kind := range []string{"machine", "infra", "node"} {
 		for _, race := range []string{"replacement", "update"} {

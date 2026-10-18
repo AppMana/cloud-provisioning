@@ -3,8 +3,16 @@ package claim
 import (
 	"context"
 	"encoding/json"
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	appsv1 "k8s.io/api/apps/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	"net/netip"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
@@ -17,9 +25,11 @@ import (
 
 // Reuse isolated API storage to exercise standalone deletion's durable capture,
 // cordon, drain marker and withdrawal capture. An intentionally missing journal
-// must stop compute deletion. No native cleanup, completed receipt sequence,
-// live CAPI, interruption bound or orphan recovery is established by this test.
-func verifyStandaloneReceiveDeletion(t *testing.T, api client.Client, core kubernetes.Interface) {
+// must stop compute deletion. A separate valid-history fixture covers real pod
+// authentication and the CAPI deletion request. Native observations and agent
+// status are synthetic; no live CAPI, interruption bound or orphan recovery is
+// established by this test.
+func verifyStandaloneReceiveDeletion(t *testing.T, api client.Client, core kubernetes.Interface, complete bool) {
 	t.Helper()
 	ctx := context.Background()
 	must := func(err error) {
@@ -28,12 +38,16 @@ func verifyStandaloneReceiveDeletion(t *testing.T, api client.Client, core kuber
 			t.Fatal(err)
 		}
 	}
-	claim := fakeClaim("reserved-standalone")
+	name := "reserved-standalone"
+	if complete {
+		name += "-completion"
+	}
+	claim := fakeClaim(name)
 	claim.Finalizers = []string{Finalizer}
 	must(api.Create(ctx, claim))
 	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: claim.Name}, Spec: corev1.NodeSpec{ProviderID: "test:///standalone"}}
 	must(api.Create(ctx, node))
-	site := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "standalone-site"}}
+	site := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name + "-site"}}
 	must(api.Create(ctx, site))
 	machine := &unstructured.Unstructured{Object: map[string]any{"spec": map[string]any{"providerID": node.Spec.ProviderID}, "status": map[string]any{"nodeRef": map[string]any{"name": node.Name, "uid": string(node.UID)}}}}
 	machine.SetGroupVersionKind(machineGVK)
@@ -44,11 +58,18 @@ func verifyStandaloneReceiveDeletion(t *testing.T, api client.Client, core kuber
 	must(api.Create(ctx, machine))
 	adoption := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: tunnel.AdoptionSecretName(claim.Name), Namespace: claim.Namespace}}
 	must(api.Create(ctx, adoption))
-	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "standalone-mesh", Namespace: claim.Namespace}, Data: map[string][]byte{tunnel.PeerPublicKeyPrefix + claim.Name: []byte("root"), tunnel.NodePublicKeyPrefix + site.Name: []byte("site")}}
+	key := func(b byte) string { var k wgtypes.Key; k[0] = b; return k.String() }
+	root, siteKey := key(2), key(1)
+	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name + "-mesh", Namespace: claim.Namespace}, Data: map[string][]byte{tunnel.PeerPublicKeyPrefix + claim.Name: []byte(root), tunnel.NodePublicKeyPrefix + site.Name: []byte(siteKey), tunnel.PeerEndpointPrefix + claim.Name: []byte("198.51.100.1:51820"), tunnel.PeerAllowedIPsPrefix + claim.Name: []byte("172.29.0.1/32"), tunnel.PeerRouteHostsPrefix + claim.Name: []byte("172.29.0.1")}}
 	must(api.Create(ctx, mesh))
 	cluster, err := core.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{})
 	must(err)
 	inventory := tunnel.ReceiveInventory{Version: 1, ClusterUID: string(cluster.UID), Namespace: mesh.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUIDs: []string{string(machine.GetUID())}, Publications: map[string]tunnel.ReceiveJournalPublication{string(machine.GetUID()): {JournalUID: "missing-journal"}}}
+	var store handover.Store
+	if complete {
+		store = standaloneRetirementJournal(t, api, core, string(cluster.UID), mesh, machine, node, site, adoption, root, siteKey, key(3))
+		inventory.Publications[string(machine.GetUID())] = tunnel.ReceiveJournalPublication{JournalUID: store.ExpectedUID}
+	}
 	raw, err := json.Marshal(inventory)
 	must(err)
 	index := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: tunnel.ReceiveInventoryName(string(mesh.UID)), Namespace: mesh.Namespace}, Data: map[string]string{"inventory.json": string(raw)}}
@@ -89,6 +110,10 @@ func verifyStandaloneReceiveDeletion(t *testing.T, api client.Client, core kuber
 	must(step()) // retain survivor inventory
 	if record.Withdrawal == nil || len(record.Withdrawal.Consumers) != 1 || record.Withdrawal.Consumers[0].NodeUID != string(site.UID) {
 		t.Fatal("withdrawal did not retain survivor")
+	}
+	if complete {
+		verifyStandaloneCompletion(t, api, core, claim, machine, mesh, index, store, site, step)
+		return
 	}
 	if err := step(); err == nil {
 		t.Fatal("missing journal permitted retirement")
@@ -132,7 +157,184 @@ func verifyStandaloneReceiveDeletion(t *testing.T, api client.Client, core kuber
 	}
 	must(api.Get(ctx, client.ObjectKeyFromObject(adoption), adoption))
 	must(api.Get(ctx, client.ObjectKeyFromObject(mesh), mesh))
-	if string(mesh.Data[tunnel.PeerPublicKeyPrefix+claim.Name]) != "root" {
+	if string(mesh.Data[tunnel.PeerPublicKeyPrefix+claim.Name]) != root {
 		t.Fatal("failed retirement removed peer")
+	}
+}
+
+// Construct synthetic completed transport history; no transport receipts here
+// come from native agents. Retirement receipts below use real TokenReview.
+func standaloneRetirementJournal(t *testing.T, api client.Client, core kubernetes.Interface, clusterUID string, mesh *corev1.Secret, machine *unstructured.Unstructured, node, site *corev1.Node, adoption *corev1.Secret, root, siteKey, receiverKey string) handover.Store {
+	t.Helper()
+	ctx := context.Background()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	peers := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: siteKey, WGAllowedIPs: []string{"10.90.0.0/24"}}}}
+	base, err := json.Marshal(peers)
+	must(err)
+	plan := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: mesh.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineName: machine.GetName(), MachineUID: string(machine.GetUID()), AdoptionName: tunnel.AdoptionSecretName(machine.GetName()), AdoptionUID: string(adoption.UID), CloudNodeName: node.Name, CloudNodeUID: string(node.UID), RootPublicKey: root, Base: base, Desired: peers, Native: []netip.Prefix{}, Ports: map[string]int{}, Bindings: map[string]tunnel.ReceiveBinding{}, Sites: map[string]tunnel.ReceiveTransitionSite{}}
+	plan.SiteDesired = tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: root, Remote: true, Endpoint: "198.51.100.1:51820", WGAllowedIPs: []string{"172.29.0.1/32"}}}}
+	prep, err := tunnel.PlanReceiveHandover(plan.MeshUID, peers, peers, nil)
+	must(err)
+	for _, path := range prep.Receivers {
+		binding := tunnel.ReceiveBinding{Interface: path.Interface, PeerPublicKey: siteKey, PublicKey: receiverKey, ListenPort: 51821}
+		plan.Bindings[siteKey] = binding
+		plan.Ports[siteKey] = binding.ListenPort
+		receiver, err := tunnel.PlanSiteReceiveClient(plan.MeshUID, siteKey, root, binding, plan.SiteDesired, plan.SiteDesired)
+		must(err)
+		plan.Sites[siteKey] = tunnel.ReceiveTransitionSite{NodeName: site.Name, NodeUID: string(site.UID), Client: receiver}
+	}
+	raw, err := json.Marshal(plan)
+	must(err)
+	spec, err := tunnel.ReceiveTransitionSpec(plan, clusterUID, tunnel.HashPeerList(raw))
+	must(err)
+	tr, err := handover.NewTransition(spec, time.Now().Add(-time.Minute), handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: time.Minute, DrainInterval: time.Second})
+	must(err)
+	for steps := 0; ; steps++ {
+		if steps > 10 {
+			t.Fatal("transition did not finish")
+		}
+		view, err := tr.View()
+		must(err)
+		if view.Complete {
+			break
+		}
+		at := view.Round.IssuedAt.Add(time.Second)
+		if view.Round.Phase == handover.Drain {
+			at = view.DrainUntil
+		}
+		digest, err := view.Round.Digest()
+		must(err)
+		var receipts []handover.AuthenticatedReceipt
+		for _, member := range view.Round.Members {
+			receipts = append(receipts, handover.AuthenticatedReceipt{AuthenticatedNodeUID: member.NodeUID, Receipt: handover.Receipt{RoundHash: digest, NodeUID: member.NodeUID, DeviceID: member.DeviceID, FromKey: member.FromKey, ToKey: member.ToKey, FromPeerKey: member.FromPeerKey, ToPeerKey: member.ToPeerKey, ObservedAt: at}})
+		}
+		tr, err = tr.Advance(at, receipts)
+		must(err)
+	}
+	history, err := tr.Bytes()
+	must(err)
+	journal := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: tunnel.ReceiveTransitionName(string(machine.GetUID())), Namespace: mesh.Namespace}, Data: map[string]string{"plan.json": string(raw), "transition.json": string(history)}}
+	must(api.Create(ctx, journal))
+	return handover.Store{ConfigMaps: core.CoreV1().ConfigMaps(mesh.Namespace), ClusterUID: clusterUID, Name: journal.Name, ExpectedUID: string(journal.UID)}
+}
+
+func verifyStandaloneCompletion(t *testing.T, api client.Client, core kubernetes.Interface, claim *v1alpha1.ProvisionedNodeClaim, machine *unstructured.Unstructured, mesh *corev1.Secret, index *corev1.ConfigMap, store handover.Store, site *corev1.Node, step func() error) {
+	t.Helper()
+	ctx := context.Background()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for stage := 0; stage < 4; stage++ {
+		must(step())
+		snapshot, err := store.Load(ctx)
+		must(err)
+		if !snapshot.Frozen() {
+			t.Fatal("standalone journal not frozen")
+		}
+		inventory, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
+		must(err)
+		publication := inventory.Publications[string(machine.GetUID())]
+		if (len(publication.Retirement) > 0) != (stage >= 1) {
+			t.Fatal("incorrect standalone retirement persistence stage", stage)
+		}
+		if len(publication.RetirementCompletion) > 0 {
+			t.Fatal("standalone fabricated cleanup completion")
+		}
+		must(api.Get(ctx, client.ObjectKeyFromObject(mesh), mesh))
+		if (len(mesh.Data[tunnel.PeerPublicKeyPrefix+claim.Name]) == 0) != (stage >= 2) {
+			t.Fatal("incorrect standalone publication stage", stage)
+		}
+		var record claimReceiveRemoval
+		must(json.Unmarshal([]byte(claim.Annotations[receiveRemovalAnnotation]), &record))
+		if record.Removing {
+			t.Fatal("missing receipts committed standalone removal")
+		}
+	}
+	const image = "example.invalid/dialer@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	sa, err := core.CoreV1().ServiceAccounts(claim.Namespace).Create(ctx, &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "retirement-agent"}}, metav1.CreateOptions{})
+	must(err)
+	labels := map[string]string{"app": "retirement-agent"}
+	daemon, err := core.AppsV1().DaemonSets(claim.Namespace).Create(ctx, &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "retirement-agent"}, Spec: appsv1.DaemonSetSpec{Selector: &metav1.LabelSelector{MatchLabels: labels}, Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labels}, Spec: corev1.PodSpec{ServiceAccountName: sa.Name, Containers: []corev1.Container{{Name: "dialer", Image: image}}}}}}, metav1.CreateOptions{})
+	must(err)
+	site.Status.NodeInfo.BootID = "retirement-boot"
+	site.Status.Conditions = []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}
+	site, err = core.CoreV1().Nodes().UpdateStatus(ctx, site, metav1.UpdateOptions{})
+	must(err)
+	agent, err := core.CoreV1().Pods(claim.Namespace).Create(ctx, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "retirement-agent", Labels: labels, OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(daemon, appsv1.SchemeGroupVersion.WithKind("DaemonSet"))}}, Spec: corev1.PodSpec{NodeName: site.Name, ServiceAccountName: sa.Name, Containers: []corev1.Container{{Name: "dialer", Image: image}}}}, metav1.CreateOptions{})
+	must(err)
+	agent.Status.Phase = corev1.PodRunning
+	agent.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+	agent.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://retirement-agent", Image: image, ImageID: image, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.Now()}}}}
+	agent, err = core.CoreV1().Pods(claim.Namespace).UpdateStatus(ctx, agent, metav1.UpdateOptions{})
+	must(err)
+	policy := handover.PodReceiptAuthenticator{API: core, Audience: "cloud-provisioning-receipts", Namespace: claim.Namespace, ServiceAccountName: sa.Name, ServiceAccountUID: string(sa.UID), DaemonSetName: daemon.Name, DaemonSetUID: string(daemon.UID), ContainerName: "dialer", Image: image, ImageID: image}
+	token, err := core.CoreV1().ServiceAccounts(claim.Namespace).CreateToken(ctx, sa.Name, &authenticationv1.TokenRequest{Spec: authenticationv1.TokenRequestSpec{Audiences: []string{policy.Audience}, BoundObjectRef: &authenticationv1.BoundObjectReference{APIVersion: "v1", Kind: "Pod", Name: agent.Name, UID: agent.UID}}}, metav1.CreateOptions{})
+	must(err)
+	submit := func(bearer string) error {
+		source, err := attachment.ReadReceiveRetirementSet(ctx, core, store, claim.Namespace, mesh.Name, string(mesh.UID), string(machine.GetUID()))
+		if err != nil {
+			return err
+		}
+		snapshot, err := store.Load(ctx)
+		if err != nil {
+			return err
+		}
+		scope, err := attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(index.UID), snapshot, mesh)
+		if err != nil {
+			return err
+		}
+		entry := handover.PodReceipt{BearerToken: bearer, BootID: site.Status.NodeInfo.BootID, Receipt: handover.Receipt{NodeUID: string(site.UID), RoundHash: scope.Digest(), AgentContainerID: agent.Status.ContainerStatuses[0].ContainerID, ObservedAt: time.Now()}}
+		return attachment.RecordReceiveRetirementWithPodReceipts(ctx, core, store, string(index.UID), scope.Digest(), mesh, snapshot, []handover.PodReceipt{entry}, map[string]handover.PodReceiptAuthenticator{string(site.UID): policy}, time.Minute, func() error { return source.Recheck(ctx, core, store) })
+	}
+	if err := submit("invalid-token"); err == nil {
+		t.Fatal("invalid token persisted completion")
+	}
+	stored, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, claim.Namespace, mesh.Name, string(mesh.UID))
+	must(err)
+	if len(stored.Publications[string(machine.GetUID())].RetirementCompletion) != 0 {
+		t.Fatal("failed authentication fabricated completion")
+	}
+	must(submit(token.Status.Token))
+	// A boot change after successful authentication invalidates stored evidence.
+	// Fresh authenticated observations may refresh it without releasing ownership.
+	site.Status.NodeInfo.BootID = "retirement-reboot"
+	site, err = core.CoreV1().Nodes().UpdateStatus(ctx, site, metav1.UpdateOptions{})
+	must(err)
+	if err := step(); err == nil {
+		t.Fatal("stale boot evidence authorized standalone deletion")
+	}
+	must(submit(token.Status.Token))
+
+	must(step())
+	var record claimReceiveRemoval
+	must(json.Unmarshal([]byte(claim.Annotations[receiveRemovalAnnotation]), &record))
+	if !record.Removing {
+		t.Fatal("authenticated cleanup did not commit standalone removal")
+	}
+	r := &Reconciler{Client: api, Reader: api, Workload: api, RetirementAPI: core, MeshName: mesh.Name}
+	_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(claim)})
+	must(err)
+	must(api.Get(ctx, client.ObjectKeyFromObject(machine), machine))
+	if machine.GetDeletionTimestamp() == nil {
+		t.Fatal("committed standalone removal did not reach CAPI deletion")
+	}
+	inventory, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
+	must(err)
+	publication := inventory.Publications[string(machine.GetUID())]
+	if len(inventory.MachineUIDs) != 1 || publication.JournalUID != store.ExpectedUID || len(publication.RetirementCompletion) == 0 {
+		t.Fatal("standalone deletion lost cleanup proof or reservation")
+	}
+	raw, err := json.Marshal(inventory)
+	must(err)
+	if strings.Contains(string(raw), token.Status.Token) || strings.Contains(claim.Annotations[receiveRemovalAnnotation], token.Status.Token) {
+		t.Fatal("retirement persisted bearer credential")
 	}
 }

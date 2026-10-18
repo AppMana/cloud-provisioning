@@ -93,6 +93,9 @@ func (s Store) ReplaceCompleted(ctx context.Context, previous Snapshot, spec Spe
 	if err != nil {
 		return fail(err)
 	}
+	if checked.Frozen() {
+		return fail(fmt.Errorf("frozen journal cannot admit a successor"))
+	}
 	old, err := checked.Transition().View()
 	if err != nil {
 		return fail(err)

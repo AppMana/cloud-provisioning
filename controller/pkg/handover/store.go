@@ -182,6 +182,9 @@ func (s Store) Commit(ctx context.Context, previous Snapshot, next Transition) (
 	if e != nil {
 		return Snapshot{}, e
 	}
+	if checked.Frozen() {
+		return Snapshot{}, fmt.Errorf("frozen journal cannot append an event")
+	}
 	if len(next.j.Events) != len(checked.transition.j.Events)+1 {
 		return Snapshot{}, fmt.Errorf("commit requires exactly one successor event")
 	}

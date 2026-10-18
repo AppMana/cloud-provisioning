@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // These checks exercise terminal authority and public identity, not native
@@ -87,7 +88,7 @@ func TestReceivePreparationRequiresExactTerminalPredecessor(t *testing.T) {
 			if _, err := NewReceivePreparePredecessor(journalRouteSnapshot(t, plan, initial), "cluster"); err == nil {
 				t.Fatal("unfinished journal authorized successor preparation")
 			}
-			for _, fault := range []string{"none", "missing", "cluster", "machine", "journal", "history", "mesh", "node-name", "node-uid", "root", "base", "generation", "invalid-generation", "port", "unfinished"} {
+			for _, fault := range []string{"none", "missing", "cluster", "machine", "journal", "history", "mesh", "node-name", "node-uid", "root", "base", "generation", "invalid-generation", "port", "unfinished", "frozen"} {
 				t.Run(fault, func(t *testing.T) {
 					binding := ref
 					req := ReceivePrepare{Version: 1, Predecessor: &binding, ReceiverGeneration: strings.Repeat("a", 64), MeshUID: plan.MeshUID, NodeName: plan.CloudNodeName, NodeUID: plan.CloudNodeUID, RootPublicKey: plan.RootPublicKey, BaseHash: HashPeerList(plan.Base), Ports: map[string]int{}}
@@ -126,6 +127,31 @@ func TestReceivePreparationRequiresExactTerminalPredecessor(t *testing.T) {
 						}
 					case "unfinished":
 						live = journalRouteSnapshot(t, plan, initial)
+					case "frozen":
+						// The real-API handover tests establish the immutable fence.
+						// Here retain identical journal/plan bytes and test the shared
+						// controller and agent predecessor admission against it.
+						raw, err := live.Checkpoint()
+						if err != nil {
+							t.Fatal(err)
+						}
+						var saved struct {
+							Version int              `json:"version"`
+							Object  corev1.ConfigMap `json:"object"`
+						}
+						if err := json.Unmarshal(raw, &saved); err != nil {
+							t.Fatal(err)
+						}
+						immutable := true
+						saved.Object.Immutable = &immutable
+						raw, err = json.Marshal(saved)
+						if err != nil {
+							t.Fatal(err)
+						}
+						live, err = (handover.Store{Name: live.Metadata().Name, ClusterUID: "cluster"}).RestoreCheckpoint(raw)
+						if err != nil || !live.Frozen() {
+							t.Fatal("invalid frozen fixture", err)
+						}
 					}
 					got, err := req.ValidatePredecessor(live)
 					if fault == "none" {

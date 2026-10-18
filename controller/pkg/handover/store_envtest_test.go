@@ -147,6 +147,9 @@ func TestStoreAPIServerCAS(t *testing.T) {
 	t.Run("completed-archives", func(t *testing.T) {
 		verifyCompletedArchives(t, Store{ConfigMaps: client.CoreV1().ConfigMaps("handover-test"), ClusterUID: "cluster-uid"})
 	})
+	t.Run("completed-freeze", func(t *testing.T) {
+		verifyCompletedFreeze(t, Store{ConfigMaps: client.CoreV1().ConfigMaps("handover-test"), ClusterUID: "cluster-uid"})
+	})
 }
 
 // Real API coverage: completion, immutable bytes, retry after a lost response,

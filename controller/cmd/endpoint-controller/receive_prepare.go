@@ -408,6 +408,11 @@ func (r *meshReconciler) receivePreparationPredecessor(ctx context.Context, adop
 // reconciliation too, so a retry cannot revoke access between grant and CAS.
 // Consumed proposals no longer request an archive; published ancestry owns it.
 func (r *meshReconciler) receivePreparationArchive(ctx context.Context, store handover.Store, snapshot handover.Snapshot) (string, error) {
+	if snapshot.Frozen() {
+		// Published ancestry retains its normal grants. A pending proposal can
+		// no longer replace this journal and needs no additional archive grant.
+		return "", nil
+	}
 	view, err := snapshot.Transition().View()
 	if err != nil || !view.Complete {
 		return "", err

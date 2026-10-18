@@ -155,6 +155,11 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 		if err != nil {
 			return nil, err
 		}
+		if existing.Frozen() {
+			// Retirement retains the serving plan until participants acknowledge
+			// native withdrawal. Source changes cannot start another generation.
+			return &existing, nil
+		}
 		if err := checkCompletedReceiveSources(existing, store.ClusterUID, mesh); err != nil {
 			if !errors.Is(err, errReceiveSourcesChanged) || native == nil || ports == nil {
 				return nil, err

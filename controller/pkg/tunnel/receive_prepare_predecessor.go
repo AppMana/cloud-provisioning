@@ -17,6 +17,9 @@ type ReceivePreparePredecessor struct {
 }
 
 func NewReceivePreparePredecessor(snapshot handover.Snapshot, clusterUID string) (ReceivePreparePredecessor, error) {
+	if snapshot.Frozen() {
+		return ReceivePreparePredecessor{}, fmt.Errorf("frozen journal cannot authorize successor preparation")
+	}
 	plan, err := DecodeReceiveTransition(snapshot, clusterUID)
 	if err != nil {
 		return ReceivePreparePredecessor{}, err

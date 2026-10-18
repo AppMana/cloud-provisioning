@@ -58,6 +58,9 @@ func (s Snapshot) Extends(previous Snapshot) error {
 		return fmt.Errorf("missing journal snapshot")
 	}
 	a, b := s.object, previous.object
+	if previous.Frozen() && !s.Frozen() {
+		return fmt.Errorf("journal lost its durable write fence")
+	}
 	if a.UID != b.UID || a.Namespace != b.Namespace || a.Name != b.Name || a.DeletionTimestamp != nil || b.DeletionTimestamp != nil || !bytes.Equal(s.Plan(), previous.Plan()) {
 		return fmt.Errorf("journal identity or public plan changed")
 	}

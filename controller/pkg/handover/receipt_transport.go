@@ -164,7 +164,16 @@ func (h *ReceiptHandler) Run(ctx context.Context) {
 
 func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	reject := func(status int) { http.Error(w, "receipt submission rejected", status) }
+	stage := "request"
+	reject := func(status int) {
+		failure := stage
+		if r.Context().Err() == context.DeadlineExceeded {
+			failure += "-deadline"
+		}
+		// Return only fixed stage names, never callback errors or credentials.
+		w.Header().Set(receiptFailureStageHeader, failure)
+		http.Error(w, "receipt submission rejected", status)
+	}
 	if r.TLS == nil {
 		reject(http.StatusUpgradeRequired)
 		return
@@ -206,6 +215,7 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		entry.BearerToken = bearer
 	}
 	// Do not build an unbounded queue retaining bearer tokens during API stalls.
+	stage = "contention"
 	select {
 	case h.gate <- struct{}{}:
 		defer func() { <-h.gate }()
@@ -220,6 +230,7 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	r = r.WithContext(ctx)
+	stage = "shutdown"
 	if h.stopped {
 		reject(http.StatusServiceUnavailable)
 		return
@@ -230,6 +241,7 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			delete(h.batches, key)
 		}
 	}
+	stage = "source"
 	target, err := h.resolve(r.Context(), request.MachineUID)
 	if err != nil {
 		delete(h.batches, request.MachineUID)
@@ -237,10 +249,12 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	digest := target.Digest
+	stage = "binding"
 	if !token(target.UID) || !hexToken(digest, 32) || digest != request.RoundHash || !now.Before(target.ExpiresAt) || target.MaxAge <= 0 || len(target.Members) == 0 || target.Observe == nil || target.Complete == nil {
 		reject(http.StatusConflict)
 		return
 	}
+	stage = "membership"
 	members := map[[2]string]bool{}
 	for _, member := range target.Members {
 		id := [2]string{member.NodeUID, member.DeviceID}
@@ -265,18 +279,21 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if batch.uid != target.UID || batch.round != digest {
 		batch = receiptBatch{uid: target.UID, round: digest, expires: target.ExpiresAt, maxAge: target.MaxAge, entries: map[[2]string]PodReceipt{}}
 	}
+	stage = "capacity"
 	if _, exists := h.batches[request.MachineUID]; !exists && len(h.batches) >= h.limit {
 		reject(http.StatusServiceUnavailable)
 		return
 	}
 	// Authenticate this subset before retaining its credentials. The backend
 	// validates freshness and exact observation bindings.
+	stage = "observation"
 	err = target.Observe(r.Context(), request.Receipts)
 	if err != nil {
 		delete(h.batches, request.MachineUID)
 		reject(http.StatusConflict)
 		return
 	}
+	stage = "freshness"
 	observedAt := time.Now()
 	if !observedAt.Before(batch.expires) {
 		delete(h.batches, request.MachineUID)
@@ -297,6 +314,7 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		all = append(all, batch.entries[[2]string{member.NodeUID, member.DeviceID}])
 	}
 	delete(h.batches, request.MachineUID)
+	stage = "completion"
 	if err := target.Complete(r.Context(), all); err != nil {
 		reject(http.StatusConflict)
 		return

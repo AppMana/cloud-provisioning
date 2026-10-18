@@ -22,6 +22,17 @@ type ReceiptClient struct {
 	client   *http.Client
 }
 
+const receiptFailureStageHeader = "X-Receipt-Failure-Stage"
+
+func receiptFailureStage(raw string) string {
+	switch strings.TrimSuffix(raw, "-deadline") {
+	case "request", "contention", "shutdown", "source", "binding", "membership", "capacity", "observation", "freshness", "completion":
+		return raw
+	default:
+		return "unknown"
+	}
+}
+
 func NewReceiptClient(endpoint string, caPEM []byte) (*ReceiptClient, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
@@ -75,7 +86,7 @@ func (c *ReceiptClient) Submit(ctx context.Context, bearer string, request Recei
 			return nil
 		}
 		if response.StatusCode != http.StatusServiceUnavailable || response.Header.Get("Retry-After") != "1" {
-			return fmt.Errorf("receipt controller rejected submission (HTTP %d)", response.StatusCode)
+			return fmt.Errorf("receipt controller rejected submission (HTTP %d, stage %s)", response.StatusCode, receiptFailureStage(response.Header.Get(receiptFailureStageHeader)))
 		}
 		// Jitter prevents simultaneously rejected consumers from continually
 		// colliding. Never refresh ObservedAt or extend the receipt lifetime.

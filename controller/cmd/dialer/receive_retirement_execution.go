@@ -39,7 +39,7 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	defer lock.Close()
 	admitted, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("initial admission: %w", err)
 	}
 	receipt := handover.Receipt{NodeUID: admitted.NodeUID, ObservedBootID: admitted.BootID, AgentPodName: cfg.receiptPodName, AgentPodUID: cfg.receiptPodUID, AgentContainerName: "dialer", AgentContainerID: containerID, ObservedAt: time.Now()}
 	verifyAgent := func() error {
@@ -49,18 +49,18 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 		return nil, err
 	}
 	if err := checkpointReceiveRetirementLocked(ctx, api, store, scope, cfg, key, lock.Name(), admitted); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("checkpoint: %w", err)
 	}
 	binding, err := attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(admitted.Metadata.UID), admitted.Journals[scope.MachineUID], admitted.Mesh)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("observation binding: %w", err)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	before, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("pre-cleanup admission: %w", err)
 	}
 	if !sameReceiveRetirement(admitted, before) {
 		return nil, fmt.Errorf("retirement changed before native cleanup")
@@ -69,7 +69,7 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 		return nil, err
 	}
 	if err := native(ctx, lock.Name(), admitted); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("native cleanup: %w", err)
 	}
 	receipt.ObservedAt = time.Now()
 	if err := ctx.Err(); err != nil {
@@ -77,14 +77,14 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	}
 	current, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("post-cleanup admission: %w", err)
 	}
 	if !sameReceiveRetirement(admitted, current) {
 		return nil, fmt.Errorf("retirement changed during native cleanup")
 	}
 	refreshed, err := attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(current.Metadata.UID), current.Journals[scope.MachineUID], current.Mesh)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("post-cleanup binding: %w", err)
 	}
 	if refreshed.Digest() != binding.Digest() {
 		return nil, fmt.Errorf("retirement observation binding changed")

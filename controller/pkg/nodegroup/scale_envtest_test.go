@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
@@ -294,6 +295,11 @@ func TestRealAPIScaleContract(t *testing.T) {
 	verifyDeletingGroupCreation(t, fresh)
 	verifySerialGatewayRetirement(t, fresh)
 	verifyPeerWithdrawalCapture(t, fresh)
+	core, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("reserved-removal-stages", func(t *testing.T) { verifyReceiveRemovalStages(t, fresh, core) })
 	verifyRegisteredGroups(t, fresh, cfg)
 
 }

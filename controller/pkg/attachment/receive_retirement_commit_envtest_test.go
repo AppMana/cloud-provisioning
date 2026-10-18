@@ -1,9 +1,13 @@
 package attachment
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -16,7 +20,8 @@ import (
 )
 
 // Called from the real TokenRequest/TokenReview fixture. Transport history and
-// native absence are synthetic; this proves authenticated persistence only.
+// native absence are synthetic; this proves authenticated persistence, including
+// TLS collection. It does not qualify live deletion or reservation release.
 func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface, policy handover.PodReceiptAuthenticator, node *corev1.Node, pod *corev1.Pod, submission handover.PodReceipt) {
 	t.Helper()
 	ctx := context.Background()
@@ -57,7 +62,7 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 	must(err)
 	mesh, err = api.CoreV1().Secrets(ns).Update(ctx, mesh, metav1.UpdateOptions{})
 	must(err)
-	for _, fault := range []string{"missing-policy", "recheck", "inventory-race", "mesh-race", "reboot-after-authentication", "none"} {
+	for _, fault := range []string{"missing-policy", "recheck", "inventory-race", "mesh-race", "reboot-after-authentication", "transport-inventory-race", "transport-commit-race", "none"} {
 		t.Run("authenticated-completion/"+fault, func(t *testing.T) {
 			scope, err := NewReceiveRetirementReceiptScope(ctx, maps, "cluster", string(index.UID), snapshot, mesh)
 			must(err)
@@ -71,18 +76,25 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 			checks := 0
 			recheck := func() error {
 				checks++
-				if checks != 2 {
+				at := 2
+				if fault == "transport-inventory-race" {
+					at = 3
+				}
+				if fault == "transport-commit-race" {
+					at = 5
+				}
+				if checks != at {
 					return nil
 				}
 				switch fault {
 				case "recheck":
 					return errors.New("source admission changed")
-				case "inventory-race":
+				case "inventory-race", "transport-inventory-race", "transport-commit-race":
 					latest, err := maps.Get(ctx, index.Name, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
-					latest.Annotations = map[string]string{"race": "changed"}
+					latest.Annotations = map[string]string{"race": fault}
 					_, err = maps.Update(ctx, latest, metav1.UpdateOptions{})
 					return err
 				case "mesh-race":
@@ -100,7 +112,38 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 				}
 				return nil
 			}
-			err = RecordReceiveRetirementWithPodReceipts(ctx, api, store, string(index.UID), scope.Digest(), mesh, snapshot, []handover.PodReceipt{entry}, policies, time.Minute, recheck)
+
+			if fault == "none" || strings.HasPrefix(fault, "transport-") {
+				// The resolver constructs fresh admission for every request. A source
+				// revision changed after partial authentication must leave no completion.
+				handler, e := handover.NewReceiptCollectionHandler(func(requestCtx context.Context, machine string) (handover.ReceiptCollection, error) {
+					if machine != w.MachineUID {
+						return handover.ReceiptCollection{}, fmt.Errorf("unknown machine")
+					}
+					return NewReceiveRetirementReceiptCollection(requestCtx, api, store, string(index.UID), mesh, snapshot, policies, time.Minute, recheck)
+				}, 1)
+				must(e)
+				server := httptest.NewTLSServer(handler)
+				defer server.Close()
+				public := entry
+				public.BearerToken = ""
+				body, e := json.Marshal(handover.ReceiptRequest{MachineUID: w.MachineUID, RoundHash: scope.Digest(), Receipts: []handover.PodReceipt{public}})
+				must(e)
+				request, e := http.NewRequestWithContext(ctx, http.MethodPost, server.URL, bytes.NewReader(body))
+				must(e)
+				request.Header.Set("Authorization", "Bearer "+entry.BearerToken)
+				response, e := server.Client().Do(request)
+				if e != nil {
+					t.Fatal("TLS retirement submission failed")
+				}
+				response.Body.Close()
+				err = nil
+				if response.StatusCode != http.StatusNoContent {
+					err = fmt.Errorf("retirement HTTP status %d", response.StatusCode)
+				}
+			} else {
+				err = RecordReceiveRetirementWithPodReceipts(ctx, api, store, string(index.UID), scope.Digest(), mesh, snapshot, []handover.PodReceipt{entry}, policies, time.Minute, recheck)
+			}
 			v, _, readErr := tunnel.ReadReceiveInventory(ctx, maps, "cluster", ns, mesh.Name, string(mesh.UID))
 			must(readErr)
 			if fault == "reboot-after-authentication" {

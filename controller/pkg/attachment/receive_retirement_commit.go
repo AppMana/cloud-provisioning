@@ -30,24 +30,7 @@ func RecordReceiveRetirementWithPodReceipts(ctx context.Context, api kubernetes.
 		return fmt.Errorf("retirement commit requires live admission and exact receipt binding")
 	}
 	checkSource := func() error {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if err := recheck(); err != nil {
-			return err
-		}
-		current, err := api.CoreV1().Secrets(mesh.Namespace).Get(ctx, mesh.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if current.UID != mesh.UID || current.ResourceVersion != mesh.ResourceVersion || current.DeletionTimestamp != nil {
-			return fmt.Errorf("retirement mesh changed during authentication")
-		}
-		journal, err := store.Load(ctx)
-		if err != nil {
-			return err
-		}
-		return journal.ContinuesExecution(snapshot)
+		return recheckReceiveRetirementSource(ctx, api, store, mesh, snapshot, recheck)
 	}
 	if err := checkSource(); err != nil {
 		return err
@@ -94,4 +77,25 @@ func RecordReceiveRetirementWithPodReceipts(ctx context.Context, api kubernetes.
 		return err
 	}
 	return tunnel.RecordReceiveRetirementCompletion(ctx, store.ConfigMaps, store.ClusterUID, scope.inventory, mesh, snapshot, scope.intent, raw)
+}
+
+func recheckReceiveRetirementSource(ctx context.Context, api kubernetes.Interface, store handover.Store, mesh *corev1.Secret, snapshot handover.Snapshot, recheck func() error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := recheck(); err != nil {
+		return err
+	}
+	current, err := api.CoreV1().Secrets(mesh.Namespace).Get(ctx, mesh.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if current.UID != mesh.UID || current.ResourceVersion != mesh.ResourceVersion || current.DeletionTimestamp != nil {
+		return fmt.Errorf("retirement mesh changed during authentication")
+	}
+	journal, err := store.Load(ctx)
+	if err != nil {
+		return err
+	}
+	return journal.ContinuesExecution(snapshot)
 }

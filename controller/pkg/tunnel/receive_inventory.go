@@ -48,6 +48,11 @@ type ReceiveJournalPublication struct {
 	// Completion is controller-verified observation evidence, not permission
 	// to release this reservation or skip fresh identity checks on reuse.
 	RetirementCompletion json.RawMessage `json:"retirementCompletion,omitempty"`
+	// Finalization consumes the exact completion record without releasing
+	// ownership. Only the dedicated finalization writer may install it; later
+	// completion refreshes cannot replace its consumed evidence. Readers that
+	// do not recognize this field must fail closed.
+	RetirementFinalization json.RawMessage `json:"retirementFinalization,omitempty"`
 }
 
 // CheckJournal admits old inventory entries as before, but new publications
@@ -84,6 +89,9 @@ func (v ReceiveInventory) validate() error {
 		}
 		if len(p.RetirementCompletion) > 0 && (len(p.Retirement) == 0 || !json.Valid(p.RetirementCompletion) || bytes.TrimSpace(p.RetirementCompletion)[0] != '{') {
 			return fmt.Errorf("retirement completion requires persisted withdrawal and non-null evidence")
+		}
+		if len(p.RetirementFinalization) > 0 && (len(p.RetirementCompletion) == 0 || !json.Valid(p.RetirementFinalization) || bytes.TrimSpace(p.RetirementFinalization)[0] != '{') {
+			return fmt.Errorf("retirement finalization requires retained completion and non-null evidence")
 		}
 		if len(p.Retirement) > 0 && (p.JournalUID == "" || !json.Valid(p.Retirement) || bytes.Equal(bytes.TrimSpace(p.Retirement), []byte("null"))) {
 			return fmt.Errorf("retirement requires a published journal and non-null intent")

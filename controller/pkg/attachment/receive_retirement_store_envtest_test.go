@@ -378,6 +378,9 @@ func TestReceiveWithdrawalPersistenceWithRealAPI(t *testing.T) {
 			t.Fatal("refresh changed reserved ownership")
 		}
 	})
+	t.Run("finalization-storage", func(t *testing.T) {
+		verifyRetirementFinalizationStorage(t, maps, mesh, snapshot, index.Name, w.MachineUID)
+	})
 	// An index incarnation is not transferable, even with identical JSON.
 	current, err := maps.Get(ctx, index.Name, metav1.GetOptions{})
 	if err != nil {

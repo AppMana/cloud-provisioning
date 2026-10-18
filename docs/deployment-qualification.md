@@ -493,6 +493,19 @@ the final write boundary. The real-API source-binding fixture changes inventory
 metadata after verification and requires a conflict when its old revision is
 used. This proves conditional-write binding only, not finalization or release.
 
+The storage-only finalization writer conditionally records a finalization object
+beside its exact consumed completion, preserving all journal and allocation
+reservations. It rejects replacement finalization and later completion refresh,
+and invokes a required caller check immediately before its inventory CAS.
+Identical retries require a fresh admitted revision and the same final check.
+Real-API storage tests cover conflicting writers, cancelled and rejected checks,
+lost responses, stale retries and preservation by ordinary publication writers.
+Their synthetic records do not authenticate consumers or define finalization
+semantics. The writer is not connected to live reconciliation; older strict
+readers reject its new field, so activating writes requires compatible readers
+and rollback qualification first. Existing completion authority hashes are not
+reinterpreted to accommodate finalized records.
+
 Finalization remains a separate protocol: persist an irreversible retirement
 record before removing active reservations, retain durable host fences against
 old boot recovery, and admit new ownership only after matching release evidence.

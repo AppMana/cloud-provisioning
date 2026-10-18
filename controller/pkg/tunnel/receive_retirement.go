@@ -94,7 +94,7 @@ func ReserveReceiveRetirement(ctx context.Context, maps typedcore.ConfigMapInter
 // retry needs a fresh admitted revision after an ambiguous response. Conflicts
 // are returned without retry, and existing evidence cannot be replaced.
 func RecordReceiveRetirementCompletion(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, expectedInventory metav1.ObjectMeta, mesh *corev1.Secret, snapshot handover.Snapshot, intent, completion json.RawMessage) error {
-	return writeReceiveRetirementCompletion(ctx, maps, clusterUID, expectedInventory, mesh, snapshot, intent, nil, completion)
+	return writeReceiveRetirementCompletion(ctx, maps, clusterUID, expectedInventory, mesh, snapshot, intent, retirementEvidenceWrite{record: completion})
 }
 
 // RefreshReceiveRetirementCompletion replaces only the exact observed evidence
@@ -105,15 +105,34 @@ func RefreshReceiveRetirementCompletion(ctx context.Context, maps typedcore.Conf
 	if len(previous) == 0 {
 		return fmt.Errorf("completion refresh requires previous evidence")
 	}
-	return writeReceiveRetirementCompletion(ctx, maps, clusterUID, expectedInventory, mesh, snapshot, intent, previous, completion)
+	return writeReceiveRetirementCompletion(ctx, maps, clusterUID, expectedInventory, mesh, snapshot, intent, retirementEvidenceWrite{previous: previous, record: completion})
 }
 
-func writeReceiveRetirementCompletion(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, expectedInventory metav1.ObjectMeta, mesh *corev1.Secret, snapshot handover.Snapshot, intent, previous, completion json.RawMessage) error {
+// RecordReceiveRetirementFinalization is storage only, not a release permit.
+// The caller must verify completion and supply live owner, consumer, source and
+// freshness checks at beforeWrite. Both the consumed completion and inventory
+// revision are exact preconditions. Identical retries require freshly admitted
+// metadata; neither a different finalization nor a later completion can replace
+// finalized evidence. Every reservation and retired journal remains retained.
+func RecordReceiveRetirementFinalization(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, expectedInventory metav1.ObjectMeta, mesh *corev1.Secret, snapshot handover.Snapshot, intent, completion, finalization json.RawMessage, beforeWrite func() error) error {
+	if len(completion) == 0 || beforeWrite == nil {
+		return fmt.Errorf("finalization requires consumed evidence and a live write-boundary check")
+	}
+	return writeReceiveRetirementCompletion(ctx, maps, clusterUID, expectedInventory, mesh, snapshot, intent, retirementEvidenceWrite{previous: completion, record: finalization, finalize: true, beforeWrite: beforeWrite})
+}
+
+type retirementEvidenceWrite struct {
+	previous, record json.RawMessage
+	finalize         bool
+	beforeWrite      func() error
+}
+
+func writeReceiveRetirementCompletion(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, expectedInventory metav1.ObjectMeta, mesh *corev1.Secret, snapshot handover.Snapshot, intent json.RawMessage, write retirementEvidenceWrite) error {
 	if maps == nil || mesh == nil || mesh.UID == "" || mesh.ResourceVersion == "" || mesh.DeletionTimestamp != nil || expectedInventory.UID == "" || expectedInventory.ResourceVersion == "" || expectedInventory.DeletionTimestamp != nil {
 		return fmt.Errorf("completion requires exact live inventory and mesh revisions")
 	}
 	var compact bytes.Buffer
-	if err := json.Compact(&compact, completion); err != nil || compact.Len() == 0 || compact.Bytes()[0] != '{' {
+	if err := json.Compact(&compact, write.record); err != nil || compact.Len() == 0 || compact.Bytes()[0] != '{' {
 		return fmt.Errorf("completion requires an object evidence record")
 	}
 	meta := snapshot.Metadata()
@@ -142,8 +161,11 @@ func writeReceiveRetirementCompletion(ctx context.Context, maps typedcore.Config
 	if publication.JournalUID != string(meta.UID) || len(publication.Retirement) == 0 || !bytes.Equal(publication.Retirement, intent) {
 		return fmt.Errorf("completion withdrawal intent changed")
 	}
-	if len(previous) > 0 {
-		if !bytes.Equal(publication.RetirementCompletion, previous) {
+	if len(publication.RetirementFinalization) > 0 && (!write.finalize || !bytes.Equal(publication.RetirementFinalization, compact.Bytes())) {
+		return fmt.Errorf("finalized retirement evidence cannot be replaced")
+	}
+	if len(write.previous) > 0 {
+		if !bytes.Equal(publication.RetirementCompletion, write.previous) {
 			return fmt.Errorf("completion refresh evidence changed")
 		}
 	} else if len(publication.RetirementCompletion) > 0 && !bytes.Equal(publication.RetirementCompletion, compact.Bytes()) {
@@ -157,13 +179,25 @@ func writeReceiveRetirementCompletion(ctx context.Context, maps typedcore.Config
 	if err := current.ContinuesExecution(snapshot); err != nil {
 		return fmt.Errorf("completion journal changed: %w", err)
 	}
-	publication.RetirementCompletion = bytes.Clone(compact.Bytes())
+	if write.finalize {
+		publication.RetirementFinalization = bytes.Clone(compact.Bytes())
+	} else {
+		publication.RetirementCompletion = bytes.Clone(compact.Bytes())
+	}
 	inventory.Publications[plan.MachineUID] = publication
 	raw, err := json.Marshal(inventory)
 	if err != nil {
 		return err
 	}
 	object.Data[receiveInventoryKey] = string(raw)
+	if write.beforeWrite != nil {
+		if err := write.beforeWrite(); err != nil {
+			return err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	stored, err := maps.Update(ctx, object, metav1.UpdateOptions{})
 	if err != nil {
 		return err

@@ -30,3 +30,26 @@ func TestReceiveRetirementCompletionRequiresWithdrawal(t *testing.T) {
 		})
 	}
 }
+
+// Format validation grants no finalization or release authority.
+func TestReceiveRetirementFinalizationRequiresCompletion(t *testing.T) {
+	for _, raw := range []string{"", `{}`, `null`, `[]`, `true`, `{} {}`} {
+		v := ReceiveInventory{Version: 1, ClusterUID: "cluster", Namespace: "test", MeshName: "mesh", MeshUID: "mesh-uid", MachineUIDs: []string{"machine"}, Publications: map[string]ReceiveJournalPublication{"machine": {JournalUID: "journal", Retirement: json.RawMessage(`{}`), RetirementCompletion: json.RawMessage(`{}`), RetirementFinalization: json.RawMessage(raw)}}}
+		err := v.validate()
+		if raw == "" || raw == `{}` {
+			if err != nil {
+				t.Fatal(err)
+			}
+		} else if err == nil {
+			t.Fatal("invalid finalization accepted", raw)
+		}
+		if raw == `{}` {
+			p := v.Publications["machine"]
+			p.RetirementCompletion = nil
+			v.Publications["machine"] = p
+			if v.validate() == nil {
+				t.Fatal("finalization without consumed completion accepted")
+			}
+		}
+	}
+}

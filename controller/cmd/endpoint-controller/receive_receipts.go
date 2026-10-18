@@ -35,6 +35,8 @@ type receiveReceiptPolicy struct {
 	ImageIDs    map[string]string `json:"imageIDs"`
 	Endpoint    string            `json:"endpoint,omitempty"`
 	TrustSecret string            `json:"trustSecret,omitempty"`
+	// Enable only after compatible agents/controllers and rollback are qualified.
+	FinalizeOrphanRetirements bool `json:"finalizeOrphanRetirements,omitempty"`
 }
 
 func (p receiveReceiptPolicy) validate() error {

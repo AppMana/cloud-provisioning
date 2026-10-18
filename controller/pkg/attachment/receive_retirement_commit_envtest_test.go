@@ -321,6 +321,7 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 		verifyConcurrentRetirementAuthentication(t, api, store, mesh, w.MachineUID, string(index.UID), policy, submission)
 	})
 	t.Run("authenticated-finalization", func(t *testing.T) {
+		verifyFinalizingRetirementCollection(t, api, store, mesh, w.MachineUID, policy, submission)
 		verifyAuthenticatedRetirementFinalization(t, api, store, mesh, node, w.MachineUID, string(index.UID), policy, submission)
 	})
 }

@@ -112,3 +112,31 @@ func (shared ReceiveRetirementSet) ReceiptCollection(ctx context.Context, api ku
 	}
 	return target, nil
 }
+
+// ReceiptCollectionWithFinalization consumes completion immediately after its
+// authenticated commit. The caller must first qualify compatible readers and
+// rollback, and ensure its lifecycle no longer needs renewable completion.
+// recheck must enforce current owner absence and consumer policy. A failed or
+// ambiguous finalization leaves the retained completion/reservation intact;
+// callers must read historical finalization separately before retrying writes.
+func (shared ReceiveRetirementSet) ReceiptCollectionWithFinalization(ctx context.Context, api kubernetes.Interface, store handover.Store, policies map[string]handover.PodReceiptAuthenticator, maxAge time.Duration, recheck func() error) (handover.ReceiptCollection, error) {
+	view, err := shared.Journals[shared.Withdrawal.MachineUID].Transition().View()
+	if err != nil {
+		return handover.ReceiptCollection{}, err
+	}
+	if view.Round.MaxReceiptAge != maxAge {
+		return handover.ReceiptCollection{}, fmt.Errorf("finalization policy differs from frozen journal")
+	}
+	target, err := shared.ReceiptCollection(ctx, api, store, policies, maxAge, recheck)
+	if err != nil {
+		return handover.ReceiptCollection{}, err
+	}
+	complete := target.Complete
+	target.Complete = func(ctx context.Context, entries []handover.PodReceipt) error {
+		if err := complete(ctx, entries); err != nil {
+			return err
+		}
+		return FinalizeReceiveRetirementCompletion(ctx, api, store, shared.Mesh.Namespace, shared.Mesh.Name, string(shared.Mesh.UID), shared.Withdrawal.MachineUID, string(shared.Metadata.UID), maxAge, recheck)
+	}
+	return target, nil
+}

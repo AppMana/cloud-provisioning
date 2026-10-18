@@ -516,7 +516,8 @@ The historical reader validates receipt age at that recorded time. It does not
 extend receipts into current absence authority, and intentionally does not treat
 a subsequent consumer boot as erasing historical consumption. Agents still need
 local durable-fence admission and current native checks; release needs separate
-live ownership checks. Neither layer is activated by live reconciliation yet.
+live ownership checks. Controller activation requires compatible readers and
+rollback targets throughout the retained consumer set.
 
 Real-token finalization tests reject owner/source changes, a consumer reboot,
 expiry during the final check and a racing API write. Lost responses retain
@@ -546,8 +547,22 @@ reject native errors or agent/inventory changes afterward. A TLS dispatch test
 checks that successful finalized maintenance sends no receipt. Native callbacks
 and finalization authentication in these agent fixtures are synthetic; actual
 token authentication is covered separately. These tests do not qualify live
-cleanup latency, reboot recovery, mixed-version rollout or rollback. Controller
-finalization writes remain disabled until compatible deployment is qualified.
+cleanup latency, reboot recovery, mixed-version rollout or rollback.
+
+The receipt policy's `finalizeOrphanRetirements` setting defaults to false.
+Enabling it consumes authenticated completion for orphaned withdrawals only;
+ordinary deletion continues to require renewable completion until its compute
+removal protocol has finished. The finalizing collection requires its observation
+lifetime to match the frozen journal and rechecks owner absence and consumer
+policy after completion, then uses the existing authenticated finalization CAS.
+A failed or ambiguous response must not be treated as successful finalization:
+read and validate the historical record before deciding whether to retry. Neither
+completion nor finalization releases reservations. Enable this setting only
+after all readers and the rollback candidate understand finalized inventories.
+Real-token collection tests cover invalid credentials, observation-policy
+mismatch, owner rejection after completion, successful consumption and rejected
+replay. They use synthetic native observations and do not establish controller
+orphan discovery, live cleanup latency, rollout compatibility or release.
 
 Finalization remains a separate protocol: persist an irreversible retirement
 record before removing active reservations, retain durable host fences against

@@ -302,12 +302,58 @@ func (r *meshReconciler) buildReceiveTransitionPlan(ctx context.Context, machine
 	if err := json.Unmarshal(base, &previous); err != nil {
 		return fail(err)
 	}
+	plan.SiteBase, err = r.receivePreparationSiteBase(ctx, adoption, request)
+	if err != nil {
+		return fail(err)
+	}
+	predecessor, err := r.receivePreparationPredecessor(ctx, adoption, request)
+	if err != nil {
+		return fail(err)
+	}
+	if predecessor != nil {
+		old, err := request.ValidatePredecessor(*predecessor)
+		if err != nil {
+			return fail(err)
+		}
+		view, err := predecessor.Transition().View()
+		if err != nil {
+			return fail(err)
+		}
+		serving, root, err := old.SelectedReceiveTransport(view)
+		if err != nil {
+			return fail(err)
+		}
+		if !root {
+			serving.Version, serving.PreviousReceiver = 1, nil
+			plan.Version = 2
+			plan.PreviousReceiver = &tunnel.ReceivePreviousReceiver{Generation: view.ServingGeneration, Plan: &serving}
+		}
+	}
+	// The legacy projection is still validated against the acknowledged base,
+	// but its worker destinations belong to the predecessor's site document.
+	// Current publication may already contain a newly allocated pod range.
+	legacyPeers, err := tunnel.SitePeers(mesh.Data)
+	if err != nil {
+		return fail(err)
+	}
+	if plan.SiteBase != nil {
+		legacyPeers = plan.SiteBase.Peers
+	}
+	var legacyCloud []tunnel.PeerSpec
+	for _, peer := range legacyPeers {
+		if peer.PublicKey == plan.RootPublicKey {
+			legacyCloud = append(legacyCloud, peer)
+		}
+	}
+	if len(legacyCloud) != 1 {
+		return fail(fmt.Errorf("predecessor cloud destinations missing or ambiguous"))
+	}
 	for public := range bindings {
 		var receipt tunnel.SiteReceiveReady
 		if err := json.Unmarshal(adoption.Data[tunnel.SiteReceiveReadyKey(public)], &receipt); err != nil {
 			return fail(err)
 		}
-		legacy, err := tunnel.PlanReceiveSiteLegacy(mesh.Data, receipt.NodeName, public, plan.RootPublicKey, previous)
+		legacy, err := tunnel.PlanReceiveSitePathForPeer(mesh.Data, receipt.NodeName, public, previous, legacyCloud[0])
 		if err != nil {
 			return fail(err)
 		}
@@ -325,10 +371,6 @@ func (r *meshReconciler) buildReceiveTransitionPlan(ctx context.Context, machine
 		return fail(err)
 	}
 	plan.SiteDesired = tunnel.PeerListDoc{Peers: sitePeers}
-	plan.SiteBase, err = r.receivePreparationSiteBase(ctx, adoption, request)
-	if err != nil {
-		return fail(err)
-	}
 
 	if _, err := tunnel.PlanReceiveRoutes(plan); err != nil {
 		return fail(err)

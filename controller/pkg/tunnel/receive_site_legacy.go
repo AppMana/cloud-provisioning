@@ -31,8 +31,31 @@ func PlanReceiveSiteLegacy(data map[string][]byte, node, public, cloud string, b
 // PlanReceiveSitePath binds forwarding to the supplied generation, independently
 // of the mutable relay election. The caller must commit the generation with it.
 func PlanReceiveSitePath(data map[string][]byte, node, public, cloud string, base PeerListDoc) (ReceiveSitePath, error) {
+	peers, err := SitePeers(data)
+	if err != nil {
+		return ReceiveSitePath{}, err
+	}
+	var worker []PeerSpec
+	for _, peer := range peers {
+		if peer.PublicKey == cloud {
+			worker = append(worker, peer)
+		}
+	}
+	if len(worker) != 1 {
+		return ReceiveSitePath{}, fmt.Errorf("site path cloud destination identity missing or ambiguous")
+	}
+	return PlanReceiveSitePathForPeer(data, node, public, base, worker[0])
+}
+
+// PlanReceiveSitePathForPeer preserves the supplied generation's destination
+// permissions while admitting site identities and next hops from the live mesh.
+// A successor's original-path projection must not borrow new worker allocations.
+func PlanReceiveSitePathForPeer(data map[string][]byte, node, public string, base PeerListDoc, cloud PeerSpec) (ReceiveSitePath, error) {
 	fail := func(reason string) (ReceiveSiteLegacy, error) {
 		return ReceiveSiteLegacy{}, fmt.Errorf("legacy site path: %s", reason)
+	}
+	if !validReceivePublicKey(cloud.PublicKey) {
+		return fail("cloud identity differs")
 	}
 	if node == "" || !validReceivePublicKey(public) || strings.TrimSpace(string(data[NodePublicKeyPrefix+node])) != public {
 		return fail("site identity differs")
@@ -58,19 +81,6 @@ func PlanReceiveSitePath(data map[string][]byte, node, public, cloud string, bas
 		return fail(err.Error())
 	}
 	result.PeerPublicKey = owner.PublicKey
-	peers, err := SitePeers(data)
-	if err != nil {
-		return fail(err.Error())
-	}
-	var worker []PeerSpec
-	for _, peer := range peers {
-		if peer.PublicKey == cloud {
-			worker = append(worker, peer)
-		}
-	}
-	if len(worker) != 1 {
-		return fail("cloud destination identity missing or ambiguous")
-	}
 	if owner.PublicKey != public {
 		relay := ""
 		for key, value := range data {
@@ -84,7 +94,7 @@ func PlanReceiveSitePath(data map[string][]byte, node, public, cloud string, bas
 		if relay == "" {
 			return fail("legacy relay identity missing")
 		}
-		result.Transit = siteTransitThrough(data, relay, worker)
+		result.Transit = siteTransitThrough(data, relay, []PeerSpec{cloud})
 		if result.Transit == nil {
 			return fail("legacy relay has no next hop")
 		}
@@ -95,12 +105,12 @@ func PlanReceiveSitePath(data map[string][]byte, node, public, cloud string, bas
 			addresses = append(addresses, raw)
 		}
 	}
-	exception, err := planReceiveSiteTunnel(addresses, public, base, worker[0], result.Transit != nil)
+	exception, err := planReceiveSiteTunnel(addresses, public, base, cloud, result.Transit != nil)
 	if err != nil {
 		return fail(err.Error())
 	}
 	result.Tunnel = &exception
-	if err := ValidateReceiveSiteLegacy(result, public, base, worker[0]); err != nil {
+	if err := ValidateReceiveSiteLegacy(result, public, base, cloud); err != nil {
 		return fail(err.Error())
 	}
 	return result, nil

@@ -354,6 +354,26 @@ func (r *meshReconciler) siteReceivePathsReady(ctx context.Context, mesh, adopti
 // Load terminal source permissions using the configured cluster authority.
 // This does not authorize replacing the journal or its serving transport graph.
 func (r *meshReconciler) receivePreparationSiteBase(ctx context.Context, adoption *corev1.Secret, request tunnel.ReceivePrepare) (*tunnel.PeerListDoc, error) {
+	snapshot, err := r.receivePreparationPredecessor(ctx, adoption, request)
+	if err != nil || snapshot == nil {
+		return nil, err
+	}
+	plan, err := request.ValidatePredecessor(*snapshot)
+	if err != nil {
+		return nil, err
+	}
+	view, err := snapshot.Transition().View()
+	if err != nil {
+		return nil, err
+	}
+	previous, err := plan.CompletedSitePeers(view)
+	if err != nil {
+		return nil, err
+	}
+	return &previous, nil
+}
+
+func (r *meshReconciler) receivePreparationPredecessor(ctx context.Context, adoption *corev1.Secret, request tunnel.ReceivePrepare) (*handover.Snapshot, error) {
 	if request.Predecessor == nil {
 		return nil, nil
 	}
@@ -374,13 +394,11 @@ func (r *meshReconciler) receivePreparationSiteBase(ctx context.Context, adoptio
 	if plan.Namespace != adoption.Namespace || plan.AdoptionName != adoption.Name || plan.AdoptionUID != string(adoption.UID) {
 		return nil, fmt.Errorf("successor preparation adoption identity changed")
 	}
-	view, err := snapshot.Transition().View()
-	if err != nil {
+	if _, err := store.ArchiveNames(ctx, snapshot); err != nil {
 		return nil, err
 	}
-	previous, err := plan.CompletedSitePeers(view)
-	if err != nil {
+	if err := tunnel.ValidateReceiveTransportHistory(ctx, store, snapshot); err != nil {
 		return nil, err
 	}
-	return &previous, nil
+	return &snapshot, nil
 }

@@ -263,6 +263,24 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 			}
 		}
 	}
+	var legacyCloudPath string
+	var legacyCloud *receiveCloudLegacyImport
+	if cloud {
+		old, markerPath, marker, err := pendingReceiveCloudLegacy(path, saved, local.Plan, plans)
+		if err != nil {
+			return err
+		}
+		if err := validateReceiveNeighborSourceGrowth(old, peers); err != nil {
+			return err
+		}
+		for _, peer := range old {
+			if identity := neighborPermissionIdentity(peer); !known[identity] {
+				previousPeers = append(previousPeers, peer)
+				known[identity] = true
+			}
+		}
+		legacyCloudPath, legacyCloud = markerPath, marker
+	}
 	// The old checkpoint recorded only the latest attempted publication. On
 	// migration, the identity-bound legacy forwarding cache can recover peers
 	// omitted by that attempt. It cannot authorize mutation or replay old routes.
@@ -330,6 +348,15 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	}
 	if err := check(); err != nil {
 		return err
+	}
+	// Import completion means the exact old permissions are durably represented
+	// in the retirement sidecar, not that native deletion has succeeded. Record
+	// it before native work: replaying the base after deletion and installation
+	// could otherwise try to retire an address now owned by its replacement.
+	if legacyCloud != nil {
+		if err := writeDurableJSON(legacyCloudPath, legacyCloud); err != nil {
+			return err
+		}
 	}
 	var allocated []string
 	var own []string

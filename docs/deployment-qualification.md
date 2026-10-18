@@ -363,6 +363,18 @@ IPv4 peer's packet stream. Its WireGuard transport is IPv4; it does not measure
 IPv6 transport, an unaffected IPv6 stream, CAPI cleanup, live-site management
 continuity or AWS bootstrap. Those remain separate cases.
 
+For a reserved cloud worker, the admitted journal's committed base supplies
+legacy ordinary-peer retirement intent. The agent transfers that intent into
+the existing retirement sidecar before writing a base-hash-specific
+`.cloud-legacy-*.json` marker and attempting native changes. The marker means
+intent was transferred, not that deletion succeeded. Preserve the neighbor
+checkpoint, retirement sidecar and import markers together during backup or
+rollback; deleting a marker can replay old intent after address reuse. Import
+admission still requires current journal and node identities, and native
+retirement still rejects changed permissions or foreign route dependencies.
+Admission tests with interrupted callbacks and isolated kernel tests do not
+establish a successful live upgrade of a worker carrying legacy peers.
+
 Site receiver preparation preserves validated public ownership snapshots in a
 separate `.owners` directory before replacing a cache or preparing a device.
 These snapshots are not offline recovery inputs, installation receipts, or

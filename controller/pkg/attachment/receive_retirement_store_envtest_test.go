@@ -329,6 +329,54 @@ func TestReceiveWithdrawalPersistenceWithRealAPI(t *testing.T) {
 		if err := persist(maps, meta.ObjectMeta, evidence); err != nil {
 			t.Fatal("reloaded identical completion failed", err)
 		}
+		meta, err = maps.Get(ctx, index.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		fresh := json.RawMessage(`{"version":2,"fixture":"fresh-completion"}`)
+		refresh := func(storage typedcore.ConfigMapInterface, previous json.RawMessage) error {
+			return tunnel.RefreshReceiveRetirementCompletion(ctx, storage, "cluster", meta.ObjectMeta, mesh, snapshot, intent, previous, fresh)
+		}
+		for _, wrong := range []json.RawMessage{nil, json.RawMessage(`{}`)} {
+			if err := refresh(maps, wrong); err == nil {
+				t.Fatal("refresh ignored previous evidence")
+			}
+		}
+		refreshRace := retirementInventoryWriter{ConfigMapInterface: maps, before: func() error {
+			latest, err := maps.Get(ctx, index.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			latest.Annotations = map[string]string{"refresh-race": "changed"}
+			_, err = maps.Update(ctx, latest, metav1.UpdateOptions{})
+			return err
+		}}
+		if err := refresh(refreshRace, evidence); !apierrors.IsConflict(err) {
+			t.Fatal("refresh ignored concurrent writer", err)
+		}
+		if string(read().Publications[w.MachineUID].RetirementCompletion) != string(evidence) {
+			t.Fatal("conflicting refresh lost old evidence")
+		}
+		meta, err = maps.Get(ctx, index.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := refresh(lost, evidence); err == nil {
+			t.Fatal("lost refresh response concealed")
+		}
+		refreshed := read()
+		if string(refreshed.Publications[w.MachineUID].RetirementCompletion) != string(fresh) {
+			t.Fatal("refresh was not persisted")
+		}
+		if err := refresh(maps, evidence); err == nil {
+			t.Fatal("stale refresh overwrote new evidence")
+		}
+		p := refreshed.Publications[w.MachineUID]
+		p.RetirementCompletion = nil
+		refreshed.Publications[w.MachineUID] = p
+		if !reflect.DeepEqual(before, refreshed) {
+			t.Fatal("refresh changed reserved ownership")
+		}
 	})
 	// An index incarnation is not transferable, even with identical JSON.
 	current, err := maps.Get(ctx, index.Name, metav1.GetOptions{})

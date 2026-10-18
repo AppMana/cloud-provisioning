@@ -24,6 +24,7 @@ type ReceiveRetirementReceiptScope struct {
 	digest        string
 	nodes         map[string]string
 	inventory     metav1.ObjectMeta
+	completion    json.RawMessage
 	inventoryHash string
 	intent        json.RawMessage
 }
@@ -54,11 +55,15 @@ func NewReceiveRetirementReceiptScope(ctx context.Context, maps typedcore.Config
 	if err != nil {
 		return fail(err)
 	}
+	publication := inventory.Publications[plan.MachineUID]
+	previousCompletion := append(json.RawMessage(nil), publication.RetirementCompletion...)
+	publication.RetirementCompletion = nil
+	inventory.Publications[plan.MachineUID] = publication
 	inventoryRaw, err := json.Marshal(inventory)
 	if err != nil {
 		return fail(err)
 	}
-	scope := ReceiveRetirementReceiptScope{digest: digest, inventoryHash: tunnel.HashPeerList(inventoryRaw), nodes: map[string]string{}, inventory: *index.ObjectMeta.DeepCopy(), intent: append(json.RawMessage(nil), inventory.Publications[plan.MachineUID].Retirement...)}
+	scope := ReceiveRetirementReceiptScope{digest: digest, inventoryHash: tunnel.HashPeerList(inventoryRaw), completion: previousCompletion, nodes: map[string]string{}, inventory: *index.ObjectMeta.DeepCopy(), intent: append(json.RawMessage(nil), inventory.Publications[plan.MachineUID].Retirement...)}
 	for _, consumer := range withdrawal.Consumers {
 		scope.nodes[consumer.NodeUID] = consumer.NodeName
 	}

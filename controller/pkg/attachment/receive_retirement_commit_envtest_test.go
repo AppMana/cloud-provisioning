@@ -238,6 +238,22 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 			if err := RecordReceiveRetirementWithPodReceipts(ctx, api, store, string(index.UID), scope.Digest(), mesh, snapshot, []handover.PodReceipt{entry}, policies, time.Minute, func() error { return nil }); err == nil {
 				t.Fatal("stale binding reused after completion write")
 			}
+			freshScope, err := NewReceiveRetirementReceiptScope(ctx, maps, "cluster", string(index.UID), snapshot, mesh)
+			must(err)
+			freshEntry := entry
+			freshEntry.Receipt.RoundHash = freshScope.Digest()
+			freshEntry.Receipt.ObservedAt = time.Now()
+			denied := freshEntry
+			denied.BearerToken = "invalid-token"
+			if err := RecordReceiveRetirementWithPodReceipts(ctx, api, store, string(index.UID), freshScope.Digest(), mesh, snapshot, []handover.PodReceipt{denied}, policies, time.Minute, func() error { return nil }); err == nil {
+				t.Fatal("unauthenticated refresh accepted")
+			}
+			must(RecordReceiveRetirementWithPodReceipts(ctx, api, store, string(index.UID), freshScope.Digest(), mesh, snapshot, []handover.PodReceipt{freshEntry}, policies, time.Minute, func() error { return nil }))
+			ok, err := VerifyReceiveRetirementCompletion(ctx, api, store, ns, mesh.Name, string(mesh.UID), w.MachineUID, string(index.UID), time.Minute)
+			must(err)
+			if !ok {
+				t.Fatal("authenticated refreshed completion not verifiable")
+			}
 		})
 	}
 }

@@ -27,7 +27,9 @@ type receiveRetirementCompletion struct {
 // CAS. recheck must admit the controller's full journal/mesh/consumer source set;
 // a per-worker receipt scope is not a substitute for that discovery. Source
 // revisions are checked again after authentication, and no conflict is retried.
-// Completion is historical evidence, never automatic reservation release.
+// Existing completion is refreshed only after a new complete authentication,
+// against the exact prior record and inventory revision. Completion remains
+// historical evidence, never automatic reservation release.
 func RecordReceiveRetirementWithPodReceipts(ctx context.Context, api kubernetes.Interface, store handover.Store, inventoryUID, expectedDigest string, mesh *corev1.Secret, snapshot handover.Snapshot, submissions []handover.PodReceipt, policies map[string]handover.PodReceiptAuthenticator, maxAge time.Duration, recheck func() error) error {
 	if api == nil || store.ConfigMaps == nil || mesh == nil || expectedDigest == "" || recheck == nil {
 		return fmt.Errorf("retirement commit requires live admission and exact receipt binding")
@@ -78,6 +80,9 @@ func RecordReceiveRetirementWithPodReceipts(ctx context.Context, api kubernetes.
 	raw, err := json.Marshal(completion)
 	if err != nil {
 		return err
+	}
+	if len(scope.completion) > 0 {
+		return tunnel.RefreshReceiveRetirementCompletion(ctx, store.ConfigMaps, store.ClusterUID, scope.inventory, mesh, snapshot, scope.intent, scope.completion, raw)
 	}
 	return tunnel.RecordReceiveRetirementCompletion(ctx, store.ConfigMaps, store.ClusterUID, scope.inventory, mesh, snapshot, scope.intent, raw)
 }

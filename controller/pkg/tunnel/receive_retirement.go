@@ -94,6 +94,21 @@ func ReserveReceiveRetirement(ctx context.Context, maps typedcore.ConfigMapInter
 // retry needs a fresh admitted revision after an ambiguous response. Conflicts
 // are returned without retry, and existing evidence cannot be replaced.
 func RecordReceiveRetirementCompletion(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, expectedInventory metav1.ObjectMeta, mesh *corev1.Secret, snapshot handover.Snapshot, intent, completion json.RawMessage) error {
+	return writeReceiveRetirementCompletion(ctx, maps, clusterUID, expectedInventory, mesh, snapshot, intent, nil, completion)
+}
+
+// RefreshReceiveRetirementCompletion replaces only the exact observed evidence
+// after the controller has authenticated a new complete consumer batch. The old
+// record and inventory revision are both compare-and-swap preconditions. No
+// participant, intent, journal or allocation reservation is removed.
+func RefreshReceiveRetirementCompletion(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, expectedInventory metav1.ObjectMeta, mesh *corev1.Secret, snapshot handover.Snapshot, intent, previous, completion json.RawMessage) error {
+	if len(previous) == 0 {
+		return fmt.Errorf("completion refresh requires previous evidence")
+	}
+	return writeReceiveRetirementCompletion(ctx, maps, clusterUID, expectedInventory, mesh, snapshot, intent, previous, completion)
+}
+
+func writeReceiveRetirementCompletion(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, expectedInventory metav1.ObjectMeta, mesh *corev1.Secret, snapshot handover.Snapshot, intent, previous, completion json.RawMessage) error {
 	if maps == nil || mesh == nil || mesh.UID == "" || mesh.ResourceVersion == "" || mesh.DeletionTimestamp != nil || expectedInventory.UID == "" || expectedInventory.ResourceVersion == "" || expectedInventory.DeletionTimestamp != nil {
 		return fmt.Errorf("completion requires exact live inventory and mesh revisions")
 	}
@@ -127,7 +142,11 @@ func RecordReceiveRetirementCompletion(ctx context.Context, maps typedcore.Confi
 	if publication.JournalUID != string(meta.UID) || len(publication.Retirement) == 0 || !bytes.Equal(publication.Retirement, intent) {
 		return fmt.Errorf("completion withdrawal intent changed")
 	}
-	if len(publication.RetirementCompletion) > 0 && !bytes.Equal(publication.RetirementCompletion, compact.Bytes()) {
+	if len(previous) > 0 {
+		if !bytes.Equal(publication.RetirementCompletion, previous) {
+			return fmt.Errorf("completion refresh evidence changed")
+		}
+	} else if len(publication.RetirementCompletion) > 0 && !bytes.Equal(publication.RetirementCompletion, compact.Bytes()) {
 		return fmt.Errorf("completion evidence already exists with different contents")
 	}
 	store := handover.Store{ConfigMaps: maps, ClusterUID: clusterUID, Name: meta.Name, ExpectedUID: string(meta.UID)}

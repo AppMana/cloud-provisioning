@@ -91,7 +91,7 @@ func writeReceiveBootFixture(t *testing.T, cfg config, root wgtypes.Key, plan tu
 
 func TestReceiveBootAdmission(t *testing.T) {
 	for _, legacy := range []bool{false, true} {
-		for _, fault := range []string{"valid", "unverified", "inventory", "local-set", "network", "identity", "allocation", "extra-journal", "same-boot", "changed-during-native", "cancelled", "busy", "unfinished", "retirement"} {
+		for _, fault := range []string{"valid", "unverified", "inventory", "local-set", "network", "identity", "allocation", "extra-journal", "same-boot", "changed-during-native", "cancelled", "busy", "unfinished", "retirement", "same-boot-retirement", "same-boot-retirement-identity"} {
 			t.Run(fmt.Sprintf("legacy-%t/%s", legacy, fault), func(t *testing.T) {
 				must := func(err error) {
 					t.Helper()
@@ -157,7 +157,7 @@ func TestReceiveBootAdmission(t *testing.T) {
 					must(writeDurableJSON(cfg.peersFile, tunnel.PeersFileDoc{PrivateKey: root.String(), LocalAddress: "172.29.0.2/32"}))
 				case "extra-journal":
 					must(os.WriteFile(filepath.Join(filepath.Dir(cfg.peersFile), cfg.iface+".reconcile.lock.receive-transition-unaccounted.json"), []byte("{}"), 0600))
-				case "retirement":
+				case "retirement", "same-boot-retirement", "same-boot-retirement-identity":
 					raw, err := os.ReadFile(inventoryPath)
 					must(err)
 					var inventory receiveInventoryCheckpoint
@@ -165,6 +165,13 @@ func TestReceiveBootAdmission(t *testing.T) {
 					publication := inventory.Inventory.Publications[plan.MachineUID]
 					publication.Retirement = json.RawMessage(`{"withdrawal":"pending"}`)
 					inventory.Inventory.Publications[plan.MachineUID] = publication
+					if fault != "retirement" {
+						inventory.BootID, err = localReceiveBootID()
+						must(err)
+					}
+					if fault == "same-boot-retirement-identity" {
+						must(writeDurableJSON(cfg.peersFile, tunnel.PeersFileDoc{PrivateKey: site.String(), LocalAddress: plan.CloudAddresses[0]}))
+					}
 					must(writeDurableJSON(inventoryPath, inventory))
 					// Preserve a matching observation digest: rejection must come
 					// from withdrawal intent, not an incidental checksum mismatch.
@@ -204,7 +211,7 @@ func TestReceiveBootAdmission(t *testing.T) {
 				if !handled {
 					t.Fatal("reserved boot fell through to legacy")
 				}
-				if fault == "same-boot" {
+				if fault == "same-boot" || fault == "same-boot-retirement" {
 					if err != nil || calls != 0 {
 						t.Fatal("host competed with live same-boot owner", err)
 					}

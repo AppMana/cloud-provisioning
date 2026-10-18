@@ -123,11 +123,6 @@ func admitReceiveBoot(ctx context.Context, cfg config, native func(receiveBootSt
 	if err := decoder.Decode(&trailing); err != io.EOF {
 		return true, fmt.Errorf("trailing boot inventory data")
 	}
-	for _, publication := range inventory.Inventory.Publications {
-		if len(publication.Retirement) != 0 {
-			return true, fmt.Errorf("boot recovery requires live receiver retirement reconciliation")
-		}
-	}
 	identityRaw, err := os.ReadFile(cfg.peersFile)
 	if err != nil {
 		return true, err
@@ -146,6 +141,11 @@ func admitReceiveBoot(ctx context.Context, cfg config, native func(receiveBootSt
 	if boot == inventory.BootID {
 		return true, nil
 	} // The live agent owns same-boot reconciliation.
+	for _, publication := range inventory.Inventory.Publications {
+		if len(publication.Retirement) != 0 {
+			return true, fmt.Errorf("boot recovery requires live receiver retirement reconciliation")
+		}
+	}
 	entries, err := os.ReadDir(filepath.Dir(lock.Name()))
 	if err != nil {
 		return true, err

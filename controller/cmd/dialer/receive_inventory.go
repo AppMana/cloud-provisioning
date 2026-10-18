@@ -40,6 +40,11 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 	if err != nil {
 		return fail(err)
 	}
+	for _, publication := range inventory.Publications {
+		if len(publication.Retirement) != 0 {
+			return fail(fmt.Errorf("receiver retirement intent requires withdrawal reconciliation"))
+		}
+	}
 	result := admittedReceiveSet{Inventory: inventory, Metadata: *object.ObjectMeta.DeepCopy(), Journals: map[string]handover.Snapshot{}, Local: map[string]admittedReceiveJournal{}}
 	var snapshots []handover.Snapshot
 	for _, uid := range inventory.MachineUIDs {
@@ -162,40 +167,9 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 		return fmt.Errorf("receiver checkpoint set has no local target")
 	}
 	path := lockPath + ".inventory.json"
-	raw, err := os.ReadFile(path)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	next := receiveInventoryCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), Inventory: admitted.Inventory, NodeName: cfg.nodeName, NodeUID: target.NodeUID, BootID: target.BootID, PublicKey: key.PublicKey().String()}
+	if err := validateReceiveInventoryCheckpoint(path, next); err != nil {
 		return err
-	}
-	if err == nil {
-		var saved receiveInventoryCheckpoint
-		decoder := json.NewDecoder(bytes.NewReader(raw))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&saved); err != nil {
-			return err
-		}
-		var trailing any
-		if err := decoder.Decode(&trailing); err != io.EOF {
-			return fmt.Errorf("trailing receiver inventory checkpoint data")
-		}
-		a, b := saved.Inventory, admitted.Inventory
-		if saved.Version != 1 || saved.InventoryUID != string(admitted.Metadata.UID) || saved.NodeName != cfg.nodeName || saved.NodeUID != target.NodeUID || saved.BootID == "" || saved.PublicKey != key.PublicKey().String() || a.Version != b.Version || a.ClusterUID != b.ClusterUID || a.Namespace != b.Namespace || a.MeshName != b.MeshName || a.MeshUID != b.MeshUID || a.MachineUIDs == nil {
-			return fmt.Errorf("receiver inventory checkpoint identity changed")
-		}
-		previous := ""
-		for uid, p := range a.Publications {
-			if p.JournalUID != "" && b.Publications[uid].JournalUID != p.JournalUID {
-				return fmt.Errorf("journal publication regressed or changed incarnation")
-			}
-			if len(p.Retirement) > 0 && !bytes.Equal(p.Retirement, b.Publications[uid].Retirement) {
-				return fmt.Errorf("receiver retirement intent regressed or changed")
-			}
-		}
-		for _, uid := range a.MachineUIDs {
-			if uid == "" || uid <= previous || !slices.Contains(b.MachineUIDs, uid) {
-				return fmt.Errorf("receiver inventory regressed or checkpoint is invalid")
-			}
-			previous = uid
-		}
 	}
 	// Also preserve journals from an interrupted first checkpoint of the set.
 	entries, err := os.ReadDir(filepath.Dir(lockPath))
@@ -231,4 +205,44 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 	}
 	saved := receiveInventoryCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), Inventory: admitted.Inventory, NodeName: cfg.nodeName, NodeUID: target.NodeUID, BootID: target.BootID, PublicKey: key.PublicKey().String()}
 	return writeDurableJSON(path, saved)
+}
+
+// Shared by phase and retirement checkpoint writers under the host lock.
+func validateReceiveInventoryCheckpoint(path string, next receiveInventoryCheckpoint) error {
+	raw, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err == nil {
+		var saved receiveInventoryCheckpoint
+		decoder := json.NewDecoder(bytes.NewReader(raw))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&saved); err != nil {
+			return err
+		}
+		var trailing any
+		if err := decoder.Decode(&trailing); err != io.EOF {
+			return fmt.Errorf("trailing receiver inventory checkpoint data")
+		}
+		a, b := saved.Inventory, next.Inventory
+		if saved.Version != 1 || saved.InventoryUID != next.InventoryUID || saved.NodeName != next.NodeName || saved.NodeUID != next.NodeUID || saved.BootID == "" || saved.PublicKey != next.PublicKey || a.Version != b.Version || a.ClusterUID != b.ClusterUID || a.Namespace != b.Namespace || a.MeshName != b.MeshName || a.MeshUID != b.MeshUID || a.MachineUIDs == nil {
+			return fmt.Errorf("receiver inventory checkpoint identity changed")
+		}
+		previous := ""
+		for uid, p := range a.Publications {
+			if p.JournalUID != "" && b.Publications[uid].JournalUID != p.JournalUID {
+				return fmt.Errorf("journal publication regressed or changed incarnation")
+			}
+			if len(p.Retirement) > 0 && !bytes.Equal(p.Retirement, b.Publications[uid].Retirement) {
+				return fmt.Errorf("receiver retirement intent regressed or changed")
+			}
+		}
+		for _, uid := range a.MachineUIDs {
+			if uid == "" || uid <= previous || !slices.Contains(b.MachineUIDs, uid) {
+				return fmt.Errorf("receiver inventory regressed or checkpoint is invalid")
+			}
+			previous = uid
+		}
+	}
+	return nil
 }

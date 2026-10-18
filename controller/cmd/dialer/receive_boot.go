@@ -123,6 +123,11 @@ func admitReceiveBoot(ctx context.Context, cfg config, native func(receiveBootSt
 	if err := decoder.Decode(&trailing); err != io.EOF {
 		return true, fmt.Errorf("trailing boot inventory data")
 	}
+	for _, publication := range inventory.Inventory.Publications {
+		if len(publication.Retirement) != 0 {
+			return true, fmt.Errorf("boot recovery requires live receiver retirement reconciliation")
+		}
+	}
 	identityRaw, err := os.ReadFile(cfg.peersFile)
 	if err != nil {
 		return true, err

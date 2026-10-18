@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -121,6 +123,64 @@ func verifyReceiveRetirementAdmission(t *testing.T, api kubernetes.Interface, st
 	if err != nil || admitted.NodeUID != plan.Sites[site.PublicKey().String()].NodeUID || len(admitted.Plans) != len(inventory.MachineUIDs) || len(admitted.Withdrawal.Consumers) != len(w.Consumers) {
 		t.Fatal("lost survivor or reservation after cloud deletion", err)
 	}
+	t.Run("retirement-checkpoint", func(t *testing.T) {
+		cfg := config{iface: "retiretest", nodeName: "site", privateKeyFile: filepath.Join(t.TempDir(), "key")}
+		lock, err := lockReconciliation(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer lock.Close()
+		persist := func(a admittedReceiveRetirement) error {
+			return checkpointReceiveRetirementLocked(ctx, api, store, scope, cfg, site, lock.Name(), a)
+		}
+		if err := persist(admitted); err != nil {
+			t.Fatal(err)
+		}
+		if err := persist(admitted); err != nil {
+			t.Fatal("retirement checkpoint retry failed", err)
+		}
+		path := lock.Name() + ".inventory.json"
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var saved receiveInventoryCheckpoint
+		if err := json.Unmarshal(raw, &saved); err != nil {
+			t.Fatal(err)
+		}
+		if saved.NodeUID != admitted.NodeUID || saved.BootID != admitted.BootID || len(saved.Inventory.Publications[scope.MachineUID].Retirement) == 0 {
+			t.Fatal("checkpoint lost retirement identity")
+		}
+		journalPath := lock.Name() + "." + store.Name + ".json"
+		journal, err := readReceiveJournalCheckpoint(journalPath, store, scope, cfg.nodeName, site)
+		if err != nil || !journal.Snapshot.Frozen() || journal.NativeObservation != nil {
+			t.Fatal("retirement checkpoint lost fence or invented native completion", err)
+		}
+		for _, name := range []string{path, journalPath} {
+			info, err := os.Stat(name)
+			if err != nil || info.Mode().Perm() != 0600 {
+				t.Fatal("retirement checkpoint is not private", err)
+			}
+		}
+		stale := admitted
+		stale.Metadata.ResourceVersion = "stale"
+		if err := persist(stale); err == nil {
+			t.Fatal("stale admission checkpointed")
+		}
+		if err := os.WriteFile(journalPath, []byte("{"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := persist(admitted); err == nil {
+			t.Fatal("corrupt prior history overwritten")
+		}
+		after, err := os.ReadFile(path)
+		if err != nil || string(after) != string(raw) {
+			t.Fatal("failed checkpoint changed durable inventory", err)
+		}
+		if _, err := loadReceiveSet(ctx, api, store, scope, cfg.nodeName, site); err == nil {
+			t.Fatal("serving reconciliation admitted a retiring inventory")
+		}
+	})
 	wrong, _ := wgtypes.GeneratePrivateKey()
 	if _, err := load(store, "site", wrong); err == nil {
 		t.Fatal("changed local key admitted")

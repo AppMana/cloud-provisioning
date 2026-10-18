@@ -91,7 +91,7 @@ func writeReceiveBootFixture(t *testing.T, cfg config, root wgtypes.Key, plan tu
 
 func TestReceiveBootAdmission(t *testing.T) {
 	for _, legacy := range []bool{false, true} {
-		for _, fault := range []string{"valid", "unverified", "inventory", "local-set", "network", "identity", "allocation", "extra-journal", "same-boot", "changed-during-native", "cancelled", "busy", "unfinished"} {
+		for _, fault := range []string{"valid", "unverified", "inventory", "local-set", "network", "identity", "allocation", "extra-journal", "same-boot", "changed-during-native", "cancelled", "busy", "unfinished", "retirement"} {
 			t.Run(fmt.Sprintf("legacy-%t/%s", legacy, fault), func(t *testing.T) {
 				must := func(err error) {
 					t.Helper()
@@ -157,6 +157,21 @@ func TestReceiveBootAdmission(t *testing.T) {
 					must(writeDurableJSON(cfg.peersFile, tunnel.PeersFileDoc{PrivateKey: root.String(), LocalAddress: "172.29.0.2/32"}))
 				case "extra-journal":
 					must(os.WriteFile(filepath.Join(filepath.Dir(cfg.peersFile), cfg.iface+".reconcile.lock.receive-transition-unaccounted.json"), []byte("{}"), 0600))
+				case "retirement":
+					raw, err := os.ReadFile(inventoryPath)
+					must(err)
+					var inventory receiveInventoryCheckpoint
+					must(json.Unmarshal(raw, &inventory))
+					publication := inventory.Inventory.Publications[plan.MachineUID]
+					publication.Retirement = json.RawMessage(`{"withdrawal":"pending"}`)
+					inventory.Inventory.Publications[plan.MachineUID] = publication
+					must(writeDurableJSON(inventoryPath, inventory))
+					// Preserve a matching observation digest: rejection must come
+					// from withdrawal intent, not an incidental checksum mismatch.
+					raw, err = os.ReadFile(inventoryPath)
+					must(err)
+					observation.InventorySHA256 = fmt.Sprintf("%x", sha256.Sum256(raw))
+					must(writeDurableJSON(observationPath, observation))
 				case "same-boot":
 					raw, err := os.ReadFile(inventoryPath)
 					must(err)

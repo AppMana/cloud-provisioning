@@ -449,7 +449,7 @@ func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store han
 				}
 			})
 			before := calls
-			if got, err := executeReceivePhase(ctx, api, store, scope, cfg, site, "container", verify); err == nil || !strings.Contains(err.Error(), "retirement intent regressed") || len(got) != 0 || calls != before {
+			if got, err := executeReceivePhase(ctx, api, store, scope, cfg, site, "container", verify); err == nil || !strings.Contains(err.Error(), "retirement intent") || len(got) != 0 || calls != before {
 				t.Fatal("retirement regression permitted native work", err)
 			}
 		})

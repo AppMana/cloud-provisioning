@@ -245,7 +245,11 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 	if retainedForward == nil || retainedForward.PeerPublicKey != preparationKey(8) || retainedForward.Transit != nil {
 		t.Fatal("journal did not preserve the external site's desired direct ownership")
 	}
-	verifyReceiveInventory(t, r, string(machine.GetUID()))
+	journalReader, err := client.New(cfg, client.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifyReceiveInventory(t, r, string(machine.GetUID()), journalReader)
 	verifyReceiveReceiptAdmission(t, r, snapshot, plan)
 	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
 		t.Fatalf("normal reconciliation could not resume its journal: %v", err)

@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
+	kubefake "k8s.io/client-go/kubernetes/fake"
+	"reflect"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -72,5 +76,85 @@ func TestDeletedRemoteRevokesItsPeerAndAdoption(t *testing.T) {
 		if err := c.Get(context.Background(), client.ObjectKeyFromObject(adoption), &corev1.Secret{}); !apierrors.IsNotFound(err) {
 			t.Fatalf("adoption remained: %v", err)
 		}
+	}
+}
+
+// Fake API admission only: reservations exclude orphan cleanup even if compute
+// is absent. Missing/corrupt journal discovery fails before mutation. This does
+// not establish native withdrawal, API atomicity or completed orphan recovery.
+func TestOrphanCleanupPreservesReceiverReservations(t *testing.T) {
+	for _, state := range []string{"prepared", "missing-storage", "missing-journal", "unpublished", "malformed", "wrong-scope", "wrong-index", "foreign-machine"} {
+		t.Run(state, func(t *testing.T) {
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			_ = corev1.AddToScheme(scheme)
+			scheme.AddKnownTypeWithName(machineGVK, &unstructured.Unstructured{})
+			scheme.AddKnownTypeWithName(machineGVK.GroupVersion().WithKind("MachineList"), &unstructured.UnstructuredList{})
+			mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mesh", Namespace: "test", UID: "mesh-uid", ResourceVersion: "1"}, Data: map[string][]byte{tunnel.PeerPublicKeyPrefix + "remote1": []byte("root"), tunnel.PeerRouteHostsPrefix + "remote1": []byte("10.100.0.128")}}
+			adoption := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: tunnel.AdoptionSecretName("remote1"), Namespace: mesh.Namespace, UID: "adoption", ResourceVersion: "1"}}
+			plan := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: mesh.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineName: "remote1", MachineUID: "machine"}
+			if state == "wrong-scope" {
+				plan.MeshUID = "other"
+			}
+			raw, err := json.Marshal(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			publication := tunnel.ReceiveJournalPublication{Plan: raw}
+			if state == "missing-journal" {
+				publication = tunnel.ReceiveJournalPublication{JournalUID: "missing"}
+			}
+			if state == "unpublished" {
+				publication = tunnel.ReceiveJournalPublication{}
+			}
+			inventory := tunnel.ReceiveInventory{Version: 1, ClusterUID: "cluster", Namespace: mesh.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUIDs: []string{"machine"}, Publications: map[string]tunnel.ReceiveJournalPublication{"machine": publication}}
+			raw, err = json.Marshal(inventory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			index := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: tunnel.ReceiveInventoryName(string(mesh.UID)), Namespace: mesh.Namespace, UID: "index", ResourceVersion: "1"}, Data: map[string]string{"inventory.json": string(raw)}}
+			if state == "malformed" {
+				index.Data["inventory.json"] = "{}"
+			}
+			objects := []client.Object{mesh, adoption, index}
+			if state == "foreign-machine" {
+				objects = objects[:2]
+				other := &unstructured.Unstructured{}
+				other.SetGroupVersionKind(machineGVK)
+				other.SetName("remote1")
+				other.SetNamespace("another-mesh")
+				objects = append(objects, other)
+			}
+			c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+			typedIndex := index.DeepCopy()
+			if state == "wrong-index" {
+				typedIndex.UID = "replacement"
+			}
+			core := kubefake.NewClientset(typedIndex)
+			r := &meshReconciler{Client: c, reader: c, secretNamespace: mesh.Namespace, tunnelSubnet: "10.100.0.0/24", receiveJournal: handover.Store{ConfigMaps: core.CoreV1().ConfigMaps(mesh.Namespace), ClusterUID: "cluster"}}
+			if state == "missing-storage" {
+				r.receiveJournal = handover.Store{}
+			}
+			before := mesh.DeepCopy()
+			changed, err := r.pruneDeletedMachines(ctx, mesh)
+			if state == "foreign-machine" {
+				if err != nil || !changed {
+					t.Fatal("unrelated namespace blocked ordinary cleanup", changed, err)
+				}
+				if err := c.Get(ctx, client.ObjectKeyFromObject(adoption), &corev1.Secret{}); !apierrors.IsNotFound(err) {
+					t.Fatal("ordinary orphan adoption not removed", err)
+				}
+				return
+			}
+			if changed || !reflect.DeepEqual(before.Data, mesh.Data) {
+				t.Fatal("reserved cleanup mutated mesh")
+			}
+			if (state == "prepared") != (err == nil) {
+				t.Fatal("incorrect reserved cleanup admission", err)
+			}
+			if err := c.Get(ctx, client.ObjectKeyFromObject(adoption), &corev1.Secret{}); err != nil {
+				t.Fatal("reserved adoption removed", err)
+			}
+		})
 	}
 }

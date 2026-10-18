@@ -20,7 +20,7 @@ import (
 func (r *meshReconciler) pruneDeletedMachines(ctx context.Context, secret *corev1.Secret) (bool, error) {
 	machines := &unstructured.UnstructuredList{}
 	machines.SetGroupVersionKind(machineGVK.GroupVersion().WithKind("MachineList"))
-	if err := r.reader.List(ctx, machines); err != nil {
+	if err := r.reader.List(ctx, machines, client.InNamespace(r.secretNamespace)); err != nil {
 		return false, fmt.Errorf("checking machines before peer cleanup: %w", err)
 	}
 	live := map[string]bool{}
@@ -28,10 +28,23 @@ func (r *meshReconciler) pruneDeletedMachines(ctx context.Context, secret *corev
 		live[machine.GetName()] = true
 	}
 	prefixes := []string{tunnel.PeerPublicKeyPrefix, tunnel.PeerEndpointPrefix, tunnel.PeerAllowedIPsPrefix, tunnel.PeerRouteHostsPrefix, tunnel.PeerRouteHostPrefix, tunnel.PeerNativeNetworkPrefix}
+	var orphans []string
+	for _, name := range publishedNames(secret.Data, prefixes...) {
+		if !live[name] {
+			orphans = append(orphans, name)
+		}
+	}
+	if len(orphans) == 0 {
+		return false, nil
+	}
+	reserved, err := r.reservedRemoteNames(ctx, secret)
+	if err != nil {
+		return false, fmt.Errorf("checking reserved peers before cleanup: %w", err)
+	}
 	changed := false
 	_, subnet, _ := net.ParseCIDR(r.tunnelSubnet)
-	for _, name := range publishedNames(secret.Data, prefixes...) {
-		if live[name] {
+	for _, name := range orphans {
+		if reserved[name] {
 			continue
 		}
 		adoption := &corev1.Secret{}

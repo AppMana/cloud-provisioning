@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type inventoryCheckedCreates struct {
@@ -39,7 +40,7 @@ func (c inventoryRacingUpdate) Update(ctx context.Context, object *corev1.Config
 }
 
 // Reuse the real API server that exercises normal journal reconciliation.
-func verifyReceiveInventory(t *testing.T, r *meshReconciler, machineUID string) {
+func verifyReceiveInventory(t *testing.T, r *meshReconciler, machineUID string, journalReader client.Reader) {
 	t.Helper()
 	ctx := context.Background()
 	mesh := &corev1.Secret{}
@@ -59,6 +60,24 @@ func verifyReceiveInventory(t *testing.T, r *meshReconciler, machineUID string) 
 	inventory, original := load()
 	if !slices.Equal(inventory.MachineUIDs, []string{machineUID}) {
 		t.Fatal("normal reconciliation omitted journal reservation", inventory.MachineUIDs)
+	}
+	// Published journal discovery protects its original Machine name even when
+	// compute is absent. This real-API read is not orphan cleanup execution.
+	discovery := *r
+	discovery.reader = journalReader
+	protected, err := discovery.reservedRemoteNames(ctx, mesh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := r.receiveJournal
+	store.Name = tunnel.ReceiveTransitionName(machineUID)
+	snapshot, err := store.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := tunnel.DecodeReceiveTransition(snapshot, cluster)
+	if err != nil || !protected[plan.MachineName] || len(protected) != 1 {
+		t.Fatal("published journal lost orphan protection", err)
 	}
 	reserve := func(uid string) error { return tunnel.ReserveReceiveJournal(ctx, maps, cluster, mesh, uid, r.owners()) }
 	if err := reserve(machineUID); err != nil {

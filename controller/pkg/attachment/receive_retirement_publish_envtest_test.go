@@ -55,7 +55,7 @@ func TestReceiveWithdrawalPublicationWithRealAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fault := range []string{"none", "denied", "missing-authority", "wrong-index", "missing-reserved-journal", "mesh-race", "inventory-race", "lost-response"} {
+	for _, fault := range []string{"none", "metadata", "denied", "missing-authority", "wrong-index", "missing-reserved-journal", "mesh-race", "inventory-race", "lost-response"} {
 		t.Run(fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -74,6 +74,9 @@ func TestReceiveWithdrawalPublicationWithRealAPI(t *testing.T) {
 			mesh, err = api.CoreV1().Secrets(ns).Update(ctx, mesh, metav1.UpdateOptions{})
 			must(err)
 			w.SourceVersion = mesh.ResourceVersion
+			if fault == "metadata" {
+				w.SourceDataHash = withdrawalSourceDataHash(mesh.Data)
+			}
 			raw, err := fixture.Checkpoint()
 			must(err)
 			var checkpoint struct {
@@ -93,6 +96,11 @@ func TestReceiveWithdrawalPublicationWithRealAPI(t *testing.T) {
 			index, err := maps.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: tunnel.ReceiveInventoryName(w.MeshUID)}, Data: map[string]string{"inventory.json": string(raw)}}, metav1.CreateOptions{})
 			must(err)
 			must(w.ReserveReceiveWithdrawal(ctx, maps, "cluster", string(index.UID), mesh, snapshot))
+			if fault == "metadata" {
+				mesh.Labels = map[string]string{"metadata": "after-reservation"}
+				mesh, err = api.CoreV1().Secrets(ns).Update(ctx, mesh, metav1.UpdateOptions{})
+				must(err)
+			}
 			if fault == "missing-reserved-journal" {
 				must(tunnel.ReserveReceiveJournal(ctx, maps, "cluster", mesh, "other-machine", nil))
 			}
@@ -127,7 +135,7 @@ func TestReceiveWithdrawalPublicationWithRealAPI(t *testing.T) {
 				publishingAPI = lostWithdrawalAPI{api}
 			}
 			result, err := PublishReceiveWithdrawal(ctx, publishingAPI, store, ns, mesh.Name, string(mesh.UID), w.MachineUID, expectedUID, authorize)
-			if fault == "none" {
+			if fault == "none" || fault == "metadata" {
 				must(err)
 				if result == nil {
 					t.Fatal("missing publication")
@@ -137,7 +145,7 @@ func TestReceiveWithdrawalPublicationWithRealAPI(t *testing.T) {
 			}
 			current, e := api.CoreV1().Secrets(ns).Get(ctx, mesh.Name, metav1.GetOptions{})
 			must(e)
-			removed := fault == "none" || fault == "lost-response"
+			removed := fault == "none" || fault == "metadata" || fault == "lost-response"
 			if (len(current.Data[tunnel.PeerPublicKeyPrefix+w.MachineName]) == 0) != removed {
 				t.Fatal("unexpected peer mutation")
 			}

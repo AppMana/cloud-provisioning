@@ -57,7 +57,9 @@ func ReadReceiveWithdrawal(inventory tunnel.ReceiveInventory, machineUID string,
 
 // ReadPreparedReceiveWithdrawal recovers the already persisted consumer set
 // before publication. It requires the original mesh revision and peer to still
-// be present. Returning this intent does not authorize native cleanup: callers
+// be present for legacy intents. Captures carrying a data hash also admit later
+// metadata revisions with identical data. Returning this intent does not authorize
+// native cleanup: callers
 // must recheck live drain authority and publish through optimistic locking.
 // Never recapture consumers after a lost response or controller restart.
 func ReadPreparedReceiveWithdrawal(inventory tunnel.ReceiveInventory, machineUID string, snapshot handover.Snapshot, mesh *corev1.Secret) (RemoteWithdrawalIntent, error) {

@@ -2,6 +2,7 @@ package attachment
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -14,15 +15,16 @@ import (
 // RemoteWithdrawalIntent contains public identities only. Persist it before
 // publishing removal; retries must retain its recipients even when unavailable.
 type RemoteWithdrawalIntent struct {
-	MeshNamespace string           `json:"meshNamespace"`
-	MeshName      string           `json:"meshName"`
-	MeshUID       string           `json:"meshUID"`
-	SourceVersion string           `json:"sourceVersion"`
-	MachineName   string           `json:"machineName"`
-	MachineUID    string           `json:"machineUID"`
-	PublicKey     string           `json:"publicKey"`
-	DrainIntent   string           `json:"drainIntent"`
-	Consumers     []ConsumerTarget `json:"consumers"`
+	MeshNamespace  string           `json:"meshNamespace"`
+	MeshName       string           `json:"meshName"`
+	MeshUID        string           `json:"meshUID"`
+	SourceVersion  string           `json:"sourceVersion"`
+	SourceDataHash string           `json:"sourceDataHash,omitempty"`
+	MachineName    string           `json:"machineName"`
+	MachineUID     string           `json:"machineUID"`
+	PublicKey      string           `json:"publicKey"`
+	DrainIntent    string           `json:"drainIntent"`
+	Consumers      []ConsumerTarget `json:"consumers"`
 }
 
 // PrepareRemoteWithdrawal captures every published survivor and excludes only
@@ -54,7 +56,7 @@ func (r MeshConsumerResolver) PrepareRemoteWithdrawal(ctx context.Context, name 
 	if key == "" || string(mesh.Data[tunnel.PeerPublicKeyPrefix+name]) != key {
 		return nil, fmt.Errorf("retiring peer identity missing")
 	}
-	intent := &RemoteWithdrawalIntent{MeshNamespace: mesh.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), SourceVersion: mesh.ResourceVersion, MachineName: name, MachineUID: worker.UID, PublicKey: key, DrainIntent: drainIntent}
+	intent := &RemoteWithdrawalIntent{MeshNamespace: mesh.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), SourceVersion: mesh.ResourceVersion, SourceDataHash: withdrawalSourceDataHash(mesh.Data), MachineName: name, MachineUID: worker.UID, PublicKey: key, DrainIntent: drainIntent}
 	removed := 0
 	for _, c := range consumers {
 		if !c.Site && c.MachineName == name && c.NodeUID == worker.NodeUID && c.PublicKey == key {
@@ -77,4 +79,11 @@ func (r MeshConsumerResolver) PrepareRemoteWithdrawal(ctx context.Context, name 
 		return nil, fmt.Errorf("mesh changed while capturing withdrawal recipients")
 	}
 	return intent, nil
+}
+
+// Hash the complete captured data, not metadata or a subset of peer fields.
+// JSON encoding of a string-to-byte-slice map is deterministic and cannot fail.
+func withdrawalSourceDataHash(data map[string][]byte) string {
+	raw, _ := json.Marshal(data)
+	return tunnel.HashPeerList(raw)
 }

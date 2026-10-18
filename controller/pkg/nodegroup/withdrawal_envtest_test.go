@@ -104,7 +104,7 @@ func verifyPeerWithdrawalCapture(t *testing.T, api client.Client) {
 		t.Fatal("API pruned public inventory")
 	}
 	w := reloaded.Status.PendingAction.Withdrawal
-	if w.MeshUID != string(mesh.UID) || w.SourceVersion != mesh.ResourceVersion || len(w.Consumers) != 2 || w.Consumers[0].MachineName != "withdrawal-survivor" || w.Consumers[0].SecretUID == "" {
+	if w.MeshUID != string(mesh.UID) || w.SourceVersion != mesh.ResourceVersion || len(w.SourceDataHash) != 64 || len(w.Consumers) != 2 || w.Consumers[0].MachineName != "withdrawal-survivor" || w.Consumers[0].SecretUID == "" {
 		t.Fatalf("lost identities: %+v", w)
 	}
 	copied := reloaded.DeepCopy()

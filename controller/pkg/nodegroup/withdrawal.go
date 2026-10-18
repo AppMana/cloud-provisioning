@@ -42,7 +42,7 @@ func CapturePeerWithdrawal(ctx context.Context, api client.Client, group *v1alph
 	if err != nil {
 		return nil, err
 	}
-	inventory := &v1alpha1.GroupPeerWithdrawal{MeshName: intent.MeshName, MeshUID: intent.MeshUID, SourceVersion: intent.SourceVersion, PublicKey: intent.PublicKey}
+	inventory := &v1alpha1.GroupPeerWithdrawal{MeshName: intent.MeshName, MeshUID: intent.MeshUID, SourceVersion: intent.SourceVersion, SourceDataHash: intent.SourceDataHash, PublicKey: intent.PublicKey}
 	for _, c := range intent.Consumers {
 		inventory.Consumers = append(inventory.Consumers, v1alpha1.GroupPeerConsumer{NodeName: c.NodeName, NodeUID: c.NodeUID, Site: c.Site, MachineName: c.MachineName, TunnelAddress: c.TunnelAddress, PublicKey: c.PublicKey, SecretUID: c.SecretUID})
 	}

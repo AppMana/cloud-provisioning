@@ -201,6 +201,7 @@ spec:
                       meshName: {type: string, minLength: 1}
                       meshUID: {type: string, minLength: 1}
                       sourceVersion: {type: string, minLength: 1}
+                      sourceDataHash: {type: string, pattern: "^[0-9a-f]{64}$"}
                       publicKey: {type: string, minLength: 1}
                       consumers:
                         type: array

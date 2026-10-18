@@ -94,7 +94,7 @@ func AuthorizeReceiveWithdrawal(ctx context.Context, api client.Client, workload
 func groupReceiveWithdrawalIntent(group *v1alpha1.ProvisionedNodeGroupClaim) attachment.RemoteWithdrawalIntent {
 	a := group.Status.PendingAction
 	w := a.Withdrawal
-	expected := attachment.RemoteWithdrawalIntent{MeshNamespace: group.Namespace, MeshName: w.MeshName, MeshUID: w.MeshUID, SourceVersion: w.SourceVersion, MachineName: a.ChildName, MachineUID: a.MachineUID, PublicKey: w.PublicKey, DrainIntent: string(group.UID) + "/" + a.ID}
+	expected := attachment.RemoteWithdrawalIntent{MeshNamespace: group.Namespace, MeshName: w.MeshName, MeshUID: w.MeshUID, SourceVersion: w.SourceVersion, SourceDataHash: w.SourceDataHash, MachineName: a.ChildName, MachineUID: a.MachineUID, PublicKey: w.PublicKey, DrainIntent: string(group.UID) + "/" + a.ID}
 	for _, c := range w.Consumers {
 		expected.Consumers = append(expected.Consumers, attachment.ConsumerTarget{NodeName: c.NodeName, NodeUID: c.NodeUID, Site: c.Site, MachineName: c.MachineName, TunnelAddress: c.TunnelAddress, PublicKey: c.PublicKey, SecretUID: c.SecretUID})
 	}

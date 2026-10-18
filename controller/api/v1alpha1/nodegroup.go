@@ -33,11 +33,12 @@ type GroupPeerConsumer struct {
 	SecretUID     string `json:"secretUID,omitempty"`
 }
 type GroupPeerWithdrawal struct {
-	MeshName      string              `json:"meshName"`
-	MeshUID       string              `json:"meshUID"`
-	SourceVersion string              `json:"sourceVersion"`
-	PublicKey     string              `json:"publicKey"`
-	Consumers     []GroupPeerConsumer `json:"consumers"`
+	MeshName       string              `json:"meshName"`
+	MeshUID        string              `json:"meshUID"`
+	SourceVersion  string              `json:"sourceVersion"`
+	SourceDataHash string              `json:"sourceDataHash,omitempty"`
+	PublicKey      string              `json:"publicKey"`
+	Consumers      []GroupPeerConsumer `json:"consumers"`
 }
 
 // BootstrapCancellation records cancellation before the join controller's

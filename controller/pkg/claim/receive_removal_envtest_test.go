@@ -232,6 +232,10 @@ func verifyStandaloneCompletion(t *testing.T, api client.Client, core kubernetes
 			t.Fatal(err)
 		}
 	}
+	// Metadata changes between durable stages must not invalidate captured
+	// network data or require recapturing the withdrawal's survivor identities.
+	mesh.Annotations = map[string]string{"test/metadata": "after-capture"}
+	must(api.Update(ctx, mesh))
 	for stage := 0; stage < 4; stage++ {
 		must(step())
 		snapshot, err := store.Load(ctx)

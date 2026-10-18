@@ -179,3 +179,37 @@ func TestReceiveRetirementRequiresFrozenOwnershipAndRetainedParticipants(t *test
 		}
 	}
 }
+
+// Admission only: a captured data hash tolerates metadata revisions without
+// relaxing the complete data snapshot. Legacy captures keep exact-RV behavior.
+// This does not authenticate capture, qualify API races or execute native cleanup.
+func TestPreparedRetirementAllowsOnlyCapturedDataAcrossMetadataChanges(t *testing.T) {
+	for _, fault := range []string{"none", "metadata", "data", "same-version-data", "invalid-hash", "legacy-metadata"} {
+		t.Run(fault, func(t *testing.T) {
+			w, snapshot, inventory, mesh := retirementFixture(t, "forward", true)
+			mesh.ResourceVersion = w.SourceVersion
+			mesh.Data[tunnel.PeerPublicKeyPrefix+w.MachineName] = []byte(w.PublicKey)
+			w.SourceDataHash = withdrawalSourceDataHash(mesh.Data)
+			switch fault {
+			case "metadata":
+				mesh.ResourceVersion = "new-version"
+				mesh.Labels = map[string]string{"changed": "true"}
+			case "data":
+				mesh.ResourceVersion = "new-version"
+				mesh.Data["private-key"] = []byte("changed fixture value")
+			case "same-version-data":
+				mesh.Data[tunnel.PeerRouteHostsPrefix+w.MachineName] = []byte("172.29.0.99")
+			case "invalid-hash":
+				w.SourceDataHash = "invalid"
+			case "legacy-metadata":
+				w.SourceDataHash = ""
+				mesh.ResourceVersion = "new-version"
+			}
+			_, err := w.receiveRetirementPlan(snapshot, inventory, mesh, false)
+			want := fault == "none" || fault == "metadata"
+			if (err == nil) != want {
+				t.Fatal("incorrect prepared source admission", fault, err)
+			}
+		})
+	}
+}

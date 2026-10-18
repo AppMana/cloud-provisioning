@@ -62,6 +62,11 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 	must(err)
 	mesh, err = api.CoreV1().Secrets(ns).Update(ctx, mesh, metav1.UpdateOptions{})
 	must(err)
+	missing, verified, err := ReadVerifiedReceiveRetirementCompletion(ctx, api, store, ns, mesh.Name, string(mesh.UID), w.MachineUID, string(index.UID), time.Minute)
+	must(err)
+	if verified || missing.Metadata.UID != "" || missing.Journals != nil {
+		t.Fatal("missing completion returned a verified source")
+	}
 	t.Run("admitted-collection-read-budget", func(t *testing.T) {
 		verifyRetirementCollectionAdmission(t, api, store, mesh, w.MachineUID, map[string]handover.PodReceiptAuthenticator{string(node.UID): policy})
 	})

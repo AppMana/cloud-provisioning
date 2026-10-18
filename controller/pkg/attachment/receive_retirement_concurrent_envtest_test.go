@@ -13,6 +13,8 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -116,8 +118,26 @@ func verifyConcurrentRetirementAuthentication(t *testing.T, api kubernetes.Inter
 	if statuses[http.StatusNoContent] != 1 || statuses[http.StatusConflict] != 1 {
 		t.Fatalf("expected one commit and one stale-source rejection: %v", statuses)
 	}
-	verified, err := VerifyReceiveRetirementCompletion(ctx, api, store, mesh.Namespace, mesh.Name, string(mesh.UID), machineUID, inventoryUID, time.Minute)
+	source, verified, err := ReadVerifiedReceiveRetirementCompletion(ctx, api, store, mesh.Namespace, mesh.Name, string(mesh.UID), machineUID, inventoryUID, time.Minute)
 	if err != nil || !verified {
 		t.Fatal("concurrent completion did not preserve verifiable authenticated evidence", err)
+	}
+	current, err := store.ConfigMaps.Get(ctx, source.Metadata.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.UID != source.Metadata.UID || current.ResourceVersion != source.Metadata.ResourceVersion || source.Withdrawal.MachineUID != machineUID || string(source.Journals[machineUID].Metadata().UID) != store.ExpectedUID {
+		t.Fatal("verified completion lost its exact source identities")
+	}
+	// A later read must not silently transfer verification to a newer revision.
+	// Metadata-only mutation exercises API CAS, not reservation finalization.
+	current.Annotations = map[string]string{"completion-test": "changed-after-verification"}
+	current, err = store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	current.ResourceVersion = source.Metadata.ResourceVersion
+	if _, err := store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{}); !apierrors.IsConflict(err) {
+		t.Fatal("verified source authorized a write against newer inventory", err)
 	}
 }

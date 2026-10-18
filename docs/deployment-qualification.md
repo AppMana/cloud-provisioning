@@ -484,6 +484,23 @@ TLS concurrency fixture overlaps two requests for one consumer against the same
 inventory revision and requires one commit and one stale-source rejection. Its
 synthetic native proof does not qualify multi-consumer aggregation or cleanup.
 
+Reservation finalization must consume the exact source returned by
+`ReadVerifiedReceiveRetirementCompletion`. A boolean verification followed by
+an unrelated newer inventory read cannot authorize a conditional write. Preserve
+the verified inventory UID/resourceVersion, captured withdrawal and journal/mesh
+identities; recheck owner absence, consumer identity and observation freshness at
+the final write boundary. The real-API source-binding fixture changes inventory
+metadata after verification and requires a conflict when its old revision is
+used. This proves conditional-write binding only, not finalization or release.
+
+Finalization remains a separate protocol: persist an irreversible retirement
+record before removing active reservations, retain durable host fences against
+old boot recovery, and admit new ownership only after matching release evidence.
+Test crashes between those steps, competing reservations, stale/replaced owners,
+consumer reboot, mixed-version readers and rollback. Current completion records
+and the source-returning verifier do not implement this protocol. Do not shrink
+inventory, delete journals or discard host checkpoints to bypass it.
+
 Agent reconciliation timing diagnostics report fixed operation/stage labels,
 elapsed milliseconds and success only, with at most sixteen stages per record.
 They must not include configuration, object identities, credentials or error text.

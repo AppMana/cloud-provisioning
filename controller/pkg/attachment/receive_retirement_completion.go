@@ -23,48 +23,60 @@ import (
 // gate, not allocation release or evidence of future connectivity. Missing
 // completion returns false; stale/incompatible evidence requires reconciliation.
 func VerifyReceiveRetirementCompletion(ctx context.Context, api kubernetes.Interface, store handover.Store, namespace, meshName, meshUID, machineUID, inventoryUID string, maxAge time.Duration) (bool, error) {
+	_, verified, err := ReadVerifiedReceiveRetirementCompletion(ctx, api, store, namespace, meshName, meshUID, machineUID, inventoryUID, maxAge)
+	return verified, err
+}
+
+// ReadVerifiedReceiveRetirementCompletion returns the exact admitted source
+// whose durable completion passed verification. Missing or invalid evidence
+// returns a zero source. Callers preparing a later write must retain this
+// inventory UID/resourceVersion and the captured journal/mesh identities; a
+// fresh read of a different revision cannot inherit this verification.
+// This is not a release permit: finalization still needs live owner/consumer
+// fencing, fresh observations and a conditional write against this source.
+func ReadVerifiedReceiveRetirementCompletion(ctx context.Context, api kubernetes.Interface, store handover.Store, namespace, meshName, meshUID, machineUID, inventoryUID string, maxAge time.Duration) (ReceiveRetirementSet, bool, error) {
 	source, err := ReadReceiveRetirementSet(ctx, api, store, namespace, meshName, meshUID, machineUID)
 	if err != nil {
-		return false, err
+		return ReceiveRetirementSet{}, false, err
 	}
 	if inventoryUID == "" || string(source.Metadata.UID) != inventoryUID || maxAge <= 0 {
-		return false, fmt.Errorf("completion requires exact inventory and observation lifetime")
+		return ReceiveRetirementSet{}, false, fmt.Errorf("completion requires exact inventory and observation lifetime")
 	}
 	publication := source.Inventory.Publications[machineUID]
 	if len(publication.RetirementCompletion) == 0 {
-		return false, nil
+		return ReceiveRetirementSet{}, false, nil
 	}
 	var completion receiveRetirementCompletion
 	decoder := json.NewDecoder(bytes.NewReader(publication.RetirementCompletion))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&completion); err != nil {
-		return false, err
+		return ReceiveRetirementSet{}, false, err
 	}
 	var extra any
 	if decoder.Decode(&extra) != io.EOF {
-		return false, fmt.Errorf("trailing completion evidence")
+		return ReceiveRetirementSet{}, false, fmt.Errorf("trailing completion evidence")
 	}
 	if (completion.Version < 2 || completion.Version > receiveRetirementCompletionVersion) || completion.InventoryVersion == "" || completion.InventoryVersion == source.Metadata.ResourceVersion || completion.MeshVersion != source.MeshMetadata.ResourceVersion {
-		return false, fmt.Errorf("completion source revision is missing or changed")
+		return ReceiveRetirementSet{}, false, fmt.Errorf("completion source revision is missing or changed")
 	}
 	inventoryHash, err := receiveRetirementInventoryHash(source.Inventory, machineUID, completion.Version)
 	if err != nil {
-		return false, err
+		return ReceiveRetirementSet{}, false, err
 	}
 	if completion.InventoryHash != inventoryHash {
-		return false, fmt.Errorf("inventory changed since completion authentication")
+		return ReceiveRetirementSet{}, false, fmt.Errorf("inventory changed since completion authentication")
 	}
 	digest, err := receiveRetirementDigest(store.ClusterUID, inventoryUID, completion.InventoryVersion, source.Mesh, publication.Retirement)
 	if err != nil {
-		return false, err
+		return ReceiveRetirementSet{}, false, err
 	}
 	if completion.Binding != digest {
-		return false, fmt.Errorf("completion no longer binds withdrawal")
+		return ReceiveRetirementSet{}, false, fmt.Errorf("completion no longer binds withdrawal")
 	}
 	if completion.Version >= 4 {
 		digest, err = receiveRetirementAuthorityDigest(store.ClusterUID, inventoryUID, inventoryHash, source.Metadata, source.Mesh, publication.Retirement)
 		if err != nil {
-			return false, err
+			return ReceiveRetirementSet{}, false, err
 		}
 	}
 	scope := ReceiveRetirementReceiptScope{digest: digest, nodes: map[string]string{}}
@@ -72,33 +84,33 @@ func VerifyReceiveRetirementCompletion(ctx context.Context, api kubernetes.Inter
 		scope.nodes[consumer.NodeUID] = consumer.NodeName
 	}
 	if len(completion.Receipts) != len(scope.nodes) {
-		return false, fmt.Errorf("completion omits retained consumers")
+		return ReceiveRetirementSet{}, false, fmt.Errorf("completion omits retained consumers")
 	}
 	seen := map[string]bool{}
 	for _, receipt := range completion.Receipts {
 		if seen[receipt.NodeUID] {
-			return false, fmt.Errorf("duplicate completion consumer")
+			return ReceiveRetirementSet{}, false, fmt.Errorf("duplicate completion consumer")
 		}
 		seen[receipt.NodeUID] = true
 		if err := scope.validateObservation(receipt, time.Now(), maxAge); err != nil {
-			return false, err
+			return ReceiveRetirementSet{}, false, err
 		}
 		if err := handover.VerifyObservationIncarnation(ctx, api, namespace, scope.nodes[receipt.NodeUID], receipt); err != nil {
-			return false, err
+			return ReceiveRetirementSet{}, false, err
 		}
 	}
 	if err := source.Recheck(ctx, api, store); err != nil {
-		return false, err
+		return ReceiveRetirementSet{}, false, err
 	}
 	for _, receipt := range completion.Receipts {
 		if err := scope.validateObservation(receipt, time.Now(), maxAge); err != nil {
-			return false, err
+			return ReceiveRetirementSet{}, false, err
 		}
 	}
 	if err := ctx.Err(); err != nil {
-		return false, err
+		return ReceiveRetirementSet{}, false, err
 	}
-	return true, nil
+	return source, true, nil
 }
 
 // Completion records are observations of cleanup, not reservation or withdrawal

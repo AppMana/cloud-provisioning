@@ -69,39 +69,45 @@ func NewReceiptHandler(resolve ReceiptResolver, maxPending int) (*ReceiptHandler
 		if err != nil {
 			return ReceiptCollection{}, err
 		}
-		snapshot, err := store.Load(ctx)
+		return NewHandoverReceiptCollection(ctx, store, policies)
+	}, maxPending)
+}
+
+// NewHandoverReceiptCollection adapts an admitted journal to the shared receipt
+// transport. The caller must resolve current source identities and policies.
+func NewHandoverReceiptCollection(ctx context.Context, store Store, policies map[string]PodReceiptAuthenticator) (ReceiptCollection, error) {
+	snapshot, err := store.Load(ctx)
+	if err != nil {
+		return ReceiptCollection{}, err
+	}
+	store.ExpectedUID = string(snapshot.Metadata().UID)
+	view, err := snapshot.Transition().View()
+	if err != nil || view.Complete {
+		return ReceiptCollection{}, fmt.Errorf("receipt round is not active")
+	}
+	digest, err := view.Round.Digest()
+	if err != nil || time.Now().Before(view.Round.IssuedAt) {
+		return ReceiptCollection{}, fmt.Errorf("receipt round is not current")
+	}
+	target := ReceiptCollection{UID: string(snapshot.Metadata().UID), Digest: digest, ExpiresAt: view.Round.ExpiresAt, MaxAge: view.Round.MaxReceiptAge}
+	for _, member := range view.Round.Members {
+		target.Members = append(target.Members, ReceiptMember{NodeUID: member.NodeUID, DeviceID: member.DeviceID})
+	}
+	target.Observe = func(ctx context.Context, entries []PodReceipt) error {
+		observed, err := store.ObserveWithPodReceipts(ctx, digest, entries, policies)
 		if err != nil {
-			return ReceiptCollection{}, err
-		}
-		store.ExpectedUID = string(snapshot.Metadata().UID)
-		view, err := snapshot.Transition().View()
-		if err != nil || view.Complete {
-			return ReceiptCollection{}, fmt.Errorf("receipt round is not active")
-		}
-		digest, err := view.Round.Digest()
-		if err != nil || time.Now().Before(view.Round.IssuedAt) {
-			return ReceiptCollection{}, fmt.Errorf("receipt round is not current")
-		}
-		target := ReceiptCollection{UID: string(snapshot.Metadata().UID), Digest: digest, ExpiresAt: view.Round.ExpiresAt, MaxAge: view.Round.MaxReceiptAge}
-		for _, member := range view.Round.Members {
-			target.Members = append(target.Members, ReceiptMember{NodeUID: member.NodeUID, DeviceID: member.DeviceID})
-		}
-		target.Observe = func(ctx context.Context, entries []PodReceipt) error {
-			observed, err := store.ObserveWithPodReceipts(ctx, digest, entries, policies)
-			if err != nil {
-				return err
-			}
-			if string(observed.Metadata().UID) != target.UID {
-				return fmt.Errorf("receipt journal incarnation changed")
-			}
-			return nil
-		}
-		target.Complete = func(ctx context.Context, entries []PodReceipt) error {
-			_, err := store.AdvanceWithPodReceipts(ctx, digest, entries, policies)
 			return err
 		}
-		return target, nil
-	}, maxPending)
+		if string(observed.Metadata().UID) != target.UID {
+			return fmt.Errorf("receipt journal incarnation changed")
+		}
+		return nil
+	}
+	target.Complete = func(ctx context.Context, entries []PodReceipt) error {
+		_, err := store.AdvanceWithPodReceipts(ctx, digest, entries, policies)
+		return err
+	}
+	return target, nil
 }
 
 // ReceiptMember identifies one required observation within a collection.

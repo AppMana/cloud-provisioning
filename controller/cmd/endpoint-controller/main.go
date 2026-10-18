@@ -2610,8 +2610,8 @@ func main() {
 				fmt.Fprintln(os.Stderr, "receipt advancement requires image-entrypoint cloud agents")
 				os.Exit(1)
 			}
-			handler, err := handover.NewReceiptHandler(func(ctx context.Context, machineUID string) (handover.Store, map[string]handover.PodReceiptAuthenticator, error) {
-				return mesh.resolveReceiveReceipts(ctx, api, *receiptPolicy, machineUID)
+			handler, err := handover.NewReceiptCollectionHandler(func(ctx context.Context, machineUID string) (handover.ReceiptCollection, error) {
+				return mesh.resolveReceiveReceiptCollection(ctx, api, *receiptPolicy, machineUID)
 			}, 128)
 			if err == nil {
 				err = mgr.Add(&receiveReceiptServer{policy: *receiptPolicy, handler: handler})

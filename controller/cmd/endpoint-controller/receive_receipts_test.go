@@ -318,6 +318,14 @@ func verifyReceiveReceiptAdmission(t *testing.T, original *meshReconciler, snaps
 			}
 			api := fake.NewClientset(objects...)
 			store, policies, err := r.resolveReceiveReceipts(ctx, api, policy, uid)
+			collection, collectionErr := r.resolveReceiveReceiptCollection(ctx, api, policy, uid)
+			if fault != "valid" && collectionErr == nil {
+				t.Fatal("shared endpoint bypassed source admission")
+			}
+			if fault == "valid" && (collectionErr != nil || collection.UID != string(snapshot.Metadata().UID) || len(collection.Members) == 0) {
+				t.Fatal("shared endpoint lost handover scope", collectionErr)
+			}
+
 			if fault != "valid" {
 				if err == nil {
 					t.Fatal("unsafe admission accepted")

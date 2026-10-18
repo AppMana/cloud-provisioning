@@ -35,10 +35,26 @@ func tunnelSourceReceiverIndices(cfg config, hosts []net.IPNet) (map[string]int,
 // actually referenced by the inspected table. Missing unused receivers are
 // allowed during preparation or after retirement; discovery grants no ownership.
 func inspectConfiguredTunnelSources(cfg config, table, legacyIndex int) ([]netlink.Rule, []netlink.Route, error) {
-	if err := validateTunnelSourceCandidates(cfg); err != nil {
+	return inspectConfiguredTunnelSourcesWithHandshake(cfg, table, legacyIndex, true)
+}
+
+// Withdrawal still authenticates keys, permissions and aliases, but cannot
+// require a terminated worker to complete a new handshake. Only this read-only
+// inspection relaxes liveness; normal source-route installation stays strict.
+func inspectConfiguredTunnelSourcesWithHandshake(cfg config, table, legacyIndex int, requireHandshake bool) ([]netlink.Rule, []netlink.Route, error) {
+	if err := validateTunnelSourceCandidatesWithLimit(cfg, requireHandshake); err != nil {
 		return nil, nil, err
 	}
-	indices := []map[string]int{{}, {}}
+	count := 2
+	for _, candidates := range cfg.receiveSourceCandidates {
+		if len(candidates) > count {
+			count = len(candidates)
+		}
+	}
+	indices := make([]map[string]int, count)
+	for i := range indices {
+		indices[i] = map[string]int{}
+	}
 	for raw, candidates := range cfg.receiveSourceCandidates {
 		_, dst, err := net.ParseCIDR(raw)
 		if err != nil {
@@ -83,7 +99,7 @@ func inspectConfiguredTunnelSources(cfg config, table, legacyIndex int) ([]netli
 		}
 		hosts = append(hosts, *route.Dst)
 	}
-	if _, err := validateReceiveRouteSelections(check, hosts, nil); err != nil {
+	if _, err := validateReceiveRouteSelectionsWithHandshake(check, hosts, nil, requireHandshake); err != nil {
 		return nil, nil, err
 	}
 	return rules, routes, nil
@@ -105,12 +121,16 @@ func preserveUnscopedSourceIndices(cfg config, indices map[string]int, routes []
 // Limit candidates to the two committed transport generations and reject
 // contradictory identities before inspecting or modifying any source routes.
 func validateTunnelSourceCandidates(cfg config) error {
+	return validateTunnelSourceCandidatesWithLimit(cfg, true)
+}
+
+func validateTunnelSourceCandidatesWithLimit(cfg config, twoGenerations bool) error {
 	if len(cfg.receiveSourceCandidates) > 0 && cfg.receiveRouteScope == nil {
 		return fmt.Errorf("source candidates require journal scope")
 	}
 	identities := map[string]receiveRouteSelection{}
 	for _, candidates := range cfg.receiveSourceCandidates {
-		if len(candidates) == 0 || len(candidates) > 2 {
+		if len(candidates) == 0 || (twoGenerations && len(candidates) > 2) {
 			return fmt.Errorf("source destination requires one or two receiver candidates")
 		}
 		seen := map[string]bool{}

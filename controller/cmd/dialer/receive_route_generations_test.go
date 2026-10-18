@@ -129,7 +129,7 @@ func TestNativeReceiveRouteGenerations(t *testing.T) {
 	}
 	for _, selected := range []int{0, 1, 0} {
 		cfg.receiveRoutes = generations[selected]
-		if err := preflightReceiveRouteGenerations(cfg, generations, false, nil); err != nil {
+		if err := preflightReceiveRouteGenerations(cfg, generations, nil, nil); err != nil {
 			t.Fatal(err)
 		}
 		if err := installRoutes(cfg, hosts, nil, nil, nil, nil, nil); err != nil {
@@ -138,12 +138,47 @@ func TestNativeReceiveRouteGenerations(t *testing.T) {
 		if err := verifyReceiveRouteInstallation(cfg, hosts, nil, nil); err != nil {
 			t.Fatal(err)
 		}
-		if err := preflightReceiveRouteGenerations(cfg, generations, false, nil); err != nil {
+		if err := preflightReceiveRouteGenerations(cfg, generations, nil, nil); err != nil {
 			t.Fatal(err)
 		}
-		if err := preflightReceiveRouteGenerations(cfg, []map[string]receiveRouteSelection{generations[1-selected]}, false, nil); err == nil {
+		if err := preflightReceiveRouteGenerations(cfg, []map[string]receiveRouteSelection{generations[1-selected]}, nil, nil); err == nil {
 			t.Fatal("unadmitted generation accepted")
 		}
+	}
+	// A shared table can contain a first transition and a successor at once.
+	// Root permission for one destination must not authorize another's route.
+	for _, allowed := range []int{0, 1} {
+		t.Run(fmt.Sprintf("mixed-root-permission-%d", allowed), func(t *testing.T) {
+			rootDestinations := map[string]bool{hosts[allowed].String(): true}
+			for _, dst := range hosts {
+				route := netlink.Route{Dst: &dst, LinkIndex: root.Attrs().Index, Table: cfg.routeTable, Scope: netlink.SCOPE_LINK, Protocol: unix.RTPROT_BOOT, Priority: receiveRoutePriority(&dst)}
+				if err := netlink.RouteReplace(&route); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := preflightReceiveRouteGenerations(cfg, generations, rootDestinations, nil); err == nil {
+				t.Fatal("root permission escaped its destination")
+			}
+			after, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
+			if err != nil || !reflect.DeepEqual(before, after) {
+				t.Fatal("rejection changed routes", err)
+			}
+			dst := hosts[1-allowed]
+			route := netlink.Route{Dst: &dst, LinkIndex: links[0].Attrs().Index, Table: cfg.routeTable, Scope: netlink.SCOPE_LINK, Protocol: unix.RTPROT_BOOT, Priority: receiveRoutePriority(&dst)}
+			if err := netlink.RouteReplace(&route); err != nil {
+				t.Fatal(err)
+			}
+			if err := preflightReceiveRouteGenerations(cfg, generations, rootDestinations, nil); err != nil {
+				t.Fatal("valid mixed graph rejected", err)
+			}
+			if err := installRoutes(cfg, hosts, nil, nil, nil, nil, nil); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 	for _, fault := range []string{"legacy-root", "foreign-source-permissions"} {
 		t.Run(fault, func(t *testing.T) {
@@ -167,7 +202,7 @@ func TestNativeReceiveRouteGenerations(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := preflightReceiveRouteGenerations(cfg, admitted, false, nil); err == nil {
+			if err := preflightReceiveRouteGenerations(cfg, admitted, nil, nil); err == nil {
 				t.Fatal("invalid predecessor route admitted")
 			}
 			after, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
@@ -193,6 +228,18 @@ func TestReceiveSuccessorNativeExecutionRemainsFenced(t *testing.T) {
 		err := reconcileReceiveLinuxPhase(context.Background(), nil, config{}, wgtypes.Key{}, nil, nil, target, handover.View{}, "", tunnel.ReceiveJournalRoutes{Plans: map[string]tunnel.ReceiveTransitionPlan{"successor": successor}}, false)
 		if err == nil || !strings.Contains(err.Error(), "receiver-to-receiver") {
 			t.Fatal("successor graph reached legacy native execution", err)
+		}
+	}
+}
+
+// Admission only: malformed root scope must fail before any kernel inspection;
+// this does not establish forwarding or mixed-journal execution safety.
+func TestReceiveRootDestinationsStayWithinScope(t *testing.T) {
+	cfg := config{iface: "absent-interface", receiveRouteScope: map[string]bool{"198.19.0.1/32": true}}
+	for _, allowed := range []map[string]bool{{"198.19.0.2/32": true}, {"198.19.0.1/32": false}} {
+		err := preflightReceiveRouteGenerations(cfg, []map[string]receiveRouteSelection{{}}, allowed, nil)
+		if err == nil || !strings.Contains(err.Error(), "legacy destination exceeds") {
+			t.Fatal("malformed root admission reached kernel inspection", err)
 		}
 	}
 }

@@ -531,15 +531,20 @@ func prepareReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.K
 // own a scoped destination. Reject foreign routes and more-specific shadows
 // before installRoutes can replace anything. Unrelated destinations survive.
 func preflightReceiveRoutePhase(cfg config, receivers map[string]receiveRouteSelection, own []string, admittedRelays ...map[string]string) error {
-	return preflightReceiveRouteGenerations(cfg, []map[string]receiveRouteSelection{receivers}, true, own, admittedRelays...)
+	return preflightReceiveRouteGenerations(cfg, []map[string]receiveRouteSelection{receivers}, cfg.receiveRouteScope, own, admittedRelays...)
 }
 
 // Callers must admit both graphs from committed journal history. A predecessor
-// receiver is not the legacy root device; allowLegacy is explicit so a successor
+// receiver is not the legacy root device; root destinations are explicit so a successor
 // cannot silently fall back to that retired transport. This check never mutates.
-func preflightReceiveRouteGenerations(cfg config, generations []map[string]receiveRouteSelection, allowLegacy bool, own []string, admittedRelays ...map[string]string) error {
+func preflightReceiveRouteGenerations(cfg config, generations []map[string]receiveRouteSelection, legacyDestinations map[string]bool, own []string, admittedRelays ...map[string]string) error {
 	if len(generations) == 0 || len(generations) > 2 {
 		return fmt.Errorf("route preflight requires one or two admitted receiver generations")
+	}
+	for raw, allowed := range legacyDestinations {
+		if !allowed || !cfg.receiveRouteScope[raw] {
+			return fmt.Errorf("legacy destination exceeds admitted route scope")
+		}
 	}
 	identities := map[string]receiveRouteSelection{}
 	for _, generation := range generations {
@@ -623,7 +628,7 @@ func preflightReceiveRouteGenerations(cfg config, generations []map[string]recei
 				}
 				continue
 			}
-			if allowLegacy && route.LinkIndex == legacy.Attrs().Index {
+			if legacyDestinations[raw] && route.LinkIndex == legacy.Attrs().Index {
 				continue
 			}
 			admitted := false

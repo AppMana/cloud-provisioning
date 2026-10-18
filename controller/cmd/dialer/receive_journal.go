@@ -100,12 +100,8 @@ func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store han
 	if err != nil {
 		return fail(err)
 	}
-	ready := false
-	for _, condition := range node.Status.Conditions {
-		ready = ready || condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue
-	}
-	if string(node.UID) != uid || node.Status.NodeInfo.BootID != boot || node.DeletionTimestamp != nil || !ready {
-		return fail(fmt.Errorf("receiver journal participant identity, boot or readiness changed"))
+	if err := validateReceiveParticipantNode(node, uid, boot); err != nil {
+		return fail(err)
 	}
 	if hasTunnelProjection {
 		currentMesh, err := api.CoreV1().Secrets(scope.Namespace).Get(ctx, scope.MeshName, metav1.GetOptions{})
@@ -124,6 +120,20 @@ func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store han
 		return fail(fmt.Errorf("receiver journal changed during admission"))
 	}
 	return admittedReceiveJournal{Snapshot: current, Plan: plan, NodeUID: uid, BootID: boot}, nil
+}
+
+func validateReceiveParticipantNode(node *corev1.Node, uid, boot string) error {
+	if node == nil || uid == "" || boot == "" {
+		return fmt.Errorf("receiver participant requires node and boot identity")
+	}
+	ready := false
+	for _, condition := range node.Status.Conditions {
+		ready = ready || condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue
+	}
+	if string(node.UID) != uid || node.Status.NodeInfo.BootID != boot || node.DeletionTimestamp != nil || !ready {
+		return fmt.Errorf("receiver journal participant identity, boot or readiness changed")
+	}
+	return nil
 }
 
 func receiveJournalParticipant(plan tunnel.ReceiveTransitionPlan, scope receiveJournalScope, nodeName string, key wgtypes.Key) (string, error) {

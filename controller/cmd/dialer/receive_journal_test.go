@@ -690,6 +690,7 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 	if _, err := loadReceiveJournal(ctx, api, store, scope, "site", site); err == nil {
 		t.Fatal("replacement adoption object admitted an old journal")
 	}
+	t.Run("retirement-survivor-admission", func(t *testing.T) { verifyReceiveRetirementAdmission(t, api, store, scope, site) })
 	cm, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)

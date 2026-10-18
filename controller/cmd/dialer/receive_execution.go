@@ -17,8 +17,9 @@ import (
 // is insufficient. The combined route intent includes other workers and must
 // preserve their selection; only the target plan authorizes phase-specific
 // preparation or retirement. Completed phase verification is read-only. An
-// explicit maintenance callback may restore only the selected transport, never
-// replay retirement or issue receipts. Platforms must reject unsupported phases.
+// explicit maintenance callback may restore the selected transport and prepare
+// an independently admitted additive successor, but never switch to it, replay
+// retirement or issue phase receipts. Platforms must reject unsupported phases.
 type receiveNativePhase func(context.Context, tunnel.ReceiveTransitionPlan, handover.View, string, tunnel.ReceiveJournalRoutes) error
 
 // executeReceivePhase holds the existing host lock from recovery admission to

@@ -36,6 +36,10 @@ type prepareReceivers func(tunnel.ReceivePrepare, tunnel.PeerListDoc) ([]receive
 // applied annotation. The caller has already reconciled the base document. A
 // stale request can leave additive receivers, but cannot publish a ready receipt.
 func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, secret *corev1.Secret, nodeName string, root wgtypes.Key, prepare prepareReceivers) error {
+	return reconcileReceivePreparationScoped(ctx, k, secret, nodeName, root, prepare, nil)
+}
+
+func reconcileReceivePreparationScoped(ctx context.Context, k kubernetes.Interface, secret *corev1.Secret, nodeName string, root wgtypes.Key, prepare prepareReceivers, check func() error) error {
 	raw, requested := secret.Data[tunnel.ReceivePrepareKey]
 	if !requested {
 		return nil
@@ -92,6 +96,11 @@ func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, se
 	if err := checkReceivePreparationPredecessor(ctx, k, secret, request); err != nil {
 		return err
 	}
+	if check != nil {
+		if err := check(); err != nil {
+			return err
+		}
+	}
 	bindings, err := prepare(request, previous)
 	if err != nil {
 		return err
@@ -120,6 +129,11 @@ func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, se
 	}
 	if err := checkReceivePreparationPredecessor(ctx, k, current, request); err != nil {
 		return err
+	}
+	if check != nil {
+		if err := check(); err != nil {
+			return err
+		}
 	}
 	receipt := tunnel.ReceiveReady{Version: 1, MeshUID: request.MeshUID, SecretUID: string(secret.UID), NodeName: nodeName, NodeUID: request.NodeUID, BootID: bootID, RootPublicKey: request.RootPublicKey, BaseHash: request.BaseHash, RequestHash: tunnel.HashPeerList(raw), Bindings: bindings}
 	encoded, err := json.Marshal(receipt)

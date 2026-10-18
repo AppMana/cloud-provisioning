@@ -130,7 +130,7 @@ func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface
 	return reconcileSiteReceivePreparationScoped(ctx, k, mesh, nodeName, siteKey, nil, prepare, observe...)
 }
 
-// A scope admits only ordinary peers under the journal executor's host lock.
+// A scope admits explicit roots under the journal executor's host lock.
 // Its live inventory check must succeed before preparing or acknowledging a path.
 type siteReceiveScope struct {
 	roots map[string]bool

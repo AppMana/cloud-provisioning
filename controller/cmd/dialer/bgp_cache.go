@@ -51,7 +51,10 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 			}
 			return reconcileReceiveAdvertisements(ctx, devices, cfg, speaker, plan.MachineUID, nodeUID, intent)
 		}, func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes, key wgtypes.Key) error {
-			return restoreCompletedReceiveState(ctx, devices, cfg, key, plan, view, nodeUID, intent)
+			if err := restoreCompletedReceiveState(ctx, devices, cfg, key, plan, view, nodeUID, intent); err != nil {
+				return err
+			}
+			return reconcileReceiveSuccessorPreparation(ctx, k, devices, cfg, key, plan, view, nodeUID, intent)
 		})
 		if handled {
 			// Ordinary neighbors have independent live admission. Do not starve

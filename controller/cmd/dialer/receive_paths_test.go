@@ -4,6 +4,7 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -16,6 +17,19 @@ func TestReceiverIdentitySeparation(t *testing.T) {
 	root, _ := wgtypes.GeneratePrivateKey()
 	other, _ := wgtypes.GeneratePrivateKey()
 	original := receiverKey(root, "mesh", "peer")
+	seen := map[wgtypes.Key]bool{original: true}
+	for _, generation := range []string{strings.Repeat("a", 64), strings.Repeat("b", 64)} {
+		p := tunnel.ReceiveTransitionPlan{MeshUID: "mesh", ReceiverGeneration: generation}
+		scope, err := p.ReceiveScope()
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := receiverKey(root, scope, "peer")
+		if seen[key] || key == root || key != receiverKey(root, scope, "peer") {
+			t.Fatal("generation key was reused or changed on restart")
+		}
+		seen[key] = true
+	}
 	if original != receiverKey(root, "mesh", "peer") {
 		t.Fatal("restart changed receiver key")
 	}

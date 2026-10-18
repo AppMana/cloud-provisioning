@@ -395,22 +395,26 @@ func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cf
 // A cloud participant can have retained receive paths with no desired egress.
 // Verify those members too before the execution boundary can issue their receipts.
 func receivePhaseSelections(key wgtypes.Key, plan tunnel.ReceiveTransitionPlan, nodeUID string) ([]receiveRouteSelection, error) {
+	receiveScope, err := plan.ReceiveScope()
+	if err != nil {
+		return nil, err
+	}
 	var selections []receiveRouteSelection
 	if nodeUID == plan.CloudNodeUID {
 		var base tunnel.PeerListDoc
 		if err := json.Unmarshal(plan.Base, &base); err != nil {
 			return nil, err
 		}
-		paths, err := tunnel.PlanReceiveHandover(plan.MeshUID, base, plan.Desired, plan.Native)
+		paths, err := tunnel.PlanReceiveHandover(receiveScope, base, plan.Desired, plan.Native)
 		if err != nil {
 			return nil, err
 		}
 		for _, path := range paths.Receivers {
 			binding := plan.Bindings[path.PublicKey]
-			if binding.PublicKey != receiverKey(key, plan.MeshUID, path.PublicKey).PublicKey().String() {
+			if binding.PublicKey != receiverKey(key, receiveScope, path.PublicKey).PublicKey().String() {
 				return nil, fmt.Errorf("receiver phase key differs from local derivation")
 			}
-			selections = append(selections, receiveRouteSelection{Interface: binding.Interface, Alias: receiverAlias(plan.MeshUID, path.PublicKey), PublicKey: binding.PublicKey, PeerPublicKey: path.PublicKey, AllowedSources: path.AllowedSources})
+			selections = append(selections, receiveRouteSelection{Interface: binding.Interface, Alias: receiverAlias(receiveScope, path.PublicKey), PublicKey: binding.PublicKey, PeerPublicKey: path.PublicKey, AllowedSources: path.AllowedSources})
 		}
 	} else {
 		site, found := plan.Sites[key.PublicKey().String()]
@@ -475,6 +479,10 @@ func verifyReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.Ke
 }
 
 func prepareReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.Key, plan tunnel.ReceiveTransitionPlan, nodeUID string) error {
+	receiveScope, err := plan.ReceiveScope()
+	if err != nil {
+		return err
+	}
 	mtu := cfg.mtu
 	if mtu == 0 {
 		mtu = underlayMTU()
@@ -484,7 +492,7 @@ func prepareReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.K
 		if err := json.Unmarshal(plan.Base, &base); err != nil {
 			return err
 		}
-		bindings, err := prepareReceivePaths(devices, plan.MeshUID, key, base, plan.Desired, plan.Native, mtu, cfg.fwmark, plan.Ports)
+		bindings, err := prepareReceivePaths(devices, receiveScope, key, base, plan.Desired, plan.Native, mtu, cfg.fwmark, plan.Ports)
 		if err != nil {
 			return err
 		}
@@ -500,7 +508,7 @@ func prepareReceivePhasePaths(devices receiverDevices, cfg config, key wgtypes.K
 		if !found || site.NodeUID != nodeUID {
 			return fmt.Errorf("missing site preparation identity")
 		}
-		client, err := prepareSiteReceiveClient(devices, plan.MeshUID, key, plan.RootPublicKey, plan.Bindings[key.PublicKey().String()], plan.PreviousSitePeers(), plan.SiteDesired, mtu, cfg.fwmark)
+		client, err := prepareSiteReceiveClient(devices, receiveScope, key, plan.RootPublicKey, plan.Bindings[key.PublicKey().String()], plan.PreviousSitePeers(), plan.SiteDesired, mtu, cfg.fwmark)
 		if err != nil {
 			return err
 		}

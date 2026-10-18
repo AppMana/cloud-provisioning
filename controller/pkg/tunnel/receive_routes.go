@@ -24,6 +24,10 @@ type ReceiveRouteSelection struct {
 // can still carry source exceptions. This is configuration, not phase authority:
 // callers still require a committed round, current identities and native proof.
 func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRouteSelection, error) {
+	receiveScope, err := p.ReceiveScope()
+	if err != nil {
+		return nil, err
+	}
 	if err := validateReceiveLocalNetwork(p); err != nil {
 		return nil, err
 	}
@@ -46,7 +50,7 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 	if err := json.Unmarshal(p.Base, &previous); err != nil {
 		return nil, err
 	}
-	preparation, err := PlanReceiveHandover(p.MeshUID, previous, p.Desired, p.Native)
+	preparation, err := PlanReceiveHandover(receiveScope, previous, p.Desired, p.Native)
 	if err != nil {
 		return nil, err
 	}
@@ -90,18 +94,18 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 			return nil, fmt.Errorf("missing or duplicate receiver site identity")
 		}
 		binding := p.Bindings[path.PublicKey]
-		client, err := PlanSiteReceiveClient(p.MeshUID, path.PublicKey, p.RootPublicKey, binding, p.PreviousSitePeers(), p.SiteDesired)
+		client, err := PlanSiteReceiveClient(receiveScope, path.PublicKey, p.RootPublicKey, binding, p.PreviousSitePeers(), p.SiteDesired)
 		if err != nil || !reflect.DeepEqual(client, site.Client) {
 			return nil, fmt.Errorf("site receiver differs from the committed peer document: %v", err)
 		}
-		sum := sha256.Sum256([]byte(p.MeshUID + "\x00" + path.PublicKey))
+		sum := sha256.Sum256([]byte(receiveScope + "\x00" + path.PublicKey))
 		selection := ReceiveRouteSelection{Interface: binding.Interface, Alias: fmt.Sprintf("cloud-provisioning:receive:v1:%x", sum), PublicKey: binding.PublicKey, PeerPublicKey: path.PublicKey, AllowedSources: slices.Clone(path.AllowedSources)}
 		if peer, wanted := desired[path.PublicKey]; wanted {
 			if err := addReceiveRoutes(cloudRoutes, peer, selection); err != nil {
 				return nil, err
 			}
 		}
-		sum = sha256.Sum256([]byte(p.MeshUID + "\x00" + path.PublicKey + "\x00" + p.RootPublicKey))
+		sum = sha256.Sum256([]byte(receiveScope + "\x00" + path.PublicKey + "\x00" + p.RootPublicKey))
 		selection = ReceiveRouteSelection{Interface: client.Interface, Alias: fmt.Sprintf("cloud-provisioning:receive-client:v1:%x", sum), PublicKey: path.PublicKey, PeerPublicKey: binding.PublicKey, AllowedSources: slices.Clone(client.AllowedSources)}
 		routes := map[string]ReceiveRouteSelection{}
 		for _, cloud := range p.SiteDesired.Peers {

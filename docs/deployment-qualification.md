@@ -600,8 +600,8 @@ resurrection and preservation of unrelated ownership. Their finalization and
 release authority are synthetic. They do not prove consumer fencing, native
 absence, safe address reuse, reboot recovery or live release. The primitive has
 no live controller caller. Released-inventory admission and durable agent
-recovery must be implemented and qualified before activation; existing checkpoint
-shrinkage rejection remains in force. Older strict readers reject `released`,
+recovery must be completed and qualified before activation; unadmitted checkpoint
+shrinkage remains rejected. Older strict readers reject `released`,
 so compatible deployment and rollback are prerequisites.
 
 Agent checkpoint admission must preserve every previously saved released-owner
@@ -629,6 +629,26 @@ but permit a new historical read. Changed inventory/journal identity, observatio
 policy, consumed evidence, withdrawal history and a missing retained journal
 must fail with no admitted result. These tests do not qualify a live release
 controller, native recovery or allocation of a replacement worker.
+
+The agent's guarded checkpoint path admits each released record through the
+historical reader and pins the complete inventory revision. A captured consumer
+must retain the same private local withdrawal fence; any locally saved
+finalization must also match. Renewable completion need not match if finalization
+was not yet saved locally, because the original native retirement receipt already
+required durable withdrawal intent. Local participant journals remain present and
+must match retained history. The retired worker cannot admit survivor release.
+Only this admission permits the corresponding active membership to shrink; the
+ordinary checkpoint validator still rejects shrinkage. Bind admission to the exact
+proposed checkpoint and recheck sources and current Node/boot at the write boundary.
+
+Real-API/filesystem tests cover finalized and withdrawal-only fences, simulated
+previous boots, missing or changed local records, non-private files, missing
+journals, transferred admission and a changed boot at the write boundary. Native
+cleanup, legacy finalization and release authority in this fixture are synthetic.
+The guarded phase and retirement checkpoint paths retain retired journal files;
+this does not qualify offline recovery, an all-retired inventory, a newly joined
+consumer, native address reuse or a live release controller. Those paths remain
+separate activation requirements.
 
 Agent reconciliation timing diagnostics report fixed operation/stage labels,
 elapsed milliseconds and success only, with at most sixteen stages per record.

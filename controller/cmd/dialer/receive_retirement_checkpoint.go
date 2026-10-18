@@ -44,7 +44,11 @@ func checkpointReceiveRetirementLocked(ctx context.Context, api kubernetes.Inter
 	}
 	next := receiveInventoryCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), Inventory: admitted.Inventory, NodeName: cfg.nodeName, NodeUID: admitted.NodeUID, BootID: admitted.BootID, PublicKey: key.PublicKey().String()}
 	path := lockPath + ".inventory.json"
-	if err := validateReceiveInventoryCheckpoint(path, next); err != nil {
+	released, err := admitReleasedReceiveCheckpoints(ctx, api, store, scope, cfg, key, lockPath, next, admitted.Metadata)
+	if err != nil {
+		return err
+	}
+	if err := validateReceiveInventoryCheckpointWithRelease(path, next, released); err != nil {
 		return err
 	}
 	checkpoints := map[string]receiveJournalCheckpoint{}
@@ -88,12 +92,15 @@ func checkpointReceiveRetirementLocked(ctx context.Context, api kubernetes.Inter
 	}
 	for _, entry := range entries {
 		if strings.HasPrefix(entry.Name(), filepath.Base(lockPath)+".receive-transition-") {
-			if _, found := checkpoints[filepath.Join(filepath.Dir(lockPath), entry.Name())]; !found {
+			if _, found := checkpoints[filepath.Join(filepath.Dir(lockPath), entry.Name())]; !found && !released.localFiles[entry.Name()] {
 				return fmt.Errorf("retirement omitted a checkpointed local journal")
 			}
 		}
 	}
 	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := released.recheck(ctx, api, store); err != nil {
 		return err
 	}
 	if err := writeDurableJSON(path, next); err != nil {

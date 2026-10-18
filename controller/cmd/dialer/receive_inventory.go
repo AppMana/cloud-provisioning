@@ -186,7 +186,11 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 	}
 	path := lockPath + ".inventory.json"
 	next := receiveInventoryCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), Inventory: admitted.Inventory, NodeName: cfg.nodeName, NodeUID: target.NodeUID, BootID: target.BootID, PublicKey: key.PublicKey().String()}
-	if err := validateReceiveInventoryCheckpoint(path, next); err != nil {
+	released, err := admitReleasedReceiveCheckpoints(ctx, api, store, scope, cfg, key, lockPath, next, admitted.Metadata)
+	if err != nil {
+		return err
+	}
+	if err := validateReceiveInventoryCheckpointWithRelease(path, next, released); err != nil {
 		return err
 	}
 	// Retirement checkpoints retain withdrawn local histories and fence old
@@ -204,7 +208,7 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 	if err != nil {
 		return err
 	}
-	expected := map[string]bool{}
+	expected := released.localFiles
 	for uid := range admitted.Local {
 		expected[filepath.Base(lockPath)+"."+tunnel.ReceiveTransitionName(uid)+".json"] = true
 	}
@@ -242,11 +246,27 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 		}
 	}
 	saved := receiveInventoryCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), Inventory: admitted.Inventory, NodeName: cfg.nodeName, NodeUID: target.NodeUID, BootID: target.BootID, PublicKey: key.PublicKey().String()}
+	if err := released.recheck(ctx, api, store); err != nil {
+		return err
+	}
 	return writeDurableJSON(path, saved)
 }
 
 // Shared by phase and retirement checkpoint writers under the host lock.
 func validateReceiveInventoryCheckpoint(path string, next receiveInventoryCheckpoint) error {
+	return validateReceiveInventoryCheckpointWithRelease(path, next, receiveReleasedCheckpointAdmission{})
+}
+
+func validateReceiveInventoryCheckpointWithRelease(path string, next receiveInventoryCheckpoint, released receiveReleasedCheckpointAdmission) error {
+	if len(released.records) > 0 {
+		raw, err := json.Marshal(next)
+		if err != nil {
+			return err
+		}
+		if released.nextSHA != tunnel.HashPeerList(raw) {
+			return fmt.Errorf("released checkpoint admission differs from write")
+		}
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -279,6 +299,9 @@ func validateReceiveInventoryCheckpoint(path string, next receiveInventoryCheckp
 		}
 		previous := ""
 		for uid, p := range a.Publications {
+			if _, authorized := released.records[uid]; authorized && sameReceiveReleasedFence(p, b.Released[uid]) {
+				continue
+			}
 			if p.JournalUID != "" && b.Publications[uid].JournalUID != p.JournalUID {
 				return fmt.Errorf("journal publication regressed or changed incarnation")
 			}
@@ -293,7 +316,9 @@ func validateReceiveInventoryCheckpoint(path string, next receiveInventoryCheckp
 			}
 		}
 		for _, uid := range a.MachineUIDs {
-			if uid == "" || uid <= previous || !slices.Contains(b.MachineUIDs, uid) {
+			_, authorized := released.records[uid]
+			releasedExactly := authorized && sameReceiveReleasedFence(a.Publications[uid], b.Released[uid])
+			if uid == "" || uid <= previous || (!slices.Contains(b.MachineUIDs, uid) && !releasedExactly) {
 				return fmt.Errorf("receiver inventory regressed or checkpoint is invalid")
 			}
 			previous = uid

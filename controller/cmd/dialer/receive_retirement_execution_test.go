@@ -124,4 +124,5 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 		seedReceiveFinalization(t, api, store, scope, false)
 		verifyReceiveRetirementDispatch(t, api, store, scope, key, pod, true)
 	})
+	t.Run("released-checkpoint-admission", func(t *testing.T) { verifyReleasedCheckpointAdmission(t, api, store, scope, key, pod) })
 }

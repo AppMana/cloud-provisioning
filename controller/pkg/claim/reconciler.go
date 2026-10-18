@@ -204,6 +204,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			clusterNameLabel: cluster.GetName(),
 		})
 		machine.SetOwnerReferences([]metav1.OwnerReference{ownerRef})
+		machine.SetAnnotations(map[string]string{ClaimAnnotation: claim.Namespace + "/" + claim.Name, ClaimUIDAnnotation: string(claim.UID)})
 		if err := r.Create(ctx, machine); err != nil {
 			return r.fail(ctx, claim, fmt.Errorf("creating Machine: %w", err))
 		}

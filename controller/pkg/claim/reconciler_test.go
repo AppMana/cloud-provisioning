@@ -150,6 +150,7 @@ func reconcileClaim(t *testing.T, r *Reconciler, claim *v1alpha1.ProvisionedNode
 
 func TestReconcile_ExpandsClaimIntoMachinePair(t *testing.T) {
 	claim := fakeClaim("public-worker")
+	claim.UID = "creation-claim-uid"
 	r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), awsConfigSecret(), fakeNode())
 
 	if err := reconcileClaim(t, r, claim); err != nil {
@@ -186,6 +187,9 @@ func TestReconcile_ExpandsClaimIntoMachinePair(t *testing.T) {
 	machine.SetGroupVersionKind(machineGVK)
 	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "public-worker"}, machine); err != nil {
 		t.Fatalf("expected a Machine named after the claim: %v", err)
+	}
+	if machine.GetAnnotations()[ClaimAnnotation] != claim.Namespace+"/"+claim.Name || machine.GetAnnotations()[ClaimUIDAnnotation] != string(claim.UID) {
+		t.Fatal("Machine creation lost claim incarnation")
 	}
 	dataSecretName, _, _ := unstructured.NestedString(machine.Object, "spec", "bootstrap", "dataSecretName")
 	if dataSecretName != "public-worker-bootstrap" {

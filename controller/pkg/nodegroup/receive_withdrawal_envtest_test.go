@@ -9,6 +9,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
+	claimcontroller "github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -64,8 +65,9 @@ func verifyReceiveRemovalStages(t *testing.T, api client.Client, core kubernetes
 	machine.SetGroupVersionKind(gvk)
 	machine.SetName(child.Name)
 	machine.SetNamespace(group.Namespace)
-	machine.SetOwnerReferences([]metav1.OwnerReference{*metav1.NewControllerRef(child, v1alpha1.GroupVersion.WithKind("ProvisionedNodeClaim"))})
-	machine.SetAnnotations(map[string]string{attachment.DrainIntentAnnotation: string(group.UID) + "/" + group.Status.PendingAction.ID, "cloud-provisioning.appmana.com/wireguard-addr4": "10.100.0.2/24"})
+	// Model a Machine whose controller no longer retains the claim ownerRef.
+	machine.SetOwnerReferences([]metav1.OwnerReference{{APIVersion: "cluster.x-k8s.io/v1beta2", Kind: "Cluster", Name: "site", UID: "cluster-owner"}})
+	machine.SetAnnotations(map[string]string{claimcontroller.ClaimAnnotation: child.Namespace + "/" + child.Name, claimcontroller.ClaimUIDAnnotation: string(child.UID), attachment.DrainIntentAnnotation: string(group.UID) + "/" + group.Status.PendingAction.ID, "cloud-provisioning.appmana.com/wireguard-addr4": "10.100.0.2/24"})
 	must(api.Create(ctx, machine))
 	adoption := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: tunnel.AdoptionSecretName(child.Name), Namespace: group.Namespace}}
 	must(api.Create(ctx, adoption))

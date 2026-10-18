@@ -23,6 +23,18 @@ func retireMissingSiteReceivers(ctx context.Context, api kubernetes.Interface, c
 	if scope == nil || len(scope.plans) == 0 {
 		return nil
 	}
+	if retire == nil {
+		return fmt.Errorf("receiver retirement requires native guard")
+	}
+	return retireSiteReceiverRecords(ctx, api, cfg, mesh, key, path, scope, "", nil, func(selections []receiveRouteSelection, _ []string) error { return retire(selections) })
+}
+
+// withdrawnRoot is supplied only by the journal withdrawal executor. Ordinary
+// absent-peer reconciliation must continue protecting every reserved root.
+func retireSiteReceiverRecords(ctx context.Context, api kubernetes.Interface, cfg config, mesh *corev1.Secret, key wgtypes.Key, path string, scope *siteReceiveScope, withdrawnRoot string, prepare func(map[string][]receiveRouteSelection, map[string][]string) error, retire func([]receiveRouteSelection, []string) error) error {
+	if scope == nil || len(scope.plans) == 0 {
+		return nil
+	}
 	if scope.check == nil || retire == nil || api == nil {
 		return fmt.Errorf("receiver retirement requires live admission and native guard")
 	}
@@ -46,6 +58,7 @@ func retireMissingSiteReceivers(ctx context.Context, api kubernetes.Interface, c
 		return err
 	}
 	groups := map[string][]receiveRouteSelection{}
+	destinations := map[string]map[string]bool{}
 	removable := []string{}
 	// Validate all records and plans before the first native mutation.
 	for _, entry := range entries {
@@ -79,13 +92,22 @@ func retireMissingSiteReceivers(ctx context.Context, api kubernetes.Interface, c
 		if record.MeshUID != string(mesh.UID) {
 			continue
 		}
-		absent, err := tunnel.PlanReceiveNeighborRetirements(record.Peers.Peers, current, scope.plans)
-		if err != nil {
-			return err
-		}
 		eligible := map[string]bool{}
-		for _, peer := range absent {
-			eligible[peer.PublicKey] = true
+		if withdrawnRoot == "" {
+			absent, err := tunnel.PlanReceiveNeighborRetirements(record.Peers.Peers, current, scope.plans)
+			if err != nil {
+				return err
+			}
+			for _, peer := range absent {
+				eligible[peer.PublicKey] = true
+			}
+		} else {
+			for _, peer := range current {
+				if peer.PublicKey == withdrawnRoot {
+					return fmt.Errorf("withdrawn receiver root was republished")
+				}
+			}
+			eligible[withdrawnRoot] = true
 		}
 		all := len(record.Bindings) > 0
 		for root, binding := range record.Bindings {
@@ -103,7 +125,39 @@ func retireMissingSiteReceivers(ctx context.Context, api kubernetes.Interface, c
 			}
 			sum := sha256.Sum256([]byte(receiveScope + "\x00" + record.PublicKey + "\x00" + root))
 			selection := receiveRouteSelection{Interface: plan.Interface, Alias: fmt.Sprintf("cloud-provisioning:receive-client:v1:%x", sum), PublicKey: record.PublicKey, PeerPublicKey: plan.PublicKey, AllowedSources: plan.AllowedSources}
+			if withdrawnRoot != "" {
+				for _, protected := range scope.plans {
+					if protected.RootPublicKey == withdrawnRoot {
+						continue
+					}
+					graphs := []tunnel.ReceiveTransitionPlan{protected}
+					if protected.PreviousReceiver != nil {
+						graphs = append(graphs, *protected.PreviousReceiver.Plan)
+					}
+					for _, graph := range graphs {
+						if member, found := graph.Sites[record.PublicKey]; found && member.NodeName == cfg.nodeName && member.Client.Interface == selection.Interface {
+							return fmt.Errorf("withdrawn receiver is reserved by another journal")
+						}
+					}
+				}
+			}
 			groups[plan.Interface] = append(groups[plan.Interface], selection)
+			if destinations[plan.Interface] == nil {
+				destinations[plan.Interface] = map[string]bool{}
+			}
+			for _, doc := range []tunnel.PeerListDoc{record.previousPeers(root), record.Peers} {
+				for _, peer := range doc.Peers {
+					if peer.PublicKey != root {
+						continue
+					}
+					for _, prefix := range peer.WGAllowedIPs {
+						destinations[plan.Interface][prefix] = true
+					}
+					for _, host := range peer.AllRouteHosts() {
+						destinations[plan.Interface][tunnel.HostCIDR(host)] = true
+					}
+				}
+			}
 		}
 		if all {
 			removable = append(removable, name)
@@ -130,11 +184,26 @@ func retireMissingSiteReceivers(ctx context.Context, api kubernetes.Interface, c
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	routeLists := map[string][]string{}
+	for _, name := range names {
+		for prefix := range destinations[name] {
+			routeLists[name] = append(routeLists[name], prefix)
+		}
+		sort.Strings(routeLists[name])
+	}
+	if prepare != nil && len(names) > 0 {
+		if err := check(); err != nil {
+			return err
+		}
+		if err := prepare(groups, routeLists); err != nil {
+			return err
+		}
+	}
 	for _, name := range names {
 		if err := check(); err != nil {
 			return err
 		}
-		if err := retire(groups[name]); err != nil {
+		if err := retire(groups[name], routeLists[name]); err != nil {
 			return err
 		}
 	}
@@ -154,29 +223,40 @@ func retireMissingSiteReceivers(ctx context.Context, api kubernetes.Interface, c
 // A crash can leave either the previously installed permissions or a prepared
 // successor. Only an exact recorded state is eligible, never their union.
 func retireRecordedSiteReceiver(devices receiverDevices, cfg config, selections []receiveRouteSelection) error {
+	selection, err := selectRecordedSiteReceiver(devices, cfg, selections)
+	if err != nil {
+		return err
+	}
+	return retireReceiveDevice(devices, selection)
+}
+
+func selectRecordedSiteReceiver(devices receiverDevices, cfg config, selections []receiveRouteSelection) (receiveRouteSelection, error) {
+	fail := func(message string) (receiveRouteSelection, error) {
+		return receiveRouteSelection{}, fmt.Errorf("%s", message)
+	}
 	if len(selections) == 0 || devices == nil {
-		return fmt.Errorf("receiver retirement requires recorded identities")
+		return fail("receiver retirement requires recorded identities")
 	}
 	first := selections[0]
 	for _, s := range selections {
 		if s.Interface != first.Interface || s.Alias != first.Alias || s.PublicKey != first.PublicKey {
-			return fmt.Errorf("receiver ownership records disagree")
+			return fail("receiver ownership records disagree")
 		}
 	}
 	live, err := devices.Device(first.Interface)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return retireReceiveDevice(devices, first)
+			return first, nil
 		}
-		return err
+		return receiveRouteSelection{}, err
 	}
-	if live.FirewallMark != cfg.fwmark {
-		return fmt.Errorf("receiver retirement firewall mark changed")
+	if live.FirewallMark != cfg.fwmark || live.PublicKey.String() != first.PublicKey {
+		return fail("receiver retirement identity or firewall mark changed")
 	}
 	for _, s := range selections {
 		if len(live.Peers) == 0 || (len(live.Peers) == 1 && live.Peers[0].PublicKey.String() == s.PeerPublicKey && receiveSourcesMatch(s.AllowedSources, live.Peers[0].AllowedIPs)) {
-			return retireReceiveDevice(devices, s)
+			return s, nil
 		}
 	}
-	return fmt.Errorf("receiver state does not match recorded ownership")
+	return fail("receiver state does not match recorded ownership")
 }

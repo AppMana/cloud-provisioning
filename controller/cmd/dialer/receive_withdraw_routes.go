@@ -15,7 +15,7 @@ import (
 // Foreign tables, source exceptions and relay routes must be retired by their
 // own owners first; this function never repairs them to make cleanup pass.
 func withdrawReceiveDeviceRoutes(ctx context.Context, cfg config, generations []map[string]receiveRouteSelection, own []string) error {
-	if cfg.routeTable <= unix.RT_TABLE_LOCAL || cfg.fwmark <= 0 || len(generations) == 0 || len(generations) > 2 {
+	if cfg.routeTable <= unix.RT_TABLE_LOCAL || cfg.fwmark <= 0 || len(generations) == 0 {
 		return fmt.Errorf("receiver withdrawal requires owned policy and admitted generations")
 	}
 	cfg.receiveRouteScope = map[string]bool{}

@@ -75,7 +75,7 @@ func TestNativeReceiveWithdrawalRoutes(t *testing.T) {
 				must(err)
 				var generations []map[string]receiveRouteSelection
 				var links []netlink.Link
-				for i := 0; i < 2; i++ {
+				for i := 0; i < 3; i++ {
 					name := fmt.Sprintf("withdrawrx%d", i)
 					alias := fmt.Sprintf("cloud-provisioning:receive:v1:withdrawal-%d", i)
 					link, key := create(name, alias)
@@ -90,7 +90,7 @@ func TestNativeReceiveWithdrawalRoutes(t *testing.T) {
 				must(netlink.RouteAdd(&protectedRoute))
 				strict := cfg
 				strict.receiveRouteScope = map[string]bool{destination: true}
-				if err := preflightReceiveRouteGenerations(strict, generations, nil, nil); err == nil {
+				if err := preflightReceiveRouteGenerations(strict, generations[:2], nil, nil); err == nil {
 					t.Fatal("forwarding accepted an unauthenticated receiver")
 				}
 				ctx, cancel := context.WithCancel(context.Background())

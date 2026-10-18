@@ -615,7 +615,7 @@ func preflightReceiveRouteGenerations(cfg config, generations []map[string]recei
 }
 
 func preflightReceiveRouteGenerationsWithHandshake(cfg config, generations []map[string]receiveRouteSelection, legacyDestinations map[string]bool, own []string, requireHandshake bool, admittedRelays ...map[string]string) error {
-	if len(generations) == 0 || len(generations) > 2 {
+	if len(generations) == 0 || (requireHandshake && len(generations) > 2) {
 		return fmt.Errorf("route preflight requires one or two admitted receiver generations")
 	}
 	for raw, allowed := range legacyDestinations {

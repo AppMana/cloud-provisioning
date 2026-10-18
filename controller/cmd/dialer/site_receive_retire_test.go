@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -14,6 +15,91 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
+
+// This exercises durable ownership selection and callback ordering only. Native
+// route/device behavior is covered separately in disposable guest namespaces.
+func TestWithdrawnSiteReceiverRecords(t *testing.T) {
+	for _, fault := range []string{"none", "prepare", "retire", "authority", "republished"} {
+		t.Run(fault, func(t *testing.T) {
+			site, _ := wgtypes.GeneratePrivateKey()
+			root, _ := wgtypes.GeneratePrivateKey()
+			other, _ := wgtypes.GeneratePrivateKey()
+			plan := receiveRestoreTestPlan(t, root, site)
+			cfg := config{iface: "site", secretNamespace: "test", secretName: "mesh", nodeName: "site", privateKeyFile: filepath.Join(t.TempDir(), "key")}
+			path := siteReceiveCachePath(cfg) + ".admitted"
+			for i := 0; i < 4; i++ {
+				public := root.PublicKey().String()
+				if i == 3 {
+					public = other.PublicKey().String()
+				}
+				receiver, _ := wgtypes.GeneratePrivateKey()
+				peer := tunnel.PeerSpec{PublicKey: public, Remote: true, Endpoint: "198.51.100.99:51820", WGAllowedIPs: []string{"172.29.0.0/24"}, RouteHosts: []string{"172.29.0.4"}}
+				record := siteReceiveCache{Version: 1, Namespace: "test", SecretName: "mesh", MeshUID: plan.MeshUID, NodeName: "site", PublicKey: site.PublicKey().String(), Peers: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{peer}}, Bindings: map[string]receiveBinding{public: {PeerPublicKey: site.PublicKey().String(), PublicKey: receiver.PublicKey().String(), ListenPort: 51821 + i}}, Generations: map[string]string{public: strings.Repeat(string(rune('a'+i)), 64)}}
+				if err := preserveSiteReceiveOwnership(path, record, cfg, site); err != nil {
+					t.Fatal(err)
+				}
+			}
+			mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mesh", Namespace: "test", UID: "restore-mesh", ResourceVersion: "1"}, Data: map[string][]byte{tunnel.NodePublicKeyPrefix + "site": []byte(site.PublicKey().String())}}
+			if fault == "republished" {
+				mesh.Data[tunnel.PeerPublicKeyPrefix+"worker"] = []byte(root.PublicKey().String())
+				mesh.Data[tunnel.PeerEndpointPrefix+"worker"] = []byte("198.51.100.99:51820")
+				mesh.Data[tunnel.PeerAllowedIPsPrefix+"worker"] = []byte("172.29.0.0/24")
+			}
+			scope := &siteReceiveScope{plans: []tunnel.ReceiveTransitionPlan{plan}, check: func() error {
+				if fault == "authority" {
+					return errors.New("changed authority")
+				}
+				return nil
+			}}
+			prepared, retired := 0, 0
+			prepare := func(groups map[string][]receiveRouteSelection, routes map[string][]string) error {
+				prepared++
+				if len(groups) != 3 || len(routes) != 3 {
+					t.Fatal("lost pending generation or selected unrelated root")
+				}
+				for name, selections := range groups {
+					if len(selections) != 1 || !slices.Equal(routes[name], []string{"172.29.0.0/24", "172.29.0.4/32"}) {
+						t.Fatal("lost explicit route hosts or exact ownership")
+					}
+				}
+				if fault == "prepare" {
+					return errors.New("route withdrawal failed")
+				}
+				return nil
+			}
+			retire := func(_ []receiveRouteSelection, _ []string) error {
+				retired++
+				if prepared != 1 {
+					t.Fatal("device retirement preceded route withdrawal")
+				}
+				if fault == "retire" {
+					return errors.New("device dependency remains")
+				}
+				return nil
+			}
+			err := retireSiteReceiverRecords(context.Background(), fake.NewClientset(mesh), cfg, mesh, site, path, scope, root.PublicKey().String(), prepare, retire)
+			remaining, globErr := filepath.Glob(path + ".owners/*.json")
+			if globErr != nil {
+				t.Fatal(globErr)
+			}
+			if fault == "none" {
+				if err != nil || prepared != 1 || retired != 3 || len(remaining) != 1 {
+					t.Fatalf("retirement: prepared=%d retired=%d retained=%d err=%v", prepared, retired, len(remaining), err)
+				}
+			} else {
+				if err == nil || len(remaining) != 4 {
+					t.Fatal("failed cleanup discarded ownership", err)
+				}
+				if (fault == "authority" || fault == "republished") && (prepared != 0 || retired != 0) {
+					t.Fatal("rejected authority reached native callback")
+				}
+				if fault == "prepare" && retired != 0 {
+					t.Fatal("failed route withdrawal reached device retirement")
+				}
+			}
+		})
+	}
+}
 
 // Native deletion is simulated here; the dedicated receiver native test covers
 // exact ownership, route/address dependencies and idempotent kernel deletion.

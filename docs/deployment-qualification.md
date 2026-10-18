@@ -479,7 +479,10 @@ reauthenticates the whole batch with exact source checks and inventory CAS.
 Synthetic transport tests cover overlap, serialized commits, queued expiry,
 cancellation and concurrent collector changes; they do not establish native
 absence, real API throughput or production freshness. Real authenticated source
-and commit races and observed multi-node cleanup remain required.
+and commit races and observed multi-node cleanup remain required. The real-token
+TLS concurrency fixture overlaps two requests for one consumer against the same
+inventory revision and requires one commit and one stale-source rejection. Its
+synthetic native proof does not qualify multi-consumer aggregation or cleanup.
 
 Agent reconciliation timing diagnostics report fixed operation/stage labels,
 elapsed milliseconds and success only, with at most sixteen stages per record.

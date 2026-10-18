@@ -312,4 +312,7 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 			}
 		})
 	}
+	t.Run("concurrent-authentication-stale-commit", func(t *testing.T) {
+		verifyConcurrentRetirementAuthentication(t, api, store, mesh, w.MachineUID, string(index.UID), policy, submission)
+	})
 }

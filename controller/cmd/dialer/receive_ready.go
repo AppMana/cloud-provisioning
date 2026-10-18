@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
@@ -88,6 +89,9 @@ func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, se
 	if string(node.UID) != request.NodeUID || node.Status.NodeInfo.BootID != bootID || node.DeletionTimestamp != nil {
 		return fmt.Errorf("receive preparation node identity changed")
 	}
+	if err := checkReceivePreparationPredecessor(ctx, k, secret, request); err != nil {
+		return err
+	}
 	bindings, err := prepare(request, previous)
 	if err != nil {
 		return err
@@ -114,6 +118,9 @@ func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, se
 	if string(node.UID) != request.NodeUID || node.Status.NodeInfo.BootID != bootID || node.DeletionTimestamp != nil {
 		return fmt.Errorf("receive preparation node changed before publication")
 	}
+	if err := checkReceivePreparationPredecessor(ctx, k, current, request); err != nil {
+		return err
+	}
 	receipt := tunnel.ReceiveReady{Version: 1, MeshUID: request.MeshUID, SecretUID: string(secret.UID), NodeName: nodeName, NodeUID: request.NodeUID, BootID: bootID, RootPublicKey: request.RootPublicKey, BaseHash: request.BaseHash, RequestHash: tunnel.HashPeerList(raw), Bindings: bindings}
 	encoded, err := json.Marshal(receipt)
 	if err != nil {
@@ -128,4 +135,26 @@ func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, se
 	}
 	_, err = k.CoreV1().Secrets(secret.Namespace).Patch(ctx, secret.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 	return err
+}
+
+// A changed predecessor may leave an unused additive device, but cannot earn
+// readiness. Journal reservation still fences the ordinary preparation path.
+func checkReceivePreparationPredecessor(ctx context.Context, k kubernetes.Interface, secret *corev1.Secret, request tunnel.ReceivePrepare) error {
+	if request.Predecessor == nil {
+		return nil
+	}
+	ref := request.Predecessor
+	store := handover.Store{ConfigMaps: k.CoreV1().ConfigMaps(secret.Namespace), Name: tunnel.ReceiveTransitionName(ref.MachineUID), ClusterUID: ref.ClusterUID, ExpectedUID: ref.JournalUID}
+	snapshot, err := store.Load(ctx)
+	if err != nil {
+		return err
+	}
+	plan, err := request.ValidatePredecessor(snapshot)
+	if err != nil {
+		return err
+	}
+	if plan.Namespace != secret.Namespace || plan.AdoptionName != secret.Name || plan.AdoptionUID != string(secret.UID) {
+		return fmt.Errorf("successor preparation adoption identity changed")
+	}
+	return nil
 }

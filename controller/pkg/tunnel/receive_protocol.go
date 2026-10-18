@@ -20,17 +20,18 @@ const (
 // active forwarding document. BaseHash identifies those exact document bytes.
 // It does not authorize applying Desired or withdrawing existing permissions.
 type ReceivePrepare struct {
-	Version            int            `json:"version"`
-	ReceiverGeneration string         `json:"receiverGeneration,omitempty"`
-	MeshUID            string         `json:"meshUID"`
-	NodeName           string         `json:"nodeName"`
-	BootID             string         `json:"bootID"`
-	NodeUID            string         `json:"nodeUID"`
-	RootPublicKey      string         `json:"rootPublicKey"`
-	BaseHash           string         `json:"baseHash"`
-	Desired            PeerListDoc    `json:"desired"`
-	Native             []netip.Prefix `json:"native"`
-	Ports              map[string]int `json:"ports"`
+	Predecessor        *ReceivePreparePredecessor `json:"predecessor,omitempty"`
+	Version            int                        `json:"version"`
+	ReceiverGeneration string                     `json:"receiverGeneration,omitempty"`
+	MeshUID            string                     `json:"meshUID"`
+	NodeName           string                     `json:"nodeName"`
+	BootID             string                     `json:"bootID"`
+	NodeUID            string                     `json:"nodeUID"`
+	RootPublicKey      string                     `json:"rootPublicKey"`
+	BaseHash           string                     `json:"baseHash"`
+	Desired            PeerListDoc                `json:"desired"`
+	Native             []netip.Prefix             `json:"native"`
+	Ports              map[string]int             `json:"ports"`
 }
 
 func (r ReceivePrepare) ReceiveScope() (string, error) {

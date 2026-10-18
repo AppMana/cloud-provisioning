@@ -237,6 +237,9 @@ func reconcileSiteReceivePreparationScoped(ctx context.Context, k kubernetes.Int
 				return err
 			}
 		}
+		if err := checkReceivePreparationPredecessor(ctx, k, latest, request); err != nil {
+			return err
+		}
 		if err := prepare(root, binding, doc, request.ReceiverGeneration); err != nil {
 			return err
 		}
@@ -262,6 +265,9 @@ func reconcileSiteReceivePreparationScoped(ctx context.Context, k kubernetes.Int
 			if err := scope.check(); err != nil {
 				return err
 			}
+		}
+		if err := checkReceivePreparationPredecessor(ctx, k, latest, request); err != nil {
+			return err
 		}
 		if err := publishSiteReceiveReady(ctx, k, mesh, latest, nodeName, plan, handshake); err != nil {
 			return err

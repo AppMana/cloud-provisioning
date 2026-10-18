@@ -588,6 +588,7 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 					if err != nil || current.ResourceVersion != changed.ResourceVersion {
 						t.Fatal("terminal readback changed the journal", err)
 					}
+					verifySuccessorReadinessFence(t, current, original, adoption, nodes["cloud"], root, store.ClusterUID)
 				} else if readbackErr == nil || readbackCalls != 0 {
 					t.Fatal("unfinished journal entered terminal readback")
 				}

@@ -19,7 +19,7 @@ import (
 )
 
 func TestReceiveReadinessIsBoundToPreparedRequest(t *testing.T) {
-	for _, fault := range []string{"none", "malformed", "version", "root", "base", "missing-native", "node", "desired", "prepare-error", "missing-binding", "wrong-interface", "root-binding", "stale-secret", "stale-version", "stale-base", "stale-request", "replaced-node", "patch-conflict", "old-boot", "node-boot", "reboot-during-preparation", "missing-ports", "unrequested-port"} {
+	for _, fault := range []string{"none", "malformed", "version", "root", "base", "missing-native", "node", "desired", "prepare-error", "missing-binding", "wrong-interface", "root-binding", "stale-secret", "stale-version", "stale-base", "stale-request", "replaced-node", "patch-conflict", "old-boot", "node-boot", "reboot-during-preparation", "missing-ports", "unrequested-port", "missing-predecessor"} {
 		t.Run(fault, func(t *testing.T) {
 			ctx := context.Background()
 			bootID, err := localReceiveBootID()
@@ -31,6 +31,8 @@ func TestReceiveReadinessIsBoundToPreparedRequest(t *testing.T) {
 			base := []byte(`{"peers":[]}`)
 			request := tunnel.ReceivePrepare{Version: 1, MeshUID: "mesh-uid", NodeName: "worker", NodeUID: "node-uid", BootID: bootID, RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(base), Ports: map[string]int{peer.PublicKey().String(): 51821}, Desired: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: peer.PublicKey().String(), WGAllowedIPs: []string{"10.90.0.10/32"}}}}, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}}
 			switch fault {
+			case "missing-predecessor":
+				request.Predecessor = &tunnel.ReceivePreparePredecessor{ClusterUID: "cluster", MachineUID: "worker", JournalUID: "missing", JournalSHA256: "missing"}
 			case "missing-ports":
 				request.Ports = nil
 			case "old-boot":
@@ -135,7 +137,7 @@ func TestReceiveReadinessIsBoundToPreparedRequest(t *testing.T) {
 					t.Fatal("invalid or stale preparation published readiness")
 				}
 				switch fault {
-				case "malformed", "version", "root", "base", "missing-native", "node", "desired", "old-boot", "node-boot", "missing-ports":
+				case "malformed", "version", "root", "base", "missing-native", "node", "desired", "old-boot", "node-boot", "missing-ports", "missing-predecessor":
 					if calls != 0 {
 						t.Fatal("invalid request reached kernel preparation")
 					}

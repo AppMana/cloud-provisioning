@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/netip"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,7 +41,7 @@ func (c *receivePreparationRaceClient) Patch(ctx context.Context, obj client.Obj
 }
 
 func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t *testing.T) {
-	for _, fault := range []string{"none", "unacknowledged", "not-ready", "missing-boot", "provider", "node-ref", "machine-uid", "retiring", "unknown-native", "native-collision", "adoption-race", "unknown-ports", "exhausted-ports"} {
+	for _, fault := range []string{"none", "retained-generation", "unacknowledged", "not-ready", "missing-boot", "provider", "node-ref", "machine-uid", "retiring", "unknown-native", "native-collision", "adoption-race", "unknown-ports", "exhausted-ports"} {
 		t.Run(fault, func(t *testing.T) {
 			ctx := context.Background()
 			machine := &unstructured.Unstructured{}
@@ -67,6 +68,9 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			pool := []int{51821, 51822, 51823, 51824}
 			expected := machine.DeepCopy()
 			switch fault {
+			case "retained-generation":
+				reserved := tunnel.ReceivePortReservations{Version: 2, MeshUID: string(mesh.UID), NodeUID: string(node.UID), RootPublicKey: preparationKey(24), Ports: map[string]int{}, Generations: map[string]map[string]int{strings.Repeat("a", 64): {preparationKey(8): 51821}}}
+				adoption.Data[tunnel.ReceivePortsKey], _ = json.Marshal(reserved)
 			case "unacknowledged":
 				adoption.Annotations[tunnel.AppliedListAnnotation] = "old"
 			case "not-ready":
@@ -105,7 +109,7 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			}
 			var bindings *preparedRemoteReceivers
 			var err error
-			if fault == "none" {
+			if fault == "none" || fault == "retained-generation" {
 				r.receivePreparation = &receivePreparationPolicy{NativeCIDRs: native, Ports: pool}
 				err = r.ensureAdoptionConfig(ctx, machine)
 			} else {
@@ -115,7 +119,7 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			if getErr := c.Get(ctx, client.ObjectKeyFromObject(adoption), current); getErr != nil {
 				t.Fatal(getErr)
 			}
-			if fault != "none" {
+			if fault != "none" && fault != "retained-generation" {
 				if fault == "adoption-race" && string(current.Data[tunnel.CloudPeersKey]) != `{"peers":[]}` {
 					t.Fatal("preparation overwrote a concurrent forwarding update")
 				}
@@ -161,6 +165,16 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			if err := json.Unmarshal(current.Data[tunnel.ReceivePortsKey], &reservations); err != nil {
 				t.Fatal(err)
 			}
+			if fault == "retained-generation" {
+				if reservations.Version != 2 || reservations.Generations[strings.Repeat("a", 64)][preparationKey(8)] != 51821 {
+					t.Fatal("controller dropped retained generation")
+				}
+				for _, port := range request.Ports {
+					if port == 51821 {
+						t.Fatal("controller reused retained listener")
+					}
+				}
+			}
 			if reservations.NodeUID != request.NodeUID || reservations.RootPublicKey != request.RootPublicKey || reservations.MeshUID != request.MeshUID {
 				t.Fatal("port reservations lost target identity")
 			}
@@ -175,7 +189,7 @@ func TestControllerPreparationPreservesForwardingAndInvalidatesStaleReadiness(t 
 			}
 			receipt := tunnel.ReceiveReady{Version: 1, MeshUID: request.MeshUID, SecretUID: string(current.UID), NodeName: request.NodeName, NodeUID: request.NodeUID, BootID: request.BootID, RootPublicKey: request.RootPublicKey, BaseHash: request.BaseHash, RequestHash: tunnel.HashPeerList(current.Data[tunnel.ReceivePrepareKey])}
 			for i, path := range plan.Receivers {
-				receipt.Bindings = append(receipt.Bindings, tunnel.ReceiveBinding{Interface: path.Interface, PeerPublicKey: path.PublicKey, PublicKey: preparationKey(byte(40 + 8*i)), ListenPort: 51821 + i})
+				receipt.Bindings = append(receipt.Bindings, tunnel.ReceiveBinding{Interface: path.Interface, PeerPublicKey: path.PublicKey, PublicKey: preparationKey(byte(40 + 8*i)), ListenPort: request.Ports[path.PublicKey]})
 			}
 			current.Data[tunnel.ReceiveReadyKey], _ = json.Marshal(receipt)
 			if err := c.Update(ctx, current); err != nil {

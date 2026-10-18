@@ -166,11 +166,12 @@ func ValidateReceiveBindings(paths []ReceivePath, root string, bindings []Receiv
 // ReceivePortReservations are durable until acknowledged receiver retirement.
 // They are scoped to the mesh, node and root identity rather than to one boot.
 type ReceivePortReservations struct {
-	Version       int            `json:"version"`
-	MeshUID       string         `json:"meshUID"`
-	NodeUID       string         `json:"nodeUID"`
-	RootPublicKey string         `json:"rootPublicKey"`
-	Ports         map[string]int `json:"ports"`
+	Version       int                       `json:"version"`
+	MeshUID       string                    `json:"meshUID"`
+	NodeUID       string                    `json:"nodeUID"`
+	RootPublicKey string                    `json:"rootPublicKey"`
+	Ports         map[string]int            `json:"ports"`
+	Generations   map[string]map[string]int `json:"generations,omitempty"`
 }
 
 // SiteReceiveReady records authenticated transport preparation only. It does

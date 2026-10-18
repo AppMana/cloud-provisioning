@@ -127,17 +127,17 @@ func (r *meshReconciler) prepareRemoteReceivePaths(ctx context.Context, expected
 		if err := json.Unmarshal(raw, &reservations); err != nil {
 			return nil, fmt.Errorf("invalid receive port reservations")
 		}
-		if reservations.Version != 1 || reservations.MeshUID != string(mesh.UID) || reservations.NodeUID != string(node.UID) || reservations.RootPublicKey != root || reservations.Ports == nil {
+		if reservations.Validate() != nil || reservations.MeshUID != string(mesh.UID) || reservations.NodeUID != string(node.UID) || reservations.RootPublicKey != root {
 			return nil, fmt.Errorf("receive port reservation identity changed")
 		}
 	} else if len(adoption.Data[tunnel.ReceivePrepareKey]) > 0 {
 		return nil, fmt.Errorf("existing receive proposal has no port reservations")
 	}
-	ports, retained, err := tunnel.AssignReceivePorts(plan.Receivers, reservations.Ports, portPool)
+	ports, retained, err := reservations.Assign("", plan.Receivers, portPool)
 	if err != nil {
 		return nil, err
 	}
-	reservations.Ports = retained
+	reservations = retained
 	reservationRaw, err := json.Marshal(reservations)
 	if err != nil {
 		return nil, err

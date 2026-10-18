@@ -3,8 +3,42 @@ package tunnel
 import (
 	"encoding/json"
 	"net/netip"
+	"strings"
 	"testing"
 )
+
+// Protocol admission only; receipt decoding is not authenticated native
+// completion, forwarding continuity or controller successor publication.
+func TestReceiveReadinessBindsReceiverGeneration(t *testing.T) {
+	peer := receiverTestKey(8)
+	target := ReceiveTarget{MeshUID: "mesh", SecretUID: "secret", NodeName: "worker", NodeUID: "node", BootID: "boot", RootPublicKey: receiverTestKey(40), Ready: true}
+	base := PeerListDoc{Peers: []PeerSpec{}}
+	rawBase, _ := json.Marshal(base)
+	r := ReceivePrepare{Version: 1, MeshUID: target.MeshUID, NodeName: target.NodeName, NodeUID: target.NodeUID, BootID: target.BootID, RootPublicKey: target.RootPublicKey, BaseHash: HashPeerList(rawBase), ReceiverGeneration: strings.Repeat("a", 64), Desired: PeerListDoc{Peers: []PeerSpec{{PublicKey: peer, WGAllowedIPs: []string{"10.90.0.1/32"}}}}, Native: []netip.Prefix{}, Ports: map[string]int{peer: 51823}}
+	scope, err := r.ReceiveScope()
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths, err := PlanReceiveHandover(scope, base, r.Desired, r.Native)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawRequest, _ := json.Marshal(r)
+	receipt := ReceiveReady{Version: 1, MeshUID: target.MeshUID, SecretUID: target.SecretUID, NodeName: target.NodeName, NodeUID: target.NodeUID, BootID: target.BootID, RootPublicKey: target.RootPublicKey, BaseHash: r.BaseHash, RequestHash: HashPeerList(rawRequest), Bindings: []ReceiveBinding{{Interface: paths.Receivers[0].Interface, PeerPublicKey: peer, PublicKey: receiverTestKey(24), ListenPort: 51823}}}
+	rawReceipt, _ := json.Marshal(receipt)
+	if _, err := ValidateReceiveReadiness(target, rawBase, rawRequest, rawReceipt); err != nil {
+		t.Fatal(err)
+	}
+	for _, generation := range []string{"", strings.Repeat("b", 64), "invalid"} {
+		r.ReceiverGeneration = generation
+		rawRequest, _ = json.Marshal(r)
+		receipt.RequestHash = HashPeerList(rawRequest)
+		rawReceipt, _ = json.Marshal(receipt)
+		if _, err := ValidateReceiveReadiness(target, rawBase, rawRequest, rawReceipt); err == nil {
+			t.Fatal("accepted bindings for another or invalid generation")
+		}
+	}
+}
 
 func TestReceiveReadinessRequiresCurrentBootRequestAndBindings(t *testing.T) {
 	for _, fault := range []string{"none", "not-ready", "target-boot", "receipt-boot", "request-boot", "secret", "node", "mesh", "root", "request-hash", "base", "unsafe-desired", "missing-native", "missing-binding", "extra-binding", "duplicate-port", "duplicate-key", "root-key", "site-key", "interface", "peer", "bad-port", "unknown-field", "trailing", "missing-ports", "wrong-port"} {

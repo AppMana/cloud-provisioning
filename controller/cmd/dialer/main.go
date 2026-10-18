@@ -1888,7 +1888,11 @@ func reconcileLocked(ctx context.Context, clientset *kubernetes.Clientset, wg *w
 			if mtu == 0 {
 				mtu = underlayMTU()
 			}
-			bindings, err := prepareReceivePaths(wg, request.MeshUID, privateKey, previous, request.Desired, request.Native, mtu, cfg.fwmark, request.Ports)
+			receiveScope, err := request.ReceiveScope()
+			if err != nil {
+				return nil, err
+			}
+			bindings, err := prepareReceivePaths(wg, receiveScope, privateKey, previous, request.Desired, request.Native, mtu, cfg.fwmark, request.Ports)
 			if err != nil {
 				return nil, err
 			}

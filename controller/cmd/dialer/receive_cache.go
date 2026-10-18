@@ -75,7 +75,11 @@ func decodeReceiveCache(raw []byte, cfg config, root wgtypes.Key) (receivePrepar
 	if err := decode(cached.Base, &base); err != nil {
 		return cached, base, err
 	}
-	plan, err := tunnel.PlanReceiveHandover(r.MeshUID, base, r.Desired, r.Native)
+	receiveScope, err := r.ReceiveScope()
+	if err != nil {
+		return cached, base, err
+	}
+	plan, err := tunnel.PlanReceiveHandover(receiveScope, base, r.Desired, r.Native)
 	if err != nil {
 		return cached, base, err
 	}
@@ -122,6 +126,10 @@ func restoreCachedReceivePreparation(cfg config, devices receiverDevices, root w
 		mtu = underlayMTU()
 	}
 	r := cached.Request
-	_, err = prepareReceivePaths(devices, r.MeshUID, root, base, r.Desired, r.Native, mtu, cfg.fwmark, r.Ports)
+	receiveScope, err := r.ReceiveScope()
+	if err != nil {
+		return err
+	}
+	_, err = prepareReceivePaths(devices, receiveScope, root, base, r.Desired, r.Native, mtu, cfg.fwmark, r.Ports)
 	return err
 }

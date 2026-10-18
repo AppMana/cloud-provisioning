@@ -70,7 +70,11 @@ func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, se
 	if err := json.Unmarshal(base, &previous); err != nil {
 		return fmt.Errorf("invalid receive preparation base")
 	}
-	plan, err := tunnel.PlanReceiveHandover(request.MeshUID, previous, request.Desired, request.Native)
+	receiveScope, err := request.ReceiveScope()
+	if err != nil {
+		return err
+	}
+	plan, err := tunnel.PlanReceiveHandover(receiveScope, previous, request.Desired, request.Native)
 	if err != nil {
 		return err
 	}

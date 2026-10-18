@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -32,13 +33,27 @@ func TestReceiveCachePreservesOnlyValidatedPublicPreparation(t *testing.T) {
 	if _, _, err := decodeReceiveCache(raw, cfg, root); err != nil {
 		t.Fatal("prepared state cannot survive a different kernel boot", err)
 	}
-	for _, fault := range []string{"version", "node", "root", "base", "ports", "unknown", "trailing"} {
+	request.ReceiverGeneration = strings.Repeat("a", 64)
+	if err := cacheReceivePreparation(cfg, root, base, request); err != nil {
+		t.Fatal(err)
+	}
+	raw, err = os.ReadFile(receiveCachePath(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, _, err := decodeReceiveCache(raw, cfg, root)
+	if err != nil || decoded.Request.ReceiverGeneration != request.ReceiverGeneration {
+		t.Fatalf("cache lost generation: %v", err)
+	}
+	for _, fault := range []string{"version", "generation", "node", "root", "base", "ports", "unknown", "trailing"} {
 		t.Run(fault, func(t *testing.T) {
 			var cached receivePreparationCache
 			if err := json.Unmarshal(raw, &cached); err != nil {
 				t.Fatal(err)
 			}
 			switch fault {
+			case "generation":
+				cached.Request.ReceiverGeneration = "invalid"
 			case "version":
 				cached.Version++
 			case "node":

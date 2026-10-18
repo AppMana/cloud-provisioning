@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -338,6 +339,47 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 				if err != nil {
 					t.Fatal(err)
 				}
+			}
+			// Each terminal outcome must reject newly published sources without
+			// rewriting the journal. This exercises controller admission against
+			// real journal storage, not native forwarding or successor activation.
+			mesh := &corev1.Secret{}
+			meshKey := client.ObjectKey{Namespace: r.secretNamespace, Name: r.secretName}
+			if err := r.reader.Get(ctx, meshKey, mesh); err != nil {
+				t.Fatal(err)
+			}
+			sourceKey := tunnel.PeerAllowedIPsPrefix + machine.GetName()
+			originalSources := slices.Clone(mesh.Data[sourceKey])
+			for _, changed := range []string{string(originalSources) + ",198.18.0.0/24", string(originalSources) + ",2001:db8:ffff::/64", "198.18.0.1/32"} {
+				mesh.Data[sourceKey] = []byte(changed)
+				if err := r.Update(ctx, mesh); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := r.ensureReceiveTransition(ctx, machine, store, nil, nil, handover.Policy{}, now); err == nil || !strings.Contains(err.Error(), "successor transition required") {
+					t.Fatal("completed journal did not report allocation drift", err)
+				}
+				after, err := store.Load(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				beforeJournal, err := current.Transition().Bytes()
+				if err != nil {
+					t.Fatal(err)
+				}
+				afterJournal, err := after.Transition().Bytes()
+				if err != nil || !bytes.Equal(beforeJournal, afterJournal) || !bytes.Equal(after.Plan(), current.Plan()) {
+					t.Fatal("allocation rejection changed the serving journal", err)
+				}
+				if err := r.reader.Get(ctx, meshKey, mesh); err != nil {
+					t.Fatal(err)
+				}
+			}
+			mesh.Data[sourceKey] = originalSources
+			if err := r.Update(ctx, mesh); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := r.ensureReceiveTransition(ctx, machine, store, nil, nil, handover.Policy{}, now); err != nil {
+				t.Fatal("unchanged serving sources did not reconcile", err)
 			}
 			object, err = k.CoreV1().ConfigMaps(machine.GetNamespace()).Get(ctx, store.Name, metav1.GetOptions{})
 			if err != nil {

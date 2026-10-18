@@ -151,6 +151,9 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 		if err != nil {
 			return nil, err
 		}
+		if err := checkCompletedReceiveSources(existing, store.ClusterUID, mesh); err != nil {
+			return nil, err
+		}
 		return &existing, nil
 	}
 	if !apierrors.IsNotFound(err) {
@@ -363,6 +366,65 @@ func checkReceiveTransitionIdentity(snapshot handover.Snapshot, clusterUID strin
 	}
 	if plan.MachineUID != string(machine.GetUID()) || plan.MachineName != machine.GetName() || plan.Namespace != mesh.Namespace || plan.MeshUID != string(mesh.UID) || plan.MeshName != mesh.Name {
 		return fmt.Errorf("receiver journal belongs to another machine")
+	}
+	return nil
+}
+
+// checkCompletedReceiveSources prevents a terminal journal from reporting
+// convergence for allocations it never admitted. It does not widen native
+// permissions or authorize replacing the serving generation.
+func checkCompletedReceiveSources(snapshot handover.Snapshot, clusterUID string, mesh *corev1.Secret) error {
+	view, err := snapshot.Transition().View()
+	if err != nil || !view.Complete {
+		return err
+	}
+	plan, err := tunnel.DecodeReceiveTransition(snapshot, clusterUID)
+	if err != nil {
+		return err
+	}
+	serving := plan.SiteDesired
+	if view.ServingGeneration == "legacy:"+tunnel.HashPeerList(plan.Base) {
+		serving = plan.PreviousSitePeers()
+	}
+	published, err := tunnel.SitePeers(mesh.Data)
+	if err != nil {
+		return err
+	}
+	sources := func(peers []tunnel.PeerSpec) ([]string, error) {
+		var result []string
+		found := false
+		for _, peer := range peers {
+			if peer.PublicKey != plan.RootPublicKey {
+				continue
+			}
+			if found {
+				return nil, fmt.Errorf("duplicate completed receiver source owner")
+			}
+			found = true
+			for _, raw := range peer.WGAllowedIPs {
+				prefix, err := netip.ParsePrefix(raw)
+				if err != nil {
+					return nil, fmt.Errorf("invalid completed receiver source prefix")
+				}
+				result = append(result, prefix.Masked().String())
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("completed receiver source owner is missing")
+		}
+		slices.Sort(result)
+		return slices.Compact(result), nil
+	}
+	want, err := sources(published)
+	if err != nil {
+		return err
+	}
+	active, err := sources(serving.Peers)
+	if err != nil {
+		return err
+	}
+	if !slices.Equal(want, active) {
+		return fmt.Errorf("completed receive transition does not cover current worker sources; successor transition required")
 	}
 	return nil
 }

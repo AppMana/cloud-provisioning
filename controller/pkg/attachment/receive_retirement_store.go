@@ -22,7 +22,11 @@ type receiveWithdrawalRecord struct {
 // ReserveReceiveWithdrawal persists the captured consumers before peer removal.
 // The caller establishes drain authority and freezes the journal first. Inventory
 // CAS preserves other workers; the journal UID and terminal history remain bound
-// across retries. This does not publish withdrawal or activate native cleanup.
+// across retries. For ordinary removal this does not publish withdrawal or
+// activate native cleanup. An orphan intent instead records an already absent
+// publication: persisting it makes that intent available to retirement readers.
+// Its producer must recheck authoritative owner absence and the full captured
+// source before this call. Neither mode proves native completion or release.
 func (w RemoteWithdrawalIntent) ReserveReceiveWithdrawal(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID, inventoryUID string, mesh *corev1.Secret, snapshot handover.Snapshot) error {
 	if mesh == nil {
 		return fmt.Errorf("withdrawal requires a mesh")

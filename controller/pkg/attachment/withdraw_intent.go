@@ -20,6 +20,7 @@ type RemoteWithdrawalIntent struct {
 	MeshUID        string           `json:"meshUID"`
 	SourceVersion  string           `json:"sourceVersion"`
 	SourceDataHash string           `json:"sourceDataHash,omitempty"`
+	Orphaned       bool             `json:"orphaned,omitempty"`
 	MachineName    string           `json:"machineName"`
 	MachineUID     string           `json:"machineUID"`
 	PublicKey      string           `json:"publicKey"`

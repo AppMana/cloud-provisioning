@@ -33,7 +33,13 @@ func (w RemoteWithdrawalIntent) receiveRetirementPlan(snapshot handover.Snapshot
 		w.MeshNamespace != mesh.Namespace || w.MeshName != mesh.Name || w.MeshUID != string(mesh.UID) {
 		return fail("withdrawal requires exact live mesh and persisted drain identity")
 	}
-	if withdrawn && w.SourceVersion == mesh.ResourceVersion {
+	if w.Orphaned && (w.DrainIntent != "orphan:"+string(snapshot.Metadata().UID) || w.SourceDataHash == "" || w.SourceDataHash != withdrawalSourceDataHash(mesh.Data)) {
+		return fail("orphan recovery requires its exact captured mesh and journal identity")
+	}
+	// Orphan capture explicitly records a publication that was already absent.
+	// It cannot use an unrelated later metadata revision as removal evidence;
+	// retain the full captured data hash instead, including acknowledgement data.
+	if withdrawn && !w.Orphaned && w.SourceVersion == mesh.ResourceVersion {
 		return fail("mesh version differs from withdrawal stage")
 	}
 	if !withdrawn {
@@ -74,7 +80,7 @@ func (w RemoteWithdrawalIntent) receiveRetirementPlan(snapshot handover.Snapshot
 	if p.Namespace != w.MeshNamespace || p.MeshName != w.MeshName || p.MeshUID != w.MeshUID || p.MachineName != w.MachineName || p.MachineUID != w.MachineUID || p.RootPublicKey != w.PublicKey {
 		return fail("withdrawal differs from journal ownership")
 	}
-	if _, present, err := tunnel.WithdrawRemotePeer(mesh.Data, w.MachineName, w.PublicKey); err != nil || present == withdrawn {
+	if _, present, err := tunnel.WithdrawRemotePeer(mesh.Data, w.MachineName, w.PublicKey); err != nil || (w.Orphaned && present) || (!w.Orphaned && present == withdrawn) {
 		return fail("peer publication differs from withdrawal stage")
 	}
 	names, uids, keys := map[string]bool{}, map[string]bool{}, map[string]bool{}

@@ -414,13 +414,16 @@ admission. Cached images do not identify the running agent: retain independent
 Pod, container and runtime-image authentication. A source-comparison regression
 does not qualify cleanup during a live image pull or garbage-collection cycle.
 
-After full retirement admission, checkpoint and pre-cleanup boundaries reuse
-the live-source recheck instead of reconstructing immutable ancestry. Recheck
-every reserved journal, inventory, mesh and local Node/boot identity, and reject
+After full retirement admission, checkpoint, pre-cleanup and final survivor
+admission boundaries reuse the live-source recheck instead of reconstructing
+immutable ancestry. Recheck every reserved journal, inventory, mesh and local
+Node/boot identity, and reject
 changed checkpoint scope. Retain full admission before execution and after
 native cleanup, plus local checkpoint history validation. A ConfigMap read-budget
 regression establishes reduced repeated reads only; it does not establish live
-latency, native absence or completion within the receipt lifetime.
+latency, native absence or completion within the receipt lifetime. Inject an
+inventory revision change at the final survivor boundary and require rejection;
+this API race test does not establish live cross-object atomicity.
 
 Exercise repeated agent admission reads against a responsive API, not only an
 initial request burst. By default the agent relies on Kubernetes API Priority

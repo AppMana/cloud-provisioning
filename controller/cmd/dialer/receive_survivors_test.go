@@ -69,6 +69,62 @@ func verifySurvivorReceiveAdmission(t *testing.T, api kubernetes.Interface, stor
 	must(err)
 	must(api.CoreV1().Nodes().Delete(ctx, plan.CloudNodeName, metav1.DeleteOptions{}))
 	must(api.CoreV1().Secrets(scope.Namespace).Delete(ctx, plan.AdoptionName, metav1.DeleteOptions{}))
+	t.Run("retained-history-read-budget", func(t *testing.T) {
+		reads := 0
+		reader := store
+		reader.ConfigMaps = receiveSetReader{ConfigMapInterface: store.ConfigMaps, before: func(name string) error {
+			if name == retiring.Name {
+				reads++
+			}
+			return nil
+		}}
+		_, err := loadReceiveSet(ctx, api, reader, scope, cfg.nodeName, key)
+		must(err)
+		// Initial admission reads and fences the retained journal three times.
+		// The final boundary needs one current read, not another history load.
+		// This fixture has no successor ancestry and proves a read budget only.
+		if reads > 4 {
+			t.Fatalf("survivor boundary reconstructed retained history: %d reads, budget 4", reads)
+		}
+	})
+	t.Run("inventory-changed-at-final-boundary", func(t *testing.T) {
+		original, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+		must(err)
+		t.Cleanup(func() {
+			current, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+			must(err)
+			current.Annotations = original.Annotations
+			_, err = store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{})
+			must(err)
+		})
+		reads := 0
+		reader := store
+		reader.ConfigMaps = receiveSetReader{ConfigMapInterface: store.ConfigMaps, before: func(name string) error {
+			if name != retiring.Name {
+				return nil
+			}
+			reads++
+			if reads != 4 {
+				return nil
+			}
+			current, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if current.Annotations == nil {
+				current.Annotations = map[string]string{}
+			}
+			current.Annotations["test-boundary-race"] = "changed"
+			_, err = store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{})
+			return err
+		}}
+		if _, err := loadReceiveSet(ctx, api, reader, scope, cfg.nodeName, key); err == nil {
+			t.Fatal("admitted inventory changed at final survivor boundary")
+		}
+		if reads < 4 {
+			t.Fatal("did not exercise final survivor boundary")
+		}
+	})
 	t.Run("cloud-survivor", func(t *testing.T) {
 		cloudCfg := config{iface: "cloudsurvivor", nodeName: servingPlan.CloudNodeName, privateKeyFile: filepath.Join(t.TempDir(), "key")}
 		invoked := false

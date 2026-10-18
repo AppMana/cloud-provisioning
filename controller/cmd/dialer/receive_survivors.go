@@ -71,14 +71,12 @@ func loadSurvivingReceiveSet(ctx context.Context, api kubernetes.Interface, stor
 		return fail(fmt.Errorf("survivor target is not a local serving journal"))
 	}
 	for uid, retired := range result.Retirements {
-		memberStore, memberScope := store, scope
-		memberStore.Name, memberStore.ExpectedUID, memberScope.MachineUID = tunnel.ReceiveTransitionName(uid), string(retired.Journals[uid].Metadata().UID), uid
-		current, err := loadReceiveRetirement(ctx, api, memberStore, memberScope, nodeName, key)
-		if err != nil {
+		memberStore := store
+		memberStore.Name, memberStore.ExpectedUID = tunnel.ReceiveTransitionName(uid), string(retired.Journals[uid].Metadata().UID)
+		// History was authenticated above; fence current sources without loading
+		// that immutable ancestry again at the final admission boundary.
+		if err := recheckReceiveRetirement(ctx, api, memberStore, retired, nodeName, key); err != nil {
 			return fail(err)
-		}
-		if !sameReceiveRetirement(retired, current) {
-			return fail(fmt.Errorf("survivor withdrawal changed during admission"))
 		}
 	}
 	return result, nil

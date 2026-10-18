@@ -31,7 +31,7 @@ func retireMissingSiteReceivers(ctx context.Context, api kubernetes.Interface, c
 
 // withdrawnRoot is supplied only by the journal withdrawal executor. Ordinary
 // absent-peer reconciliation must continue protecting every reserved root.
-func retireSiteReceiverRecords(ctx context.Context, api kubernetes.Interface, cfg config, mesh *corev1.Secret, key wgtypes.Key, path string, scope *siteReceiveScope, withdrawnRoot string, prepare func(map[string][]receiveRouteSelection, map[string][]string) error, retire func([]receiveRouteSelection, []string) error) error {
+func retireSiteReceiverRecords(ctx context.Context, api kubernetes.Interface, cfg config, mesh *corev1.Secret, key wgtypes.Key, path string, scope *siteReceiveScope, withdrawnRoot string, prepare func(map[string][]receiveRouteSelection, map[string][]string) error, retire func([]receiveRouteSelection, []string) error, additionalPaths ...string) error {
 	if scope == nil || len(scope.plans) == 0 {
 		return nil
 	}
@@ -42,35 +42,45 @@ func retireSiteReceiverRecords(ctx context.Context, api kubernetes.Interface, cf
 	if err != nil {
 		return err
 	}
-	directory := path + ".owners"
-	info, err := os.Lstat(directory)
-	if os.IsNotExist(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if !info.IsDir() || info.Mode().Perm() != 0700 {
-		return fmt.Errorf("receiver ownership directory must be private")
-	}
-	entries, err := os.ReadDir(directory)
-	if err != nil {
-		return err
+	var files []string
+	seenDirectories := map[string]bool{}
+	for _, base := range append([]string{path}, additionalPaths...) {
+		directory := filepath.Clean(base + ".owners")
+		if seenDirectories[directory] {
+			continue
+		}
+		seenDirectories[directory] = true
+		info, err := os.Lstat(directory)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() || info.Mode().Perm() != 0700 {
+			return fmt.Errorf("receiver ownership directory must be private")
+		}
+		entries, err := os.ReadDir(directory)
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			// Interrupted atomic writes are not committed ownership evidence.
+			if strings.HasPrefix(entry.Name(), ".") && !entry.IsDir() {
+				continue
+			}
+			if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+				return fmt.Errorf("unexpected receiver ownership entry")
+			}
+			files = append(files, filepath.Join(directory, entry.Name()))
+		}
 	}
 	groups := map[string][]receiveRouteSelection{}
 	destinations := map[string]map[string]bool{}
 	removable := []string{}
+	retained := map[string]siteReceiveCache{}
 	// Validate all records and plans before the first native mutation.
-	for _, entry := range entries {
-		// An interrupted atomic write can leave an uncommitted temporary file.
-		// It is not ownership evidence and cannot authorize a native mutation.
-		if strings.HasPrefix(entry.Name(), ".") && !entry.IsDir() {
-			continue
-		}
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
-			return fmt.Errorf("unexpected receiver ownership entry")
-		}
-		name := filepath.Join(path+".owners", entry.Name())
+	for _, name := range files {
 		info, err := os.Lstat(name)
 		if err != nil {
 			return err
@@ -82,7 +92,7 @@ func retireSiteReceiverRecords(ctx context.Context, api kubernetes.Interface, cf
 		if err != nil {
 			return err
 		}
-		if entry.Name() != fmt.Sprintf("%x.json", sha256.Sum256(raw)) {
+		if filepath.Base(name) != fmt.Sprintf("%x.json", sha256.Sum256(raw)) {
 			return fmt.Errorf("receiver ownership content digest changed")
 		}
 		record, err := decodeSiteReceiveCache(raw, cfg, key)
@@ -161,6 +171,14 @@ func retireSiteReceiverRecords(ctx context.Context, api kubernetes.Interface, cf
 		}
 		if all {
 			removable = append(removable, name)
+		} else if withdrawnRoot != "" {
+			if _, found := record.Bindings[withdrawnRoot]; found {
+				next, err := withoutSiteReceiveBinding(record, withdrawnRoot)
+				if err != nil {
+					return err
+				}
+				retained[name] = next
+			}
 		}
 	}
 	check := func() error {
@@ -213,6 +231,17 @@ func retireSiteReceiverRecords(ctx context.Context, api kubernetes.Interface, cf
 	// preparation must write fresh ownership intent before recreating a device.
 	// Re-admitting here can starve this commit under client-side rate limiting.
 	for _, name := range removable {
+		if err := removeDurableCache(name); err != nil {
+			return err
+		}
+	}
+	for name, record := range retained {
+		// Write surviving ownership before removing the mixed record. A crash
+		// may duplicate intent, but cannot lose another receiver's provenance.
+		base := strings.TrimSuffix(filepath.Dir(name), ".owners")
+		if err := preserveSiteReceiveOwnership(base, record, cfg, key); err != nil {
+			return err
+		}
 		if err := removeDurableCache(name); err != nil {
 			return err
 		}

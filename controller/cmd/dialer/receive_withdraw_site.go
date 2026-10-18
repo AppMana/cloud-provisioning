@@ -13,8 +13,8 @@ import (
 )
 
 // Caller holds the host lock. Retire the journal's site receivers and separately
-// prepared successors recorded in the admitted ownership directory. Ordinary
-// root peers, source exceptions, relay paths and other caches remain separate
+// prepared successors recorded in both receiver ownership directories. Ordinary
+// root peers, source exceptions, relay paths and ordinary peer caches remain separate
 // cleanup obligations; success here must never be published as full retirement.
 func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Interface, devices receiverDevices, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, admitted admittedReceiveRetirement) error {
 	if devices == nil || cfg.secretName != scope.MeshName || cfg.secretNamespace != scope.Namespace || siteReceiveCachePath(cfg) == "" {
@@ -43,7 +43,12 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 	if err := checkpointReceiveRetirementLocked(ctx, api, store, scope, cfg, key, lockPath, admitted); err != nil {
 		return err
 	}
-	path := siteReceiveCachePath(cfg) + ".admitted"
+	caches, err := preserveRetiringSiteCaches(cfg, key, scope.MeshUID)
+	if err != nil {
+		return err
+	}
+	basePath := siteReceiveCachePath(cfg)
+	path := basePath + ".admitted"
 	graphs := []tunnel.ReceiveTransitionPlan{plan}
 	if plan.PreviousReceiver != nil {
 		graphs = append(graphs, *plan.PreviousReceiver.Plan)
@@ -98,7 +103,10 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 		}
 		return withdrawReceiveDeviceRoutes(ctx, cfg, generations, own)
 	}
-	return retireSiteReceiverRecords(ctx, api, cfg, mesh, key, path, guard, plan.RootPublicKey, prepare, func(selections []receiveRouteSelection, _ []string) error {
+	if err := retireSiteReceiverRecords(ctx, api, cfg, mesh, key, path, guard, plan.RootPublicKey, prepare, func(selections []receiveRouteSelection, _ []string) error {
 		return retireRecordedSiteReceiver(devices, cfg, selections)
-	})
+	}, basePath); err != nil {
+		return err
+	}
+	return commitRetiredSiteCaches(caches, plan.RootPublicKey)
 }

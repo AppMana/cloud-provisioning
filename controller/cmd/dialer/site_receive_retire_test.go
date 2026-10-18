@@ -19,14 +19,15 @@ import (
 // This exercises durable ownership selection and callback ordering only. Native
 // route/device behavior is covered separately in disposable guest namespaces.
 func TestWithdrawnSiteReceiverRecords(t *testing.T) {
-	for _, fault := range []string{"none", "prepare", "retire", "authority", "republished"} {
+	for _, fault := range []string{"none", "prepare", "retire", "authority", "republished", "legacy-only", "legacy-digest", "mixed"} {
 		t.Run(fault, func(t *testing.T) {
 			site, _ := wgtypes.GeneratePrivateKey()
 			root, _ := wgtypes.GeneratePrivateKey()
 			other, _ := wgtypes.GeneratePrivateKey()
 			plan := receiveRestoreTestPlan(t, root, site)
 			cfg := config{iface: "site", secretNamespace: "test", secretName: "mesh", nodeName: "site", privateKeyFile: filepath.Join(t.TempDir(), "key")}
-			path := siteReceiveCachePath(cfg) + ".admitted"
+			base := siteReceiveCachePath(cfg)
+			path := base + ".admitted"
 			for i := 0; i < 4; i++ {
 				public := root.PublicKey().String()
 				if i == 3 {
@@ -35,7 +36,27 @@ func TestWithdrawnSiteReceiverRecords(t *testing.T) {
 				receiver, _ := wgtypes.GeneratePrivateKey()
 				peer := tunnel.PeerSpec{PublicKey: public, Remote: true, Endpoint: "198.51.100.99:51820", WGAllowedIPs: []string{"172.29.0.0/24"}, RouteHosts: []string{"172.29.0.4"}}
 				record := siteReceiveCache{Version: 1, Namespace: "test", SecretName: "mesh", MeshUID: plan.MeshUID, NodeName: "site", PublicKey: site.PublicKey().String(), Peers: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{peer}}, Bindings: map[string]receiveBinding{public: {PeerPublicKey: site.PublicKey().String(), PublicKey: receiver.PublicKey().String(), ListenPort: 51821 + i}}, Generations: map[string]string{public: strings.Repeat(string(rune('a'+i)), 64)}}
-				if err := preserveSiteReceiveOwnership(path, record, cfg, site); err != nil {
+				if fault == "mixed" && i == 0 {
+					survivor := peer
+					survivor.PublicKey = other.PublicKey().String()
+					survivor.Endpoint = "198.51.100.100:51820"
+					survivor.WGAllowedIPs = []string{"172.30.0.0/24"}
+					survivor.RouteHosts = []string{"172.30.0.4"}
+					record.Peers.Peers = append(record.Peers.Peers, survivor)
+					survivorReceiver, _ := wgtypes.GeneratePrivateKey()
+					record.Bindings[survivor.PublicKey] = receiveBinding{PeerPublicKey: site.PublicKey().String(), PublicKey: survivorReceiver.PublicKey().String(), ListenPort: 51830}
+				}
+				recordPath := path
+				if i == 0 || fault == "legacy-only" {
+					recordPath = base
+				}
+				if err := preserveSiteReceiveOwnership(recordPath, record, cfg, site); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if fault == "legacy-digest" {
+				files, _ := filepath.Glob(base + ".owners/*.json")
+				if err := os.WriteFile(files[0], []byte("{}"), 0600); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -77,20 +98,45 @@ func TestWithdrawnSiteReceiverRecords(t *testing.T) {
 				}
 				return nil
 			}
-			err := retireSiteReceiverRecords(context.Background(), fake.NewClientset(mesh), cfg, mesh, site, path, scope, root.PublicKey().String(), prepare, retire)
+			err := retireSiteReceiverRecords(context.Background(), fake.NewClientset(mesh), cfg, mesh, site, path, scope, root.PublicKey().String(), prepare, retire, base)
 			remaining, globErr := filepath.Glob(path + ".owners/*.json")
 			if globErr != nil {
 				t.Fatal(globErr)
 			}
-			if fault == "none" {
-				if err != nil || prepared != 1 || retired != 3 || len(remaining) != 1 {
+			legacy, e := filepath.Glob(base + ".owners/*.json")
+			if e != nil {
+				t.Fatal(e)
+			}
+			remaining = append(remaining, legacy...)
+			if fault == "none" || fault == "legacy-only" || fault == "mixed" {
+				want := 1
+				if fault == "mixed" {
+					want = 2
+				}
+				for _, name := range remaining {
+					raw, e := os.ReadFile(name)
+					if e != nil {
+						t.Fatal(e)
+					}
+					record, e := decodeSiteReceiveCache(raw, cfg, site)
+					if e != nil {
+						t.Fatal(e)
+					}
+					if _, found := record.Bindings[root.PublicKey().String()]; found {
+						t.Fatal("retained withdrawn binding")
+					}
+					if _, found := record.Bindings[other.PublicKey().String()]; !found {
+						t.Fatal("lost surviving binding")
+					}
+				}
+				if err != nil || prepared != 1 || retired != 3 || len(remaining) != want {
 					t.Fatalf("retirement: prepared=%d retired=%d retained=%d err=%v", prepared, retired, len(remaining), err)
 				}
 			} else {
 				if err == nil || len(remaining) != 4 {
 					t.Fatal("failed cleanup discarded ownership", err)
 				}
-				if (fault == "authority" || fault == "republished") && (prepared != 0 || retired != 0) {
+				if (fault == "authority" || fault == "republished" || fault == "legacy-digest") && (prepared != 0 || retired != 0) {
 					t.Fatal("rejected authority reached native callback")
 				}
 				if fault == "prepare" && retired != 0 {

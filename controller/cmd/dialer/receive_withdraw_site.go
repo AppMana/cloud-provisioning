@@ -16,8 +16,9 @@ import (
 // Caller holds the host lock. Retire the journal's site receivers and separately
 // prepared successors recorded in both receiver ownership directories. Ordinary
 // source exceptions, committed relay routes, root peers and caches are also
-// retired. Non-endpoint followers and authenticated completion remain separate obligations; success here must
-// never be published as full retirement.
+// retired. This backend supports direct receiver participants only; followers
+// and cloud consumers fail admission before mutation. The executor must recheck
+// source and agent identity before issuing the local completion observation.
 func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Interface, devices receiverDevices, speaker *transitSpeaker, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, admitted admittedReceiveRetirement) error {
 	if devices == nil || cfg.secretName != scope.MeshName || cfg.secretNamespace != scope.Namespace || siteReceiveCachePath(cfg) == "" {
 		return fmt.Errorf("site retirement requires native devices and local mesh storage")

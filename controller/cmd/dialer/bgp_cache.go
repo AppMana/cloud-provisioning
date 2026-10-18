@@ -55,6 +55,8 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 				return err
 			}
 			return reconcileReceiveSuccessorPreparation(ctx, k, devices, cfg, key, plan, view, nodeUID, intent)
+		}, func(ctx context.Context, store handover.Store, scope receiveJournalScope, key wgtypes.Key, lockPath string, admitted admittedReceiveRetirement) error {
+			return retireAdmittedSiteReceiversLocked(ctx, k, devices, speaker, store, scope, cfg, key, lockPath, admitted)
 		})
 		if handled {
 			// Ordinary neighbors have independent live admission. Do not starve

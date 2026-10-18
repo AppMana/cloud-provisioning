@@ -235,18 +235,9 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		if err != nil {
 			return err
 		}
-		var previous receiveNeighborCheckpoint
-		decoder := json.NewDecoder(bytes.NewReader(raw))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&previous); err != nil {
+		previous, err := decodeReceiveNeighborCheckpoint(raw, saved, source == path)
+		if err != nil {
 			return err
-		}
-		var trailing any
-		if err := decoder.Decode(&trailing); err != io.EOF {
-			return fmt.Errorf("trailing neighbor checkpoint data")
-		}
-		if previous.Version != 1 || previous.InventoryUID != saved.InventoryUID || previous.MeshUID != saved.MeshUID || previous.NodeUID != saved.NodeUID || previous.BootID == "" || previous.PublicKey != saved.PublicKey || previous.Peers == nil || (source == path && (len(previous.Retiring) != 0 || len(previous.Candidates) != 0)) {
-			return fmt.Errorf("neighbor checkpoint identity changed")
 		}
 		prior := previous.Peers
 		if source != path {
@@ -429,4 +420,22 @@ func neighborPermissionIdentity(peer tunnel.PeerSpec) string {
 	slices.Sort(sources)
 	raw, _ := json.Marshal(sources)
 	return peer.PublicKey + string(raw)
+}
+
+// Earlier boots may supply ownership intent, but never live execution authority.
+func decodeReceiveNeighborCheckpoint(raw []byte, expected receiveNeighborCheckpoint, main bool) (receiveNeighborCheckpoint, error) {
+	var previous receiveNeighborCheckpoint
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&previous); err != nil {
+		return previous, err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		return previous, fmt.Errorf("trailing neighbor checkpoint data")
+	}
+	if previous.Version != 1 || previous.InventoryUID != expected.InventoryUID || previous.MeshUID != expected.MeshUID || previous.NodeUID != expected.NodeUID || previous.BootID == "" || previous.PublicKey != expected.PublicKey || previous.Peers == nil || (main && (len(previous.Retiring) != 0 || len(previous.Candidates) != 0)) {
+		return previous, fmt.Errorf("neighbor checkpoint identity changed")
+	}
+	return previous, nil
 }

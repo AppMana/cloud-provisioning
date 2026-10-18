@@ -261,6 +261,17 @@ the persistent image owner before a fresh campaign. Registry descriptors alone
 do not qualify native execution, and a corrected image reference does not waive
 workload or management continuity checks during its rollout.
 
+Verify that image corrections survive owner restart, leadership changes and
+manifest regeneration. With k0s static configuration, editing the configuration
+file does not refresh the running controller's configuration snapshot. A
+controller can therefore regenerate an older image reference even after the
+file and current DaemonSet have been corrected; Windows-node presence changes
+also trigger kube-proxy regeneration. Refresh each controller through the
+qualified maintenance procedure, then exercise regeneration and check effective
+image references and native execution again. Before arming rollback, compare
+its captured configuration with the current desired image pins. File readback
+and a successful pod rollout alone do not establish restart durability.
+
 Exercise image resolution with both warm and empty caches, and after switching
 between a platform reference and its index. A low-level container-store listing
 does not prove kubelet can resolve a local alias with pull policy `Never`.

@@ -53,24 +53,33 @@ func receivePhaseSources(intent tunnel.ReceiveJournalRoutes, node string, alloca
 	}
 	seen := map[string]bool{}
 	for _, plan := range intent.Plans {
-		for _, site := range plan.Sites {
-			if site.NodeUID != node {
-				continue
-			}
-			hosts := append([]string(nil), site.Legacy.Tunnel.Hosts...)
-			if site.Forward != nil {
-				hosts = append(hosts, site.Forward.Tunnel.Hosts...)
-			}
-			for _, raw := range hosts {
-				if seen[raw] {
+		graphs := []tunnel.ReceiveTransitionPlan{plan}
+		if plan.PreviousReceiver != nil {
+			graphs = append(graphs, *plan.PreviousReceiver.Plan)
+		}
+		for _, graph := range graphs {
+			for _, site := range graph.Sites {
+				if site.NodeUID != node {
 					continue
 				}
-				seen[raw] = true
-				_, host, err := net.ParseCIDR(raw)
-				if err != nil {
-					return nil, nil, nil, err
+				var hosts []string
+				if plan.PreviousReceiver == nil {
+					hosts = append(hosts, site.Legacy.Tunnel.Hosts...)
 				}
-				admitted = append(admitted, *host)
+				if site.Forward != nil {
+					hosts = append(hosts, site.Forward.Tunnel.Hosts...)
+				}
+				for _, raw := range hosts {
+					if seen[raw] {
+						continue
+					}
+					seen[raw] = true
+					_, host, err := net.ParseCIDR(raw)
+					if err != nil {
+						return nil, nil, nil, err
+					}
+					admitted = append(admitted, *host)
+				}
 			}
 		}
 	}
@@ -89,7 +98,11 @@ func validateReceiveSiteSources(p tunnel.ReceiveTransitionPlan, public string) e
 	if err := json.Unmarshal(p.Base, &base); err != nil {
 		return err
 	}
-	prepared, err := tunnel.PlanReceiveHandover(p.MeshUID, base, p.Desired, p.Native)
+	scope, err := p.ReceiveScope()
+	if err != nil {
+		return err
+	}
+	prepared, err := tunnel.PlanReceiveHandover(scope, base, p.Desired, p.Native)
 	if err != nil {
 		return err
 	}

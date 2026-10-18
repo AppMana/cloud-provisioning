@@ -36,14 +36,6 @@ func restoreCompletedReceiveRoutes(ctx context.Context, devices receiverDevices,
 }
 
 func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, own, allocated []string, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes, restore bool) error {
-	if plan.PreviousReceiver != nil {
-		return fmt.Errorf("receiver-to-receiver journal execution is not yet supported")
-	}
-	for _, candidate := range intent.Plans {
-		if candidate.PreviousReceiver != nil {
-			return fmt.Errorf("shared routes contain unsupported receiver-to-receiver intent")
-		}
-	}
 	verifyInstalled := verifyReceiveRouteInstallation
 	if restore {
 		verifyInstalled = verifyReceiveRouteDestinations
@@ -96,6 +88,8 @@ func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cf
 	cfg.receiveSourceRoutes = map[string]receiveRouteSelection{}
 	cfg.receiveSourceCandidates = map[string][]receiveRouteSelection{}
 	cfg.receiveRelayRoutes = map[string]string{}
+	previousRoutes := map[string]receiveRouteSelection{}
+	legacyDestinations := map[string]bool{}
 	allLegacyRelays := map[string]string{}
 	allForwardRelays := map[string]string{}
 	cfg.receiveRouteScope = map[string]bool{}
@@ -118,6 +112,67 @@ func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cf
 		}
 		for raw := range routes[nodeUID] {
 			cfg.receiveRouteScope[raw] = true
+		}
+		if p.PreviousReceiver != nil {
+			if _, root := intent.Legacy[machineUID]; root {
+				return fmt.Errorf("successor cannot select original tunnel")
+			}
+			committed, found := intent.Views[machineUID]
+			if !found || (machineUID == plan.MachineUID && !reflect.DeepEqual(committed, view)) {
+				return fmt.Errorf("successor phase lacks committed view")
+			}
+			active, root, err := p.SelectedReceiveTransport(committed)
+			if err != nil || root {
+				return fmt.Errorf("successor phase lacks selected receiver graph: %v", err)
+			}
+			receiverPlans = append(receiverPlans, active)
+			oldRoutes, err := tunnel.PlanReceiveRoutes(*p.PreviousReceiver.Plan)
+			if err != nil {
+				return err
+			}
+			for raw, selection := range oldRoutes[nodeUID] {
+				cfg.receiveRouteScope[raw] = true
+				previousRoutes[raw] = selection
+			}
+			for generation, graph := range []tunnel.ReceiveTransitionPlan{*p.PreviousReceiver.Plan, p} {
+				graphRoutes := oldRoutes[nodeUID]
+				relays := allLegacyRelays
+				if generation == 1 {
+					graphRoutes, relays = routes[nodeUID], allForwardRelays
+				}
+				selected := graph.ReceiverGeneration == active.ReceiverGeneration
+				for _, site := range graph.Sites {
+					if site.NodeUID != nodeUID || site.Forward == nil {
+						continue
+					}
+					if site.Forward.Tunnel != nil {
+						for _, raw := range site.Forward.Tunnel.Hosts {
+							selection, found := graphRoutes[raw]
+							if !found {
+								return fmt.Errorf("successor source exception lacks receiver")
+							}
+							cfg.receiveSourceCandidates[raw] = append(cfg.receiveSourceCandidates[raw], selection)
+							if selected {
+								cfg.receiveSourceRoutes[raw] = selection
+							}
+						}
+					}
+					if site.Forward.Transit != nil {
+						for raw := range graphRoutes {
+							_, dst, err := net.ParseCIDR(raw)
+							if err != nil || site.Forward.Transit.Gateway(dst.IP) == nil {
+								return fmt.Errorf("successor relay lacks destination gateway")
+							}
+							relays[raw] = site.Forward.Transit.Gateway(dst.IP).String()
+							if selected {
+								cfg.receiveRelayRoutes[raw] = relays[raw]
+								delete(cfg.receiveRoutes, raw)
+							}
+						}
+					}
+				}
+			}
+			continue
 		}
 		var old []tunnel.PeerSpec
 		var relay *tunnel.TransitSpec
@@ -195,6 +250,7 @@ func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cf
 			}
 			for _, raw := range destinations {
 				cfg.receiveRouteScope[raw] = true
+				legacyDestinations[raw] = true
 				if relay != nil {
 					_, dst, err := net.ParseCIDR(raw)
 					if err != nil || relay.Gateway(dst.IP) == nil {
@@ -241,7 +297,15 @@ func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cf
 	}
 	_, targetLegacy := intent.Legacy[plan.MachineUID]
 	wantLegacy := view.RollbackRequested || view.Round.Phase == handover.Prepare || view.Round.Phase == handover.Abort
-	if targetLegacy != wantLegacy {
+	targetPrevious := targetLegacy
+	if plan.PreviousReceiver != nil {
+		active, _, err := plan.SelectedReceiveTransport(view)
+		if err != nil {
+			return err
+		}
+		targetPrevious = active.ReceiverGeneration == plan.PreviousReceiver.Plan.ReceiverGeneration
+	}
+	if targetPrevious != wantLegacy {
 		return fmt.Errorf("native route direction differs from committed phase")
 	}
 	if view.Round.Phase == handover.Switch {
@@ -293,6 +357,11 @@ func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cf
 		}
 	}
 	allocation := stableAddressOwnerRequest{MeshUID: plan.MeshUID, NodeUID: nodeUID, LegacyInterface: cfg.iface, RootPublicKey: key.PublicKey().String(), Addresses: allocated}
+	if plan.PreviousReceiver != nil && (targetPrevious || view.Round.Phase == handover.Switch || view.Round.Phase == handover.Drain) {
+		if err := verifyReceivePhasePaths(devices, cfg, key, *plan.PreviousReceiver.Plan, nodeUID); err != nil {
+			return err
+		}
+	}
 	if view.Round.Phase == handover.Prepare {
 		if err := verifyInstalled(cfg, hosts, nil, own); err != nil {
 			return err
@@ -308,14 +377,14 @@ func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cf
 			return err
 		}
 	}
-	retiringReceivers := view.Round.Phase == handover.Abort || (view.Round.Phase == handover.Retire && targetLegacy)
+	retiringReceivers := view.Round.Phase == handover.Abort || (view.Round.Phase == handover.Retire && targetPrevious)
 	if !retiringReceivers {
 		if err := verifyReceivePhasePaths(devices, cfg, key, plan, nodeUID); err != nil {
 			return err
 		}
 	}
 	if view.Round.Phase == handover.Switch || restore {
-		if err := preflightReceiveRoutePhase(cfg, allRoutes[nodeUID], own, allLegacyRelays, allForwardRelays); err != nil {
+		if err := preflightReceiveRouteGenerations(cfg, []map[string]receiveRouteSelection{allRoutes[nodeUID], previousRoutes}, legacyDestinations, own, allLegacyRelays, allForwardRelays); err != nil {
 			return err
 		}
 		staged, stagedReceivers, err := preflightReceiveSourceSwitchPlan(cfg, sourceAddresses, sourceHosts, admittedSourceHosts)
@@ -348,8 +417,12 @@ func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cf
 	if err := verifyInstalled(cfg, hosts, nil, own); err != nil {
 		return err
 	}
-	if retiringReceivers {
-		selections, err := receivePhaseSelections(key, plan, nodeUID)
+	if retiringReceivers || (plan.PreviousReceiver != nil && view.Round.Phase == handover.Retire) {
+		retired := plan
+		if !retiringReceivers {
+			retired = *plan.PreviousReceiver.Plan
+		}
+		selections, err := receivePhaseSelections(key, retired, nodeUID)
 		if err != nil {
 			return err
 		}

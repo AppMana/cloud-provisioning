@@ -97,6 +97,18 @@ func (r *meshReconciler) configureReceiptAgent(daemon *appsv1.DaemonSet) {
 	daemon.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
 	const directory = "/var/run/cloud-provisioning/receipts"
 	agent := &daemon.Spec.Template.Spec.Containers[0]
+	// Refresh observations before their freshness window closes. The ordinary
+	// 30-second idle interval can itself consume the entire receipt lifetime.
+	// API/native latency is additional; authentication still rejects old proof.
+	interval := min(30*time.Second, max(time.Nanosecond, r.receivePreparation.Journal.MaxReceiptAge.Duration/3))
+	pollArg := "--poll-interval=" + interval.String()
+	args := make([]string, 0, len(agent.Args)+1)
+	for _, arg := range agent.Args {
+		if !strings.HasPrefix(arg, "--poll-interval=") {
+			args = append(args, arg)
+		}
+	}
+	agent.Args = append(args, pollArg)
 	agent.Args = append(agent.Args, "--receipt-url="+p.Endpoint, "--receipt-ca-file="+directory+"/ca.crt", "--receipt-token-file="+directory+"/token", "--receive-mesh-name="+r.secretName)
 	agent.Env = append(agent.Env,
 		corev1.EnvVar{Name: "POD_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"}}},

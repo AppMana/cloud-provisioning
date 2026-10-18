@@ -364,3 +364,27 @@ func TestReceiptAgentReleaseValidation(t *testing.T) {
 		t.Fatal("receipt-free development configuration rejected", err)
 	}
 }
+
+// This checks the generated idle cadence, not native execution or API latency.
+// Slow reconciliations can still miss freshness or round deadlines; those must
+// remain failures rather than be accepted through older receipts.
+func TestReceiptAgentRefreshesBeforeFreshnessDeadline(t *testing.T) {
+	for _, age := range []time.Duration{30 * time.Second, time.Minute, 5 * time.Minute} {
+		r := &meshReconciler{receivePreparation: &receivePreparationPolicy{Journal: &receiveJournalPolicy{MaxReceiptAge: metav1.Duration{Duration: age}, Receipts: &receiveReceiptPolicy{Endpoint: "https://receipts.invalid/v1/receipts", TrustSecret: "trust"}}}}
+		daemon := &appsv1.DaemonSet{Spec: appsv1.DaemonSetSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "dialer", Args: []string{"--poll-interval=30s", "--iface=test"}}}}}}}
+		r.configureReceiptAgent(daemon)
+		count := 0
+		for _, arg := range daemon.Spec.Template.Spec.Containers[0].Args {
+			if value, ok := strings.CutPrefix(arg, "--poll-interval="); ok {
+				count++
+				interval, err := time.ParseDuration(value)
+				if err != nil || interval <= 0 || interval > 30*time.Second || interval*3 > age {
+					t.Fatalf("receipt age %v has unsuitable refresh interval %q", age, value)
+				}
+			}
+		}
+		if count != 1 {
+			t.Fatalf("poll interval appears %d times", count)
+		}
+	}
+}

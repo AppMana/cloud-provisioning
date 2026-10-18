@@ -248,6 +248,14 @@ from a single-platform reference to an index tests artifact selection and
 rollout continuity, but does not satisfy the version-changing `agent-upgrade`
 requirement by itself.
 
+Exercise image resolution with both warm and empty caches, and after switching
+between a platform reference and its index. A low-level container-store listing
+does not prove kubelet can resolve a local alias with pull policy `Never`.
+Rollback must demonstrate that the predecessor starts through the actual runtime;
+retain a retrievable immutable reference and usable pull credentials. Verify
+running executable bytes when resolving an index-versus-platform identity
+mismatch, and retain failed rollout and rollback attempts separately.
+
 1. Freeze binaries, chart and multi-architecture image digests, CAPI/CAPA,
    k0s, both Calico variants and AWS VPC CNI versions. Prove ARM64 runtime,
    not merely an image manifest. Rebuild after any code change.

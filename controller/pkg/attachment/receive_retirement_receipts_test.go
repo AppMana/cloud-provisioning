@@ -15,7 +15,7 @@ func TestReceiveRetirementObservationBatch(t *testing.T) {
 	now := time.Now()
 	for _, fault := range []string{"none", "missing", "duplicate", "unknown", "digest", "phase-key", "peer-key", "device", "boot", "container", "credential", "stale", "future", "age", "zero-scope"} {
 		t.Run(fault, func(t *testing.T) {
-			scope := ReceiveRetirementReceiptScope{digest: strings.Repeat("a", 64), nodes: map[string]bool{"one": true, "two": true}}
+			scope := ReceiveRetirementReceiptScope{digest: strings.Repeat("a", 64), nodes: map[string]string{"one": "node-one", "two": "node-two"}}
 			var batch []handover.PodReceipt
 			for _, node := range []string{"one", "two"} {
 				batch = append(batch, handover.PodReceipt{BearerToken: "test-only", BootID: "boot", Receipt: handover.Receipt{NodeUID: node, AgentContainerID: "container", RoundHash: scope.digest, ObservedAt: now.Add(-time.Second)}})

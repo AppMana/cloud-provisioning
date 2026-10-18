@@ -21,7 +21,7 @@ import (
 // kernel absence; each admitted agent must verify every cleanup obligation.
 type ReceiveRetirementReceiptScope struct {
 	digest string
-	nodes  map[string]bool
+	nodes  map[string]string
 }
 
 func (s ReceiveRetirementReceiptScope) Digest() string { return s.digest }
@@ -59,9 +59,9 @@ func NewReceiveRetirementReceiptScope(ctx context.Context, maps typedcore.Config
 		return fail(err)
 	}
 	sum := sha256.Sum256(raw)
-	scope := ReceiveRetirementReceiptScope{digest: hex.EncodeToString(sum[:]), nodes: map[string]bool{}}
+	scope := ReceiveRetirementReceiptScope{digest: hex.EncodeToString(sum[:]), nodes: map[string]string{}}
 	for _, consumer := range withdrawal.Consumers {
-		scope.nodes[consumer.NodeUID] = true
+		scope.nodes[consumer.NodeUID] = consumer.NodeName
 	}
 	if len(scope.nodes) == 0 {
 		return fail(fmt.Errorf("retirement has no retained consumers"))
@@ -95,6 +95,14 @@ func (s ReceiveRetirementReceiptScope) AuthenticateComplete(ctx context.Context,
 		}
 		proofs = append(proofs, proof)
 	}
+	// An earlier consumer may reboot while a later consumer authenticates.
+	// Reuse the existing incarnation verifier before returning the full batch.
+	for _, proof := range proofs {
+		policy := policies[proof.AuthenticatedNodeUID]
+		if err := handover.VerifyObservationIncarnation(ctx, policy.API, policy.Namespace, s.nodes[proof.AuthenticatedNodeUID], proof.Receipt); err != nil {
+			return nil, err
+		}
+	}
 	// Slow API calls cannot extend the observation lifetime.
 	if err := s.validateSubmissions(submissions, time.Now(), maxAge); err != nil {
 		return nil, err
@@ -112,7 +120,7 @@ func (s ReceiveRetirementReceiptScope) validateSubmissions(submissions []handove
 	seen := map[string]bool{}
 	for _, entry := range submissions {
 		r := entry.Receipt
-		if !s.nodes[r.NodeUID] || seen[r.NodeUID] || entry.BootID == "" || entry.BearerToken == "" || r.AgentContainerID == "" || r.RoundHash != s.digest || r.DeviceID != "" || r.FromKey != "" || r.ToKey != "" || r.FromPeerKey != "" || r.ToPeerKey != "" {
+		if s.nodes[r.NodeUID] == "" || seen[r.NodeUID] || entry.BootID == "" || entry.BearerToken == "" || r.AgentContainerID == "" || r.RoundHash != s.digest || r.DeviceID != "" || r.FromKey != "" || r.ToKey != "" || r.FromPeerKey != "" || r.ToPeerKey != "" {
 			return fmt.Errorf("retirement observation does not bind its consumer and withdrawal")
 		}
 		if r.ObservedAt.IsZero() || r.ObservedAt.After(now) || now.Sub(r.ObservedAt) > maxAge {

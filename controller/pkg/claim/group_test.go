@@ -72,3 +72,58 @@ func TestGroupLifetimeGuardsClaimAdmission(t *testing.T) {
 		})
 	}
 }
+
+// Group authorization is a durable lifecycle decision, not a fresh cleanup
+// receipt. This fake-API check does not qualify native retirement or CAPI drain.
+func TestGroupClaimDeletionRequiresMatchingCommittedAction(t *testing.T) {
+	for _, state := range []string{"committed", "pending", "group-uid", "child-uid", "machine-uid", "marker", "provider", "mesh", "cancellation", "invalid-cancellation"} {
+		t.Run(state, func(t *testing.T) {
+			claim := fakeClaim("worker")
+			claim.UID = "claim"
+			owner := metav1.OwnerReference{APIVersion: v1alpha1.GroupVersion.String(), Kind: "ProvisionedNodeGroupClaim", Name: "workers", UID: "group"}
+			claim.OwnerReferences = []metav1.OwnerReference{owner}
+			group := &v1alpha1.ProvisionedNodeGroupClaim{ObjectMeta: metav1.ObjectMeta{Name: owner.Name, Namespace: claim.Namespace, UID: owner.UID}, Status: v1alpha1.ProvisionedNodeGroupClaimStatus{PendingAction: &v1alpha1.NodeGroupAction{Type: "Drain", ID: "remove", ChildName: claim.Name, ChildUID: string(claim.UID), MachineUID: "machine", NodeName: "worker", NodeUID: "node", ProviderID: "test:///worker", Removing: true, Withdrawal: &v1alpha1.GroupPeerWithdrawal{MeshName: "mesh"}}}}
+			machine := &unstructured.Unstructured{Object: map[string]any{"spec": map[string]any{"providerID": "test:///worker"}, "status": map[string]any{"nodeRef": map[string]any{"name": "worker", "uid": "node"}}}}
+			machine.SetGroupVersionKind(machineGVK)
+			machine.SetName(claim.Name)
+			machine.SetNamespace(claim.Namespace)
+			machine.SetUID("machine")
+			annotations := map[string]string{ClaimAnnotation: claim.Namespace + "/" + claim.Name, ClaimUIDAnnotation: string(claim.UID), "cloud-provisioning.appmana.com/drain-intent": "group/remove"}
+			switch state {
+			case "pending":
+				group.Status.PendingAction.Removing = false
+			case "group-uid":
+				group.UID = "replacement"
+			case "child-uid":
+				group.Status.PendingAction.ChildUID = "other"
+			case "machine-uid":
+				machine.SetUID("other")
+			case "marker":
+				annotations["cloud-provisioning.appmana.com/drain-intent"] = "other"
+			case "provider":
+				group.Status.PendingAction.ProviderID = "test:///other"
+			case "mesh":
+				group.Status.PendingAction.Withdrawal.MeshName = "other"
+			case "cancellation", "invalid-cancellation":
+				group.Status.PendingAction.Removing = false
+				group.Status.PendingAction.Withdrawal = nil
+				group.Status.PendingAction.NodeName = ""
+				group.Status.PendingAction.NodeUID = ""
+				unstructured.RemoveNestedField(machine.Object, "status", "nodeRef")
+				_ = unstructured.SetNestedField(machine.Object, "bootstrap", "spec", "bootstrap", "dataSecretName")
+				group.Status.PendingAction.BootstrapCancellation = &v1alpha1.BootstrapCancellation{SecretName: "bootstrap", MeshName: "mesh", MeshUID: "mesh-uid"}
+				if state == "cancellation" {
+					annotations["cloud-provisioning.appmana.com/cancel-before-bootstrap"] = "group/remove"
+				}
+			}
+			machine.SetAnnotations(annotations)
+			r := newClaimReconciler(t, claim, group, machine)
+			r.MeshName = "mesh"
+			allowed, err := r.groupReceiveDeletionCommitted(context.Background(), claim, machine, owner)
+			want := state == "committed" || state == "cancellation"
+			if allowed != want || (want && err != nil) {
+				t.Fatal("incorrect group deletion admission", allowed, err)
+			}
+		})
+	}
+}

@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -45,8 +46,14 @@ const clusterNameLabel = "cluster.x-k8s.io/cluster-name"
 
 // Reconciler expands claims.
 type Reconciler struct {
+	// Lifecycle reads must bypass caches. Production registration supplies direct
+	// Client, Reader and Workload APIs for drain and retirement admission.
 	client.Client
-	Reader client.Reader
+	Reader           client.Reader
+	RetirementAPI    kubernetes.Interface
+	Workload         client.Client
+	MeshName         string
+	RetirementMaxAge time.Duration
 
 	// Provisioners are the registered claim-fulfilling providers.
 	Provisioners []join.MachineProvisioner
@@ -268,6 +275,13 @@ func (r *Reconciler) reconcileDelete(ctx context.Context, claim *v1alpha1.Provis
 	switch err := r.Reader.Get(ctx, key, machine); {
 	case err == nil:
 		if machine.GetDeletionTimestamp().IsZero() {
+			allowed, err := r.prepareReceiveDeletion(ctx, claim, machine)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if !allowed {
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			}
 			if err := r.deleteObserved(ctx, machine); err != nil && !apierrors.IsNotFound(err) {
 				return ctrl.Result{}, fmt.Errorf("deleting Machine %s: %w", key, err)
 			}

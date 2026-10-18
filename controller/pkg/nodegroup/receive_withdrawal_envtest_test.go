@@ -51,7 +51,7 @@ func verifyReceiveRemovalStages(t *testing.T, api client.Client, core kubernetes
 	must(api.Create(ctx, group))
 	child, err := BuildChild(group, 0)
 	must(err)
-	child.Finalizers = []string{"test/hold-removal"}
+	child.Finalizers = []string{claimcontroller.Finalizer, "test/hold-removal"}
 	must(api.Create(ctx, child))
 	action, err := ProposeAction(group, []v1alpha1.ProvisionedNodeClaim{*child})
 	must(err)
@@ -64,6 +64,7 @@ func verifyReceiveRemovalStages(t *testing.T, api client.Client, core kubernetes
 	gvk := schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"}
 	machine := &unstructured.Unstructured{Object: map[string]any{"spec": map[string]any{"providerID": node.Spec.ProviderID}, "status": map[string]any{"nodeRef": map[string]any{"name": node.Name, "uid": string(node.UID)}}}}
 	machine.SetGroupVersionKind(gvk)
+	machine.SetFinalizers([]string{"test/hold-compute"})
 	machine.SetName(child.Name)
 	machine.SetNamespace(group.Namespace)
 	// Model a Machine whose controller no longer retains the claim ownerRef.
@@ -361,6 +362,21 @@ func verifyReceiveRemovalStages(t *testing.T, api client.Client, core kubernetes
 	must(err)
 	if len(stored.MachineUIDs) != 1 || stored.Publications[a.MachineUID].JournalUID != string(journal.UID) || len(stored.Publications[a.MachineUID].RetirementCompletion) == 0 {
 		t.Fatal("removal lost retirement ownership or proof")
+	}
+
+	// The child controller accepts the committed group action and delegates actual
+	// termination to CAPI. No CAPI/provider controller runs in this API fixture.
+	cr := &claimcontroller.Reconciler{Client: api, Reader: api, Workload: api, RetirementAPI: core, MeshName: mesh.Name}
+	_, err = cr.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(child)})
+	must(err)
+	must(api.Get(ctx, client.ObjectKeyFromObject(machine), machine))
+	if machine.GetDeletionTimestamp() == nil {
+		t.Fatal("committed group removal did not reach CAPI deletion")
+	}
+	retained, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, group.Namespace, mesh.Name, string(mesh.UID))
+	must(err)
+	if len(retained.MachineUIDs) != 1 || len(retained.Publications[a.MachineUID].RetirementCompletion) == 0 {
+		t.Fatal("compute deletion released retirement state")
 	}
 
 }

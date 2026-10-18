@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
@@ -47,6 +48,11 @@ func TestRealAPITeardownDeletionRaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	core, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("standalone-receiver-removal", func(t *testing.T) { verifyStandaloneReceiveDeletion(t, api, core) })
 	ctx := context.Background()
 	for _, kind := range []string{"machine", "infra", "node"} {
 		for _, race := range []string{"replacement", "update"} {

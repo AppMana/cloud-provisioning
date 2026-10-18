@@ -2753,11 +2753,24 @@ func main() {
 			os.Exit(1)
 		}
 
+		claimAPI, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to create direct claim client: %v\n", err)
+			os.Exit(1)
+		}
+		claimRetirementAge := time.Minute
+		if receivePolicy != nil && receivePolicy.Journal != nil {
+			claimRetirementAge = receivePolicy.Journal.MaxReceiptAge.Duration
+		}
 		err = ctrl.NewControllerManagedBy(mgr).
 			Named("claim").
 			For(&v1alpha1.ProvisionedNodeClaim{}).
 			Complete(&claim.Reconciler{
-				Client:                    mgr.GetClient(),
+				Client:                    claimAPI,
+				Workload:                  claimAPI,
+				RetirementAPI:             clientset,
+				MeshName:                  secretName,
+				RetirementMaxAge:          claimRetirementAge,
 				Reader:                    mgr.GetAPIReader(),
 				Provisioners:              []join.MachineProvisioner{awsProvider, dockerProvider, labcontainersProvider},
 				RoleLabel:                 cloudWorkerRoleLabel,

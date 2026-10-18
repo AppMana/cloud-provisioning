@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"strings"
@@ -52,20 +53,38 @@ func (c *ReceiptClient) Submit(ctx context.Context, bearer string, request Recei
 	if err != nil || len(body) > 1<<20 {
 		return fmt.Errorf("receipt request cannot be encoded within the transport limit")
 	}
-	r, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("receipt request could not be constructed")
+	// Keep the original delivery bound across retries, including backoff. Only
+	// the collector's pre-admission busy response is retryable; ambiguous network
+	// failures, rejected observations, shutdown and capacity exhaustion are not.
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	for {
+		r, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))
+		if err != nil {
+			return fmt.Errorf("receipt request could not be constructed")
+		}
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("Authorization", "Bearer "+bearer)
+		response, err := c.client.Do(r)
+		if err != nil {
+			// Do not propagate request, URL, header or arbitrary peer error text.
+			return fmt.Errorf("receipt delivery failed")
+		}
+		response.Body.Close()
+		if response.StatusCode == http.StatusAccepted || response.StatusCode == http.StatusNoContent {
+			return nil
+		}
+		if response.StatusCode != http.StatusServiceUnavailable || response.Header.Get("Retry-After") != "1" {
+			return fmt.Errorf("receipt controller rejected submission (HTTP %d)", response.StatusCode)
+		}
+		// Jitter prevents simultaneously rejected consumers from continually
+		// colliding. Never refresh ObservedAt or extend the receipt lifetime.
+		timer := time.NewTimer(time.Second + time.Duration(rand.Int64N(int64(time.Second))))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return fmt.Errorf("receipt delivery deadline exceeded")
+		case <-timer.C:
+		}
 	}
-	r.Header.Set("Content-Type", "application/json")
-	r.Header.Set("Authorization", "Bearer "+bearer)
-	response, err := c.client.Do(r)
-	if err != nil {
-		// Do not propagate request, URL, header or arbitrary peer error text.
-		return fmt.Errorf("receipt delivery failed")
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusAccepted && response.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("receipt controller rejected submission (HTTP %d)", response.StatusCode)
-	}
-	return nil
 }

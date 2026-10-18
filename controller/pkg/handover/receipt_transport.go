@@ -210,6 +210,10 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case h.gate <- struct{}{}:
 		defer func() { <-h.gate }()
 	default:
+		// No admission or mutation has started. Let agents redeliver this
+		// observation within its original lifetime instead of rerunning native
+		// cleanup after every collision with another consumer.
+		w.Header().Set("Retry-After", "1")
 		reject(http.StatusServiceUnavailable)
 		return
 	}

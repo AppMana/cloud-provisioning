@@ -68,6 +68,154 @@ func TestReceiptClientTLSAndRedirects(t *testing.T) {
 	}
 }
 
+// Transport-only contention coverage. Synthetic callbacks do not establish
+// native absence or authenticated completion; production admission still owns
+// identity, source and freshness checks on every delivery.
+func TestReceiptClientRetriesOnlyExplicitBusy(t *testing.T) {
+	for _, scenario := range []string{"busy", "conflict", "unavailable", "cancel", "deadline"} {
+		t.Run(scenario, func(t *testing.T) {
+			calls := 0
+			var first []byte
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if scenario == "deadline" {
+				var stop context.CancelFunc
+				ctx, stop = context.WithTimeout(ctx, 100*time.Millisecond)
+				defer stop()
+			}
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				raw, _ := io.ReadAll(r.Body)
+				if r.Header.Get("Authorization") != "Bearer private-token" {
+					t.Error("credential missing on delivery")
+				}
+				if calls == 1 {
+					first = raw
+				} else if !bytes.Equal(first, raw) {
+					t.Error("retry changed observation or freshness")
+				}
+				if calls > 1 {
+					w.WriteHeader(http.StatusAccepted)
+					return
+				}
+				if scenario == "busy" || scenario == "cancel" || scenario == "deadline" {
+					w.Header().Set("Retry-After", "1")
+				}
+				if scenario == "cancel" {
+					cancel()
+				}
+				if scenario == "conflict" {
+					w.Header().Set("Retry-After", "1")
+					w.WriteHeader(http.StatusConflict)
+				} else {
+					w.WriteHeader(http.StatusServiceUnavailable)
+				}
+			}))
+			defer server.Close()
+			ca := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+			client, err := NewReceiptClient(server.URL, ca)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Close()
+			request := ReceiptRequest{MachineUID: "machine", Receipts: []PodReceipt{{Receipt: Receipt{ObservedAt: time.Now()}}}}
+			err = client.Submit(ctx, "private-token", request)
+			if scenario == "busy" {
+				if err != nil || calls != 2 {
+					t.Fatalf("busy observation not redelivered: calls=%d err=%v", calls, err)
+				}
+			} else if err == nil || calls != 1 || strings.Contains(err.Error(), "private-token") {
+				t.Fatalf("unsafe retry or error: calls=%d err=%v", calls, err)
+			}
+		})
+	}
+}
+
+func TestReceiptCollectorSignalsBusyBeforeAdmission(t *testing.T) {
+	called := false
+	h, err := NewReceiptCollectionHandler(func(context.Context, string) (ReceiptCollection, error) {
+		called = true
+		return ReceiptCollection{}, fmt.Errorf("must not resolve")
+	}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.gate <- struct{}{}
+	defer func() { <-h.gate }()
+	digest := strings.Repeat("a", 64)
+	body, _ := json.Marshal(ReceiptRequest{MachineUID: "machine", RoundHash: digest, Receipts: []PodReceipt{{Receipt: Receipt{RoundHash: digest}}}})
+	r := httptest.NewRequest(http.MethodPost, "https://controller/receipts", bytes.NewReader(body))
+	r.Header.Set("Authorization", "Bearer private-token")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") != "1" || called {
+		t.Fatal("busy response did not precede admission")
+	}
+}
+
+func TestReceiptConcurrentDelivery(t *testing.T) {
+	digest := strings.Repeat("b", 64)
+	observed := time.Now()
+	var members []ReceiptMember
+	for i := 0; i < 7; i++ {
+		members = append(members, ReceiptMember{NodeUID: fmt.Sprintf("node-%d", i)})
+	}
+	completed := make(chan struct{}, 1)
+	h, err := NewReceiptCollectionHandler(func(ctx context.Context, _ string) (ReceiptCollection, error) {
+		// Hold the real collector gate while modeling an admission API read.
+		select {
+		case <-time.After(50 * time.Millisecond):
+		case <-ctx.Done():
+			return ReceiptCollection{}, ctx.Err()
+		}
+		return ReceiptCollection{
+			UID: "journal", Digest: digest, ExpiresAt: observed.Add(10 * time.Second), MaxAge: 10 * time.Second, Members: members,
+			Observe: func(_ context.Context, entries []PodReceipt) error {
+				for _, e := range entries {
+					if e.BearerToken != "private-token" || !e.Receipt.ObservedAt.Equal(observed) || time.Since(e.Receipt.ObservedAt) >= 10*time.Second {
+						return fmt.Errorf("credential or observation changed or expired")
+					}
+				}
+				return nil
+			},
+			Complete: func(_ context.Context, entries []PodReceipt) error {
+				if len(entries) != len(members) {
+					return fmt.Errorf("incomplete consumer batch")
+				}
+				completed <- struct{}{}
+				return nil
+			},
+		}, nil
+	}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewTLSServer(h)
+	defer server.Close()
+	ca := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+	client, err := NewReceiptClient(server.URL, ca)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	results := make(chan error, len(members))
+	for _, member := range members {
+		go func() {
+			results <- client.Submit(ctx, "private-token", ReceiptRequest{MachineUID: "machine", RoundHash: digest, Receipts: []PodReceipt{{BootID: "boot", Receipt: Receipt{NodeUID: member.NodeUID, AgentContainerID: "container", RoundHash: digest, ObservedAt: observed}}}})
+		}()
+	}
+	for range members {
+		if err := <-results; err != nil {
+			t.Error(err)
+		}
+	}
+	if len(completed) != 1 {
+		t.Fatal("concurrent submissions did not complete one batch")
+	}
+}
+
 func TestReceiptCollectorExpiryAndShutdown(t *testing.T) {
 	h, _ := NewReceiptHandler(func(context.Context, string) (Store, map[string]PodReceiptAuthenticator, error) {
 		return Store{}, nil, fmt.Errorf("unused")

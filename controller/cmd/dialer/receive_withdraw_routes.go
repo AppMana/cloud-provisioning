@@ -8,13 +8,14 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// withdrawReceiveDeviceRoutes removes only the explicitly admitted direct
-// receiver routes. The caller must hold the host lock and have checkpointed a
+// withdrawReceiveDeviceRoutes removes only explicitly admitted direct and relay
+// receiver destinations. The caller must hold the host lock and have checkpointed a
 // live withdrawal covering these generations. No handshake from the deleted
 // worker is required. Device retirement remains a separate verified operation.
-// Foreign tables, source exceptions and relay routes must be retired by their
-// own owners first; this function never repairs them to make cleanup pass.
-func withdrawReceiveDeviceRoutes(ctx context.Context, cfg config, generations []map[string]receiveRouteSelection, own []string) error {
+// Foreign tables and source exceptions must be retired by their own owners
+// first. Relay next hops must match a committed generation; nothing is repaired
+// to make cleanup pass.
+func withdrawReceiveDeviceRoutes(ctx context.Context, cfg config, generations []map[string]receiveRouteSelection, own []string, admittedRelays ...map[string]string) error {
 	if cfg.routeTable <= unix.RT_TABLE_LOCAL || cfg.fwmark <= 0 || len(generations) == 0 {
 		return fmt.Errorf("receiver withdrawal requires owned policy and admitted generations")
 	}
@@ -44,6 +45,11 @@ func withdrawReceiveDeviceRoutes(ctx context.Context, cfg config, generations []
 			indices[link.Attrs().Index] = true
 		}
 	}
+	for _, relays := range admittedRelays {
+		for raw := range relays {
+			cfg.receiveRouteScope[raw] = true
+		}
+	}
 	if len(cfg.receiveRouteScope) == 0 {
 		return nil
 	}
@@ -53,7 +59,7 @@ func withdrawReceiveDeviceRoutes(ctx context.Context, cfg config, generations []
 	if err := verifyReceivePolicyRules(cfg); err != nil {
 		return err
 	}
-	if err := preflightReceiveRouteGenerationsWithHandshake(cfg, generations, nil, own, false); err != nil {
+	if err := preflightReceiveRouteGenerationsWithHandshake(cfg, generations, nil, own, false, admittedRelays...); err != nil {
 		return err
 	}
 	routes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, netlink.RT_FILTER_TABLE)
@@ -68,11 +74,12 @@ func withdrawReceiveDeviceRoutes(ctx context.Context, cfg config, generations []
 				uses = true
 			}
 		}
-		if !uses {
+		relay := route.Table == cfg.routeTable && route.Dst != nil && cfg.receiveRouteScope[route.Dst.String()] && len(route.Gw) != 0
+		if !uses && !relay {
 			continue
 		}
 		scope := netlink.SCOPE_LINK
-		if route.Family == netlink.FAMILY_V6 {
+		if route.Family == netlink.FAMILY_V6 || relay {
 			scope = netlink.SCOPE_UNIVERSE
 		}
 		if route.Table != cfg.routeTable || route.Dst == nil || !cfg.receiveRouteScope[route.Dst.String()] || route.Scope != scope || route.Flags != 0 {

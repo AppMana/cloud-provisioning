@@ -642,7 +642,7 @@ func preflightReceiveRouteGenerationsWithHandshake(cfg config, generations []map
 	if legacy.Type() != "wireguard" {
 		return fmt.Errorf("legacy route device is not WireGuard")
 	}
-	if len(admittedRelays) > 2 {
+	if requireHandshake && len(admittedRelays) > 2 {
 		return fmt.Errorf("too many admitted relay generations")
 	}
 	if len(admittedRelays) == 0 {

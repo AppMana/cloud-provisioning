@@ -15,8 +15,8 @@ import (
 
 // Caller holds the host lock. Retire the journal's site receivers and separately
 // prepared successors recorded in both receiver ownership directories. Ordinary
-// source exceptions, root peers and caches are also retired. Relay paths
-// and authenticated completion remain separate obligations; success here must
+// source exceptions, committed relay routes, root peers and caches are also
+// retired. Non-endpoint followers and authenticated completion remain separate obligations; success here must
 // never be published as full retirement.
 func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Interface, devices receiverDevices, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, admitted admittedReceiveRetirement) error {
 	if devices == nil || cfg.secretName != scope.MeshName || cfg.secretNamespace != scope.Namespace || siteReceiveCachePath(cfg) == "" {
@@ -114,6 +114,32 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 	if err != nil {
 		return err
 	}
+	var relayGenerations []map[string]string
+	for _, graph := range graphs {
+		routes, err := tunnel.PlanReceiveRoutes(graph)
+		if err != nil {
+			return err
+		}
+		member := graph.Sites[key.PublicKey().String()]
+		for _, path := range []*tunnel.ReceiveSitePath{member.Legacy, member.Forward} {
+			if path == nil || path.Transit == nil {
+				continue
+			}
+			relays := map[string]string{}
+			for raw := range routes[admitted.NodeUID] {
+				_, dst, err := net.ParseCIDR(raw)
+				if err != nil {
+					return err
+				}
+				gateway := path.Transit.Gateway(dst.IP)
+				if gateway == nil {
+					return fmt.Errorf("withdrawn relay has no committed gateway")
+				}
+				relays[raw] = gateway.String()
+			}
+			relayGenerations = append(relayGenerations, relays)
+		}
+	}
 	guard := &siteReceiveScope{plans: admitted.Plans, check: check}
 	prepare := func(groups map[string][]receiveRouteSelection, destinations map[string][]string) error {
 		var names []string
@@ -166,7 +192,7 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 		if err := check(); err != nil {
 			return err
 		}
-		return withdrawReceiveDeviceRoutes(ctx, cfg, generations, own)
+		return withdrawReceiveDeviceRoutes(ctx, cfg, generations, own, relayGenerations...)
 	}
 	checkpoint := receiveNeighborCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), MeshUID: scope.MeshUID, MeshVersion: mesh.ResourceVersion, NodeUID: admitted.NodeUID, BootID: admitted.BootID, PublicKey: key.PublicKey().String(), Peers: currentPeers}
 	if err := retireWithdrawnNeighborCaches(ctx, lockPath+".neighbors.json", checkpoint, admitted.Plans, plan.RootPublicKey, recorded, check, func(peers []tunnel.PeerSpec) error {

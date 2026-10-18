@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net"
 	"os"
 	"reflect"
@@ -160,6 +161,75 @@ func TestNativeReceiveRelayRouteSwitch(t *testing.T) {
 					}
 				}
 			}
+			// Withdrawal is destination-scoped: a surviving worker can use the
+			// same underlay and gateway without losing its route. This observes
+			// kernel state only, not packets, API admission or cloud deletion.
+			for _, fault := range []string{"none", "gateway", "protocol", "metric", "cancelled", "older-gateway"} {
+				t.Run("withdraw/"+fault, func(t *testing.T) {
+					must := func(err error) {
+						t.Helper()
+						if err != nil {
+							t.Fatal(err)
+						}
+					}
+					good := netlink.Route{Dst: dst, LinkIndex: lan.Attrs().Index, Gw: net.ParseIP(tc.gateway), Src: addr.IP, Table: 518, Protocol: unix.RTPROT_BOOT}
+					must(netlink.RouteReplace(&good))
+					cfg.receiveRelayRoutes = map[string]string{tc.destination: tc.gateway, tc.second: tc.other}
+					must(installRoutes(cfg, hosts, nil, nil, nil, nil, own))
+					relays := []map[string]string{{tc.destination: tc.gateway}}
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					bad := good
+					switch fault {
+					case "gateway":
+						bad.Gw = net.ParseIP(tc.other)
+					case "protocol":
+						bad.Protocol = unix.RTPROT_STATIC
+					case "metric":
+						bad.Priority = 123
+					case "cancelled":
+						cancel()
+					case "older-gateway":
+						bad.Gw = net.ParseIP(tc.other)
+						relays = append(relays, map[string]string{tc.destination: tc.other}, map[string]string{tc.destination: tc.gateway})
+					}
+					// RouteReplace with another metric may add a second route;
+					// remove the original first so the rejection tests one owner.
+					must(netlink.RouteDel(&good))
+					must(netlink.RouteAdd(&bad))
+					family := netlink.FAMILY_V6
+					if addr.IP.To4() != nil {
+						family = netlink.FAMILY_V4
+					}
+					snapshot := func() []netlink.Route {
+						r, e := netlink.RouteListFiltered(family, &netlink.Route{Table: 518}, netlink.RT_FILTER_TABLE)
+						must(e)
+						return r
+					}
+					before := snapshot()
+					err := withdrawReceiveDeviceRoutes(ctx, cfg, []map[string]receiveRouteSelection{{}}, own, relays...)
+					if fault != "none" && fault != "older-gateway" {
+						if err == nil || !reflect.DeepEqual(before, snapshot()) {
+							t.Fatal("unsafe relay withdrawal changed routes", err)
+						}
+						must(netlink.RouteDel(&bad))
+						must(netlink.RouteAdd(&good))
+						return
+					}
+					must(err)
+					must(withdrawReceiveDeviceRoutes(ctx, cfg, []map[string]receiveRouteSelection{{}}, own, relays...))
+					var expected []netlink.Route
+					for _, route := range before {
+						if route.Dst == nil || route.Dst.String() != tc.destination {
+							expected = append(expected, route)
+						}
+					}
+					if !reflect.DeepEqual(expected, snapshot()) {
+						t.Fatal("relay withdrawal changed another worker")
+					}
+				})
+			}
+
 		})
 	}
 }

@@ -61,53 +61,15 @@ func (r *Reconciler) beginReceiveRemoval(ctx context.Context, group *v1alpha1.Pr
 	if !slices.Contains(inventory.MachineUIDs, a.MachineUID) {
 		return false, nil
 	}
-	publication := inventory.Publications[a.MachineUID]
-	if publication.JournalUID == "" {
-		return true, fmt.Errorf("receiver journal is not fully published")
-	}
-	store.ExpectedUID = publication.JournalUID
-	snapshot, err := store.Load(ctx)
-	if err != nil {
-		return true, err
-	}
 	intent := groupReceiveWithdrawalIntent(group)
 	authorize := func(ctx context.Context, w attachment.RemoteWithdrawalIntent) error {
 		return AuthorizeReceiveWithdrawal(ctx, r.API, r.Workload, r.MachineGVK, group, w)
-	}
-	if err := authorize(ctx, intent); err != nil {
-		return true, err
-	}
-	plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
-	if err != nil {
-		return true, err
-	}
-	if plan.MachineUID != a.MachineUID || plan.MachineName != a.ChildName || plan.CloudNodeUID != a.NodeUID || plan.CloudNodeName != a.NodeName || plan.Namespace != group.Namespace || plan.MeshName != mesh.Name || plan.MeshUID != string(mesh.UID) || plan.RootPublicKey != intent.PublicKey {
-		return true, fmt.Errorf("receiver journal differs from drain owner")
-	}
-	if !snapshot.Frozen() {
-		_, err := store.FreezeCompleted(ctx, snapshot)
-		return true, err
-	}
-	if len(publication.Retirement) == 0 {
-		return true, intent.ReserveReceiveWithdrawal(ctx, store.ConfigMaps, store.ClusterUID, string(index.UID), mesh, snapshot)
-	}
-	if _, err := attachment.PublishReceiveWithdrawal(ctx, r.RetirementAPI, store, group.Namespace, mesh.Name, string(mesh.UID), a.MachineUID, string(index.UID), authorize); err != nil {
-		return true, err
 	}
 	maxAge := r.RetirementMaxAge
 	if maxAge <= 0 {
 		maxAge = time.Minute
 	}
-	complete, err := attachment.VerifyReceiveRetirementCompletion(ctx, r.RetirementAPI, store, group.Namespace, mesh.Name, string(mesh.UID), a.MachineUID, string(index.UID), maxAge)
-	if err != nil || !complete {
-		return true, err
-	}
-	if err := authorize(ctx, intent); err != nil {
-		return true, err
-	}
-	// Lifecycle reads may take time. Revalidate completion age, incarnations and
-	// source after that check rather than carrying an earlier success forward.
-	complete, err = attachment.VerifyReceiveRetirementCompletion(ctx, r.RetirementAPI, store, group.Namespace, mesh.Name, string(mesh.UID), a.MachineUID, string(index.UID), maxAge)
+	complete, err := attachment.AdvanceReceiveRemoval(ctx, r.RetirementAPI, store, liveIndex.ObjectMeta, mesh, intent, a.NodeName, a.NodeUID, maxAge, authorize)
 	if err != nil || !complete {
 		return true, err
 	}

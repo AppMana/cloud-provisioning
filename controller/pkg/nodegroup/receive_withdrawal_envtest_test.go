@@ -3,6 +3,7 @@ package nodegroup
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/netip"
 	"testing"
 	"time"
@@ -142,6 +143,47 @@ func verifyReceiveRemovalStages(t *testing.T, api client.Client, core kubernetes
 	index := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: tunnel.ReceiveInventoryName(string(mesh.UID)), Namespace: group.Namespace}, Data: map[string]string{"inventory.json": string(raw)}}
 	must(api.Create(ctx, index))
 	store := handover.Store{ConfigMaps: core.CoreV1().ConfigMaps(group.Namespace), ClusterUID: string(cluster.UID), Name: journal.Name, ExpectedUID: string(journal.UID)}
+	// Shared retirement execution must reject invalid caller authority before
+	// freezing or publishing anything. Real API storage, synthetic history.
+	for _, fault := range []string{"authority", "index-version", "node", "receipt-policy"} {
+		expected := index.ObjectMeta
+		nodeName := node.Name
+		maxAge := time.Minute
+		authorize := func(ctx context.Context, w attachment.RemoteWithdrawalIntent) error {
+			return AuthorizeReceiveWithdrawal(ctx, api, api, gvk, group, w)
+		}
+		switch fault {
+		case "authority":
+			authorize = func(context.Context, attachment.RemoteWithdrawalIntent) error {
+				return fmt.Errorf("injected lifecycle rejection")
+			}
+		case "index-version":
+			expected.ResourceVersion = "stale"
+		case "node":
+			nodeName = "replacement"
+		case "receipt-policy":
+			maxAge = 0
+		}
+		ready, err := attachment.AdvanceReceiveRemoval(ctx, core, store, expected, mesh, groupReceiveWithdrawalIntent(group), nodeName, string(node.UID), maxAge, authorize)
+		if err == nil || ready {
+			t.Fatal("shared retirement accepted invalid caller", fault, err)
+		}
+		snapshot, err := store.Load(ctx)
+		must(err)
+		if snapshot.Frozen() {
+			t.Fatal("invalid authority froze journal", fault)
+		}
+		unchanged := &corev1.ConfigMap{}
+		must(api.Get(ctx, client.ObjectKeyFromObject(index), unchanged))
+		if unchanged.ResourceVersion != index.ResourceVersion {
+			t.Fatal("invalid authority changed inventory", fault)
+		}
+		currentMesh := &corev1.Secret{}
+		must(api.Get(ctx, client.ObjectKeyFromObject(mesh), currentMesh))
+		if currentMesh.ResourceVersion != mesh.ResourceVersion {
+			t.Fatal("invalid authority changed mesh", fault)
+		}
+	}
 	// Let ordinary reconciliation persist its finalizer and capacity report first.
 	for attempt := 0; attempt < 2; attempt++ {
 		r := &Reconciler{API: api, Workload: api, MachineGVK: gvk, RetirementAPI: core, MeshName: mesh.Name}

@@ -423,6 +423,18 @@ callbacks. Synthetic concurrency tests establish overlap, bounded admission and
 error behavior only, not live API throughput or authenticated retirement within
 the observation lifetime.
 
+Version-three retirement completion records exclude all completion evidence
+from their inventory authority hash, so recording or refreshing a sibling
+completion does not invalidate an otherwise current proof. Journal identities,
+withdrawal intents, membership and every other inventory field remain bound.
+Version-two records retain their original own-record-only exclusion and must be
+refreshed through complete authentication to acquire the new semantics. Older
+readers reject version three; retain a compatible runtime after such writes.
+In-flight submissions still bind the inventory revision, and completion still
+requires current identities, fresh observations and an uncontested write. Scope
+hash tests and synthetic evidence updates do not prove two live workers can
+finish retirement within the required freshness window.
+
 Dispatch all local withdrawal targets before other receiver maintenance,
 preserving their discovery order. A later background read failure must not
 prevent an earlier cleanup attempt merely because opaque machine IDs sort in

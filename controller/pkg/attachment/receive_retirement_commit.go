@@ -14,6 +14,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const receiveRetirementCompletionVersion = 3
+
 type receiveRetirementCompletion struct {
 	InventoryVersion string             `json:"inventoryVersion"`
 	InventoryHash    string             `json:"inventoryHash"`
@@ -72,7 +74,7 @@ func RecordReceiveRetirementWithPodReceipts(ctx context.Context, api kubernetes.
 	if err := scope.validateSubmissions(submissions, time.Now(), maxAge); err != nil {
 		return err
 	}
-	completion := receiveRetirementCompletion{Version: 2, InventoryVersion: scope.inventory.ResourceVersion, InventoryHash: scope.inventoryHash, MeshVersion: mesh.ResourceVersion, Binding: scope.Digest(), Receipts: make([]handover.Receipt, 0, len(proofs))}
+	completion := receiveRetirementCompletion{Version: receiveRetirementCompletionVersion, InventoryVersion: scope.inventory.ResourceVersion, InventoryHash: scope.inventoryHash, MeshVersion: mesh.ResourceVersion, Binding: scope.Digest(), Receipts: make([]handover.Receipt, 0, len(proofs))}
 	for _, proof := range proofs {
 		completion.Receipts = append(completion.Receipts, proof.Receipt)
 	}

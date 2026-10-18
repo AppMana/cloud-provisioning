@@ -14,8 +14,9 @@ import (
 )
 
 // VerifyReceiveRetirementCompletion checks controller-authenticated durable
-// evidence without storing or replaying bearer tokens. Only the completion's own
-// inventory write may differ from its authenticated source. Current pod/container
+// evidence without storing or replaying bearer tokens. Version three excludes
+// completion evidence from the inventory authority hash; version two retains
+// its original own-record-only exclusion. Current pod/container
 // and boot identities and observation age remain mandatory. This is a deletion
 // gate, not allocation release or evidence of future connectivity. Missing
 // completion returns false; stale/incompatible evidence requires reconciliation.
@@ -41,16 +42,14 @@ func VerifyReceiveRetirementCompletion(ctx context.Context, api kubernetes.Inter
 	if decoder.Decode(&extra) != io.EOF {
 		return false, fmt.Errorf("trailing completion evidence")
 	}
-	if completion.Version != 2 || completion.InventoryVersion == "" || completion.InventoryVersion == source.Metadata.ResourceVersion || completion.MeshVersion != source.MeshMetadata.ResourceVersion {
+	if (completion.Version != 2 && completion.Version != receiveRetirementCompletionVersion) || completion.InventoryVersion == "" || completion.InventoryVersion == source.Metadata.ResourceVersion || completion.MeshVersion != source.MeshMetadata.ResourceVersion {
 		return false, fmt.Errorf("completion source revision is missing or changed")
 	}
-	publication.RetirementCompletion = nil
-	source.Inventory.Publications[machineUID] = publication
-	raw, err := json.Marshal(source.Inventory)
+	inventoryHash, err := receiveRetirementInventoryHash(source.Inventory, machineUID, completion.Version)
 	if err != nil {
 		return false, err
 	}
-	if completion.InventoryHash != tunnel.HashPeerList(raw) {
+	if completion.InventoryHash != inventoryHash {
 		return false, fmt.Errorf("inventory changed since completion authentication")
 	}
 	digest, err := receiveRetirementDigest(store.ClusterUID, inventoryUID, completion.InventoryVersion, source.Mesh, publication.Retirement)
@@ -92,4 +91,30 @@ func VerifyReceiveRetirementCompletion(ctx context.Context, api kubernetes.Inter
 		return false, err
 	}
 	return true, nil
+}
+
+// Completion records are observations of cleanup, not reservation or withdrawal
+// authority. New records bind every inventory field except those observations.
+// Legacy records retain their original interpretation; never silently upgrade
+// their hash semantics. Copy publication entries so source admission is intact.
+func receiveRetirementInventoryHash(inventory tunnel.ReceiveInventory, machineUID string, version int) (string, error) {
+	if version != 2 && version != receiveRetirementCompletionVersion {
+		return "", fmt.Errorf("unsupported retirement completion version")
+	}
+	if _, found := inventory.Publications[machineUID]; machineUID == "" || !found {
+		return "", fmt.Errorf("completion target is not published")
+	}
+	publications := make(map[string]tunnel.ReceiveJournalPublication, len(inventory.Publications))
+	for uid, publication := range inventory.Publications {
+		if uid == machineUID || version == receiveRetirementCompletionVersion {
+			publication.RetirementCompletion = nil
+		}
+		publications[uid] = publication
+	}
+	inventory.Publications = publications
+	raw, err := json.Marshal(inventory)
+	if err != nil {
+		return "", err
+	}
+	return tunnel.HashPeerList(raw), nil
 }

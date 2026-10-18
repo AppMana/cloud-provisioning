@@ -161,7 +161,7 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 			must(err)
 			var completion receiveRetirementCompletion
 			must(json.Unmarshal(record, &completion))
-			if completion.Version != 2 || completion.InventoryVersion != scope.inventory.ResourceVersion || completion.InventoryHash != scope.inventoryHash || completion.MeshVersion != mesh.ResourceVersion || completion.Binding != scope.Digest() || len(completion.Receipts) != 1 || completion.Receipts[0].AgentPodUID != string(pod.UID) || completion.Receipts[0].ObservedBootID != entry.BootID {
+			if completion.Version != receiveRetirementCompletionVersion || completion.InventoryVersion != scope.inventory.ResourceVersion || completion.InventoryHash != scope.inventoryHash || completion.MeshVersion != mesh.ResourceVersion || completion.Binding != scope.Digest() || len(completion.Receipts) != 1 || completion.Receipts[0].AgentPodUID != string(pod.UID) || completion.Receipts[0].ObservedBootID != entry.BootID {
 				t.Fatal("lost authenticated completion identity")
 			}
 			if strings.Contains(string(record), entry.BearerToken) || len(v.MachineUIDs) != 1 || v.Publications[w.MachineUID].JournalUID != string(journal.UID) {
@@ -172,6 +172,36 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 			if !verified {
 				t.Fatal("authenticated completion did not survive its own inventory write")
 			}
+			// A v2 record keeps its old hash semantics; parsing a newer reader
+			// must not require rewriting otherwise valid retained evidence.
+			legacy := completion
+			legacy.Version = 2
+			legacy.InventoryHash, err = receiveRetirementInventoryHash(v, w.MachineUID, 2)
+			must(err)
+			legacyRaw, err := json.Marshal(legacy)
+			must(err)
+			currentInventory, currentIndex, err := tunnel.ReadReceiveInventory(ctx, maps, "cluster", ns, mesh.Name, string(mesh.UID))
+			must(err)
+			publication := currentInventory.Publications[w.MachineUID]
+			publication.RetirementCompletion = legacyRaw
+			currentInventory.Publications[w.MachineUID] = publication
+			encoded, err := json.Marshal(currentInventory)
+			must(err)
+			currentIndex.Data["inventory.json"] = string(encoded)
+			currentIndex, err = maps.Update(ctx, currentIndex, metav1.UpdateOptions{})
+			must(err)
+			legacyOK, err := VerifyReceiveRetirementCompletion(ctx, api, store, ns, mesh.Name, string(mesh.UID), w.MachineUID, string(index.UID), time.Minute)
+			must(err)
+			if !legacyOK {
+				t.Fatal("valid legacy completion rejected")
+			}
+			publication.RetirementCompletion = record
+			currentInventory.Publications[w.MachineUID] = publication
+			encoded, err = json.Marshal(currentInventory)
+			must(err)
+			currentIndex.Data["inventory.json"] = string(encoded)
+			_, err = maps.Update(ctx, currentIndex, metav1.UpdateOptions{})
+			must(err)
 			for _, damage := range []string{"version", "inventory-version", "inventory-hash", "mesh-version", "binding", "missing", "duplicate", "container", "stale", "phase"} {
 				t.Run("readback/"+damage, func(t *testing.T) {
 					var changed receiveRetirementCompletion

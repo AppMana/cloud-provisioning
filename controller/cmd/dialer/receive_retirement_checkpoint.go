@@ -32,14 +32,16 @@ func sameReceiveRetirement(a, b admittedReceiveRetirement) bool {
 // That order fences old serving-state recovery even if a later write fails.
 // This is retirement intent, never evidence that native cleanup completed.
 func checkpointReceiveRetirementLocked(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, admitted admittedReceiveRetirement) error {
-	current, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
-	if err != nil {
+	if admitted.Mesh == nil || scope.Namespace != admitted.Mesh.Namespace || scope.MeshName != admitted.Mesh.Name || scope.MeshUID != string(admitted.Mesh.UID) || scope.MachineUID != admitted.Withdrawal.MachineUID || store.Name != tunnel.ReceiveTransitionName(scope.MachineUID) {
+		return fmt.Errorf("retirement checkpoint differs from admitted scope")
+	}
+	target, found := admitted.Journals[scope.MachineUID]
+	if !found || (store.ExpectedUID != "" && store.ExpectedUID != string(target.Metadata().UID)) {
+		return fmt.Errorf("retirement checkpoint journal incarnation changed")
+	}
+	if err := recheckReceiveRetirement(ctx, api, store, admitted, cfg.nodeName, key); err != nil {
 		return err
 	}
-	if !sameReceiveRetirement(admitted, current) {
-		return fmt.Errorf("retirement changed before checkpoint")
-	}
-	admitted = current
 	next := receiveInventoryCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), Inventory: admitted.Inventory, NodeName: cfg.nodeName, NodeUID: admitted.NodeUID, BootID: admitted.BootID, PublicKey: key.PublicKey().String()}
 	path := lockPath + ".inventory.json"
 	if err := validateReceiveInventoryCheckpoint(path, next); err != nil {

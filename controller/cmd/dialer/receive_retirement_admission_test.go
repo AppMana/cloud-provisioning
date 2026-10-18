@@ -140,8 +140,17 @@ func verifyReceiveRetirementAdmission(t *testing.T, api kubernetes.Interface, st
 		persist := func(a admittedReceiveRetirement) error {
 			return checkpointReceiveRetirementLocked(ctx, api, store, scope, cfg, site, lock.Name(), a)
 		}
-		if err := persist(admitted); err != nil {
+		// Already admitted immutable history must not be reconstructed just
+		// to checkpoint intent. Budget one live read per journal plus inventory;
+		// Node and mesh checks remain separate. This is not a latency guarantee.
+		counted := &changingJournalReader{ConfigMapInterface: store.ConfigMaps, change: func() error { return nil }}
+		reader := store
+		reader.ConfigMaps = counted
+		if err := checkpointReceiveRetirementLocked(ctx, api, reader, scope, cfg, site, lock.Name(), admitted); err != nil {
 			t.Fatal(err)
+		}
+		if counted.reads > len(admitted.Journals)+1 {
+			t.Fatalf("checkpoint reconstructed admitted history: %d ConfigMap reads", counted.reads)
 		}
 		if err := persist(admitted); err != nil {
 			t.Fatal("retirement checkpoint retry failed", err)
@@ -173,6 +182,26 @@ func verifyReceiveRetirementAdmission(t *testing.T, api kubernetes.Interface, st
 		stale.Metadata.ResourceVersion = "stale"
 		if err := persist(stale); err == nil {
 			t.Fatal("stale admission checkpointed")
+		}
+		for _, fault := range []string{"namespace", "mesh", "mesh-uid", "machine", "store", "journal-uid"} {
+			changedScope, changedStore := scope, store
+			switch fault {
+			case "namespace":
+				changedScope.Namespace = "different"
+			case "mesh":
+				changedScope.MeshName = "different"
+			case "mesh-uid":
+				changedScope.MeshUID = "different"
+			case "machine":
+				changedScope.MachineUID = "different"
+			case "store":
+				changedStore.Name = "different"
+			case "journal-uid":
+				changedStore.ExpectedUID = "different"
+			}
+			if err := checkpointReceiveRetirementLocked(ctx, api, changedStore, changedScope, cfg, site, lock.Name(), admitted); err == nil {
+				t.Fatalf("checkpoint accepted changed %s scope", fault)
+			}
 		}
 		if err := os.WriteFile(journalPath, []byte("{"), 0600); err != nil {
 			t.Fatal(err)

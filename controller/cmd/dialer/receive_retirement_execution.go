@@ -58,12 +58,8 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	before, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
-	if err != nil {
+	if err := recheckReceiveRetirement(ctx, api, store, admitted, cfg.nodeName, key); err != nil {
 		return nil, fmt.Errorf("pre-cleanup admission: %w", err)
-	}
-	if !sameReceiveRetirement(admitted, before) {
-		return nil, fmt.Errorf("retirement changed before native cleanup")
 	}
 	if err := verifyAgent(); err != nil {
 		return nil, err

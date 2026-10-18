@@ -414,6 +414,14 @@ admission. Cached images do not identify the running agent: retain independent
 Pod, container and runtime-image authentication. A source-comparison regression
 does not qualify cleanup during a live image pull or garbage-collection cycle.
 
+After full retirement admission, checkpoint and pre-cleanup boundaries reuse
+the live-source recheck instead of reconstructing immutable ancestry. Recheck
+every reserved journal, inventory, mesh and local Node/boot identity, and reject
+changed checkpoint scope. Retain full admission before execution and after
+native cleanup, plus local checkpoint history validation. A ConfigMap read-budget
+regression establishes reduced repeated reads only; it does not establish live
+latency, native absence or completion within the receipt lifetime.
+
 Receipt collection permits at most eight concurrent read-only source resolutions.
 Authentication, batch changes and completion remain serialized and must recheck
 the resolved source; concurrent reads do not authorize stale writes. Saturated

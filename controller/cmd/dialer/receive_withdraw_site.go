@@ -23,14 +23,9 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 	if devices == nil || cfg.secretName != scope.MeshName || cfg.secretNamespace != scope.Namespace || siteReceiveCachePath(cfg) == "" {
 		return fmt.Errorf("site retirement requires native devices and local mesh storage")
 	}
-	current, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
-	if err != nil {
+	if err := recheckReceiveRetirement(ctx, api, store, admitted, cfg.nodeName, key); err != nil {
 		return err
 	}
-	if !sameReceiveRetirement(admitted, current) {
-		return fmt.Errorf("site retirement authority changed")
-	}
-	admitted = current
 	plan, err := tunnel.DecodeReceiveTransition(admitted.Journals[scope.MachineUID], store.ClusterUID)
 	if err != nil {
 		return err

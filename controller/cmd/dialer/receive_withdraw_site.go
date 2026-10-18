@@ -18,7 +18,7 @@ import (
 // source exceptions, committed relay routes, root peers and caches are also
 // retired. Non-endpoint followers and authenticated completion remain separate obligations; success here must
 // never be published as full retirement.
-func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Interface, devices receiverDevices, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, admitted admittedReceiveRetirement) error {
+func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Interface, devices receiverDevices, speaker *transitSpeaker, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, admitted admittedReceiveRetirement) error {
 	if devices == nil || cfg.secretName != scope.MeshName || cfg.secretNamespace != scope.Namespace || siteReceiveCachePath(cfg) == "" {
 		return fmt.Errorf("site retirement requires native devices and local mesh storage")
 	}
@@ -193,6 +193,14 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 			return err
 		}
 		return withdrawReceiveDeviceRoutes(ctx, cfg, generations, own, relayGenerations...)
+	}
+	// Stop announcing target destinations before removing their forwarding.
+	// The retirement checkpoint fences offline cache replay across interruption.
+	if err := check(); err != nil {
+		return err
+	}
+	if err := withdrawReceiveAdvertisements(ctx, speaker, admitted.Plans, scope.MachineUID, admitted.NodeUID); err != nil {
+		return err
 	}
 	checkpoint := receiveNeighborCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), MeshUID: scope.MeshUID, MeshVersion: mesh.ResourceVersion, NodeUID: admitted.NodeUID, BootID: admitted.BootID, PublicKey: key.PublicKey().String(), Peers: currentPeers}
 	if err := retireWithdrawnNeighborCaches(ctx, lockPath+".neighbors.json", checkpoint, admitted.Plans, plan.RootPublicKey, recorded, check, func(peers []tunnel.PeerSpec) error {

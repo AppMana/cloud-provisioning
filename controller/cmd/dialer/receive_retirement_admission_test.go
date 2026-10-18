@@ -181,6 +181,7 @@ func verifyReceiveRetirementAdmission(t *testing.T, api kubernetes.Interface, st
 			t.Fatal("serving reconciliation admitted a retiring inventory")
 		}
 	})
+	verifyReceiveRetirementExecution(t, api, store, scope, site)
 	wrong, _ := wgtypes.GeneratePrivateKey()
 	if _, err := load(store, "site", wrong); err == nil {
 		t.Fatal("changed local key admitted")

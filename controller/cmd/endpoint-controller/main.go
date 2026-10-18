@@ -2776,7 +2776,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, "experimental node groups require --join-enabled")
 			os.Exit(1)
 		}
-		if err := nodegroup.Register(mgr, secretNamespace, secretName, joinAPIVIP, apiServerPortOf(joinAPIAddress), bootstrapSecretNameFormat); err != nil {
+		retirementAge := time.Minute
+		if receivePolicy != nil && receivePolicy.Journal != nil {
+			retirementAge = receivePolicy.Journal.MaxReceiptAge.Duration
+		}
+		if err := nodegroup.Register(mgr, secretNamespace, secretName, joinAPIVIP, apiServerPortOf(joinAPIAddress), bootstrapSecretNameFormat, retirementAge); err != nil {
 			fmt.Fprintf(os.Stderr, "unable to register node groups: %v\n", err)
 			os.Exit(1)
 		}

@@ -25,12 +25,8 @@ func AuthorizeReceiveWithdrawal(ctx context.Context, api client.Client, workload
 	if api == nil || workload == nil || a.Removing || a.Withdrawal == nil || a.Gateways == nil {
 		return fmt.Errorf("active captured withdrawal required")
 	}
-	w := a.Withdrawal
-	expected := attachment.RemoteWithdrawalIntent{MeshNamespace: group.Namespace, MeshName: w.MeshName, MeshUID: w.MeshUID, SourceVersion: w.SourceVersion, MachineName: a.ChildName, MachineUID: a.MachineUID, PublicKey: w.PublicKey, DrainIntent: string(group.UID) + "/" + a.ID}
-	for _, c := range w.Consumers {
-		expected.Consumers = append(expected.Consumers, attachment.ConsumerTarget{NodeName: c.NodeName, NodeUID: c.NodeUID, Site: c.Site, MachineName: c.MachineName, TunnelAddress: c.TunnelAddress, PublicKey: c.PublicKey, SecretUID: c.SecretUID})
-	}
-	if w.MeshName != a.Gateways.Mesh || !reflect.DeepEqual(intent, expected) {
+	expected := groupReceiveWithdrawalIntent(group)
+	if a.Withdrawal.MeshName != a.Gateways.Mesh || !reflect.DeepEqual(intent, expected) {
 		return fmt.Errorf("receiver retirement differs from captured drain intent")
 	}
 	checkGroup := func() error {
@@ -93,4 +89,14 @@ func AuthorizeReceiveWithdrawal(ctx context.Context, api client.Client, workload
 		return err
 	}
 	return checkGroup()
+}
+
+func groupReceiveWithdrawalIntent(group *v1alpha1.ProvisionedNodeGroupClaim) attachment.RemoteWithdrawalIntent {
+	a := group.Status.PendingAction
+	w := a.Withdrawal
+	expected := attachment.RemoteWithdrawalIntent{MeshNamespace: group.Namespace, MeshName: w.MeshName, MeshUID: w.MeshUID, SourceVersion: w.SourceVersion, MachineName: a.ChildName, MachineUID: a.MachineUID, PublicKey: w.PublicKey, DrainIntent: string(group.UID) + "/" + a.ID}
+	for _, c := range w.Consumers {
+		expected.Consumers = append(expected.Consumers, attachment.ConsumerTarget{NodeName: c.NodeName, NodeUID: c.NodeUID, Site: c.Site, MachineName: c.MachineName, TunnelAddress: c.TunnelAddress, PublicKey: c.PublicKey, SecretUID: c.SecretUID})
+	}
+	return expected
 }

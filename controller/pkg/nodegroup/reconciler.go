@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -21,6 +22,8 @@ const GroupFinalizer = "cloud-provisioning.appmana.com/node-group"
 // must bypass the cache so planning observes completed creation and deletion.
 // Manager registration requires the explicit experimental-node-groups flag.
 type Reconciler struct {
+	RetirementAPI             kubernetes.Interface
+	RetirementMaxAge          time.Duration
 	API                       client.Client
 	Workload                  client.Client
 	MachineGVK                schema.GroupVersionKind
@@ -174,6 +177,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			}
 			if expanded {
 				return again, nil
+			}
+			if handled, err := r.beginReceiveRemoval(ctx, bound); handled || err != nil {
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 			}
 			applied, err := BeginRemoval(ctx, r.API, r.MachineGVK, bound, r.APIVIP, r.APIPort)
 			if err != nil {

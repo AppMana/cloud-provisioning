@@ -24,6 +24,10 @@ func BeginRemoval(ctx context.Context, api client.Client, gvk schema.GroupVersio
 	if err != nil || !applied {
 		return false, err
 	}
+	return recordRemoval(ctx, api, group)
+}
+
+func recordRemoval(ctx context.Context, api client.Client, group *v1alpha1.ProvisionedNodeGroupClaim) (bool, error) {
 	next := group.DeepCopy()
 	next.Status.PendingAction.Removing = true
 	expected := next.DeepCopy()

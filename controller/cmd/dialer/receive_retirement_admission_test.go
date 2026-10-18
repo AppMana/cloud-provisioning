@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -88,6 +89,47 @@ func verifyReceiveRetirementAdmission(t *testing.T, api kubernetes.Interface, st
 	if err != nil || admitted.NodeUID != plan.Sites[site.PublicKey().String()].NodeUID || len(admitted.Plans) != len(inventory.MachineUIDs) || len(admitted.Withdrawal.Consumers) != len(w.Consumers) {
 		t.Fatal("lost survivor or reservation after cloud deletion", err)
 	}
+	t.Run("retirement-live-recheck", func(t *testing.T) {
+		// Real live-source reads; no native mutation. Recheck every reserved
+		// journal and inventory without rereading their immutable ancestry.
+		counted := &changingJournalReader{ConfigMapInterface: store.ConfigMaps, change: func() error { return nil }}
+		reader := store
+		reader.ConfigMaps = counted
+		if err := recheckReceiveRetirement(ctx, api, reader, admitted, "site", site); err != nil {
+			t.Fatal(err)
+		}
+		if counted.reads != len(admitted.Journals)+1 {
+			t.Fatalf("expected live journal and inventory reads, got %d", counted.reads)
+		}
+		for _, fault := range []string{"inventory", "mesh", "node", "boot", "key", "read", "cancelled"} {
+			t.Run(fault, func(t *testing.T) {
+				candidate := admitted
+				reader := store
+				key := site
+				runCtx, cancel := context.WithCancel(ctx)
+				defer cancel()
+				switch fault {
+				case "inventory":
+					candidate.Metadata.ResourceVersion = "stale"
+				case "mesh":
+					candidate.MeshMetadata.ResourceVersion = "stale"
+				case "node":
+					candidate.NodeUID = "replacement"
+				case "boot":
+					candidate.BootID = "previous-boot"
+				case "key":
+					key, _ = wgtypes.GeneratePrivateKey()
+				case "read":
+					reader.ConfigMaps = &changingJournalReader{ConfigMapInterface: store.ConfigMaps, reads: 1, change: func() error { return errors.New("API unavailable") }}
+				case "cancelled":
+					cancel()
+				}
+				if err := recheckReceiveRetirement(runCtx, api, reader, candidate, "site", key); err == nil {
+					t.Fatal("invalid source passed retirement recheck")
+				}
+			})
+		}
+	})
 	t.Run("retirement-checkpoint", func(t *testing.T) {
 		cfg := config{iface: "retiretest", nodeName: "site", privateKeyFile: filepath.Join(t.TempDir(), "key")}
 		lock, err := lockReconciliation(cfg)

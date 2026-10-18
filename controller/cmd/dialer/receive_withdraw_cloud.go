@@ -24,12 +24,8 @@ func retireAdmittedCloudNeighborLocked(ctx context.Context, api kubernetes.Inter
 	}
 	var adoption *corev1.Secret
 	check := func() error {
-		current, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
-		if err != nil {
+		if err := recheckReceiveRetirement(ctx, api, store, admitted, cfg.nodeName, key); err != nil {
 			return err
-		}
-		if !sameReceiveRetirement(admitted, current) {
-			return fmt.Errorf("cloud retirement authority changed")
 		}
 		if adoption != nil {
 			name, err := cloudAdoptionSecretName(cfg)

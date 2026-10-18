@@ -17,6 +17,51 @@ type admittedReceiveRetirement struct {
 	NodeUID, BootID string
 }
 
+// Recheck an already admitted cleanup attempt without repeatedly reconstructing
+// its immutable ancestry at every device boundary. The shared recheck still
+// reads every live journal, inventory and mesh; only unchanged authority or
+// appended observations are accepted. Execution must perform full admission
+// again before issuing its receipt. Never use this as initial admission.
+func recheckReceiveRetirement(ctx context.Context, api kubernetes.Interface, store handover.Store, admitted admittedReceiveRetirement, nodeName string, key wgtypes.Key) error {
+	if api == nil || nodeName == "" || key == (wgtypes.Key{}) || admitted.NodeUID == "" || admitted.BootID == "" {
+		return fmt.Errorf("retirement recheck requires admitted local identity")
+	}
+	found := false
+	for _, consumer := range admitted.Withdrawal.Consumers {
+		if consumer.NodeName == nodeName && consumer.NodeUID == admitted.NodeUID && (consumer.PublicKey == key.PublicKey().String() || consumer.Site && consumer.PublicKey == "") {
+			found = true
+		}
+	}
+	if !found {
+		return fmt.Errorf("retirement consumer identity changed")
+	}
+	boot, err := localReceiveBootID()
+	if err != nil {
+		return err
+	}
+	if boot != admitted.BootID {
+		return fmt.Errorf("retirement local boot changed")
+	}
+	node, err := api.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if err := validateReceiveParticipantNode(node, admitted.NodeUID, admitted.BootID); err != nil {
+		return err
+	}
+	if err := admitted.Recheck(ctx, api, store); err != nil {
+		return err
+	}
+	current, err := api.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if !sameReceiveParticipantNode(node, current) {
+		return fmt.Errorf("retirement participant changed during recheck")
+	}
+	return ctx.Err()
+}
+
 // loadReceiveRetirement admits the full reserved set and the persisted survivor
 // identity without requiring the deleted worker's adoption Secret or Node. It
 // never drops a journal because its worker is absent. Its output is read-only

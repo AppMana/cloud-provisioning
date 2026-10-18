@@ -96,14 +96,7 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 		return fmt.Errorf("withdrawal mesh changed before site cleanup")
 	}
 	check := func() error {
-		current, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
-		if err != nil {
-			return err
-		}
-		if !sameReceiveRetirement(admitted, current) {
-			return fmt.Errorf("site retirement authority changed during cleanup")
-		}
-		return ctx.Err()
+		return recheckReceiveRetirement(ctx, api, store, admitted, cfg.nodeName, key)
 	}
 	currentPeers, err := tunnel.SitePeers(mesh.Data)
 	if err != nil {

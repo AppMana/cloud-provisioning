@@ -47,12 +47,8 @@ func retireAdmittedFollowerLocked(ctx context.Context, api kubernetes.Interface,
 		return err
 	}
 	check := func() error {
-		current, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
-		if err != nil {
+		if err := recheckReceiveRetirement(ctx, api, store, admitted, cfg.nodeName, key); err != nil {
 			return err
-		}
-		if !sameReceiveRetirement(admitted, current) {
-			return fmt.Errorf("follower retirement authority changed")
 		}
 		currentNode, err := api.CoreV1().Nodes().Get(ctx, cfg.nodeName, metav1.GetOptions{})
 		if err != nil {

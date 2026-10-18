@@ -216,6 +216,77 @@ func TestReceiveWithdrawalPersistenceWithRealAPI(t *testing.T) {
 			t.Fatalf("accepted %s record", fault)
 		}
 	}
+	// Storage-only completion fixture: synthetic evidence exercises CAS and
+	// retention, never authentication or native completion authority.
+	t.Run("completion-storage", func(t *testing.T) {
+		evidence := json.RawMessage(`{"version":1,"fixture":"synthetic-completion"}`)
+		before := read()
+		meta, err := maps.Get(ctx, index.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		intent := before.Publications[w.MachineUID].Retirement
+		persist := func(storage typedcore.ConfigMapInterface, expected metav1.ObjectMeta, record json.RawMessage) error {
+			return tunnel.RecordReceiveRetirementCompletion(ctx, storage, "cluster", expected, mesh, snapshot, intent, record)
+		}
+		for _, bad := range []json.RawMessage{nil, json.RawMessage(`null`), json.RawMessage(`[]`), json.RawMessage(`{} {}`)} {
+			if err := persist(maps, meta.ObjectMeta, bad); err == nil {
+				t.Fatal("invalid completion record accepted")
+			}
+		}
+		if err := tunnel.RecordReceiveRetirementCompletion(ctx, maps, "cluster", meta.ObjectMeta, mesh, snapshot, json.RawMessage(`{}`), evidence); err == nil {
+			t.Fatal("changed withdrawal accepted")
+		}
+		racing := retirementInventoryWriter{ConfigMapInterface: maps, before: func() error {
+			latest, err := maps.Get(ctx, index.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			latest.Annotations = map[string]string{"completion-race": "changed"}
+			_, err = maps.Update(ctx, latest, metav1.UpdateOptions{})
+			return err
+		}}
+		if err := persist(racing, meta.ObjectMeta, evidence); !apierrors.IsConflict(err) {
+			t.Fatal("completion conflict was not returned", err)
+		}
+		if len(read().Publications[w.MachineUID].RetirementCompletion) != 0 {
+			t.Fatal("conflicting completion persisted")
+		}
+		if err := persist(maps, meta.ObjectMeta, evidence); err == nil {
+			t.Fatal("stale authentication revision accepted")
+		}
+		meta, err = maps.Get(ctx, index.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		lost := retirementInventoryWriter{ConfigMapInterface: maps, lostResponse: true}
+		if err := persist(lost, meta.ObjectMeta, evidence); err == nil {
+			t.Fatal("lost response concealed")
+		}
+		after := read()
+		if string(after.Publications[w.MachineUID].RetirementCompletion) != string(evidence) {
+			t.Fatal("ambiguous write evidence not retained")
+		}
+		item := after.Publications[w.MachineUID]
+		item.RetirementCompletion = nil
+		after.Publications[w.MachineUID] = item
+		if !reflect.DeepEqual(before, after) {
+			t.Fatal("completion changed reservations or another worker")
+		}
+		if err := persist(maps, meta.ObjectMeta, evidence); err == nil {
+			t.Fatal("ambiguous write blindly retried")
+		}
+		meta, err = maps.Get(ctx, index.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := persist(maps, meta.ObjectMeta, json.RawMessage(`{"changed":true}`)); err == nil {
+			t.Fatal("completion replaced")
+		}
+		if err := persist(maps, meta.ObjectMeta, evidence); err != nil {
+			t.Fatal("reloaded identical completion failed", err)
+		}
+	})
 	// An index incarnation is not transferable, even with identical JSON.
 	current, err := maps.Get(ctx, index.Name, metav1.GetOptions{})
 	if err != nil {

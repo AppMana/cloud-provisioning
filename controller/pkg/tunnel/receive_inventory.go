@@ -45,6 +45,9 @@ type ReceiveJournalPublication struct {
 	// acknowledgement. Its interpretation belongs to the withdrawal owner;
 	// ordinary journal publication and reservation must preserve it verbatim.
 	Retirement json.RawMessage `json:"retirement,omitempty"`
+	// Completion is controller-verified observation evidence, not permission
+	// to release this reservation or skip fresh identity checks on reuse.
+	RetirementCompletion json.RawMessage `json:"retirementCompletion,omitempty"`
 }
 
 // CheckJournal admits old inventory entries as before, but new publications
@@ -78,6 +81,9 @@ func (v ReceiveInventory) validate() error {
 	for uid, p := range v.Publications {
 		if !slices.Contains(v.MachineUIDs, uid) || (len(p.Plan) == 0) == (p.JournalUID == "") {
 			return fmt.Errorf("invalid journal publication state")
+		}
+		if len(p.RetirementCompletion) > 0 && (len(p.Retirement) == 0 || !json.Valid(p.RetirementCompletion) || bytes.TrimSpace(p.RetirementCompletion)[0] != '{') {
+			return fmt.Errorf("retirement completion requires persisted withdrawal and non-null evidence")
 		}
 		if len(p.Retirement) > 0 && (p.JournalUID == "" || !json.Valid(p.Retirement) || bytes.Equal(bytes.TrimSpace(p.Retirement), []byte("null"))) {
 			return fmt.Errorf("retirement requires a published journal and non-null intent")

@@ -204,6 +204,15 @@ func (r *meshReconciler) siteReceivePathsReady(ctx context.Context, mesh, adopti
 		return false, err
 	}
 	siteDoc := tunnel.PeerListDoc{Peers: sitePeers}
+	previous := siteDoc
+	predecessor, err := r.receivePreparationSiteBase(ctx, adoption, request)
+	if err != nil {
+		return false, err
+	}
+	if predecessor != nil {
+		previous = *predecessor
+	}
+
 	siteHash, err := tunnel.SitePeerHash(mesh.Data)
 	if err != nil {
 		return false, err
@@ -251,7 +260,7 @@ func (r *meshReconciler) siteReceivePathsReady(ctx context.Context, mesh, adopti
 		if err != nil {
 			return false, err
 		}
-		plan, err := tunnel.PlanSiteReceiveClient(receiveScope, public, request.RootPublicKey, binding, siteDoc, siteDoc)
+		plan, err := tunnel.PlanSiteReceiveClient(receiveScope, public, request.RootPublicKey, binding, previous, siteDoc)
 		if err != nil {
 			return false, err
 		}
@@ -273,5 +282,42 @@ func (r *meshReconciler) siteReceivePathsReady(ctx context.Context, mesh, adopti
 	if currentMesh.UID != mesh.UID || currentMesh.ResourceVersion != mesh.ResourceVersion || currentMesh.DeletionTimestamp != nil || currentAdoption.UID != adoption.UID || currentAdoption.ResourceVersion != adoption.ResourceVersion || currentAdoption.DeletionTimestamp != nil {
 		return false, fmt.Errorf("receiver proposal changed during site readiness validation")
 	}
+	if _, err := r.receivePreparationSiteBase(ctx, adoption, request); err != nil {
+		return false, err
+	}
 	return true, nil
+}
+
+// Load terminal source permissions using the configured cluster authority.
+// This does not authorize replacing the journal or its serving transport graph.
+func (r *meshReconciler) receivePreparationSiteBase(ctx context.Context, adoption *corev1.Secret, request tunnel.ReceivePrepare) (*tunnel.PeerListDoc, error) {
+	if request.Predecessor == nil {
+		return nil, nil
+	}
+	ref := request.Predecessor
+	store := r.receiveJournal
+	if store.ConfigMaps == nil || store.ClusterUID == "" || store.ClusterUID != ref.ClusterUID {
+		return nil, fmt.Errorf("successor preparation cluster authority unavailable")
+	}
+	store.Name, store.ExpectedUID = tunnel.ReceiveTransitionName(ref.MachineUID), ref.JournalUID
+	snapshot, err := store.Load(ctx)
+	if err != nil {
+		return nil, err
+	}
+	plan, err := request.ValidatePredecessor(snapshot)
+	if err != nil {
+		return nil, err
+	}
+	if plan.Namespace != adoption.Namespace || plan.AdoptionName != adoption.Name || plan.AdoptionUID != string(adoption.UID) {
+		return nil, fmt.Errorf("successor preparation adoption identity changed")
+	}
+	view, err := snapshot.Transition().View()
+	if err != nil {
+		return nil, err
+	}
+	previous, err := plan.CompletedSitePeers(view)
+	if err != nil {
+		return nil, err
+	}
+	return &previous, nil
 }

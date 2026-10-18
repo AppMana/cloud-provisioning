@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -17,7 +18,7 @@ import (
 // Native deletion is simulated here; the dedicated receiver native test covers
 // exact ownership, route/address dependencies and idempotent kernel deletion.
 func TestSiteReceiverRetirementAdmission(t *testing.T) {
-	for _, fault := range []string{"none", "live-owner", "reserved-owner", "inventory", "publication", "native", "digest", "cancel-after-native"} {
+	for _, fault := range []string{"none", "previous-sources", "live-owner", "reserved-owner", "inventory", "publication", "native", "digest", "cancel-after-native"} {
 		t.Run(fault, func(t *testing.T) {
 			site, _ := wgtypes.GeneratePrivateKey()
 			root, _ := wgtypes.GeneratePrivateKey()
@@ -30,6 +31,12 @@ func TestSiteReceiverRetirementAdmission(t *testing.T) {
 			cfg := config{iface: "site", secretNamespace: "test", secretName: "mesh", nodeName: "site", privateKeyFile: filepath.Join(t.TempDir(), "key")}
 			peer := tunnel.PeerSpec{PublicKey: cloud.PublicKey().String(), Remote: true, Endpoint: "198.51.100.99:51820", WGAllowedIPs: []string{"172.29.99.1/32"}}
 			record := siteReceiveCache{Version: 1, Namespace: "test", SecretName: "mesh", MeshUID: plan.MeshUID, NodeName: "site", PublicKey: site.PublicKey().String(), Peers: tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{peer}}, Bindings: map[string]receiveBinding{peer.PublicKey: {PeerPublicKey: site.PublicKey().String(), PublicKey: receiver.PublicKey().String(), ListenPort: 51821}}}
+
+			if fault == "previous-sources" {
+				previous := peer
+				previous.WGAllowedIPs = []string{"172.29.99.2/32", "2001:db8:99::2/128"}
+				record.Previous = map[string]tunnel.PeerListDoc{peer.PublicKey: {Peers: []tunnel.PeerSpec{previous}}}
+			}
 			path := siteReceiveCachePath(cfg) + ".admitted"
 			if err := preserveSiteReceiveOwnership(path, record, cfg, site); err != nil {
 				t.Fatal(err)
@@ -65,6 +72,10 @@ func TestSiteReceiverRetirementAdmission(t *testing.T) {
 				if len(selections) != 1 || selections[0].PeerPublicKey != receiver.PublicKey().String() {
 					t.Fatal("wrong owner selected")
 				}
+
+				if fault == "previous-sources" && !slices.Equal(selections[0].AllowedSources, []string{"172.29.99.1/32", "172.29.99.2/32", "2001:db8:99::2/128"}) {
+					t.Fatal("retirement lost prepared predecessor permissions")
+				}
 				if fault == "native" {
 					return errors.New("foreign route")
 				}
@@ -75,7 +86,7 @@ func TestSiteReceiverRetirementAdmission(t *testing.T) {
 			}
 			err := retireMissingSiteReceivers(ctx, fake.NewClientset(live), cfg, mesh, site, path, scope, retire)
 			remaining, _ := filepath.Glob(path + ".owners/*.json")
-			if fault == "none" || fault == "cancel-after-native" {
+			if fault == "none" || fault == "previous-sources" || fault == "cancel-after-native" {
 				if err != nil || calls != 1 || len(remaining) != 0 {
 					t.Fatalf("retirement: calls=%d retained=%d err=%v", calls, len(remaining), err)
 				}

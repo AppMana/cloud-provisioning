@@ -97,7 +97,7 @@ func retireMissingSiteReceivers(ctx context.Context, api kubernetes.Interface, c
 			if err != nil {
 				return err
 			}
-			plan, err := tunnel.PlanSiteReceiveClient(receiveScope, record.PublicKey, root, binding, record.Peers, record.Peers)
+			plan, err := tunnel.PlanSiteReceiveClient(receiveScope, record.PublicKey, root, binding, record.previousPeers(root), record.Peers)
 			if err != nil {
 				return err
 			}

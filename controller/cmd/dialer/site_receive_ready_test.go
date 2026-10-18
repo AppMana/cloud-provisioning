@@ -115,12 +115,12 @@ func TestSitePreparesOnlyCurrentCloudReceivers(t *testing.T) {
 					observe = append(observe, func(tunnel.SiteReceiveClient) (time.Time, error) { return time.Now(), nil })
 				}
 			}
-			err = reconcileSiteReceivePreparationScoped(context.Background(), k, mesh, "site", site, scope, func(cloud string, b receiveBinding, got tunnel.PeerListDoc, generation string) error {
+			err = reconcileSiteReceivePreparationScoped(context.Background(), k, mesh, "site", site, scope, func(cloud string, b receiveBinding, previous, got tunnel.PeerListDoc, generation string) error {
 				calls++
 				if generation != request.ReceiverGeneration {
 					t.Fatal("preparation lost committed generation")
 				}
-				_, err := tunnel.PlanSiteReceiveClient(receiveScope, pub, cloud, b, got, got)
+				_, err := tunnel.PlanSiteReceiveClient(receiveScope, pub, cloud, b, previous, got)
 				return err
 			}, observe...)
 			pending := fault == "no-request" || fault == "no-receipt" || fault == "unapplied" || fault == "reserved"

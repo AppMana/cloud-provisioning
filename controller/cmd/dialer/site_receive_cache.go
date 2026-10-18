@@ -22,15 +22,24 @@ import (
 // Public preparation inputs only. This is neither a forwarding snapshot nor
 // permission to publish readiness after a restart.
 type siteReceiveCache struct {
-	Version     int                       `json:"version"`
-	Namespace   string                    `json:"namespace"`
-	SecretName  string                    `json:"secretName"`
-	MeshUID     string                    `json:"meshUID"`
-	NodeName    string                    `json:"nodeName"`
-	PublicKey   string                    `json:"publicKey"`
-	Peers       tunnel.PeerListDoc        `json:"peers"`
-	Bindings    map[string]receiveBinding `json:"bindings"`
-	Generations map[string]string         `json:"generations,omitempty"`
+	Version     int                           `json:"version"`
+	Namespace   string                        `json:"namespace"`
+	SecretName  string                        `json:"secretName"`
+	MeshUID     string                        `json:"meshUID"`
+	NodeName    string                        `json:"nodeName"`
+	PublicKey   string                        `json:"publicKey"`
+	Peers       tunnel.PeerListDoc            `json:"peers"`
+	Bindings    map[string]receiveBinding     `json:"bindings"`
+	Generations map[string]string             `json:"generations,omitempty"`
+	Previous    map[string]tunnel.PeerListDoc `json:"previous,omitempty"`
+}
+
+// Previous inputs are per receiver because workers can advance independently.
+func (c siteReceiveCache) previousPeers(root string) tunnel.PeerListDoc {
+	if previous, found := c.Previous[root]; found {
+		return previous
+	}
+	return c.Peers
 }
 
 func (c siteReceiveCache) receiveScope(root string) (string, error) {
@@ -63,12 +72,17 @@ func decodeSiteReceiveCache(raw []byte, cfg config, key wgtypes.Key) (siteReceiv
 			return cached, fmt.Errorf("site receiver generation has no binding or identity")
 		}
 	}
+	for root, previous := range cached.Previous {
+		if _, found := cached.Bindings[root]; !found || previous.Peers == nil {
+			return cached, fmt.Errorf("previous site permissions have no binding or document")
+		}
+	}
 	for root, binding := range cached.Bindings {
 		receiveScope, err := cached.receiveScope(root)
 		if err != nil {
 			return cached, err
 		}
-		if _, err := tunnel.PlanSiteReceiveClient(receiveScope, cached.PublicKey, root, binding, cached.Peers, cached.Peers); err != nil {
+		if _, err := tunnel.PlanSiteReceiveClient(receiveScope, cached.PublicKey, root, binding, cached.previousPeers(root), cached.Peers); err != nil {
 			return cached, err
 		}
 	}
@@ -155,7 +169,7 @@ func restoreSiteReceiveCache(cfg config, devices receiverDevices, key wgtypes.Ke
 		if err != nil {
 			return err
 		}
-		if _, err := prepareSiteReceiveClient(devices, receiveScope, key, root, binding, cached.Peers, cached.Peers, mtu, cfg.fwmark); err != nil {
+		if _, err := prepareSiteReceiveClient(devices, receiveScope, key, root, binding, cached.previousPeers(root), cached.Peers, mtu, cfg.fwmark); err != nil {
 			return err
 		}
 	}
@@ -197,6 +211,7 @@ func reconcileDurableSiteReceiversScoped(ctx context.Context, k kubernetes.Inter
 		if previous.MeshUID == cached.MeshUID && reflect.DeepEqual(previous.Peers, cached.Peers) {
 			cached.Bindings = previous.Bindings
 			cached.Generations = previous.Generations
+			cached.Previous = previous.Previous
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -222,11 +237,15 @@ func reconcileDurableSiteReceiversScoped(ctx context.Context, k kubernetes.Inter
 		return err
 	}
 	seen := map[string]bool{}
-	err = reconcileSiteReceivePreparationScoped(ctx, k, mesh, cfg.nodeName, key, scope, func(root string, binding receiveBinding, doc tunnel.PeerListDoc, generation string) error {
+	err = reconcileSiteReceivePreparationScoped(ctx, k, mesh, cfg.nodeName, key, scope, func(root string, binding receiveBinding, previous, doc tunnel.PeerListDoc, generation string) error {
 		intent := cached
 		intent.Peers = doc
 		intent.Bindings = map[string]receiveBinding{root: binding}
 		intent.Generations = nil
+		intent.Previous = nil
+		if !reflect.DeepEqual(previous, doc) {
+			intent.Previous = map[string]tunnel.PeerListDoc{root: previous}
+		}
 		if generation != "" {
 			intent.Generations = map[string]string{root: generation}
 		}
@@ -243,10 +262,18 @@ func reconcileDurableSiteReceiversScoped(ctx context.Context, k kubernetes.Inter
 		if err != nil {
 			return err
 		}
-		if _, err := prepareSiteReceiveClient(devices, receiveScope, key, root, binding, doc, doc, mtu, cfg.fwmark); err != nil {
+		if _, err := prepareSiteReceiveClient(devices, receiveScope, key, root, binding, previous, doc, mtu, cfg.fwmark); err != nil {
 			return err
 		}
 		cached.Bindings[root] = binding
+		if !reflect.DeepEqual(previous, doc) {
+			if cached.Previous == nil {
+				cached.Previous = map[string]tunnel.PeerListDoc{}
+			}
+			cached.Previous[root] = previous
+		} else {
+			delete(cached.Previous, root)
+		}
 		if generation != "" {
 			if cached.Generations == nil {
 				cached.Generations = map[string]string{}
@@ -266,6 +293,7 @@ func reconcileDurableSiteReceiversScoped(ctx context.Context, k kubernetes.Inter
 	for root := range cached.Bindings {
 		if !seen[root] {
 			delete(cached.Bindings, root)
+			delete(cached.Previous, root)
 			delete(cached.Generations, root)
 		}
 	}

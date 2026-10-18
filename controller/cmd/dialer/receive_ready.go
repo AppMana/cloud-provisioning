@@ -140,21 +140,36 @@ func reconcileReceivePreparation(ctx context.Context, k kubernetes.Interface, se
 // A changed predecessor may leave an unused additive device, but cannot earn
 // readiness. Journal reservation still fences the ordinary preparation path.
 func checkReceivePreparationPredecessor(ctx context.Context, k kubernetes.Interface, secret *corev1.Secret, request tunnel.ReceivePrepare) error {
+	_, err := receivePreparationPreviousSitePeers(ctx, k, secret, request)
+	return err
+}
+
+// Nil preserves the original preparation protocol. A successor uses the exact
+// serving predecessor's permissions, independently of the current publication.
+func receivePreparationPreviousSitePeers(ctx context.Context, k kubernetes.Interface, secret *corev1.Secret, request tunnel.ReceivePrepare) (*tunnel.PeerListDoc, error) {
 	if request.Predecessor == nil {
-		return nil
+		return nil, nil
 	}
 	ref := request.Predecessor
 	store := handover.Store{ConfigMaps: k.CoreV1().ConfigMaps(secret.Namespace), Name: tunnel.ReceiveTransitionName(ref.MachineUID), ClusterUID: ref.ClusterUID, ExpectedUID: ref.JournalUID}
 	snapshot, err := store.Load(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	plan, err := request.ValidatePredecessor(snapshot)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if plan.Namespace != secret.Namespace || plan.AdoptionName != secret.Name || plan.AdoptionUID != string(secret.UID) {
-		return fmt.Errorf("successor preparation adoption identity changed")
+		return nil, fmt.Errorf("successor preparation adoption identity changed")
 	}
-	return nil
+	view, err := snapshot.Transition().View()
+	if err != nil {
+		return nil, err
+	}
+	previous, err := plan.CompletedSitePeers(view)
+	if err != nil {
+		return nil, err
+	}
+	return &previous, nil
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -27,18 +28,39 @@ func TestSiteReceiveCacheRejectsInvalidRecoveryBeforeDevices(t *testing.T) {
 		t.Fatal(err)
 	}
 	valid.Generations = map[string]string{cloud.PublicKey().String(): strings.Repeat("a", 64)}
+	old := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: cloud.PublicKey().String(), Remote: true, Endpoint: "198.51.100.10:51820", WGAllowedIPs: []string{"10.88.0.4/32", "2001:db8::4/128"}}}}
+	valid.Previous = map[string]tunnel.PeerListDoc{cloud.PublicKey().String(): old}
+
 	raw, _ = json.Marshal(valid)
 	decoded, err := decodeSiteReceiveCache(raw, cfg, key)
 	if err != nil || decoded.Generations[cloud.PublicKey().String()] != valid.Generations[cloud.PublicKey().String()] {
 		t.Fatal("generation lost from site ownership", err)
 	}
-	for _, fault := range []string{"version", "generation", "orphan-generation", "namespace", "secret", "node", "key", "mesh", "bindings", "port", "sources", "unknown", "trailing"} {
+
+	scope, err := decoded.receiveScope(cloud.PublicKey().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := tunnel.PlanSiteReceiveClient(scope, decoded.PublicKey, cloud.PublicKey().String(), decoded.Bindings[cloud.PublicKey().String()], decoded.previousPeers(cloud.PublicKey().String()), decoded.Peers)
+	if err != nil || !slices.Equal(prepared.AllowedSources, []string{"10.88.0.3/32", "10.88.0.4/32", "2001:db8::4/128"}) {
+		t.Fatal("recovery lost predecessor source permissions", err)
+	}
+	for _, fault := range []string{"version", "generation", "orphan-generation", "orphan-previous", "empty-previous", "invalid-previous", "namespace", "secret", "node", "key", "mesh", "bindings", "port", "sources", "unknown", "trailing"} {
 		t.Run(fault, func(t *testing.T) {
 			var cached siteReceiveCache
 			if err := json.Unmarshal(raw, &cached); err != nil {
 				t.Fatal(err)
 			}
 			switch fault {
+			case "orphan-previous":
+				cached.Previous[key.PublicKey().String()] = old
+			case "empty-previous":
+				cached.Previous[cloud.PublicKey().String()] = tunnel.PeerListDoc{}
+			case "invalid-previous":
+				previous := cached.Previous[cloud.PublicKey().String()]
+				previous.Peers[0].WGAllowedIPs = []string{"0.0.0.0/0"}
+				cached.Previous[cloud.PublicKey().String()] = previous
+
 			case "generation":
 				cached.Generations[cloud.PublicKey().String()] = "invalid"
 			case "orphan-generation":
@@ -81,6 +103,7 @@ func TestSiteReceiveCacheRejectsInvalidRecoveryBeforeDevices(t *testing.T) {
 	}
 	valid.Bindings = map[string]receiveBinding{}
 	valid.Generations = nil
+	valid.Previous = nil
 	if err := writeDurableJSON(siteReceiveCachePath(cfg), valid); err != nil {
 		t.Fatal(err)
 	}

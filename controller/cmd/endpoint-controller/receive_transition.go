@@ -322,6 +322,11 @@ func (r *meshReconciler) buildReceiveTransitionPlan(ctx context.Context, machine
 		return fail(err)
 	}
 	plan.SiteDesired = tunnel.PeerListDoc{Peers: sitePeers}
+	plan.SiteBase, err = r.receivePreparationSiteBase(ctx, adoption, request)
+	if err != nil {
+		return fail(err)
+	}
+
 	if _, err := tunnel.PlanReceiveRoutes(plan); err != nil {
 		return fail(err)
 	}
@@ -382,9 +387,9 @@ func checkCompletedReceiveSources(snapshot handover.Snapshot, clusterUID string,
 	if err != nil {
 		return err
 	}
-	serving := plan.SiteDesired
-	if view.ServingGeneration == "legacy:"+tunnel.HashPeerList(plan.Base) {
-		serving = plan.PreviousSitePeers()
+	serving, err := plan.CompletedSitePeers(view)
+	if err != nil {
+		return err
 	}
 	published, err := tunnel.SitePeers(mesh.Data)
 	if err != nil {

@@ -93,3 +93,19 @@ func DecodeReceiveTransition(snapshot handover.Snapshot, clusterUID string) (Rec
 	}
 	return plan, nil
 }
+
+// CompletedSitePeers selects serving permissions after a validated terminal
+// round. It does not return the transitional receive union or grant retirement.
+func (p ReceiveTransitionPlan) CompletedSitePeers(view handover.View) (PeerListDoc, error) {
+	if !view.Complete {
+		return PeerListDoc{}, fmt.Errorf("site permissions require a completed transition")
+	}
+	switch view.ServingGeneration {
+	case "legacy:" + HashPeerList(p.Base):
+		return p.PreviousSitePeers(), nil
+	case "receivers:" + view.Round.PlanHash:
+		return p.SiteDesired, nil
+	default:
+		return PeerListDoc{}, fmt.Errorf("unknown completed site generation")
+	}
+}

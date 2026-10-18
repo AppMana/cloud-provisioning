@@ -1,6 +1,8 @@
 package tunnel
 
 import (
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +15,24 @@ import (
 func TestReceivePreparationRequiresExactTerminalPredecessor(t *testing.T) {
 	for _, outcome := range []string{"forward", "abort", "rollback"} {
 		t.Run(outcome, func(t *testing.T) {
-			plan, tr := journalRouteFixture(t, routeSetFixture(t)[0])
+
+			input := routeSetFixture(t)[0]
+			previousRaw, _ := json.Marshal(input.SiteDesired)
+			var previous PeerListDoc
+			if err := json.Unmarshal(previousRaw, &previous); err != nil {
+				t.Fatal(err)
+			}
+			previous.Peers[0].WGAllowedIPs = append(previous.Peers[0].WGAllowedIPs, "2001:db8:159::/64")
+			input.SiteBase = &previous
+			for key, site := range input.Sites {
+				var err error
+				site.Client, err = PlanSiteReceiveClient(input.MeshUID, key, input.RootPublicKey, input.Bindings[key], previous, input.SiteDesired)
+				if err != nil {
+					t.Fatal(err)
+				}
+				input.Sites[key] = site
+			}
+			plan, tr := journalRouteFixture(t, input)
 			initial := tr
 			rolled := false
 			for {
@@ -37,6 +56,28 @@ func TestReceivePreparationRequiresExactTerminalPredecessor(t *testing.T) {
 					}
 					tr = advanceJournalRoute(t, tr, at)
 				}
+			}
+
+			view, err := tr.View()
+			if err != nil {
+				t.Fatal(err)
+			}
+			selected, err := plan.CompletedSitePeers(view)
+			expected := plan.SiteDesired
+			if outcome != "forward" {
+				expected = previous
+			}
+			if err != nil || !reflect.DeepEqual(selected, expected) {
+				t.Fatal("selected wrong terminal site permissions", err)
+			}
+			unfinishedView, _ := initial.View()
+			if _, err := plan.CompletedSitePeers(unfinishedView); err == nil {
+				t.Fatal("unfinished plan selected terminal site permissions")
+			}
+			unknown := view
+			unknown.ServingGeneration = "unknown"
+			if _, err := plan.CompletedSitePeers(unknown); err == nil {
+				t.Fatal("unknown serving generation accepted")
 			}
 			snapshot := journalRouteSnapshot(t, plan, tr)
 			ref, err := NewReceivePreparePredecessor(snapshot, "cluster")

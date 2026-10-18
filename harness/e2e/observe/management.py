@@ -3,6 +3,8 @@
 READY.json requires two successful samples per lane. STOP requests one final
 sample per lane; deadline expiry is incomplete. Failures and sampling gaps are
 sticky. This proves sampled availability, not delivery between samples.
+Failed responses retain bounded diagnostic text in the private sample files;
+diagnostics never change the availability verdict or trigger a retry.
 """
 import argparse
 import concurrent.futures
@@ -42,6 +44,15 @@ def complete(lanes, stable, stop, ready):
     return bool(lanes) and stable and stop and ready and all(x['ok'] for x in lanes)
 
 
+def response_evidence(code, stdout, stderr):
+    evidence = {'returnCode': code}
+    for name, value in (('stdout', stdout), ('stderr', stderr)):
+        value = value or b''
+        evidence[name] = value[:4096].decode('utf-8', errors='replace')
+        evidence[name + 'Bytes'] = len(value)
+    return evidence
+
+
 def observe(kube, servers, targets, output, duration=600, interval=1, max_gap=10):
     if (not servers or len(set(servers)) != len(servers) or
             not all(s.startswith('https://') for s in servers) or
@@ -70,17 +81,23 @@ def observe(kube, servers, targets, output, duration=600, interval=1, max_gap=10
                     lane['server'], kube.namespace, lane['pod'], lane['operation'])
                 # The bastion and namespace are explicit Kubectl configuration;
                 # never use a host kubeconfig or an API failover helper.
+                diagnostic = None
                 try:
                     result = subprocess.run(args, capture_output=True, timeout=8)
                     ok = successful(lane['operation'], result.stdout, result.returncode)
                     error = None if ok else 'management response failed'
-                except subprocess.TimeoutExpired:
+                    if not ok:
+                        diagnostic = response_evidence(result.returncode, result.stdout, result.stderr)
+                except subprocess.TimeoutExpired as exc:
                     ok, error = False, 'management observation timeout'
+                    diagnostic = response_evidence(None, exc.stdout, exc.stderr)
                 except OSError:
                     ok, error = False, 'management executor unavailable'
                 row = dict(nonce=nonce, pid=pid, sequence=len(rows), startedAt=stamp,
                            finishedAt=utc(), startMonotonic=begin, finishMonotonic=time.monotonic(),
                            ok=ok, error=error, stopBoundary=stopped)
+                if diagnostic is not None:
+                    row['response'] = diagnostic
                 gap = begin - rows[-1]['startMonotonic'] if rows else 0
                 rows.append(row)
                 stream.write(json.dumps(row) + '\n'); stream.flush()

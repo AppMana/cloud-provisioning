@@ -3,11 +3,37 @@ import json
 import pathlib
 import tempfile
 import unittest
-from management import command, successful, complete, assess_window
+import subprocess
+from types import SimpleNamespace
+from unittest.mock import patch
+from management import command, successful, complete, assess_window, observe
 from survivor import summarize
 
 
 class ManagementTests(unittest.TestCase):
+    def test_failed_response_is_retained_without_retry_or_passing(self):
+        for timeout in (False, True):
+            with self.subTest(timeout=timeout), tempfile.TemporaryDirectory() as temp:
+                output = pathlib.Path(temp) / 'observation'
+                body, stderr = b'[-]etcd failed\n', b'diagnostic\n' + b'x' * 5000
+                def snapshot(*args):
+                    (output / 'STOP').touch()
+                    return []
+                response = subprocess.CompletedProcess([], 1, body, stderr)
+                effect = subprocess.TimeoutExpired([], 8, output=body, stderr=stderr) if timeout else None
+                with patch('management.snapshot', side_effect=snapshot), patch(
+                        'management.subprocess.run', return_value=response, side_effect=effect) as run:
+                    result = observe(SimpleNamespace(bastion='probe', namespace='probe'),
+                                     ['https://192.0.2.1:6443'], [], output)
+                run.assert_called_once()
+                row = json.loads((output / 'lane-00.jsonl').read_text())
+                self.assertFalse(row['ok'])
+                self.assertFalse(result['ok'])
+                self.assertEqual(row['response']['returnCode'], None if timeout else 1)
+                self.assertEqual(row['response']['stdout'], body.decode())
+                self.assertEqual(row['response']['stderr'], stderr[:4096].decode())
+                self.assertEqual(row['response']['stderrBytes'], len(stderr))
+
     def test_direct_api_and_body_checks(self):
         for op in ('api', 'exec', 'logs'):
             args = command('https://192.0.2.1:6443', 'probe', 'hc-node', op)

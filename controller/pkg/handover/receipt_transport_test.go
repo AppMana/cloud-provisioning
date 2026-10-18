@@ -620,3 +620,84 @@ func TestReceiptRejectedObservationPreservesOtherConsumers(t *testing.T) {
 		t.Fatal("completed batch retained credentials")
 	}
 }
+
+// These synthetic admission failures must not discard previously authenticated
+// evidence. This exercises collector liveness, not real-API authentication or
+// traffic continuity; Complete remains responsible for current authority checks.
+func TestReceiptAdmissionFailurePreservesOtherConsumers(t *testing.T) {
+	for _, failure := range []string{"source", "foreign-member", "duplicate-submission", "invalid-members"} {
+		t.Run(failure, func(t *testing.T) {
+			digest := strings.Repeat("d", 64)
+			now := time.Now()
+			rejectAdmission := false
+			observations, completions := 0, 0
+			h, err := NewReceiptCollectionHandler(func(context.Context, string) (ReceiptCollection, error) {
+				if rejectAdmission && failure == "source" {
+					return ReceiptCollection{}, fmt.Errorf("source unavailable")
+				}
+				members := []ReceiptMember{{NodeUID: "first"}, {NodeUID: "second"}}
+				if rejectAdmission && failure == "invalid-members" {
+					members = append(members, members[0])
+				}
+				return ReceiptCollection{UID: "journal", Digest: digest, ExpiresAt: now.Add(time.Minute), MaxAge: 30 * time.Second, Members: members,
+					Observe: func(_ context.Context, entries []PodReceipt) error { observations++; return nil },
+					Complete: func(_ context.Context, entries []PodReceipt) error {
+						completions++
+						if len(entries) != 2 {
+							t.Fatal("incomplete batch")
+						}
+						for _, entry := range entries {
+							if entry.BearerToken != "accepted-token" || !entry.Receipt.ObservedAt.Equal(now) {
+								t.Fatal("credential or original observation changed")
+							}
+						}
+						return nil
+					},
+				}, nil
+			}, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			submit := func(nodes ...string) int {
+				request := ReceiptRequest{MachineUID: "machine", RoundHash: digest}
+				for _, node := range nodes {
+					request.Receipts = append(request.Receipts, PodReceipt{Receipt: Receipt{NodeUID: node, RoundHash: digest, ObservedAt: now}})
+				}
+				body, _ := json.Marshal(request)
+				r := httptest.NewRequest(http.MethodPost, "https://controller/receipts", bytes.NewReader(body))
+				r.Header.Set("Authorization", "Bearer accepted-token")
+				w := httptest.NewRecorder()
+				h.ServeHTTP(w, r)
+				return w.Code
+			}
+			if status := submit("first"); status != http.StatusAccepted {
+				t.Fatalf("first status %d", status)
+			}
+			rejectAdmission = true
+			nodes := []string{"second"}
+			if failure == "foreign-member" {
+				nodes = []string{"foreign"}
+			}
+			if failure == "duplicate-submission" {
+				nodes = append(nodes, nodes[0])
+			}
+			if status := submit(nodes...); status != http.StatusConflict {
+				t.Fatalf("rejection status %d", status)
+			}
+			if observations != 1 || completions != 0 {
+				t.Fatal("rejected admission reached mutation callbacks")
+			}
+			batch := h.batches["machine"]
+			if len(batch.entries) != 1 || !batch.entries[[2]string{"first", ""}].Receipt.ObservedAt.Equal(now) {
+				t.Fatal("admission failure discarded or refreshed authenticated evidence")
+			}
+			rejectAdmission = false
+			if status := submit("second"); status != http.StatusNoContent || completions != 1 {
+				t.Fatalf("valid retry did not complete: status %d", status)
+			}
+			if len(h.batches) != 0 {
+				t.Fatal("completed batch retained credentials")
+			}
+		})
+	}
+}

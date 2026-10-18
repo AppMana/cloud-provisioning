@@ -443,8 +443,12 @@ A rejected consumer observation must not discard other consumers' independently
 admitted receipts. Retained receipts keep their original timestamps and expiry;
 completion must still authenticate every consumer and recheck current source
 and identities. Exercise a rejected submission between two valid consumers and
-verify that its credential is never retained. Synthetic accumulation tests do
-not prove that live consumers can deliver within the shared freshness window.
+verify that its credential is never retained. Also inject a source lookup
+failure, an unknown member, duplicate submitted membership and invalid resolved
+membership between valid consumers. These failures must neither invoke mutation
+callbacks nor erase or refresh earlier authenticated observations. A subsequent
+valid submission must still pass full completion authentication. Synthetic
+accumulation tests do not prove that live consumers can deliver within the shared freshness window.
 
 Version-three and version-four retirement completion records exclude all
 completion evidence from their inventory authority hash, so refreshing a sibling

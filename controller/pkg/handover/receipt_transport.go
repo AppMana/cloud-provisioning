@@ -268,7 +268,9 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	stage = "source"
 	if err != nil {
-		delete(h.batches, request.MachineUID)
+		// Failed read-only admission does not invalidate other observations.
+		// They retain their original expiry and require full reauthentication
+		// against current authority before completion.
 		reject(http.StatusConflict)
 		return
 	}
@@ -287,7 +289,6 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, member := range target.Members {
 		id := [2]string{member.NodeUID, member.DeviceID}
 		if !token(member.NodeUID) || members[id] {
-			delete(h.batches, request.MachineUID)
 			reject(http.StatusConflict)
 			return
 		}
@@ -297,7 +298,6 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, entry := range request.Receipts {
 		id := [2]string{entry.Receipt.NodeUID, entry.Receipt.DeviceID}
 		if !members[id] || submitted[id] {
-			delete(h.batches, request.MachineUID)
 			reject(http.StatusConflict)
 			return
 		}

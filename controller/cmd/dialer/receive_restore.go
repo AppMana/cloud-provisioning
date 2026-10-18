@@ -25,8 +25,12 @@ func restoreCompletedReceivePaths(ctx context.Context, devices receiverDevices, 
 	if err != nil || uid != nodeUID {
 		return fmt.Errorf("transport restoration participant differs: %v", err)
 	}
+	active, rootSelected, err := plan.SelectedReceiveTransport(view)
+	if err != nil {
+		return err
+	}
 	legacy, selectedLegacy := intent.Legacy[plan.MachineUID]
-	if selectedLegacy != (view.RollbackRequested || view.Round.Phase == handover.Abort) || (selectedLegacy && !reflect.DeepEqual(legacy, plan)) {
+	if selectedLegacy != rootSelected || (selectedLegacy && !reflect.DeepEqual(legacy, plan)) {
 		return fmt.Errorf("transport restoration selection differs from completed journal")
 	}
 	expected, err := tunnel.ReceiveTransitionSpec(plan, view.Round.ClusterUID, view.Round.PlanHash)
@@ -52,13 +56,13 @@ func restoreCompletedReceivePaths(ctx context.Context, devices receiverDevices, 
 	if selectedLegacy {
 		return nil // Receivers were retired; never revive them.
 	}
-	if err := prepareReceivePhasePaths(devices, cfg, key, plan, nodeUID); err != nil {
+	if err := prepareReceivePhasePaths(devices, cfg, key, active, nodeUID); err != nil {
 		return err
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return verifyReceivePhasePaths(devices, cfg, key, plan, nodeUID)
+	return verifyReceivePhasePaths(devices, cfg, key, active, nodeUID)
 }
 
 // restoreCompletedReceiveState requires the host lock and either live terminal

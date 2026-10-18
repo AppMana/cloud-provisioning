@@ -194,7 +194,20 @@ func TestNativeReceiveSuccessorPhases(t *testing.T) {
 				t.Fatal("no selected route to interrupt")
 			}
 			must(netlink.RouteDel(&installed[0]))
-			must(restoreCompletedReceiveRoutes(context.Background(), devices, cfg, key, own, allocated, next, view, role, intent))
+			must(restoreCompletedReceiveState(context.Background(), devices, cfg, key, next, view, role, intent))
+			// Recovery must never resurrect the displaced receiver generation.
+			retired := old
+			if outcome != "forward" {
+				retired = next
+			}
+			retiredSelections, err := receivePhaseSelections(key, retired, role)
+			must(err)
+			for _, selection := range retiredSelections {
+				if _, err := netlink.LinkByName(selection.Interface); !isLinkNotFound(err) {
+					t.Fatal("recovery revived retired receiver", err)
+				}
+			}
+
 			must(receiveLinuxPhase(context.Background(), devices, cfg, key, own, allocated, next, view, role, intent))
 			break
 		}

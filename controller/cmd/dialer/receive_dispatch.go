@@ -26,7 +26,7 @@ type receiveDispatchNative func(context.Context, tunnel.ReceiveTransitionPlan, h
 // A local reserved journal owns forwarding even after completion. Never fall
 // through to legacy reconciliation on an API, credential, admission or native
 // failure. Releasing reservations and restoring ordinary publishers is separate.
-func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg config, native, maintain receiveDispatchNative, retirement ...receiveDispatchRetirement) (bool, error) {
+func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg config, native, maintain receiveDispatchNative, retirement ...receiveDispatchRetirement) (handled bool, resultErr error) {
 	namespace := cfg.secretNamespace
 	if namespace == "" {
 		namespace = cfg.peersSecretNamespace
@@ -112,6 +112,9 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 	}
 	defer transport.Close()
 	var failures []error
+	// A later discovery or identity read must not hide failures already
+	// observed for earlier receivers in this reconciliation pass.
+	defer func() { resultErr = errors.Join(append(failures, resultErr)...) }()
 	for _, uid := range targets {
 		store.Name = tunnel.ReceiveTransitionName(uid)
 		scope := receiveJournalScope{Namespace: namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUID: uid}
@@ -199,7 +202,7 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 			failures = append(failures, fmt.Errorf("receiver %s phase delivery: %w", uid, err))
 		}
 	}
-	return true, errors.Join(failures...)
+	return true, nil
 }
 
 func receiveDispatchIdentity(cfg config) (wgtypes.Key, []string, error) {

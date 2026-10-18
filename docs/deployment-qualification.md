@@ -409,6 +409,12 @@ an acceptance criterion.
 | Sustained operation | Observe the same candidate for at least 24 hours with continuous management and workload measurements, including credential renewal and actual requests across expiry. | Adding disconnected short runs does not establish a continuous soak. A successful soak does not substitute for fault injection, and an unobserved interval cannot be inferred healthy from later readiness. |
 | Resource pressure during rollout | Retain the same management and workload availability requirements while measuring controller CPU, memory and storage pressure through activation and rollback. | Ready nodes and unchanged process IDs do not prove API availability. A short healthy baseline does not establish rollout headroom. Record actual VM resources; changing capacity requires a fresh observation and cannot turn the earlier failure into a pass. Correlation with pressure does not establish the failure's cause. |
 
+When multiple receivers fail in one reconciliation pass, retain earlier execution
+or delivery errors alongside any later API or identity-read failure. Exercise this
+with a rejected cleanup followed by a failed read for another receiver. A synthetic
+dispatch test establishes error retention only; it does not establish native
+cleanup, authenticated completion, or recovery within the live deadline.
+
 For every row, name untested combinations explicitly, including IP family,
 architecture, CNI, operating system, endpoint placement and site profile. Keep
 run timestamps, actual identities, measurements and failure narratives in private

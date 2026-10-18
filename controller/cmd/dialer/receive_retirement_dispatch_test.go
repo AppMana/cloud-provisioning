@@ -2,14 +2,18 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
@@ -21,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	ktesting "k8s.io/client-go/testing"
 )
 
 // Copy the persisted withdrawal fixture into a fake API for dispatch. Real TLS
@@ -42,7 +47,7 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fault := range []string{"none", "follower", "missing-backend", "native-error", "container-race", "delivery-failure"} {
+	for _, fault := range []string{"none", "follower", "missing-backend", "native-error", "container-race", "delivery-failure", "later-api-error"} {
 		t.Run("retirement-dispatch/"+fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -54,6 +59,50 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 			objects := []runtime.Object{}
 			for _, cm := range maps.Items {
 				objects = append(objects, cm.DeepCopy())
+			}
+			if fault == "later-api-error" {
+				// A second discovered target fails its Pod read after the first
+				// target has already rejected a missing retirement backend.
+				// This fixture exercises dispatch only, not route admission.
+				var extra *corev1.ConfigMap
+				for _, object := range objects {
+					cm := object.(*corev1.ConfigMap)
+					if cm.Name != store.Name {
+						continue
+					}
+					extra = cm.DeepCopy()
+				}
+				if extra == nil {
+					t.Fatal("missing source journal")
+				}
+				var plan tunnel.ReceiveTransitionPlan
+				must(json.Unmarshal([]byte(extra.Data["plan.json"]), &plan))
+				plan.MachineUID = scope.MachineUID + "z"
+				raw, e := json.Marshal(plan)
+				must(e)
+				spec, e := tunnel.ReceiveTransitionSpec(plan, store.ClusterUID, fmt.Sprintf("%x", sha256.Sum256(raw)))
+				must(e)
+				transition, e := handover.NewTransition(spec, time.Now(), handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: 30 * time.Second, DrainInterval: time.Second})
+				must(e)
+				encoded, e := transition.Bytes()
+				must(e)
+				extra.Name = tunnel.ReceiveTransitionName(plan.MachineUID)
+				extra.UID = "later-journal"
+				extra.Data = map[string]string{"plan.json": string(raw), "transition.json": string(encoded)}
+				for _, object := range objects {
+					cm := object.(*corev1.ConfigMap)
+					if cm.Name != tunnel.ReceiveInventoryName(scope.MeshUID) {
+						continue
+					}
+					var inventory tunnel.ReceiveInventory
+					must(json.Unmarshal([]byte(cm.Data["inventory.json"]), &inventory))
+					inventory.MachineUIDs = append(inventory.MachineUIDs, plan.MachineUID)
+					inventory.Publications[plan.MachineUID] = tunnel.ReceiveJournalPublication{JournalUID: string(extra.UID)}
+					encoded, e := json.Marshal(inventory)
+					must(e)
+					cm.Data["inventory.json"] = string(encoded)
+				}
+				objects = append(objects, extra)
 			}
 			if fault == "follower" {
 				currentNode.Name = "follower"
@@ -87,6 +136,17 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 			}
 			objects = append(objects, currentMesh, currentNode, currentPod, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system", UID: types.UID(store.ClusterUID)}})
 			client := fake.NewClientset(objects...)
+			laterError := errors.New("later Pod read failed")
+			if fault == "later-api-error" {
+				reads := 0
+				client.PrependReactor("get", "pods", func(ktesting.Action) (bool, runtime.Object, error) {
+					reads++
+					if reads == 2 {
+						return true, nil, laterError
+					}
+					return false, nil, nil
+				})
+			}
 			delivered := make(chan handover.ReceiptRequest, 1)
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Header.Get("Authorization") != "Bearer fixture-token" {
@@ -136,16 +196,19 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 				}
 				return nil
 			})
-			if fault == "missing-backend" {
+			if fault == "missing-backend" || fault == "later-api-error" {
 				native = nil
 			}
 			handled, err := dispatchReceivePhases(ctx, client, cfg, phase, phase, native)
+			if fault == "later-api-error" && (!errors.Is(err, laterError) || !strings.Contains(err.Error(), "retirement requires a complete native cleanup backend")) {
+				t.Fatalf("lost an earlier dispatch failure: %v", err)
+			}
 			success := fault == "none" || fault == "follower"
 			if !handled || (err == nil) != success || phaseCalls != 0 {
 				t.Fatal("wrong dispatch outcome", handled, err, phaseCalls)
 			}
 			expectedCalls := 1
-			if fault == "missing-backend" {
+			if fault == "missing-backend" || fault == "later-api-error" {
 				expectedCalls = 0
 			}
 			if calls != expectedCalls {

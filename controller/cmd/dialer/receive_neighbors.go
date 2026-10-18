@@ -42,7 +42,9 @@ type receiveNeighborCheckpoint struct {
 // Ordinary peers have independent forwarding authority. This operation keeps
 // every journal and local phase fence, and never issues a phase receipt or a
 // whole-mesh readiness acknowledgement for its partial work.
-func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cfg config, native receiveNeighborNative, prepare receiveNeighborPreparation) error {
+func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cfg config, native receiveNeighborNative, prepare receiveNeighborPreparation) (resultErr error) {
+	timing := newReceiveTiming(cfg.receiptURL != "", "neighbors")
+	defer func() { timing.finish(resultErr == nil) }()
 	cloud := cfg.secretName == ""
 	namespace := cfg.secretNamespace
 	if cloud {
@@ -51,11 +53,13 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	if api == nil || native == nil || namespace == "" || cfg.receiptMeshName == "" || (!cloud && cfg.secretName != cfg.receiptMeshName) || (cloud && cfg.peersFile == "") || cfg.receiptPodName == "" || cfg.receiptPodUID == "" {
 		return fmt.Errorf("neighbor admission requires scoped node and agent identities")
 	}
+	timing.step("lock")
 	lock, err := lockReconciliation(cfg)
 	if err != nil {
 		return err
 	}
 	defer lock.Close()
+	timing.step("discovery")
 	key, allocation, err := receiveDispatchIdentity(cfg)
 	if err != nil {
 		return err
@@ -103,13 +107,16 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		return fmt.Errorf("neighbor writer has no local reserved journal")
 	}
 	store.Name = tunnel.ReceiveTransitionName(scope.MachineUID)
+	timing.step("admission")
 	set, err := loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
 	if err != nil {
 		return err
 	}
+	timing.step("checkpoint")
 	if err := checkpointReceiveSetLocked(ctx, api, store, scope, cfg, key, lock.Name(), set); err != nil {
 		return err
 	}
+	timing.step("planning")
 	deadline := time.Now().Add(30 * time.Second)
 	for _, local := range set.Local {
 		view, err := local.Snapshot.Transition().View()
@@ -373,12 +380,15 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		retirement.Retiring = nil
 		return writeDurableJSON(path+".retiring", retirement)
 	}
+	timing.step("native")
 	if err := native(ctx, key, peers, own, retirement.Retiring, allocated, commitRetirement); err != nil {
 		return err
 	}
+	timing.step("post-native-admission")
 	if err := check(); err != nil {
 		return err
 	}
+	timing.step("post-native-checkpoint")
 	// Successful native readback resolves installation ambiguity even if the
 	// separately prepared receiver later fails. Do not retain obsolete variants
 	// as deletion authority after confirming the new permissions.
@@ -387,6 +397,7 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	if err := writeDurableJSON(path+".retiring", retirement); err != nil {
 		return err
 	}
+	timing.step("preparation")
 	if prepare != nil && !cloud {
 		if err := prepare(ctx, key, mesh, peers, plans, check); err != nil {
 			return err

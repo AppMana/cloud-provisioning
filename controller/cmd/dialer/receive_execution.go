@@ -46,25 +46,37 @@ func verifyCompletedReceivePhase(ctx context.Context, api kubernetes.Interface, 
 	return err
 }
 
-func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase, completedReadback, completedMaintenance bool) ([]handover.PodReceipt, error) {
+func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveNativePhase, completedReadback, completedMaintenance bool) (result []handover.PodReceipt, resultErr error) {
+	operation := "phase"
+	if completedMaintenance {
+		operation = "maintenance"
+	} else if completedReadback {
+		operation = "readback"
+	}
+	timing := newReceiveTiming(cfg.receiptURL != "", operation)
+	defer func() { timing.finish(resultErr == nil) }()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	if native == nil || containerID == "" || scope.MachineUID == "" || store.Name != tunnel.ReceiveTransitionName(scope.MachineUID) {
 		return nil, fmt.Errorf("phase execution requires native verification and admitted identities")
 	}
+	timing.step("lock")
 	lock, err := lockReconciliation(cfg)
 	if err != nil {
 		return nil, err
 	}
 	defer lock.Close()
+	timing.step("admission")
 	set, err := loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
 	if err != nil {
 		return nil, err
 	}
+	timing.step("checkpoint")
 	if err := checkpointReceiveSetLocked(ctx, api, store, scope, cfg, key, lock.Name(), set); err != nil {
 		return nil, err
 	}
+	timing.step("phase-authority")
 	admitted := set.Local[scope.MachineUID]
 	view, err := admitted.Snapshot.Transition().View()
 	if err != nil {
@@ -112,6 +124,7 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 	}
 	phaseCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
+	timing.step("pre-native-admission")
 	beforeNative, err := loadReceiveSet(phaseCtx, api, store, scope, cfg.nodeName, key)
 	if err != nil {
 		return nil, err
@@ -145,6 +158,7 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 	if err := checkDependencies(set.Routes); err != nil {
 		return nil, err
 	}
+	timing.step("native")
 	if err := native(phaseCtx, admitted.Plan, view, admitted.NodeUID, set.Routes); err != nil {
 		return nil, err
 	}
@@ -154,6 +168,7 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 	}
 	// Re-read live object identities and journal execution authority. Native
 	// execution can outlast a phase, deletion, replacement or boot transition.
+	timing.step("post-native-admission")
 	afterNative, err := loadReceiveSet(phaseCtx, api, store, scope, cfg.nodeName, key)
 	if err != nil {
 		return nil, err
@@ -168,6 +183,7 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 	if err := phaseCtx.Err(); err != nil {
 		return nil, err
 	}
+	timing.step("observation-checkpoint")
 	if completedReadback {
 		if cfg.peersFile != "" && current.NodeUID == current.Plan.CloudNodeUID {
 			if err := checkpointReceiveNativeObservation(phaseCtx, api, store, scope, cfg, key, lock.Name(), containerID, observed, afterNative); err != nil {

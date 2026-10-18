@@ -22,12 +22,15 @@ import (
 )
 
 // Advertisements follow successful forwarding, including after offline replay.
-func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl.Client, cfg config, speaker *transitSpeaker) error {
+func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl.Client, cfg config, speaker *transitSpeaker) (resultErr error) {
+	timing := newReceiveTiming(cfg.receiptURL != "", "reconcile")
+	defer func() { timing.finish(resultErr == nil) }()
 	cfg.receiveRecoveryDevices = devices
 	if cfg.receiptURL != "" {
 		if k == nil {
 			return fmt.Errorf("receiver dispatch requires an in-cluster API client")
 		}
+		timing.step("dispatch")
 		handled, err := dispatchReceivePhases(ctx, k, cfg, func(ctx context.Context, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes, key wgtypes.Key) error {
 			if err := reconcileReceivePolicy(ctx, k, devices, cfg, key, plan, view, nodeUID, intent); err != nil {
 				return err
@@ -67,6 +70,7 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 		if handled {
 			// Ordinary neighbors have independent live admission. Do not starve
 			// their recovery while phase verification waits for their routes.
+			timing.step("neighbors")
 			neighborErr := reconcileReceiveNeighbors(ctx, k, cfg, func(ctx context.Context, key wgtypes.Key, peers []tunnel.PeerSpec, own []string, retiring []tunnel.PeerSpec, allocated []string, commitRetirement func() error) error {
 				if err := retireReceiveNeighbors(ctx, devices, cfg, key, retiring, own, allocated); err != nil {
 					return err

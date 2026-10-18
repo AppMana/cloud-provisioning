@@ -425,6 +425,15 @@ latency, native absence or completion within the receipt lifetime. Inject an
 inventory revision change at the final survivor boundary and require rejection;
 this API race test does not establish live cross-object atomicity.
 
+Agent reconciliation timing diagnostics report fixed operation/stage labels,
+elapsed milliseconds and success only, with at most sixteen stages per record.
+They must not include configuration, object identities, credentials or error text.
+Emission follows release of the operation's host lock. Timings include nested
+operations: do not sum parent and child records. A stage can include API reads,
+local computation and storage; its elapsed time alone does not identify the
+cause of delay. Failed or missing records are not cleanup evidence. Preserve
+independent receipt freshness, native readback and continuous traffic gates.
+
 Exercise repeated agent admission reads against a responsive API, not only an
 initial request burst. By default the agent relies on Kubernetes API Priority
 and Fairness, matching the controller, while preserving explicit caller QPS,

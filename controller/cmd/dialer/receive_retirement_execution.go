@@ -23,7 +23,9 @@ type receiveRetirementNative func(context.Context, string, admittedReceiveRetire
 // verification and renewed identity/source checks. The controller independently
 // authenticates and ages it. Source changes suppress receipts without undoing
 // cleanup; retry must admit the current state. Call without holding the host lock.
-func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveRetirementNative) ([]handover.PodReceipt, error) {
+func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveRetirementNative) (result []handover.PodReceipt, resultErr error) {
+	timing := newReceiveTiming(cfg.receiptURL != "", "retirement")
+	defer func() { timing.finish(resultErr == nil) }()
 	if api == nil || native == nil || containerID == "" || cfg.receiptPodName == "" || cfg.receiptPodUID == "" || scope.MachineUID == "" || store.Name != tunnel.ReceiveTransitionName(scope.MachineUID) {
 		return nil, fmt.Errorf("retirement execution requires native verification and agent identity")
 	}
@@ -32,11 +34,13 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	timing.step("lock")
 	lock, err := lockReconciliation(cfg)
 	if err != nil {
 		return nil, err
 	}
 	defer lock.Close()
+	timing.step("admission")
 	admitted, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
 	if err != nil {
 		return nil, fmt.Errorf("initial admission: %w", err)
@@ -45,12 +49,15 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	verifyAgent := func() error {
 		return handover.VerifyObservationIncarnation(ctx, api, scope.Namespace, cfg.nodeName, receipt)
 	}
+	timing.step("agent-identity")
 	if err := verifyAgent(); err != nil {
 		return nil, err
 	}
+	timing.step("checkpoint")
 	if err := checkpointReceiveRetirementLocked(ctx, api, store, scope, cfg, key, lock.Name(), admitted); err != nil {
 		return nil, fmt.Errorf("checkpoint: %w", err)
 	}
+	timing.step("binding")
 	binding, err := attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(admitted.Metadata.UID), admitted.Journals[scope.MachineUID], admitted.Mesh)
 	if err != nil {
 		return nil, fmt.Errorf("observation binding: %w", err)
@@ -58,12 +65,14 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	timing.step("pre-native-admission")
 	if err := recheckReceiveRetirement(ctx, api, store, admitted, cfg.nodeName, key); err != nil {
 		return nil, fmt.Errorf("pre-cleanup admission: %w", err)
 	}
 	if err := verifyAgent(); err != nil {
 		return nil, err
 	}
+	timing.step("native")
 	if err := native(ctx, lock.Name(), admitted); err != nil {
 		return nil, fmt.Errorf("native cleanup: %w", err)
 	}
@@ -71,6 +80,7 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	timing.step("post-native-admission")
 	current, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
 	if err != nil {
 		return nil, fmt.Errorf("post-cleanup admission: %w", err)
@@ -78,6 +88,7 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	if !sameReceiveRetirement(admitted, current) {
 		return nil, fmt.Errorf("retirement changed during native cleanup")
 	}
+	timing.step("post-native-binding")
 	refreshed, err := attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(current.Metadata.UID), current.Journals[scope.MachineUID], current.Mesh)
 	if err != nil {
 		return nil, fmt.Errorf("post-cleanup binding: %w", err)

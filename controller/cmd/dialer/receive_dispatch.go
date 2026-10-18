@@ -163,7 +163,11 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 				failures = append(failures, fmt.Errorf("receiver %s retirement execution: %w", uid, err))
 				continue
 			}
-			if err := transport.Submit(ctx, strings.TrimSpace(string(token)), handover.ReceiptRequest{MachineUID: uid, RoundHash: receipts[0].Receipt.RoundHash, Receipts: receipts}); err != nil {
+			delivery := newReceiveTiming(true, "retirement-delivery")
+			delivery.step("request")
+			deliveryErr := transport.Submit(ctx, strings.TrimSpace(string(token)), handover.ReceiptRequest{MachineUID: uid, RoundHash: receipts[0].Receipt.RoundHash, Receipts: receipts})
+			delivery.finish(deliveryErr == nil)
+			if err := deliveryErr; err != nil {
 				failures = append(failures, fmt.Errorf("receiver %s retirement delivery: %w", uid, err))
 			}
 			continue
@@ -211,7 +215,11 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 			failures = append(failures, fmt.Errorf("receiver %s phase execution: %w", uid, err))
 			continue
 		}
-		if err := transport.Submit(ctx, strings.TrimSpace(string(token)), handover.ReceiptRequest{MachineUID: uid, RoundHash: receipts[0].Receipt.RoundHash, Receipts: receipts}); err != nil {
+		delivery := newReceiveTiming(true, "phase-delivery")
+		delivery.step("request")
+		deliveryErr := transport.Submit(ctx, strings.TrimSpace(string(token)), handover.ReceiptRequest{MachineUID: uid, RoundHash: receipts[0].Receipt.RoundHash, Receipts: receipts})
+		delivery.finish(deliveryErr == nil)
+		if err := deliveryErr; err != nil {
 			failures = append(failures, fmt.Errorf("receiver %s phase delivery: %w", uid, err))
 		}
 	}

@@ -59,9 +59,10 @@ func TestRetirementScopeHashSurvivesSiblingCompletion(t *testing.T) {
 	if before.inventoryHash != after.inventoryHash {
 		t.Fatal("sibling completion changed retirement authority hash")
 	}
-	// New submissions must still bind the current inventory revision and CAS.
-	if before.Digest() == after.Digest() {
-		t.Fatal("inventory revision change did not invalidate in-flight submissions")
+	// Completion evidence is not withdrawal authority. A sibling finishing
+	// must not reset collection; the final write still pins its live revision.
+	if before.Digest() != after.Digest() {
+		t.Fatal("sibling completion invalidated in-flight submissions")
 	}
 }
 
@@ -80,6 +81,9 @@ func TestRetirementInventoryHashKeepsAuthorityAndLegacySemantics(t *testing.T) {
 		return h
 	}
 	old, newHash := hash(inventory, 2), hash(inventory, 3)
+	if hash(inventory, 4) != newHash {
+		t.Fatal("current evidence changed inventory authority semantics")
+	}
 	for _, change := range []string{"own-evidence", "sibling-evidence", "sibling-withdrawal", "sibling-journal", "membership", "mesh", "cluster", "namespace", "pending-plan"} {
 		t.Run(change, func(t *testing.T) {
 			var copy tunnel.ReceiveInventory
@@ -114,8 +118,10 @@ func TestRetirementInventoryHashKeepsAuthorityAndLegacySemantics(t *testing.T) {
 				copy.Publications["two"] = sibling
 			}
 			equivalent := change == "own-evidence" || change == "sibling-evidence"
-			if (hash(copy, 3) == newHash) != equivalent {
-				t.Fatal("completion exclusion changed authority semantics")
+			for _, version := range []int{3, 4} {
+				if (hash(copy, version) == newHash) != equivalent {
+					t.Fatal("completion exclusion changed authority semantics")
+				}
 			}
 			if (hash(copy, 2) == old) != (change == "own-evidence") {
 				t.Fatal("legacy hash semantics changed")
@@ -126,7 +132,7 @@ func TestRetirementInventoryHashKeepsAuthorityAndLegacySemantics(t *testing.T) {
 	if string(original) != string(after) {
 		t.Fatal("hashing mutated source")
 	}
-	if _, err := receiveRetirementInventoryHash(inventory, "one", 4); err == nil {
+	if _, err := receiveRetirementInventoryHash(inventory, "one", 5); err == nil {
 		t.Fatal("unknown completion version admitted")
 	}
 }

@@ -430,14 +430,19 @@ and identities. Exercise a rejected submission between two valid consumers and
 verify that its credential is never retained. Synthetic accumulation tests do
 not prove that live consumers can deliver within the shared freshness window.
 
-Version-three retirement completion records exclude all completion evidence
-from their inventory authority hash, so recording or refreshing a sibling
+Version-three and version-four retirement completion records exclude all
+completion evidence from their inventory authority hash, so refreshing a sibling
 completion does not invalidate an otherwise current proof. Journal identities,
 withdrawal intents, membership and every other inventory field remain bound.
 Version-two records retain their original own-record-only exclusion and must be
-refreshed through complete authentication to acquire the new semantics. Older
-readers reject version three; retain a compatible runtime after such writes.
-In-flight submissions still bind the inventory revision, and completion still
+refreshed through complete authentication to acquire the new semantics.
+Version-four receipts bind this authority hash and inventory metadata, excluding
+only resource version and managed-field bookkeeping. A sibling completion must
+not reset collection when withdrawal authority is unchanged. The final write
+still binds and compares the exact admitted inventory revision, including after
+authentication; source races and CAS conflicts must fail. Versions two and three
+keep their original revision-bound receipt interpretation. Older readers reject
+version four; retain a compatible runtime after such writes. Completion still
 requires current identities, fresh observations and an uncontested write. Scope
 hash tests and synthetic evidence updates do not prove two live workers can
 finish retirement within the required freshness window.

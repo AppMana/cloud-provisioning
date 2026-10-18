@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-const receiveRetirementCompletionVersion = 3
+const receiveRetirementCompletionVersion = 4
 
 type receiveRetirementCompletion struct {
 	InventoryVersion string             `json:"inventoryVersion"`
@@ -60,7 +60,7 @@ func RecordReceiveRetirementWithPodReceipts(ctx context.Context, api kubernetes.
 	if err != nil {
 		return err
 	}
-	if current.Digest() != scope.Digest() {
+	if current.Digest() != scope.Digest() || current.inventory.UID != scope.inventory.UID || current.inventory.ResourceVersion != scope.inventory.ResourceVersion {
 		return fmt.Errorf("retirement source changed during authentication")
 	}
 	for _, proof := range proofs {
@@ -74,7 +74,11 @@ func RecordReceiveRetirementWithPodReceipts(ctx context.Context, api kubernetes.
 	if err := scope.validateSubmissions(submissions, time.Now(), maxAge); err != nil {
 		return err
 	}
-	completion := receiveRetirementCompletion{Version: receiveRetirementCompletionVersion, InventoryVersion: scope.inventory.ResourceVersion, InventoryHash: scope.inventoryHash, MeshVersion: mesh.ResourceVersion, Binding: scope.Digest(), Receipts: make([]handover.Receipt, 0, len(proofs))}
+	commitBinding, err := receiveRetirementDigest(store.ClusterUID, inventoryUID, scope.inventory.ResourceVersion, mesh, scope.intent)
+	if err != nil {
+		return err
+	}
+	completion := receiveRetirementCompletion{Version: receiveRetirementCompletionVersion, InventoryVersion: scope.inventory.ResourceVersion, InventoryHash: scope.inventoryHash, MeshVersion: mesh.ResourceVersion, Binding: commitBinding, Receipts: make([]handover.Receipt, 0, len(proofs))}
 	for _, proof := range proofs {
 		completion.Receipts = append(completion.Receipts, proof.Receipt)
 	}

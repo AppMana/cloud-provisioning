@@ -315,13 +315,13 @@ func verifyRetirementReceiptCollection(t *testing.T, scope ReceiveRetirementRece
 		t.Fatal("partial collection completed")
 	}
 	submit(batch[1], batch[0].BearerToken, http.StatusConflict)
-	// Authentication failure clears the earlier retained credential. The second
-	// consumer alone must still be insufficient after the failed submission.
-	submit(batch[1], batch[1].BearerToken, http.StatusAccepted)
+	// A rejected token cannot erase the first consumer's authenticated proof,
+	// or count as the missing consumer's proof. Completion reauthenticates both.
 	if completed.Load() != 0 {
-		t.Fatal("failed collection retained authority")
+		t.Fatal("rejected consumer authorized completion")
 	}
-	submit(batch[0], batch[0].BearerToken, http.StatusNoContent)
+	submit(batch[1], batch[1].BearerToken, http.StatusNoContent)
+	submit(batch[0], batch[0].BearerToken, http.StatusAccepted)
 	if completed.Load() != 1 {
 		t.Fatal("independent consumers did not complete exactly once")
 	}

@@ -62,7 +62,7 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 	must(err)
 	mesh, err = api.CoreV1().Secrets(ns).Update(ctx, mesh, metav1.UpdateOptions{})
 	must(err)
-	for _, fault := range []string{"missing-policy", "recheck", "inventory-race", "mesh-race", "reboot-after-authentication", "transport-inventory-race", "transport-commit-race", "none"} {
+	for _, fault := range []string{"missing-policy", "recheck", "inventory-race", "inventory-revision-race", "mesh-race", "reboot-after-authentication", "transport-inventory-race", "transport-commit-race", "none"} {
 		t.Run("authenticated-completion/"+fault, func(t *testing.T) {
 			scope, err := NewReceiveRetirementReceiptScope(ctx, maps, "cluster", string(index.UID), snapshot, mesh)
 			must(err)
@@ -89,13 +89,20 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 				switch fault {
 				case "recheck":
 					return errors.New("source admission changed")
-				case "inventory-race", "transport-inventory-race", "transport-commit-race":
+				case "inventory-race", "inventory-revision-race", "transport-inventory-race", "transport-commit-race":
 					latest, err := maps.Get(ctx, index.Name, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
+					original := latest.Annotations
 					latest.Annotations = map[string]string{"race": fault}
-					_, err = maps.Update(ctx, latest, metav1.UpdateOptions{})
+					latest, err = maps.Update(ctx, latest, metav1.UpdateOptions{})
+					if err == nil && fault == "inventory-revision-race" {
+						// Restore identical authority while changing its revision.
+						// Stable receipt bindings must not permit a stale commit.
+						latest.Annotations = original
+						_, err = maps.Update(ctx, latest, metav1.UpdateOptions{})
+					}
 					return err
 				case "mesh-race":
 					changed := mesh.DeepCopy()
@@ -161,7 +168,9 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 			must(err)
 			var completion receiveRetirementCompletion
 			must(json.Unmarshal(record, &completion))
-			if completion.Version != receiveRetirementCompletionVersion || completion.InventoryVersion != scope.inventory.ResourceVersion || completion.InventoryHash != scope.inventoryHash || completion.MeshVersion != mesh.ResourceVersion || completion.Binding != scope.Digest() || len(completion.Receipts) != 1 || completion.Receipts[0].AgentPodUID != string(pod.UID) || completion.Receipts[0].ObservedBootID != entry.BootID {
+			commitBinding, err := receiveRetirementDigest("cluster", string(index.UID), scope.inventory.ResourceVersion, mesh, scope.intent)
+			must(err)
+			if completion.Version != receiveRetirementCompletionVersion || completion.InventoryVersion != scope.inventory.ResourceVersion || completion.InventoryHash != scope.inventoryHash || completion.MeshVersion != mesh.ResourceVersion || completion.Binding != commitBinding || len(completion.Receipts) != 1 || completion.Receipts[0].AgentPodUID != string(pod.UID) || completion.Receipts[0].ObservedBootID != entry.BootID {
 				t.Fatal("lost authenticated completion identity")
 			}
 			if strings.Contains(string(record), entry.BearerToken) || len(v.MachineUIDs) != 1 || v.Publications[w.MachineUID].JournalUID != string(journal.UID) {
@@ -172,37 +181,43 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 			if !verified {
 				t.Fatal("authenticated completion did not survive its own inventory write")
 			}
-			// A v2 record keeps its old hash semantics; parsing a newer reader
-			// must not require rewriting otherwise valid retained evidence.
-			legacy := completion
-			legacy.Version = 2
-			legacy.InventoryHash, err = receiveRetirementInventoryHash(v, w.MachineUID, 2)
-			must(err)
-			legacyRaw, err := json.Marshal(legacy)
-			must(err)
-			currentInventory, currentIndex, err := tunnel.ReadReceiveInventory(ctx, maps, "cluster", ns, mesh.Name, string(mesh.UID))
-			must(err)
-			publication := currentInventory.Publications[w.MachineUID]
-			publication.RetirementCompletion = legacyRaw
-			currentInventory.Publications[w.MachineUID] = publication
-			encoded, err := json.Marshal(currentInventory)
-			must(err)
-			currentIndex.Data["inventory.json"] = string(encoded)
-			currentIndex, err = maps.Update(ctx, currentIndex, metav1.UpdateOptions{})
-			must(err)
-			legacyOK, err := VerifyReceiveRetirementCompletion(ctx, api, store, ns, mesh.Name, string(mesh.UID), w.MachineUID, string(index.UID), time.Minute)
-			must(err)
-			if !legacyOK {
-				t.Fatal("valid legacy completion rejected")
+			// Legacy records keep their revision-bound receipt semantics.
+			// A newer reader must not reinterpret retained evidence.
+			for _, legacyVersion := range []int{2, 3} {
+				legacy := completion
+				legacy.Receipts = append([]handover.Receipt(nil), completion.Receipts...)
+				for i := range legacy.Receipts {
+					legacy.Receipts[i].RoundHash = commitBinding
+				}
+				legacy.Version = legacyVersion
+				legacy.InventoryHash, err = receiveRetirementInventoryHash(v, w.MachineUID, legacyVersion)
+				must(err)
+				legacyRaw, err := json.Marshal(legacy)
+				must(err)
+				currentInventory, currentIndex, err := tunnel.ReadReceiveInventory(ctx, maps, "cluster", ns, mesh.Name, string(mesh.UID))
+				must(err)
+				publication := currentInventory.Publications[w.MachineUID]
+				publication.RetirementCompletion = legacyRaw
+				currentInventory.Publications[w.MachineUID] = publication
+				encoded, err := json.Marshal(currentInventory)
+				must(err)
+				currentIndex.Data["inventory.json"] = string(encoded)
+				currentIndex, err = maps.Update(ctx, currentIndex, metav1.UpdateOptions{})
+				must(err)
+				legacyOK, err := VerifyReceiveRetirementCompletion(ctx, api, store, ns, mesh.Name, string(mesh.UID), w.MachineUID, string(index.UID), time.Minute)
+				must(err)
+				if !legacyOK {
+					t.Fatal("valid legacy completion rejected")
+				}
+				publication.RetirementCompletion = record
+				currentInventory.Publications[w.MachineUID] = publication
+				encoded, err = json.Marshal(currentInventory)
+				must(err)
+				currentIndex.Data["inventory.json"] = string(encoded)
+				_, err = maps.Update(ctx, currentIndex, metav1.UpdateOptions{})
+				must(err)
 			}
-			publication.RetirementCompletion = record
-			currentInventory.Publications[w.MachineUID] = publication
-			encoded, err = json.Marshal(currentInventory)
-			must(err)
-			currentIndex.Data["inventory.json"] = string(encoded)
-			_, err = maps.Update(ctx, currentIndex, metav1.UpdateOptions{})
-			must(err)
-			for _, damage := range []string{"version", "inventory-version", "inventory-hash", "mesh-version", "binding", "missing", "duplicate", "container", "stale", "phase"} {
+			for _, damage := range []string{"version", "inventory-version", "inventory-hash", "mesh-version", "binding", "legacy-receipts", "missing", "duplicate", "container", "stale", "phase"} {
 				t.Run("readback/"+damage, func(t *testing.T) {
 					var changed receiveRetirementCompletion
 					must(json.Unmarshal(record, &changed))
@@ -217,6 +232,8 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 						changed.MeshVersion = "different"
 					case "binding":
 						changed.Binding = "different"
+					case "legacy-receipts":
+						changed.Version = 3
 					case "missing":
 						changed.Receipts = nil
 					case "duplicate":
@@ -265,8 +282,10 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 			currentNode.Status.NodeInfo.BootID = oldBoot
 			_, err = api.CoreV1().Nodes().UpdateStatus(ctx, currentNode, metav1.UpdateOptions{})
 			must(err)
-			if err := RecordReceiveRetirementWithPodReceipts(ctx, api, store, string(index.UID), scope.Digest(), mesh, snapshot, []handover.PodReceipt{entry}, policies, time.Minute, func() error { return nil }); err == nil {
-				t.Fatal("stale binding reused after completion write")
+			expired := entry
+			expired.Receipt.ObservedAt = time.Now().Add(-2 * time.Minute)
+			if err := RecordReceiveRetirementWithPodReceipts(ctx, api, store, string(index.UID), scope.Digest(), mesh, snapshot, []handover.PodReceipt{expired}, policies, time.Minute, func() error { return nil }); err == nil {
+				t.Fatal("expired observation reused after completion write")
 			}
 			freshScope, err := NewReceiveRetirementReceiptScope(ctx, maps, "cluster", string(index.UID), snapshot, mesh)
 			must(err)

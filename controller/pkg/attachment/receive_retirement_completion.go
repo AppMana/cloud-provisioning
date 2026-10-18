@@ -14,9 +14,11 @@ import (
 )
 
 // VerifyReceiveRetirementCompletion checks controller-authenticated durable
-// evidence without storing or replaying bearer tokens. Version three excludes
-// completion evidence from the inventory authority hash; version two retains
-// its original own-record-only exclusion. Current pod/container
+// evidence without storing or replaying bearer tokens. Versions three and four
+// exclude completion evidence from the inventory authority hash; version two
+// retains its own-record-only exclusion. Version four receipts bind authority
+// independently of the completion's exact source-revision binding. Versions two
+// and three retain revision-bound receipts. Current pod/container
 // and boot identities and observation age remain mandatory. This is a deletion
 // gate, not allocation release or evidence of future connectivity. Missing
 // completion returns false; stale/incompatible evidence requires reconciliation.
@@ -42,7 +44,7 @@ func VerifyReceiveRetirementCompletion(ctx context.Context, api kubernetes.Inter
 	if decoder.Decode(&extra) != io.EOF {
 		return false, fmt.Errorf("trailing completion evidence")
 	}
-	if (completion.Version != 2 && completion.Version != receiveRetirementCompletionVersion) || completion.InventoryVersion == "" || completion.InventoryVersion == source.Metadata.ResourceVersion || completion.MeshVersion != source.MeshMetadata.ResourceVersion {
+	if (completion.Version < 2 || completion.Version > receiveRetirementCompletionVersion) || completion.InventoryVersion == "" || completion.InventoryVersion == source.Metadata.ResourceVersion || completion.MeshVersion != source.MeshMetadata.ResourceVersion {
 		return false, fmt.Errorf("completion source revision is missing or changed")
 	}
 	inventoryHash, err := receiveRetirementInventoryHash(source.Inventory, machineUID, completion.Version)
@@ -58,6 +60,12 @@ func VerifyReceiveRetirementCompletion(ctx context.Context, api kubernetes.Inter
 	}
 	if completion.Binding != digest {
 		return false, fmt.Errorf("completion no longer binds withdrawal")
+	}
+	if completion.Version >= 4 {
+		digest, err = receiveRetirementAuthorityDigest(store.ClusterUID, inventoryUID, inventoryHash, source.Metadata, source.Mesh, publication.Retirement)
+		if err != nil {
+			return false, err
+		}
 	}
 	scope := ReceiveRetirementReceiptScope{digest: digest, nodes: map[string]string{}}
 	for _, consumer := range source.Withdrawal.Consumers {
@@ -98,7 +106,7 @@ func VerifyReceiveRetirementCompletion(ctx context.Context, api kubernetes.Inter
 // Legacy records retain their original interpretation; never silently upgrade
 // their hash semantics. Copy publication entries so source admission is intact.
 func receiveRetirementInventoryHash(inventory tunnel.ReceiveInventory, machineUID string, version int) (string, error) {
-	if version != 2 && version != receiveRetirementCompletionVersion {
+	if version < 2 || version > receiveRetirementCompletionVersion {
 		return "", fmt.Errorf("unsupported retirement completion version")
 	}
 	if _, found := inventory.Publications[machineUID]; machineUID == "" || !found {
@@ -106,7 +114,7 @@ func receiveRetirementInventoryHash(inventory tunnel.ReceiveInventory, machineUI
 	}
 	publications := make(map[string]tunnel.ReceiveJournalPublication, len(inventory.Publications))
 	for uid, publication := range inventory.Publications {
-		if uid == machineUID || version == receiveRetirementCompletionVersion {
+		if uid == machineUID || version >= 3 {
 			publication.RetirementCompletion = nil
 		}
 		publications[uid] = publication

@@ -51,13 +51,13 @@ func NewReceiveRetirementReceiptScope(ctx context.Context, maps typedcore.Config
 	if err != nil {
 		return fail(err)
 	}
-	digest, err := receiveRetirementDigest(clusterUID, inventoryUID, index.ResourceVersion, mesh, inventory.Publications[plan.MachineUID].Retirement)
-	if err != nil {
-		return fail(err)
-	}
 	publication := inventory.Publications[plan.MachineUID]
 	previousCompletion := append(json.RawMessage(nil), publication.RetirementCompletion...)
 	inventoryHash, err := receiveRetirementInventoryHash(inventory, plan.MachineUID, receiveRetirementCompletionVersion)
+	if err != nil {
+		return fail(err)
+	}
+	digest, err := receiveRetirementAuthorityDigest(clusterUID, inventoryUID, inventoryHash, index.ObjectMeta, mesh, publication.Retirement)
 	if err != nil {
 		return fail(err)
 	}
@@ -148,6 +148,7 @@ func (s ReceiveRetirementReceiptScope) validateBatch(submissions []handover.PodR
 	return nil
 }
 
+// The legacy binding remains the completion's exact source-revision binding.
 func receiveRetirementDigest(clusterUID, inventoryUID, inventoryVersion string, mesh *corev1.Secret, intent json.RawMessage) (string, error) {
 	raw, err := json.Marshal(struct {
 		Kind             string          `json:"kind"`
@@ -158,6 +159,30 @@ func receiveRetirementDigest(clusterUID, inventoryUID, inventoryVersion string, 
 		MeshVersion      string          `json:"meshVersion"`
 		Withdrawal       json.RawMessage `json:"withdrawal"`
 	}{"cldt/receive-retirement-observation/v1", clusterUID, inventoryUID, inventoryVersion, string(mesh.UID), mesh.ResourceVersion, intent})
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+// Receipt collection binds withdrawal authority, not another consumer's
+// completion write. Keep inventory metadata other than server bookkeeping,
+// all authority data, and the exact mesh revision. Commit still pins the live
+// inventory revision independently; no write conflict is retried with receipts.
+func receiveRetirementAuthorityDigest(clusterUID, inventoryUID, inventoryHash string, metadata metav1.ObjectMeta, mesh *corev1.Secret, intent json.RawMessage) (string, error) {
+	metadata.ResourceVersion = ""
+	metadata.ManagedFields = nil
+	raw, err := json.Marshal(struct {
+		Kind              string            `json:"kind"`
+		ClusterUID        string            `json:"clusterUID"`
+		InventoryUID      string            `json:"inventoryUID"`
+		InventoryHash     string            `json:"inventoryHash"`
+		InventoryMetadata metav1.ObjectMeta `json:"inventoryMetadata"`
+		MeshUID           string            `json:"meshUID"`
+		MeshVersion       string            `json:"meshVersion"`
+		Withdrawal        json.RawMessage   `json:"withdrawal"`
+	}{"cldt/receive-retirement-observation/v2", clusterUID, inventoryUID, inventoryHash, metadata, string(mesh.UID), mesh.ResourceVersion, intent})
 	if err != nil {
 		return "", err
 	}

@@ -222,6 +222,7 @@ func TestRetirementReceiptAuthenticationRealAPI(t *testing.T) {
 	if _, err := scope.AuthenticateComplete(ctx, fresh, policies, time.Minute); err != nil {
 		t.Fatal("fresh replacement observation rejected", err)
 	}
+	verifyRetirementAuthenticatedCommit(t, api, verifier, nodes[0], pods[0], fresh[0])
 	pods[0].Status.ContainerStatuses[0].ImageID = "sha256:" + strings.Repeat("b", 64)
 	pods[0], err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pods[0], metav1.UpdateOptions{})
 	if err != nil {

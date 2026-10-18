@@ -11,6 +11,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
@@ -20,8 +21,10 @@ import (
 // before any reservation release. Neither construction nor authentication proves
 // kernel absence; each admitted agent must verify every cleanup obligation.
 type ReceiveRetirementReceiptScope struct {
-	digest string
-	nodes  map[string]string
+	digest    string
+	nodes     map[string]string
+	inventory metav1.ObjectMeta
+	intent    json.RawMessage
 }
 
 func (s ReceiveRetirementReceiptScope) Digest() string { return s.digest }
@@ -59,7 +62,7 @@ func NewReceiveRetirementReceiptScope(ctx context.Context, maps typedcore.Config
 		return fail(err)
 	}
 	sum := sha256.Sum256(raw)
-	scope := ReceiveRetirementReceiptScope{digest: hex.EncodeToString(sum[:]), nodes: map[string]string{}}
+	scope := ReceiveRetirementReceiptScope{digest: hex.EncodeToString(sum[:]), nodes: map[string]string{}, inventory: *index.ObjectMeta.DeepCopy(), intent: append(json.RawMessage(nil), inventory.Publications[plan.MachineUID].Retirement...)}
 	for _, consumer := range withdrawal.Consumers {
 		scope.nodes[consumer.NodeUID] = consumer.NodeName
 	}

@@ -16,14 +16,21 @@ import (
 
 func retirementFixture(t *testing.T, outcome string, frozen bool, meshUID ...string) (RemoteWithdrawalIntent, handover.Snapshot, tunnel.ReceiveInventory, *corev1.Secret) {
 	t.Helper()
+	uid := "mesh-uid"
+	if len(meshUID) > 0 {
+		uid = meshUID[0]
+	}
+	return retirementFixtureForConsumer(t, outcome, frozen, uid, "test", "site", "site-uid")
+}
+
+func retirementFixtureForConsumer(t *testing.T, outcome string, frozen bool, meshUID, namespace, nodeName, nodeUID string) (RemoteWithdrawalIntent, handover.Snapshot, tunnel.ReceiveInventory, *corev1.Secret) {
+	t.Helper()
 	key := func(b byte) string { var k wgtypes.Key; k[0] = b; return k.String() }
 	site, root := key(1), key(2)
 	peers := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: site, WGAllowedIPs: []string{"10.90.0.0/24"}}}}
 	base, _ := json.Marshal(peers)
-	p := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: "test", MeshName: "mesh", MeshUID: "mesh-uid", MachineName: "worker", MachineUID: "machine-uid", AdoptionName: tunnel.AdoptionSecretName("worker"), AdoptionUID: "adoption-uid", CloudNodeName: "cloud", CloudNodeUID: "cloud-uid", RootPublicKey: root, Base: base, Desired: peers, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}, Ports: map[string]int{}, Bindings: map[string]tunnel.ReceiveBinding{}, Sites: map[string]tunnel.ReceiveTransitionSite{}}
-	if len(meshUID) > 0 {
-		p.MeshUID = meshUID[0]
-	}
+	p := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: namespace, MeshName: "mesh", MeshUID: "mesh-uid", MachineName: "worker", MachineUID: "machine-uid", AdoptionName: tunnel.AdoptionSecretName("worker"), AdoptionUID: "adoption-uid", CloudNodeName: "cloud", CloudNodeUID: "cloud-uid", RootPublicKey: root, Base: base, Desired: peers, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}, Ports: map[string]int{}, Bindings: map[string]tunnel.ReceiveBinding{}, Sites: map[string]tunnel.ReceiveTransitionSite{}}
+	p.MeshUID = meshUID
 	p.SiteDesired = tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: root, Remote: true, Endpoint: "198.51.100.1:51820", WGAllowedIPs: []string{"172.29.0.1/32"}}}}
 	prep, err := tunnel.PlanReceiveHandover(p.MeshUID, peers, peers, p.Native)
 	if err != nil {
@@ -36,7 +43,7 @@ func retirementFixture(t *testing.T, outcome string, frozen bool, meshUID ...str
 		if err != nil {
 			t.Fatal(err)
 		}
-		p.Sites[site] = tunnel.ReceiveTransitionSite{NodeName: "site", NodeUID: "site-uid", Client: client}
+		p.Sites[site] = tunnel.ReceiveTransitionSite{NodeName: nodeName, NodeUID: nodeUID, Client: client}
 	}
 	plan, _ := json.Marshal(p)
 	spec, err := tunnel.ReceiveTransitionSpec(p, "cluster", tunnel.HashPeerList(plan))
@@ -89,9 +96,9 @@ func retirementFixture(t *testing.T, outcome string, frozen bool, meshUID ...str
 	if err != nil {
 		t.Fatal(err)
 	}
-	w := RemoteWithdrawalIntent{MeshNamespace: p.Namespace, MeshName: p.MeshName, MeshUID: p.MeshUID, SourceVersion: "before", MachineName: p.MachineName, MachineUID: p.MachineUID, PublicKey: root, DrainIntent: "claim/action", Consumers: []ConsumerTarget{{Site: true, NodeName: "site", NodeUID: "site-uid", PublicKey: site}}}
+	w := RemoteWithdrawalIntent{MeshNamespace: p.Namespace, MeshName: p.MeshName, MeshUID: p.MeshUID, SourceVersion: "before", MachineName: p.MachineName, MachineUID: p.MachineUID, PublicKey: root, DrainIntent: "claim/action", Consumers: []ConsumerTarget{{Site: true, NodeName: nodeName, NodeUID: nodeUID, PublicKey: site}}}
 	inventory := tunnel.ReceiveInventory{Version: 1, ClusterUID: "cluster", Namespace: p.Namespace, MeshName: p.MeshName, MeshUID: p.MeshUID, MachineUIDs: []string{p.MachineUID}, Publications: map[string]tunnel.ReceiveJournalPublication{p.MachineUID: {JournalUID: "journal-uid"}}}
-	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: p.Namespace, Name: p.MeshName, UID: "mesh-uid", ResourceVersion: "after"}, Data: map[string][]byte{tunnel.NodePublicKeyPrefix + "site": []byte(site)}}
+	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: p.Namespace, Name: p.MeshName, UID: "mesh-uid", ResourceVersion: "after"}, Data: map[string][]byte{tunnel.NodePublicKeyPrefix + nodeName: []byte(site)}}
 	return w, snapshot, inventory, mesh
 }
 

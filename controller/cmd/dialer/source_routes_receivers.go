@@ -14,10 +14,16 @@ func tunnelSourceReceiverIndices(cfg config, hosts []net.IPNet) (map[string]int,
 	if (len(cfg.receiveSourceRoutes) != 0 || len(cfg.receiveSourceCandidates) != 0) && cfg.receiveRouteScope == nil {
 		return nil, fmt.Errorf("source receiver selection requires journal scope")
 	}
+	if err := validateTunnelSourceCandidates(cfg); err != nil {
+		return nil, err
+	}
 	for raw, selected := range cfg.receiveSourceRoutes {
-		candidate, found := cfg.receiveSourceCandidates[raw]
-		if !found || !reflect.DeepEqual(selected, candidate) {
-			return nil, fmt.Errorf("source receiver differs from admitted candidate")
+		admitted := false
+		for _, candidate := range cfg.receiveSourceCandidates[raw] {
+			admitted = admitted || reflect.DeepEqual(selected, candidate)
+		}
+		if !admitted {
+			return nil, fmt.Errorf("source receiver differs from admitted candidates")
 		}
 	}
 	check := cfg
@@ -29,8 +35,11 @@ func tunnelSourceReceiverIndices(cfg config, hosts []net.IPNet) (map[string]int,
 // actually referenced by the inspected table. Missing unused receivers are
 // allowed during preparation or after retirement; discovery grants no ownership.
 func inspectConfiguredTunnelSources(cfg config, table, legacyIndex int) ([]netlink.Rule, []netlink.Route, error) {
-	indices := map[string]int{}
-	for raw, selection := range cfg.receiveSourceCandidates {
+	if err := validateTunnelSourceCandidates(cfg); err != nil {
+		return nil, nil, err
+	}
+	indices := []map[string]int{{}, {}}
+	for raw, candidates := range cfg.receiveSourceCandidates {
 		_, dst, err := net.ParseCIDR(raw)
 		if err != nil {
 			return nil, nil, err
@@ -38,16 +47,18 @@ func inspectConfiguredTunnelSources(cfg config, table, legacyIndex int) ([]netli
 		if err := validateTunnelSourceScope(cfg, []net.IPNet{*dst}); err != nil {
 			return nil, nil, err
 		}
-		link, err := netlink.LinkByName(selection.Interface)
-		if isLinkNotFound(err) {
-			continue
+		for generation, selection := range candidates {
+			link, err := netlink.LinkByName(selection.Interface)
+			if isLinkNotFound(err) {
+				continue
+			}
+			if err != nil {
+				return nil, nil, err
+			}
+			indices[generation][raw] = link.Attrs().Index
 		}
-		if err != nil {
-			return nil, nil, err
-		}
-		indices[raw] = link.Attrs().Index
 	}
-	rules, routes, err := inspectTunnelSourceState(cfg.routeTable, table, legacyIndex, indices)
+	rules, routes, err := inspectTunnelSourceState(cfg.routeTable, table, legacyIndex, indices...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -59,7 +70,17 @@ func inspectConfiguredTunnelSources(cfg config, table, legacyIndex int) ([]netli
 			continue
 		}
 		raw := route.Dst.String()
-		check.receiveRoutes[raw] = cfg.receiveSourceCandidates[raw]
+		found := false
+		for generation, byDestination := range indices {
+			if byDestination[raw] == route.LinkIndex {
+				check.receiveRoutes[raw] = cfg.receiveSourceCandidates[raw][generation]
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, nil, fmt.Errorf("source route has no admitted receiver generation")
+		}
 		hosts = append(hosts, *route.Dst)
 	}
 	if _, err := validateReceiveRouteSelections(check, hosts, nil); err != nil {
@@ -79,4 +100,48 @@ func preserveUnscopedSourceIndices(cfg config, indices map[string]int, routes []
 			indices[route.Dst.String()] = route.LinkIndex
 		}
 	}
+}
+
+// Limit candidates to the two committed transport generations and reject
+// contradictory identities before inspecting or modifying any source routes.
+func validateTunnelSourceCandidates(cfg config) error {
+	if len(cfg.receiveSourceCandidates) > 0 && cfg.receiveRouteScope == nil {
+		return fmt.Errorf("source candidates require journal scope")
+	}
+	identities := map[string]receiveRouteSelection{}
+	for _, candidates := range cfg.receiveSourceCandidates {
+		if len(candidates) == 0 || len(candidates) > 2 {
+			return fmt.Errorf("source destination requires one or two receiver candidates")
+		}
+		seen := map[string]bool{}
+		for _, selection := range candidates {
+			if selection.Interface == "" || seen[selection.Interface] {
+				return fmt.Errorf("source destination has missing or duplicate receiver identity")
+			}
+			seen[selection.Interface] = true
+			if previous, found := identities[selection.Interface]; found && !reflect.DeepEqual(previous, selection) {
+				return fmt.Errorf("source candidates disagree on receiver ownership")
+			}
+			identities[selection.Interface] = selection
+		}
+	}
+	return nil
+}
+
+// Inspection has already authenticated the route. Resolve only its admitted
+// identity for withdrawal staging; reconciliation revalidates it before writes.
+func installedTunnelSourceReceiver(cfg config, route netlink.Route) (receiveRouteSelection, error) {
+	for _, selection := range cfg.receiveSourceCandidates[route.Dst.String()] {
+		link, err := netlink.LinkByName(selection.Interface)
+		if isLinkNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return receiveRouteSelection{}, err
+		}
+		if link.Attrs().Index == route.LinkIndex {
+			return selection, nil
+		}
+	}
+	return receiveRouteSelection{}, fmt.Errorf("installed source receiver is no longer admitted")
 }

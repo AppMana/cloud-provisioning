@@ -94,7 +94,7 @@ func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cf
 		cfg.receiveRoutes[raw] = selected
 	}
 	cfg.receiveSourceRoutes = map[string]receiveRouteSelection{}
-	cfg.receiveSourceCandidates = map[string]receiveRouteSelection{}
+	cfg.receiveSourceCandidates = map[string][]receiveRouteSelection{}
 	cfg.receiveRelayRoutes = map[string]string{}
 	allLegacyRelays := map[string]string{}
 	allForwardRelays := map[string]string{}
@@ -142,7 +142,7 @@ func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cf
 							if !found {
 								return fmt.Errorf("source exception lacks its committed receiver")
 							}
-							cfg.receiveSourceCandidates[raw] = selection
+							cfg.receiveSourceCandidates[raw] = []receiveRouteSelection{selection}
 							if !legacySelected {
 								cfg.receiveSourceRoutes[raw] = selection
 							}

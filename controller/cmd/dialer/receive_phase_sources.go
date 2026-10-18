@@ -198,7 +198,11 @@ func preflightReceiveSourceSwitchPlan(cfg config, addresses []string, desired, a
 			return nil, nil, fmt.Errorf("source switch found an uncommitted destination")
 		}
 		if !wanted[raw] && route.LinkIndex != link.Attrs().Index {
-			selected[raw] = cfg.receiveSourceCandidates[raw]
+			receiver, err := installedTunnelSourceReceiver(cfg, route)
+			if err != nil {
+				return nil, nil, err
+			}
+			selected[raw] = receiver
 		}
 		wanted[raw] = true
 	}

@@ -12,6 +12,10 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+// Isolated native source-route ownership and staging only. Handshakes have a
+// ten-second deadline; rejected operations must preserve routes. No workload
+// stream, journal activation, reboot or source-sensitive application traffic is
+// measured. Disposable network and mount namespaces bound cleanup.
 func TestNativeTunnelSourceReceivers(t *testing.T) {
 	if os.Getenv("CLDT_SOURCE_RECEIVERS_NETNS") != "1" {
 		t.Skip("requires isolated guest network and mount namespaces")
@@ -46,7 +50,7 @@ func TestNativeTunnelSourceReceivers(t *testing.T) {
 	if err := netlink.LinkSetUp(legacy); err != nil {
 		t.Fatal(err)
 	}
-	cfg := config{iface: legacy.Attrs().Name, routeTable: 518, fwmark: 518, receiveRouteScope: map[string]bool{}, receiveSourceCandidates: map[string]receiveRouteSelection{}}
+	cfg := config{iface: legacy.Attrs().Name, routeTable: 518, fwmark: 518, receiveRouteScope: map[string]bool{}, receiveSourceCandidates: map[string][]receiveRouteSelection{}}
 	addresses := []string{"10.88.0.1/24", "fd20::1/64"}
 	var hosts []net.IPNet
 	for _, raw := range []string{"10.88.0.128/32", "fd20::128/128"} {
@@ -54,46 +58,65 @@ func TestNativeTunnelSourceReceivers(t *testing.T) {
 		hosts = append(hosts, *dst)
 		cfg.receiveRouteScope[raw] = true
 	}
-	// Two independent receiver identities share the same source table.
+	// Both generations have independent authenticated receivers for each family.
 	for i, host := range hosts {
-		local, _ := wgtypes.GeneratePrivateKey()
-		remote, _ := wgtypes.GeneratePrivateKey()
-		names := []string{"src-client4", "src-server4"}
-		if i == 1 {
-			names = []string{"src-client6", "src-server6"}
+		for generation := 0; generation < 2; generation++ {
+			local, _ := wgtypes.GeneratePrivateKey()
+			remote, _ := wgtypes.GeneratePrivateKey()
+			names := []string{"src-client4", "src-server4"}
+			if i == 1 {
+				names = []string{"src-client6", "src-server6"}
+			}
+			if generation == 1 {
+				names = []string{"nxt-client4", "nxt-server4"}
+				if i == 1 {
+					names = []string{"nxt-client6", "nxt-server6"}
+				}
+			}
+
+			keys := []wgtypes.Key{local, remote}
+			for side, name := range names {
+				link := &netlink.Wireguard{LinkAttrs: netlink.LinkAttrs{Name: name, Alias: "cloud-provisioning:receive-client:v1:" + name}}
+				if err := netlink.LinkAdd(link); err != nil {
+					t.Fatal(err)
+				}
+				defer netlink.LinkDel(link)
+				if err := netlink.LinkSetAlias(link, "cloud-provisioning:receive-client:v1:"+name); err != nil {
+					t.Fatal(err)
+				}
+				if err := netlink.LinkSetUp(link); err != nil {
+					t.Fatal(err)
+				}
+				port, peerPort := 58120+i*4+generation*2+side, 58120+i*4+generation*2+1-side
+				keepalive := time.Second
+				peer := keys[1-side].PublicKey()
+				mark := cfg.fwmark
+				if err := devices.ConfigureDevice(name, wgtypes.Config{PrivateKey: &keys[side], ListenPort: &port, FirewallMark: &mark, Peers: []wgtypes.PeerConfig{{PublicKey: peer, Endpoint: &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: peerPort}, AllowedIPs: []net.IPNet{host}, PersistentKeepaliveInterval: &keepalive}}}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cfg.receiveSourceCandidates[host.String()] = append(cfg.receiveSourceCandidates[host.String()], receiveRouteSelection{Interface: names[0], Alias: "cloud-provisioning:receive-client:v1:" + names[0], PublicKey: local.PublicKey().String(), PeerPublicKey: remote.PublicKey().String(), AllowedSources: []string{host.String()}})
 		}
-		keys := []wgtypes.Key{local, remote}
-		for side, name := range names {
-			link := &netlink.Wireguard{LinkAttrs: netlink.LinkAttrs{Name: name, Alias: "cloud-provisioning:receive-client:v1:" + name}}
-			if err := netlink.LinkAdd(link); err != nil {
-				t.Fatal(err)
-			}
-			defer netlink.LinkDel(link)
-			if err := netlink.LinkSetAlias(link, "cloud-provisioning:receive-client:v1:"+name); err != nil {
-				t.Fatal(err)
-			}
-			if err := netlink.LinkSetUp(link); err != nil {
-				t.Fatal(err)
-			}
-			port, peerPort := 58120+i*2+side, 58120+i*2+1-side
-			keepalive := time.Second
-			peer := keys[1-side].PublicKey()
-			mark := cfg.fwmark
-			if err := devices.ConfigureDevice(name, wgtypes.Config{PrivateKey: &keys[side], ListenPort: &port, FirewallMark: &mark, Peers: []wgtypes.PeerConfig{{PublicKey: peer, Endpoint: &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: peerPort}, AllowedIPs: []net.IPNet{host}, PersistentKeepaliveInterval: &keepalive}}}); err != nil {
-				t.Fatal(err)
-			}
-		}
-		cfg.receiveSourceCandidates[host.String()] = receiveRouteSelection{Interface: names[0], Alias: "cloud-provisioning:receive-client:v1:" + names[0], PublicKey: local.PublicKey().String(), PeerPublicKey: remote.PublicKey().String(), AllowedSources: []string{host.String()}}
 	}
+	selectGeneration := func(generation int) map[string]receiveRouteSelection {
+		selected := map[string]receiveRouteSelection{}
+		for raw, candidates := range cfg.receiveSourceCandidates {
+			selected[raw] = candidates[generation]
+		}
+		return selected
+	}
+
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		ready := true
-		for _, selection := range cfg.receiveSourceCandidates {
-			d, err := devices.Device(selection.Interface)
-			if err != nil {
-				t.Fatal(err)
+		for _, candidates := range cfg.receiveSourceCandidates {
+			for _, selection := range candidates {
+				d, err := devices.Device(selection.Interface)
+				if err != nil {
+					t.Fatal(err)
+				}
+				ready = ready && len(d.Peers) == 1 && !d.Peers[0].LastHandshakeTime.IsZero()
 			}
-			ready = ready && len(d.Peers) == 1 && !d.Peers[0].LastHandshakeTime.IsZero()
 		}
 		if ready {
 			break
@@ -117,7 +140,7 @@ func TestNativeTunnelSourceReceivers(t *testing.T) {
 		if err := reconcileTunnelSourceRoutes(cfg, addresses, hosts); err != nil {
 			t.Fatal(err)
 		}
-		cfg.receiveSourceRoutes = cfg.receiveSourceCandidates
+		cfg.receiveSourceRoutes = selectGeneration(0)
 		if err := verifyTunnelSourceRoutes(cfg, addresses, hosts); err == nil {
 			t.Fatal("legacy routes satisfied receiver readback")
 		}
@@ -134,7 +157,7 @@ func TestNativeTunnelSourceReceivers(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, route := range snapshot() {
-			link, err := netlink.LinkByName(cfg.receiveSourceCandidates[route.Dst.String()].Interface)
+			link, err := netlink.LinkByName(cfg.receiveSourceCandidates[route.Dst.String()][0].Interface)
 			if err != nil || route.LinkIndex != link.Attrs().Index {
 				t.Fatal("source exception used wrong receiver", err)
 			}
@@ -193,12 +216,43 @@ func TestNativeTunnelSourceReceivers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+
+	t.Run("receiver-generations", func(t *testing.T) {
+		for _, generation := range []int{0, 1, 0, 1} {
+			cfg.receiveSourceRoutes = selectGeneration(generation)
+			staged, selected, err := preflightReceiveSourceSwitchPlan(cfg, addresses, hosts, hosts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			stageCfg := cfg
+			stageCfg.receiveSourceRoutes = selected
+			if err := reconcileTunnelSourceRoutes(stageCfg, addresses, staged); err != nil {
+				t.Fatal(err)
+			}
+			if err := verifyTunnelSourceRoutes(cfg, addresses, hosts); err != nil {
+				t.Fatal(err)
+			}
+			before := snapshot()
+			cfg.receiveSourceRoutes = nil
+			staged, selected, err = preflightReceiveSourceSwitchPlan(cfg, addresses, nil, hosts)
+			if err != nil || !reflect.DeepEqual(selected, selectGeneration(generation)) {
+				t.Fatal("withdrawal staging lost the installed receiver generation", err)
+			}
+			stageCfg.receiveSourceRoutes = selected
+			if err := reconcileTunnelSourceRoutes(stageCfg, addresses, staged); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(before, snapshot()) {
+				t.Fatal("withdrawal staging changed the serving generation")
+			}
+		}
+	})
 	// A live candidate name with altered cryptographic identity grants no authority.
-	cfg.receiveSourceRoutes = cfg.receiveSourceCandidates
+	cfg.receiveSourceRoutes = selectGeneration(0)
 	if err := reconcileTunnelSourceRoutes(cfg, addresses, hosts); err != nil {
 		t.Fatal(err)
 	}
-	selection := cfg.receiveSourceCandidates[hosts[0].String()]
+	selection := cfg.receiveSourceCandidates[hosts[0].String()][0]
 	link, _ := netlink.LinkByName(selection.Interface)
 	if err := netlink.LinkSetAlias(link, "foreign"); err != nil {
 		t.Fatal(err)
@@ -225,11 +279,35 @@ func TestNativeTunnelSourceReceivers(t *testing.T) {
 }
 
 func TestSourceReceiverCleanupRequiresScope(t *testing.T) {
-	cfg := config{routeTable: 518, receiveSourceCandidates: map[string]receiveRouteSelection{"10.88.0.128/32": {Interface: "candidate"}}}
+	cfg := config{routeTable: 518, receiveSourceCandidates: map[string][]receiveRouteSelection{"10.88.0.128/32": {{Interface: "candidate"}}}}
 	if _, err := tunnelSourceReceiverIndices(cfg, nil); err == nil {
 		t.Fatal("unscoped receiver candidate admitted")
 	}
 	if err := reconcileTunnelSourceRoutes(cfg, nil, nil); err == nil {
 		t.Fatal("unscoped empty intent authorized cleanup")
+	}
+}
+
+func TestSourceReceiverCandidatesRejectConflictingGenerations(t *testing.T) {
+	for _, fault := range []string{"empty", "too-many", "duplicate", "changed-owner"} {
+		t.Run(fault, func(t *testing.T) {
+			first := receiveRouteSelection{Interface: "first", PublicKey: "first-key"}
+			second := receiveRouteSelection{Interface: "second", PublicKey: "second-key"}
+			cfg := config{receiveRouteScope: map[string]bool{"10.88.0.128/32": true}, receiveSourceCandidates: map[string][]receiveRouteSelection{"10.88.0.128/32": {first, second}}}
+			switch fault {
+			case "empty":
+				cfg.receiveSourceCandidates["10.88.0.128/32"] = nil
+			case "too-many":
+				cfg.receiveSourceCandidates["10.88.0.128/32"] = []receiveRouteSelection{first, second, {Interface: "third"}}
+			case "duplicate":
+				cfg.receiveSourceCandidates["10.88.0.128/32"] = []receiveRouteSelection{first, first}
+			case "changed-owner":
+				first.PublicKey = "changed"
+				cfg.receiveSourceCandidates["10.88.0.129/32"] = []receiveRouteSelection{first}
+			}
+			if _, err := tunnelSourceReceiverIndices(cfg, nil); err == nil {
+				t.Fatal("invalid candidate set admitted")
+			}
+		})
 	}
 }

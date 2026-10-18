@@ -117,7 +117,7 @@ type config struct {
 	// Source exceptions select independently of workload egress. Candidates
 	// admit either generation during a switch; routes select the final receiver.
 	receiveSourceRoutes     map[string]receiveRouteSelection
-	receiveSourceCandidates map[string]receiveRouteSelection
+	receiveSourceCandidates map[string][]receiveRouteSelection
 	// Per-destination selected relay next hops from the admitted journal set.
 	receiveRelayRoutes map[string]string
 	// A phase owns only these destinations. Nil retains ordinary whole-table

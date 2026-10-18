@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"sort"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
@@ -14,7 +15,7 @@ import (
 
 // Caller holds the host lock. Retire the journal's site receivers and separately
 // prepared successors recorded in both receiver ownership directories. Ordinary
-// root peers and caches are retired afterward. Source exceptions, relay paths
+// source exceptions, root peers and caches are also retired. Relay paths
 // and authenticated completion remain separate obligations; success here must
 // never be published as full retirement.
 func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Interface, devices receiverDevices, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, admitted admittedReceiveRetirement) error {
@@ -109,6 +110,10 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 	if _, err := tunnel.PlanReceiveWithdrawnNeighborPeers(recorded, currentPeers, admitted.Plans, plan.RootPublicKey); err != nil {
 		return err
 	}
+	sourceCfg, sourceAddresses, sourceHosts, err := planReceiveSourceWithdrawal(cfg, admitted.Plans, plan.RootPublicKey, admitted.NodeUID)
+	if err != nil {
+		return err
+	}
 	guard := &siteReceiveScope{plans: admitted.Plans, check: check}
 	prepare := func(groups map[string][]receiveRouteSelection, destinations map[string][]string) error {
 		var names []string
@@ -122,11 +127,44 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 			if err != nil {
 				return err
 			}
+			// Add recorded pending generations for committed source hosts only.
+			// Exact installed permissions were checked by selectRecordedSiteReceiver.
+			for _, host := range sourceHosts {
+				accepts := false
+				for _, raw := range selection.AllowedSources {
+					_, prefix, e := net.ParseCIDR(raw)
+					if e != nil {
+						return e
+					}
+					accepts = accepts || prefix.Contains(host.IP)
+				}
+				if !accepts {
+					continue
+				}
+				candidates := sourceCfg.receiveSourceCandidates[host.String()]
+				replaced := false
+				for i := range candidates {
+					if candidates[i].Interface == selection.Interface {
+						candidates[i] = selection
+						replaced = true
+					}
+				}
+				if !replaced {
+					candidates = append(candidates, selection)
+				}
+				sourceCfg.receiveSourceCandidates[host.String()] = candidates
+			}
 			routes := map[string]receiveRouteSelection{}
 			for _, prefix := range destinations[name] {
 				routes[prefix] = selection
 			}
 			generations = append(generations, routes)
+		}
+		if err := withdrawReceiveSourceRoutes(ctx, sourceCfg, sourceAddresses, sourceHosts); err != nil {
+			return err
+		}
+		if err := check(); err != nil {
+			return err
 		}
 		return withdrawReceiveDeviceRoutes(ctx, cfg, generations, own)
 	}

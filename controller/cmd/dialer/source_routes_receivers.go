@@ -60,8 +60,12 @@ func inspectConfiguredTunnelSourcesWithHandshake(cfg config, table, legacyIndex 
 		if err != nil {
 			return nil, nil, err
 		}
-		if err := validateTunnelSourceScope(cfg, []net.IPNet{*dst}); err != nil {
-			return nil, nil, err
+		// Withdrawal authenticates surviving receivers outside its removal scope
+		// for preservation only; these candidates never authorize installation.
+		if requireHandshake || tunnelSourceInScope(cfg.receiveRouteScope, *dst) {
+			if err := validateTunnelSourceScope(cfg, []net.IPNet{*dst}); err != nil {
+				return nil, nil, err
+			}
 		}
 		for generation, selection := range candidates {
 			link, err := netlink.LinkByName(selection.Interface)

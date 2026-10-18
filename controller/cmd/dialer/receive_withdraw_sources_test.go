@@ -29,7 +29,7 @@ func TestNativeReceiveSourceWithdrawal(t *testing.T) {
 		}
 	}
 	for _, family := range []int{netlink.FAMILY_V4, netlink.FAMILY_V6} {
-		for _, fault := range []string{"none", "foreign-route", "alias", "key", "selector", "uncommitted", "cancelled", "last-route"} {
+		for _, fault := range []string{"none", "foreign-route", "alias", "key", "selector", "uncommitted", "cancelled", "last-route", "receiver-survivor", "foreign-survivor"} {
 			t.Run(fmt.Sprintf("%d/%s", family, fault), func(t *testing.T) {
 				must := func(err error) {
 					t.Helper()
@@ -82,6 +82,22 @@ func TestNativeReceiveSourceWithdrawal(t *testing.T) {
 				defer netlink.RuleDel(rule)
 				route := netlink.Route{Dst: host, LinkIndex: receiver.Attrs().Index, Table: table, Scope: netlink.SCOPE_LINK, Protocol: unix.RTPROT_BOOT}
 				protected := netlink.Route{Dst: kept, LinkIndex: legacy.Attrs().Index, Table: table, Scope: netlink.SCOPE_LINK, Protocol: unix.RTPROT_BOOT}
+				if fault == "receiver-survivor" || fault == "foreign-survivor" {
+					local, _ := wgtypes.GeneratePrivateKey()
+					remote, _ := wgtypes.GeneratePrivateKey()
+					other := &netlink.Wireguard{LinkAttrs: netlink.LinkAttrs{Name: "source-survivor", Alias: "cloud-provisioning:receive-client:v1:survivor"}}
+					must(netlink.LinkAdd(other))
+					defer netlink.LinkDel(other)
+					must(netlink.LinkSetAlias(other, other.Attrs().Alias))
+					must(netlink.LinkSetUp(other))
+					mark := cfg.fwmark
+					must(devices.ConfigureDevice(other.Attrs().Name, wgtypes.Config{PrivateKey: &local, FirewallMark: &mark, Peers: []wgtypes.PeerConfig{{PublicKey: remote.PublicKey(), AllowedIPs: []net.IPNet{*kept}}}}))
+					cfg.receiveSourceCandidates[survivor] = []receiveRouteSelection{{Interface: other.Attrs().Name, Alias: other.Attrs().Alias, PublicKey: local.PublicKey().String(), PeerPublicKey: remote.PublicKey().String(), AllowedSources: []string{survivor}}}
+					protected.LinkIndex = other.Attrs().Index
+					if fault == "foreign-survivor" {
+						must(netlink.LinkSetAlias(other, "foreign"))
+					}
+				}
 				must(netlink.RouteAdd(&route))
 				defer netlink.RouteDel(&route)
 				if fault != "last-route" {
@@ -123,7 +139,7 @@ func TestNativeReceiveSourceWithdrawal(t *testing.T) {
 				}
 				before := snapshot()
 				err = withdrawReceiveSourceRoutes(ctx, cfg, []string{source}, admitted)
-				if fault != "none" && fault != "last-route" {
+				if fault != "none" && fault != "last-route" && fault != "receiver-survivor" {
 					if err == nil {
 						t.Fatal("unsafe withdrawal accepted")
 					}
@@ -140,7 +156,7 @@ func TestNativeReceiveSourceWithdrawal(t *testing.T) {
 						t.Fatal("target route remains")
 					}
 				} else {
-					if len(after) != 1 || after[0].Dst.String() != survivor || after[0].LinkIndex != legacy.Attrs().Index {
+					if len(after) != 1 || after[0].Dst.String() != survivor || after[0].LinkIndex != protected.LinkIndex {
 						t.Fatal("surviving source route lost")
 					}
 				}

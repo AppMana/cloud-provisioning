@@ -611,6 +611,10 @@ func preflightReceiveRoutePhase(cfg config, receivers map[string]receiveRouteSel
 // receiver is not the legacy root device; root destinations are explicit so a successor
 // cannot silently fall back to that retired transport. This check never mutates.
 func preflightReceiveRouteGenerations(cfg config, generations []map[string]receiveRouteSelection, legacyDestinations map[string]bool, own []string, admittedRelays ...map[string]string) error {
+	return preflightReceiveRouteGenerationsWithHandshake(cfg, generations, legacyDestinations, own, true, admittedRelays...)
+}
+
+func preflightReceiveRouteGenerationsWithHandshake(cfg config, generations []map[string]receiveRouteSelection, legacyDestinations map[string]bool, own []string, requireHandshake bool, admittedRelays ...map[string]string) error {
 	if len(generations) == 0 || len(generations) > 2 {
 		return fmt.Errorf("route preflight requires one or two admitted receiver generations")
 	}
@@ -722,7 +726,7 @@ func preflightReceiveRouteGenerations(cfg config, generations []map[string]recei
 				}
 				check := cfg
 				check.receiveRoutes = map[string]receiveRouteSelection{raw: selection}
-				indices, err := validateReceiveRouteSelections(check, []net.IPNet{*route.Dst}, nil)
+				indices, err := validateReceiveRouteSelectionsWithHandshake(check, []net.IPNet{*route.Dst}, nil, requireHandshake)
 				if err != nil {
 					return err
 				}

@@ -21,6 +21,13 @@ type receiveRouteSelection = tunnel.ReceiveRouteSelection
 // Validate the whole selection before installRoutes changes rules or routes.
 // Destinations must already belong to the caller's validated tunnel route set.
 func validateReceiveRouteSelections(cfg config, hosts, blocks []net.IPNet) (map[string]int, error) {
+	return validateReceiveRouteSelectionsWithHandshake(cfg, hosts, blocks, true)
+}
+
+// Withdrawal validates the same exact ownership but cannot require a handshake
+// from a worker that has already been terminated. Forwarding callers remain
+// handshake-strict through validateReceiveRouteSelections.
+func validateReceiveRouteSelectionsWithHandshake(cfg config, hosts, blocks []net.IPNet, requireHandshake bool) (map[string]int, error) {
 	result := map[string]int{}
 	if len(cfg.receiveRoutes) == 0 {
 		return result, nil
@@ -63,7 +70,7 @@ func validateReceiveRouteSelections(cfg config, hosts, blocks []net.IPNet) (map[
 			return nil, fmt.Errorf("selected receiver source permissions differ from the committed plan")
 		}
 		now := time.Now()
-		if peer.Endpoint == nil || peer.LastHandshakeTime.IsZero() || peer.LastHandshakeTime.After(now) || now.Sub(peer.LastHandshakeTime) > receiveHandshakeMaxAge {
+		if requireHandshake && (peer.Endpoint == nil || peer.LastHandshakeTime.IsZero() || peer.LastHandshakeTime.After(now) || now.Sub(peer.LastHandshakeTime) > receiveHandshakeMaxAge) {
 			return nil, fmt.Errorf("selected receiver has no current authenticated transport")
 		}
 		covered := false

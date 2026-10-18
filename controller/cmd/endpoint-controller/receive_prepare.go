@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/netip"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -37,6 +39,13 @@ type preparedRemoteReceivers struct {
 // evidence only, never permission to move traffic or release old endpoints.
 // Activation orchestration must gate entry into this phase on agent support.
 func (r *meshReconciler) prepareRemoteReceivePaths(ctx context.Context, expected *unstructured.Unstructured, native []netip.Prefix, portPool []int) (*preparedRemoteReceivers, error) {
+	return r.prepareRemoteReceiveGeneration(ctx, expected, native, portPool, nil)
+}
+
+// A successor uses the same proposal/readiness exchange, but binds additive
+// preparation to a terminal journal and reserves distinct generation listeners.
+// The caller still owns journal replacement and publication ordering.
+func (r *meshReconciler) prepareRemoteReceiveGeneration(ctx context.Context, expected *unstructured.Unstructured, native []netip.Prefix, portPool []int, predecessor *handover.Snapshot) (*preparedRemoteReceivers, error) {
 	if expected == nil || expected.GetUID() == "" || expected.GetNamespace() != r.secretNamespace || native == nil || portPool == nil {
 		return nil, fmt.Errorf("receiver preparation requires a scoped Machine and verified native boundaries")
 	}
@@ -118,7 +127,48 @@ func (r *meshReconciler) prepareRemoteReceivePaths(ctx context.Context, expected
 	if err := json.Unmarshal(futureRaw, &future); err != nil {
 		return nil, err
 	}
-	plan, err := tunnel.PlanReceiveHandover(string(mesh.UID), previous, future, native)
+	request := tunnel.ReceivePrepare{Version: 1, MeshUID: string(mesh.UID), NodeName: node.Name, NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, RootPublicKey: root, BaseHash: tunnel.HashPeerList(baseRaw), Desired: future, Native: native}
+	if predecessor != nil {
+		ref, err := tunnel.NewReceivePreparePredecessor(*predecessor, r.receiveJournal.ClusterUID)
+		if err != nil {
+			return nil, err
+		}
+		if ref.MachineUID != string(machine.GetUID()) {
+			return nil, fmt.Errorf("preparation predecessor belongs to another machine")
+		}
+		request.Predecessor = &ref
+		// Boot/readiness changes must not consume another set of listeners.
+		// Bind the desired transport and this worker's site permissions, not
+		// unrelated workers or transient Secret resource versions.
+		peers, err := tunnel.SitePeers(mesh.Data)
+		if err != nil {
+			return nil, err
+		}
+		var worker []tunnel.PeerSpec
+		for _, peer := range peers {
+			if peer.PublicKey == root {
+				worker = append(worker, peer)
+			}
+		}
+		if len(worker) != 1 {
+			return nil, fmt.Errorf("successor preparation lacks unique worker destinations")
+		}
+		identity, err := json.Marshal(struct {
+			Predecessor tunnel.ReceivePreparePredecessor
+			Desired     tunnel.PeerListDoc
+			Native      []netip.Prefix
+			Worker      tunnel.PeerSpec
+		}{ref, future, native, worker[0]})
+		if err != nil {
+			return nil, err
+		}
+		request.ReceiverGeneration = fmt.Sprintf("%x", sha256.Sum256(identity))
+	}
+	receiveScope, err := request.ReceiveScope()
+	if err != nil {
+		return nil, err
+	}
+	plan, err := tunnel.PlanReceiveHandover(receiveScope, previous, future, native)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +183,7 @@ func (r *meshReconciler) prepareRemoteReceivePaths(ctx context.Context, expected
 	} else if len(adoption.Data[tunnel.ReceivePrepareKey]) > 0 {
 		return nil, fmt.Errorf("existing receive proposal has no port reservations")
 	}
-	ports, retained, err := reservations.Assign("", plan.Receivers, portPool)
+	ports, retained, err := reservations.Assign(request.ReceiverGeneration, plan.Receivers, portPool)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +192,15 @@ func (r *meshReconciler) prepareRemoteReceivePaths(ctx context.Context, expected
 	if err != nil {
 		return nil, err
 	}
-	request := tunnel.ReceivePrepare{Version: 1, MeshUID: string(mesh.UID), NodeName: node.Name, NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, RootPublicKey: root, BaseHash: tunnel.HashPeerList(baseRaw), Desired: future, Native: native, Ports: ports}
+	request.Ports = ports
+	if predecessor != nil {
+		if _, err := request.ValidatePredecessor(*predecessor); err != nil {
+			return nil, err
+		}
+		if _, err := r.receivePreparationSiteBase(ctx, adoption, request); err != nil {
+			return nil, err
+		}
+	}
 	raw, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -171,6 +229,11 @@ func (r *meshReconciler) prepareRemoteReceivePaths(ctx context.Context, expected
 	}
 	if currentNode.UID != node.UID || currentNode.Status.NodeInfo.BootID != node.Status.NodeInfo.BootID || currentNode.Spec.ProviderID != provider || !currentReady || currentNode.DeletionTimestamp != nil {
 		return nil, fmt.Errorf("receiver Node changed during preparation")
+	}
+	if predecessor != nil {
+		if _, err := r.receivePreparationSiteBase(ctx, adoption, request); err != nil {
+			return nil, err
+		}
 	}
 	if !bytes.Equal(adoption.Data[tunnel.ReceivePrepareKey], raw) || !bytes.Equal(adoption.Data[tunnel.ReceivePortsKey], reservationRaw) {
 		patch := client.MergeFromWithOptions(adoption.DeepCopy(), client.MergeFromWithOptimisticLock{})

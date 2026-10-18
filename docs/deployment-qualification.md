@@ -525,6 +525,15 @@ A deterministic future-time projection is not an elapsed-time soak. Native
 cleanup is synthetic, the fixture has one consumer, and metadata or simulated
 boot changes do not qualify real reboot recovery or address reuse.
 
+Agent inventory checkpoint admission preserves any saved finalization and its
+consumed completion bytes across subsequent reconciliations and boot identities.
+Removing or replacing either record fails before checkpoint replacement. Initial
+finalization, completion refresh before finalization, and independent retirement
+progress remain permitted by this fence; their authority requires separate live
+admission. Filesystem tests use synthetic evidence and simulated boot identities.
+They establish regression rejection and read-only admission, not authenticated
+finalization, native absence, actual reboot recovery, or reservation release.
+
 Finalization remains a separate protocol: persist an irreversible retirement
 record before removing active reservations, retain durable host fences against
 old boot recovery, and admit new ownership only after matching release evidence.

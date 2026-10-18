@@ -273,6 +273,12 @@ func validateReceiveInventoryCheckpoint(path string, next receiveInventoryCheckp
 			if len(p.Retirement) > 0 && !bytes.Equal(p.Retirement, b.Publications[uid].Retirement) {
 				return fmt.Errorf("receiver retirement intent regressed or changed")
 			}
+			// Once consumed, completion is historical evidence, not a renewable
+			// receipt. Preserve both records across later reconciliations and
+			// boots; accepting their removal would erase the durable fence.
+			if len(p.RetirementFinalization) > 0 && (!bytes.Equal(p.RetirementFinalization, b.Publications[uid].RetirementFinalization) || !bytes.Equal(p.RetirementCompletion, b.Publications[uid].RetirementCompletion)) {
+				return fmt.Errorf("receiver retirement finalization regressed or consumed evidence changed")
+			}
 		}
 		for _, uid := range a.MachineUIDs {
 			if uid == "" || uid <= previous || !slices.Contains(b.MachineUIDs, uid) {

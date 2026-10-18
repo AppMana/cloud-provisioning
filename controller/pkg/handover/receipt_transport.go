@@ -126,11 +126,17 @@ type ReceiptCollection struct {
 	Members     []ReceiptMember
 	Observe     func(context.Context, []PodReceipt) error
 	Complete    func(context.Context, []PodReceipt) error
+	// ReadOnlyObserve explicitly permits concurrent authentication. Observe
+	// must not mutate authoritative state or collector memory, and must fence
+	// its live source before and after authentication. Complete remains serial
+	// and must independently reauthenticate and CAS current authority.
+	// Ordinary handover Observe writes its journal and must leave this false.
+	ReadOnlyObserve bool
 }
 
 // ReceiptCollectionResolver performs read-only source admission. It may run
-// concurrently for different requests. Observe and Complete remain serialized
-// and must revalidate their admitted source before mutation.
+// concurrently for different requests. Mutating Observe and all Complete calls
+// remain serialized and must revalidate their admitted source before mutation.
 type ReceiptCollectionResolver func(context.Context, string) (ReceiptCollection, error)
 
 // NewReceiptCollectionHandler accepts at most one optional progress reporter.
@@ -260,9 +266,15 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	target, err := h.resolve(ctx, request.MachineUID)
 	sourceFinished := time.Now()
 	stage = "contention"
+	gateHeld := false
+	defer func() {
+		if gateHeld {
+			<-h.gate
+		}
+	}()
 	select {
 	case h.gate <- struct{}{}:
-		defer func() { <-h.gate }()
+		gateHeld = true
 	case <-ctx.Done():
 		if err != nil {
 			stage = "source"
@@ -274,7 +286,7 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reject(http.StatusServiceUnavailable)
 		return
 	}
-	queueFinished := time.Now()
+	queueMillis := time.Since(sourceFinished).Milliseconds()
 	stage = "shutdown"
 	if h.stopped {
 		reject(http.StatusServiceUnavailable)
@@ -323,10 +335,6 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		submitted[id] = true
 	}
-	batch := h.batches[request.MachineUID]
-	if batch.uid != target.UID || batch.round != digest {
-		batch = receiptBatch{uid: target.UID, round: digest, expires: target.ExpiresAt, maxAge: target.MaxAge, entries: map[[2]string]PodReceipt{}}
-	}
 	stage = "capacity"
 	if _, exists := h.batches[request.MachineUID]; !exists && len(h.batches) >= h.limit {
 		reject(http.StatusServiceUnavailable)
@@ -334,6 +342,11 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Authenticate this subset before retaining its credentials. The backend
 	// validates freshness and exact observation bindings.
+	before := h.batches[request.MachineUID]
+	if target.ReadOnlyObserve {
+		<-h.gate
+		gateHeld = false
+	}
 	stage = "observation"
 	observeStarted := time.Now()
 	err = target.Observe(r.Context(), request.Receipts)
@@ -346,12 +359,58 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reject(http.StatusConflict)
 		return
 	}
+	if target.ReadOnlyObserve {
+		// Admission slots remain held, bounding concurrent reads and credentials.
+		// No batch map or entry map may be accessed until the gate is reacquired.
+		stage = "contention"
+		queued := time.Now()
+		select {
+		case h.gate <- struct{}{}:
+			gateHeld = true
+		case <-ctx.Done():
+			reject(http.StatusServiceUnavailable)
+			return
+		}
+		queueMillis += time.Since(queued).Milliseconds()
+		stage = "shutdown"
+		if h.stopped || ctx.Err() != nil {
+			reject(http.StatusServiceUnavailable)
+			return
+		}
+		stage = "capacity"
+		current, exists := h.batches[request.MachineUID]
+		if !exists && len(h.batches) >= h.limit {
+			reject(http.StatusServiceUnavailable)
+			return
+		}
+		stage = "binding"
+		if exists && (current.uid != target.UID || current.round != digest) && (current.uid != before.uid || current.round != before.round) {
+			// Another admitted request installed different authority while this
+			// one authenticated. Do not replace that newer collection.
+			reject(http.StatusConflict)
+			return
+		}
+		stage = "freshness"
+		now := time.Now()
+		if !now.Before(target.ExpiresAt) {
+			reject(http.StatusConflict)
+			return
+		}
+	}
+	// Authentication may overlap other requests. Always use the current batch,
+	// never a copied entry map from before releasing the gate.
+	batch := h.batches[request.MachineUID]
+	if batch.uid != target.UID || batch.round != digest {
+		batch = receiptBatch{uid: target.UID, round: digest, expires: target.ExpiresAt, maxAge: target.MaxAge, entries: map[[2]string]PodReceipt{}}
+	}
 	stage = "freshness"
 	// A successfully re-admitted collection may have a renewed observation
 	// window. Handover rounds retain their fixed expiry; retirement collections
 	// roll forward while their source binding is unchanged. Keep per-entry
 	// timestamps intact and prune using the currently admitted age limit.
-	batch.expires = target.ExpiresAt
+	if !target.ReadOnlyObserve || target.ExpiresAt.After(batch.expires) {
+		batch.expires = target.ExpiresAt
+	}
 	batch.maxAge = target.MaxAge
 	observedAt := time.Now()
 	if !observedAt.Before(batch.expires) {
@@ -359,15 +418,28 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reject(http.StatusConflict)
 		return
 	}
+	if target.ReadOnlyObserve {
+		for _, entry := range request.Receipts {
+			at := entry.Receipt.ObservedAt
+			if at.IsZero() || at.After(observedAt) || !observedAt.Before(at.Add(target.MaxAge)) {
+				reject(http.StatusConflict)
+				return
+			}
+		}
+	}
 	batch.prune(observedAt)
 	for _, entry := range request.Receipts {
-		batch.entries[[2]string{entry.Receipt.NodeUID, entry.Receipt.DeviceID}] = entry
+		id := [2]string{entry.Receipt.NodeUID, entry.Receipt.DeviceID}
+		if previous, exists := batch.entries[id]; target.ReadOnlyObserve && exists && entry.Receipt.ObservedAt.Before(previous.Receipt.ObservedAt) {
+			continue
+		}
+		batch.entries[id] = entry
 	}
 	h.batches[request.MachineUID] = batch
 	if h.progress != nil {
 		progress = receiptProgress(target, batch, submitted, observedAt)
 		progress.SourceMillis = sourceFinished.Sub(sourceStarted).Milliseconds()
-		progress.QueueMillis = queueFinished.Sub(sourceFinished).Milliseconds()
+		progress.QueueMillis = queueMillis
 		progress.ObserveMillis = observeFinished.Sub(observeStarted).Milliseconds()
 	}
 	if len(batch.entries) != len(target.Members) {

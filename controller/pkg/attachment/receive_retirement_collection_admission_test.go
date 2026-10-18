@@ -42,8 +42,12 @@ func verifyRetirementCollectionAdmission(t *testing.T, api kubernetes.Interface,
 		}
 		return nil
 	}}
-	if _, err := source.ReceiptCollection(ctx, api, reader, policies, time.Minute, func() error { return nil }); err != nil {
+	collection, err := source.ReceiptCollection(ctx, api, reader, policies, time.Minute, func() error { return nil })
+	if err != nil {
 		t.Fatal(err)
+	}
+	if !collection.ReadOnlyObserve {
+		t.Fatal("retirement authentication must use bounded concurrent observation")
 	}
 	if reads != 1 {
 		t.Fatalf("collection reconstructed admitted history: %d journal reads, want one live recheck", reads)

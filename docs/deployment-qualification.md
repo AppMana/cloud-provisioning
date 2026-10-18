@@ -468,6 +468,19 @@ native callbacks. Re-run authenticated source-race checks and observed multi-nod
 cleanup: overlapping completion writes may invalidate another operation's exact
 source checks, and lower delivery latency alone does not qualify cleanup.
 
+Only retirement collections explicitly declare observation authentication
+read-only. Those callbacks may overlap within the collector's existing eight
+admission slots; mutating handover observation and all completion writes remain
+serialized. Recheck shutdown, capacity, collection identity and original receipt
+expiry after reacquiring the collector gate. A slower request must not erase a
+newer observation or replace a collection installed during its authentication.
+Retirement callbacks retain source checks around authentication, and completion
+reauthenticates the whole batch with exact source checks and inventory CAS.
+Synthetic transport tests cover overlap, serialized commits, queued expiry,
+cancellation and concurrent collector changes; they do not establish native
+absence, real API throughput or production freshness. Real authenticated source
+and commit races and observed multi-node cleanup remain required.
+
 Agent reconciliation timing diagnostics report fixed operation/stage labels,
 elapsed milliseconds and success only, with at most sixteen stages per record.
 They must not include configuration, object identities, credentials or error text.

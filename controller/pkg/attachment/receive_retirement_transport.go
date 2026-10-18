@@ -78,7 +78,7 @@ func (shared ReceiveRetirementSet) ReceiptCollection(ctx context.Context, api ku
 	if err != nil {
 		return fail(err)
 	}
-	target := handover.ReceiptCollection{UID: string(snapshot.Metadata().UID), Digest: scope.Digest(), ExpiresAt: time.Now().Add(maxAge), MaxAge: maxAge}
+	target := handover.ReceiptCollection{UID: string(snapshot.Metadata().UID), Digest: scope.Digest(), ExpiresAt: time.Now().Add(maxAge), MaxAge: maxAge, ReadOnlyObserve: true}
 	for uid := range scope.nodes {
 		if _, ok := policies[uid]; !ok {
 			return fail(fmt.Errorf("retirement consumer has no trusted agent policy"))

@@ -1101,6 +1101,18 @@ func cachePath(cfg config) string {
 	return filepath.Join(filepath.Dir(cfg.peersFile), cfg.iface+".peers-cache.json")
 }
 
+// Resolve the same adoption source for reconciliation and retirement admission.
+func cloudAdoptionSecretName(cfg config) (string, error) {
+	if cfg.peersSecretName != "" {
+		return cfg.peersSecretName, nil
+	}
+	raw, err := os.ReadFile(cfg.machineNameFile)
+	if err != nil {
+		return "", fmt.Errorf("reading --machine-name-file %s: %w", cfg.machineNameFile, err)
+	}
+	return tunnel.AdoptionSecretName(strings.TrimSpace(string(raw))), nil
+}
+
 func writeCachedPeers(path string, doc tunnel.PeerListDoc) error {
 	return writeDurableJSON(path, doc)
 }
@@ -1428,13 +1440,9 @@ func reconcileLocked(ctx context.Context, clientset *kubernetes.Clientset, wg *w
 		// peer list, it supersedes the file's (bootstrap-era) peers.
 		// The file remains the identity source and the fallback floor.
 		if cfg.peersSecretNamespace != "" && clientset != nil {
-			overrideName := cfg.peersSecretName
-			if overrideName == "" {
-				raw, err := os.ReadFile(cfg.machineNameFile)
-				if err != nil {
-					return fmt.Errorf("reading --machine-name-file %s: %w", cfg.machineNameFile, err)
-				}
-				overrideName = tunnel.AdoptionSecretName(strings.TrimSpace(string(raw)))
+			overrideName, err := cloudAdoptionSecretName(cfg)
+			if err != nil {
+				return err
 			}
 			secret, err := clientset.CoreV1().Secrets(cfg.peersSecretNamespace).Get(ctx, overrideName, metav1.GetOptions{})
 			if err == nil {

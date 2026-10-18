@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -25,13 +26,23 @@ func TestSiteReceiveCacheRejectsInvalidRecoveryBeforeDevices(t *testing.T) {
 	if _, err := decodeSiteReceiveCache(raw, cfg, key); err != nil {
 		t.Fatal(err)
 	}
-	for _, fault := range []string{"version", "namespace", "secret", "node", "key", "mesh", "bindings", "port", "sources", "unknown", "trailing"} {
+	valid.Generations = map[string]string{cloud.PublicKey().String(): strings.Repeat("a", 64)}
+	raw, _ = json.Marshal(valid)
+	decoded, err := decodeSiteReceiveCache(raw, cfg, key)
+	if err != nil || decoded.Generations[cloud.PublicKey().String()] != valid.Generations[cloud.PublicKey().String()] {
+		t.Fatal("generation lost from site ownership", err)
+	}
+	for _, fault := range []string{"version", "generation", "orphan-generation", "namespace", "secret", "node", "key", "mesh", "bindings", "port", "sources", "unknown", "trailing"} {
 		t.Run(fault, func(t *testing.T) {
 			var cached siteReceiveCache
 			if err := json.Unmarshal(raw, &cached); err != nil {
 				t.Fatal(err)
 			}
 			switch fault {
+			case "generation":
+				cached.Generations[cloud.PublicKey().String()] = "invalid"
+			case "orphan-generation":
+				cached.Generations[key.PublicKey().String()] = strings.Repeat("b", 64)
 			case "version":
 				cached.Version++
 			case "namespace":
@@ -69,6 +80,7 @@ func TestSiteReceiveCacheRejectsInvalidRecoveryBeforeDevices(t *testing.T) {
 		})
 	}
 	valid.Bindings = map[string]receiveBinding{}
+	valid.Generations = nil
 	if err := writeDurableJSON(siteReceiveCachePath(cfg), valid); err != nil {
 		t.Fatal(err)
 	}

@@ -22,14 +22,19 @@ import (
 // Public preparation inputs only. This is neither a forwarding snapshot nor
 // permission to publish readiness after a restart.
 type siteReceiveCache struct {
-	Version    int                       `json:"version"`
-	Namespace  string                    `json:"namespace"`
-	SecretName string                    `json:"secretName"`
-	MeshUID    string                    `json:"meshUID"`
-	NodeName   string                    `json:"nodeName"`
-	PublicKey  string                    `json:"publicKey"`
-	Peers      tunnel.PeerListDoc        `json:"peers"`
-	Bindings   map[string]receiveBinding `json:"bindings"`
+	Version     int                       `json:"version"`
+	Namespace   string                    `json:"namespace"`
+	SecretName  string                    `json:"secretName"`
+	MeshUID     string                    `json:"meshUID"`
+	NodeName    string                    `json:"nodeName"`
+	PublicKey   string                    `json:"publicKey"`
+	Peers       tunnel.PeerListDoc        `json:"peers"`
+	Bindings    map[string]receiveBinding `json:"bindings"`
+	Generations map[string]string         `json:"generations,omitempty"`
+}
+
+func (c siteReceiveCache) receiveScope(root string) (string, error) {
+	return (tunnel.ReceiveTransitionPlan{MeshUID: c.MeshUID, ReceiverGeneration: c.Generations[root]}).ReceiveScope()
 }
 
 func siteReceiveCachePath(cfg config) string {
@@ -53,17 +58,27 @@ func decodeSiteReceiveCache(raw []byte, cfg config, key wgtypes.Key) (siteReceiv
 	if cached.Version != 1 || cached.Namespace == "" || cached.Namespace != cfg.secretNamespace || cached.SecretName == "" || cached.SecretName != cfg.secretName || cached.MeshUID == "" || cached.NodeName == "" || cached.NodeName != cfg.nodeName || key == (wgtypes.Key{}) || cached.PublicKey != key.PublicKey().String() || cached.Bindings == nil || cached.Peers.Peers == nil {
 		return cached, fmt.Errorf("site receiver cache identity or version mismatch")
 	}
+	for root, generation := range cached.Generations {
+		if _, found := cached.Bindings[root]; !found || generation == "" {
+			return cached, fmt.Errorf("site receiver generation has no binding or identity")
+		}
+	}
 	for root, binding := range cached.Bindings {
-		if _, err := tunnel.PlanSiteReceiveClient(cached.MeshUID, cached.PublicKey, root, binding, cached.Peers, cached.Peers); err != nil {
+		receiveScope, err := cached.receiveScope(root)
+		if err != nil {
+			return cached, err
+		}
+		if _, err := tunnel.PlanSiteReceiveClient(receiveScope, cached.PublicKey, root, binding, cached.Peers, cached.Peers); err != nil {
 			return cached, err
 		}
 	}
 	return cached, nil
 }
 
-// Keep ownership evidence separate from replayable preparation state. An older
-// binary can still read the v1 cache; neither it nor offline recovery consumes
-// these records. A record is native intent, not proof of installation or live
+// Keep ownership evidence separate from replayable preparation state. Legacy
+// caches remain readable by older binaries; generation-bearing caches require
+// a reader that understands them and otherwise fail closed. Offline recovery
+// does not consume these records. A record is native intent, not proof of installation or live
 // authority to delete a device. Retirement must independently admit the owner
 // withdrawal and verify the exact kernel state and absence of dependencies.
 func preserveSiteReceiveOwnership(path string, cached siteReceiveCache, cfg config, key wgtypes.Key) error {
@@ -136,7 +151,11 @@ func restoreSiteReceiveCache(cfg config, devices receiverDevices, key wgtypes.Ke
 	}
 	// Decode and validate every entry before reconstructing any device.
 	for root, binding := range cached.Bindings {
-		if _, err := prepareSiteReceiveClient(devices, cached.MeshUID, key, root, binding, cached.Peers, cached.Peers, mtu, cfg.fwmark); err != nil {
+		receiveScope, err := cached.receiveScope(root)
+		if err != nil {
+			return err
+		}
+		if _, err := prepareSiteReceiveClient(devices, receiveScope, key, root, binding, cached.Peers, cached.Peers, mtu, cfg.fwmark); err != nil {
 			return err
 		}
 	}
@@ -177,6 +196,7 @@ func reconcileDurableSiteReceiversScoped(ctx context.Context, k kubernetes.Inter
 		}
 		if previous.MeshUID == cached.MeshUID && reflect.DeepEqual(previous.Peers, cached.Peers) {
 			cached.Bindings = previous.Bindings
+			cached.Generations = previous.Generations
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -202,10 +222,14 @@ func reconcileDurableSiteReceiversScoped(ctx context.Context, k kubernetes.Inter
 		return err
 	}
 	seen := map[string]bool{}
-	err = reconcileSiteReceivePreparationScoped(ctx, k, mesh, cfg.nodeName, key, scope, func(root string, binding receiveBinding, doc tunnel.PeerListDoc) error {
+	err = reconcileSiteReceivePreparationScoped(ctx, k, mesh, cfg.nodeName, key, scope, func(root string, binding receiveBinding, doc tunnel.PeerListDoc, generation string) error {
 		intent := cached
 		intent.Peers = doc
 		intent.Bindings = map[string]receiveBinding{root: binding}
+		intent.Generations = nil
+		if generation != "" {
+			intent.Generations = map[string]string{root: generation}
+		}
 		// Persist intent first: a crash after native preparation must not leave
 		// an owned device whose identity is absent from every durable record.
 		if err := preserveSiteReceiveOwnership(path, intent, cfg, key); err != nil {
@@ -215,10 +239,22 @@ func reconcileDurableSiteReceiversScoped(ctx context.Context, k kubernetes.Inter
 		if mtu == 0 {
 			mtu = underlayMTU()
 		}
-		if _, err := prepareSiteReceiveClient(devices, string(mesh.UID), key, root, binding, doc, doc, mtu, cfg.fwmark); err != nil {
+		receiveScope, err := intent.receiveScope(root)
+		if err != nil {
+			return err
+		}
+		if _, err := prepareSiteReceiveClient(devices, receiveScope, key, root, binding, doc, doc, mtu, cfg.fwmark); err != nil {
 			return err
 		}
 		cached.Bindings[root] = binding
+		if generation != "" {
+			if cached.Generations == nil {
+				cached.Generations = map[string]string{}
+			}
+			cached.Generations[root] = generation
+		} else {
+			delete(cached.Generations, root)
+		}
 		seen[root] = true
 		return save() // Native success and durable recovery precede readiness.
 	}, func(plan tunnel.SiteReceiveClient) (time.Time, error) {
@@ -230,6 +266,7 @@ func reconcileDurableSiteReceiversScoped(ctx context.Context, k kubernetes.Inter
 	for root := range cached.Bindings {
 		if !seen[root] {
 			delete(cached.Bindings, root)
+			delete(cached.Generations, root)
 		}
 	}
 	return save()

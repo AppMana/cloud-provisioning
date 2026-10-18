@@ -247,7 +247,11 @@ func (r *meshReconciler) siteReceivePathsReady(ctx context.Context, mesh, adopti
 		if !ready || node.UID == "" || node.Status.NodeInfo.BootID == "" || node.DeletionTimestamp != nil {
 			return false, nil
 		}
-		plan, err := tunnel.PlanSiteReceiveClient(string(mesh.UID), public, request.RootPublicKey, binding, siteDoc, siteDoc)
+		receiveScope, err := request.ReceiveScope()
+		if err != nil {
+			return false, err
+		}
+		plan, err := tunnel.PlanSiteReceiveClient(receiveScope, public, request.RootPublicKey, binding, siteDoc, siteDoc)
 		if err != nil {
 			return false, err
 		}

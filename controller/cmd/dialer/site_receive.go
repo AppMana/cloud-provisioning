@@ -126,7 +126,7 @@ func prepareSiteReceiveClient(devices receiverDevices, mesh string, siteKey wgty
 // adoption Secrets the site already reads for forwarding acknowledgements.
 // It prepares only additional devices; it neither switches routes nor publishes
 // a forwarding acknowledgement. Missing readiness leaves the legacy path active.
-func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface, mesh *corev1.Secret, nodeName string, siteKey wgtypes.Key, prepare func(string, receiveBinding, tunnel.PeerListDoc) error, observe ...func(tunnel.SiteReceiveClient) (time.Time, error)) error {
+func reconcileSiteReceivePreparation(ctx context.Context, k kubernetes.Interface, mesh *corev1.Secret, nodeName string, siteKey wgtypes.Key, prepare func(string, receiveBinding, tunnel.PeerListDoc, string) error, observe ...func(tunnel.SiteReceiveClient) (time.Time, error)) error {
 	return reconcileSiteReceivePreparationScoped(ctx, k, mesh, nodeName, siteKey, nil, prepare, observe...)
 }
 
@@ -138,7 +138,7 @@ type siteReceiveScope struct {
 	check func() error
 }
 
-func reconcileSiteReceivePreparationScoped(ctx context.Context, k kubernetes.Interface, mesh *corev1.Secret, nodeName string, siteKey wgtypes.Key, scope *siteReceiveScope, prepare func(string, receiveBinding, tunnel.PeerListDoc) error, observe ...func(tunnel.SiteReceiveClient) (time.Time, error)) error {
+func reconcileSiteReceivePreparationScoped(ctx context.Context, k kubernetes.Interface, mesh *corev1.Secret, nodeName string, siteKey wgtypes.Key, scope *siteReceiveScope, prepare func(string, receiveBinding, tunnel.PeerListDoc, string) error, observe ...func(tunnel.SiteReceiveClient) (time.Time, error)) error {
 	if scope != nil && (scope.roots == nil || scope.check == nil) {
 		return fmt.Errorf("scoped receive preparation requires admitted roots and live revalidation")
 	}
@@ -237,13 +237,17 @@ func reconcileSiteReceivePreparationScoped(ctx context.Context, k kubernetes.Int
 				return err
 			}
 		}
-		if err := prepare(root, binding, doc); err != nil {
+		if err := prepare(root, binding, doc, request.ReceiverGeneration); err != nil {
 			return err
 		}
 		if len(observe) == 0 {
 			continue
 		}
-		plan, err := tunnel.PlanSiteReceiveClient(string(mesh.UID), siteKey.PublicKey().String(), root, binding, doc, doc)
+		receiveScope, err := request.ReceiveScope()
+		if err != nil {
+			return err
+		}
+		plan, err := tunnel.PlanSiteReceiveClient(receiveScope, siteKey.PublicKey().String(), root, binding, doc, doc)
 		if err != nil {
 			return err
 		}

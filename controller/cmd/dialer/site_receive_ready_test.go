@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/netip"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 )
 
 func TestSitePreparesOnlyCurrentCloudReceivers(t *testing.T) {
-	for _, fault := range []string{"none", "no-request", "no-receipt", "unapplied", "wrong-root", "reboot", "unready", "replaced-mesh", "changed-mesh", "wrong-local-key", "wrong-port", "node-changes-before-prepare", "proposal-changes-before-prepare", "scoped", "reserved", "scope-before", "scope-after"} {
+	for _, fault := range []string{"none", "generation", "no-request", "no-receipt", "unapplied", "wrong-root", "reboot", "unready", "replaced-mesh", "changed-mesh", "wrong-local-key", "wrong-port", "node-changes-before-prepare", "proposal-changes-before-prepare", "scoped", "reserved", "scope-before", "scope-after"} {
 		t.Run(fault, func(t *testing.T) {
 			site, _ := wgtypes.GeneratePrivateKey()
 			root, _ := wgtypes.GeneratePrivateKey()
@@ -34,7 +35,14 @@ func TestSitePreparesOnlyCurrentCloudReceivers(t *testing.T) {
 			doc := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: pub, WGAllowedIPs: []string{"10.90.0.10/32"}}}}
 			base, _ := json.Marshal(doc)
 			request := tunnel.ReceivePrepare{Version: 1, MeshUID: string(mesh.UID), NodeName: "cloud", NodeUID: "cloud-uid", BootID: "boot", RootPublicKey: root.PublicKey().String(), BaseHash: tunnel.HashPeerList(base), Desired: doc, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}, Ports: map[string]int{pub: 51821}}
-			plan, err := tunnel.PlanReceiveHandover(string(mesh.UID), doc, doc, request.Native)
+			if fault == "generation" {
+				request.ReceiverGeneration = strings.Repeat("a", 64)
+			}
+			receiveScope, err := request.ReceiveScope()
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan, err := tunnel.PlanReceiveHandover(receiveScope, doc, doc, request.Native)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -107,13 +115,16 @@ func TestSitePreparesOnlyCurrentCloudReceivers(t *testing.T) {
 					observe = append(observe, func(tunnel.SiteReceiveClient) (time.Time, error) { return time.Now(), nil })
 				}
 			}
-			err = reconcileSiteReceivePreparationScoped(context.Background(), k, mesh, "site", site, scope, func(cloud string, b receiveBinding, got tunnel.PeerListDoc) error {
+			err = reconcileSiteReceivePreparationScoped(context.Background(), k, mesh, "site", site, scope, func(cloud string, b receiveBinding, got tunnel.PeerListDoc, generation string) error {
 				calls++
-				_, err := tunnel.PlanSiteReceiveClient(string(mesh.UID), pub, cloud, b, got, got)
+				if generation != request.ReceiverGeneration {
+					t.Fatal("preparation lost committed generation")
+				}
+				_, err := tunnel.PlanSiteReceiveClient(receiveScope, pub, cloud, b, got, got)
 				return err
 			}, observe...)
 			pending := fault == "no-request" || fault == "no-receipt" || fault == "unapplied" || fault == "reserved"
-			if fault == "none" || fault == "scoped" {
+			if fault == "none" || fault == "generation" || fault == "scoped" {
 				if err != nil || calls != 1 {
 					t.Fatalf("valid receipt: calls=%d err=%v", calls, err)
 				}

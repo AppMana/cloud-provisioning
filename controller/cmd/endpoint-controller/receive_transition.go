@@ -287,7 +287,7 @@ func (r *meshReconciler) buildReceiveTransitionPlan(ctx context.Context, machine
 	if !ready {
 		return fail(fmt.Errorf("receiver site preparation is pending"))
 	}
-	plan := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: r.secretNamespace, MeshName: mesh.Name, MachineName: machine.GetName(), AdoptionName: adoption.Name, CloudNodeName: node.Name, MeshUID: string(mesh.UID), MachineUID: string(machine.GetUID()), AdoptionUID: string(adoption.UID), CloudNodeUID: target.NodeUID, RootPublicKey: target.RootPublicKey, Base: append([]byte(nil), base...), Desired: request.Desired, Native: request.Native, Ports: request.Ports, Bindings: bindings, Sites: map[string]tunnel.ReceiveTransitionSite{}}
+	plan := tunnel.ReceiveTransitionPlan{Version: 1, ReceiverGeneration: request.ReceiverGeneration, Namespace: r.secretNamespace, MeshName: mesh.Name, MachineName: machine.GetName(), AdoptionName: adoption.Name, CloudNodeName: node.Name, MeshUID: string(mesh.UID), MachineUID: string(machine.GetUID()), AdoptionUID: string(adoption.UID), CloudNodeUID: target.NodeUID, RootPublicKey: target.RootPublicKey, Base: append([]byte(nil), base...), Desired: request.Desired, Native: request.Native, Ports: request.Ports, Bindings: bindings, Sites: map[string]tunnel.ReceiveTransitionSite{}}
 	plan.CloudAddresses = receiveMachineAddresses(currentMachine)
 	if len(plan.CloudAddresses) == 0 {
 		return fail(fmt.Errorf("receiver plan requires the machine's allocated tunnel identity"))

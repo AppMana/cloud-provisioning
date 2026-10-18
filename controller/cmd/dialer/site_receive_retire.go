@@ -93,11 +93,15 @@ func retireMissingSiteReceivers(ctx context.Context, api kubernetes.Interface, c
 				all = false
 				continue
 			}
-			plan, err := tunnel.PlanSiteReceiveClient(record.MeshUID, record.PublicKey, root, binding, record.Peers, record.Peers)
+			receiveScope, err := record.receiveScope(root)
 			if err != nil {
 				return err
 			}
-			sum := sha256.Sum256([]byte(record.MeshUID + "\x00" + record.PublicKey + "\x00" + root))
+			plan, err := tunnel.PlanSiteReceiveClient(receiveScope, record.PublicKey, root, binding, record.Peers, record.Peers)
+			if err != nil {
+				return err
+			}
+			sum := sha256.Sum256([]byte(receiveScope + "\x00" + record.PublicKey + "\x00" + root))
 			selection := receiveRouteSelection{Interface: plan.Interface, Alias: fmt.Sprintf("cloud-provisioning:receive-client:v1:%x", sum), PublicKey: record.PublicKey, PeerPublicKey: plan.PublicKey, AllowedSources: plan.AllowedSources}
 			groups[plan.Interface] = append(groups[plan.Interface], selection)
 		}

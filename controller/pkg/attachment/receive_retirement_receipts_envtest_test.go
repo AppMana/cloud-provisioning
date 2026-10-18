@@ -1,12 +1,16 @@
 package attachment
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"k8s.io/client-go/rest"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -106,6 +110,27 @@ func TestRetirementReceiptAuthenticationRealAPI(t *testing.T) {
 		policies[uid] = verifier
 		batch = append(batch, handover.PodReceipt{BearerToken: mint(pods[i], verifier.Audience), BootID: node.Status.NodeInfo.BootID, Receipt: handover.Receipt{NodeUID: uid, RoundHash: scope.digest, AgentContainerID: "containerd://running-agent", ObservedAt: time.Now()}})
 	}
+
+	// Each consumer submits its own pod-bound credential. Partial admission
+	// must not relax complete-batch authorization, and rejects a different
+	// consumer's token. This checks authentication, not native absence.
+	for i := range batch {
+		single := []handover.PodReceipt{batch[i]}
+		if proofs, err := scope.AuthenticatePartial(ctx, single, policies, time.Minute); err != nil || len(proofs) != 1 {
+			t.Fatal("independent consumer authentication failed", err)
+		}
+		if _, err := scope.AuthenticateComplete(ctx, single, policies, time.Minute); err == nil {
+			t.Fatal("partial submission authorized completion")
+		}
+		single[0].BearerToken = batch[1-i].BearerToken
+		if _, err := scope.AuthenticatePartial(ctx, single, policies, time.Minute); err == nil {
+			t.Fatal("partial submission accepted another consumer credential")
+		}
+	}
+	if _, err := scope.AuthenticatePartial(ctx, nil, policies, time.Minute); err == nil {
+		t.Fatal("empty partial submission accepted")
+	}
+	verifyRetirementReceiptCollection(t, scope, batch, policies)
 	proofs, err := scope.AuthenticateComplete(ctx, batch, policies, time.Minute)
 	if err != nil || len(proofs) != 2 {
 		t.Fatal("complete retirement batch failed authentication", err)
@@ -234,3 +259,70 @@ func TestRetirementReceiptAuthenticationRealAPI(t *testing.T) {
 type retirementRoundTripper func(*http.Request) (*http.Response, error)
 
 func (f retirementRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// Real TLS submissions and real pod-bound authentication, with synthetic scope
+// and completion callback. Proves independent collection and reauthentication;
+// does not prove native cleanup, source admission or persisted completion.
+func verifyRetirementReceiptCollection(t *testing.T, scope ReceiveRetirementReceiptScope, batch []handover.PodReceipt, policies map[string]handover.PodReceiptAuthenticator) {
+	t.Helper()
+	var completed atomic.Int32
+	handler, err := handover.NewReceiptCollectionHandler(func(ctx context.Context, machine string) (handover.ReceiptCollection, error) {
+		target := handover.ReceiptCollection{UID: "retirement-fixture", Digest: scope.Digest(), ExpiresAt: time.Now().Add(time.Minute), MaxAge: time.Minute}
+		for _, entry := range batch {
+			target.Members = append(target.Members, handover.ReceiptMember{NodeUID: entry.Receipt.NodeUID})
+		}
+		target.Observe = func(ctx context.Context, entries []handover.PodReceipt) error {
+			_, err := scope.AuthenticatePartial(ctx, entries, policies, time.Minute)
+			return err
+		}
+		target.Complete = func(ctx context.Context, entries []handover.PodReceipt) error {
+			if _, err := scope.AuthenticateComplete(ctx, entries, policies, time.Minute); err != nil {
+				return err
+			}
+			completed.Add(1)
+			return nil
+		}
+		return target, nil
+	}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewTLSServer(handler)
+	defer server.Close()
+	submit := func(entry handover.PodReceipt, bearer string, expected int) {
+		t.Helper()
+		entry.BearerToken = ""
+		raw, err := json.Marshal(handover.ReceiptRequest{MachineUID: "worker", RoundHash: scope.Digest(), Receipts: []handover.PodReceipt{entry}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		req, err := http.NewRequest(http.MethodPost, server.URL, bytes.NewReader(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Authorization", "Bearer "+bearer)
+		response, err := server.Client().Do(req)
+		if err != nil {
+			t.Fatal("receipt transport request failed")
+		}
+		response.Body.Close()
+		if response.StatusCode != expected {
+			t.Fatalf("receipt status %d, want %d", response.StatusCode, expected)
+		}
+	}
+	submit(batch[0], batch[0].BearerToken, http.StatusAccepted)
+	if completed.Load() != 0 {
+		t.Fatal("partial collection completed")
+	}
+	submit(batch[1], batch[0].BearerToken, http.StatusConflict)
+	// Authentication failure clears the earlier retained credential. The second
+	// consumer alone must still be insufficient after the failed submission.
+	submit(batch[1], batch[1].BearerToken, http.StatusAccepted)
+	if completed.Load() != 0 {
+		t.Fatal("failed collection retained authority")
+	}
+	submit(batch[0], batch[0].BearerToken, http.StatusNoContent)
+	if completed.Load() != 1 {
+		t.Fatal("independent consumers did not complete exactly once")
+	}
+}

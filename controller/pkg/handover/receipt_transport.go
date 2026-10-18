@@ -53,7 +53,7 @@ func (b receiptBatch) prune(now time.Time) bool {
 // Each controller process may have its own collector: journal CAS remains the
 // authority, and no conflict is retried with an already assembled batch.
 type ReceiptHandler struct {
-	resolve ReceiptResolver
+	resolve ReceiptCollectionResolver
 	limit   int
 	gate    chan struct{}
 	batches map[string]receiptBatch
@@ -61,6 +61,67 @@ type ReceiptHandler struct {
 }
 
 func NewReceiptHandler(resolve ReceiptResolver, maxPending int) (*ReceiptHandler, error) {
+	if resolve == nil {
+		return nil, fmt.Errorf("receipt transport requires admission")
+	}
+	return NewReceiptCollectionHandler(func(ctx context.Context, machine string) (ReceiptCollection, error) {
+		store, policies, err := resolve(ctx, machine)
+		if err != nil {
+			return ReceiptCollection{}, err
+		}
+		snapshot, err := store.Load(ctx)
+		if err != nil {
+			return ReceiptCollection{}, err
+		}
+		store.ExpectedUID = string(snapshot.Metadata().UID)
+		view, err := snapshot.Transition().View()
+		if err != nil || view.Complete {
+			return ReceiptCollection{}, fmt.Errorf("receipt round is not active")
+		}
+		digest, err := view.Round.Digest()
+		if err != nil || time.Now().Before(view.Round.IssuedAt) {
+			return ReceiptCollection{}, fmt.Errorf("receipt round is not current")
+		}
+		target := ReceiptCollection{UID: string(snapshot.Metadata().UID), Digest: digest, ExpiresAt: view.Round.ExpiresAt, MaxAge: view.Round.MaxReceiptAge}
+		for _, member := range view.Round.Members {
+			target.Members = append(target.Members, ReceiptMember{NodeUID: member.NodeUID, DeviceID: member.DeviceID})
+		}
+		target.Observe = func(ctx context.Context, entries []PodReceipt) error {
+			observed, err := store.ObserveWithPodReceipts(ctx, digest, entries, policies)
+			if err != nil {
+				return err
+			}
+			if string(observed.Metadata().UID) != target.UID {
+				return fmt.Errorf("receipt journal incarnation changed")
+			}
+			return nil
+		}
+		target.Complete = func(ctx context.Context, entries []PodReceipt) error {
+			_, err := store.AdvanceWithPodReceipts(ctx, digest, entries, policies)
+			return err
+		}
+		return target, nil
+	}, maxPending)
+}
+
+// ReceiptMember identifies one required observation within a collection.
+type ReceiptMember struct{ NodeUID, DeviceID string }
+
+// ReceiptCollection supplies trusted admission and commit operations to the
+// existing bounded transport. Observe must authenticate each submitted subset;
+// Complete must reauthenticate the full batch and CAS its authoritative state.
+// Callbacks must never persist credentials. Members are immutable for a digest.
+type ReceiptCollection struct {
+	UID, Digest string
+	ExpiresAt   time.Time
+	MaxAge      time.Duration
+	Members     []ReceiptMember
+	Observe     func(context.Context, []PodReceipt) error
+	Complete    func(context.Context, []PodReceipt) error
+}
+type ReceiptCollectionResolver func(context.Context, string) (ReceiptCollection, error)
+
+func NewReceiptCollectionHandler(resolve ReceiptCollectionResolver, maxPending int) (*ReceiptHandler, error) {
 	if resolve == nil || maxPending < 1 {
 		return nil, fmt.Errorf("receipt transport requires admission and a positive pending limit")
 	}
@@ -159,61 +220,74 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			delete(h.batches, key)
 		}
 	}
-	store, policies, err := h.resolve(r.Context(), request.MachineUID)
+	target, err := h.resolve(r.Context(), request.MachineUID)
 	if err != nil {
 		delete(h.batches, request.MachineUID)
 		reject(http.StatusConflict)
 		return
 	}
-	snapshot, err := store.Load(r.Context())
-	if err != nil {
-		delete(h.batches, request.MachineUID)
+	digest := target.Digest
+	if !token(target.UID) || !hexToken(digest, 32) || digest != request.RoundHash || !now.Before(target.ExpiresAt) || target.MaxAge <= 0 || len(target.Members) == 0 || target.Observe == nil || target.Complete == nil {
 		reject(http.StatusConflict)
 		return
 	}
-	store.ExpectedUID = string(snapshot.Metadata().UID)
-	view, err := snapshot.Transition().View()
-	if err != nil {
-		delete(h.batches, request.MachineUID)
-		reject(http.StatusConflict)
-		return
+	members := map[[2]string]bool{}
+	for _, member := range target.Members {
+		id := [2]string{member.NodeUID, member.DeviceID}
+		if !token(member.NodeUID) || members[id] {
+			delete(h.batches, request.MachineUID)
+			reject(http.StatusConflict)
+			return
+		}
+		members[id] = true
 	}
-	digest, err := view.Round.Digest()
-	if err != nil || digest != request.RoundHash || view.Complete || now.Before(view.Round.IssuedAt) || !now.Before(view.Round.ExpiresAt) {
-		reject(http.StatusConflict)
-		return
+	submitted := map[[2]string]bool{}
+	for _, entry := range request.Receipts {
+		id := [2]string{entry.Receipt.NodeUID, entry.Receipt.DeviceID}
+		if !members[id] || submitted[id] {
+			delete(h.batches, request.MachineUID)
+			reject(http.StatusConflict)
+			return
+		}
+		submitted[id] = true
 	}
 	batch := h.batches[request.MachineUID]
-	if batch.uid != string(snapshot.Metadata().UID) || batch.round != digest {
-		batch = receiptBatch{uid: string(snapshot.Metadata().UID), round: digest, expires: view.Round.ExpiresAt, maxAge: view.Round.MaxReceiptAge, entries: map[[2]string]PodReceipt{}}
+	if batch.uid != target.UID || batch.round != digest {
+		batch = receiptBatch{uid: target.UID, round: digest, expires: target.ExpiresAt, maxAge: target.MaxAge, entries: map[[2]string]PodReceipt{}}
 	}
 	if _, exists := h.batches[request.MachineUID]; !exists && len(h.batches) >= h.limit {
 		reject(http.StatusServiceUnavailable)
 		return
 	}
-	// Authenticate and commit this subset before retaining its credentials.
-	// Store validates membership, duplicates, freshness and exact key bindings.
-	observed, err := store.ObserveWithPodReceipts(r.Context(), digest, request.Receipts, policies)
-	if err != nil || string(observed.Metadata().UID) != batch.uid {
+	// Authenticate this subset before retaining its credentials. The backend
+	// validates freshness and exact observation bindings.
+	err = target.Observe(r.Context(), request.Receipts)
+	if err != nil {
 		delete(h.batches, request.MachineUID)
 		reject(http.StatusConflict)
 		return
 	}
-	batch.prune(time.Now())
+	observedAt := time.Now()
+	if !observedAt.Before(batch.expires) {
+		delete(h.batches, request.MachineUID)
+		reject(http.StatusConflict)
+		return
+	}
+	batch.prune(observedAt)
 	for _, entry := range request.Receipts {
 		batch.entries[[2]string{entry.Receipt.NodeUID, entry.Receipt.DeviceID}] = entry
 	}
 	h.batches[request.MachineUID] = batch
-	if len(batch.entries) != len(view.Round.Members) {
+	if len(batch.entries) != len(target.Members) {
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 	all := make([]PodReceipt, 0, len(batch.entries))
-	for _, member := range view.Round.Members {
+	for _, member := range target.Members {
 		all = append(all, batch.entries[[2]string{member.NodeUID, member.DeviceID}])
 	}
 	delete(h.batches, request.MachineUID)
-	if _, err := store.AdvanceWithPodReceipts(r.Context(), digest, all, policies); err != nil {
+	if err := target.Complete(r.Context(), all); err != nil {
 		reject(http.StatusConflict)
 		return
 	}

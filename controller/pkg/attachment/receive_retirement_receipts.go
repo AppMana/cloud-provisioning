@@ -78,7 +78,18 @@ func NewReceiveRetirementReceiptScope(ctx context.Context, maps typedcore.Config
 // deletion completion. Policies and maxAge are trusted controller settings.
 // Bearers remain request-local. The caller must re-admit source state afterward.
 func (s ReceiveRetirementReceiptScope) AuthenticateComplete(ctx context.Context, submissions []handover.PodReceipt, policies map[string]handover.PodReceiptAuthenticator, maxAge time.Duration) ([]handover.AuthenticatedReceipt, error) {
-	if err := s.validateSubmissions(submissions, time.Now(), maxAge); err != nil {
+	return s.authenticate(ctx, submissions, policies, maxAge, true)
+}
+
+// AuthenticatePartial authenticates independently submitted consumer observations.
+// It never authorizes completion; the collector must authenticate the complete
+// batch again against current source state before recording completion.
+func (s ReceiveRetirementReceiptScope) AuthenticatePartial(ctx context.Context, submissions []handover.PodReceipt, policies map[string]handover.PodReceiptAuthenticator, maxAge time.Duration) ([]handover.AuthenticatedReceipt, error) {
+	return s.authenticate(ctx, submissions, policies, maxAge, false)
+}
+
+func (s ReceiveRetirementReceiptScope) authenticate(ctx context.Context, submissions []handover.PodReceipt, policies map[string]handover.PodReceiptAuthenticator, maxAge time.Duration, complete bool) ([]handover.AuthenticatedReceipt, error) {
+	if err := s.validateBatch(submissions, time.Now(), maxAge, complete); err != nil {
 		return nil, err
 	}
 	for _, submission := range submissions {
@@ -107,7 +118,7 @@ func (s ReceiveRetirementReceiptScope) AuthenticateComplete(ctx context.Context,
 		}
 	}
 	// Slow API calls cannot extend the observation lifetime.
-	if err := s.validateSubmissions(submissions, time.Now(), maxAge); err != nil {
+	if err := s.validateBatch(submissions, time.Now(), maxAge, complete); err != nil {
 		return nil, err
 	}
 	if err := ctx.Err(); err != nil {
@@ -117,7 +128,11 @@ func (s ReceiveRetirementReceiptScope) AuthenticateComplete(ctx context.Context,
 }
 
 func (s ReceiveRetirementReceiptScope) validateSubmissions(submissions []handover.PodReceipt, now time.Time, maxAge time.Duration) error {
-	if len(s.digest) != 64 || len(s.nodes) == 0 || maxAge <= 0 || len(submissions) != len(s.nodes) {
+	return s.validateBatch(submissions, now, maxAge, true)
+}
+
+func (s ReceiveRetirementReceiptScope) validateBatch(submissions []handover.PodReceipt, now time.Time, maxAge time.Duration, complete bool) error {
+	if len(s.digest) != 64 || len(s.nodes) == 0 || maxAge <= 0 || len(submissions) == 0 || len(submissions) > len(s.nodes) || (complete && len(submissions) != len(s.nodes)) {
 		return fmt.Errorf("retirement requires a complete current consumer batch")
 	}
 	seen := map[string]bool{}

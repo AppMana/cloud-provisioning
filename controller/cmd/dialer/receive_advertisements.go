@@ -74,16 +74,28 @@ func planReceiveAdvertisements(cfg config, saved *siteForwardingCache, nodeUID s
 			if site.NodeName != cfg.nodeName || !slices.Equal(site.RouteSources, g.own) {
 				return nil, fmt.Errorf("advertising endpoint differs from journal source identity")
 			}
+			_, g.legacy = intent.Legacy[machine]
 			matched := false
-			for _, candidate := range plan.SiteDesired.Peers {
-				if candidate.PublicKey == peer.PublicKey {
-					matched = sameAdvertisementSet(candidate.WGAllowedIPs, peer.WGAllowedIPs) && sameAdvertisementSet(candidate.AllRouteHosts(), peer.AllRouteHosts())
+			var selected *tunnel.PeerSpec
+			for generation, document := range []tunnel.PeerListDoc{plan.PreviousSitePeers(), plan.SiteDesired} {
+				for _, candidate := range document.Peers {
+					if candidate.PublicKey != peer.PublicKey {
+						continue
+					}
+					matched = matched || (sameAdvertisementSet(candidate.WGAllowedIPs, peer.WGAllowedIPs) && sameAdvertisementSet(candidate.AllRouteHosts(), peer.AllRouteHosts()))
+					if (generation == 0) == g.legacy {
+						copy := candidate
+						selected = &copy
+					}
 				}
 			}
-			if !matched {
+			if !matched || selected == nil {
 				return nil, fmt.Errorf("advertisement graph differs from committed worker destinations")
 			}
-			_, g.legacy = intent.Legacy[machine]
+			// The cache must belong to one committed generation, but only the
+			// serving generation can authorize advertisements. This preserves
+			// rollback destinations without prematurely announcing new ranges.
+			peer, g.peer = *selected, *selected
 			path := site.Forward
 			if g.legacy {
 				path = site.Legacy

@@ -2,12 +2,75 @@ package main
 
 import (
 	"net"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
+
+// Planning only: native route readback and BGP convergence remain separate
+// gates. Both saved generations must select exactly the committed direction.
+func TestReceiveAdvertisementsFollowAllocationGeneration(t *testing.T) {
+	site, _ := wgtypes.GeneratePrivateKey()
+	worker, _ := wgtypes.GeneratePrivateKey()
+	data := map[string][]byte{
+		tunnel.NodePublicKeyPrefix + "site":     []byte(site.PublicKey().String()),
+		tunnel.NodeTunnelAddressPrefix + "site": []byte("10.88.0.1/32"),
+		tunnel.NodeAddressesPrefix + "site":     []byte("10.10.0.1"),
+		tunnel.PeerPublicKeyPrefix + "worker":   []byte(worker.PublicKey().String()),
+		tunnel.PeerRouteHostsPrefix + "worker":  []byte("172.30.0.1"),
+	}
+	oldPrefixes := []string{"172.30.0.1/32", "10.244.159.0/26", "2001:db8:159::/64"}
+	newPrefixes := []string{"172.30.0.1/32", "10.244.160.0/26", "2001:db8:160::/64"}
+	data[tunnel.PeerAllowedIPsPrefix+"worker"] = []byte(strings.Join(oldPrefixes, ","))
+	oldPeers, err := tunnel.SitePeers(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data[tunnel.PeerAllowedIPsPrefix+"worker"] = []byte(strings.Join(newPrefixes, ","))
+	newPeers, err := tunnel.SitePeers(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := tunnel.ReceiveTransitionPlan{MachineUID: "worker", MeshUID: "mesh", RootPublicKey: worker.PublicKey().String(), SiteBase: &tunnel.PeerListDoc{Peers: oldPeers}, SiteDesired: tunnel.PeerListDoc{Peers: newPeers}, Sites: map[string]tunnel.ReceiveTransitionSite{"site": {NodeName: "site", NodeUID: "site-uid", RouteSources: []string{"10.10.0.1"}, Legacy: &tunnel.ReceiveSitePath{}, Forward: &tunnel.ReceiveSitePath{}}}}
+	intent := tunnel.ReceiveJournalRoutes{Plans: map[string]tunnel.ReceiveTransitionPlan{"worker": p}, Legacy: map[string]tunnel.ReceiveTransitionPlan{}, Receivers: map[string]map[string]tunnel.ReceiveRouteSelection{"site-uid": {}}}
+	for _, raw := range newPrefixes {
+		intent.Receivers["site-uid"][raw] = tunnel.ReceiveRouteSelection{Interface: "receiver"}
+	}
+	saved := &siteForwardingCache{NodeName: "site", MeshUID: "mesh", Data: data}
+	for _, legacy := range []bool{true, false} {
+		want := newPrefixes
+		if legacy {
+			intent.Legacy["worker"] = p
+			want = oldPrefixes
+		} else {
+			delete(intent.Legacy, "worker")
+		}
+		for _, cached := range [][]string{oldPrefixes, newPrefixes} {
+			data[tunnel.PeerAllowedIPsPrefix+"worker"] = []byte(strings.Join(cached, ","))
+			groups, err := planReceiveAdvertisements(config{nodeName: "site"}, saved, "site-uid", intent)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(groups) != 1 || groups[0].legacy != legacy || !sameAdvertisementSet(groups[0].peer.WGAllowedIPs, want) {
+				t.Fatal("advertisement used cached rather than serving permissions")
+			}
+			var announced []string
+			for _, route := range groups[0].routes {
+				announced = append(announced, route.prefix)
+			}
+			if !sameAdvertisementSet(announced, want) {
+				t.Fatalf("wrong announced destinations: %v", announced)
+			}
+		}
+	}
+	data[tunnel.PeerAllowedIPsPrefix+"worker"] = []byte(strings.Join(append(append([]string{}, oldPrefixes...), newPrefixes[1:]...), ","))
+	if _, err := planReceiveAdvertisements(config{nodeName: "site"}, saved, "site-uid", intent); err == nil {
+		t.Fatal("accepted a cache that matches neither committed generation")
+	}
+}
 
 func TestAdvertisementLegacyPeerRejectsShadowedTraffic(t *testing.T) {
 	root, _ := wgtypes.GeneratePrivateKey()

@@ -83,9 +83,11 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 		if !maps.Equal(current, policies) {
 			return fmt.Errorf("retirement consumer policy changed during authentication")
 		}
-		return source.Recheck(ctx, api, store)
+		// The collection rechecks this exact admitted journal/inventory/mesh
+		// source after the independent owner and consumer-policy checks.
+		return nil
 	}
-	return attachment.NewReceiveRetirementReceiptCollection(ctx, api, store, string(source.Metadata.UID), source.Mesh, snapshot, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, recheck)
+	return source.ReceiptCollection(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, recheck)
 }
 
 // Reuse published-consumer discovery, including CAPI placement and adoption

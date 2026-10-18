@@ -62,6 +62,9 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 	must(err)
 	mesh, err = api.CoreV1().Secrets(ns).Update(ctx, mesh, metav1.UpdateOptions{})
 	must(err)
+	t.Run("admitted-collection-read-budget", func(t *testing.T) {
+		verifyRetirementCollectionAdmission(t, api, store, mesh, w.MachineUID, map[string]handover.PodReceiptAuthenticator{string(node.UID): policy})
+	})
 	for _, fault := range []string{"missing-policy", "recheck", "inventory-race", "inventory-revision-race", "mesh-race", "reboot-after-authentication", "transport-inventory-race", "transport-commit-race", "none"} {
 		t.Run("authenticated-completion/"+fault, func(t *testing.T) {
 			scope, err := NewReceiveRetirementReceiptScope(ctx, maps, "cluster", string(index.UID), snapshot, mesh)
@@ -127,7 +130,11 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 					if machine != w.MachineUID {
 						return handover.ReceiptCollection{}, fmt.Errorf("unknown machine")
 					}
-					return NewReceiveRetirementReceiptCollection(requestCtx, api, store, string(index.UID), mesh, snapshot, policies, time.Minute, recheck)
+					source, err := ReadReceiveRetirementSet(requestCtx, api, store, mesh.Namespace, mesh.Name, string(mesh.UID), machine)
+					if err != nil {
+						return handover.ReceiptCollection{}, err
+					}
+					return source.ReceiptCollection(requestCtx, api, store, policies, time.Minute, recheck)
 				}, 1)
 				must(e)
 				server := httptest.NewTLSServer(handler)

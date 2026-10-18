@@ -445,6 +445,17 @@ and cancellation. The read-budget fixture has
 one retirement and no successor ancestry; fewer reads do not establish live
 latency, address release or completion within the receipt lifetime.
 
+Receipt collection may reuse the current request's fully admitted retirement
+source. Recheck consumer policies and orphan-owner absence, then every reserved
+journal, inventory and mesh around authentication and completion. Never carry
+admission across requests or replace exact revision checks with receipt digests.
+The standalone constructor still performs full source admission. Real-API tests
+bound repeated reads and reject changed scope, withdrawal, source revisions,
+policy failures, unavailable reads and concurrent journal or inventory changes.
+TLS tests retain authentication and completion-race checks. Synthetic native
+proofs and reduced reads do not establish live throughput or safe allocation
+release; the original freshness and connectivity gates still apply.
+
 Agent reconciliation timing diagnostics report fixed operation/stage labels,
 elapsed milliseconds and success only, with at most sixteen stages per record.
 They must not include configuration, object identities, credentials or error text.

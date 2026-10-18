@@ -3,6 +3,7 @@ package attachment
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 	"time"
 
@@ -35,6 +36,34 @@ func NewReceiveRetirementReceiptCollection(ctx context.Context, api kubernetes.I
 	}
 	if err := shared.Journals[plan.MachineUID].ContinuesExecution(snapshot); err != nil {
 		return fail(err)
+	}
+	return shared.ReceiptCollection(ctx, api, store, policies, maxAge, recheck)
+}
+
+// ReceiptCollection uses this request's trusted, fully admitted source. The
+// callback rechecks consumer policy and owner absence; source rechecks remain
+// part of the collection. Never reuse admission across requests. Obtain this
+// source through ReadReceiveRetirementSet, not a manually assembled value.
+func (shared ReceiveRetirementSet) ReceiptCollection(ctx context.Context, api kubernetes.Interface, store handover.Store, policies map[string]handover.PodReceiptAuthenticator, maxAge time.Duration, recheck func() error) (handover.ReceiptCollection, error) {
+	fail := func(err error) (handover.ReceiptCollection, error) { return handover.ReceiptCollection{}, err }
+	if api == nil || store.ConfigMaps == nil || shared.Mesh == nil || recheck == nil || maxAge <= 0 {
+		return fail(fmt.Errorf("retirement collection requires admitted sources and bounded observation age"))
+	}
+	machineUID := shared.Withdrawal.MachineUID
+	snapshot, found := shared.Journals[machineUID]
+	if !found || store.Name != tunnel.ReceiveTransitionName(machineUID) || (store.ExpectedUID != "" && store.ExpectedUID != string(snapshot.Metadata().UID)) || shared.Inventory.ClusterUID != store.ClusterUID {
+		return fail(fmt.Errorf("retirement collection journal scope changed"))
+	}
+	mesh, inventoryUID := shared.Mesh, string(shared.Metadata.UID)
+	if shared.MeshMetadata.UID != mesh.UID || shared.MeshMetadata.ResourceVersion != mesh.ResourceVersion || inventoryUID == "" || snapshot.Metadata().Namespace != mesh.Namespace {
+		return fail(fmt.Errorf("retirement collection source scope changed"))
+	}
+	withdrawal, err := ReadReceiveWithdrawal(shared.Inventory, machineUID, snapshot, mesh)
+	if err != nil {
+		return fail(err)
+	}
+	if !reflect.DeepEqual(withdrawal, shared.Withdrawal) {
+		return fail(fmt.Errorf("retirement collection withdrawal changed"))
 	}
 	check := func(ctx context.Context) error {
 		if err := recheck(); err != nil {

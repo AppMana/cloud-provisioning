@@ -249,4 +249,5 @@ func verifyAuthenticatedRetirementFinalization(t *testing.T, api kubernetes.Inte
 	if !ok {
 		t.Fatal("consumer reboot erased historical finalization")
 	}
+	verifyReleasedJournalAdmission(t, api, store, mesh, machineUID, inventoryUID)
 }

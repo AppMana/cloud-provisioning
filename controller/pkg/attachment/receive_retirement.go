@@ -83,28 +83,9 @@ func (w RemoteWithdrawalIntent) receiveRetirementPlan(snapshot handover.Snapshot
 	if _, present, err := tunnel.WithdrawRemotePeer(mesh.Data, w.MachineName, w.PublicKey); err != nil || (w.Orphaned && present) || (!w.Orphaned && present == withdrawn) {
 		return fail("peer publication differs from withdrawal stage")
 	}
-	names, uids, keys := map[string]bool{}, map[string]bool{}, map[string]bool{}
-	sites, remotes := map[string]ConsumerTarget{}, map[string]ConsumerTarget{}
-	for _, c := range w.Consumers {
-		if c.NodeName == "" || c.NodeUID == "" || (!c.Site && c.PublicKey == "") || names[c.NodeName] || uids[c.NodeUID] || (c.PublicKey != "" && keys[c.PublicKey]) ||
-			c.NodeName == p.CloudNodeName || c.NodeUID == p.CloudNodeUID || c.PublicKey == p.RootPublicKey {
-			return fail("incomplete, duplicate or retiring consumer identity")
-		}
-		names[c.NodeName], uids[c.NodeUID], keys[c.PublicKey] = true, true, true
-		if c.Site {
-			sites[c.NodeName] = c
-		} else {
-			if c.MachineName == "" || c.MachineName == w.MachineName || c.SecretUID == "" || c.TunnelAddress == "" || remotes[c.MachineName].NodeUID != "" {
-				return fail("incomplete or duplicate remote consumer")
-			}
-			remotes[c.MachineName] = c
-		}
-	}
-	for public, site := range p.Sites {
-		c, found := sites[site.NodeName]
-		if !found || c.NodeUID != site.NodeUID || c.PublicKey != public {
-			return fail("withdrawal omits or replaces a journal participant")
-		}
+	sites, remotes, err := w.receiveWithdrawalConsumers(p)
+	if err != nil {
+		return tunnel.ReceiveTransitionPlan{}, err
 	}
 	for field, value := range mesh.Data {
 		if !withdrawn && field == tunnel.PeerPublicKeyPrefix+w.MachineName {
@@ -129,4 +110,33 @@ func (w RemoteWithdrawalIntent) receiveRetirementPlan(snapshot handover.Snapshot
 		}
 	}
 	return p, nil
+}
+
+// Validate captured identities independently of current mesh membership. Active
+// retirement additionally validates every published consumer against these maps.
+func (w RemoteWithdrawalIntent) receiveWithdrawalConsumers(p tunnel.ReceiveTransitionPlan) (map[string]ConsumerTarget, map[string]ConsumerTarget, error) {
+	names, uids, keys := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	sites, remotes := map[string]ConsumerTarget{}, map[string]ConsumerTarget{}
+	for _, c := range w.Consumers {
+		if c.NodeName == "" || c.NodeUID == "" || (!c.Site && c.PublicKey == "") || names[c.NodeName] || uids[c.NodeUID] || (c.PublicKey != "" && keys[c.PublicKey]) ||
+			c.NodeName == p.CloudNodeName || c.NodeUID == p.CloudNodeUID || c.PublicKey == p.RootPublicKey {
+			return nil, nil, fmt.Errorf("receive retirement: incomplete, duplicate or retiring consumer identity")
+		}
+		names[c.NodeName], uids[c.NodeUID], keys[c.PublicKey] = true, true, true
+		if c.Site {
+			sites[c.NodeName] = c
+		} else {
+			if c.MachineName == "" || c.MachineName == w.MachineName || c.SecretUID == "" || c.TunnelAddress == "" || remotes[c.MachineName].NodeUID != "" {
+				return nil, nil, fmt.Errorf("receive retirement: incomplete or duplicate remote consumer")
+			}
+			remotes[c.MachineName] = c
+		}
+	}
+	for public, site := range p.Sites {
+		c, found := sites[site.NodeName]
+		if !found || c.NodeUID != site.NodeUID || c.PublicKey != public {
+			return nil, nil, fmt.Errorf("receive retirement: withdrawal omits or replaces a journal participant")
+		}
+	}
+	return sites, remotes, nil
 }

@@ -614,6 +614,22 @@ They permit unrelated retired records only as a monotonic history change;
 separate source admission must validate those records. A matching retired record
 alone still cannot authorize shrinkage of a saved active reservation set.
 
+The released-journal reader verifies retained frozen history and ancestry,
+withdrawal identity and captured consumers, and historical finalization under
+the supplied observation policy. It rechecks exact inventory, journal and mesh
+revisions before returning. The retired owner remains outside active membership
+in its result. Later mesh data or consumer boot changes do not erase historical
+consumption; this reader does not establish current owner absence or authorize
+native cleanup, restoration, reservation release or address reuse.
+
+Real-token fixture tests first establish completion and finalization, then use
+synthetic release admission to exercise this reader. An active finalization is
+not a release. Later mesh changes invalidate an earlier read's revision check
+but permit a new historical read. Changed inventory/journal identity, observation
+policy, consumed evidence, withdrawal history and a missing retained journal
+must fail with no admitted result. These tests do not qualify a live release
+controller, native recovery or allocation of a replacement worker.
+
 Agent reconciliation timing diagnostics report fixed operation/stage labels,
 elapsed milliseconds and success only, with at most sixteen stages per record.
 They must not include configuration, object identities, credentials or error text.

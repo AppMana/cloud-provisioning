@@ -84,7 +84,7 @@ func TestNativeCombinedSiteWithdrawal(t *testing.T) {
 	immutable := true
 	journal := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: tunnel.ReceiveTransitionName(plan.MachineUID), UID: "journal", ResourceVersion: "1"}, Immutable: &immutable, Data: map[string]string{"transition.json": string(history), "plan.json": string(raw)}}
 	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "mesh", UID: "restore-mesh", ResourceVersion: "1"}, Data: map[string][]byte{
-		tunnel.NodePublicKeyPrefix + "site": []byte(site.PublicKey().String()), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.90.0.2/24,fd90::2/64"), tunnel.NodeAddressesPrefix + "site": []byte("10.90.0.2,fd90::2"),
+		tunnel.NodePublicKeyPrefix + "site": []byte(site.PublicKey().String()), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.90.0.2/24"), tunnel.NodeTunnelAddress6Prefix + "site": []byte("fd90::2/64"), tunnel.NodeAddressesPrefix + "site": []byte("10.90.0.2,fd90::2"),
 		tunnel.PeerPublicKeyPrefix + "worker": []byte(root.PublicKey().String()), tunnel.PeerEndpointPrefix + "worker": []byte("198.51.100.1:51820"), tunnel.PeerAllowedIPsPrefix + "worker": []byte("172.29.0.1/32,fd29::1/128"), tunnel.PeerRouteHostsPrefix + "worker": []byte("172.29.0.1,fd29::1"),
 		tunnel.PeerPublicKeyPrefix + "survivor": []byte(survivor.PublicKey().String()), tunnel.PeerEndpointPrefix + "survivor": []byte("198.51.100.3:51820"), tunnel.PeerAllowedIPsPrefix + "survivor": []byte("172.29.0.3/32,fd29::3/128"), tunnel.PeerRouteHostsPrefix + "survivor": []byte("172.29.0.3,fd29::3"),
 	}}

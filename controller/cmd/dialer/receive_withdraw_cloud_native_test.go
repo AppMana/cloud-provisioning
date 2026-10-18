@@ -52,6 +52,7 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 	site, _ := wgtypes.GeneratePrivateKey()
 	targetKey, _ := wgtypes.GeneratePrivateKey()
 	localKey, _ := wgtypes.GeneratePrivateKey()
+	foreignKey, _ := wgtypes.GeneratePrivateKey()
 	target := receiveRestoreTestPlan(t, targetKey, site)
 	local := receiveRestoreTestPlan(t, localKey, site)
 	raw, err := json.Marshal(local)
@@ -70,7 +71,7 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 	targetJournal := cloudWithdrawalTestJournal(t, target, "target-journal")
 	localJournal := cloudWithdrawalTestJournal(t, local, "local-journal")
 	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "mesh", UID: types.UID(target.MeshUID), ResourceVersion: "2"}, Data: map[string][]byte{
-		tunnel.NodePublicKeyPrefix + "site": []byte(site.PublicKey().String()), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.90.0.2/24,fd90::2/64"), tunnel.NodeAddressesPrefix + "site": []byte("10.90.0.2,fd90::2"),
+		tunnel.NodePublicKeyPrefix + "site": []byte(site.PublicKey().String()), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.90.0.2/24"), tunnel.NodeTunnelAddress6Prefix + "site": []byte("fd90::2/64"), tunnel.NodeAddressesPrefix + "site": []byte("10.90.0.2,fd90::2"),
 		tunnel.PeerPublicKeyPrefix + local.MachineName: []byte(local.RootPublicKey), tunnel.PeerEndpointPrefix + local.MachineName: []byte("198.51.100.3:51820"), tunnel.PeerAllowedIPsPrefix + local.MachineName: []byte("172.29.0.3/32,fd29::3/128"), tunnel.PeerRouteHostsPrefix + local.MachineName: []byte("172.29.0.3,fd29::3"),
 	}}
 	intent := attachment.RemoteWithdrawalIntent{MeshNamespace: "test", MeshName: "mesh", MeshUID: target.MeshUID, SourceVersion: "1", MachineName: target.MachineName, MachineUID: target.MachineUID, PublicKey: target.RootPublicKey, DrainIntent: "native-test", Consumers: []attachment.ConsumerTarget{
@@ -109,7 +110,9 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 	allowed := func(raw string) net.IPNet { _, p, e := net.ParseCIDR(raw); must(e); return *p }
 	must(devices.ConfigureDevice(cfg.iface, wgtypes.Config{PrivateKey: &localKey, FirewallMark: &cfg.fwmark, Peers: []wgtypes.PeerConfig{
 		{PublicKey: targetKey.PublicKey(), AllowedIPs: []net.IPNet{allowed("172.29.0.1/32"), allowed("fd29::1/128")}},
-		{PublicKey: site.PublicKey(), AllowedIPs: []net.IPNet{allowed("10.90.0.0/24"), allowed("fd90::/64")}},
+		// The completed survivor serves the site through its receiver. Preserve
+		// an unrelated root peer, rather than inventing an unretired site peer.
+		{PublicKey: foreignKey.PublicKey(), AllowedIPs: []net.IPNet{allowed("198.18.0.1/32")}},
 	}}))
 	selections, err := receivePhaseSelections(localKey, local, local.CloudNodeUID)
 	must(err)
@@ -122,7 +125,8 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 	scopeName, err := local.ReceiveScope()
 	must(err)
 	receiverPrivate := receiverKey(localKey, scopeName, site.PublicKey().String())
-	must(devices.ConfigureDevice(selected.Interface, wgtypes.Config{PrivateKey: &receiverPrivate, FirewallMark: &cfg.fwmark, Peers: []wgtypes.PeerConfig{{PublicKey: site.PublicKey(), AllowedIPs: []net.IPNet{allowed("10.90.0.0/24"), allowed("fd90::/64")}}}}))
+	receiverPort := local.Bindings[site.PublicKey().String()].ListenPort
+	must(devices.ConfigureDevice(selected.Interface, wgtypes.Config{PrivateKey: &receiverPrivate, ListenPort: &receiverPort, FirewallMark: &cfg.fwmark, Peers: []wgtypes.PeerConfig{{PublicKey: site.PublicKey(), AllowedIPs: []net.IPNet{allowed("10.90.0.0/24"), allowed("fd90::/64")}}}}))
 	receiverBefore, err := devices.Device(selected.Interface)
 	must(err)
 	for _, raw := range []string{"172.29.0.1/32", "fd29::1/128", "10.90.0.0/24", "fd90::/64"} {
@@ -163,7 +167,7 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 	}
 	live, err = devices.Device(cfg.iface)
 	must(err)
-	if live.PublicKey != localKey.PublicKey() || len(live.Peers) != 1 || live.Peers[0].PublicKey != site.PublicKey() {
+	if live.PublicKey != localKey.PublicKey() || len(live.Peers) != 1 || live.Peers[0].PublicKey != foreignKey.PublicKey() {
 		t.Fatal("cleanup changed identity or surviving peer")
 	}
 	routes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
@@ -202,6 +206,70 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 	must(err)
 	if strings.Contains(string(cached), target.RootPublicKey) {
 		t.Fatal("executable cache retained target")
+	}
+	// Recover a lost survivor route after complete withdrawal. Authenticate the
+	// existing receiver against an isolated loopback endpoint before admitting
+	// native recovery; absence of the retired peer never authorizes its return.
+	lo, err := netlink.LinkByName("lo")
+	must(err)
+	must(netlink.LinkSetUp(lo))
+	endpoint, err := netlink.ParseAddr("198.51.100.1/32")
+	must(err)
+	must(netlink.AddrAdd(lo, endpoint))
+	defer netlink.AddrDel(lo, endpoint)
+	_, err = prepareSiteReceiveClient(devices, local.MeshUID, site, local.RootPublicKey, local.Bindings[site.PublicKey().String()], local.SiteDesired, local.SiteDesired, cfg.mtu, cfg.fwmark)
+	must(err)
+	defer func() {
+		if client, err := netlink.LinkByName(local.Sites[site.PublicKey().String()].Client.Interface); err == nil {
+			_ = netlink.LinkDel(client)
+		}
+	}()
+	survivorStore, survivorScope := store, scope
+	survivorStore.Name, survivorScope.MachineUID = localJournal.Name, local.MachineUID
+	for _, lost := range routes {
+		must(netlink.RouteDel(&lost))
+		deadline := time.Now().Add(10 * time.Second)
+		for {
+			err = maintainCompletedReceivePhase(ctx, api, survivorStore, survivorScope, cfg, localKey, "agent", func(ctx context.Context, p tunnel.ReceiveTransitionPlan, v handover.View, uid string, serving tunnel.ReceiveJournalRoutes) error {
+				if len(serving.Plans) != 1 || serving.Withdrawn[target.MachineUID].RootPublicKey != target.RootPublicKey {
+					return fmt.Errorf("survivor lost withdrawn ownership")
+				}
+				if err := restoreCompletedReceiveState(ctx, devices, cfg, localKey, p, v, uid, serving); err != nil {
+					return err
+				}
+				return receiveLinuxPhase(ctx, devices, cfg, localKey, nil, local.CloudAddresses, p, v, uid, serving)
+			})
+			if err == nil {
+				if time.Now().After(deadline) {
+					t.Fatal("survivor route recovery exceeded ten seconds")
+				}
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatal("survivor maintenance after withdrawal", err)
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	routes, err = netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
+	must(err)
+	if len(routes) != 2 {
+		t.Fatal("maintenance failed to restore exactly the survivor routes", routes)
+	}
+	for _, route := range routes {
+		if route.Dst == nil || (route.Dst.String() != "10.90.0.0/24" && route.Dst.String() != "fd90::/64") || route.LinkIndex != receiver.Attrs().Index {
+			t.Fatal("maintenance restored an unrelated destination", route)
+		}
+	}
+	live, err = devices.Device(cfg.iface)
+	must(err)
+	if len(live.Peers) != 1 || live.Peers[0].PublicKey != foreignKey.PublicKey() {
+		t.Fatal("survivor maintenance changed unrelated root peer")
+	}
+	for _, peer := range live.Peers {
+		if peer.PublicKey == targetKey.PublicKey() {
+			t.Fatal("maintenance revived withdrawn root peer")
+		}
 	}
 }
 

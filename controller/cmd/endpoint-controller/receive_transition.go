@@ -141,6 +141,9 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 	}
 	existing, err := store.Load(ctx)
 	if err == nil {
+		if err := tunnel.ValidateReceiveTransportHistory(ctx, store, existing); err != nil {
+			return nil, err
+		}
 		if err := checkReceiveTransitionIdentity(existing, store.ClusterUID, machine, mesh); err != nil {
 			return nil, err
 		}

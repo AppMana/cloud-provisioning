@@ -61,7 +61,10 @@ func PlanReceiveJournalRoutes(snapshots []handover.Snapshot, clusterUID string) 
 		case "receivers:" + view.Round.PlanHash:
 			selected = append(selected, plan)
 		default:
-			return fail(fmt.Errorf("journal selects an unknown transport generation"))
+			if plan.PreviousReceiver == nil || generation != plan.PreviousReceiver.Generation {
+				return fail(fmt.Errorf("journal selects an unknown transport generation"))
+			}
+			selected = append(selected, *plan.PreviousReceiver.Plan)
 		}
 		plans = append(plans, plan)
 	}

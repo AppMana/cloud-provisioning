@@ -26,9 +26,13 @@ func ReceiveTransitionSpec(plan ReceiveTransitionPlan, clusterUID, hash string) 
 	members := make([]handover.Member, 0, 2*len(plan.Sites))
 	for pub, site := range plan.Sites {
 		binding := plan.Bindings[pub]
+		fromKey := plan.RootPublicKey
+		if plan.PreviousReceiver != nil {
+			fromKey = plan.PreviousReceiver.Plan.Bindings[pub].PublicKey
+		}
 		members = append(members,
-			handover.Member{NodeUID: plan.CloudNodeUID, DeviceID: "site:" + pub, FromKey: plan.RootPublicKey, ToKey: binding.PublicKey, FromPeerKey: pub, ToPeerKey: pub},
-			handover.Member{NodeUID: site.NodeUID, DeviceID: "cloud:" + plan.RootPublicKey, FromKey: pub, ToKey: pub, FromPeerKey: plan.RootPublicKey, ToPeerKey: binding.PublicKey})
+			handover.Member{NodeUID: plan.CloudNodeUID, DeviceID: "site:" + pub, FromKey: fromKey, ToKey: binding.PublicKey, FromPeerKey: pub, ToPeerKey: pub},
+			handover.Member{NodeUID: site.NodeUID, DeviceID: "cloud:" + plan.RootPublicKey, FromKey: pub, ToKey: pub, FromPeerKey: fromKey, ToPeerKey: binding.PublicKey})
 	}
 	sort.Slice(members, func(i, j int) bool {
 		if members[i].NodeUID != members[j].NodeUID {
@@ -36,7 +40,11 @@ func ReceiveTransitionSpec(plan ReceiveTransitionPlan, clusterUID, hash string) 
 		}
 		return members[i].DeviceID < members[j].DeviceID
 	})
-	return handover.Spec{ClusterUID: clusterUID, TransitionUID: plan.MachineUID + ":" + hash, PlanHash: hash, FromGeneration: "legacy:" + HashPeerList(plan.Base), ToGeneration: "receivers:" + hash, Phase: handover.Prepare, Members: members}, nil
+	fromGeneration := "legacy:" + HashPeerList(plan.Base)
+	if plan.PreviousReceiver != nil {
+		fromGeneration = plan.PreviousReceiver.Generation
+	}
+	return handover.Spec{ClusterUID: clusterUID, TransitionUID: plan.MachineUID + ":" + hash, PlanHash: hash, FromGeneration: fromGeneration, ToGeneration: "receivers:" + hash, Phase: handover.Prepare, Members: members}, nil
 }
 
 // A valid journal and matching plan hash do not by themselves bind its
@@ -60,6 +68,12 @@ func validateReceiveTransitionBinding(snapshot handover.Snapshot, plan ReceiveTr
 			m.FromPeerKey, m.ToPeerKey = m.ToPeerKey, m.FromPeerKey
 		}
 	}
+	if plan.PreviousReceiver != nil {
+		predecessor, found := snapshot.Predecessor()
+		if !found || predecessor.ServingGeneration != plan.PreviousReceiver.Generation {
+			return fmt.Errorf("receiver graph is not bound to the journal predecessor")
+		}
+	}
 	if !reflect.DeepEqual(expected, view.Round.Spec) {
 		return fmt.Errorf("receiver journal round does not match its public transport plan")
 	}
@@ -70,6 +84,19 @@ func validateReceiveTransitionBinding(snapshot handover.Snapshot, plan ReceiveTr
 // round or authorizing native changes. Both publisher and agents use this
 // decoder; a storage hash alone does not establish executable graph semantics.
 func DecodeReceiveTransition(snapshot handover.Snapshot, clusterUID string) (ReceiveTransitionPlan, error) {
+	plan, err := decodeReceiveTransitionContents(snapshot, clusterUID)
+	if err != nil {
+		return ReceiveTransitionPlan{}, err
+	}
+	metadata := snapshot.Metadata()
+	if metadata.Name != ReceiveTransitionName(plan.MachineUID) || metadata.Namespace != plan.Namespace || metadata.DeletionTimestamp != nil {
+		return ReceiveTransitionPlan{}, fmt.Errorf("receiver journal object does not match its public scope or is being deleted")
+	}
+	return plan, nil
+}
+
+// Archive callers must separately authenticate the immutable archive identity.
+func decodeReceiveTransitionContents(snapshot handover.Snapshot, clusterUID string) (ReceiveTransitionPlan, error) {
 	var plan ReceiveTransitionPlan
 	fail := func(err error) (ReceiveTransitionPlan, error) { return ReceiveTransitionPlan{}, err }
 	decoder := json.NewDecoder(bytes.NewReader(snapshot.Plan()))
@@ -81,12 +108,8 @@ func DecodeReceiveTransition(snapshot handover.Snapshot, clusterUID string) (Rec
 	if err := decoder.Decode(&trailing); err != io.EOF {
 		return fail(fmt.Errorf("receiver journal contains trailing plan data"))
 	}
-	if plan.Version != 1 || plan.Namespace == "" || plan.MeshName == "" || plan.MeshUID == "" || plan.MachineName == "" || plan.MachineUID == "" || plan.AdoptionName != AdoptionSecretName(plan.MachineName) || plan.AdoptionUID == "" || plan.CloudNodeName == "" || plan.CloudNodeUID == "" {
+	if (plan.Version != 1 && plan.Version != 2) || plan.Namespace == "" || plan.MeshName == "" || plan.MeshUID == "" || plan.MachineName == "" || plan.MachineUID == "" || plan.AdoptionName != AdoptionSecretName(plan.MachineName) || plan.AdoptionUID == "" || plan.CloudNodeName == "" || plan.CloudNodeUID == "" {
 		return fail(fmt.Errorf("receiver journal has incomplete public identities"))
-	}
-	metadata := snapshot.Metadata()
-	if metadata.Name != ReceiveTransitionName(plan.MachineUID) || metadata.Namespace != plan.Namespace || metadata.DeletionTimestamp != nil {
-		return fail(fmt.Errorf("receiver journal object does not match its public scope or is being deleted"))
 	}
 	if err := validateReceiveTransitionBinding(snapshot, plan, clusterUID); err != nil {
 		return fail(err)
@@ -99,6 +122,12 @@ func DecodeReceiveTransition(snapshot handover.Snapshot, clusterUID string) (Rec
 func (p ReceiveTransitionPlan) CompletedSitePeers(view handover.View) (PeerListDoc, error) {
 	if !view.Complete {
 		return PeerListDoc{}, fmt.Errorf("site permissions require a completed transition")
+	}
+	if p.PreviousReceiver != nil && view.ServingGeneration == p.PreviousReceiver.Generation {
+		if err := validateReceivePreviousReceiver(p); err != nil {
+			return PeerListDoc{}, err
+		}
+		return p.PreviousReceiver.Plan.SiteDesired, nil
 	}
 	switch view.ServingGeneration {
 	case "legacy:" + HashPeerList(p.Base):

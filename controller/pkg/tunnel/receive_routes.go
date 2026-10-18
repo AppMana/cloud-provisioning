@@ -24,6 +24,9 @@ type ReceiveRouteSelection struct {
 // can still carry source exceptions. This is configuration, not phase authority:
 // callers still require a committed round, current identities and native proof.
 func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRouteSelection, error) {
+	if err := validateReceivePreviousReceiver(p); err != nil {
+		return nil, err
+	}
 	receiveScope, err := p.ReceiveScope()
 	if err != nil {
 		return nil, err
@@ -31,7 +34,7 @@ func PlanReceiveRoutes(p ReceiveTransitionPlan) (map[string]map[string]ReceiveRo
 	if err := validateReceiveLocalNetwork(p); err != nil {
 		return nil, err
 	}
-	if p.Version != 1 || p.MeshUID == "" || p.CloudNodeUID == "" || p.Native == nil || p.SiteDesired.Peers == nil {
+	if (p.Version != 1 && p.Version != 2) || p.MeshUID == "" || p.CloudNodeUID == "" || p.Native == nil || p.SiteDesired.Peers == nil {
 		return nil, fmt.Errorf("receiver routes require a complete transport plan")
 	}
 	oldCloudFound := false

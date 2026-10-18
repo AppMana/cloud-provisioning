@@ -130,3 +130,31 @@ func (s Store) readPredecessor(ctx context.Context, current Snapshot) (Snapshot,
 	}
 	return archive, source, nil
 }
+
+// PredecessorArchive returns the exact immutable immediate predecessor after
+// checking its pinned identity, terminal history and the current live journal.
+// The archive retains its archive identity; it is never executable live state.
+// Call ArchiveNames when the complete ancestry is required.
+func (s Store) PredecessorArchive(ctx context.Context, current Snapshot) (Snapshot, error) {
+	if err := s.configured(); err != nil {
+		return Snapshot{}, err
+	}
+	if current.object == nil {
+		return Snapshot{}, fmt.Errorf("missing successor journal")
+	}
+	if _, err := s.snapshot(current.object); err != nil {
+		return Snapshot{}, err
+	}
+	archive, _, err := s.readPredecessor(ctx, current)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	live, err := s.Load(ctx)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	if err := live.ContinuesExecution(current); err != nil {
+		return Snapshot{}, err
+	}
+	return archive, nil
+}

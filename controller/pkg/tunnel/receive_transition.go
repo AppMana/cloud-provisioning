@@ -11,6 +11,7 @@ import (
 // round. Boot IDs and receipt timestamps are observations, not configuration;
 // each phase must independently revalidate them before acting.
 type ReceiveTransitionPlan struct {
+	PreviousReceiver   *ReceivePreviousReceiver         `json:"previousReceiver,omitempty"`
 	Namespace          string                           `json:"namespace"`
 	MeshName           string                           `json:"meshName"`
 	MachineName        string                           `json:"machineName"`

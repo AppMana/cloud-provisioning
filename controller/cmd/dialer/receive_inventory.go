@@ -52,6 +52,9 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 		if err := inventory.CheckJournal(uid, string(snapshot.Metadata().UID)); err != nil {
 			return fail(err)
 		}
+		if err := tunnel.ValidateReceiveTransportHistory(ctx, currentStore, snapshot); err != nil {
+			return fail(err)
+		}
 		plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
 		if err != nil {
 			return fail(err)

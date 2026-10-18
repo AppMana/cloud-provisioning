@@ -36,6 +36,14 @@ func restoreCompletedReceiveRoutes(ctx context.Context, devices receiverDevices,
 }
 
 func reconcileReceiveLinuxPhase(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, own, allocated []string, plan tunnel.ReceiveTransitionPlan, view handover.View, nodeUID string, intent tunnel.ReceiveJournalRoutes, restore bool) error {
+	if plan.PreviousReceiver != nil {
+		return fmt.Errorf("receiver-to-receiver journal execution is not yet supported")
+	}
+	for _, candidate := range intent.Plans {
+		if candidate.PreviousReceiver != nil {
+			return fmt.Errorf("shared routes contain unsupported receiver-to-receiver intent")
+		}
+	}
 	verifyInstalled := verifyReceiveRouteInstallation
 	if restore {
 		verifyInstalled = verifyReceiveRouteDestinations

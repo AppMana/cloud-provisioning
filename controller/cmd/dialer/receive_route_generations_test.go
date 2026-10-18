@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"golang.zx2c4.com/wireguard/wgctrl"
@@ -174,5 +178,21 @@ func TestNativeReceiveRouteGenerations(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+// Until the native executor understands both journal graphs, a different worker
+// sharing the route table must not cause partial successor activation either.
+func TestReceiveSuccessorNativeExecutionRemainsFenced(t *testing.T) {
+	successor := tunnel.ReceiveTransitionPlan{PreviousReceiver: &tunnel.ReceivePreviousReceiver{}}
+	for _, local := range []bool{false, true} {
+		target := tunnel.ReceiveTransitionPlan{}
+		if local {
+			target = successor
+		}
+		err := reconcileReceiveLinuxPhase(context.Background(), nil, config{}, wgtypes.Key{}, nil, nil, target, handover.View{}, "", tunnel.ReceiveJournalRoutes{Plans: map[string]tunnel.ReceiveTransitionPlan{"successor": successor}}, false)
+		if err == nil || !strings.Contains(err.Error(), "receiver-to-receiver") {
+			t.Fatal("successor graph reached legacy native execution", err)
+		}
 	}
 }

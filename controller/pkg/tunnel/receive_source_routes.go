@@ -5,6 +5,8 @@ import (
 	"net/netip"
 	"reflect"
 	"slices"
+
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 )
 
 // PlanReceiveSourceRoutes derives the complete site source-exception selection
@@ -22,6 +24,7 @@ func PlanReceiveSourceRoutes(intent ReceiveJournalRoutes) (map[string]ReceiveSit
 		return nil, fmt.Errorf("journal source routes: %s", reason)
 	}
 	var plans, selected []ReceiveTransitionPlan
+	serving := map[string]ReceiveTransitionPlan{}
 	for machine, p := range intent.Plans {
 		if machine != p.MachineUID {
 			return fail("plan identity differs")
@@ -32,7 +35,31 @@ func PlanReceiveSourceRoutes(intent ReceiveJournalRoutes) (map[string]ReceiveSit
 				return fail("legacy selection differs")
 			}
 		} else {
-			selected = append(selected, p)
+			active := p
+			if p.PreviousReceiver != nil {
+				view, found := intent.Views[machine]
+				if !found {
+					return fail("successor source selection has no committed view")
+				}
+				generation := view.ServingGeneration
+				if !view.Complete {
+					switch view.Round.Phase {
+					case handover.Prepare, handover.Abort:
+						generation = view.Round.FromGeneration
+					case handover.Switch, handover.Drain, handover.Retire:
+						generation = view.Round.ToGeneration
+					default:
+						return fail("unknown successor phase")
+					}
+				}
+				if generation == p.PreviousReceiver.Generation {
+					active = *p.PreviousReceiver.Plan
+				} else if generation != "receivers:"+view.Round.PlanHash {
+					return fail("unknown successor source generation")
+				}
+			}
+			serving[machine] = active
+			selected = append(selected, active)
 		}
 	}
 	for machine := range intent.Legacy {
@@ -65,6 +92,9 @@ func PlanReceiveSourceRoutes(intent ReceiveJournalRoutes) (map[string]ReceiveSit
 	allocations := map[netip.Addr]string{}
 	for _, p := range plans {
 		_, legacy := intent.Legacy[p.MachineUID]
+		if active, found := serving[p.MachineUID]; found {
+			p = active
+		}
 		for _, site := range p.Sites {
 			if site.Legacy == nil || site.Legacy.Tunnel == nil {
 				return fail("explicit site tunnel projection missing")

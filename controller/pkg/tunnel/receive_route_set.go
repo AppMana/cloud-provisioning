@@ -99,10 +99,45 @@ func PlanReceiveRouteSet(plans []ReceiveTransitionPlan) (map[string]map[string]R
 				return nil, err
 			}
 		}
+
+		if plan.PreviousReceiver != nil {
+			previousRoutes, err := PlanReceiveRoutes(*plan.PreviousReceiver.Plan)
+			if err != nil {
+				return nil, err
+			}
+			for _, binding := range plan.PreviousReceiver.Plan.Bindings {
+				if err := bindKey(binding.PublicKey, plan.CloudNodeUID); err != nil {
+					return nil, err
+				}
+			}
+			for node, previous := range previousRoutes {
+				if devices[node] == nil {
+					devices[node] = map[string]ReceiveRouteSelection{}
+				}
+				for raw, selection := range previous {
+					if old, found := devices[node][selection.Interface]; found && !reflect.DeepEqual(old, selection) {
+						return nil, fmt.Errorf("previous receiver conflicts with another device owner")
+					}
+					devices[node][selection.Interface] = selection
+					prefix, err := netip.ParsePrefix(raw)
+					if err != nil {
+						return nil, err
+					}
+					for _, old := range destinations[node] {
+						if old.machine != plan.MachineUID && old.prefix.Overlaps(prefix) {
+							return nil, fmt.Errorf("previous receiver overlaps another destination owner")
+						}
+					}
+					destinations[node] = append(destinations[node], destination{prefix, plan.MachineUID})
+				}
+			}
+		}
 		for node, byDestination := range routes {
 			if result[node] == nil {
 				result[node] = map[string]ReceiveRouteSelection{}
-				devices[node] = map[string]ReceiveRouteSelection{}
+				if devices[node] == nil {
+					devices[node] = map[string]ReceiveRouteSelection{}
+				}
 			}
 			for raw, selection := range byDestination {
 				if old, exists := devices[node][selection.Interface]; exists && !reflect.DeepEqual(old, selection) {

@@ -51,6 +51,9 @@ func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store han
 			return fail(err)
 		}
 	}
+	if err := tunnel.ValidateReceiveTransportHistory(ctx, store, snapshot); err != nil {
+		return fail(err)
+	}
 	plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
 	if err != nil {
 		return fail(err)

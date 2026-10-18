@@ -125,9 +125,13 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		return 1
 	})
 	var failures []error
+	var deliveries receiveRetirementDeliveries
 	// A later discovery or identity read must not hide failures already
 	// observed for earlier receivers in this reconciliation pass.
-	defer func() { resultErr = errors.Join(append(failures, resultErr)...) }()
+	// Join outstanding deliveries before the deferred transport.Close, even
+	// when a later target fails admission. One failed request cannot cancel the
+	// other consumers' observations or escape this reconciliation pass.
+	defer func() { resultErr = errors.Join(append(failures, resultErr, deliveries.wait())...) }()
 	for _, uid := range targets {
 		store.Name = tunnel.ReceiveTransitionName(uid)
 		scope := receiveJournalScope{Namespace: namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUID: uid}
@@ -163,13 +167,16 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 				failures = append(failures, fmt.Errorf("receiver %s retirement execution: %w", uid, err))
 				continue
 			}
-			delivery := newReceiveTiming(true, "retirement-delivery")
-			delivery.step("request")
-			deliveryErr := transport.Submit(ctx, strings.TrimSpace(string(token)), handover.ReceiptRequest{MachineUID: uid, RoundHash: receipts[0].Receipt.RoundHash, Receipts: receipts})
-			delivery.finish(deliveryErr == nil)
-			if err := deliveryErr; err != nil {
-				failures = append(failures, fmt.Errorf("receiver %s retirement delivery: %w", uid, err))
-			}
+			deliveries.submit(func() error {
+				delivery := newReceiveTiming(true, "retirement-delivery")
+				delivery.step("request")
+				err := transport.Submit(ctx, strings.TrimSpace(string(token)), handover.ReceiptRequest{MachineUID: uid, RoundHash: receipts[0].Receipt.RoundHash, Receipts: receipts})
+				delivery.finish(err == nil)
+				if err != nil {
+					return fmt.Errorf("receiver %s retirement delivery: %w", uid, err)
+				}
+				return nil
+			})
 			continue
 		}
 		snapshot, err := store.Load(ctx)

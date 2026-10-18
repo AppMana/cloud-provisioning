@@ -456,6 +456,18 @@ TLS tests retain authentication and completion-race checks. Synthetic native
 proofs and reduced reads do not establish live throughput or safe allocation
 release; the original freshness and connectivity gates still apply.
 
+Retirement receipt delivery may overlap subsequent serial native reconciliation,
+with at most two HTTP submissions in flight per agent. Dispatch must join all
+submissions before returning or closing its client, including after an unrelated
+admission failure. Preserve each failure and the original observation timestamp;
+one rejected request must not cancel other submissions. Serving-phase delivery
+remains serial. Blocked-callback and synthetic TLS tests exercise backpressure,
+joining, cancellation and timestamp preservation, not native cleanup, controller
+authentication or freshness acceptance. Existing dispatch fixtures use simulated
+native callbacks. Re-run authenticated source-race checks and observed multi-node
+cleanup: overlapping completion writes may invalidate another operation's exact
+source checks, and lower delivery latency alone does not qualify cleanup.
+
 Agent reconciliation timing diagnostics report fixed operation/stage labels,
 elapsed milliseconds and success only, with at most sixteen stages per record.
 They must not include configuration, object identities, credentials or error text.

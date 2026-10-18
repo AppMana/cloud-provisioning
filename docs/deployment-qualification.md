@@ -430,6 +430,12 @@ A local HTTP regression proves only that default client throttling does not
 consume the admission deadline. Live qualification must still measure API
 availability, resource pressure and receipt freshness under all consumers' load.
 
+Consumer-policy admission reads each shared DaemonSet owner once per admission,
+while independently validating every retained Node. Re-admission must read the
+owners again and detect deletion or replacement; owner snapshots must never be
+cached across requests. Fake-API tests verify the read budget and replacement
+visibility, not API latency, live authentication or cleanup convergence.
+
 Receipt collection permits at most eight concurrent read-only source resolutions.
 Authentication, batch changes and completion remain serialized and must recheck
 the resolved source; concurrent reads do not authorize stale writes. Saturated

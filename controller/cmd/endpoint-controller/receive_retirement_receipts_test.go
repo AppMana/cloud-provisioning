@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	kubefake "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -104,7 +105,8 @@ func TestRetirementConsumerPolicies(t *testing.T) {
 				mesh.ResourceVersion = "stale"
 			}
 			policy := receiveReceiptPolicy{ImageIDs: map[string]string{"amd64": "amd-release", "arm64": "arm-release"}}
-			policies, err := r.retirementConsumerPolicies(ctx, kubefake.NewClientset(apiObjects...), policy, mesh, retained)
+			api := kubefake.NewClientset(apiObjects...)
+			policies, err := r.retirementConsumerPolicies(ctx, api, policy, mesh, retained)
 			if fault != "none" {
 				if err == nil {
 					t.Fatal("changed consumer or policy admitted")
@@ -114,9 +116,38 @@ func TestRetirementConsumerPolicies(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			// One policy snapshot must read each shared DaemonSet once. Repeated
+			// reads add API work per consumer and can mix owner incarnations.
+			daemonReads := map[string]int{}
+			for _, action := range api.Actions() {
+				if action.Matches("get", "daemonsets") {
+					daemonReads[action.(clienttesting.GetAction).GetName()]++
+				}
+			}
+			if daemonReads["site-agent"] != 1 || daemonReads["cloud-agent"] != 1 {
+				t.Fatalf("policy snapshot reread shared owners: %v", daemonReads)
+			}
 			if len(policies) != 3 || policies["follower"].DaemonSetName != "site-agent" || policies["cloud"].DaemonSetName != "cloud-agent" || policies["cloud"].ImageID != "arm-release" || policies["site"].ImageID != "amd-release" {
 				t.Fatal("lost participant or architecture policy")
 			}
+			// Replacing an owner between admissions must not reuse the earlier
+			// identity. This is request-local reuse, not a long-lived API cache.
+			if err := api.AppsV1().DaemonSets("test").Delete(ctx, "site-agent", metav1.DeleteOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := api.AppsV1().DaemonSets("test").Create(ctx, &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "site-agent", Namespace: "test", UID: "replacement-owner"}}, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			refreshed, err := r.retirementConsumerPolicies(ctx, api, policy, mesh, retained)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range []string{"site", "follower"} {
+				if policies[name].DaemonSetUID != "site-agent" || refreshed[name].DaemonSetUID != "replacement-owner" {
+					t.Fatal("policy admission reused a replaced owner")
+				}
+			}
+
 		})
 	}
 }

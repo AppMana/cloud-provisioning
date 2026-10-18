@@ -125,6 +125,9 @@ func (r *meshReconciler) retirementConsumerPolicies(ctx context.Context, api kub
 		return nil, fmt.Errorf("receipt agent account is not live")
 	}
 	policies := map[string]handover.PodReceiptAuthenticator{}
+	// Shared owners belong to this admission snapshot only. Every recheck
+	// calls this function again and must observe owner replacement.
+	daemonUIDs := map[string]string{}
 	for _, consumer := range retained {
 		node, err := api.CoreV1().Nodes().Get(ctx, consumer.NodeName, metav1.GetOptions{})
 		if err != nil {
@@ -141,14 +144,19 @@ func (r *meshReconciler) retirementConsumerPolicies(ctx context.Context, api kub
 		if !consumer.Site {
 			daemonName = r.dialerCloudDaemonSetName
 		}
-		daemon, err := api.AppsV1().DaemonSets(r.secretNamespace).Get(ctx, daemonName, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
+		daemonUID, found := daemonUIDs[daemonName]
+		if !found {
+			daemon, err := api.AppsV1().DaemonSets(r.secretNamespace).Get(ctx, daemonName, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			if daemon.UID == "" || daemon.DeletionTimestamp != nil {
+				return nil, fmt.Errorf("receipt agent daemon is not live")
+			}
+			daemonUID = string(daemon.UID)
+			daemonUIDs[daemonName] = daemonUID
 		}
-		if daemon.UID == "" || daemon.DeletionTimestamp != nil {
-			return nil, fmt.Errorf("receipt agent daemon is not live")
-		}
-		policies[consumer.NodeUID] = handover.PodReceiptAuthenticator{API: api, Audience: receiveReceiptAudience, Namespace: r.secretNamespace, ServiceAccountName: sa.Name, ServiceAccountUID: string(sa.UID), DaemonSetName: daemon.Name, DaemonSetUID: string(daemon.UID), ContainerName: "dialer", Image: r.dialerImage, ImageID: imageID}
+		policies[consumer.NodeUID] = handover.PodReceiptAuthenticator{API: api, Audience: receiveReceiptAudience, Namespace: r.secretNamespace, ServiceAccountName: sa.Name, ServiceAccountUID: string(sa.UID), DaemonSetName: daemonName, DaemonSetUID: daemonUID, ContainerName: "dialer", Image: r.dialerImage, ImageID: imageID}
 	}
 	return policies, nil
 }

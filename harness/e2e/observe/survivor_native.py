@@ -222,10 +222,12 @@ class Session:
             return False
         earlier = self.progress(label+'-first')
         time.sleep(1)
+        # API identity reads can take longer than the status freshness budget.
+        # Finish them before the final exact-process progress observation.
+        if snapshot(self.kube, target_pairs, family=session.get('addressFamily')) != initial:
+            return False
         later = self.progress(label+'-second')
         if any(a['attempts'] >= b['attempts'] for a,b in zip(earlier,later)):
-            return False
-        if snapshot(self.kube, target_pairs, family=session.get('addressFamily')) != initial:
             return False
         if not fresh_progress(later, session['maxGap']):
             return False

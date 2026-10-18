@@ -8,6 +8,41 @@ from survivor_native import Session
 
 
 class NativeControlTest(unittest.TestCase):
+    def test_slow_identity_reads_do_not_age_final_progress(self):
+        import datetime
+        from unittest.mock import patch
+        from survivor_native import fresh_progress
+        initial = [dict(pod='a', nodeUID='a'), dict(pod='b', nodeUID='b')]
+        for fault in [None, 'changed-identity', 'stalled', 'stale-progress']:
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as root:
+                p = pathlib.Path(root)
+                session = Session(Mock(), p)
+                (p/'initial.json').write_text(json.dumps(initial))
+                (p/'session.json').write_text(json.dumps(dict(maxGap=5, lanes=[
+                    dict(source=s, target=t) for s in initial for t in initial if s != t])))
+                clock = [datetime.datetime(2026, 10, 18, tzinfo=datetime.timezone.utc)]
+                snapshots = []
+                rounds = []
+                def snapshot(*args, **kwargs):
+                    clock[0] += datetime.timedelta(seconds=6)
+                    snapshots.append(clock[0])
+                    return [] if fault == 'changed-identity' and len(snapshots) == 2 else initial
+                def progress(label):
+                    rounds.append(label)
+                    stamp = clock[0].isoformat()
+                    rows = [dict(nonce=str(i), pid=i+1,
+                                 attempts=1 if fault == 'stalled' else len(rounds),
+                                 requestedAt=stamp, observedAt=stamp) for i in range(2)]
+                    (p/('progress-'+label+'.json')).write_text(json.dumps(rows))
+                    if fault == 'stale-progress':
+                        clock[0] += datetime.timedelta(seconds=6)
+                    return rows
+                with patch('pod_matrix.snapshot', side_effect=snapshot), patch('time.sleep'), \
+                        patch.object(session, 'progress', side_effect=progress), \
+                        patch('survivor_native.fresh_progress', side_effect=lambda rows, age: fresh_progress(rows, age, clock[0])):
+                    self.assertEqual(session.live_ready(['a=a', 'b=b'], 'baseline'), fault is None)
+                self.assertEqual((p/'READY.json').exists(), fault is None)
+
     def test_ipv6_session_preserves_family_when_resuming_identity_checks(self):
         from unittest.mock import patch
         from pod_matrix import snapshot

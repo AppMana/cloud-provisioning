@@ -417,13 +417,24 @@ does not qualify cleanup during a live image pull or garbage-collection cycle.
 After full retirement admission, checkpoint, pre-cleanup and final survivor
 admission boundaries reuse the live-source recheck instead of reconstructing
 immutable ancestry. Recheck every reserved journal, inventory, mesh and local
-Node/boot identity, and reject
-changed checkpoint scope. Retain full admission before execution and after
-native cleanup, plus local checkpoint history validation. A ConfigMap read-budget
+Node/boot identity, and reject changed checkpoint scope. Retain initial full
+admission and full admission after native cleanup, plus local checkpoint history
+validation. A ConfigMap read-budget
 regression establishes reduced repeated reads only; it does not establish live
 latency, native absence or completion within the receipt lifetime. Inject an
 inventory revision change at the final survivor boundary and require rejection;
 this API race test does not establish live cross-object atomicity.
+
+Before native phase execution and during neighbor reconciliation, intermediate
+guards may reuse fully admitted retirement histories while re-reading every
+reserved journal, inventory, mesh
+and retained local identity. Serving journals still require live adoption,
+allocation and participant admission. Retain full set admission at operation
+entry and after native phase execution or final neighbor verification. Test
+concurrent inventory mutation during a guard, changed scope, node, boot and key,
+and cancellation. The read-budget fixture has
+one retirement and no successor ancestry; fewer reads do not establish live
+latency, address release or completion within the receipt lifetime.
 
 Agent reconciliation timing diagnostics report fixed operation/stage labels,
 elapsed milliseconds and success only, with at most sixteen stages per record.

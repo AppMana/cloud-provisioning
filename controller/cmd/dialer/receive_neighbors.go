@@ -203,7 +203,7 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	if err != nil {
 		return err
 	}
-	check := func() error {
+	checkSet := func(full bool) error {
 		currentCluster, err := api.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -218,12 +218,16 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		if !sameReceiveRevision(mesh.ObjectMeta, current.ObjectMeta) {
 			return fmt.Errorf("neighbor mesh publication changed")
 		}
-		currentSet, err := loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
-		if err != nil {
+		if full {
+			currentSet, err := loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
+			if err != nil {
+				return err
+			}
+			if !sameReceiveSet(set, currentSet) {
+				return fmt.Errorf("neighbor journal inventory changed")
+			}
+		} else if err := recheckReceiveSet(ctx, api, store, scope, cfg.nodeName, key, set); err != nil {
 			return err
-		}
-		if !sameReceiveSet(set, currentSet) {
-			return fmt.Errorf("neighbor journal inventory changed")
 		}
 		currentContainer, err := checkAgent()
 		if err != nil {
@@ -234,6 +238,7 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		}
 		return ctx.Err()
 	}
+	check := func() error { return checkSet(false) }
 	// Earlier-boot intent is admissible only after the complete live journal
 	// set has verified the current local boot. Cached peers are never replayed.
 	saved := receiveNeighborCheckpoint{Version: 1, InventoryUID: string(set.Metadata.UID), MeshUID: string(mesh.UID), MeshVersion: mesh.ResourceVersion, NodeUID: local.NodeUID, BootID: local.BootID, PublicKey: key.PublicKey().String(), Peers: peers}
@@ -403,7 +408,8 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 			return err
 		}
 	}
-	return check()
+	// Final verification still authenticates the full retained histories.
+	return checkSet(true)
 }
 
 // Native ordinary-peer reconciliation accepts growth only. Reject unsupported

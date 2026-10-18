@@ -125,6 +125,88 @@ func verifySurvivorReceiveAdmission(t *testing.T, api kubernetes.Interface, stor
 			t.Fatal("did not exercise final survivor boundary")
 		}
 	})
+	t.Run("survivor-live-set-guard", func(t *testing.T) {
+		admitted, err := loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
+		must(err)
+		reads := 0
+		reader := store
+		reader.ConfigMaps = receiveSetReader{ConfigMapInterface: store.ConfigMaps, before: func(name string) error {
+			if name == retiring.Name {
+				reads++
+			}
+			return nil
+		}}
+		must(recheckReceiveSet(ctx, api, reader, scope, cfg.nodeName, key, admitted))
+		if reads != 1 {
+			t.Fatalf("guard reloaded retained history: %d reads, want one live root read", reads)
+		}
+		t.Run("inventory-race", func(t *testing.T) {
+			original, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+			must(err)
+			t.Cleanup(func() {
+				current, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+				must(err)
+				current.Annotations = original.Annotations
+				_, err = store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{})
+				must(err)
+			})
+			changed := false
+			racing := store
+			racing.ConfigMaps = receiveSetReader{ConfigMapInterface: store.ConfigMaps, before: func(name string) error {
+				if name != retiring.Name || changed {
+					return nil
+				}
+				changed = true
+				current, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if current.Annotations == nil {
+					current.Annotations = map[string]string{}
+				}
+				current.Annotations["test-guard-race"] = "changed"
+				_, err = store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{})
+				return err
+			}}
+			if err := recheckReceiveSet(ctx, api, racing, scope, cfg.nodeName, key, admitted); err == nil || !changed {
+				t.Fatal("concurrent inventory mutation escaped guard", err)
+			}
+		})
+		admitted, err = loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
+		must(err)
+		for _, fault := range []string{"inventory", "node", "boot", "scope", "key", "cancelled"} {
+			t.Run(fault, func(t *testing.T) {
+				candidate := admitted
+				candidate.Local = make(map[string]admittedReceiveJournal, len(admitted.Local))
+				for uid, member := range admitted.Local {
+					candidate.Local[uid] = member
+				}
+				member := candidate.Local[scope.MachineUID]
+				localScope, localKey := scope, key
+				runCtx, cancel := context.WithCancel(ctx)
+				defer cancel()
+				switch fault {
+				case "inventory":
+					candidate.Metadata.ResourceVersion = "stale"
+				case "node":
+					member.NodeUID = "replacement"
+				case "boot":
+					member.BootID = "previous-boot"
+				case "scope":
+					localScope.MeshUID = "replacement"
+				case "key":
+					localKey, err = wgtypes.GeneratePrivateKey()
+					must(err)
+				case "cancelled":
+					cancel()
+				}
+				candidate.Local[scope.MachineUID] = member
+				if err := recheckReceiveSet(runCtx, api, store, localScope, cfg.nodeName, localKey, candidate); err == nil {
+					t.Fatal("changed authority passed live-set guard")
+				}
+			})
+		}
+	})
 	t.Run("cloud-survivor", func(t *testing.T) {
 		cloudCfg := config{iface: "cloudsurvivor", nodeName: servingPlan.CloudNodeName, privateKeyFile: filepath.Join(t.TempDir(), "key")}
 		invoked := false

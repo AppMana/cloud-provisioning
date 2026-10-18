@@ -125,12 +125,8 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 	phaseCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 	timing.step("pre-native-admission")
-	beforeNative, err := loadReceiveSet(phaseCtx, api, store, scope, cfg.nodeName, key)
-	if err != nil {
+	if err := recheckReceiveSet(phaseCtx, api, store, scope, cfg.nodeName, key, set); err != nil {
 		return nil, err
-	}
-	if !sameReceiveSet(set, beforeNative) {
-		return nil, fmt.Errorf("handover set changed before native phase execution")
 	}
 	if err := phaseCtx.Err(); err != nil {
 		return nil, err

@@ -126,6 +126,7 @@ func TestWithdrawnForwardingCache(t *testing.T) {
 			retry, err := prepareWithdrawnForwardingCache(cfg, site, uid, "departed", pub)
 			must(err)
 			must(commitWithdrawnForwardingCache(retry))
+			verifyWithdrawnAdvertisementCache(t, cfg, site, mesh, before)
 		})
 	}
 }

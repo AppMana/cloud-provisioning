@@ -53,6 +53,10 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 	if err != nil {
 		return err
 	}
+	advertisements, err := prepareWithdrawnAdvertisementCache(cfg, speaker, forwarding)
+	if err != nil {
+		return err
+	}
 	var recorded []tunnel.PeerSpec
 	if forwarding != nil {
 		recorded = append(recorded, forwarding.peers...)
@@ -221,5 +225,5 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 	if err := check(); err != nil {
 		return err
 	}
-	return commitWithdrawnForwardingCache(forwarding)
+	return commitWithdrawnSiteCaches(forwarding, advertisements)
 }

@@ -72,7 +72,67 @@ func PlanReceiveCloudNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPl
 	return planReceiveNeighborPeers(peers, plans, root)
 }
 
+// PlanReceiveWithdrawnNeighborPeers selects only the withdrawn root's recorded
+// ordinary-peer variants. The caller must independently admit persisted
+// withdrawal authority against the complete live inventory under the host lock.
+// This does not release any reservation or authorize receiver-device cleanup.
+func PlanReceiveWithdrawnNeighborPeers(previous, current []PeerSpec, plans []ReceiveTransitionPlan, root string) ([]PeerSpec, error) {
+	if !validReceivePublicKey(root) {
+		return nil, fmt.Errorf("withdrawn neighbor requires exact root identity")
+	}
+	if _, err := PlanReceiveNeighborPeers(current, plans); err != nil {
+		return nil, err
+	}
+	found := false
+	for _, plan := range plans {
+		found = found || plan.RootPublicKey == root
+	}
+	if !found {
+		return nil, fmt.Errorf("withdrawn neighbor has no reserved journal")
+	}
+	for _, peer := range current {
+		if peer.PublicKey == root {
+			return nil, fmt.Errorf("withdrawn neighbor remains published")
+		}
+	}
+	result := make([]PeerSpec, 0)
+	for _, peer := range previous {
+		if peer.PublicKey != root {
+			continue
+		}
+		admitted, err := planReceiveNeighborPeersWithWithdrawal([]PeerSpec{peer}, plans, "", root)
+		if err != nil {
+			return nil, err
+		}
+		// Historical variants need not coexist. Current published owners, however,
+		// must not overlap any route or permission this operation could remove.
+		prefixes, err := neighborPeerPrefixes(peer)
+		if err != nil {
+			return nil, err
+		}
+		for _, live := range current {
+			other, err := neighborPeerPrefixes(live)
+			if err != nil {
+				return nil, err
+			}
+			for _, prefix := range prefixes {
+				for _, owned := range other {
+					if prefix.Overlaps(owned) {
+						return nil, fmt.Errorf("withdrawn neighbor overlaps a published owner")
+					}
+				}
+			}
+		}
+		result = append(result, admitted...)
+	}
+	return result, nil
+}
+
 func planReceiveNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan, cloudRoot string) ([]PeerSpec, error) {
+	return planReceiveNeighborPeersWithWithdrawal(peers, plans, cloudRoot, "")
+}
+
+func planReceiveNeighborPeersWithWithdrawal(peers []PeerSpec, plans []ReceiveTransitionPlan, cloudRoot, withdrawnRoot string) ([]PeerSpec, error) {
 	if len(plans) == 0 || peers == nil {
 		return nil, fmt.Errorf("neighbor planning requires a complete peer document and reserved plans")
 	}
@@ -85,7 +145,7 @@ func planReceiveNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan, c
 	cloudOwned := map[string][]netip.Prefix{}
 	foundCloud := cloudRoot == ""
 	for _, plan := range plans {
-		if cloudRoot == "" || cloudRoot == plan.RootPublicKey {
+		if (cloudRoot == "" || cloudRoot == plan.RootPublicKey) && withdrawnRoot != plan.RootPublicKey {
 			reserved[plan.RootPublicKey] = true
 		}
 		foundCloud = foundCloud || cloudRoot == plan.RootPublicKey
@@ -113,7 +173,7 @@ func planReceiveNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan, c
 				if err != nil {
 					return nil, err
 				}
-				if cloudRoot != "" && cloudRoot != plan.RootPublicKey {
+				if (cloudRoot != "" && cloudRoot != plan.RootPublicKey) || withdrawnRoot == plan.RootPublicKey {
 					cloudOwned[plan.RootPublicKey] = append(cloudOwned[plan.RootPublicKey], prefix)
 				} else {
 					protected = append(protected, prefix)
@@ -146,7 +206,7 @@ func planReceiveNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan, c
 				if err != nil {
 					return nil, err
 				}
-				if cloudRoot != "" && cloudRoot != plan.RootPublicKey {
+				if (cloudRoot != "" && cloudRoot != plan.RootPublicKey) || withdrawnRoot == plan.RootPublicKey {
 					cloudOwned[plan.RootPublicKey] = append(cloudOwned[plan.RootPublicKey], prefixes...)
 				} else {
 					protected = append(protected, prefixes...)

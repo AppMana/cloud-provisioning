@@ -197,3 +197,72 @@ func TestReceiveNeighborRetirementPreservesExactGrowthVariants(t *testing.T) {
 		t.Fatal("overlapping desired owners accepted")
 	}
 }
+
+// Pure planning tests: persisted withdrawal, native ownership, receipt identity
+// and traffic continuity are separate requirements. Historical variants are
+// deliberately independent; actual live permissions must match before deletion.
+func TestReceiveWithdrawnNeighborPeers(t *testing.T) {
+	for _, fault := range []string{"none", "republished", "missing-document", "missing-plan", "unknown-root", "site-source", "other-worker", "transit", "current-owner", "outside-route", "receiver-identity", "empty-root", "default-source", "site-role"} {
+		t.Run(fault, func(t *testing.T) {
+			plans := routeSetFixture(t)
+			root := plans[0].RootPublicKey
+			old := plans[0].SiteDesired.Peers[0]
+			old.Remote = true
+			historical := old
+			historical.WGAllowedIPs = []string{"172.29.0.8/32"}
+			historical.RouteHosts = []string{"172.29.0.8"}
+			current := []PeerSpec{neighborFixture()}
+			switch fault {
+			case "republished":
+				current = append(current, old)
+			case "missing-document":
+				current = nil
+			case "missing-plan":
+				plans = nil
+			case "unknown-root":
+				root = receiverTestKey(123)
+			case "receiver-identity":
+				root = plans[0].Bindings[receiverTestKey(8)].PublicKey
+			case "empty-root":
+				root = ""
+			case "default-source":
+				historical.WGAllowedIPs = []string{"0.0.0.0/0"}
+				historical.RouteHosts = nil
+			case "site-role":
+				historical.Remote = false
+			case "site-source":
+				historical.WGAllowedIPs = []string{"10.90.0.7/32"}
+				historical.RouteHosts = nil
+			case "other-worker":
+				historical.WGAllowedIPs = []string{"172.29.0.3/32"}
+				historical.RouteHosts = nil
+			case "transit":
+				historical.Transit = []string{"172.29.0.8/32"}
+			case "current-owner":
+				historical.WGAllowedIPs = []string{"172.29.0.9/32"}
+				historical.RouteHosts = nil
+			case "outside-route":
+				historical.RouteHosts = []string{"172.29.0.10"}
+			}
+			previous := []PeerSpec{old, historical, neighborFixture()}
+			got, err := PlanReceiveWithdrawnNeighborPeers(previous, current, plans, root)
+			if fault != "none" {
+				if err == nil {
+					t.Fatal("unsafe withdrawal admitted")
+				}
+				return
+			}
+			if err != nil || !reflect.DeepEqual(got, previous[:2]) {
+				t.Fatalf("lost target variants or selected another owner: %+v %v", got, err)
+			}
+			got[0].WGAllowedIPs[0] = "changed"
+			if previous[0].WGAllowedIPs[0] == "changed" {
+				t.Fatal("aliased recorded permissions")
+			}
+			ordinary, err := PlanReceiveNeighborRetirements(previous, current, plans)
+			if err != nil || len(ordinary) != 0 {
+				t.Fatal("ordinary reconciliation lost reserved-root fence", err)
+			}
+		})
+	}
+}

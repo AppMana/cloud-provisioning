@@ -12,18 +12,21 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	appsv1 "k8s.io/api/apps/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Real API persistence across freshly constructed reconcilers: freeze, reserve,
-// publish and wait for receipts. Synthetic completed transport history does not
-// establish native cleanup, authenticated completion, provider deletion or any
-// workload/management interruption bound. The required policy is to keep blocking
+// publish, authenticate cleanup observations and commit removal. Synthetic
+// transport history and agent status do not establish native cleanup, provider
+// deletion or workload/management interruption bounds. The required policy is to keep blocking
 // while receipts are absent; these retries do not measure a timeout or prove
 // indefinite behavior.
 func verifyReceiveRemovalStages(t *testing.T, api client.Client, core kubernetes.Interface) {
@@ -46,6 +49,7 @@ func verifyReceiveRemovalStages(t *testing.T, api client.Client, core kubernetes
 	must(api.Create(ctx, group))
 	child, err := BuildChild(group, 0)
 	must(err)
+	child.Finalizers = []string{"test/hold-removal"}
 	must(api.Create(ctx, child))
 	action, err := ProposeAction(group, []v1alpha1.ProvisionedNodeClaim{*child})
 	must(err)
@@ -61,8 +65,10 @@ func verifyReceiveRemovalStages(t *testing.T, api client.Client, core kubernetes
 	machine.SetName(child.Name)
 	machine.SetNamespace(group.Namespace)
 	machine.SetOwnerReferences([]metav1.OwnerReference{*metav1.NewControllerRef(child, v1alpha1.GroupVersion.WithKind("ProvisionedNodeClaim"))})
-	machine.SetAnnotations(map[string]string{attachment.DrainIntentAnnotation: string(group.UID) + "/" + group.Status.PendingAction.ID})
+	machine.SetAnnotations(map[string]string{attachment.DrainIntentAnnotation: string(group.UID) + "/" + group.Status.PendingAction.ID, "cloud-provisioning.appmana.com/wireguard-addr4": "10.100.0.2/24"})
 	must(api.Create(ctx, machine))
+	adoption := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: tunnel.AdoptionSecretName(child.Name), Namespace: group.Namespace}}
+	must(api.Create(ctx, adoption))
 	key := func(b byte) string { var k wgtypes.Key; k[0] = b; return k.String() }
 	siteKey, root := key(1), key(2)
 	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "reserved-mesh", Namespace: group.Namespace}, Data: map[string][]byte{
@@ -84,7 +90,7 @@ func verifyReceiveRemovalStages(t *testing.T, api client.Client, core kubernetes
 	peers := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: siteKey, WGAllowedIPs: []string{"10.90.0.0/24"}}}}
 	base, err := json.Marshal(peers)
 	must(err)
-	plan := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: group.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineName: child.Name, MachineUID: a.MachineUID, AdoptionName: tunnel.AdoptionSecretName(child.Name), AdoptionUID: "adoption-uid", CloudNodeName: node.Name, CloudNodeUID: string(node.UID), RootPublicKey: root, Base: base, Desired: peers, Native: []netip.Prefix{}, Ports: map[string]int{}, Bindings: map[string]tunnel.ReceiveBinding{}, Sites: map[string]tunnel.ReceiveTransitionSite{}}
+	plan := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: group.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineName: child.Name, MachineUID: a.MachineUID, AdoptionName: tunnel.AdoptionSecretName(child.Name), AdoptionUID: string(adoption.UID), CloudNodeName: node.Name, CloudNodeUID: string(node.UID), RootPublicKey: root, Base: base, Desired: peers, Native: []netip.Prefix{}, Ports: map[string]int{}, Bindings: map[string]tunnel.ReceiveBinding{}, Sites: map[string]tunnel.ReceiveTransitionSite{}}
 	plan.SiteDesired = tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: root, Remote: true, Endpoint: "198.51.100.1:51820", WGAllowedIPs: []string{"172.29.0.1/32"}}}}
 	prep, err := tunnel.PlanReceiveHandover(plan.MeshUID, peers, peers, nil)
 	must(err)
@@ -134,17 +140,20 @@ func verifyReceiveRemovalStages(t *testing.T, api client.Client, core kubernetes
 	index := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: tunnel.ReceiveInventoryName(string(mesh.UID)), Namespace: group.Namespace}, Data: map[string]string{"inventory.json": string(raw)}}
 	must(api.Create(ctx, index))
 	store := handover.Store{ConfigMaps: core.CoreV1().ConfigMaps(group.Namespace), ClusterUID: string(cluster.UID), Name: journal.Name, ExpectedUID: string(journal.UID)}
+	// Let ordinary reconciliation persist its finalizer and capacity report first.
+	for attempt := 0; attempt < 2; attempt++ {
+		r := &Reconciler{API: api, Workload: api, MachineGVK: gvk, RetirementAPI: core, MeshName: mesh.Name}
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(group)})
+		must(err)
+	}
 	var publishedVersion string
 	for stage := 0; stage < 5; stage++ {
 		// Neither the caller's status nor an in-memory reconciler survives a retry.
 		current := &v1alpha1.ProvisionedNodeGroupClaim{}
 		must(api.Get(ctx, client.ObjectKeyFromObject(group), current))
-		r := &Reconciler{API: api, Workload: api, MachineGVK: gvk, RetirementAPI: core}
-		handled, err := r.beginReceiveRemoval(ctx, current)
+		r := &Reconciler{API: api, Workload: api, MachineGVK: gvk, RetirementAPI: core, MeshName: mesh.Name}
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(group)})
 		must(err)
-		if !handled {
-			t.Fatal("reserved worker fell through")
-		}
 		snapshot, err := store.Load(ctx)
 		must(err)
 		if !snapshot.Frozen() {
@@ -220,5 +229,94 @@ func verifyReceiveRemovalStages(t *testing.T, api client.Client, core kubernetes
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "late-retirement-workload", Namespace: group.Namespace}, Spec: corev1.PodSpec{NodeName: node.Name, Containers: []corev1.Container{{Name: "workload", Image: "example.invalid/workload:test"}}}}
 	must(api.Create(ctx, pod))
 	reject()
+
+	// The late workload finishes normally before retirement can be authorized.
+	pod.Status.Phase = corev1.PodSucceeded
+	must(api.Status().Update(ctx, pod))
+	const image = "example.invalid/dialer@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	sa, err := core.CoreV1().ServiceAccounts(group.Namespace).Create(ctx, &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "retirement-agent"}}, metav1.CreateOptions{})
+	must(err)
+	labels := map[string]string{"app": "retirement-agent"}
+	daemon, err := core.AppsV1().DaemonSets(group.Namespace).Create(ctx, &appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "retirement-agent"}, Spec: appsv1.DaemonSetSpec{Selector: &metav1.LabelSelector{MatchLabels: labels}, Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labels}, Spec: corev1.PodSpec{ServiceAccountName: sa.Name, Containers: []corev1.Container{{Name: "dialer", Image: image}}}}}}, metav1.CreateOptions{})
+	must(err)
+	site.Status.NodeInfo.BootID = "retirement-boot"
+	site.Status.Conditions = []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}
+	site, err = core.CoreV1().Nodes().UpdateStatus(ctx, site, metav1.UpdateOptions{})
+	must(err)
+	agent, err := core.CoreV1().Pods(group.Namespace).Create(ctx, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "retirement-agent", Labels: labels, OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(daemon, appsv1.SchemeGroupVersion.WithKind("DaemonSet"))}}, Spec: corev1.PodSpec{NodeName: site.Name, ServiceAccountName: sa.Name, Containers: []corev1.Container{{Name: "dialer", Image: image}}}}, metav1.CreateOptions{})
+	must(err)
+	agent.Status.Phase = corev1.PodRunning
+	agent.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+	agent.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://retirement-agent", Image: image, ImageID: image, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.Now()}}}}
+	agent, err = core.CoreV1().Pods(group.Namespace).UpdateStatus(ctx, agent, metav1.UpdateOptions{})
+	must(err)
+	policy := handover.PodReceiptAuthenticator{API: core, Audience: "cloud-provisioning-receipts", Namespace: group.Namespace, ServiceAccountName: sa.Name, ServiceAccountUID: string(sa.UID), DaemonSetName: daemon.Name, DaemonSetUID: string(daemon.UID), ContainerName: "dialer", Image: image, ImageID: image}
+	token, err := core.CoreV1().ServiceAccounts(group.Namespace).CreateToken(ctx, sa.Name, &authenticationv1.TokenRequest{Spec: authenticationv1.TokenRequestSpec{Audiences: []string{policy.Audience}, BoundObjectRef: &authenticationv1.BoundObjectReference{APIVersion: "v1", Kind: "Pod", Name: agent.Name, UID: agent.UID}}}, metav1.CreateOptions{})
+	must(err)
+	submit := func(bearer string) error {
+		source, err := attachment.ReadReceiveRetirementSet(ctx, core, store, group.Namespace, mesh.Name, string(mesh.UID), a.MachineUID)
+		if err != nil {
+			return err
+		}
+		snapshot, err := store.Load(ctx)
+		if err != nil {
+			return err
+		}
+		scope, err := attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(index.UID), snapshot, mesh)
+		if err != nil {
+			return err
+		}
+		entry := handover.PodReceipt{BearerToken: bearer, BootID: site.Status.NodeInfo.BootID, Receipt: handover.Receipt{NodeUID: string(site.UID), RoundHash: scope.Digest(), AgentContainerID: agent.Status.ContainerStatuses[0].ContainerID, ObservedAt: time.Now()}}
+		return attachment.RecordReceiveRetirementWithPodReceipts(ctx, core, store, string(index.UID), scope.Digest(), mesh, snapshot, []handover.PodReceipt{entry}, map[string]handover.PodReceiptAuthenticator{string(site.UID): policy}, time.Minute, func() error { return source.Recheck(ctx, core, store) })
+	}
+	if err := submit("invalid-token"); err == nil {
+		t.Fatal("invalid token persisted completion")
+	}
+	stored, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, group.Namespace, mesh.Name, string(mesh.UID))
+	must(err)
+	if len(stored.Publications[a.MachineUID].RetirementCompletion) != 0 {
+		t.Fatal("failed authentication fabricated completion")
+	}
+	must(submit(token.Status.Token))
+	// A boot change after successful authentication invalidates stored evidence.
+	// Fresh authenticated observations may refresh it without releasing ownership.
+	site.Status.NodeInfo.BootID = "retirement-reboot"
+	site, err = core.CoreV1().Nodes().UpdateStatus(ctx, site, metav1.UpdateOptions{})
+	must(err)
+	reject()
+	must(submit(token.Status.Token))
+	current := &v1alpha1.ProvisionedNodeGroupClaim{}
+	must(api.Get(ctx, client.ObjectKeyFromObject(group), current))
+	for attempt := 0; !current.Status.PendingAction.Removing; attempt++ {
+		if attempt == 10 {
+			t.Fatal("authenticated cleanup did not commit removal")
+		}
+		r := &Reconciler{API: api, Workload: api, MachineGVK: gvk, RetirementAPI: core, MeshName: mesh.Name}
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(group)})
+		must(err)
+		must(api.Get(ctx, client.ObjectKeyFromObject(group), current))
+	}
+	must(api.Get(ctx, client.ObjectKeyFromObject(child), child))
+	if child.DeletionTimestamp != nil {
+		t.Fatal("commit skipped durable removal boundary")
+	}
+	done, err := ResumeRemoval(ctx, api, api, gvk, current)
+	must(err)
+	if done {
+		t.Fatal("removal completed before provider teardown")
+	}
+	must(api.Get(ctx, client.ObjectKeyFromObject(child), child))
+	if child.DeletionTimestamp == nil {
+		t.Fatal("committed removal did not delegate to child")
+	}
+	must(api.Get(ctx, client.ObjectKeyFromObject(machine), machine))
+	if machine.GetDeletionTimestamp() != nil {
+		t.Fatal("group bypassed child compute teardown")
+	}
+	stored, _, err = tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, group.Namespace, mesh.Name, string(mesh.UID))
+	must(err)
+	if len(stored.MachineUIDs) != 1 || stored.Publications[a.MachineUID].JournalUID != string(journal.UID) || len(stored.Publications[a.MachineUID].RetirementCompletion) == 0 {
+		t.Fatal("removal lost retirement ownership or proof")
+	}
 
 }

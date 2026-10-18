@@ -564,6 +564,18 @@ mismatch, owner rejection after completion, successful consumption and rejected
 replay. They use synthetic native observations and do not establish controller
 orphan discovery, live cleanup latency, rollout compatibility or release.
 
+For configuration rollback after finalization, disable new finalization writes
+on a compatible binary while retaining the populated records. Require unchanged
+agent Pod identities, verified running executable hashes, successful historical
+finalization and current orphan-absence checks, and unchanged reservations and
+consumed evidence. Observe baseline and operation-wide workload, API and
+management traffic with zero failures. This scenario covers the policy change
+and resulting controller restart only. It does not qualify an older binary,
+agent restart or reboot, allocation release, address reuse, another platform,
+or a different network profile. Missing receipt progress logs alone do not prove
+that agents stopped submitting; verify retained state and local maintenance
+independently. A historical finalization is not a renewed absence observation.
+
 Finalization remains a separate protocol: persist an irreversible retirement
 record before removing active reservations, retain durable host fences against
 old boot recovery, and admit new ownership only after matching release evidence.

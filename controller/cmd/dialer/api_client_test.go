@@ -9,6 +9,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 func TestAPIClientBoundsStalledResponse(t *testing.T) {
@@ -64,10 +65,10 @@ func TestAPIClientPreservesShorterDeadline(t *testing.T) {
 	}
 }
 
-// A single phase admission in the real-API fixture performs 36 HTTP reads.
-// This responsive-server test covers the client-side burst budget only; it
-// does not prove native completion, server capacity or multi-node convergence.
-func TestAPIClientAllowsReceiptAdmissionBurst(t *testing.T) {
+// Repeated admissions must reach a responsive server without exhausting their
+// deadline in a default local token bucket. This covers client throttling only;
+// it does not prove native completion, server capacity or multi-node convergence.
+func TestAPIClientAllowsRepeatedReceiptAdmission(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"apiVersion":"v1","kind":"Secret","metadata":{"name":"peers","namespace":"test"}}`))
@@ -83,7 +84,7 @@ func TestAPIClientAllowsReceiptAdmissionBurst(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	for i := 0; i < 36; i++ {
+	for i := 0; i < 5*36; i++ {
 		if _, err := client.CoreV1().Secrets("test").Get(ctx, "peers", metav1.GetOptions{}); err != nil {
 			t.Fatalf("responsive API admission throttled at read %d: %v", i+1, err)
 		}
@@ -106,5 +107,17 @@ func TestAPIClientPreservesExplicitRateBudget(t *testing.T) {
 	}
 	if limiter.TryAccept() {
 		t.Fatal("explicit burst exceeded")
+	}
+}
+
+func TestAPIClientPreservesExplicitLimiter(t *testing.T) {
+	limiter := flowcontrol.NewTokenBucketRateLimiter(7, 3)
+	config := &rest.Config{Host: "https://example.invalid", RateLimiter: limiter}
+	client, err := newAPIClient(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.CoreV1().RESTClient().GetRateLimiter() != limiter || config.QPS != 0 || config.Burst != 0 {
+		t.Fatal("explicit limiter replaced or caller configuration changed")
 	}
 }

@@ -422,6 +422,14 @@ native cleanup, plus local checkpoint history validation. A ConfigMap read-budge
 regression establishes reduced repeated reads only; it does not establish live
 latency, native absence or completion within the receipt lifetime.
 
+Exercise repeated agent admission reads against a responsive API, not only an
+initial request burst. By default the agent relies on Kubernetes API Priority
+and Fairness, matching the controller, while preserving explicit caller QPS,
+burst and limiter settings. Request and phase deadlines remain mandatory.
+A local HTTP regression proves only that default client throttling does not
+consume the admission deadline. Live qualification must still measure API
+availability, resource pressure and receipt freshness under all consumers' load.
+
 Receipt collection permits at most eight concurrent read-only source resolutions.
 Authentication, batch changes and completion remain serialized and must recheck
 the resolved source; concurrent reads do not authorize stale writes. Saturated

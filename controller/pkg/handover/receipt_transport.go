@@ -59,6 +59,7 @@ type ReceiptHandler struct {
 	admissionSlots chan struct{}
 	batches        map[string]receiptBatch
 	stopped        bool
+	progress       func(ReceiptProgress)
 }
 
 func NewReceiptHandler(resolve ReceiptResolver, maxPending int) (*ReceiptHandler, error) {
@@ -132,11 +133,18 @@ type ReceiptCollection struct {
 // and must revalidate their admitted source before mutation.
 type ReceiptCollectionResolver func(context.Context, string) (ReceiptCollection, error)
 
-func NewReceiptCollectionHandler(resolve ReceiptCollectionResolver, maxPending int) (*ReceiptHandler, error) {
-	if resolve == nil || maxPending < 1 {
+// NewReceiptCollectionHandler accepts at most one optional progress reporter.
+// It receives only authenticated, bounded snapshots after collector locks are
+// released, and must be concurrency-safe and return promptly.
+func NewReceiptCollectionHandler(resolve ReceiptCollectionResolver, maxPending int, progress ...func(ReceiptProgress)) (*ReceiptHandler, error) {
+	if resolve == nil || maxPending < 1 || len(progress) > 1 {
 		return nil, fmt.Errorf("receipt transport requires admission and a positive pending limit")
 	}
-	return &ReceiptHandler{resolve: resolve, limit: maxPending, gate: make(chan struct{}, 1), admissionSlots: make(chan struct{}, 8), batches: map[string]receiptBatch{}}, nil
+	var report func(ReceiptProgress)
+	if len(progress) == 1 {
+		report = progress[0]
+	}
+	return &ReceiptHandler{progress: report, resolve: resolve, limit: maxPending, gate: make(chan struct{}, 1), admissionSlots: make(chan struct{}, 8), batches: map[string]receiptBatch{}}, nil
 }
 
 // Run expires credentials even when agents stop sending, and drops every
@@ -168,6 +176,15 @@ func (h *ReceiptHandler) Run(ctx context.Context) {
 }
 
 func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	started := time.Now()
+	var progress *ReceiptProgress
+	// Registered before lock/slot defers, so diagnostics run after both release.
+	defer func() {
+		if progress != nil {
+			progress.ElapsedMillis = time.Since(started).Milliseconds()
+			h.progress(*progress)
+		}
+	}()
 	w.Header().Set("Cache-Control", "no-store")
 	stage := "request"
 	reject := func(status int) {
@@ -239,7 +256,9 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// work without serializing it behind another consumer's reads. Only the
 	// bounded admitted set can wait to authenticate or mutate the collection.
 	stage = "source"
+	sourceStarted := time.Now()
 	target, err := h.resolve(ctx, request.MachineUID)
+	sourceFinished := time.Now()
 	stage = "contention"
 	select {
 	case h.gate <- struct{}{}:
@@ -255,6 +274,7 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reject(http.StatusServiceUnavailable)
 		return
 	}
+	queueFinished := time.Now()
 	stage = "shutdown"
 	if h.stopped {
 		reject(http.StatusServiceUnavailable)
@@ -315,7 +335,9 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Authenticate this subset before retaining its credentials. The backend
 	// validates freshness and exact observation bindings.
 	stage = "observation"
+	observeStarted := time.Now()
 	err = target.Observe(r.Context(), request.Receipts)
+	observeFinished := time.Now()
 	if err != nil {
 		// Reject this subset without erasing independently admitted consumers.
 		// A stale or unauthenticated submission must not reset their progress.
@@ -342,6 +364,12 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		batch.entries[[2]string{entry.Receipt.NodeUID, entry.Receipt.DeviceID}] = entry
 	}
 	h.batches[request.MachineUID] = batch
+	if h.progress != nil {
+		progress = receiptProgress(target, batch, submitted, observedAt)
+		progress.SourceMillis = sourceFinished.Sub(sourceStarted).Milliseconds()
+		progress.QueueMillis = queueFinished.Sub(sourceFinished).Milliseconds()
+		progress.ObserveMillis = observeFinished.Sub(observeStarted).Milliseconds()
+	}
 	if len(batch.entries) != len(target.Members) {
 		w.WriteHeader(http.StatusAccepted)
 		return
@@ -352,9 +380,18 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	delete(h.batches, request.MachineUID)
 	stage = "completion"
-	if err := target.Complete(r.Context(), all); err != nil {
+	completeStarted := time.Now()
+	err = target.Complete(r.Context(), all)
+	if progress != nil {
+		progress.CompleteMillis = time.Since(completeStarted).Milliseconds()
+		progress.Outcome = "completion-rejected"
+	}
+	if err != nil {
 		reject(http.StatusConflict)
 		return
+	}
+	if progress != nil {
+		progress.Outcome = "completed"
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

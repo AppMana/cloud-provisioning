@@ -2617,7 +2617,9 @@ func main() {
 			}
 			handler, err := handover.NewReceiptCollectionHandler(func(ctx context.Context, machineUID string) (handover.ReceiptCollection, error) {
 				return mesh.resolveReceiveReceiptCollection(ctx, api, *receiptPolicy, machineUID)
-			}, 128)
+			}, 128, func(progress handover.ReceiptProgress) {
+				ctrl.Log.WithName("receipts").V(1).Info("receipt collection progress", "progress", progress)
+			})
 			if err == nil {
 				err = mgr.Add(&receiveReceiptServer{policy: *receiptPolicy, handler: handler})
 			}

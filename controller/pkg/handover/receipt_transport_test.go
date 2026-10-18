@@ -564,7 +564,10 @@ func TestReceiptRejectedObservationPreservesOtherConsumers(t *testing.T) {
 	digest := strings.Repeat("c", 64)
 	now := time.Now()
 	completed := false
-	h, err := NewReceiptCollectionHandler(func(context.Context, string) (ReceiptCollection, error) {
+	var h *ReceiptHandler
+	var err error
+	var reports []ReceiptProgress
+	h, err = NewReceiptCollectionHandler(func(context.Context, string) (ReceiptCollection, error) {
 		return ReceiptCollection{UID: "journal", Digest: digest, ExpiresAt: now.Add(time.Minute), MaxAge: 30 * time.Second,
 			Members: []ReceiptMember{{NodeUID: "first"}, {NodeUID: "second"}},
 			Observe: func(_ context.Context, entries []PodReceipt) error {
@@ -586,7 +589,12 @@ func TestReceiptRejectedObservationPreservesOtherConsumers(t *testing.T) {
 				return nil
 			},
 		}, nil
-	}, 1)
+	}, 1, func(progress ReceiptProgress) {
+		if len(h.gate) != 0 || len(h.admissionSlots) != 0 {
+			t.Fatal("diagnostics ran while holding collector capacity")
+		}
+		reports = append(reports, progress)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -618,6 +626,24 @@ func TestReceiptRejectedObservationPreservesOtherConsumers(t *testing.T) {
 	}
 	if len(h.batches) != 0 {
 		t.Fatal("completed batch retained credentials")
+	}
+	if len(reports) != 2 || reports[0].Outcome != "accepted" || reports[0].Pending != 1 || reports[1].Outcome != "completed" || reports[1].Pending != 2 {
+		t.Fatalf("unexpected authenticated progress: %+v", reports)
+	}
+	if !reports[0].Consumers[0].Present || reports[0].Consumers[1].Present || !reports[0].Consumers[0].Submitted {
+		t.Fatal("progress lost the missing consumer")
+	}
+	if reports[0].Collection != reports[1].Collection || reports[0].Consumers[0].ID != reports[1].Consumers[0].ID {
+		t.Fatal("diagnostic identities cannot correlate requests")
+	}
+	raw, err := json.Marshal(reports)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, private := range []string{"accepted-token", "rejected-token", "first", "second", "journal", digest} {
+		if bytes.Contains(raw, []byte(private)) {
+			t.Fatalf("progress exposed private input %q", private)
+		}
 	}
 }
 

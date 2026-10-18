@@ -456,6 +456,17 @@ callbacks nor erase or refresh earlier authenticated observations. A subsequent
 valid submission must still pass full completion authentication. Synthetic
 accumulation tests do not prove that live consumers can deliver within the shared freshness window.
 
+At debug logging level, receipt collection reports authenticated consumer ages,
+missing consumers, and source, queue, observation and completion timings. Reports
+use hashed collection/consumer identities, include at most sixteen consumer
+entries, and exclude credentials, request bodies, source objects and callback
+errors. Logging runs after collector locks and admission slots are released.
+An accepted report proves partial admission only; even a completed report is not
+reservation-release authority. Missing reports can reflect rejected admission,
+logging configuration or delivery gaps and must not be interpreted as an absent
+consumer. Synthetic diagnostic tests cover bounds, redaction and lock release,
+not live timing or full lifecycle qualification.
+
 Version-three and version-four retirement completion records exclude all
 completion evidence from their inventory authority hash, so refreshing a sibling
 completion does not invalidate an otherwise current proof. Journal identities,

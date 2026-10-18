@@ -5,6 +5,43 @@ import (
 	"testing"
 )
 
+// Allocation only: this does not prove durable publication, native socket
+// coexistence, listener cleanup or packet continuity during generation changes.
+func TestSuccessorPortsPreserveOccupiedGenerations(t *testing.T) {
+	a, b := receiverTestKey(8), receiverTestKey(16)
+	paths := []ReceivePath{{PublicKey: b}, {PublicKey: a}}
+	old := map[string]int{a: 51821, b: 51822}
+	pool := []int{51824, 51822, 51823, 51821}
+	assigned, reserved, err := AssignReceivePorts(paths, map[string]int{}, pool, old[a], old[b])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, port := range assigned {
+		if port == old[a] || port == old[b] {
+			t.Fatal("successor reclaimed a serving listener")
+		}
+	}
+	again, retained, err := AssignReceivePorts(paths, reserved, pool, old[b], old[a])
+	if err != nil || !reflect.DeepEqual(again, assigned) || !reflect.DeepEqual(retained, reserved) {
+		t.Fatalf("retry changed successor reservations: %v", err)
+	}
+	for _, occupied := range [][]int{{51821, 51822, 51823, 51824}, {0}, {65536}, {51821, 51821}} {
+		got, updated, err := AssignReceivePorts(paths, map[string]int{}, pool, occupied...)
+		if err == nil || got != nil || updated != nil {
+			t.Fatal("invalid or exhausted listener set returned partial assignments")
+		}
+	}
+	if _, _, err := AssignReceivePorts(paths, old, pool, old[a]); err == nil {
+		t.Fatal("accepted reservation also owned by another generation")
+	}
+	if _, _, err := AssignReceivePorts(paths, map[string]int{}, []int{51823, 51824}, old[a], old[b]); err != nil {
+		t.Fatalf("occupied predecessor outside new pool blocked valid assignment: %v", err)
+	}
+	if !reflect.DeepEqual(old, map[string]int{a: 51821, b: 51822}) {
+		t.Fatal("changed predecessor reservations")
+	}
+}
+
 func TestReceivePortReservationsSurviveMembershipChanges(t *testing.T) {
 	a, b, c := receiverTestKey(8), receiverTestKey(16), receiverTestKey(24)
 	pool := []int{51823, 51821, 51822}

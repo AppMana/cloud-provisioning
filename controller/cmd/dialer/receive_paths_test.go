@@ -69,16 +69,15 @@ func TestNativeReceivePreparation(t *testing.T) {
 	if os.Getenv("CLDT_NATIVE_RECEIVE_PATHS") != "1" {
 		t.Skip("requires isolated VM network namespace")
 	}
-	self, err := os.Readlink("/proc/self/ns/net")
-	if err != nil {
-		t.Fatal(err)
-	}
-	init, err := os.Readlink("/proc/1/ns/net")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if self == init {
-		t.Fatal("refusing guest host namespace")
+	for _, kind := range []string{"net", "mnt"} {
+		self, err := os.Readlink("/proc/self/ns/" + kind)
+		if err != nil {
+			t.Fatal(err)
+		}
+		init, err := os.Readlink("/proc/1/ns/" + kind)
+		if err != nil || self == init {
+			t.Fatal("refusing guest host namespace")
+		}
 	}
 	links, err := netlink.LinkList()
 	if err != nil {
@@ -138,6 +137,55 @@ func TestNativeReceivePreparation(t *testing.T) {
 	if !reflect.DeepEqual(first, second) {
 		t.Fatal("repeated preparation changed receiver bindings")
 	}
+	// Real kernel listener coexistence only; no authenticated packet flow,
+	// journal publication, generation switch or retirement is exercised here.
+	t.Run("successor-listeners", func(t *testing.T) {
+		p := tunnel.ReceiveTransitionPlan{MeshUID: "native-mesh", ReceiverGeneration: strings.Repeat("a", 64)}
+		scope, err := p.ReceiveScope()
+		if err != nil {
+			t.Fatal(err)
+		}
+		paths, err := tunnel.PlanReceiveHandover(scope, before, after, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var occupied []int
+		previous := map[string]*wgtypes.Device{}
+		for _, binding := range first {
+			occupied = append(occupied, binding.ListenPort)
+			previous[binding.Interface], err = devices.Device(binding.Interface)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		assigned, _, err := tunnel.AssignReceivePorts(paths.Receivers, map[string]int{}, []int{51821, 51822, 51823, 51824}, occupied...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			for _, path := range paths.Receivers {
+				if link, err := netlink.LinkByName(path.Interface); err == nil {
+					if err := netlink.LinkDel(link); err != nil {
+						t.Error(err)
+					}
+				}
+			}
+		})
+		next, err := prepareReceivePaths(devices, scope, root, before, after, nil, 1400, 518, assigned)
+		if err != nil {
+			t.Fatal(err)
+		}
+		retry, err := prepareReceivePaths(devices, scope, root, before, after, nil, 1400, 518, assigned)
+		if err != nil || !reflect.DeepEqual(next, retry) {
+			t.Fatalf("successor retry changed bindings: %v", err)
+		}
+		for name, want := range previous {
+			got, err := devices.Device(name)
+			if err != nil || !reflect.DeepEqual(want, got) {
+				t.Fatalf("successor preparation changed predecessor: %v", err)
+			}
+		}
+	})
 	changedPorts := map[string]int{}
 	for key, port := range ports {
 		changedPorts[key] = port + 10

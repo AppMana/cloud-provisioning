@@ -8,8 +8,10 @@ import (
 
 // AssignReceivePorts reserves stable listener ports from an explicitly permitted
 // pool. Existing reservations, including departed peers, remain occupied until
-// a separate retirement operation proves they can be released.
-func AssignReceivePorts(paths []ReceivePath, reserved map[string]int, pool []int) (map[string]int, map[string]int, error) {
+// a separate retirement operation proves they can be released. Occupied ports
+// belong to other generations or listeners and cannot be assigned or claimed by
+// this reservation set, even when the remote peer identity is unchanged.
+func AssignReceivePorts(paths []ReceivePath, reserved map[string]int, pool []int, occupied ...int) (map[string]int, map[string]int, error) {
 	if reserved == nil || pool == nil {
 		return nil, nil, fmt.Errorf("explicit receive port reservations and pool required")
 	}
@@ -21,6 +23,12 @@ func AssignReceivePorts(paths []ReceivePath, reserved map[string]int, pool []int
 		allowed[port] = true
 	}
 	used := map[int]bool{}
+	for _, port := range occupied {
+		if port < 1 || port > 65535 || used[port] {
+			return nil, nil, fmt.Errorf("invalid or duplicate occupied receive port")
+		}
+		used[port] = true
+	}
 	for key, port := range reserved {
 		if !validReceivePublicKey(key) || !allowed[port] || used[port] {
 			return nil, nil, fmt.Errorf("existing receive port reservation is invalid or outside the permitted pool")

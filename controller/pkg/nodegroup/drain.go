@@ -45,16 +45,7 @@ func DrainNode(ctx context.Context, api client.Client, name string, uid types.UI
 		if pod.Spec.NodeName != name {
 			return false, fmt.Errorf("pod list returned a different node")
 		}
-		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
-			continue
-		}
-		// Static pods and DaemonSets persist while the node runs. Network agents
-		// must remain available until the later attachment withdrawal stage.
-		if pod.Annotations[corev1.MirrorPodAnnotationKey] != "" {
-			continue
-		}
-		owner := metav1.GetControllerOf(pod)
-		if owner != nil && owner.APIVersion == "apps/v1" && owner.Kind == "DaemonSet" {
+		if drainPodExempt(pod) {
 			continue
 		}
 		if !pod.DeletionTimestamp.IsZero() {
@@ -71,4 +62,13 @@ func DrainNode(ctx context.Context, api client.Client, name string, uid types.UI
 		return false, err
 	}
 	return true, nil
+}
+
+// Network agents and static pods remain until attachment withdrawal completes.
+func drainPodExempt(pod *corev1.Pod) bool {
+	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed || pod.Annotations[corev1.MirrorPodAnnotationKey] != "" {
+		return true
+	}
+	owner := metav1.GetControllerOf(pod)
+	return owner != nil && owner.APIVersion == "apps/v1" && owner.Kind == "DaemonSet"
 }

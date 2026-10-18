@@ -158,6 +158,35 @@ func TestReceiveWithdrawalPersistenceWithRealAPI(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(got, w) {
 		t.Fatal("withdrawal lost durable participants", err)
 	}
+	receiptScope, err := NewReceiveRetirementReceiptScope(ctx, maps, "cluster", string(index.UID), snapshot, mesh)
+	if err != nil || len(receiptScope.Digest()) != 64 || len(receiptScope.nodes) != len(w.Consumers) {
+		t.Fatal("missing exact withdrawal receipt scope", err)
+	}
+	repeated, err := NewReceiveRetirementReceiptScope(ctx, maps, "cluster", string(index.UID), snapshot, mesh)
+	if err != nil || repeated.Digest() != receiptScope.Digest() {
+		t.Fatal("unchanged withdrawal changed receipt binding", err)
+	}
+	if _, err := NewReceiveRetirementReceiptScope(ctx, maps, "cluster", "replacement-index", snapshot, mesh); err == nil {
+		t.Fatal("replacement index inherited receipt scope")
+	}
+	changedMesh := mesh.DeepCopy()
+	changedMesh.ResourceVersion += "-changed"
+	changedScope, err := NewReceiveRetirementReceiptScope(ctx, maps, "cluster", string(index.UID), snapshot, changedMesh)
+	if err != nil || changedScope.Digest() == receiptScope.Digest() {
+		t.Fatal("mesh revision not bound to retirement observation", err)
+	}
+	revisedIndex, err := maps.Get(ctx, index.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	revisedIndex.Annotations = map[string]string{"receipt-revision": "changed"}
+	if _, err = maps.Update(ctx, revisedIndex, metav1.UpdateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	revisedScope, err := NewReceiveRetirementReceiptScope(ctx, maps, "cluster", string(index.UID), snapshot, mesh)
+	if err != nil || revisedScope.Digest() == receiptScope.Digest() {
+		t.Fatal("inventory revision not bound to retirement observation", err)
+	}
 	// No consumer Nodes exist in this API server. Their required identities
 	// remain in the intent; this read must not manufacture retirement receipts.
 	if len(got.Consumers) != 1 || len(retained.MachineUIDs) != 2 {

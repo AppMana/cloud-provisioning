@@ -238,6 +238,16 @@ artifacts passed qualification. Include the rendered chart and effective values
 in the immutable release bundle, including any separate cloud or Windows image
 overrides.
 
+For a multi-architecture release, retain the index digest, each platform's
+manifest digest and its executable checksum. Verify the runtime-reported image
+identity on each architecture; it can identify the selected platform manifest
+rather than the requested index. Bind receipt policy to those verified runtime
+identities instead of assuming they equal the publication index. An amd64 image
+resolution check does not qualify ARM64 execution. Moving unchanged binaries
+from a single-platform reference to an index tests artifact selection and
+rollout continuity, but does not satisfy the version-changing `agent-upgrade`
+requirement by itself.
+
 1. Freeze binaries, chart and multi-architecture image digests, CAPI/CAPA,
    k0s, both Calico variants and AWS VPC CNI versions. Prove ARM64 runtime,
    not merely an image manifest. Rebuild after any code change.

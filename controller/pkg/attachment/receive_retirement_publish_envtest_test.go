@@ -96,6 +96,11 @@ func TestReceiveWithdrawalPublicationWithRealAPI(t *testing.T) {
 			index, err := maps.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: tunnel.ReceiveInventoryName(w.MeshUID)}, Data: map[string]string{"inventory.json": string(raw)}}, metav1.CreateOptions{})
 			must(err)
 			must(w.ReserveReceiveWithdrawal(ctx, maps, "cluster", string(index.UID), mesh, snapshot))
+			prepared, err := ReadPreparedReceiveRetirementSet(ctx, api, store, ns, mesh.Name, string(mesh.UID), w.MachineUID)
+			must(err)
+			if len(prepared.Routes.Reserved.Plans) != 1 || len(prepared.Routes.Serving.Plans) != 1 {
+				t.Fatal("unpublished withdrawal lost serving intent or ownership")
+			}
 			if fault == "metadata" {
 				mesh.Labels = map[string]string{"metadata": "after-reservation"}
 				mesh, err = api.CoreV1().Secrets(ns).Update(ctx, mesh, metav1.UpdateOptions{})
@@ -156,6 +161,11 @@ func TestReceiveWithdrawalPublicationWithRealAPI(t *testing.T) {
 				t.Fatalf("authorization was not reached: %d, %v", calls, err)
 			}
 			if removed {
+				withdrawn, err := ReadReceiveRetirementSet(ctx, api, store, ns, mesh.Name, string(mesh.UID), w.MachineUID)
+				must(err)
+				if len(withdrawn.Routes.Reserved.Plans) != 1 || len(withdrawn.Routes.Serving.Plans) != 0 {
+					t.Fatal("published withdrawal retained serving intent or released ownership")
+				}
 				before := current.ResourceVersion
 				retried, err := PublishReceiveWithdrawal(ctx, api, store, ns, mesh.Name, string(mesh.UID), w.MachineUID, string(index.UID), authorize)
 				must(err)

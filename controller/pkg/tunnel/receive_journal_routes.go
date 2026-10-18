@@ -126,3 +126,54 @@ func (p ReceiveTransitionPlan) SelectedReceiveTransport(view handover.View) (Rec
 	}
 	return ReceiveTransitionPlan{}, false, fmt.Errorf("journal selects an unknown transport generation")
 }
+
+// ReceiveSurvivorRoutes separates retained ownership from serving intent. The
+// reserved set is never suitable for native replay after withdrawal; it keeps
+// retired destinations unavailable for reassignment until explicit release.
+type ReceiveSurvivorRoutes struct {
+	Reserved ReceiveJournalRoutes
+	Serving  ReceiveJournalRoutes
+}
+
+// PlanReceiveSurvivorRoutes projects a complete admitted inventory after peer
+// withdrawal. withdrawn maps Machine UID to its exact frozen journal UID.
+// Callers must independently authenticate persisted withdrawal and publication;
+// frozen terminal history alone does not authorize removal or native mutation.
+// This projection neither deletes routes nor releases inventory reservations.
+func PlanReceiveSurvivorRoutes(snapshots []handover.Snapshot, clusterUID string, withdrawn map[string]string) (ReceiveSurvivorRoutes, error) {
+	fail := func(err error) (ReceiveSurvivorRoutes, error) { return ReceiveSurvivorRoutes{}, err }
+	reserved, err := PlanReceiveJournalRoutes(snapshots, clusterUID)
+	if err != nil {
+		return fail(err)
+	}
+	for uid, journalUID := range withdrawn {
+		if _, found := reserved.Plans[uid]; !found || journalUID == "" {
+			return fail(fmt.Errorf("withdrawal requires a reserved journal incarnation"))
+		}
+	}
+	var survivors []handover.Snapshot
+	for _, snapshot := range snapshots {
+		plan, err := DecodeReceiveTransition(snapshot, clusterUID)
+		if err != nil {
+			return fail(err)
+		}
+		journalUID, retiring := withdrawn[plan.MachineUID]
+		if !retiring {
+			survivors = append(survivors, snapshot)
+			continue
+		}
+		if string(snapshot.Metadata().UID) != journalUID || !snapshot.Frozen() || !reserved.Views[plan.MachineUID].Complete {
+			return fail(fmt.Errorf("withdrawal requires the exact frozen terminal journal"))
+		}
+	}
+	// All workers may be withdrawn. This explicit empty projection is not an
+	// instruction to clear shared tables: ownership remains in Reserved.
+	serving := ReceiveJournalRoutes{Views: map[string]handover.View{}, Receivers: map[string]map[string]ReceiveRouteSelection{}, Legacy: map[string]ReceiveTransitionPlan{}, Plans: map[string]ReceiveTransitionPlan{}, Sources: map[string]ReceiveSiteTunnel{}}
+	if len(survivors) != 0 {
+		serving, err = PlanReceiveJournalRoutes(survivors, clusterUID)
+		if err != nil {
+			return fail(err)
+		}
+	}
+	return ReceiveSurvivorRoutes{Reserved: reserved, Serving: serving}, nil
+}

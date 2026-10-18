@@ -21,6 +21,7 @@ type ReceiveRetirementSet struct {
 	Journals               map[string]handover.Snapshot
 	Plans                  []tunnel.ReceiveTransitionPlan
 	Withdrawal             RemoteWithdrawalIntent
+	Routes                 tunnel.ReceiveSurvivorRoutes
 }
 
 // ReadReceiveRetirementSet validates all reserved histories, route ownership,
@@ -106,6 +107,31 @@ func readReceiveRetirementSetStage(ctx context.Context, api kubernetes.Interface
 		return fail(fmt.Errorf("retiring journal is not reserved"))
 	}
 	result.Withdrawal, err = readReceiveWithdrawalStage(inventory, machineUID, snapshot, mesh, withdrawn)
+	if err != nil {
+		return fail(err)
+	}
+
+	// Keep all ownership, but select serving routes only for workers whose
+	// withdrawal has not been published. Validate every retirement record;
+	// a different worker's malformed record must not be silently filtered.
+	withdrawnJournals := map[string]string{}
+	var snapshots []handover.Snapshot
+	for _, uid := range inventory.MachineUIDs {
+		snapshot := result.Journals[uid]
+		snapshots = append(snapshots, snapshot)
+		if len(inventory.Publications[uid].Retirement) == 0 {
+			continue
+		}
+		if _, err := ReadReceiveWithdrawal(inventory, uid, snapshot, mesh); err == nil {
+			withdrawnJournals[uid] = string(snapshot.Metadata().UID)
+			continue
+		}
+		// A captured but unpublished withdrawal still owns serving intent.
+		if _, err := readReceiveWithdrawalStage(inventory, uid, snapshot, mesh, false); err != nil {
+			return fail(err)
+		}
+	}
+	result.Routes, err = tunnel.PlanReceiveSurvivorRoutes(snapshots, store.ClusterUID, withdrawnJournals)
 	if err != nil {
 		return fail(err)
 	}

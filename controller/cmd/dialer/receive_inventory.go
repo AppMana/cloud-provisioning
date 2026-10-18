@@ -50,6 +50,9 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 	for _, uid := range inventory.MachineUIDs {
 		currentStore := store
 		currentStore.Name = tunnel.ReceiveTransitionName(uid)
+		if uid != scope.MachineUID {
+			currentStore.ExpectedUID = ""
+		}
 		snapshot, err := currentStore.Load(ctx)
 		if err != nil {
 			return fail(fmt.Errorf("loading reserved receiver journal %s: %w", currentStore.Name, err))
@@ -107,6 +110,7 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 	for _, uid := range inventory.MachineUIDs {
 		currentStore := store
 		currentStore.Name = tunnel.ReceiveTransitionName(uid)
+		currentStore.ExpectedUID = string(result.Journals[uid].Metadata().UID)
 		current, err := currentStore.Load(ctx)
 		if err != nil {
 			return fail(err)
@@ -195,6 +199,7 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 		}
 		currentStore, currentScope := store, scope
 		currentStore.Name, currentScope.MachineUID = tunnel.ReceiveTransitionName(uid), uid
+		currentStore.ExpectedUID = string(member.Snapshot.Metadata().UID)
 		saved, err := checkpointReceiveJournalLocked(ctx, api, currentStore, currentScope, cfg, key, lockPath+"."+currentStore.Name+".json")
 		if err != nil {
 			return err

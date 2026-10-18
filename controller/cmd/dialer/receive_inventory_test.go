@@ -166,6 +166,25 @@ func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store han
 	if got, err := executeReceivePhase(ctx, api, store, scope, cfg, site, "container", verify); err != nil || len(got) != 1 || calls != 1 {
 		t.Fatalf("two-worker execution admission: %v", err)
 	}
+	t.Run("target-journal-incarnation", func(t *testing.T) {
+		pinned := store
+		pinned.ExpectedUID = string(firstSnapshot.Metadata().UID)
+		cloudSet, err := loadReceiveSet(ctx, api, pinned, scope, first.CloudNodeName, firstRoot)
+		if err != nil || len(cloudSet.Journals) != 2 || len(cloudSet.Local) != 1 {
+			t.Fatal("target UID pin lost nonlocal journal admission", err)
+		}
+		fresh := cfg
+		fresh.privateKeyFile = filepath.Join(t.TempDir(), "key")
+		before := calls
+		if got, err := executeReceivePhase(ctx, api, pinned, scope, fresh, site, "container", verify); err != nil || len(got) != 1 || calls != before+1 {
+			t.Fatal("target UID pin rejected a different reserved journal", err)
+		}
+		pinned.ExpectedUID = "replaced-target"
+		before = calls
+		if got, err := executeReceivePhase(ctx, api, pinned, scope, fresh, site, "container", verify); err == nil || len(got) != 0 || calls != before {
+			t.Fatal("wrong target UID permitted native execution", err)
+		}
+	})
 	lockPath := filepath.Join(filepath.Dir(cfg.privateKeyFile), cfg.iface+".reconcile.lock")
 	for _, suffix := range []string{"inventory.json", store.Name + ".json", otherStore.Name + ".json"} {
 		if info, err := os.Stat(lockPath + "." + suffix); err != nil || info.Mode().Perm() != 0600 {

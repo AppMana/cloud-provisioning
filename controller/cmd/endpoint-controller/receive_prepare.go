@@ -17,6 +17,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -401,4 +402,50 @@ func (r *meshReconciler) receivePreparationPredecessor(ctx context.Context, adop
 		return nil, err
 	}
 	return &snapshot, nil
+}
+
+// Include a pending successor's exact terminal archive in ordinary Role
+// reconciliation too, so a retry cannot revoke access between grant and CAS.
+// Consumed proposals no longer request an archive; published ancestry owns it.
+func (r *meshReconciler) receivePreparationArchive(ctx context.Context, store handover.Store, snapshot handover.Snapshot) (string, error) {
+	view, err := snapshot.Transition().View()
+	if err != nil || !view.Complete {
+		return "", err
+	}
+	plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
+	if err != nil {
+		return "", err
+	}
+	adoption := &corev1.Secret{}
+	if err := r.reader.Get(ctx, types.NamespacedName{Namespace: plan.Namespace, Name: plan.AdoptionName}, adoption); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", nil // A retained journal need not still have a proposal Secret.
+		}
+		return "", err
+	}
+	raw := adoption.Data[tunnel.ReceivePrepareKey]
+	if len(raw) == 0 {
+		return "", nil
+	}
+	var request tunnel.ReceivePrepare
+	if err := json.Unmarshal(raw, &request); err != nil {
+		return "", err
+	}
+	if request.Predecessor == nil || request.ReceiverGeneration == plan.ReceiverGeneration {
+		return "", nil
+	}
+	if string(adoption.UID) != plan.AdoptionUID || adoption.DeletionTimestamp != nil {
+		return "", fmt.Errorf("pending successor adoption identity changed")
+	}
+	if _, err := request.ValidatePredecessor(snapshot); err != nil {
+		return "", err
+	}
+	if err := tunnel.ValidateReceiveTransportHistory(ctx, store, snapshot); err != nil {
+		return "", err
+	}
+	archive, err := store.ArchiveCompleted(ctx, snapshot)
+	if err != nil {
+		return "", err
+	}
+	return archive.Metadata().Name, nil
 }

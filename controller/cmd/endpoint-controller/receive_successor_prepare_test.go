@@ -286,4 +286,6 @@ func verifySuccessorPreparedPlan(t *testing.T, r *meshReconciler, machine *unstr
 	if err != nil || spec.FromGeneration != view.ServingGeneration {
 		t.Fatal("successor starts from a different generation", err)
 	}
+
+	verifySuccessorPublication(t, r, machine, native, ports, predecessor)
 }

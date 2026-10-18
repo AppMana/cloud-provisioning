@@ -1677,6 +1677,20 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 	if r.dialerServiceAccount == "" {
 		return nil
 	}
+	// Capture the Role revision before deriving grants. A concurrent pass that
+	// grants a newly archived predecessor must make this older update conflict.
+	role := &rbacv1.Role{}
+	key := types.NamespacedName{Namespace: r.secretNamespace, Name: r.dialerServiceAccount}
+	// The chart owns the Role's existence (its floor names the peer
+	// Secret alone); this method only reshapes the one that is there.
+	// A Role missing entirely is the install broken, not something to
+	// paper over by creating one, and this identity holds no create on
+	// roles anyway: the dialer's scope is maintained by a different
+	// identity than the one it confines, and narrowing what this one
+	// can do to the RBAC group is part of the point.
+	if err := r.reader.Get(ctx, key, role); err != nil {
+		return fmt.Errorf("reading the dialer Role: %w", err)
+	}
 	machines := &unstructured.UnstructuredList{}
 	machines.SetGroupVersionKind(machineGVK.GroupVersion().WithKind(machineGVK.Kind + "List"))
 	opts := []client.ListOption{}
@@ -1724,6 +1738,13 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 					return err
 				}
 				journals = append(journals, archives...)
+				pending, err := r.receivePreparationArchive(ctx, store, snapshot)
+				if err != nil {
+					return err
+				}
+				if pending != "" {
+					journals = append(journals, pending)
+				}
 			}
 			found := false
 			for _, current := range journals {
@@ -1751,18 +1772,6 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 		desired = append(desired, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get"}})
 	}
 
-	role := &rbacv1.Role{}
-	key := types.NamespacedName{Namespace: r.secretNamespace, Name: r.dialerServiceAccount}
-	// The chart owns the Role's existence (its floor names the peer
-	// Secret alone); this method only reshapes the one that is there.
-	// A Role missing entirely is the install broken, not something to
-	// paper over by creating one, and this identity holds no create on
-	// roles anyway: the dialer's scope is maintained by a different
-	// identity than the one it confines, and narrowing what this one
-	// can do to the RBAC group is part of the point.
-	if err := r.reader.Get(ctx, key, role); err != nil {
-		return fmt.Errorf("reading the dialer Role: %w", err)
-	}
 	if reflect.DeepEqual(role.Rules, desired) {
 		return nil
 	}

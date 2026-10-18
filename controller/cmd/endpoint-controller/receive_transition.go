@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/netip"
@@ -155,7 +156,10 @@ func (r *meshReconciler) ensureReceiveTransition(ctx context.Context, machine *u
 			return nil, err
 		}
 		if err := checkCompletedReceiveSources(existing, store.ClusterUID, mesh); err != nil {
-			return nil, err
+			if !errors.Is(err, errReceiveSourcesChanged) || native == nil || ports == nil {
+				return nil, err
+			}
+			return r.prepareAndPublishReceiveSuccessor(ctx, machine, store, existing, native, ports, policy, now)
 		}
 		return &existing, nil
 	}
@@ -474,7 +478,51 @@ func checkCompletedReceiveSources(snapshot handover.Snapshot, clusterUID string,
 		return err
 	}
 	if !slices.Equal(want, active) {
-		return fmt.Errorf("completed receive transition does not cover current worker sources; successor transition required")
+		return errReceiveSourcesChanged
 	}
 	return nil
+}
+
+var errReceiveSourcesChanged = errors.New("completed receive transition does not cover current worker sources; successor transition required")
+
+// Retain the published journal UID and inventory reservation. Archive access
+// precedes replacement, so agents can authenticate the new generation's ancestry.
+// A failed preparation, archive, Role update or CAS leaves serving authority in
+// the old journal; retries use the same proposal and immutable archive.
+func (r *meshReconciler) prepareAndPublishReceiveSuccessor(ctx context.Context, machine *unstructured.Unstructured, store handover.Store, previous handover.Snapshot, native []netip.Prefix, ports []int, policy handover.Policy, now time.Time) (*handover.Snapshot, error) {
+	prepared, err := r.prepareRemoteReceiveGeneration(ctx, machine, native, ports, &previous)
+	if err != nil || prepared == nil {
+		return nil, err
+	}
+	if r.dialerServiceAccount == "" || r.receivePreparation == nil || r.receivePreparation.Journal == nil || r.receiveJournal.ClusterUID != store.ClusterUID {
+		return nil, fmt.Errorf("successor publication requires configured agent archive access")
+	}
+	if _, err := store.ArchiveCompleted(ctx, previous); err != nil {
+		return nil, err
+	}
+	if err := r.ensureDialerRole(ctx); err != nil {
+		return nil, err
+	}
+	// Role reconciliation may take time. Revalidate the exact preparation
+	// versions and predecessor after granting access, before committing a plan.
+	plan, err := r.buildReceiveTransitionPlan(ctx, machine, prepared, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(plan)
+	if err != nil {
+		return nil, err
+	}
+	spec, err := tunnel.ReceiveTransitionSpec(plan, store.ClusterUID, fmt.Sprintf("%x", sha256.Sum256(raw)))
+	if err != nil {
+		return nil, err
+	}
+	persisted, err := store.ReplaceCompleted(ctx, previous, spec, raw, now, policy)
+	if err != nil {
+		return nil, err
+	}
+	if err := tunnel.ValidateReceiveTransportHistory(ctx, store, persisted); err != nil {
+		return nil, err
+	}
+	return &persisted, nil
 }

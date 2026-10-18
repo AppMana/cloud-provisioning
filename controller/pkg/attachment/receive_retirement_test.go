@@ -14,13 +14,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func retirementFixture(t *testing.T, outcome string, frozen bool) (RemoteWithdrawalIntent, handover.Snapshot, tunnel.ReceiveInventory, *corev1.Secret) {
+func retirementFixture(t *testing.T, outcome string, frozen bool, meshUID ...string) (RemoteWithdrawalIntent, handover.Snapshot, tunnel.ReceiveInventory, *corev1.Secret) {
 	t.Helper()
 	key := func(b byte) string { var k wgtypes.Key; k[0] = b; return k.String() }
 	site, root := key(1), key(2)
 	peers := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: site, WGAllowedIPs: []string{"10.90.0.0/24"}}}}
 	base, _ := json.Marshal(peers)
 	p := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: "test", MeshName: "mesh", MeshUID: "mesh-uid", MachineName: "worker", MachineUID: "machine-uid", AdoptionName: tunnel.AdoptionSecretName("worker"), AdoptionUID: "adoption-uid", CloudNodeName: "cloud", CloudNodeUID: "cloud-uid", RootPublicKey: root, Base: base, Desired: peers, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}, Ports: map[string]int{}, Bindings: map[string]tunnel.ReceiveBinding{}, Sites: map[string]tunnel.ReceiveTransitionSite{}}
+	if len(meshUID) > 0 {
+		p.MeshUID = meshUID[0]
+	}
 	p.SiteDesired = tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: root, Remote: true, Endpoint: "198.51.100.1:51820", WGAllowedIPs: []string{"172.29.0.1/32"}}}}
 	prep, err := tunnel.PlanReceiveHandover(p.MeshUID, peers, peers, p.Native)
 	if err != nil {
@@ -97,7 +100,7 @@ func retirementFixture(t *testing.T, outcome string, frozen bool) (RemoteWithdra
 // receipts, native cleanup, interruption bounds, or safe reservation release.
 func TestReceiveRetirementRequiresFrozenOwnershipAndRetainedParticipants(t *testing.T) {
 	for _, outcome := range []string{"forward", "abort", "rollback"} {
-		for _, fault := range []string{"none", "unfrozen", "unfinished", "mesh", "drain", "source", "unpublished-version", "pending-publication", "machine", "root", "cluster", "journal", "legacy-reservation", "missing-reservation", "missing-participant", "replaced-participant", "duplicate", "retiring-node", "republished", "partial-withdrawal", "new-site", "new-remote", "changed-site-key", "unpublished-survivor"} {
+		for _, fault := range []string{"none", "unfrozen", "unfinished", "mesh", "drain", "source", "unpublished-version", "pending-publication", "machine", "root", "cluster", "journal", "legacy-reservation", "missing-reservation", "missing-participant", "replaced-participant", "duplicate", "retiring-node", "republished", "partial-withdrawal", "new-site", "new-remote", "changed-site-key", "unpublished-survivor", "site-without-endpoint"} {
 			t.Run(outcome+"/"+fault, func(t *testing.T) {
 				state := outcome
 				if fault == "unfinished" {
@@ -145,13 +148,17 @@ func TestReceiveRetirementRequiresFrozenOwnershipAndRetainedParticipants(t *test
 					mesh.Data[tunnel.PeerPublicKeyPrefix+"new"] = []byte("new")
 				case "changed-site-key":
 					mesh.Data[tunnel.NodePublicKeyPrefix+"site"] = []byte("replacement")
+				case "site-without-endpoint":
+					w.Consumers = append(w.Consumers, ConsumerTarget{Site: true, NodeName: "plain-site", NodeUID: "plain-site-uid"}, ConsumerTarget{Site: true, NodeName: "plain-site-two", NodeUID: "plain-site-two-uid"})
+					mesh.Data[tunnel.SiteAddressesPrefix+"plain-site"] = []byte("10.90.0.9")
+					mesh.Data[tunnel.SiteAddressesPrefix+"plain-site-two"] = []byte("10.90.0.10")
 				case "unpublished-survivor":
 					delete(mesh.Data, tunnel.NodePublicKeyPrefix+"site")
 				}
 				before, _ := json.Marshal([]any{w, inventory, mesh})
 				plan, err := w.ReceiveRetirementPlan(snapshot, inventory, mesh)
-				if fault == "none" || fault == "unpublished-survivor" {
-					if err != nil || plan.MachineUID != w.MachineUID || len(plan.Sites) != len(w.Consumers) {
+				if fault == "none" || fault == "unpublished-survivor" || fault == "site-without-endpoint" {
+					if err != nil || plan.MachineUID != w.MachineUID || len(plan.Sites) != 1 {
 						t.Fatal("lost required participant", err)
 					}
 				} else if err == nil {

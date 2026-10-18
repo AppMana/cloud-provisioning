@@ -21,13 +21,20 @@ import (
 // Prepared devices outside the journal still require durable ownership records.
 // Keep the reservation until all required native retirement receipts are durable.
 func (w RemoteWithdrawalIntent) ReceiveRetirementPlan(snapshot handover.Snapshot, inventory tunnel.ReceiveInventory, mesh *corev1.Secret) (tunnel.ReceiveTransitionPlan, error) {
+	return w.receiveRetirementPlan(snapshot, inventory, mesh, true)
+}
+
+func (w RemoteWithdrawalIntent) receiveRetirementPlan(snapshot handover.Snapshot, inventory tunnel.ReceiveInventory, mesh *corev1.Secret, withdrawn bool) (tunnel.ReceiveTransitionPlan, error) {
 	fail := func(message string) (tunnel.ReceiveTransitionPlan, error) {
 		return tunnel.ReceiveTransitionPlan{}, fmt.Errorf("receive retirement: %s", message)
 	}
 	if mesh == nil || mesh.UID == "" || mesh.ResourceVersion == "" || mesh.DeletionTimestamp != nil ||
-		w.SourceVersion == "" || w.SourceVersion == mesh.ResourceVersion || w.DrainIntent == "" || w.MachineName == "" || w.MachineUID == "" || w.PublicKey == "" ||
+		w.SourceVersion == "" || w.DrainIntent == "" || w.MachineName == "" || w.MachineUID == "" || w.PublicKey == "" ||
 		w.MeshNamespace != mesh.Namespace || w.MeshName != mesh.Name || w.MeshUID != string(mesh.UID) {
 		return fail("withdrawal requires exact live mesh and persisted drain identity")
+	}
+	if (withdrawn && w.SourceVersion == mesh.ResourceVersion) || (!withdrawn && w.SourceVersion != mesh.ResourceVersion) {
+		return fail("mesh version differs from withdrawal stage")
 	}
 	if inventory.Version != 1 || inventory.ClusterUID == "" || inventory.Namespace != w.MeshNamespace || inventory.MeshName != w.MeshName || inventory.MeshUID != w.MeshUID {
 		return fail("inventory scope differs from withdrawal")
@@ -56,13 +63,13 @@ func (w RemoteWithdrawalIntent) ReceiveRetirementPlan(snapshot handover.Snapshot
 	if p.Namespace != w.MeshNamespace || p.MeshName != w.MeshName || p.MeshUID != w.MeshUID || p.MachineName != w.MachineName || p.MachineUID != w.MachineUID || p.RootPublicKey != w.PublicKey {
 		return fail("withdrawal differs from journal ownership")
 	}
-	if _, present, err := tunnel.WithdrawRemotePeer(mesh.Data, w.MachineName, w.PublicKey); err != nil || present {
-		return fail("complete peer withdrawal has not been published")
+	if _, present, err := tunnel.WithdrawRemotePeer(mesh.Data, w.MachineName, w.PublicKey); err != nil || present == withdrawn {
+		return fail("peer publication differs from withdrawal stage")
 	}
 	names, uids, keys := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	sites, remotes := map[string]ConsumerTarget{}, map[string]ConsumerTarget{}
 	for _, c := range w.Consumers {
-		if c.NodeName == "" || c.NodeUID == "" || c.PublicKey == "" || names[c.NodeName] || uids[c.NodeUID] || keys[c.PublicKey] ||
+		if c.NodeName == "" || c.NodeUID == "" || (!c.Site && c.PublicKey == "") || names[c.NodeName] || uids[c.NodeUID] || (c.PublicKey != "" && keys[c.PublicKey]) ||
 			c.NodeName == p.CloudNodeName || c.NodeUID == p.CloudNodeUID || c.PublicKey == p.RootPublicKey {
 			return fail("incomplete, duplicate or retiring consumer identity")
 		}
@@ -83,6 +90,9 @@ func (w RemoteWithdrawalIntent) ReceiveRetirementPlan(snapshot handover.Snapshot
 		}
 	}
 	for field, value := range mesh.Data {
+		if !withdrawn && field == tunnel.PeerPublicKeyPrefix+w.MachineName {
+			continue
+		}
 		for _, kind := range []struct {
 			prefix  string
 			targets map[string]ConsumerTarget

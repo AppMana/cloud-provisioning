@@ -388,6 +388,72 @@ func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store han
 			t.Fatal(err)
 		}
 	})
+	for _, fault := range []string{"removed", "replaced"} {
+		t.Run("retirement-intent-"+fault, func(t *testing.T) {
+			path := lockPath + ".inventory.json"
+			good, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				if err := os.WriteFile(path, good, 0600); err != nil {
+					t.Error(err)
+				}
+			})
+			var saved receiveInventoryCheckpoint
+			if err := json.Unmarshal(good, &saved); err != nil {
+				t.Fatal(err)
+			}
+			publication := tunnel.ReceiveJournalPublication{JournalUID: string(firstSnapshot.Metadata().UID), Retirement: json.RawMessage(`{"intent":"retained"}`)}
+			if saved.Inventory.Publications == nil {
+				saved.Inventory.Publications = map[string]tunnel.ReceiveJournalPublication{}
+			}
+			saved.Inventory.Publications[first.MachineUID] = publication
+			raw, err := json.Marshal(saved)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			v, object, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, scope.Namespace, scope.MeshName, scope.MeshUID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			original := object.DeepCopy()
+			publication.Retirement = nil
+			if fault == "replaced" {
+				publication.Retirement = json.RawMessage(`{"intent":"replacement"}`)
+			}
+			if v.Publications == nil {
+				v.Publications = map[string]tunnel.ReceiveJournalPublication{}
+			}
+			v.Publications[first.MachineUID] = publication
+			raw, err = json.Marshal(v)
+			if err != nil {
+				t.Fatal(err)
+			}
+			object.Data["inventory.json"] = string(raw)
+			if _, err := store.ConfigMaps.Update(ctx, object, metav1.UpdateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				current, err := store.ConfigMaps.Get(ctx, object.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				current.Data = original.Data
+				if _, err := store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{}); err != nil {
+					t.Error(err)
+				}
+			})
+			before := calls
+			if got, err := executeReceivePhase(ctx, api, store, scope, cfg, site, "container", verify); err == nil || !strings.Contains(err.Error(), "retirement intent regressed") || len(got) != 0 || calls != before {
+				t.Fatal("retirement regression permitted native work", err)
+			}
+		})
+	}
 	t.Run("corrupt-inventory-checkpoint", func(t *testing.T) {
 		path := lockPath + ".inventory.json"
 		good, err := os.ReadFile(path)

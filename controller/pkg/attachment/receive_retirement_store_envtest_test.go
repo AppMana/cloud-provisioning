@@ -1,0 +1,206 @@
+package attachment
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"os"
+	"reflect"
+	"testing"
+
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
+)
+
+type retirementInventoryWriter struct {
+	typedcore.ConfigMapInterface
+	before       func() error
+	lostResponse bool
+}
+
+func (w retirementInventoryWriter) Update(ctx context.Context, object *corev1.ConfigMap, opts metav1.UpdateOptions) (*corev1.ConfigMap, error) {
+	if w.before != nil {
+		if err := w.before(); err != nil {
+			return nil, err
+		}
+	}
+	stored, err := w.ConfigMapInterface.Update(ctx, object, opts)
+	if err == nil && w.lostResponse {
+		return nil, errors.New("injected lost write response")
+	}
+	return stored, err
+}
+
+// The API and etcd are isolated. Terminal phase receipts are synthetic; this
+// verifies persistence and concurrency, not native retirement or continuity.
+func TestReceiveWithdrawalPersistenceWithRealAPI(t *testing.T) {
+	if os.Getenv("KUBEBUILDER_ASSETS") == "" {
+		t.Skip("set KUBEBUILDER_ASSETS for isolated API validation")
+	}
+	env := &envtest.Environment{}
+	config, err := env.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := env.Stop(); err != nil {
+			t.Error(err)
+		}
+	})
+	api, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if _, err := api.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	mesh, err := api.CoreV1().Secrets("test").Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mesh"}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, fixture, inventory, _ := retirementFixture(t, "forward", true, string(mesh.UID))
+	mesh.Data = map[string][]byte{tunnel.NodePublicKeyPrefix + "site": []byte(w.Consumers[0].PublicKey), tunnel.PeerPublicKeyPrefix + w.MachineName: []byte(w.PublicKey)}
+	mesh, err = api.CoreV1().Secrets("test").Update(ctx, mesh, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.SourceVersion = mesh.ResourceVersion
+	raw, err := fixture.Checkpoint()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var checkpoint struct {
+		Object corev1.ConfigMap `json:"object"`
+	}
+	if err := json.Unmarshal(raw, &checkpoint); err != nil {
+		t.Fatal(err)
+	}
+	checkpoint.Object.UID, checkpoint.Object.ResourceVersion = "", ""
+	maps := api.CoreV1().ConfigMaps("test")
+	journal, err := maps.Create(ctx, &checkpoint.Object, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := handover.Store{ConfigMaps: maps, ClusterUID: "cluster", Name: journal.Name, ExpectedUID: string(journal.UID)}
+	snapshot, err := store.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inventory.Publications[w.MachineUID] = tunnel.ReceiveJournalPublication{JournalUID: string(journal.UID)}
+	raw, _ = json.Marshal(inventory)
+	index, err := maps.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: tunnel.ReceiveInventoryName(w.MeshUID)}, Data: map[string]string{"inventory.json": string(raw)}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	read := func() tunnel.ReceiveInventory {
+		t.Helper()
+		v, _, err := tunnel.ReadReceiveInventory(ctx, maps, "cluster", "test", mesh.Name, string(mesh.UID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	reserve := func(storage typedcore.ConfigMapInterface) error {
+		return w.ReserveReceiveWithdrawal(ctx, storage, "cluster", string(index.UID), mesh, snapshot)
+	}
+	race := retirementInventoryWriter{ConfigMapInterface: maps, before: func() error {
+		return tunnel.ReserveReceiveJournal(ctx, maps, "cluster", mesh, "other-machine", nil)
+	}}
+	if err := reserve(race); !apierrors.IsConflict(err) {
+		t.Fatalf("concurrent reservation was not protected: %v", err)
+	}
+	if got := read(); len(got.MachineUIDs) != 2 || len(got.Publications[w.MachineUID].Retirement) != 0 {
+		t.Fatal("conflict changed withdrawal or lost another worker")
+	}
+	if err := reserve(retirementInventoryWriter{ConfigMapInterface: maps, lostResponse: true}); err == nil {
+		t.Fatal("lost response accepted")
+	}
+	if len(read().Publications[w.MachineUID].Retirement) == 0 {
+		t.Fatal("write was not committed before response loss")
+	}
+	if err := reserve(maps); err != nil {
+		t.Fatal("identical retry failed", err)
+	}
+	if _, err := ReadReceiveWithdrawal(read(), w.MachineUID, snapshot, mesh); err == nil {
+		t.Fatal("stored intent admitted before peer withdrawal")
+	}
+	changed := w
+	changed.Consumers = nil
+	if err := changed.ReserveReceiveWithdrawal(ctx, maps, "cluster", string(index.UID), mesh, snapshot); err == nil {
+		t.Fatal("missing participant replaced intent")
+	}
+	changed = w
+	changed.DrainIntent = "different/action"
+	if err := changed.ReserveReceiveWithdrawal(ctx, maps, "cluster", string(index.UID), mesh, snapshot); err == nil {
+		t.Fatal("different action replaced intent")
+	}
+	if err := w.ReserveReceiveWithdrawal(ctx, maps, "cluster", "recreated-index", mesh, snapshot); err == nil {
+		t.Fatal("wrong index incarnation accepted")
+	}
+	mesh.Data, _, err = tunnel.WithdrawRemotePeer(mesh.Data, w.MachineName, w.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mesh, err = api.CoreV1().Secrets("test").Update(ctx, mesh, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	retained := read()
+	got, err := ReadReceiveWithdrawal(retained, w.MachineUID, snapshot, mesh)
+	if err != nil || !reflect.DeepEqual(got, w) {
+		t.Fatal("withdrawal lost durable participants", err)
+	}
+	// No consumer Nodes exist in this API server. Their required identities
+	// remain in the intent; this read must not manufacture retirement receipts.
+	if len(got.Consumers) != 1 || len(retained.MachineUIDs) != 2 {
+		t.Fatal("absence released a reservation or participant")
+	}
+	for _, fault := range []string{"hash", "unknown", "trailing", "version"} {
+		v := read()
+		p := v.Publications[w.MachineUID]
+		var record map[string]any
+		if err := json.Unmarshal(p.Retirement, &record); err != nil {
+			t.Fatal(err)
+		}
+		switch fault {
+		case "hash":
+			record["journalSHA256"] = "changed"
+		case "unknown":
+			record["unrecognized"] = true
+		case "version":
+			record["version"] = 99
+		}
+		p.Retirement, _ = json.Marshal(record)
+		if fault == "trailing" {
+			p.Retirement = append(p.Retirement, []byte(" {}")...)
+		}
+		v.Publications[w.MachineUID] = p
+		if _, err := ReadReceiveWithdrawal(v, w.MachineUID, snapshot, mesh); err == nil {
+			t.Fatalf("accepted %s record", fault)
+		}
+	}
+	// An index incarnation is not transferable, even with identical JSON.
+	current, err := maps.Get(ctx, index.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid := types.UID(index.UID)
+	if err := maps.Delete(ctx, index.Name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}); err != nil {
+		t.Fatal(err)
+	}
+	current.UID, current.ResourceVersion = "", ""
+	if _, err := maps.Create(ctx, current, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := tunnel.ReserveReceiveRetirement(ctx, maps, "cluster", string(index.UID), mesh, snapshot, retained.Publications[w.MachineUID].Retirement); err == nil {
+		t.Fatal("recreated inventory accepted")
+	}
+}

@@ -186,6 +186,9 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 			if p.JournalUID != "" && b.Publications[uid].JournalUID != p.JournalUID {
 				return fmt.Errorf("journal publication regressed or changed incarnation")
 			}
+			if len(p.Retirement) > 0 && !bytes.Equal(p.Retirement, b.Publications[uid].Retirement) {
+				return fmt.Errorf("receiver retirement intent regressed or changed")
+			}
 		}
 		for _, uid := range a.MachineUIDs {
 			if uid == "" || uid <= previous || !slices.Contains(b.MachineUIDs, uid) {

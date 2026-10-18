@@ -604,6 +604,16 @@ recovery must be implemented and qualified before activation; existing checkpoin
 shrinkage rejection remains in force. Older strict readers reject `released`,
 so compatible deployment and rollback are prerequisites.
 
+Agent checkpoint admission must preserve every previously saved released-owner
+record, including across a boot identity change. Reject dropped or changed
+evidence and attempts to put that identity back into active reservations or
+publications. Filesystem tests exercise these regressions and confirm that
+validation never rewrites the saved checkpoint. They use synthetic evidence and
+modeled boot identities, not authenticated release or actual reboot recovery.
+They permit unrelated retired records only as a monotonic history change;
+separate source admission must validate those records. A matching retired record
+alone still cannot authorize shrinkage of a saved active reservation set.
+
 Agent reconciliation timing diagnostics report fixed operation/stage labels,
 elapsed milliseconds and success only, with at most sixteen stages per record.
 They must not include configuration, object identities, credentials or error text.

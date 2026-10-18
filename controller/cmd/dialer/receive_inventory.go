@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -264,6 +265,17 @@ func validateReceiveInventoryCheckpoint(path string, next receiveInventoryCheckp
 		a, b := saved.Inventory, next.Inventory
 		if saved.Version != 1 || saved.InventoryUID != next.InventoryUID || saved.NodeName != next.NodeName || saved.NodeUID != next.NodeUID || saved.BootID == "" || saved.PublicKey != next.PublicKey || a.Version != b.Version || a.ClusterUID != b.ClusterUID || a.Namespace != b.Namespace || a.MeshName != b.MeshName || a.MeshUID != b.MeshUID || a.MachineUIDs == nil {
 			return fmt.Errorf("receiver inventory checkpoint identity changed")
+		}
+		for uid, retired := range a.Released {
+			// Retired identities remain fenced even after their active routing
+			// reservation is gone. A later boot must not erase this history or
+			// reinterpret it as a fresh publication of the old worker.
+			current, found := b.Released[uid]
+			_, published := b.Publications[uid]
+			_, previouslyPublished := a.Publications[uid]
+			if uid == "" || retired.JournalUID == "" || len(retired.Plan) != 0 || len(retired.Retirement) == 0 || len(retired.RetirementCompletion) == 0 || len(retired.RetirementFinalization) == 0 || previouslyPublished || slices.Contains(a.MachineUIDs, uid) || !found || !reflect.DeepEqual(retired, current) || published || slices.Contains(b.MachineUIDs, uid) {
+				return fmt.Errorf("released receiver ownership regressed, changed or reappeared")
+			}
 		}
 		previous := ""
 		for uid, p := range a.Publications {

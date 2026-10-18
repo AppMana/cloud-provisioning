@@ -132,6 +132,46 @@ func TestReceiveWithdrawalPersistenceWithRealAPI(t *testing.T) {
 	if _, err := ReadReceiveWithdrawal(read(), w.MachineUID, snapshot, mesh); err == nil {
 		t.Fatal("stored intent admitted before peer withdrawal")
 	}
+	// A lost persistence response can resume publication from the exact retained
+	// recipients; it must not use the post-publication native admission path.
+	prepared, err := ReadPreparedReceiveWithdrawal(read(), w.MachineUID, snapshot, mesh)
+	if err != nil || !reflect.DeepEqual(prepared, w) {
+		t.Fatal("persisted preparation could not resume", err)
+	}
+	for _, fault := range []string{"revision", "replacement-peer", "absent-peer", "changed-history", "missing-recipient", "trailing"} {
+		t.Run("prepared-retry/"+fault, func(t *testing.T) {
+			v := read()
+			source := mesh.DeepCopy()
+			switch fault {
+			case "revision":
+				source.ResourceVersion = "different"
+			case "replacement-peer":
+				source.Data[tunnel.PeerPublicKeyPrefix+w.MachineName] = []byte("replacement")
+			case "absent-peer":
+				delete(source.Data, tunnel.PeerPublicKeyPrefix+w.MachineName)
+			default:
+				p := v.Publications[w.MachineUID]
+				var record receiveWithdrawalRecord
+				if err := json.Unmarshal(p.Retirement, &record); err != nil {
+					t.Fatal(err)
+				}
+				switch fault {
+				case "changed-history":
+					record.JournalSHA256 = "different"
+				case "missing-recipient":
+					record.Withdrawal.Consumers = nil
+				}
+				p.Retirement, _ = json.Marshal(record)
+				if fault == "trailing" {
+					p.Retirement = append(p.Retirement, []byte(" {}")...)
+				}
+				v.Publications[w.MachineUID] = p
+			}
+			if _, err := ReadPreparedReceiveWithdrawal(v, w.MachineUID, snapshot, source); err == nil {
+				t.Fatal("changed preparation admitted")
+			}
+		})
+	}
 	changed := w
 	changed.Consumers = nil
 	if err := changed.ReserveReceiveWithdrawal(ctx, maps, "cluster", string(index.UID), mesh, snapshot); err == nil {
@@ -152,6 +192,9 @@ func TestReceiveWithdrawalPersistenceWithRealAPI(t *testing.T) {
 	mesh, err = api.CoreV1().Secrets("test").Update(ctx, mesh, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if _, err := ReadPreparedReceiveWithdrawal(read(), w.MachineUID, snapshot, mesh); err == nil {
+		t.Fatal("published withdrawal admitted as unpublished preparation")
 	}
 	retained := read()
 	got, err := ReadReceiveWithdrawal(retained, w.MachineUID, snapshot, mesh)

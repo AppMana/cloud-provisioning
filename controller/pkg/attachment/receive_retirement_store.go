@@ -52,6 +52,19 @@ func (w RemoteWithdrawalIntent) ReserveReceiveWithdrawal(ctx context.Context, ma
 // removal. Callers still verify live object revisions, ancestry and local native
 // ownership. Returning an intent is not a receipt from any retained participant.
 func ReadReceiveWithdrawal(inventory tunnel.ReceiveInventory, machineUID string, snapshot handover.Snapshot, mesh *corev1.Secret) (RemoteWithdrawalIntent, error) {
+	return readReceiveWithdrawalStage(inventory, machineUID, snapshot, mesh, true)
+}
+
+// ReadPreparedReceiveWithdrawal recovers the already persisted consumer set
+// before publication. It requires the original mesh revision and peer to still
+// be present. Returning this intent does not authorize native cleanup: callers
+// must recheck live drain authority and publish through optimistic locking.
+// Never recapture consumers after a lost response or controller restart.
+func ReadPreparedReceiveWithdrawal(inventory tunnel.ReceiveInventory, machineUID string, snapshot handover.Snapshot, mesh *corev1.Secret) (RemoteWithdrawalIntent, error) {
+	return readReceiveWithdrawalStage(inventory, machineUID, snapshot, mesh, false)
+}
+
+func readReceiveWithdrawalStage(inventory tunnel.ReceiveInventory, machineUID string, snapshot handover.Snapshot, mesh *corev1.Secret, withdrawn bool) (RemoteWithdrawalIntent, error) {
 	fail := func(err error) (RemoteWithdrawalIntent, error) { return RemoteWithdrawalIntent{}, err }
 	raw := inventory.Publications[machineUID].Retirement
 	var record receiveWithdrawalRecord
@@ -71,7 +84,7 @@ func ReadReceiveWithdrawal(inventory tunnel.ReceiveInventory, machineUID string,
 	if record.Version != 1 || record.Withdrawal.MachineUID != machineUID || record.JournalSHA256 != tunnel.HashPeerList(history) {
 		return fail(fmt.Errorf("withdrawal record differs from terminal journal"))
 	}
-	if _, err := record.Withdrawal.ReceiveRetirementPlan(snapshot, inventory, mesh); err != nil {
+	if _, err := record.Withdrawal.receiveRetirementPlan(snapshot, inventory, mesh, withdrawn); err != nil {
 		return fail(err)
 	}
 	return record.Withdrawal, nil

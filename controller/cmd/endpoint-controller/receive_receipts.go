@@ -68,6 +68,22 @@ func (p receiveReceiptPolicy) validate() error {
 	return nil
 }
 
+// Validate the configured release before creating journal or agent resources.
+func validateReceiptAgentRelease(policy *receivePreparationPolicy, image, cloudImage string) error {
+	if policy == nil || policy.Journal == nil || policy.Journal.Receipts == nil {
+		return nil
+	}
+	if cloudImage != "" {
+		return fmt.Errorf("receipt advancement requires image-entrypoint cloud agents")
+	}
+	for _, id := range policy.Journal.Receipts.ImageIDs {
+		if err := handover.ValidateReceiptImagePolicy(image, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *meshReconciler) configureReceiptAgent(daemon *appsv1.DaemonSet) {
 	if r.receivePreparation == nil || r.receivePreparation.Journal == nil || r.receivePreparation.Journal.Receipts == nil {
 		return

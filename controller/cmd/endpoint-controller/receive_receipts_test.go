@@ -342,3 +342,25 @@ func verifyReceiveReceiptAdmission(t *testing.T, original *meshReconciler, snaps
 		})
 	}
 }
+
+// Invalid release configuration must fail before API discovery or journal
+// publication. This checks configuration only, not live image availability or
+// authenticated phase completion; an existing transition still needs recovery.
+func TestReceiptAgentReleaseValidation(t *testing.T) {
+	p := &receivePreparationPolicy{Journal: &receiveJournalPolicy{Receipts: &receiveReceiptPolicy{ImageIDs: map[string]string{"amd64": "sha256:" + strings.Repeat("a", 64), "arm64": "sha256:" + strings.Repeat("b", 64)}}}}
+	pinned := "example.invalid/dialer@sha256:" + strings.Repeat("c", 64)
+	for _, image := range []string{"", "example.invalid/dialer:revision", "sha256:" + strings.Repeat("c", 64), "example.invalid/dialer@sha256:abc", pinned + "\n"} {
+		if err := validateReceiptAgentRelease(p, image, ""); err == nil {
+			t.Fatalf("mutable or malformed agent release accepted: %q", image)
+		}
+	}
+	if err := validateReceiptAgentRelease(p, pinned, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateReceiptAgentRelease(p, pinned, "public-base:tag"); err == nil {
+		t.Fatal("host-binary entrypoint accepted for receipt agents")
+	}
+	if err := validateReceiptAgentRelease(nil, "local-dev:tag", ""); err != nil {
+		t.Fatal("receipt-free development configuration rejected", err)
+	}
+}

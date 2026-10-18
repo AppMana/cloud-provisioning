@@ -2388,6 +2388,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, policyErr)
 		os.Exit(2)
 	}
+	if err := validateReceiptAgentRelease(receivePolicy, dialerImage, dialerCloudImage); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	if _, err := parseDialerPullPolicy(dialerImagePullPolicy); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)

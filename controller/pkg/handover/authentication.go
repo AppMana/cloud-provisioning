@@ -47,7 +47,7 @@ func (a PodReceiptAuthenticator) Authenticate(ctx context.Context, bearer string
 	if a.API == nil || a.Audience == "" || a.Namespace == "" || a.ServiceAccountName == "" || a.ServiceAccountUID == "" || a.DaemonSetName == "" || a.DaemonSetUID == "" || bearer == "" || receipt.NodeUID == "" || bootID == "" {
 		return fail("missing policy, credential or identity")
 	}
-	if a.ContainerName == "" || !receiptImagePinned(a.Image, false) || !receiptImagePinned(a.ImageID, true) {
+	if a.ContainerName == "" || ValidateReceiptImagePolicy(a.Image, a.ImageID) != nil {
 		return fail("missing immutable agent image policy")
 	}
 	review, err := a.API.AuthenticationV1().TokenReviews().Create(ctx, &authenticationv1.TokenReview{Spec: authenticationv1.TokenReviewSpec{Token: bearer, Audiences: []string{a.Audience}}}, metav1.CreateOptions{})
@@ -137,6 +137,15 @@ func receiptImageEntrypoint(containers []corev1.Container, name, image string) b
 		}
 	}
 	return false
+}
+
+// ValidateReceiptImagePolicy checks release inputs before a controller starts
+// accepting transitions. Authentication uses the same rules for every receipt.
+func ValidateReceiptImagePolicy(image, runtimeID string) error {
+	if !receiptImagePinned(image, false) || !receiptImagePinned(runtimeID, true) {
+		return fmt.Errorf("receipt policy requires a digest-pinned agent image and immutable runtime image ID")
+	}
+	return nil
 }
 
 func receiptImagePinned(value string, runtimeID bool) bool {

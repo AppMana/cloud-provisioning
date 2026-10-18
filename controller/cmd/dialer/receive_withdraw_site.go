@@ -14,8 +14,9 @@ import (
 
 // Caller holds the host lock. Retire the journal's site receivers and separately
 // prepared successors recorded in both receiver ownership directories. Ordinary
-// root peers, source exceptions, relay paths and ordinary peer caches remain separate
-// cleanup obligations; success here must never be published as full retirement.
+// root peers and caches are retired afterward. Source exceptions, relay paths
+// and authenticated completion remain separate obligations; success here must
+// never be published as full retirement.
 func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Interface, devices receiverDevices, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, admitted admittedReceiveRetirement) error {
 	if devices == nil || cfg.secretName != scope.MeshName || cfg.secretNamespace != scope.Namespace || siteReceiveCachePath(cfg) == "" {
 		return fmt.Errorf("site retirement requires native devices and local mesh storage")
@@ -36,7 +37,7 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 	if !found || member.NodeUID != admitted.NodeUID || member.NodeName != cfg.nodeName {
 		return fmt.Errorf("site retirement requires the retained receiver participant")
 	}
-	own, _, err := tunnel.ReceiveLocalNetwork(plan, admitted.NodeUID)
+	own, allocated, err := tunnel.ReceiveLocalNetwork(plan, admitted.NodeUID)
 	if err != nil {
 		return err
 	}
@@ -47,6 +48,20 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 	if err != nil {
 		return err
 	}
+	forwarding, err := prepareWithdrawnForwardingCache(cfg, key, scope.MeshUID, plan.MachineName, plan.RootPublicKey)
+	if err != nil {
+		return err
+	}
+	var recorded []tunnel.PeerSpec
+	if forwarding != nil {
+		recorded = append(recorded, forwarding.peers...)
+	}
+	for _, cache := range caches {
+		recorded = append(recorded, cache.record.Peers.Peers...)
+		for _, previous := range cache.record.Previous {
+			recorded = append(recorded, previous.Peers...)
+		}
+	}
 	basePath := siteReceiveCachePath(cfg)
 	path := basePath + ".admitted"
 	graphs := []tunnel.ReceiveTransitionPlan{plan}
@@ -56,6 +71,8 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 	// Preserve committed receivers alongside additive preparation records before
 	// changing routes. An interrupted cleanup must retain both sources of intent.
 	for _, graph := range graphs {
+		recorded = append(recorded, graph.SiteDesired.Peers...)
+		recorded = append(recorded, graph.PreviousSitePeers().Peers...)
 		root := graph.RootPublicKey
 		record := siteReceiveCache{Version: 1, Namespace: scope.Namespace, SecretName: scope.MeshName, MeshUID: scope.MeshUID, NodeName: cfg.nodeName, PublicKey: key.PublicKey().String(), Peers: graph.SiteDesired, Bindings: map[string]receiveBinding{root: graph.Bindings[key.PublicKey().String()]}, Previous: map[string]tunnel.PeerListDoc{root: graph.PreviousSitePeers()}}
 		if graph.ReceiverGeneration != "" {
@@ -82,6 +99,16 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 		}
 		return ctx.Err()
 	}
+	currentPeers, err := tunnel.SitePeers(mesh.Data)
+	if err != nil {
+		return err
+	}
+	if currentPeers == nil {
+		currentPeers = []tunnel.PeerSpec{}
+	}
+	if _, err := tunnel.PlanReceiveWithdrawnNeighborPeers(recorded, currentPeers, admitted.Plans, plan.RootPublicKey); err != nil {
+		return err
+	}
 	guard := &siteReceiveScope{plans: admitted.Plans, check: check}
 	prepare := func(groups map[string][]receiveRouteSelection, destinations map[string][]string) error {
 		var names []string
@@ -103,10 +130,24 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 		}
 		return withdrawReceiveDeviceRoutes(ctx, cfg, generations, own)
 	}
-	if err := retireSiteReceiverRecords(ctx, api, cfg, mesh, key, path, guard, plan.RootPublicKey, prepare, func(selections []receiveRouteSelection, _ []string) error {
-		return retireRecordedSiteReceiver(devices, cfg, selections)
-	}, basePath); err != nil {
+	checkpoint := receiveNeighborCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), MeshUID: scope.MeshUID, MeshVersion: mesh.ResourceVersion, NodeUID: admitted.NodeUID, BootID: admitted.BootID, PublicKey: key.PublicKey().String(), Peers: currentPeers}
+	if err := retireWithdrawnNeighborCaches(ctx, lockPath+".neighbors.json", checkpoint, admitted.Plans, plan.RootPublicKey, recorded, check, func(peers []tunnel.PeerSpec) error {
+		// The sidecar has durably imported cache-only permission variants before
+		// receiver cleanup can remove their original executable references.
+		if err := retireSiteReceiverRecords(ctx, api, cfg, mesh, key, path, guard, plan.RootPublicKey, prepare, func(selections []receiveRouteSelection, _ []string) error {
+			return retireRecordedSiteReceiver(devices, cfg, selections)
+		}, basePath); err != nil {
+			return err
+		}
+		if err := commitRetiredSiteCaches(caches, plan.RootPublicKey); err != nil {
+			return err
+		}
+		return retireReceiveNeighbors(ctx, devices, cfg, key, peers, own, allocated)
+	}); err != nil {
 		return err
 	}
-	return commitRetiredSiteCaches(caches, plan.RootPublicKey)
+	if err := check(); err != nil {
+		return err
+	}
+	return commitWithdrawnForwardingCache(forwarding)
 }

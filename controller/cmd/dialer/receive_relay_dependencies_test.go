@@ -11,7 +11,15 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+// Synthetic receipts test ordering only, not native forwarding or continuity.
 func TestRelaySwitchRequiresCurrentSuccessorObservation(t *testing.T) {
+	for _, receivers := range []bool{false, true} {
+		t.Run(fmt.Sprintf("receiver-predecessor-%v", receivers), func(t *testing.T) {
+			testRelaySwitchRequiresCurrentSuccessorObservation(t, receivers)
+		})
+	}
+}
+func testRelaySwitchRequiresCurrentSuccessorObservation(t *testing.T, receivers bool) {
 	key := func() string {
 		k, err := wgtypes.GeneratePrivateKey()
 		if err != nil {
@@ -20,7 +28,7 @@ func TestRelaySwitchRequiresCurrentSuccessorObservation(t *testing.T) {
 		return k.PublicKey().String()
 	}
 	at := time.Now()
-	tr, err := handover.NewTransition(handover.Spec{ClusterUID: "cluster", TransitionUID: "transition", PlanHash: strings.Repeat("a", 64), FromGeneration: "old", ToGeneration: "new", Phase: handover.Prepare, Members: []handover.Member{{NodeUID: "old", FromKey: key(), ToKey: key()}, {NodeUID: "new", FromKey: key(), ToKey: key()}}}, at, handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: 10 * time.Second, DrainInterval: time.Second})
+	tr, err := handover.NewTransition(handover.Spec{ClusterUID: "cluster", TransitionUID: "transition", PlanHash: strings.Repeat("a", 64), FromGeneration: "receivers:old", ToGeneration: "receivers:" + strings.Repeat("a", 64), Phase: handover.Prepare, Members: []handover.Member{{NodeUID: "old", FromKey: key(), ToKey: key()}, {NodeUID: "new", FromKey: key(), ToKey: key()}}}, at, handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: 10 * time.Second, DrainInterval: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,6 +55,15 @@ func TestRelaySwitchRequiresCurrentSuccessorObservation(t *testing.T) {
 		"old": {NodeUID: "old", Legacy: &tunnel.ReceiveSiteLegacy{PeerPublicKey: "old"}, Forward: &tunnel.ReceiveSitePath{PeerPublicKey: "new", Transit: &tunnel.TransitSpec{Via: "10.90.0.2"}}},
 		"new": {NodeUID: "new", Legacy: &tunnel.ReceiveSiteLegacy{PeerPublicKey: "old", Transit: &tunnel.TransitSpec{Via: "10.90.0.1"}}, Forward: &tunnel.ReceiveSitePath{PeerPublicKey: "new"}},
 	}}
+	if receivers {
+		old := plan
+		old.Sites = map[string]tunnel.ReceiveTransitionSite{}
+		for name, site := range plan.Sites {
+			site.Forward = site.Legacy
+			old.Sites[name] = site
+		}
+		plan.PreviousReceiver = &tunnel.ReceivePreviousReceiver{Generation: "receivers:old", Plan: &old}
+	}
 	intent := tunnel.ReceiveJournalRoutes{Plans: map[string]tunnel.ReceiveTransitionPlan{"worker": plan}, Legacy: map[string]tunnel.ReceiveTransitionPlan{}}
 	for _, reverse := range []bool{false, true} {
 		predecessor, successor := "old", "new"
@@ -56,7 +73,9 @@ func TestRelaySwitchRequiresCurrentSuccessorObservation(t *testing.T) {
 				t.Fatal(err)
 			}
 			predecessor, successor = "new", "old"
-			intent.Legacy["worker"] = plan
+			if !receivers {
+				intent.Legacy["worker"] = plan
+			}
 		}
 		v, _ = tr.View()
 		now := at.Add(5 * time.Second)

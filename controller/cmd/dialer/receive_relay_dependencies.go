@@ -21,6 +21,17 @@ func visitReceiveRelayDependencies(intent tunnel.ReceiveJournalRoutes, nodeUID, 
 	fail := func(reason string) error { return fmt.Errorf("relay forwarding dependency: %s", reason) }
 	for machine, plan := range intent.Plans {
 		_, legacy := intent.Legacy[machine]
+		if plan.PreviousReceiver != nil {
+			view, found := intent.Views[machine]
+			if !found || legacy || (machine == target && !reflect.DeepEqual(view, targetView)) {
+				return fail("successor receiver selection missing or changed")
+			}
+			active, root, err := plan.SelectedReceiveTransport(view)
+			if err != nil || root {
+				return fail("successor receiver generation differs")
+			}
+			plan = active
+		}
 		for _, site := range plan.Sites {
 			if site.NodeUID != nodeUID {
 				continue
@@ -41,7 +52,7 @@ func visitReceiveRelayDependencies(intent tunnel.ReceiveJournalRoutes, nodeUID, 
 			if view.Complete || view.Round.Phase != handover.Switch {
 				continue
 			}
-			if legacy != view.RollbackRequested {
+			if intent.Plans[machine].PreviousReceiver == nil && legacy != view.RollbackRequested {
 				return fail("direction differs from committed round")
 			}
 			owner, found := plan.Sites[path.PeerPublicKey]

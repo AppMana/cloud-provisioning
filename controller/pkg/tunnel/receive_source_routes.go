@@ -5,8 +5,6 @@ import (
 	"net/netip"
 	"reflect"
 	"slices"
-
-	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 )
 
 // PlanReceiveSourceRoutes derives the complete site source-exception selection
@@ -31,7 +29,7 @@ func PlanReceiveSourceRoutes(intent ReceiveJournalRoutes) (map[string]ReceiveSit
 		}
 		plans = append(plans, p)
 		if legacy, found := intent.Legacy[machine]; found {
-			if !reflect.DeepEqual(legacy, p) {
+			if p.PreviousReceiver != nil || !reflect.DeepEqual(legacy, p) {
 				return fail("legacy selection differs")
 			}
 		} else {
@@ -41,20 +39,10 @@ func PlanReceiveSourceRoutes(intent ReceiveJournalRoutes) (map[string]ReceiveSit
 				if !found {
 					return fail("successor source selection has no committed view")
 				}
-				generation := view.ServingGeneration
-				if !view.Complete {
-					switch view.Round.Phase {
-					case handover.Prepare, handover.Abort:
-						generation = view.Round.FromGeneration
-					case handover.Switch, handover.Drain, handover.Retire:
-						generation = view.Round.ToGeneration
-					default:
-						return fail("unknown successor phase")
-					}
-				}
-				if generation == p.PreviousReceiver.Generation {
-					active = *p.PreviousReceiver.Plan
-				} else if generation != "receivers:"+view.Round.PlanHash {
+				var err error
+				var root bool
+				active, root, err = p.SelectedReceiveTransport(view)
+				if err != nil || root {
 					return fail("unknown successor source generation")
 				}
 			}

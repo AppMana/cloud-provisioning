@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -63,6 +64,33 @@ func TestReceiveAdvertisementsFollowAllocationGeneration(t *testing.T) {
 			}
 			if !sameAdvertisementSet(announced, want) {
 				t.Fatalf("wrong announced destinations: %v", announced)
+			}
+		}
+	}
+	// Synthetic admitted views: no ancestry, kernel or BGP qualification.
+	old := p
+	old.ReceiverGeneration = "old"
+	old.SiteDesired = *p.SiteBase
+	p.ReceiverGeneration = "new"
+	p.PreviousReceiver = &tunnel.ReceivePreviousReceiver{Generation: "receivers:old", Plan: &old}
+	intent.Plans["worker"] = p
+	for _, generation := range []string{"old", "new"} {
+		view := handover.View{Complete: true, ServingGeneration: "receivers:" + generation}
+		view.Round.PlanHash = "new"
+		intent.Views = map[string]handover.View{"worker": view}
+		want := newPrefixes
+		if generation == "old" {
+			want = oldPrefixes
+		}
+		intent.Receivers["site-uid"] = map[string]tunnel.ReceiveRouteSelection{}
+		for _, raw := range want {
+			intent.Receivers["site-uid"][raw] = tunnel.ReceiveRouteSelection{Interface: "selected-receiver"}
+		}
+		for _, cached := range [][]string{oldPrefixes, newPrefixes} {
+			data[tunnel.PeerAllowedIPsPrefix+"worker"] = []byte(strings.Join(cached, ","))
+			groups, err := planReceiveAdvertisements(config{nodeName: "site"}, saved, "site-uid", intent)
+			if err != nil || len(groups) != 1 || groups[0].legacy || !sameAdvertisementSet(groups[0].peer.WGAllowedIPs, want) {
+				t.Fatalf("successor %s selected wrong graph: %v", generation, err)
 			}
 		}
 	}

@@ -44,27 +44,14 @@ func PlanReceiveJournalRoutes(snapshots []handover.Snapshot, clusterUID string) 
 			return fail(err)
 		}
 		views[plan.MachineUID] = view
-		generation := view.ServingGeneration
-		if !view.Complete {
-			switch view.Round.Phase {
-			case handover.Prepare, handover.Abort:
-				generation = view.Round.FromGeneration
-			case handover.Switch, handover.Drain, handover.Retire:
-				generation = view.Round.ToGeneration
-			default:
-				return fail(fmt.Errorf("unknown receiver routing phase"))
-			}
+		active, root, err := plan.SelectedReceiveTransport(view)
+		if err != nil {
+			return fail(err)
 		}
-		switch generation {
-		case "legacy:" + HashPeerList(plan.Base):
+		if root {
 			legacy[plan.MachineUID] = plan
-		case "receivers:" + view.Round.PlanHash:
-			selected = append(selected, plan)
-		default:
-			if plan.PreviousReceiver == nil || generation != plan.PreviousReceiver.Generation {
-				return fail(fmt.Errorf("journal selects an unknown transport generation"))
-			}
-			selected = append(selected, *plan.PreviousReceiver.Plan)
+		} else {
+			selected = append(selected, active)
 		}
 		plans = append(plans, plan)
 	}
@@ -106,4 +93,36 @@ func PlanReceiveJournalRoutes(snapshots []handover.Snapshot, clusterUID string) 
 		}
 	}
 	return result, nil
+}
+
+// SelectedReceiveTransport selects forwarding intent from an already admitted
+// journal view. It does not validate ancestry, authorize native mutation or prove
+// forwarding completion. The boolean identifies the original root transport;
+// a predecessor receiver remains a receiver even during abort or rollback.
+func (p ReceiveTransitionPlan) SelectedReceiveTransport(view handover.View) (ReceiveTransitionPlan, bool, error) {
+	generation := view.ServingGeneration
+	if !view.Complete {
+		switch view.Round.Phase {
+		case handover.Prepare, handover.Abort:
+			generation = view.Round.FromGeneration
+		case handover.Switch, handover.Drain, handover.Retire:
+			generation = view.Round.ToGeneration
+		default:
+			return ReceiveTransitionPlan{}, false, fmt.Errorf("unknown receiver routing phase")
+		}
+	}
+	if p.PreviousReceiver != nil {
+		if p.PreviousReceiver.Plan == nil {
+			return ReceiveTransitionPlan{}, false, fmt.Errorf("missing predecessor receiver graph")
+		}
+		if generation == p.PreviousReceiver.Generation {
+			return *p.PreviousReceiver.Plan, false, nil
+		}
+	} else if generation == "legacy:"+HashPeerList(p.Base) {
+		return p, true, nil
+	}
+	if view.Round.PlanHash != "" && generation == "receivers:"+view.Round.PlanHash {
+		return p, false, nil
+	}
+	return ReceiveTransitionPlan{}, false, fmt.Errorf("journal selects an unknown transport generation")
 }

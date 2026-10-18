@@ -65,8 +65,22 @@ func planReceiveAdvertisements(cfg config, saved *siteForwardingCache, nodeUID s
 			g.machine = machine
 			seen[machine] = true
 			plan := intent.Plans[machine]
+			active := plan
+			_, g.legacy = intent.Legacy[machine]
+			previous := g.legacy
+			if plan.PreviousReceiver != nil {
+				view, found := intent.Views[machine]
+				if !found || g.legacy {
+					return nil, fmt.Errorf("successor advertisement lacks receiver selection")
+				}
+				active, _, err = plan.SelectedReceiveTransport(view)
+				if err != nil {
+					return nil, err
+				}
+				previous = active.ReceiverGeneration == plan.PreviousReceiver.Plan.ReceiverGeneration
+			}
 			var site tunnel.ReceiveTransitionSite
-			for _, candidate := range plan.Sites {
+			for _, candidate := range active.Sites {
 				if candidate.NodeUID == nodeUID {
 					site = candidate
 				}
@@ -74,7 +88,6 @@ func planReceiveAdvertisements(cfg config, saved *siteForwardingCache, nodeUID s
 			if site.NodeName != cfg.nodeName || !slices.Equal(site.RouteSources, g.own) {
 				return nil, fmt.Errorf("advertising endpoint differs from journal source identity")
 			}
-			_, g.legacy = intent.Legacy[machine]
 			matched := false
 			var selected *tunnel.PeerSpec
 			for generation, document := range []tunnel.PeerListDoc{plan.PreviousSitePeers(), plan.SiteDesired} {
@@ -83,7 +96,7 @@ func planReceiveAdvertisements(cfg config, saved *siteForwardingCache, nodeUID s
 						continue
 					}
 					matched = matched || (sameAdvertisementSet(candidate.WGAllowedIPs, peer.WGAllowedIPs) && sameAdvertisementSet(candidate.AllRouteHosts(), peer.AllRouteHosts()))
-					if (generation == 0) == g.legacy {
+					if (generation == 0) == previous {
 						copy := candidate
 						selected = &copy
 					}

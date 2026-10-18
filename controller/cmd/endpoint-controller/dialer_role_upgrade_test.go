@@ -92,7 +92,8 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 	role.Rules[0].ResourceNames = append(role.Rules[0].ResourceNames, "worker-a-tunnel-peers", "worker-b-tunnel-peers")
 	journalName := tunnel.ReceiveTransitionName("worker-a-uid")
 	indexName := tunnel.ReceiveInventoryName("mesh-uid")
-	role.Rules = append(role.Rules, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: []string{journalName, indexName}})
+	archiveName := "handover-archive-0123456789abcdef0123456789abcdef"
+	role.Rules = append(role.Rules, rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, Verbs: []string{"get"}, ResourceNames: []string{journalName, indexName, archiveName}})
 	if err := admin.Update(ctx, role); err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +102,7 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, name := range []string{journalName, indexName, "unrelated-journal"} {
+	for _, name := range []string{journalName, indexName, archiveName, "unrelated-journal"} {
 		if err := admin.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: key.Namespace}, Data: map[string]string{"transition.json": "controller-owned"}}); err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +129,7 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 		if err := dialer.Get(ctx, types.NamespacedName{Namespace: key.Namespace, Name: "unrelated"}, &corev1.Secret{}); !apierrors.IsForbidden(err) {
 			t.Fatalf("unrelated secret access: %v", err)
 		}
-		for _, protectedName := range []string{journalName, indexName} {
+		for _, protectedName := range []string{journalName, indexName, archiveName} {
 			journal := &corev1.ConfigMap{}
 			if err := dialer.Get(ctx, types.NamespacedName{Namespace: key.Namespace, Name: protectedName}, journal); err != nil {
 				t.Fatal("journal read access interrupted:", err)
@@ -174,7 +175,7 @@ func TestDialerSecretAccessSurvivesHelmUpgrade(t *testing.T) {
 	if err := admin.Get(ctx, key, role); err != nil {
 		t.Fatal(err)
 	}
-	if len(role.Rules) != 2 || !equalStrings(role.Rules[0].ResourceNames, []string{"cloud-provisioning-peers", "worker-a-tunnel-peers", "worker-b-tunnel-peers"}) || !equalStrings(role.Rules[1].ResourceNames, []string{indexName, journalName}) {
+	if len(role.Rules) != 2 || !equalStrings(role.Rules[0].ResourceNames, []string{"cloud-provisioning-peers", "worker-a-tunnel-peers", "worker-b-tunnel-peers"}) || !equalStrings(role.Rules[1].ResourceNames, []string{archiveName, indexName, journalName}) {
 		t.Fatalf("upgrade changed grants: %+v", role.Rules)
 	}
 }

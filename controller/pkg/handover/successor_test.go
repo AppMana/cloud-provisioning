@@ -186,6 +186,10 @@ func verifyStoredSuccessor(t *testing.T, store Store, previous Snapshot) {
 			t.Fatalf("missed generation history: %v", err)
 		}
 	}
+	names, err := store.ArchiveNames(ctx, latest)
+	if err != nil || len(names) != 2 || names[0] != secondArchive.Metadata().Name || names[1] != archived.Metadata().Name {
+		t.Fatalf("archive grants differ from pinned ancestry: %v %v", names, err)
+	}
 	if err := store.CheckHistory(ctx, next, previous); err == nil {
 		t.Fatal("accepted obsolete live admission after history lookup")
 	}
@@ -194,6 +198,9 @@ func verifyStoredSuccessor(t *testing.T, store Store, previous Snapshot) {
 	}
 	if err := store.CheckHistory(ctx, latest, previous); err == nil {
 		t.Fatal("accepted a missing intermediate archive")
+	}
+	if names, err := store.ArchiveNames(ctx, latest); err == nil || len(names) != 0 {
+		t.Fatal("returned partial grants for missing history")
 	}
 	recreated := archived.object.DeepCopy()
 	recreated.UID, recreated.ResourceVersion = "", ""

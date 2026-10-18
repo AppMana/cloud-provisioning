@@ -42,22 +42,8 @@ func (s Store) CheckHistory(ctx context.Context, current, previous Snapshot) err
 			return fmt.Errorf("history is missing or cycles before the local checkpoint")
 		}
 		seen[link.ArchiveUID] = true
-		reader := Store{ConfigMaps: s.ConfigMaps, Name: link.ArchiveName, ExpectedUID: link.ArchiveUID, ClusterUID: s.ClusterUID}
-		archive, err := reader.Load(ctx)
+		_, source, err := s.readPredecessor(ctx, cursor)
 		if err != nil {
-			return fmt.Errorf("loading predecessor archive: %w", err)
-		}
-		// Reconstruct only the archive's source identity for comparison. This
-		// synthetic snapshot is never returned as executable or live state.
-		source := archive
-		source.object = archive.object.DeepCopy()
-		source.object.ObjectMeta = metav1.ObjectMeta{
-			Name:            archive.object.Annotations["handover.cloud-provisioning.io/source-name"],
-			Namespace:       archive.object.Namespace,
-			UID:             types.UID(archive.object.Annotations["handover.cloud-provisioning.io/source-uid"]),
-			ResourceVersion: archive.object.Annotations["handover.cloud-provisioning.io/source-resource-version"],
-		}
-		if err := cursor.Succeeds(source, archive); err != nil {
 			return err
 		}
 		if err := source.Extends(previous); err == nil {
@@ -72,4 +58,75 @@ func (s Store) CheckHistory(ctx context.Context, current, previous Snapshot) err
 		return err
 	}
 	return live.ContinuesExecution(current)
+}
+
+// ArchiveNames returns only the verified, pinned predecessor chain needed by
+// readers of this journal. It grants no access and never scans the namespace.
+func (s Store) ArchiveNames(ctx context.Context, current Snapshot) ([]string, error) {
+	if err := s.configured(); err != nil {
+		return nil, err
+	}
+	if current.object == nil {
+		return nil, fmt.Errorf("missing current journal")
+	}
+	if _, err := s.snapshot(current.object); err != nil {
+		return nil, err
+	}
+	var names []string
+	seen := map[string]bool{}
+	cursor := current
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		link, found := cursor.Predecessor()
+		if !found {
+			break
+		}
+		if !link.valid() || seen[link.ArchiveUID] {
+			return nil, fmt.Errorf("invalid or cyclic archive history")
+		}
+		seen[link.ArchiveUID] = true
+		archive, source, err := s.readPredecessor(ctx, cursor)
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, archive.Metadata().Name)
+		cursor = source
+	}
+	live, err := s.Load(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := live.ContinuesExecution(current); err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
+func (s Store) readPredecessor(ctx context.Context, current Snapshot) (Snapshot, Snapshot, error) {
+	fail := func(err error) (Snapshot, Snapshot, error) { return Snapshot{}, Snapshot{}, err }
+	link, found := current.Predecessor()
+	if !found || !link.valid() {
+		return fail(fmt.Errorf("missing predecessor binding"))
+	}
+	reader := Store{ConfigMaps: s.ConfigMaps, Name: link.ArchiveName, ExpectedUID: link.ArchiveUID, ClusterUID: s.ClusterUID}
+	archive, err := reader.Load(ctx)
+	if err != nil {
+		return fail(fmt.Errorf("loading predecessor archive: %w", err))
+	}
+	// Reconstruct only the archive's source identity for comparison. This
+	// synthetic snapshot is never returned to callers as executable live state.
+	source := archive
+	source.object = archive.object.DeepCopy()
+	source.object.ObjectMeta = metav1.ObjectMeta{
+		Name:            archive.object.Annotations["handover.cloud-provisioning.io/source-name"],
+		Namespace:       archive.object.Namespace,
+		UID:             types.UID(archive.object.Annotations["handover.cloud-provisioning.io/source-uid"]),
+		ResourceVersion: archive.object.Annotations["handover.cloud-provisioning.io/source-resource-version"],
+	}
+	if err := current.Succeeds(source, archive); err != nil {
+		return fail(err)
+	}
+	return archive, source, nil
 }

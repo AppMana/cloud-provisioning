@@ -1712,6 +1712,19 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 		journals = append(journals, tunnel.ReceiveInventoryName(string(mesh.UID)))
 		for _, uid := range inventory.MachineUIDs {
 			name := tunnel.ReceiveTransitionName(uid)
+			if publication := inventory.Publications[uid]; publication.JournalUID != "" {
+				store := r.receiveJournal
+				store.Name, store.ExpectedUID = name, publication.JournalUID
+				snapshot, err := store.Load(ctx)
+				if err != nil {
+					return err
+				}
+				archives, err := store.ArchiveNames(ctx, snapshot)
+				if err != nil {
+					return err
+				}
+				journals = append(journals, archives...)
+			}
 			found := false
 			for _, current := range journals {
 				found = found || current == name

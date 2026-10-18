@@ -59,6 +59,9 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 			if cfg.secretName == "" {
 				return retireAdmittedCloudNeighborLocked(ctx, k, devices, store, scope, cfg, key, lockPath, admitted)
 			}
+			if strings.TrimSpace(string(admitted.Mesh.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName])) == "" {
+				return retireAdmittedFollowerLocked(ctx, k, speaker, store, scope, cfg, key, lockPath, admitted)
+			}
 			return retireAdmittedSiteReceiversLocked(ctx, k, devices, speaker, store, scope, cfg, key, lockPath, admitted)
 		})
 		if handled {

@@ -24,16 +24,7 @@ func planWithdrawnTransitRoutes(cache *withdrawnForwardingCache, plans []tunnel.
 	if err != nil {
 		return nil, err
 	}
-	recorded := append([]tunnel.PeerSpec{}, cache.peers...)
-	for _, plan := range plans {
-		if plan.RootPublicKey != root {
-			continue
-		}
-		recorded = append(recorded, plan.SiteDesired.Peers...)
-		if plan.PreviousReceiver != nil {
-			recorded = append(recorded, plan.PreviousReceiver.Plan.SiteDesired.Peers...)
-		}
-	}
+	recorded := withdrawnTransitPeerVariants(cache, plans, root)
 	selected, err := tunnel.PlanReceiveWithdrawnNeighborPeers(recorded, current, plans, root)
 	if err != nil {
 		return nil, err
@@ -71,4 +62,18 @@ func planWithdrawnTransitRoutes(cache *withdrawnForwardingCache, plans []tunnel.
 		}
 	}
 	return routes, nil
+}
+
+func withdrawnTransitPeerVariants(cache *withdrawnForwardingCache, plans []tunnel.ReceiveTransitionPlan, root string) []tunnel.PeerSpec {
+	recorded := append([]tunnel.PeerSpec{}, cache.peers...)
+	for _, plan := range plans {
+		if plan.RootPublicKey != root {
+			continue
+		}
+		recorded = append(recorded, plan.SiteDesired.Peers...)
+		if plan.PreviousReceiver != nil {
+			recorded = append(recorded, plan.PreviousReceiver.Plan.SiteDesired.Peers...)
+		}
+	}
+	return recorded
 }

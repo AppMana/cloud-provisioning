@@ -435,6 +435,15 @@ requires current identities, fresh observations and an uncontested write. Scope
 hash tests and synthetic evidence updates do not prove two live workers can
 finish retirement within the required freshness window.
 
+For simultaneous withdrawals, require independent production verification of
+each completion against the configured receipt lifetime after both records
+exist. Record presence or a successful rollout is not a passing deletion gate.
+Record verification failures separately from packet and management continuity:
+uninterrupted forwarding does not establish that cleanup can safely finish.
+Diagnostic verifiers must use the trusted policy's receipt lifetime and a reader
+compatible with the candidate's completion format; a relaxed diagnostic lifetime
+can isolate a binding defect but cannot qualify retirement.
+
 Dispatch all local withdrawal targets before other receiver maintenance,
 preserving their discovery order. A later background read failure must not
 prevent an earlier cleanup attempt merely because opaque machine IDs sort in

@@ -58,7 +58,7 @@ func retireAdmittedFollowerLocked(ctx context.Context, api kubernetes.Interface,
 		if err != nil {
 			return err
 		}
-		if !sameReceiveRevision(node.ObjectMeta, currentNode.ObjectMeta) {
+		if !sameReceiveParticipantNode(node, currentNode) {
 			return fmt.Errorf("follower node source changed")
 		}
 		if _, err := netlink.LinkByName(cfg.iface); !isLinkNotFound(err) {

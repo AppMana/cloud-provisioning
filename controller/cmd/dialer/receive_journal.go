@@ -10,6 +10,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -134,6 +135,26 @@ func validateReceiveParticipantNode(node *corev1.Node, uid, boot string) error {
 		return fmt.Errorf("receiver journal participant identity, boot or readiness changed")
 	}
 	return nil
+}
+
+// Kubelet heartbeats advance the Node resource version without changing its
+// identity or forwarding authority. Compare the remaining source fields so
+// routine status refreshes do not prevent bounded retirement from completing.
+// Readiness transitions, boot changes, addresses and allocation remain fenced.
+func sameReceiveParticipantNode(a, b *corev1.Node) bool {
+	if a == nil || b == nil || a.UID == "" || b.UID == "" || a.ResourceVersion == "" || b.ResourceVersion == "" || a.DeletionTimestamp != nil || b.DeletionTimestamp != nil {
+		return false
+	}
+	normalize := func(node *corev1.Node) *corev1.Node {
+		node = node.DeepCopy()
+		node.ResourceVersion = ""
+		node.ManagedFields = nil
+		for i := range node.Status.Conditions {
+			node.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
+		}
+		return node
+	}
+	return equality.Semantic.DeepEqual(normalize(a), normalize(b))
 }
 
 func receiveJournalParticipant(plan tunnel.ReceiveTransitionPlan, scope receiveJournalScope, nodeName string, key wgtypes.Key) (string, error) {

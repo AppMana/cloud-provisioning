@@ -61,7 +61,7 @@ func loadReceiveRetirement(ctx context.Context, api kubernetes.Interface, store 
 	if err != nil {
 		return fail(err)
 	}
-	if !sameReceiveRevision(node.ObjectMeta, currentNode.ObjectMeta) {
+	if !sameReceiveParticipantNode(node, currentNode) {
 		return fail(fmt.Errorf("receiver retirement source changed during admission"))
 	}
 	if err := validateReceiveParticipantNode(currentNode, result.NodeUID, result.BootID); err != nil {

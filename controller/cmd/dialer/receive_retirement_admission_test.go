@@ -154,6 +154,25 @@ func verifyReceiveRetirementAdmission(t *testing.T, api kubernetes.Interface, st
 	if _, err := load(store, "cloud", site); err == nil {
 		t.Fatal("retiring node admitted as survivor")
 	}
+	t.Run("retirement-heartbeat", func(t *testing.T) {
+		raced := store
+		changed := false
+		raced.ConfigMaps = &changingJournalReader{ConfigMapInterface: store.ConfigMaps, reads: -3, change: func() error {
+			n, err := api.CoreV1().Nodes().Get(ctx, "site", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			for i := range n.Status.Conditions {
+				n.Status.Conditions[i].LastHeartbeatTime = metav1.Now()
+			}
+			_, err = api.CoreV1().Nodes().UpdateStatus(ctx, n, metav1.UpdateOptions{})
+			changed = err == nil
+			return err
+		}}
+		if _, err := load(raced, "site", site); err != nil || !changed {
+			t.Fatal("heartbeat prevented retirement admission", err)
+		}
+	})
 	for _, fault := range []string{"mesh", "inventory", "journal", "node"} {
 		t.Run("retirement-race-"+fault, func(t *testing.T) {
 			raced := store

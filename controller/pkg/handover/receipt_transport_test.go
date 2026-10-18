@@ -248,6 +248,62 @@ func TestReceiptCollectorExpiryAndShutdown(t *testing.T) {
 	}
 }
 
+// Retirement collections have a rolling observation window rather than a
+// handover round's fixed expiry. Renewing the admitted collection deadline
+// must preserve still-fresh peers, never extend any individual observation.
+func TestReceiptCollectorRefreshesAdmittedWindow(t *testing.T) {
+	for _, renewal := range []bool{true, false} {
+		t.Run(fmt.Sprintf("renewal-%t", renewal), func(t *testing.T) {
+			digest := strings.Repeat("c", 64)
+			now := time.Now()
+			oldExpiry := now.Add(time.Second)
+			targetExpiry := oldExpiry
+			if renewal {
+				targetExpiry = now.Add(time.Minute)
+			}
+			completed := false
+			h, err := NewReceiptCollectionHandler(func(context.Context, string) (ReceiptCollection, error) {
+				return ReceiptCollection{
+					UID: "journal", Digest: digest, ExpiresAt: targetExpiry, MaxAge: time.Minute,
+					Members: []ReceiptMember{{NodeUID: "first"}, {NodeUID: "second"}},
+					Observe: func(context.Context, []PodReceipt) error {
+						time.Sleep(time.Until(oldExpiry) + time.Millisecond)
+						return nil
+					},
+					Complete: func(_ context.Context, entries []PodReceipt) error {
+						if len(entries) != 2 || !entries[0].Receipt.ObservedAt.Equal(now) {
+							t.Error("lost or refreshed a retained observation")
+						}
+						completed = true
+						return nil
+					},
+				}, nil
+			}, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			h.batches["machine"] = receiptBatch{uid: "journal", round: digest, expires: oldExpiry, maxAge: time.Minute, entries: map[[2]string]PodReceipt{
+				{"first", ""}: {BearerToken: "first-token", Receipt: Receipt{NodeUID: "first", ObservedAt: now}},
+			}}
+			body, _ := json.Marshal(ReceiptRequest{MachineUID: "machine", RoundHash: digest, Receipts: []PodReceipt{{BootID: "boot", Receipt: Receipt{NodeUID: "second", RoundHash: digest, ObservedAt: now}}}})
+			r := httptest.NewRequest(http.MethodPost, "https://controller/receipts", bytes.NewReader(body))
+			r.Header.Set("Authorization", "Bearer second-token")
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+			if !renewal {
+				if w.Code != http.StatusConflict || completed {
+					t.Fatal("fixed round deadline was extended")
+				}
+				return
+			}
+			if w.Code != http.StatusNoContent || !completed {
+				t.Fatalf("fresh batch rejected at obsolete collection expiry: status=%d stage=%s", w.Code, w.Header().Get(receiptFailureStageHeader))
+			}
+
+		})
+	}
+}
+
 func TestReceiptTransportRejectsUnprotectedRequests(t *testing.T) {
 	called := false
 	h, err := NewReceiptHandler(func(context.Context, string) (Store, map[string]PodReceiptAuthenticator, error) {

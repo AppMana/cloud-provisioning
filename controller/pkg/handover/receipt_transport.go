@@ -294,6 +294,12 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	stage = "freshness"
+	// A successfully re-admitted collection may have a renewed observation
+	// window. Handover rounds retain their fixed expiry; retirement collections
+	// roll forward while their source binding is unchanged. Keep per-entry
+	// timestamps intact and prune using the currently admitted age limit.
+	batch.expires = target.ExpiresAt
+	batch.maxAge = target.MaxAge
 	observedAt := time.Now()
 	if !observedAt.Before(batch.expires) {
 		delete(h.batches, request.MachineUID)

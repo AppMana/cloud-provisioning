@@ -151,6 +151,13 @@ func sameReceiveParticipantNode(a, b *corev1.Node) bool {
 		node.ManagedFields = nil
 		for i := range node.Status.Conditions {
 			node.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
+			// Reporters may refresh a network or pressure transition timestamp
+			// without changing its condition. These timestamps are informational;
+			// condition values remain fenced. Preserve Ready transition history
+			// to reject a readiness cycle between admission reads.
+			if node.Status.Conditions[i].Type != corev1.NodeReady {
+				node.Status.Conditions[i].LastTransitionTime = metav1.Time{}
+			}
 		}
 		return node
 	}

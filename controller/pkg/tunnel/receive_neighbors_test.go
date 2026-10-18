@@ -10,6 +10,54 @@ func neighborFixture() PeerSpec {
 	return PeerSpec{PublicKey: receiverTestKey(120), Remote: true, Endpoint: "198.51.100.9:51820", WGAllowedIPs: []string{"172.29.0.9/32", "2001:db8:2::9/128"}, RouteHosts: []string{"172.29.0.9", "2001:db8:2::9"}}
 }
 
+func TestReceiveCloudNeighborsKeepIndependentJournalEdges(t *testing.T) {
+	plans := routeSetFixture(t)
+	root := plans[0].RootPublicKey
+	other := plans[1].SiteDesired.Peers[0]
+	other.Remote = true
+	peers := []PeerSpec{plans[0].SiteDesired.Peers[0], other, neighborFixture()}
+	got, err := PlanReceiveCloudNeighborPeers(peers, plans, root)
+	if err != nil || !reflect.DeepEqual(got, peers[1:]) {
+		t.Fatalf("lost direct cloud edge for journal-owned worker: %+v %v", got, err)
+	}
+	retiring, err := PlanReceiveCloudNeighborRetirements(got, []PeerSpec{neighborFixture()}, plans, root)
+	if err != nil || !reflect.DeepEqual(retiring, []PeerSpec{other}) {
+		t.Fatalf("cloud edge withdrawal changed site-facing journal ownership: %+v %v", retiring, err)
+	}
+	// A site must continue excluding both reserved workers from ordinary work.
+	site, err := PlanReceiveNeighborPeers(peers, plans)
+	if err != nil || !reflect.DeepEqual(site, []PeerSpec{neighborFixture()}) {
+		t.Fatal("cloud projection weakened site journal ownership", err)
+	}
+	for _, fault := range []string{"other-owner", "other-receiver", "site-source", "own-source", "unknown-root", "empty-root"} {
+		t.Run(fault, func(t *testing.T) {
+			peer := other
+			peer.RouteHosts = nil
+			local := root
+			switch fault {
+			case "other-owner":
+				peer.PublicKey = receiverTestKey(121)
+			case "other-receiver":
+				peer.PublicKey = plans[1].Bindings[receiverTestKey(8)].PublicKey
+			case "site-source":
+				peer.WGAllowedIPs = []string{"10.90.0.7/32"}
+			case "own-source":
+				peer.WGAllowedIPs = []string{"172.29.0.1/32"}
+			case "unknown-root":
+				local = receiverTestKey(122)
+			case "empty-root":
+				local = ""
+			}
+			if _, err := PlanReceiveCloudNeighborPeers([]PeerSpec{peer}, plans, local); err == nil {
+				t.Fatal("conflicting cloud edge admitted")
+			}
+			if _, err := PlanReceiveCloudNeighborRetirements([]PeerSpec{peer}, []PeerSpec{}, plans, local); err == nil {
+				t.Fatal("conflicting cloud edge authorized retirement")
+			}
+		})
+	}
+}
+
 func TestReceiveNeighborRetirementIntent(t *testing.T) {
 	plans := routeSetFixture(t)
 	old := neighborFixture()

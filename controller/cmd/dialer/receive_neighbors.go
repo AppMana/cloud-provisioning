@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"slices"
 	"time"
@@ -42,22 +43,24 @@ type receiveNeighborCheckpoint struct {
 // every journal and local phase fence, and never issues a phase receipt or a
 // whole-mesh readiness acknowledgement for its partial work.
 func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cfg config, native receiveNeighborNative, prepare receiveNeighborPreparation) error {
-	if cfg.secretName == "" {
-		return nil
-	} // Cloud documents need their own projection.
-	if api == nil || native == nil || cfg.secretNamespace == "" || cfg.secretName != cfg.receiptMeshName || cfg.receiptPodName == "" || cfg.receiptPodUID == "" {
-		return fmt.Errorf("neighbor admission requires scoped site and agent identities")
+	cloud := cfg.secretName == ""
+	namespace := cfg.secretNamespace
+	if cloud {
+		namespace = cfg.peersSecretNamespace
+	}
+	if api == nil || native == nil || namespace == "" || cfg.receiptMeshName == "" || (!cloud && cfg.secretName != cfg.receiptMeshName) || (cloud && cfg.peersFile == "") || cfg.receiptPodName == "" || cfg.receiptPodUID == "" {
+		return fmt.Errorf("neighbor admission requires scoped node and agent identities")
 	}
 	lock, err := lockReconciliation(cfg)
 	if err != nil {
 		return err
 	}
 	defer lock.Close()
-	key, _, err := receiveDispatchIdentity(cfg)
+	key, allocation, err := receiveDispatchIdentity(cfg)
 	if err != nil {
 		return err
 	}
-	mesh, err := api.CoreV1().Secrets(cfg.secretNamespace).Get(ctx, cfg.secretName, metav1.GetOptions{})
+	mesh, err := api.CoreV1().Secrets(namespace).Get(ctx, cfg.receiptMeshName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -71,12 +74,12 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	if cluster.UID == "" || cluster.DeletionTimestamp != nil {
 		return fmt.Errorf("neighbor cluster identity missing")
 	}
-	store := handover.Store{ConfigMaps: api.CoreV1().ConfigMaps(cfg.secretNamespace), ClusterUID: string(cluster.UID)}
-	inventory, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, cfg.secretNamespace, mesh.Name, string(mesh.UID))
+	store := handover.Store{ConfigMaps: api.CoreV1().ConfigMaps(namespace), ClusterUID: string(cluster.UID)}
+	inventory, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, namespace, mesh.Name, string(mesh.UID))
 	if err != nil {
 		return err
 	}
-	scope := receiveJournalScope{Namespace: cfg.secretNamespace, MeshName: mesh.Name, MeshUID: string(mesh.UID)}
+	scope := receiveJournalScope{Namespace: namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID)}
 	for _, uid := range inventory.MachineUIDs {
 		store.Name = tunnel.ReceiveTransitionName(uid)
 		snapshot, err := store.Load(ctx)
@@ -87,7 +90,8 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		if err != nil {
 			return err
 		}
-		if site, ok := plan.Sites[key.PublicKey().String()]; ok && site.NodeName == cfg.nodeName {
+		site, siteMember := plan.Sites[key.PublicKey().String()]
+		if (cloud && plan.CloudNodeName == cfg.nodeName && plan.RootPublicKey == key.PublicKey().String()) || (!cloud && siteMember && site.NodeName == cfg.nodeName) {
 			scope.MachineUID = uid
 			break
 		}
@@ -121,28 +125,53 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	}
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
-	role, _, err := tunnel.SiteForwardingRole(mesh.Data, cfg.nodeName, nil)
-	if err != nil {
-		return err
-	}
-	if role != "direct" {
-		return fmt.Errorf("ordinary peer admission requires a direct site projection")
-	}
-	peers, err := tunnel.SitePeers(mesh.Data)
-	if err != nil {
-		return err
-	}
+	local := set.Local[scope.MachineUID]
+	var peers []tunnel.PeerSpec
 	plans := make([]tunnel.ReceiveTransitionPlan, 0, len(set.Routes.Plans))
 	for _, uid := range set.Inventory.MachineUIDs {
 		plans = append(plans, set.Routes.Plans[uid])
 	}
-	peers, err = tunnel.PlanReceiveNeighborPeers(peers, plans)
+	if cloud {
+		if !slices.Equal(allocation, local.Plan.CloudAddresses) || len(allocation) == 0 {
+			return fmt.Errorf("neighbor cloud allocation differs from committed plan")
+		}
+		address, err := netip.ParsePrefix(allocation[0])
+		if err != nil {
+			return err
+		}
+		projected, err := tunnel.RemotePeers(mesh.Data, address.Addr().String(), nil)
+		if err != nil {
+			return err
+		}
+		peers = make([]tunnel.PeerSpec, 0)
+		for _, peer := range projected {
+			if peer.Remote {
+				peers = append(peers, peer)
+			}
+		}
+	} else {
+		role, _, err := tunnel.SiteForwardingRole(mesh.Data, cfg.nodeName, nil)
+		if err != nil {
+			return err
+		}
+		if role != "direct" {
+			return fmt.Errorf("ordinary peer admission requires a direct site projection")
+		}
+		peers, err = tunnel.SitePeers(mesh.Data)
+		if err != nil {
+			return err
+		}
+	}
+	if cloud {
+		peers, err = tunnel.PlanReceiveCloudNeighborPeers(peers, plans, key.PublicKey().String())
+	} else {
+		peers, err = tunnel.PlanReceiveNeighborPeers(peers, plans)
+	}
 	if err != nil {
 		return err
 	}
-	local := set.Local[scope.MachineUID]
 	checkAgent := func() (string, error) {
-		pod, err := api.CoreV1().Pods(cfg.secretNamespace).Get(ctx, cfg.receiptPodName, metav1.GetOptions{})
+		pod, err := api.CoreV1().Pods(namespace).Get(ctx, cfg.receiptPodName, metav1.GetOptions{})
 		if err != nil {
 			return "", err
 		}
@@ -168,7 +197,7 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		if currentCluster.UID != cluster.UID || currentCluster.DeletionTimestamp != nil {
 			return fmt.Errorf("neighbor cluster identity changed")
 		}
-		current, err := api.CoreV1().Secrets(cfg.secretNamespace).Get(ctx, mesh.Name, metav1.GetOptions{})
+		current, err := api.CoreV1().Secrets(namespace).Get(ctx, mesh.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -237,7 +266,7 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	// The old checkpoint recorded only the latest attempted publication. On
 	// migration, the identity-bound legacy forwarding cache can recover peers
 	// omitted by that attempt. It cannot authorize mutation or replay old routes.
-	if legacy {
+	if legacy && !cloud {
 		cached, err := readSiteForwardingCache(cfg, key)
 		if err == nil {
 			if cached.MeshUID != saved.MeshUID {
@@ -279,7 +308,11 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 			candidates[identity] = true
 		}
 	}
-	retirement.Retiring, err = tunnel.PlanReceiveNeighborRetirements(previousPeers, peers, plans)
+	if cloud {
+		retirement.Retiring, err = tunnel.PlanReceiveCloudNeighborRetirements(previousPeers, peers, plans, key.PublicKey().String())
+	} else {
+		retirement.Retiring, err = tunnel.PlanReceiveNeighborRetirements(previousPeers, peers, plans)
+	}
 	if err != nil {
 		return err
 	}
@@ -299,6 +332,12 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		return err
 	}
 	var allocated []string
+	var own []string
+	if cloud {
+		allocated = slices.Clone(local.Plan.CloudAddresses)
+	} else {
+		own = tunnel.ReceiveSiteRouteSources(mesh.Data, cfg.nodeName)
+	}
 	if site := local.Plan.Sites[key.PublicKey().String()]; site.Legacy != nil && site.Legacy.Tunnel != nil {
 		allocated = site.Legacy.Tunnel.Addresses
 	}
@@ -309,7 +348,7 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		retirement.Retiring = nil
 		return writeDurableJSON(path+".retiring", retirement)
 	}
-	if err := native(ctx, key, peers, tunnel.ReceiveSiteRouteSources(mesh.Data, cfg.nodeName), retirement.Retiring, allocated, commitRetirement); err != nil {
+	if err := native(ctx, key, peers, own, retirement.Retiring, allocated, commitRetirement); err != nil {
 		return err
 	}
 	if err := check(); err != nil {
@@ -323,7 +362,7 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	if err := writeDurableJSON(path+".retiring", retirement); err != nil {
 		return err
 	}
-	if prepare != nil {
+	if prepare != nil && !cloud {
 		if err := prepare(ctx, key, mesh, peers, plans, check); err != nil {
 			return err
 		}

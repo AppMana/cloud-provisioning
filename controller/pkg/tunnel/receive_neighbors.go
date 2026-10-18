@@ -13,7 +13,20 @@ import (
 // exact device, peer permissions and owned routes. Both journal generations
 // remain excluded even after their transitions complete.
 func PlanReceiveNeighborRetirements(previous, desired []PeerSpec, plans []ReceiveTransitionPlan) ([]PeerSpec, error) {
-	if _, err := PlanReceiveNeighborPeers(desired, plans); err != nil {
+	return planReceiveNeighborRetirements(previous, desired, plans, "")
+}
+
+// PlanReceiveCloudNeighborRetirements withdraws only recorded direct cloud
+// edges; it grants no authority over either endpoint's site-facing receivers.
+func PlanReceiveCloudNeighborRetirements(previous, desired []PeerSpec, plans []ReceiveTransitionPlan, root string) ([]PeerSpec, error) {
+	if root == "" {
+		return nil, fmt.Errorf("cloud neighbor root is required")
+	}
+	return planReceiveNeighborRetirements(previous, desired, plans, root)
+}
+
+func planReceiveNeighborRetirements(previous, desired []PeerSpec, plans []ReceiveTransitionPlan, cloudRoot string) ([]PeerSpec, error) {
+	if _, err := planReceiveNeighborPeers(desired, plans, cloudRoot); err != nil {
 		return nil, err
 	}
 	wanted := make(map[string]bool, len(desired))
@@ -33,7 +46,7 @@ func PlanReceiveNeighborRetirements(previous, desired []PeerSpec, plans []Receiv
 	result := make([]PeerSpec, 0, len(absent))
 	positions := map[string]int{}
 	for _, peer := range absent {
-		admitted, err := PlanReceiveNeighborPeers([]PeerSpec{peer}, plans)
+		admitted, err := planReceiveNeighborPeers([]PeerSpec{peer}, plans, cloudRoot)
 		if err != nil {
 			return nil, err
 		}
@@ -58,7 +71,7 @@ func PlanReceiveNeighborRetirements(previous, desired []PeerSpec, plans []Receiv
 			merged = append(merged, peer)
 		}
 	}
-	if _, err := PlanReceiveNeighborPeers(merged, plans); err != nil {
+	if _, err := planReceiveNeighborPeers(merged, plans, cloudRoot); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -70,6 +83,20 @@ func PlanReceiveNeighborRetirements(previous, desired []PeerSpec, plans []Receiv
 // with phase execution, and check existing kernel ownership before applying it.
 // Both generations remain protected, independently of the selected phase.
 func PlanReceiveNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan) ([]PeerSpec, error) {
+	return planReceiveNeighborPeers(peers, plans, "")
+}
+
+// PlanReceiveCloudNeighborPeers admits direct cloud edges independently of
+// site-facing receivers. Every journal still protects its transport identities
+// and destinations; only each remote's committed root may own its direct edge.
+func PlanReceiveCloudNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan, root string) ([]PeerSpec, error) {
+	if root == "" {
+		return nil, fmt.Errorf("cloud neighbor root is required")
+	}
+	return planReceiveNeighborPeers(peers, plans, root)
+}
+
+func planReceiveNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan, cloudRoot string) ([]PeerSpec, error) {
 	if len(plans) == 0 || peers == nil {
 		return nil, fmt.Errorf("neighbor planning requires a complete peer document and reserved plans")
 	}
@@ -79,8 +106,13 @@ func PlanReceiveNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan) (
 	reserved := map[string]bool{}
 	transport := map[string]bool{}
 	var protected []netip.Prefix
+	cloudOwned := map[string][]netip.Prefix{}
+	foundCloud := cloudRoot == ""
 	for _, plan := range plans {
-		reserved[plan.RootPublicKey] = true
+		if cloudRoot == "" || cloudRoot == plan.RootPublicKey {
+			reserved[plan.RootPublicKey] = true
+		}
+		foundCloud = foundCloud || cloudRoot == plan.RootPublicKey
 		var base PeerListDoc
 		if err := json.Unmarshal(plan.Base, &base); err != nil {
 			return nil, err
@@ -105,7 +137,11 @@ func PlanReceiveNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan) (
 				if err != nil {
 					return nil, err
 				}
-				protected = append(protected, prefix)
+				if cloudRoot != "" && cloudRoot != plan.RootPublicKey {
+					cloudOwned[plan.RootPublicKey] = append(cloudOwned[plan.RootPublicKey], prefix)
+				} else {
+					protected = append(protected, prefix)
+				}
 			}
 			for _, path := range []*ReceiveSitePath{site.Legacy, site.Forward} {
 				if path == nil {
@@ -134,12 +170,19 @@ func PlanReceiveNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan) (
 				if err != nil {
 					return nil, err
 				}
-				protected = append(protected, prefixes...)
+				if cloudRoot != "" && cloudRoot != plan.RootPublicKey {
+					cloudOwned[plan.RootPublicKey] = append(cloudOwned[plan.RootPublicKey], prefixes...)
+				} else {
+					protected = append(protected, prefixes...)
+				}
 			}
 			if !found {
 				return nil, fmt.Errorf("reserved worker has no destination projection")
 			}
 		}
+	}
+	if !foundCloud {
+		return nil, fmt.Errorf("cloud neighbor root has no reserved journal")
 	}
 	seen := map[string]bool{}
 	owners := map[netip.Prefix]string{}
@@ -160,6 +203,13 @@ func PlanReceiveNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan) (
 			return nil, err
 		}
 		for _, prefix := range prefixes {
+			for owner, owned := range cloudOwned {
+				for _, other := range owned {
+					if owner != peer.PublicKey && prefix.Overlaps(other) {
+						return nil, fmt.Errorf("neighbor destination overlaps another cloud owner")
+					}
+				}
+			}
 			for _, owned := range protected {
 				if prefix.Overlaps(owned) {
 					return nil, fmt.Errorf("neighbor destination overlaps reserved forwarding")

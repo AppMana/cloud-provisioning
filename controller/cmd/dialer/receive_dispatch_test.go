@@ -76,6 +76,7 @@ func verifyReceiveDispatch(t *testing.T, api kubernetes.Interface, store handove
 		t.Fatal(err)
 	}
 	objects := []runtime.Object{mesh, index, adoption, node, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system", UID: types.UID(store.ClusterUID)}}, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: mesh.Namespace, Name: store.Name, UID: "dispatch-journal", ResourceVersion: "1"}, Data: map[string]string{"transition.json": string(encoded), "plan.json": string(raw)}}}
+	verifyCloudNeighborAdmission(t, objects, plan, root, index.Name)
 	for _, fault := range []string{"valid", "allocation", "pod", "credential", "native", "complete", "complete-native", "complete-maintenance", "complete-pod-race", "complete-container-race", "publication-pending", "publication-replaced"} {
 		t.Run("dispatch-"+fault, func(t *testing.T) {
 			copies := []runtime.Object{}

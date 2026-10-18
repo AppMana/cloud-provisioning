@@ -635,12 +635,19 @@ func preflightReceiveRouteGenerationsWithHandshake(cfg config, generations []map
 			identities[selection.Interface] = selection
 		}
 	}
-	legacy, err := netlink.LinkByName(cfg.iface)
-	if err != nil {
-		return err
-	}
-	if legacy.Type() != "wireguard" {
-		return fmt.Errorf("legacy route device is not WireGuard")
+	// A follower owns relay routes without a local tunnel. Resolve the legacy
+	// device only when a caller explicitly admits destinations on that device;
+	// receiver and relay identities are independently checked below.
+	var legacy netlink.Link
+	if len(legacyDestinations) != 0 {
+		var err error
+		legacy, err = netlink.LinkByName(cfg.iface)
+		if err != nil {
+			return err
+		}
+		if legacy.Type() != "wireguard" {
+			return fmt.Errorf("legacy route device is not WireGuard")
+		}
 	}
 	if requireHandshake && len(admittedRelays) > 2 {
 		return fmt.Errorf("too many admitted relay generations")

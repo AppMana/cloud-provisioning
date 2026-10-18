@@ -423,6 +423,13 @@ callbacks. Synthetic concurrency tests establish overlap, bounded admission and
 error behavior only, not live API throughput or authenticated retirement within
 the observation lifetime.
 
+Dispatch all local withdrawal targets before other receiver maintenance,
+preserving their discovery order. A later background read failure must not
+prevent an earlier cleanup attempt merely because opaque machine IDs sort in
+a different order. Synthetic dispatch tests establish ordering and error
+retention only; live multi-worker retirement must still meet the shared receipt
+freshness limit and maintain forwarding throughout cleanup.
+
 When multiple receivers fail in one reconciliation pass, retain earlier execution
 or delivery errors alongside any later API or identity-read failure. Exercise this
 with a rejected cleanup followed by a failed read for another receiver. A synthetic

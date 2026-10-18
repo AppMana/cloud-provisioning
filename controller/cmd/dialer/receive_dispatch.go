@@ -111,6 +111,19 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		return true, err
 	}
 	defer transport.Close()
+	// Retained-consumer observations have a short shared freshness window.
+	// Do not interleave other receiver maintenance between withdrawal targets
+	// merely because their opaque machine UIDs sort between those targets.
+	// Preserve discovery order within each group and all admission checks.
+	slices.SortStableFunc(targets, func(a, b string) int {
+		if retiring[a] == retiring[b] {
+			return 0
+		}
+		if retiring[a] {
+			return -1
+		}
+		return 1
+	})
 	var failures []error
 	// A later discovery or identity read must not hide failures already
 	// observed for earlier receivers in this reconciliation pass.

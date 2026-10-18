@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -47,7 +48,7 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fault := range []string{"none", "follower", "missing-backend", "native-error", "container-race", "delivery-failure", "later-api-error"} {
+	for _, fault := range []string{"none", "follower", "missing-backend", "native-error", "container-race", "delivery-failure", "later-api-error", "priority-api-error"} {
 		t.Run("retirement-dispatch/"+fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -60,7 +61,7 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 			for _, cm := range maps.Items {
 				objects = append(objects, cm.DeepCopy())
 			}
-			if fault == "later-api-error" {
+			if fault == "later-api-error" || fault == "priority-api-error" {
 				// A second discovered target fails its Pod read after the first
 				// target has already rejected a missing retirement backend.
 				// This fixture exercises dispatch only, not route admission.
@@ -78,6 +79,9 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 				var plan tunnel.ReceiveTransitionPlan
 				must(json.Unmarshal([]byte(extra.Data["plan.json"]), &plan))
 				plan.MachineUID = scope.MachineUID + "z"
+				if fault == "priority-api-error" {
+					plan.MachineUID = "0-background"
+				}
 				raw, e := json.Marshal(plan)
 				must(e)
 				spec, e := tunnel.ReceiveTransitionSpec(plan, store.ClusterUID, fmt.Sprintf("%x", sha256.Sum256(raw)))
@@ -97,6 +101,7 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 					var inventory tunnel.ReceiveInventory
 					must(json.Unmarshal([]byte(cm.Data["inventory.json"]), &inventory))
 					inventory.MachineUIDs = append(inventory.MachineUIDs, plan.MachineUID)
+					slices.Sort(inventory.MachineUIDs)
 					inventory.Publications[plan.MachineUID] = tunnel.ReceiveJournalPublication{JournalUID: string(extra.UID)}
 					encoded, e := json.Marshal(inventory)
 					must(e)
@@ -137,11 +142,11 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 			objects = append(objects, currentMesh, currentNode, currentPod, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "kube-system", UID: types.UID(store.ClusterUID)}})
 			client := fake.NewClientset(objects...)
 			laterError := errors.New("later Pod read failed")
-			if fault == "later-api-error" {
+			if fault == "later-api-error" || fault == "priority-api-error" {
 				reads := 0
 				client.PrependReactor("get", "pods", func(ktesting.Action) (bool, runtime.Object, error) {
 					reads++
-					if reads == 2 {
+					if reads >= 2 {
 						return true, nil, laterError
 					}
 					return false, nil, nil
@@ -196,11 +201,11 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 				}
 				return nil
 			})
-			if fault == "missing-backend" || fault == "later-api-error" {
+			if fault == "missing-backend" || fault == "later-api-error" || fault == "priority-api-error" {
 				native = nil
 			}
 			handled, err := dispatchReceivePhases(ctx, client, cfg, phase, phase, native)
-			if fault == "later-api-error" && (!errors.Is(err, laterError) || !strings.Contains(err.Error(), "retirement requires a complete native cleanup backend")) {
+			if (fault == "later-api-error" || fault == "priority-api-error") && (!errors.Is(err, laterError) || !strings.Contains(err.Error(), "retirement requires a complete native cleanup backend")) {
 				t.Fatalf("lost an earlier dispatch failure: %v", err)
 			}
 			success := fault == "none" || fault == "follower"
@@ -208,7 +213,7 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 				t.Fatal("wrong dispatch outcome", handled, err, phaseCalls)
 			}
 			expectedCalls := 1
-			if fault == "missing-backend" || fault == "later-api-error" {
+			if fault == "missing-backend" || fault == "later-api-error" || fault == "priority-api-error" {
 				expectedCalls = 0
 			}
 			if calls != expectedCalls {

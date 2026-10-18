@@ -20,6 +20,16 @@ type withdrawnForwardingCache struct {
 // Read-only preparation. The returned old peers must enter durable retirement
 // intent before native cleanup. The caller holds the host reconciliation lock.
 func prepareWithdrawnForwardingCache(cfg config, key wgtypes.Key, meshUID, machine, root string) (*withdrawnForwardingCache, error) {
+	return prepareWithdrawnForwardingCacheMode(cfg, key, meshUID, machine, root, false)
+}
+
+// Follower admission is separate from direct receiver admission. Both modes
+// preserve the existing cache format and remove only the exact remote owner.
+func prepareWithdrawnTransitCache(cfg config, key wgtypes.Key, meshUID, machine, root string) (*withdrawnForwardingCache, error) {
+	return prepareWithdrawnForwardingCacheMode(cfg, key, meshUID, machine, root, true)
+}
+
+func prepareWithdrawnForwardingCacheMode(cfg config, key wgtypes.Key, meshUID, machine, root string, transit bool) (*withdrawnForwardingCache, error) {
 	path := siteForwardingCachePath(cfg)
 	if path == "" || meshUID == "" || machine == "" || root == "" {
 		return nil, fmt.Errorf("forwarding withdrawal requires exact cache and worker identity")
@@ -42,8 +52,8 @@ func prepareWithdrawnForwardingCache(cfg config, key wgtypes.Key, meshUID, machi
 	if err != nil {
 		return nil, err
 	}
-	if saved.MeshUID != meshUID || saved.Transit {
-		return nil, fmt.Errorf("forwarding withdrawal requires matching direct-site cache")
+	if saved.MeshUID != meshUID || saved.Transit != transit {
+		return nil, fmt.Errorf("forwarding withdrawal requires matching mesh and forwarding mode")
 	}
 	peers, err := tunnel.SitePeers(saved.Data)
 	if err != nil {

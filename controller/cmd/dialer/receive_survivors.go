@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -17,15 +18,35 @@ import (
 func loadSurvivingReceiveSet(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, nodeName string, key wgtypes.Key, inventory tunnel.ReceiveInventory, metadata metav1.ObjectMeta) (admittedReceiveSet, error) {
 	fail := func(err error) (admittedReceiveSet, error) { return admittedReceiveSet{}, err }
 	result := admittedReceiveSet{Inventory: inventory, Metadata: metadata, Local: map[string]admittedReceiveJournal{}, Retirements: map[string]admittedReceiveRetirement{}}
+	var shared *admittedReceiveRetirement
 	for _, uid := range inventory.MachineUIDs {
 		if len(inventory.Publications[uid].Retirement) == 0 {
 			continue
 		}
 		memberStore, memberScope := store, scope
 		memberStore.Name, memberStore.ExpectedUID, memberScope.MachineUID = tunnel.ReceiveTransitionName(uid), inventory.Publications[uid].JournalUID, uid
-		retired, err := loadReceiveRetirement(ctx, api, memberStore, memberScope, nodeName, key)
-		if err != nil {
-			return fail(err)
+		var retired admittedReceiveRetirement
+		if shared == nil {
+			var err error
+			retired, err = loadReceiveRetirement(ctx, api, memberStore, memberScope, nodeName, key)
+			if err != nil {
+				return fail(err)
+			}
+			shared = &retired
+		} else {
+			// The first admission authenticated every reserved history, ownership
+			// and route. Bind each sibling withdrawal to that same snapshot;
+			// its consumer and live-source recheck remains mandatory below.
+			retired = *shared
+			snapshot, found := retired.Journals[uid]
+			if !found || string(snapshot.Metadata().UID) != memberStore.ExpectedUID {
+				return fail(fmt.Errorf("survivor withdrawal journal incarnation changed"))
+			}
+			var err error
+			retired.Withdrawal, err = attachment.ReadReceiveWithdrawal(retired.Inventory, uid, snapshot, retired.Mesh)
+			if err != nil {
+				return fail(err)
+			}
 		}
 		if !sameReceiveRevision(metadata, retired.Metadata) {
 			return fail(fmt.Errorf("survivor inventory changed during withdrawal admission"))

@@ -282,6 +282,10 @@ func verifySurvivorReceiveAdmission(t *testing.T, api kubernetes.Interface, stor
 		}
 	})
 
+	t.Run("shared-retirement-admission", func(t *testing.T) {
+		verifySharedSurvivorRetirements(t, api, store, scope, retiring, plan, w, key, cloudKey)
+	})
+
 }
 
 func completeReceiveTestJournal(t *testing.T, store handover.Store) handover.Snapshot {

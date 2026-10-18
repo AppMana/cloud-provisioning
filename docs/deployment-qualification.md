@@ -425,6 +425,15 @@ latency, native absence or completion within the receipt lifetime. Inject an
 inventory revision change at the final survivor boundary and require rejection;
 this API race test does not establish live cross-object atomicity.
 
+With multiple withdrawals, survivor admission authenticates the shared reserved
+histories and route ownership once per call. Bind each withdrawal to that same
+inventory, journal incarnation and mesh snapshot, then independently recheck its
+captured consumer and live sources. Never cache this admission across calls.
+The two-retirement API fixture bounds root reads and rejects missing or replaced
+sibling consumers, malformed records and concurrent inventory changes. It uses
+synthetic terminal proofs and no predecessor ancestry; it does not establish
+actual owner deletion, native cleanup, live latency or authenticated completion.
+
 Before native phase execution and during neighbor reconciliation, intermediate
 guards may reuse fully admitted retirement histories while re-reading every
 reserved journal, inventory, mesh

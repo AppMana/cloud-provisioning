@@ -506,6 +506,25 @@ readers reject its new field, so activating writes requires compatible readers
 and rollback qualification first. Existing completion authority hashes are not
 reinterpreted to accommodate finalized records.
 
+The authenticated finalization layer consumes verified completion and rechecks
+caller-supplied ownership/policy, current receipt incarnations, source revisions
+and observation age at the conditional write boundary. Its typed record binds
+the consumed evidence, captured inventory metadata, mesh/journal identities and
+observation policy. The record time is controller verification time, not an API
+server transaction timestamp; observation age is checked again before submission.
+The historical reader validates receipt age at that recorded time. It does not
+extend receipts into current absence authority, and intentionally does not treat
+a subsequent consumer boot as erasing historical consumption. Agents still need
+local durable-fence admission and current native checks; release needs separate
+live ownership checks. Neither layer is activated by live reconciliation yet.
+
+Real-token finalization tests reject owner/source changes, a consumer reboot,
+expiry during the final check and a racing API write. Lost responses retain
+verifiable evidence; altered records and incomplete identity/binding data fail.
+A deterministic future-time projection is not an elapsed-time soak. Native
+cleanup is synthetic, the fixture has one consumer, and metadata or simulated
+boot changes do not qualify real reboot recovery or address reuse.
+
 Finalization remains a separate protocol: persist an irreversible retirement
 record before removing active reservations, retain durable host fences against
 old boot recovery, and admit new ownership only after matching release evidence.

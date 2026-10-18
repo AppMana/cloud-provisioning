@@ -68,16 +68,9 @@ func ReadPreparedReceiveWithdrawal(inventory tunnel.ReceiveInventory, machineUID
 
 func readReceiveWithdrawalStage(inventory tunnel.ReceiveInventory, machineUID string, snapshot handover.Snapshot, mesh *corev1.Secret, withdrawn bool) (RemoteWithdrawalIntent, error) {
 	fail := func(err error) (RemoteWithdrawalIntent, error) { return RemoteWithdrawalIntent{}, err }
-	raw := inventory.Publications[machineUID].Retirement
-	var record receiveWithdrawalRecord
-	d := json.NewDecoder(bytes.NewReader(raw))
-	d.DisallowUnknownFields()
-	if err := d.Decode(&record); err != nil {
+	record, err := decodeReceiveWithdrawalRecord(inventory.Publications[machineUID].Retirement, machineUID)
+	if err != nil {
 		return fail(err)
-	}
-	var trailing any
-	if err := d.Decode(&trailing); err != io.EOF {
-		return fail(fmt.Errorf("trailing withdrawal data"))
 	}
 	history, err := snapshot.Transition().Bytes()
 	if err != nil {
@@ -90,4 +83,31 @@ func readReceiveWithdrawalStage(inventory tunnel.ReceiveInventory, machineUID st
 		return fail(err)
 	}
 	return record.Withdrawal, nil
+}
+
+// RecordedReceiveWithdrawal decodes persisted intent without granting execution
+// authority. Offline recovery may use it only to exclude peers after matching
+// the entire inventory to a previously verified native observation. Live callers
+// must use ReadReceiveWithdrawal to validate publication and terminal history.
+func RecordedReceiveWithdrawal(raw []byte, machineUID string) (RemoteWithdrawalIntent, error) {
+	record, err := decodeReceiveWithdrawalRecord(raw, machineUID)
+	return record.Withdrawal, err
+}
+
+func decodeReceiveWithdrawalRecord(raw []byte, machineUID string) (receiveWithdrawalRecord, error) {
+	fail := func(err error) (receiveWithdrawalRecord, error) { return receiveWithdrawalRecord{}, err }
+	var record receiveWithdrawalRecord
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&record); err != nil {
+		return fail(err)
+	}
+	var trailing any
+	if err := d.Decode(&trailing); err != io.EOF {
+		return fail(fmt.Errorf("trailing withdrawal data"))
+	}
+	if record.Version != 1 || machineUID == "" || record.Withdrawal.MachineUID != machineUID || len(record.JournalSHA256) != 64 {
+		return fail(fmt.Errorf("invalid recorded withdrawal identity"))
+	}
+	return record, nil
 }

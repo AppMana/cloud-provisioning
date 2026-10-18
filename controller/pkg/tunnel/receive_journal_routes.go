@@ -16,7 +16,7 @@ type ReceiveJournalRoutes struct {
 	Plans     map[string]ReceiveTransitionPlan
 	Sources   map[string]ReceiveSiteTunnel
 	// Withdrawn remains reserved but must never be restored as an ordinary peer.
-	Withdrawn map[string]ReceiveTransitionPlan
+	Withdrawn map[string]string
 }
 
 // PlanReceiveJournalRoutes validates the complete caller-admitted journal set
@@ -178,9 +178,9 @@ func PlanReceiveSurvivorRoutes(snapshots []handover.Snapshot, clusterUID string,
 		}
 	}
 	if len(withdrawn) != 0 {
-		serving.Withdrawn = map[string]ReceiveTransitionPlan{}
+		serving.Withdrawn = map[string]string{}
 		for uid := range withdrawn {
-			serving.Withdrawn[uid] = reserved.Plans[uid]
+			serving.Withdrawn[uid] = reserved.Plans[uid].RootPublicKey
 		}
 	}
 	return ReceiveSurvivorRoutes{Reserved: reserved, Serving: serving}, nil

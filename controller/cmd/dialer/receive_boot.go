@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.org/x/sys/unix"
@@ -141,11 +142,6 @@ func admitReceiveBoot(ctx context.Context, cfg config, native func(receiveBootSt
 	if boot == inventory.BootID {
 		return true, nil
 	} // The live agent owns same-boot reconciliation.
-	for _, publication := range inventory.Inventory.Publications {
-		if len(publication.Retirement) != 0 {
-			return true, fmt.Errorf("boot recovery requires live receiver retirement reconciliation")
-		}
-	}
 	entries, err := os.ReadDir(filepath.Dir(lock.Name()))
 	if err != nil {
 		return true, err
@@ -197,11 +193,6 @@ func admitReceiveBoot(ctx context.Context, cfg config, native func(receiveBootSt
 	}
 	legacyObservationPath := lock.Name() + ".native-" + store.Name + ".json"
 	allowed := map[string]bool{filepath.Base(inventoryPath): true, filepath.Base(journalPath): true, filepath.Base(observationPath): true, filepath.Base(legacyObservationPath): true}
-	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), filepath.Base(lock.Name())+".") && !allowed[entry.Name()] {
-			return true, fmt.Errorf("boot recovery has an unaccounted checkpoint")
-		}
-	}
 	cfg.nodeName = inventory.NodeName
 	cfg.routeTable, cfg.fwmark, cfg.mtu = network.RouteTable, network.FWMark, network.MTU
 	cfg.listenPort, cfg.keepaliveSecs = network.ListenPort, network.KeepaliveSeconds
@@ -209,9 +200,56 @@ func admitReceiveBoot(ctx context.Context, cfg config, native func(receiveBootSt
 	if err != nil {
 		return true, err
 	}
+	// Only the inventory digest bound to successful native readback may supply
+	// exclusions. These records cannot add routes, replay retirement or release
+	// ownership. The local worker itself must still be serving.
+	for _, uid := range inventory.Inventory.MachineUIDs {
+		publication := inventory.Inventory.Publications[uid]
+		if len(publication.Retirement) == 0 {
+			continue
+		}
+		if uid == machineUID || publication.JournalUID == "" || len(publication.Plan) != 0 {
+			return true, fmt.Errorf("boot recovery cannot restore a retiring worker")
+		}
+		withdrawal, err := attachment.RecordedReceiveWithdrawal(publication.Retirement, uid)
+		if err != nil {
+			return true, err
+		}
+		if withdrawal.MeshNamespace != scope.Namespace || withdrawal.MeshName != scope.MeshName || withdrawal.MeshUID != scope.MeshUID || withdrawal.MachineName == "" || withdrawal.DrainIntent == "" || withdrawal.SourceVersion == "" || withdrawal.PublicKey == recovered.Plan.RootPublicKey {
+			return true, fmt.Errorf("boot withdrawal differs from verified inventory")
+		}
+		consumer := false
+		for _, retained := range withdrawal.Consumers {
+			consumer = consumer || (!retained.Site && retained.NodeName == inventory.NodeName && retained.NodeUID == inventory.NodeUID && retained.PublicKey == key.PublicKey().String() && retained.MachineName == recovered.Plan.MachineName && retained.SecretUID == recovered.Plan.AdoptionUID)
+		}
+		if !consumer {
+			return true, fmt.Errorf("boot withdrawal does not retain the local worker")
+		}
+		public, err := wgtypes.ParseKey(withdrawal.PublicKey)
+		if err != nil || public == (wgtypes.Key{}) {
+			return true, fmt.Errorf("boot withdrawal has invalid peer identity")
+		}
+		if routes.Withdrawn == nil {
+			routes.Withdrawn = map[string]string{}
+		}
+		routes.Withdrawn[uid] = withdrawal.PublicKey
+	}
 	view := routes.Views[machineUID]
 	if !view.Complete {
 		return true, fmt.Errorf("boot recovery cannot advance unfinished intent")
+	}
+	neighbors, err := readReceiveBootNeighborFiles(lock.Name(), inventory, routes.Withdrawn)
+	if err != nil {
+		return true, err
+	}
+	for path, raw := range neighbors {
+		files[path] = raw
+		allowed[filepath.Base(path)] = true
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), filepath.Base(lock.Name())+".") && !allowed[entry.Name()] {
+			return true, fmt.Errorf("boot recovery has an unaccounted checkpoint %s", entry.Name())
+		}
 	}
 	state := receiveBootState{Config: cfg, Key: key, Plan: recovered.Plan, View: view, Routes: routes, NodeUID: inventory.NodeUID}
 	selections, err := receiveEndpointSelections(routes, inventory.NodeUID)

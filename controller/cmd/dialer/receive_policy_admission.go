@@ -202,7 +202,7 @@ func planSelectedCloudReceivePolicy(cfg config, key wgtypes.Key, plan tunnel.Rec
 	for _, peer := range selected.Peers {
 		withdrawn := false
 		for _, retired := range intent.Withdrawn {
-			if retired.RootPublicKey == peer.PublicKey {
+			if retired == peer.PublicKey {
 				if !peer.Remote {
 					return nil, fmt.Errorf("withdrawn cloud peer has site permissions")
 				}

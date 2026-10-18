@@ -96,6 +96,7 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 	devices, err := wgctrl.New()
 	must(err)
 	defer devices.Close()
+	cfg.receiveRecoveryDevices = devices
 	link := &netlink.Wireguard{LinkAttrs: netlink.LinkAttrs{Name: cfg.iface}}
 	must(netlink.LinkAdd(link))
 	defer netlink.LinkDel(link)
@@ -119,7 +120,11 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 	selected := selections[0]
 	receiver := &netlink.Wireguard{LinkAttrs: netlink.LinkAttrs{Name: selected.Interface, Alias: selected.Alias}}
 	must(netlink.LinkAdd(receiver))
-	defer netlink.LinkDel(receiver)
+	defer func() {
+		if current, err := netlink.LinkByName(selected.Interface); err == nil {
+			_ = netlink.LinkDel(current)
+		}
+	}()
 	must(netlink.LinkSetAlias(receiver, selected.Alias))
 	must(netlink.LinkSetUp(receiver))
 	scopeName, err := local.ReceiveScope()
@@ -231,7 +236,7 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 		deadline := time.Now().Add(10 * time.Second)
 		for {
 			err = maintainCompletedReceivePhase(ctx, api, survivorStore, survivorScope, cfg, localKey, "agent", func(ctx context.Context, p tunnel.ReceiveTransitionPlan, v handover.View, uid string, serving tunnel.ReceiveJournalRoutes) error {
-				if len(serving.Plans) != 1 || serving.Withdrawn[target.MachineUID].RootPublicKey != target.RootPublicKey {
+				if len(serving.Plans) != 1 || serving.Withdrawn[target.MachineUID] != target.RootPublicKey {
 					return fmt.Errorf("survivor lost withdrawn ownership")
 				}
 				if err := restoreCompletedReceiveState(ctx, devices, cfg, localKey, p, v, uid, serving); err != nil {
@@ -270,6 +275,68 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 		if peer.PublicKey == targetKey.PublicKey() {
 			t.Fatal("maintenance revived withdrawn root peer")
 		}
+	}
+	// Rebind actual successful readback to a simulated previous boot, then lose
+	// the receiver. Keep all emitted files so offline admission sees the same
+	// retained inventory and auxiliary checkpoints that a restart would see.
+	lockPath := filepath.Join(filepath.Dir(cfg.peersFile), cfg.iface+".reconcile.lock")
+	inventoryPath := lockPath + ".inventory.json"
+	journalPath := lockPath + "." + localJournal.Name + ".json"
+	observationPath := receiveNativeObservationPath(journalPath, localJournal.Name)
+	read := func(path string, value any) {
+		t.Helper()
+		raw, err := os.ReadFile(path)
+		must(err)
+		must(json.Unmarshal(raw, value))
+	}
+	var bootInventory receiveInventoryCheckpoint
+	var bootJournal receiveJournalCheckpoint
+	var bootObservation receiveNativeObservation
+	read(inventoryPath, &bootInventory)
+	read(journalPath, &bootJournal)
+	read(observationPath, &bootObservation)
+	var bootEndpoints receiveBootEndpoints
+	read(receiveBootEndpointsPath(observationPath), &bootEndpoints)
+	bootInventory.BootID, bootJournal.BootID, bootObservation.BootID = "previous-boot", "previous-boot", "previous-boot"
+	must(writeDurableJSON(inventoryPath, bootInventory))
+	must(writeDurableJSON(journalPath, bootJournal))
+	inventoryBytes, err := os.ReadFile(inventoryPath)
+	must(err)
+	bootObservation.InventorySHA256 = fmt.Sprintf("%x", sha256.Sum256(inventoryBytes))
+	must(writeDurableJSON(observationPath, bootObservation))
+	must(writeReceiveBootEndpoints(observationPath, bootEndpoints.Endpoints))
+	must(netlink.LinkDel(receiver))
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		handled, err := recoverReceiveBoot(ctx, devices, cfg)
+		if !handled {
+			t.Fatal("survivor reboot fell through to legacy")
+		}
+		if err == nil {
+			if time.Now().After(deadline) {
+				t.Fatal("survivor boot recovery exceeded ten seconds")
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("survivor boot recovery", err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	routes, err = netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{Table: cfg.routeTable}, netlink.RT_FILTER_TABLE)
+	must(err)
+	if len(routes) != 2 {
+		t.Fatal("boot recovery lost survivor routes", routes)
+	}
+	for _, route := range routes {
+		if route.Dst == nil || (route.Dst.String() != "10.90.0.0/24" && route.Dst.String() != "fd90::/64") {
+			t.Fatal("boot recovery revived withdrawn destination", route)
+		}
+	}
+	live, err = devices.Device(cfg.iface)
+	must(err)
+	if len(live.Peers) != 1 || live.Peers[0].PublicKey != foreignKey.PublicKey() {
+		t.Fatal("boot recovery changed unrelated peers or revived withdrawal")
 	}
 }
 

@@ -62,7 +62,7 @@ func TestCloudReceivePolicyProjection(t *testing.T) {
 				view := handover.View{Round: handover.Round{Spec: spec}, Complete: true, ServingGeneration: spec.ToGeneration}
 				intent := tunnel.ReceiveJournalRoutes{Plans: map[string]tunnel.ReceiveTransitionPlan{plan.MachineUID: plan}, Views: map[string]handover.View{}, Legacy: map[string]tunnel.ReceiveTransitionPlan{}}
 				if retiredPublic != "" {
-					intent.Withdrawn = map[string]tunnel.ReceiveTransitionPlan{"retired": {MachineUID: "retired", RootPublicKey: retiredPublic}}
+					intent.Withdrawn = map[string]string{"retired": retiredPublic}
 				}
 				intent.Receivers, err = tunnel.PlanReceiveRoutes(plan)
 				if err != nil {

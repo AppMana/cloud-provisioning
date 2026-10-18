@@ -57,7 +57,7 @@ func planReceiveAdvertisements(cfg config, saved *siteForwardingCache, nodeUID s
 			continue
 		}
 		for _, withdrawn := range intent.Withdrawn {
-			if peer.PublicKey == withdrawn.RootPublicKey {
+			if peer.PublicKey == withdrawn {
 				return nil, fmt.Errorf("advertisement cache still contains a withdrawn worker")
 			}
 		}

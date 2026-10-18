@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -91,7 +92,7 @@ func writeReceiveBootFixture(t *testing.T, cfg config, root wgtypes.Key, plan tu
 
 func TestReceiveBootAdmission(t *testing.T) {
 	for _, legacy := range []bool{false, true} {
-		for _, fault := range []string{"valid", "unverified", "inventory", "local-set", "network", "identity", "allocation", "extra-journal", "same-boot", "changed-during-native", "cancelled", "busy", "unfinished", "retirement", "same-boot-retirement", "same-boot-retirement-identity"} {
+		for _, fault := range []string{"valid", "unverified", "inventory", "local-set", "network", "identity", "allocation", "extra-journal", "same-boot", "changed-during-native", "cancelled", "busy", "unfinished", "retirement", "same-boot-retirement", "same-boot-retirement-identity", "withdrawn-survivor", "withdrawn-scope", "withdrawn-consumer", "withdrawn-stale-observation", "withdrawn-journal-uid"} {
 			t.Run(fmt.Sprintf("legacy-%t/%s", legacy, fault), func(t *testing.T) {
 				must := func(err error) {
 					t.Helper()
@@ -117,6 +118,38 @@ func TestReceiveBootAdmission(t *testing.T) {
 					defer held.Close()
 				}
 				switch fault {
+				case "withdrawn-survivor", "withdrawn-scope", "withdrawn-consumer", "withdrawn-stale-observation", "withdrawn-journal-uid":
+					raw, err := os.ReadFile(inventoryPath)
+					must(err)
+					var inventory receiveInventoryCheckpoint
+					must(json.Unmarshal(raw, &inventory))
+					retired, err := wgtypes.GeneratePrivateKey()
+					must(err)
+					withdrawal := attachment.RemoteWithdrawalIntent{MeshNamespace: plan.Namespace, MeshName: plan.MeshName, MeshUID: plan.MeshUID, MachineName: "withdrawn-worker", MachineUID: "withdrawn-uid", PublicKey: retired.PublicKey().String(), DrainIntent: "test/delete", SourceVersion: "1", Consumers: []attachment.ConsumerTarget{{NodeName: plan.CloudNodeName, NodeUID: plan.CloudNodeUID, PublicKey: plan.RootPublicKey, MachineName: plan.MachineName, SecretUID: plan.AdoptionUID}}}
+					if fault == "withdrawn-scope" {
+						withdrawal.MeshUID = "different"
+					}
+					if fault == "withdrawn-consumer" {
+						withdrawal.Consumers = nil
+					}
+					record, err := json.Marshal(map[string]any{"version": 1, "journalSHA256": fmt.Sprintf("%x", sha256.Sum256([]byte("terminal-history"))), "withdrawal": withdrawal})
+					must(err)
+					if inventory.Inventory.Publications == nil {
+						inventory.Inventory.Publications = map[string]tunnel.ReceiveJournalPublication{}
+					}
+					publication := tunnel.ReceiveJournalPublication{JournalUID: "withdrawn-journal", Retirement: record}
+					if fault == "withdrawn-journal-uid" {
+						publication.JournalUID = ""
+					}
+					inventory.Inventory.Publications["withdrawn-uid"] = publication
+					inventory.Inventory.MachineUIDs = append(inventory.Inventory.MachineUIDs, "withdrawn-uid")
+					must(writeDurableJSON(inventoryPath, inventory))
+					if fault != "withdrawn-stale-observation" {
+						raw, err = os.ReadFile(inventoryPath)
+						must(err)
+						observation.InventorySHA256 = fmt.Sprintf("%x", sha256.Sum256(raw))
+						must(writeDurableJSON(observationPath, observation))
+					}
 				case "unfinished":
 					data, err := os.ReadFile(checkpointPath)
 					must(err)
@@ -196,6 +229,9 @@ func TestReceiveBootAdmission(t *testing.T) {
 				calls := 0
 				handled, err := admitReceiveBoot(ctx, cfg, func(state receiveBootState, check func() error) error {
 					calls++
+					if fault == "withdrawn-survivor" && (len(state.Routes.Plans) != 1 || len(state.Routes.Withdrawn) != 1 || state.Routes.Withdrawn["withdrawn-uid"] == "") {
+						t.Fatal("boot recovery lost withdrawal exclusion")
+					}
 					if state.Key != root || state.NodeUID != plan.CloudNodeUID || state.Config.routeTable != 518 || state.Config.mtu != 1400 || !state.View.Complete {
 						t.Fatal("boot recovery lost verified identity or network settings")
 					}
@@ -217,7 +253,7 @@ func TestReceiveBootAdmission(t *testing.T) {
 					}
 					return
 				}
-				if fault == "valid" {
+				if fault == "valid" || fault == "withdrawn-survivor" {
 					must(err)
 					if calls != 1 {
 						t.Fatal("valid boot not restored")

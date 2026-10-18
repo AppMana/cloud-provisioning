@@ -74,7 +74,7 @@ func TestReceiveSurvivorRoutes(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				want.Withdrawn = map[string]ReceiveTransitionPlan{retired.MachineUID: retired}
+				want.Withdrawn = map[string]string{retired.MachineUID: retired.RootPublicKey}
 				for _, order := range [][]handover.Snapshot{{frozen, serving}, {serving, frozen}} {
 					got, err := PlanReceiveSurvivorRoutes(order, "cluster", withdrawal)
 					if err != nil {

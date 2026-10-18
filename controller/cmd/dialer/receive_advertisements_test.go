@@ -72,7 +72,7 @@ func TestReceiveAdvertisementsFollowAllocationGeneration(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		intent.Withdrawn = map[string]tunnel.ReceiveTransitionPlan{"retired": {MachineUID: "retired", RootPublicKey: retired.PublicKey().String()}}
+		intent.Withdrawn = map[string]string{"retired": retired.PublicKey().String()}
 		data[tunnel.PeerPublicKeyPrefix+"retired"] = []byte(retired.PublicKey().String())
 		data[tunnel.PeerAllowedIPsPrefix+"retired"] = []byte("172.31.0.1/32")
 		defer func() {

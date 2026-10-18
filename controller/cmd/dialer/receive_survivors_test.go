@@ -166,8 +166,11 @@ func completeReceiveTestJournal(t *testing.T, store handover.Store) handover.Sna
 		if view.Complete {
 			break
 		}
-		at := view.Round.IssuedAt.Add(time.Second)
-		if view.Round.Phase == handover.Drain {
+		at := time.Now()
+		if earliest := view.Round.IssuedAt.Add(time.Second); at.Before(earliest) {
+			at = earliest
+		}
+		if view.Round.Phase == handover.Drain && at.Before(view.DrainUntil) {
 			at = view.DrainUntil
 		}
 		hash, err := view.Round.Digest()

@@ -519,6 +519,11 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 			return 0, fmt.Errorf("creating peer secret %s: %w", secretKey, err)
 		}
 	}
+	if progressed, err := r.reconcileOrphanReceiveWithdrawals(ctx, secret); err != nil {
+		return 0, err
+	} else if progressed {
+		return time.Second, nil
+	}
 	patch := client.MergeFromWithOptions(secret.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	if secret.Data == nil {
 		secret.Data = map[string][]byte{}

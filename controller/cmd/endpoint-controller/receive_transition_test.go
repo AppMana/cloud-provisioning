@@ -344,6 +344,7 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 					t.Fatal(err)
 				}
 			}
+			verifyOrphanReceiveReconciliation(t, r, store, current)
 			verifySuccessorPreparationProposal(t, r, machine, native, store, current)
 			// Each terminal outcome must reject newly published sources without
 			// rewriting the journal. This exercises controller admission against

@@ -54,11 +54,28 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 	}
 	snapshot := source.Journals[machineUID]
 	store.ExpectedUID = string(snapshot.Metadata().UID)
+	checkOrphan := func() error {
+		if !source.Withdrawal.Orphaned {
+			return nil
+		}
+		plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
+		if err != nil {
+			return err
+		}
+		resolver := attachment.MeshConsumerResolver{Reader: r.reader, Namespace: source.Mesh.Namespace, SecretName: source.Mesh.Name, SecretUID: string(source.Mesh.UID)}
+		return resolver.CheckReceiveOrphanAbsent(ctx, plan)
+	}
+	if err := checkOrphan(); err != nil {
+		return fail(err)
+	}
 	policies, err := r.retirementConsumerPolicies(ctx, api, policy, source.Mesh, source.Withdrawal.Consumers)
 	if err != nil {
 		return fail(err)
 	}
 	recheck := func() error {
+		if err := checkOrphan(); err != nil {
+			return err
+		}
 		current, err := r.retirementConsumerPolicies(ctx, api, policy, source.Mesh, source.Withdrawal.Consumers)
 		if err != nil {
 			return err

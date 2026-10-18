@@ -63,3 +63,48 @@ func TestAPIClientPreservesShorterDeadline(t *testing.T) {
 		t.Fatalf("shorter deadline was not retained: %v", err)
 	}
 }
+
+// A single phase admission in the real-API fixture performs 36 HTTP reads.
+// This responsive-server test covers the client-side burst budget only; it
+// does not prove native completion, server capacity or multi-node convergence.
+func TestAPIClientAllowsReceiptAdmissionBurst(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"apiVersion":"v1","kind":"Secret","metadata":{"name":"peers","namespace":"test"}}`))
+	}))
+	defer server.Close()
+	config := &rest.Config{Host: server.URL}
+	client, err := newAPIClient(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.QPS != 0 || config.Burst != 0 {
+		t.Fatal("mutated caller's rate budget")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	for i := 0; i < 36; i++ {
+		if _, err := client.CoreV1().Secrets("test").Get(ctx, "peers", metav1.GetOptions{}); err != nil {
+			t.Fatalf("responsive API admission throttled at read %d: %v", i+1, err)
+		}
+	}
+}
+
+func TestAPIClientPreservesExplicitRateBudget(t *testing.T) {
+	client, err := newAPIClient(&rest.Config{Host: "https://example.invalid", QPS: 7, Burst: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	limiter := client.CoreV1().RESTClient().GetRateLimiter()
+	if limiter.QPS() != 7 {
+		t.Fatal("explicit request rate changed")
+	}
+	for i := 0; i < 3; i++ {
+		if !limiter.TryAccept() {
+			t.Fatal("explicit burst reduced")
+		}
+	}
+	if limiter.TryAccept() {
+		t.Fatal("explicit burst exceeded")
+	}
+}

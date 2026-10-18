@@ -161,12 +161,80 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 			must(err)
 			var completion receiveRetirementCompletion
 			must(json.Unmarshal(record, &completion))
-			if completion.Version != 1 || completion.Binding != scope.Digest() || len(completion.Receipts) != 1 || completion.Receipts[0].AgentPodUID != string(pod.UID) || completion.Receipts[0].ObservedBootID != entry.BootID {
+			if completion.Version != 2 || completion.InventoryVersion != scope.inventory.ResourceVersion || completion.InventoryHash != scope.inventoryHash || completion.MeshVersion != mesh.ResourceVersion || completion.Binding != scope.Digest() || len(completion.Receipts) != 1 || completion.Receipts[0].AgentPodUID != string(pod.UID) || completion.Receipts[0].ObservedBootID != entry.BootID {
 				t.Fatal("lost authenticated completion identity")
 			}
 			if strings.Contains(string(record), entry.BearerToken) || len(v.MachineUIDs) != 1 || v.Publications[w.MachineUID].JournalUID != string(journal.UID) {
 				t.Fatal("completion persisted credential or released reservation")
 			}
+			verified, err := VerifyReceiveRetirementCompletion(ctx, api, store, ns, mesh.Name, string(mesh.UID), w.MachineUID, string(index.UID), time.Minute)
+			must(err)
+			if !verified {
+				t.Fatal("authenticated completion did not survive its own inventory write")
+			}
+			for _, damage := range []string{"version", "inventory-version", "inventory-hash", "mesh-version", "binding", "missing", "duplicate", "container", "stale", "phase"} {
+				t.Run("readback/"+damage, func(t *testing.T) {
+					var changed receiveRetirementCompletion
+					must(json.Unmarshal(record, &changed))
+					switch damage {
+					case "version":
+						changed.Version = 1
+					case "inventory-version":
+						changed.InventoryVersion = "different"
+					case "inventory-hash":
+						changed.InventoryHash = "different"
+					case "mesh-version":
+						changed.MeshVersion = "different"
+					case "binding":
+						changed.Binding = "different"
+					case "missing":
+						changed.Receipts = nil
+					case "duplicate":
+						changed.Receipts = append(changed.Receipts, changed.Receipts[0])
+					case "container":
+						changed.Receipts[0].AgentContainerID = "replacement"
+					case "stale":
+						changed.Receipts[0].ObservedAt = time.Now().Add(-time.Hour)
+					case "phase":
+						changed.Receipts[0].DeviceID = "receiver"
+					}
+					damaged, err := json.Marshal(changed)
+					must(err)
+					current, object, err := tunnel.ReadReceiveInventory(ctx, maps, "cluster", ns, mesh.Name, string(mesh.UID))
+					must(err)
+					publication := current.Publications[w.MachineUID]
+					publication.RetirementCompletion = damaged
+					current.Publications[w.MachineUID] = publication
+					raw, err := json.Marshal(current)
+					must(err)
+					object.Data["inventory.json"] = string(raw)
+					_, err = maps.Update(ctx, object, metav1.UpdateOptions{})
+					must(err)
+					if ok, err := VerifyReceiveRetirementCompletion(ctx, api, store, ns, mesh.Name, string(mesh.UID), w.MachineUID, string(index.UID), time.Minute); err == nil || ok {
+						t.Fatal("invalid completion authorized deletion")
+					}
+					current.Publications[w.MachineUID] = v.Publications[w.MachineUID]
+					raw, err = json.Marshal(current)
+					must(err)
+					object, err = maps.Get(ctx, index.Name, metav1.GetOptions{})
+					must(err)
+					object.Data["inventory.json"] = string(raw)
+					_, err = maps.Update(ctx, object, metav1.UpdateOptions{})
+					must(err)
+				})
+			}
+			currentNode, err := api.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+			must(err)
+			oldBoot := currentNode.Status.NodeInfo.BootID
+			currentNode.Status.NodeInfo.BootID = "reboot-after-completion"
+			currentNode, err = api.CoreV1().Nodes().UpdateStatus(ctx, currentNode, metav1.UpdateOptions{})
+			must(err)
+			if ok, err := VerifyReceiveRetirementCompletion(ctx, api, store, ns, mesh.Name, string(mesh.UID), w.MachineUID, string(index.UID), time.Minute); err == nil || ok {
+				t.Fatal("reboot reused old completion")
+			}
+			currentNode.Status.NodeInfo.BootID = oldBoot
+			_, err = api.CoreV1().Nodes().UpdateStatus(ctx, currentNode, metav1.UpdateOptions{})
+			must(err)
 			if err := RecordReceiveRetirementWithPodReceipts(ctx, api, store, string(index.UID), scope.Digest(), mesh, snapshot, []handover.PodReceipt{entry}, policies, time.Minute, func() error { return nil }); err == nil {
 				t.Fatal("stale binding reused after completion write")
 			}

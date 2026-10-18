@@ -208,7 +208,7 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 		}
 	})
 	t.Run("complete-set-admission", func(t *testing.T) {
-		verifyReceiveSetAdmission(t, api, store, scope, mesh, plan, site)
+		verifyReceiveSetAdmission(t, api, store, scope, mesh, plan, site, root)
 	})
 	// Concurrent receipt tests append observations using real API CAS writes.
 	snapshot, err = store.Load(ctx)
@@ -647,6 +647,7 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 			}
 		})
 	}
+	t.Run("fresh-successor-history", func(t *testing.T) { verifyFreshReceiveHistory(t, api, store, scope, root) })
 	raced := store
 	raced.ConfigMaps = &changingJournalReader{ConfigMapInterface: store.ConfigMaps, change: func() error {
 		cm, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})

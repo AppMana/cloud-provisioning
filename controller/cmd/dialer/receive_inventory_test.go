@@ -37,7 +37,7 @@ func (r receiveSetReader) Get(ctx context.Context, name string, opts metav1.GetO
 
 // The callback is a simulated native verifier. These tests prove complete-set
 // admission and durable fencing, not network continuity or native completion.
-func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, mesh *corev1.Secret, first tunnel.ReceiveTransitionPlan, site wgtypes.Key) {
+func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, mesh *corev1.Secret, first tunnel.ReceiveTransitionPlan, site, firstRoot wgtypes.Key) {
 	t.Helper()
 	ctx := context.Background()
 	_, originalIndex, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, scope.Namespace, scope.MeshName, scope.MeshUID)
@@ -49,6 +49,22 @@ func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store han
 	other.MachineName, other.MachineUID = "worker-two", "second-machine-uid"
 	other.CloudNodeName, other.CloudNodeUID = "cloud-two", "second-cloud-uid"
 	other.RootPublicKey = otherKey.PublicKey().String()
+	cloudNode, err := api.CoreV1().Nodes().Create(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: other.CloudNodeName}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	boot, err := localReceiveBootID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cloudNode.Status.NodeInfo.BootID = boot
+	cloudNode.Status.Conditions = []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}
+	cloudNode, err = api.CoreV1().Nodes().UpdateStatus(ctx, cloudNode, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other.CloudNodeUID = string(cloudNode.UID)
+
 	adoption, err := api.CoreV1().Secrets(scope.Namespace).Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: tunnel.AdoptionSecretName(other.MachineName)}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -481,6 +497,17 @@ func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store han
 			}
 		})
 	}
+
+	t.Run("nonlocal-successor-history", func(t *testing.T) {
+		otherScope := scope
+		otherScope.MachineUID = other.MachineUID
+		verifyFreshReceiveHistory(t, api, otherStore, otherScope, otherKey, func(candidate handover.Store) error {
+			firstStore := store
+			firstStore.ConfigMaps = candidate.ConfigMaps
+			_, err := loadReceiveSet(ctx, api, firstStore, scope, first.CloudNodeName, firstRoot)
+			return err
+		})
+	})
 	t.Run("replaced-inventory", func(t *testing.T) {
 		current, err := store.ConfigMaps.Get(ctx, originalIndex.Name, metav1.GetOptions{})
 		if err != nil {

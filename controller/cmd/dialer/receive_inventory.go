@@ -76,6 +76,15 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 			result.Local[uid] = admitted
 			snapshot = admitted.Snapshot
 		}
+		if !local {
+			// Nonlocal journals can own shared destinations. Their ancestry cannot be
+			// skipped merely because this process will not issue their phase receipts.
+			if _, found := snapshot.Predecessor(); found {
+				if _, err := currentStore.ArchiveNames(ctx, snapshot); err != nil {
+					return fail(err)
+				}
+			}
+		}
 		result.Journals[uid] = snapshot
 		snapshots = append(snapshots, snapshot)
 	}

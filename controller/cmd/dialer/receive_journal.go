@@ -44,6 +44,13 @@ func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store han
 	if metadata.Namespace != scope.Namespace || metadata.DeletionTimestamp != nil {
 		return fail(fmt.Errorf("receiver journal scope changed or is being deleted"))
 	}
+	// A fresh process has no checkpoint to compare. It still requires every
+	// pinned predecessor, including read access, before admitting a successor.
+	if _, found := snapshot.Predecessor(); found {
+		if _, err := store.ArchiveNames(ctx, snapshot); err != nil {
+			return fail(err)
+		}
+	}
 	plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
 	if err != nil {
 		return fail(err)

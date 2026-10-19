@@ -37,9 +37,14 @@ type receiveReceiptPolicy struct {
 	TrustSecret string            `json:"trustSecret,omitempty"`
 	// Enable only after compatible agents/controllers and rollback are qualified.
 	FinalizeOrphanRetirements bool `json:"finalizeOrphanRetirements,omitempty"`
+	// Requires separately qualified release-aware agents, recovery and rollback.
+	ReleaseOrphanRetirements bool `json:"releaseOrphanRetirements,omitempty"`
 }
 
 func (p receiveReceiptPolicy) validate() error {
+	if p.ReleaseOrphanRetirements && (!p.FinalizeOrphanRetirements || p.Endpoint == "" || p.TrustSecret == "") {
+		return fmt.Errorf("orphan release requires finalization and authenticated agent receipt delivery")
+	}
 	if p.Endpoint != "" || p.TrustSecret != "" {
 		u, err := url.Parse(p.Endpoint)
 		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || p.TrustSecret == "" {
@@ -106,11 +111,14 @@ func (r *meshReconciler) configureReceiptAgent(daemon *appsv1.DaemonSet) {
 	pollArg := "--poll-interval=" + interval.String()
 	args := make([]string, 0, len(agent.Args)+1)
 	for _, arg := range agent.Args {
-		if !strings.HasPrefix(arg, "--poll-interval=") {
+		if !strings.HasPrefix(arg, "--poll-interval=") && !strings.HasPrefix(arg, "--observe-finalized-retirements=") {
 			args = append(args, arg)
 		}
 	}
 	agent.Args = append(args, pollArg)
+	if p.ReleaseOrphanRetirements {
+		agent.Args = append(agent.Args, "--observe-finalized-retirements=true")
+	}
 	agent.Args = append(agent.Args, "--receipt-url="+p.Endpoint, "--receipt-ca-file="+directory+"/ca.crt", "--receipt-token-file="+directory+"/token", "--receive-mesh-name="+r.secretName)
 	agent.Env = append(agent.Env,
 		corev1.EnvVar{Name: "POD_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"}}},

@@ -106,6 +106,7 @@ func verifyFinalizingRetirementCollection(t *testing.T, api kubernetes.Interface
 			if err := collection.Complete(ctx, []handover.PodReceipt{entry}); err == nil {
 				t.Fatal("consumed completion replay accepted")
 			}
+			verifyReleasingRetirementCollection(t, api, store, mesh, machineUID, policy, entry)
 		})
 	}
 }

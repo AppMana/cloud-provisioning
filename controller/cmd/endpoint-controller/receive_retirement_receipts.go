@@ -87,6 +87,12 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 		// source after the independent owner and consumer-policy checks.
 		return nil
 	}
+	if policy.ReleaseOrphanRetirements && source.Withdrawal.Orphaned && len(source.Inventory.Publications[machineUID].RetirementFinalization) != 0 {
+		if err := policy.validate(); err != nil {
+			return fail(err)
+		}
+		return source.ReceiptCollectionWithRelease(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, recheck)
+	}
 	if policy.FinalizeOrphanRetirements && source.Withdrawal.Orphaned {
 		return source.ReceiptCollectionWithFinalization(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, recheck)
 	}

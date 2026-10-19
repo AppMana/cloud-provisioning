@@ -28,7 +28,7 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fault := range []string{"none", "native-error", "pod-before", "pod-after", "mesh-after", "inventory-after", "cancelled", "cancelled-after", "finalized", "finalized-native-error", "finalized-pod-after", "finalized-inventory-after", "finalized-corrupt"} {
+	for _, fault := range []string{"none", "native-error", "pod-before", "pod-after", "mesh-after", "inventory-after", "cancelled", "cancelled-after", "finalized", "finalized-native-error", "finalized-pod-after", "finalized-inventory-after", "finalized-corrupt", "finalized-release", "finalized-release-native-error", "finalized-release-pod-after", "finalized-release-inventory-after"} {
 		t.Run("retirement-execution/"+fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -40,6 +40,7 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 			pod, err = api.CoreV1().Pods(scope.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
 			must(err)
 			cfg := config{iface: "retireexec", nodeName: "site", privateKeyFile: filepath.Join(t.TempDir(), "key"), receiptPodName: pod.Name, receiptPodUID: string(pod.UID)}
+			cfg.observeFinalizedRetirements = strings.HasPrefix(fault, "finalized-release")
 			if fault == "pod-before" {
 				cfg.receiptPodUID = "replaced"
 			}
@@ -65,9 +66,9 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 				case "cancelled-after":
 					cancel()
 					return nil
-				case "native-error", "finalized-native-error":
+				case "native-error", "finalized-native-error", "finalized-release-native-error":
 					return errors.New("cleanup did not verify")
-				case "pod-after", "finalized-pod-after":
+				case "pod-after", "finalized-pod-after", "finalized-release-pod-after":
 					pod.Status.ContainerStatuses[0].ContainerID = "containerd://replacement"
 					pod, err = api.CoreV1().Pods(scope.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
 					return err
@@ -79,7 +80,7 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 					mesh.Annotations = map[string]string{"execution-race": fault}
 					_, e = api.CoreV1().Secrets(scope.Namespace).Update(ctx, mesh, metav1.UpdateOptions{})
 					return e
-				case "inventory-after", "finalized-inventory-after":
+				case "inventory-after", "finalized-inventory-after", "finalized-release-inventory-after":
 					index, e := store.ConfigMaps.Get(ctx, admitted.Metadata.Name, metav1.GetOptions{})
 					if e != nil {
 						return e
@@ -97,7 +98,7 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 				}
 				return
 			}
-			if fault != "none" {
+			if fault != "none" && fault != "finalized-release" {
 				if runErr == nil || len(receipts) != 0 {
 					t.Fatal("failed cleanup emitted receipt")
 				}

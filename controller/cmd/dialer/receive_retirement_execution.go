@@ -23,8 +23,9 @@ type receiveRetirementNative func(context.Context, string, admittedReceiveRetire
 // verification and renewed identity/source checks. The controller independently
 // authenticates and ages it. Source changes suppress receipts without undoing
 // cleanup; retry must admit the current state. Call without holding the host lock.
-// Verified finalization returns no receipts after the same local cleanup checks;
-// historical evidence never substitutes for current native verification.
+// Finalized maintenance returns no receipts by default. Explicit release
+// observation uses the same cleanup and checkpoints, then emits a fresh bound
+// receipt; historical evidence never substitutes for native verification.
 func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveRetirementNative) (result []handover.PodReceipt, resultErr error) {
 	timing := newReceiveTiming(cfg.receiptURL != "", "retirement")
 	defer func() { timing.finish(resultErr == nil) }()
@@ -105,9 +106,11 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 		if err := verifyAgent(); err != nil {
 			return nil, err
 		}
-		// Successful local maintenance is not a new distributed completion.
-		// Keep all reservations and checkpoints; send no historical receipt.
-		return nil, ctx.Err()
+		// Release observation must still pass the post-native digest and agent
+		// checks below. Never replay the historical completion as a new proof.
+		if !cfg.observeFinalizedRetirements {
+			return nil, ctx.Err()
+		}
 	}
 	timing.step("post-native-binding")
 	refreshed, err := attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(current.Metadata.UID), current.Journals[scope.MachineUID], current.Mesh)

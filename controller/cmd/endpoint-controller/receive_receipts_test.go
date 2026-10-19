@@ -261,6 +261,54 @@ func TestReceiveReceiptPolicy(t *testing.T) {
 	}
 }
 
+// Activation changes agent behavior only for an explicitly configured release
+// policy. This is configuration validation, not live release qualification.
+func TestOrphanReleasePolicyAndAgentOptIn(t *testing.T) {
+	base := receiveReceiptPolicy{BindAddress: ":9444", CertFile: "/tls/cert", KeyFile: "/tls/key", ImageIDs: map[string]string{"amd64": "sha256:" + strings.Repeat("a", 64)}, Endpoint: "https://receipts.invalid/v1/receipts", TrustSecret: "trust"}
+	for _, fault := range []string{"disabled", "enabled", "without-finalization", "without-delivery", "without-trust"} {
+		t.Run(fault, func(t *testing.T) {
+			p := base
+			p.ReleaseOrphanRetirements, p.FinalizeOrphanRetirements = true, true
+			switch fault {
+			case "disabled":
+				p.ReleaseOrphanRetirements, p.FinalizeOrphanRetirements = false, false
+			case "without-finalization":
+				p.FinalizeOrphanRetirements = false
+			case "without-delivery":
+				p.Endpoint = ""
+			case "without-trust":
+				p.TrustSecret = ""
+			}
+			valid := fault == "disabled" || fault == "enabled"
+			if err := p.validate(); (err == nil) != valid {
+				t.Fatalf("unexpected release policy result: %v", err)
+			}
+			if !valid {
+				return
+			}
+			r := &meshReconciler{receivePreparation: &receivePreparationPolicy{Journal: &receiveJournalPolicy{MaxReceiptAge: metav1.Duration{Duration: time.Minute}, Receipts: &p}}}
+			daemon := &appsv1.DaemonSet{Spec: appsv1.DaemonSetSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "dialer", Args: []string{"--observe-finalized-retirements=true"}}}}}}}
+			r.configureReceiptAgent(daemon)
+			count := 0
+			for _, arg := range daemon.Spec.Template.Spec.Containers[0].Args {
+				if strings.HasPrefix(arg, "--observe-finalized-retirements=") {
+					count++
+					if arg != "--observe-finalized-retirements=true" {
+						t.Fatal("incorrect release observation argument")
+					}
+				}
+			}
+			expected := 0
+			if p.ReleaseOrphanRetirements {
+				expected = 1
+			}
+			if count != expected {
+				t.Fatal("release observation opt-in did not follow controller policy", count)
+			}
+		})
+	}
+}
+
 // Reuses the committed controller plan and real API-backed reservation, while
 // varying live participant objects without modifying the preparation fixture.
 func verifyReceiveReceiptAdmission(t *testing.T, original *meshReconciler, snapshot handover.Snapshot, plan tunnel.ReceiveTransitionPlan) {

@@ -600,9 +600,9 @@ Real-API storage tests exercise invalid or changed evidence, denied authority,
 concurrent reservation, cancellation, lost response, identical retry, attempted
 resurrection and preservation of unrelated ownership. Their finalization and
 release authority are synthetic. They do not prove consumer fencing, native
-absence, safe address reuse, reboot recovery or live release. The primitive has
-no live controller caller. Released-inventory admission and durable agent
-recovery must be completed and qualified before activation; unadmitted checkpoint
+absence, safe address reuse, reboot recovery or live release. The controller's
+release caller is disabled by default. Released-inventory admission and durable agent recovery must be completed and qualified before
+activation; unadmitted checkpoint
 shrinkage remains rejected. Older strict readers reject `released`,
 so compatible deployment and rollback are prerequisites.
 
@@ -910,3 +910,32 @@ fixtures exercise empty and all-released membership, archive retention, repeat
 reconciliation, and incarnation mismatch. Release evidence and Role writes are
 synthetic in these fixtures; they do not qualify RBAC propagation, authenticated
 release, actual agent recovery, or live address allocation.
+
+The receipt policy's `releaseOrphanRetirements` setting defaults to false and
+requires `finalizeOrphanRetirements` plus authenticated agent receipt delivery.
+Enable it only after release-aware readers, durable recovery, native reuse and
+the rollback candidate are qualified. It opts agents into fresh native-absence
+observations after finalization; default finalized maintenance still suppresses
+receipts. Every observation requires the existing host lock, durable withdrawal
+checkpoint, native cleanup, current agent/boot identity and post-cleanup source
+checks. The post-finalization digest cannot reuse consumed completion receipts.
+
+For finalized orphan withdrawals, the controller reuses the bounded receipt
+collector and current image/consumer policies. Completion authenticates every
+current consumer, pins the exact inventory/mesh/journal source, rechecks owner
+absence, and checks observation incarnation and age again at the release write
+boundary. The exact finalized publication moves to retained released history;
+consumed completion and finalization are not renewed. An ambiguous response
+requires historical readback; the old collection cannot perform a second release.
+Ordinary deletion does not use this release path. Disabling the policy stops new
+release observations and writes; it does not erase existing released records.
+
+Real-token/API tests exercise missing finalization or policy, invalid credentials,
+wrong image policy, consumed receipt replay, incomplete/stale batches, owner and
+inventory changes, boot replacement, expiry/cancellation at the write boundary,
+CAS conflicts, lost responses and successful release. Agent tests exercise fresh
+post-finalization observation and suppression on native, identity or source
+failure. Native observations and rollout policy are synthetic in these fixtures;
+they do not establish live controller routing, multi-consumer release timing,
+RBAC propagation, actual reboot recovery, or version rollback. Activation remains
+subject to those separate lifecycle checks.

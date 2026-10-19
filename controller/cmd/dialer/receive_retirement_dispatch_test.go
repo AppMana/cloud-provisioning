@@ -50,7 +50,7 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 	}
 	faults := []string{"none", "follower", "missing-backend", "native-error", "container-race", "delivery-failure", "later-api-error", "priority-api-error"}
 	if len(finalized) == 1 && finalized[0] {
-		faults = []string{"finalized"}
+		faults = []string{"finalized", "finalized-release"}
 	}
 	for _, fault := range faults {
 		t.Run("retirement-dispatch/"+fault, func(t *testing.T) {
@@ -175,6 +175,7 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 			defer server.Close()
 			dir := t.TempDir()
 			cfg := config{iface: "retiredispatch", nodeName: currentNode.Name, secretNamespace: scope.Namespace, secretName: scope.MeshName, privateKeyFile: filepath.Join(dir, "key"), receiptURL: server.URL, receiptCAFile: filepath.Join(dir, "ca"), receiptTokenFile: filepath.Join(dir, "token"), receiptMeshName: scope.MeshName, receiptPodName: currentPod.Name, receiptPodUID: string(currentPod.UID)}
+			cfg.observeFinalizedRetirements = fault == "finalized-release"
 			must(os.WriteFile(cfg.privateKeyFile, []byte(key.String()), 0600))
 			must(os.WriteFile(cfg.receiptTokenFile, []byte("fixture-token"), 0600))
 			must(os.WriteFile(cfg.receiptCAFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw}), 0600))
@@ -212,7 +213,7 @@ func verifyReceiveRetirementDispatch(t *testing.T, api kubernetes.Interface, sto
 			if (fault == "later-api-error" || fault == "priority-api-error") && (!errors.Is(err, laterError) || !strings.Contains(err.Error(), "retirement requires a complete native cleanup backend")) {
 				t.Fatalf("lost an earlier dispatch failure: %v", err)
 			}
-			success := fault == "none" || fault == "follower" || fault == "finalized"
+			success := fault == "none" || fault == "follower" || fault == "finalized" || fault == "finalized-release"
 			if !handled || (err == nil) != success || phaseCalls != 0 {
 				t.Fatal("wrong dispatch outcome", handled, err, phaseCalls)
 			}

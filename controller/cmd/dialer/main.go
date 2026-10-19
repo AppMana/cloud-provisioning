@@ -78,6 +78,7 @@ type config struct {
 	machineNameFile                                              string
 	receiptURL, receiptCAFile, receiptTokenFile, receiptMeshName string
 	receiptPodName, receiptPodUID                                string
+	observeFinalizedRetirements                                  bool
 
 	nodeName       string
 	bgpListenPort  int
@@ -234,6 +235,7 @@ func main() {
 	flag.StringVar(&cfg.peersSecretNamespace, "peers-secret-namespace", "", "optional (with --peers-file): namespace of a Secret whose peers.json key overrides the file's peer list once readable: the adoption/reconciliation path")
 	flag.StringVar(&cfg.peersSecretName, "peers-secret-name", "", "optional (with --peers-file): name of the peer-list override Secret")
 	flag.StringVar(&cfg.machineNameFile, "machine-name-file", "", "optional (with --peers-file): file holding this machine's CAPI Machine name (written by cloud-init); the peer-list override Secret's name is derived from it: an alternative to --peers-secret-name that lets one shared DaemonSet spec serve per-machine Secrets")
+	flag.BoolVar(&cfg.observeFinalizedRetirements, "observe-finalized-retirements", false, "emit fresh native absence observations after finalization for controller-authorized release")
 	flag.StringVar(&cfg.receiptURL, "receipt-url", "", "optional HTTPS controller receipt endpoint")
 	flag.StringVar(&cfg.receiptCAFile, "receipt-ca-file", "", "trusted receipt serving CA file")
 	flag.StringVar(&cfg.receiptTokenFile, "receipt-token-file", "", "projected receipt-audience pod token file")

@@ -21,6 +21,12 @@ import (
 // may have committed, use ReadReleasedReceiveJournal for fresh historical
 // readback; an already released record must not be treated as active authority.
 func ReleaseFinalizedReceiveRetirement(ctx context.Context, api kubernetes.Interface, store handover.Store, namespace, meshName, meshUID, machineUID, inventoryUID string, maxAge time.Duration, check func(ReceiveRetirementSet) error) error {
+	return releaseFinalizedReceiveRetirement(ctx, api, store, namespace, meshName, meshUID, machineUID, inventoryUID, maxAge, check, nil)
+}
+
+// finalCheck runs after source rechecks at both release boundaries. Receipt
+// callers use it to reject observations that aged out during API reads.
+func releaseFinalizedReceiveRetirement(ctx context.Context, api kubernetes.Interface, store handover.Store, namespace, meshName, meshUID, machineUID, inventoryUID string, maxAge time.Duration, check func(ReceiveRetirementSet) error, finalCheck func() error) error {
 	if api == nil || store.ConfigMaps == nil || check == nil {
 		return fmt.Errorf("release requires API, retained history and live release authority")
 	}
@@ -45,6 +51,11 @@ func ReleaseFinalizedReceiveRetirement(ctx context.Context, api kubernetes.Inter
 		}
 		if err := source.Recheck(ctx, api, store); err != nil {
 			return err
+		}
+		if finalCheck != nil {
+			if err := finalCheck(); err != nil {
+				return err
+			}
 		}
 		return ctx.Err()
 	}

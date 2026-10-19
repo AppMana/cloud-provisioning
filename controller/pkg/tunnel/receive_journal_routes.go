@@ -15,7 +15,8 @@ type ReceiveJournalRoutes struct {
 	Legacy    map[string]ReceiveTransitionPlan
 	Plans     map[string]ReceiveTransitionPlan
 	Sources   map[string]ReceiveSiteTunnel
-	// Withdrawn remains reserved but must never be restored as an ordinary peer.
+	// Withdrawn roots must never be restored as ordinary peers, including after
+	// their reservations are released. This map does not reserve addresses.
 	Withdrawn map[string]string
 }
 

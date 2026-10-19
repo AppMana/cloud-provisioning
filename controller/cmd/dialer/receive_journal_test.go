@@ -112,7 +112,11 @@ func TestReceiveJournalAdmissionWithRealAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw, _ := json.Marshal(plan)
-	store := handover.Store{ConfigMaps: api.CoreV1().ConfigMaps(namespace.Name), ClusterUID: "admitted-cluster", Name: tunnel.ReceiveTransitionName(plan.MachineUID), OwnerReferences: []metav1.OwnerReference{{APIVersion: "apps/v1", Kind: "Deployment", Name: "controller", UID: "controller-uid"}}}
+	cluster, err := api.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := handover.Store{ConfigMaps: api.CoreV1().ConfigMaps(namespace.Name), ClusterUID: string(cluster.UID), Name: tunnel.ReceiveTransitionName(plan.MachineUID), OwnerReferences: []metav1.OwnerReference{{APIVersion: "apps/v1", Kind: "Deployment", Name: "controller", UID: "controller-uid"}}}
 	spec, err := tunnel.ReceiveTransitionSpec(plan, store.ClusterUID, fmt.Sprintf("%x", sha256.Sum256(raw)))
 	if err != nil {
 		t.Fatal(err)

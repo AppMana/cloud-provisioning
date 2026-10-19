@@ -282,6 +282,42 @@ func verifySurvivorReceiveAdmission(t *testing.T, api kubernetes.Interface, stor
 		}
 	})
 
+	// Exclusion planning can remove authority before checkpoint authentication;
+	// synthetic finalization must still fail before native execution is allowed.
+	t.Run("released-exclusions-before-checkpoint", func(t *testing.T) {
+		inventory, index, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, scope.Namespace, scope.MeshName, scope.MeshUID)
+		must(err)
+		original := index.DeepCopy()
+		defer func() {
+			current, err := store.ConfigMaps.Get(ctx, original.Name, metav1.GetOptions{})
+			must(err)
+			current.Data = original.Data
+			_, err = store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{})
+			must(err)
+		}()
+		p := inventory.Publications[plan.MachineUID]
+		p.RetirementCompletion, p.RetirementFinalization = json.RawMessage(`{}`), json.RawMessage(`{}`)
+		inventory.Released = map[string]tunnel.ReceiveJournalPublication{plan.MachineUID: p}
+		delete(inventory.Publications, plan.MachineUID)
+		inventory.MachineUIDs = []string{scope.MachineUID}
+		raw, err := json.Marshal(inventory)
+		must(err)
+		index.Data["inventory.json"] = string(raw)
+		_, err = store.ConfigMaps.Update(ctx, index, metav1.UpdateOptions{})
+		must(err)
+		set, err := loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
+		must(err)
+		if set.Routes.Withdrawn[plan.MachineUID] != plan.RootPublicKey || len(set.Routes.Plans) != 1 {
+			t.Fatal("released root lost its exclusion or retained active routes")
+		}
+		lock, err := lockReconciliation(cfg)
+		must(err)
+		defer lock.Close()
+		if err := checkpointReceiveSetLocked(ctx, api, store, scope, cfg, key, lock.Name(), set); err == nil {
+			t.Fatal("synthetic finalization authorized an executable checkpoint")
+		}
+	})
+
 	t.Run("shared-retirement-admission", func(t *testing.T) {
 		verifySharedSurvivorRetirements(t, api, store, scope, retiring, plan, w, key, cloudKey)
 	})

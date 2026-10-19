@@ -103,17 +103,31 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 			break
 		}
 	}
-	if scope.MachineUID == "" {
+	releasedOnly := scope.MachineUID == "" && !cloud && len(inventory.MachineUIDs) == 0 && len(inventory.Released) != 0
+	if scope.MachineUID == "" && !releasedOnly {
 		return fmt.Errorf("neighbor writer has no local reserved journal")
 	}
 	store.Name = tunnel.ReceiveTransitionName(scope.MachineUID)
 	timing.step("admission")
-	set, err := loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
+	var set admittedReceiveSet
+	var local admittedReceiveJournal
+	var released receiveReleasedCheckpointAdmission
+	if releasedOnly {
+		set, local, released, err = admitReleasedReceiveNeighbors(ctx, api, store, scope, cfg, key, lock.Name(), mesh)
+	} else {
+		set, err = loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
+		local = set.Local[scope.MachineUID]
+	}
 	if err != nil {
 		return err
 	}
 	timing.step("checkpoint")
-	if err := checkpointReceiveSetLocked(ctx, api, store, scope, cfg, key, lock.Name(), set); err != nil {
+	if releasedOnly {
+		err = checkpointReleasedReceiveNeighbors(ctx, api, store, cfg, key, lock.Name(), set, local, released)
+	} else {
+		err = checkpointReceiveSetLocked(ctx, api, store, scope, cfg, key, lock.Name(), set)
+	}
+	if err != nil {
 		return err
 	}
 	timing.step("planning")
@@ -135,7 +149,6 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	}
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
-	local := set.Local[scope.MachineUID]
 	var peers []tunnel.PeerSpec
 	plans := make([]tunnel.ReceiveTransitionPlan, 0, len(set.Routes.Plans))
 	for _, uid := range set.Inventory.MachineUIDs {
@@ -184,6 +197,13 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	if err != nil {
 		return err
 	}
+	for _, root := range set.Routes.Withdrawn {
+		for _, peer := range peers {
+			if peer.PublicKey == root {
+				return fmt.Errorf("withdrawn worker key remains published as an ordinary neighbor")
+			}
+		}
+	}
 	checkAgent := func() (string, error) {
 		pod, err := api.CoreV1().Pods(namespace).Get(ctx, cfg.receiptPodName, metav1.GetOptions{})
 		if err != nil {
@@ -218,7 +238,19 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		if !sameReceiveRevision(mesh.ObjectMeta, current.ObjectMeta) {
 			return fmt.Errorf("neighbor mesh publication changed")
 		}
-		if full {
+		if releasedOnly {
+			if full {
+				currentSet, currentLocal, _, err := admitReleasedReceiveNeighbors(ctx, api, store, scope, cfg, key, lock.Name(), current)
+				if err != nil {
+					return err
+				}
+				if !sameReceiveRevision(set.Metadata, currentSet.Metadata) || currentLocal.NodeUID != local.NodeUID || currentLocal.BootID != local.BootID {
+					return fmt.Errorf("released neighbor authority changed")
+				}
+			} else if err := released.recheck(ctx, api, store); err != nil {
+				return err
+			}
+		} else if full {
 			currentSet, err := loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
 			if err != nil {
 				return err
@@ -377,6 +409,9 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	}
 	if site := local.Plan.Sites[key.PublicKey().String()]; site.Legacy != nil && site.Legacy.Tunnel != nil {
 		allocated = site.Legacy.Tunnel.Addresses
+	}
+	if releasedOnly {
+		allocated = tunnel.SplitList(string(mesh.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName]), string(mesh.Data[tunnel.NodeTunnelAddress6Prefix+cfg.nodeName]))
 	}
 	commitRetirement := func() error {
 		if err := check(); err != nil {

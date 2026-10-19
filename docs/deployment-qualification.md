@@ -850,3 +850,37 @@ native work. Synthetic boot tests cover exclusion retention, changed files,
 identity mismatch, active/released overlap and missing readback; they do not
 prove actual reboot, authenticated release, all-retired recovery, retained local
 participant-journal recovery or native address reuse.
+
+Finalized reservation release must read and verify the retained finalization
+before invoking live release policy for that exact admitted source. Repeat the
+policy and full source checks immediately before the inventory conditional
+write. A policy denial, cancellation, source change or conflict must preserve
+active ownership. A lost response requires fresh historical readback; an already
+released record cannot re-enter active release admission. Real-token/API tests
+cover these boundaries with synthetic native cleanup and live-policy callbacks.
+They do not qualify consumer recovery, compatible rollout/rollback, current
+native absence, live controller release or address reuse; no live release caller
+is enabled by these tests.
+
+When all receiver reservations have been released, dispatch must retain the
+phase-aware path instead of falling back to legacy cache replay. A directly
+published site may maintain ordinary neighbors through the existing reconciler
+after admitting all released histories, its current key/address/Node/boot, and
+its durable local retirement records. Preserve retired journal files, reject
+republishing a retired worker key, and recheck mesh, inventory and agent identity
+through native execution. Cloud workers still need an active local journal;
+this path does not admit relayed sites or followers without tunnel ownership.
+The isolated API fixture exercises a replacement key with the old address,
+previous-boot admission, missing local records, withdrawn site ownership,
+republication of the old key, native failure and in-flight source/agent changes.
+Its native callback and legacy finalization are synthetic: it does not qualify
+kernel address reuse, actual reboot, live controller release, a newly joined
+consumer, or mixed-version rollback.
+
+Released worker keys also remain exclusions while other journals are active.
+Exclusion planning alone cannot authorize execution: checkpoint admission must
+verify retained finalization and local records before native work. A replacement
+key may reuse released addresses, but an active plan or ordinary peer cannot
+restore the retired key. Tests distinguish this negative planning authority
+from authenticated executable checkpoints; synthetic finalization may produce
+exclusions but must not pass the execution boundary.

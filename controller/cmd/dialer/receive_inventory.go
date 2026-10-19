@@ -131,6 +131,9 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 	if !sameReceiveRevision(result.Metadata, current.ObjectMeta) {
 		return fail(fmt.Errorf("receiver inventory changed during admission"))
 	}
+	if err := appendReleasedReceiveExclusions(inventory, &result.Routes); err != nil {
+		return fail(err)
+	}
 	return result, nil
 }
 

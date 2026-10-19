@@ -266,3 +266,28 @@ func TestReceiveWithdrawnNeighborPeers(t *testing.T) {
 		})
 	}
 }
+
+// Empty-plan planning is not proof that reservations were released. Callers
+// must independently admit the complete inventory and historical fences.
+func TestReceiveNeighborsWithExplicitEmptyInventory(t *testing.T) {
+	peer := PeerSpec{PublicKey: receiverTestKey(127), Remote: true, Endpoint: "198.51.100.2:51820", WGAllowedIPs: []string{"172.29.0.1/32"}, RouteHosts: []string{"172.29.0.1"}}
+	plans := []ReceiveTransitionPlan{}
+	if got, err := PlanReceiveNeighborPeers([]PeerSpec{peer}, plans); err != nil || len(got) != 1 {
+		t.Fatalf("explicit empty inventory: %v %v", got, err)
+	}
+	if _, err := PlanReceiveNeighborPeers([]PeerSpec{peer}, nil); err == nil {
+		t.Fatal("missing inventory accepted")
+	}
+	if _, err := PlanReceiveCloudNeighborPeers([]PeerSpec{peer}, plans, receiverTestKey(126)); err == nil {
+		t.Fatal("cloud worker accepted without its own plan")
+	}
+	other := peer
+	other.PublicKey = receiverTestKey(125)
+	if _, err := PlanReceiveNeighborPeers([]PeerSpec{peer, other}, plans); err == nil {
+		t.Fatal("competing owners accepted")
+	}
+	got, err := PlanReceiveNeighborRetirements([]PeerSpec{peer}, []PeerSpec{}, plans)
+	if err != nil || len(got) != 1 || got[0].PublicKey != peer.PublicKey {
+		t.Fatalf("lost exact retirement intent: %v %v", got, err)
+	}
+}

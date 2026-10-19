@@ -135,4 +135,6 @@ func verifyReleasedCheckpointAdmission(t *testing.T, api kubernetes.Interface, s
 	if string(after) != string(journalBefore) {
 		t.Fatal("release admission rewrote retained local journal")
 	}
+	must(lock.Close())
+	verifyReleasedNeighborRecovery(t, api, store, scope, cfg, key)
 }

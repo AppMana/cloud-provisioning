@@ -100,5 +100,8 @@ func loadSurvivingReceiveSet(ctx context.Context, api kubernetes.Interface, stor
 			return fail(err)
 		}
 	}
+	if err := appendReleasedReceiveExclusions(inventory, &result.Routes); err != nil {
+		return fail(err)
+	}
 	return result, nil
 }

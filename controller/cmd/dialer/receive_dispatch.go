@@ -96,7 +96,9 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		}
 	}
 	if len(targets) == 0 {
-		return false, nil
+		// Keep released ownership on the phase-aware path. Ordinary neighbor
+		// admission must verify the retained fences before doing native work.
+		return len(inventory.Released) != 0, nil
 	}
 	key, allocated, err := receiveDispatchIdentity(cfg)
 	if err != nil {

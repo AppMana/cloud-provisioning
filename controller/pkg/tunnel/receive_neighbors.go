@@ -133,11 +133,16 @@ func planReceiveNeighborPeers(peers []PeerSpec, plans []ReceiveTransitionPlan, c
 }
 
 func planReceiveNeighborPeersWithWithdrawal(peers []PeerSpec, plans []ReceiveTransitionPlan, cloudRoot, withdrawnRoot string) ([]PeerSpec, error) {
-	if len(plans) == 0 || peers == nil {
-		return nil, fmt.Errorf("neighbor planning requires a complete peer document and reserved plans")
+	if plans == nil || peers == nil {
+		return nil, fmt.Errorf("neighbor planning requires a complete peer document and explicit plan inventory")
 	}
-	if _, err := PlanReceiveRouteSet(plans); err != nil {
-		return nil, err
+	// An explicitly empty inventory can follow verified retirement of the last
+	// receiver. Nil still means undiscovered authority. The caller must admit
+	// live inventory and retained retirement fences before native execution.
+	if len(plans) != 0 {
+		if _, err := PlanReceiveRouteSet(plans); err != nil {
+			return nil, err
+		}
 	}
 	reserved := map[string]bool{}
 	transport := map[string]bool{}

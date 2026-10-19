@@ -128,6 +128,16 @@ syscalls, application and CRI log timestamps, and original continuous observers.
 Retain all request failures and verify daemon, workload and cluster recovery.
 Such a diagnostic establishes a failure mechanism, not deployment readiness.
 
+Before a subsequent maintenance action, verify authenticated exec and log
+access to an unchanged workload on the restarted node through each required
+API endpoint. API `/readyz`, CRI readiness and a Node's existing `Ready`
+condition do not establish that the restarted kubelet is serving requests.
+Repeated restarts before that recovery can combine individually short outages
+into one continuous management outage. Keep the original observer running and
+measure the complete failure-to-recovery interval; do not reset it at restart
+boundaries. Qualify repeated failures separately from maintenance operations
+that wait for full recovery, retaining failures in both scenarios.
+
 ## Static-pod metadata across build changes
 
 `static-pod-metadata.patch` targets the same k0s base as the listener patch.

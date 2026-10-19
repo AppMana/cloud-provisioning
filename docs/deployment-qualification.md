@@ -983,3 +983,21 @@ and a marker changed during the native callback. Rejected initial admission must
 not invoke native recovery; the mutation case must fail the source recheck. This
 establishes admission behavior only, not VM reboot timing, kernel reconstruction,
 live API recovery or safety after reuse of a retired worker's address.
+
+Automatic Linux tunnel sizing uses the same 1420-byte ceiling as the Windows
+backend and reduces that budget for a smaller known egress interface. A jumbo
+underlay does not authorize a jumbo tunnel budget; explicit configured MTUs
+remain explicit overrides. IPv4 default-route discovery accepts both an omitted
+destination and an explicit `0.0.0.0/0` destination. The native ceiling scenario runs in isolated guest
+mount and network namespaces and checks the initial WireGuard device MTU for
+9001-, 1500-, 1450- and 1360-byte dummy underlays, repeated reconciliation,
+explicit overrides, and unchanged underlying links. It does not qualify an
+actual AWS path, IPv6 route selection, CNI configuration or workload delivery.
+
+A workload's initial packet budget must also fit the tunnel and any additional
+CNI encapsulation. A smaller tunnel device alone can still reject the first
+oversized DF reply from a pod with a larger interface MTU. A later fragmented
+reply after an ICMP MTU update does not turn that initial loss into a pass.
+Configure the owning CNI before workload creation and verify recreated pods;
+existing pods can retain their old MTU. Record request and response sizes
+separately, including application command prefixes and IP/UDP headers.

@@ -48,6 +48,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/apiproxy"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunneldevice"
 	"github.com/google/nftables"
 	"github.com/google/nftables/expr"
 	"github.com/vishvananda/netlink"
@@ -633,8 +634,9 @@ func setSysctl(name, value string) error {
 // mesh that may carry either), 8 of UDP, and 32 of WireGuard's own.
 const wireGuardOverhead = 80
 
-// underlayMTU sizes the tunnel from the interface that carries the
-// default route, since that is what the encapsulated packets leave by.
+// underlayMTU caps the automatic tunnel budget, reducing it further for the
+// interface carrying the default route. A jumbo local link must not silently
+// expand a budget shared with peers on ordinary links.
 //
 // Getting this wrong is not a broken tunnel, which is why it is worth
 // deriving rather than assuming. A tunnel one byte too large works for
@@ -643,20 +645,21 @@ const wireGuardOverhead = 80
 // two hops away, so the "packet too big" it must send goes back to a
 // pod it does not host, on a node it does not control.
 func underlayMTU() int {
-	const fallback = 1500 - wireGuardOverhead
+	const fallback = tunneldevice.DefaultTransportMTU
 	routes, err := netlink.RouteList(nil, netlink.FAMILY_V4)
 	if err != nil {
 		return fallback
 	}
 	for _, route := range routes {
-		if route.Dst != nil || route.LinkIndex == 0 {
+		// netlink can represent the default destination explicitly as /0.
+		if route.LinkIndex == 0 || (route.Dst != nil && route.Dst.String() != "0.0.0.0/0") {
 			continue // not the default route
 		}
 		link, err := netlink.LinkByIndex(route.LinkIndex)
 		if err != nil || link.Attrs().MTU == 0 {
 			continue
 		}
-		return link.Attrs().MTU - wireGuardOverhead
+		return min(fallback, link.Attrs().MTU-wireGuardOverhead)
 	}
 	return fallback
 }

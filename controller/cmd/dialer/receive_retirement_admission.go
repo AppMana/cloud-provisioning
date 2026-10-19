@@ -22,6 +22,9 @@ type admittedReceiveRetirement struct {
 // the durable local fence remain mandatory, including on a different boot.
 // Use the frozen journal's observation policy; a policy mismatch fails closed.
 func receiveRetirementFinalized(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, admitted admittedReceiveRetirement) (bool, error) {
+	if admitted.Withdrawal.MachineUID != scope.MachineUID || admitted.Inventory.Namespace != scope.Namespace || admitted.Inventory.MeshName != scope.MeshName || admitted.Inventory.MeshUID != scope.MeshUID {
+		return false, fmt.Errorf("retirement finalization scope differs from admission")
+	}
 	if len(admitted.Inventory.Publications[scope.MachineUID].RetirementFinalization) == 0 {
 		return false, nil
 	}
@@ -29,16 +32,14 @@ func receiveRetirementFinalized(ctx context.Context, api kubernetes.Interface, s
 	if err != nil {
 		return false, err
 	}
-	source, verified, err := attachment.ReadReceiveRetirementFinalization(ctx, api, store, scope.Namespace, scope.MeshName, scope.MeshUID, scope.MachineUID, string(admitted.Metadata.UID), view.Round.MaxReceiptAge)
+	verified, err := admitted.VerifyFinalization(ctx, api, store, string(admitted.Metadata.UID), view.Round.MaxReceiptAge)
 	if err != nil {
 		return false, err
 	}
-	current := admittedReceiveRetirement{ReceiveRetirementSet: source, NodeUID: admitted.NodeUID, BootID: admitted.BootID}
-	current.ReleasedJournals, err = loadReleasedReceiveJournals(ctx, store, source.Inventory)
-	if err != nil {
+	if err := recheckReleasedReceiveJournals(ctx, store, admitted.ReleasedJournals); err != nil {
 		return false, err
 	}
-	if !verified || !sameReceiveRetirement(admitted, current) {
+	if !verified {
 		return false, fmt.Errorf("retirement finalization changed during admission")
 	}
 	return true, ctx.Err()

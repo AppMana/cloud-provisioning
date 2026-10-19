@@ -939,3 +939,15 @@ failure. Native observations and rollout policy are synthetic in these fixtures;
 they do not establish live controller routing, multi-consumer release timing,
 RBAC propagation, actual reboot recovery, or version rollback. Activation remains
 subject to those separate lifecycle checks.
+
+Finalized agent execution verifies historical finalization against its freshly
+admitted retirement set instead of reconstructing the same ancestry again.
+Initial and post-native admission still read and validate the full history;
+historical verification rereads every live reserved journal, inventory and mesh,
+and the agent separately rechecks retained released journals. Real-API tests
+cover the live-read budget, changed scope and journal incarnation, cancellation,
+and inventory, mesh and journal mutation during verification. The journal race
+is injected before the first authority read, independent of map traversal order;
+sequential rechecks do not provide an atomic cluster snapshot. These tests use
+synthetic finalization and native callbacks and do not establish live latency,
+fresh multi-consumer quorum, release, reboot or rollback qualification.

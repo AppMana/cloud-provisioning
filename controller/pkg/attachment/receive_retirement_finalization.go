@@ -110,14 +110,34 @@ func ReadReceiveRetirementFinalization(ctx context.Context, api kubernetes.Inter
 	if err != nil {
 		return ReceiveRetirementSet{}, false, err
 	}
-	ok, err := validateReceiveRetirementFinalization(source, store.ClusterUID, machineUID, inventoryUID, maxAge, time.Now())
+	ok, err := source.VerifyFinalization(ctx, api, store, inventoryUID, maxAge)
 	if err != nil || !ok {
 		return ReceiveRetirementSet{}, false, err
 	}
-	if err := source.Recheck(ctx, api, store); err != nil {
-		return ReceiveRetirementSet{}, false, err
-	}
 	return source, true, nil
+}
+
+// VerifyFinalization checks historical evidence against this already admitted
+// source and rereads its live revisions. Call only on a freshly admitted set;
+// this avoids reconstructing the same immutable ancestry a second time within
+// one admission. It is not a substitute for initial or post-native admission,
+// current native absence, consumer identity checks or release authorization.
+func (source ReceiveRetirementSet) VerifyFinalization(ctx context.Context, api kubernetes.Interface, store handover.Store, inventoryUID string, maxAge time.Duration) (bool, error) {
+	machineUID := source.Withdrawal.MachineUID
+	if machineUID == "" || store.Name != tunnel.ReceiveTransitionName(machineUID) || source.Mesh == nil || source.Inventory.ClusterUID != store.ClusterUID {
+		return false, fmt.Errorf("finalization verification requires admitted retirement scope")
+	}
+	if store.ExpectedUID != "" && store.ExpectedUID != string(source.Journals[machineUID].Metadata().UID) {
+		return false, fmt.Errorf("finalization journal incarnation differs")
+	}
+	ok, err := validateReceiveRetirementFinalization(source, store.ClusterUID, machineUID, inventoryUID, maxAge, time.Now())
+	if err != nil || !ok {
+		return false, err
+	}
+	if err := source.Recheck(ctx, api, store); err != nil {
+		return false, err
+	}
+	return true, ctx.Err()
 }
 
 func decodeRetirementEvidence(raw []byte, destination any) error {

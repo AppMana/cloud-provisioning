@@ -52,6 +52,9 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 			if strings.HasPrefix(fault, "finalized") {
 				seedReceiveFinalization(t, api, store, scope, fault == "finalized-corrupt")
 			}
+			if fault == "finalized" {
+				verifyAdmittedRetirementFinalization(t, api, store, scope, key)
+			}
 			called := false
 			receipts, runErr := executeReceiveRetirement(runCtx, api, store, scope, cfg, key, "containerd://agent", func(_ context.Context, lockPath string, admitted admittedReceiveRetirement) error {
 				called = true
@@ -126,4 +129,78 @@ func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, st
 		verifyReceiveRetirementDispatch(t, api, store, scope, key, pod, true)
 	})
 	t.Run("released-checkpoint-admission", func(t *testing.T) { verifyReleasedCheckpointAdmission(t, api, store, scope, key, pod) })
+}
+
+// Reuse the real API and finalized history. The read budget excludes initial
+// admission: historical verification must reread all live authority, but must
+// not reconstruct that admission's ancestry. Races still suppress verification.
+// No kernel mutation, receipt authentication or latency qualification is claimed.
+func verifyAdmittedRetirementFinalization(t *testing.T, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, key wgtypes.Key) {
+	t.Helper()
+	ctx := context.Background()
+	for _, fault := range []string{"none", "scope", "cluster", "journal-uid", "inventory-race", "mesh-race", "journal-race", "cancelled"} {
+		t.Run("admitted-finalization/"+fault, func(t *testing.T) {
+			admitted, err := loadReceiveRetirement(ctx, api, store, scope, "site", key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			reader := store
+			currentScope := scope
+			runCtx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			counted := &changingJournalReader{ConfigMapInterface: store.ConfigMaps, change: func() error { return nil }}
+			reader.ConfigMaps = counted
+			switch fault {
+			case "scope":
+				currentScope.MeshUID = "replacement"
+			case "cluster":
+				reader.ClusterUID = "replacement"
+			case "journal-uid":
+				reader.ExpectedUID = "replacement"
+			case "cancelled":
+				cancel()
+			case "inventory-race", "journal-race":
+				if fault == "journal-race" {
+					// Mutate before the first authority read, independent of map order.
+					counted.reads = 1
+				}
+				counted.change = func() error {
+					name := admitted.Metadata.Name
+					if fault == "journal-race" {
+						name = store.Name
+					}
+					object, err := store.ConfigMaps.Get(ctx, name, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					object.Annotations = map[string]string{"finalization-race": fault}
+					_, err = store.ConfigMaps.Update(ctx, object, metav1.UpdateOptions{})
+					return err
+				}
+			case "mesh-race":
+				counted.change = func() error {
+					object, err := api.CoreV1().Secrets(scope.Namespace).Get(ctx, scope.MeshName, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					object.Annotations = map[string]string{"finalization-race": fault}
+					_, err = api.CoreV1().Secrets(scope.Namespace).Update(ctx, object, metav1.UpdateOptions{})
+					return err
+				}
+			}
+			ok, err := receiveRetirementFinalized(runCtx, api, reader, currentScope, admitted)
+			if fault != "none" {
+				if err == nil || ok {
+					t.Fatal("changed source verified finalization", fault)
+				}
+				return
+			}
+			if err != nil || !ok {
+				t.Fatal("unchanged finalization did not verify", err)
+			}
+			if counted.reads != len(admitted.Journals)+len(admitted.ReleasedJournals)+1 {
+				t.Fatalf("historical verification reread ancestry: %d configmap reads", counted.reads)
+			}
+		})
+	}
 }

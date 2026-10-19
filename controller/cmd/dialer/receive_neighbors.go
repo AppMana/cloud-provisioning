@@ -103,6 +103,11 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 			break
 		}
 	}
+	if scope.MachineUID == "" && !cloud && len(inventory.Released) != 0 && len(mesh.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName]) == 0 {
+		// Retained observers have no published tunnel to reconcile. They still
+		// authenticate and persist released ownership under the same host lock.
+		return checkpointReleasedReceiveObserver(ctx, api, store, scope, cfg, key, lock.Name(), mesh)
+	}
 	releasedOnly := scope.MachineUID == "" && !cloud && len(inventory.MachineUIDs) == 0 && len(inventory.Released) != 0
 	if scope.MachineUID == "" && !releasedOnly {
 		return fmt.Errorf("neighbor writer has no local reserved journal")

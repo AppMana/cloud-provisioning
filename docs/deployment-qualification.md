@@ -951,3 +951,21 @@ is injected before the first authority read, independent of map traversal order;
 sequential rechecks do not provide an atomic cluster snapshot. These tests use
 synthetic finalization and native callbacks and do not establish live latency,
 fresh multi-consumer quorum, release, reboot or rollback qualification.
+
+Unpublished site observers with no local active receiver can advance released
+inventory checkpoints without ordinary-neighbor routing authority. Admission
+validates every active journal and its ancestry, rejects local active or pending
+retirement obligations, authenticates released history and the saved withdrawal
+fences, and rechecks node boot, agent incarnation, journal and mesh authority
+before the durable write. Unknown local journals, pending neighbor cleanup and
+retained ordinary-neighbor peers prevent this observer-only path from succeeding.
+No native callback, receipt or journal deletion is permitted by that operation.
+
+The real-API observer scenario retains an unrelated active receiver and uses
+synthetic finalized/released evidence. It exercises checkpoint advancement,
+previous saved boot identity, missing or changed fences, unexpected local
+journals, retained neighbor ownership, replaced agent identity, cancellation,
+changed active-journal incarnation and inventory/mesh mutation during admission.
+Failed admission must preserve checkpoint bytes. This proves local checkpoint
+handling and callback suppression, not actual reboot, live API partition recovery,
+kernel absence, stale-worker execution or address reuse.

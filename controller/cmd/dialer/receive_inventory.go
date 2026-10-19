@@ -21,12 +21,13 @@ import (
 )
 
 type admittedReceiveSet struct {
-	Inventory   tunnel.ReceiveInventory
-	Metadata    metav1.ObjectMeta
-	Journals    map[string]handover.Snapshot
-	Local       map[string]admittedReceiveJournal
-	Routes      tunnel.ReceiveJournalRoutes
-	Retirements map[string]admittedReceiveRetirement
+	Inventory        tunnel.ReceiveInventory
+	Metadata         metav1.ObjectMeta
+	Journals         map[string]handover.Snapshot
+	ReleasedJournals map[string]handover.Snapshot
+	Local            map[string]admittedReceiveJournal
+	Routes           tunnel.ReceiveJournalRoutes
+	Retirements      map[string]admittedReceiveRetirement
 }
 
 // Load every controller-reserved journal, not only the target Machine. A missing
@@ -51,6 +52,10 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 		}
 	}
 	result := admittedReceiveSet{Inventory: inventory, Metadata: *object.ObjectMeta.DeepCopy(), Journals: map[string]handover.Snapshot{}, Local: map[string]admittedReceiveJournal{}}
+	result.ReleasedJournals, err = loadReleasedReceiveJournals(ctx, store, inventory)
+	if err != nil {
+		return fail(err)
+	}
 	var snapshots []handover.Snapshot
 	for _, uid := range inventory.MachineUIDs {
 		currentStore := store
@@ -134,6 +139,9 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 	if err := appendReleasedReceiveExclusions(inventory, &result.Routes); err != nil {
 		return fail(err)
 	}
+	if err := recheckReleasedReceiveJournals(ctx, store, result.ReleasedJournals); err != nil {
+		return fail(err)
+	}
 	return result, nil
 }
 
@@ -142,7 +150,7 @@ func sameReceiveRevision(a, b metav1.ObjectMeta) bool {
 }
 
 func sameReceiveSet(a, b admittedReceiveSet) bool {
-	if !sameReceiveRevision(a.Metadata, b.Metadata) || len(a.Journals) != len(b.Journals) || len(a.Local) != len(b.Local) {
+	if !sameReleasedReceiveJournals(a.ReleasedJournals, b.ReleasedJournals) || !sameReceiveRevision(a.Metadata, b.Metadata) || len(a.Journals) != len(b.Journals) || len(a.Local) != len(b.Local) {
 		return false
 	}
 	for uid, snapshot := range a.Journals {

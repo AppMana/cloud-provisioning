@@ -14,7 +14,8 @@ import (
 
 type admittedReceiveRetirement struct {
 	attachment.ReceiveRetirementSet
-	NodeUID, BootID string
+	NodeUID, BootID  string
+	ReleasedJournals map[string]handover.Snapshot
 }
 
 // Historical finalization suppresses only receipt renewal. Native cleanup and
@@ -33,6 +34,10 @@ func receiveRetirementFinalized(ctx context.Context, api kubernetes.Interface, s
 		return false, err
 	}
 	current := admittedReceiveRetirement{ReceiveRetirementSet: source, NodeUID: admitted.NodeUID, BootID: admitted.BootID}
+	current.ReleasedJournals, err = loadReleasedReceiveJournals(ctx, store, source.Inventory)
+	if err != nil {
+		return false, err
+	}
 	if !verified || !sameReceiveRetirement(admitted, current) {
 		return false, fmt.Errorf("retirement finalization changed during admission")
 	}
@@ -71,6 +76,9 @@ func recheckReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	if err := validateReceiveParticipantNode(node, admitted.NodeUID, admitted.BootID); err != nil {
 		return err
 	}
+	if err := recheckReleasedReceiveJournals(ctx, store, admitted.ReleasedJournals); err != nil {
+		return err
+	}
 	if err := admitted.Recheck(ctx, api, store); err != nil {
 		return err
 	}
@@ -99,6 +107,16 @@ func loadReceiveRetirement(ctx context.Context, api kubernetes.Interface, store 
 		return fail(err)
 	}
 	result := admittedReceiveRetirement{ReceiveRetirementSet: shared}
+	result.ReleasedJournals, err = loadReleasedReceiveJournals(ctx, store, shared.Inventory)
+	if err != nil {
+		return fail(err)
+	}
+	if err := appendReleasedReceiveExclusions(shared.Inventory, &result.Routes.Reserved); err != nil {
+		return fail(err)
+	}
+	if err := appendReleasedReceiveExclusions(shared.Inventory, &result.Routes.Serving); err != nil {
+		return fail(err)
+	}
 	for _, c := range result.Withdrawal.Consumers {
 		if c.NodeName == nodeName {
 			if c.PublicKey != key.PublicKey().String() && !(c.Site && c.PublicKey == "") {
@@ -119,6 +137,9 @@ func loadReceiveRetirement(ctx context.Context, api kubernetes.Interface, store 
 		return fail(err)
 	}
 	if err := validateReceiveParticipantNode(node, result.NodeUID, result.BootID); err != nil {
+		return fail(err)
+	}
+	if err := recheckReleasedReceiveJournals(ctx, store, result.ReleasedJournals); err != nil {
 		return fail(err)
 	}
 	if err := shared.Recheck(ctx, api, store); err != nil {

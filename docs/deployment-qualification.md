@@ -884,3 +884,18 @@ key may reuse released addresses, but an active plan or ordinary peer cannot
 restore the retired key. Tests distinguish this negative planning authority
 from authenticated executable checkpoints; synthetic finalization may produce
 exclusions but must not pass the execution boundary.
+
+Active maintenance and overlapping retirement must pin released journal
+incarnations throughout execution, including final admission. Released keys
+remain excluded in both reserved and serving route views. Isolated API tests
+mutate a released journal during active maintenance and during another worker's
+retirement; either operation must stop. Their finalization records are synthetic
+and do not establish native cleanup or controller release safety.
+
+The isolated native neighbor scenario retires a peer, installs a different key
+at its old address, verifies encrypted traffic from the replacement and rejection
+of the old sender, then reapplies recovery. Stale cleanup must reject the new
+owner's routes while an unrelated peer's stream continues. This uses guest mount
+and network namespaces and real WireGuard devices; it does not exercise API
+release authorization, durable checkpoint admission, actual VM reboot, or
+mixed-version rollback.

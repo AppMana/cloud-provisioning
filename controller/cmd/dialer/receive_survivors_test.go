@@ -310,6 +310,9 @@ func verifySurvivorReceiveAdmission(t *testing.T, api kubernetes.Interface, stor
 		if set.Routes.Withdrawn[plan.MachineUID] != plan.RootPublicKey || len(set.Routes.Plans) != 1 {
 			t.Fatal("released root lost its exclusion or retained active routes")
 		}
+		verifyReleasedJournalExecutionGuard(t, retiring, func() error {
+			return recheckReceiveSet(ctx, api, store, scope, cfg.nodeName, key, set)
+		})
 		lock, err := lockReconciliation(cfg)
 		must(err)
 		defer lock.Close()

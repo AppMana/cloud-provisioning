@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -195,4 +196,41 @@ func verifySharedSurvivorRetirements(t *testing.T, api kubernetes.Interface, sto
 			}
 		})
 	}
+	t.Run("released-sibling-during-retirement", func(t *testing.T) {
+		inventory, index, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, scope.Namespace, scope.MeshName, scope.MeshUID)
+		must(err)
+		p := inventory.Publications[third.MachineUID]
+		// Synthetic completion is sufficient only for exclusion planning and
+		// mutation guards; it cannot authorize a checkpoint or native work.
+		p.RetirementCompletion, p.RetirementFinalization = json.RawMessage(`{}`), json.RawMessage(`{}`)
+		inventory.Released = map[string]tunnel.ReceiveJournalPublication{third.MachineUID: p}
+		delete(inventory.Publications, third.MachineUID)
+		inventory.MachineUIDs = nil
+		for _, uid := range []string{plan.MachineUID, scope.MachineUID} {
+			inventory.MachineUIDs = append(inventory.MachineUIDs, uid)
+		}
+		slices.Sort(inventory.MachineUIDs)
+		raw, err := json.Marshal(inventory)
+		must(err)
+		index.Data["inventory.json"] = string(raw)
+		_, err = store.ConfigMaps.Update(ctx, index, metav1.UpdateOptions{})
+		must(err)
+		admitted, err := loadReceiveSet(ctx, api, store, scope, "site", key)
+		must(err)
+		retired := admitted.Retirements[plan.MachineUID]
+		if len(admitted.ReleasedJournals) != 1 || len(retired.ReleasedJournals) != 1 || retired.Routes.Serving.Withdrawn[third.MachineUID] != third.RootPublicKey || retired.Routes.Reserved.Withdrawn[third.MachineUID] != third.RootPublicKey {
+			t.Fatal("overlapping retirement lost released history or root exclusion")
+		}
+		retiredScope := scope
+		retiredScope.MachineUID = plan.MachineUID
+		verifyReleasedJournalExecutionGuard(t, thirdStore, func() error {
+			return recheckReceiveSet(ctx, api, store, scope, "site", key, admitted)
+		})
+		retired, err = loadReceiveRetirement(ctx, api, retiring, retiredScope, "site", key)
+		must(err)
+		verifyReleasedJournalExecutionGuard(t, thirdStore, func() error {
+			return recheckReceiveRetirement(ctx, api, retiring, retired, "site", key)
+		})
+	})
+
 }

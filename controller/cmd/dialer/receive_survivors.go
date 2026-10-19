@@ -54,6 +54,7 @@ func loadSurvivingReceiveSet(ctx context.Context, api kubernetes.Interface, stor
 		result.Retirements[uid] = retired
 		if result.Journals == nil {
 			result.Journals = retired.Journals
+			result.ReleasedJournals = retired.ReleasedJournals
 			result.Routes = retired.Routes.Serving
 		}
 	}

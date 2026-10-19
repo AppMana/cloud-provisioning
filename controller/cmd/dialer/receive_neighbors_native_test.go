@@ -375,11 +375,31 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 		}
 	}
 	verifyGrowthRetirement(peer, []string{"10.77.0.1"}, allocated, "10.77.0.30/32", "10.77.0.31/32")
+	// Reuse the address with a new key and an explicitly empty reservation
+	// set. Keep the old sender alive through recovery and stale cleanup.
+	retiredPeer := peer
 	replacement, replaced, _ := makeSender("replacement", "10.77.0.3", 51824)
-	peer.PublicKey = replacement.String()
-	peer.Endpoint = "127.0.0.1:51824"
-	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}))
+	peer.PublicKey, peer.Endpoint = replacement.String(), "127.0.0.1:51824"
+	desired, err := tunnel.PlanReceiveNeighborPeers([]tunnel.PeerSpec{peer}, []tunnel.ReceiveTransitionPlan{})
+	must(err)
+	must(installReceiveNeighbors(context.Background(), devices, cfg, root, desired, []string{"10.77.0.1"}))
 	probe(replaced)
+	if err := exchange(joining); err == nil {
+		t.Fatal("retired key still carries traffic after address reuse")
+	}
+	if err := retireReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{retiredPeer}, []string{"10.77.0.1"}, allocated); err == nil {
+		t.Fatal("old retirement accepted the replacement owner's routes")
+	}
+	probe(replaced)
+	must(restoreReceiveNeighbors(context.Background(), devices, cfg, root, desired, []string{"10.77.0.1"}))
+	probe(replaced)
+	device, err = devices.Device(cfg.iface)
+	must(err)
+	for _, current := range device.Peers {
+		if current.PublicKey == neighbor {
+			t.Fatal("recovery restored the retired key")
+		}
+	}
 	// IPv6 uses the same authenticated underlay but has distinct kernel route
 	// normalization and connected-subnet ownership. Keep the IPv4 stream active.
 	addAddrs(t, link, "fd77::1/64")

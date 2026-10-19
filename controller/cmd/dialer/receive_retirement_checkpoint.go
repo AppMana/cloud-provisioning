@@ -15,7 +15,7 @@ import (
 )
 
 func sameReceiveRetirement(a, b admittedReceiveRetirement) bool {
-	if !sameReceiveRevision(a.Metadata, b.Metadata) || !sameReceiveRevision(a.MeshMetadata, b.MeshMetadata) || a.NodeUID != b.NodeUID || a.BootID != b.BootID || len(a.Journals) != len(b.Journals) {
+	if !sameReleasedReceiveJournals(a.ReleasedJournals, b.ReleasedJournals) || !sameReceiveRevision(a.Metadata, b.Metadata) || !sameReceiveRevision(a.MeshMetadata, b.MeshMetadata) || a.NodeUID != b.NodeUID || a.BootID != b.BootID || len(a.Journals) != len(b.Journals) {
 		return false
 	}
 	for uid, snapshot := range a.Journals {

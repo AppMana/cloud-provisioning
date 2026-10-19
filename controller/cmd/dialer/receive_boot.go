@@ -203,8 +203,25 @@ func admitReceiveBoot(ctx context.Context, cfg config, native func(receiveBootSt
 	// Only the inventory digest bound to successful native readback may supply
 	// exclusions. These records cannot add routes, replay retirement or release
 	// ownership. The local worker itself must still be serving.
+	// Released records remain exclusions after active reservations disappear.
+	// Their authority is the inventory digest bound to prior native readback,
+	// never an offline attempt to authenticate or refresh completion receipts.
+	withdrawals := make(map[string]tunnel.ReceiveJournalPublication)
 	for _, uid := range inventory.Inventory.MachineUIDs {
-		publication := inventory.Inventory.Publications[uid]
+		withdrawals[uid] = inventory.Inventory.Publications[uid]
+	}
+	if len(inventory.Inventory.Released) != 0 {
+		if err := inventory.Inventory.Validate(); err != nil {
+			return true, err
+		}
+		if _, err := readPrivateRetirementCache(inventoryPath); err != nil {
+			return true, err
+		}
+		for uid, publication := range inventory.Inventory.Released {
+			withdrawals[uid] = publication
+		}
+	}
+	for uid, publication := range withdrawals {
 		if len(publication.Retirement) == 0 {
 			continue
 		}

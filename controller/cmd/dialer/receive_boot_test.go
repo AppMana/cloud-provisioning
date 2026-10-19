@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -92,7 +93,7 @@ func writeReceiveBootFixture(t *testing.T, cfg config, root wgtypes.Key, plan tu
 
 func TestReceiveBootAdmission(t *testing.T) {
 	for _, legacy := range []bool{false, true} {
-		for _, fault := range []string{"valid", "unverified", "inventory", "local-set", "network", "identity", "allocation", "extra-journal", "same-boot", "changed-during-native", "cancelled", "busy", "unfinished", "retirement", "same-boot-retirement", "same-boot-retirement-identity", "withdrawn-survivor", "withdrawn-scope", "withdrawn-consumer", "withdrawn-stale-observation", "withdrawn-journal-uid"} {
+		for _, fault := range []string{"valid", "unverified", "inventory", "local-set", "network", "identity", "allocation", "extra-journal", "same-boot", "changed-during-native", "cancelled", "busy", "unfinished", "retirement", "same-boot-retirement", "same-boot-retirement-identity", "withdrawn-survivor", "withdrawn-scope", "withdrawn-consumer", "withdrawn-stale-observation", "withdrawn-journal-uid", "released-survivor", "released-scope", "released-consumer", "released-stale-observation", "released-overlap", "released-public-inventory", "released-changed-during-native", "released-local-worker"} {
 			t.Run(fmt.Sprintf("legacy-%t/%s", legacy, fault), func(t *testing.T) {
 				must := func(err error) {
 					t.Helper()
@@ -118,7 +119,7 @@ func TestReceiveBootAdmission(t *testing.T) {
 					defer held.Close()
 				}
 				switch fault {
-				case "withdrawn-survivor", "withdrawn-scope", "withdrawn-consumer", "withdrawn-stale-observation", "withdrawn-journal-uid":
+				case "withdrawn-survivor", "withdrawn-scope", "withdrawn-consumer", "withdrawn-stale-observation", "withdrawn-journal-uid", "released-survivor", "released-scope", "released-consumer", "released-stale-observation", "released-overlap", "released-public-inventory", "released-changed-during-native", "released-local-worker":
 					raw, err := os.ReadFile(inventoryPath)
 					must(err)
 					var inventory receiveInventoryCheckpoint
@@ -126,10 +127,10 @@ func TestReceiveBootAdmission(t *testing.T) {
 					retired, err := wgtypes.GeneratePrivateKey()
 					must(err)
 					withdrawal := attachment.RemoteWithdrawalIntent{MeshNamespace: plan.Namespace, MeshName: plan.MeshName, MeshUID: plan.MeshUID, MachineName: "withdrawn-worker", MachineUID: "withdrawn-uid", PublicKey: retired.PublicKey().String(), DrainIntent: "test/delete", SourceVersion: "1", Consumers: []attachment.ConsumerTarget{{NodeName: plan.CloudNodeName, NodeUID: plan.CloudNodeUID, PublicKey: plan.RootPublicKey, MachineName: plan.MachineName, SecretUID: plan.AdoptionUID}}}
-					if fault == "withdrawn-scope" {
+					if fault == "withdrawn-scope" || fault == "released-scope" {
 						withdrawal.MeshUID = "different"
 					}
-					if fault == "withdrawn-consumer" {
+					if fault == "withdrawn-consumer" || fault == "released-consumer" {
 						withdrawal.Consumers = nil
 					}
 					record, err := json.Marshal(map[string]any{"version": 1, "journalSHA256": fmt.Sprintf("%x", sha256.Sum256([]byte("terminal-history"))), "withdrawal": withdrawal})
@@ -143,8 +144,26 @@ func TestReceiveBootAdmission(t *testing.T) {
 					}
 					inventory.Inventory.Publications["withdrawn-uid"] = publication
 					inventory.Inventory.MachineUIDs = append(inventory.Inventory.MachineUIDs, "withdrawn-uid")
+					if strings.HasPrefix(fault, "released-") {
+						publication.RetirementCompletion = json.RawMessage(`{"fixture":"completion"}`)
+						publication.RetirementFinalization = json.RawMessage(`{"fixture":"finalization"}`)
+						inventory.Inventory.Released = map[string]tunnel.ReceiveJournalPublication{"withdrawn-uid": publication}
+						delete(inventory.Inventory.Publications, "withdrawn-uid")
+						inventory.Inventory.MachineUIDs = []string{plan.MachineUID}
+						if fault == "released-overlap" {
+							inventory.Inventory.Publications["withdrawn-uid"] = publication
+						}
+						if fault == "released-local-worker" {
+							delete(inventory.Inventory.Publications, plan.MachineUID)
+							inventory.Inventory.MachineUIDs = []string{}
+							inventory.Inventory.Released[plan.MachineUID] = publication
+						}
+					}
 					must(writeDurableJSON(inventoryPath, inventory))
-					if fault != "withdrawn-stale-observation" {
+					if fault == "released-public-inventory" {
+						must(os.Chmod(inventoryPath, 0644))
+					}
+					if fault != "withdrawn-stale-observation" && fault != "released-stale-observation" {
 						raw, err = os.ReadFile(inventoryPath)
 						must(err)
 						observation.InventorySHA256 = fmt.Sprintf("%x", sha256.Sum256(raw))
@@ -229,7 +248,7 @@ func TestReceiveBootAdmission(t *testing.T) {
 				calls := 0
 				handled, err := admitReceiveBoot(ctx, cfg, func(state receiveBootState, check func() error) error {
 					calls++
-					if fault == "withdrawn-survivor" && (len(state.Routes.Plans) != 1 || len(state.Routes.Withdrawn) != 1 || state.Routes.Withdrawn["withdrawn-uid"] == "") {
+					if (fault == "withdrawn-survivor" || fault == "released-survivor") && (len(state.Routes.Plans) != 1 || len(state.Routes.Withdrawn) != 1 || state.Routes.Withdrawn["withdrawn-uid"] == "") {
 						t.Fatal("boot recovery lost withdrawal exclusion")
 					}
 					if state.Key != root || state.NodeUID != plan.CloudNodeUID || state.Config.routeTable != 518 || state.Config.mtu != 1400 || !state.View.Complete {
@@ -238,6 +257,9 @@ func TestReceiveBootAdmission(t *testing.T) {
 					if lock, err := lockReconciliation(cfg); err == nil {
 						lock.Close()
 						t.Fatal("boot recovery escaped host lock")
+					}
+					if fault == "released-changed-during-native" {
+						must(os.WriteFile(inventoryPath, []byte("{}"), 0600))
 					}
 					if fault == "changed-during-native" {
 						must(os.WriteFile(observationPath, []byte("{}"), 0600))
@@ -253,7 +275,7 @@ func TestReceiveBootAdmission(t *testing.T) {
 					}
 					return
 				}
-				if fault == "valid" || fault == "withdrawn-survivor" {
+				if fault == "valid" || fault == "withdrawn-survivor" || fault == "released-survivor" {
 					must(err)
 					if calls != 1 {
 						t.Fatal("valid boot not restored")
@@ -264,7 +286,7 @@ func TestReceiveBootAdmission(t *testing.T) {
 					t.Fatal("unsafe boot admitted")
 				}
 				want := 0
-				if fault == "changed-during-native" {
+				if fault == "changed-during-native" || fault == "released-changed-during-native" {
 					want = 1
 				}
 				if calls != want {

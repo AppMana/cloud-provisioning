@@ -76,6 +76,10 @@ func ReceiveInventoryName(meshUID string) string {
 	return fmt.Sprintf("receive-inventory-%x", sum[:16])
 }
 
+// Validate checks inventory structure only. It does not authenticate retirement
+// evidence or authorize native restoration, release, or address reuse.
+func (v ReceiveInventory) Validate() error { return v.validate() }
+
 func (v ReceiveInventory) validate() error {
 	if v.Version != 1 || v.ClusterUID == "" || v.Namespace == "" || v.MeshName == "" || v.MeshUID == "" || v.MachineUIDs == nil {
 		return fmt.Errorf("receiver inventory requires complete mesh and cluster identity")

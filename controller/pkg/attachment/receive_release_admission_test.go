@@ -15,7 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// Reuse actual-token completion/finalization evidence. Release admission and
+// Reuse actual-token completion/finalization evidence. The live release policy and
 // native observations are synthetic. Historical readback after unrelated mesh
 // changes does not establish current owner absence, safe reuse or reboot recovery.
 func verifyReleasedJournalAdmission(t *testing.T, api kubernetes.Interface, store handover.Store, mesh *corev1.Secret, machineUID, inventoryUID string) {
@@ -41,7 +41,7 @@ func verifyReleasedJournalAdmission(t *testing.T, api kubernetes.Interface, stor
 		t.Fatal("missing authenticated finalization fixture")
 	}
 	publication := source.Inventory.Publications[machineUID]
-	must(tunnel.ReleaseReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, source.Metadata, source.Mesh, source.Journals[machineUID], publication, func() error { return nil }))
+	verifyFinalizedRelease(t, api, store, mesh, machineUID, inventoryUID, publication)
 	historical, ok, err := read()
 	must(err)
 	if !ok || slices.Contains(historical.Inventory.MachineUIDs, machineUID) || historical.Inventory.Publications[machineUID].JournalUID != "" || !reflect.DeepEqual(historical.Inventory.Released[machineUID], publication) {

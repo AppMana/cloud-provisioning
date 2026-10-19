@@ -46,6 +46,12 @@ func verifyAuthenticatedRetirementFinalization(t *testing.T, api kubernetes.Inte
 	if ok {
 		t.Fatal("missing finalization accepted")
 	}
+	if err := ReleaseFinalizedReceiveRetirement(ctx, api, store, mesh.Namespace, mesh.Name, string(mesh.UID), machineUID, inventoryUID, time.Minute, func(ReceiveRetirementSet) error {
+		t.Fatal("unfinalized retirement reached release policy")
+		return nil
+	}); err == nil {
+		t.Fatal("unfinalized retirement released")
+	}
 	changeInventory := func() error {
 		inventory, err := store.ConfigMaps.Get(ctx, tunnel.ReceiveInventoryName(string(mesh.UID)), metav1.GetOptions{})
 		if err != nil {

@@ -820,6 +820,16 @@ request, and the first successful recovery for each affected management lane.
 Observe activation and rollback as well as the candidate restart, and retain
 the autonomous rollback limit of five minutes.
 
+API readiness can precede recovery of the local CRI socket and workload log
+draining. Record these recovery points separately. Retained container identities
+do not establish responsive workloads: synchronous stdout or stderr writes can
+block application replies while the runtime is unavailable. Preserve workload
+logging and request deadlines during this test. Correlate application timestamps,
+runtime log timestamps and failed requests; a client timeout alone does not
+measure the duration or establish the cause of a network outage. If observation
+fails before all planned controllers are activated, report the partial scope and
+retain the original observers through autonomous restoration.
+
 Keep runtime-maintenance evidence separate from campaign rows requiring zero
 management failures. This allowance does not apply to agent upgrades, endpoint
 changes or ordinary reconciliation, and does not turn a failed continuous

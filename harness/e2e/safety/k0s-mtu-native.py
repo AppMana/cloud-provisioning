@@ -110,20 +110,15 @@ def main():
         for repetition in range(1, args.repetitions + 1):
             location = root + '/run-' + str(repetition)
             guest('cp', f'mkdir -m 700 {location}')
-            # k0s must regenerate its managed manifests; the template annotation
-            # forces CNI installers to run on every site node for each revision.
-            candidate_builder = '''import json,sys,yaml
+            # k0s inlines MTU in the DaemonSet's CNI configuration. Changing the
+            # owned MTU must trigger the normal rollout without a test-only nudge.
+            candidate_builder = '''import sys,yaml
 p=yaml.safe_load(open('/etc/k0s/k0s.yaml'))
 c=p['spec']['network']['calico']; c['mtu']=int(sys.argv[2])
-for entry in c['patches']:
- if entry['target']['kind']=='DaemonSet' and entry['target']['name']=='calico-node':
-  patch=json.loads(entry['patch']['content'])
-  patch['spec']['template'].setdefault('metadata',{}).setdefault('annotations',{})['cloud-provisioning.appmana.com/mtu-revision']=sys.argv[3]
-  entry['patch']['content']=json.dumps(patch)
 open(sys.argv[1],'w').write(yaml.safe_dump(p))
 '''
             put('cp', location + '/candidate.py', candidate_builder.encode())
-            guest('cp', f'python3 {location}/candidate.py {location}/candidate {args.candidate_mtu} {repetition}; chmod 600 {location}/candidate')
+            guest('cp', f'python3 {location}/candidate.py {location}/candidate {args.candidate_mtu}; chmod 600 {location}/candidate')
             candidate = guest('cp', f'cat {location}/candidate')
             command = b'#!/bin/sh\nset -eu\nsystemctl restart k0scontroller\n'
             put('cp', location + '/reload', command, '0700')

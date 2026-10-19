@@ -96,6 +96,32 @@ flag does not provide those guarantees. Keep runtime maintenance separate from
 controller maintenance: an independently managed runtime can still block logs
 when it is itself unavailable.
 
+`k0s-containerd.service` adapts containerd's upstream systemd unit for the
+default Linux k0s paths. It preserves the runtime root, state, socket and
+configuration and keeps shim processes alive when the daemon stops. The
+`external-cri-ordering.conf` drop-in orders k0s after that service without
+coupling their stop or restart operations. These files require an already
+staged, verified containerd, shim, runc and complete runtime configuration;
+they do not install or migrate them. Custom data directories and Windows
+require their own configuration.
+
+Install the unit as `/etc/systemd/system/k0s-containerd.service` and the
+ordering drop-in under the actual `k0scontroller.service.d` or
+`k0sworker.service.d` directory only as part of a guarded ownership transfer.
+Retain every existing k0s invocation argument when adding
+`--cri-socket=remote:unix:///run/k0s/containerd.sock`. Never run both runtime
+owners against the same root or socket. Keep the original unit and runtime
+configuration available for rollback, and verify the daemon's cgroup and
+process identity across each subsequent k0s restart.
+
+External ownership also transfers responsibility for runtime binary staging,
+drop-in configuration reloads, sandbox-image configuration and image imports;
+k0s's embedded-runtime component no longer performs those operations. Pin
+the whole runtime payload and preserve required registry and CNI settings.
+Do not assume that replacing the outer k0s executable upgrades an externally
+managed runtime. These reference units remain subject to the migration and
+failure tests above before deployment.
+
 A diagnostic that pauses the daemon must have guest-local automatic resumption
 bound to the original process identity. Capture workload thread stacks and
 syscalls, application and CRI log timestamps, and original continuous observers.

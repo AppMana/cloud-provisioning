@@ -265,6 +265,14 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sourceStarted := time.Now()
 	target, err := h.resolve(ctx, request.MachineUID)
 	sourceFinished := time.Now()
+	// Failed read-only admission has no collector state to inspect or mutate.
+	// Return before queueing behind another request's authentication/commit;
+	// otherwise rejected requests retain credentials and admission slots until
+	// that unrelated work finishes or the shared deadline expires.
+	if err != nil || ctx.Err() != nil {
+		reject(http.StatusConflict)
+		return
+	}
 	stage = "contention"
 	gateHeld := false
 	defer func() {
@@ -276,11 +284,6 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case h.gate <- struct{}{}:
 		gateHeld = true
 	case <-ctx.Done():
-		if err != nil {
-			stage = "source"
-			reject(http.StatusConflict)
-			return
-		}
 		// Resolution is read-only; Observe and Complete have not run.
 		w.Header().Set("Retry-After", "1")
 		reject(http.StatusServiceUnavailable)
@@ -299,13 +302,6 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	stage = "source"
-	if err != nil {
-		// Failed read-only admission does not invalidate other observations.
-		// They retain their original expiry and require full reauthentication
-		// against current authority before completion.
-		reject(http.StatusConflict)
-		return
-	}
 	if ctx.Err() != nil {
 		reject(http.StatusConflict)
 		return

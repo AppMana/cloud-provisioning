@@ -70,3 +70,54 @@ func TestReceiptFailureStageAllowlist(t *testing.T) {
 		}
 	}
 }
+
+// A rejected source must not queue behind an unrelated collection's commit or
+// consume an admission slot while waiting for that commit to finish.
+func TestReceiptSourceRejectionDoesNotWaitForCollector(t *testing.T) {
+	for _, canceled := range []bool{false, true} {
+		t.Run(map[bool]string{false: "rejected", true: "canceled"}[canceled], func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			h, err := NewReceiptCollectionHandler(func(context.Context, string) (ReceiptCollection, error) {
+				if canceled {
+					cancel()
+					return ReceiptCollection{}, nil
+				}
+				return ReceiptCollection{}, errors.New("private source error")
+			}, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			h.gate <- struct{}{}
+			digest := strings.Repeat("a", 64)
+			body, _ := json.Marshal(ReceiptRequest{MachineUID: "machine", RoundHash: digest, Receipts: []PodReceipt{{Receipt: Receipt{RoundHash: digest}}}})
+			r := httptest.NewRequest(http.MethodPost, "https://controller/receipts", bytes.NewReader(body)).WithContext(ctx)
+			r.Header.Set("Authorization", "Bearer private-token")
+			w := httptest.NewRecorder()
+			done := make(chan struct{})
+			go func() {
+				h.ServeHTTP(w, r)
+				close(done)
+			}()
+			defer func() {
+				cancel()
+				<-h.gate
+				<-done
+			}()
+			select {
+			case <-done:
+			case <-time.After(time.Second):
+				t.Fatal("rejected source waited for the collector")
+			}
+			if w.Code != http.StatusConflict || w.Header().Get(receiptFailureStageHeader) != "source" || w.Header().Get("Retry-After") != "" {
+				t.Fatalf("source rejection misclassified: %d %v", w.Code, w.Header())
+			}
+			if len(h.admissionSlots) != 0 || len(h.batches) != 0 || len(h.gate) != 1 {
+				t.Fatal("source rejection retained admission or changed collector state")
+			}
+			if strings.Contains(w.Body.String(), "private") {
+				t.Fatal("source rejection exposed credentials or backend errors")
+			}
+		})
+	}
+}

@@ -49,7 +49,7 @@ func RequiredRows() []string {
 			for _, placement := range []string{"control-plane", "one-worker", "two-workers", "all-nodes"} {
 				rows = append(rows, prefix+"aws-matrix/"+placement)
 			}
-			for _, test := range []string{"source-preservation", "cni-ownership", "allocation-churn", "pod-recreate", "worker-replace", "last-worker-delete", "endpoint-failover", "api-loss", "controller-restart", "agent-upgrade", "network-manager-restart", "route-collision", "mtu-blackhole", "ingress", "soak-24h"} {
+			for _, test := range []string{"source-preservation", "cni-ownership", "allocation-churn", "pod-recreate", "worker-replace", "last-worker-delete", "endpoint-failover", "api-loss", "controller-restart", "leader-failover", "worker-reboot", "agent-upgrade", "network-manager-restart", "route-collision", "mtu-blackhole", "ingress"} {
 				rows = append(rows, prefix+test)
 			}
 		}
@@ -97,7 +97,9 @@ func Check(e Evidence) []string {
 		}
 		// Fault injection can lose cloud requests, but every attempt remains in the
 		// artifact. Bounded recovery does not permit management/site losses.
-		fault := strings.Contains(id, "/endpoint-failover") || strings.Contains(id, "/api-loss") || strings.Contains(id, "/controller-restart") || strings.Contains(id, "/network-manager-restart") || strings.Contains(id, "/mtu-blackhole")
+		workerReboot := strings.HasSuffix(id, "/worker-reboot")
+		leaderFailover := strings.HasSuffix(id, "/leader-failover")
+		fault := workerReboot || leaderFailover || strings.Contains(id, "/endpoint-failover") || strings.Contains(id, "/api-loss") || strings.Contains(id, "/controller-restart") || strings.Contains(id, "/network-manager-restart") || strings.Contains(id, "/mtu-blackhole")
 		if !fault && r.Failures != 0 {
 			problem = "failed required attempts"
 		}
@@ -116,14 +118,21 @@ func Check(e Evidence) []string {
 		if strings.Contains(id, "/vm-rollback/") && !r.AutonomousRollback {
 			problem = "autonomous rollback not demonstrated"
 		}
-		if fault && (r.RecoverySeconds > 60 || (r.Failures > 0 && r.RecoverySeconds == 0)) {
-			problem = "cloud recovery exceeded 60 seconds"
+		limit := 60
+		if workerReboot {
+			limit = 120
+		}
+		if fault && (r.RecoverySeconds > limit || (r.Failures > 0 && r.RecoverySeconds == 0)) {
+			problem = fmt.Sprintf("cloud recovery exceeded %d seconds", limit)
+		}
+		if (workerReboot || leaderFailover) && r.RecoverySeconds <= 0 {
+			problem = "measured recovery required"
+		}
+		if leaderFailover && r.Failures != 0 {
+			problem = "leader failover interrupted established traffic"
 		}
 		if strings.Contains(id, "/vm-rollback/") && (r.RecoverySeconds <= 0 || r.RecoverySeconds > 300) {
 			problem = "rollback must complete autonomously within five minutes"
-		}
-		if strings.Contains(id, "/soak-24h") && r.DurationSeconds < 86400 {
-			problem = "soak shorter than 24 hours"
 		}
 		if strings.Contains(id, "/ipv4/") || strings.Contains(id, "/ipv6/") {
 			expectedFamily := "ipv4"

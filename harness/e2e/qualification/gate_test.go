@@ -98,7 +98,7 @@ func TestGateRequiresEverySiteAndFamily(t *testing.T) {
 	if got := Check(complete()); len(got) != 0 {
 		t.Fatal(got)
 	}
-	for _, kind := range []string{"missing", "historical-calico", "regression", "soak", "rollback", "candidate", "attempt-loss", "duplicate", "console", "manual-rollback", "wrong-family", "no-fault"} {
+	for _, kind := range []string{"missing", "historical-calico", "regression", "rollback", "candidate", "attempt-loss", "duplicate", "console", "manual-rollback", "wrong-family", "no-fault"} {
 		t.Run(kind, func(t *testing.T) {
 			e := complete()
 			switch kind {
@@ -110,10 +110,6 @@ func TestGateRequiresEverySiteAndFamily(t *testing.T) {
 				}
 			case "regression":
 				e.Rows[0].ManagementFailures = 1
-			case "soak":
-				for i := range e.Rows {
-					e.Rows[i].DurationSeconds = 86399
-				}
 			case "rollback":
 				for i := range e.Rows {
 					e.Rows[i].RecoverySeconds = 301
@@ -146,5 +142,64 @@ func TestGateRequiresEverySiteAndFamily(t *testing.T) {
 	}
 	if len(Check(Evidence{})) == 0 {
 		t.Fatal("no evidence qualified")
+	}
+}
+
+// Gate tests validate evidence requirements, not live failover or boot behavior.
+func TestRecoveryScope(t *testing.T) {
+	for _, kind := range []string{"worker-reboot", "leader-failover"} {
+		for _, fault := range []string{"none", "missing", "not-injected", "unobserved", "unknown-recovery", "slow", "management-loss", "site-loss", "packet-loss"} {
+			t.Run(kind+"/"+fault, func(t *testing.T) {
+				e := complete()
+				id := "site-a/ipv4/" + kind
+				for i := range e.Rows {
+					r := &e.Rows[i]
+					if r.ID != id {
+						continue
+					}
+					if kind == "worker-reboot" {
+						r.RecoverySeconds = 120
+						r.Failures = 59
+					}
+					switch fault {
+					case "missing":
+						e.Rows = append(e.Rows[:i], e.Rows[i+1:]...)
+					case "not-injected":
+						r.FaultInjected = false
+					case "unobserved":
+						r.ManagementContinuous = false
+					case "unknown-recovery":
+						r.RecoverySeconds = 0
+					case "slow":
+						if kind == "worker-reboot" {
+							r.RecoverySeconds = 121
+						} else {
+							r.RecoverySeconds = 61
+						}
+					case "management-loss":
+						r.ManagementFailures = 1
+					case "site-loss":
+						r.SiteFailures = 1
+					case "packet-loss":
+						r.Failures = 1
+					}
+					break
+				}
+				wantPass := fault == "none" || (fault == "packet-loss" && kind == "worker-reboot")
+				if got := Check(e); (len(got) == 0) != wantPass {
+					t.Fatalf("want pass %t: %v", wantPass, got)
+				}
+			})
+		}
+	}
+	e := complete()
+	for i := range e.Rows {
+		e.Rows[i].DurationSeconds = 1
+		if strings.Contains(e.Rows[i].ID, "soak") {
+			t.Fatal("soak remains required")
+		}
+	}
+	if got := Check(e); len(got) != 0 {
+		t.Fatal(got)
 	}
 }

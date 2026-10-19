@@ -77,6 +77,31 @@ identity preservation after a reboot that clears the runtime directory or a
 rollback to an unpatched executable. It also does not preserve active exec
 streams through a kubelet restart. Qualify management continuity separately.
 
+## Runtime logging during controller maintenance
+
+The embedded containerd daemon stops with k0s. Container processes can survive
+while their synchronous stdout or stderr writes block because the daemon is
+no longer draining CRI logs. Preserved Pod UIDs and container IDs therefore do
+not prove workload continuity. Measure replies with ordinary workload logging
+enabled throughout restart and rollback; do not increase request deadlines to
+hide a stalled log writer.
+
+k0s supports an [independently managed CRI runtime](https://docs.k0sproject.io/v1.36.4%2Bk0s.1/runtime/#using-custom-cri-runtimes)
+through `--cri-socket=remote:unix:///path/to/containerd.sock`, including controllers
+with `--enable-worker`. In that mode k0s does not manage the runtime lifecycle
+or configuration. Before using it for maintenance isolation, qualify ownership
+transfer, service ordering, runtime binary and configuration preservation, shim
+survival, reboot, rollback and runtime upgrades. Merely supplying the socket
+flag does not provide those guarantees. Keep runtime maintenance separate from
+controller maintenance: an independently managed runtime can still block logs
+when it is itself unavailable.
+
+A diagnostic that pauses the daemon must have guest-local automatic resumption
+bound to the original process identity. Capture workload thread stacks and
+syscalls, application and CRI log timestamps, and original continuous observers.
+Retain all request failures and verify daemon, workload and cluster recovery.
+Such a diagnostic establishes a failure mechanism, not deployment readiness.
+
 ## Static-pod metadata across build changes
 
 `static-pod-metadata.patch` targets the same k0s base as the listener patch.

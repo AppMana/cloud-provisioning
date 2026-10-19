@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"testing"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -182,6 +184,90 @@ func verifySuccessorPublication(t *testing.T, r *meshReconciler, machine *unstru
 	if err := checkGrant(); err != nil {
 		t.Fatal(err)
 	}
+	t.Run("released-history-read-access", func(t *testing.T) {
+		mesh := &corev1.Secret{}
+		if err := r.reader.Get(ctx, client.ObjectKey{Namespace: r.secretNamespace, Name: r.secretName}, mesh); err != nil {
+			t.Fatal(err)
+		}
+		inventory, index, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		saved := index.DeepCopy()
+		defer func() {
+			current, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			current.Data = saved.Data
+			if _, err := store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+		}()
+		uid := string(machine.GetUID())
+		// Synthetic evidence tests read-access derivation only. It does not
+		// authorize release, prove finalization, or admit native execution.
+		publication := inventory.Publications[uid]
+		publication.Plan = nil
+		publication.Retirement, publication.RetirementCompletion, publication.RetirementFinalization = json.RawMessage(`{}`), json.RawMessage(`{}`), json.RawMessage(`{}`)
+		inventory.MachineUIDs = slices.DeleteFunc(inventory.MachineUIDs, func(current string) bool { return current == uid })
+		delete(inventory.Publications, uid)
+		inventory.Released = map[string]tunnel.ReceiveJournalPublication{uid: publication}
+		raw, err := json.Marshal(inventory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		index.Data["inventory.json"] = string(raw)
+		if _, err := store.ConfigMaps.Update(ctx, index, metav1.UpdateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.ensureDialerRole(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := checkGrant(); err != nil {
+			t.Fatal("released history lost archive read access", err)
+		}
+		currentRole := &rbacv1.Role{}
+		if err := r.reader.Get(ctx, client.ObjectKeyFromObject(role), currentRole); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.ensureDialerRole(ctx); err != nil {
+			t.Fatal(err)
+		}
+		repeated := &rbacv1.Role{}
+		if err := r.reader.Get(ctx, client.ObjectKeyFromObject(role), repeated); err != nil {
+			t.Fatal(err)
+		}
+		if repeated.ResourceVersion != currentRole.ResourceVersion {
+			t.Fatal("unchanged released grants were rewritten")
+		}
+		// A replaced or missing retained incarnation must fail before changing
+		// the Role, rather than silently pruning the previous exact grants.
+		publication.JournalUID = "replacement-incarnation"
+		inventory.Released[uid] = publication
+		raw, err = json.Marshal(inventory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		index, err = store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		index.Data["inventory.json"] = string(raw)
+		if _, err := store.ConfigMaps.Update(ctx, index, metav1.UpdateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.ensureDialerRole(ctx); err == nil {
+			t.Fatal("changed released journal identity admitted")
+		}
+		if err := r.reader.Get(ctx, client.ObjectKeyFromObject(role), repeated); err != nil {
+			t.Fatal(err)
+		}
+		if repeated.ResourceVersion != currentRole.ResourceVersion {
+			t.Fatal("failed released admission changed grants")
+		}
+	})
+
 }
 
 // Inject a newer Role grant after the reconciler begins deriving membership.

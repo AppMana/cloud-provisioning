@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"k8s.io/client-go/kubernetes"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -180,4 +181,37 @@ func verifyOrphanReceiveReconciliation(t *testing.T, r *meshReconciler, store ha
 	if err != nil || last.ResourceVersion != currentIndex.ResourceVersion {
 		t.Fatal("retry rewrote persisted consumers", err)
 	}
+	for _, released := range []bool{false, true} {
+		t.Run(fmt.Sprintf("empty-active-released-%v", released), func(t *testing.T) {
+			empty := current
+			empty.MachineUIDs = []string{}
+			empty.Publications = nil
+			if released {
+				p := current.Publications[plan.MachineUID]
+				p.RetirementCompletion, p.RetirementFinalization = json.RawMessage(`{}`), json.RawMessage(`{}`)
+				empty.Released = map[string]tunnel.ReceiveJournalPublication{plan.MachineUID: p}
+			}
+			raw, err := json.Marshal(empty)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			before.Data["inventory.json"] = string(raw)
+			before, err = store.ConfigMaps.Update(ctx, before, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if progress, err := test.reconcileOrphanReceiveWithdrawals(ctx, mesh); err != nil || progress {
+				t.Fatal("empty active set blocked ordinary reconciliation", err)
+			}
+			after, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+			if err != nil || before.ResourceVersion != after.ResourceVersion {
+				t.Fatal("empty reconciliation mutated retained state", err)
+			}
+		})
+	}
+
 }

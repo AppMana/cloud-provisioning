@@ -28,6 +28,11 @@ func (r *meshReconciler) reconcileOrphanReceiveWithdrawals(ctx context.Context, 
 	if err != nil {
 		return false, err
 	}
+	// An authoritative empty active set has no orphan work. Released records
+	// remain in the inventory; this no-op grants no release or route authority.
+	if len(inventory.MachineUIDs) == 0 {
+		return false, nil
+	}
 	snapshots := map[string]handover.Snapshot{}
 	plans := map[string]tunnel.ReceiveTransitionPlan{}
 	var all []handover.Snapshot

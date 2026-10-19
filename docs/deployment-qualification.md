@@ -899,3 +899,14 @@ owner's routes while an unrelated peer's stream continues. This uses guest mount
 and network namespaces and real WireGuard devices; it does not exercise API
 release authorization, durable checkpoint admission, actual VM reboot, or
 mixed-version rollback.
+
+After reservation release, controller reconciliation must retain named, read-only
+agent access to each released journal and its immutable ancestry. Released owners
+do not acquire pending successor archive grants. A changed retained incarnation
+must stop Role reconciliation before removing existing grants. An authoritative
+empty active inventory is a no-op for orphan discovery, allowing ordinary mesh
+reconciliation to continue without mutating retained release records. Controller
+fixtures exercise empty and all-released membership, archive retention, repeat
+reconciliation, and incarnation mismatch. Release evidence and Role writes are
+synthetic in these fixtures; they do not qualify RBAC propagation, authenticated
+release, actual agent recovery, or live address allocation.

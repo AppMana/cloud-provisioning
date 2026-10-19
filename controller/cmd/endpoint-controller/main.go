@@ -1729,9 +1729,20 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 			return err
 		}
 		journals = append(journals, tunnel.ReceiveInventoryName(string(mesh.UID)))
-		for _, uid := range inventory.MachineUIDs {
+		// Released histories still fence stale boot recovery. Keep their exact
+		// journal and ancestry reads without treating them as active owners.
+		retained := append([]string{}, inventory.MachineUIDs...)
+		for uid := range inventory.Released {
+			retained = append(retained, uid)
+		}
+		sort.Strings(retained)
+		for _, uid := range retained {
 			name := tunnel.ReceiveTransitionName(uid)
-			if publication := inventory.Publications[uid]; publication.JournalUID != "" {
+			publication, released := inventory.Released[uid]
+			if !released {
+				publication = inventory.Publications[uid]
+			}
+			if publication.JournalUID != "" {
 				store := r.receiveJournal
 				store.Name, store.ExpectedUID = name, publication.JournalUID
 				snapshot, err := store.Load(ctx)
@@ -1743,12 +1754,14 @@ func (r *meshReconciler) ensureDialerRole(ctx context.Context) error {
 					return err
 				}
 				journals = append(journals, archives...)
-				pending, err := r.receivePreparationArchive(ctx, store, snapshot)
-				if err != nil {
-					return err
-				}
-				if pending != "" {
-					journals = append(journals, pending)
+				if !released {
+					pending, err := r.receivePreparationArchive(ctx, store, snapshot)
+					if err != nil {
+						return err
+					}
+					if pending != "" {
+						journals = append(journals, pending)
+					}
 				}
 			}
 			found := false

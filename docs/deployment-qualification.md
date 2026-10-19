@@ -969,3 +969,17 @@ changed active-journal incarnation and inventory/mesh mutation during admission.
 Failed admission must preserve checkpoint bytes. This proves local checkpoint
 handling and callback suppression, not actual reboot, live API partition recovery,
 kernel absence, stale-worker execution or address reuse.
+
+Offline cloud boot admission retains a completed legacy-cloud import marker when
+its inventory, mesh, node, public key and committed base hash match the admitted
+local journal. The marker must be a private regular file and accompany completed
+neighbor bookkeeping. It supplies no forwarding or deletion authority: boot
+recovery keeps it byte-for-byte in its source rechecks and never imports its old
+peers again. Unknown markers and pending neighbor cleanup still reject recovery.
+The regression scenario uses a synthetic terminal journal and previous-boot
+observation. It checks valid and absent markers, identity/base mismatches, missing
+or pending neighbor state, public files, symlinks, unknown markers, trailing JSON
+and a marker changed during the native callback. Rejected initial admission must
+not invoke native recovery; the mutation case must fail the source recheck. This
+establishes admission behavior only, not VM reboot timing, kernel reconstruction,
+live API recovery or safety after reuse of a retired worker's address.

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 )
 
 // Account for completed ordinary-neighbor bookkeeping without replaying it.
@@ -44,4 +46,32 @@ func readReceiveBootNeighborFiles(lockPath string, inventory receiveInventoryChe
 		files[name] = raw
 	}
 	return files, nil
+}
+
+// A completed cloud-base import is a durable no-replay fence. Retain only the
+// exact marker bound to the admitted local journal and completed neighbor state;
+// never import its peers or infer permission to repeat their cleanup at boot.
+func retainReceiveBootLegacyImport(lockPath string, inventory receiveInventoryCheckpoint, plan tunnel.ReceiveTransitionPlan, files map[string][]byte) error {
+	current := receiveNeighborCheckpoint{InventoryUID: inventory.InventoryUID, MeshUID: inventory.Inventory.MeshUID, NodeUID: inventory.NodeUID, PublicKey: inventory.PublicKey}
+	expected, err := receiveCloudLegacyImportIdentity(current, plan)
+	if err != nil {
+		return err
+	}
+	path := lockPath + ".neighbors.json"
+	markerPath := path + ".cloud-legacy-" + expected.BaseHash + ".json"
+	raw, err := readPrivateRetirementCache(markerPath)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if _, ok := files[path]; !ok {
+		return fmt.Errorf("boot legacy import requires completed neighbor checkpoint")
+	}
+	if err := validateReceiveCloudLegacyImport(raw, expected); err != nil {
+		return err
+	}
+	files[markerPath] = raw
+	return nil
 }

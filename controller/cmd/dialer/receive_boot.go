@@ -259,6 +259,9 @@ func admitReceiveBoot(ctx context.Context, cfg config, native func(receiveBootSt
 	if err != nil {
 		return true, err
 	}
+	if err := retainReceiveBootLegacyImport(lock.Name(), inventory, recovered.Plan, neighbors); err != nil {
+		return true, err
+	}
 	for path, raw := range neighbors {
 		files[path] = raw
 		allowed[filepath.Base(path)] = true

@@ -19,11 +19,12 @@ func main() {
 	instance := flag.String("instance-id", "", "existing EC2 instance ID")
 	bootstrapWait := flag.Duration("bootstrap-wait", 0, "wait for completed bootstrap before reporting; requires -bootstrap-status")
 	bootstrapStatus := flag.Bool("bootstrap-status", false, "observe native first-boot completion through the guest adapter")
+	capaBootstrap := flag.Bool("capa-bootstrap", false, "use the CAPA secure Linux bootstrap contract; requires -bootstrap-status")
 	stdin := flag.Bool("stdin", false, "stage stdin privately for the command")
 	put := flag.String("put", "", "write stdin to this protected guest file instead of executing a command")
 	timeout := flag.Duration("timeout", 5*time.Minute, "command deadline")
 	flag.Parse()
-	if *bootstrapWait < 0 || (*bootstrapWait > 0 && !*bootstrapStatus) || *work == "" || *instance == "" || (!*bootstrapStatus && *put == "" && flag.NArg() == 0) || (*put != "" && (flag.NArg() != 0 || *stdin)) || (*bootstrapStatus && (flag.NArg() != 0 || *stdin || *put != "")) {
+	if *bootstrapWait < 0 || (*capaBootstrap && !*bootstrapStatus) || (*bootstrapWait > 0 && !*bootstrapStatus) || *work == "" || *instance == "" || (!*bootstrapStatus && *put == "" && flag.NArg() == 0) || (*put != "" && (flag.NArg() != 0 || *stdin)) || (*bootstrapStatus && (flag.NArg() != 0 || *stdin || *put != "")) {
 		fmt.Fprintln(os.Stderr, "-work-dir and -instance-id are required; select a command, -put or -bootstrap-status")
 		os.Exit(2)
 	}
@@ -48,6 +49,12 @@ func main() {
 	node.Commands, err = aws.DiscoverGuestCommands(ctx, cli, *instance)
 	if err != nil {
 		fatal(err)
+	}
+	if *capaBootstrap {
+		if _, ok := node.Commands.(aws.LinuxCommands); !ok {
+			fatal(fmt.Errorf("CAPA Linux bootstrap requires a Linux instance"))
+		}
+		node.Commands = aws.CAPALinuxCommands{}
 	}
 	if *bootstrapStatus {
 		var complete bool

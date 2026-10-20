@@ -345,6 +345,11 @@ func verifyReceiveTransitionJournal(t *testing.T, r *meshReconciler, machine *un
 				}
 			}
 			verifyOrphanReceiveReconciliation(t, r, store, current)
+			if direction == "forward" {
+				t.Run("normal-retirement-controller", func(t *testing.T) {
+					verifyOrphanReceiveReconciliation(t, r, store, current, true)
+				})
+			}
 			verifySuccessorPreparationProposal(t, r, machine, native, store, current)
 			// Each terminal outcome must reject newly published sources without
 			// rewriting the journal. This exercises controller admission against

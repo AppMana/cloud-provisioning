@@ -46,9 +46,25 @@ func (r MeshConsumerResolver) PrepareOrphanReceiveWithdrawal(ctx context.Context
 // bind the exact reserved terminal history, persisted intent and current mesh.
 // Repeat these reads immediately before publishing or advancing retirement.
 func (r MeshConsumerResolver) CheckReceiveOrphanAbsent(ctx context.Context, plan tunnel.ReceiveTransitionPlan) error {
-	if r.Reader == nil || r.Namespace == "" || r.SecretName == "" || r.SecretUID == "" || plan.Namespace != r.Namespace || plan.MeshName != r.SecretName || plan.MeshUID != r.SecretUID || plan.MachineName == "" || plan.MachineUID == "" || plan.CloudNodeName == "" || plan.CloudNodeUID == "" || plan.AdoptionName != tunnel.AdoptionSecretName(plan.MachineName) || plan.AdoptionUID == "" {
-		return fmt.Errorf("orphan recovery requires exact reserved identities")
+	absent, err := r.ReceiveOwnerAbsent(ctx, plan)
+	if err != nil {
+		return err
 	}
+	if !absent {
+		return fmt.Errorf("retirement owner or replacement still exists")
+	}
+	return nil
+}
+
+// ReceiveOwnerAbsent distinguishes unfinished deletion from a failed read.
+// Existing objects, including replacements, keep ownership reserved. Callers
+// must still authorize withdrawal history and repeat absence checks at writes;
+// this read is not a provider deletion or native cleanup proof.
+func (r MeshConsumerResolver) ReceiveOwnerAbsent(ctx context.Context, plan tunnel.ReceiveTransitionPlan) (bool, error) {
+	if r.Reader == nil || r.Namespace == "" || r.SecretName == "" || r.SecretUID == "" || plan.Namespace != r.Namespace || plan.MeshName != r.SecretName || plan.MeshUID != r.SecretUID || plan.MachineName == "" || plan.MachineUID == "" || plan.CloudNodeName == "" || plan.CloudNodeUID == "" || plan.AdoptionName != tunnel.AdoptionSecretName(plan.MachineName) || plan.AdoptionUID == "" {
+		return false, fmt.Errorf("retirement absence requires exact reserved identities")
+	}
+	absent := true
 	machine := &unstructured.Unstructured{}
 	machine.SetGroupVersionKind(schema.GroupVersionKind{Group: "cluster.x-k8s.io", Version: "v1beta2", Kind: "Machine"})
 	for _, target := range []struct {
@@ -61,11 +77,12 @@ func (r MeshConsumerResolver) CheckReceiveOrphanAbsent(ctx context.Context, plan
 	} {
 		err := r.Reader.Get(ctx, target.key, target.obj)
 		if err == nil {
-			return fmt.Errorf("orphan recovery found an existing %T at %s", target.obj, target.key)
+			absent = false
+			continue
 		}
 		if !apierrors.IsNotFound(err) {
-			return err
+			return false, err
 		}
 	}
-	return nil
+	return absent, ctx.Err()
 }

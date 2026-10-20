@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"maps"
 
+	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,19 +56,43 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 	}
 	snapshot := source.Journals[machineUID]
 	store.ExpectedUID = string(snapshot.Metadata().UID)
-	checkOrphan := func() error {
-		if !source.Withdrawal.Orphaned {
-			return nil
-		}
-		plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
+	ownerAbsent := func(member attachment.ReceiveRetirementSet) (bool, error) {
+		plan, err := tunnel.DecodeReceiveTransition(member.Journals[member.Withdrawal.MachineUID], store.ClusterUID)
 		if err != nil {
-			return err
+			return false, err
 		}
-		resolver := attachment.MeshConsumerResolver{Reader: r.reader, Namespace: source.Mesh.Namespace, SecretName: source.Mesh.Name, SecretUID: string(source.Mesh.UID)}
-		return resolver.CheckReceiveOrphanAbsent(ctx, plan)
+		if !member.Withdrawal.Orphaned {
+			// The claim finalizer can still be removing an orphaned provider
+			// object after the CAPI Machine disappears. Its absence is the
+			// normal lifecycle's durable indication that teardown finished.
+			claim := &v1alpha1.ProvisionedNodeClaim{}
+			if err := r.reader.Get(ctx, client.ObjectKey{Namespace: plan.Namespace, Name: plan.MachineName}, claim); err == nil {
+				return false, nil
+			} else if !apierrors.IsNotFound(err) {
+				return false, err
+			}
+		}
+		resolver := attachment.MeshConsumerResolver{Reader: r.reader, Namespace: member.Mesh.Namespace, SecretName: member.Mesh.Name, SecretUID: string(member.Mesh.UID)}
+		return resolver.ReceiveOwnerAbsent(ctx, plan)
 	}
-	if err := checkOrphan(); err != nil {
-		return fail(err)
+	finalize := policy.FinalizeRetirements || (policy.FinalizeOrphanRetirements && source.Withdrawal.Orphaned)
+	release := policy.ReleaseRetirements || (policy.ReleaseOrphanRetirements && source.Withdrawal.Orphaned)
+	// Normal deletion still consumes renewable completion while its owner
+	// exists. Do not finalize that evidence before the lifecycle finishes.
+	requireAbsent := source.Withdrawal.Orphaned
+	if requireAbsent || finalize || release {
+		absent, err := ownerAbsent(source)
+		if err != nil {
+			return fail(err)
+		}
+		if requireAbsent && !absent {
+			return fail(fmt.Errorf("orphan retirement owner or replacement exists"))
+		}
+		if absent {
+			requireAbsent = true
+		} else {
+			finalize, release = false, false
+		}
 	}
 	cohort, err := source.RetirementCohort()
 	if err != nil {
@@ -76,10 +102,7 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 	if err != nil {
 		return fail(err)
 	}
-	recheck := func() error {
-		if err := checkOrphan(); err != nil {
-			return err
-		}
+	checkPolicies := func() error {
 		current, err := r.retirementConsumerPolicies(ctx, api, policy, source.Mesh, cohort.Consumers)
 		if err != nil {
 			return err
@@ -91,13 +114,48 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 		// source after the independent owner and consumer-policy checks.
 		return nil
 	}
-	if policy.ReleaseOrphanRetirements && source.Withdrawal.Orphaned && len(source.Inventory.Publications[machineUID].RetirementFinalization) != 0 {
+	checkMember := func(member attachment.ReceiveRetirementSet) error {
+		absent, err := ownerAbsent(member)
+		if err != nil {
+			return err
+		}
+		if !absent {
+			return fmt.Errorf("retirement owner or replacement exists")
+		}
+		return nil
+	}
+	recheck := func() error {
+		if requireAbsent {
+			if err := checkMember(source); err != nil {
+				return err
+			}
+		}
+		return checkPolicies()
+	}
+	if release && len(source.Inventory.Publications[machineUID].RetirementFinalization) != 0 {
 		if err := policy.validate(); err != nil {
 			return fail(err)
 		}
+		if len(cohort.MachineUIDs) > 1 {
+			if !policy.ReleaseRetirements {
+				return fail(fmt.Errorf("joint release requires explicit retirement release policy"))
+			}
+			return source.ReceiptCollectionWithCohortRelease(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, func(member attachment.ReceiveRetirementSet) error {
+				if err := checkMember(member); err != nil {
+					return err
+				}
+				// Every validated group includes the target exactly once.
+				// Recheck shared consumer policy once per group boundary,
+				// while independently checking absence for every owner.
+				if member.Withdrawal.MachineUID == machineUID {
+					return checkPolicies()
+				}
+				return nil
+			})
+		}
 		return source.ReceiptCollectionWithRelease(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, recheck)
 	}
-	if policy.FinalizeOrphanRetirements && source.Withdrawal.Orphaned {
+	if finalize {
 		return source.ReceiptCollectionWithFinalization(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, recheck)
 	}
 	return source.ReceiptCollection(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, recheck)

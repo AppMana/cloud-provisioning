@@ -22,7 +22,7 @@ import (
 // Journal/index persistence uses the existing API server; owner absence and
 // survivors use synthetic objects. This does not measure native retirement,
 // authenticated completion, release, or live network continuity.
-func verifyOrphanReceiveReconciliation(t *testing.T, r *meshReconciler, store handover.Store, snapshot handover.Snapshot) {
+func verifyOrphanReceiveReconciliation(t *testing.T, r *meshReconciler, store handover.Store, snapshot handover.Snapshot, normalMode ...bool) {
 	t.Helper()
 	ctx := context.Background()
 	plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
@@ -86,6 +86,7 @@ func verifyOrphanReceiveReconciliation(t *testing.T, r *meshReconciler, store ha
 	if err != nil {
 		t.Fatal(err)
 	}
+	published := mesh.DeepCopy()
 	mesh.Data, _, err = tunnel.WithdrawRemotePeer(mesh.Data, plan.MachineName, plan.RootPublicKey)
 	if err != nil {
 		t.Fatal(err)
@@ -120,6 +121,13 @@ func verifyOrphanReceiveReconciliation(t *testing.T, r *meshReconciler, store ha
 		}
 	}
 	api := fake.NewClientBuilder().WithScheme(r.Scheme()).WithObjects(objects...).Build()
+	if len(normalMode) != 0 && normalMode[0] {
+		// Model the publication update's new revision; normal withdrawal must
+		// not admit the same mesh revision captured before peer removal.
+		if err := api.Update(ctx, mesh); err != nil {
+			t.Fatal(err)
+		}
+	}
 	test := *r
 	test.receiveJournal = store
 	test.Client = api
@@ -144,6 +152,31 @@ func verifyOrphanReceiveReconciliation(t *testing.T, r *meshReconciler, store ha
 	isolated.Data["inventory.json"] = string(raw)
 	if _, err := store.ConfigMaps.Update(ctx, isolated, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
+	}
+	if len(normalMode) != 0 && normalMode[0] {
+		snapshot, err := store.Load(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		snapshot, err = store.FreezeCompleted(ctx, snapshot)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resolver := attachment.MeshConsumerResolver{Reader: api, Namespace: mesh.Namespace, SecretName: mesh.Name, SecretUID: string(mesh.UID)}
+		consumers, err := resolver.PublishedConsumers(ctx, mesh)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, err := json.Marshal(published.Data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		intent := attachment.RemoteWithdrawalIntent{MeshNamespace: mesh.Namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), SourceVersion: published.ResourceVersion, SourceDataHash: tunnel.HashPeerList(raw), MachineName: plan.MachineName, MachineUID: plan.MachineUID, PublicKey: plan.RootPublicKey, DrainIntent: "test/normal-removal", Consumers: consumers}
+		if err := intent.ReserveReceiveWithdrawal(ctx, store.ConfigMaps, store.ClusterUID, string(index.UID), published, snapshot); err != nil {
+			t.Fatal(err)
+		}
+		verifyNormalRetirementControllerLifecycle(t, &test, api, mesh, store, plan)
+		return
 	}
 	for pass := 0; pass < 2; pass++ {
 		progress, err := test.reconcileOrphanReceiveWithdrawals(ctx, mesh)

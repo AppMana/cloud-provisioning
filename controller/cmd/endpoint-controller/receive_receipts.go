@@ -39,9 +39,16 @@ type receiveReceiptPolicy struct {
 	FinalizeOrphanRetirements bool `json:"finalizeOrphanRetirements,omitempty"`
 	// Requires separately qualified release-aware agents, recovery and rollback.
 	ReleaseOrphanRetirements bool `json:"releaseOrphanRetirements,omitempty"`
+	// Includes normal withdrawals after their owner objects are absent.
+	// The orphan-only switches retain their narrower activation scope.
+	FinalizeRetirements bool `json:"finalizeRetirements,omitempty"`
+	ReleaseRetirements  bool `json:"releaseRetirements,omitempty"`
 }
 
 func (p receiveReceiptPolicy) validate() error {
+	if p.ReleaseRetirements && (!p.FinalizeRetirements || p.Endpoint == "" || p.TrustSecret == "") {
+		return fmt.Errorf("retirement release requires finalization and authenticated agent receipt delivery")
+	}
 	if p.ReleaseOrphanRetirements && (!p.FinalizeOrphanRetirements || p.Endpoint == "" || p.TrustSecret == "") {
 		return fmt.Errorf("orphan release requires finalization and authenticated agent receipt delivery")
 	}
@@ -116,7 +123,7 @@ func (r *meshReconciler) configureReceiptAgent(daemon *appsv1.DaemonSet) {
 		}
 	}
 	agent.Args = append(args, pollArg)
-	if p.ReleaseOrphanRetirements {
+	if p.ReleaseOrphanRetirements || p.ReleaseRetirements {
 		agent.Args = append(agent.Args, "--observe-finalized-retirements=true")
 	}
 	agent.Args = append(agent.Args, "--receipt-url="+p.Endpoint, "--receipt-ca-file="+directory+"/ca.crt", "--receipt-token-file="+directory+"/token", "--receive-mesh-name="+r.secretName)

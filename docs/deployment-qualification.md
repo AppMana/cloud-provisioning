@@ -573,6 +573,22 @@ A failed or ambiguous response must not be treated as successful finalization:
 read and validate the historical record before deciding whether to retry. Neither
 completion nor finalization releases reservations. Enable this setting only
 after all readers and the rollback candidate understand finalized inventories.
+The broader `finalizeRetirements` setting also defaults to false. It includes
+normal withdrawals only after fresh reads establish that their claim, Machine,
+Node and adoption Secret are absent. A remaining claim may still be removing
+provider resources; existing or replacement owners retain renewable completion.
+Read errors must fail admission rather than count as absence. Recheck absence
+and consumer policy at finalization boundaries. The orphan-only setting must
+not change the behavior of normal withdrawals.
+
+Controller lifecycle tests reuse completed preparation journals in separate
+real API storage. They must retain renewable completion while each owner exists,
+reject owner-read failures, and reject replacements after admission without
+changing inventory revisions. Require separate fresh observations for
+finalization and release. These tests use synthetic owner/consumer objects,
+TokenReview answers and native observations; they do not establish provider
+termination, token cryptography, native cleanup or live continuity.
+
 Real-token collection tests cover invalid credentials, observation-policy
 mismatch, owner rejection after completion, successful consumption and rejected
 replay. They use synthetic native observations and do not establish controller
@@ -941,6 +957,14 @@ observations after finalization; default finalized maintenance still suppresses
 receipts. Every observation requires the existing host lock, durable withdrawal
 checkpoint, native cleanup, current agent/boot identity and post-cleanup source
 checks. The post-finalization digest cannot reuse consumed completion receipts.
+The broader `releaseRetirements` setting requires `finalizeRetirements` and
+authenticated delivery, and opts agents into the same fresh observations.
+For joint normal withdrawals, use the existing atomic cohort release collection,
+checking every member's owner absence and shared consumer policy at each
+boundary. All members must already have compatible consumed finalization.
+Neither the orphan-only release setting nor one owner's absence authorizes a
+joint release. Keep these settings disabled until the corresponding live
+recovery, continuity and rollback gates are qualified.
 
 For finalized orphan withdrawals, the controller reuses the bounded receipt
 collector and current image/consumer policies. Completion authenticates every

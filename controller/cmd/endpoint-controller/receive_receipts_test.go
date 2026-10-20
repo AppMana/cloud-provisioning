@@ -270,13 +270,14 @@ func TestReceiveReceiptPolicy(t *testing.T) {
 
 // Activation changes agent behavior only for an explicitly configured release
 // policy. This is configuration validation, not live release qualification.
-func TestOrphanReleasePolicyAndAgentOptIn(t *testing.T) {
+func TestRetirementReleasePolicyAndAgentOptIn(t *testing.T) {
 	base := receiveReceiptPolicy{BindAddress: ":9444", CertFile: "/tls/cert", KeyFile: "/tls/key", ImageIDs: map[string]string{"amd64": "sha256:" + strings.Repeat("a", 64)}, Endpoint: "https://receipts.invalid/v1/receipts", TrustSecret: "trust"}
-	for _, fault := range []string{"disabled", "enabled", "without-finalization", "without-delivery", "without-trust"} {
+	for _, fault := range []string{"disabled", "enabled", "without-finalization", "without-delivery", "without-trust", "normal-disabled", "normal-enabled", "normal-without-finalization", "normal-without-delivery", "normal-without-trust", "normal-orphan-finalization-only"} {
 		t.Run(fault, func(t *testing.T) {
 			p := base
 			p.ReleaseOrphanRetirements, p.FinalizeOrphanRetirements = true, true
-			switch fault {
+			mode := strings.TrimPrefix(fault, "normal-")
+			switch mode {
 			case "disabled":
 				p.ReleaseOrphanRetirements, p.FinalizeOrphanRetirements = false, false
 			case "without-finalization":
@@ -286,7 +287,14 @@ func TestOrphanReleasePolicyAndAgentOptIn(t *testing.T) {
 			case "without-trust":
 				p.TrustSecret = ""
 			}
-			valid := fault == "disabled" || fault == "enabled"
+			if strings.HasPrefix(fault, "normal-") {
+				p.ReleaseRetirements, p.FinalizeRetirements = p.ReleaseOrphanRetirements, p.FinalizeOrphanRetirements
+				p.ReleaseOrphanRetirements, p.FinalizeOrphanRetirements = false, false
+			}
+			if mode == "orphan-finalization-only" {
+				p.FinalizeRetirements, p.FinalizeOrphanRetirements = false, true
+			}
+			valid := mode == "disabled" || mode == "enabled"
 			if err := p.validate(); (err == nil) != valid {
 				t.Fatalf("unexpected release policy result: %v", err)
 			}
@@ -306,7 +314,7 @@ func TestOrphanReleasePolicyAndAgentOptIn(t *testing.T) {
 				}
 			}
 			expected := 0
-			if p.ReleaseOrphanRetirements {
+			if p.ReleaseOrphanRetirements || p.ReleaseRetirements {
 				expected = 1
 			}
 			if count != expected {

@@ -467,3 +467,34 @@ the local proxy becomes usable before CNI cleanup and creation need it.
 Repeat full reboot tests with a stable workload Service, preserving all failed
 requests and measuring both Node and workload recovery. Removing the Service
 routing dependency does not remove other host boot or CNI delays.
+
+## DaemonSet rollout with retired nodes
+
+The controller-manager dependency must include Kubernetes change
+`b791867865b7483feea2b65468b731e9a3a73f49`, based on `v1.36.4`, from branch
+`fix/daemon-retired-node-rollout` in the existing Kubernetes fork. The change
+excludes terminating-only pods on absent or no-longer-selected nodes from the
+non-surge rollout's unavailable count. Terminating pods on still-selected nodes
+continue to consume the configured availability budget. Surge cleanup behavior
+is unchanged.
+
+Run the full `./pkg/controller/daemon` test package, including
+`TestDaemonSetRolloutWithTerminatingRetiredPod`. Its cases cover selector
+exclusion, untolerated taints, Node deletion and a still-selected node. Use
+owned, terminating Running pods so the fixture exercises the controller's
+actual pod-discovery path.
+
+Cross-compile `cmd/kube-controller-manager` for each target architecture using
+the Kubernetes build targets. Include it in the existing k0s runtime ZIP and
+embedding workflow, preserving the other components selected for that release.
+Record the component source revision and payload hashes. A component-only
+package that preserves the supervisor also preserves its version string;
+verify the full package and running controller-manager hashes rather than
+using that string to identify the dependency.
+
+Qualify the installed runtime with an actual blocked DaemonSet rollout while
+observing workload and management continuity. Preserve retired-node pods and
+the configured availability budget during the test. Unit tests and artifact
+inspection do not establish native rollout progress, architecture-specific
+execution or deployment readiness. If agent rollout resumes during runtime
+maintenance, qualify agent-only upgrade continuity separately.

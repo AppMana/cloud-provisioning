@@ -410,103 +410,124 @@ func TestReconcileDelete_RemovesComputeAndOnlyThenReleasesTheClaim(t *testing.T)
 	}
 }
 
-// Fake API state-machine coverage only: conditions are injected snapshots, not
-// proof that CAPA observes EC2 faithfully or that provider termination is timely.
+// Fake API state-machine coverage only: conditions and provider states are
+// injected snapshots, not proof that CAPA observes EC2 faithfully or that
+// provider termination is timely.
 func TestReconcileDelete_PreservesInfrastructureWhileCAPIDeletionIsPending(t *testing.T) {
-	for _, condition := range []string{"True", "False", "Unknown"} {
-		t.Run("reported-ready-"+condition, func(t *testing.T) {
-			ctx := context.Background()
-			claim := fakeClaim("public-worker")
-			r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), fakeNode())
-			if err := reconcileClaim(t, r, claim); err != nil {
-				t.Fatal(err)
-			}
-			key := client.ObjectKeyFromObject(claim)
-			machine := &unstructured.Unstructured{}
-			machine.SetGroupVersionKind(machineGVK)
-			if err := r.Get(context.Background(), key, machine); err != nil {
-				t.Fatal(err)
-			}
-			// Conditions can lag the provider or describe a failed reconcile. Their
-			// values must never authorize bypassing the CAPI deletion lifecycle.
-			if err := unstructured.SetNestedSlice(machine.Object, []any{map[string]any{"type": "Ready", "status": condition}}, "status", "conditions"); err != nil {
-				t.Fatal(err)
-			}
-			machine.SetFinalizers([]string{"machine.cluster.x-k8s.io"})
-			machine.SetAnnotations(map[string]string{"pre-drain.delete.hook.machine.cluster.x-k8s.io/test": "awaiting-network-withdrawal"})
-			if err := r.Update(context.Background(), machine); err != nil {
-				t.Fatal(err)
-			}
-			created := &v1alpha1.ProvisionedNodeClaim{}
-			if err := r.Get(context.Background(), key, created); err != nil {
-				t.Fatal(err)
-			}
-			if err := r.Delete(context.Background(), created); err != nil {
-				t.Fatal(err)
-			}
-			for attempt := 0; attempt < 3; attempt++ {
-				// Preserve API state but discard controller process state each time.
-				restarted := *r
-				result, err := restarted.Reconcile(ctx, ctrl.Request{NamespacedName: key})
-				if err != nil || result.RequeueAfter != 10*time.Second {
-					t.Fatalf("CAPI pending must retry without error backoff: %+v %v", result, err)
+	for _, providerState := range []string{"", "running", "shutting-down", "terminated"} {
+		for _, condition := range []string{"True", "False", "Unknown"} {
+			t.Run("provider-"+providerState+"/reported-ready-"+condition, func(t *testing.T) {
+				ctx := context.Background()
+				claim := fakeClaim("public-worker")
+				r := newClaimReconciler(t, claim, fakeTemplate(claim.Name), fakeCluster("appmana"), fakeNode())
+				if err := reconcileClaim(t, r, claim); err != nil {
+					t.Fatal(err)
 				}
-				if err := r.Get(context.Background(), key, machine); err != nil || machine.GetDeletionTimestamp() == nil {
-					t.Fatalf("CAPI Machine must remain pending deletion: %v", err)
+				key := client.ObjectKeyFromObject(claim)
+				provider := &unstructured.Unstructured{}
+				provider.SetGroupVersionKind(joinaws.Provider{}.GVK())
+				if err := r.Get(ctx, key, provider); err != nil {
+					t.Fatal(err)
 				}
+				// Provider status is an asynchronous observation, not authority to
+				// bypass either deletion lifecycle, even when it says terminated.
+				if providerState != "" {
+					if err := unstructured.SetNestedField(provider.Object, providerState, "status", "instanceState"); err != nil {
+						t.Fatal(err)
+					}
+					if err := r.Update(ctx, provider); err != nil {
+						t.Fatal(err)
+					}
+				}
+				machine := &unstructured.Unstructured{}
+				machine.SetGroupVersionKind(machineGVK)
+				if err := r.Get(context.Background(), key, machine); err != nil {
+					t.Fatal(err)
+				}
+				// Conditions can lag the provider or describe a failed reconcile. Their
+				// values must never authorize bypassing the CAPI deletion lifecycle.
+				if err := unstructured.SetNestedSlice(machine.Object, []any{map[string]any{"type": "Ready", "status": condition}}, "status", "conditions"); err != nil {
+					t.Fatal(err)
+				}
+				machine.SetFinalizers([]string{"machine.cluster.x-k8s.io"})
+				machine.SetAnnotations(map[string]string{"pre-drain.delete.hook.machine.cluster.x-k8s.io/test": "awaiting-network-withdrawal"})
+				if err := r.Update(context.Background(), machine); err != nil {
+					t.Fatal(err)
+				}
+				created := &v1alpha1.ProvisionedNodeClaim{}
+				if err := r.Get(context.Background(), key, created); err != nil {
+					t.Fatal(err)
+				}
+				if err := r.Delete(context.Background(), created); err != nil {
+					t.Fatal(err)
+				}
+				for attempt := 0; attempt < 3; attempt++ {
+					// Preserve API state but discard controller process state each time.
+					restarted := *r
+					result, err := restarted.Reconcile(ctx, ctrl.Request{NamespacedName: key})
+					if err != nil || result.RequeueAfter != 10*time.Second {
+						t.Fatalf("CAPI pending must retry without error backoff: %+v %v", result, err)
+					}
+					if err := r.Get(context.Background(), key, machine); err != nil || machine.GetDeletionTimestamp() == nil {
+						t.Fatalf("CAPI Machine must remain pending deletion: %v", err)
+					}
+					infra := &unstructured.Unstructured{}
+					infra.SetGroupVersionKind(joinaws.Provider{}.GVK())
+					if err := r.Get(context.Background(), key, infra); err != nil || infra.GetDeletionTimestamp() != nil {
+						t.Fatalf("claim bypassed CAPI's deletion gate: %v", err)
+					}
+					if err := r.Get(context.Background(), key, created); err != nil || !containsString(created.Finalizers, Finalizer) {
+						t.Fatalf("claim must retain cleanup ownership: %v", err)
+					}
+				}
+				// Model CAPI finishing Machine deletion while a provider object remains.
+				// The claim may clean up that orphan, but must wait for its finalizer.
 				infra := &unstructured.Unstructured{}
 				infra.SetGroupVersionKind(joinaws.Provider{}.GVK())
-				if err := r.Get(context.Background(), key, infra); err != nil || infra.GetDeletionTimestamp() != nil {
-					t.Fatalf("claim bypassed CAPI's deletion gate: %v", err)
+				if err := r.Get(ctx, key, infra); err != nil {
+					t.Fatal(err)
 				}
-				if err := r.Get(context.Background(), key, created); err != nil || !containsString(created.Finalizers, Finalizer) {
-					t.Fatalf("claim must retain cleanup ownership: %v", err)
+				infra.SetFinalizers([]string{"test/provider-termination"})
+				if err := r.Update(ctx, infra); err != nil {
+					t.Fatal(err)
 				}
-			}
-			// Model CAPI finishing Machine deletion while a provider object remains.
-			// The claim may clean up that orphan, but must wait for its finalizer.
-			infra := &unstructured.Unstructured{}
-			infra.SetGroupVersionKind(joinaws.Provider{}.GVK())
-			if err := r.Get(ctx, key, infra); err != nil {
-				t.Fatal(err)
-			}
-			infra.SetFinalizers([]string{"test/provider-termination"})
-			if err := r.Update(ctx, infra); err != nil {
-				t.Fatal(err)
-			}
-			machine.SetFinalizers(nil)
-			if err := r.Update(ctx, machine); err != nil {
-				t.Fatal(err)
-			}
-			for attempt := 0; attempt < 3; attempt++ {
-				restarted := *r
-				result, err := restarted.Reconcile(ctx, ctrl.Request{NamespacedName: key})
-				if err != nil || result.RequeueAfter != 10*time.Second {
-					t.Fatalf("provider finalizer must remain pending: %+v %v", result, err)
+				machine.SetFinalizers(nil)
+				if err := r.Update(ctx, machine); err != nil {
+					t.Fatal(err)
 				}
-				if err := r.Get(ctx, key, infra); err != nil || infra.GetDeletionTimestamp() == nil {
-					t.Fatalf("orphan cleanup not requested: %v", err)
+				for attempt := 0; attempt < 3; attempt++ {
+					restarted := *r
+					result, err := restarted.Reconcile(ctx, ctrl.Request{NamespacedName: key})
+					if err != nil || result.RequeueAfter != 10*time.Second {
+						t.Fatalf("provider finalizer must remain pending: %+v %v", result, err)
+					}
+					if err := r.Get(ctx, key, infra); err != nil || infra.GetDeletionTimestamp() == nil {
+						t.Fatalf("orphan cleanup not requested: %v", err)
+					}
+					if observed, _, err := unstructured.NestedString(infra.Object, "status", "instanceState"); err != nil || observed != providerState {
+						t.Fatalf("provider observation changed or was not exercised: got %q, want %q: %v", observed, providerState, err)
+					}
+					if err := r.Get(ctx, key, created); err != nil || !containsString(created.Finalizers, Finalizer) {
+						t.Fatalf("provider pending lost claim ownership: %v", err)
+					}
 				}
-				if err := r.Get(ctx, key, created); err != nil || !containsString(created.Finalizers, Finalizer) {
-					t.Fatalf("provider pending lost claim ownership: %v", err)
+				infra.SetFinalizers(nil)
+				if err := r.Update(ctx, infra); err != nil {
+					t.Fatal(err)
 				}
-			}
-			infra.SetFinalizers(nil)
-			if err := r.Update(ctx, infra); err != nil {
-				t.Fatal(err)
-			}
-			if err := reconcileClaim(t, r, created); err != nil {
-				t.Fatal(err)
-			}
-			if err := r.Get(ctx, key, created); !apierrors.IsNotFound(err) {
-				t.Fatalf("compute gone but claim did not finish: %v", err)
-			}
-			// A delayed duplicate event after completion is harmless.
-			if err := reconcileClaim(t, r, created); err != nil {
-				t.Fatal(err)
-			}
+				if err := reconcileClaim(t, r, created); err != nil {
+					t.Fatal(err)
+				}
+				if err := r.Get(ctx, key, created); !apierrors.IsNotFound(err) {
+					t.Fatalf("compute gone but claim did not finish: %v", err)
+				}
+				// A delayed duplicate event after completion is harmless.
+				if err := reconcileClaim(t, r, created); err != nil {
+					t.Fatal(err)
+				}
 
-		})
+			})
+		}
 	}
 }
 

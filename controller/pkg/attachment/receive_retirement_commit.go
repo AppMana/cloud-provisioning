@@ -15,6 +15,7 @@ import (
 )
 
 const receiveRetirementCompletionVersion = 4
+const receiveRetirementCohortCompletionVersion = 5
 
 type receiveRetirementCompletion struct {
 	InventoryVersion string             `json:"inventoryVersion"`
@@ -23,6 +24,7 @@ type receiveRetirementCompletion struct {
 	Version          int                `json:"version"`
 	Binding          string             `json:"binding"`
 	Receipts         []handover.Receipt `json:"receipts"`
+	Cohort           []string           `json:"cohort,omitempty"`
 }
 
 // RecordReceiveRetirementWithPodReceipts joins live authentication to inventory
@@ -78,7 +80,10 @@ func RecordReceiveRetirementWithPodReceipts(ctx context.Context, api kubernetes.
 	if err != nil {
 		return err
 	}
-	completion := receiveRetirementCompletion{Version: receiveRetirementCompletionVersion, InventoryVersion: scope.inventory.ResourceVersion, InventoryHash: scope.inventoryHash, MeshVersion: mesh.ResourceVersion, Binding: commitBinding, Receipts: make([]handover.Receipt, 0, len(proofs))}
+	completion := receiveRetirementCompletion{Version: scope.version, InventoryVersion: scope.inventory.ResourceVersion, InventoryHash: scope.inventoryHash, MeshVersion: mesh.ResourceVersion, Binding: commitBinding, Receipts: make([]handover.Receipt, 0, len(proofs))}
+	if scope.version == receiveRetirementCohortCompletionVersion {
+		completion.Cohort = scope.CleanupMachineUIDs()
+	}
 	for _, proof := range proofs {
 		completion.Receipts = append(completion.Receipts, proof.Receipt)
 	}

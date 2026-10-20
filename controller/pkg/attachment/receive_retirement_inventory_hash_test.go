@@ -118,7 +118,7 @@ func TestRetirementInventoryHashKeepsAuthorityAndLegacySemantics(t *testing.T) {
 				copy.Publications["two"] = sibling
 			}
 			equivalent := change == "own-evidence" || change == "sibling-evidence"
-			for _, version := range []int{3, 4} {
+			for _, version := range []int{3, 4, 5} {
 				if (hash(copy, version) == newHash) != equivalent {
 					t.Fatal("completion exclusion changed authority semantics")
 				}
@@ -132,7 +132,7 @@ func TestRetirementInventoryHashKeepsAuthorityAndLegacySemantics(t *testing.T) {
 	if string(original) != string(after) {
 		t.Fatal("hashing mutated source")
 	}
-	if _, err := receiveRetirementInventoryHash(inventory, "one", 5); err == nil {
+	if _, err := receiveRetirementInventoryHash(inventory, "one", 6); err == nil {
 		t.Fatal("unknown completion version admitted")
 	}
 }

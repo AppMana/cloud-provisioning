@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
@@ -27,9 +28,27 @@ type ReceiveRetirementReceiptScope struct {
 	completion    json.RawMessage
 	inventoryHash string
 	intent        json.RawMessage
+	version       int
+	cohort        []string
 }
 
-func (s ReceiveRetirementReceiptScope) Digest() string { return s.digest }
+func (s ReceiveRetirementReceiptScope) Digest() string               { return s.digest }
+func (s ReceiveRetirementReceiptScope) CleanupMachineUIDs() []string { return slices.Clone(s.cohort) }
+func (s ReceiveRetirementReceiptScope) RequiresConsumer(nodeUID string) bool {
+	return s.nodes[nodeUID] != ""
+}
+
+func receiveJointRetirementDigest(base string, members []string) (string, error) {
+	raw, err := json.Marshal(struct {
+		Kind    string   `json:"kind"`
+		Binding string   `json:"binding"`
+		Members []string `json:"members"`
+	}{"cldt/joint-retirement-observation/v1", base, members})
+	if err != nil {
+		return "", err
+	}
+	return tunnel.HashPeerList(raw), nil
+}
 
 func NewReceiveRetirementReceiptScope(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID, inventoryUID string, snapshot handover.Snapshot, mesh *corev1.Secret) (ReceiveRetirementReceiptScope, error) {
 	fail := func(err error) (ReceiveRetirementReceiptScope, error) { return ReceiveRetirementReceiptScope{}, err }
@@ -53,7 +72,15 @@ func NewReceiveRetirementReceiptScope(ctx context.Context, maps typedcore.Config
 	}
 	publication := inventory.Publications[plan.MachineUID]
 	previousCompletion := append(json.RawMessage(nil), publication.RetirementCompletion...)
-	inventoryHash, err := receiveRetirementInventoryHash(inventory, plan.MachineUID, receiveRetirementCompletionVersion)
+	cohort, err := loadReceiptRetirementCohort(ctx, handover.Store{ConfigMaps: maps, ClusterUID: clusterUID}, ReceiveRetirementSet{Inventory: inventory, Mesh: mesh, Withdrawal: withdrawal, Journals: map[string]handover.Snapshot{plan.MachineUID: snapshot}})
+	if err != nil {
+		return fail(err)
+	}
+	version := receiveRetirementCompletionVersion
+	if len(cohort.MachineUIDs) > 1 {
+		version = receiveRetirementCohortCompletionVersion
+	}
+	inventoryHash, err := receiveRetirementInventoryHash(inventory, plan.MachineUID, version)
 	if err != nil {
 		return fail(err)
 	}
@@ -61,8 +88,14 @@ func NewReceiveRetirementReceiptScope(ctx context.Context, maps typedcore.Config
 	if err != nil {
 		return fail(err)
 	}
-	scope := ReceiveRetirementReceiptScope{digest: digest, inventoryHash: inventoryHash, completion: previousCompletion, nodes: map[string]string{}, inventory: *index.ObjectMeta.DeepCopy(), intent: append(json.RawMessage(nil), inventory.Publications[plan.MachineUID].Retirement...)}
-	for _, consumer := range withdrawal.Consumers {
+	if len(cohort.MachineUIDs) > 1 {
+		digest, err = receiveJointRetirementDigest(digest, cohort.MachineUIDs)
+		if err != nil {
+			return fail(err)
+		}
+	}
+	scope := ReceiveRetirementReceiptScope{version: version, cohort: cohort.MachineUIDs, digest: digest, inventoryHash: inventoryHash, completion: previousCompletion, nodes: map[string]string{}, inventory: *index.ObjectMeta.DeepCopy(), intent: append(json.RawMessage(nil), inventory.Publications[plan.MachineUID].Retirement...)}
+	for _, consumer := range cohort.Consumers {
 		scope.nodes[consumer.NodeUID] = consumer.NodeName
 	}
 	if len(scope.nodes) == 0 {

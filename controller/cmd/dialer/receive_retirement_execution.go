@@ -72,28 +72,66 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	timing.step("pre-native-admission")
-	if err := recheckReceiveRetirement(ctx, api, store, admitted, cfg.nodeName, key); err != nil {
-		return nil, fmt.Errorf("pre-cleanup admission: %w", err)
+	if !binding.RequiresConsumer(admitted.NodeUID) {
+		return nil, fmt.Errorf("departing worker cannot observe joint retirement")
 	}
-	if err := verifyAgent(); err != nil {
-		return nil, err
+	// Admit and checkpoint every member before touching native state. All cleanup
+	// shares the host lock and the original deadline; a member gets no fresh budget.
+	members := make([]admittedReceiveRetirement, 0, len(binding.CleanupMachineUIDs()))
+	for _, uid := range binding.CleanupMachineUIDs() {
+		member := admitted
+		memberStore, memberScope := retirementMemberScope(store, scope, admitted, uid)
+		if uid != scope.MachineUID {
+			member, err = loadReceiveRetirement(ctx, api, memberStore, memberScope, cfg.nodeName, key)
+			if err != nil {
+				return nil, fmt.Errorf("joint admission: %w", err)
+			}
+			if member.NodeUID != admitted.NodeUID || member.BootID != admitted.BootID {
+				return nil, fmt.Errorf("joint retirement observer changed")
+			}
+			if err := checkpointReceiveRetirementLocked(ctx, api, memberStore, memberScope, cfg, key, lock.Name(), member); err != nil {
+				return nil, fmt.Errorf("joint checkpoint: %w", err)
+			}
+		}
+		members = append(members, member)
 	}
-	timing.step("native")
-	if err := native(ctx, lock.Name(), admitted); err != nil {
-		return nil, fmt.Errorf("native cleanup: %w", err)
-	}
-	receipt.ObservedAt = time.Now()
-	if err := ctx.Err(); err != nil {
-		return nil, err
+	for i, member := range members {
+		timing.step("pre-native-admission")
+		memberStore, _ := retirementMemberScope(store, scope, member, member.Withdrawal.MachineUID)
+		if err := recheckReceiveRetirement(ctx, api, memberStore, member, cfg.nodeName, key); err != nil {
+			return nil, fmt.Errorf("pre-cleanup admission: %w", err)
+		}
+		if err := verifyAgent(); err != nil {
+			return nil, err
+		}
+		timing.step("native")
+		if err := native(ctx, lock.Name(), member); err != nil {
+			return nil, fmt.Errorf("native cleanup: %w", err)
+		}
+		if i == 0 {
+			// Joint evidence is only as fresh as its earliest native observation.
+			// Later members must not renew the first member's absence timestamp.
+			receipt.ObservedAt = time.Now()
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 	}
 	timing.step("post-native-admission")
-	current, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
-	if err != nil {
-		return nil, fmt.Errorf("post-cleanup admission: %w", err)
-	}
-	if !sameReceiveRetirement(admitted, current) {
-		return nil, fmt.Errorf("retirement changed during native cleanup")
+	var current admittedReceiveRetirement
+	for _, member := range members {
+		uid := member.Withdrawal.MachineUID
+		memberStore, memberScope := retirementMemberScope(store, scope, member, uid)
+		refreshed, err := loadReceiveRetirement(ctx, api, memberStore, memberScope, cfg.nodeName, key)
+		if err != nil {
+			return nil, fmt.Errorf("post-cleanup admission: %w", err)
+		}
+		if !sameReceiveRetirement(member, refreshed) {
+			return nil, fmt.Errorf("retirement changed during native cleanup")
+		}
+		if uid == scope.MachineUID {
+			current = refreshed
+		}
 	}
 	if finalized {
 		verified, err := receiveRetirementFinalized(ctx, api, store, scope, current)
@@ -128,4 +166,12 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	}
 	receipt.RoundHash = binding.Digest()
 	return []handover.PodReceipt{{BootID: admitted.BootID, Receipt: receipt}}, nil
+}
+
+// Select the member's immutable journal identity for existing native backends.
+func retirementMemberScope(store handover.Store, scope receiveJournalScope, admitted admittedReceiveRetirement, uid string) (handover.Store, receiveJournalScope) {
+	store.Name = tunnel.ReceiveTransitionName(uid)
+	store.ExpectedUID = string(admitted.Journals[uid].Metadata().UID)
+	scope.MachineUID = uid
+	return store, scope
 }

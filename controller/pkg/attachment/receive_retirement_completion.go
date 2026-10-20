@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
@@ -56,7 +57,7 @@ func ReadVerifiedReceiveRetirementCompletion(ctx context.Context, api kubernetes
 	if decoder.Decode(&extra) != io.EOF {
 		return ReceiveRetirementSet{}, false, fmt.Errorf("trailing completion evidence")
 	}
-	if (completion.Version < 2 || completion.Version > receiveRetirementCompletionVersion) || completion.InventoryVersion == "" || completion.InventoryVersion == source.Metadata.ResourceVersion || completion.MeshVersion != source.MeshMetadata.ResourceVersion {
+	if (completion.Version < 2 || completion.Version > receiveRetirementCohortCompletionVersion) || completion.InventoryVersion == "" || completion.InventoryVersion == source.Metadata.ResourceVersion || completion.MeshVersion != source.MeshMetadata.ResourceVersion {
 		return ReceiveRetirementSet{}, false, fmt.Errorf("completion source revision is missing or changed")
 	}
 	inventoryHash, err := receiveRetirementInventoryHash(source.Inventory, machineUID, completion.Version)
@@ -79,8 +80,25 @@ func ReadVerifiedReceiveRetirementCompletion(ctx context.Context, api kubernetes
 			return ReceiveRetirementSet{}, false, err
 		}
 	}
+	consumers := source.Withdrawal.Consumers
+	if completion.Version == receiveRetirementCohortCompletionVersion {
+		cohort, err := source.RetirementCohort()
+		if err != nil {
+			return ReceiveRetirementSet{}, false, err
+		}
+		if len(cohort.MachineUIDs) < 2 || !slices.Equal(cohort.MachineUIDs, completion.Cohort) {
+			return ReceiveRetirementSet{}, false, fmt.Errorf("joint completion member set changed")
+		}
+		consumers = cohort.Consumers
+		digest, err = receiveJointRetirementDigest(digest, completion.Cohort)
+		if err != nil {
+			return ReceiveRetirementSet{}, false, err
+		}
+	} else if len(completion.Cohort) != 0 {
+		return ReceiveRetirementSet{}, false, fmt.Errorf("legacy completion cannot carry joint authority")
+	}
 	scope := ReceiveRetirementReceiptScope{digest: digest, nodes: map[string]string{}}
-	for _, consumer := range source.Withdrawal.Consumers {
+	for _, consumer := range consumers {
 		scope.nodes[consumer.NodeUID] = consumer.NodeName
 	}
 	if len(completion.Receipts) != len(scope.nodes) {
@@ -118,7 +136,7 @@ func ReadVerifiedReceiveRetirementCompletion(ctx context.Context, api kubernetes
 // Legacy records retain their original interpretation; never silently upgrade
 // their hash semantics. Copy publication entries so source admission is intact.
 func receiveRetirementInventoryHash(inventory tunnel.ReceiveInventory, machineUID string, version int) (string, error) {
-	if version < 2 || version > receiveRetirementCompletionVersion {
+	if version < 2 || version > receiveRetirementCohortCompletionVersion {
 		return "", fmt.Errorf("unsupported retirement completion version")
 	}
 	if _, found := inventory.Publications[machineUID]; machineUID == "" || !found {

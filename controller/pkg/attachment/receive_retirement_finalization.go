@@ -65,8 +65,12 @@ func FinalizeReceiveRetirementCompletion(ctx context.Context, api kubernetes.Int
 	if err != nil {
 		return err
 	}
+	consumers, err := source.completionConsumers(completion)
+	if err != nil {
+		return err
+	}
 	scope := ReceiveRetirementReceiptScope{nodes: map[string]string{}}
-	for _, c := range source.Withdrawal.Consumers {
+	for _, c := range consumers {
 		scope.nodes[c.NodeUID] = c.NodeName
 	}
 	if len(completion.Receipts) == 0 {
@@ -177,7 +181,7 @@ func validateReceiveRetirementFinalization(source ReceiveRetirementSet, clusterU
 	if err := decodeRetirementEvidence(publication.RetirementCompletion, &completion); err != nil {
 		return false, err
 	}
-	if completion.Version < 2 || completion.Version > receiveRetirementCompletionVersion || completion.InventoryVersion == "" || completion.InventoryVersion == record.Inventory.ResourceVersion || completion.MeshVersion != record.MeshVersion {
+	if completion.Version < 2 || completion.Version > receiveRetirementCohortCompletionVersion || completion.InventoryVersion == "" || completion.InventoryVersion == record.Inventory.ResourceVersion || completion.MeshVersion != record.MeshVersion {
 		return fail("completion source changed")
 	}
 	historicalMesh := source.Mesh.DeepCopy()
@@ -195,8 +199,18 @@ func validateReceiveRetirementFinalization(source ReceiveRetirementSet, clusterU
 			return false, err
 		}
 	}
+	consumers, err := source.completionConsumers(completion)
+	if err != nil {
+		return false, err
+	}
+	if completion.Version == receiveRetirementCohortCompletionVersion {
+		digest, err = receiveJointRetirementDigest(digest, completion.Cohort)
+		if err != nil {
+			return false, err
+		}
+	}
 	scope := ReceiveRetirementReceiptScope{digest: digest, nodes: map[string]string{}}
-	for _, c := range source.Withdrawal.Consumers {
+	for _, c := range consumers {
 		scope.nodes[c.NodeUID] = c.NodeName
 	}
 	if len(completion.Receipts) != len(scope.nodes) || len(scope.nodes) == 0 {

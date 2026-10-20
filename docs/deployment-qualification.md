@@ -962,6 +962,27 @@ they do not establish live controller routing, multi-consumer release timing,
 RBAC propagation, actual reboot recovery, or version rollback. Activation remains
 subject to those separate lifecycle checks.
 
+Joint retirement must preserve each withdrawal's captured consumers. Group only
+published version-two withdrawals from the same exact captured mesh when every
+member names the other departing workers by committed identity and all members
+have identical surviving consumers. An unpublished sibling, missing journal,
+changed identity or differing capture must not excuse a required observer.
+Every surviving observer must checkpoint and clean every member under one host
+lock and one execution deadline before issuing an observation. Partial cleanup,
+source changes or agent replacement must suppress that observation. Version-five
+completion binds the ordered group separately from individual-worker evidence;
+older completion versions keep their existing interpretation. Historical
+finalization must validate its explicit members rather than expanding them to
+include later withdrawals. Individual release of a joint completion is forbidden;
+atomic release must preserve all member history and recovery fences together.
+
+Joint-execution API tests use synthetic serving histories and native callbacks.
+They must cover a failed second cleanup, retry of all members, shared deadlines,
+and source changes between members. These fixtures do not qualify actual kernel
+absence, authenticated joint completion, atomic release, stale-worker replay,
+address reuse, live continuity or rollback to readers predating version five.
+Those gates remain mandatory before deployment or resource release.
+
 Finalized agent execution verifies historical finalization against its freshly
 admitted retirement set instead of reconstructing the same ancestry again.
 Initial and post-native admission still read and validate the full history;

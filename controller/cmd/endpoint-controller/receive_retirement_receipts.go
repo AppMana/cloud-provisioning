@@ -68,7 +68,11 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 	if err := checkOrphan(); err != nil {
 		return fail(err)
 	}
-	policies, err := r.retirementConsumerPolicies(ctx, api, policy, source.Mesh, source.Withdrawal.Consumers)
+	cohort, err := source.RetirementCohort()
+	if err != nil {
+		return fail(err)
+	}
+	policies, err := r.retirementConsumerPolicies(ctx, api, policy, source.Mesh, cohort.Consumers)
 	if err != nil {
 		return fail(err)
 	}
@@ -76,7 +80,7 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 		if err := checkOrphan(); err != nil {
 			return err
 		}
-		current, err := r.retirementConsumerPolicies(ctx, api, policy, source.Mesh, source.Withdrawal.Consumers)
+		current, err := r.retirementConsumerPolicies(ctx, api, policy, source.Mesh, cohort.Consumers)
 		if err != nil {
 			return err
 		}

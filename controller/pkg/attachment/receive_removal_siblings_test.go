@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -140,6 +141,13 @@ func verifySiblingReceiveRemoval(t *testing.T, api kubernetes.Interface) {
 			if len(mesh.Data[tunnel.PeerPublicKeyPrefix+intents[first].MachineName]) != 0 {
 				t.Fatal("first withdrawal not published")
 			}
+			firstSource, err := ReadReceiveRetirementSet(ctx, api, stores[first], ns, "mesh", string(mesh.UID), intents[first].MachineUID)
+			must(err)
+			beforeJoint, err := firstSource.RetirementCohort()
+			must(err)
+			if len(beforeJoint.MachineUIDs) != 1 || len(beforeJoint.Consumers) != 2 {
+				t.Fatal("unpublished sibling was excluded from required consumers")
+			}
 			original := mesh.DeepCopy()
 			for _, fault := range []string{"unrelated-data", "partial-peer", "replacement-key"} {
 				current, err := api.CoreV1().Secrets(ns).Get(ctx, "mesh", metav1.GetOptions{})
@@ -194,6 +202,7 @@ func verifySiblingReceiveRemoval(t *testing.T, api kubernetes.Interface) {
 				if len(source.Routes.Serving.Plans) != 0 || len(source.Routes.Reserved.Plans) != 2 || len(source.Withdrawal.Consumers) != 2 {
 					t.Fatal("lost retained sibling obligations")
 				}
+				verifyJointRetirementScope(t, ctx, stores[i], source)
 			}
 			after, err := json.Marshal(intents)
 			must(err)
@@ -201,5 +210,56 @@ func verifySiblingReceiveRemoval(t *testing.T, api kubernetes.Interface) {
 				t.Fatal("source validation mutated input captures")
 			}
 		})
+	}
+}
+
+// Joint admission uses real persisted withdrawal records. This does not prove
+// native absence or authenticate a receipt; it verifies which cleanup and
+// consumer obligations a receipt must bind, including malformed member sets.
+func verifyJointRetirementScope(t *testing.T, ctx context.Context, store handover.Store, source ReceiveRetirementSet) {
+	t.Helper()
+	cohort, err := source.RetirementCohort()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cohort.MachineUIDs) != 2 || len(cohort.Consumers) != 1 || cohort.Consumers[0].NodeUID != "site-uid" {
+		t.Fatalf("unexpected joint obligations: %+v", cohort)
+	}
+	binding, err := NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(source.Metadata.UID), source.Journals[source.Withdrawal.MachineUID], source.Mesh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if binding.version != receiveRetirementCohortCompletionVersion || !slices.Equal(binding.CleanupMachineUIDs(), cohort.MachineUIDs) || !binding.RequiresConsumer("site-uid") || len(binding.nodes) != 1 {
+		t.Fatal("receipt scope did not bind complete joint cleanup")
+	}
+	for _, c := range source.Withdrawal.Consumers {
+		if c.NodeUID != "site-uid" && binding.RequiresConsumer(c.NodeUID) {
+			t.Fatal("departing worker still required as joint observer")
+		}
+	}
+	copied := binding.CleanupMachineUIDs()
+	copied[0] = "replacement"
+	if !slices.Equal(binding.CleanupMachineUIDs(), cohort.MachineUIDs) {
+		t.Fatal("caller mutated receipt membership")
+	}
+	base, err := receiveRetirementAuthorityDigest(store.ClusterUID, string(source.Metadata.UID), binding.inventoryHash, source.Metadata, source.Mesh, source.Inventory.Publications[source.Withdrawal.MachineUID].Retirement)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if base == binding.Digest() {
+		t.Fatal("single-worker observation could satisfy joint cleanup")
+	}
+	for _, members := range [][]string{nil, {source.Withdrawal.MachineUID, source.Withdrawal.MachineUID}, {"missing"}, {cohort.MachineUIDs[1], cohort.MachineUIDs[0]}} {
+		if _, err := source.retirementCohortFor(members); err == nil {
+			t.Fatal("invalid joint members accepted", members)
+		}
+	}
+	for _, completion := range []receiveRetirementCompletion{
+		{Version: receiveRetirementCompletionVersion, Cohort: cohort.MachineUIDs},
+		{Version: receiveRetirementCohortCompletionVersion, Cohort: []string{source.Withdrawal.MachineUID}},
+	} {
+		if _, err := source.completionConsumers(completion); err == nil {
+			t.Fatal("invalid historical joint membership accepted")
+		}
 	}
 }

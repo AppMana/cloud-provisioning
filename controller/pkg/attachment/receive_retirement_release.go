@@ -2,6 +2,7 @@ package attachment
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -39,6 +40,16 @@ func releaseFinalizedReceiveRetirement(ctx context.Context, api kubernetes.Inter
 	}
 	if !verified {
 		return fmt.Errorf("release requires verified retirement finalization")
+	}
+	// A joint proof depends on all retained member journals. Individual release
+	// would discard authority needed by the other members; only an atomic cohort
+	// release protocol may consume these completions.
+	var completion receiveRetirementCompletion
+	if err := json.Unmarshal(source.Inventory.Publications[machineUID].RetirementCompletion, &completion); err != nil {
+		return err
+	}
+	if completion.Version == receiveRetirementCohortCompletionVersion {
+		return fmt.Errorf("joint retirement requires atomic cohort release")
 	}
 	// Supply the authenticated source to the policy check, not a separately read
 	// withdrawal that could name a different owner or captured consumer set.

@@ -184,7 +184,8 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 				continue
 			}
 			receipts, err := executeReceiveRetirement(ctx, api, store, scope, cfg, key, containerID, func(ctx context.Context, lockPath string, admitted admittedReceiveRetirement) error {
-				return retirement[0](ctx, store, scope, key, lockPath, admitted)
+				memberStore, memberScope := retirementMemberScope(store, scope, admitted, admitted.Withdrawal.MachineUID)
+				return retirement[0](ctx, memberStore, memberScope, key, lockPath, admitted)
 			})
 			if err != nil {
 				failures = append(failures, fmt.Errorf("receiver %s retirement execution: %w", uid, err))

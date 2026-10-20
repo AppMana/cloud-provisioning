@@ -158,8 +158,10 @@ python3 harness/e2e/safety/k0s-mtu-native.py \
   --artifacts "$PRIVATE_ARTIFACT_DIRECTORY" --repetitions 3
 ```
 
-The fixture snapshots the controller's k0s configuration, changes the Calico
-MTU and pod-template revision, and asks k0s to regenerate its managed manifests.
+The fixture snapshots the controller's k0s configuration, changes only the Calico
+MTU, and asks k0s to regenerate its managed manifests. The normal rendered
+pod-template change triggers the rollout; no additional revision annotation
+forces it.
 It verifies CNI installation on all three nodes and creates new pods to check
 actual interface MTU before and after autonomous restoration. Independent
 IPv4/IPv6 management and existing-workload probes span the change. A dropped
@@ -171,6 +173,15 @@ This fixture deliberately exercises a service-managed configuration. Restarting
 k0s starts reconciliation outside the guard's process group, so command exit
 and `rolled-back` state alone do not prove CNI restoration. The fixture requires
 observed convergence of installed CNI configuration and newly created pods.
+For multiple controllers, budget both the serial controller restarts and the
+normal CNI DaemonSet rollout in each direction before arming any guard. A
+single-controller fixture's timing does not establish a multi-controller
+schedule. Candidate convergence must leave time for verification before the
+first original rollback deadline. Keep each node's deadline immutable and
+record source-file restoration separately from complete CNI reconciliation.
+If the schedule cannot meet the required recovery bound, revise the deployment
+procedure; do not force faster DaemonSet updates, shorten traffic observation,
+or report late convergence as an on-time pass.
 Production use additionally requires exclusive ownership across all controllers,
 reconciliation after API loss, BGP resource restoration, and each site's routing
 and workload compatibility. Do not substitute this isolated MTU rehearsal for

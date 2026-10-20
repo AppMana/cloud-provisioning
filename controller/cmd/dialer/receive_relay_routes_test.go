@@ -229,7 +229,41 @@ func TestNativeReceiveRelayRouteSwitch(t *testing.T) {
 					}
 				})
 			}
-
+			t.Run("follower-without-tunnel", func(t *testing.T) {
+				must := func(err error) {
+					t.Helper()
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				// A follower must not need a dummy tunnel to use the scoped
+				// installer. Keep an unrelated underlay route as a sentinel.
+				must(netlink.LinkDel(wg))
+				must(netlink.RouteAdd(&netlink.Route{Dst: unrelated, LinkIndex: lan.Attrs().Index, Table: 518, Scope: netlink.SCOPE_LINK}))
+				cfg.receiveRelayRoutes = map[string]string{tc.destination: tc.gateway, tc.second: tc.other}
+				must(installRoutes(cfg, hosts, nil, nil, nil, nil, own))
+				must(verifyReceiveRouteInstallation(cfg, hosts, nil, own))
+				family := netlink.FAMILY_V6
+				if addr.IP.To4() != nil {
+					family = netlink.FAMILY_V4
+				}
+				before, err := netlink.RouteListFiltered(family, &netlink.Route{Table: 518}, netlink.RT_FILTER_TABLE)
+				must(err)
+				delete(cfg.receiveRelayRoutes, tc.second)
+				if err := installRoutes(cfg, hosts, nil, nil, nil, nil, own); err == nil {
+					t.Fatal("unbound destination accepted without a tunnel")
+				}
+				after, err := netlink.RouteListFiltered(family, &netlink.Route{Table: 518}, netlink.RT_FILTER_TABLE)
+				must(err)
+				if !reflect.DeepEqual(before, after) {
+					t.Fatal("rejected partial relay selection changed kernel routes")
+				}
+				sentinel, err := netlink.RouteListFiltered(family, &netlink.Route{Table: 518, Dst: unrelated}, netlink.RT_FILTER_TABLE|netlink.RT_FILTER_DST)
+				must(err)
+				if len(sentinel) != 1 || sentinel[0].LinkIndex != lan.Attrs().Index {
+					t.Fatal("follower installation changed unrelated route")
+				}
+			})
 		})
 	}
 }

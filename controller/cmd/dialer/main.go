@@ -2072,16 +2072,19 @@ func installRoutesWithPolicy(cfg config, routeHosts, claimedHosts, blocks []net.
 	if err != nil {
 		return err
 	}
-	// A retired generation is optional only when every direct destination has
-	// an authenticated prepared receiver. Unresolved claims and relay state still
-	// require the legacy path; reject before touching policy rules or routes.
+	// A local tunnel is optional when every destination has an authenticated
+	// prepared receiver or an explicitly admitted underlay relay. Followers
+	// have no tunnel device. Unresolved claims still require the legacy path;
+	// reject before touching policy rules or routes.
 	if link == nil {
-		if len(selected) == 0 || len(claimedHosts) != 0 || relay != nil || len(relayDsts) != 0 {
+		if len(selected)+len(relays) == 0 || len(claimedHosts) != 0 || relay != nil || len(relayDsts) != 0 {
 			return fmt.Errorf("missing legacy device with incomplete receiver-only routing")
 		}
 		for _, destinations := range [][]net.IPNet{routeHosts, blocks} {
 			for _, dst := range destinations {
-				if _, found := selected[dst.String()]; !found {
+				_, receiver := selected[dst.String()]
+				_, relayed := relays[dst.String()]
+				if !receiver && !relayed {
 					return fmt.Errorf("destination %s still requires the retired legacy device", dst.String())
 				}
 			}

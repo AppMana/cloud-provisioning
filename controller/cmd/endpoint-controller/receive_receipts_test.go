@@ -212,7 +212,14 @@ func TestReceiptChartAuthorizationRealAPI(t *testing.T) {
 		{"", "pods", "receipt-test", "agent-pod", "get", true},
 		{"", "serviceaccounts", "receipt-test", "cloud-provisioning", "get", true},
 		{"", "serviceaccounts", "receipt-test", "unrelated", "get", false},
-		{"", "pods", "unrelated", "agent-pod", "get", false},
+		// Journal-backed removal drains workloads across namespaces. Receipt
+		// identity reads share that controller account; deletion and unrelated
+		// credential access must remain denied.
+		{"", "pods", "unrelated", "agent-pod", "get", true},
+		{"", "pods", "unrelated", "", "list", true},
+		{"", "pods", "unrelated", "agent-pod", "delete", false},
+		{"", "secrets", "unrelated", "credential", "get", false},
+		{"", "serviceaccounts", "unrelated", "dialer", "get", false},
 		{"authentication.k8s.io", "tokenreviews", "", "", "list", false},
 	} {
 		deadline := time.Now().Add(5 * time.Second)

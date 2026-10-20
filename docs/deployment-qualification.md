@@ -1248,6 +1248,17 @@ qualification must correlate the captured Machine/AWSMachine identity and
 conditions with direct EC2 state reads for that same instance, retaining the
 original operation deadline and reporting the phase that remains pending.
 
+Retirement freshness is recorded in each immutable journal. The configured
+receipt age is an admission ceiling: increasing it admits older journals with
+their original age, while decreasing it below a journal's recorded age rejects
+that journal. Test expired evidence that falls inside an increased ceiling but
+outside the journal's bound; both receipt collection and claim removal must
+reject it without changing storage or requesting Machine deletion. These
+synthetic-timestamp tests do not establish live quorum convergence. Changing
+configuration does not repair an existing short-lived journal. Rollback to a
+controller without this policy selection requires restoring its matching
+configuration; mixed receipt-age journals are not qualified for that rollback.
+
 An expired completion must keep standalone claim deletion pending on the
 existing five-second retry cadence, without accepting the expired evidence or
 accumulating reconciliation error backoff. Future or missing observation times,

@@ -47,6 +47,10 @@ func AdvanceReceiveRemoval(ctx context.Context, api kubernetes.Interface, store 
 	if err != nil {
 		return false, err
 	}
+	maxAge, err = ReceiveRetirementReceiptAge(snapshot, maxAge)
+	if err != nil {
+		return false, err
+	}
 	if err := authorize(ctx, intent); err != nil {
 		return false, err
 	}

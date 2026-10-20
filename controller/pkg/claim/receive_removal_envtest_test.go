@@ -427,7 +427,7 @@ func verifyStandaloneCompletion(t *testing.T, api client.Client, core kubernetes
 	must(submit(token.Status.Token))
 
 	t.Run("completion-refresh", func(t *testing.T) {
-		for _, fault := range []string{"expired", "future", "missing-time"} {
+		for _, fault := range []string{"expired", "expired-after-policy-increase", "future", "missing-time"} {
 			t.Run(fault, func(t *testing.T) {
 				original, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
 				must(err)
@@ -465,9 +465,15 @@ func verifyStandaloneCompletion(t *testing.T, api client.Client, core kubernetes
 				must(api.Get(ctx, client.ObjectKeyFromObject(machine), machine))
 				claimVersion, machineVersion := claim.ResourceVersion, machine.GetResourceVersion()
 				r := &Reconciler{Client: api, Reader: api, Workload: api, RetirementAPI: core, MeshName: mesh.Name}
+				if fault == "expired-after-policy-increase" {
+					// Evidence is newer than the configured ceiling but older
+					// than the immutable journal's one-minute bound. Synthetic
+					// receipt timestamps test authority, not provider latency.
+					r.RetirementMaxAge = 3 * time.Minute
+				}
 				for attempt := 0; attempt < 3; attempt++ {
 					result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(claim)})
-					if fault == "expired" {
+					if fault == "expired" || fault == "expired-after-policy-increase" {
 						if err != nil || result.RequeueAfter != 5*time.Second {
 							t.Fatalf("expired observations must await refresh without error backoff: %+v, %v", result, err)
 						}

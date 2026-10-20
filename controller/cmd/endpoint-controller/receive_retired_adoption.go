@@ -113,13 +113,9 @@ func (r *meshReconciler) reconcileRetiredReceiveAdoption(ctx context.Context, me
 	}
 	store := r.receiveJournal
 	store.Name, store.ExpectedUID = tunnel.ReceiveTransitionName(plan.MachineUID), string(snapshot.Metadata().UID)
-	age := r.receivePreparation.Journal.MaxReceiptAge.Duration
-	view, err := snapshot.View()
+	age, err := attachment.ReceiveRetirementReceiptAge(snapshot, r.receivePreparation.Journal.MaxReceiptAge.Duration)
 	if err != nil {
 		return false, err
-	}
-	if view.Round.MaxReceiptAge != age {
-		return false, fmt.Errorf("adoption retirement policy differs from frozen journal")
 	}
 	source, verified, err := attachment.ReadVerifiedReceiveRetirementCompletion(ctx, r.receiveAPI, store, plan.Namespace, plan.MeshName, plan.MeshUID, plan.MachineUID, inventoryUID, age)
 	if err != nil || !verified {

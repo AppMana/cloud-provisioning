@@ -88,6 +88,37 @@ func verifyNormalRetirementControllerLifecycle(t *testing.T, r *meshReconciler, 
 		}
 		return c
 	}
+	// Increasing policy for future journals must not extend observations for
+	// an existing journal. This fixture uses synthetic native observations;
+	// it tests policy compatibility, not loaded retirement convergence.
+	t.Run("policy-increase-preserves-journal-freshness", func(t *testing.T) {
+		originalAge := r.receivePreparation.Journal.MaxReceiptAge.Duration
+		r.receivePreparation.Journal.MaxReceiptAge.Duration = 2 * originalAge
+		defer func() { r.receivePreparation.Journal.MaxReceiptAge.Duration = originalAge }()
+		c, err := r.resolveReceiveReceiptCollection(ctx, api, policy, plan.MachineUID)
+		if err != nil {
+			t.Fatal("compatible older journal rejected", err)
+		}
+		if c.MaxAge != originalAge {
+			t.Fatal("configuration increase extended an existing journal's receipts")
+		}
+		_, before := read()
+		stale := append([]handover.PodReceipt(nil), entries...)
+		for i := range stale {
+			stale[i].Receipt.RoundHash = c.Digest
+			stale[i].Receipt.ObservedAt = time.Now().Add(-originalAge - originalAge/2)
+		}
+		if err := c.Observe(ctx, stale); err == nil {
+			t.Fatal("policy increase admitted expired observations")
+		}
+		if err := c.Complete(ctx, stale); err == nil {
+			t.Fatal("policy increase committed expired observations")
+		}
+		_, after := read()
+		if after != before {
+			t.Fatal("expired evidence changed retirement storage")
+		}
+	})
 	complete := func(c handover.ReceiptCollection) {
 		must(c.Observe(ctx, entries))
 		must(c.Complete(ctx, entries))

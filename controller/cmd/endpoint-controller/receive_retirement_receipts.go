@@ -55,6 +55,10 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 		return fail(err)
 	}
 	snapshot := source.Journals[machineUID]
+	maxAge, err := attachment.ReceiveRetirementReceiptAge(snapshot, r.receivePreparation.Journal.MaxReceiptAge.Duration)
+	if err != nil {
+		return fail(err)
+	}
 	store.ExpectedUID = string(snapshot.Metadata().UID)
 	ownerAbsent := func(member attachment.ReceiveRetirementSet) (bool, error) {
 		plan, err := tunnel.DecodeReceiveTransition(member.Journals[member.Withdrawal.MachineUID], store.ClusterUID)
@@ -136,7 +140,7 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 		if err := policy.validate(); err != nil {
 			return fail(err)
 		}
-		observationAge := r.receivePreparation.Journal.MaxReceiptAge.Duration
+		observationAge := maxAge
 		if policy.ReleaseObservationMaxAge.Duration != 0 {
 			observationAge = policy.ReleaseObservationMaxAge.Duration
 		}
@@ -144,7 +148,7 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 			if !policy.ReleaseRetirements {
 				return fail(fmt.Errorf("joint release requires explicit retirement release policy"))
 			}
-			return source.ReceiptCollectionWithCohortRelease(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, observationAge, func(member attachment.ReceiveRetirementSet) error {
+			return source.ReceiptCollectionWithCohortRelease(ctx, api, store, policies, maxAge, observationAge, func(member attachment.ReceiveRetirementSet) error {
 				if err := checkMember(member); err != nil {
 					return err
 				}
@@ -157,12 +161,12 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 				return nil
 			})
 		}
-		return source.ReceiptCollectionWithRelease(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, observationAge, recheck)
+		return source.ReceiptCollectionWithRelease(ctx, api, store, policies, maxAge, observationAge, recheck)
 	}
 	if finalize {
-		return source.ReceiptCollectionWithFinalization(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, recheck)
+		return source.ReceiptCollectionWithFinalization(ctx, api, store, policies, maxAge, recheck)
 	}
-	return source.ReceiptCollection(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, recheck)
+	return source.ReceiptCollection(ctx, api, store, policies, maxAge, recheck)
 }
 
 // Reuse published-consumer discovery, including CAPI placement and adoption

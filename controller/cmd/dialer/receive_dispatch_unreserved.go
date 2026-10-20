@@ -81,22 +81,18 @@ func dispatchUnreservedReceiveCloud(ctx context.Context, api kubernetes.Interfac
 			return true, nil
 		}
 	}
-	var histories []attachment.ReceiveReleasedJournal
-	for uid, publication := range current.Released {
-		member := store
-		member.Name, member.ExpectedUID = tunnel.ReceiveTransitionName(uid), publication.JournalUID
-		snapshot, err := member.Load(ctx)
-		if err != nil {
-			return true, err
-		}
-		view, err := snapshot.View()
-		if err != nil {
-			return true, err
-		}
-		history, verified, err := attachment.ReadReleasedReceiveJournal(ctx, api, member, current.Namespace, current.MeshName, current.MeshUID, uid, string(index.UID), view.Round.MaxReceiptAge)
-		if err != nil {
-			return true, err
-		}
+	// The existing shared reader validates every retained history and selects
+	// each journal's frozen receipt age. Reconstructing that set separately for
+	// each retired worker delays ordinary admission as release history grows.
+	histories, err := attachment.ReadReleasedReceiveJournals(ctx, api, store, current.Namespace, current.MeshName, current.MeshUID, string(index.UID), 0)
+	if err != nil {
+		return true, err
+	}
+	if len(histories.Records) != len(current.Released) {
+		return true, fmt.Errorf("unreserved cloud release membership changed")
+	}
+	for uid := range current.Released {
+		history, verified := histories.Records[uid]
 		if !verified || !sameReceiveRevision(index.ObjectMeta, history.Metadata) {
 			return true, fmt.Errorf("unreserved cloud release history changed")
 		}
@@ -111,10 +107,9 @@ func dispatchUnreservedReceiveCloud(ctx context.Context, api kubernetes.Interfac
 				return true, nil
 			}
 		}
-		histories = append(histories, history)
 	}
-	for _, history := range histories {
-		if err := history.Recheck(ctx, api, store); err != nil {
+	if len(histories.Records) != 0 {
+		if err := histories.Recheck(ctx, api, store); err != nil {
 			return true, err
 		}
 	}

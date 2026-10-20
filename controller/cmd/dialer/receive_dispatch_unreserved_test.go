@@ -105,4 +105,29 @@ func verifyUnreservedCloudDispatch(t *testing.T, api kubernetes.Interface, store
 			}
 		})
 	}
+	t.Run("unreserved-cloud/shared-history-reads", func(t *testing.T) {
+		dir := t.TempDir()
+		cfg := config{iface: "freshcloud", nodeName: node.Name, peersFile: filepath.Join(dir, "peers.json"), peersSecretNamespace: scope.Namespace, peersSecretName: "fresh-cloud-worker-tunnel-peers"}
+		raw, err := json.Marshal(tunnel.PeersFileDoc{PrivateKey: key.String(), LocalAddress: "172.29.0.99/32"})
+		must(err)
+		must(os.WriteFile(cfg.peersFile, raw, 0600))
+		reader := store
+		retainedReads := 0
+		reader.ConfigMaps = receiveSetReader{ConfigMapInterface: store.ConfigMaps, before: func(name string) error {
+			if name == store.Name {
+				retainedReads++
+			}
+			return nil
+		}}
+		handled, err := dispatchUnreservedReceiveCloud(ctx, api, reader, cfg, inventory)
+		if err != nil || handled {
+			t.Fatalf("fresh worker did not reach ordinary admission: handled=%t err=%v", handled, err)
+		}
+		// One validated load plus the admission and execution rechecks. The
+		// shared reader owns policy selection; dispatch must not load each
+		// retained journal again merely to discover its frozen receipt age.
+		if retainedReads > 3 {
+			t.Fatalf("redundant retained journal reads: got %d, budget 3", retainedReads)
+		}
+	})
 }

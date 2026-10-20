@@ -1262,6 +1262,10 @@ history replay within that snapshot. Each API load and checkpoint restore must
 still validate the complete persisted history, and returned views must not expose
 mutable snapshot state. Unit tests and synthetic replay benchmarks establish
 these boundaries, not live convergence or the freshness of native observations.
+Fresh-worker dispatch must use the shared retained-history reader and its live
+recheck, while preserving retired UID, key, adoption and durable-file fences.
+The real-API dispatch test bounds redundant retained-journal reads; it does not
+establish bootstrap latency under a growing live history.
 
 Unpublished site observers with no local active receiver can advance released
 inventory checkpoints without ordinary-neighbor routing authority. Admission

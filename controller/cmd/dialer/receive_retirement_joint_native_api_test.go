@@ -145,7 +145,7 @@ func prepareNativeJointExecution(t *testing.T, api kubernetes.Interface, store h
 	allowed := func(raw string) net.IPNet { _, prefix, e := net.ParseCIDR(raw); must(e); return *prefix }
 	peers := []wgtypes.PeerConfig{}
 	interfaces := []string{}
-	for _, plan := range plans {
+	for i, plan := range plans {
 		root, e := wgtypes.ParseKey(plan.RootPublicKey)
 		must(e)
 		ips := []net.IPNet{}
@@ -170,7 +170,14 @@ func prepareNativeJointExecution(t *testing.T, api kubernetes.Interface, store h
 			if dst.IP.To4() == nil {
 				src = net.ParseIP("fd90::2")
 			}
-			must(netlink.RouteAdd(&netlink.Route{LinkIndex: receiver.Attrs().Index, Dst: &dst, Src: src, Table: cfg.routeTable, Scope: netlink.SCOPE_LINK, Protocol: unix.RTPROT_BOOT, Priority: receiveRoutePriority(&dst)}))
+			// The first worker still uses its legacy routes; the second has
+			// switched only IPv6. Authentication and finalization must cover
+			// actual cleanup of both possible native generations.
+			index := receiver.Attrs().Index
+			if i == 0 || dst.IP.To4() != nil {
+				index = legacy.Attrs().Index
+			}
+			must(netlink.RouteAdd(&netlink.Route{LinkIndex: index, Dst: &dst, Src: src, Table: cfg.routeTable, Scope: netlink.SCOPE_LINK, Protocol: unix.RTPROT_BOOT, Priority: receiveRoutePriority(&dst)}))
 		}
 		interfaces = append(interfaces, path.Interface)
 	}

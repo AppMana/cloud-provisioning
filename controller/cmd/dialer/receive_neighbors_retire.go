@@ -11,24 +11,28 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-// Retire only the ordinary owners admitted from durable intent and a complete
-// live mesh/journal read. The caller holds the reconciliation lock. A missing
-// handshake is never deletion authority. Routes drain before source permissions;
-// retries can finish that sequence without changing unrelated peers or policy.
-func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, retiring []tunnel.PeerSpec, own, allocated []string) error {
-	if len(retiring) == 0 {
-		return nil
-	}
+// Admission is shared with receiver-device retirement so an interrupted switch
+// can retain an exact legacy route until its ordinary owner is retired. This
+// validates native peer permissions without requiring either route generation
+// to have already disappeared. The caller holds the host reconciliation lock.
+type receiveNeighborRetirementAdmission struct {
+	cfg      config
+	link     netlink.Link
+	selected map[wgtypes.Key]tunnel.PeerSpec
+	prefixes []netip.Prefix
+}
+
+func admitReceiveNeighborRetirement(devices receiverDevices, cfg config, key wgtypes.Key, retiring []tunnel.PeerSpec) (*receiveNeighborRetirementAdmission, error) {
 	link, err := netlink.LinkByName(cfg.iface)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	live, err := devices.Device(cfg.iface)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if link.Type() != "wireguard" || key == (wgtypes.Key{}) || live.PublicKey != key.PublicKey() || cfg.routeTable <= unix.RT_TABLE_LOCAL || cfg.fwmark <= 0 || live.FirewallMark != cfg.fwmark {
-		return fmt.Errorf("neighbor retirement device identity changed")
+		return nil, fmt.Errorf("neighbor retirement device identity changed")
 	}
 	cfg.receiveRouteScope = map[string]bool{}
 	cfg.receiveRoutes, cfg.receiveRelayRoutes = nil, nil
@@ -40,14 +44,14 @@ func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg co
 	for _, peer := range retiring {
 		public, err := wgtypes.ParseKey(peer.PublicKey)
 		if err != nil || public == key.PublicKey() || public == (wgtypes.Key{}) || !peer.Remote || len(peer.Transit) != 0 || len(peer.TransitHosts) != 0 || len(peer.WGAllowedIPs) == 0 {
-			return fmt.Errorf("invalid retiring neighbor identity")
+			return nil, fmt.Errorf("invalid retiring neighbor identity")
 		}
 		owners[public] = append(owners[public], peer)
 		seenSources := map[netip.Prefix]bool{}
 		for _, raw := range peer.WGAllowedIPs {
 			prefix, err := netip.ParsePrefix(raw)
 			if err != nil || prefix != prefix.Masked() || !prefix.Addr().IsGlobalUnicast() || prefix.Addr().Is4In6() || prefix.Bits() == 0 || seenSources[prefix] {
-				return fmt.Errorf("invalid retiring neighbor source")
+				return nil, fmt.Errorf("invalid retiring neighbor source")
 			}
 			seenSources[prefix] = true
 			if !sourcePrefixes[prefix] {
@@ -68,18 +72,18 @@ func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg co
 				}
 			}
 			if !matched {
-				return fmt.Errorf("retiring neighbor source permissions changed")
+				return nil, fmt.Errorf("retiring neighbor source permissions changed")
 			}
 			// Overlapping historical intent is harmless only when the actual
 			// retiring owners do not compete for source authorization.
 			for _, allowed := range peer.AllowedIPs {
 				prefix, err := netip.ParsePrefix(allowed.String())
 				if err != nil {
-					return err
+					return nil, err
 				}
 				for previous, owner := range liveOwners {
 					if owner != peer.PublicKey && prefix.Overlaps(previous) {
-						return fmt.Errorf("retiring live neighbor sources overlap")
+						return nil, fmt.Errorf("retiring live neighbor sources overlap")
 					}
 				}
 				liveOwners[prefix] = peer.PublicKey
@@ -89,15 +93,32 @@ func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg co
 		for _, allowed := range peer.AllowedIPs {
 			prefix, err := netip.ParsePrefix(allowed.String())
 			if err != nil {
-				return err
+				return nil, err
 			}
 			for _, retired := range prefixes {
 				if prefix.Overlaps(retired) {
-					return fmt.Errorf("neighbor retirement overlaps another live owner")
+					return nil, fmt.Errorf("neighbor retirement overlaps another live owner")
 				}
 			}
 		}
 	}
+	return &receiveNeighborRetirementAdmission{cfg: cfg, link: link, selected: selected, prefixes: prefixes}, nil
+}
+
+// Retire only the ordinary owners admitted from durable intent and a complete
+// live mesh/journal read. The caller holds the reconciliation lock. A missing
+// handshake is never deletion authority. Routes drain before source permissions;
+// retries can finish that sequence without changing unrelated peers or policy.
+func retireReceiveNeighbors(ctx context.Context, devices receiverDevices, cfg config, key wgtypes.Key, retiring []tunnel.PeerSpec, own, allocated []string) error {
+	if len(retiring) == 0 {
+		return nil
+	}
+	admitted, err := admitReceiveNeighborRetirement(devices, cfg, key, retiring)
+	if err != nil {
+		return err
+	}
+	cfg, link := admitted.cfg, admitted.link
+	selected, prefixes := admitted.selected, admitted.prefixes
 	if err := preflightReceiveRoutePhase(cfg, nil, own); err != nil {
 		return err
 	}

@@ -16,6 +16,13 @@ import (
 // first. Relay next hops must match a committed generation; nothing is repaired
 // to make cleanup pass.
 func withdrawReceiveDeviceRoutes(ctx context.Context, cfg config, generations []map[string]receiveRouteSelection, own []string, admittedRelays ...map[string]string) error {
+	return withdrawReceiveDeviceRoutesWithLegacy(ctx, cfg, generations, nil, own, admittedRelays...)
+}
+
+// admittedLegacy comes from ordinary-neighbor admission under the same host
+// lock. Such routes remain for that owner's separate retirement step; they
+// must not be mistaken for receiver-device routes after an interrupted switch.
+func withdrawReceiveDeviceRoutesWithLegacy(ctx context.Context, cfg config, generations []map[string]receiveRouteSelection, admittedLegacy map[string]bool, own []string, admittedRelays ...map[string]string) error {
 	if cfg.routeTable <= unix.RT_TABLE_LOCAL || cfg.fwmark <= 0 || len(generations) == 0 {
 		return fmt.Errorf("receiver withdrawal requires owned policy and admitted generations")
 	}
@@ -53,13 +60,22 @@ func withdrawReceiveDeviceRoutes(ctx context.Context, cfg config, generations []
 	if len(cfg.receiveRouteScope) == 0 {
 		return nil
 	}
+	legacy := map[string]bool{}
+	for raw, allowed := range admittedLegacy {
+		if !allowed {
+			return fmt.Errorf("legacy withdrawal destination is not admitted")
+		}
+		if cfg.receiveRouteScope[raw] {
+			legacy[raw] = true
+		}
+	}
 	if err := validateReceiveRouteScope(cfg, nil, nil, nil, nil, nil); err != nil {
 		return err
 	}
 	if err := verifyReceivePolicyRules(cfg); err != nil {
 		return err
 	}
-	if err := preflightReceiveRouteGenerationsWithHandshake(cfg, generations, nil, own, false, admittedRelays...); err != nil {
+	if err := preflightReceiveRouteGenerationsWithHandshake(cfg, generations, legacy, own, false, admittedRelays...); err != nil {
 		return err
 	}
 	routes, err := netlink.RouteListFiltered(netlink.FAMILY_ALL, &netlink.Route{}, netlink.RT_FILTER_TABLE)
@@ -99,6 +115,11 @@ func withdrawReceiveDeviceRoutes(ctx context.Context, cfg config, generations []
 	}
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if len(legacy) != 0 {
+		// Only the separately admitted ordinary device may remain. No receiver
+		// or relay generation is admitted at this post-removal boundary.
+		return preflightReceiveRouteGenerationsWithHandshake(cfg, []map[string]receiveRouteSelection{{}}, legacy, own, false)
 	}
 	return verifyReceiveRouteDestinations(cfg, nil, nil, own)
 }

@@ -578,6 +578,10 @@ The broader `finalizeRetirements` setting also defaults to false. It includes
 normal withdrawals only after fresh reads establish that their claim, Machine,
 Node and adoption Secret are absent. A remaining claim may still be removing
 provider resources; existing or replacement owners retain renewable completion.
+Disabling finalization and release does not disable authorized withdrawal
+publication or native cleanup. A controller upgrade may therefore fence and
+publish pending deletions. Assess those mutations against their retained
+authority before rollback; unchanged policy flags do not prove unchanged state.
 Read errors must fail admission rather than count as absence. Recheck absence
 and consumer policy at finalization boundaries. The orphan-only setting must
 not change the behavior of normal withdrawals.
@@ -1032,7 +1036,13 @@ The combined native/API fixture must start its own API server and datastore in
 a fresh guest mount/network namespace and reuse the site retirement backend.
 Require real dual-stack receiver, route, peer, local advertisement and executable
 cache cleanup while preserving an unrelated route and the local WireGuard
-identity. A failed second cleanup, cancellation, agent replacement or source
+identity. Include legacy-only and mixed legacy/receiver route placement:
+preparing a receiver does not prove that switching moved every destination.
+Reuse ordinary-neighbor admission to validate exact legacy device identity,
+recorded peer permissions and absence of competing owners before allowing those
+routes to remain during receiver-device cleanup. Re-admit and remove them in the
+ordinary-peer cleanup step. Neither step alone permits a completion receipt.
+A failed second cleanup, cancellation, agent replacement or source
 change must suppress receipts; retry must remain idempotent. Authenticate fresh
 native observations with a Pod-bound TokenRequest/TokenReview, finalize both
 members, and atomically release the group using another fresh observation.

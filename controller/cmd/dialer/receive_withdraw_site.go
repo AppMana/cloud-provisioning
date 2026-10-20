@@ -134,6 +134,7 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 		}
 	}
 	guard := &siteReceiveScope{plans: admitted.Plans, check: check}
+	var legacyDestinations map[string]bool
 	prepare := func(groups map[string][]receiveRouteSelection, destinations map[string][]string) error {
 		var names []string
 		for name := range groups {
@@ -185,7 +186,7 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 		if err := check(); err != nil {
 			return err
 		}
-		return withdrawReceiveDeviceRoutes(ctx, cfg, generations, own, relayGenerations...)
+		return withdrawReceiveDeviceRoutesWithLegacy(ctx, cfg, generations, legacyDestinations, own, relayGenerations...)
 	}
 	// Stop announcing target destinations before removing their forwarding.
 	// The retirement checkpoint fences offline cache replay across interruption.
@@ -197,6 +198,16 @@ func retireAdmittedSiteReceiversLocked(ctx context.Context, api kubernetes.Inter
 	}
 	checkpoint := receiveNeighborCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), MeshUID: scope.MeshUID, MeshVersion: mesh.ResourceVersion, NodeUID: admitted.NodeUID, BootID: admitted.BootID, PublicKey: key.PublicKey().String(), Peers: currentPeers}
 	if err := retireWithdrawnNeighborCaches(ctx, lockPath+".neighbors.json", checkpoint, admitted.Plans, plan.RootPublicKey, recorded, check, func(peers []tunnel.PeerSpec) error {
+		// A prepared receiver does not prove that switching reached every
+		// destination. Admit the exact retained ordinary peer permissions
+		// before allowing its routes to survive receiver-device retirement.
+		// retireReceiveNeighbors repeats admission before removing those
+		// routes and permissions; completion still requires both steps.
+		neighbors, err := admitReceiveNeighborRetirement(devices, cfg, key, peers)
+		if err != nil {
+			return err
+		}
+		legacyDestinations = neighbors.cfg.receiveRouteScope
 		// The sidecar has durably imported cache-only permission variants before
 		// receiver cleanup can remove their original executable references.
 		if err := retireSiteReceiverRecords(ctx, api, cfg, mesh, key, path, guard, plan.RootPublicKey, prepare, func(selections []receiveRouteSelection, _ []string) error {

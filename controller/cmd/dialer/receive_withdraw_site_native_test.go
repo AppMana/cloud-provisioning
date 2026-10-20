@@ -35,7 +35,7 @@ func TestNativeCombinedSiteWithdrawal(t *testing.T) {
 		if name == "" {
 			name = "completed"
 		}
-		t.Run(name, func(t *testing.T) { nativeCombinedSiteWithdrawal(t, phase) })
+		t.Run(name, func(t *testing.T) { nativeCombinedSiteWithdrawal(t, phase, false, "receiver") })
 	}
 }
 
@@ -51,11 +51,27 @@ func TestNativeJointSiteWithdrawal(t *testing.T) {
 		if name == "" {
 			name = "completed"
 		}
-		t.Run(name, func(t *testing.T) { nativeCombinedSiteWithdrawal(t, phase, true) })
+		t.Run(name, func(t *testing.T) { nativeCombinedSiteWithdrawal(t, phase, true, "receiver") })
 	}
 }
 
-func nativeCombinedSiteWithdrawal(t *testing.T, phase string, joint ...bool) {
+// An interrupted switch can leave destinations on the original device even
+// though a prepared receiver exists. Exercise both route families and mixed
+// placement without requiring a handshake from either removed worker.
+func TestNativeLegacySiteWithdrawal(t *testing.T) {
+	if os.Getenv("CLDT_NATIVE_COMBINED_WITHDRAWAL") != "1" {
+		t.Skip("requires isolated guest namespaces")
+	}
+	for _, placement := range []string{"legacy", "mixed"} {
+		for _, joint := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/joint-%t", placement, joint), func(t *testing.T) {
+				nativeCombinedSiteWithdrawal(t, "switch", joint, placement)
+			})
+		}
+	}
+}
+
+func nativeCombinedSiteWithdrawal(t *testing.T, phase string, joint bool, placement string) {
 	for _, kind := range []string{"net", "mnt"} {
 		self, e := os.Readlink("/proc/self/ns/" + kind)
 		host, h := os.Readlink("/proc/1/ns/" + kind)
@@ -80,7 +96,7 @@ func nativeCombinedSiteWithdrawal(t *testing.T, phase string, joint ...bool) {
 	must(err)
 	plans := []tunnel.ReceiveTransitionPlan{plan}
 	roots := []wgtypes.Key{root}
-	if len(joint) != 0 && joint[0] {
+	if joint {
 		second, secondRoot := secondNativeWithdrawal(t, site)
 		plans, roots = append(plans, second), append(roots, secondRoot)
 	}
@@ -156,7 +172,11 @@ func nativeCombinedSiteWithdrawal(t *testing.T, phase string, joint ...bool) {
 		must(err)
 		must(devices.ConfigureDevice(selected.Interface, wgtypes.Config{PrivateKey: &site, FirewallMark: &cfg.fwmark, Peers: []wgtypes.PeerConfig{{PublicKey: remote, AllowedIPs: ips}}}))
 		for _, raw := range addresses {
-			addRoute(raw, receiver.Attrs().Index)
+			index := receiver.Attrs().Index
+			if placement == "legacy" || (placement == "mixed" && allowed(raw).IP.To4() != nil) {
+				index = legacy.Attrs().Index
+			}
+			addRoute(raw, index)
 		}
 		interfaces, receivers = append(interfaces, selected.Interface), append(receivers, receiver)
 		retiredIPs = append(retiredIPs, addresses...)

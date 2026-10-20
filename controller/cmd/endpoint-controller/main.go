@@ -1368,7 +1368,7 @@ func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName stri
 	}
 	// AWS VPC CNI owns this node; never pin a Calico BGP address on it.
 	if node.Labels[awspod.NodeLabel] == awspod.NodeValue {
-		return nil
+		return awspod.ValidateNodeCNI(node)
 	}
 	owned, err := attachment.NativeTransportOwned(node)
 	if err != nil {

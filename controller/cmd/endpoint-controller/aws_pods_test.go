@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -53,6 +54,34 @@ func TestAWSNodeDoesNotReceiveCalicoAddresses(t *testing.T) {
 	}
 	if _, err := r.publishRemotePodCIDRs(context.Background(), &unstructured.Unstructured{}, n.Name); err == nil {
 		t.Fatal("AWS node fell back to Calico allocations")
+	}
+}
+
+// Native CNI ownership conflicts must be reported without modifying the Node;
+// these fake-client checks do not prove what CNI or BGP sessions run on a guest.
+func TestAWSNodeRejectsRetainedCalicoBGPAddresses(t *testing.T) {
+	for _, key := range []string{calicoIPv4Annotation, calicoIPv6Annotation} {
+		for _, value := range []string{"10.100.0.128/32", "fd00:10:100::128/128", "invalid"} {
+			t.Run(key+"/"+value, func(t *testing.T) {
+				ctx := context.Background()
+				n := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "cloud", Labels: map[string]string{awspod.NodeLabel: awspod.NodeValue}, Annotations: map[string]string{key: value, "example.com/owner": "preserve"}}}
+				r, c := dualStackReconciler(t, "", n)
+				if err := c.Get(ctx, client.ObjectKeyFromObject(n), n); err != nil {
+					t.Fatal(err)
+				}
+				before := n.DeepCopy()
+				err := r.ensureCNINodeAddress(ctx, n.Name, []string{"10.100.0.128", "fd00:10:100::128"}, "test/claim")
+				if err == nil || !strings.Contains(err.Error(), key) {
+					t.Fatalf("conflicting Calico ownership not reported: %v", err)
+				}
+				if err := c.Get(ctx, client.ObjectKeyFromObject(n), n); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(before, n) {
+					t.Fatal("conflicting CNI configuration was modified")
+				}
+			})
+		}
 	}
 }
 

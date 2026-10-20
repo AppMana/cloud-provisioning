@@ -253,6 +253,9 @@ func (o *Observer) binding(ctx context.Context, expected *unstructured.Unstructu
 	if node.UID == "" || (boundUID != "" && string(node.UID) != boundUID) || node.DeletionTimestamp != nil || node.Spec.ProviderID != provider || node.Labels[NodeLabel] != NodeValue || node.Labels["cloud-provisioning.appmana.com/role"] != "cloud-worker" {
 		return nil, nil, fmt.Errorf("Node allocation binding absent or changed")
 	}
+	if err := ValidateNodeCNI(node); err != nil {
+		return nil, nil, err
+	}
 	switch node.Labels[corev1.LabelOSStable] {
 	case "linux":
 	case "windows":

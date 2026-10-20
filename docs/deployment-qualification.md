@@ -230,6 +230,12 @@ expected immutable runtime image identity, and a changed Pod UID at each
 transition. A successful `rollout status` alone does not prove the requested
 version ran: another writer can change the desired revision while it waits.
 
+For receipt-enabled agents, update the expected runtime image identities in
+the controller's receipt policy alongside its dialer image setting. Verify
+the running image identity on every architecture after the owner reconciles
+the DaemonSets. Keep the policy's retirement authority, freshness limits and
+historical evidence unchanged during this image-only upgrade.
+
 Set `image.digest` and `dialerImage.digest` to their tested `sha256:` manifest
 digests, with plain registry/repository names in the corresponding `repository`
 values. A digest takes precedence over the tag and chart application version.

@@ -15,6 +15,8 @@ dialerImage:
   tag: ""            # defaults to .Chart.AppVersion
   digest: ""         # sha256:<64 lowercase hex>; takes precedence over tag
 
+# Pass every reference to the controller and its managed agent DaemonSets.
+# Separate repositories may require different restricted credentials.
 imagePullSecrets: []
 
 # The remote node's DaemonSet. Remotes without a preloaded image need

@@ -2159,11 +2159,17 @@ func dialerTolerations() []corev1.Toleration {
 	return tolerations
 }
 
-func imagePullSecrets(name string) []corev1.LocalObjectReference {
-	if name == "" {
-		return nil
+func imagePullSecrets(names string) []corev1.LocalObjectReference {
+	var refs []corev1.LocalObjectReference
+	seen := make(map[string]bool)
+	for _, name := range strings.Split(names, ",") {
+		name = strings.TrimSpace(name)
+		if name != "" && !seen[name] {
+			refs = append(refs, corev1.LocalObjectReference{Name: name})
+			seen[name] = true
+		}
 	}
-	return []corev1.LocalObjectReference{{Name: name}}
+	return refs
 }
 
 func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
@@ -2365,7 +2371,7 @@ func main() {
 	flag.StringVar(&dialerServiceAccount, "dialer-service-account", "cloud-provisioning-dialer", "ServiceAccount the dialer DaemonSet's pods run as")
 	flag.StringVar(&dialerImage, "dialer-image", "", "REQUIRED image for the dialer DaemonSets, pinned by digest (tag@sha256:...). Deliberately has no default: a stale built-in default once pointed at a pre-hardening build")
 	flag.StringVar(&dialerImagePullPolicy, "dialer-image-pull-policy", "IfNotPresent", "pull policy for generated Linux dialer DaemonSets: Always, IfNotPresent, or Never for preloaded images")
-	flag.StringVar(&dialerImagePullSecret, "dialer-image-pull-secret", "", "optional imagePullSecret for the dialer DaemonSets; leave empty when the images are publicly pullable. Naming a Secret that does not exist makes every pod on every endpoint node log a pull-secret warning, so this defaults to none")
+	flag.StringVar(&dialerImagePullSecret, "dialer-image-pull-secret", "", "optional comma-separated imagePullSecret names for agent DaemonSets; leave empty when images are publicly pullable. Missing Secrets produce pull-secret warnings, so this defaults to none")
 	flag.IntVar(&transitBGPPort, "transit-bgp-port", 0, "port for the speaker each tunnel endpoint runs, telling the rest of the site which remote nodes are reachable through it. 0 leaves it off, which is right when every node that needs a remote terminates a tunnel of its own. Not 179: a node whose CNI speaks BGP is already there")
 	flag.IntVar(&transitBGPASN, "transit-bgp-asn", 64512, "autonomous system for that speaker; match the cluster's own")
 	flag.StringVar(&ownerDeployment, "owner-deployment", "", "this controller's own Deployment name; everything it creates at runtime (both DaemonSets, the peer and adoption Secrets) is owned by it, so an uninstall garbage-collects them instead of orphaning a tunnel interface on every endpoint node")

@@ -197,7 +197,11 @@ spec:
             - "--join-dialer-binary-sha256-arm64={{ $.Values.dialerBinary.arm64.sha256 | required "dialerBinary.arm64.sha256 is required when a url is set: an unpinned download is a supply-chain hole" }}"
             {{- end }}
             {{- with .Values.imagePullSecrets }}
-            - "--dialer-image-pull-secret={{ (first .).name }}"
+            {{- $names := list }}
+            {{- range . }}
+            {{- $names = append $names .name }}
+            {{- end }}
+            - {{ printf "--dialer-image-pull-secret=%s" (join "," $names) | quote }}
             {{- end }}
             {{- if .Values.windowsBootstrap.nativePodRouting }}
             - "--windows-native-pod-routing=true"

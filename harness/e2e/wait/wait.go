@@ -1,25 +1,6 @@
-// Package wait polls for a condition with a deadline that holds.
-//
-// Every wait in this harness was written the same way and had the
-// same hole:
-//
-//	for {
-//	    if probe() == nil { return nil }
-//	    if time.Now().After(deadline) { return errTimeout }
-//	    time.Sleep(interval)
-//	}
-//
-// The deadline is only consulted between attempts, so it bounds
-// nothing if an attempt does not return. On containers no attempt
-// ever hung and the hole was invisible. On machines every probe is an
-// ssh into a guest, and a guest whose k0s is wedged answers "k0s
-// status" by never answering at all: one call sat for four minutes
-// inside a wait that claimed a three-minute limit, and the run's only
-// evidence was a log that had stopped moving.
-//
-// Until gives each attempt its own deadline, so a limit means what it
-// says whether the condition is false or the machine has stopped
-// talking.
+// Package wait polls conditions with cancellable, time-limited attempts.
+// Attempts must honor their context. The retry budget is checked between
+// attempts; callers needing an overall deadline must supply one in the context.
 package wait
 
 import (

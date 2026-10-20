@@ -477,7 +477,7 @@ func bgpMesh(ctx context.Context, c client.Reader) Check {
 		external, _, _ := unstructured.NestedString(p.Object, "spec", "peerIP")
 		localSafe := strings.TrimSpace(node) == siteSelector
 		if external != "" && peer == "" {
-			// Preserve AppMana's Linux-only IPv6 router scope while excluding cloud.
+			// Preserve Linux-only IPv6 router scope while excluding cloud workers.
 			for _, osSelector := range []string{`kubernetes.io/os == 'linux'`, `kubernetes.io/os == "linux"`} {
 				localSafe = localSafe || strings.TrimSpace(node) == siteSelector+" && "+osSelector || strings.TrimSpace(node) == osSelector+" && "+siteSelector
 			}

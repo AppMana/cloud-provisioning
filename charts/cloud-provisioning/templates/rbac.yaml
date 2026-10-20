@@ -38,6 +38,9 @@ rules:
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodegroupclaims"]
     verbs: ["get", "list", "watch"]
+  {{- end }}
+  {{- /* Standalone claims also drain workloads when receiver journals exist. */}}
+  {{- if or .Values.experimentalNodeGroups (and .Values.tunnel.receivePreparation .Values.tunnel.receivePreparation.journal) }}
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list"]

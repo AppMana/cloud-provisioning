@@ -335,4 +335,17 @@ func verifyReceiveRetirementAdmission(t *testing.T, api kubernetes.Interface, st
 	if _, err := load(store, "site", site); err == nil {
 		t.Fatal("replacement survivor inherited retirement authority")
 	}
+	t.Run("reused-consumer-name", func(t *testing.T) {
+		// Earlier subtests restore the active withdrawal. Install the same
+		// synthetic historical release only for this replacement admission.
+		seedReceiveFinalization(t, api, store, scope, false)
+		source, err := attachment.ReadReceiveRetirementSet(ctx, api, store, scope.Namespace, scope.MeshName, scope.MeshUID, scope.MachineUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := tunnel.ReleaseReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, source.Metadata, source.Mesh, source.Journals[scope.MachineUID], source.Inventory.Publications[scope.MachineUID], func() error { return nil }); err != nil {
+			t.Fatal(err)
+		}
+		verifyReleasedCheckpointNameReuse(t, api, store, scope, replacement, site, string(node.UID))
+	})
 }

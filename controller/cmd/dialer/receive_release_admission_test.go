@@ -136,6 +136,82 @@ func verifyReleasedCheckpointAdmission(t *testing.T, api kubernetes.Interface, s
 		t.Fatal("release admission rewrote retained local journal")
 	}
 	must(lock.Close())
+	t.Run("reused-cloud-name", func(t *testing.T) {
+		plan, err := tunnel.DecodeReceiveTransition(admitted.Journals[scope.MachineUID], store.ClusterUID)
+		must(err)
+		node, err := api.CoreV1().Nodes().Create(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: plan.CloudNodeName}}, metav1.CreateOptions{})
+		must(err)
+		defer func() { must(api.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{})) }()
+		node.Status.NodeInfo.BootID = next.BootID
+		node.Status.Conditions = []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}
+		node, err = api.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+		must(err)
+		verifyReleasedCheckpointNameReuse(t, api, store, scope, node, key, plan.CloudNodeUID)
+	})
 	verifyReleasedObserverCheckpoint(t, api, store, scope, cfg, key, before)
 	verifyReleasedNeighborRecovery(t, api, store, scope, cfg, key)
+}
+
+// A new API Node can share a released owner's or consumer's name. It may
+// checkpoint that history without inheriting its authority. Native cleanup and
+// live packet continuity are outside this real-API admission fixture.
+func verifyReleasedCheckpointNameReuse(t *testing.T, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, node *corev1.Node, retainedKey wgtypes.Key, oldUID string) {
+	t.Helper()
+	ctx := context.Background()
+	freshKey, err := wgtypes.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	inventory, index, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, scope.Namespace, scope.MeshName, scope.MeshUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inventory.Released) == 0 {
+		t.Fatal("name reuse requires retained released history")
+	}
+	for _, fault := range []string{"fresh", "retained-key", "old-uid", "saved-fence"} {
+		t.Run(fault, func(t *testing.T) {
+			key := freshKey
+			if fault == "retained-key" {
+				key = retainedKey
+			}
+			cfg := config{iface: "reusedcheck", nodeName: node.Name, privateKeyFile: filepath.Join(t.TempDir(), "key")}
+			lock, err := lockReconciliation(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer lock.Close()
+			next := receiveInventoryCheckpoint{Version: 1, InventoryUID: string(index.UID), Inventory: inventory, NodeName: node.Name, NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, PublicKey: key.PublicKey().String()}
+			if fault == "old-uid" {
+				next.NodeUID = oldUID
+			}
+			path := lock.Name() + ".inventory.json"
+			if fault == "saved-fence" {
+				saved := next
+				saved.NodeUID = oldUID
+				if err := writeDurableJSON(path, saved); err != nil {
+					t.Fatal(err)
+				}
+			}
+			proof, err := admitReleasedReceiveCheckpoints(ctx, api, store, scope, cfg, key, lock.Name(), next, index.ObjectMeta)
+			if err == nil {
+				err = validateReceiveInventoryCheckpointWithRelease(path, next, proof)
+			}
+			if fault != "fresh" {
+				if err == nil {
+					t.Fatal("replacement inherited retired identity or local state", fault)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal("released name blocked fresh checkpoint", err)
+			}
+			if len(proof.localFiles) != 0 || len(proof.records) != len(inventory.Released) {
+				t.Fatal("fresh checkpoint inherited local ownership or omitted history")
+			}
+			if err := proof.recheck(ctx, api, store); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 }

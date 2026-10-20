@@ -1235,6 +1235,13 @@ recreation and require ordinary dispatch for a fresh identity; reused keys,
 retired adoption names and saved fences must remain blocked. This admission
 test does not qualify native forwarding, same-adoption-name reuse, replay of an
 old worker disk or provider address reuse; verify those scenarios separately.
+Repeat name reuse at released-history checkpoint admission, after the worker
+has acquired its own active journal. Cover both a retired owner and a captured
+consumer with a new Node UID and key; require retained history without inherited
+local ownership. Old UIDs, retained keys and saved inventory fences must still
+fail. Real-API tests use synthetic historical finalization and release; they do
+not establish live serving-round completion or joint removal. A passing ordinary
+dispatch or packet matrix alone does not qualify these later admission paths.
 
 Unpublished site observers with no local active receiver can advance released
 inventory checkpoints without ordinary-neighbor routing authority. Admission

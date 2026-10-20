@@ -70,7 +70,10 @@ func admitReleasedReceiveCheckpoints(ctx context.Context, api kubernetes.Interfa
 			return fail(fmt.Errorf("released checkpoint inventory changed during admission"))
 		}
 		for _, c := range released.Withdrawal.Consumers {
-			if c.NodeName != cfg.nodeName && c.NodeUID != next.NodeUID && (c.PublicKey == "" || c.PublicKey != key.PublicKey().String()) {
+			// A released consumer's name may now belong to a fresh Node.
+			// Match immutable identity before requiring its local fence;
+			// matching either the old UID or key still requires both.
+			if c.NodeUID != next.NodeUID && (c.PublicKey == "" || c.PublicKey != key.PublicKey().String()) {
 				continue
 			}
 			retainedConsumer = true
@@ -96,7 +99,7 @@ func admitReleasedReceiveCheckpoints(ctx context.Context, api kubernetes.Interfa
 				return fail(fmt.Errorf("release requires the exact local retirement fence"))
 			}
 		}
-		if released.Plan.CloudNodeName == cfg.nodeName || released.Plan.CloudNodeUID == next.NodeUID || released.Plan.RootPublicKey == key.PublicKey().String() {
+		if released.Plan.CloudNodeUID == next.NodeUID || released.Plan.RootPublicKey == key.PublicKey().String() {
 			return fail(fmt.Errorf("retired worker cannot admit survivor release"))
 		}
 		if localUID, err := receiveJournalParticipant(released.Plan, memberScope, cfg.nodeName, key); err == nil {

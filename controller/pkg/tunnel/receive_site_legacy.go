@@ -51,13 +51,34 @@ func PlanReceiveSitePath(data map[string][]byte, node, public, cloud string, bas
 // permissions while admitting site identities and next hops from the live mesh.
 // A successor's original-path projection must not borrow new worker allocations.
 func PlanReceiveSitePathForPeer(data map[string][]byte, node, public string, base PeerListDoc, cloud PeerSpec) (ReceiveSitePath, error) {
+	return planReceiveSitePathForPeer(data, node, public, base, cloud, false)
+}
+
+// PlanReceiveFollowerPath projects a no-tunnel site's sources through the owner
+// in an admitted cloud generation. It does not elect a relay or authorize native
+// mutation. Callers must bind the source allocation to the current Node, admit
+// the generation and verify the selected relay's forwarding before installation.
+func PlanReceiveFollowerPath(data map[string][]byte, node string, base PeerListDoc, cloud PeerSpec) (ReceiveSitePath, error) {
+	return planReceiveSitePathForPeer(data, node, "", base, cloud, true)
+}
+
+func planReceiveSitePathForPeer(data map[string][]byte, node, public string, base PeerListDoc, cloud PeerSpec, follower bool) (ReceiveSitePath, error) {
 	fail := func(reason string) (ReceiveSiteLegacy, error) {
 		return ReceiveSiteLegacy{}, fmt.Errorf("legacy site path: %s", reason)
 	}
 	if !validReceivePublicKey(cloud.PublicKey) {
 		return fail("cloud identity differs")
 	}
-	if node == "" || !validReceivePublicKey(public) || strings.TrimSpace(string(data[NodePublicKeyPrefix+node])) != public {
+	if node == "" {
+		return fail("site identity differs")
+	}
+	if follower {
+		for _, prefix := range []string{NodePublicKeyPrefix, NodeTunnelAddressPrefix, NodeTunnelAddress6Prefix} {
+			if len(data[prefix+node]) != 0 {
+				return fail("follower has published endpoint ownership")
+			}
+		}
+	} else if !validReceivePublicKey(public) || strings.TrimSpace(string(data[NodePublicKeyPrefix+node])) != public {
 		return fail("site identity differs")
 	}
 	sources := map[string]bool{}
@@ -99,17 +120,19 @@ func PlanReceiveSitePathForPeer(data map[string][]byte, node, public string, bas
 			return fail("legacy relay has no next hop")
 		}
 	}
-	var addresses []string
-	for _, prefix := range []string{NodeTunnelAddressPrefix, NodeTunnelAddress6Prefix} {
-		if raw := strings.TrimSpace(string(data[prefix+node])); raw != "" {
-			addresses = append(addresses, raw)
+	if !follower {
+		var addresses []string
+		for _, prefix := range []string{NodeTunnelAddressPrefix, NodeTunnelAddress6Prefix} {
+			if raw := strings.TrimSpace(string(data[prefix+node])); raw != "" {
+				addresses = append(addresses, raw)
+			}
 		}
+		exception, err := planReceiveSiteTunnel(addresses, public, base, cloud, result.Transit != nil)
+		if err != nil {
+			return fail(err.Error())
+		}
+		result.Tunnel = &exception
 	}
-	exception, err := planReceiveSiteTunnel(addresses, public, base, cloud, result.Transit != nil)
-	if err != nil {
-		return fail(err.Error())
-	}
-	result.Tunnel = &exception
 	if err := ValidateReceiveSiteLegacy(result, public, base, cloud); err != nil {
 		return fail(err.Error())
 	}

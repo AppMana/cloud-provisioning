@@ -95,7 +95,18 @@ func TestSuccessorReceiverGraphFollowsArchivedServingGeneration(t *testing.T) {
 	ctx := context.Background()
 	for _, fault := range []string{"forward", "abort", "rollback", "forged-permissions"} {
 		t.Run(fault, func(t *testing.T) {
-			previous, tr := journalRouteFixture(t, routeSetFixture(t)[0])
+			originalPlan := routeSetFixture(t)[0]
+			for i := range originalPlan.Desired.Peers {
+				if originalPlan.Desired.Peers[i].PublicKey == receiverTestKey(16) {
+					originalPlan.Desired.Peers[i].RouteHosts = append(originalPlan.Desired.Peers[i].RouteHosts, "10.90.0.1", "2001:db8:1::1")
+				}
+			}
+			previous, tr := journalRouteFixture(t, originalPlan)
+			followerMesh := map[string][]byte{
+				NodePublicKeyPrefix + "relay":    []byte(receiverTestKey(16)),
+				NodeAddressesPrefix + "relay":    []byte("10.90.0.1,2001:db8:1::1"),
+				NodeAddressesPrefix + "follower": []byte("10.90.0.3,2001:db8:1::3"),
+			}
 			for {
 				view, err := tr.View()
 				if err != nil {
@@ -199,6 +210,19 @@ func TestSuccessorReceiverGraphFollowsArchivedServingGeneration(t *testing.T) {
 					}
 					if len(intent.Legacy) != 0 || !reflect.DeepEqual(intent.Receivers, want) {
 						t.Fatal("successor selected the wrong receiver generation")
+					}
+					follower, err := PlanReceiveJournalFollowerPath(followerMesh, "follower", current, "cluster")
+					if err != nil {
+						t.Fatal(err)
+					}
+					expectedTransit := &TransitSpec{Via: "10.90.0.1", ViaOtherFamily: "2001:db8:1::1"}
+					for _, peer := range selected.SiteDesired.Peers {
+						if peer.PublicKey == selected.RootPublicKey {
+							setTransitDestinations(expectedTransit, []PeerSpec{peer})
+						}
+					}
+					if follower.Tunnel != nil || !reflect.DeepEqual(follower.Transit, expectedTransit) {
+						t.Fatal("follower borrowed destinations from an unselected receiver generation")
 					}
 					if view.Complete {
 						sitePeers, err := next.CompletedSitePeers(view)

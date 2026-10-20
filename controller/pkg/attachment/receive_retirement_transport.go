@@ -3,7 +3,6 @@ package attachment
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sort"
 	"time"
 
@@ -50,21 +49,8 @@ func (shared ReceiveRetirementSet) ReceiptCollection(ctx context.Context, api ku
 		return fail(fmt.Errorf("retirement collection requires admitted sources and bounded observation age"))
 	}
 	machineUID := shared.Withdrawal.MachineUID
-	snapshot, found := shared.Journals[machineUID]
-	if !found || store.Name != tunnel.ReceiveTransitionName(machineUID) || (store.ExpectedUID != "" && store.ExpectedUID != string(snapshot.Metadata().UID)) || shared.Inventory.ClusterUID != store.ClusterUID {
-		return fail(fmt.Errorf("retirement collection journal scope changed"))
-	}
+	snapshot := shared.Journals[machineUID]
 	mesh, inventoryUID := shared.Mesh, string(shared.Metadata.UID)
-	if shared.MeshMetadata.UID != mesh.UID || shared.MeshMetadata.ResourceVersion != mesh.ResourceVersion || inventoryUID == "" || snapshot.Metadata().Namespace != mesh.Namespace {
-		return fail(fmt.Errorf("retirement collection source scope changed"))
-	}
-	withdrawal, err := ReadReceiveWithdrawal(shared.Inventory, machineUID, snapshot, mesh)
-	if err != nil {
-		return fail(err)
-	}
-	if !reflect.DeepEqual(withdrawal, shared.Withdrawal) {
-		return fail(fmt.Errorf("retirement collection withdrawal changed"))
-	}
 	check := func(ctx context.Context) error {
 		if err := recheck(); err != nil {
 			return err
@@ -74,7 +60,7 @@ func (shared ReceiveRetirementSet) ReceiptCollection(ctx context.Context, api ku
 	if err := check(ctx); err != nil {
 		return fail(err)
 	}
-	scope, err := NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, inventoryUID, snapshot, mesh)
+	scope, err := shared.ReceiptScope(ctx, store)
 	if err != nil {
 		return fail(err)
 	}
@@ -96,7 +82,7 @@ func (shared ReceiveRetirementSet) ReceiptCollection(ctx context.Context, api ku
 		if err := check(ctx); err != nil {
 			return err
 		}
-		current, err := NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, inventoryUID, snapshot, mesh)
+		current, err := shared.ReceiptScope(ctx, store)
 		if err != nil {
 			return err
 		}

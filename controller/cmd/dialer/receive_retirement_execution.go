@@ -85,7 +85,7 @@ func executeReceiveRetirementCohort(ctx context.Context, api kubernetes.Interfac
 		return nil, fmt.Errorf("checkpoint: %w", err)
 	}
 	timing.step("binding")
-	binding, err := attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(admitted.Metadata.UID), admitted.Journals[scope.MachineUID], admitted.Mesh)
+	binding, err := admitted.ReceiptScope(ctx, store)
 	if err != nil {
 		return nil, fmt.Errorf("observation binding: %w", err)
 	}
@@ -118,7 +118,7 @@ func executeReceiveRetirementCohort(ctx context.Context, api kubernetes.Interfac
 			if err := checkpointReceiveRetirementLocked(ctx, api, memberStore, memberScope, cfg, key, lock.Name(), member); err != nil {
 				return nil, fmt.Errorf("joint checkpoint: %w", err)
 			}
-			bindings[uid], err = attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(member.Metadata.UID), member.Journals[uid], member.Mesh)
+			bindings[uid], err = member.ReceiptScope(ctx, memberStore)
 			if err != nil {
 				return nil, fmt.Errorf("joint observation binding: %w", err)
 			}
@@ -197,7 +197,7 @@ func executeReceiveRetirementCohort(ctx context.Context, api kubernetes.Interfac
 			}
 		}
 		timing.step("post-native-binding")
-		refreshed, err := attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(current[uid].Metadata.UID), current[uid].Journals[uid], current[uid].Mesh)
+		refreshed, err := current[uid].ReceiptScope(ctx, memberStore)
 		if err != nil {
 			return nil, fmt.Errorf("post-cleanup binding: %w", err)
 		}

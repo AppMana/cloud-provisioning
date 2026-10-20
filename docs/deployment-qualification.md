@@ -1205,6 +1205,15 @@ missing records, cancellation and source replacement; native callbacks in this
 fixture only checkpoint intent. These tests do not establish live retirement
 latency, network continuity or freshness convergence.
 
+Receipt binding within an admitted retirement set must reuse the cohort's
+validated histories and produce the same digest and surviving consumers as the
+standalone constructor. Require one live read per reserved journal and inventory
+when constructing a collection. Missing siblings, changed source revisions,
+withdrawal changes, cancellation and denied reads must fail closed. Authentication
+still rechecks current agent identities and freshness; joint timestamps remain
+bound to the earliest native observation. Real-API read-budget tests use synthetic
+native observations and do not establish loaded execution time or timely quorum.
+
 Measure joint retirement under the declared workload and management observation
 load. Its execution deadline includes admission, checkpoints, every member's
 backend and final revalidation; it is distinct from receipt freshness, which

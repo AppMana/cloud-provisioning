@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"time"
 
@@ -76,21 +77,73 @@ func NewReceiveRetirementReceiptScope(ctx context.Context, maps typedcore.Config
 	if err != nil {
 		return fail(err)
 	}
-	publication := inventory.Publications[plan.MachineUID]
-	previousCompletion := append(json.RawMessage(nil), publication.RetirementCompletion...)
 	cohort, err := loadReceiptRetirementCohort(ctx, handover.Store{ConfigMaps: maps, ClusterUID: clusterUID}, ReceiveRetirementSet{Inventory: inventory, Mesh: mesh, Withdrawal: withdrawal, Journals: map[string]handover.Snapshot{plan.MachineUID: snapshot}})
 	if err != nil {
 		return fail(err)
 	}
+	return receiveRetirementReceiptScope(inventory, index.ObjectMeta, mesh, plan.MachineUID, cohort)
+}
+
+// ReceiptScope binds this request's fully admitted source without replaying its
+// histories. Obtain the set through ReadReceiveRetirementSet and never reuse it
+// across requests. Callers must recheck live sources at execution and evidence
+// admission boundaries; binding itself performs no API calls.
+func (s ReceiveRetirementSet) ReceiptScope(ctx context.Context, store handover.Store) (ReceiveRetirementReceiptScope, error) {
+	fail := func(err error) (ReceiveRetirementReceiptScope, error) { return ReceiveRetirementReceiptScope{}, err }
+	if err := ctx.Err(); err != nil {
+		return fail(err)
+	}
+	uid := s.Withdrawal.MachineUID
+	snapshot, found := s.Journals[uid]
+	if store.ConfigMaps == nil || s.Mesh == nil || !found || store.Name != tunnel.ReceiveTransitionName(uid) || (store.ExpectedUID != "" && store.ExpectedUID != string(snapshot.Metadata().UID)) || s.Inventory.ClusterUID != store.ClusterUID {
+		return fail(fmt.Errorf("retirement receipt journal scope changed"))
+	}
+	if s.Metadata.UID == "" || s.MeshMetadata.UID != s.Mesh.UID || s.MeshMetadata.ResourceVersion != s.Mesh.ResourceVersion || snapshot.Metadata().Namespace != s.Mesh.Namespace || len(s.Journals) != len(s.Inventory.MachineUIDs) {
+		return fail(fmt.Errorf("retirement receipt source scope changed"))
+	}
+	for _, member := range s.Inventory.MachineUIDs {
+		journal, ok := s.Journals[member]
+		if !ok {
+			return fail(fmt.Errorf("retirement receipt omitted reserved journal"))
+		}
+		if err := s.Inventory.CheckJournal(member, string(journal.Metadata().UID)); err != nil {
+			return fail(err)
+		}
+	}
+	withdrawal, err := ReadReceiveWithdrawal(s.Inventory, uid, snapshot, s.Mesh)
+	if err != nil {
+		return fail(err)
+	}
+	if !reflect.DeepEqual(withdrawal, s.Withdrawal) {
+		return fail(fmt.Errorf("retirement receipt withdrawal changed"))
+	}
+	cohort, err := s.RetirementCohort()
+	if err != nil {
+		return fail(err)
+	}
+	scope, err := receiveRetirementReceiptScope(s.Inventory, s.Metadata, s.Mesh, uid, cohort)
+	if err != nil {
+		return fail(err)
+	}
+	if err := ctx.Err(); err != nil {
+		return fail(err)
+	}
+	return scope, nil
+}
+
+func receiveRetirementReceiptScope(inventory tunnel.ReceiveInventory, index metav1.ObjectMeta, mesh *corev1.Secret, machineUID string, cohort ReceiveRetirementCohort) (ReceiveRetirementReceiptScope, error) {
+	fail := func(err error) (ReceiveRetirementReceiptScope, error) { return ReceiveRetirementReceiptScope{}, err }
+	publication := inventory.Publications[machineUID]
+	previousCompletion := append(json.RawMessage(nil), publication.RetirementCompletion...)
 	version := receiveRetirementCompletionVersion
 	if len(cohort.MachineUIDs) > 1 {
 		version = receiveRetirementCohortCompletionVersion
 	}
-	inventoryHash, err := receiveRetirementInventoryHash(inventory, plan.MachineUID, version)
+	inventoryHash, err := receiveRetirementInventoryHash(inventory, machineUID, version)
 	if err != nil {
 		return fail(err)
 	}
-	digest, err := receiveRetirementAuthorityDigest(clusterUID, inventoryUID, inventoryHash, index.ObjectMeta, mesh, publication.Retirement)
+	digest, err := receiveRetirementAuthorityDigest(inventory.ClusterUID, string(index.UID), inventoryHash, index, mesh, publication.Retirement)
 	if err != nil {
 		return fail(err)
 	}
@@ -100,7 +153,7 @@ func NewReceiveRetirementReceiptScope(ctx context.Context, maps typedcore.Config
 			return fail(err)
 		}
 	}
-	scope := ReceiveRetirementReceiptScope{version: version, cohort: cohort.MachineUIDs, digest: digest, inventoryHash: inventoryHash, completion: previousCompletion, nodes: map[string]string{}, inventory: *index.ObjectMeta.DeepCopy(), intent: append(json.RawMessage(nil), inventory.Publications[plan.MachineUID].Retirement...)}
+	scope := ReceiveRetirementReceiptScope{version: version, cohort: cohort.MachineUIDs, digest: digest, inventoryHash: inventoryHash, completion: previousCompletion, nodes: map[string]string{}, inventory: *index.DeepCopy(), intent: append(json.RawMessage(nil), inventory.Publications[machineUID].Retirement...)}
 	for _, consumer := range cohort.Consumers {
 		scope.nodes[consumer.NodeUID] = consumer.NodeName
 	}

@@ -99,6 +99,37 @@ func verifyJointRetirementAuthentication(t *testing.T, api kubernetes.Interface,
 	mesh, err = api.CoreV1().Secrets(ns).Update(ctx, mesh, metav1.UpdateOptions{})
 	must(err)
 	policies := map[string]handover.PodReceiptAuthenticator{string(nodes[0].UID): policy, string(nodes[1].UID): policy}
+	t.Run("shared-binding-read-budget", func(t *testing.T) {
+		source, err := ReadReceiveRetirementSet(ctx, api, stores[0], ns, mesh.Name, string(mesh.UID), intents[0].MachineUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reads := map[string]int{}
+		reader := stores[0]
+		reader.ConfigMaps = retirementCollectionReader{ConfigMapInterface: maps, before: func(name string) error { reads[name]++; return nil }}
+		collection, err := source.ReceiptCollection(ctx, api, reader, policies, time.Minute, func() error { return nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{stores[0].Name, stores[1].Name, index.Name} {
+			if reads[name] != 1 {
+				t.Errorf("source %s read %d times, want one live recheck", name, reads[name])
+			}
+		}
+		standalone, err := NewReceiveRetirementReceiptScope(ctx, maps, "cluster", string(index.UID), snapshots[0], mesh)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if collection.Digest != standalone.Digest() || len(collection.Members) != 2 {
+			t.Fatal("shared binding differs from standalone admission")
+		}
+		// Reusing admitted data must not allow a missing sibling to escape its
+		// live revision check or shrink the cleanup obligation.
+		delete(source.Journals, intents[1].MachineUID)
+		if _, err := source.ReceiptScope(ctx, stores[0]); err == nil {
+			t.Fatal("incomplete admitted source produced a receipt scope")
+		}
+	})
 	for i, store := range stores {
 		t.Run(fmt.Sprintf("member-%d", i), func(t *testing.T) {
 			scope, err := NewReceiveRetirementReceiptScope(ctx, maps, "cluster", string(index.UID), snapshots[i], mesh)

@@ -426,6 +426,66 @@ func verifyStandaloneCompletion(t *testing.T, api client.Client, core kubernetes
 	}
 	must(submit(token.Status.Token))
 
+	t.Run("completion-refresh", func(t *testing.T) {
+		for _, fault := range []string{"expired", "future", "missing-time"} {
+			t.Run(fault, func(t *testing.T) {
+				original, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+				must(err)
+				defer func() {
+					current, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+					must(err)
+					current.Data = original.Data
+					_, err = store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{})
+					must(err)
+				}()
+				var inventory tunnel.ReceiveInventory
+				must(json.Unmarshal([]byte(original.Data["inventory.json"]), &inventory))
+				publication := inventory.Publications[string(machine.GetUID())]
+				var completion map[string]any
+				must(json.Unmarshal(publication.RetirementCompletion, &completion))
+				at := time.Now().Add(-2 * time.Minute)
+				if fault == "future" {
+					at = time.Now().Add(time.Minute)
+				} else if fault == "missing-time" {
+					at = time.Time{}
+				}
+				for _, entry := range completion["receipts"].([]any) {
+					entry.(map[string]any)["observedAt"] = at.Format(time.RFC3339Nano)
+				}
+				publication.RetirementCompletion, err = json.Marshal(completion)
+				must(err)
+				inventory.Publications[string(machine.GetUID())] = publication
+				raw, err := json.Marshal(inventory)
+				must(err)
+				changed := original.DeepCopy()
+				changed.Data["inventory.json"] = string(raw)
+				changed, err = store.ConfigMaps.Update(ctx, changed, metav1.UpdateOptions{})
+				must(err)
+				must(api.Get(ctx, client.ObjectKeyFromObject(claim), claim))
+				must(api.Get(ctx, client.ObjectKeyFromObject(machine), machine))
+				claimVersion, machineVersion := claim.ResourceVersion, machine.GetResourceVersion()
+				r := &Reconciler{Client: api, Reader: api, Workload: api, RetirementAPI: core, MeshName: mesh.Name}
+				for attempt := 0; attempt < 3; attempt++ {
+					result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(claim)})
+					if fault == "expired" {
+						if err != nil || result.RequeueAfter != 5*time.Second {
+							t.Fatalf("expired observations must await refresh without error backoff: %+v, %v", result, err)
+						}
+					} else if err == nil {
+						t.Fatal("invalid observation treated as expected refresh", fault)
+					}
+					must(api.Get(ctx, client.ObjectKeyFromObject(claim), claim))
+					must(api.Get(ctx, client.ObjectKeyFromObject(machine), machine))
+					current, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+					must(err)
+					if claim.ResourceVersion != claimVersion || machine.GetResourceVersion() != machineVersion || machine.GetDeletionTimestamp() != nil || current.ResourceVersion != changed.ResourceVersion {
+						t.Fatal("invalid or expired completion mutated removal authority")
+					}
+				}
+			})
+		}
+	})
+
 	must(step())
 	var record claimReceiveRemoval
 	must(json.Unmarshal([]byte(claim.Annotations[receiveRemovalAnnotation]), &record))

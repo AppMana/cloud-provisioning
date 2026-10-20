@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -265,6 +266,11 @@ func (r *Reconciler) prepareReceiveDeletion(ctx context.Context, claim *v1alpha1
 		age = time.Minute
 	}
 	ready, err := attachment.AdvanceReceiveRemoval(ctx, r.RetirementAPI, store, liveIndex.ObjectMeta, mesh, *record.Withdrawal, node.Name, string(node.UID), age, authorize)
+	if errors.Is(err, attachment.ErrRetirementObservationExpired) && ctx.Err() == nil {
+		// Expired evidence still forbids deletion. Use the existing pending
+		// retirement cadence so error backoff cannot keep missing refreshes.
+		return false, nil
+	}
 	if err != nil || !ready {
 		return false, err
 	}

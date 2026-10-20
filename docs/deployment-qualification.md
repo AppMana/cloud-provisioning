@@ -1217,6 +1217,15 @@ cost-control termination, inspect the recorded instance identities again:
 already terminated instances need no further mutation. Preserve failed and
 post-deadline observations separately.
 
+An expired completion must keep standalone claim deletion pending on the
+existing five-second retry cadence, without accepting the expired evidence or
+accumulating reconciliation error backoff. Future or missing observation times,
+changed identities and malformed authority remain errors. Exercise repeated
+expiration against real API storage and require unchanged claim, Machine and
+inventory revisions, then verify that fresh authenticated evidence permits the
+normal deletion path. This tests retry selection and fencing, not workqueue
+scheduling under load or live provider termination.
+
 Execution rechecks may avoid replaying a previously validated immutable
 snapshot only after a fresh GET returns an exactly matching journal object.
 Compare content and metadata, not resource version alone. Changed objects must

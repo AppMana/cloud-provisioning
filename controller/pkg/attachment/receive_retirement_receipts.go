@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -15,6 +16,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
 )
+
+// ErrRetirementObservationExpired requires a new observation, never acceptance
+// of the expired evidence. Lifecycle callers may wait for refresh without
+// increasing an error backoff beyond the evidence's freshness window.
+var ErrRetirementObservationExpired = errors.New("retirement observation has expired")
 
 // ReceiveRetirementReceiptScope binds complete-consumer absence observations to
 // a persisted withdrawal. It does not advance the frozen transport journal.
@@ -227,8 +233,11 @@ func (s ReceiveRetirementReceiptScope) validateObservation(r handover.Receipt, n
 	if s.nodes[r.NodeUID] == "" || r.AgentContainerID == "" || r.RoundHash != s.digest || r.DeviceID != "" || r.FromKey != "" || r.ToKey != "" || r.FromPeerKey != "" || r.ToPeerKey != "" {
 		return fmt.Errorf("retirement observation does not bind its consumer and withdrawal")
 	}
-	if maxAge <= 0 || r.ObservedAt.IsZero() || r.ObservedAt.After(now) || now.Sub(r.ObservedAt) > maxAge {
+	if maxAge <= 0 || r.ObservedAt.IsZero() || r.ObservedAt.After(now) {
 		return fmt.Errorf("retirement observation is stale or in the future")
+	}
+	if now.Sub(r.ObservedAt) > maxAge {
+		return ErrRetirementObservationExpired
 	}
 	return nil
 }

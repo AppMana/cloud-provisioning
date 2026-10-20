@@ -106,6 +106,7 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 	index, err = store.ConfigMaps.Update(ctx, index, metav1.UpdateOptions{})
 	must(err)
 	currentData := index.DeepCopy().Data
+	verifyInitialReceiveObserver(t, api, store, cfg, key, inv)
 	verifyUnreservedCloudDispatch(t, api, store, scope, foreignRoot, key)
 	for _, fault := range []string{"none", "previous-boot", "missing-fence", "changed-fence", "unknown-journal", "neighbor-owner", "wrong-agent", "cancelled", "inventory-race", "mesh-race", "missing-active-journal", "callback-success", "callback-neighbor-dispatch", "callback-mesh-race", "callback-node-race", "callback-inventory-race", "callback-agent-race", "callback-cancelled", "callback-post-use-race"} {
 		t.Run("released-observer/"+fault, func(t *testing.T) {
@@ -318,6 +319,11 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 				if uses != 1 || (success && writes != 1) || (!success && writes != 0) {
 					t.Fatalf("callback escaped admission boundary: uses=%d writes=%d", uses, writes)
 				}
+			} else if fault == "missing-fence" {
+				e = reconcileReceiveNeighbors(runCtx, api, runCfg, native, nil, func(context.Context, wgtypes.Key, string, receiveObserverAdmission, func() error) error {
+					t.Fatal("retained consumer entered serving without its original fence")
+					return nil
+				})
 			} else {
 				e = reconcileReceiveNeighbors(runCtx, api, runCfg, native, nil)
 			}

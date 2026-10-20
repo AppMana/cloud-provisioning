@@ -39,22 +39,40 @@ type receiveObserverAdmission struct {
 // call check before mutations. Both boundaries retain the exact discovery and
 // participant identities; no callback may issue a receiver-phase receipt.
 func withReleasedReceiveObserver(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, mesh *corev1.Secret, use func(context.Context, receiveObserverAdmission, func() error) error) error {
+	return withReceiveObserver(ctx, api, store, scope, cfg, key, lockPath, mesh, true, use)
+}
+
+// Initial observers may establish their first fence from complete live authority.
+// Retained consumers still need the original release proof; an absent inventory
+// file never permits discarding another local recovery record.
+func withReceiveObserver(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, mesh *corev1.Secret, retainedOnly bool, use func(context.Context, receiveObserverAdmission, func() error) error) error {
 	if use != nil {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 	}
 	if cfg.secretName == "" || mesh == nil || scope.MachineUID != "" || len(mesh.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName]) != 0 || len(mesh.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName]) != 0 || len(mesh.Data[tunnel.NodeTunnelAddress6Prefix+cfg.nodeName]) != 0 {
-		return fmt.Errorf("released observer requires unpublished site identity")
+		return fmt.Errorf("observer requires unpublished site identity")
 	}
 	if _, err := readPrivateRetirementCache(lockPath + ".inventory.json"); err != nil {
-		return err
+		if retainedOnly || !os.IsNotExist(err) {
+			return err
+		}
+		entries, err := os.ReadDir(filepath.Dir(lockPath))
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			if strings.HasPrefix(entry.Name(), filepath.Base(lockPath)+".") {
+				return fmt.Errorf("initial observer cannot omit local recovery inventory")
+			}
+		}
 	}
 	inventory, index, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, scope.Namespace, scope.MeshName, scope.MeshUID)
 	if err != nil {
 		return err
 	}
-	if len(inventory.Released) == 0 {
+	if retainedOnly && len(inventory.Released) == 0 {
 		return fmt.Errorf("released observer requires retained release history")
 	}
 	node, err := api.CoreV1().Nodes().Get(ctx, cfg.nodeName, metav1.GetOptions{})

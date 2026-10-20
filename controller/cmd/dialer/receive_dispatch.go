@@ -106,6 +106,12 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		if cfg.secretName == "" && len(inventory.Released) != 0 {
 			return dispatchUnreservedReceiveCloud(ctx, api, store, cfg, inventory)
 		}
+		// A follower may observe active reservations before any worker has been
+		// retired. Its per-worker writer must still run under live admission;
+		// the ordinary whole-mesh election cannot select reserved paths.
+		if cfg.secretName != "" && len(inventory.MachineUIDs) != 0 && len(mesh.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName]) == 0 {
+			return true, nil
+		}
 		// Keep released ownership on the phase-aware path. Ordinary neighbor
 		// admission must verify the retained fences before doing native work.
 		return len(inventory.Released) != 0, nil

@@ -103,9 +103,9 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 			break
 		}
 	}
-	if scope.MachineUID == "" && !cloud && len(inventory.Released) != 0 && len(mesh.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName]) == 0 {
+	if scope.MachineUID == "" && !cloud && len(mesh.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName]) == 0 {
 		if len(follower) == 1 && follower[0] != nil {
-			return withReleasedReceiveObserver(ctx, api, store, scope, cfg, key, lock.Name(), mesh, func(ctx context.Context, admitted receiveObserverAdmission, check func() error) error {
+			return withReceiveObserver(ctx, api, store, scope, cfg, key, lock.Name(), mesh, false, func(ctx context.Context, admitted receiveObserverAdmission, check func() error) error {
 				return follower[0](ctx, key, lock.Name(), admitted, check)
 			})
 		}

@@ -1013,3 +1013,11 @@ reply after an ICMP MTU update does not turn that initial loss into a pass.
 Configure the owning CNI before workload creation and verify recreated pods;
 existing pods can retain their old MTU. Record request and response sizes
 separately, including application command prefixes and IP/UDP headers.
+
+Derive the pod MTU from the complete forwarding path. For example, a 1420-byte
+tunnel budget with 50 bytes of additional CNI encapsulation leaves a 1370-byte
+pod budget. Verify the actual encapsulation and address families before using
+that value. Apply it through the CNI's owning configuration on every controller
+that can reconcile the network, then verify installed configuration and fresh
+pod interfaces. Keep physical interface MTUs unchanged. A successful source
+configuration update alone does not establish workload convergence.

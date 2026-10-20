@@ -30,6 +30,16 @@ func TestNativeCombinedFollowerWithdrawal(t *testing.T) {
 	if os.Getenv("CLDT_NATIVE_COMBINED_FOLLOWER") != "1" {
 		t.Skip("requires isolated guest namespaces")
 	}
+	for _, recorded := range []bool{false, true} {
+		name := "legacy-cache"
+		if recorded {
+			name = "interrupted-worker-routes"
+		}
+		t.Run(name, func(t *testing.T) { nativeCombinedFollowerWithdrawal(t, recorded) })
+	}
+}
+
+func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes bool) {
 	for _, kind := range []string{"net", "mnt"} {
 		self, e := os.Readlink("/proc/self/ns/" + kind)
 		host, h := os.Readlink("/proc/1/ns/" + kind)
@@ -100,6 +110,27 @@ func TestNativeCombinedFollowerWithdrawal(t *testing.T) {
 	api := fake.NewClientset(mesh, journal, node, pod, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: tunnel.ReceiveInventoryName(plan.MeshUID), UID: "inventory", ResourceVersion: "1"}, Data: map[string]string{"inventory.json": string(inventoryRaw)}})
 	store := handover.Store{ConfigMaps: api.CoreV1().ConfigMaps("test"), ClusterUID: "native-cluster", Name: journal.Name}
 	scope := receiveJournalScope{Namespace: "test", MeshName: "mesh", MeshUID: plan.MeshUID, MachineUID: plan.MachineUID}
+	followerPath := filepath.Join(filepath.Dir(cfg.privateKeyFile), cfg.iface+".reconcile.lock.follower.json")
+	followerScope := receiveInventoryCheckpoint{Version: 1, InventoryUID: "inventory", Inventory: inventory, NodeName: cfg.nodeName, NodeUID: string(node.UID), BootID: boot, PublicKey: key.PublicKey().String()}
+	var pending receiveFollowerCache
+	if withRecordedRoutes {
+		recorded, err := stageReceiveFollowerRoutes(followerPath, cfg, followerScope, own, receiveFollowerCache{}, map[string]map[string]string{
+			plan.RootPublicKey:            {"172.29.0.1/32": "10.90.0.2", "fd29::1/128": "fd90::2"},
+			survivor.PublicKey().String(): {"172.29.0.3/32": "10.90.0.2", "fd29::3/128": "fd90::2"},
+		})
+		must(err)
+		// Simulate a write interrupted before compaction: the recorded candidate
+		// relay differs from the older whole-mesh cache's election.
+		pending, err = stageReceiveFollowerRoutes(followerPath, cfg, followerScope, own, recorded, map[string]map[string]string{
+			plan.RootPublicKey: {"172.29.0.1/32": "10.90.0.3", "fd29::1/128": "fd90::3"},
+		})
+		must(err)
+		for raw, gateway := range map[string]string{"172.29.0.1/32": "10.90.0.3", "fd29::1/128": "fd90::3"} {
+			_, dst, err := net.ParseCIDR(raw)
+			must(err)
+			must(netlink.RouteReplace(&netlink.Route{Dst: dst, LinkIndex: link.Attrs().Index, Gw: net.ParseIP(gateway), Src: transitSource(dst.IP, own, []net.IP{net.ParseIP(own[0]), net.ParseIP(own[1])}), Table: cfg.routeTable, Protocol: unix.RTPROT_BOOT, Priority: receiveRoutePriority(dst)}))
+		}
+	}
 	run := func() ([]handover.PodReceipt, error) {
 		return executeReceiveRetirement(ctx, api, store, scope, cfg, key, "agent", func(ctx context.Context, path string, a admittedReceiveRetirement) error {
 			return retireAdmittedFollowerLocked(ctx, api, speaker, store, scope, cfg, key, path, a)
@@ -173,5 +204,22 @@ func TestNativeCombinedFollowerWithdrawal(t *testing.T) {
 	must(err)
 	if len(saved.Data[tunnel.PeerPublicKeyPrefix+"worker"]) != 0 || string(saved.Data[tunnel.PeerPublicKeyPrefix+"survivor"]) != survivor.PublicKey().String() {
 		t.Fatal("cache cleanup lost survivor or retained target")
+	}
+	if withRecordedRoutes {
+		remaining, err := readReceiveFollowerCache(followerPath, cfg, followerScope, own)
+		must(err)
+		if len(remaining.Routes) != 1 || len(remaining.Routes[survivor.PublicKey().String()]) != 1 {
+			t.Fatal("follower route ownership retained the retired worker or lost the survivor")
+		}
+		before, err := os.ReadFile(followerPath)
+		must(err)
+		if _, err := stageReceiveFollowerRoutes(followerPath, cfg, followerScope, own, pending, map[string]map[string]string{plan.RootPublicKey: pending.Routes[plan.RootPublicKey][0]}); err == nil {
+			t.Fatal("stale pre-retirement write restored departed route ownership")
+		}
+		after, err := os.ReadFile(followerPath)
+		must(err)
+		if string(before) != string(after) {
+			t.Fatal("rejected stale write changed post-retirement ownership")
+		}
 	}
 }

@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -46,6 +48,7 @@ func retireAdmittedFollowerLocked(ctx context.Context, api kubernetes.Interface,
 	if err != nil {
 		return err
 	}
+	var checkFollowerRecord func() error
 	check := func() error {
 		if err := recheckReceiveRetirement(ctx, api, store, admitted, cfg.nodeName, key); err != nil {
 			return err
@@ -64,6 +67,11 @@ func retireAdmittedFollowerLocked(ctx context.Context, api kubernetes.Interface,
 		for _, path := range []string{base, base + ".admitted", base + ".owners", base + ".admitted.owners", lockPath + ".neighbors.json", lockPath + ".neighbors.json.retiring"} {
 			if _, err := os.Lstat(path); !os.IsNotExist(err) {
 				return fmt.Errorf("follower has unresolved receiver cache state")
+			}
+		}
+		if checkFollowerRecord != nil {
+			if err := checkFollowerRecord(); err != nil {
+				return err
 			}
 		}
 		return ctx.Err()
@@ -101,6 +109,45 @@ func retireAdmittedFollowerLocked(ctx context.Context, api kubernetes.Interface,
 	if !slices.Equal(own, forwarding.next.Own) {
 		return fmt.Errorf("follower source allocation changed")
 	}
+	relayVariants := []map[string]string{routes}
+	followerPath := lockPath + ".follower.json"
+	followerScope := receiveInventoryCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), Inventory: admitted.Inventory, NodeName: cfg.nodeName, NodeUID: admitted.NodeUID, BootID: admitted.BootID, PublicKey: key.PublicKey().String()}
+	follower, err := readReceiveFollowerCache(followerPath, cfg, followerScope, own)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err == nil {
+		checkFollowerRecord = func() error {
+			current, err := readReceiveFollowerCache(followerPath, cfg, followerScope, own)
+			if err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(current, follower) {
+				return fmt.Errorf("follower route ownership changed during retirement")
+			}
+			return nil
+		}
+		for _, variant := range follower.Routes[target.RootPublicKey] {
+			// Reuse the existing destination-ownership check. This record
+			// describes routes only, so it grants no WireGuard permissions.
+			peer := tunnel.PeerSpec{PublicKey: target.RootPublicKey, Remote: true}
+			for raw := range variant {
+				peer.WGAllowedIPs = append(peer.WGAllowedIPs, raw)
+			}
+			slices.Sort(peer.WGAllowedIPs)
+			if _, err := tunnel.PlanReceiveWithdrawnNeighborPeers([]tunnel.PeerSpec{peer}, currentPeers, admitted.Plans, target.RootPublicKey); err != nil {
+				return err
+			}
+			relayVariants = append(relayVariants, variant)
+		}
+	} else {
+		checkFollowerRecord = func() error {
+			if _, err := os.Lstat(followerPath); !os.IsNotExist(err) {
+				return fmt.Errorf("follower route ownership appeared during retirement")
+			}
+			return nil
+		}
+	}
 	advertisements, err := prepareWithdrawnAdvertisementCache(cfg, speaker, forwarding)
 	if err != nil {
 		return err
@@ -113,18 +160,29 @@ func retireAdmittedFollowerLocked(ctx context.Context, api kubernetes.Interface,
 	}
 	if speaker != nil {
 		prefixes := map[string]bool{}
-		for raw := range routes {
-			prefixes[raw] = true
+		for _, variant := range relayVariants {
+			for raw := range variant {
+				prefixes[raw] = true
+			}
 		}
 		if err := speaker.withdrawReceivePrefixes(ctx, prefixes); err != nil {
 			return err
 		}
 	}
-	if err := withdrawReceiveDeviceRoutes(ctx, cfg, []map[string]receiveRouteSelection{{}}, own, routes); err != nil {
+	if err := withdrawReceiveDeviceRoutes(ctx, cfg, []map[string]receiveRouteSelection{{}}, own, relayVariants...); err != nil {
 		return err
 	}
 	if err := check(); err != nil {
 		return err
 	}
-	return commitWithdrawnSiteCaches(forwarding, advertisements)
+	if err := commitWithdrawnSiteCaches(forwarding, advertisements); err != nil {
+		return err
+	}
+	if follower.Version != 0 {
+		next := follower
+		next.Routes = maps.Clone(follower.Routes)
+		delete(next.Routes, target.RootPublicKey)
+		return replaceReceiveFollowerCache(followerPath, cfg, followerScope, own, follower, next)
+	}
+	return nil
 }

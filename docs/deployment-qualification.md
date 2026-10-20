@@ -1205,6 +1205,18 @@ missing records, cancellation and source replacement; native callbacks in this
 fixture only checkpoint intent. These tests do not establish live retirement
 latency, network continuity or freshness convergence.
 
+Measure joint retirement under the declared workload and management observation
+load. Its execution deadline includes admission, checkpoints, every member's
+backend and final revalidation; it is distinct from receipt freshness, which
+starts at the earliest native observation. Backend duration includes live source
+checks and must not be reported as kernel mutation time. Report claim removal,
+provider termination, completion finalization and reservation release separately.
+Cleanup after the original deadline does not pass that deadline, and completion
+after observers stop does not prove convergence under the original load. Before
+cost-control termination, inspect the recorded instance identities again:
+already terminated instances need no further mutation. Preserve failed and
+post-deadline observations separately.
+
 Unpublished site observers with no local active receiver can advance released
 inventory checkpoints without ordinary-neighbor routing authority. Admission
 validates every active journal and its ancestry, rejects local active or pending

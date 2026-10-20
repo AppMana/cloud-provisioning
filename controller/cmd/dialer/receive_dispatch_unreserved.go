@@ -37,12 +37,12 @@ func dispatchUnreservedReceiveCloud(ctx context.Context, api kubernetes.Interfac
 	if err != nil {
 		return true, err
 	}
-	local := func(plan tunnel.ReceiveTransitionPlan) bool {
-		if plan.CloudNodeName == cfg.nodeName || plan.CloudNodeUID == string(node.UID) || plan.RootPublicKey == key.PublicKey().String() || plan.AdoptionName == adoption {
+	local := func(plan tunnel.ReceiveTransitionPlan, reserveNames bool) bool {
+		if (reserveNames && plan.CloudNodeName == cfg.nodeName) || plan.CloudNodeUID == string(node.UID) || plan.RootPublicKey == key.PublicKey().String() || plan.AdoptionName == adoption {
 			return true
 		}
 		for public, site := range plan.Sites {
-			if site.NodeName == cfg.nodeName || site.NodeUID == string(node.UID) || public == key.PublicKey().String() {
+			if (reserveNames && site.NodeName == cfg.nodeName) || site.NodeUID == string(node.UID) || public == key.PublicKey().String() {
 				return true
 			}
 		}
@@ -72,7 +72,7 @@ func dispatchUnreservedReceiveCloud(ctx context.Context, api kubernetes.Interfac
 		if err != nil {
 			return true, err
 		}
-		if local(plan) {
+		if local(plan, true) {
 			return true, nil
 		}
 		if len(current.Publications[uid].Retirement) != 0 {
@@ -100,11 +100,14 @@ func dispatchUnreservedReceiveCloud(ctx context.Context, api kubernetes.Interfac
 		if !verified || !sameReceiveRevision(index.ObjectMeta, history.Metadata) {
 			return true, fmt.Errorf("unreserved cloud release history changed")
 		}
-		if local(history.Plan) {
+		// Released names can belong to a new Node incarnation. Keep the
+		// historical UID, key, adoption and durable-file fences; a name alone
+		// must not strand a fresh worker before it acquires its own journal.
+		if local(history.Plan, false) {
 			return true, nil
 		}
 		for _, consumer := range history.Withdrawal.Consumers {
-			if consumer.NodeName == cfg.nodeName || consumer.NodeUID == string(node.UID) || consumer.PublicKey == key.PublicKey().String() || (consumer.MachineName != "" && tunnel.AdoptionSecretName(consumer.MachineName) == adoption) {
+			if consumer.NodeUID == string(node.UID) || consumer.PublicKey == key.PublicKey().String() || (consumer.MachineName != "" && tunnel.AdoptionSecretName(consumer.MachineName) == adoption) {
 				return true, nil
 			}
 		}

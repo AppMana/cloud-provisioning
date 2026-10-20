@@ -36,19 +36,45 @@ func verifyUnreservedCloudDispatch(t *testing.T, api kubernetes.Interface, store
 	must(err)
 	retiredPlan, err := tunnel.DecodeReceiveTransition(retired, store.ClusterUID)
 	must(err)
-	for _, fault := range []string{"fresh", "active-key", "retired-adoption", "retained-consumer-key", "saved-fence", "missing-node", "cancelled"} {
+	replacement, err := api.CoreV1().Nodes().Create(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: retiredPlan.CloudNodeName}}, metav1.CreateOptions{})
+	must(err)
+	defer func() { must(api.CoreV1().Nodes().Delete(ctx, replacement.Name, metav1.DeleteOptions{})) }()
+	if string(replacement.UID) == retiredPlan.CloudNodeUID {
+		t.Fatal("replacement retained the retired Node UID")
+	}
+	inventory, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, scope.Namespace, scope.MeshName, scope.MeshUID)
+	must(err)
+	if len(inventory.MachineUIDs) != 1 {
+		t.Fatal("expected one active journal beside released history")
+	}
+	activeStore := store
+	activeStore.Name, activeStore.ExpectedUID = tunnel.ReceiveTransitionName(inventory.MachineUIDs[0]), ""
+	active, err := activeStore.Load(ctx)
+	must(err)
+	activePlan, err := tunnel.DecodeReceiveTransition(active, store.ClusterUID)
+	must(err)
+	activeName, err := api.CoreV1().Nodes().Create(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: activePlan.CloudNodeName}}, metav1.CreateOptions{})
+	must(err)
+	defer func() { must(api.CoreV1().Nodes().Delete(ctx, activeName.Name, metav1.DeleteOptions{})) }()
+	for _, fault := range []string{"fresh", "active-key", "active-name", "retired-adoption", "retained-consumer-key", "saved-fence", "missing-node", "cancelled", "reused-node-name", "reused-name-consumer-key", "reused-name-retired-adoption", "reused-name-saved-fence"} {
 		t.Run("unreserved-cloud/"+fault, func(t *testing.T) {
 			dir := t.TempDir()
 			cfg := config{iface: "freshcloud", nodeName: node.Name, peersFile: filepath.Join(dir, "peers.json"), peersSecretNamespace: scope.Namespace, peersSecretName: "fresh-cloud-worker-tunnel-peers", receiptMeshName: scope.MeshName, receiptURL: "https://unused.invalid", receiptCAFile: "unused", receiptTokenFile: "unused", receiptPodName: "fresh-agent", receiptPodUID: "fresh-agent-uid"}
+			switch fault {
+			case "reused-node-name", "reused-name-consumer-key", "reused-name-retired-adoption", "reused-name-saved-fence":
+				cfg.nodeName = replacement.Name
+			}
 			identity := key
 			switch fault {
 			case "active-key":
 				identity = activeKey
-			case "retired-adoption":
+			case "active-name":
+				cfg.nodeName = activeName.Name
+			case "retired-adoption", "reused-name-retired-adoption":
 				cfg.peersSecretName = retiredPlan.AdoptionName
-			case "retained-consumer-key":
+			case "retained-consumer-key", "reused-name-consumer-key":
 				identity = consumerKey
-			case "saved-fence":
+			case "saved-fence", "reused-name-saved-fence":
 				must(os.WriteFile(filepath.Join(dir, cfg.iface+".reconcile.lock.inventory.json"), []byte("{}"), 0600))
 			case "missing-node":
 				cfg.nodeName = "absent-worker"
@@ -70,7 +96,7 @@ func verifyUnreservedCloudDispatch(t *testing.T, api kubernetes.Interface, store
 			if calls != 0 {
 				t.Fatal("dispatch unexpectedly executed a receiver phase")
 			}
-			if fault == "fresh" {
+			if fault == "fresh" || fault == "reused-node-name" {
 				if err != nil || handled {
 					t.Fatalf("unrelated release blocked fresh worker: handled=%t err=%v", handled, err)
 				}

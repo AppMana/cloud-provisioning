@@ -1227,6 +1227,15 @@ does not cache API reads, extend deadlines, change receipt age or replace
 initial and post-native admission. Measure loaded retirement separately from
 read-only history benchmarks.
 
+A fresh cloud Node may reuse a fully released participant's name without
+inheriting its ownership. Dispatch must distinguish the new Node UID, key and
+adoption identity while preserving saved local ownership fences. Active
+reservations still reserve their participant names. Exercise real Node
+recreation and require ordinary dispatch for a fresh identity; reused keys,
+retired adoption names and saved fences must remain blocked. This admission
+test does not qualify native forwarding, same-adoption-name reuse, replay of an
+old worker disk or provider address reuse; verify those scenarios separately.
+
 Unpublished site observers with no local active receiver can advance released
 inventory checkpoints without ordinary-neighbor routing authority. Admission
 validates every active journal and its ancestry, rejects local active or pending

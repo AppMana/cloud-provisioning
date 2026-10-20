@@ -259,6 +259,14 @@ func verifyRetirementReceiptAuthenticationRealAPI(t *testing.T, history string) 
 		t.Run("joint-authentication", func(t *testing.T) {
 			verifyJointRetirementAuthentication(t, api, verifier, nodes, fresh, history)
 		})
+		// Joint release faults change and restore live Node status. Reuse the
+		// restored current revisions for subsequent independent fixture writes.
+		for i, node := range nodes {
+			nodes[i], err = api.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 	verifyRetirementAuthenticatedCommit(t, api, verifier, nodes[0], pods[0], fresh[0], history)
 	pods[0].Status.ContainerStatuses[0].ImageID = "sha256:" + strings.Repeat("b", 64)

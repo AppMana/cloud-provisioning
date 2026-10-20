@@ -994,9 +994,32 @@ Retained joint history must load and verify every member journal and consumed
 finalization, require identical explicit member sets, and pin their revisions.
 Historical readback must survive later mesh ownership without granting cleanup
 or active allocation authority over a replacement. Reject missing members,
-replaced journal incarnations and mismatched groups. Reader fixtures simulate
-moving authenticated records together into retained storage; they do not qualify
-an atomic release writer, native absence, reboot recovery or live address reuse.
+replaced journal incarnations and mismatched groups. Reader fixtures use the joint release writer to move authenticated records into
+retained storage. Native observations and owner/rollback policy remain synthetic;
+these tests do not qualify native absence, reboot recovery or live address reuse.
+
+Joint release requires an explicit per-member ownership check and fresh joint
+observations from every surviving consumer after every member finalized. An
+ordinary single-owner release policy must not authorize another owner. Admit all
+members, check each owner at both release boundaries, and move the exact consumed
+records in one inventory compare-and-swap. Reread the shared source once per
+boundary instead of rebuilding each member's ancestry. Reject partial prior
+release and mismatched evidence. Retain every frozen journal and retired-owner
+record; old owners must not reserve or republish themselves.
+Release currently requires every member to have finalized the same explicit
+joint member set. Later overlapping groups with different consumed member sets
+are rejected; they must not silently rewrite historical evidence. Qualify that
+recovery separately before allowing overlapping retirement campaigns.
+
+Real-token release fixtures must exercise missing finalization and policy,
+incomplete, stale or replayed observations, invalid tokens, second-owner denial,
+boot replacement, expiry/cancellation at the write boundary, source mutation,
+concurrent reservation conflicts and lost responses. Failed admission must leave
+all members reserved. A lost response must permit historical readback of the
+whole committed group and reject a retry through the old collection. Assert one
+inventory write for success and preserve unrelated concurrent reservations on
+conflict. Live controller integration and compatible recovery/rollback remain
+separate activation gates.
 
 Finalized agent execution verifies historical finalization against its freshly
 admitted retirement set instead of reconstructing the same ancestry again.

@@ -24,55 +24,86 @@ import (
 // fresh admission; an identical retry preserves the retired record. Neither a
 // conflict nor an ambiguous response is retried internally.
 func ReleaseReceiveJournal(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, expectedInventory metav1.ObjectMeta, mesh *corev1.Secret, snapshot handover.Snapshot, consumed ReceiveJournalPublication, beforeWrite func() error) error {
-	if maps == nil || mesh == nil || mesh.UID == "" || mesh.ResourceVersion == "" || mesh.DeletionTimestamp != nil || expectedInventory.UID == "" || expectedInventory.ResourceVersion == "" || expectedInventory.DeletionTimestamp != nil || beforeWrite == nil {
-		return fmt.Errorf("release requires exact inventory, live mesh and a write-boundary authority check")
-	}
-	meta := snapshot.Metadata()
-	if !snapshot.Frozen() || meta.UID == "" || meta.ResourceVersion == "" || meta.DeletionTimestamp != nil || consumed.JournalUID != string(meta.UID) || len(consumed.Plan) != 0 || len(consumed.RetirementFinalization) == 0 {
-		return fmt.Errorf("release requires a finalized frozen journal incarnation")
-	}
 	plan, err := DecodeReceiveTransition(snapshot, clusterUID)
 	if err != nil {
 		return err
 	}
-	if !snapshot.RetirementFrozen() {
-		return fmt.Errorf("retirement requires completed or explicitly fenced interrupted history")
+	return ReleaseReceiveJournals(ctx, maps, clusterUID, expectedInventory, mesh, map[string]handover.Snapshot{plan.MachineUID: snapshot}, map[string]ReceiveJournalPublication{plan.MachineUID: consumed}, beforeWrite)
+}
+
+// ReleaseReceiveJournals performs one inventory CAS for an explicitly admitted
+// group. It is storage only: each member needs independently verified history,
+// owner absence, durable consumer fencing and compatible recovery. The caller
+// must recheck the entire group at beforeWrite. No journal is deleted. Partial
+// prior releases are rejected; an ambiguous response requires fresh readback.
+func ReleaseReceiveJournals(ctx context.Context, maps typedcore.ConfigMapInterface, clusterUID string, expectedInventory metav1.ObjectMeta, mesh *corev1.Secret, snapshots map[string]handover.Snapshot, consumed map[string]ReceiveJournalPublication, beforeWrite func() error) error {
+	if maps == nil || mesh == nil || mesh.UID == "" || mesh.ResourceVersion == "" || mesh.DeletionTimestamp != nil || expectedInventory.UID == "" || expectedInventory.ResourceVersion == "" || expectedInventory.DeletionTimestamp != nil || beforeWrite == nil || len(snapshots) == 0 || len(snapshots) != len(consumed) {
+		return fmt.Errorf("release requires exact inventory, complete member evidence and a write-boundary authority check")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	inventory, object, err := ReadReceiveInventory(ctx, maps, clusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
 	if err != nil {
 		return err
 	}
-	if object.UID != expectedInventory.UID || object.ResourceVersion != expectedInventory.ResourceVersion || object.Name != expectedInventory.Name || object.Namespace != expectedInventory.Namespace || plan.Namespace != inventory.Namespace || plan.MeshName != inventory.MeshName || plan.MeshUID != inventory.MeshUID {
+	if object.UID != expectedInventory.UID || object.ResourceVersion != expectedInventory.ResourceVersion || object.Name != expectedInventory.Name || object.Namespace != expectedInventory.Namespace {
 		return fmt.Errorf("release inventory revision or scope changed")
 	}
-	if retired, exists := inventory.Released[plan.MachineUID]; exists {
-		if !reflect.DeepEqual(retired, consumed) {
-			return fmt.Errorf("released journal evidence cannot be replaced")
+	uids := make([]string, 0, len(snapshots))
+	for uid := range snapshots {
+		uids = append(uids, uid)
+	}
+	slices.Sort(uids)
+	released := 0
+	for _, uid := range uids {
+		snapshot, publication := snapshots[uid], consumed[uid]
+		meta := snapshot.Metadata()
+		if uid == "" || !snapshot.RetirementFrozen() || meta.UID == "" || meta.ResourceVersion == "" || meta.DeletionTimestamp != nil || publication.JournalUID != string(meta.UID) || len(publication.Plan) != 0 || len(publication.RetirementFinalization) == 0 {
+			return fmt.Errorf("release requires each finalized frozen journal incarnation")
 		}
-	} else {
-		if err := inventory.CheckJournal(plan.MachineUID, string(meta.UID)); err != nil {
+		plan, err := DecodeReceiveTransition(snapshot, clusterUID)
+		if err != nil {
 			return err
 		}
-		if !reflect.DeepEqual(inventory.Publications[plan.MachineUID], consumed) {
-			return fmt.Errorf("release consumed publication changed")
+		if plan.MachineUID != uid || plan.Namespace != inventory.Namespace || plan.MeshName != inventory.MeshName || plan.MeshUID != inventory.MeshUID {
+			return fmt.Errorf("release journal scope changed")
 		}
-		if inventory.Released == nil {
-			inventory.Released = map[string]ReceiveJournalPublication{}
+		if retired, exists := inventory.Released[uid]; exists {
+			if !reflect.DeepEqual(retired, publication) {
+				return fmt.Errorf("released journal evidence cannot be replaced")
+			}
+			released++
+		} else {
+			if err := inventory.CheckJournal(uid, string(meta.UID)); err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(inventory.Publications[uid], publication) {
+				return fmt.Errorf("release consumed publication changed")
+			}
 		}
-		inventory.Released[plan.MachineUID] = consumed
-		delete(inventory.Publications, plan.MachineUID)
-		inventory.MachineUIDs = slices.DeleteFunc(inventory.MachineUIDs, func(uid string) bool { return uid == plan.MachineUID })
+		store := handover.Store{ConfigMaps: maps, ClusterUID: clusterUID, Name: meta.Name, ExpectedUID: string(meta.UID)}
+		current, err := store.Load(ctx)
+		if err != nil {
+			return err
+		}
+		if err := current.ContinuesExecution(snapshot); err != nil {
+			return fmt.Errorf("release journal changed: %w", err)
+		}
 	}
+	if released != 0 && released != len(uids) {
+		return fmt.Errorf("release group is partially retired")
+	}
+	if inventory.Released == nil {
+		inventory.Released = map[string]ReceiveJournalPublication{}
+	}
+	for _, uid := range uids {
+		inventory.Released[uid] = consumed[uid]
+		delete(inventory.Publications, uid)
+	}
+	inventory.MachineUIDs = slices.DeleteFunc(inventory.MachineUIDs, func(uid string) bool { _, found := snapshots[uid]; return found })
 	if err := inventory.validate(); err != nil {
 		return err
-	}
-	store := handover.Store{ConfigMaps: maps, ClusterUID: clusterUID, Name: meta.Name, ExpectedUID: string(meta.UID)}
-	current, err := store.Load(ctx)
-	if err != nil {
-		return err
-	}
-	if err := current.ContinuesExecution(snapshot); err != nil {
-		return fmt.Errorf("release journal changed: %w", err)
 	}
 	raw, err := json.Marshal(inventory)
 	if err != nil {

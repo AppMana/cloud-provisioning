@@ -224,17 +224,10 @@ func verifyJointRetirementAuthentication(t *testing.T, api kubernetes.Interface,
 			t.Fatal("individual release changed joint ownership")
 		}
 	}
-	// Simulate the storage result of an atomic group release in this isolated
-	// API. This does not exercise or authorize a production release writer.
-	retained, current, err := tunnel.ReadReceiveInventory(ctx, maps, "cluster", ns, mesh.Name, string(mesh.UID))
+	verifyJointRetirementRelease(t, api, stores[0], mesh, intents[0].MachineUID, policies, entries)
+	retained, _, err := tunnel.ReadReceiveInventory(ctx, maps, "cluster", ns, mesh.Name, string(mesh.UID))
 	must(err)
-	retained.Released = retained.Publications
-	retained.Publications = map[string]tunnel.ReceiveJournalPublication{}
-	retained.MachineUIDs = []string{}
 	raw, err = json.Marshal(retained)
-	must(err)
-	current.Data["inventory.json"] = string(raw)
-	_, err = maps.Update(ctx, current, metav1.UpdateOptions{})
 	must(err)
 	mesh.Data[tunnel.PeerPublicKeyPrefix+intents[0].MachineName] = []byte(intents[1].PublicKey)
 	mesh, err = api.CoreV1().Secrets(ns).Update(ctx, mesh, metav1.UpdateOptions{})

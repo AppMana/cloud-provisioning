@@ -27,6 +27,8 @@ type receiveDispatchNative func(context.Context, tunnel.ReceiveTransitionPlan, h
 // through to legacy reconciliation on an API, credential, admission or native
 // failure. Releasing reservations and restoring ordinary publishers is separate.
 func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg config, native, maintain receiveDispatchNative, retirement ...receiveDispatchRetirement) (handled bool, resultErr error) {
+	timing := newReceiveTiming(cfg.receiptURL != "", "dispatch")
+	defer func() { timing.finish(resultErr == nil) }()
 	namespace := cfg.secretNamespace
 	if namespace == "" {
 		namespace = cfg.peersSecretNamespace
@@ -37,10 +39,12 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 	if cfg.secretName != "" && cfg.secretName != cfg.receiptMeshName {
 		return true, fmt.Errorf("receiver discovery differs from configured mesh")
 	}
+	timing.step("mesh")
 	mesh, err := api.CoreV1().Secrets(namespace).Get(ctx, cfg.receiptMeshName, metav1.GetOptions{})
 	if err != nil {
 		return true, err
 	}
+	timing.step("cluster")
 	cluster, err := api.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{})
 	if err != nil {
 		return true, err
@@ -49,6 +53,7 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		return true, fmt.Errorf("receiver dispatch requires live mesh and cluster identities")
 	}
 	store := handover.Store{ConfigMaps: api.CoreV1().ConfigMaps(namespace), ClusterUID: string(cluster.UID)}
+	timing.step("inventory")
 	inventory, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, namespace, mesh.Name, string(mesh.UID))
 	if apierrors.IsNotFound(err) {
 		return false, nil
@@ -58,6 +63,7 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 	}
 	var targets []string
 	retiring := map[string]bool{}
+	timing.step("journal-discovery")
 	for _, uid := range inventory.MachineUIDs {
 		store.Name = tunnel.ReceiveTransitionName(uid)
 		snapshot, err := store.Load(ctx)
@@ -96,6 +102,7 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		}
 	}
 	if len(targets) == 0 {
+		timing.step("unreserved-admission")
 		if cfg.secretName == "" && len(inventory.Released) != 0 {
 			return dispatchUnreservedReceiveCloud(ctx, api, store, cfg, inventory)
 		}
@@ -103,6 +110,7 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		// admission must verify the retained fences before doing native work.
 		return len(inventory.Released) != 0, nil
 	}
+	timing.step("identity")
 	key, allocated, err := receiveDispatchIdentity(cfg)
 	if err != nil {
 		return true, err
@@ -136,7 +144,11 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 	// Join outstanding deliveries before the deferred transport.Close, even
 	// when a later target fails admission. One failed request cannot cancel the
 	// other consumers' observations or escape this reconciliation pass.
-	defer func() { resultErr = errors.Join(append(failures, resultErr, deliveries.wait())...) }()
+	defer func() {
+		timing.step("pending-deliveries")
+		resultErr = errors.Join(append(failures, resultErr, deliveries.wait())...)
+	}()
+	timing.step("targets")
 	for _, uid := range targets {
 		store.Name = tunnel.ReceiveTransitionName(uid)
 		scope := receiveJournalScope{Namespace: namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUID: uid}

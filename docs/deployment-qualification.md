@@ -1137,6 +1137,11 @@ records in one inventory compare-and-swap. Reread the shared source once per
 boundary instead of rebuilding each member's ancestry. Reject partial prior
 release and mismatched evidence. Retain every frozen journal and retired-owner
 record; old owners must not reserve or republish themselves.
+Exercise reservation rejection against retained live identities with current
+mesh metadata and valid API credentials. Require the retired-identity rejection
+and unchanged inventory data and revision, rather than accepting an
+authentication failure as proof. This direct API check does not replace
+restored-worker execution or packet-level address-reuse tests.
 The optional `receipts.releaseObservationMaxAge` bounds fresh release observations
 independently of the journal's historical receipt age. Zero retains the journal
 age; an explicit value must be positive and at most two minutes. Select it from

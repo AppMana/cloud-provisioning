@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -37,13 +36,8 @@ func loadSurvivingReceiveSet(ctx context.Context, api kubernetes.Interface, stor
 			// The first admission authenticated every reserved history, ownership
 			// and route. Bind each sibling withdrawal to that same snapshot;
 			// its consumer and live-source recheck remains mandatory below.
-			retired = *shared
-			snapshot, found := retired.Journals[uid]
-			if !found || string(snapshot.Metadata().UID) != memberStore.ExpectedUID {
-				return fail(fmt.Errorf("survivor withdrawal journal incarnation changed"))
-			}
 			var err error
-			retired.Withdrawal, err = attachment.ReadReceiveWithdrawal(retired.Inventory, uid, snapshot, retired.Mesh)
+			retired, err = receiveRetirementMember(memberStore, memberScope, *shared)
 			if err != nil {
 				return fail(err)
 			}

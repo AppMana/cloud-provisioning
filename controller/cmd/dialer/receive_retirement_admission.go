@@ -21,6 +21,25 @@ type admittedReceiveRetirement struct {
 	releasedCheckpoint *receiveReleasedCheckpointAdmission
 }
 
+// Select another withdrawal from the same freshly admitted full set. This
+// performs no I/O and grants no execution authority: callers must still recheck
+// that member's consumer identity and live sources at their admission boundary.
+func receiveRetirementMember(store handover.Store, scope receiveJournalScope, admitted admittedReceiveRetirement) (admittedReceiveRetirement, error) {
+	if admitted.Mesh == nil || store.ClusterUID != admitted.Inventory.ClusterUID || scope.Namespace != admitted.Mesh.Namespace || scope.MeshName != admitted.Mesh.Name || scope.MeshUID != string(admitted.Mesh.UID) || store.Name != tunnel.ReceiveTransitionName(scope.MachineUID) {
+		return admittedReceiveRetirement{}, fmt.Errorf("retirement member differs from admitted scope")
+	}
+	snapshot, found := admitted.Journals[scope.MachineUID]
+	if !found || (store.ExpectedUID != "" && store.ExpectedUID != string(snapshot.Metadata().UID)) {
+		return admittedReceiveRetirement{}, fmt.Errorf("retirement member journal incarnation changed")
+	}
+	withdrawal, err := attachment.ReadReceiveWithdrawal(admitted.Inventory, scope.MachineUID, snapshot, admitted.Mesh)
+	if err != nil {
+		return admittedReceiveRetirement{}, err
+	}
+	admitted.Withdrawal = withdrawal
+	return admitted, nil
+}
+
 // Historical finalization suppresses only receipt renewal. Native cleanup and
 // the durable local fence remain mandatory, including on a different boot.
 // Use the frozen journal's observation policy; a policy mismatch fails closed.

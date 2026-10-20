@@ -104,14 +104,13 @@ func executeReceiveRetirementCohort(ctx context.Context, api kubernetes.Interfac
 		member := admitted
 		memberStore, memberScope := retirementMemberScope(store, scope, admitted, uid)
 		if uid != scope.MachineUID {
-			member, err = loadReceiveRetirement(ctx, api, memberStore, memberScope, cfg.nodeName, key)
+			member, err = receiveRetirementMember(memberStore, memberScope, admitted)
 			if err != nil {
 				return nil, fmt.Errorf("joint admission: %w", err)
 			}
-			if !sameReceiveRetirement(admitted, member) {
-				return nil, fmt.Errorf("joint retirement source or observer changed")
+			if err := recheckReceiveRetirement(ctx, api, memberStore, member, cfg.nodeName, key); err != nil {
+				return nil, fmt.Errorf("joint source or observer admission: %w", err)
 			}
-			member.releasedCheckpoint = admitted.releasedCheckpoint
 			finalized[uid], err = receiveRetirementFinalized(ctx, api, memberStore, memberScope, member)
 			if err != nil {
 				return nil, fmt.Errorf("joint finalization admission: %w", err)
@@ -152,16 +151,26 @@ func executeReceiveRetirementCohort(ctx context.Context, api kubernetes.Interfac
 		}
 	}
 	timing.step("post-native-admission")
+	// Read the complete set again after native work. Every member is selected
+	// from that same fresh admission and independently fenced below, rather
+	// than reconstructing all histories again for each member.
+	refreshedSet, err := loadReceiveRetirement(ctx, api, store, scope, cfg.nodeName, key)
+	if err != nil {
+		return nil, fmt.Errorf("post-cleanup admission: %w", err)
+	}
 	current := make(map[string]admittedReceiveRetirement, len(members))
 	for _, member := range members {
 		uid := member.Withdrawal.MachineUID
 		memberStore, memberScope := retirementMemberScope(store, scope, member, uid)
-		refreshed, err := loadReceiveRetirement(ctx, api, memberStore, memberScope, cfg.nodeName, key)
+		refreshed, err := receiveRetirementMember(memberStore, memberScope, refreshedSet)
 		if err != nil {
 			return nil, fmt.Errorf("post-cleanup admission: %w", err)
 		}
 		if !sameReceiveRetirement(member, refreshed) {
 			return nil, fmt.Errorf("retirement changed during native cleanup")
+		}
+		if err := recheckReceiveRetirement(ctx, api, memberStore, refreshed, cfg.nodeName, key); err != nil {
+			return nil, fmt.Errorf("post-cleanup member admission: %w", err)
 		}
 		current[uid] = refreshed
 	}

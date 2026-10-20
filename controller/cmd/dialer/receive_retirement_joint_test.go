@@ -136,6 +136,39 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 		native = prepareNativeJointExecution(t, api, stores[0], scope, cfg, site, plans, publishedMesh)
 	}
 	t.Run("dispatch-once", func(t *testing.T) { verifyJointDispatchOnce(t, api, stores, mesh, cfg, site, native) })
+	t.Run("member-scope", func(t *testing.T) {
+		admitted, err := loadReceiveRetirement(ctx, api, stores[0], scope, cfg.nodeName, site)
+		must(err)
+		for _, fault := range []string{"none", "cluster", "namespace", "mesh", "journal-name", "journal-uid"} {
+			t.Run(fault, func(t *testing.T) {
+				store, memberScope := retirementMemberScope(stores[0], scope, admitted, plans[1].MachineUID)
+				switch fault {
+				case "cluster":
+					store.ClusterUID = "replacement"
+				case "namespace":
+					memberScope.Namespace = "replacement"
+				case "mesh":
+					memberScope.MeshUID = "replacement"
+				case "journal-name":
+					store.Name = stores[0].Name
+				case "journal-uid":
+					store.ExpectedUID = "replacement"
+				}
+				member, err := receiveRetirementMember(store, memberScope, admitted)
+				if fault != "none" {
+					if err == nil {
+						t.Fatal("member admitted under a different source scope")
+					}
+					return
+				}
+				must(err)
+				if member.Withdrawal.MachineUID != plans[1].MachineUID || !sameReceiveRetirement(admitted, member) {
+					t.Fatal("member selection changed admitted source or selected the wrong withdrawal")
+				}
+				must(recheckReceiveRetirement(ctx, api, store, member, cfg.nodeName, site))
+			})
+		}
+	})
 	for _, fault := range []string{"second-fails", "cancelled-after-first", "pod-after-first", "none", "source-after-first"} {
 		t.Run(fault, func(t *testing.T) {
 			pod.Status.ContainerStatuses[0].ContainerID = "containerd://joint"
@@ -145,7 +178,16 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 			defer cancel()
 			var calls []string
 			var deadline, secondStarted time.Time
-			receipts, err := executeReceiveRetirementCohort(runCtx, api, stores[0], scope, cfg, site, "containerd://joint", func(run context.Context, path string, admitted admittedReceiveRetirement) error {
+			reads, beforeNative := 0, 0
+			reader := stores[0]
+			reader.ConfigMaps = receiveSetReader{ConfigMapInterface: reader.ConfigMaps, before: func(string) error {
+				reads++
+				return nil
+			}}
+			receipts, err := executeReceiveRetirementCohort(runCtx, api, reader, scope, cfg, site, "containerd://joint", func(run context.Context, path string, admitted admittedReceiveRetirement) error {
+				if len(calls) == 0 {
+					beforeNative = reads
+				}
 				calls = append(calls, admitted.Withdrawal.MachineUID)
 				if len(calls) == 2 {
 					secondStarted = time.Now()
@@ -192,6 +234,10 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 				return nil
 			})
 			if fault == "none" {
+				t.Logf("cohort ConfigMap reads: before native=%d total=%d", beforeNative, reads)
+				if !useNative && (beforeNative > 25 || reads > 47) {
+					t.Fatalf("cohort reconstructed shared histories: before native=%d total=%d", beforeNative, reads)
+				}
 				if err != nil || len(receipts) != len(stores) || !slices.Equal(calls, inventory.MachineUIDs) {
 					t.Fatalf("joint cleanup did not complete: calls=%v receipts=%d err=%v", calls, len(receipts), err)
 				}

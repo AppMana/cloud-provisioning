@@ -1164,6 +1164,10 @@ Within one locked retirement cohort, reuse the existing released-history
 checkpoint admission across member checkpoints and native backends. Each write
 must still match the exact inventory and local identity binding and recheck live
 released sources. Reject member source changes before sharing that admission.
+Admit the full reserved set once before cleanup and again afterward; select each
+member's withdrawal from the corresponding admitted set, then independently
+recheck its live sources and retained-consumer identity. Do not carry this
+admission into another reconciliation or skip post-native history validation.
 Real-API tests bound repeated journal reads and exercise invalid bindings,
 missing records, cancellation and source replacement; native callbacks in this
 fixture only checkpoint intent. These tests do not establish live retirement

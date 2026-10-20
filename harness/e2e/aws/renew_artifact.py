@@ -50,6 +50,7 @@ def main():
     p.add_argument('--evidence-dir',type=pathlib.Path,required=True)
     p.add_argument('--api-server',required=True)
     p.add_argument('--bastion',default='clab-cldt-bastion')
+    p.add_argument('--runner',help='isolated Docker runner containing the bastion')
     p.add_argument('--architecture',choices=['amd64','arm64'],default='amd64')
     a=p.parse_args();os.umask(0o077)
     a.evidence_dir.mkdir(mode=0o700)
@@ -61,7 +62,8 @@ def main():
         return out.stdout
     if json.loads(aws(['sts','get-caller-identity']))['Account']!=state['account']:
         raise ValueError('AWS account mismatch')
-    kube=['docker','exec','-i',a.bastion,'kubectl','--server='+a.api_server,'-n','cloud-provisioning']
+    docker=['docker','exec','-i',a.runner,'docker'] if a.runner else ['docker']
+    kube=docker+['exec','-i',a.bastion,'kubectl','--server='+a.api_server,'-n','cloud-provisioning']
     raw=subprocess.run(kube+['get','deployment','cloud-provisioning-endpoint-controller','-o','json'],capture_output=True,text=True,check=True,timeout=30)
     deployment=json.loads(raw.stdout);selected=artifact(deployment,state,a.architecture)
     target=a.evidence_dir/'verified-binary'

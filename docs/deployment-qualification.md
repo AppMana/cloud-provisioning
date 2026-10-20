@@ -1269,3 +1269,18 @@ that value. Apply it through the CNI's owning configuration on every controller
 that can reconcile the network, then verify installed configuration and fresh
 pod interfaces. Keep physical interface MTUs unchanged. A successful source
 configuration update alone does not establish workload convergence.
+
+Apply the same path budget to AWS VPC CNI pods. Its `POD_MTU` is independent of
+Calico's setting and of `AWS_VPC_ENI_MTU`; changing the site CNI does not change
+AWS pod interfaces. For a verified 1370-byte pod budget, render the AWS CNI with
+`aws/vpc_cni.py --pod-mtu 1370` and recreate measured AWS pods before testing.
+Leave the physical ENI MTU unchanged and retain the original failed sweep.
+
+Ordinary-neighbor reconciliation must preserve a recently authenticated
+WireGuard endpoint when NAT has changed the published address or port. Test
+both ordinary reconciliation and recovery with a stale configured endpoint,
+and verify that traffic and the learned endpoint survive. An absent, future,
+or stale handshake must still permit the configured fallback. This check does
+not qualify recovery after a NAT mapping expires or a peer is offline; those
+cases require separate packet observations. Endpoint preservation must never
+retain withdrawn keys or source permissions.

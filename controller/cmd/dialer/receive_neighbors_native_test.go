@@ -173,6 +173,21 @@ func TestNativeReceiveNeighbors(t *testing.T) {
 
 	must(installReceiveNeighbors(context.Background(), devices, cfg, root, []tunnel.PeerSpec{peer}, []string{"10.77.0.1"}))
 	probe(joining)
+	// A stale published transport hint must not overwrite the endpoint learned
+	// by the real kernel handshake. Exercise both ordinary and recovery paths.
+	roamed := peer
+	roamed.Endpoint = "192.0.2.10:51820"
+	for _, apply := range []func(context.Context, receiverDevices, config, wgtypes.Key, []tunnel.PeerSpec, []string) error{installReceiveNeighbors, restoreReceiveNeighbors} {
+		must(apply(context.Background(), devices, cfg, root, []tunnel.PeerSpec{roamed}, []string{"10.77.0.1"}))
+		live, err := devices.Device(cfg.iface)
+		must(err)
+		for _, entry := range live.Peers {
+			if entry.PublicKey == neighbor && (entry.Endpoint == nil || entry.Endpoint.String() != peer.Endpoint) {
+				t.Fatal("reconciliation replaced the authenticated neighbor endpoint")
+			}
+		}
+		probe(joining)
+	}
 	// Reapplication must preserve both established sessions and foreign routes.
 	// A node's pod CIDR can arrive after its initial host-only publication.
 	peer.WGAllowedIPs = append(peer.WGAllowedIPs, "10.77.2.0/24")

@@ -117,6 +117,10 @@ func reconcileReceiveNeighborPartition(ctx context.Context, devices receiverDevi
 					return fmt.Errorf("withdrawing existing neighbor source authorization requires a separate transition")
 				}
 			}
+			// The published endpoint is a bootstrap hint. Reasserting it over
+			// an authenticated NAT mapping interrupts an established neighbor
+			// until another inbound packet teaches WireGuard the mapping again.
+			endpoint = receiveNeighborEndpoint(endpoint, old, time.Now())
 		}
 		wanted = append(wanted, wgtypes.PeerConfig{PublicKey: public, Endpoint: endpoint, AllowedIPs: allowed, ReplaceAllowedIPs: true, PersistentKeepaliveInterval: &keepalive})
 	}
@@ -220,4 +224,14 @@ func reconcileReceiveNeighborPartition(ctx context.Context, devices receiverDevi
 		}
 	}
 	return ctx.Err()
+}
+
+func receiveNeighborEndpoint(configured *net.UDPAddr, live wgtypes.Peer, now time.Time) *net.UDPAddr {
+	if live.Endpoint != nil && !live.LastHandshakeTime.IsZero() && !live.LastHandshakeTime.After(now) && now.Sub(live.LastHandshakeTime) <= receiveHandshakeMaxAge {
+		// Omit the update, rather than copying an endpoint that may roam again
+		// between this read and ConfigureDevice. Keys and sources remain subject
+		// to the caller's independent admission and withdrawal checks.
+		return nil
+	}
+	return configured
 }

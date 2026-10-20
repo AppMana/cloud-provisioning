@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
@@ -27,6 +28,17 @@ type receiveRetirementNative func(context.Context, string, admittedReceiveRetire
 // observation uses the same cleanup and checkpoints, then emits a fresh bound
 // receipt; historical evidence never substitutes for native verification.
 func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveRetirementNative) (result []handover.PodReceipt, resultErr error) {
+	group, err := executeReceiveRetirementCohort(ctx, api, store, scope, cfg, key, containerID, native)
+	if err != nil {
+		return nil, err
+	}
+	return group[scope.MachineUID], nil
+}
+
+// Execute a cohort once and bind each member's receipt independently. An entry
+// with no receipts means that member's finalized maintenance succeeded. Results
+// are local to this execution; any member failure suppresses the entire group.
+func executeReceiveRetirementCohort(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, containerID string, native receiveRetirementNative) (result map[string][]handover.PodReceipt, resultErr error) {
 	timing := newReceiveTiming(cfg.receiptURL != "", "retirement")
 	defer func() { timing.finish(resultErr == nil) }()
 	if api == nil || native == nil || containerID == "" || cfg.receiptPodName == "" || cfg.receiptPodUID == "" || scope.MachineUID == "" || store.Name != tunnel.ReceiveTransitionName(scope.MachineUID) {
@@ -48,7 +60,7 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	if err != nil {
 		return nil, fmt.Errorf("initial admission: %w", err)
 	}
-	finalized, err := receiveRetirementFinalized(ctx, api, store, scope, admitted)
+	targetFinalized, err := receiveRetirementFinalized(ctx, api, store, scope, admitted)
 	if err != nil {
 		return nil, fmt.Errorf("finalization admission: %w", err)
 	}
@@ -78,6 +90,8 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	// Admit and checkpoint every member before touching native state. All cleanup
 	// shares the host lock and the original deadline; a member gets no fresh budget.
 	members := make([]admittedReceiveRetirement, 0, len(binding.CleanupMachineUIDs()))
+	bindings := map[string]attachment.ReceiveRetirementReceiptScope{scope.MachineUID: binding}
+	finalized := map[string]bool{scope.MachineUID: targetFinalized}
 	for _, uid := range binding.CleanupMachineUIDs() {
 		member := admitted
 		memberStore, memberScope := retirementMemberScope(store, scope, admitted, uid)
@@ -89,8 +103,19 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 			if member.NodeUID != admitted.NodeUID || member.BootID != admitted.BootID {
 				return nil, fmt.Errorf("joint retirement observer changed")
 			}
+			finalized[uid], err = receiveRetirementFinalized(ctx, api, memberStore, memberScope, member)
+			if err != nil {
+				return nil, fmt.Errorf("joint finalization admission: %w", err)
+			}
 			if err := checkpointReceiveRetirementLocked(ctx, api, memberStore, memberScope, cfg, key, lock.Name(), member); err != nil {
 				return nil, fmt.Errorf("joint checkpoint: %w", err)
+			}
+			bindings[uid], err = attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(member.Metadata.UID), member.Journals[uid], member.Mesh)
+			if err != nil {
+				return nil, fmt.Errorf("joint observation binding: %w", err)
+			}
+			if !bindings[uid].RequiresConsumer(admitted.NodeUID) || !slices.Equal(bindings[uid].CleanupMachineUIDs(), binding.CleanupMachineUIDs()) {
+				return nil, fmt.Errorf("joint observation membership changed")
 			}
 		}
 		members = append(members, member)
@@ -118,7 +143,7 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 		}
 	}
 	timing.step("post-native-admission")
-	var current admittedReceiveRetirement
+	current := make(map[string]admittedReceiveRetirement, len(members))
 	for _, member := range members {
 		uid := member.Withdrawal.MachineUID
 		memberStore, memberScope := retirementMemberScope(store, scope, member, uid)
@@ -129,34 +154,47 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 		if !sameReceiveRetirement(member, refreshed) {
 			return nil, fmt.Errorf("retirement changed during native cleanup")
 		}
-		if uid == scope.MachineUID {
-			current = refreshed
-		}
+		current[uid] = refreshed
 	}
-	if finalized {
-		verified, err := receiveRetirementFinalized(ctx, api, store, scope, current)
-		if err != nil {
-			return nil, fmt.Errorf("post-cleanup finalization: %w", err)
+	result = make(map[string][]handover.PodReceipt, len(members))
+	for _, member := range members {
+		uid := member.Withdrawal.MachineUID
+		memberStore, memberScope := retirementMemberScope(store, scope, member, uid)
+		result[uid] = nil
+		if finalized[uid] {
+			verified, err := receiveRetirementFinalized(ctx, api, memberStore, memberScope, current[uid])
+			if err != nil {
+				return nil, fmt.Errorf("post-cleanup finalization: %w", err)
+			}
+			if !verified {
+				return nil, fmt.Errorf("retirement finalization disappeared during cleanup")
+			}
+			if err := verifyAgent(); err != nil {
+				return nil, err
+			}
+			// Release observation must still pass the post-native digest and agent
+			// checks below. Never replay the historical completion as a new proof.
+			if !cfg.observeFinalizedRetirements {
+				continue
+			}
 		}
-		if !verified {
-			return nil, fmt.Errorf("retirement finalization disappeared during cleanup")
+		timing.step("post-native-binding")
+		refreshed, err := attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(current[uid].Metadata.UID), current[uid].Journals[uid], current[uid].Mesh)
+		if err != nil {
+			return nil, fmt.Errorf("post-cleanup binding: %w", err)
+		}
+		if refreshed.Digest() != bindings[uid].Digest() {
+			return nil, fmt.Errorf("retirement observation binding changed")
 		}
 		if err := verifyAgent(); err != nil {
 			return nil, err
 		}
-		// Release observation must still pass the post-native digest and agent
-		// checks below. Never replay the historical completion as a new proof.
-		if !cfg.observeFinalizedRetirements {
-			return nil, ctx.Err()
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
-	}
-	timing.step("post-native-binding")
-	refreshed, err := attachment.NewReceiveRetirementReceiptScope(ctx, store.ConfigMaps, store.ClusterUID, string(current.Metadata.UID), current.Journals[scope.MachineUID], current.Mesh)
-	if err != nil {
-		return nil, fmt.Errorf("post-cleanup binding: %w", err)
-	}
-	if refreshed.Digest() != binding.Digest() {
-		return nil, fmt.Errorf("retirement observation binding changed")
+		memberReceipt := receipt
+		memberReceipt.RoundHash = bindings[uid].Digest()
+		result[uid] = []handover.PodReceipt{{BootID: admitted.BootID, Receipt: memberReceipt}}
 	}
 	if err := verifyAgent(); err != nil {
 		return nil, err
@@ -164,8 +202,7 @@ func executeReceiveRetirement(ctx context.Context, api kubernetes.Interface, sto
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	receipt.RoundHash = binding.Digest()
-	return []handover.PodReceipt{{BootID: admitted.BootID, Receipt: receipt}}, nil
+	return result, nil
 }
 
 // Select the member's immutable journal identity for existing native backends.

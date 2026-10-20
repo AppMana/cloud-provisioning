@@ -135,6 +135,7 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 		cfg.routeTable, cfg.fwmark, cfg.mtu, cfg.bgpListenPort = 518, 518, 1400, -1
 		native = prepareNativeJointExecution(t, api, stores[0], scope, cfg, site, plans, publishedMesh)
 	}
+	t.Run("dispatch-once", func(t *testing.T) { verifyJointDispatchOnce(t, api, stores, mesh, cfg, site, native) })
 	for _, fault := range []string{"second-fails", "cancelled-after-first", "pod-after-first", "none", "source-after-first"} {
 		t.Run(fault, func(t *testing.T) {
 			pod.Status.ContainerStatuses[0].ContainerID = "containerd://joint"
@@ -144,7 +145,7 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 			defer cancel()
 			var calls []string
 			var deadline, secondStarted time.Time
-			receipts, err := executeReceiveRetirement(runCtx, api, stores[0], scope, cfg, site, "containerd://joint", func(run context.Context, path string, admitted admittedReceiveRetirement) error {
+			receipts, err := executeReceiveRetirementCohort(runCtx, api, stores[0], scope, cfg, site, "containerd://joint", func(run context.Context, path string, admitted admittedReceiveRetirement) error {
 				calls = append(calls, admitted.Withdrawal.MachineUID)
 				if len(calls) == 2 {
 					secondStarted = time.Now()
@@ -191,11 +192,29 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 				return nil
 			})
 			if fault == "none" {
-				if err != nil || len(receipts) != 1 || !slices.Equal(calls, inventory.MachineUIDs) {
+				if err != nil || len(receipts) != len(stores) || !slices.Equal(calls, inventory.MachineUIDs) {
 					t.Fatalf("joint cleanup did not complete: calls=%v receipts=%d err=%v", calls, len(receipts), err)
 				}
-				if receipts[0].Receipt.ObservedAt.After(secondStarted) {
-					t.Fatal("later cleanup renewed the first observation timestamp")
+				var observed time.Time
+				bindings := map[string]bool{}
+				for i, plan := range plans {
+					entries := receipts[plan.MachineUID]
+					if len(entries) != 1 || entries[0].BearerToken != "" {
+						t.Fatal("cohort member missing credential-free observation")
+					}
+					entry := entries[0].Receipt
+					if entry.ObservedAt.After(secondStarted) || (!observed.IsZero() && !entry.ObservedAt.Equal(observed)) {
+						t.Fatal("later member renewed the first observation timestamp")
+					}
+					observed = entry.ObservedAt
+					current, e := stores[i].Load(ctx)
+					must(e)
+					binding, e := attachment.NewReceiveRetirementReceiptScope(ctx, stores[i].ConfigMaps, clusterUID, string(index.UID), current, mesh)
+					must(e)
+					if entry.RoundHash != binding.Digest() || bindings[entry.RoundHash] {
+						t.Fatal("cohort receipt reused another member's binding")
+					}
+					bindings[entry.RoundHash] = true
 				}
 			} else {
 				if err == nil || len(receipts) != 0 {

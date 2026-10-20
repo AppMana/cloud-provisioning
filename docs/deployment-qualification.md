@@ -1008,6 +1008,15 @@ revalidate history on each load. Corruption after a successful replay must still
 be rejected. Synthetic replay benchmarks measure local validation cost; they
 do not establish live receipt convergence, API capacity or finalization latency.
 
+A dispatch pass may clean an admitted retirement cohort once and issue separate
+member-bound receipts from that execution. Preserve every member's admission,
+checkpoint, native readback and post-cleanup validation under one lock and
+deadline. Every receipt retains the earliest native observation timestamp;
+partial failure suppresses all receipts. Reuse is limited to that dispatch pass.
+Finalized members remain subject to their own observation policy. The isolated
+API/native fixture checks cleanup counts, member bindings, failure suppression
+and authenticated release; it does not qualify live convergence or reboot.
+
 Joint retirement must preserve each withdrawal's captured consumers. Group only
 published version-two withdrawals from the same exact captured mesh when every
 member names the other departing workers by committed identity and all members

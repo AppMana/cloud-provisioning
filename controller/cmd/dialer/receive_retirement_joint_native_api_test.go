@@ -272,8 +272,9 @@ func verifyNativeJointReceiptLifecycle(t *testing.T, api kubernetes.Interface, s
 		must(err)
 		memberScope := scope
 		memberScope.MachineUID = plan.MachineUID
-		entries, err := executeReceiveRetirement(ctx, api, store, memberScope, cfg, key, "containerd://joint", native)
+		group, err := executeReceiveRetirementCohort(ctx, api, store, memberScope, cfg, key, "containerd://joint", native)
 		must(err)
+		entries := group[plan.MachineUID]
 		if len(entries) != 1 {
 			t.Fatal("native cleanup did not generate an observation")
 		}
@@ -283,6 +284,19 @@ func verifyNativeJointReceiptLifecycle(t *testing.T, api kubernetes.Interface, s
 		entries[0].BearerToken = token.Status.Token
 		source, err := attachment.ReadReceiveRetirementSet(ctx, api, store, scope.Namespace, scope.MeshName, scope.MeshUID, plan.MachineUID)
 		must(err)
+		if len(group) != len(stores) {
+			t.Fatal("joint observation omitted a member")
+		}
+		for uid, memberEntries := range group {
+			finalized := len(source.Inventory.Publications[uid].RetirementFinalization) != 0
+			want := 1
+			if finalized && !cfg.observeFinalizedRetirements {
+				want = 0
+			}
+			if len(memberEntries) != want {
+				t.Fatal("cohort observation ignored member finalization policy")
+			}
+		}
 		return source, entries
 	}
 	for _, store := range stores {
@@ -295,6 +309,16 @@ func verifyNativeJointReceiptLifecycle(t *testing.T, api kubernetes.Interface, s
 		}
 		must(collection.Observe(ctx, entries))
 		must(collection.Complete(ctx, entries))
+	}
+	maintenance, err := executeReceiveRetirementCohort(ctx, api, stores[0], scope, cfg, key, "containerd://joint", native)
+	must(err)
+	if len(maintenance) != len(stores) {
+		t.Fatal("finalized cohort maintenance omitted a member")
+	}
+	for _, entries := range maintenance {
+		if len(entries) != 0 {
+			t.Fatal("finalized maintenance renewed historical evidence")
+		}
 	}
 	cfg.observeFinalizedRetirements = true
 	source, entries := observe(stores[0])

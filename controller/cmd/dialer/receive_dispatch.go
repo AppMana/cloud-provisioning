@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -145,6 +146,7 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 	})
 	var failures []error
 	var deliveries receiveRetirementDeliveries
+	retirementExecuted := map[string]bool{}
 	// A later discovery or identity read must not hide failures already
 	// observed for earlier receivers in this reconciliation pass.
 	// Join outstanding deliveries before the deferred transport.Close, even
@@ -156,6 +158,9 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 	}()
 	timing.step("targets")
 	for _, uid := range targets {
+		if retiring[uid] && retirementExecuted[uid] {
+			continue
+		}
 		store.Name = tunnel.ReceiveTransitionName(uid)
 		scope := receiveJournalScope{Namespace: namespace, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUID: uid}
 		pod, err := api.CoreV1().Pods(namespace).Get(ctx, cfg.receiptPodName, metav1.GetOptions{})
@@ -183,7 +188,7 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 				failures = append(failures, fmt.Errorf("retirement requires a complete native cleanup backend"))
 				continue
 			}
-			receipts, err := executeReceiveRetirement(ctx, api, store, scope, cfg, key, containerID, func(ctx context.Context, lockPath string, admitted admittedReceiveRetirement) error {
+			group, err := executeReceiveRetirementCohort(ctx, api, store, scope, cfg, key, containerID, func(ctx context.Context, lockPath string, admitted admittedReceiveRetirement) error {
 				memberStore, memberScope := retirementMemberScope(store, scope, admitted, admitted.Withdrawal.MachineUID)
 				return retirement[0](ctx, memberStore, memberScope, key, lockPath, admitted)
 			})
@@ -191,21 +196,25 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 				failures = append(failures, fmt.Errorf("receiver %s retirement execution: %w", uid, err))
 				continue
 			}
-			if len(receipts) == 0 {
-				// Finalized retirement still verified local native cleanup but
-				// does not renew the controller's historical completion.
-				continue
-			}
-			deliveries.submit(func() error {
-				delivery := newReceiveTiming(true, "retirement-delivery")
-				delivery.step("request")
-				err := transport.Submit(ctx, strings.TrimSpace(string(token)), handover.ReceiptRequest{MachineUID: uid, RoundHash: receipts[0].Receipt.RoundHash, Receipts: receipts})
-				delivery.finish(err == nil)
-				if err != nil {
-					return fmt.Errorf("receiver %s retirement delivery: %w", uid, err)
+			for _, memberUID := range slices.Sorted(maps.Keys(group)) {
+				retirementExecuted[memberUID] = true
+				receipts := group[memberUID]
+				if len(receipts) == 0 {
+					// Finalized retirement still verified local native cleanup but
+					// does not renew the controller's historical completion.
+					continue
 				}
-				return nil
-			})
+				deliveries.submit(func() error {
+					delivery := newReceiveTiming(true, "retirement-delivery")
+					delivery.step("request")
+					err := transport.Submit(ctx, strings.TrimSpace(string(token)), handover.ReceiptRequest{MachineUID: memberUID, RoundHash: receipts[0].Receipt.RoundHash, Receipts: receipts})
+					delivery.finish(err == nil)
+					if err != nil {
+						return fmt.Errorf("receiver %s retirement delivery: %w", memberUID, err)
+					}
+					return nil
+				})
+			}
 			continue
 		}
 		snapshot, err := store.Load(ctx)

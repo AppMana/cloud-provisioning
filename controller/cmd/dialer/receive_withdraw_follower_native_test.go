@@ -30,16 +30,14 @@ func TestNativeCombinedFollowerWithdrawal(t *testing.T) {
 	if os.Getenv("CLDT_NATIVE_COMBINED_FOLLOWER") != "1" {
 		t.Skip("requires isolated guest namespaces")
 	}
-	for _, recorded := range []bool{false, true} {
-		name := "legacy-cache"
-		if recorded {
-			name = "interrupted-worker-routes"
-		}
-		t.Run(name, func(t *testing.T) { nativeCombinedFollowerWithdrawal(t, recorded) })
+	for _, name := range []string{"legacy-cache", "interrupted-worker-routes", "empty-legacy-cache"} {
+		t.Run(name, func(t *testing.T) {
+			nativeCombinedFollowerWithdrawal(t, name != "legacy-cache", name == "empty-legacy-cache")
+		})
 	}
 }
 
-func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes bool) {
+func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLegacy bool) {
 	for _, kind := range []string{"net", "mnt"} {
 		self, e := os.Readlink("/proc/self/ns/" + kind)
 		host, h := os.Readlink("/proc/1/ns/" + kind)
@@ -131,6 +129,14 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes bool) {
 			must(netlink.RouteReplace(&netlink.Route{Dst: dst, LinkIndex: link.Attrs().Index, Gw: net.ParseIP(gateway), Src: transitSource(dst.IP, own, []net.IP{net.ParseIP(own[0]), net.ParseIP(own[1])}), Table: cfg.routeTable, Protocol: unix.RTPROT_BOOT, Priority: receiveRoutePriority(dst)}))
 		}
 	}
+	if emptyLegacy {
+		empty := mesh.DeepCopy()
+		empty.Data, _, err = tunnel.WithdrawRemotePeer(empty.Data, "survivor", survivor.PublicKey().String())
+		must(err)
+		delete(empty.Data, tunnel.NodeTunnelAddressPrefix+"site")
+		must(saveSiteForwardingCache(cfg, key, empty, nil, map[string]bool{}, own))
+		must(saveTransitAdvertisements(cfg, speaker, empty, []string{}))
+	}
 	run := func() ([]handover.PodReceipt, error) {
 		return executeReceiveRetirement(ctx, api, store, scope, cfg, key, "agent", func(ctx context.Context, path string, a admittedReceiveRetirement) error {
 			return retireAdmittedFollowerLocked(ctx, api, speaker, store, scope, cfg, key, path, a)
@@ -202,8 +208,27 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes bool) {
 	}
 	_, saved, err := readTransitAdvertisements(cfg, speaker)
 	must(err)
-	if len(saved.Data[tunnel.PeerPublicKeyPrefix+"worker"]) != 0 || string(saved.Data[tunnel.PeerPublicKeyPrefix+"survivor"]) != survivor.PublicKey().String() {
+	expectedSurvivor := survivor.PublicKey().String()
+	if emptyLegacy {
+		expectedSurvivor = ""
+	}
+	if len(saved.Data[tunnel.PeerPublicKeyPrefix+"worker"]) != 0 || string(saved.Data[tunnel.PeerPublicKeyPrefix+"survivor"]) != expectedSurvivor {
 		t.Fatal("cache cleanup lost survivor or retained target")
+	}
+	if emptyLegacy {
+		// The record is compacted after success. A retry must still reject a
+		// reappearing committed destination, even with no legacy relay evidence.
+		_, dst, err := net.ParseCIDR("172.29.0.1/32")
+		must(err)
+		foreign := netlink.Route{Dst: dst, LinkIndex: link.Attrs().Index, Gw: net.ParseIP("10.90.0.99"), Src: net.ParseIP(own[0]), Table: cfg.routeTable, Protocol: unix.RTPROT_BOOT}
+		must(netlink.RouteAdd(&foreign))
+		receipts, err := run()
+		if err == nil || len(receipts) != 0 {
+			t.Fatal("empty metadata concealed a reappearing withdrawn route")
+		}
+		must(netlink.RouteDel(&foreign))
+		_, err = run()
+		must(err)
 	}
 	if withRecordedRoutes {
 		remaining, err := readReceiveFollowerCache(followerPath, cfg, followerScope, own)

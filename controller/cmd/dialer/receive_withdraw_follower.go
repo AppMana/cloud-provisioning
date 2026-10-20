@@ -97,8 +97,18 @@ func retireAdmittedFollowerLocked(ctx context.Context, api kubernetes.Interface,
 	if err != nil {
 		return err
 	}
-	if _, err := tunnel.PlanReceiveWithdrawnNeighborPeers(withdrawnTransitPeerVariants(forwarding, admitted.Plans, target.RootPublicKey), currentPeers, admitted.Plans, target.RootPublicKey); err != nil {
+	withdrawnPeers, err := tunnel.PlanReceiveWithdrawnNeighborPeers(withdrawnTransitPeerVariants(forwarding, admitted.Plans, target.RootPublicKey), currentPeers, admitted.Plans, target.RootPublicKey)
+	if err != nil {
 		return err
+	}
+	prefixes := map[string]bool{}
+	for _, peer := range withdrawnPeers {
+		for _, raw := range peer.WGAllowedIPs {
+			prefixes[raw] = true
+		}
+		for _, host := range peer.AllRouteHosts() {
+			prefixes[tunnel.HostCIDR(host)] = true
+		}
 	}
 	var own []string
 	for _, a := range node.Status.Addresses {
@@ -158,18 +168,25 @@ func retireAdmittedFollowerLocked(ctx context.Context, api kubernetes.Interface,
 	if err := check(); err != nil {
 		return err
 	}
-	if speaker != nil {
-		prefixes := map[string]bool{}
-		for _, variant := range relayVariants {
-			for raw := range variant {
-				prefixes[raw] = true
-			}
+	for _, variant := range relayVariants {
+		for raw := range variant {
+			prefixes[raw] = true
 		}
+	}
+	if speaker != nil {
 		if err := speaker.withdrawReceivePrefixes(ctx, prefixes); err != nil {
 			return err
 		}
 	}
 	if err := withdrawReceiveDeviceRoutes(ctx, cfg, []map[string]receiveRouteSelection{{}}, own, relayVariants...); err != nil {
+		return err
+	}
+	// Even an empty legacy snapshot or a retry after record compaction must
+	// prove the committed destinations absent. No relay map here means that
+	// any remaining scoped route or foreign more-specific route is rejected.
+	absent := cfg
+	absent.receiveRouteScope, absent.receiveRoutes, absent.receiveRelayRoutes = prefixes, nil, nil
+	if err := preflightReceiveRouteGenerationsWithHandshake(absent, []map[string]receiveRouteSelection{{}}, nil, own, false, map[string]string{}); err != nil {
 		return err
 	}
 	if err := check(); err != nil {

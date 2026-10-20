@@ -750,6 +750,14 @@ func refreshTransitAdvertisementCache(ctx context.Context, clientset kubernetes.
 	if err != nil {
 		return nil, nil, &transitObservationError{err}
 	}
+	site := transitSitePeers(nodes, notSite)
+	if err := saveTransitAdvertisements(cfg, speaker, secret, site); err != nil {
+		return nil, nil, err
+	}
+	return site, routes, nil
+}
+
+func transitSitePeers(nodes *corev1.NodeList, notSite map[string]bool) []string {
 	site := []string{}
 	for _, node := range nodes.Items {
 		if node.Labels["cloud-provisioning.appmana.com/role"] == "cloud-worker" {
@@ -762,10 +770,7 @@ func refreshTransitAdvertisementCache(ctx context.Context, clientset kubernetes.
 			site = append(site, addr.Address)
 		}
 	}
-	if err := saveTransitAdvertisements(cfg, speaker, secret, site); err != nil {
-		return nil, nil, err
-	}
-	return site, routes, nil
+	return site
 }
 
 func transitAdvertisementPlan(data map[string][]byte, nodeName string) ([]transitRoute, map[string]bool, error) {

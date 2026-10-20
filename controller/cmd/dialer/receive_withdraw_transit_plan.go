@@ -36,6 +36,17 @@ func planWithdrawnTransitRoutes(cache *withdrawnForwardingCache, plans []tunnel.
 	if err := validateSiteTransit(transit); err != nil {
 		return nil, err
 	}
+	if transit == nil {
+		for _, peer := range cache.peers {
+			if peer.PublicKey == root {
+				return nil, fmt.Errorf("recorded follower worker lost its relay evidence")
+			}
+		}
+		// A fresh phase-aware follower may have no legacy worker routes at all.
+		// Its per-worker record supplies native ownership; the retirement caller
+		// must independently verify absence over the committed destination set.
+		return map[string]string{}, nil
+	}
 	next, err := tunnel.SiteTransit(cache.next.Data, cache.next.NotReady)
 	if err != nil {
 		return nil, err

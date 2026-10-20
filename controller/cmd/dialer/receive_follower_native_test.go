@@ -222,6 +222,97 @@ func TestNativeFollowerServingRoutes(t *testing.T) {
 		}
 		checkRoutes(map[string]string{"172.29.0.1/32": "10.90.0.2", "fd29::1/128": "fd90::2"})
 		checkSurvivor()
+		t.Run("initial-storage", func(t *testing.T) {
+			for _, fault := range []string{"fresh", "interrupted", "no-legacy-endpoint", "orphaned-routes", "orphaned-bgp", "receiver-state", "live-failure", "symlink"} {
+				t.Run(fault, func(t *testing.T) {
+					run := cfg
+					runAdmitted := admitted
+					if fault == "no-legacy-endpoint" {
+						runAdmitted.Mesh = admitted.Mesh.DeepCopy()
+						delete(runAdmitted.Mesh.Data, tunnel.NodeTunnelAddressPrefix+"site")
+					}
+					run.privateKeyFile = filepath.Join(t.TempDir(), "key")
+					must(os.WriteFile(run.privateKeyFile, []byte(key.String()), 0600))
+					runLock, err := lockReconciliation(run)
+					must(err)
+					defer runLock.Close()
+					runSpeaker, err := startTransitSpeaker(ctx, -1, 64512, strings.Join(own, ","))
+					must(err)
+					defer runSpeaker.stop(ctx)
+					if fault == "fresh" || fault == "interrupted" || fault == "no-legacy-endpoint" {
+						must(withdrawReceiveDeviceRoutes(ctx, cfg, []map[string]receiveRouteSelection{{}}, own, map[string]string{"172.29.0.1/32": "10.90.0.2", "fd29::1/128": "fd90::2"}))
+					}
+					switch fault {
+					case "orphaned-routes":
+						must(os.WriteFile(runLock.Name()+".follower.json", []byte("{}"), 0600))
+					case "orphaned-bgp":
+						must(os.WriteFile(transitAdvertisementCachePath(run), []byte("{}"), 0600))
+					case "receiver-state":
+						must(os.WriteFile(siteReceiveCachePath(run), []byte("{}"), 0600))
+					case "symlink":
+						target := filepath.Join(t.TempDir(), "foreign")
+						must(os.WriteFile(target, []byte("untouched"), 0600))
+						must(os.Symlink(target, siteForwardingCachePath(run)))
+					}
+					calls := 0
+					check := func() error {
+						calls++
+						if fault == "live-failure" || (fault == "interrupted" && calls == 2) {
+							return errors.New("live authority changed")
+						}
+						return nil
+					}
+					err = reconcileReceiveFollower(ctx, api, run, runSpeaker, key, runLock.Name(), runAdmitted, check)
+					if fault != "fresh" && fault != "interrupted" && fault != "no-legacy-endpoint" {
+						if err == nil {
+							t.Fatal("unsafe initial storage accepted")
+						}
+						if len(runSpeaker.advertised) != 0 {
+							t.Fatal("rejected initialization advertised routes")
+						}
+						return
+					}
+					if fault == "interrupted" {
+						if err == nil {
+							t.Fatal("interrupted initialization succeeded")
+						}
+						if _, err := os.Lstat(transitAdvertisementCachePath(run)); !os.IsNotExist(err) {
+							t.Fatal("interrupted initialization saved BGP metadata")
+						}
+						empty, err := readSiteForwardingCache(run, key)
+						must(err)
+						peers, err := tunnel.SitePeers(empty.Data)
+						must(err)
+						if len(peers) != 0 {
+							t.Fatal("initial metadata claimed uninstalled worker routes")
+						}
+						absent := cfg
+						absent.receiveRouteScope = map[string]bool{"172.29.0.1/32": true, "fd29::1/128": true}
+						must(verifyReceiveRouteInstallation(absent, nil, nil, own))
+					} else {
+						must(err)
+					}
+					must(reconcileReceiveFollower(ctx, api, run, runSpeaker, key, runLock.Name(), runAdmitted, func() error { return nil }))
+					cached, empty, err := readTransitAdvertisements(run, runSpeaker)
+					must(err)
+					oldPeers, err := tunnel.SitePeers(empty.Data)
+					must(err)
+					if len(oldPeers) != 0 || len(cached.Peers) != 0 || len(runSpeaker.advertised) != 2 {
+						t.Fatal("initial storage or advertisements claimed unrelated forwarding")
+					}
+					readScope := expected
+					readScope.BootID, err = localReceiveBootID()
+					must(err)
+					record, err := readReceiveFollowerCache(runLock.Name()+".follower.json", run, readScope, own)
+					must(err)
+					if len(record.Routes) != 1 || len(record.Routes[rootPublic]) != 1 {
+						t.Fatal("initial serving did not record exact per-worker ownership")
+					}
+					checkRoutes(map[string]string{"172.29.0.1/32": "10.90.0.2", "fd29::1/128": "fd90::2"})
+					checkSurvivor()
+				})
+			}
+		})
 		admitted.Node.Status.Addresses[0].Address = "10.90.0.99"
 		if err := reconcileReceiveFollower(ctx, api, cfg, speaker, key, lock.Name(), admitted, func() error { t.Fatal("changed source reached mutation admission"); return nil }); err == nil {
 			t.Fatal("changed Node source accepted")

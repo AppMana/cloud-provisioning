@@ -86,12 +86,16 @@ func reconcileReceiveFollower(ctx context.Context, api kubernetes.Interface, cfg
 		return err
 	}
 	expected := receiveInventoryCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), Inventory: admitted.Inventory, NodeName: cfg.nodeName, NodeUID: string(admitted.Node.UID), BootID: boot, PublicKey: key.PublicKey().String()}
-	return applyReceiveFollowerRoutes(ctx, cfg, speaker, key, lockPath, expected, own, desired, peers, plans, func() error {
+	renew := func() error {
 		if err := check(); err != nil {
 			return err
 		}
 		return checkPaths()
-	})
+	}
+	if err := prepareReceiveFollowerStorage(ctx, api, cfg, speaker, key, lockPath, admitted.Mesh, own, renew); err != nil {
+		return err
+	}
+	return applyReceiveFollowerRoutes(ctx, cfg, speaker, key, lockPath, expected, own, desired, peers, plans, renew)
 }
 
 func receiveFollowerTransitRoutes(transit *tunnel.TransitSpec) (map[string]string, error) {
@@ -130,14 +134,8 @@ func applyReceiveFollowerRoutes(ctx context.Context, cfg config, speaker *transi
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if _, err := netlink.LinkByName(cfg.iface); !isLinkNotFound(err) {
-		return fmt.Errorf("follower retains local tunnel state: %v", err)
-	}
-	base := siteReceiveCachePath(cfg)
-	for _, path := range []string{base, base + ".admitted", base + ".owners", base + ".admitted.owners", lockPath + ".neighbors.json", lockPath + ".neighbors.json.retiring"} {
-		if _, err := os.Lstat(path); !os.IsNotExist(err) {
-			return fmt.Errorf("follower retains unresolved receiver state")
-		}
+	if err := validateReceiveFollowerNativeAbsence(cfg, lockPath); err != nil {
+		return err
 	}
 	raw, err := readPrivateRetirementCache(siteForwardingCachePath(cfg))
 	if err != nil {
@@ -161,13 +159,16 @@ func applyReceiveFollowerRoutes(ctx context.Context, cfg config, speaker *transi
 	if err != nil {
 		return err
 	}
-	oldRoutes, err := receiveFollowerTransitRoutes(oldTransit)
-	if err != nil {
-		return err
-	}
 	oldPeers, err := tunnel.SitePeers(saved.Data)
 	if err != nil {
 		return err
+	}
+	oldRoutes := map[string]string{}
+	if oldTransit != nil || len(oldPeers) != 0 {
+		oldRoutes, err = receiveFollowerTransitRoutes(oldTransit)
+		if err != nil {
+			return err
+		}
 	}
 	evidence := map[string][]map[string]string{}
 	staging := map[string][]map[string]string{}
@@ -325,4 +326,17 @@ func applyReceiveFollowerRoutes(ctx context.Context, cfg config, speaker *transi
 	}
 	_, err = finishReceiveFollowerRoutes(path, cfg, expected, own, staged, desired)
 	return err
+}
+
+func validateReceiveFollowerNativeAbsence(cfg config, lockPath string) error {
+	if _, err := netlink.LinkByName(cfg.iface); !isLinkNotFound(err) {
+		return fmt.Errorf("follower retains local tunnel state: %v", err)
+	}
+	base := siteReceiveCachePath(cfg)
+	for _, path := range []string{base, base + ".admitted", base + ".owners", base + ".admitted.owners", lockPath + ".neighbors.json", lockPath + ".neighbors.json.retiring"} {
+		if _, err := os.Lstat(path); !os.IsNotExist(err) {
+			return fmt.Errorf("follower retains unresolved receiver state")
+		}
+	}
+	return nil
 }

@@ -49,6 +49,11 @@ func (s Snapshot) ContinuesExecution(previous Snapshot) error {
 	if !reflect.DeepEqual(a, b) {
 		return fmt.Errorf("journal identity, metadata or public plan changed")
 	}
+	// Both snapshots were validated on admission and expose no mutable journal
+	// state. Identical committed bytes cannot append or change authority.
+	if s.object.Data[journalKey] == previous.object.Data[journalKey] {
+		return nil
+	}
 	if err := s.transition.Extends(previous.transition); err != nil {
 		return err
 	}
@@ -172,6 +177,40 @@ func (s Store) Load(ctx context.Context) (Snapshot, error) {
 		return Snapshot{}, e
 	}
 	return s.snapshot(object)
+}
+
+// RecheckExecution reads the live journal on every call. An exact match to an
+// admitted snapshot needs no repeated history replay; changed objects still
+// undergo full decoding and execution-continuation validation. ResourceVersion
+// alone is never sufficient. This does not replace initial admission, ancestry,
+// participant or deadline checks.
+func (s Store) RecheckExecution(ctx context.Context, previous Snapshot) error {
+	if err := s.configured(); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	object, err := s.ConfigMaps.Get(ctx, s.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	before := previous.object
+	if before != nil && before.Name == s.Name && before.UID != "" &&
+		before.ResourceVersion != "" && before.DeletionTimestamp == nil &&
+		previous.transition.j.Initial.ClusterUID == s.ClusterUID &&
+		(s.ExpectedUID == "" || s.ExpectedUID == string(before.UID)) &&
+		reflect.DeepEqual(object, before) {
+		return ctx.Err()
+	}
+	current, err := s.snapshot(object)
+	if err != nil {
+		return err
+	}
+	if err := current.ContinuesExecution(previous); err != nil {
+		return err
+	}
+	return ctx.Err()
 }
 
 // Commit accepts exactly one validated successor event. Callers must publish

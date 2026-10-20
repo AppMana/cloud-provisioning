@@ -152,11 +152,7 @@ func (s ReceiveRetirementSet) Recheck(ctx context.Context, api kubernetes.Interf
 		currentStore := store
 		currentStore.Name = tunnel.ReceiveTransitionName(uid)
 		currentStore.ExpectedUID = string(before.Metadata().UID)
-		current, err := currentStore.Load(ctx)
-		if err != nil {
-			return err
-		}
-		if err := current.ContinuesExecution(before); err != nil {
+		if err := currentStore.RecheckExecution(ctx, before); err != nil {
 			return fmt.Errorf("reserved journal changed during retirement admission: %w", err)
 		}
 	}

@@ -1217,6 +1217,16 @@ cost-control termination, inspect the recorded instance identities again:
 already terminated instances need no further mutation. Preserve failed and
 post-deadline observations separately.
 
+Execution rechecks may avoid replaying a previously validated immutable
+snapshot only after a fresh GET returns an exactly matching journal object.
+Compare content and metadata, not resource version alone. Changed objects must
+still pass full decoding and execution-continuation checks; only appended
+observations may preserve authority. Missing objects, access denial,
+cancellation, replacement and scope changes remain failures. This optimization
+does not cache API reads, extend deadlines, change receipt age or replace
+initial and post-native admission. Measure loaded retirement separately from
+read-only history benchmarks.
+
 Unpublished site observers with no local active receiver can advance released
 inventory checkpoints without ordinary-neighbor routing authority. Admission
 validates every active journal and its ancestry, rejects local active or pending

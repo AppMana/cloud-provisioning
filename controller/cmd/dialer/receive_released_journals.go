@@ -29,11 +29,7 @@ func recheckReleasedReceiveJournals(ctx context.Context, store handover.Store, a
 	for uid, before := range admitted {
 		member := store
 		member.Name, member.ExpectedUID = tunnel.ReceiveTransitionName(uid), string(before.Metadata().UID)
-		current, err := member.Load(ctx)
-		if err != nil {
-			return err
-		}
-		if err := current.ContinuesExecution(before); err != nil {
+		if err := member.RecheckExecution(ctx, before); err != nil {
 			return fmt.Errorf("released journal changed during execution: %w", err)
 		}
 	}

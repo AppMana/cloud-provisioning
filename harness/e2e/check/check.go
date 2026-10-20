@@ -23,6 +23,7 @@ package check
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -91,6 +92,8 @@ type Result struct {
 	// fail: how many bytes came back, what address was resolved.
 	Detail string
 	Err    error
+	// UDP retains the probe's packet timestamps, sequences and complete errors.
+	UDP json.RawMessage
 }
 
 // String renders the result the way a row's log reads.
@@ -327,6 +330,7 @@ type UDPReport struct {
 	Attempts int
 	Echoed   int
 	Errors   []string
+	Raw      json.RawMessage
 }
 
 // Target is where a node's probe pod can be reached. The IPv6 fields are

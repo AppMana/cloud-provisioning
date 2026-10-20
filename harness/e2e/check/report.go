@@ -11,6 +11,9 @@ func (m *Matrix) Details() map[string]any {
 		if r.Err != nil {
 			detail["error"] = r.Err.Error()
 		}
+		if len(r.UDP) > 0 {
+			detail["udp"] = r.UDP
+		}
 		results = append(results, detail)
 	}
 	prior := make([]map[string]any, 0, len(m.PriorPasses))

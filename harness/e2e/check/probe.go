@@ -413,7 +413,7 @@ func ParseUDPReport(out []byte) (UDPReport, error) {
 	if err := json.Unmarshal(bytes.TrimSpace(out), &raw); err != nil {
 		return UDPReport{}, fmt.Errorf("reading the UDP prober's report %q: %w", truncate(string(out)), err)
 	}
-	report := UDPReport{OK: raw.OK, Attempts: len(raw.Attempts)}
+	report := UDPReport{OK: raw.OK, Attempts: len(raw.Attempts), Raw: bytes.Clone(bytes.TrimSpace(out))}
 	seen := map[string]bool{}
 	for _, a := range raw.Attempts {
 		if a.OK {

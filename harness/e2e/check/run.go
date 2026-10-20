@@ -232,6 +232,7 @@ func udpEcho(ctx context.Context, p Prober, pair Pair, kind Kind, host string, p
 	}
 	destination := net.JoinHostPort(host, strconv.Itoa(UDPPort))
 	report, err := u.UDPEcho(ctx, pair.From, destination, probe.Payload(family), tries, probe.DontFragment)
+	r.UDP = report.Raw
 	mode := "fragmentable"
 	if probe.DontFragment {
 		mode = "don't fragment"

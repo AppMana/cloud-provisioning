@@ -55,7 +55,7 @@ func (s Snapshot) Succeeds(previous, archive Snapshot) error {
 		if snapshot.object.UID == "" || snapshot.object.ResourceVersion == "" || snapshot.object.DeletionTimestamp != nil {
 			return fmt.Errorf("successor admission requires live identities")
 		}
-		if _, err := snapshot.Transition().View(); err != nil {
+		if _, err := snapshot.View(); err != nil {
 			return err
 		}
 	}
@@ -68,7 +68,7 @@ func (s Snapshot) Succeeds(previous, archive Snapshot) error {
 	if err := archive.Transition().Extends(previous.Transition()); err != nil {
 		return err
 	}
-	old, _ := archive.Transition().View()
+	old, _ := archive.View()
 	initial := s.transition.j.Initial
 	if !old.Complete || old.ServingGeneration != p.ServingGeneration || initial.ClusterUID != old.Round.ClusterUID || initial.FromGeneration != old.ServingGeneration || initial.TransitionUID == old.Round.TransitionUID || initial.PlanHash == old.Round.PlanHash {
 		return fmt.Errorf("successor does not continue archived completion")
@@ -96,7 +96,7 @@ func (s Store) ReplaceCompleted(ctx context.Context, previous Snapshot, spec Spe
 	if checked.Frozen() {
 		return fail(fmt.Errorf("frozen journal cannot admit a successor"))
 	}
-	old, err := checked.Transition().View()
+	old, err := checked.View()
 	if err != nil {
 		return fail(err)
 	}

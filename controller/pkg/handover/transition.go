@@ -69,19 +69,24 @@ func NewTransition(spec Spec, now time.Time, policy Policy) (Transition, error) 
 }
 
 func DecodeTransition(raw []byte) (Transition, error) {
+	t, _, err := decodeTransitionView(raw)
+	return t, err
+}
+
+func decodeTransitionView(raw []byte) (Transition, View, error) {
 	var j journal
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
 	if e := d.Decode(&j); e != nil {
-		return Transition{}, e
+		return Transition{}, View{}, e
 	}
 	var extra any
 	if e := d.Decode(&extra); e != io.EOF {
-		return Transition{}, fmt.Errorf("trailing transition state")
+		return Transition{}, View{}, fmt.Errorf("trailing transition state")
 	}
 	t := Transition{j}
-	_, e := t.View()
-	return t, e
+	v, e := t.View()
+	return t, v, e
 }
 func (t Transition) Bytes() ([]byte, error) {
 	if _, e := t.View(); e != nil {

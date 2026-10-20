@@ -28,7 +28,7 @@ func (s Snapshot) RetirementFrozen() bool {
 	if !s.Frozen() {
 		return false
 	}
-	view, err := s.transition.View()
+	view, err := s.View()
 	return err == nil && ((view.Complete && view.ServingGeneration != "") || hexToken(s.WithdrawalIntentHash(), 32))
 }
 
@@ -50,7 +50,7 @@ func (s Store) FreezeExpiredWithdrawal(ctx context.Context, previous Snapshot, i
 	if err != nil {
 		return Snapshot{}, err
 	}
-	view, err := checked.Transition().View()
+	view, err := checked.View()
 	if err != nil || view.Complete || now.Before(view.Round.ExpiresAt) {
 		return Snapshot{}, fmt.Errorf("withdrawal requires an expired unfinished round")
 	}
@@ -91,7 +91,7 @@ func (s Store) FreezeCompleted(ctx context.Context, previous Snapshot) (Snapshot
 	if err != nil {
 		return fail(err)
 	}
-	view, err := checked.Transition().View()
+	view, err := checked.View()
 	if err != nil {
 		return fail(err)
 	}

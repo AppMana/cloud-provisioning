@@ -36,7 +36,7 @@ func PublishReceiveJournal(ctx context.Context, maps typedcore.ConfigMapInterfac
 	if !bytes.Equal(publication.Plan, snapshot.Plan()) {
 		return fail(fmt.Errorf("journal differs from reserved preparation"))
 	}
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil {
 		return fail(err)
 	}

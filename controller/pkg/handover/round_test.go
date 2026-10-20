@@ -11,7 +11,7 @@ import (
 
 var epoch = time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
 
-func fixture(t *testing.T) Round {
+func fixture(t testing.TB) Round {
 	t.Helper()
 	key := func() string {
 		p, e := wgtypes.GeneratePrivateKey()
@@ -26,7 +26,7 @@ func fixture(t *testing.T) Round {
 	}
 	return r
 }
-func receipts(t *testing.T, r Round, at time.Time) []AuthenticatedReceipt {
+func receipts(t testing.TB, r Round, at time.Time) []AuthenticatedReceipt {
 	t.Helper()
 	hash, e := r.Digest()
 	if e != nil {

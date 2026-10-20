@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func checkpointFixture(t *testing.T, tr Transition) (Store, Snapshot) {
+func checkpointFixture(t testing.TB, tr Transition) (Store, Snapshot) {
 	t.Helper()
 	store := Store{Name: "transition", ClusterUID: "cluster-uid"}
 	raw, err := tr.Bytes()

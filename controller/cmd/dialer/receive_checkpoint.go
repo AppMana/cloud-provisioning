@@ -163,7 +163,7 @@ func checkpointReceiveJournalLocked(ctx context.Context, api kubernetes.Interfac
 // revalidation. Boot recovery separately admits the complete persisted binding.
 func checkpointReceiveNativeObservation(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath, containerID string, observed time.Time, set admittedReceiveSet) error {
 	admitted := set.Local[scope.MachineUID]
-	view, err := admitted.Snapshot.Transition().View()
+	view, err := admitted.Snapshot.View()
 	if err != nil || !view.Complete || admitted.Plan.CloudNodeUID != admitted.NodeUID || admitted.Plan.RootPublicKey != key.PublicKey().String() {
 		return fmt.Errorf("native recovery observation requires a completed cloud journal")
 	}
@@ -246,7 +246,7 @@ func readReceiveNativeObservation(path, journalName string, saved receiveJournal
 	if observation.JournalSHA256 != fmt.Sprintf("%x", sha256.Sum256(saved.Journal)) || observation.BootID != saved.BootID {
 		return nil, nil
 	}
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil || !view.Complete || observation.AgentPodUID == "" || observation.AgentContainerID == "" || observation.ObservedAt.IsZero() || observation.ObservedAt.After(time.Now()) {
 		return nil, fmt.Errorf("receiver native observation differs from terminal intent")
 	}

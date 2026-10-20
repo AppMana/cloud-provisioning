@@ -83,7 +83,7 @@ func NewHandoverReceiptCollection(ctx context.Context, store Store, policies map
 		return ReceiptCollection{}, err
 	}
 	store.ExpectedUID = string(snapshot.Metadata().UID)
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil || view.Complete {
 		return ReceiptCollection{}, fmt.Errorf("receipt round is not active")
 	}

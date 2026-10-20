@@ -16,7 +16,7 @@ func PlanReceiveJournalFollowerPath(data map[string][]byte, node string, snapsho
 	if err != nil {
 		return ReceiveSitePath{}, err
 	}
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil {
 		return ReceiveSitePath{}, err
 	}

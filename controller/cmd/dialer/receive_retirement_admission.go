@@ -50,7 +50,7 @@ func receiveRetirementFinalized(ctx context.Context, api kubernetes.Interface, s
 	if len(admitted.Inventory.Publications[scope.MachineUID].RetirementFinalization) == 0 {
 		return false, nil
 	}
-	view, err := admitted.Journals[scope.MachineUID].Transition().View()
+	view, err := admitted.Journals[scope.MachineUID].View()
 	if err != nil {
 		return false, err
 	}

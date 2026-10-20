@@ -36,7 +36,7 @@ func admitReceiveFollowerJournalPath(data map[string][]byte, nodeName, nodeUID s
 			return fail(fmt.Errorf("receiver participant cannot use follower routing"))
 		}
 	}
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil {
 		return fail(err)
 	}

@@ -120,7 +120,7 @@ func (shared ReceiveRetirementSet) ReceiptCollection(ctx context.Context, api ku
 // ambiguous finalization leaves the retained completion/reservation intact;
 // callers must read historical finalization separately before retrying writes.
 func (shared ReceiveRetirementSet) ReceiptCollectionWithFinalization(ctx context.Context, api kubernetes.Interface, store handover.Store, policies map[string]handover.PodReceiptAuthenticator, maxAge time.Duration, recheck func() error) (handover.ReceiptCollection, error) {
-	view, err := shared.Journals[shared.Withdrawal.MachineUID].Transition().View()
+	view, err := shared.Journals[shared.Withdrawal.MachineUID].View()
 	if err != nil {
 		return handover.ReceiptCollection{}, err
 	}

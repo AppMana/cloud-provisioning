@@ -154,7 +154,7 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 	timing.step("planning")
 	deadline := time.Now().Add(30 * time.Second)
 	for _, local := range set.Local {
-		view, err := local.Snapshot.Transition().View()
+		view, err := local.Snapshot.View()
 		if err != nil {
 			return err
 		}

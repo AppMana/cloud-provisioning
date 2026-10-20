@@ -221,7 +221,7 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		if err != nil {
 			return true, err
 		}
-		view, err := snapshot.Transition().View()
+		view, err := snapshot.View()
 		if err != nil {
 			return true, err
 		}

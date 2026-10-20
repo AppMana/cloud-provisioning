@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func transitionFixture(t *testing.T) Transition {
+func transitionFixture(t testing.TB) Transition {
 	t.Helper()
 	tr, err := NewTransition(fixture(t).Spec, epoch, Policy{time.Minute, 10 * time.Second, 5 * time.Second})
 	if err != nil {
@@ -14,7 +14,7 @@ func transitionFixture(t *testing.T) Transition {
 	}
 	return tr
 }
-func view(t *testing.T, tr Transition) View {
+func view(t testing.TB, tr Transition) View {
 	t.Helper()
 	v, e := tr.View()
 	if e != nil {
@@ -22,7 +22,7 @@ func view(t *testing.T, tr Transition) View {
 	}
 	return v
 }
-func step(t *testing.T, tr Transition, at time.Time) Transition {
+func step(t testing.TB, tr Transition, at time.Time) Transition {
 	t.Helper()
 	next, e := tr.Advance(at, receipts(t, view(t, tr).Round, at))
 	if e != nil {

@@ -1257,6 +1257,11 @@ and binary identity checks. If this gate fails, keep the failed bootstrap verdic
 and classify subsequent deletion as cleanup of an incomplete handover. Measure
 the entire serial reconciliation cycle against receipt freshness, including
 completed-worker maintenance and neighbor reconciliation between submissions.
+An immutable snapshot may retain its validated phase view to avoid repeated
+history replay within that snapshot. Each API load and checkpoint restore must
+still validate the complete persisted history, and returned views must not expose
+mutable snapshot state. Unit tests and synthetic replay benchmarks establish
+these boundaries, not live convergence or the freshness of native observations.
 
 Unpublished site observers with no local active receiver can advance released
 inventory checkpoints without ordinary-neighbor routing authority. Admission

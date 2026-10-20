@@ -325,7 +325,7 @@ func (r *meshReconciler) buildReceiveTransitionPlan(ctx context.Context, machine
 		if err != nil {
 			return fail(err)
 		}
-		view, err := predecessor.Transition().View()
+		view, err := predecessor.View()
 		if err != nil {
 			return fail(err)
 		}
@@ -434,7 +434,7 @@ func checkReceiveTransitionIdentity(snapshot handover.Snapshot, clusterUID strin
 // convergence for allocations it never admitted. It does not widen native
 // permissions or authorize replacing the serving generation.
 func checkCompletedReceiveSources(snapshot handover.Snapshot, clusterUID string, mesh *corev1.Secret) error {
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil || !view.Complete {
 		return err
 	}

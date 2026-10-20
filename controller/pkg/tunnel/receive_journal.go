@@ -51,7 +51,7 @@ func ReceiveTransitionSpec(plan ReceiveTransitionPlan, clusterUID, hash string) 
 // participants to the plan. Reconstruct that binding without minting a round
 // or changing persisted state, including the reversed direction of rollback.
 func validateReceiveTransitionBinding(snapshot handover.Snapshot, plan ReceiveTransitionPlan, clusterUID string) error {
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil {
 		return err
 	}

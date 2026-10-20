@@ -58,7 +58,7 @@ func AdvanceReceiveRemoval(ctx context.Context, api kubernetes.Interface, store 
 		return false, fmt.Errorf("receiver journal differs from drain owner")
 	}
 	if !snapshot.Frozen() {
-		view, err := snapshot.Transition().View()
+		view, err := snapshot.View()
 		if err != nil {
 			return false, err
 		}

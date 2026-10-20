@@ -114,7 +114,7 @@ func (r *meshReconciler) reconcileRetiredReceiveAdoption(ctx context.Context, me
 	store := r.receiveJournal
 	store.Name, store.ExpectedUID = tunnel.ReceiveTransitionName(plan.MachineUID), string(snapshot.Metadata().UID)
 	age := r.receivePreparation.Journal.MaxReceiptAge.Duration
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil {
 		return false, err
 	}

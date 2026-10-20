@@ -177,7 +177,7 @@ func receivePreparationPreviousSitePeers(ctx context.Context, k kubernetes.Inter
 	if plan.Namespace != secret.Namespace || plan.AdoptionName != secret.Name || plan.AdoptionUID != string(secret.UID) {
 		return nil, fmt.Errorf("successor preparation adoption identity changed")
 	}
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil {
 		return nil, err
 	}

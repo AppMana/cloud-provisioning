@@ -54,7 +54,7 @@ func admitReceiveSuccessorPreparation(ctx context.Context, api kubernetes.Interf
 		return fail(err)
 	}
 	local := admitted.Local[plan.MachineUID]
-	currentView, err := local.Snapshot.Transition().View()
+	currentView, err := local.Snapshot.View()
 	if err != nil {
 		return fail(err)
 	}

@@ -24,7 +24,7 @@ func NewReceivePreparePredecessor(snapshot handover.Snapshot, clusterUID string)
 	if err != nil {
 		return ReceivePreparePredecessor{}, err
 	}
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil {
 		return ReceivePreparePredecessor{}, err
 	}

@@ -363,7 +363,7 @@ func (r *meshReconciler) receivePreparationSiteBase(ctx context.Context, adoptio
 	if err != nil {
 		return nil, err
 	}
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil {
 		return nil, err
 	}
@@ -413,7 +413,7 @@ func (r *meshReconciler) receivePreparationArchive(ctx context.Context, store ha
 		// no longer replace this journal and needs no additional archive grant.
 		return "", nil
 	}
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil || !view.Complete {
 		return "", err
 	}

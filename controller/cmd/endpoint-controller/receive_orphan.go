@@ -87,7 +87,7 @@ func (r *meshReconciler) reconcileOrphanReceiveWithdrawals(ctx context.Context, 
 		} else if present {
 			continue
 		} // A still-published owner requires a separate removal protocol.
-		view, err := snapshot.Transition().View()
+		view, err := snapshot.View()
 		if err != nil {
 			return false, err
 		}

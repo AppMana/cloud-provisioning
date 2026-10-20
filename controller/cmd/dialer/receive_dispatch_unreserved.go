@@ -89,7 +89,7 @@ func dispatchUnreservedReceiveCloud(ctx context.Context, api kubernetes.Interfac
 		if err != nil {
 			return true, err
 		}
-		view, err := snapshot.Transition().View()
+		view, err := snapshot.View()
 		if err != nil {
 			return true, err
 		}

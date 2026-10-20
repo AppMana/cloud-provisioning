@@ -87,7 +87,7 @@ func ValidateReceiveTransportHistory(ctx context.Context, store handover.Store, 
 	if err != nil {
 		return err
 	}
-	view, err := archive.Transition().View()
+	view, err := archive.View()
 	if err != nil {
 		return err
 	}

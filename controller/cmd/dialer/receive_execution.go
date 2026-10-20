@@ -78,7 +78,7 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 	}
 	timing.step("phase-authority")
 	admitted := set.Local[scope.MachineUID]
-	view, err := admitted.Snapshot.Transition().View()
+	view, err := admitted.Snapshot.View()
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 		if completedReadback && !completedMaintenance {
 			break
 		} // Readback cannot extend another worker's mutation authority.
-		other, err := member.Snapshot.Transition().View()
+		other, err := member.Snapshot.View()
 		if err != nil {
 			return nil, err
 		}
@@ -217,7 +217,7 @@ func runReceivePhase(ctx context.Context, api kubernetes.Interface, store handov
 }
 
 func executableReceiveRound(snapshot handover.Snapshot, now time.Time) (handover.View, error) {
-	view, err := snapshot.Transition().View()
+	view, err := snapshot.View()
 	if err != nil {
 		return handover.View{}, err
 	}

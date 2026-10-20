@@ -38,7 +38,7 @@ func (s Store) commitPodReceipts(ctx context.Context, expectedRoundHash string, 
 	if err != nil {
 		return Snapshot{}, err
 	}
-	view, err := previous.Transition().View()
+	view, err := previous.View()
 	if err != nil {
 		return Snapshot{}, err
 	}

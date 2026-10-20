@@ -42,7 +42,7 @@ func PlanReceiveJournalRoutes(snapshots []handover.Snapshot, clusterUID string) 
 		if err != nil {
 			return fail(err)
 		}
-		view, err := snapshot.Transition().View()
+		view, err := snapshot.View()
 		if err != nil {
 			return fail(err)
 		}

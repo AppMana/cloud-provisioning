@@ -154,7 +154,7 @@ func readReleasedReceiveJournals(ctx context.Context, api kubernetes.Interface, 
 	source := ReceiveRetirementSet{Inventory: inventory, Metadata: *index.ObjectMeta.DeepCopy(), MeshMetadata: *mesh.ObjectMeta.DeepCopy(), Mesh: mesh, Journals: journals}
 	for uid, age := range ages {
 		if age == 0 {
-			view, err := journals[uid].Transition().View()
+			view, err := journals[uid].View()
 			if err != nil {
 				return fail(err)
 			}

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"reflect"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,9 +30,24 @@ type Store struct {
 type Snapshot struct {
 	transition Transition
 	object     *corev1.ConfigMap
+	view       *View
 }
 
 func (s Snapshot) Transition() Transition { return s.transition }
+
+// View returns the history verified when this immutable snapshot was loaded.
+// It is not a live read or authorization to execute: callers still check live
+// identity, execution continuity, deadlines and receipt freshness. Every load
+// and checkpoint restore validates history anew. Mutable slices are copied.
+func (s Snapshot) View() (View, error) {
+	if s.view == nil {
+		return s.transition.View()
+	}
+	v := *s.view
+	v.Round.Members = slices.Clone(v.Round.Members)
+	v.Observed = slices.Clone(v.Observed)
+	return v, nil
+}
 
 // ContinuesExecution accepts only unchanged state or appended observations in
 // the same journal incarnation. Observations do not change native authority.
@@ -89,11 +105,7 @@ func (s Store) snapshot(object *corev1.ConfigMap) (Snapshot, error) {
 	if s.ExpectedUID != "" && string(object.UID) != s.ExpectedUID {
 		return Snapshot{}, fmt.Errorf("journal incarnation differs from admission")
 	}
-	t, e := DecodeTransition([]byte(object.Data[journalKey]))
-	if e != nil {
-		return Snapshot{}, e
-	}
-	v, e := t.View()
+	t, v, e := decodeTransitionView([]byte(object.Data[journalKey]))
 	if e != nil {
 		return Snapshot{}, e
 	}
@@ -113,7 +125,7 @@ func (s Store) snapshot(object *corev1.ConfigMap) (Snapshot, error) {
 			return Snapshot{}, fmt.Errorf("journal public plan does not match its committed hash")
 		}
 	}
-	return Snapshot{transition: t, object: object.DeepCopy()}, nil
+	return Snapshot{transition: t, object: object.DeepCopy(), view: &v}, nil
 }
 func (s Store) configured() error {
 	if s.ConfigMaps == nil || !token(s.Name) || !token(s.ClusterUID) {

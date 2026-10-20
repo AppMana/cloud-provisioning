@@ -27,7 +27,7 @@ func (s Store) ArchiveCompleted(ctx context.Context, previous Snapshot) (Snapsho
 	if err != nil {
 		return fail(err)
 	}
-	view, err := checked.Transition().View()
+	view, err := checked.View()
 	if err != nil {
 		return fail(err)
 	}

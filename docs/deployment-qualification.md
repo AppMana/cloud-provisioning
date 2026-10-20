@@ -1003,6 +1003,24 @@ not establish the combined real-API-to-kernel path, token authentication, packet
 continuity, external BGP convergence, actual reboot, cloud lifecycle, live release
 or version rollback. Those remain separate deployment gates.
 
+The combined native/API fixture must start its own API server and datastore in
+a fresh guest mount/network namespace and reuse the site retirement backend.
+Require real dual-stack receiver, route, peer, local advertisement and executable
+cache cleanup while preserving an unrelated route and the local WireGuard
+identity. A failed second cleanup, cancellation, agent replacement or source
+change must suppress receipts; retry must remain idempotent. Authenticate fresh
+native observations with a Pod-bound TokenRequest/TokenReview, finalize both
+members, and atomically release the group using another fresh observation.
+Verify retained history, reject re-reserving either retired identity, and reject
+replaying the consumed collection.
+
+This combined fixture uses synthetic Pod/Node status and completed serving
+history, one surviving site observer, and absent target Node/adoption objects.
+It does not qualify kubelet-attested execution, multiple live observers, provider
+deletion, workload traffic, actual reboot, address reuse or rollback compatibility.
+Those require the live deployment scenarios; fixture release is not deployment
+approval.
+
 Real-token joint fixtures cover two surviving consumers for completed and
 interrupted histories. Require rejection without inventory mutation for missing
 consumers, individual-worker and wrong-member digests, expired observations,

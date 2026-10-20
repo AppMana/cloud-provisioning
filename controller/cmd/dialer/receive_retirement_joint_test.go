@@ -19,10 +19,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// Real API storage, synthetic completed serving histories and native callbacks.
-// These checks prove all-member ordering, deadline sharing and receipt fencing;
-// they do not prove kernel cleanup, token authentication or live continuity.
-func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clusterUID string) {
+// Real API storage and synthetic completed serving histories. The default uses
+// native callbacks for ordering, deadline sharing and receipt fencing. The
+// explicitly isolated native variant also checks kernel cleanup and authenticated
+// release; neither variant proves live continuity or actual worker reboot.
+func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clusterUID string, nativeMode ...bool) {
+	useNative := len(nativeMode) != 0 && nativeMode[0]
 	ctx := context.Background()
 	must := func(err error) {
 		t.Helper()
@@ -64,9 +66,9 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 		binding.Interface = preparation.Receivers[0].Interface
 		binding.PublicKey = receiverKey(root, plan.MeshUID, public).PublicKey().String()
 		plan.Bindings[public] = binding
-		plan.CloudAddresses = []string{fmt.Sprintf("172.29.0.%d/32", i+1)}
+		plan.CloudAddresses = []string{fmt.Sprintf("172.29.0.%d/32", i+1), fmt.Sprintf("fd29::%d/128", i+1)}
 		plan.SiteDesired.Peers[0].WGAllowedIPs = slices.Clone(plan.CloudAddresses)
-		plan.SiteDesired.Peers[0].RouteHosts = []string{fmt.Sprintf("172.29.0.%d", i+1)}
+		plan.SiteDesired.Peers[0].RouteHosts = []string{fmt.Sprintf("172.29.0.%d", i+1), fmt.Sprintf("fd29::%d", i+1)}
 		local := plan.Sites[public]
 		local.NodeName, local.NodeUID = node.Name, string(node.UID)
 		local.Client, err = tunnel.PlanSiteReceiveClient(plan.MeshUID, public, plan.RootPublicKey, binding, plan.SiteDesired, plan.SiteDesired)
@@ -87,9 +89,11 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 		store.ExpectedUID = string(snapshot.Metadata().UID)
 		inventory.MachineUIDs = append(inventory.MachineUIDs, plan.MachineUID)
 		inventory.Publications[plan.MachineUID] = tunnel.ReceiveJournalPublication{JournalUID: store.ExpectedUID}
-		mesh.Data[tunnel.PeerPublicKeyPrefix+plan.MachineName] = []byte(plan.RootPublicKey)
+		addNativeWithdrawalPeer(mesh, plan)
 		plans, stores, snapshots = append(plans, plan), append(stores, store), append(snapshots, snapshot)
 	}
+	mesh.Data[tunnel.NodeTunnelAddress6Prefix+node.Name] = []byte("fd90::2/64")
+	mesh.Data[tunnel.NodeAddressesPrefix+node.Name] = []byte("10.90.0.2,fd90::2")
 	mesh, err = api.CoreV1().Secrets(ns.Name).Update(ctx, mesh, metav1.UpdateOptions{})
 	must(err)
 	raw, err := json.Marshal(inventory)
@@ -107,19 +111,30 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 		}}
 		must(w.ReserveReceiveWithdrawal(ctx, stores[i].ConfigMaps, clusterUID, string(index.UID), mesh, snapshots[i]))
 	}
+	publishedMesh := mesh.DeepCopy()
 	for _, plan := range plans {
 		mesh.Data, _, err = tunnel.WithdrawRemotePeer(mesh.Data, plan.MachineName, plan.RootPublicKey)
 		must(err)
 	}
 	mesh, err = api.CoreV1().Secrets(ns.Name).Update(ctx, mesh, metav1.UpdateOptions{})
 	must(err)
-	pod, err := api.CoreV1().Pods(ns.Name).Create(ctx, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "agent"}, Spec: corev1.PodSpec{NodeName: node.Name, Containers: []corev1.Container{{Name: "dialer", Image: "test.invalid/agent"}}}}, metav1.CreateOptions{})
+	podSpec := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "agent"}, Spec: corev1.PodSpec{NodeName: node.Name, Containers: []corev1.Container{{Name: "dialer", Image: "test.invalid/agent"}}}}
+	if useNative {
+		podSpec = nativeJointReceiptPod(t, api, ns.Name, node.Name)
+	}
+	pod, err := api.CoreV1().Pods(ns.Name).Create(ctx, podSpec, metav1.CreateOptions{})
 	must(err)
-	pod.Status = corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}, ContainerStatuses: []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://joint", Image: "test.invalid/agent", ImageID: "test", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(time.Now().Add(-time.Minute))}}}}}
+	pod.Status = corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}, ContainerStatuses: []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://joint", Image: pod.Spec.Containers[0].Image, ImageID: pod.Spec.Containers[0].Image, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(time.Now().Add(-time.Minute))}}}}}
 	pod, err = api.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
 	must(err)
 	scope := receiveJournalScope{Namespace: ns.Name, MeshName: mesh.Name, MeshUID: string(mesh.UID), MachineUID: plans[0].MachineUID}
 	cfg := config{iface: "jointtest", nodeName: node.Name, privateKeyFile: filepath.Join(t.TempDir(), "key"), receiptPodName: pod.Name, receiptPodUID: string(pod.UID)}
+	var native receiveRetirementNative
+	if useNative {
+		cfg.secretNamespace, cfg.secretName = ns.Name, mesh.Name
+		cfg.routeTable, cfg.fwmark, cfg.mtu, cfg.bgpListenPort = 518, 518, 1400, -1
+		native = prepareNativeJointExecution(t, api, stores[0], scope, cfg, site, plans, publishedMesh)
+	}
 	for _, fault := range []string{"second-fails", "cancelled-after-first", "pod-after-first", "none", "source-after-first"} {
 		t.Run(fault, func(t *testing.T) {
 			pod.Status.ContainerStatuses[0].ContainerID = "containerd://joint"
@@ -149,6 +164,11 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 				}
 				if fault == "second-fails" && len(calls) == 2 {
 					return fmt.Errorf("second native cleanup failed")
+				}
+				if native != nil {
+					if err := native(run, path, admitted); err != nil {
+						return err
+					}
 				}
 				if fault == "cancelled-after-first" && len(calls) == 1 {
 					cancel()
@@ -190,5 +210,8 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 				}
 			}
 		})
+	}
+	if useNative {
+		verifyNativeJointReceiptLifecycle(t, api, stores, scope, cfg, site, pod, native)
 	}
 }

@@ -681,8 +681,13 @@ policy, consumed evidence, withdrawal history and a missing retained journal
 must fail with no admitted result. These tests do not qualify a live release
 controller, native recovery or allocation of a replacement worker.
 
-The agent's guarded checkpoint path admits each released record through the
-historical reader and pins the complete inventory revision. A captured consumer
+The agent's guarded checkpoint path admits released records together through the
+historical reader and pins the complete inventory revision. Shared cohort journals
+are loaded once per admission, with each record checked under its frozen
+observation policy. A fresh recheck reads every retained journal, inventory and
+mesh; it must not reuse cached API responses. Read-count tests must also reject
+changed revisions and damaged cohort history. Reduced reads alone do not prove
+that a live retirement meets its receipt deadline. A captured consumer
 must retain the same private local withdrawal fence; any locally saved
 finalization must also match. Renewable completion need not match if finalization
 was not yet saved locally, because the original native retirement receipt already

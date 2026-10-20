@@ -245,6 +245,65 @@ func verifyJointRetirementAuthentication(t *testing.T, api kubernetes.Interface,
 		}
 		must(released.Recheck(ctx, api, store))
 	}
+	// Shared admission must still reread every journal and fence the live
+	// source. The read budget checks duplicate I/O, not elapsed-time behavior.
+	counts := map[string]int{}
+	counted := stores[0]
+	counted.ConfigMaps = retirementCollectionReader{ConfigMapInterface: maps, before: func(name string) error {
+		counts[name]++
+		return nil
+	}}
+	group, err := ReadReleasedReceiveJournals(ctx, api, counted, ns, mesh.Name, string(mesh.UID), string(index.UID), time.Minute)
+	must(err)
+	if len(group.Records) != 2 || counts[index.Name] != 2 {
+		t.Fatalf("joint history admission did not share inventory reads: %v", counts)
+	}
+	for i, store := range stores {
+		record := group.Records[intents[i].MachineUID]
+		if counts[store.Name] != 2 || record.Journal.Metadata().UID != snapshots[i].Metadata().UID || len(record.Inventory.Publications) != 0 {
+			t.Fatalf("joint history omitted a journal or repeated its reads: %v", counts)
+		}
+	}
+	// This fixture explicitly finalized with a one-minute retirement policy,
+	// independently of its shorter serving-round policy. Deriving the latter
+	// must reject that mismatch, rather than trusting the evidence's age field.
+	for _, age := range []time.Duration{0, -time.Second} {
+		rejected, err := ReadReleasedReceiveJournals(ctx, api, stores[0], ns, mesh.Name, string(mesh.UID), string(index.UID), age)
+		if err == nil || len(rejected.Records) != 0 {
+			t.Fatal("shared history accepted a different observation lifetime")
+		}
+	}
+	clear(counts)
+	must(group.Recheck(ctx, api, counted))
+	if counts[index.Name] != 1 || counts[stores[0].Name] != 1 || counts[stores[1].Name] != 1 {
+		t.Fatalf("shared recheck must read each source once: %v", counts)
+	}
+	changed := false
+	clear(counts)
+	counted.ConfigMaps = retirementCollectionReader{ConfigMapInterface: maps, before: func(name string) error {
+		counts[name]++
+		if name != index.Name || counts[name] != 2 {
+			return nil
+		}
+		current, err := api.CoreV1().Secrets(ns).Get(ctx, mesh.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if current.Annotations == nil {
+			current.Annotations = map[string]string{}
+		}
+		current.Annotations["test-revision"] = "changed-during-shared-admission"
+		_, err = api.CoreV1().Secrets(ns).Update(ctx, current, metav1.UpdateOptions{})
+		changed = err == nil
+		return err
+	}}
+	rejected, err := ReadReleasedReceiveJournals(ctx, api, counted, ns, mesh.Name, string(mesh.UID), string(index.UID), time.Minute)
+	if !changed || err == nil || len(rejected.Records) != 0 {
+		t.Fatal("shared history admission returned evidence across a changed mesh revision")
+	}
+	if err := group.Recheck(ctx, api, stores[0]); err == nil {
+		t.Fatal("shared recheck reused a cached mesh revision")
+	}
 	for _, fault := range []string{"missing-member", "replaced-journal", "mismatched-cohort"} {
 		t.Run("released-history/"+fault, func(t *testing.T) {
 			var damaged tunnel.ReceiveInventory
@@ -274,6 +333,9 @@ func verifyJointRetirementAuthentication(t *testing.T, api kubernetes.Interface,
 			must(err)
 			if _, ok, err := ReadReleasedReceiveJournal(ctx, api, stores[0], ns, mesh.Name, string(mesh.UID), intents[0].MachineUID, string(index.UID), time.Minute); err == nil || ok {
 				t.Fatal("damaged joint history accepted")
+			}
+			if damaged, err := ReadReleasedReceiveJournals(ctx, api, stores[0], ns, mesh.Name, string(mesh.UID), string(index.UID), time.Minute); err == nil || len(damaged.Records) != 0 {
+				t.Fatal("shared admission accepted damaged joint history")
 			}
 			current, err = maps.Get(ctx, index.Name, metav1.GetOptions{})
 			must(err)

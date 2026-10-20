@@ -22,6 +22,7 @@ type receiveReleasedCheckpointAdmission struct {
 	nodeName, nodeUID, bootID string
 	nextSHA                   string
 	records                   map[string]attachment.ReceiveReleasedJournal
+	set                       attachment.ReceiveReleasedJournalSet
 	localFiles                map[string]bool
 }
 
@@ -50,24 +51,21 @@ func admitReleasedReceiveCheckpoints(ctx context.Context, api kubernetes.Interfa
 	if boot != next.BootID {
 		return fail(fmt.Errorf("released checkpoint boot changed"))
 	}
+	releasedSet, err := attachment.ReadReleasedReceiveJournals(ctx, api, store, scope.Namespace, scope.MeshName, scope.MeshUID, next.InventoryUID, 0)
+	if err != nil {
+		return fail(err)
+	}
+	if len(releasedSet.Records) != len(next.Inventory.Released) {
+		return fail(fmt.Errorf("released checkpoint membership changed during admission"))
+	}
+	result.set = releasedSet
 	for uid, p := range next.Inventory.Released {
 		retainedConsumer := false
 		memberStore, memberScope := store, scope
 		memberStore.Name = tunnel.ReceiveTransitionName(uid)
 		memberStore.ExpectedUID = p.JournalUID
 		memberScope.MachineUID = uid
-		snapshot, err := memberStore.Load(ctx)
-		if err != nil {
-			return fail(err)
-		}
-		view, err := snapshot.Transition().View()
-		if err != nil {
-			return fail(err)
-		}
-		released, verified, err := attachment.ReadReleasedReceiveJournal(ctx, api, memberStore, scope.Namespace, scope.MeshName, scope.MeshUID, uid, next.InventoryUID, view.Round.MaxReceiptAge)
-		if err != nil {
-			return fail(err)
-		}
+		released, verified := releasedSet.Records[uid]
 		if !verified || !sameReceiveRevision(metadata, released.Metadata) || !reflect.DeepEqual(next.Inventory, released.Inventory) {
 			return fail(fmt.Errorf("released checkpoint inventory changed during admission"))
 		}
@@ -120,10 +118,8 @@ func admitReleasedReceiveCheckpoints(ctx context.Context, api kubernetes.Interfa
 		}
 		result.records[uid] = released
 	}
-	for _, record := range result.records {
-		if err := record.Recheck(ctx, api, store); err != nil {
-			return fail(err)
-		}
+	if err := result.set.Recheck(ctx, api, store); err != nil {
+		return fail(err)
 	}
 	current, err := api.CoreV1().Nodes().Get(ctx, cfg.nodeName, metav1.GetOptions{})
 	if err != nil {
@@ -159,10 +155,8 @@ func (r receiveReleasedCheckpointAdmission) recheck(ctx context.Context, api kub
 	if err := validateReceiveParticipantNode(node, r.nodeUID, r.bootID); err != nil {
 		return err
 	}
-	for _, record := range r.records {
-		if err := record.Recheck(ctx, api, store); err != nil {
-			return err
-		}
+	if err := r.set.Recheck(ctx, api, store); err != nil {
+		return err
 	}
 	current, err := api.CoreV1().Nodes().Get(ctx, r.nodeName, metav1.GetOptions{})
 	if err != nil {

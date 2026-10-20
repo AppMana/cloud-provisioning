@@ -26,9 +26,20 @@ func (c *Claimer) Delete(ctx context.Context, name, node string) error {
 type Remover struct {
 	Kube      *kube.Client
 	Reconcile func(context.Context) error
+	// Timeout bounds the complete removal observation; zero preserves ten minutes.
+	Timeout time.Duration
 }
 
 func (c *Remover) Delete(ctx context.Context, name, node string) error {
+	within := c.Timeout
+	if within < 0 {
+		return fmt.Errorf("removal timeout must be positive")
+	}
+	if within == 0 {
+		within = 10 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(ctx, within)
+	defer cancel()
 	raw, err := c.Kube.Run(ctx, "-n", Namespace, "get", "machine", name, "-o", "json")
 	if err != nil {
 		return err
@@ -52,7 +63,7 @@ func (c *Remover) Delete(ctx context.Context, name, node string) error {
 	if _, err := c.Kube.Run(ctx, "-n", Namespace, "delete", "provisionednodeclaim", name, "--wait=false"); err != nil {
 		return err
 	}
-	return wait.Until(ctx, 10*time.Minute, "claim removal did not clean up "+name, func(ctx context.Context) error {
+	return wait.Until(ctx, within, "claim removal did not clean up "+name, func(ctx context.Context) error {
 		if c.Reconcile != nil {
 			if err := c.Reconcile(ctx); err != nil {
 				return err

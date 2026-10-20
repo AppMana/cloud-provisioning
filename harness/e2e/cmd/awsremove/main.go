@@ -33,10 +33,14 @@ func run() error {
 	distro := flag.String("distro", "k0s", "site distribution")
 	cni := flag.String("cni", "default", "site network profile, which selects the site topology")
 	name := flag.String("claim", "", "CAPA claim to delete")
+	timeout := flag.Duration("timeout", 20*time.Minute, "total removal observation budget, including provider termination")
 	report := flag.String("report", "", "new removal evidence JSON path")
 	flag.Parse()
 	if *work == "" || *site == "" || *name == "" || *report == "" {
 		return fmt.Errorf("all flags are required")
+	}
+	if *timeout <= 0 {
+		return fmt.Errorf("timeout must be positive")
 	}
 	if *apiPort < 1 || *apiPort > 65535 {
 		return fmt.Errorf("api-port must be between 1 and 65535")
@@ -44,7 +48,7 @@ func run() error {
 	if _, err := os.Stat(*report); !os.IsNotExist(err) {
 		return fmt.Errorf("report exists or cannot be checked")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
 	raw, err := os.ReadFile(filepath.Join(*work, "resources.json"))
 	if err != nil {
@@ -130,7 +134,7 @@ func run() error {
 		return fmt.Errorf("instance ownership does not match this test VPC and run")
 	}
 	fmt.Println("Deleting claim", *name, "with instance", id, "and Node", node)
-	if err = (&claim.Remover{Kube: k}).Delete(ctx, *name, node); err != nil {
+	if err = (&claim.Remover{Kube: k, Timeout: *timeout}).Delete(ctx, *name, node); err != nil {
 		return err
 	}
 	err = wait.Until(ctx, 5*time.Minute, "CAPA did not terminate "+id, func(ctx context.Context) error {

@@ -71,3 +71,24 @@ func TestRemovalRequiresInfrastructureIdentityBeforeDeleting(t *testing.T) {
 		t.Fatalf("missing infrastructure identity must not initiate deletion: %v", err)
 	}
 }
+
+// A short simulated provider wait tests the observer's budget, not AWS latency.
+func TestRemovalTimeoutBoundsPendingProviderWithoutOuterDeadline(t *testing.T) {
+	n := &removalNode{ref: `{"spec":{"infrastructureRef":{"kind":"AWSMachine","apiGroup":"infrastructure.cluster.x-k8s.io","name":"infra-worker"}}}`, remaining: "infrastructure"}
+	start := time.Now()
+	err := (&Remover{Kube: &kube.Client{Bastion: n, ControlPlanes: []string{"10.10.0.10"}}, Timeout: 50 * time.Millisecond}).Delete(context.Background(), "worker", "node")
+	if err == nil || !strings.Contains(err.Error(), "deadline exceeded") || !n.deleted || !n.checkedInfrastructure {
+		t.Fatalf("pending provider must time out after requesting ordinary deletion: %v", err)
+	}
+	if time.Since(start) > time.Second {
+		t.Fatal("observer exceeded its configured budget")
+	}
+}
+
+func TestRemovalRejectsNegativeTimeoutBeforeDeleting(t *testing.T) {
+	n := &removalNode{}
+	err := (&Remover{Kube: &kube.Client{Bastion: n}, Timeout: -time.Second}).Delete(context.Background(), "worker", "node")
+	if err == nil || n.deleted {
+		t.Fatal("invalid budget initiated deletion")
+	}
+}

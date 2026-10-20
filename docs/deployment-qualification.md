@@ -1226,6 +1226,14 @@ cost-control termination, inspect the recorded instance identities again:
 already terminated instances need no further mutation. Preserve failed and
 post-deadline observations separately.
 
+Declare the AWS lifecycle observation budget before starting an operation.
+`awsremove --timeout` bounds the complete command and its shared cleanup wait;
+provider polling cannot renew that deadline. The default command budget is
+20 minutes. The shared remover retains its ten-minute default for other callers.
+A longer test budget does not extend retirement evidence freshness or turn a
+post-deadline completion into a pass. Timeout tests use simulated provider state
+and do not predict EC2 termination latency.
+
 Separate retirement authorization from provider deletion progress. Before the
 claim's durable removal commit, expired or incomplete observations must preserve
 the reservation and prevent a Machine deletion request. After the commit,

@@ -1001,6 +1001,13 @@ they do not establish live controller routing, multi-consumer release timing,
 RBAC propagation, actual reboot recovery, or version rollback. Activation remains
 subject to those separate lifecycle checks.
 
+History replay may reuse a canonical round's digest and member lookup within
+that replay, but must rebuild them whenever the round changes. Validate every
+event's timestamp, receipt binding, membership, freshness and chronology, and
+revalidate history on each load. Corruption after a successful replay must still
+be rejected. Synthetic replay benchmarks measure local validation cost; they
+do not establish live receipt convergence, API capacity or finalization latency.
+
 Joint retirement must preserve each withdrawal's captured consumers. Group only
 published version-two withdrawals from the same exact captured mesh when every
 member names the other departing workers by committed identity and all members

@@ -206,12 +206,17 @@ func (r Round) Digest() (string, error) {
 	if e != nil {
 		return "", e
 	}
+	return normalized.canonicalDigest()
+}
+
+// canonicalDigest requires a round already checked by canonical.
+func (r Round) canonicalDigest() (string, error) {
 	// Domain separation prevents a hash for another public document type from
 	// being mistaken for a phase-round binding.
 	raw, e := json.Marshal(struct {
 		Kind  string `json:"kind"`
 		Round Round  `json:"round"`
-	}{"cldt/handover-round/v1", normalized})
+	}{"cldt/handover-round/v1", r})
 	if e != nil {
 		return "", e
 	}
@@ -238,31 +243,52 @@ func (r Round) validateReceipts(now time.Time, receipts []AuthenticatedReceipt, 
 	if e != nil {
 		return e
 	}
-	r = normalized
-	if now.Before(r.IssuedAt) || !now.Before(r.ExpiresAt) {
-		return fmt.Errorf("handover round is not current")
-	}
-	digest, e := r.Digest()
+	validator, e := normalized.receiptValidator()
 	if e != nil {
 		return e
 	}
-	if len(receipts) == 0 || len(receipts) > len(r.Members) || (complete && len(receipts) != len(r.Members)) {
-		return fmt.Errorf("incomplete handover receipts")
+	return validator.validate(now, receipts, complete)
+}
+
+// receiptValidator is local to one validation or history replay. It never
+// caches admission across loads, and each new round requires a new validator.
+type receiptValidator struct {
+	round   Round
+	digest  string
+	members map[[2]string]Member
+}
+
+// receiptValidator requires a round already checked by canonical.
+func (r Round) receiptValidator() (receiptValidator, error) {
+	digest, err := r.canonicalDigest()
+	if err != nil {
+		return receiptValidator{}, err
 	}
-	members := map[[2]string]Member{}
+	members := make(map[[2]string]Member, len(r.Members))
 	for _, m := range r.Members {
 		members[[2]string{m.NodeUID, m.DeviceID}] = m
+	}
+	return receiptValidator{round: r, digest: digest, members: members}, nil
+}
+
+func (v receiptValidator) validate(now time.Time, receipts []AuthenticatedReceipt, complete bool) error {
+	r := v.round
+	if now.Before(r.IssuedAt) || !now.Before(r.ExpiresAt) {
+		return fmt.Errorf("handover round is not current")
+	}
+	if len(receipts) == 0 || len(receipts) > len(r.Members) || (complete && len(receipts) != len(r.Members)) {
+		return fmt.Errorf("incomplete handover receipts")
 	}
 	seen := map[[2]string]bool{}
 	for _, authenticated := range receipts {
 		receipt := authenticated.Receipt
 		id := [2]string{receipt.NodeUID, receipt.DeviceID}
-		member, ok := members[id]
+		member, ok := v.members[id]
 		if !ok || seen[id] || authenticated.AuthenticatedNodeUID != receipt.NodeUID {
 			return fmt.Errorf("receipt node identity mismatch or duplicate")
 		}
 		seen[id] = true
-		if receipt.RoundHash != digest || receipt.FromKey != member.FromKey || receipt.ToKey != member.ToKey || receipt.FromPeerKey != member.FromPeerKey || receipt.ToPeerKey != member.ToPeerKey {
+		if receipt.RoundHash != v.digest || receipt.FromKey != member.FromKey || receipt.ToKey != member.ToKey || receipt.FromPeerKey != member.FromPeerKey || receipt.ToPeerKey != member.ToPeerKey {
 			return fmt.Errorf("receipt does not bind the current round and devices")
 		}
 		if receipt.ObservedAt.Before(r.IssuedAt) || receipt.ObservedAt.After(now) || now.Sub(receipt.ObservedAt) > r.MaxReceiptAge {

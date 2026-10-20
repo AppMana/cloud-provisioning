@@ -111,6 +111,17 @@ func (t Transition) View() (View, error) {
 		return View{}, fmt.Errorf("invalid initial phase round")
 	}
 	v := View{Round: initial}
+	var validator *receiptValidator
+	validate := func(at time.Time, proofs []AuthenticatedReceipt, complete bool) error {
+		if validator == nil {
+			prepared, err := v.Round.receiptValidator()
+			if err != nil {
+				return err
+			}
+			validator = &prepared
+		}
+		return validator.validate(at, proofs, complete)
+	}
 	last := initial.IssuedAt
 	nonces := map[string]bool{initial.Nonce: true}
 	for _, ev := range t.j.Events {
@@ -127,7 +138,7 @@ func (t Transition) View() (View, error) {
 			for i, receipt := range ev.Receipts {
 				proofs[i] = AuthenticatedReceipt{AuthenticatedNodeUID: receipt.NodeUID, Receipt: receipt}
 			}
-			if e = v.Round.ValidateReceipts(ev.At, proofs); e != nil {
+			if e = validate(ev.At, proofs, false); e != nil {
 				return View{}, e
 			}
 			byMember := map[[2]string]Receipt{}
@@ -154,7 +165,7 @@ func (t Transition) View() (View, error) {
 			for i, r := range ev.Receipts {
 				proofs[i] = AuthenticatedReceipt{AuthenticatedNodeUID: r.NodeUID, Receipt: r}
 			}
-			if e = v.Round.Ready(ev.At, proofs); e != nil {
+			if e = validate(ev.At, proofs, true); e != nil {
 				return View{}, fmt.Errorf("invalid committed receipts: %w", e)
 			}
 			switch v.Round.Phase {
@@ -226,6 +237,7 @@ func (t Transition) View() (View, error) {
 			}
 			nonces[next.Nonce] = true
 			v.Round = next
+			validator = nil
 		}
 		v.Observed = nil
 		last = ev.At

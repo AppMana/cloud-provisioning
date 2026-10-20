@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/netip"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -64,11 +65,11 @@ func retirementFixtureForConsumer(t *testing.T, outcome string, frozen bool, mes
 		if err != nil {
 			t.Fatal(err)
 		}
-		if view.Complete {
+		if view.Complete || (strings.HasPrefix(outcome, "interrupted-") && strings.TrimPrefix(outcome, "interrupted-") == string(view.Round.Phase)) {
 			break
 		}
 		at = view.Round.IssuedAt.Add(time.Second)
-		if !rolled && ((outcome == "abort" && view.Round.Phase == handover.Prepare) || (outcome == "rollback" && view.Round.Phase == handover.Switch)) {
+		if !rolled && (((outcome == "abort" || outcome == "interrupted-abort") && view.Round.Phase == handover.Prepare) || (outcome == "rollback" && view.Round.Phase == handover.Switch)) {
 			tr, err = tr.Rollback(at)
 			rolled = true
 		} else {

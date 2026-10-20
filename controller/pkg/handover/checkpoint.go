@@ -61,6 +61,9 @@ func (s Snapshot) Extends(previous Snapshot) error {
 	if previous.Frozen() && !s.Frozen() {
 		return fmt.Errorf("journal lost its durable write fence")
 	}
+	if previous.WithdrawalIntentHash() != "" && s.WithdrawalIntentHash() != previous.WithdrawalIntentHash() {
+		return fmt.Errorf("journal lost or changed its withdrawal authority")
+	}
 	if a.UID != b.UID || a.Namespace != b.Namespace || a.Name != b.Name || a.DeletionTimestamp != nil || b.DeletionTimestamp != nil || !bytes.Equal(s.Plan(), previous.Plan()) {
 		return fmt.Errorf("journal identity or public plan changed")
 	}

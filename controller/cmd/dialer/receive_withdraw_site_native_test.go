@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
-	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -31,6 +29,16 @@ func TestNativeCombinedSiteWithdrawal(t *testing.T) {
 	if os.Getenv("CLDT_NATIVE_COMBINED_WITHDRAWAL") != "1" {
 		t.Skip("requires isolated guest namespaces")
 	}
+	for _, phase := range []string{"", "prepare", "switch", "drain", "retire", "abort"} {
+		name := phase
+		if name == "" {
+			name = "completed"
+		}
+		t.Run(name, func(t *testing.T) { nativeCombinedSiteWithdrawal(t, phase) })
+	}
+}
+
+func nativeCombinedSiteWithdrawal(t *testing.T, phase string) {
 	for _, kind := range []string{"net", "mnt"} {
 		self, e := os.Readlink("/proc/self/ns/" + kind)
 		host, h := os.Readlink("/proc/1/ns/" + kind)
@@ -53,36 +61,8 @@ func TestNativeCombinedSiteWithdrawal(t *testing.T) {
 	must(os.WriteFile(cfg.privateKeyFile, []byte(site.String()), 0600))
 	boot, err := localReceiveBootID()
 	must(err)
-	raw, err := json.Marshal(plan)
-	must(err)
-	spec, err := tunnel.ReceiveTransitionSpec(plan, "native-cluster", fmt.Sprintf("%x", sha256.Sum256(raw)))
-	must(err)
-	at := time.Now().Add(-10 * time.Second)
-	transition, err := handover.NewTransition(spec, at, handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: time.Minute, DrainInterval: time.Second})
-	must(err)
-	for i := 0; i < 6; i++ {
-		view, e := transition.View()
-		must(e)
-		if view.Complete {
-			break
-		}
-		at = at.Add(time.Second)
-		if at.Before(view.DrainUntil) {
-			at = view.DrainUntil
-		}
-		digest, e := view.Round.Digest()
-		must(e)
-		proofs := []handover.AuthenticatedReceipt{}
-		for _, m := range view.Round.Members {
-			proofs = append(proofs, handover.AuthenticatedReceipt{AuthenticatedNodeUID: m.NodeUID, Receipt: handover.Receipt{RoundHash: digest, NodeUID: m.NodeUID, DeviceID: m.DeviceID, FromKey: m.FromKey, ToKey: m.ToKey, FromPeerKey: m.FromPeerKey, ToPeerKey: m.ToPeerKey, ObservedAt: at}})
-		}
-		transition, err = transition.Advance(at, proofs)
-		must(err)
-	}
-	history, err := transition.Bytes()
-	must(err)
-	immutable := true
-	journal := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: tunnel.ReceiveTransitionName(plan.MachineUID), UID: "journal", ResourceVersion: "1"}, Immutable: &immutable, Data: map[string]string{"transition.json": string(history), "plan.json": string(raw)}}
+	journal := cloudWithdrawalTestJournal(t, plan, "journal", phase)
+	history := []byte(journal.Data["transition.json"])
 	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "mesh", UID: "restore-mesh", ResourceVersion: "1"}, Data: map[string][]byte{
 		tunnel.NodePublicKeyPrefix + "site": []byte(site.PublicKey().String()), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.90.0.2/24"), tunnel.NodeTunnelAddress6Prefix + "site": []byte("fd90::2/64"), tunnel.NodeAddressesPrefix + "site": []byte("10.90.0.2,fd90::2"),
 		tunnel.PeerPublicKeyPrefix + "worker": []byte(root.PublicKey().String()), tunnel.PeerEndpointPrefix + "worker": []byte("198.51.100.1:51820"), tunnel.PeerAllowedIPsPrefix + "worker": []byte("172.29.0.1/32,fd29::1/128"), tunnel.PeerRouteHostsPrefix + "worker": []byte("172.29.0.1,fd29::1"),
@@ -97,6 +77,11 @@ func TestNativeCombinedSiteWithdrawal(t *testing.T) {
 	must(err)
 	must(speaker.reconcile(ctx, nil, routes))
 	intent := attachment.RemoteWithdrawalIntent{MeshNamespace: "test", MeshName: "mesh", MeshUID: plan.MeshUID, SourceVersion: "1", MachineName: plan.MachineName, MachineUID: plan.MachineUID, PublicKey: plan.RootPublicKey, DrainIntent: "native-test", Consumers: []attachment.ConsumerTarget{{Site: true, NodeName: "site", NodeUID: "site-uid", PublicKey: site.PublicKey().String()}, {NodeName: "survivor", NodeUID: "survivor-uid", MachineName: "survivor", SecretUID: "survivor-adoption", TunnelAddress: "172.29.0.3", PublicKey: survivor.PublicKey().String()}}}
+	if phase != "" {
+		raw, err := json.Marshal(intent)
+		must(err)
+		journal.Data["withdrawal-intent-sha256"] = tunnel.HashPeerList(raw)
+	}
 	retirement, err := json.Marshal(map[string]any{"version": 1, "journalSHA256": tunnel.HashPeerList(history), "withdrawal": intent})
 	must(err)
 	inventory := tunnel.ReceiveInventory{Version: 1, ClusterUID: "native-cluster", Namespace: "test", MeshName: "mesh", MeshUID: plan.MeshUID, MachineUIDs: []string{plan.MachineUID}, Publications: map[string]tunnel.ReceiveJournalPublication{plan.MachineUID: {JournalUID: "journal", Retirement: retirement}}}

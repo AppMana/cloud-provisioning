@@ -95,6 +95,11 @@ func (s Store) snapshot(object *corev1.ConfigMap) (Snapshot, error) {
 	if v.Round.ClusterUID != s.ClusterUID {
 		return Snapshot{}, fmt.Errorf("journal belongs to another cluster")
 	}
+	if digest, present := object.Data[withdrawalIntentKey]; present {
+		if !hexToken(digest, 32) || object.Immutable == nil || !*object.Immutable || v.Complete {
+			return Snapshot{}, fmt.Errorf("invalid interrupted withdrawal fence")
+		}
+	}
 	if t.j.PlanRequired && object.Data[planKey] == "" {
 		return Snapshot{}, fmt.Errorf("journal public plan is missing")
 	}

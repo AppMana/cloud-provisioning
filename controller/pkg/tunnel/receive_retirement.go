@@ -37,9 +37,8 @@ func ReserveReceiveRetirement(ctx context.Context, maps typedcore.ConfigMapInter
 	if err != nil {
 		return err
 	}
-	view, err := snapshot.Transition().View()
-	if err != nil || !view.Complete || view.ServingGeneration == "" {
-		return fmt.Errorf("retirement requires a completed journal")
+	if !snapshot.RetirementFrozen() {
+		return fmt.Errorf("retirement requires completed or explicitly fenced interrupted history")
 	}
 	inventory, object, err := ReadReceiveInventory(ctx, maps, clusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
 	if err != nil {
@@ -143,9 +142,8 @@ func writeReceiveRetirementCompletion(ctx context.Context, maps typedcore.Config
 	if err != nil {
 		return err
 	}
-	view, err := snapshot.Transition().View()
-	if err != nil || !view.Complete || view.ServingGeneration == "" {
-		return fmt.Errorf("completion requires terminal transport history")
+	if !snapshot.RetirementFrozen() {
+		return fmt.Errorf("retirement requires completed or explicitly fenced interrupted history")
 	}
 	inventory, object, err := ReadReceiveInventory(ctx, maps, clusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
 	if err != nil {

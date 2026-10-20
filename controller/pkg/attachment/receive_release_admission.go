@@ -69,9 +69,8 @@ func ReadReleasedReceiveJournal(ctx context.Context, api kubernetes.Interface, s
 	if err != nil {
 		return fail(err)
 	}
-	view, err := snapshot.Transition().View()
-	if err != nil || !view.Complete || view.ServingGeneration == "" || plan.MachineUID != machineUID || plan.Namespace != namespace || plan.MeshName != meshName || plan.MeshUID != meshUID {
-		return fail(fmt.Errorf("released journal scope or terminal history changed"))
+	if !snapshot.RetirementFrozen() || plan.MachineUID != machineUID || plan.Namespace != namespace || plan.MeshName != meshName || plan.MeshUID != meshUID {
+		return fail(fmt.Errorf("released journal scope or retirement fence changed"))
 	}
 	record, err := decodeReceiveWithdrawalRecord(publication.Retirement, machineUID)
 	if err != nil {
@@ -82,6 +81,9 @@ func ReadReleasedReceiveJournal(ctx context.Context, api kubernetes.Interface, s
 		return fail(err)
 	}
 	w := record.Withdrawal
+	if err := w.validateJournalWithdrawalFence(snapshot); err != nil {
+		return fail(err)
+	}
 	if record.JournalSHA256 != tunnel.HashPeerList(history) || w.MeshNamespace != namespace || w.MeshName != meshName || w.MeshUID != meshUID || w.MachineName != plan.MachineName || w.PublicKey != plan.RootPublicKey || w.SourceVersion == "" || w.DrainIntent == "" {
 		return fail(fmt.Errorf("released withdrawal differs from retained journal"))
 	}

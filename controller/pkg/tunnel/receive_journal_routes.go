@@ -141,7 +141,7 @@ type ReceiveSurvivorRoutes struct {
 // PlanReceiveSurvivorRoutes projects a complete admitted inventory after peer
 // withdrawal. withdrawn maps Machine UID to its exact frozen journal UID.
 // Callers must independently authenticate persisted withdrawal and publication;
-// frozen terminal history alone does not authorize removal or native mutation.
+// a retirement fence alone does not authorize removal or native mutation.
 // This projection neither deletes routes nor releases inventory reservations.
 func PlanReceiveSurvivorRoutes(snapshots []handover.Snapshot, clusterUID string, withdrawn map[string]string) (ReceiveSurvivorRoutes, error) {
 	fail := func(err error) (ReceiveSurvivorRoutes, error) { return ReceiveSurvivorRoutes{}, err }
@@ -165,8 +165,8 @@ func PlanReceiveSurvivorRoutes(snapshots []handover.Snapshot, clusterUID string,
 			survivors = append(survivors, snapshot)
 			continue
 		}
-		if string(snapshot.Metadata().UID) != journalUID || !snapshot.Frozen() || !reserved.Views[plan.MachineUID].Complete {
-			return fail(fmt.Errorf("withdrawal requires the exact frozen terminal journal"))
+		if string(snapshot.Metadata().UID) != journalUID || !snapshot.RetirementFrozen() {
+			return fail(fmt.Errorf("withdrawal requires the exact retirement-fenced journal"))
 		}
 	}
 	// All workers may be withdrawn. This explicit empty projection is not an

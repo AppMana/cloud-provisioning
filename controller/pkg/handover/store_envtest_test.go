@@ -149,6 +149,7 @@ func TestStoreAPIServerCAS(t *testing.T) {
 	})
 	t.Run("completed-freeze", func(t *testing.T) {
 		verifyCompletedFreeze(t, Store{ConfigMaps: client.CoreV1().ConfigMaps("handover-test"), ClusterUID: "cluster-uid"})
+		verifyExpiredWithdrawalFreeze(t, Store{ConfigMaps: client.CoreV1().ConfigMaps("handover-test"), ClusterUID: "cluster-uid"})
 	})
 }
 

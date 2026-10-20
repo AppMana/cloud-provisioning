@@ -41,6 +41,9 @@ func loadReceiveJournal(ctx context.Context, api kubernetes.Interface, store han
 	if err != nil {
 		return fail(err)
 	}
+	if snapshot.WithdrawalIntentHash() != "" {
+		return fail(fmt.Errorf("interrupted journal is fenced for withdrawal"))
+	}
 	metadata := snapshot.Metadata()
 	if metadata.Namespace != scope.Namespace || metadata.DeletionTimestamp != nil {
 		return fail(fmt.Errorf("receiver journal scope changed or is being deleted"))

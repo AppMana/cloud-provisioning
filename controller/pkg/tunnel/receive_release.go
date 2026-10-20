@@ -35,9 +35,8 @@ func ReleaseReceiveJournal(ctx context.Context, maps typedcore.ConfigMapInterfac
 	if err != nil {
 		return err
 	}
-	view, err := snapshot.Transition().View()
-	if err != nil || !view.Complete || view.ServingGeneration == "" {
-		return fmt.Errorf("release requires terminal transport history")
+	if !snapshot.RetirementFrozen() {
+		return fmt.Errorf("retirement requires completed or explicitly fenced interrupted history")
 	}
 	inventory, object, err := ReadReceiveInventory(ctx, maps, clusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
 	if err != nil {

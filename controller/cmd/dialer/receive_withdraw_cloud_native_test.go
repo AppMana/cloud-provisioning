@@ -35,6 +35,16 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 	if os.Getenv("CLDT_NATIVE_CLOUD_WITHDRAWAL") != "1" {
 		t.Skip("requires isolated guest namespaces")
 	}
+	for _, phase := range []string{"", "prepare", "switch", "drain", "retire", "abort"} {
+		name := phase
+		if name == "" {
+			name = "completed"
+		}
+		t.Run(name, func(t *testing.T) { nativeCloudNeighborWithdrawal(t, phase) })
+	}
+}
+
+func nativeCloudNeighborWithdrawal(t *testing.T, phase string) {
 	for _, kind := range []string{"net", "mnt"} {
 		self, e := os.Readlink("/proc/self/ns/" + kind)
 		host, h := os.Readlink("/proc/1/ns/" + kind)
@@ -68,7 +78,7 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 	bootstrap := tunnel.PeersFileDoc{PrivateKey: localKey.String(), LocalAddress: local.CloudAddresses[0], LocalAddress6: local.CloudAddresses[1], Peers: oldPeers, APIServers: []string{"10.90.0.2:6443"}}
 	must(writeDurableJSON(cfg.peersFile, bootstrap))
 	must(writeDurableJSON(cachePath(cfg), tunnel.PeerListDoc{Peers: oldPeers, APIServers: bootstrap.APIServers}))
-	targetJournal := cloudWithdrawalTestJournal(t, target, "target-journal")
+	targetJournal := cloudWithdrawalTestJournal(t, target, "target-journal", phase)
 	localJournal := cloudWithdrawalTestJournal(t, local, "local-journal")
 	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "mesh", UID: types.UID(target.MeshUID), ResourceVersion: "2"}, Data: map[string][]byte{
 		tunnel.NodePublicKeyPrefix + "site": []byte(site.PublicKey().String()), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.90.0.2/24"), tunnel.NodeTunnelAddress6Prefix + "site": []byte("fd90::2/64"), tunnel.NodeAddressesPrefix + "site": []byte("10.90.0.2,fd90::2"),
@@ -78,6 +88,11 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 		{Site: true, NodeName: "site", NodeUID: "site-uid", PublicKey: site.PublicKey().String()},
 		{NodeName: local.CloudNodeName, NodeUID: local.CloudNodeUID, MachineName: local.MachineName, SecretUID: local.AdoptionUID, TunnelAddress: "172.29.0.3", PublicKey: local.RootPublicKey},
 	}}
+	if phase != "" {
+		raw, err := json.Marshal(intent)
+		must(err)
+		targetJournal.Data["withdrawal-intent-sha256"] = tunnel.HashPeerList(raw)
+	}
 	retirement, err := json.Marshal(map[string]any{"version": 1, "journalSHA256": tunnel.HashPeerList([]byte(targetJournal.Data["transition.json"])), "withdrawal": intent})
 	must(err)
 	inventory := tunnel.ReceiveInventory{Version: 1, ClusterUID: "native-cluster", Namespace: "test", MeshName: "mesh", MeshUID: target.MeshUID, MachineUIDs: []string{local.MachineUID, target.MachineUID}, Publications: map[string]tunnel.ReceiveJournalPublication{
@@ -340,7 +355,7 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 	}
 }
 
-func cloudWithdrawalTestJournal(t *testing.T, plan tunnel.ReceiveTransitionPlan, uid string) *corev1.ConfigMap {
+func cloudWithdrawalTestJournal(t *testing.T, plan tunnel.ReceiveTransitionPlan, uid string, interrupted ...string) *corev1.ConfigMap {
 	t.Helper()
 	must := func(err error) {
 		t.Helper()
@@ -353,12 +368,23 @@ func cloudWithdrawalTestJournal(t *testing.T, plan tunnel.ReceiveTransitionPlan,
 	spec, err := tunnel.ReceiveTransitionSpec(plan, "native-cluster", fmt.Sprintf("%x", sha256.Sum256(raw)))
 	must(err)
 	at := time.Now().Add(-10 * time.Second)
+	phase := ""
+	if len(interrupted) > 0 {
+		phase = interrupted[0]
+	}
+	if phase != "" {
+		at = time.Now().Add(-time.Hour)
+	}
 	transition, err := handover.NewTransition(spec, at, handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: time.Minute, DrainInterval: time.Second})
 	must(err)
+	if phase == "abort" {
+		transition, err = transition.Rollback(at.Add(time.Second))
+		must(err)
+	}
 	for i := 0; i < 6; i++ {
 		view, err := transition.View()
 		must(err)
-		if view.Complete {
+		if view.Complete || string(view.Round.Phase) == phase {
 			break
 		}
 		at = at.Add(time.Second)

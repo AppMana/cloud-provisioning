@@ -15,6 +15,9 @@ import (
 // Native ownership, withdrawal and durable recovery remain separate admission.
 func admitReceiveFollowerJournalPath(data map[string][]byte, nodeName, nodeUID string, snapshot handover.Snapshot, clusterUID string, now time.Time, check func(tunnel.ReceiveTransitionSite, handover.Receipt) error) (tunnel.ReceiveSitePath, error) {
 	fail := func(err error) (tunnel.ReceiveSitePath, error) { return tunnel.ReceiveSitePath{}, err }
+	if snapshot.WithdrawalIntentHash() != "" {
+		return fail(fmt.Errorf("interrupted follower journal is fenced for withdrawal"))
+	}
 	if nodeName == "" || nodeUID == "" {
 		return fail(fmt.Errorf("follower requires exact local Node identity"))
 	}

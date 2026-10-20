@@ -62,12 +62,39 @@ func AdvanceReceiveRemoval(ctx context.Context, api kubernetes.Interface, store 
 		if err != nil {
 			return false, err
 		}
-		// Waiting for transport completion is normal lifecycle progress, not
-		// a failed reconciliation. Keep the caller's bounded pending retry;
-		// error backoff can otherwise outlive the next receipt window.
-		// Only FreezeCompleted may establish the retirement write fence.
+		// An executable transport retains its normal bounded retry. An expired
+		// transport can no longer complete through fresh phase receipts; fence
+		// its exact lifecycle intent without pretending that it completed.
 		if !view.Complete {
-			return false, nil
+			now := time.Now()
+			if now.Before(view.Round.ExpiresAt) {
+				return false, nil
+			}
+			// The fence is irreversible. Reject an incomplete or stale capture
+			// before binding it, rather than leaving an unusable frozen journal.
+			if intent.Orphaned || intent.DrainIntent == "" || intent.SourceVersion == "" ||
+				string(mesh.Data[tunnel.PeerPublicKeyPrefix+intent.MachineName]) != intent.PublicKey {
+				return false, fmt.Errorf("interrupted withdrawal requires a published drained owner")
+			}
+			if (intent.SourceDataHash != "" && intent.SourceDataHash != withdrawalSourceDataHash(mesh.Data)) ||
+				(intent.SourceDataHash == "" && intent.SourceVersion != mesh.ResourceVersion) {
+				return false, fmt.Errorf("interrupted withdrawal capture changed before freezing")
+			}
+			if _, _, err := intent.receiveWithdrawalConsumers(plan); err != nil {
+				return false, err
+			}
+			digest, err := intent.withdrawalIntentHash()
+			if err != nil {
+				return false, err
+			}
+			if err := tunnel.ValidateReceiveTransportHistory(ctx, store, snapshot); err != nil {
+				return false, err
+			}
+			if err := authorize(ctx, intent); err != nil {
+				return false, err
+			}
+			_, err = store.FreezeExpiredWithdrawal(ctx, snapshot, digest, now)
+			return false, err
 		}
 		_, err = store.FreezeCompleted(ctx, snapshot)
 		return false, err

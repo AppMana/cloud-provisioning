@@ -192,7 +192,7 @@ func verifyStandalonePendingTransition(t *testing.T, api client.Client, core kub
 		_, err = store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{})
 		must(err)
 	}()
-	for _, scenario := range []string{"prepare", "switch", "drain", "retire", "abort", "expired-prepare", "malformed"} {
+	for _, scenario := range []string{"prepare", "switch", "drain", "retire", "abort", "malformed"} {
 		t.Run("pending-transition/"+scenario, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -201,9 +201,6 @@ func verifyStandalonePendingTransition(t *testing.T, api client.Client, core kub
 				}
 			}
 			at := time.Now()
-			if scenario == "expired-prepare" {
-				at = at.Add(-time.Hour)
-			}
 			tr, err := handover.NewTransition(spec, at, handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: 30 * time.Second, DrainInterval: time.Second})
 			must(err)
 			if scenario == "abort" {

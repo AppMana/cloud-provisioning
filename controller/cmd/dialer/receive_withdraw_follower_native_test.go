@@ -30,14 +30,18 @@ func TestNativeCombinedFollowerWithdrawal(t *testing.T) {
 	if os.Getenv("CLDT_NATIVE_COMBINED_FOLLOWER") != "1" {
 		t.Skip("requires isolated guest namespaces")
 	}
-	for _, name := range []string{"legacy-cache", "interrupted-worker-routes", "empty-legacy-cache"} {
+	for _, name := range []string{"legacy-cache", "interrupted-worker-routes", "empty-legacy-cache", "expired-prepare", "expired-switch", "expired-drain", "expired-retire", "expired-abort"} {
 		t.Run(name, func(t *testing.T) {
-			nativeCombinedFollowerWithdrawal(t, name != "legacy-cache", name == "empty-legacy-cache")
+			phase := ""
+			if strings.HasPrefix(name, "expired-") {
+				phase = strings.TrimPrefix(name, "expired-")
+			}
+			nativeCombinedFollowerWithdrawal(t, name != "legacy-cache", name == "empty-legacy-cache", phase)
 		})
 	}
 }
 
-func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLegacy bool) {
+func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLegacy bool, phase string) {
 	for _, kind := range []string{"net", "mnt"} {
 		self, e := os.Readlink("/proc/self/ns/" + kind)
 		host, h := os.Readlink("/proc/1/ns/" + kind)
@@ -57,7 +61,7 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLeg
 	site, _ := wgtypes.GeneratePrivateKey()
 	survivor, _ := wgtypes.GeneratePrivateKey()
 	plan := receiveRestoreTestPlan(t, root, site)
-	journal := cloudWithdrawalTestJournal(t, plan, "target-journal")
+	journal := cloudWithdrawalTestJournal(t, plan, "target-journal", phase)
 	cfg := config{iface: "no-tunnel", nodeName: "follower", secretNamespace: "test", secretName: "mesh", privateKeyFile: filepath.Join(t.TempDir(), "key"), routeTable: 518, fwmark: 518, bgpListenPort: -1, receiptPodName: "agent", receiptPodUID: "agent-uid"}
 	must(os.WriteFile(cfg.privateKeyFile, []byte(key.String()), 0600))
 	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "mesh", UID: "restore-mesh", ResourceVersion: "1"}, Data: map[string][]byte{
@@ -93,6 +97,11 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLeg
 		{Site: true, NodeName: "follower", NodeUID: "follower-uid"},
 		{NodeName: "survivor", NodeUID: "survivor-uid", MachineName: "survivor", SecretUID: "survivor-adoption", TunnelAddress: "172.29.0.3", PublicKey: survivor.PublicKey().String()},
 	}}
+	if phase != "" {
+		raw, err := json.Marshal(intent)
+		must(err)
+		journal.Data["withdrawal-intent-sha256"] = tunnel.HashPeerList(raw)
+	}
 	retirement, err := json.Marshal(map[string]any{"version": 1, "journalSHA256": tunnel.HashPeerList([]byte(journal.Data["transition.json"])), "withdrawal": intent})
 	must(err)
 	inventory := tunnel.ReceiveInventory{Version: 1, ClusterUID: "native-cluster", Namespace: "test", MeshName: "mesh", MeshUID: plan.MeshUID, MachineUIDs: []string{plan.MachineUID}, Publications: map[string]tunnel.ReceiveJournalPublication{plan.MachineUID: {JournalUID: string(journal.UID), Retirement: retirement}}}

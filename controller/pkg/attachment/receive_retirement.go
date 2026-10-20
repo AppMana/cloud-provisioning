@@ -1,6 +1,7 @@
 package attachment
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -8,6 +9,32 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
 )
+
+// withdrawalIntentHash uses the same persisted intent fields at freeze, publication
+// and historical release admission. It binds authority, not native completion.
+func (w RemoteWithdrawalIntent) withdrawalIntentHash() (string, error) {
+	raw, err := json.Marshal(w)
+	if err != nil {
+		return "", err
+	}
+	return tunnel.HashPeerList(raw), nil
+}
+
+func (w RemoteWithdrawalIntent) validateJournalWithdrawalFence(snapshot handover.Snapshot) error {
+	if !snapshot.RetirementFrozen() {
+		return fmt.Errorf("journal lacks a retirement write fence")
+	}
+	if bound := snapshot.WithdrawalIntentHash(); bound != "" {
+		digest, err := w.withdrawalIntentHash()
+		if err != nil {
+			return err
+		}
+		if digest != bound {
+			return fmt.Errorf("interrupted retirement lifecycle intent changed")
+		}
+	}
+	return nil
+}
 
 // ReceiveRetirementPlan binds a previously persisted withdrawal intent to a
 // frozen, still-reserved journal and a published withdrawal. It does not infer
@@ -73,9 +100,8 @@ func (w RemoteWithdrawalIntent) receiveRetirementPlan(snapshot handover.Snapshot
 	if err != nil {
 		return fail(err.Error())
 	}
-	view, err := snapshot.Transition().View()
-	if err != nil || !view.Complete || view.ServingGeneration == "" {
-		return fail("journal has not completed")
+	if err := w.validateJournalWithdrawalFence(snapshot); err != nil {
+		return fail(err.Error())
 	}
 	if p.Namespace != w.MeshNamespace || p.MeshName != w.MeshName || p.MeshUID != w.MeshUID || p.MachineName != w.MachineName || p.MachineUID != w.MachineUID || p.RootPublicKey != w.PublicKey {
 		return fail("withdrawal differs from journal ownership")

@@ -983,6 +983,21 @@ absence, authenticated joint completion, atomic release, stale-worker replay,
 address reuse, live continuity or rollback to readers predating version five.
 Those gates remain mandatory before deployment or resource release.
 
+Real-token joint fixtures cover two surviving consumers for completed and
+interrupted histories. Require rejection without inventory mutation for missing
+consumers, individual-worker and wrong-member digests, expired observations,
+invalid tokens, old containers and cancellation. Finalizing one member changes
+receipt authority; another member must obtain fresh authenticated observations
+before finalizing. An earlier batch must not be silently rebased.
+
+Retained joint history must load and verify every member journal and consumed
+finalization, require identical explicit member sets, and pin their revisions.
+Historical readback must survive later mesh ownership without granting cleanup
+or active allocation authority over a replacement. Reject missing members,
+replaced journal incarnations and mismatched groups. Reader fixtures simulate
+moving authenticated records together into retained storage; they do not qualify
+an atomic release writer, native absence, reboot recovery or live address reuse.
+
 Finalized agent execution verifies historical finalization against its freshly
 admitted retirement set instead of reconstructing the same ancestry again.
 Initial and post-native admission still read and validate the full history;

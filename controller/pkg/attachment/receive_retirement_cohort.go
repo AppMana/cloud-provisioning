@@ -61,6 +61,10 @@ func (s ReceiveRetirementSet) RetirementCohort() (ReceiveRetirementCohort, error
 // The explicit member set is also used to validate historically consumed joint
 // evidence. Later withdrawals do not retroactively change an old observation.
 func (s ReceiveRetirementSet) retirementCohortFor(members []string) (ReceiveRetirementCohort, error) {
+	return s.retirementCohortMembers(members, false)
+}
+
+func (s ReceiveRetirementSet) retirementCohortMembers(members []string, historical bool) (ReceiveRetirementCohort, error) {
 	fail := func(err error) (ReceiveRetirementCohort, error) { return ReceiveRetirementCohort{}, err }
 	if len(members) == 0 || !slices.IsSorted(members) || !slices.Contains(members, s.Withdrawal.MachineUID) {
 		return fail(fmt.Errorf("invalid joint retirement member set"))
@@ -76,13 +80,14 @@ func (s ReceiveRetirementSet) retirementCohortFor(members []string) (ReceiveReti
 		if !ok {
 			return fail(fmt.Errorf("joint retirement journal missing"))
 		}
-		w, err := ReadReceiveWithdrawal(s.Inventory, uid, snapshot, s.Mesh)
+		w, plan, err := retainedReceiveWithdrawal(s.Inventory, uid, snapshot, s.Inventory.Publications[uid])
 		if err != nil {
 			return fail(err)
 		}
-		plan, err := tunnel.DecodeReceiveTransition(snapshot, s.Inventory.ClusterUID)
-		if err != nil {
-			return fail(err)
+		if !historical {
+			if _, err := ReadReceiveWithdrawal(s.Inventory, uid, snapshot, s.Mesh); err != nil {
+				return fail(err)
+			}
 		}
 		if _, exists := plans[plan.CloudNodeUID]; exists {
 			return fail(fmt.Errorf("joint retirement reuses a worker identity"))
@@ -189,7 +194,7 @@ func (s ReceiveRetirementSet) completionConsumers(completion receiveRetirementCo
 	if len(completion.Cohort) < 2 {
 		return nil, fmt.Errorf("joint completion requires multiple members")
 	}
-	cohort, err := s.retirementCohortFor(completion.Cohort)
+	cohort, err := s.retirementCohortMembers(completion.Cohort, true)
 	if err != nil {
 		return nil, err
 	}

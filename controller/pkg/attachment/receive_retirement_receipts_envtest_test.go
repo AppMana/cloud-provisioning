@@ -255,6 +255,11 @@ func verifyRetirementReceiptAuthenticationRealAPI(t *testing.T, history string) 
 	if _, err := scope.AuthenticateComplete(ctx, fresh, policies, time.Minute); err != nil {
 		t.Fatal("fresh replacement observation rejected", err)
 	}
+	if history == "forward" || history == "interrupted-switch" {
+		t.Run("joint-authentication", func(t *testing.T) {
+			verifyJointRetirementAuthentication(t, api, verifier, nodes, fresh, history)
+		})
+	}
 	verifyRetirementAuthenticatedCommit(t, api, verifier, nodes[0], pods[0], fresh[0], history)
 	pods[0].Status.ContainerStatuses[0].ImageID = "sha256:" + strings.Repeat("b", 64)
 	pods[0], err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pods[0], metav1.UpdateOptions{})

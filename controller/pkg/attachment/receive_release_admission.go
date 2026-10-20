@@ -3,6 +3,7 @@ package attachment
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
@@ -65,32 +66,8 @@ func ReadReleasedReceiveJournal(ctx context.Context, api kubernetes.Interface, s
 	if err := tunnel.ValidateReceiveTransportHistory(ctx, store, snapshot); err != nil {
 		return fail(err)
 	}
-	plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
+	w, plan, err := retainedReceiveWithdrawal(inventory, machineUID, snapshot, publication)
 	if err != nil {
-		return fail(err)
-	}
-	if !snapshot.RetirementFrozen() || plan.MachineUID != machineUID || plan.Namespace != namespace || plan.MeshName != meshName || plan.MeshUID != meshUID {
-		return fail(fmt.Errorf("released journal scope or retirement fence changed"))
-	}
-	record, err := decodeReceiveWithdrawalRecord(publication.Retirement, machineUID)
-	if err != nil {
-		return fail(err)
-	}
-	history, err := snapshot.Transition().Bytes()
-	if err != nil {
-		return fail(err)
-	}
-	w := record.Withdrawal
-	if err := w.validateJournalWithdrawalFence(snapshot); err != nil {
-		return fail(err)
-	}
-	if record.JournalSHA256 != tunnel.HashPeerList(history) || w.MeshNamespace != namespace || w.MeshName != meshName || w.MeshUID != meshUID || w.MachineName != plan.MachineName || w.PublicKey != plan.RootPublicKey || w.SourceVersion == "" || w.DrainIntent == "" {
-		return fail(fmt.Errorf("released withdrawal differs from retained journal"))
-	}
-	if w.Orphaned && (w.DrainIntent != "orphan:"+string(snapshot.Metadata().UID) || w.SourceDataHash == "") {
-		return fail(fmt.Errorf("released orphan identity changed"))
-	}
-	if _, _, err := w.receiveWithdrawalConsumers(plan); err != nil {
 		return fail(err)
 	}
 	mesh, err := api.CoreV1().Secrets(namespace).Get(ctx, meshName, metav1.GetOptions{})
@@ -105,12 +82,61 @@ func ReadReleasedReceiveJournal(ctx context.Context, api kubernetes.Interface, s
 	// stays private. Never expose the retired owner as active routing authority.
 	projected := source
 	projected.Inventory.Publications = map[string]tunnel.ReceiveJournalPublication{machineUID: publication}
-	ok, err := validateReceiveRetirementFinalization(projected, store.ClusterUID, machineUID, inventoryUID, maxAge, time.Now())
-	if err != nil {
+	var completion receiveRetirementCompletion
+	if err := decodeRetirementEvidence(publication.RetirementCompletion, &completion); err != nil {
 		return fail(err)
 	}
-	if !ok {
-		return fail(fmt.Errorf("released journal lacks verified historical finalization"))
+	members := []string{machineUID}
+	if completion.Version == receiveRetirementCohortCompletionVersion {
+		if len(completion.Cohort) < 2 || !slices.Contains(completion.Cohort, machineUID) {
+			return fail(fmt.Errorf("released joint completion has invalid membership"))
+		}
+		members = completion.Cohort
+		for _, uid := range members {
+			if uid == machineUID {
+				continue
+			}
+			member, found := inventory.Released[uid]
+			if !found {
+				return fail(fmt.Errorf("released joint history omitted a member"))
+			}
+			memberStore := store
+			memberStore.Name, memberStore.ExpectedUID = tunnel.ReceiveTransitionName(uid), member.JournalUID
+			retained, err := memberStore.Load(ctx)
+			if err != nil {
+				return fail(err)
+			}
+			if err := tunnel.ValidateReceiveTransportHistory(ctx, memberStore, retained); err != nil {
+				return fail(err)
+			}
+			if _, _, err := retainedReceiveWithdrawal(inventory, uid, retained, member); err != nil {
+				return fail(err)
+			}
+			source.Journals[uid] = retained
+			projected.Inventory.Publications[uid] = member
+		}
+	}
+	for _, uid := range members {
+		member := projected.Inventory.Publications[uid]
+		var evidence receiveRetirementCompletion
+		if err := decodeRetirementEvidence(member.RetirementCompletion, &evidence); err != nil {
+			return fail(err)
+		}
+		if completion.Version == receiveRetirementCohortCompletionVersion && (evidence.Version != completion.Version || !slices.Equal(evidence.Cohort, members)) {
+			return fail(fmt.Errorf("released joint completions disagree on membership"))
+		}
+		withdrawal, _, err := retainedReceiveWithdrawal(inventory, uid, source.Journals[uid], member)
+		if err != nil {
+			return fail(err)
+		}
+		projected.Withdrawal = withdrawal
+		ok, err := validateReceiveRetirementFinalization(projected, store.ClusterUID, uid, inventoryUID, maxAge, time.Now())
+		if err != nil {
+			return fail(err)
+		}
+		if !ok {
+			return fail(fmt.Errorf("released journal lacks verified historical finalization"))
+		}
 	}
 	if err := source.Recheck(ctx, api, store); err != nil {
 		return fail(err)

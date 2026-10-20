@@ -59,38 +59,52 @@ func visitReceiveRelayDependencies(intent tunnel.ReceiveJournalRoutes, nodeUID, 
 			if !found || owner.NodeUID == nodeUID {
 				return fail("relay identity missing or self-referential")
 			}
-			ownerPath := owner.Forward
-			if legacy {
-				ownerPath = owner.Legacy
+			if err := visitReceiveRelaySwitch(owner, path.PeerPublicKey, legacy, view, now, check); err != nil {
+				return err
 			}
-			if ownerPath == nil || ownerPath.Transit != nil || ownerPath.PeerPublicKey != path.PeerPublicKey {
-				return fail("selected relay has no committed direct path")
+		}
+	}
+	return nil
+}
+
+// Shared by receiver participants and unpublished followers. The caller has
+// already selected the generation and resolved its exact relay Node identity.
+// A handshake does not replace these authenticated switch observations.
+func visitReceiveRelaySwitch(owner tunnel.ReceiveTransitionSite, public string, legacy bool, view handover.View, now time.Time, check func(tunnel.ReceiveTransitionSite, handover.Receipt) error) error {
+	fail := func(reason string) error { return fmt.Errorf("relay forwarding dependency: %s", reason) }
+	if view.Complete || view.Round.Phase != handover.Switch {
+		return fail("forwarding observation requires an unfinished switch")
+	}
+	ownerPath := owner.Forward
+	if legacy {
+		ownerPath = owner.Legacy
+	}
+	if ownerPath == nil || ownerPath.Transit != nil || ownerPath.PeerPublicKey != public {
+		return fail("selected relay has no committed direct path")
+	}
+	var proofs []handover.AuthenticatedReceipt
+	required := 0
+	for _, member := range view.Round.Members {
+		if member.NodeUID != owner.NodeUID {
+			continue
+		}
+		required++
+		for _, receipt := range view.Observed {
+			if receipt.NodeUID == member.NodeUID && receipt.DeviceID == member.DeviceID {
+				proofs = append(proofs, handover.AuthenticatedReceipt{AuthenticatedNodeUID: receipt.NodeUID, Receipt: receipt})
 			}
-			var proofs []handover.AuthenticatedReceipt
-			required := 0
-			for _, member := range view.Round.Members {
-				if member.NodeUID != owner.NodeUID {
-					continue
-				}
-				required++
-				for _, receipt := range view.Observed {
-					if receipt.NodeUID == member.NodeUID && receipt.DeviceID == member.DeviceID {
-						proofs = append(proofs, handover.AuthenticatedReceipt{AuthenticatedNodeUID: receipt.NodeUID, Receipt: receipt})
-					}
-				}
-			}
-			if required == 0 || len(proofs) != required {
-				return fail("selected relay has not verified this switch")
-			}
-			if err := view.Round.ValidateReceipts(now, proofs); err != nil {
-				return fail("selected relay observation is stale or does not bind this round")
-			}
-			if check != nil {
-				for _, proof := range proofs {
-					if err := check(owner, proof.Receipt); err != nil {
-						return err
-					}
-				}
+		}
+	}
+	if required == 0 || len(proofs) != required {
+		return fail("selected relay has not verified this switch")
+	}
+	if err := view.Round.ValidateReceipts(now, proofs); err != nil {
+		return fail("selected relay observation is stale or does not bind this round")
+	}
+	if check != nil {
+		for _, proof := range proofs {
+			if err := check(owner, proof.Receipt); err != nil {
+				return err
 			}
 		}
 	}

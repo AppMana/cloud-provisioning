@@ -49,6 +49,9 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 	foreignSite, err := wgtypes.GeneratePrivateKey()
 	must(err)
 	plan := receiveRestoreTestPlan(t, foreignRoot, foreignSite)
+	plan.Desired.Peers[0].RouteHosts = []string{"10.90.0.2", "fd90::2"}
+	plan.Base, err = json.Marshal(plan.Desired)
+	must(err)
 	plan.Namespace, plan.MeshName, plan.MeshUID = scope.Namespace, scope.MeshName, scope.MeshUID
 	plan.MachineName, plan.MachineUID = "observer-foreign", "observer-foreign-uid"
 	plan.AdoptionName = tunnel.AdoptionSecretName(plan.MachineName)
@@ -117,6 +120,15 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 			delete(m.Data, tunnel.NodePublicKeyPrefix+cfg.nodeName)
 			delete(m.Data, tunnel.NodeTunnelAddressPrefix+cfg.nodeName)
 			delete(m.Data, tunnel.NodeTunnelAddress6Prefix+cfg.nodeName)
+			if strings.HasPrefix(fault, "callback-") {
+				if m.Data == nil {
+					m.Data = map[string][]byte{}
+				}
+				m.Data[tunnel.PeerPublicKeyPrefix+plan.MachineName] = []byte(plan.RootPublicKey)
+				m.Data[tunnel.NodePublicKeyPrefix+member.NodeName] = []byte(pub)
+				m.Data[tunnel.NodeAddressesPrefix+member.NodeName] = []byte("10.90.0.2,fd90::2")
+				m.Data[tunnel.SiteAddressesPrefix+cfg.nodeName] = []byte("10.90.0.4,fd90::4")
+			}
 			m, e = api.CoreV1().Secrets(scope.Namespace).Update(ctx, m, metav1.UpdateOptions{})
 			must(e)
 			i, e := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
@@ -229,6 +241,13 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 						t.Fatal("observer callback lacks bounded authority")
 					}
 					must(check())
+					projected, err := admitReceiveFollowerJournalPath(admitted.Mesh.Data, admitted.Node.Name, string(admitted.Node.UID), admitted.Journals[plan.MachineUID], store.ClusterUID, time.Now(), func(owner tunnel.ReceiveTransitionSite, receipt handover.Receipt) error {
+						return handover.VerifyObservationIncarnation(useCtx, api, scope.Namespace, owner.NodeName, receipt)
+					})
+					must(err)
+					if projected.Transit == nil || projected.Transit.Via != "10.90.0.2" || projected.Transit.ViaOtherFamily != "fd90::2" {
+						t.Fatal("observer admission lost the worker's committed relay")
+					}
 					switch fault {
 					case "callback-mesh-race", "callback-post-use-race":
 						obj, err := api.CoreV1().Secrets(scope.Namespace).Get(useCtx, scope.MeshName, metav1.GetOptions{})

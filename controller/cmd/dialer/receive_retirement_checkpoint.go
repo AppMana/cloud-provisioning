@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -32,6 +33,13 @@ func sameReceiveRetirement(a, b admittedReceiveRetirement) bool {
 // That order fences old serving-state recovery even if a later write fails.
 // This is retirement intent, never evidence that native cleanup completed.
 func checkpointReceiveRetirementLocked(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, admitted admittedReceiveRetirement) error {
+	return checkpointReceiveRetirementWithReleasedLocked(ctx, api, store, scope, cfg, key, lockPath, admitted, nil)
+}
+
+// A set checkpoint may pass its already authenticated release histories. The
+// exact next checkpoint must match, and live rechecks still run at each write.
+// The admission is local to this locked operation, never a reconciliation cache.
+func checkpointReceiveRetirementWithReleasedLocked(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, admitted admittedReceiveRetirement, shared *receiveReleasedCheckpointAdmission) error {
 	if admitted.Mesh == nil || scope.Namespace != admitted.Mesh.Namespace || scope.MeshName != admitted.Mesh.Name || scope.MeshUID != string(admitted.Mesh.UID) || scope.MachineUID != admitted.Withdrawal.MachineUID || store.Name != tunnel.ReceiveTransitionName(scope.MachineUID) {
 		return fmt.Errorf("retirement checkpoint differs from admitted scope")
 	}
@@ -44,9 +52,22 @@ func checkpointReceiveRetirementLocked(ctx context.Context, api kubernetes.Inter
 	}
 	next := receiveInventoryCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), Inventory: admitted.Inventory, NodeName: cfg.nodeName, NodeUID: admitted.NodeUID, BootID: admitted.BootID, PublicKey: key.PublicKey().String()}
 	path := lockPath + ".inventory.json"
-	released, err := admitReleasedReceiveCheckpoints(ctx, api, store, scope, cfg, key, lockPath, next, admitted.Metadata)
-	if err != nil {
-		return err
+	var released receiveReleasedCheckpointAdmission
+	if shared == nil {
+		var err error
+		released, err = admitReleasedReceiveCheckpoints(ctx, api, store, scope, cfg, key, lockPath, next, admitted.Metadata)
+		if err != nil {
+			return err
+		}
+	} else {
+		raw, err := json.Marshal(next)
+		if err != nil {
+			return err
+		}
+		if shared.nextSHA == "" || shared.nextSHA != tunnel.HashPeerList(raw) || len(shared.records) != len(next.Inventory.Released) {
+			return fmt.Errorf("shared released checkpoint admission differs from write")
+		}
+		released = *shared
 	}
 	if err := validateReceiveInventoryCheckpointWithRelease(path, next, released); err != nil {
 		return err

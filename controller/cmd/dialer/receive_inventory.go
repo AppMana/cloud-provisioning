@@ -204,13 +204,17 @@ func checkpointReceiveSetLocked(ctx context.Context, api kubernetes.Interface, s
 	if err := validateReceiveInventoryCheckpointWithRelease(path, next, released); err != nil {
 		return err
 	}
+	var sharedReleased *receiveReleasedCheckpointAdmission
+	if len(released.records) > 0 {
+		sharedReleased = &released
+	}
 	// Retirement checkpoints retain withdrawn local histories and fence old
 	// boot recovery before active histories can be refreshed.
 	for uid, retired := range admitted.Retirements {
 		retiredStore, retiredScope := store, scope
 		retiredStore.Name, retiredScope.MachineUID = tunnel.ReceiveTransitionName(uid), uid
 		retiredStore.ExpectedUID = string(retired.Journals[uid].Metadata().UID)
-		if err := checkpointReceiveRetirementLocked(ctx, api, retiredStore, retiredScope, cfg, key, lockPath, retired); err != nil {
+		if err := checkpointReceiveRetirementWithReleasedLocked(ctx, api, retiredStore, retiredScope, cfg, key, lockPath, retired, sharedReleased); err != nil {
 			return err
 		}
 	}

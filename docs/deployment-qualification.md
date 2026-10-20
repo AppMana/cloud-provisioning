@@ -685,6 +685,16 @@ must match retained history. The retired worker cannot admit survivor release.
 Only this admission permits the corresponding active membership to shrink; the
 ordinary checkpoint validator still rejects shrinkage. Bind admission to the exact
 proposed checkpoint and recheck sources and current Node/boot at the write boundary.
+Within one locked set checkpoint, nested retirement checkpoints may reuse that
+released-history admission only when its binding matches the exact proposed
+inventory checkpoint. Each nested write still rechecks current sources and
+Node/boot identity. Do not retain this admission across reconciliation passes.
+The mixed serving/retiring/released regression uses real API storage and
+synthetic legacy finalization, with no native callback. It checks bounded
+released-history reads and rejects empty or mismatched admission, changed
+membership, cancellation and changed released journals without rewriting the
+inventory. It does not establish live cleanup, release policy, reboot recovery
+or production convergence latency.
 
 Real-API/filesystem tests cover finalized and withdrawal-only fences, simulated
 previous boots, missing or changed local records, non-private files, missing

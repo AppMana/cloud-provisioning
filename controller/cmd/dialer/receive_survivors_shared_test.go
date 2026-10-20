@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -196,6 +198,9 @@ func verifySharedSurvivorRetirements(t *testing.T, api kubernetes.Interface, sto
 			}
 		})
 	}
+	t.Run("checkpoint-shares-released-admission", func(t *testing.T) {
+		verifySharedReleasedCheckpoint(t, api, store, scope, retiring, thirdStore, key)
+	})
 	t.Run("released-sibling-during-retirement", func(t *testing.T) {
 		inventory, index, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, scope.Namespace, scope.MeshName, scope.MeshUID)
 		must(err)
@@ -233,4 +238,95 @@ func verifySharedSurvivorRetirements(t *testing.T, api kubernetes.Interface, sto
 		})
 	})
 
+}
+
+// Real API storage with synthetic legacy finalization and no native callback.
+// This exercises shared checkpoint admission, not cleanup, release policy or
+// reboot recovery. Reusing history must retain binding and live source fences.
+func verifySharedReleasedCheckpoint(t *testing.T, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, retiring, releasedStore handover.Store, key wgtypes.Key) {
+	ctx := context.Background()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	snapshot, err := releasedStore.Load(ctx)
+	must(err)
+	plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
+	must(err)
+	releasedScope := scope
+	releasedScope.MachineUID = plan.MachineUID
+	seedReceiveFinalization(t, api, releasedStore, releasedScope, false)
+	cfg := config{iface: "sharedrelease", nodeName: "site", privateKeyFile: filepath.Join(t.TempDir(), "key")}
+	lock, err := lockReconciliation(cfg)
+	must(err)
+	defer lock.Close()
+	set, err := loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
+	must(err)
+	must(checkpointReceiveSetLocked(ctx, api, store, scope, cfg, key, lock.Name(), set))
+	source := set.Retirements[plan.MachineUID]
+	must(tunnel.ReleaseReceiveJournal(ctx, store.ConfigMaps, store.ClusterUID, source.Metadata, source.Mesh, source.Journals[plan.MachineUID], source.Inventory.Publications[plan.MachineUID], func() error { return nil }))
+	set, err = loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
+	must(err)
+	reads := 0
+	reader := store
+	reader.ConfigMaps = receiveSetReader{ConfigMapInterface: store.ConfigMaps, before: func(name string) error {
+		if name == releasedStore.Name {
+			reads++
+		}
+		return nil
+	}}
+	must(checkpointReceiveSetLocked(ctx, api, reader, scope, cfg, key, lock.Name(), set))
+	t.Logf("released journal reads in set checkpoint: %d", reads)
+	// Admission authenticates the released history once. Its write-boundary
+	// rechecks remain; nested retirement must not reconstruct that history.
+	if reads > 8 {
+		t.Fatalf("repeated released history admission: %d reads", reads)
+	}
+	var next receiveInventoryCheckpoint
+	raw, err := os.ReadFile(lock.Name() + ".inventory.json")
+	must(err)
+	must(json.Unmarshal(raw, &next))
+	proof, err := admitReleasedReceiveCheckpoints(ctx, api, store, scope, cfg, key, lock.Name(), next, set.Metadata)
+	must(err)
+	var member admittedReceiveRetirement
+	for _, value := range set.Retirements {
+		member = value
+	}
+	memberScope := scope
+	memberScope.MachineUID = member.Withdrawal.MachineUID
+	for _, fault := range []string{"empty", "binding", "membership", "cancelled", "released-source"} {
+		t.Run(fault, func(t *testing.T) {
+			candidate := proof
+			callCtx := ctx
+			switch fault {
+			case "empty":
+				candidate = receiveReleasedCheckpointAdmission{}
+			case "binding":
+				candidate.nextSHA = "wrong"
+			case "membership":
+				candidate.records = nil
+			case "cancelled":
+				var cancel context.CancelFunc
+				callCtx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+			before, err := os.ReadFile(lock.Name() + ".inventory.json")
+			must(err)
+			call := func() error {
+				return checkpointReceiveRetirementWithReleasedLocked(callCtx, api, retiring, memberScope, cfg, key, lock.Name(), member, &candidate)
+			}
+			if fault == "released-source" {
+				verifyReleasedJournalExecutionGuard(t, releasedStore, call)
+			} else if call() == nil {
+				t.Fatal("invalid shared release admission accepted")
+			}
+			after, err := os.ReadFile(lock.Name() + ".inventory.json")
+			must(err)
+			if string(before) != string(after) {
+				t.Fatal("failed admission rewrote durable inventory")
+			}
+		})
+	}
 }

@@ -159,6 +159,15 @@ peers. This diagnostic does not provision a worker or qualify EC2, external
 routers, another Calico build, or migration availability. It cannot replace the
 live AWS campaign or justify relaxing the deployment preconditions on its own.
 
+The AWS workload matrix gives a complete pass its ten-minute matrix window,
+bounded by the row's overall deadline. SSM delivery and observation count
+against that budget; a ready Machine does not prove timely command delivery.
+Retain every unsuccessful pass even if a later pass succeeds. For an observation
+timeout, inspect the original SSM command ID to distinguish delayed delivery,
+guest execution failure and an unobserved result. Later command success does
+not convert the failed campaign into a pass. This matrix checks convergence;
+separate continuous observers establish existing-site availability.
+
 For a separate native IPv6 campaign, use `aws/bootstrap.py --ipv6` when
 creating its infrastructure and `aws/native_access.py --family ipv6` when
 configuring IPAM and observation. The recorded VPC and subnet IPv6 ranges feed

@@ -139,6 +139,10 @@ type Options struct {
 	// later hidden by convergence. It runs synchronously after all probes finish;
 	// observers must treat the matrix as read-only. Attempts start at one.
 	ObservePass func(attempt int, matrix *Matrix)
+	// PassTimeout bounds a complete Converge pass. Zero uses one third of
+	// the convergence window. Slow command transports can use a larger share;
+	// the remaining window and parent context always bound execution.
+	PassTimeout time.Duration
 	// NotRequired names paths the degraded topology no longer promises. They
 	// are reported separately and never counted as successful probes.
 	NotRequired func(from, to string, kind Kind) string
@@ -303,13 +307,17 @@ const passShare = 3
 func Converge(ctx context.Context, p Prober, targets []Target, opts Options, within, every time.Duration) *Matrix {
 	started := time.Now()
 	deadline := started.Add(within)
+	passLimit := opts.PassTimeout
+	if passLimit <= 0 {
+		passLimit = within / passShare
+	}
 	var history []*Matrix
 	for attempt := 1; ; attempt++ {
 		// Each pass on its own clock. Run reaches every node through
 		// the rig, and a probe into a machine that has stopped talking
 		// returns only when something takes it away — which without a
 		// bound here is never, leaving a window that cannot expire.
-		pass, cancel := context.WithTimeout(ctx, min(within/passShare, time.Until(deadline)))
+		pass, cancel := context.WithTimeout(ctx, min(passLimit, time.Until(deadline)))
 		m := Run(pass, p, targets, opts)
 		cancel()
 		m.Elapsed = time.Since(started)

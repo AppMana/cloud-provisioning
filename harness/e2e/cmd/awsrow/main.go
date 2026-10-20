@@ -400,7 +400,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	matrix, recordErr := recordedMatrix(ctx, pods, targets, check.Options{VerifySource: true, Port: check.Port, ExternalURL: check.ExternalURL, UDP: &check.UDPOptions{Tries: 10}}, 10*time.Minute, 10*time.Second, journal)
+	// A complete AWS pass includes hundreds of SSM command observations. Give
+	// it the existing matrix window rather than splitting that budget into
+	// three passes that can repeat already successful work after timing out.
+	const matrixWindow = 10 * time.Minute
+	matrix, recordErr := recordedMatrix(ctx, pods, targets, check.Options{VerifySource: true, Port: check.Port, ExternalURL: check.ExternalURL, UDP: &check.UDPOptions{Tries: 10}, PassTimeout: matrixWindow}, matrixWindow, 10*time.Second, journal)
 	closeErr := journal.Close()
 	if recordErr != nil {
 		return recordErr

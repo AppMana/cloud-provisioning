@@ -9,6 +9,59 @@ import (
 
 type recoveringDNS struct{ calls int }
 
+type delayedDNS struct {
+	delay time.Duration
+	calls int
+}
+
+func (*delayedDNS) HTTPGet(context.Context, string, string) ([]byte, error) {
+	panic("unexpected HTTP probe")
+}
+
+func (p *delayedDNS) Resolve(ctx context.Context, _, _ string) error {
+	p.calls++
+	select {
+	case <-time.After(p.delay):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func TestConvergeAllowsSlowTransportWithinExplicitPassBudget(t *testing.T) {
+	p := &delayedDNS{delay: 900 * time.Millisecond}
+	m := Converge(context.Background(), p, []Target{{Node: "worker"}},
+		Options{PassTimeout: 2 * time.Second}, 2*time.Second, time.Millisecond)
+	if !m.OK() || p.calls != 1 || len(m.PriorPasses) != 0 {
+		t.Fatalf("slow successful probe was interrupted or repeated: calls=%d %s", p.calls, m.Report())
+	}
+}
+
+func TestConvergeExplicitPassBudgetCannotExtendOuterDeadline(t *testing.T) {
+	for _, parent := range []bool{false, true} {
+		t.Run(map[bool]string{false: "window", true: "parent"}[parent], func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			window := 50 * time.Millisecond
+			if parent {
+				var stop context.CancelFunc
+				ctx, stop = context.WithTimeout(ctx, window)
+				defer stop()
+				window = 2 * time.Second
+			}
+			p := &delayedDNS{delay: time.Second}
+			m := Converge(ctx, p, []Target{{Node: "worker"}},
+				Options{PassTimeout: time.Hour}, window, time.Millisecond)
+			if m.OK() || p.calls != 1 || m.Cancelled != parent || m.Failed() != 1 {
+				t.Fatalf("outer deadline was not enforced: calls=%d %s", p.calls, m.Report())
+			}
+			if !errors.Is(m.Results()[0].Err, context.DeadlineExceeded) {
+				t.Fatalf("deadline failure lost: %+v", m.Results())
+			}
+		})
+	}
+}
+
 func (*recoveringDNS) HTTPGet(context.Context, string, string) ([]byte, error) {
 	panic("unexpected HTTP probe")
 }

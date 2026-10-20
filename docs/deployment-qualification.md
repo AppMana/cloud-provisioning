@@ -142,6 +142,23 @@ IPv6 range and delegated /80s. Register cloud nodes with both
 `cloud-provisioning.appmana.com/cni=aws-vpc` before CNI installation. Configure
 site-only Calico first. The observer alone does not install AWS VPC CNI.
 
+Native AWS nodes must not retain `projectcalico.org/IPv4Address` or
+`projectcalico.org/IPv6Address` annotations. The controller rejects these
+conflicting BGP addresses before publishing allocations, including conflicts
+introduced during an EC2 read. It does not delete another CNI's configuration.
+Resolve the ownership conflict before retrying; a successful retry alone does
+not prove that Calico stopped running on the worker.
+
+To qualify native AWS workers with an existing full mesh, observe the site's
+BGP peer identities before registration, while workers run, and after removal,
+in both address families. Require unchanged site adjacency and no cloud peers,
+alongside the CNI ownership and continuous traffic checks above. A synthetic
+Node with InternalIP addresses can isolate peer-discovery behavior; adding BGP
+annotations provides a negative control that the observation detects unwanted
+peers. This diagnostic does not provision a worker or qualify EC2, external
+routers, another Calico build, or migration availability. It cannot replace the
+live AWS campaign or justify relaxing the deployment preconditions on its own.
+
 For a separate native IPv6 campaign, use `aws/bootstrap.py --ipv6` when
 creating its infrastructure and `aws/native_access.py --family ipv6` when
 configuring IPAM and observation. The recorded VPC and subnet IPv6 ranges feed

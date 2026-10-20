@@ -492,12 +492,58 @@ func verifyStandaloneCompletion(t *testing.T, api client.Client, core kubernetes
 	if !record.Removing {
 		t.Fatal("authenticated cleanup did not commit standalone removal")
 	}
+	// Advance evidence age after the durable Removing commit, before asking
+	// CAPI to delete. Provider latency must not restart receipt collection.
+	// This simulates elapsed time, not AWS/CAPA behavior or native cleanup.
+	committed := claim.Annotations[receiveRemovalAnnotation]
+	agedIndex, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+	must(err)
+	var agedInventory tunnel.ReceiveInventory
+	must(json.Unmarshal([]byte(agedIndex.Data["inventory.json"]), &agedInventory))
+	agedPublication := agedInventory.Publications[string(machine.GetUID())]
+	var agedCompletion map[string]any
+	must(json.Unmarshal(agedPublication.RetirementCompletion, &agedCompletion))
+	for _, entry := range agedCompletion["receipts"].([]any) {
+		entry.(map[string]any)["observedAt"] = time.Now().Add(-24 * time.Hour).Format(time.RFC3339Nano)
+	}
+	agedPublication.RetirementCompletion, err = json.Marshal(agedCompletion)
+	must(err)
+	agedInventory.Publications[string(machine.GetUID())] = agedPublication
+	agedRaw, err := json.Marshal(agedInventory)
+	must(err)
+	agedIndex.Data["inventory.json"] = string(agedRaw)
+	agedIndex, err = store.ConfigMaps.Update(ctx, agedIndex, metav1.UpdateOptions{})
+	must(err)
 	r := &Reconciler{Client: api, Reader: api, Workload: api, RetirementAPI: core, MeshName: mesh.Name}
 	_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(claim)})
 	must(err)
 	must(api.Get(ctx, client.ObjectKeyFromObject(machine), machine))
 	if machine.GetDeletionTimestamp() == nil {
 		t.Fatal("committed standalone removal did not reach CAPI deletion")
+	}
+	// The real API holds the Machine on a synthetic provider finalizer. Fresh
+	// reconciler instances model controller restarts while CAPI is pending.
+	// Removing retirement API access makes any accidental re-entry fail.
+	must(api.Get(ctx, client.ObjectKeyFromObject(claim), claim))
+	claimVersion, machineVersion := claim.ResourceVersion, machine.GetResourceVersion()
+	journalBefore, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+	must(err)
+	for attempt := 0; attempt < 3; attempt++ {
+		restarted := &Reconciler{Client: api, Reader: api, MeshName: mesh.Name}
+		result, err := restarted.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(claim)})
+		must(err)
+		if result.RequeueAfter != 10*time.Second {
+			t.Fatal("provider wait must remain pending without error backoff", result)
+		}
+		must(api.Get(ctx, client.ObjectKeyFromObject(claim), claim))
+		must(api.Get(ctx, client.ObjectKeyFromObject(machine), machine))
+		currentIndex, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+		must(err)
+		currentJournal, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+		must(err)
+		if claim.ResourceVersion != claimVersion || machine.GetResourceVersion() != machineVersion || claim.Annotations[receiveRemovalAnnotation] != committed || currentIndex.ResourceVersion != agedIndex.ResourceVersion || currentJournal.ResourceVersion != journalBefore.ResourceVersion {
+			t.Fatal("pending provider deletion restarted or mutated committed retirement")
+		}
 	}
 	inventory, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
 	must(err)

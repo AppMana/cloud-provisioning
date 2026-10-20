@@ -1226,6 +1226,20 @@ cost-control termination, inspect the recorded instance identities again:
 already terminated instances need no further mutation. Preserve failed and
 post-deadline observations separately.
 
+Separate retirement authorization from provider deletion progress. Before the
+claim's durable removal commit, expired or incomplete observations must preserve
+the reservation and prevent a Machine deletion request. After the commit,
+observation expiry must not restart retirement collection. While CAPI holds a
+Machine in deletion, retain the provider object and claim finalizer regardless
+of Ready condition values. After the Machine disappears, wait for any remaining
+provider object's finalizer before completing claim teardown. Repeat these
+transitions across fresh reconciler instances and duplicate completion events.
+Fake-client state tests and real-API deletion tests establish this ordering only;
+they do not establish that CAPA status matches EC2 or bound AWS latency. Live AWS
+qualification must correlate the captured Machine/AWSMachine identity and
+conditions with direct EC2 state reads for that same instance, retaining the
+original operation deadline and reporting the phase that remains pending.
+
 An expired completion must keep standalone claim deletion pending on the
 existing five-second retry cadence, without accepting the expired evidence or
 accumulating reconciliation error backoff. Future or missing observation times,

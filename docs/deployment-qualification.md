@@ -49,6 +49,30 @@ These safeguards do not implement or prove the entire routing/migration
 contract. In particular, a successful allocation observation does not establish
 source preservation, return routing, rollback, or compatibility with live routers.
 
+## BGP migration observations
+
+Stage replacement peer configuration before withdrawing the existing peering
+source. During overlap, inspect established adjacency to every expected peer in
+both address families. Calico can render separate `Node_` and `Mesh_` protocol
+entries for the same peer; an idle duplicate does not by itself prove that
+adjacency is lost. Conversely, counting established sessions without checking
+their peer identities can conceal a missing route to another node.
+Overlap alone does not establish uninterrupted traffic: withdrawing an active
+peering source can still lose packets while its replacement takes over.
+
+Require the final protocol inventory to match the intended configuration, with
+all expected peers established. Record bounded convergence separately from
+continuous workload and management observations: waiting for BGP to converge
+must not erase packet failures, API failures, or sampling gaps. Retain the
+original configuration identities and unrelated settings through restoration.
+
+A site-only rehearsal does not establish compatibility with external routers,
+cloud-node exclusion, or the target's Calico build. Exercise those profiles
+before deployment. Restoration performed by the test process also does not
+establish autonomous rollback after that process or the API becomes unavailable.
+BGP observations do not qualify a pod-MTU change; that requires its own CNI
+configuration ownership and management-availability evidence.
+
 ## AWS observer configuration
 
 Use `awsPodObserver.configMap` containing `scope.json`; optionally supply

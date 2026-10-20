@@ -96,6 +96,9 @@ func dispatchReceivePhases(ctx context.Context, api kubernetes.Interface, cfg co
 		}
 	}
 	if len(targets) == 0 {
+		if cfg.secretName == "" && len(inventory.Released) != 0 {
+			return dispatchUnreservedReceiveCloud(ctx, api, store, cfg, inventory)
+		}
 		// Keep released ownership on the phase-aware path. Ordinary neighbor
 		// admission must verify the retained fences before doing native work.
 		return len(inventory.Released) != 0, nil

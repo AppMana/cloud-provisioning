@@ -983,6 +983,20 @@ Failed admission must preserve checkpoint bytes. This proves local checkpoint
 handling and callback suppression, not actual reboot, live API partition recovery,
 kernel absence, stale-worker execution or address reuse.
 
+New cloud workers unrelated to retained release history must still reach ordinary
+adoption. Dispatch authenticates the released journals with the existing history
+reader and checks active and retired node, key and adoption identities, including
+captured consumers. Local phase files still prohibit ordinary reconciliation;
+failed API reads never authorize bootstrap fallback. Active withdrawal, historical
+identity overlap and name reuse remain on the phase-aware path.
+
+The real-API dispatch scenario uses one unrelated active journal and synthetic
+released evidence. It checks fresh-worker selection, active-key reuse, retired
+adoption identity, retained consumer identity, saved local fences, missing nodes
+and cancellation. It does not prove native adoption or packet continuity. Require
+a fresh provisioned worker to acknowledge its peer list and pass the traffic
+matrix with retained history present; separately qualify reboot and address reuse.
+
 Offline cloud boot admission retains a completed legacy-cloud import marker when
 its inventory, mesh, node, public key and committed base hash match the admitted
 local journal. The marker must be a private regular file and accompany completed

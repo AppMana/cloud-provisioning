@@ -99,6 +99,7 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 	index, err = store.ConfigMaps.Update(ctx, index, metav1.UpdateOptions{})
 	must(err)
 	currentData := index.DeepCopy().Data
+	verifyUnreservedCloudDispatch(t, api, store, scope, foreignRoot, key)
 	for _, fault := range []string{"none", "previous-boot", "missing-fence", "changed-fence", "unknown-journal", "neighbor-owner", "wrong-agent", "cancelled", "inventory-race", "mesh-race", "missing-active-journal"} {
 		t.Run("released-observer/"+fault, func(t *testing.T) {
 			must := func(err error) {

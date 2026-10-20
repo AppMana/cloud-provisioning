@@ -21,7 +21,7 @@ type receiveWithdrawalRecord struct {
 
 // ReserveReceiveWithdrawal persists the captured consumers before peer removal.
 // The caller establishes drain authority and freezes the journal first. Inventory
-// CAS preserves other workers; the journal UID and terminal history remain bound
+// CAS preserves other workers; the journal UID and fenced history remain bound
 // across retries. For ordinary removal this does not publish withdrawal or
 // activate native cleanup. An orphan intent instead records an already absent
 // publication: persisting it makes that intent available to retirement readers.
@@ -81,7 +81,7 @@ func readReceiveWithdrawalStage(inventory tunnel.ReceiveInventory, machineUID st
 		return fail(err)
 	}
 	if record.Version != 1 || record.Withdrawal.MachineUID != machineUID || record.JournalSHA256 != tunnel.HashPeerList(history) {
-		return fail(fmt.Errorf("withdrawal record differs from terminal journal"))
+		return fail(fmt.Errorf("withdrawal record differs from fenced journal"))
 	}
 	if _, err := record.Withdrawal.receiveRetirementPlan(snapshot, inventory, mesh, withdrawn); err != nil {
 		return fail(err)
@@ -92,7 +92,7 @@ func readReceiveWithdrawalStage(inventory tunnel.ReceiveInventory, machineUID st
 // RecordedReceiveWithdrawal decodes persisted intent without granting execution
 // authority. Offline recovery may use it only to exclude peers after matching
 // the entire inventory to a previously verified native observation. Live callers
-// must use ReadReceiveWithdrawal to validate publication and terminal history.
+// must use ReadReceiveWithdrawal to validate publication and fenced history.
 func RecordedReceiveWithdrawal(raw []byte, machineUID string) (RemoteWithdrawalIntent, error) {
 	record, err := decodeReceiveWithdrawalRecord(raw, machineUID)
 	return record.Withdrawal, err

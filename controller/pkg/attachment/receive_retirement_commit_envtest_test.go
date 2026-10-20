@@ -22,7 +22,7 @@ import (
 // Called from the real TokenRequest/TokenReview fixture. Transport history and
 // native absence are synthetic; this proves authenticated persistence, including
 // TLS collection. It does not qualify live deletion or reservation release.
-func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface, policy handover.PodReceiptAuthenticator, node *corev1.Node, pod *corev1.Pod, submission handover.PodReceipt) {
+func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface, policy handover.PodReceiptAuthenticator, node *corev1.Node, pod *corev1.Pod, submission handover.PodReceipt, history string) {
 	t.Helper()
 	ctx := context.Background()
 	must := func(err error) {
@@ -34,7 +34,7 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 	ns := policy.Namespace
 	mesh, err := api.CoreV1().Secrets(ns).Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mesh"}}, metav1.CreateOptions{})
 	must(err)
-	w, fixture, inventory, _ := retirementFixtureForConsumer(t, "forward", true, string(mesh.UID), ns, node.Name, string(node.UID))
+	w, fixture, inventory, _ := retirementFixtureForConsumer(t, history, true, string(mesh.UID), ns, node.Name, string(node.UID))
 	mesh.Data = map[string][]byte{tunnel.NodePublicKeyPrefix + node.Name: []byte(w.Consumers[0].PublicKey), tunnel.PeerPublicKeyPrefix + w.MachineName: []byte(w.PublicKey)}
 	mesh, err = api.CoreV1().Secrets(ns).Update(ctx, mesh, metav1.UpdateOptions{})
 	must(err)
@@ -46,6 +46,11 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 	}
 	must(json.Unmarshal(raw, &checkpoint))
 	checkpoint.Object.UID, checkpoint.Object.ResourceVersion = "", ""
+	if strings.HasPrefix(history, "interrupted-") {
+		digest, err := w.withdrawalIntentHash()
+		must(err)
+		checkpoint.Object.Data["withdrawal-intent-sha256"] = digest
+	}
 	maps := api.CoreV1().ConfigMaps(ns)
 	journal, err := maps.Create(ctx, &checkpoint.Object, metav1.CreateOptions{})
 	must(err)

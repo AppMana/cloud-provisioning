@@ -155,6 +155,11 @@ func verifyJointRetirementAuthentication(t *testing.T, api kubernetes.Interface,
 					}
 				})
 			}
+			if i == 0 {
+				t.Run("sibling-commit-conflict", func(t *testing.T) {
+					verifyRetirementCommitConflictRetry(t, api, stores, snapshots, mesh, string(index.UID), policies, fresh())
+				})
+			}
 			must(RecordReceiveRetirementWithPodReceipts(ctx, api, store, string(index.UID), scope.Digest(), mesh, snapshots[i], fresh(), policies, time.Minute, func() error { return nil }))
 			source, ok, err := ReadVerifiedReceiveRetirementCompletion(ctx, api, store, ns, mesh.Name, string(mesh.UID), intents[i].MachineUID, string(index.UID), time.Minute)
 			must(err)

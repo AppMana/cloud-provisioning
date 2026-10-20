@@ -446,7 +446,9 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, member := range target.Members {
 		all = append(all, batch.entries[[2]string{member.NodeUID, member.DeviceID}])
 	}
-	delete(h.batches, request.MachineUID)
+	if !target.ReadOnlyObserve {
+		delete(h.batches, request.MachineUID)
+	}
 	stage = "completion"
 	completeStarted := time.Now()
 	err = target.Complete(r.Context(), all)
@@ -455,11 +457,17 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		progress.Outcome = "completion-rejected"
 	}
 	if err != nil {
+		// Retirement commits can conflict with a sibling's inventory write.
+		// Keep the original bounded observations for a later authenticated
+		// submission, which repeats resolution and complete authentication.
+		// Changed bindings replace the batch; expiry still prunes credentials.
+		// Never retry the write or renew observation timestamps here.
 		reject(http.StatusConflict)
 		return
 	}
 	if progress != nil {
 		progress.Outcome = "completed"
 	}
+	delete(h.batches, request.MachineUID)
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -491,6 +491,16 @@ expiry after reacquiring the collector gate. A slower request must not erase a
 newer observation or replace a collection installed during its authentication.
 Retirement callbacks retain source checks around authentication, and completion
 reauthenticates the whole batch with exact source checks and inventory CAS.
+After a failed retirement completion, retain independently admitted observations
+only within their original freshness bounds. A later authenticated submission
+must resolve current authority and reauthenticate the complete batch before
+another write; do not retry writes automatically or renew retained timestamps.
+Changed collection bindings and incarnations must discard the old batch.
+Successful completion clears credentials; rejected mutating handover batches
+retain their existing discard behavior. Exercise a real authenticated sibling
+commit racing the inventory CAS, then complete through a single-consumer
+resubmission. Synthetic native observations in that API test do not establish
+live cleanup, reboot recovery, provider deletion or release.
 Synthetic transport tests cover overlap, serialized commits, queued expiry,
 cancellation and concurrent collector changes; they do not establish native
 absence, real API throughput or production freshness. Real authenticated source

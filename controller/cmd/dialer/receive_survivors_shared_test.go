@@ -15,6 +15,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -261,7 +262,7 @@ func verifySharedReleasedCheckpoint(t *testing.T, api kubernetes.Interface, stor
 	cfg := config{iface: "sharedrelease", nodeName: "site", privateKeyFile: filepath.Join(t.TempDir(), "key")}
 	lock, err := lockReconciliation(cfg)
 	must(err)
-	defer lock.Close()
+	defer func() { lock.Close() }()
 	set, err := loadReceiveSet(ctx, api, store, scope, cfg.nodeName, key)
 	must(err)
 	must(checkpointReceiveSetLocked(ctx, api, store, scope, cfg, key, lock.Name(), set))
@@ -296,6 +297,56 @@ func verifySharedReleasedCheckpoint(t *testing.T, api kubernetes.Interface, stor
 	}
 	memberScope := scope
 	memberScope.MachineUID = member.Withdrawal.MachineUID
+	t.Run("nested-native-checkpoint", func(t *testing.T) {
+		candidate := member
+		candidate.releasedCheckpoint = &proof
+		reads = 0
+		memberReader := reader
+		memberReader.Name, memberReader.ExpectedUID = retiring.Name, retiring.ExpectedUID
+		must(checkpointReceiveRetirementLocked(ctx, api, memberReader, memberScope, cfg, key, lock.Name(), candidate))
+		t.Logf("released journal reads in nested checkpoint: %d", reads)
+		if reads > 3 {
+			t.Fatalf("nested checkpoint reconstructed released history: %d reads", reads)
+		}
+	})
+	t.Run("execution-shares-with-native-backend", func(t *testing.T) {
+		pod, err := api.CoreV1().Pods(scope.Namespace).Create(ctx, &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "shared-checkpoint-agent"},
+			Spec:       corev1.PodSpec{NodeName: cfg.nodeName, Containers: []corev1.Container{{Name: "dialer", Image: "test.invalid/agent"}}},
+		}, metav1.CreateOptions{})
+		must(err)
+		pod.Status = corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}, ContainerStatuses: []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://shared", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(time.Now().Add(-time.Minute))}}}}}
+		pod, err = api.CoreV1().Pods(scope.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+		must(err)
+		callCfg := cfg
+		callCfg.receiptPodName, callCfg.receiptPodUID = pod.Name, string(pod.UID)
+		must(lock.Close())
+		defer func() {
+			lock, err = lockReconciliation(cfg)
+			must(err)
+		}()
+		called := false
+		_, err = executeReceiveRetirementCohort(ctx, api, retiring, memberScope, callCfg, key, "containerd://shared", func(run context.Context, path string, admitted admittedReceiveRetirement) error {
+			called = true
+			if admitted.releasedCheckpoint == nil {
+				return fmt.Errorf("execution did not share released admission with native backend")
+			}
+			nested := reader
+			nested.Name, nested.ExpectedUID = retiring.Name, retiring.ExpectedUID
+			reads = 0
+			if err := checkpointReceiveRetirementLocked(run, api, nested, memberScope, callCfg, key, path, admitted); err != nil {
+				return err
+			}
+			if reads > 3 {
+				return fmt.Errorf("native backend reconstructed released history: %d reads", reads)
+			}
+			return nil
+		})
+		must(err)
+		if !called {
+			t.Fatal("native backend was not exercised")
+		}
+	})
 	for _, fault := range []string{"empty", "binding", "membership", "cancelled", "released-source"} {
 		t.Run(fault, func(t *testing.T) {
 			candidate := proof
@@ -315,7 +366,9 @@ func verifySharedReleasedCheckpoint(t *testing.T, api kubernetes.Interface, stor
 			before, err := os.ReadFile(lock.Name() + ".inventory.json")
 			must(err)
 			call := func() error {
-				return checkpointReceiveRetirementWithReleasedLocked(callCtx, api, retiring, memberScope, cfg, key, lock.Name(), member, &candidate)
+				inherited := member
+				inherited.releasedCheckpoint = &candidate
+				return checkpointReceiveRetirementLocked(callCtx, api, retiring, memberScope, cfg, key, lock.Name(), inherited)
 			}
 			if fault == "released-source" {
 				verifyReleasedJournalExecutionGuard(t, releasedStore, call)

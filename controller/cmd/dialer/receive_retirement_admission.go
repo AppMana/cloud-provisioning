@@ -16,6 +16,9 @@ type admittedReceiveRetirement struct {
 	attachment.ReceiveRetirementSet
 	NodeUID, BootID  string
 	ReleasedJournals map[string]handover.Snapshot
+	// Shared only during one locked cohort execution. Every checkpoint still
+	// validates its exact binding and rechecks live sources before writing.
+	releasedCheckpoint *receiveReleasedCheckpointAdmission
 }
 
 // Historical finalization suppresses only receipt renewal. Native cleanup and

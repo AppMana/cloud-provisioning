@@ -73,6 +73,14 @@ func executeReceiveRetirementCohort(ctx context.Context, api kubernetes.Interfac
 		return nil, err
 	}
 	timing.step("checkpoint")
+	if len(admitted.Inventory.Released) > 0 {
+		next := receiveInventoryCheckpoint{Version: 1, InventoryUID: string(admitted.Metadata.UID), Inventory: admitted.Inventory, NodeName: cfg.nodeName, NodeUID: admitted.NodeUID, BootID: admitted.BootID, PublicKey: key.PublicKey().String()}
+		released, err := admitReleasedReceiveCheckpoints(ctx, api, store, scope, cfg, key, lock.Name(), next, admitted.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("released checkpoint admission: %w", err)
+		}
+		admitted.releasedCheckpoint = &released
+	}
 	if err := checkpointReceiveRetirementLocked(ctx, api, store, scope, cfg, key, lock.Name(), admitted); err != nil {
 		return nil, fmt.Errorf("checkpoint: %w", err)
 	}
@@ -100,9 +108,10 @@ func executeReceiveRetirementCohort(ctx context.Context, api kubernetes.Interfac
 			if err != nil {
 				return nil, fmt.Errorf("joint admission: %w", err)
 			}
-			if member.NodeUID != admitted.NodeUID || member.BootID != admitted.BootID {
-				return nil, fmt.Errorf("joint retirement observer changed")
+			if !sameReceiveRetirement(admitted, member) {
+				return nil, fmt.Errorf("joint retirement source or observer changed")
 			}
+			member.releasedCheckpoint = admitted.releasedCheckpoint
 			finalized[uid], err = receiveRetirementFinalized(ctx, api, memberStore, memberScope, member)
 			if err != nil {
 				return nil, fmt.Errorf("joint finalization admission: %w", err)

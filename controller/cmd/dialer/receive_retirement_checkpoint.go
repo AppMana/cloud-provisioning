@@ -33,7 +33,7 @@ func sameReceiveRetirement(a, b admittedReceiveRetirement) bool {
 // That order fences old serving-state recovery even if a later write fails.
 // This is retirement intent, never evidence that native cleanup completed.
 func checkpointReceiveRetirementLocked(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, admitted admittedReceiveRetirement) error {
-	return checkpointReceiveRetirementWithReleasedLocked(ctx, api, store, scope, cfg, key, lockPath, admitted, nil)
+	return checkpointReceiveRetirementWithReleasedLocked(ctx, api, store, scope, cfg, key, lockPath, admitted, admitted.releasedCheckpoint)
 }
 
 // A set checkpoint may pass its already authenticated release histories. The

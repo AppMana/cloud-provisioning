@@ -1160,6 +1160,15 @@ sequential rechecks do not provide an atomic cluster snapshot. These tests use
 synthetic finalization and native callbacks and do not establish live latency,
 fresh multi-consumer quorum, release, reboot or rollback qualification.
 
+Within one locked retirement cohort, reuse the existing released-history
+checkpoint admission across member checkpoints and native backends. Each write
+must still match the exact inventory and local identity binding and recheck live
+released sources. Reject member source changes before sharing that admission.
+Real-API tests bound repeated journal reads and exercise invalid bindings,
+missing records, cancellation and source replacement; native callbacks in this
+fixture only checkpoint intent. These tests do not establish live retirement
+latency, network continuity or freshness convergence.
+
 Unpublished site observers with no local active receiver can advance released
 inventory checkpoints without ordinary-neighbor routing authority. Admission
 validates every active journal and its ancestry, rejects local active or pending

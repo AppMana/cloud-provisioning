@@ -404,8 +404,9 @@ compartments remain pending while other endpoints progress. The helper therefore
 ## Calico address ownership
 
 When the attachment controller manages Calico's stored node address, Linux
-Calico's `IP=autodetect` can select the WireGuard interface and repeatedly
-overwrite that address. The fresh-site harness option
+Calico's `IP=autodetect` can select an underlay or WireGuard address and repeatedly
+overwrite the controller's choice, including during periodic checks without a
+pod restart. The fresh-site harness option
 `-k0s-calico-managed-addresses` removes `IP` from the bundled Linux Calico
 DaemonSet through k0s's supported manifest patches. It is opt-in, requires
 k0s with bundled Calico, and rejects `-reuse-site`.
@@ -413,6 +414,14 @@ k0s with bundled Calico, and rejects `-reuse-site`.
 With `IP` unset, Calico uses an existing stored node address; it still detects
 an address initially if none exists. This follows
 [Calico's documented address selection](https://docs.tigera.io/calico/latest/networking/ipam/ip-autodetection).
+Verify that every node has its intended stored address before changing this
+setting. Treat IPv6 address ownership separately when IPv6 is enabled; the
+IPv4 patch below does not change `IP6`.
+
+Require stable stored addresses and running Calico pod identities across at
+least one periodic address-check interval after rollout. Readiness alone does
+not prove address stability. Do not ignore address changes in retirement
+validation or lengthen receipt expiry to conceal competing address writers.
 For existing static-config clusters, append this entry to
 `spec.network.calico.patches`, preserving existing patches, and follow the
 controller validation and sequential restart procedure below:

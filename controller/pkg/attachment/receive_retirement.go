@@ -70,16 +70,11 @@ func (w RemoteWithdrawalIntent) receiveRetirementPlan(snapshot handover.Snapshot
 		return fail("mesh version differs from withdrawal stage")
 	}
 	if !withdrawn {
-		// Legacy intents retain their exact-version rule. New captures allow
-		// metadata-only changes, but never reinterpret changed network data.
-		if w.SourceDataHash != "" {
-			if w.SourceDataHash != withdrawalSourceDataHash(mesh.Data) {
-				return fail("mesh data differs from captured withdrawal")
-			}
-		} else if w.SourceVersion != mesh.ResourceVersion {
-			return fail("mesh version differs from withdrawal stage")
+		if err := w.validateCapturedWithdrawalSource(inventory, mesh); err != nil {
+			return fail(err.Error())
 		}
 	}
+
 	if inventory.Version != 1 || inventory.ClusterUID == "" || inventory.Namespace != w.MeshNamespace || inventory.MeshName != w.MeshName || inventory.MeshUID != w.MeshUID {
 		return fail("inventory scope differs from withdrawal")
 	}

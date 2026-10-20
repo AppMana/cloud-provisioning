@@ -39,6 +39,9 @@ func verifyRetirementAuthenticatedCommit(t *testing.T, api kubernetes.Interface,
 	mesh, err = api.CoreV1().Secrets(ns).Update(ctx, mesh, metav1.UpdateOptions{})
 	must(err)
 	w.SourceVersion = mesh.ResourceVersion
+	if strings.HasPrefix(history, "interrupted-") {
+		w.SourceDataHash = withdrawalSourceDataHash(mesh.Data)
+	}
 	raw, err := fixture.Checkpoint()
 	must(err)
 	var checkpoint struct {

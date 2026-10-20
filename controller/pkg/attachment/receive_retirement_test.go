@@ -2,6 +2,7 @@ package attachment
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/netip"
 	"reflect"
 	"strings"
@@ -24,21 +25,35 @@ func retirementFixture(t *testing.T, outcome string, frozen bool, meshUID ...str
 	return retirementFixtureForConsumer(t, outcome, frozen, uid, "test", "site", "site-uid")
 }
 
-func retirementFixtureForConsumer(t *testing.T, outcome string, frozen bool, meshUID, namespace, nodeName, nodeUID string) (RemoteWithdrawalIntent, handover.Snapshot, tunnel.ReceiveInventory, *corev1.Secret) {
+func retirementFixtureForConsumer(t *testing.T, outcome string, frozen bool, meshUID, namespace, nodeName, nodeUID string, workerSeed ...byte) (RemoteWithdrawalIntent, handover.Snapshot, tunnel.ReceiveInventory, *corev1.Secret) {
 	t.Helper()
 	key := func(b byte) string { var k wgtypes.Key; k[0] = b; return k.String() }
 	site, root := key(1), key(2)
+	host, bindingKey := byte(1), key(3)
+	if len(workerSeed) > 0 {
+		host = workerSeed[0]
+		root = key(host)
+		bindingKey = key(host + 1)
+	}
 	peers := tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: site, WGAllowedIPs: []string{"10.90.0.0/24"}}}}
 	base, _ := json.Marshal(peers)
 	p := tunnel.ReceiveTransitionPlan{Version: 1, Namespace: namespace, MeshName: "mesh", MeshUID: "mesh-uid", MachineName: "worker", MachineUID: "machine-uid", AdoptionName: tunnel.AdoptionSecretName("worker"), AdoptionUID: "adoption-uid", CloudNodeName: "cloud", CloudNodeUID: "cloud-uid", RootPublicKey: root, Base: base, Desired: peers, Native: []netip.Prefix{netip.MustParsePrefix("172.29.0.0/24")}, Ports: map[string]int{}, Bindings: map[string]tunnel.ReceiveBinding{}, Sites: map[string]tunnel.ReceiveTransitionSite{}}
 	p.MeshUID = meshUID
-	p.SiteDesired = tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: root, Remote: true, Endpoint: "198.51.100.1:51820", WGAllowedIPs: []string{"172.29.0.1/32"}}}}
+	if len(workerSeed) > 0 {
+		p.MachineName = fmt.Sprintf("worker-%d", host)
+		p.MachineUID = fmt.Sprintf("machine-%d", host)
+		p.AdoptionName = tunnel.AdoptionSecretName(p.MachineName)
+		p.AdoptionUID = fmt.Sprintf("adoption-%d", host)
+		p.CloudNodeName = fmt.Sprintf("cloud-%d", host)
+		p.CloudNodeUID = fmt.Sprintf("cloud-uid-%d", host)
+	}
+	p.SiteDesired = tunnel.PeerListDoc{Peers: []tunnel.PeerSpec{{PublicKey: root, Remote: true, Endpoint: fmt.Sprintf("198.51.100.%d:51820", host), WGAllowedIPs: []string{fmt.Sprintf("172.29.0.%d/32", host)}}}}
 	prep, err := tunnel.PlanReceiveHandover(p.MeshUID, peers, peers, p.Native)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range prep.Receivers {
-		binding := tunnel.ReceiveBinding{Interface: path.Interface, PeerPublicKey: site, PublicKey: key(3), ListenPort: 51821}
+		binding := tunnel.ReceiveBinding{Interface: path.Interface, PeerPublicKey: site, PublicKey: bindingKey, ListenPort: 51821}
 		p.Bindings[site], p.Ports[site] = binding, binding.ListenPort
 		client, err := tunnel.PlanSiteReceiveClient(p.MeshUID, site, root, binding, p.SiteDesired, p.SiteDesired)
 		if err != nil {

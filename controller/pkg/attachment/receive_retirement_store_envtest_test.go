@@ -59,6 +59,7 @@ func TestReceiveWithdrawalPersistenceWithRealAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	verifyExpiredReceiveRemoval(t, api)
+	verifySiblingReceiveRemoval(t, api)
 	ctx := context.Background()
 	if _, err := api.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)

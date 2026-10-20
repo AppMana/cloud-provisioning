@@ -76,10 +76,10 @@ func AdvanceReceiveRemoval(ctx context.Context, api kubernetes.Interface, store 
 				string(mesh.Data[tunnel.PeerPublicKeyPrefix+intent.MachineName]) != intent.PublicKey {
 				return false, fmt.Errorf("interrupted withdrawal requires a published drained owner")
 			}
-			if (intent.SourceDataHash != "" && intent.SourceDataHash != withdrawalSourceDataHash(mesh.Data)) ||
-				(intent.SourceDataHash == "" && intent.SourceVersion != mesh.ResourceVersion) {
-				return false, fmt.Errorf("interrupted withdrawal capture changed before freezing")
+			if err := intent.validateCapturedWithdrawalSource(inventory, mesh); err != nil {
+				return false, err
 			}
+
 			if _, _, err := intent.receiveWithdrawalConsumers(plan); err != nil {
 				return false, err
 			}

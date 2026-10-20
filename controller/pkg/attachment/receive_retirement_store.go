@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -17,6 +18,9 @@ type receiveWithdrawalRecord struct {
 	Version       int                    `json:"version"`
 	JournalSHA256 string                 `json:"journalSHA256"`
 	Withdrawal    RemoteWithdrawalIntent `json:"withdrawal"`
+	// Exact public transport fields removed by this withdrawal. Version two
+	// retains them only to validate sibling captures, never for native replay.
+	PeerData map[string][]byte `json:"peerData,omitempty"`
 }
 
 // ReserveReceiveWithdrawal persists the captured consumers before peer removal.
@@ -45,11 +49,44 @@ func (w RemoteWithdrawalIntent) ReserveReceiveWithdrawal(ctx context.Context, ma
 	if err != nil {
 		return err
 	}
-	raw, err := json.Marshal(receiveWithdrawalRecord{Version: 1, JournalSHA256: tunnel.HashPeerList(history), Withdrawal: w})
+	record := receiveWithdrawalRecord{Version: 1, JournalSHA256: tunnel.HashPeerList(history), Withdrawal: w}
+	if existing := inventory.Publications[w.MachineUID].Retirement; len(existing) != 0 {
+		previous, err := decodeReceiveWithdrawalRecord(existing, w.MachineUID)
+		if err != nil {
+			return err
+		}
+		if previous.JournalSHA256 != record.JournalSHA256 || !reflect.DeepEqual(previous.Withdrawal, w) {
+			return fmt.Errorf("persisted withdrawal differs from captured authority")
+		}
+		// Never upgrade or recapture an existing record after an ambiguous write.
+		return tunnel.ReserveReceiveRetirement(ctx, maps, clusterUID, inventoryUID, mesh, snapshot, existing)
+	}
+	if w.SourceDataHash != "" && !w.Orphaned {
+		record.Version = 2
+		record.PeerData, err = captureWithdrawalPeerData(w, mesh.Data)
+		if err != nil {
+			return err
+		}
+	}
+	raw, err := json.Marshal(record)
 	if err != nil {
 		return err
 	}
 	return tunnel.ReserveReceiveRetirement(ctx, maps, clusterUID, inventoryUID, mesh, snapshot, raw)
+}
+
+func captureWithdrawalPeerData(w RemoteWithdrawalIntent, data map[string][]byte) (map[string][]byte, error) {
+	remaining, present, err := tunnel.WithdrawRemotePeer(data, w.MachineName, w.PublicKey)
+	if err != nil || !present {
+		return nil, fmt.Errorf("withdrawal capture requires its published peer fields")
+	}
+	fields := map[string][]byte{}
+	for name, value := range data {
+		if _, remains := remaining[name]; !remains {
+			fields[name] = bytes.Clone(value)
+		}
+	}
+	return fields, nil
 }
 
 // ReadReceiveWithdrawal admits only the persisted intent after publication of
@@ -80,8 +117,14 @@ func readReceiveWithdrawalStage(inventory tunnel.ReceiveInventory, machineUID st
 	if err != nil {
 		return fail(err)
 	}
-	if record.Version != 1 || record.Withdrawal.MachineUID != machineUID || record.JournalSHA256 != tunnel.HashPeerList(history) {
+	if record.Withdrawal.MachineUID != machineUID || record.JournalSHA256 != tunnel.HashPeerList(history) {
 		return fail(fmt.Errorf("withdrawal record differs from fenced journal"))
+	}
+	if !withdrawn && record.Version == 2 {
+		fields, err := captureWithdrawalPeerData(record.Withdrawal, mesh.Data)
+		if err != nil || !reflect.DeepEqual(fields, record.PeerData) {
+			return fail(fmt.Errorf("captured peer fields differ before withdrawal publication"))
+		}
 	}
 	if _, err := record.Withdrawal.receiveRetirementPlan(snapshot, inventory, mesh, withdrawn); err != nil {
 		return fail(err)
@@ -110,8 +153,18 @@ func decodeReceiveWithdrawalRecord(raw []byte, machineUID string) (receiveWithdr
 	if err := d.Decode(&trailing); err != io.EOF {
 		return fail(fmt.Errorf("trailing withdrawal data"))
 	}
-	if record.Version != 1 || machineUID == "" || record.Withdrawal.MachineUID != machineUID || len(record.JournalSHA256) != 64 {
+	if (record.Version != 1 && record.Version != 2) || machineUID == "" || record.Withdrawal.MachineUID != machineUID || len(record.JournalSHA256) != 64 {
 		return fail(fmt.Errorf("invalid recorded withdrawal identity"))
+	}
+	if record.Version == 1 && len(record.PeerData) != 0 {
+		return fail(fmt.Errorf("legacy withdrawal cannot carry peer reconstruction fields"))
+	}
+	if record.Version == 2 {
+		w := record.Withdrawal
+		remaining, present, err := tunnel.WithdrawRemotePeer(record.PeerData, w.MachineName, w.PublicKey)
+		if err != nil || !present || len(remaining) != 0 || w.Orphaned || w.SourceDataHash == "" {
+			return fail(fmt.Errorf("withdrawal peer reconstruction exceeds its captured identity"))
+		}
 	}
 	return record, nil
 }

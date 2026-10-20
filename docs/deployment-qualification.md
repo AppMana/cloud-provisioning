@@ -1223,6 +1223,10 @@ reply after an ICMP MTU update does not turn that initial loss into a pass.
 Configure the owning CNI before workload creation and verify recreated pods;
 existing pods can retain their old MTU. Record request and response sizes
 separately, including application command prefixes and IP/UDP headers.
+Read the interface MTU inside every existing probe pod before a large-packet
+or reboot baseline; the rendered CNI configuration is not a substitute.
+After deliberately recreating probes, retain the earlier failed observations
+and bind subsequent tests to the replacement pod and container identities.
 
 Derive the pod MTU from the complete forwarding path. For example, a 1420-byte
 tunnel budget with 50 bytes of additional CNI encapsulation leaves a 1370-byte

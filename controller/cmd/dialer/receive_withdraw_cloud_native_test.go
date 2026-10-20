@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -44,7 +45,20 @@ func TestNativeCloudNeighborWithdrawal(t *testing.T) {
 	}
 }
 
-func nativeCloudNeighborWithdrawal(t *testing.T, phase string) {
+func TestNativeJointCloudNeighborWithdrawal(t *testing.T) {
+	if os.Getenv("CLDT_NATIVE_CLOUD_WITHDRAWAL") != "1" {
+		t.Skip("requires isolated guest namespaces")
+	}
+	for _, phase := range []string{"", "prepare", "switch", "drain", "retire", "abort"} {
+		name := phase
+		if name == "" {
+			name = "completed"
+		}
+		t.Run(name, func(t *testing.T) { nativeCloudNeighborWithdrawal(t, phase, true) })
+	}
+}
+
+func nativeCloudNeighborWithdrawal(t *testing.T, phase string, joint ...bool) {
 	for _, kind := range []string{"net", "mnt"} {
 		self, e := os.Readlink("/proc/self/ns/" + kind)
 		host, h := os.Readlink("/proc/1/ns/" + kind)
@@ -64,6 +78,11 @@ func nativeCloudNeighborWithdrawal(t *testing.T, phase string) {
 	localKey, _ := wgtypes.GeneratePrivateKey()
 	foreignKey, _ := wgtypes.GeneratePrivateKey()
 	target := receiveRestoreTestPlan(t, targetKey, site)
+	plans := []tunnel.ReceiveTransitionPlan{target}
+	if len(joint) != 0 && joint[0] {
+		second, _ := secondNativeWithdrawal(t, site)
+		plans = append(plans, second)
+	}
 	local := receiveRestoreTestPlan(t, localKey, site)
 	raw, err := json.Marshal(local)
 	must(err)
@@ -74,30 +93,33 @@ func nativeCloudNeighborWithdrawal(t *testing.T, phase string) {
 	local.AdoptionName, local.AdoptionUID = tunnel.AdoptionSecretName(local.MachineName), "survivor-adoption"
 	cfg := config{iface: "withdrawcloud", nodeName: local.CloudNodeName, peersFile: filepath.Join(t.TempDir(), "peers.json"), peersSecretNamespace: "test", peersSecretName: local.AdoptionName, receiptMeshName: "mesh", receiptPodName: "agent", receiptPodUID: "agent-uid", routeTable: 518, fwmark: 518, mtu: 1400}
 	oldPeers := append([]tunnel.PeerSpec{}, local.Desired.Peers...)
-	oldPeers = append(oldPeers, target.SiteDesired.Peers...)
+	for _, member := range plans {
+		oldPeers = append(oldPeers, member.SiteDesired.Peers...)
+	}
 	bootstrap := tunnel.PeersFileDoc{PrivateKey: localKey.String(), LocalAddress: local.CloudAddresses[0], LocalAddress6: local.CloudAddresses[1], Peers: oldPeers, APIServers: []string{"10.90.0.2:6443"}}
 	must(writeDurableJSON(cfg.peersFile, bootstrap))
 	must(writeDurableJSON(cachePath(cfg), tunnel.PeerListDoc{Peers: oldPeers, APIServers: bootstrap.APIServers}))
-	targetJournal := cloudWithdrawalTestJournal(t, target, "target-journal", phase)
 	localJournal := cloudWithdrawalTestJournal(t, local, "local-journal")
-	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "mesh", UID: types.UID(target.MeshUID), ResourceVersion: "2"}, Data: map[string][]byte{
+	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "mesh", UID: types.UID(target.MeshUID), ResourceVersion: "1"}, Data: map[string][]byte{
 		tunnel.NodePublicKeyPrefix + "site": []byte(site.PublicKey().String()), tunnel.NodeTunnelAddressPrefix + "site": []byte("10.90.0.2/24"), tunnel.NodeTunnelAddress6Prefix + "site": []byte("fd90::2/64"), tunnel.NodeAddressesPrefix + "site": []byte("10.90.0.2,fd90::2"),
 		tunnel.PeerPublicKeyPrefix + local.MachineName: []byte(local.RootPublicKey), tunnel.PeerEndpointPrefix + local.MachineName: []byte("198.51.100.3:51820"), tunnel.PeerAllowedIPsPrefix + local.MachineName: []byte("172.29.0.3/32,fd29::3/128"), tunnel.PeerRouteHostsPrefix + local.MachineName: []byte("172.29.0.3,fd29::3"),
 	}}
-	intent := attachment.RemoteWithdrawalIntent{MeshNamespace: "test", MeshName: "mesh", MeshUID: target.MeshUID, SourceVersion: "1", MachineName: target.MachineName, MachineUID: target.MachineUID, PublicKey: target.RootPublicKey, DrainIntent: "native-test", Consumers: []attachment.ConsumerTarget{
+	for _, member := range plans {
+		addNativeWithdrawalPeer(mesh, member)
+	}
+	consumers := []attachment.ConsumerTarget{
 		{Site: true, NodeName: "site", NodeUID: "site-uid", PublicKey: site.PublicKey().String()},
 		{NodeName: local.CloudNodeName, NodeUID: local.CloudNodeUID, MachineName: local.MachineName, SecretUID: local.AdoptionUID, TunnelAddress: "172.29.0.3", PublicKey: local.RootPublicKey},
-	}}
-	if phase != "" {
-		raw, err := json.Marshal(intent)
-		must(err)
-		targetJournal.Data["withdrawal-intent-sha256"] = tunnel.HashPeerList(raw)
 	}
-	retirement, err := json.Marshal(map[string]any{"version": 1, "journalSHA256": tunnel.HashPeerList([]byte(targetJournal.Data["transition.json"])), "withdrawal": intent})
-	must(err)
-	inventory := tunnel.ReceiveInventory{Version: 1, ClusterUID: "native-cluster", Namespace: "test", MeshName: "mesh", MeshUID: target.MeshUID, MachineUIDs: []string{local.MachineUID, target.MachineUID}, Publications: map[string]tunnel.ReceiveJournalPublication{
-		target.MachineUID: {JournalUID: string(targetJournal.UID), Retirement: retirement}, local.MachineUID: {JournalUID: string(localJournal.UID)},
-	}}
+	inventory, objects := nativeWithdrawalJournals(t, mesh, plans, consumers, phase)
+	inventory.MachineUIDs = append(inventory.MachineUIDs, local.MachineUID)
+	slices.Sort(inventory.MachineUIDs)
+	inventory.Publications[local.MachineUID] = tunnel.ReceiveJournalPublication{JournalUID: string(localJournal.UID)}
+	for _, member := range plans {
+		mesh.Data, _, err = tunnel.WithdrawRemotePeer(mesh.Data, member.MachineName, member.RootPublicKey)
+		must(err)
+	}
+	mesh.ResourceVersion = "2"
 	inventoryRaw, err := json.Marshal(inventory)
 	must(err)
 	boot, err := localReceiveBootID()
@@ -107,7 +129,8 @@ func nativeCloudNeighborWithdrawal(t *testing.T, phase string) {
 	published, err := json.Marshal(tunnel.PeerListDoc{Peers: oldPeers})
 	must(err)
 	adoption := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: local.AdoptionName, UID: types.UID(local.AdoptionUID), ResourceVersion: "1"}, Data: map[string][]byte{tunnel.CloudPeersKey: published}}
-	api := fake.NewClientset(mesh, targetJournal, localJournal, node, pod, adoption, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: tunnel.ReceiveInventoryName(target.MeshUID), UID: "inventory", ResourceVersion: "1"}, Data: map[string]string{"inventory.json": string(inventoryRaw)}})
+	objects = append(objects, mesh, localJournal, node, pod, adoption, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: tunnel.ReceiveInventoryName(target.MeshUID), UID: "inventory", ResourceVersion: "1"}, Data: map[string]string{"inventory.json": string(inventoryRaw)}})
+	api := fake.NewClientset(objects...)
 	devices, err := wgctrl.New()
 	must(err)
 	defer devices.Close()
@@ -124,12 +147,20 @@ func nativeCloudNeighborWithdrawal(t *testing.T, phase string) {
 		must(netlink.AddrAdd(link, a))
 	}
 	allowed := func(raw string) net.IPNet { _, p, e := net.ParseCIDR(raw); must(e); return *p }
-	must(devices.ConfigureDevice(cfg.iface, wgtypes.Config{PrivateKey: &localKey, FirewallMark: &cfg.fwmark, Peers: []wgtypes.PeerConfig{
-		{PublicKey: targetKey.PublicKey(), AllowedIPs: []net.IPNet{allowed("172.29.0.1/32"), allowed("fd29::1/128")}},
-		// The completed survivor serves the site through its receiver. Preserve
-		// an unrelated root peer, rather than inventing an unretired site peer.
-		{PublicKey: foreignKey.PublicKey(), AllowedIPs: []net.IPNet{allowed("198.18.0.1/32")}},
-	}}))
+	// Preserve an unrelated root peer; the local worker serves the site through its receiver.
+	peers := []wgtypes.PeerConfig{{PublicKey: foreignKey.PublicKey(), AllowedIPs: []net.IPNet{allowed("198.18.0.1/32")}}}
+	retiredIPs := []string{}
+	for _, member := range plans {
+		public, err := wgtypes.ParseKey(member.RootPublicKey)
+		must(err)
+		ips := []net.IPNet{}
+		for _, raw := range member.CloudAddresses {
+			ips = append(ips, allowed(raw))
+		}
+		peers = append(peers, wgtypes.PeerConfig{PublicKey: public, AllowedIPs: ips})
+		retiredIPs = append(retiredIPs, member.CloudAddresses...)
+	}
+	must(devices.ConfigureDevice(cfg.iface, wgtypes.Config{PrivateKey: &localKey, FirewallMark: &cfg.fwmark, Peers: peers}))
 	selections, err := receivePhaseSelections(localKey, local, local.CloudNodeUID)
 	must(err)
 	selected := selections[0]
@@ -149,7 +180,7 @@ func nativeCloudNeighborWithdrawal(t *testing.T, phase string) {
 	must(devices.ConfigureDevice(selected.Interface, wgtypes.Config{PrivateKey: &receiverPrivate, ListenPort: &receiverPort, FirewallMark: &cfg.fwmark, Peers: []wgtypes.PeerConfig{{PublicKey: site.PublicKey(), AllowedIPs: []net.IPNet{allowed("10.90.0.0/24"), allowed("fd90::/64")}}}}))
 	receiverBefore, err := devices.Device(selected.Interface)
 	must(err)
-	for _, raw := range []string{"172.29.0.1/32", "fd29::1/128", "10.90.0.0/24", "fd90::/64"} {
+	for _, raw := range append(slices.Clone(retiredIPs), "10.90.0.0/24", "fd90::/64") {
 		dst := allowed(raw)
 		routeLink := link.Attrs().Index
 		if raw == "10.90.0.0/24" || raw == "fd90::/64" {
@@ -157,11 +188,12 @@ func nativeCloudNeighborWithdrawal(t *testing.T, phase string) {
 		}
 		must(netlink.RouteAdd(&netlink.Route{LinkIndex: routeLink, Dst: &dst, Table: cfg.routeTable, Scope: netlink.SCOPE_LINK, Protocol: unix.RTPROT_BOOT, Priority: receiveRoutePriority(&dst)}))
 	}
-	store := handover.Store{ConfigMaps: api.CoreV1().ConfigMaps("test"), ClusterUID: "native-cluster", Name: targetJournal.Name}
+	store := handover.Store{ConfigMaps: api.CoreV1().ConfigMaps("test"), ClusterUID: "native-cluster", Name: tunnel.ReceiveTransitionName(target.MachineUID)}
 	scope := receiveJournalScope{Namespace: "test", MeshName: "mesh", MeshUID: target.MeshUID, MachineUID: target.MachineUID}
 	run := func() ([]handover.PodReceipt, error) {
 		return executeReceiveRetirement(ctx, api, store, scope, cfg, localKey, "agent", func(ctx context.Context, path string, a admittedReceiveRetirement) error {
-			return retireAdmittedCloudNeighborLocked(ctx, api, devices, store, scope, cfg, localKey, path, a)
+			memberStore, memberScope := retirementMemberScope(store, scope, a, a.Withdrawal.MachineUID)
+			return retireAdmittedCloudNeighborLocked(ctx, api, devices, memberStore, memberScope, cfg, localKey, path, a)
 		})
 	}
 	receipts, failure := run()
@@ -170,12 +202,35 @@ func nativeCloudNeighborWithdrawal(t *testing.T, phase string) {
 	}
 	live, err := devices.Device(cfg.iface)
 	must(err)
-	if len(live.Peers) != 2 {
+	if len(live.Peers) != len(plans)+1 {
 		t.Fatal("stale publication changed native peers")
+	}
+	if len(plans) > 1 {
+		partial := local.Desired
+		partial.Peers = append(slices.Clone(partial.Peers), plans[1].SiteDesired.Peers...)
+		adoption.Data[tunnel.CloudPeersKey], err = json.Marshal(partial)
+		must(err)
+		adoption.ResourceVersion = "2"
+		_, err = api.CoreV1().Secrets("test").Update(ctx, adoption, metav1.UpdateOptions{})
+		must(err)
+		receipts, failure = run()
+		if failure == nil || !strings.Contains(failure.Error(), "remains in surviving cloud publication") || len(receipts) != 0 {
+			t.Fatalf("second stale adoption emitted joint receipt: %v", failure)
+		}
+		live, err = devices.Device(cfg.iface)
+		must(err)
+		if len(live.Peers) != 2 {
+			t.Fatal("partial cleanup lost surviving peers", failure)
+		}
+		for _, peer := range live.Peers {
+			if peer.PublicKey == targetKey.PublicKey() {
+				t.Fatal("first cleanup did not precede second rejection", failure)
+			}
+		}
 	}
 	adoption.Data[tunnel.CloudPeersKey], err = json.Marshal(local.Desired)
 	must(err)
-	adoption.ResourceVersion = "2"
+	adoption.ResourceVersion = "3"
 	_, err = api.CoreV1().Secrets("test").Update(ctx, adoption, metav1.UpdateOptions{})
 	must(err)
 	for i := 0; i < 2; i++ {
@@ -224,8 +279,10 @@ func nativeCloudNeighborWithdrawal(t *testing.T, phase string) {
 	}
 	cached, err := os.ReadFile(cachePath(cfg))
 	must(err)
-	if strings.Contains(string(cached), target.RootPublicKey) {
-		t.Fatal("executable cache retained target")
+	for _, member := range plans {
+		if strings.Contains(string(cached), member.RootPublicKey) {
+			t.Fatal("executable cache retained target")
+		}
 	}
 	// Recover a lost survivor route after complete withdrawal. Authenticate the
 	// existing receiver against an isolated loopback endpoint before admitting
@@ -251,8 +308,13 @@ func nativeCloudNeighborWithdrawal(t *testing.T, phase string) {
 		deadline := time.Now().Add(10 * time.Second)
 		for {
 			err = maintainCompletedReceivePhase(ctx, api, survivorStore, survivorScope, cfg, localKey, "agent", func(ctx context.Context, p tunnel.ReceiveTransitionPlan, v handover.View, uid string, serving tunnel.ReceiveJournalRoutes) error {
-				if len(serving.Plans) != 1 || serving.Withdrawn[target.MachineUID] != target.RootPublicKey {
-					return fmt.Errorf("survivor lost withdrawn ownership")
+				if len(serving.Plans) != 1 {
+					return fmt.Errorf("survivor membership changed")
+				}
+				for _, member := range plans {
+					if serving.Withdrawn[member.MachineUID] != member.RootPublicKey {
+						return fmt.Errorf("survivor lost withdrawn ownership")
+					}
 				}
 				if err := restoreCompletedReceiveState(ctx, devices, cfg, localKey, p, v, uid, serving); err != nil {
 					return err

@@ -983,6 +983,26 @@ absence, authenticated joint completion, atomic release, stale-worker replay,
 address reuse, live continuity or rollback to readers predating version five.
 Those gates remain mandatory before deployment or resource release.
 
+Native joint fixtures must run each exact case in a fresh guest mount/network
+namespace with the existing per-case deadline. Exercise site receivers, follower
+routes and surviving cloud neighbors for completed and interrupted prepare,
+switch, drain, retire and abort histories, alongside individual-worker regression
+cases. Keep real IPv4/IPv6 forwarding, WireGuard identity, source rules, surviving
+receivers, local BGP preferences and executable caches intact for unrelated owners.
+
+A foreign dependency on the second site receiver must suppress a joint receipt
+after the first cleanup succeeds. Partial cloud adoption publication must likewise
+block completion until every retiring peer is absent. Retrying verified cleanup
+must remain idempotent. Follower cleanup must reject stale pre-retirement ownership
+writes for either member. Cloud survivor route recovery and simulated prior-boot
+checkpoint recovery must not revive withdrawn destinations or peers.
+
+These native tests use synthetic Kubernetes objects and serving histories. Their
+previous-boot case edits fixture checkpoints rather than rebooting a VM. They do
+not establish the combined real-API-to-kernel path, token authentication, packet
+continuity, external BGP convergence, actual reboot, cloud lifecycle, live release
+or version rollback. Those remain separate deployment gates.
+
 Real-token joint fixtures cover two surviving consumers for completed and
 interrupted histories. Require rejection without inventory mutation for missing
 consumers, individual-worker and wrong-member digests, expired observations,

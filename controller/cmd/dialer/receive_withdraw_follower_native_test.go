@@ -41,7 +41,20 @@ func TestNativeCombinedFollowerWithdrawal(t *testing.T) {
 	}
 }
 
-func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLegacy bool, phase string) {
+func TestNativeJointFollowerWithdrawal(t *testing.T) {
+	if os.Getenv("CLDT_NATIVE_COMBINED_FOLLOWER") != "1" {
+		t.Skip("requires isolated guest namespaces")
+	}
+	for _, phase := range []string{"", "prepare", "switch", "drain", "retire", "abort"} {
+		name := phase
+		if name == "" {
+			name = "completed"
+		}
+		t.Run(name, func(t *testing.T) { nativeCombinedFollowerWithdrawal(t, true, false, phase, true) })
+	}
+}
+
+func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLegacy bool, phase string, joint ...bool) {
 	for _, kind := range []string{"net", "mnt"} {
 		self, e := os.Readlink("/proc/self/ns/" + kind)
 		host, h := os.Readlink("/proc/1/ns/" + kind)
@@ -61,7 +74,11 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLeg
 	site, _ := wgtypes.GeneratePrivateKey()
 	survivor, _ := wgtypes.GeneratePrivateKey()
 	plan := receiveRestoreTestPlan(t, root, site)
-	journal := cloudWithdrawalTestJournal(t, plan, "target-journal", phase)
+	plans := []tunnel.ReceiveTransitionPlan{plan}
+	if len(joint) != 0 && joint[0] {
+		second, _ := secondNativeWithdrawal(t, site)
+		plans = append(plans, second)
+	}
 	cfg := config{iface: "no-tunnel", nodeName: "follower", secretNamespace: "test", secretName: "mesh", privateKeyFile: filepath.Join(t.TempDir(), "key"), routeTable: 518, fwmark: 518, bgpListenPort: -1, receiptPodName: "agent", receiptPodUID: "agent-uid"}
 	must(os.WriteFile(cfg.privateKeyFile, []byte(key.String()), 0600))
 	mesh := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "mesh", UID: "restore-mesh", ResourceVersion: "1"}, Data: map[string][]byte{
@@ -69,6 +86,11 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLeg
 		tunnel.PeerPublicKeyPrefix + "worker": []byte(root.PublicKey().String()), tunnel.PeerEndpointPrefix + "worker": []byte("198.51.100.1:51820"), tunnel.PeerAllowedIPsPrefix + "worker": []byte("172.29.0.1/32,fd29::1/128"), tunnel.PeerRouteHostsPrefix + "worker": []byte("172.29.0.1,fd29::1"),
 		tunnel.PeerPublicKeyPrefix + "survivor": []byte(survivor.PublicKey().String()), tunnel.PeerEndpointPrefix + "survivor": []byte("198.51.100.3:51820"), tunnel.PeerAllowedIPsPrefix + "survivor": []byte("172.29.0.3/32,fd29::3/128"), tunnel.PeerRouteHostsPrefix + "survivor": []byte("172.29.0.3,fd29::3"),
 	}}
+	retiredIPs := []string{}
+	for _, member := range plans {
+		addNativeWithdrawalPeer(mesh, member)
+		retiredIPs = append(retiredIPs, member.CloudAddresses...)
+	}
 	own := []string{"10.90.0.4", "fd90::4"}
 	must(saveSiteForwardingCache(cfg, key, mesh, nil, map[string]bool{}, own))
 	speaker, err := startTransitSpeaker(ctx, -1, 64512, strings.Join(own, ","))
@@ -92,39 +114,36 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLeg
 	must(err)
 	must(installSiteTransit(cfg, transit, own))
 	defer removeRouteRule(cfg.routeTable, cfg.fwmark)
-	intent := attachment.RemoteWithdrawalIntent{MeshNamespace: "test", MeshName: "mesh", MeshUID: plan.MeshUID, SourceVersion: "1", MachineName: plan.MachineName, MachineUID: plan.MachineUID, PublicKey: plan.RootPublicKey, DrainIntent: "native-test", Consumers: []attachment.ConsumerTarget{
+	consumers := []attachment.ConsumerTarget{
 		{Site: true, NodeName: "site", NodeUID: "site-uid", PublicKey: site.PublicKey().String()},
 		{Site: true, NodeName: "follower", NodeUID: "follower-uid"},
 		{NodeName: "survivor", NodeUID: "survivor-uid", MachineName: "survivor", SecretUID: "survivor-adoption", TunnelAddress: "172.29.0.3", PublicKey: survivor.PublicKey().String()},
-	}}
-	if phase != "" {
-		raw, err := json.Marshal(intent)
-		must(err)
-		journal.Data["withdrawal-intent-sha256"] = tunnel.HashPeerList(raw)
 	}
-	retirement, err := json.Marshal(map[string]any{"version": 1, "journalSHA256": tunnel.HashPeerList([]byte(journal.Data["transition.json"])), "withdrawal": intent})
-	must(err)
-	inventory := tunnel.ReceiveInventory{Version: 1, ClusterUID: "native-cluster", Namespace: "test", MeshName: "mesh", MeshUID: plan.MeshUID, MachineUIDs: []string{plan.MachineUID}, Publications: map[string]tunnel.ReceiveJournalPublication{plan.MachineUID: {JournalUID: string(journal.UID), Retirement: retirement}}}
+	inventory, objects := nativeWithdrawalJournals(t, mesh, plans, consumers, phase)
 	inventoryRaw, err := json.Marshal(inventory)
 	must(err)
-	mesh.Data, _, err = tunnel.WithdrawRemotePeer(mesh.Data, plan.MachineName, plan.RootPublicKey)
-	must(err)
+	for _, member := range plans {
+		mesh.Data, _, err = tunnel.WithdrawRemotePeer(mesh.Data, member.MachineName, member.RootPublicKey)
+		must(err)
+	}
 	mesh.ResourceVersion = "2"
 	boot, err := localReceiveBootID()
 	must(err)
 	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "follower", UID: "follower-uid", ResourceVersion: "1"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{BootID: boot}, Addresses: []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: own[0]}, {Type: corev1.NodeInternalIP, Address: own[1]}}, Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}}}
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "agent", UID: "agent-uid"}, Spec: corev1.PodSpec{NodeName: "follower"}, Status: corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}, ContainerStatuses: []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "agent", State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(time.Now().Add(-time.Minute))}}}}}}
-	api := fake.NewClientset(mesh, journal, node, pod, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: tunnel.ReceiveInventoryName(plan.MeshUID), UID: "inventory", ResourceVersion: "1"}, Data: map[string]string{"inventory.json": string(inventoryRaw)}})
-	store := handover.Store{ConfigMaps: api.CoreV1().ConfigMaps("test"), ClusterUID: "native-cluster", Name: journal.Name}
+	objects = append(objects, mesh, node, pod, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: tunnel.ReceiveInventoryName(plan.MeshUID), UID: "inventory", ResourceVersion: "1"}, Data: map[string]string{"inventory.json": string(inventoryRaw)}})
+	api := fake.NewClientset(objects...)
+	store := handover.Store{ConfigMaps: api.CoreV1().ConfigMaps("test"), ClusterUID: "native-cluster", Name: tunnel.ReceiveTransitionName(plan.MachineUID)}
 	scope := receiveJournalScope{Namespace: "test", MeshName: "mesh", MeshUID: plan.MeshUID, MachineUID: plan.MachineUID}
 	followerPath := filepath.Join(filepath.Dir(cfg.privateKeyFile), cfg.iface+".reconcile.lock.follower.json")
 	followerScope := receiveInventoryCheckpoint{Version: 1, InventoryUID: "inventory", Inventory: inventory, NodeName: cfg.nodeName, NodeUID: string(node.UID), BootID: boot, PublicKey: key.PublicKey().String()}
 	var pending receiveFollowerCache
 	if withRecordedRoutes {
-		recorded, err := stageReceiveFollowerRoutes(followerPath, cfg, followerScope, own, receiveFollowerCache{}, map[string]map[string]string{
-			plan.RootPublicKey:            {"172.29.0.1/32": "10.90.0.2", "fd29::1/128": "fd90::2"},
-			survivor.PublicKey().String(): {"172.29.0.3/32": "10.90.0.2", "fd29::3/128": "fd90::2"},
-		})
+		byRoot := map[string]map[string]string{survivor.PublicKey().String(): {"172.29.0.3/32": "10.90.0.2", "fd29::3/128": "fd90::2"}}
+		for _, member := range plans {
+			byRoot[member.RootPublicKey] = map[string]string{member.CloudAddresses[0]: "10.90.0.2", member.CloudAddresses[1]: "fd90::2"}
+		}
+		recorded, err := stageReceiveFollowerRoutes(followerPath, cfg, followerScope, own, receiveFollowerCache{}, byRoot)
 		must(err)
 		// Simulate a write interrupted before compaction: the recorded candidate
 		// relay differs from the older whole-mesh cache's election.
@@ -148,7 +167,8 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLeg
 	}
 	run := func() ([]handover.PodReceipt, error) {
 		return executeReceiveRetirement(ctx, api, store, scope, cfg, key, "agent", func(ctx context.Context, path string, a admittedReceiveRetirement) error {
-			return retireAdmittedFollowerLocked(ctx, api, speaker, store, scope, cfg, key, path, a)
+			memberStore, memberScope := retirementMemberScope(store, scope, a, a.Withdrawal.MachineUID)
+			return retireAdmittedFollowerLocked(ctx, api, speaker, memberStore, memberScope, cfg, key, path, a)
 		})
 	}
 	// A former endpoint cannot acknowledge follower-only cleanup while executable
@@ -159,7 +179,7 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLeg
 	if failure == nil || !strings.Contains(failure.Error(), "unresolved receiver cache") || len(receipts) != 0 {
 		t.Fatalf("receiver evidence was ignored: %v", failure)
 	}
-	for _, raw := range []string{"172.29.0.1/32", "fd29::1/128"} {
+	for _, raw := range retiredIPs {
 		_, err := advertisedMED(ctx, speaker, raw)
 		must(err)
 	}
@@ -175,7 +195,7 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLeg
 	if failure == nil || len(receipts) != 0 {
 		t.Fatal("live survivor overlap authorized cleanup")
 	}
-	for _, raw := range []string{"172.29.0.1/32", "fd29::1/128"} {
+	for _, raw := range retiredIPs {
 		_, err := advertisedMED(ctx, speaker, raw)
 		must(err)
 	}
@@ -201,7 +221,7 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLeg
 		}
 	}
 	must(verifyReceivePolicyRules(cfg))
-	for _, raw := range []string{"172.29.0.1/32", "fd29::1/128"} {
+	for _, raw := range retiredIPs {
 		if _, err := advertisedMED(ctx, speaker, raw); err == nil {
 			t.Fatal("departed BGP destination remains")
 		}
@@ -221,7 +241,12 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLeg
 	if emptyLegacy {
 		expectedSurvivor = ""
 	}
-	if len(saved.Data[tunnel.PeerPublicKeyPrefix+"worker"]) != 0 || string(saved.Data[tunnel.PeerPublicKeyPrefix+"survivor"]) != expectedSurvivor {
+	for _, member := range plans {
+		if len(saved.Data[tunnel.PeerPublicKeyPrefix+member.MachineName]) != 0 {
+			t.Fatal("cache retained retired worker")
+		}
+	}
+	if string(saved.Data[tunnel.PeerPublicKeyPrefix+"survivor"]) != expectedSurvivor {
 		t.Fatal("cache cleanup lost survivor or retained target")
 	}
 	if emptyLegacy {
@@ -247,8 +272,10 @@ func nativeCombinedFollowerWithdrawal(t *testing.T, withRecordedRoutes, emptyLeg
 		}
 		before, err := os.ReadFile(followerPath)
 		must(err)
-		if _, err := stageReceiveFollowerRoutes(followerPath, cfg, followerScope, own, pending, map[string]map[string]string{plan.RootPublicKey: pending.Routes[plan.RootPublicKey][0]}); err == nil {
-			t.Fatal("stale pre-retirement write restored departed route ownership")
+		for _, member := range plans {
+			if _, err := stageReceiveFollowerRoutes(followerPath, cfg, followerScope, own, pending, map[string]map[string]string{member.RootPublicKey: pending.Routes[member.RootPublicKey][0]}); err == nil {
+				t.Fatal("stale pre-retirement write restored departed route ownership")
+			}
 		}
 		after, err := os.ReadFile(followerPath)
 		must(err)

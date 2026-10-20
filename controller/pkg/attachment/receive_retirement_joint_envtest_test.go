@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -334,6 +335,39 @@ func verifyJointRetirementAuthentication(t *testing.T, api kubernetes.Interface,
 	}
 	if err := group.Recheck(ctx, api, stores[0]); err == nil {
 		t.Fatal("shared recheck reused a cached mesh revision")
+	}
+	// A rejected snapshot must be discarded. A fresh admission can converge
+	// after an unrelated source update without rewriting history or making
+	// the old snapshot valid. This is a real-API consistency test, not proof
+	// that a live verifier will finish within its observation deadline.
+	beforeMesh, err := api.CoreV1().Secrets(ns).Get(ctx, mesh.Name, metav1.GetOptions{})
+	must(err)
+	beforeIndex, err := maps.Get(ctx, index.Name, metav1.GetOptions{})
+	must(err)
+	fresh, err := ReadReleasedReceiveJournals(ctx, api, stores[0], ns, mesh.Name, string(mesh.UID), string(index.UID), time.Minute)
+	must(err)
+	if len(fresh.Records) != len(group.Records) {
+		t.Fatal("fresh admission lost released history")
+	}
+	for uid, old := range group.Records {
+		current := fresh.Records[uid]
+		if current.Journal.Metadata().UID != old.Journal.Metadata().UID ||
+			current.Journal.Metadata().ResourceVersion != old.Journal.Metadata().ResourceVersion ||
+			!reflect.DeepEqual(current.Inventory.Released[uid], old.Inventory.Released[uid]) ||
+			!reflect.DeepEqual(current.Plan, old.Plan) || !reflect.DeepEqual(current.Withdrawal, old.Withdrawal) {
+			t.Fatal("fresh admission changed retained journal or consumed evidence")
+		}
+	}
+	must(fresh.Recheck(ctx, api, stores[0]))
+	if err := group.Recheck(ctx, api, stores[0]); err == nil {
+		t.Fatal("fresh admission repaired stale evidence")
+	}
+	afterMesh, err := api.CoreV1().Secrets(ns).Get(ctx, mesh.Name, metav1.GetOptions{})
+	must(err)
+	afterIndex, err := maps.Get(ctx, index.Name, metav1.GetOptions{})
+	must(err)
+	if beforeMesh.ResourceVersion != afterMesh.ResourceVersion || beforeIndex.ResourceVersion != afterIndex.ResourceVersion {
+		t.Fatal("historical read mutated its source")
 	}
 	for _, fault := range []string{"missing-member", "replaced-journal", "mismatched-cohort"} {
 		t.Run("released-history/"+fault, func(t *testing.T) {

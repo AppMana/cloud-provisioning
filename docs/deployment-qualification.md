@@ -1248,6 +1248,16 @@ qualification must correlate the captured Machine/AWSMachine identity and
 conditions with direct EC2 state reads for that same instance, retaining the
 original operation deadline and reporting the phase that remains pending.
 
+Historical admission may reject a snapshot when the mesh or inventory changes
+during its API reads. Discard that snapshot; a later successful read does not
+validate the earlier observation. Exercise fresh admission after an unrelated
+source revision and require identical retained journals and consumed evidence,
+unchanged storage, and continued rejection of the old snapshot. This real-API
+consistency test does not establish a live verifier's convergence deadline.
+Report compute termination, finalization/release and historical verification
+separately so a verifier failure cannot erase evidence of the earlier stages
+or be silently treated as a successful end-to-end removal.
+
 Retirement freshness is recorded in each immutable journal. The configured
 receipt age is an admission ceiling: increasing it admits older journals with
 their original age, while decreasing it below a journal's recorded age rejects

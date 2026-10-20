@@ -71,14 +71,16 @@ func reconcileReceiveFollower(ctx context.Context, api kubernetes.Interface, cfg
 		}
 		plans = append(plans, plan)
 	}
-	if err := checkPaths(); err != nil {
-		return err
-	}
-	if len(desired) == 0 {
-		return check()
-	}
 	peers, err := tunnel.SitePeers(admitted.Mesh.Data)
 	if err != nil {
+		return err
+	}
+	ordinary, _, checkOrdinary, err := admitReceiveFollowerOrdinary(ctx, api, cfg, admitted, peers, plans)
+	if err != nil {
+		return err
+	}
+	desired = ordinary
+	if err := checkPaths(); err != nil {
 		return err
 	}
 	boot, err := localReceiveBootID()
@@ -90,10 +92,19 @@ func reconcileReceiveFollower(ctx context.Context, api kubernetes.Interface, cfg
 		if err := check(); err != nil {
 			return err
 		}
+		if err := checkOrdinary(); err != nil {
+			return err
+		}
 		return checkPaths()
 	}
 	if err := prepareReceiveFollowerStorage(ctx, api, cfg, speaker, key, lockPath, admitted.Mesh, own, renew); err != nil {
 		return err
+	}
+	if err := retireOrdinaryReceiveFollowers(ctx, cfg, speaker, key, lockPath, expected, own, peers, plans, renew); err != nil {
+		return err
+	}
+	if len(desired) == 0 {
+		return renew()
 	}
 	return applyReceiveFollowerRoutes(ctx, cfg, speaker, key, lockPath, expected, own, desired, peers, plans, renew)
 }
@@ -153,46 +164,11 @@ func applyReceiveFollowerRoutes(ctx context.Context, cfg config, speaker *transi
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	// Read the old whole-mesh election only as evidence of routes installed before
-	// per-worker selection. It cannot authorize the desired generation.
-	oldTransit, err := tunnel.SiteTransit(saved.Data, saved.NotReady)
+	staging, err := receiveFollowerLegacyRoutes(saved)
 	if err != nil {
 		return err
-	}
-	oldPeers, err := tunnel.SitePeers(saved.Data)
-	if err != nil {
-		return err
-	}
-	oldRoutes := map[string]string{}
-	if oldTransit != nil || len(oldPeers) != 0 {
-		oldRoutes, err = receiveFollowerTransitRoutes(oldTransit)
-		if err != nil {
-			return err
-		}
 	}
 	evidence := map[string][]map[string]string{}
-	staging := map[string][]map[string]string{}
-	// Import all legacy owners, including workers this pass will not touch.
-	// Otherwise an omitted worker's old allocation could be claimed by a new
-	// worker before the explicit retirement protocol removes its evidence.
-	for _, peer := range oldPeers {
-		if !peer.Remote {
-			continue
-		}
-		legacy := map[string]string{}
-		prefixes := slices.Clone(peer.WGAllowedIPs)
-		for _, host := range peer.AllRouteHosts() {
-			prefixes = append(prefixes, tunnel.HostCIDR(host))
-		}
-		for _, prefix := range prefixes {
-			if via, found := oldRoutes[prefix]; found {
-				legacy[prefix] = via
-			}
-		}
-		if len(legacy) != 0 {
-			staging[peer.PublicKey] = append(staging[peer.PublicKey], legacy)
-		}
-	}
 	for root := range desired {
 		evidence[root] = append(evidence[root], previous.Routes[root]...)
 		evidence[root] = append(evidence[root], staging[root]...)
@@ -205,22 +181,12 @@ func applyReceiveFollowerRoutes(ctx context.Context, cfg config, speaker *transi
 	var variants []map[string]string
 	var hosts []net.IPNet
 	for root, generations := range evidence {
-		// Reuse retirement's ownership overlap check, excluding this root itself.
-		// This grants neither retirement authority nor permission to change a peer.
-		other := []tunnel.PeerSpec{}
-		for _, peer := range peers {
-			if peer.PublicKey != root {
-				other = append(other, peer)
-			}
-		}
 		for _, routes := range generations {
-			recorded := tunnel.PeerSpec{PublicKey: root, Remote: true}
-			for prefix := range routes {
-				recorded.WGAllowedIPs = append(recorded.WGAllowedIPs, prefix)
-				cfg.receiveRouteScope[prefix] = true
-			}
-			if _, err := tunnel.PlanReceiveWithdrawnNeighborPeers([]tunnel.PeerSpec{recorded}, other, plans, root); err != nil {
+			if err := validateReceiveFollowerVariant(root, routes, peers, plans); err != nil {
 				return err
+			}
+			for prefix := range routes {
+				cfg.receiveRouteScope[prefix] = true
 			}
 			variants = append(variants, routes)
 		}
@@ -339,4 +305,69 @@ func validateReceiveFollowerNativeAbsence(cfg config, lockPath string) error {
 		}
 	}
 	return nil
+}
+
+// Historical projection only; this never selects desired forwarding.
+func receiveFollowerLegacyRoutes(saved *siteForwardingCache) (map[string][]map[string]string, error) {
+	oldTransit, err := tunnel.SiteTransit(saved.Data, saved.NotReady)
+	if err != nil {
+		return nil, err
+	}
+	oldPeers, err := tunnel.SitePeers(saved.Data)
+	if err != nil {
+		return nil, err
+	}
+	oldRoutes := map[string]string{}
+	if oldTransit != nil || len(oldPeers) != 0 {
+		oldRoutes, err = receiveFollowerTransitRoutes(oldTransit)
+		if err != nil {
+			return nil, err
+		}
+	}
+	staging := map[string][]map[string]string{}
+	// Import all legacy owners, including workers this pass will not touch.
+	// Otherwise an omitted worker's old allocation could be claimed by a new
+	// worker before the explicit retirement protocol removes its evidence.
+	for _, peer := range oldPeers {
+		if !peer.Remote {
+			continue
+		}
+		legacy := map[string]string{}
+		prefixes := slices.Clone(peer.WGAllowedIPs)
+		for _, host := range peer.AllRouteHosts() {
+			prefixes = append(prefixes, tunnel.HostCIDR(host))
+		}
+		for _, prefix := range prefixes {
+			if via, found := oldRoutes[prefix]; found {
+				legacy[prefix] = via
+			}
+		}
+		if len(legacy) != 0 {
+			staging[peer.PublicKey] = append(staging[peer.PublicKey], legacy)
+		}
+	}
+	return staging, nil
+}
+
+// Ordinary variants use the existing reserved-prefix ownership checks. A journal
+// owner instead uses the existing withdrawal projection to exclude only itself.
+func validateReceiveFollowerVariant(root string, routes map[string]string, peers []tunnel.PeerSpec, plans []tunnel.ReceiveTransitionPlan) error {
+	other := []tunnel.PeerSpec{}
+	for _, peer := range peers {
+		if peer.PublicKey != root {
+			other = append(other, peer)
+		}
+	}
+	recorded := tunnel.PeerSpec{PublicKey: root, Remote: true}
+	for raw := range routes {
+		recorded.WGAllowedIPs = append(recorded.WGAllowedIPs, raw)
+	}
+	for _, plan := range plans {
+		if plan.RootPublicKey == root {
+			_, err := tunnel.PlanReceiveWithdrawnNeighborPeers([]tunnel.PeerSpec{recorded}, other, plans, root)
+			return err
+		}
+	}
+	_, err := tunnel.PlanReceiveNeighborPeers(append(other, recorded), plans)
+	return err
 }

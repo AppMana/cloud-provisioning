@@ -313,6 +313,9 @@ func TestNativeFollowerServingRoutes(t *testing.T) {
 				})
 			}
 		})
+		t.Run("ordinary-lifecycle", func(t *testing.T) {
+			verifyNativeOrdinaryFollower(t, api, cfg, key, lock.Name(), speaker, admitted, plan)
+		})
 		admitted.Node.Status.Addresses[0].Address = "10.90.0.99"
 		if err := reconcileReceiveFollower(ctx, api, cfg, speaker, key, lock.Name(), admitted, func() error { t.Fatal("changed source reached mutation admission"); return nil }); err == nil {
 			t.Fatal("changed Node source accepted")

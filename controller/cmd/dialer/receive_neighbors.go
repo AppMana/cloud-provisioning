@@ -104,10 +104,22 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		}
 	}
 	if scope.MachineUID == "" && !cloud && len(mesh.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName]) == 0 {
-		if len(follower) == 1 && follower[0] != nil {
+		if len(follower) > 2 {
+			return fmt.Errorf("follower requires one writer and at most one acknowledgement")
+		}
+		if len(follower) >= 1 && follower[0] != nil {
+			var acknowledge []func(context.Context, receiveObserverAdmission, func() error) error
+			if len(follower) == 2 {
+				if follower[1] == nil {
+					return fmt.Errorf("follower acknowledgement is missing")
+				}
+				acknowledge = append(acknowledge, func(ctx context.Context, admitted receiveObserverAdmission, check func() error) error {
+					return follower[1](ctx, key, lock.Name(), admitted, check)
+				})
+			}
 			return withReceiveObserver(ctx, api, store, scope, cfg, key, lock.Name(), mesh, false, func(ctx context.Context, admitted receiveObserverAdmission, check func() error) error {
 				return follower[0](ctx, key, lock.Name(), admitted, check)
-			})
+			}, acknowledge...)
 		}
 		// Checkpoint-only callers never acquire native routing authority.
 		return checkpointReleasedReceiveObserver(ctx, api, store, scope, cfg, key, lock.Name(), mesh)

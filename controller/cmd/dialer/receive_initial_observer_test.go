@@ -54,7 +54,7 @@ func verifyInitialReceiveObserver(t *testing.T, api kubernetes.Interface, store 
 	}
 	mesh, err = api.CoreV1().Secrets(inventory.Namespace).Update(ctx, mesh, metav1.UpdateOptions{})
 	must(err)
-	for _, fault := range []string{"fresh", "retry", "orphaned-follower", "orphaned-journal", "orphaned-neighbors", "corrupt-inventory", "wrong-agent", "cancelled", "mesh-race"} {
+	for _, fault := range []string{"fresh", "retry", "orphaned-follower", "orphaned-journal", "orphaned-neighbors", "corrupt-inventory", "wrong-agent", "cancelled", "mesh-race", "ack-success", "ack-race"} {
 		t.Run("initial-observer/"+fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -87,7 +87,7 @@ func verifyInitialReceiveObserver(t *testing.T, api kubernetes.Interface, store 
 				t.Fatal("observer reached ordinary native writer")
 				return nil
 			}
-			calls, writes := 0, 0
+			calls, writes, acknowledgements := 0, 0, 0
 			follower := func(useCtx context.Context, gotKey wgtypes.Key, gotPath string, admitted receiveObserverAdmission, check func() error) error {
 				calls++
 				if gotKey != key || gotPath != lockPath || len(admitted.Inventory.Released) != 0 || len(admitted.Journals) == 0 {
@@ -104,10 +104,40 @@ func verifyInitialReceiveObserver(t *testing.T, api kubernetes.Interface, store 
 					return err
 				}
 				writes++
+				if fault == "ack-race" {
+					m, e := api.CoreV1().Secrets(inventory.Namespace).Get(useCtx, inventory.MeshName, metav1.GetOptions{})
+					must(e)
+					m.Annotations = map[string]string{"test/observer-race": "changed"}
+					_, e = api.CoreV1().Secrets(inventory.Namespace).Update(useCtx, m, metav1.UpdateOptions{})
+					must(e)
+				}
 				return nil
 			}
-			err := reconcileReceiveNeighbors(runCtx, api, run, native, nil, follower)
-			if fault == "fresh" || fault == "retry" {
+			callbacks := []receiveFollowerNative{follower}
+			if fault == "ack-success" || fault == "ack-race" {
+				callbacks = append(callbacks, func(ctx context.Context, _ wgtypes.Key, _ string, admitted receiveObserverAdmission, check func() error) error {
+					if err := check(); err != nil {
+						return err
+					}
+					acknowledgements++
+					// An acknowledgement legitimately changes the admitted mesh revision.
+					m := admitted.Mesh.DeepCopy()
+					m.Annotations = map[string]string{"test/observer-ack": "accepted"}
+					_, err := api.CoreV1().Secrets(m.Namespace).Update(ctx, m, metav1.UpdateOptions{})
+					return err
+				})
+			}
+			err := reconcileReceiveNeighbors(runCtx, api, run, native, nil, callbacks...)
+			if fault == "ack-success" && acknowledgements != 1 {
+				t.Fatal("acknowledgement was not executed")
+			}
+			if fault == "ack-race" {
+				if err == nil || writes != 1 || acknowledgements != 0 {
+					t.Fatal("post-write authority race allowed acknowledgement")
+				}
+				return
+			}
+			if fault == "fresh" || fault == "retry" || fault == "ack-success" {
 				must(err)
 				if calls != 1 || writes != 1 {
 					t.Fatal("initial serving callback not executed")

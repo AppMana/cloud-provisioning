@@ -171,3 +171,74 @@ func TestFollowerRouteCacheRejectsInvalidScopeAndOwnership(t *testing.T) {
 		t.Fatal("symlink cache accepted")
 	}
 }
+
+// A completed withdrawal must survive restart and cannot be erased by a stale
+// writer or downgrade. The addresses become reusable; the withdrawn key does not.
+func TestFollowerWithdrawalFenceSurvivesAddressReuse(t *testing.T) {
+	cfg, expected, own, oldRoot, newRoot := followerCacheFixture(t)
+	path := filepath.Join(t.TempDir(), "follower.json")
+	routes := map[string]string{"172.29.0.1/32": "10.10.0.1"}
+	before, err := stageReceiveFollowerRoutes(path, cfg, expected, own, receiveFollowerCache{}, map[string]map[string]string{oldRoot: routes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	retired := before
+	retired.Version = 2
+	retired.Routes = map[string][]map[string]string{}
+	retired.Retired = map[string]bool{oldRoot: true}
+	if err := replaceReceiveFollowerCache(path, cfg, expected, own, before, retired); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := readReceiveFollowerCache(path, cfg, expected, own)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reused, err := stageReceiveFollowerRoutes(path, cfg, expected, own, loaded, map[string]map[string]string{newRoot: routes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reject := func(action func() error) {
+		t.Helper()
+		original, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if action() == nil {
+			t.Fatal("withdrawn ownership restored or forgotten")
+		}
+		after, err := os.ReadFile(path)
+		if err != nil || string(after) != string(original) {
+			t.Fatal("rejected write changed durable ownership")
+		}
+	}
+	reject(func() error {
+		_, err := stageReceiveFollowerRoutes(path, cfg, expected, own, reused, map[string]map[string]string{oldRoot: {"172.29.0.9/32": "10.10.0.1"}})
+		return err
+	})
+	reject(func() error {
+		downgrade := reused
+		downgrade.Version, downgrade.Retired = 1, nil
+		return replaceReceiveFollowerCache(path, cfg, expected, own, reused, downgrade)
+	})
+	reject(func() error { return replaceReceiveFollowerCache(path, cfg, expected, own, before, before) })
+	for _, fault := range []string{"v1-marker", "v2-empty", "false-marker"} {
+		t.Run(fault, func(t *testing.T) {
+			invalid := reused
+			switch fault {
+			case "v1-marker":
+				invalid.Version = 1
+			case "v2-empty":
+				invalid.Retired = nil
+			case "false-marker":
+				invalid.Retired = map[string]bool{oldRoot: false}
+			}
+			raw, err := json.Marshal(invalid)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := decodeReceiveFollowerCache(raw, cfg, expected, own); err == nil {
+				t.Fatal("invalid withdrawal marker accepted")
+			}
+		})
+	}
+}

@@ -45,7 +45,10 @@ func withReleasedReceiveObserver(ctx context.Context, api kubernetes.Interface, 
 // Initial observers may establish their first fence from complete live authority.
 // Retained consumers still need the original release proof; an absent inventory
 // file never permits discarding another local recovery record.
-func withReceiveObserver(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, mesh *corev1.Secret, retainedOnly bool, use func(context.Context, receiveObserverAdmission, func() error) error) error {
+func withReceiveObserver(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, mesh *corev1.Secret, retainedOnly bool, use func(context.Context, receiveObserverAdmission, func() error) error, acknowledge ...func(context.Context, receiveObserverAdmission, func() error) error) error {
+	if len(acknowledge) > 1 || (len(acknowledge) != 0 && (use == nil || acknowledge[0] == nil)) {
+		return fmt.Errorf("observer acknowledgement requires one admitted serving operation")
+	}
 	if use != nil {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
@@ -240,8 +243,18 @@ func withReceiveObserver(ctx context.Context, api kubernetes.Interface, store ha
 	if use == nil {
 		return nil
 	}
-	if err := use(ctx, receiveObserverAdmission{Inventory: inventory, Metadata: index.ObjectMeta, Journals: active, Mesh: mesh, Node: node}, check); err != nil {
+	admitted := receiveObserverAdmission{Inventory: inventory, Metadata: index.ObjectMeta, Journals: active, Mesh: mesh, Node: node}
+	if err := use(ctx, admitted, check); err != nil {
 		return err
 	}
-	return check()
+	if err := check(); err != nil {
+		return err
+	}
+	// A final whole-site acknowledgement may CAS-update the mesh receipt after
+	// this check. It must independently verify the complete native projection;
+	// it may not perform additional route mutations or issue phase receipts.
+	if len(acknowledge) == 1 {
+		return acknowledge[0](ctx, admitted, check)
+	}
+	return nil
 }

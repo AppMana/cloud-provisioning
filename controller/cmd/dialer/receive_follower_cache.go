@@ -31,6 +31,9 @@ type receiveFollowerCache struct {
 	Mark         int                            `json:"mark"`
 	Own          []string                       `json:"own"`
 	Routes       map[string][]map[string]string `json:"routes"`
+	// Version 2 retains completed ordinary withdrawals by key, not address.
+	// Their destinations can be reassigned, but the old key cannot be replayed.
+	Retired map[string]bool `json:"retired,omitempty"`
 }
 
 func decodeReceiveFollowerCache(raw []byte, cfg config, expected receiveInventoryCheckpoint, own []string) (receiveFollowerCache, error) {
@@ -45,7 +48,8 @@ func decodeReceiveFollowerCache(raw []byte, cfg config, expected receiveInventor
 	if err := d.Decode(&trailing); err != io.EOF {
 		return fail(fmt.Errorf("trailing follower route ownership"))
 	}
-	if saved.Version != 1 || saved.InventoryUID == "" || saved.InventoryUID != expected.InventoryUID ||
+	validVersion := (saved.Version == 1 && len(saved.Retired) == 0) || (saved.Version == 2 && len(saved.Retired) != 0)
+	if !validVersion || saved.InventoryUID == "" || saved.InventoryUID != expected.InventoryUID ||
 		saved.MeshUID == "" || saved.MeshUID != expected.Inventory.MeshUID ||
 		saved.NodeName == "" || saved.NodeName != cfg.nodeName || saved.NodeName != expected.NodeName ||
 		saved.NodeUID == "" || saved.NodeUID != expected.NodeUID || saved.BootID == "" ||
@@ -56,6 +60,12 @@ func decodeReceiveFollowerCache(raw []byte, cfg config, expected receiveInventor
 	}
 	if key, err := wgtypes.ParseKey(saved.PublicKey); err != nil || key == (wgtypes.Key{}) {
 		return fail(fmt.Errorf("invalid follower identity"))
+	}
+	for root, retired := range saved.Retired {
+		key, err := wgtypes.ParseKey(root)
+		if !retired || err != nil || key == (wgtypes.Key{}) || root == saved.PublicKey || len(saved.Routes[root]) != 0 {
+			return fail(fmt.Errorf("invalid or restored retired follower owner"))
+		}
 	}
 	seenSources := map[string]bool{}
 	for _, raw := range own {
@@ -124,6 +134,7 @@ func stageReceiveFollowerRouteVariants(path string, cfg config, expected receive
 		if _, err := decodeReceiveFollowerCache(raw, cfg, expected, own); err != nil {
 			return receiveFollowerCache{}, err
 		}
+		next.Version, next.Retired = previous.Version, maps.Clone(previous.Retired)
 		for root, variants := range previous.Routes {
 			for _, routes := range variants {
 				next.Routes[root] = append(next.Routes[root], maps.Clone(routes))
@@ -190,6 +201,11 @@ func replaceReceiveFollowerCache(path string, cfg config, expected receiveInvent
 		}
 		if !reflect.DeepEqual(current, previous) {
 			return fmt.Errorf("follower route ownership changed before persistence")
+		}
+		for root := range previous.Retired {
+			if !next.Retired[root] {
+				return fmt.Errorf("retired follower ownership cannot be forgotten")
+			}
 		}
 	}
 	return writeDurableJSON(path, next)

@@ -7,7 +7,9 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -164,11 +166,35 @@ func (s ReceiveRetirementSet) Recheck(ctx context.Context, api kubernetes.Interf
 	if err != nil {
 		return err
 	}
-	same := func(a, b metav1.ObjectMeta) bool {
-		return a.UID != "" && a.UID == b.UID && a.ResourceVersion != "" && a.ResourceVersion == b.ResourceVersion && a.DeletionTimestamp == nil && b.DeletionTimestamp == nil
+	indexErr := retirementSourceRevision(s.Metadata, index.ObjectMeta, "configmaps")
+	meshErr := retirementSourceRevision(s.MeshMetadata, mesh.ObjectMeta, "secrets")
+	// A concurrent revision on one source must not hide replacement or
+	// deletion of the other source behind a retryable conflict.
+	if indexErr != nil && !apierrors.IsConflict(indexErr) {
+		return indexErr
 	}
-	if !same(s.Metadata, index.ObjectMeta) || !same(s.MeshMetadata, mesh.ObjectMeta) {
-		return fmt.Errorf("retirement source changed during admission")
+	if meshErr != nil && !apierrors.IsConflict(meshErr) {
+		return meshErr
+	}
+	if indexErr != nil {
+		return indexErr
+	}
+	return meshErr
+}
+
+// A revision conflict invalidates the captured admission. Callers may discard
+// it and admit a fresh source, but must not retry native work using that stale
+// evidence. Replacement, deletion and incomplete metadata are not conflicts.
+func retirementSourceRevision(before, current metav1.ObjectMeta, resource string) error {
+	if before.UID == "" || before.UID != current.UID || before.Name == "" || before.Name != current.Name ||
+		before.Namespace == "" || before.Namespace != current.Namespace ||
+		before.ResourceVersion == "" || current.ResourceVersion == "" ||
+		before.DeletionTimestamp != nil || current.DeletionTimestamp != nil {
+		return fmt.Errorf("retirement %s identity or lifecycle changed during admission", resource)
+	}
+	if before.ResourceVersion != current.ResourceVersion {
+		return apierrors.NewConflict(schema.GroupResource{Resource: resource}, current.Name,
+			fmt.Errorf("retirement source revision changed during admission"))
 	}
 	return nil
 }

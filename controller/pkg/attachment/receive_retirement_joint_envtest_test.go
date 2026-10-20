@@ -13,6 +13,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -330,8 +331,8 @@ func verifyJointRetirementAuthentication(t *testing.T, api kubernetes.Interface,
 		return err
 	}}
 	rejected, err := ReadReleasedReceiveJournals(ctx, api, counted, ns, mesh.Name, string(mesh.UID), string(index.UID), time.Minute)
-	if !changed || err == nil || len(rejected.Records) != 0 {
-		t.Fatal("shared history admission returned evidence across a changed mesh revision")
+	if !changed || !apierrors.IsConflict(err) || len(rejected.Records) != 0 {
+		t.Fatalf("shared history admission must reject a changed revision with a conflict: %v", err)
 	}
 	if err := group.Recheck(ctx, api, stores[0]); err == nil {
 		t.Fatal("shared recheck reused a cached mesh revision")
@@ -359,6 +360,21 @@ func verifyJointRetirementAuthentication(t *testing.T, api kubernetes.Interface,
 		}
 	}
 	must(fresh.Recheck(ctx, api, stores[0]))
+	for _, fault := range []string{"mesh-replacement", "inventory-replacement"} {
+		t.Run("source-conflict/"+fault, func(t *testing.T) {
+			invalid := fresh
+			if fault == "mesh-replacement" {
+				invalid.source.MeshMetadata.UID = "replaced"
+				invalid.source.Metadata.ResourceVersion = "stale"
+			} else {
+				invalid.source.Metadata.UID = "replaced"
+				invalid.source.MeshMetadata.ResourceVersion = "stale"
+			}
+			if err := invalid.Recheck(ctx, api, stores[0]); err == nil || apierrors.IsConflict(err) {
+				t.Fatalf("concurrent revision hid source identity failure: %v", err)
+			}
+		})
+	}
 	if err := group.Recheck(ctx, api, stores[0]); err == nil {
 		t.Fatal("fresh admission repaired stale evidence")
 	}

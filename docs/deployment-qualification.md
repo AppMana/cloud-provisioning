@@ -1257,6 +1257,14 @@ consistency test does not establish a live verifier's convergence deadline.
 Report compute termination, finalization/release and historical verification
 separately so a verifier failure cannot erase evidence of the earlier stages
 or be silently treated as a successful end-to-end removal.
+Revision changes on the same live source return a Kubernetes conflict. A
+verifier may retry fresh shared-history admission for that classified conflict
+within the original operation deadline. Identity replacement, deletion,
+incomplete metadata and invalid consumed evidence must fail rather than enter
+that retry path. Check both sources before classifying a conflict so a revision
+change on one cannot mask replacement of the other. Use the shared historical
+reader for qualification; individual-versus-shared read benchmarks are separate
+measurements and must not add repeated admission passes to the cleanup gate.
 
 Retirement freshness is recorded in each immutable journal. The configured
 receipt age is an admission ceiling: increasing it admits older journals with

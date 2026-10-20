@@ -1124,6 +1124,10 @@ or active allocation authority over a replacement. Reject missing members,
 replaced journal incarnations and mismatched groups. Reader fixtures use the joint release writer to move authenticated records into
 retained storage. Native observations and owner/rollback policy remain synthetic;
 these tests do not qualify native absence, reboot recovery or live address reuse.
+Live recovery checks must use readers compatible with every retained record
+format and verify both ordinary and orphan retirements when they coexist.
+A reader decode failure leaves the scenario unverified; do not omit records
+or treat a failed verifier as evidence of successful recovery.
 
 Joint release requires an explicit per-member ownership check and fresh joint
 observations from every surviving consumer after every member finalized. An

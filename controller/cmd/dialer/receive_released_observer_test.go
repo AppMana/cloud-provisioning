@@ -107,7 +107,7 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 	must(err)
 	currentData := index.DeepCopy().Data
 	verifyUnreservedCloudDispatch(t, api, store, scope, foreignRoot, key)
-	for _, fault := range []string{"none", "previous-boot", "missing-fence", "changed-fence", "unknown-journal", "neighbor-owner", "wrong-agent", "cancelled", "inventory-race", "mesh-race", "missing-active-journal", "callback-success", "callback-mesh-race", "callback-node-race", "callback-inventory-race", "callback-agent-race", "callback-cancelled", "callback-post-use-race"} {
+	for _, fault := range []string{"none", "previous-boot", "missing-fence", "changed-fence", "unknown-journal", "neighbor-owner", "wrong-agent", "cancelled", "inventory-race", "mesh-race", "missing-active-journal", "callback-success", "callback-neighbor-dispatch", "callback-mesh-race", "callback-node-race", "callback-inventory-race", "callback-agent-race", "callback-cancelled", "callback-post-use-race"} {
 		t.Run("released-observer/"+fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -232,7 +232,7 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 				observerScope := scope
 				observerScope.MachineUID = ""
 				uses, writes := 0, 0
-				e = withReleasedReceiveObserver(runCtx, api, store, observerScope, runCfg, key, lock.Name(), m, func(useCtx context.Context, admitted receiveObserverAdmission, check func() error) error {
+				use := func(useCtx context.Context, admitted receiveObserverAdmission, check func() error) error {
 					uses++
 					if len(admitted.Inventory.Released) != 1 || len(admitted.Journals) != 1 || admitted.Journals[plan.MachineUID].Metadata().UID != snapshot.Metadata().UID || admitted.Node.Name != cfg.nodeName || admitted.Mesh.UID != mesh.UID {
 						t.Fatal("callback lost admitted observer scope")
@@ -302,8 +302,20 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 					}
 					writes++
 					return nil
-				})
-				if uses != 1 || (fault == "callback-success" && writes != 1) || (fault != "callback-success" && writes != 0) {
+				}
+				if fault == "callback-neighbor-dispatch" {
+					must(lock.Close())
+					e = reconcileReceiveNeighbors(runCtx, api, runCfg, native, nil, func(useCtx context.Context, gotKey wgtypes.Key, gotPath string, admitted receiveObserverAdmission, check func() error) error {
+						if gotKey != key || gotPath != lockPath {
+							t.Fatal("follower dispatch lost host identity")
+						}
+						return use(useCtx, admitted, check)
+					})
+				} else {
+					e = withReleasedReceiveObserver(runCtx, api, store, observerScope, runCfg, key, lock.Name(), m, use)
+				}
+				success := fault == "callback-success" || fault == "callback-neighbor-dispatch"
+				if uses != 1 || (success && writes != 1) || (!success && writes != 0) {
 					t.Fatalf("callback escaped admission boundary: uses=%d writes=%d", uses, writes)
 				}
 			} else {
@@ -313,7 +325,7 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 				t.Fatal("observer invoked routing callback")
 			}
 			after, _ := os.ReadFile(lockPath + ".inventory.json")
-			if fault != "none" && fault != "previous-boot" && fault != "callback-success" {
+			if fault != "none" && fault != "previous-boot" && fault != "callback-success" && fault != "callback-neighbor-dispatch" {
 				if e == nil {
 					t.Fatal("invalid observer checkpoint accepted", fault)
 				}

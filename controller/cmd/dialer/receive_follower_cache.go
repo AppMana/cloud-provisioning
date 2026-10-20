@@ -107,6 +107,14 @@ func readReceiveFollowerCache(path string, cfg config, expected receiveInventory
 // retirement. Caller holds the host lock and has admitted every new route.
 // A previous boot's record is evidence only; it cannot authorize restoration.
 func stageReceiveFollowerRoutes(path string, cfg config, expected receiveInventoryCheckpoint, own []string, previous receiveFollowerCache, desired map[string]map[string]string) (receiveFollowerCache, error) {
+	variants := map[string][]map[string]string{}
+	for root, routes := range desired {
+		variants[root] = []map[string]string{routes}
+	}
+	return stageReceiveFollowerRouteVariants(path, cfg, expected, own, previous, variants)
+}
+
+func stageReceiveFollowerRouteVariants(path string, cfg config, expected receiveInventoryCheckpoint, own []string, previous receiveFollowerCache, variants map[string][]map[string]string) (receiveFollowerCache, error) {
 	next := receiveFollowerCache{Version: 1, InventoryUID: expected.InventoryUID, MeshUID: expected.Inventory.MeshUID, NodeName: expected.NodeName, NodeUID: expected.NodeUID, BootID: expected.BootID, PublicKey: expected.PublicKey, Interface: cfg.iface, Table: cfg.routeTable, Mark: cfg.fwmark, Own: slices.Clone(own), Routes: map[string][]map[string]string{}}
 	if previous.Version != 0 {
 		raw, err := json.Marshal(previous)
@@ -122,13 +130,15 @@ func stageReceiveFollowerRoutes(path string, cfg config, expected receiveInvento
 			}
 		}
 	}
-	for root, routes := range desired {
-		found := false
-		for _, old := range next.Routes[root] {
-			found = found || reflect.DeepEqual(old, routes)
-		}
-		if !found {
-			next.Routes[root] = append(next.Routes[root], maps.Clone(routes))
+	for root, candidates := range variants {
+		for _, routes := range candidates {
+			found := false
+			for _, old := range next.Routes[root] {
+				found = found || reflect.DeepEqual(old, routes)
+			}
+			if !found {
+				next.Routes[root] = append(next.Routes[root], maps.Clone(routes))
+			}
 		}
 	}
 	if err := replaceReceiveFollowerCache(path, cfg, expected, own, previous, next); err != nil {

@@ -42,7 +42,7 @@ type receiveNeighborCheckpoint struct {
 // Ordinary peers have independent forwarding authority. This operation keeps
 // every journal and local phase fence, and never issues a phase receipt or a
 // whole-mesh readiness acknowledgement for its partial work.
-func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cfg config, native receiveNeighborNative, prepare receiveNeighborPreparation) (resultErr error) {
+func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cfg config, native receiveNeighborNative, prepare receiveNeighborPreparation, follower ...receiveFollowerNative) (resultErr error) {
 	timing := newReceiveTiming(cfg.receiptURL != "", "neighbors")
 	defer func() { timing.finish(resultErr == nil) }()
 	cloud := cfg.secretName == ""
@@ -104,8 +104,12 @@ func reconcileReceiveNeighbors(ctx context.Context, api kubernetes.Interface, cf
 		}
 	}
 	if scope.MachineUID == "" && !cloud && len(inventory.Released) != 0 && len(mesh.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName]) == 0 {
-		// Retained observers have no published tunnel to reconcile. They still
-		// authenticate and persist released ownership under the same host lock.
+		if len(follower) == 1 && follower[0] != nil {
+			return withReleasedReceiveObserver(ctx, api, store, scope, cfg, key, lock.Name(), mesh, func(ctx context.Context, admitted receiveObserverAdmission, check func() error) error {
+				return follower[0](ctx, key, lock.Name(), admitted, check)
+			})
+		}
+		// Checkpoint-only callers never acquire native routing authority.
 		return checkpointReleasedReceiveObserver(ctx, api, store, scope, cfg, key, lock.Name(), mesh)
 	}
 	releasedOnly := scope.MachineUID == "" && !cloud && len(inventory.MachineUIDs) == 0 && len(inventory.Released) != 0

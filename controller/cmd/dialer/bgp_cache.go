@@ -87,6 +87,8 @@ func reconcileNode(ctx context.Context, k *kubernetes.Clientset, devices *wgctrl
 					roots[peer.PublicKey] = true
 				}
 				return reconcileDurableSiteReceiversScoped(ctx, k, devices, cfg, mesh, key, &siteReceiveScope{roots: roots, plans: plans, check: check})
+			}, func(ctx context.Context, key wgtypes.Key, lockPath string, admitted receiveObserverAdmission, check func() error) error {
+				return reconcileReceiveFollower(ctx, k, cfg, speaker, key, lockPath, admitted, check)
 			})
 			return errors.Join(err, neighborErr)
 		}

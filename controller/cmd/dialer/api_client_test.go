@@ -65,6 +65,62 @@ func TestAPIClientPreservesShorterDeadline(t *testing.T) {
 	}
 }
 
+// Repeated failed passes must release the actual HTTP request on cancellation.
+// This checks transport lifetime, not kernel-operation cancellation or live API
+// latency. A subsequent healthy request must still succeed on the same client.
+func TestAPIClientCancellationDoesNotAccumulateRequests(t *testing.T) {
+	started := make(chan struct{}, 1)
+	finished := make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/namespaces/test/secrets/healthy" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"apiVersion":"v1","kind":"Secret","metadata":{"name":"healthy","namespace":"test"}}`))
+			return
+		}
+		started <- struct{}{}
+		<-r.Context().Done()
+		finished <- struct{}{}
+	}))
+	defer server.Close()
+	client, err := newAPIClient(&rest.Config{Host: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 20; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan error, 1)
+		go func() {
+			_, err := client.CoreV1().Secrets("test").Get(ctx, "stalled", metav1.GetOptions{})
+			done <- err
+		}()
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			cancel()
+			t.Fatal("request did not reach server")
+		}
+		cancel()
+		select {
+		case err := <-done:
+			if err == nil {
+				t.Fatal("cancelled request succeeded")
+			}
+		case <-time.After(time.Second):
+			t.Fatal("client retained cancelled request")
+		}
+		select {
+		case <-finished:
+		case <-time.After(time.Second):
+			t.Fatal("server retained cancelled request")
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := client.CoreV1().Secrets("test").Get(ctx, "healthy", metav1.GetOptions{}); err != nil {
+		t.Fatalf("client did not recover: %v", err)
+	}
+}
+
 // Repeated admissions must reach a responsive server without exhausting their
 // deadline in a default local token bucket. This covers client throttling only;
 // it does not prove native completion, server capacity or multi-node convergence.

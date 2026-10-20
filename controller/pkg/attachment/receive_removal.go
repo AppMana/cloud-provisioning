@@ -58,7 +58,18 @@ func AdvanceReceiveRemoval(ctx context.Context, api kubernetes.Interface, store 
 		return false, fmt.Errorf("receiver journal differs from drain owner")
 	}
 	if !snapshot.Frozen() {
-		_, err := store.FreezeCompleted(ctx, snapshot)
+		view, err := snapshot.Transition().View()
+		if err != nil {
+			return false, err
+		}
+		// Waiting for transport completion is normal lifecycle progress, not
+		// a failed reconciliation. Keep the caller's bounded pending retry;
+		// error backoff can otherwise outlive the next receipt window.
+		// Only FreezeCompleted may establish the retirement write fence.
+		if !view.Complete {
+			return false, nil
+		}
+		_, err = store.FreezeCompleted(ctx, snapshot)
 		return false, err
 	}
 	if len(publication.Retirement) == 0 {

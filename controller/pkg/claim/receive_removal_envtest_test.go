@@ -112,6 +112,7 @@ func verifyStandaloneReceiveDeletion(t *testing.T, api client.Client, core kuber
 		t.Fatal("withdrawal did not retain survivor")
 	}
 	if complete {
+		verifyStandalonePendingTransition(t, api, core, claim, machine, mesh, index, store)
 		verifyStandaloneCompletion(t, api, core, claim, machine, mesh, index, store, site, step)
 		return
 	}
@@ -159,6 +160,117 @@ func verifyStandaloneReceiveDeletion(t *testing.T, api client.Client, core kuber
 	must(api.Get(ctx, client.ObjectKeyFromObject(mesh), mesh))
 	if string(mesh.Data[tunnel.PeerPublicKeyPrefix+claim.Name]) != root {
 		t.Fatal("failed retirement removed peer")
+	}
+}
+
+// Synthetic unfinished histories exercise the real deletion reconciler and API
+// persistence. Pending work must use its fixed retry without freezing a journal,
+// withdrawing publication or requesting compute deletion. This does not prove
+// native transition progress or recovery after an actual participant outage.
+func verifyStandalonePendingTransition(t *testing.T, api client.Client, core kubernetes.Interface, claim *v1alpha1.ProvisionedNodeClaim, machine *unstructured.Unstructured, mesh *corev1.Secret, index *corev1.ConfigMap, store handover.Store) {
+	t.Helper()
+	ctx := context.Background()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	snapshot, err := store.Load(ctx)
+	must(err)
+	plan, err := tunnel.DecodeReceiveTransition(snapshot, store.ClusterUID)
+	must(err)
+	journal, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+	must(err)
+	spec, err := tunnel.ReceiveTransitionSpec(plan, store.ClusterUID, tunnel.HashPeerList([]byte(journal.Data["plan.json"])))
+	must(err)
+	completed := journal.Data["transition.json"]
+	defer func() {
+		current, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+		must(err)
+		current.Data["transition.json"] = completed
+		_, err = store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{})
+		must(err)
+	}()
+	for _, scenario := range []string{"prepare", "switch", "drain", "retire", "abort", "expired-prepare", "malformed"} {
+		t.Run("pending-transition/"+scenario, func(t *testing.T) {
+			must := func(err error) {
+				t.Helper()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			at := time.Now()
+			if scenario == "expired-prepare" {
+				at = at.Add(-time.Hour)
+			}
+			tr, err := handover.NewTransition(spec, at, handover.Policy{RoundLifetime: time.Minute, MaxReceiptAge: 30 * time.Second, DrainInterval: time.Second})
+			must(err)
+			if scenario == "abort" {
+				tr, err = tr.Rollback(at.Add(time.Second))
+				must(err)
+			}
+			for advances := 0; scenario == "switch" || scenario == "drain" || scenario == "retire"; advances++ {
+				view, err := tr.View()
+				must(err)
+				if string(view.Round.Phase) == scenario {
+					break
+				}
+				if advances > 5 || view.Complete {
+					t.Fatal("fixture did not reach pending phase", scenario)
+				}
+				at = view.Round.IssuedAt.Add(time.Second)
+				if at.Before(view.DrainUntil) {
+					at = view.DrainUntil
+				}
+				digest, err := view.Round.Digest()
+				must(err)
+				var receipts []handover.AuthenticatedReceipt
+				for _, member := range view.Round.Members {
+					receipts = append(receipts, handover.AuthenticatedReceipt{AuthenticatedNodeUID: member.NodeUID, Receipt: handover.Receipt{RoundHash: digest, NodeUID: member.NodeUID, DeviceID: member.DeviceID, FromKey: member.FromKey, ToKey: member.ToKey, FromPeerKey: member.FromPeerKey, ToPeerKey: member.ToPeerKey, ObservedAt: at}})
+				}
+				tr, err = tr.Advance(at, receipts)
+				must(err)
+			}
+			raw, err := tr.Bytes()
+			must(err)
+			if scenario == "malformed" {
+				raw = []byte(`{"invalid":true}`)
+			}
+			current, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+			must(err)
+			current.Data["transition.json"] = string(raw)
+			current, err = store.ConfigMaps.Update(ctx, current, metav1.UpdateOptions{})
+			must(err)
+			must(api.Get(ctx, client.ObjectKeyFromObject(claim), claim))
+			must(api.Get(ctx, client.ObjectKeyFromObject(machine), machine))
+			must(api.Get(ctx, client.ObjectKeyFromObject(mesh), mesh))
+			must(api.Get(ctx, client.ObjectKeyFromObject(index), index))
+			versions := []string{claim.ResourceVersion, machine.GetResourceVersion(), mesh.ResourceVersion, index.ResourceVersion}
+			r := &Reconciler{Client: api, Reader: api, Workload: api, RetirementAPI: core, MeshName: mesh.Name}
+			for attempt := 0; attempt < 2; attempt++ {
+				result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(claim)})
+				if scenario == "malformed" {
+					if err == nil {
+						t.Fatal("malformed transition treated as pending")
+					}
+				} else if err != nil || result.RequeueAfter != 5*time.Second {
+					t.Fatalf("unfinished transition must retry in five seconds without error: %+v, %v", result, err)
+				}
+				after, err := store.ConfigMaps.Get(ctx, store.Name, metav1.GetOptions{})
+				must(err)
+				if after.ResourceVersion != current.ResourceVersion || (after.Immutable != nil && *after.Immutable) {
+					t.Fatal("pending deletion mutated or froze the journal")
+				}
+				must(api.Get(ctx, client.ObjectKeyFromObject(claim), claim))
+				must(api.Get(ctx, client.ObjectKeyFromObject(machine), machine))
+				must(api.Get(ctx, client.ObjectKeyFromObject(mesh), mesh))
+				must(api.Get(ctx, client.ObjectKeyFromObject(index), index))
+				if claim.ResourceVersion != versions[0] || machine.GetResourceVersion() != versions[1] || mesh.ResourceVersion != versions[2] || index.ResourceVersion != versions[3] || machine.GetDeletionTimestamp() != nil {
+					t.Fatal("pending deletion changed authority, publication or compute")
+				}
+			}
+		})
 	}
 }
 

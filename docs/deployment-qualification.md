@@ -991,6 +991,24 @@ Neither the orphan-only release setting nor one owner's absence authorizes a
 joint release. Keep these settings disabled until the corresponding live
 recovery, continuity and rollback gates are qualified.
 
+With normal finalization enabled, reconciliation must remove the captured
+adoption Secret after verified cleanup completion and live absence of the
+Machine, claim and Node. Peer withdrawal can already have removed the name
+from ordinary pruning, while its routing reservation remains intentionally
+retained. Require the journal's exact adoption UID, current receipt incarnation
+and age, live source rechecks, and UID/resource-version deletion preconditions.
+Never delete a replacement Secret, bypass its finalizers, or release the routing
+reservation as part of adoption cleanup. Missing or expired evidence and failed
+owner reads must leave the Secret intact.
+
+The normal lifecycle regression exercises reconciliation, source and owner
+races, disabled policy, invalid evidence, replacement identity and cancellation.
+Its journal storage is real; owner objects, TokenReview and native observations
+are synthetic. Separate real-API deletion cases verify rejection of changed
+resource versions and replacement UIDs, plus successful and already-absent
+deletion. These tests do not prove provider termination, native absence or
+workload continuity; require the live retirement/finalization campaign as well.
+
 For finalized orphan withdrawals, the controller reuses the bounded receipt
 collector and current image/consumer policies. Completion authenticates every
 current consumer, pins the exact inventory/mesh/journal source, rechecks owner

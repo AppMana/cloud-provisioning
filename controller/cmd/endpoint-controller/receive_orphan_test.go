@@ -154,6 +154,13 @@ func verifyOrphanReceiveReconciliation(t *testing.T, r *meshReconciler, store ha
 		t.Fatal(err)
 	}
 	if len(normalMode) != 0 && normalMode[0] {
+		t.Run("adoption-delete-preconditions", func(t *testing.T) {
+			realClient, err := client.New(cfg, client.Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			verifyRetiredAdoptionDeletePreconditions(t, realClient, mesh.Namespace)
+		})
 		snapshot, err := store.Load(ctx)
 		if err != nil {
 			t.Fatal(err)

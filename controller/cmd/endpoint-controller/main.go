@@ -146,6 +146,7 @@ type meshReconciler struct {
 	awsPodObserver         *awspod.Observer
 	receivePreparation     *receivePreparationPolicy
 	receiveJournal         handover.Store
+	receiveAPI             kubernetes.Interface
 	tunnelSubnet           string
 	localAddressBase       string
 	// tunnelIPv6Prefix is the prefix IPv6 tunnel addresses are paired
@@ -270,6 +271,19 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	if err := r.ensureWindowsPublisherDaemonSet(ctx); err != nil {
 		return ctrl.Result{}, fmt.Errorf("ensuring Windows peer publisher: %w", err)
 	}
+	// Finish ordinary reconciliation before admitting cleanup. Old/expired
+	// receipts must not block agent updates or surviving peer publication.
+	defer func() {
+		if err != nil {
+			return
+		}
+		progressed, cleanupErr := r.reconcileRetiredReceiveAdoptions(ctx)
+		if cleanupErr != nil {
+			err = fmt.Errorf("retiring captured adoption: %w", cleanupErr)
+		} else if progressed && (result.RequeueAfter == 0 || result.RequeueAfter > time.Second) {
+			result.RequeueAfter = time.Second
+		}
+	}()
 
 	// Node events enqueue a nameless request because they change the endpoint
 	// set rather than one Machine. Refresh every remote's adoption document:

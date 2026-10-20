@@ -35,6 +35,7 @@ func (r *meshReconciler) configureReceiveJournal(ctx context.Context, api kubern
 		return fmt.Errorf("receiver journal requires a live cluster identity")
 	}
 	r.receiveJournal = handover.Store{ConfigMaps: api.CoreV1().ConfigMaps(r.secretNamespace), ClusterUID: string(namespace.UID)}
+	r.receiveAPI = api
 	return nil
 }
 

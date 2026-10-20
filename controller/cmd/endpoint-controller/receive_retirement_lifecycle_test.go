@@ -113,6 +113,9 @@ func verifyNormalRetirementControllerLifecycle(t *testing.T, r *meshReconciler, 
 		}
 		must(owners.Delete(ctx, owner))
 	}
+	t.Run("retire-captured-adoption", func(t *testing.T) {
+		verifyRetiredAdoptionCleanup(t, r, owners, api, mesh, store, plan, policy, retiredOwners, func() { complete(collection(policy)) })
+	})
 	// Existing orphan-only opt-in must not silently expand to normal deletion.
 	orphanOnly := policy
 	orphanOnly.FinalizeRetirements, orphanOnly.ReleaseRetirements = false, false

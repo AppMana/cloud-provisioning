@@ -24,7 +24,7 @@ import (
 func verifyJointRetirementRelease(t *testing.T, api kubernetes.Interface, store handover.Store, mesh *corev1.Secret, machineUID string, policies map[string]handover.PodReceiptAuthenticator, consumed []handover.PodReceipt) {
 	t.Helper()
 	ctx := context.Background()
-	for _, fault := range []string{"partial-prior-release", "missing-check", "missing-member-finalization", "authentication", "incomplete", "consumed-replay", "stale", "second-owner-at-write", "inventory-at-write", "boot-after-authentication", "expires-at-write", "cancel-at-write", "CAS", "lost-response", "none"} {
+	for _, fault := range []string{"partial-prior-release", "missing-check", "historical-age-policy", "zero-observation-age", "longer-window", "missing-member-finalization", "authentication", "incomplete", "consumed-replay", "stale", "second-owner-at-write", "inventory-at-write", "boot-after-authentication", "expires-at-write", "cancel-at-write", "CAS", "lost-response", "none"} {
 		t.Run("joint-release/"+fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -110,6 +110,17 @@ func verifyJointRetirementRelease(t *testing.T, api kubernetes.Interface, store 
 				}
 			}
 			batch := slices.Clone(oldBatch)
+			historicalAge, observationAge := time.Minute, 2*time.Minute
+			if fault == "none" {
+				observationAge = historicalAge
+			}
+			if fault == "historical-age-policy" {
+				historicalAge += time.Second
+			}
+			if fault == "zero-observation-age" {
+				observationAge = 0
+			}
+			success := fault == "none" || fault == "longer-window"
 			calls := map[string]int{}
 			denied := errors.New("joint owner not retired")
 			changeInventory := func() error {
@@ -148,7 +159,7 @@ func verifyJointRetirementRelease(t *testing.T, api kubernetes.Interface, store 
 				case "inventory-at-write":
 					return changeInventory()
 				case "expires-at-write":
-					batch[0].Receipt.ObservedAt = time.Now().Add(-2 * time.Minute)
+					batch[0].Receipt.ObservedAt = time.Now().Add(-2 * observationAge)
 				case "cancel-at-write":
 					cancel()
 				}
@@ -169,19 +180,26 @@ func verifyJointRetirementRelease(t *testing.T, api kubernetes.Interface, store 
 			if fault == "lost-response" {
 				candidate.ConfigMaps = retirementInventoryWriter{ConfigMapInterface: store.ConfigMaps, before: func() error { writes++; return nil }, lostResponse: true}
 			}
-			collection, err := source.ReceiptCollectionWithCohortRelease(attempt, api, candidate, policies, time.Minute, check)
-			if fault == "missing-check" || fault == "missing-member-finalization" {
+			collection, err := source.ReceiptCollectionWithCohortRelease(attempt, api, candidate, policies, historicalAge, observationAge, check)
+			if fault == "missing-check" || fault == "missing-member-finalization" || fault == "historical-age-policy" || fault == "zero-observation-age" {
 				if err == nil {
 					t.Fatal("invalid joint release admitted")
 				}
 				return
 			}
 			must(err)
+			if collection.MaxAge != observationAge {
+				t.Fatal("joint release observation age changed")
+			}
 			for n := range batch {
 				batch[n].Receipt.RoundHash = collection.Digest
 				batch[n].Receipt.ObservedAt = time.Now()
 			}
 			switch fault {
+			case "longer-window":
+				for n := range batch {
+					batch[n].Receipt.ObservedAt = time.Now().Add(-90 * time.Second)
+				}
 			case "authentication":
 				batch[0].BearerToken = "invalid"
 			case "incomplete":
@@ -189,14 +207,14 @@ func verifyJointRetirementRelease(t *testing.T, api kubernetes.Interface, store 
 			case "consumed-replay":
 				batch = slices.Clone(oldBatch)
 			case "stale":
-				batch[0].Receipt.ObservedAt = time.Now().Add(-2 * time.Minute)
+				batch[0].Receipt.ObservedAt = time.Now().Add(-2 * observationAge)
 			}
-			if fault == "none" {
+			if success {
 				must(collection.Observe(attempt, batch))
 			}
 			calls = map[string]int{}
 			err = collection.Complete(attempt, batch)
-			if fault == "none" {
+			if success {
 				must(err)
 			} else if err == nil {
 				t.Fatal("unsafe joint release accepted")
@@ -215,7 +233,7 @@ func verifyJointRetirementRelease(t *testing.T, api kubernetes.Interface, store 
 			}
 			inventory, _, readErr := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
 			must(readErr)
-			if fault != "none" && fault != "lost-response" {
+			if !success && fault != "lost-response" {
 				wantWrites := 0
 				if fault == "CAS" {
 					wantWrites = 1

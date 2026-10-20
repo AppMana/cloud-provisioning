@@ -1133,6 +1133,18 @@ records in one inventory compare-and-swap. Reread the shared source once per
 boundary instead of rebuilding each member's ancestry. Reject partial prior
 release and mismatched evidence. Retain every frozen journal and retired-owner
 record; old owners must not reserve or republish themselves.
+The optional `receipts.releaseObservationMaxAge` bounds fresh release observations
+independently of the journal's historical receipt age. Zero retains the journal
+age; an explicit value must be positive and at most two minutes. Select it from
+measured observation cadence, delivery and authentication time. It does not
+renew observation timestamps, change consumed finalization evidence, extend
+native execution deadlines or relax incarnation and source checks. Test expiry
+at both authentication and the release write boundary, and reject consumed
+receipt replay even with the longer window. Real-token fixtures use synthetic
+observations and agent status; live convergence remains a separate gate.
+Rollback to a controller that does not recognize this option must restore its
+supported receipt policy as well as its image. Retained historical evidence
+continues to use the original journal age.
 Release currently requires every member to have finalized the same explicit
 joint member set. Later overlapping groups with different consumed member sets
 are rejected; they must not silently rewrite historical evidence. Qualify that

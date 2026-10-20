@@ -84,7 +84,9 @@ func verifyRetirementReceiptAuthenticationRealAPI(t *testing.T, history string) 
 			t.Fatal(err)
 		}
 		pod.Status.Phase = corev1.PodRunning
-		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://running-agent", Image: "sha256:runtime-config", ImageID: retirementTestImage, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.Now()}}}}
+		// Keep expiry tests inside the agent's lifetime so incarnation rejection
+		// cannot mask a missing observation-age check. Status is synthetic.
+		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "dialer", Ready: true, ContainerID: "containerd://running-agent", Image: "sha256:runtime-config", ImageID: retirementTestImage, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(time.Now().Add(-10 * time.Minute))}}}}
 		pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
 		pod, err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
 		if err != nil {

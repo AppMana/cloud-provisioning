@@ -18,7 +18,9 @@ import (
 //
 // The caller must admit current owner absence and compatible agent/controller
 // and rollback releases in recheck. Construction does not enable live release.
-func (shared ReceiveRetirementSet) ReceiptCollectionWithRelease(ctx context.Context, api kubernetes.Interface, store handover.Store, policies map[string]handover.PodReceiptAuthenticator, maxAge time.Duration, recheck func() error) (handover.ReceiptCollection, error) {
+// maxAge validates consumed historical evidence; observationAge bounds only the
+// fresh release batch. Both are trusted controller policy, never agent input.
+func (shared ReceiveRetirementSet) ReceiptCollectionWithRelease(ctx context.Context, api kubernetes.Interface, store handover.Store, policies map[string]handover.PodReceiptAuthenticator, maxAge, observationAge time.Duration, recheck func() error) (handover.ReceiptCollection, error) {
 	if recheck == nil {
 		return handover.ReceiptCollection{}, fmt.Errorf("release collection requires current release authority")
 	}
@@ -31,14 +33,14 @@ func (shared ReceiveRetirementSet) ReceiptCollectionWithRelease(ctx context.Cont
 		}
 		return releaseFinalizedReceiveRetirement(ctx, api, store, shared.Mesh.Namespace, shared.Mesh.Name, string(shared.Mesh.UID), shared.Withdrawal.MachineUID, string(shared.Metadata.UID), maxAge, check, finalCheck)
 	}
-	return shared.receiptCollectionWithRelease(ctx, api, store, policies, maxAge, recheck, release)
+	return shared.receiptCollectionWithRelease(ctx, api, store, policies, maxAge, observationAge, recheck, release)
 }
 
 // ReceiptCollectionWithCohortRelease requires a fresh joint native observation
 // from every survivor after all members finalized. check independently admits
 // current absence and compatible recovery for each departing owner. This API is
 // explicit: ordinary single-owner release policy cannot authorize other owners.
-func (shared ReceiveRetirementSet) ReceiptCollectionWithCohortRelease(ctx context.Context, api kubernetes.Interface, store handover.Store, policies map[string]handover.PodReceiptAuthenticator, maxAge time.Duration, check func(ReceiveRetirementSet) error) (handover.ReceiptCollection, error) {
+func (shared ReceiveRetirementSet) ReceiptCollectionWithCohortRelease(ctx context.Context, api kubernetes.Interface, store handover.Store, policies map[string]handover.PodReceiptAuthenticator, maxAge, observationAge time.Duration, check func(ReceiveRetirementSet) error) (handover.ReceiptCollection, error) {
 	if check == nil {
 		return handover.ReceiptCollection{}, fmt.Errorf("joint release collection requires per-member authority")
 	}
@@ -65,10 +67,10 @@ func (shared ReceiveRetirementSet) ReceiptCollectionWithCohortRelease(ctx contex
 		}
 		return releaseFinalizedReceiveRetirementCohort(ctx, api, store, shared.Mesh.Namespace, shared.Mesh.Name, string(shared.Mesh.UID), shared.Withdrawal.MachineUID, string(shared.Metadata.UID), maxAge, check, boundCheck)
 	}
-	return shared.receiptCollectionWithRelease(ctx, api, store, policies, maxAge, recheck, release)
+	return shared.receiptCollectionWithRelease(ctx, api, store, policies, maxAge, observationAge, recheck, release)
 }
 
-func (shared ReceiveRetirementSet) receiptCollectionWithRelease(ctx context.Context, api kubernetes.Interface, store handover.Store, policies map[string]handover.PodReceiptAuthenticator, maxAge time.Duration, recheck func() error, release func(context.Context, func() error) error) (handover.ReceiptCollection, error) {
+func (shared ReceiveRetirementSet) receiptCollectionWithRelease(ctx context.Context, api kubernetes.Interface, store handover.Store, policies map[string]handover.PodReceiptAuthenticator, maxAge, observationAge time.Duration, recheck func() error, release func(context.Context, func() error) error) (handover.ReceiptCollection, error) {
 	machineUID := shared.Withdrawal.MachineUID
 	verified, err := validateReceiveRetirementFinalization(shared, store.ClusterUID, machineUID, string(shared.Metadata.UID), maxAge, time.Now())
 	if err != nil {
@@ -77,7 +79,7 @@ func (shared ReceiveRetirementSet) receiptCollectionWithRelease(ctx context.Cont
 	if !verified {
 		return handover.ReceiptCollection{}, fmt.Errorf("release collection requires verified finalization")
 	}
-	target, err := shared.ReceiptCollection(ctx, api, store, policies, maxAge, recheck)
+	target, err := shared.ReceiptCollection(ctx, api, store, policies, observationAge, recheck)
 	if err != nil {
 		return handover.ReceiptCollection{}, err
 	}
@@ -95,7 +97,7 @@ func (shared ReceiveRetirementSet) receiptCollectionWithRelease(ctx context.Cont
 		if err := shared.Recheck(ctx, api, store); err != nil {
 			return err
 		}
-		proofs, err := scope.AuthenticateComplete(ctx, entries, policies, maxAge)
+		proofs, err := scope.AuthenticateComplete(ctx, entries, policies, observationAge)
 		if err != nil {
 			return err
 		}
@@ -106,7 +108,7 @@ func (shared ReceiveRetirementSet) receiptCollectionWithRelease(ctx context.Cont
 					return err
 				}
 			}
-			return scope.validateSubmissions(entries, time.Now(), maxAge)
+			return scope.validateSubmissions(entries, time.Now(), observationAge)
 		}
 		return release(ctx, finalCheck)
 	}

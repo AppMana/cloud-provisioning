@@ -162,7 +162,15 @@ func verifyNormalRetirementControllerLifecycle(t *testing.T, r *meshReconciler, 
 		t.Fatal("normal finalization did not retain its reservation")
 	}
 	rejectReplacement(collection(policy))
+	if collection(policy).MaxAge != r.receivePreparation.Journal.MaxReceiptAge.Duration {
+		t.Fatal("default release observation age differs from the journal policy")
+	}
+	policy.ReleaseObservationMaxAge = metav1.Duration{Duration: 90 * time.Second}
+	rejectReplacement(collection(policy))
 	release := collection(policy)
+	if release.MaxAge != 90*time.Second {
+		t.Fatal("explicit release observation age was not applied")
+	}
 	complete(release)
 	inventory, _ = read()
 	if len(inventory.MachineUIDs) != 0 || len(inventory.Publications) != 0 || len(inventory.Released) != 1 {

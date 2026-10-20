@@ -21,7 +21,7 @@ import (
 func verifyReleasingRetirementCollection(t *testing.T, api kubernetes.Interface, store handover.Store, mesh *corev1.Secret, machineUID string, policy handover.PodReceiptAuthenticator, consumed handover.PodReceipt) {
 	t.Helper()
 	ctx := context.Background()
-	for _, fault := range []string{"missing-finalization", "missing-check", "age-policy", "authentication", "image-policy", "consumed-replay", "incomplete", "stale", "owner-at-write", "inventory-at-write", "boot-after-authentication", "expires-at-write", "cancel-at-write", "CAS", "lost-response", "none"} {
+	for _, fault := range []string{"missing-finalization", "missing-check", "age-policy", "zero-observation-age", "negative-observation-age", "longer-window", "authentication", "image-policy", "consumed-replay", "incomplete", "stale", "owner-at-write", "inventory-at-write", "boot-after-authentication", "expires-at-write", "cancel-at-write", "CAS", "lost-response", "none"} {
 		t.Run("releasing-collection/"+fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -55,6 +55,17 @@ func verifyReleasingRetirementCollection(t *testing.T, api kubernetes.Interface,
 			view, err := source.Journals[machineUID].Transition().View()
 			must(err)
 			age := view.Round.MaxReceiptAge
+			observationAge := 2 * age
+			if fault == "none" {
+				observationAge = age
+			}
+			if fault == "zero-observation-age" {
+				observationAge = 0
+			}
+			if fault == "negative-observation-age" {
+				observationAge = -time.Second
+			}
+			success := fault == "none" || fault == "longer-window"
 			if fault == "age-policy" {
 				age += time.Second
 			}
@@ -95,7 +106,7 @@ func verifyReleasingRetirementCollection(t *testing.T, api kubernetes.Interface,
 				case "inventory-at-write":
 					return changeInventory()
 				case "expires-at-write":
-					entries[0].Receipt.ObservedAt = time.Now().Add(-2 * age)
+					entries[0].Receipt.ObservedAt = time.Now().Add(-2 * observationAge)
 				case "cancel-at-write":
 					cancel()
 				}
@@ -115,19 +126,24 @@ func verifyReleasingRetirementCollection(t *testing.T, api kubernetes.Interface,
 			if fault == "image-policy" {
 				currentPolicy.ImageID = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 			}
-			collection, err := source.ReceiptCollectionWithRelease(attempt, api, candidate, map[string]handover.PodReceiptAuthenticator{consumed.Receipt.NodeUID: currentPolicy}, age, check)
-			if fault == "missing-finalization" || fault == "missing-check" || fault == "age-policy" {
+			collection, err := source.ReceiptCollectionWithRelease(attempt, api, candidate, map[string]handover.PodReceiptAuthenticator{consumed.Receipt.NodeUID: currentPolicy}, age, observationAge, check)
+			if fault == "missing-finalization" || fault == "missing-check" || fault == "age-policy" || fault == "zero-observation-age" || fault == "negative-observation-age" {
 				if err == nil {
 					t.Fatal("invalid release collection admitted")
 				}
 				return
 			}
 			must(err)
+			if collection.MaxAge != observationAge {
+				t.Fatal("release observation age did not follow its independent policy")
+			}
 			if collection.Digest == consumed.Receipt.RoundHash {
 				t.Fatal("finalized release retained consumed receipt binding")
 			}
 			entries[0].Receipt.RoundHash, entries[0].Receipt.ObservedAt = collection.Digest, time.Now()
 			switch fault {
+			case "longer-window":
+				entries[0].Receipt.ObservedAt = time.Now().Add(-age - age/2)
 			case "authentication":
 				entries[0].BearerToken = "invalid-token"
 			case "consumed-replay":
@@ -135,14 +151,14 @@ func verifyReleasingRetirementCollection(t *testing.T, api kubernetes.Interface,
 			case "incomplete":
 				entries = nil
 			case "stale":
-				entries[0].Receipt.ObservedAt = time.Now().Add(-2 * age)
+				entries[0].Receipt.ObservedAt = time.Now().Add(-2 * observationAge)
 			}
-			if fault == "none" {
+			if success {
 				must(collection.Observe(attempt, entries))
 			}
 			calls = 0
 			err = collection.Complete(attempt, entries)
-			if fault == "none" {
+			if success {
 				must(err)
 			} else if err == nil {
 				t.Fatal("unsafe release accepted")
@@ -162,7 +178,7 @@ func verifyReleasingRetirementCollection(t *testing.T, api kubernetes.Interface,
 			inventory, _, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, mesh.Namespace, mesh.Name, string(mesh.UID))
 			must(err)
 			publication := source.Inventory.Publications[machineUID]
-			if fault != "none" && fault != "lost-response" {
+			if !success && fault != "lost-response" {
 				if len(inventory.Released) != 0 || !reflect.DeepEqual(inventory.Publications[machineUID], publication) {
 					t.Fatal("failed release changed ownership or historical evidence")
 				}

@@ -136,11 +136,15 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 		if err := policy.validate(); err != nil {
 			return fail(err)
 		}
+		observationAge := r.receivePreparation.Journal.MaxReceiptAge.Duration
+		if policy.ReleaseObservationMaxAge.Duration != 0 {
+			observationAge = policy.ReleaseObservationMaxAge.Duration
+		}
 		if len(cohort.MachineUIDs) > 1 {
 			if !policy.ReleaseRetirements {
 				return fail(fmt.Errorf("joint release requires explicit retirement release policy"))
 			}
-			return source.ReceiptCollectionWithCohortRelease(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, func(member attachment.ReceiveRetirementSet) error {
+			return source.ReceiptCollectionWithCohortRelease(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, observationAge, func(member attachment.ReceiveRetirementSet) error {
 				if err := checkMember(member); err != nil {
 					return err
 				}
@@ -153,7 +157,7 @@ func (r *meshReconciler) resolveReceiveRetirementReceipts(ctx context.Context, a
 				return nil
 			})
 		}
-		return source.ReceiptCollectionWithRelease(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, recheck)
+		return source.ReceiptCollectionWithRelease(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, observationAge, recheck)
 	}
 	if finalize {
 		return source.ReceiptCollectionWithFinalization(ctx, api, store, policies, r.receivePreparation.Journal.MaxReceiptAge.Duration, recheck)

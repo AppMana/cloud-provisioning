@@ -43,9 +43,16 @@ type receiveReceiptPolicy struct {
 	// The orphan-only switches retain their narrower activation scope.
 	FinalizeRetirements bool `json:"finalizeRetirements,omitempty"`
 	ReleaseRetirements  bool `json:"releaseRetirements,omitempty"`
+	// Applies only to new native-absence observations for release. Consumed
+	// historical completion and finalization retain the frozen journal age.
+	// Zero uses that age; explicitly configured windows remain bounded.
+	ReleaseObservationMaxAge metav1.Duration `json:"releaseObservationMaxAge,omitempty"`
 }
 
 func (p receiveReceiptPolicy) validate() error {
+	if p.ReleaseObservationMaxAge.Duration < 0 || p.ReleaseObservationMaxAge.Duration > 2*time.Minute {
+		return fmt.Errorf("release observation age must be zero or at most two minutes")
+	}
 	if p.ReleaseRetirements && (!p.FinalizeRetirements || p.Endpoint == "" || p.TrustSecret == "") {
 		return fmt.Errorf("retirement release requires finalization and authenticated agent receipt delivery")
 	}

@@ -323,7 +323,7 @@ func verifyNativeJointReceiptLifecycle(t *testing.T, api kubernetes.Interface, s
 	cfg.observeFinalizedRetirements = true
 	source, entries := observe(stores[0])
 	policies := map[string]handover.PodReceiptAuthenticator{entries[0].Receipt.NodeUID: policy}
-	collection, err := source.ReceiptCollectionWithCohortRelease(ctx, api, stores[0], policies, 30*time.Second, checkOwner)
+	collection, err := source.ReceiptCollectionWithCohortRelease(ctx, api, stores[0], policies, 30*time.Second, 90*time.Second, checkOwner)
 	must(err)
 	must(collection.Observe(ctx, entries))
 	must(collection.Complete(ctx, entries))

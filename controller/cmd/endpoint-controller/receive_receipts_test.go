@@ -268,6 +268,18 @@ func TestReceiveReceiptPolicy(t *testing.T) {
 	}
 }
 
+func TestReleaseObservationAgePolicy(t *testing.T) {
+	for _, age := range []time.Duration{0, 90 * time.Second, 2 * time.Minute, -time.Second, 2*time.Minute + time.Nanosecond} {
+		p := receiveReceiptPolicy{BindAddress: ":9444", CertFile: "/tls/cert", KeyFile: "/tls/key",
+			ImageIDs:                 map[string]string{"amd64": "sha256:" + strings.Repeat("a", 64)},
+			ReleaseObservationMaxAge: metav1.Duration{Duration: age}}
+		valid := age >= 0 && age <= 2*time.Minute
+		if err := p.validate(); (err == nil) != valid {
+			t.Fatalf("unexpected validation for observation age %v: %v", age, err)
+		}
+	}
+}
+
 // Activation changes agent behavior only for an explicitly configured release
 // policy. This is configuration validation, not live release qualification.
 func TestRetirementReleasePolicyAndAgentOptIn(t *testing.T) {

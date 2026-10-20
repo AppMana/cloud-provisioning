@@ -498,3 +498,10 @@ the configured availability budget during the test. Unit tests and artifact
 inspection do not establish native rollout progress, architecture-specific
 execution or deployment readiness. If agent rollout resumes during runtime
 maintenance, qualify agent-only upgrade continuity separately.
+
+Keep direct per-controller API readiness failures separate from exec/log
+maintenance interruptions. Bounded exec/log recovery does not satisfy a
+zero-interruption API requirement. Also observe the actual client-facing HA
+endpoint through controller replacement; healthy surviving controllers alone
+do not prove client failover or request continuity. Retain both sets of samples
+and describe their endpoint scope in the scenario.

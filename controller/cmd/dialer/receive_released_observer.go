@@ -22,6 +22,28 @@ import (
 // Admit every active history and reject local ownership before saving anything.
 // This never invokes native work, issues receipts or removes local journals.
 func checkpointReleasedReceiveObserver(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, mesh *corev1.Secret) error {
+	return withReleasedReceiveObserver(ctx, api, store, scope, cfg, key, lockPath, mesh, nil)
+}
+
+type receiveObserverAdmission struct {
+	Inventory tunnel.ReceiveInventory
+	Metadata  metav1.ObjectMeta
+	Journals  map[string]handover.Snapshot
+	Mesh      *corev1.Secret
+	Node      *corev1.Node
+}
+
+// Caller holds the host lock. The callback receives authenticated observer
+// identity and histories, not unrestricted routing authority. It must separately
+// admit source ownership, relay dependencies and durable native ownership, and
+// call check before mutations. Both boundaries retain the exact discovery and
+// participant identities; no callback may issue a receiver-phase receipt.
+func withReleasedReceiveObserver(ctx context.Context, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, lockPath string, mesh *corev1.Secret, use func(context.Context, receiveObserverAdmission, func() error) error) error {
+	if use != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+	}
 	if cfg.secretName == "" || mesh == nil || scope.MachineUID != "" || len(mesh.Data[tunnel.NodePublicKeyPrefix+cfg.nodeName]) != 0 || len(mesh.Data[tunnel.NodeTunnelAddressPrefix+cfg.nodeName]) != 0 || len(mesh.Data[tunnel.NodeTunnelAddress6Prefix+cfg.nodeName]) != 0 {
 		return fmt.Errorf("released observer requires unpublished site identity")
 	}
@@ -143,32 +165,65 @@ func checkpointReleasedReceiveObserver(ctx context.Context, api kubernetes.Inter
 	if err := handover.VerifyObservationIncarnation(ctx, api, scope.Namespace, cfg.nodeName, receipt); err != nil {
 		return err
 	}
-	for uid, before := range active {
-		member := store
-		member.Name, member.ExpectedUID = tunnel.ReceiveTransitionName(uid), string(before.Metadata().UID)
-		current, err := member.Load(ctx)
+	check := func() error {
+		cluster, err := api.CoreV1().Namespaces().Get(ctx, "kube-system", metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		if err := current.ContinuesExecution(before); err != nil {
+		if string(cluster.UID) != store.ClusterUID || cluster.DeletionTimestamp != nil {
+			return fmt.Errorf("observer cluster identity changed")
+		}
+		for uid, before := range active {
+			member := store
+			member.Name, member.ExpectedUID = tunnel.ReceiveTransitionName(uid), string(before.Metadata().UID)
+			current, err := member.Load(ctx)
+			if err != nil {
+				return err
+			}
+			if err := current.ContinuesExecution(before); err != nil {
+				return err
+			}
+		}
+		_, currentIndex, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, scope.Namespace, scope.MeshName, scope.MeshUID)
+		if err != nil {
 			return err
 		}
+		if !sameReceiveRevision(index.ObjectMeta, currentIndex.ObjectMeta) {
+			return fmt.Errorf("observer inventory changed during admission")
+		}
+		if err := proof.recheck(ctx, api, store); err != nil {
+			return err
+		}
+		currentMesh, err := api.CoreV1().Secrets(scope.Namespace).Get(ctx, scope.MeshName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if !sameReceiveRevision(mesh.ObjectMeta, currentMesh.ObjectMeta) {
+			return fmt.Errorf("observer mesh changed during checkpoint admission")
+		}
+		currentNode, err := api.CoreV1().Nodes().Get(ctx, cfg.nodeName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if !sameReceiveParticipantNode(node, currentNode) {
+			return fmt.Errorf("observer source allocation or identity changed")
+		}
+		if err := handover.VerifyObservationIncarnation(ctx, api, scope.Namespace, cfg.nodeName, receipt); err != nil {
+			return err
+		}
+		return ctx.Err()
 	}
-	if err := proof.recheck(ctx, api, store); err != nil {
+	if err := check(); err != nil {
 		return err
 	}
-	currentMesh, err := api.CoreV1().Secrets(scope.Namespace).Get(ctx, scope.MeshName, metav1.GetOptions{})
-	if err != nil {
+	if err := writeDurableJSON(lockPath+".inventory.json", next); err != nil {
 		return err
 	}
-	if !sameReceiveRevision(mesh.ObjectMeta, currentMesh.ObjectMeta) {
-		return fmt.Errorf("observer mesh changed during checkpoint admission")
+	if use == nil {
+		return nil
 	}
-	if err := handover.VerifyObservationIncarnation(ctx, api, scope.Namespace, cfg.nodeName, receipt); err != nil {
+	if err := use(ctx, receiveObserverAdmission{Inventory: inventory, Metadata: index.ObjectMeta, Journals: active, Mesh: mesh, Node: node}, check); err != nil {
 		return err
 	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return writeDurableJSON(lockPath+".inventory.json", next)
+	return check()
 }

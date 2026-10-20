@@ -7,20 +7,24 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
 // Real API and private durable files, with synthetic finalized/released evidence.
 // Exercises unpublished observer checkpoint advancement while another receiver
-// remains active. Native callbacks must never run. No actual reboot, kernel
-// absence, stale-worker replay or address reuse is qualified by this fixture.
+// remains active. Ordinary-neighbor native callbacks must never run. Separate
+// simulated observer callbacks exercise admission races without kernel writes.
+// No actual reboot, kernel absence, stale-worker replay or address reuse is
+// qualified by this fixture.
 func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, cfg config, key wgtypes.Key, before []byte) {
 	t.Helper()
 	ctx := context.Background()
@@ -100,7 +104,7 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 	must(err)
 	currentData := index.DeepCopy().Data
 	verifyUnreservedCloudDispatch(t, api, store, scope, foreignRoot, key)
-	for _, fault := range []string{"none", "previous-boot", "missing-fence", "changed-fence", "unknown-journal", "neighbor-owner", "wrong-agent", "cancelled", "inventory-race", "mesh-race", "missing-active-journal"} {
+	for _, fault := range []string{"none", "previous-boot", "missing-fence", "changed-fence", "unknown-journal", "neighbor-owner", "wrong-agent", "cancelled", "inventory-race", "mesh-race", "missing-active-journal", "callback-success", "callback-mesh-race", "callback-node-race", "callback-inventory-race", "callback-agent-race", "callback-cancelled", "callback-post-use-race"} {
 		t.Run("released-observer/"+fault, func(t *testing.T) {
 			must := func(err error) {
 				t.Helper()
@@ -207,6 +211,82 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 				if !changed {
 					t.Fatal("source race was not exercised")
 				}
+			} else if strings.HasPrefix(fault, "callback-") {
+				// Simulated native boundary only. The real API must reject changed
+				// authority before a callback could write, and again on return.
+				lock, lockErr := lockReconciliation(runCfg)
+				must(lockErr)
+				defer lock.Close()
+				observerScope := scope
+				observerScope.MachineUID = ""
+				uses, writes := 0, 0
+				e = withReleasedReceiveObserver(runCtx, api, store, observerScope, runCfg, key, lock.Name(), m, func(useCtx context.Context, admitted receiveObserverAdmission, check func() error) error {
+					uses++
+					if len(admitted.Inventory.Released) != 1 || len(admitted.Journals) != 1 || admitted.Journals[plan.MachineUID].Metadata().UID != snapshot.Metadata().UID || admitted.Node.Name != cfg.nodeName || admitted.Mesh.UID != mesh.UID {
+						t.Fatal("callback lost admitted observer scope")
+					}
+					if deadline, ok := useCtx.Deadline(); !ok || time.Until(deadline) > 30*time.Second {
+						t.Fatal("observer callback lacks bounded authority")
+					}
+					must(check())
+					switch fault {
+					case "callback-mesh-race", "callback-post-use-race":
+						obj, err := api.CoreV1().Secrets(scope.Namespace).Get(useCtx, scope.MeshName, metav1.GetOptions{})
+						must(err)
+						obj.Annotations = map[string]string{"test/observer-callback": fault}
+						_, err = api.CoreV1().Secrets(scope.Namespace).Update(useCtx, obj, metav1.UpdateOptions{})
+						must(err)
+					case "callback-inventory-race":
+						obj, err := store.ConfigMaps.Get(useCtx, index.Name, metav1.GetOptions{})
+						must(err)
+						obj.Annotations = map[string]string{"test/observer-callback": fault}
+						_, err = store.ConfigMaps.Update(useCtx, obj, metav1.UpdateOptions{})
+						must(err)
+					case "callback-node-race":
+						obj, err := api.CoreV1().Nodes().Get(useCtx, cfg.nodeName, metav1.GetOptions{})
+						must(err)
+						savedStatus := obj.DeepCopy().Status
+						defer func() {
+							current, err := api.CoreV1().Nodes().Get(ctx, cfg.nodeName, metav1.GetOptions{})
+							must(err)
+							current.Status = savedStatus
+							_, err = api.CoreV1().Nodes().UpdateStatus(ctx, current, metav1.UpdateOptions{})
+							must(err)
+						}()
+						obj.Status.Addresses = []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: "192.0.2.199"}}
+						_, err = api.CoreV1().Nodes().UpdateStatus(useCtx, obj, metav1.UpdateOptions{})
+						must(err)
+					case "callback-agent-race":
+						obj, err := api.CoreV1().Pods(scope.Namespace).Get(useCtx, cfg.receiptPodName, metav1.GetOptions{})
+						must(err)
+						savedStatus := obj.DeepCopy().Status
+						defer func() {
+							current, err := api.CoreV1().Pods(scope.Namespace).Get(ctx, cfg.receiptPodName, metav1.GetOptions{})
+							must(err)
+							current.Status = savedStatus
+							_, err = api.CoreV1().Pods(scope.Namespace).UpdateStatus(ctx, current, metav1.UpdateOptions{})
+							must(err)
+						}()
+						for j := range obj.Status.ContainerStatuses {
+							obj.Status.ContainerStatuses[j].ContainerID = "containerd://replacement"
+						}
+						_, err = api.CoreV1().Pods(scope.Namespace).UpdateStatus(useCtx, obj, metav1.UpdateOptions{})
+						must(err)
+					case "callback-cancelled":
+						cancel()
+					}
+					if fault == "callback-post-use-race" {
+						return nil // Outer boundary must detect the changed mesh.
+					}
+					if err := check(); err != nil {
+						return err
+					}
+					writes++
+					return nil
+				})
+				if uses != 1 || (fault == "callback-success" && writes != 1) || (fault != "callback-success" && writes != 0) {
+					t.Fatalf("callback escaped admission boundary: uses=%d writes=%d", uses, writes)
+				}
 			} else {
 				e = reconcileReceiveNeighbors(runCtx, api, runCfg, native, nil)
 			}
@@ -214,11 +294,11 @@ func verifyReleasedObserverCheckpoint(t *testing.T, api kubernetes.Interface, st
 				t.Fatal("observer invoked routing callback")
 			}
 			after, _ := os.ReadFile(lockPath + ".inventory.json")
-			if fault != "none" && fault != "previous-boot" {
+			if fault != "none" && fault != "previous-boot" && fault != "callback-success" {
 				if e == nil {
 					t.Fatal("invalid observer checkpoint accepted", fault)
 				}
-				if string(prior) != string(after) {
+				if !strings.HasPrefix(fault, "callback-") && string(prior) != string(after) {
 					t.Fatal("failed observer changed saved fence")
 				}
 				return

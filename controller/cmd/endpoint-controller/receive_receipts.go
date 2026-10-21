@@ -300,7 +300,7 @@ func (s *receiveReceiptServer) serve(ctx context.Context, listener net.Listener,
 	defer cancel()
 	mux := http.NewServeMux()
 	mux.Handle("/v1/receipts", s.handler)
-	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 32768, TLSConfig: &tls.Config{Certificates: []tls.Certificate{certificate}, MinVersion: tls.VersionTLS12}, BaseContext: func(net.Listener) context.Context { return ctx }}
+	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: handover.ReceiptWriteTimeout, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 32768, TLSConfig: &tls.Config{Certificates: []tls.Certificate{certificate}, MinVersion: tls.VersionTLS12}, BaseContext: func(net.Listener) context.Context { return ctx }}
 	collectorDone := make(chan struct{})
 	go func() { s.handler.Run(ctx); close(collectorDone) }()
 	result := make(chan error, 1)

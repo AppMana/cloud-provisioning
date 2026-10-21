@@ -46,7 +46,7 @@ func NewReceiptClient(endpoint string, caPEM []byte) (*ReceiptClient, error) {
 	transport.Proxy = nil
 	transport.TLSClientConfig = &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}
 	return &ReceiptClient{endpoint: endpoint, client: &http.Client{
-		Transport: transport, Timeout: 20 * time.Second,
+		Transport: transport, Timeout: ReceiptDeliveryTimeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}}, nil
 }
@@ -67,7 +67,7 @@ func (c *ReceiptClient) Submit(ctx context.Context, bearer string, request Recei
 	// Keep the original delivery bound across retries, including backoff. Only
 	// the collector's pre-admission busy response is retryable; ambiguous network
 	// failures, rejected observations, shutdown and capacity exhaustion are not.
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, ReceiptDeliveryTimeout)
 	defer cancel()
 	for {
 		r, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))

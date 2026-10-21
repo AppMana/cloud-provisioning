@@ -255,7 +255,7 @@ func (h *ReceiptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reject(http.StatusServiceUnavailable)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), ReceiptRequestTimeout)
 	defer cancel()
 	r = r.WithContext(ctx)
 	// Source resolution can require many independent API reads. Bound that

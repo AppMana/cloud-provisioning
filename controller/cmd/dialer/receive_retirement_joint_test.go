@@ -171,13 +171,20 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 			})
 		}
 	})
-	for _, fault := range []string{"second-fails", "cancelled-after-first", "cancelled-post-native", "pod-after-first", "none", "source-after-first"} {
+	for _, fault := range []string{"second-fails", "cancelled-after-first", "cancelled-post-native", "pod-after-first", "parent-deadline", "none", "source-after-first"} {
 		t.Run(fault, func(t *testing.T) {
 			pod.Status.ContainerStatuses[0].ContainerID = "containerd://joint"
 			pod, err = api.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
 			must(err)
 			runCtx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			var parentDeadline time.Time
+			if fault == "parent-deadline" {
+				parentDeadline = time.Now().Add(20 * time.Second)
+				var stop context.CancelFunc
+				runCtx, stop = context.WithDeadline(runCtx, parentDeadline)
+				defer stop()
+			}
 			var calls []string
 			var deadline, secondStarted time.Time
 			var reads atomic.Int64
@@ -203,6 +210,9 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 				got, ok := run.Deadline()
 				if !ok {
 					return fmt.Errorf("missing cleanup deadline")
+				}
+				if !parentDeadline.IsZero() && !got.Equal(parentDeadline) {
+					return fmt.Errorf("cohort extended caller deadline")
 				}
 				if deadline.IsZero() {
 					deadline = got
@@ -246,7 +256,7 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 				}
 				return nil
 			})
-			if fault == "none" {
+			if fault == "none" || fault == "parent-deadline" {
 				t.Logf("cohort ConfigMap reads: before native=%d total=%d", beforeNative, reads.Load())
 				if !useNative && (beforeNative > 25 || reads.Load() > 47) {
 					t.Fatalf("cohort reconstructed shared histories: before native=%d total=%d", beforeNative, reads.Load())

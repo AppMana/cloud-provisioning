@@ -44,7 +44,10 @@ func executeReceiveRetirementCohort(ctx context.Context, api kubernetes.Interfac
 	if api == nil || native == nil || containerID == "" || cfg.receiptPodName == "" || cfg.receiptPodUID == "" || scope.MachineUID == "" || store.Name != tunnel.ReceiveTransitionName(scope.MachineUID) {
 		return nil, fmt.Errorf("retirement execution requires native verification and agent identity")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	// Budget the complete cohort, including renewed admission after every
+	// member's native cleanup. Keep one bound across all members and honor a
+	// shorter caller deadline; neither retries nor receipt delivery renew it.
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	if err := ctx.Err(); err != nil {
 		return nil, err

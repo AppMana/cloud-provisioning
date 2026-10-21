@@ -1112,7 +1112,11 @@ member names the other departing workers by committed identity and all members
 have identical surviving consumers. An unpublished sibling, missing journal,
 changed identity or differing capture must not excuse a required observer.
 Every surviving observer must checkpoint and clean every member under one host
-lock and one execution deadline before issuing an observation. Partial cleanup,
+lock and one execution deadline before issuing an observation. The cohort shares
+a one-minute maximum, shortened by the caller's deadline, including final
+admission after native cleanup. Members and retries within that execution must
+not renew the budget or the earliest native observation timestamp. This budget
+does not extend receipt freshness or the live lifecycle test deadline. Partial cleanup,
 source changes or agent replacement must suppress that observation. Version-five
 completion binds the ordered group separately from individual-worker evidence;
 older completion versions keep their existing interpretation. Historical

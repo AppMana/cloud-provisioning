@@ -19,7 +19,7 @@ import (
 // Reuse the real API fixture after cloud deletion. Native cleanup is a callback
 // stub: this proves checkpoint ordering and receipt suppression on failure or
 // identity/source races, not kernel absence, token authentication or transport.
-// The executor sets a 30-second context deadline; native callbacks must honor
+// The executor sets a one-minute context deadline; native callbacks must honor
 // it. No interruption allowance applies here.
 func verifyReceiveRetirementExecution(t *testing.T, api kubernetes.Interface, store handover.Store, scope receiveJournalScope, key wgtypes.Key) {
 	t.Helper()

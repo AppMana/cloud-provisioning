@@ -117,17 +117,10 @@ func loadReceiveSet(ctx context.Context, api kubernetes.Interface, store handove
 		return fail(err)
 	}
 	// A later journal's admission must not conceal changes to an earlier one.
-	for _, uid := range inventory.MachineUIDs {
-		currentStore := store
-		currentStore.Name = tunnel.ReceiveTransitionName(uid)
-		currentStore.ExpectedUID = string(result.Journals[uid].Metadata().UID)
-		current, err := currentStore.Load(ctx)
-		if err != nil {
-			return fail(err)
-		}
-		if current.ContinuesExecution(result.Journals[uid]) != nil {
-			return fail(fmt.Errorf("receiver journal set changed during admission"))
-		}
+	// Reuse the bounded named-read guard: unchanged objects need no second
+	// history replay, and every read completes before admitting the set.
+	if err := store.RecheckExecutions(ctx, snapshots); err != nil {
+		return fail(fmt.Errorf("receiver journal set changed during admission: %w", err))
 	}
 	_, current, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, scope.Namespace, scope.MeshName, scope.MeshUID)
 	if err != nil {

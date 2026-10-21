@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -166,6 +167,52 @@ func verifyReceiveSetAdmission(t *testing.T, api kubernetes.Interface, store han
 	if got, err := executeReceivePhase(ctx, api, store, scope, cfg, site, "container", verify); err != nil || len(got) != 1 || calls != 1 {
 		t.Fatalf("two-worker execution admission: %v", err)
 	}
+	t.Run("independent-live-rechecks", func(t *testing.T) {
+		// Measure the final named read for each member, then hold those reads
+		// until both arrive. This exercises full admission, including a nonlocal
+		// owner, without treating a cached snapshot as live authority.
+		counts := map[string]int{}
+		var mu sync.Mutex
+		counted := store
+		counted.ConfigMaps = receiveSetReader{ConfigMapInterface: store.ConfigMaps, before: func(name string) error {
+			mu.Lock()
+			counts[name]++
+			mu.Unlock()
+			return nil
+		}}
+		if _, err := loadReceiveSet(ctx, api, counted, scope, first.CloudNodeName, firstRoot); err != nil {
+			t.Fatal(err)
+		}
+		bounded, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		arrived := 0
+		ready := make(chan struct{})
+		reads := map[string]int{}
+		counted.ConfigMaps = receiveSetReader{ConfigMapInterface: store.ConfigMaps, before: func(name string) error {
+			mu.Lock()
+			reads[name]++
+			final := (name == store.Name || name == otherStore.Name) && reads[name] == counts[name]
+			if final {
+				arrived++
+				if arrived == 2 {
+					close(ready)
+				}
+			}
+			mu.Unlock()
+			if final {
+				select {
+				case <-ready:
+				case <-bounded.Done():
+					return bounded.Err()
+				}
+			}
+			return nil
+		}}
+		admitted, err := loadReceiveSet(bounded, api, counted, scope, first.CloudNodeName, firstRoot)
+		if err != nil || arrived != 2 || len(admitted.Journals) != 2 || len(admitted.Local) != 1 {
+			t.Fatalf("independent live rechecks did not admit the complete set: arrivals=%d error=%v", arrived, err)
+		}
+	})
 	t.Run("target-journal-incarnation", func(t *testing.T) {
 		pinned := store
 		pinned.ExpectedUID = string(firstSnapshot.Metadata().UID)

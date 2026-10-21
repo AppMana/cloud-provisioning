@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -169,7 +171,7 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 			})
 		}
 	})
-	for _, fault := range []string{"second-fails", "cancelled-after-first", "pod-after-first", "none", "source-after-first"} {
+	for _, fault := range []string{"second-fails", "cancelled-after-first", "cancelled-post-native", "pod-after-first", "none", "source-after-first"} {
 		t.Run(fault, func(t *testing.T) {
 			pod.Status.ContainerStatuses[0].ContainerID = "containerd://joint"
 			pod, err = api.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
@@ -178,15 +180,21 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 			defer cancel()
 			var calls []string
 			var deadline, secondStarted time.Time
-			reads, beforeNative := 0, 0
+			var reads atomic.Int64
+			var cancelPostNative atomic.Bool
+			var beforeNative int64
 			reader := stores[0]
 			reader.ConfigMaps = receiveSetReader{ConfigMapInterface: reader.ConfigMaps, before: func(string) error {
-				reads++
+				reads.Add(1)
+				if cancelPostNative.Load() {
+					cancel()
+					return runCtx.Err()
+				}
 				return nil
 			}}
 			receipts, err := executeReceiveRetirementCohort(runCtx, api, reader, scope, cfg, site, "containerd://joint", func(run context.Context, path string, admitted admittedReceiveRetirement) error {
 				if len(calls) == 0 {
-					beforeNative = reads
+					beforeNative = reads.Load()
 				}
 				calls = append(calls, admitted.Withdrawal.MachineUID)
 				if len(calls) == 2 {
@@ -216,6 +224,11 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 				if fault == "cancelled-after-first" && len(calls) == 1 {
 					cancel()
 				}
+				if fault == "cancelled-post-native" && len(calls) == 2 {
+					// Both native callbacks succeeded. Cancel the next journal
+					// read during full post-cleanup admission, not native work.
+					cancelPostNative.Store(true)
+				}
 				if fault == "pod-after-first" && len(calls) == 1 {
 					pod.Status.ContainerStatuses[0].ContainerID = "containerd://replacement"
 					var e error
@@ -234,9 +247,9 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 				return nil
 			})
 			if fault == "none" {
-				t.Logf("cohort ConfigMap reads: before native=%d total=%d", beforeNative, reads)
-				if !useNative && (beforeNative > 25 || reads > 47) {
-					t.Fatalf("cohort reconstructed shared histories: before native=%d total=%d", beforeNative, reads)
+				t.Logf("cohort ConfigMap reads: before native=%d total=%d", beforeNative, reads.Load())
+				if !useNative && (beforeNative > 25 || reads.Load() > 47) {
+					t.Fatalf("cohort reconstructed shared histories: before native=%d total=%d", beforeNative, reads.Load())
 				}
 				if err != nil || len(receipts) != len(stores) || !slices.Equal(calls, inventory.MachineUIDs) {
 					t.Fatalf("joint cleanup did not complete: calls=%v receipts=%d err=%v", calls, len(receipts), err)
@@ -267,11 +280,14 @@ func verifyJointRetirementExecution(t *testing.T, api kubernetes.Interface, clus
 					t.Fatal("partial or raced cleanup emitted receipt")
 				}
 				want := 2
-				if fault != "second-fails" {
+				if fault != "second-fails" && fault != "cancelled-post-native" {
 					want = 1
 				}
 				if len(calls) != want {
 					t.Fatalf("fault not exercised: calls=%v err=%v", calls, err)
+				}
+				if fault == "cancelled-post-native" && !errors.Is(err, context.Canceled) {
+					t.Fatalf("post-cleanup cancellation was not preserved: %v", err)
 				}
 			}
 		})

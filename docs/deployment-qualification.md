@@ -1122,7 +1122,11 @@ atomic release must preserve all member history and recovery fences together.
 
 Joint-execution API tests use synthetic serving histories and native callbacks.
 They must cover a failed second cleanup, retry of all members, shared deadlines,
-and source changes between members. These fixtures do not qualify actual kernel
+source changes between members, and cancellation during final admission after
+both native callbacks succeed. Final-admission cancellation must preserve the
+context error and return no member receipts. This injected cancellation checks
+receipt fencing; it does not measure deadline exhaustion or cleanup latency.
+These fixtures do not qualify actual kernel
 absence, authenticated joint completion, atomic release, stale-worker replay,
 address reuse, live continuity or rollback to readers predating version five.
 Those gates remain mandatory before deployment or resource release.

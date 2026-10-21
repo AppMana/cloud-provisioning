@@ -1,6 +1,6 @@
 # Read-only tunnel observations
 
-`tunnelobserve` samples an existing `cldt` WireGuard interface. Linux uses
+`tunnelobserve` samples an existing `cldt` root or `cldr` receiver WireGuard interface. Linux uses
 netlink through `wgctrl`; Windows uses the WireGuard driver API. It does not
 create an adapter, configure peers, or require a `wg` executable.
 
@@ -13,7 +13,8 @@ GOOS=windows GOARCH=amd64 go build -o /private/tunnelobserve.exe ./cmd/tunnelobs
 
 Copy the matching binary through the machine's management adapter and run it
 with administrator/root privileges. Substitute the existing interface name and
-a new report path:
+a new report path. Root names use eight hexadecimal digits after `cldt`;
+receiver names use ten after `cldr`:
 
 ```sh
 /private/tunnelobserve -interface cldt0123abcd \

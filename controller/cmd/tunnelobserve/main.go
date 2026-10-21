@@ -28,14 +28,14 @@ type adapterReader struct {
 }
 
 func run() error {
-	name := flag.String("interface", "", "existing cldt adapter name")
+	name := flag.String("interface", "", "existing cldt or cldr adapter name")
 	report := flag.String("report", "", "new JSONL observation file")
 	samples := flag.Int("samples", 1, "number of samples, at most 3600")
 	interval := flag.Duration("interval", time.Second, "sampling interval, 100ms to 1m")
 	flag.Parse()
-	if !regexp.MustCompile(`^cldt[0-9a-f]{8}$`).MatchString(*name) || *report == "" ||
+	if !regexp.MustCompile(`^(cldt[0-9a-f]{8}|cldr[0-9a-f]{10})$`).MatchString(*name) || *report == "" ||
 		*samples < 1 || *samples > 3600 || *interval < 100*time.Millisecond || *interval > time.Minute || time.Duration(*samples-1)*(*interval) > time.Hour {
-		return fmt.Errorf("require an existing cldt interface, new report, and bounded sampling")
+		return fmt.Errorf("require an existing cldt or cldr interface, new report, and bounded sampling")
 	}
 	adapter, err := openAdapter(*name)
 	if err != nil {

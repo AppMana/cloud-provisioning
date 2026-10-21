@@ -3,26 +3,51 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	"golang.org/x/sync/errgroup"
 )
 
 // Pin released histories independently of serving reservations. This is only a
 // mutation guard: checkpoint admission still authenticates finalization and the
 // durable local fence before native work. Released histories never grant routes.
 func loadReleasedReceiveJournals(ctx context.Context, store handover.Store, inventory tunnel.ReceiveInventory) (map[string]handover.Snapshot, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	result := map[string]handover.Snapshot{}
+	var mu sync.Mutex
+	// Independent named reads retain Store.Load's complete history and
+	// incarnation validation. Bound API pressure and join every read before
+	// returning; a partial set never authorizes an operation.
+	group, readCtx := errgroup.WithContext(ctx)
+	group.SetLimit(4)
 	for uid, publication := range inventory.Released {
 		member := store
 		member.Name, member.ExpectedUID = tunnel.ReceiveTransitionName(uid), publication.JournalUID
-		snapshot, err := member.Load(ctx)
-		if err != nil {
-			return nil, err
-		}
-		result[uid] = snapshot
+		group.Go(func() error {
+			if err := readCtx.Err(); err != nil {
+				return err
+			}
+			snapshot, err := member.Load(readCtx)
+			if err != nil {
+				return err
+			}
+			mu.Lock()
+			result[uid] = snapshot
+			mu.Unlock()
+			return nil
+		})
 	}
-	return result, ctx.Err()
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func recheckReleasedReceiveJournals(ctx context.Context, store handover.Store, admitted map[string]handover.Snapshot) error {

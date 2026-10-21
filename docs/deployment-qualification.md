@@ -1367,6 +1367,14 @@ and binary identity checks. If this gate fails, keep the failed bootstrap verdic
 and classify subsequent deletion as cleanup of an incomplete handover. Measure
 the entire serial reconciliation cycle against receipt freshness, including
 completed-worker maintenance and neighbor reconciliation between submissions.
+Released-journal loading bounds independent named reads to four concurrent
+requests and waits for every started read before returning. Every returned
+snapshot still validates its complete history and expected incarnation; any
+failed read or validation discards the entire result. Unit tests cover overlap,
+the concurrency bound, cancellation, replacement, malformed history and plan
+mismatch without namespace-list access. They do not prove live admission
+latency, API capacity, finalization authenticity or native forwarding.
+
 An immutable snapshot may retain its validated phase view to avoid repeated
 history replay within that snapshot. Each API load and checkpoint restore must
 still validate the complete persisted history, and returned views must not expose

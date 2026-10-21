@@ -56,9 +56,13 @@ class Session:
         return json.loads(body)
 
     def start(self, sources, executables, duration=3600, interval=0.1, max_gap=10,
-              diagnostic_reason=None):
+              diagnostic_reason=None, observation_max_age=None):
         if not 0 < duration <= 7200 or not 0.01 <= interval <= 1 or not interval <= max_gap <= 60:
             raise ValueError('invalid bounded stream configuration')
+        if observation_max_age is None:
+            observation_max_age = max_gap
+        if type(observation_max_age) not in (int, float) or not 0 < observation_max_age <= 60:
+            raise ValueError('observation freshness must be bounded to 60 seconds')
         if len(sources) < 2 or len({s['nodeUID'] for s in sources}) != len(sources):
             raise ValueError('distinct survivor Node identities required')
         if set(executables) != {s['nodeUID'] for s in sources}:
@@ -78,6 +82,7 @@ class Session:
                       directory=executables[s['nodeUID']] + '-stream-' + str(i))
                  for i, (s, t) in enumerate((s, t) for s in sources for t in sources if s != t)]
         exclusive(self.output/'session.json', dict(lanes=lanes, maxGap=max_gap,
+            observationMaxAge=observation_max_age,
             duration=duration, interval=interval, transport='native-oob',
             diagnosticReason=diagnostic_reason, addressFamily=family))
         for i, lane in enumerate(lanes):
@@ -162,7 +167,7 @@ class Session:
         session = json.loads((self.output/'session.json').read_text())
         if len(b) != len(session['lanes']):
             raise ValueError('readiness omitted native lanes')
-        if not fresh_progress(b, session['maxGap']):
+        if not fresh_progress(b, session.get('observationMaxAge', session['maxGap'])):
             raise ValueError('native progress is stale; collect a bounded fresh round')
         receipt = dict(readyAt=utc(), lanes=len(b), transport='native-oob', progress=b,
             diagnosticReason=session.get('diagnosticReason'))
@@ -229,7 +234,7 @@ class Session:
         later = self.progress(label+'-second')
         if any(a['attempts'] >= b['attempts'] for a,b in zip(earlier,later)):
             return False
-        if not fresh_progress(later, session['maxGap']):
+        if not fresh_progress(later, session.get('observationMaxAge', session['maxGap'])):
             return False
         # Preserve the original pre-operation readiness for final window proof.
         if not (self.output/'READY.json').exists():

@@ -8,6 +8,56 @@ from survivor_native import Session
 
 
 class NativeControlTest(unittest.TestCase):
+    def test_invalid_observation_budget_rejected_before_start(self):
+        for value in [0, -1, 61, float('nan'), float('inf'), True, '15']:
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as root:
+                output = pathlib.Path(root)/'streams'
+                with self.assertRaises(ValueError):
+                    Session(Mock(), output).start([], {}, observation_max_age=value)
+                self.assertFalse(output.exists())
+
+    def test_observation_latency_does_not_relax_workload_health(self):
+        import copy
+        f = json.loads((pathlib.Path(__file__).parent/'testdata/survivor-preflight-loss.json').read_text())
+        for fault in ['loss', 'gap', None]:
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as root:
+                p = pathlib.Path(root); kube = Mock(); session = Session(kube, p)
+                (p/'session.json').write_text(json.dumps(dict(maxGap=5,
+                    observationMaxAge=15, lanes=[f['lane']])))
+                (p/'lane-00-receipt.json').write_text(json.dumps(f['receipt']))
+                status = copy.deepcopy(f['status'])
+                row = status['latest']
+                row.update(passed=row['attempts'], healthy=True, maxStartIntervalSeconds=.1)
+                if fault == 'loss':
+                    row.update(passed=row['attempts']-1, healthy=False)
+                if fault == 'gap':
+                    row['maxStartIntervalSeconds'] = 6
+                kube.exec_result.return_value = (json.dumps(status).encode(), 0, '')
+                if fault:
+                    with self.assertRaises(ValueError): session.progress('read')
+                else:
+                    self.assertTrue(session.progress('read')[0]['healthy'])
+
+    def test_observation_latency_has_its_own_bounded_readiness_budget(self):
+        import datetime
+        from unittest.mock import patch
+        from survivor_native import fresh_progress
+        now = datetime.datetime.now(datetime.timezone.utc)
+        for age, expected in [(6.5, True), (16, False)]:
+            with self.subTest(age=age), tempfile.TemporaryDirectory() as root:
+                p = pathlib.Path(root); session = Session(Mock(), p)
+                (p/'session.json').write_text(json.dumps(dict(maxGap=5, observationMaxAge=15, lanes=[{}])))
+                for label, attempts, offset in [('first', 1, age+1), ('second', 2, age)]:
+                    (p/('progress-'+label+'.json')).write_text(json.dumps([dict(
+                        nonce='same', pid=3, attempts=attempts,
+                        requestedAt=(now-datetime.timedelta(seconds=offset)).isoformat(),
+                        observedAt=(now-datetime.timedelta(seconds=offset-1)).isoformat())]))
+                with patch('survivor_native.fresh_progress', side_effect=lambda rows, limit: fresh_progress(rows, limit, now)):
+                    if expected:
+                        self.assertEqual(session.ready('first', 'second')['lanes'], 1)
+                    else:
+                        with self.assertRaises(ValueError): session.ready('first', 'second')
+
     def test_slow_identity_reads_do_not_age_final_progress(self):
         import datetime
         from unittest.mock import patch
@@ -54,12 +104,14 @@ class NativeControlTest(unittest.TestCase):
             output = pathlib.Path(root)/'streams'
             session = Session(kube, output)
             with patch.object(session, 'control', return_value={}) as control:
-                session.start(sources, {s['nodeUID']: '/tmp/probe' for s in sources})
+                session.start(sources, {s['nodeUID']: '/tmp/probe' for s in sources}, observation_max_age=15)
             for call in control.call_args_list:
                 arguments = call.args[3]
                 self.assertTrue(arguments[arguments.index('-destination')+1].startswith('[2001:db8::'))
                 self.assertTrue(arguments[arguments.index('-source-ip')+1].startswith('2001:db8::'))
             self.assertEqual(json.loads((output/'session.json').read_text())['addressFamily'], 6)
+            self.assertEqual(json.loads((output/'session.json').read_text())['observationMaxAge'], 15)
+            self.assertEqual(json.loads((output/'session.json').read_text())['maxGap'], 10)
             resumed = Session(kube, output)
             with patch('time.sleep'), patch('survivor_native.fresh_progress', return_value=True), \
                     patch.object(resumed, 'progress', side_effect=[[dict(attempts=1)]*6, [dict(attempts=2)]*6]), \

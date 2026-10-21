@@ -198,6 +198,14 @@ intent and response document; a repeated start or stop is rejected locally.
 A timeout leaves the original intent for inspection. Processes retain their
 configured maximum lifetime even if the controller exits.
 
+`start(observation_max_age=15)` can give a slow out-of-band executor a separate
+readiness freshness budget. The default remains `max_gap`, and the observation
+budget cannot exceed 60 seconds. Freshness includes executor queueing and return
+latency, measured from request submission. This does not change `max_gap`, probe
+timeouts, cumulative packet-failure checks, or the terminal-log verdict. Record
+the selected observation budget in the test description; readiness can only
+establish progress within that interval, not at the instant of fault injection.
+
 `assess_window` checks that host-side readiness preceded an operation and every
 stop request followed it. It is only an ordering check: independently validate
 terminal logs with `survivor_stream.evaluate` and recheck the complete Pod/Node/

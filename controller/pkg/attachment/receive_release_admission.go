@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	"golang.org/x/sync/errgroup"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -115,19 +117,6 @@ func readReleasedReceiveJournals(ctx context.Context, api kubernetes.Interface, 
 		if !found {
 			return fail(fmt.Errorf("released joint history omitted a member"))
 		}
-		memberStore := store
-		memberStore.Name, memberStore.ExpectedUID = tunnel.ReceiveTransitionName(uid), publication.JournalUID
-		snapshot, err := memberStore.Load(ctx)
-		if err != nil {
-			return fail(err)
-		}
-		if !snapshot.Frozen() {
-			return fail(fmt.Errorf("released journal is not frozen"))
-		}
-		if err := tunnel.ValidateReceiveTransportHistory(ctx, memberStore, snapshot); err != nil {
-			return fail(err)
-		}
-		journals[uid] = snapshot
 		var completion receiveRetirementCompletion
 		if err := decodeRetirementEvidence(publication.RetirementCompletion, &completion); err != nil {
 			return fail(err)
@@ -143,6 +132,41 @@ func readReleasedReceiveJournals(ctx context.Context, api kubernetes.Interface, 
 				}
 			}
 		}
+	}
+	// Resolve cohort closure from the captured inventory before independent
+	// named reads. Every frozen history and its ancestry must still validate;
+	// inventory membership alone grants no authority. Join all reads on error.
+	group, readCtx := errgroup.WithContext(ctx)
+	group.SetLimit(4)
+	var mu sync.Mutex
+	for _, uid := range pending {
+		group.Go(func() error {
+			if err := readCtx.Err(); err != nil {
+				return err
+			}
+			memberStore := store
+			memberStore.Name, memberStore.ExpectedUID = tunnel.ReceiveTransitionName(uid), inventory.Released[uid].JournalUID
+			snapshot, err := memberStore.Load(readCtx)
+			if err != nil {
+				return err
+			}
+			if !snapshot.Frozen() {
+				return fmt.Errorf("released journal is not frozen")
+			}
+			if err := tunnel.ValidateReceiveTransportHistory(readCtx, memberStore, snapshot); err != nil {
+				return err
+			}
+			mu.Lock()
+			journals[uid] = snapshot
+			mu.Unlock()
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return fail(err)
+	}
+	if err := ctx.Err(); err != nil {
+		return fail(err)
 	}
 	mesh, err := api.CoreV1().Secrets(namespace).Get(ctx, meshName, metav1.GetOptions{})
 	if err != nil {

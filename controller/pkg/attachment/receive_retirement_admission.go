@@ -150,13 +150,15 @@ func (s ReceiveRetirementSet) Recheck(ctx context.Context, api kubernetes.Interf
 	if api == nil || store.ConfigMaps == nil || s.Mesh == nil || len(s.Journals) == 0 {
 		return fmt.Errorf("retirement recheck requires admitted source state")
 	}
+	snapshots := make([]handover.Snapshot, 0, len(s.Journals))
 	for uid, before := range s.Journals {
-		currentStore := store
-		currentStore.Name = tunnel.ReceiveTransitionName(uid)
-		currentStore.ExpectedUID = string(before.Metadata().UID)
-		if err := currentStore.RecheckExecution(ctx, before); err != nil {
-			return fmt.Errorf("reserved journal changed during retirement admission: %w", err)
+		if before.Metadata().Name != tunnel.ReceiveTransitionName(uid) {
+			return fmt.Errorf("reserved journal differs from admitted machine")
 		}
+		snapshots = append(snapshots, before)
+	}
+	if err := store.RecheckExecutions(ctx, snapshots); err != nil {
+		return fmt.Errorf("reserved journal changed during retirement admission: %w", err)
 	}
 	_, index, err := tunnel.ReadReceiveInventory(ctx, store.ConfigMaps, store.ClusterUID, s.Mesh.Namespace, s.Mesh.Name, string(s.Mesh.UID))
 	if err != nil {

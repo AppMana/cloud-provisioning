@@ -1375,6 +1375,19 @@ the concurrency bound, cancellation, replacement, malformed history and plan
 mismatch without namespace-list access. They do not prove live admission
 latency, API capacity, finalization authenticity or native forwarding.
 
+Shared historical retirement admission resolves joint membership from its
+captured inventory, then validates each frozen journal and transport ancestry
+with at most four concurrent readers. Shared retirement rechecks use the same
+bounded named-read mechanism before checking inventory and mesh revisions.
+Any failed or cancelled member invalidates the entire set; all reads finish
+before return. No cache, broader RBAC, receipt lifetime or execution deadline
+change is implied. Real-API joint-history tests require overlapping initial
+reads and final rechecks, reject concurrent source changes and damaged history,
+and verify cancellation returns no partial records or unfinished callbacks.
+Synthetic serving history and observations in those tests do not establish
+native cleanup timing, traffic continuity or live convergence under API load.
+
+
 An immutable snapshot may retain its validated phase view to avoid repeated
 history replay within that snapshot. Each API load and checkpoint restore must
 still validate the complete persisted history, and returned views must not expose

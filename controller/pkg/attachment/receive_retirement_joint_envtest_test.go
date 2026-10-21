@@ -3,10 +3,12 @@ package attachment
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -107,8 +109,9 @@ func verifyJointRetirementAuthentication(t *testing.T, api kubernetes.Interface,
 			t.Fatal(err)
 		}
 		reads := map[string]int{}
+		var readMu sync.Mutex
 		reader := stores[0]
-		reader.ConfigMaps = retirementCollectionReader{ConfigMapInterface: maps, before: func(name string) error { reads[name]++; return nil }}
+		reader.ConfigMaps = retirementCollectionReader{ConfigMapInterface: maps, before: func(name string) error { readMu.Lock(); defer readMu.Unlock(); reads[name]++; return nil }}
 		collection, err := source.ReceiptCollection(ctx, api, reader, policies, time.Minute, func() error { return nil })
 		if err != nil {
 			t.Fatal(err)
@@ -281,13 +284,43 @@ func verifyJointRetirementAuthentication(t *testing.T, api kubernetes.Interface,
 	// Shared admission must still reread every journal and fence the live
 	// source. The read budget checks duplicate I/O, not elapsed-time behavior.
 	counts := map[string]int{}
+	var countMu sync.Mutex
 	counted := stores[0]
+	parallelCtx, parallelCancel := context.WithTimeout(ctx, 15*time.Second)
+	defer parallelCancel()
+	bothReading := [2]chan struct{}{make(chan struct{}), make(chan struct{})}
+	firstReads := [2]int{}
 	counted.ConfigMaps = retirementCollectionReader{ConfigMapInterface: maps, before: func(name string) error {
+		countMu.Lock()
+		counts[name]++
+		phase := counts[name] - 1
+		initialJournal := (name == stores[0].Name || name == stores[1].Name) && phase < 2
+		if initialJournal {
+			firstReads[phase]++
+			if firstReads[phase] == 2 {
+				close(bothReading[phase])
+			}
+		}
+		countMu.Unlock()
+		if initialJournal {
+			select {
+			case <-bothReading[phase]:
+			case <-parallelCtx.Done():
+				return parallelCtx.Err()
+			}
+		}
+		return nil
+	}}
+	group, err := ReadReleasedReceiveJournals(parallelCtx, api, counted, ns, mesh.Name, string(mesh.UID), string(index.UID), time.Minute)
+	must(err)
+	parallelCancel()
+	counted.ConfigMaps = retirementCollectionReader{ConfigMapInterface: maps, before: func(name string) error {
+		countMu.Lock()
+		defer countMu.Unlock()
 		counts[name]++
 		return nil
 	}}
-	group, err := ReadReleasedReceiveJournals(ctx, api, counted, ns, mesh.Name, string(mesh.UID), string(index.UID), time.Minute)
-	must(err)
+
 	if len(group.Records) != 2 || counts[index.Name] != 2 {
 		t.Fatalf("joint history admission did not share inventory reads: %v", counts)
 	}
@@ -297,6 +330,36 @@ func verifyJointRetirementAuthentication(t *testing.T, api kubernetes.Interface,
 			t.Fatalf("joint history omitted a journal or repeated its reads: %v", counts)
 		}
 	}
+	// Cancellation during independent history reads must return no records and
+	// join both callbacks before returning to the caller.
+	t.Run("shared-history-cancellation", func(t *testing.T) {
+		cancelCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+		var mu sync.Mutex
+		active, entered := 0, 0
+		reader := stores[0]
+		reader.ConfigMaps = retirementCollectionReader{ConfigMapInterface: maps, before: func(name string) error {
+			if name != stores[0].Name && name != stores[1].Name {
+				return nil
+			}
+			mu.Lock()
+			active++
+			entered++
+			if entered == 2 {
+				cancel()
+			}
+			mu.Unlock()
+			<-cancelCtx.Done()
+			mu.Lock()
+			active--
+			mu.Unlock()
+			return cancelCtx.Err()
+		}}
+		rejected, err := ReadReleasedReceiveJournals(cancelCtx, api, reader, ns, mesh.Name, string(mesh.UID), string(index.UID), time.Minute)
+		if !errors.Is(err, context.Canceled) || len(rejected.Records) != 0 || active != 0 || entered != 2 {
+			t.Fatalf("cancelled shared history returned partial or unjoined admission: err=%v records=%d active=%d entered=%d", err, len(rejected.Records), active, entered)
+		}
+	})
 	// This fixture explicitly finalized with a one-minute retirement policy,
 	// independently of its shorter serving-round policy. Deriving the latter
 	// must reject that mismatch, rather than trusting the evidence's age field.
@@ -314,6 +377,8 @@ func verifyJointRetirementAuthentication(t *testing.T, api kubernetes.Interface,
 	changed := false
 	clear(counts)
 	counted.ConfigMaps = retirementCollectionReader{ConfigMapInterface: maps, before: func(name string) error {
+		countMu.Lock()
+		defer countMu.Unlock()
 		counts[name]++
 		if name != index.Name || counts[name] != 2 {
 			return nil

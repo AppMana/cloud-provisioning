@@ -11,13 +11,14 @@ addresses. It does not alter routes, firewall policy, offloads, or packets.
 umask 077
 python3 observe/wireguard_tx.py --interface "$UPLINK_INTERFACE" \
   --peer "$CLOUD_PUBLIC_IPV4" --seconds 300 > "$EVIDENCE/trace.bt"
-sudo bpftrace -q "$EVIDENCE/trace.bt" \
+sudo bpftrace -B none -q "$EVIDENCE/trace.bt" \
   > "$EVIDENCE/trace.jsonl" 2> "$EVIDENCE/trace.stderr"
 ```
 
 Use fresh private artifact paths. Wait for the `ready` event before starting
 the measured operation and require the `stopped` event and successful process
-exit afterward. Retain stderr; lost-event warnings, unmatched starts/returns,
+exit afterward. Unbuffered output makes readiness visible while the trace runs.
+Retain stderr; lost-event warnings, unmatched starts/returns,
 or missing coverage invalidate complete-transmit claims. Records contain
 kernel addresses and should stay in private evidence. Empty traces do not
 prove an absence of drops.

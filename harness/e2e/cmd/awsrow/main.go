@@ -49,6 +49,9 @@ func run() error {
 	calicoSiteOnly := flag.Bool("k0s-calico-site-only", false, "verify site-only Calico ownership; require an explicit AWS pod family")
 	podFamily := flag.String("pod-family", "", "explicit AWS pod campaign: IPv4 or IPv6")
 	calicoMTU := flag.Int("k0s-calico-mtu", 0, "the Calico MTU the site was built with (calico-bird-dualstack required settings); zero is the profile's own")
+	k0sVersion := flag.String("k0s-version", k0s.Version, "expected k0s version on the existing site")
+	k0sBinarySHA256 := flag.String("k0s-binary-sha256", "", "expected k0s binary SHA256 on every site node; required for a fork")
+	k0sSourceRevision := flag.String("k0s-source-revision", "", "full source commit for the existing site's k0s fork build")
 	flag.Parse()
 	if *podFamily != "" && *podFamily != "IPv4" && *podFamily != "IPv6" {
 		return fmt.Errorf("pod-family must be IPv4 or IPv6")
@@ -95,7 +98,7 @@ func run() error {
 	}
 	siteRig := vm.New(topo, *site)
 	k := &kube.Client{Bastion: siteRig.Node("bastion"), ControlPlanes: cluster.ControlPlaneAddresses(topo)}
-	if err := builder.Reuse(ctx, cluster.Deps{Rig: siteRig, Kube: k, Topology: topo, Network: profile.BuilderNetwork, WorkDir: *site, K0sCalicoMTU: *calicoMTU, K0sCalicoSiteOnly: *calicoSiteOnly}); err != nil {
+	if err := builder.Reuse(ctx, cluster.Deps{Rig: siteRig, Kube: k, Topology: topo, Network: profile.BuilderNetwork, WorkDir: *site, K0sCalicoMTU: *calicoMTU, K0sCalicoSiteOnly: *calicoSiteOnly, K0sVersion: *k0sVersion, K0sBinarySHA256: *k0sBinarySHA256, K0sSourceRevision: *k0sSourceRevision}); err != nil {
 		return err
 	}
 	cli := &aws.CLI{Region: state.Region, SessionPath: filepath.Join(*work, "harness-session.json")}

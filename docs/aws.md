@@ -748,6 +748,12 @@ site reuse checks; the AWS rig supplies guest execution through SSM. Reports
 record the selected profile and CRI endpoint. Unsupported observer profiles are
 rejected before contacting AWS.
 
+For an existing k0s fork site, pass `-k0s-version`, `-k0s-binary-sha256`,
+and `-k0s-source-revision` using the site's prepared artifact identity.
+These feed the distribution builder's existing reuse checks, including exact
+version and binary digest verification on every site node. Worker runtime
+verification remains a separate check against the selected distribution.
+
 Keep both the site and remote dialer images available in the harness host's
 Docker store. They may differ. The runner stages both through the AWS rig and
 requires a current, Ready Pod owned by the remote adoption DaemonSet before

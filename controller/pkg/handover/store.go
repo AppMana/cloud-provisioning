@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"slices"
 
+	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -220,6 +221,51 @@ func (s Store) RecheckExecution(ctx context.Context, previous Snapshot) error {
 		return err
 	}
 	if err := current.ContinuesExecution(previous); err != nil {
+		return err
+	}
+	return ctx.Err()
+}
+
+// RecheckExecutions preserves each journal's named-read authority and live
+// execution check, but bounds independent read concurrency instead of paying
+// every retained journal's network latency serially. It does not cache reads,
+// grant list access, or extend the caller's deadline. All reads finish before
+// return; any failed check invalidates the entire admission.
+// Each snapshot supplies its name and expected UID; the store supplies the
+// namespaced reader and cluster identity, not a single selected journal.
+func (s Store) RecheckExecutions(ctx context.Context, previous []Snapshot) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if len(previous) == 0 {
+		return nil
+	}
+	seen := make(map[string]bool, len(previous))
+	if s.ConfigMaps == nil || !token(s.ClusterUID) {
+		return fmt.Errorf("journal set recheck requires a configured cluster reader")
+	}
+	for _, snapshot := range previous {
+		object := snapshot.object
+		if object == nil || !token(object.Name) || object.UID == "" || object.ResourceVersion == "" ||
+			object.DeletionTimestamp != nil || snapshot.transition.j.Initial.ClusterUID != s.ClusterUID || seen[object.Name] {
+			return fmt.Errorf("journal recheck requires distinct admitted identities")
+		}
+		seen[object.Name] = true
+	}
+	group, readCtx := errgroup.WithContext(ctx)
+	group.SetLimit(4)
+	for _, snapshot := range previous {
+		group.Go(func() error {
+			member := s
+			member.Name = snapshot.object.Name
+			member.ExpectedUID = string(snapshot.object.UID)
+			if err := member.RecheckExecution(readCtx, snapshot); err != nil {
+				return fmt.Errorf("journal %s: %w", member.Name, err)
+			}
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
 		return err
 	}
 	return ctx.Err()

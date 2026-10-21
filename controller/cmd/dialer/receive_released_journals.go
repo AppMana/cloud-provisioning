@@ -26,12 +26,15 @@ func loadReleasedReceiveJournals(ctx context.Context, store handover.Store, inve
 }
 
 func recheckReleasedReceiveJournals(ctx context.Context, store handover.Store, admitted map[string]handover.Snapshot) error {
+	snapshots := make([]handover.Snapshot, 0, len(admitted))
 	for uid, before := range admitted {
-		member := store
-		member.Name, member.ExpectedUID = tunnel.ReceiveTransitionName(uid), string(before.Metadata().UID)
-		if err := member.RecheckExecution(ctx, before); err != nil {
-			return fmt.Errorf("released journal changed during execution: %w", err)
+		if before.Metadata().Name != tunnel.ReceiveTransitionName(uid) {
+			return fmt.Errorf("released journal differs from admitted machine")
 		}
+		snapshots = append(snapshots, before)
+	}
+	if err := store.RecheckExecutions(ctx, snapshots); err != nil {
+		return fmt.Errorf("released journal changed during execution: %w", err)
 	}
 	return ctx.Err()
 }

@@ -49,6 +49,11 @@ transmit-start hook, in firmware, at a router, or elsewhere in transit. Retain
 ordinary-pod observations and captures at both ends; the trace supplements
 them and never substitutes for deployment qualification.
 
+Give each capture process invocation a distinct output filename. A service
+restart must preserve previous capture files; record the restart as a coverage
+gap even when both files survive. Compare packet counts and capture intervals
+with the trace before treating a missing packet as evidence of network loss.
+
 ## Ordinary-pod matrix
 
 `pod_matrix.py` tests existing ordinary agnhost `netexec` pods on distinct nodes.

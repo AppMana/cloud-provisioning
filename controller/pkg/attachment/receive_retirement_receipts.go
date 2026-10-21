@@ -13,6 +13,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -188,17 +189,31 @@ func (s ReceiveRetirementReceiptScope) authenticate(ctx context.Context, submiss
 			return nil, fmt.Errorf("retirement consumer has no trusted agent policy")
 		}
 	}
-	proofs := make([]handover.AuthenticatedReceipt, 0, len(submissions))
-	for _, submission := range submissions {
-		if err := ctx.Err(); err != nil {
-			return nil, err
+	// Independent consumers authenticate concurrently under the caller's one
+	// deadline. Bound API pressure and join every read before returning an error;
+	// no partial proof set can authorize completion.
+	proofs := make([]handover.AuthenticatedReceipt, len(submissions))
+	group, authCtx := errgroup.WithContext(ctx)
+	group.SetLimit(4)
+	for i, submission := range submissions {
+		group.Go(func() error {
+			if err := authCtx.Err(); err != nil {
+				return err
+			}
+			policy := policies[submission.Receipt.NodeUID]
+			proof, err := policy.Authenticate(authCtx, submission.BearerToken, submission.Receipt, submission.BootID)
+			if err != nil {
+				return err
+			}
+			proofs[i] = proof
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		if cancelled := ctx.Err(); cancelled != nil {
+			return nil, cancelled
 		}
-		policy := policies[submission.Receipt.NodeUID]
-		proof, err := policy.Authenticate(ctx, submission.BearerToken, submission.Receipt, submission.BootID)
-		if err != nil {
-			return nil, err
-		}
-		proofs = append(proofs, proof)
+		return nil, err
 	}
 	// An earlier consumer may reboot while a later consumer authenticates.
 	// Reuse the existing incarnation verifier before returning the full batch.

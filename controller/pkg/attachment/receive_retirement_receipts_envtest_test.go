@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"k8s.io/client-go/rest"
 	"net/http"
@@ -141,6 +142,7 @@ func verifyRetirementReceiptAuthenticationRealAPI(t *testing.T, history string) 
 		t.Fatal("empty partial submission accepted")
 	}
 	verifyRetirementReceiptCollection(t, scope, batch, policies)
+	verifyParallelRetirementAuthentication(t, cfg, scope, batch, policies)
 	proofs, err := scope.AuthenticateComplete(ctx, batch, policies, time.Minute)
 	if err != nil || len(proofs) != 2 {
 		t.Fatal("complete retirement batch failed authentication", err)
@@ -166,13 +168,12 @@ func verifyRetirementReceiptAuthenticationRealAPI(t *testing.T, history string) 
 	}
 	for _, fault := range []string{"boot", "container"} {
 		t.Run("first-consumer-changes-during-second-authentication/"+fault, func(t *testing.T) {
-			reviews := 0
+			var reviews atomic.Int32
 			racing := rest.CopyConfig(cfg)
 			racing.WrapTransport = func(base http.RoundTripper) http.RoundTripper {
 				return retirementRoundTripper(func(request *http.Request) (*http.Response, error) {
 					if request.Method == http.MethodPost && strings.HasSuffix(request.URL.Path, "/tokenreviews") {
-						reviews++
-						if reviews == 2 {
+						if reviews.Add(1) == 2 {
 							if fault == "boot" {
 								nodes[0].Status.NodeInfo.BootID = "raced-boot"
 								nodes[0], err = api.CoreV1().Nodes().UpdateStatus(ctx, nodes[0], metav1.UpdateOptions{})
@@ -181,7 +182,7 @@ func verifyRetirementReceiptAuthenticationRealAPI(t *testing.T, history string) 
 								pods[0], err = api.CoreV1().Pods(ns).UpdateStatus(ctx, pods[0], metav1.UpdateOptions{})
 							}
 							if err != nil {
-								t.Fatal(err)
+								return nil, err
 							}
 						}
 					}
@@ -209,7 +210,7 @@ func verifyRetirementReceiptAuthenticationRealAPI(t *testing.T, history string) 
 			if err != nil {
 				t.Fatal(err)
 			}
-			if reviews != 2 {
+			if reviews.Load() != 2 {
 				t.Fatal("race did not reach second authentication")
 			}
 			if e == nil || len(got) != 0 {
@@ -347,5 +348,68 @@ func verifyRetirementReceiptCollection(t *testing.T, scope ReceiveRetirementRece
 	submit(batch[0], batch[0].BearerToken, http.StatusAccepted)
 	if completed.Load() != 1 {
 		t.Fatal("independent consumers did not complete exactly once")
+	}
+}
+
+// A barrier at real TokenReview requests proves overlap without a timing-based
+// speed assertion. Cancellation must join both requests and return no proofs.
+func verifyParallelRetirementAuthentication(t *testing.T, cfg *rest.Config, scope ReceiveRetirementReceiptScope, batch []handover.PodReceipt, policies map[string]handover.PodReceiptAuthenticator) {
+	t.Helper()
+	for _, cancelled := range []bool{false, true} {
+		t.Run(map[bool]string{false: "parallel-authentication", true: "cancelled-parallel-authentication"}[cancelled], func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			var reviews atomic.Int32
+			var active atomic.Int32
+			ready := make(chan struct{})
+			config := rest.CopyConfig(cfg)
+			config.WrapTransport = func(base http.RoundTripper) http.RoundTripper {
+				return retirementRoundTripper(func(request *http.Request) (*http.Response, error) {
+					if request.Method == http.MethodPost && strings.HasSuffix(request.URL.Path, "/tokenreviews") {
+						active.Add(1)
+						defer active.Add(-1)
+						if reviews.Add(1) == int32(len(batch)) {
+							if cancelled {
+								cancel()
+							}
+							close(ready)
+						}
+						select {
+						case <-ready:
+						case <-request.Context().Done():
+							return nil, request.Context().Err()
+						}
+					}
+					return base.RoundTrip(request)
+				})
+			}
+			api, err := kubernetes.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			concurrent := map[string]handover.PodReceiptAuthenticator{}
+			for uid, policy := range policies {
+				policy.API = api
+				concurrent[uid] = policy
+			}
+			proofs, err := scope.AuthenticateComplete(ctx, batch, concurrent, time.Minute)
+			if reviews.Load() != int32(len(batch)) || active.Load() != 0 {
+				t.Fatal("authentication did not overlap and join every consumer", reviews.Load(), active.Load(), err)
+			}
+			if cancelled {
+				if !errors.Is(err, context.Canceled) || len(proofs) != 0 {
+					t.Fatal("cancelled authentication returned proofs or lost cancellation", err)
+				}
+			} else {
+				if err != nil || len(proofs) != len(batch) {
+					t.Fatal("parallel authentication failed", err)
+				}
+				for i, p := range proofs {
+					if p.AuthenticatedNodeUID != batch[i].Receipt.NodeUID {
+						t.Fatal("authentication reordered consumer proofs")
+					}
+				}
+			}
+		})
 	}
 }

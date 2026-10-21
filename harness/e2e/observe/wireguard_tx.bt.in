@@ -1,4 +1,4 @@
-BEGIN { printf("{\"event\":\"ready\"}\n"); }
+BEGIN { printf("{\"event\":\"ready\",\"ns\":%llu}\n", nsecs); }
 tracepoint:net:net_dev_start_xmit
 /str(args->name) == @@INTERFACE@@/
 {
@@ -36,4 +36,4 @@ tracepoint:skb:kfree_skb
   printf("{\"event\":\"free-before-return\",\"ns\":%llu,\"receiver\":%u,\"counter\":%llu,\"reason\":%d}\n",nsecs,@receiver[$key],@counter[$key],args->reason);
 }
 interval:s:@@SECONDS@@ { exit(); }
-END { clear(@active);clear(@receiver);clear(@counter);clear(@destination);printf("{\"event\":\"stopped\"}\n"); }
+END { clear(@active);clear(@receiver);clear(@counter);clear(@destination);printf("{\"event\":\"stopped\",\"ns\":%llu}\n", nsecs); }

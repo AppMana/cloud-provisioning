@@ -18,6 +18,9 @@ sudo bpftrace -B none -q "$EVIDENCE/trace.bt" \
 Use fresh private artifact paths. Wait for the `ready` event before starting
 the measured operation and require the `stopped` event and successful process
 exit afterward. Unbuffered output makes readiness visible while the trace runs.
+Readiness and stop events include kernel timestamps to bound the observed
+interval. Allow compilation and attachment time within the campaign startup
+budget; a live process alone does not establish readiness.
 Retain stderr; lost-event warnings, unmatched starts/returns,
 or missing coverage invalidate complete-transmit claims. Records contain
 kernel addresses and should stay in private evidence. Empty traces do not

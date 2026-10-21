@@ -277,12 +277,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 		if err != nil {
 			return
 		}
-		progressed, cleanupErr := r.reconcileRetiredReceiveAdoptions(ctx)
-		if cleanupErr != nil {
-			err = fmt.Errorf("retiring captured adoption: %w", cleanupErr)
-		} else if progressed && (result.RequeueAfter == 0 || result.RequeueAfter > time.Second) {
-			result.RequeueAfter = time.Second
-		}
+		result, err = r.finishRetiredReceiveAdoptions(ctx, result)
 	}()
 
 	// Node events enqueue a nameless request because they change the endpoint

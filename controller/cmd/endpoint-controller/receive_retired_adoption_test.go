@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -156,6 +157,26 @@ func verifyRetiredAdoptionCleanup(t *testing.T, r *meshReconciler, owners client
 				must(owners.Get(ctx, adoptionKey, &corev1.Secret{}))
 				if fault != "disabled" && fault != "missing-completion" && fault != "claim-present" && fault != "machine-present" && fault != "node-present" && err == nil {
 					t.Fatal("unsafe adoption cleanup was not rejected", fault)
+				}
+			}
+			if fault == "expired-completion" {
+				result, err := test.finishRetiredReceiveAdoptions(ctx, ctrl.Result{RequeueAfter: 30 * time.Second})
+				must(err)
+				if result.RequeueAfter != 5*time.Second {
+					t.Fatalf("expired evidence did not schedule a bounded refresh: %+v", result)
+				}
+				must(owners.Get(ctx, adoptionKey, &corev1.Secret{}))
+				// Only a newly verified completion permits the next pass to delete.
+				complete()
+				index, err = store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})
+				must(err)
+				result, err = test.finishRetiredReceiveAdoptions(ctx, ctrl.Result{})
+				must(err)
+				if result.RequeueAfter != time.Second {
+					t.Fatalf("refreshed cleanup did not report progress: %+v", result)
+				}
+				if err := owners.Get(ctx, adoptionKey, &corev1.Secret{}); !apierrors.IsNotFound(err) {
+					t.Fatal("fresh completion failed to retire captured adoption", err)
 				}
 			}
 			current, err := store.ConfigMaps.Get(ctx, index.Name, metav1.GetOptions{})

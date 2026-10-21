@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
@@ -11,8 +13,32 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func (r *meshReconciler) finishRetiredReceiveAdoptions(ctx context.Context, result ctrl.Result) (ctrl.Result, error) {
+	progressed, err := r.reconcileRetiredReceiveAdoptions(ctx)
+	return retiredReceiveAdoptionResult(ctx, result, progressed, err)
+}
+
+func retiredReceiveAdoptionResult(ctx context.Context, result ctrl.Result, progressed bool, err error) (ctrl.Result, error) {
+	retry := time.Duration(0)
+	if errors.Is(err, attachment.ErrRetirementObservationExpired) && ctx.Err() == nil {
+		// Match pending claim retirement: expired evidence forbids mutation,
+		// but waiting for its refresh must not enter exponential error backoff.
+		retry = 5 * time.Second
+	} else if err != nil {
+		// controller-runtime ignores a requeue result when an error is returned.
+		return ctrl.Result{}, fmt.Errorf("retiring captured adoption: %w", err)
+	} else if progressed {
+		retry = time.Second
+	}
+	if retry > 0 && (result.RequeueAfter == 0 || retry < result.RequeueAfter) {
+		result.RequeueAfter = retry
+	}
+	return result, nil
+}
 
 // Called after DaemonSet reconciliation, so pending cleanup cannot block an
 // agent update. Each pass makes at most one conditional Secret deletion.

@@ -24,15 +24,26 @@ Run from the repository root on a Linux KVM host with Docker and containerlab
 installed, plus a statically linked Helm binary. The harness copies Helm into
 the Debian bastion, so Alpine's musl-linked package cannot be used. Choose a
 fresh state directory and unused runner name. The example
-reserves 40 GiB and 12 CPUs; leave enough resources for retained clusters.
+limits the runner to 40 GiB and 12 CPUs; these limits do not reserve resources.
+Keep only the fleet under test running. Shut down idle guests cleanly and retain
+their disks and evidence before stopping their runner.
+
+Prefer a separate local SSD for state, selected with `LAB_STATE_ROOT`. On Btrfs,
+create an empty directory for VM disks and set `chattr +C` before creating or
+copying disks into it. This disables data checksums and compression for those
+files; retain independent recovery copies. Never relocate a live VM disk or
+Docker data directory. Keep captures and verdicts until their archive hashes
+have been verified; do not use indiscriminate Docker or filesystem pruning.
 
 ```sh
 repo=$(pwd -P)
-state="$repo/harness/e2e/.state/isolated-kuberouter"
+state="${LAB_STATE_ROOT:-$repo/harness/e2e/.state}/isolated-kuberouter"
 runner=cldt-isolated-kuberouter
 umask 077
 mkdir "$state"
 mkdir "$state/context" "$state/work" "$state/docker-data" "$state/go-cache"
+python3 harness/e2e/runner/host-check.py --state "$state" \
+  --additional-memory-gib 40 || exit 1
 cp harness/e2e/runner/Dockerfile "$state/context/Dockerfile"
 install -m 0755 "$(command -v containerlab)" "$state/context/containerlab"
 install -m 0755 "$(command -v helm)" "$state/context/helm"
@@ -131,6 +142,22 @@ The inner names and IPs deliberately overlap the original lab. Omitting the
 outer `docker exec "$runner"` targets the original host daemon instead.
 
 ## Memory during image import
+
+Before a campaign on an existing runner, run the host check with no additional
+memory budget. Preserve its JSON output with the private campaign evidence and
+stop if it fails. A successful admission check is only a sample: record host
+pressure and runner `memory.events` during the run as well. Do not classify a
+failed continuity test as passing because the host was overloaded.
+
+```sh
+python3 harness/e2e/runner/host-check.py --state "$state" \
+  > "$state/host-admission.json" || exit 1
+```
+
+Emergency host swap can protect unrelated processes from OOM, but is not extra
+VM capacity. Keep guest RAM resident and leave host headroom; do not increase
+runner limits to compensate for host memory pressure. Serialize full lab
+campaigns, image imports, large builds and archive copies on shared hosts.
 
 Budget for guest RAM, the nested Docker daemon, and image export/import buffers.
 Import into one guest at a time and retain a single image export. Check available host memory before increasing a runner's limit.

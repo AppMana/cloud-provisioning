@@ -351,6 +351,15 @@ not qualify this product change. See [API egress qualification](../../docs/k0s-w
 
 ## Konnectivity lease discovery
 
+`konnectivity-discovery-regression.patch` is a test-only patch for upstream
+Konnectivity revision `e8432610cab5a696fcbdb37969ac1aacb8bcf7f8`.
+It reproduces agents retaining a two-controller response header when a third
+controller returns. Repeated connection attempts remain suppressed with the
+default count-based discovery; continuous discovery connects to the returned
+server. Apply it to the Konnectivity checkout and run
+`go test ./pkg/agent -run TestStaleTwoControllerHeaderAfterThirdControllerReturns`.
+This tests agent discovery behavior, not live cluster recovery or continuity.
+
 `konnectivity-discovery-preparation.patch` applies to `v1.36.4+k0s.1` after
 `native-linux-egress.patch`. It enables `--sync-forever=true` on both agent
 variants without changing server headers or server lease mode. It removes the

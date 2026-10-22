@@ -1,0 +1,79 @@
+diff --git a/pkg/agent/stale_count_test.go b/pkg/agent/stale_count_test.go
+new file mode 100644
+--- /dev/null
++++ b/pkg/agent/stale_count_test.go
+@@ -0,0 +1,74 @@
++package agent
++
++import (
++	"google.golang.org/grpc"
++	"google.golang.org/grpc/credentials/insecure"
++	"google.golang.org/grpc/metadata"
++	"net"
++	agentproto "sigs.k8s.io/apiserver-network-proxy/proto/agent"
++	"sigs.k8s.io/apiserver-network-proxy/proto/header"
++	"testing"
++	"time"
++)
++
++func TestStaleTwoControllerHeaderAfterThirdControllerReturns(t *testing.T) {
++	for _, continuous := range []bool{false, true} {
++		t.Run(map[bool]string{false: "cached_count_stalls", true: "continuous_discovery_recovers"}[continuous], func(t *testing.T) {
++			addresses := []string{staleCountEndpoint(t, "first", "2"), staleCountEndpoint(t, "second", "2"), staleCountEndpoint(t, "returned", "3")}
++			drain, stop := make(chan struct{}), make(chan struct{})
++			cs := (&ClientSetConfig{Address: addresses[0], AgentID: "stale-count", SyncForever: continuous, ProbeInterval: time.Hour, DialOptions: []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}}).NewAgentClientSet(drain, stop)
++			cs.SetServerCounter(NewResponseBasedCounter(cs))
++			defer func() { close(stop); cs.shutdown() }()
++			for _, address := range addresses[:2] {
++				cs.address = address
++				if err := cs.connectOnce(); err != nil {
++					t.Fatal(err)
++				}
++			}
++			if cs.ClientsCount() != 2 || cs.lastReceivedServerCount != 2 {
++				t.Fatal("did not establish stale two-controller state")
++			}
++			cs.address = addresses[2]
++			for i := 0; i < 3; i++ {
++				err := cs.connectOnce()
++				if err != nil {
++					if _, duplicate := err.(*DuplicateServerError); !duplicate {
++						t.Fatal(err)
++					}
++				}
++			}
++			want := 2
++			if continuous {
++				want = 3
++			}
++			if got := cs.ClientsCount(); got != want {
++				t.Fatalf("connected=%d want=%d", got, want)
++			}
++		})
++	}
++}
++
++type staleCountServer struct {
++	agentproto.UnimplementedAgentServiceServer
++	id, count string
++}
++
++func (s *staleCountServer) Connect(stream agentproto.AgentService_ConnectServer) error {
++	if err := stream.SendHeader(metadata.Pairs(header.ServerID, s.id, header.ServerCount, s.count)); err != nil {
++		return err
++	}
++	<-stream.Context().Done()
++	return stream.Context().Err()
++}
++func staleCountEndpoint(t *testing.T, id, count string) string {
++	t.Helper()
++	ln, err := net.Listen("tcp", "127.0.0.1:0")
++	if err != nil {
++		t.Fatal(err)
++	}
++	server := grpc.NewServer()
++	agentproto.RegisterAgentServiceServer(server, &staleCountServer{id: id, count: count})
++	go server.Serve(ln)
++	t.Cleanup(server.Stop)
++	return ln.Addr().String()
++}

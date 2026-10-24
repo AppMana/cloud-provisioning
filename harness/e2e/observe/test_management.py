@@ -26,6 +26,11 @@ class ManagementTests(unittest.TestCase):
                     result = observe(SimpleNamespace(bastion='probe', namespace='probe'),
                                      ['https://192.0.2.1:6443'], [], output)
                 run.assert_called_once()
+                argv = run.call_args.args[0]
+                self.assertEqual(argv[:5], ['docker', 'exec', '-e', 'GOMAXPROCS=2', 'probe'])
+                self.assertIn('--server=https://192.0.2.1:6443', argv)
+                self.assertEqual(run.call_args.kwargs['timeout'], 8)
+                self.assertEqual(run.call_args.kwargs['env']['GOMAXPROCS'], '2')
                 row = json.loads((output / 'lane-00.jsonl').read_text())
                 self.assertFalse(row['ok'])
                 self.assertFalse(result['ok'])

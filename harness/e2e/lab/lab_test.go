@@ -243,3 +243,33 @@ func TestGuestMemoryIsChosenPerTopology(t *testing.T) {
 		}
 	}
 }
+
+func TestAppliancesDoNotStartKubernetesDaemons(t *testing.T) {
+	for _, rig := range []Rig{VM, Container} {
+		topo := Default()
+		config, err := topo.ContainerlabConfig(rig)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, node := range topo.Nodes {
+			definition := config.Topology.Nodes[node.Name]
+			for _, unit := range []string{"kubelet", "containerd"} {
+				masked := false
+				for _, bind := range definition.Binds {
+					if bind == "/dev/null:/etc/systemd/system/"+unit+".service:ro" {
+						masked = true
+					}
+				}
+				if masked == node.IsClusterNode() {
+					t.Fatalf("rig %v node %s: %s masked=%v", rig, node.Name, unit, masked)
+				}
+			}
+			if !node.IsClusterNode() && definition.Env["GOMAXPROCS"] != "2" {
+				t.Fatalf("unbounded appliance %s", node.Name)
+			}
+			if node.IsClusterNode() && definition.Env["GOMAXPROCS"] != "" {
+				t.Fatalf("cluster runtime constrained on %s", node.Name)
+			}
+		}
+	}
+}

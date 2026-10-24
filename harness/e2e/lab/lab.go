@@ -355,6 +355,14 @@ func (t Topology) ContainerlabConfig(rig Rig) (*core.Config, error) {
 		if rig == Container {
 			definition.Binds = append([]string(nil), node.Binds...)
 		}
+		if !node.IsClusterNode() {
+			// Reuse the node image's network tools and systemd, but do not run
+			// Kubernetes daemons on routers, cloud edges or the bastion.
+			definition.Binds = append(definition.Binds,
+				"/dev/null:/etc/systemd/system/kubelet.service:ro",
+				"/dev/null:/etc/systemd/system/containerd.service:ro")
+			definition.Env = map[string]string{"GOMAXPROCS": "2"}
+		}
 		config.Topology.Nodes[node.Name] = definition
 	}
 	for _, link := range t.Links() {

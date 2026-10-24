@@ -68,6 +68,7 @@ def observe(kube, servers, targets, output, duration=600, interval=1, max_gap=10
     receipt = dict(nonce=nonce, pid=pid, startedAt=utc(), targets=initial,
                    lanes=lanes, intervalSeconds=interval, maxGapSeconds=max_gap)
     (output / 'initial.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    executor_env = dict(os.environ, GOMAXPROCS='2')
     start = time.monotonic()
     lock, ready_lanes = threading.Lock(), set()
 
@@ -77,13 +78,15 @@ def observe(kube, servers, targets, output, duration=600, interval=1, max_gap=10
             while time.monotonic() - start < duration:
                 stopped = (output / 'STOP').exists()
                 begin, stamp = time.monotonic(), utc()
-                args = ['docker', 'exec', kube.bastion] + command(
+                # Each lane is already concurrent; bound per-process Go scheduling
+                # overhead without reducing requests or changing timeouts.
+                args = ['docker', 'exec', '-e', 'GOMAXPROCS=2', kube.bastion] + command(
                     lane['server'], kube.namespace, lane['pod'], lane['operation'])
                 # The bastion and namespace are explicit Kubectl configuration;
                 # never use a host kubeconfig or an API failover helper.
                 diagnostic = None
                 try:
-                    result = subprocess.run(args, capture_output=True, timeout=8)
+                    result = subprocess.run(args, capture_output=True, timeout=8, env=executor_env)
                     ok = successful(lane['operation'], result.stdout, result.returncode)
                     error = None if ok else 'management response failed'
                     if not ok:

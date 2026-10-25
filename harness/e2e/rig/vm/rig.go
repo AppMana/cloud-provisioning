@@ -47,13 +47,11 @@ func Exec(ctx context.Context, stdin io.Reader, argv ...string) ([]byte, []byte,
 
 // Rig is the lab, with its cluster nodes as machines.
 type Rig struct {
-	Topology lab.Topology
-	WorkDir  string
-	Run      Runner
-	Runtime  rig.Runtime
-	// GuestExecPrefix selects a platform's serial execution policy wrapper.
-	GuestExecPrefix []string
-	builderSSH      bool
+	Topology   lab.Topology
+	WorkDir    string
+	Run        Runner
+	Runtime    rig.Runtime
+	builderSSH bool
 }
 
 // New returns a VM rig.

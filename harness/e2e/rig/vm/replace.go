@@ -8,7 +8,7 @@ import (
 
 // DestroyDeployed removes the lab by its deployed identity, before a new
 // topology is installed. Reconfigure with the new topology leaves behind old
-// nodes absent from it (observed when switching five-node k0s to compact OKD).
+// nodes absent from it.
 func (r *Rig) DestroyDeployed(ctx context.Context) error {
 	out, stderr, code, err := r.runner()(ctx, nil, "docker", "ps", "-aq", "--filter", "label=containerlab="+r.Topology.Name)
 	if err != nil || code != 0 {

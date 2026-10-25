@@ -120,9 +120,6 @@ func (n *Node) Pipe(ctx context.Context, stdin io.Reader, argv ...string) (out [
 		timeout = time.Until(deadline)
 	}
 	full = append(full, n.Wrapper(), "/cldt-guest", "exec", timeout.String(), input)
-	if n.rig != nil {
-		full = append(full, n.rig.GuestExecPrefix...)
-	}
 	full = append(full, argv...)
 	if n.rig != nil && n.rig.builderSSH {
 		full = n.ssh(stdin != nil, argv...)
@@ -162,9 +159,9 @@ func (n *Node) Put(ctx context.Context, src io.Reader, dst string, mode fs.FileM
 }
 
 func (n *Node) sdkControl() bool {
-	// Image preparation and CoreOS's policy-wrapped execution remain explicit
-	// specialized paths until their runtime contracts are migrated as well.
-	return n.rig != nil && n.rig.Runtime != nil && !n.rig.builderSSH && len(n.rig.GuestExecPrefix) == 0
+	// Image preparation remains an explicit specialized path until its runtime
+	// contract is migrated as well.
+	return n.rig != nil && n.rig.Runtime != nil && !n.rig.builderSSH
 }
 
 func (n *Node) openSDK(ctx context.Context) (*labclient.Client, *labclient.Session, error) {

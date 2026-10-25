@@ -28,6 +28,17 @@ limits the runner to 40 GiB and 12 CPUs; these limits do not reserve resources.
 Keep only the fleet under test running. Shut down idle guests cleanly and retain
 their disks and evidence before stopping their runner.
 
+Size the runner for its own guests. Guest RAM is anonymous memory in the
+runner's cgroup, and the page cache for their disks is charged to the same
+limit. Leave at least 10 GiB above the sum of guest RAM, set `--memory-swap`
+equal to `--memory`, and give at least one CPU per cluster VM. A seven-VM
+2 GiB profile under 18 GiB and four CPUs spent a third of its CPU periods
+throttled and hit its memory limit continuously. The guests' containerd then
+missed crictl's two-second connect deadline and matrix rows failed without
+measuring the network. The same site passed every row under 28 GiB and eight
+CPUs. Check `cpu.stat` and `memory.events` in the runner's cgroup before
+attributing a failure to the product.
+
 Prefer a separate local SSD for state, selected with `LAB_STATE_ROOT`. On Btrfs,
 create an empty directory for VM disks and set `chattr +C` before creating or
 copying disks into it. This disables data checksums and compression for those

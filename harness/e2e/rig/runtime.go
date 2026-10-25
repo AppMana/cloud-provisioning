@@ -46,9 +46,20 @@ func OpenRuntime(ctx context.Context, runtime Runtime, workDir, kind string) (*l
 }
 
 // Open reconnects through the SDK's saved socket, without launching a second
-// daemon or resolving nodes by reconstructed container names.
+// daemon or resolving nodes by reconstructed container names. Each reconnect
+// renews the kept lease, so labd reaps a lab one TTL after its last use rather
+// than one TTL after it was deployed.
 func (LabcontainersRuntime) Open(ctx context.Context, workDir, kind string) (*labclient.Client, *labclient.Session, error) {
-	return labclient.OpenPersistent(ctx, persistentOptions(workDir, kind))
+	opts := persistentOptions(workDir, kind)
+	client, session, err := labclient.OpenPersistent(ctx, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := session.Keep(ctx, opts.TTL); err != nil {
+		_ = client.Close()
+		return nil, nil, fmt.Errorf("renew lab lease: %w", err)
+	}
+	return client, session, nil
 }
 
 func (LabcontainersRuntime) Deploy(ctx context.Context, workDir, kind, name string, config *core.Config) error {

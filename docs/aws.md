@@ -737,6 +737,30 @@ images/snapshots, IAM roles/profile and bucket, plus termination of test instanc
 Use the setup identity for both commands; the restricted sessions are removed
 during cleanup.
 
+## Preparing a Linux campaign on a VM site
+
+After `native_access.py`, `importsite`, `session.py` and `identity.py` have bound
+a run inventory to the site, `harness/e2e/aws/prepare_campaign.py` installs the
+committed candidate for that run. It cross-compiles both architectures, builds
+multi-platform OCI layouts by layer copy, publishes them with `publisher.py`,
+uploads the first-boot dialers with `assets.py` and renews the observer file
+credentials. It issues the receipt serving certificate from a run-scoped
+cert-manager CA, so the certificate renews without manual rotation, and renders
+the chart values only from recorded digests and URLs. Run it with setup
+credentials; without `--apply` it stops after a Helm server dry run:
+
+```sh
+python3 harness/e2e/aws/prepare_campaign.py --work-dir <run-directory> \
+  --runner <runner> --api-server https://10.10.0.10:6443 \
+  --cluster-uid <kube-system-uid> --builder <docker-container-builder> \
+  --native-cidr 203.0.113.0/24 --native-cidr 192.0.2.0/24 \
+  --native-cidr <run-subnet> --apply
+```
+
+Pass every protected cloud range, including the run subnet. The rendered values
+stay private in the run directory because they contain presigned URLs. The
+receipt policy admits the published dialer index on every architecture.
+
 ## Running the AWS worker matrix
 
 `cmd/awsrow` observes Linux workers using the selected distribution's runtime.

@@ -1,4 +1,4 @@
-package containernet
+package labcontainers
 
 import (
 	"context"

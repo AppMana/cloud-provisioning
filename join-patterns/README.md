@@ -26,7 +26,7 @@ kubeadm-family cluster that terminates its API behind an external
 load balancer and wants nodes pinned to it.
 
 The lab's own site nodes get the same property from a static-pod TCP
-forwarder written before kubeadm runs (see `harness/clab/cluster.sh`):
+forwarder written before kubeadm runs (see `harness/e2e/cluster/kubeadm/kubeadm.go`):
 kubelet starts static pods from disk with no API access, which is the
 same reason the remote's balancer lives in the dialer's host unit and
 never in a pod.

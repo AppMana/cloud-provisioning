@@ -8,6 +8,7 @@ certificate through the site's cert-manager and renders the chart values from
 what those helpers recorded. Without --apply it stops after a server dry run.
 """
 import argparse
+import datetime
 import hashlib
 import json
 import os
@@ -152,8 +153,10 @@ def main():
              '--component', component, '--api-server', a.api_server, '--runner', a.runner])
     run([sys.executable, str(HERE / 'assets.py'), '--work-dir', str(a.work_dir),
          *[arg for arch in ARCHITECTURES for arg in ('--file', str(binaries_dir / ('wg-dialer-linux-' + arch)))]])
+    # The observer helper requires a new receipt directory for every renewal.
+    renewal = 'observer-renewal-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     run([sys.executable, str(HERE / 'observer_credentials.py'), '--work-dir', str(a.work_dir), '--runner', a.runner,
-         '--cluster-uid', a.cluster_uid, '--receipts', str(out / 'observer-renewal')])
+         '--cluster-uid', a.cluster_uid, '--receipts', str(out / renewal)])
     tls = {'apiVersion': 'v1', 'kind': 'List', 'items': receipt_tls_objects(state['runID'])}
     bastion(a.runner, a.api_server, 'kubectl', '--server=' + a.api_server, 'apply', '-f', '-', stdin=json.dumps(tls))
     bastion(a.runner, a.api_server, 'kubectl', '--server=' + a.api_server, '-n', NAMESPACE, 'wait',

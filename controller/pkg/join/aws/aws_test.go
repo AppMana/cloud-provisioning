@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -163,5 +164,16 @@ func TestGVK_IsAWSMachineV1beta2(t *testing.T) {
 	gvk := Provider{}.GVK()
 	if gvk.Group != "infrastructure.cluster.x-k8s.io" || gvk.Version != "v1beta2" || gvk.Kind != "AWSMachine" {
 		t.Errorf("GVK = %+v, want infrastructure.cluster.x-k8s.io/v1beta2, Kind=AWSMachine", gvk)
+	}
+}
+
+// EC2 machines run the AWS VPC CNI unless their template chooses the site
+// CNI, for Linux and Windows alike.
+func TestEC2MachinesDefaultToTheVPCCNI(t *testing.T) {
+	var n join.NetworkProvider = Provider{}
+	for _, os := range []string{"linux", "windows"} {
+		if got := n.DefaultCNI(os); got != VPCCNI {
+			t.Errorf("DefaultCNI(%q) = %q, want %q", os, got, VPCCNI)
+		}
 	}
 }

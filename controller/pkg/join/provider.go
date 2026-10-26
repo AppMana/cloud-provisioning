@@ -104,6 +104,15 @@ type NodeLocalBalancer interface {
 	NeedsAPIProxy() bool
 }
 
+// NetworkProvider is an optional capability an InfraProvider implements
+// when its machines run a provider-native pod network by default (the AWS
+// VPC CNI on EC2, ...). A machine template may still choose the site CNI
+// with the platform.CNILabel. Providers without it keep the site CNI over
+// the tunnel.
+type NetworkProvider interface {
+	DefaultCNI(os string) string
+}
+
 // AddressObserver is an optional capability an InfraProvider
 // implements when it observes machines that already exist, so it
 // knows where one is before that machine is bootstrapped.

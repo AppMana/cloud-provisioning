@@ -52,6 +52,7 @@ import (
 	joinmicrok8s "github.com/appmana/cloud-provisioning/controller/pkg/join/microk8s"
 	joinrke2 "github.com/appmana/cloud-provisioning/controller/pkg/join/rke2"
 	"github.com/appmana/cloud-provisioning/controller/pkg/nodegroup"
+	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -97,15 +98,15 @@ const externalDNSTargetAnnotation = "external-dns.alpha.kubernetes.io/target"
 // defaults, so the taint key cannot drift between where it is applied
 // and where it is tolerated. A node carrying a taint nothing tolerates
 // cannot schedule its own Gateway data-plane pod.
-const cloudWorkerTaintKey = "cloud-provisioning.appmana.com/internet-facing"
+const cloudWorkerTaintKey = platform.TaintKey
 
 // cloudWorkerRoleLabel/Value select which Machine this operator
 // treats as a remote peer. They are also the default
 // --machine-selector value, so the label a node registers with and the
 // selector used to find its Machine cannot drift either.
 const (
-	cloudWorkerRoleLabel = "cloud-provisioning.appmana.com/role"
-	cloudWorkerRoleValue = "cloud-worker"
+	cloudWorkerRoleLabel = platform.RoleLabel
+	cloudWorkerRoleValue = platform.RoleValue
 )
 
 // controlPlaneLabel marks control-plane nodes. The on-prem dialer
@@ -2311,7 +2312,7 @@ func main() {
 		joinAPIAddress            string
 		joinAPIVIP                string
 		joinAPIProxyPort          int
-		joinKubeletExtraArgs      string
+		joinKubeletExtraFlags     string
 		joinSSHAuthorizedKeys     string
 		joinTokenTTL              time.Duration
 		joinProviderName          string
@@ -2386,9 +2387,8 @@ func main() {
 	flag.StringVar(&joinAPIAddress, "join-api-address", "", "REQUIRED cluster API server address used to mint join tokens (bracket IPv6 literals, e.g. https://[fd8f:cf26:522a::1]:6443)")
 	flag.StringVar(&joinAPIVIP, "join-api-vip", "", "REQUIRED cluster API VIP the new node must reach through the tunnel before joining")
 	flag.IntVar(&joinAPIProxyPort, "join-api-proxy-port", 7445, "port of the loopback API balancer the remote's dialer serves; the join gates on it and kubelet keeps dialing it")
-	flag.StringVar(&joinKubeletExtraArgs, "join-kubelet-extra-args",
-		fmt.Sprintf("--node-labels=%s=%s --register-with-taints=%s:NoSchedule", cloudWorkerRoleLabel, cloudWorkerRoleValue, cloudWorkerTaintKey),
-		"extra kubelet args applied to every joining cloud-worker node: defaults derived from the same constants the DaemonSet toleration and --machine-selector default use, so they can't drift")
+	flag.StringVar(&joinKubeletExtraFlags, "join-kubelet-extra-flags", "",
+		"extra kubelet flags for every joining cloud-worker node; its labels and taint come from its node class and may not be restated here")
 	flag.StringVar(&joinSSHAuthorizedKeys, "join-ssh-authorized-keys", "", "comma-separated SSH public keys to authorize on every new node")
 	flag.DurationVar(&joinTokenTTL, "join-token-ttl", 2*time.Hour, "validity window for a minted join token")
 	flag.StringVar(&wireGuardAddress, "join-wireguard-address", "10.100.0.128/24", "base WireGuard tunnel address for REMOTE (cloud) nodes; each gets the next free address in this subnet")
@@ -2435,6 +2435,11 @@ func main() {
 	// The dialer image has no discoverable value and no safe default.
 	if strings.TrimSpace(dialerImage) == "" {
 		fmt.Fprintf(os.Stderr, "--dialer-image is required\n")
+		os.Exit(1)
+	}
+
+	if err := platform.ValidateExtraFlags(joinKubeletExtraFlags); err != nil {
+		fmt.Fprintf(os.Stderr, "invalid --join-kubelet-extra-flags: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -2749,7 +2754,7 @@ func main() {
 			BootstrapRenderers: bootstrapRenderers,
 			APIVIP:             joinAPIVIP,
 			APIProxyPort:       joinAPIProxyPort,
-			KubeletExtraArgs:   joinKubeletExtraArgs,
+			KubeletExtraFlags:  joinKubeletExtraFlags,
 			SSHAuthorizedKeys:  sshKeys,
 
 			WireGuardAddress:        wireGuardAddress,

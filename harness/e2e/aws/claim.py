@@ -21,6 +21,7 @@ p.add_argument('--instance-type')
 p.add_argument('--linux-image-id', help='explicit authorized Linux image; leaves the run default unchanged')
 p.add_argument('--variant', choices=['cpu','gpu'], default='cpu', help='Windows image variant; GPU requires an explicit instance type')
 p.add_argument('--root-volume-gib', type=int)
+p.add_argument('--cni', help='node class network: site, or a provider-native network; defaults to the platform default')
 p.add_argument('--windows-version', choices=['2022', '2025'], help='Use this run’s captured, available Windows image')
 a = p.parse_args()
 if a.linux_image_id and a.windows_version:
@@ -100,7 +101,7 @@ apply(obj('cluster.x-k8s.io/v1beta2', 'Cluster', cluster, {
     'controlPlaneRef': {'apiGroup': 'infrastructure.labcontainers.appmana.com', 'kind': 'LabImportedControlPlane', 'name': cluster},
     'infrastructureRef': {'apiGroup': 'infrastructure.cluster.x-k8s.io', 'kind': 'AWSCluster', 'name': cluster},
 }))
-apply(obj('infrastructure.cluster.x-k8s.io/v1beta2', 'AWSMachineTemplate', template_name, {'template': {'metadata': {'labels': {'kubernetes.io/os': machine_os}}, 'spec': {
+apply(obj('infrastructure.cluster.x-k8s.io/v1beta2', 'AWSMachineTemplate', template_name, {'template': {'metadata': {'labels': {'kubernetes.io/os': machine_os, **({'cloud-provisioning.appmana.com/cni': a.cni} if a.cni else {})}}, 'spec': {
     'instanceType': a.instance_type, 'ami': {'id': ami_id}, 'subnet': {'id': s['subnetID']},
     'additionalSecurityGroups': [{'id': s['securityGroupID']}], 'publicIP': True,
     **({'assignPrimaryIPv6': 'enabled'} if ipv6 else {}),

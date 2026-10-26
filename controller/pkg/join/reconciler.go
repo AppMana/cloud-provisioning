@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
+	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
@@ -109,10 +110,10 @@ type Reconciler struct {
 
 	// Static, cluster-topology values this reconciler contributes
 	// directly (not provider-specific): the API VIP reachable once the
-	// tunnel is up, kubelet taint/label args, and the SSH keys to
-	// authorize on every new node.
+	// tunnel is up, kubelet flags beyond the node class's labels and
+	// taint, and the SSH keys to authorize on every new node.
 	APIVIP            string
-	KubeletExtraArgs  string
+	KubeletExtraFlags string
 	SSHAuthorizedKeys []string
 	// APIProxyPort is where the remote's own loopback API balancer
 	// listens (the dialer host unit serves it): the join gates on it
@@ -244,7 +245,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 
-	renderer, err := r.bootstrapRenderer(infraMachine)
+	class := platform.ClassOf(infraMachine, defaultCNI(infra))
+	renderer, err := r.bootstrapRenderer(class.OS)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -380,7 +382,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		"sshAuthorizedKeys":       r.SSHAuthorizedKeys,
 		"apiVIP":                  r.APIVIP,
 		"apiProxyPort":            apiProxyPort,
-		"kubeletExtraArgs":        r.KubeletExtraArgs,
+		"kubeletExtraArgs":        class.KubeletArgs(r.KubeletExtraFlags),
 		"wireguardAddress":        cloudWGAddress,
 		"wireguardAddress6":       cloudWGAddress6,
 		"wireguardListenPort":     r.WireGuardListenPort,
@@ -529,6 +531,15 @@ func (r *Reconciler) apiServers(dialerSecret *corev1.Secret) []string {
 		return nil
 	}
 	return []string{r.APIVIP}
+}
+
+// defaultCNI is the provider's default pod network for a guest OS, or nil
+// when its machines keep the site CNI.
+func defaultCNI(infra InfraProvider) func(string) string {
+	if n, ok := infra.(NetworkProvider); ok {
+		return n.DefaultCNI
+	}
+	return nil
 }
 
 // infraProviderFor finds the registered InfraProvider whose GVK.Kind

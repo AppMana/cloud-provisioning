@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"github.com/appmana/cloud-provisioning/controller/pkg/cni/awspod"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -50,6 +51,13 @@ var (
 )
 
 // GVK implements join.InfraProvider.
+// VPCCNI is the AWS VPC CNI's node class network name.
+const VPCCNI = awspod.NodeValue
+
+// DefaultCNI makes EC2 machines run the AWS VPC CNI unless their template
+// chooses the site CNI.
+func (Provider) DefaultCNI(string) string { return VPCCNI }
+
 func (Provider) GVK() schema.GroupVersionKind { return gvk }
 
 // ClusterGVK implements join.MachineProvisioner.

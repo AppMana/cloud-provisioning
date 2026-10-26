@@ -202,7 +202,7 @@ func newFakeJoinReconciler(t *testing.T, joinProvider ClusterJoinProvider, objs 
 
 		BootstrapRenderers: map[string]BootstrapRenderer{"linux": PatternBootstrap{Path: tmplPath, Format: bootstrap.CloudConfig}},
 		APIVIP:             "10.101.0.1",
-		KubeletExtraArgs:   "--node-labels=cloud-provisioning.appmana.com/role=cloud-worker",
+		KubeletExtraFlags:  "",
 
 		WireGuardAddress:    "10.100.0.128/24",
 		WireGuardListenPort: "51820",

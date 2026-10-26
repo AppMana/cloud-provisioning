@@ -5,8 +5,6 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/bootstrap"
 	"github.com/appmana/cloud-provisioning/controller/pkg/render"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // BootstrapRenderer owns the native guest payload, independently of the
@@ -30,12 +28,7 @@ func (p PatternBootstrap) Render(values map[string]any) (bootstrap.Data, error) 
 	return data, nil
 }
 
-func (r *Reconciler) bootstrapRenderer(machine *unstructured.Unstructured) (BootstrapRenderer, error) {
-	guest := machine.GetLabels()[corev1.LabelOSStable]
-	// Existing machine templates predate guest metadata and describe Linux.
-	if guest == "" {
-		guest = "linux"
-	}
+func (r *Reconciler) bootstrapRenderer(guest string) (BootstrapRenderer, error) {
 	renderer := r.BootstrapRenderers[guest]
 	if renderer == nil {
 		return nil, fmt.Errorf("no bootstrap renderer registered for guest OS %q", guest)

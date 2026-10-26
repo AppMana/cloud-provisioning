@@ -142,7 +142,7 @@ class Trial:
         operation = dict(claim=name, startedAt=now())
         self.save('operation-start.json', operation)
         common = ['--work-dir', c['workDirectory'], '--api-server', c['apiServer'], '--bastion', c['bastion']]
-        self.run(self.helper('aws/claim.py', *common, '--name', name, '--windows-version', c['windowsVersion']), 'create')
+        self.run(self.helper('aws/claim.py', *common, '--name', name, '--windows-version', c['windowsVersion'], '--cni', 'site'), 'create')
         for _ in range(120):
             machine = self.get('machine', name)
             node_name = (machine or {}).get('status', {}).get('nodeRef', {}).get('name')

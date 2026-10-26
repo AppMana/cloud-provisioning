@@ -166,10 +166,8 @@ spec:
             {{- end }}
             - {{ printf "--site-dialer-node-selector=%s" (join "," $selectors) | quote }}
             {{- end }}
-            {{- if .Values.joinKubeletExtraArgs }}
-            - {{ printf "--join-kubelet-extra-args=%s" .Values.joinKubeletExtraArgs | quote }}
-            {{- else if .Values.awsPodObserver.configMap }}
-            - "--join-kubelet-extra-args=--node-labels=cloud-provisioning.appmana.com/role=cloud-worker,cloud-provisioning.appmana.com/cni=aws-vpc --register-with-taints=cloud-provisioning.appmana.com/internet-facing:NoSchedule"
+            {{- with .Values.joinKubeletExtraFlags }}
+            - {{ printf "--join-kubelet-extra-flags=%s" . | quote }}
             {{- end }}
             - "--join-template-path=/join-patterns/{{ .Values.joinProvider }}-worker.cloud-config.tmpl"
             {{- with .Values.cluster.apiAddress }}

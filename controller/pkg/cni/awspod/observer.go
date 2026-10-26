@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	"net/netip"
 	"sort"
 	"strings"
@@ -16,7 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const NodeLabel = "cloud-provisioning.appmana.com/cni"
+const NodeLabel = platform.CNILabel
 const NodeValue = "aws-vpc"
 
 type Config struct {

@@ -143,6 +143,11 @@ func patternValues() map[string]any {
 		"cniPluginsSHA256Arm64":   "c",
 		"cniPluginsURLAmd64":      "https://example.invalid/d",
 		"cniPluginsSHA256Amd64":   "d",
+		// Empty unless the worker image carries a pinned, baked k0s; the
+		// controller always supplies all three.
+		"k0sWorkerVersion":     "",
+		"k0sWorkerSHA256Amd64": "",
+		"k0sWorkerSHA256Arm64": "",
 	}
 }
 

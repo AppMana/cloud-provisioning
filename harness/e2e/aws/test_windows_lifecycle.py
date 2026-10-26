@@ -1,46 +1,20 @@
 """Lifecycle guard regressions based on the Windows 2025 native trial."""
 import copy
-import datetime
 import json
 import pathlib
 import tempfile
 import unittest
 from unittest.mock import patch
-from windows_lifecycle import observer_ready, probe_objects, Trial
+from windows_lifecycle import probe_objects, Trial, validate_config
 
 
-class ObserverTest(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
-        self.root = pathlib.Path(self.temp.name)
-        self.targets = ['a=uid-a', 'b=uid-b']
-        (self.root/'READY.json').write_text(json.dumps({'lanes': 2}))
-        (self.root/'initial.json').write_text(json.dumps([{'pod': n, 'nodeUID': 'uid-'+n} for n in ['a', 'b']]))
-        self.rows = []
-        for index, (a,b) in enumerate([('a','b'),('b','a')]):
-            row = dict(ok=True, source=a, target=b, finishedAt=datetime.datetime.now(datetime.timezone.utc).isoformat())
-            self.rows.append(row)
-            (self.root/f'lane-{index}.jsonl').write_text(json.dumps(row)+'\n')
-
-    def test_requires_every_current_identity_and_directed_lane(self):
-        self.assertTrue(observer_ready(self.root,self.targets))
-        self.assertFalse(observer_ready(self.root,['a=replacement','b=uid-b']))
-        (self.root/'lane-1.jsonl').unlink()
-        self.assertFalse(observer_ready(self.root,self.targets))
-
-    def test_failure_is_sticky_and_partial_append_does_not_hide_it(self):
-        row=self.rows[0];row['ok']=False
-        (self.root/'lane-0.jsonl').write_text(json.dumps(row)+'\n'+json.dumps(self.rows[1])[:8])
-        self.assertFalse(observer_ready(self.root,self.targets))
-
-    def test_recent_file_cannot_hide_old_samples(self):
-        row=self.rows[0];row['finishedAt']=(datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(minutes=2)).isoformat()
-        (self.root/'lane-0.jsonl').write_text(json.dumps(row)+'\n')
-        self.assertFalse(observer_ready(self.root,self.targets))
-
-    def test_terminal_observer_cannot_authorize_new_operation(self):
-        (self.root/'result.json').write_text('{}')
-        self.assertFalse(observer_ready(self.root,self.targets))
+class ConfigTest(unittest.TestCase):
+    def test_native_executors_are_required_before_provisioning(self):
+        config=dict(bastion='b',apiServer='https://a',name='n',probeNamespace='ns',sourcePod='s',windowsVersion='2025',
+                    workDirectory='w',siteDirectory='site',awsnode='an',awsremove='ar',gateway='g',gatewayUID='u',
+                    gatewayTemplate='t',observerDirectory='o',survivorTargets=['a=x','b=y'])
+        with self.assertRaisesRegex(ValueError,'executor'):validate_config(config)
+        validate_config(dict(config,observerExecutors='executors.json'))
 
 
 class RecipeTest(unittest.TestCase):
@@ -71,14 +45,15 @@ class EvidenceTest(unittest.TestCase):
 
 
 class SequenceTest(unittest.TestCase):
-    def exercise(self, fail_gateway=False, survivor=None):
+    def exercise(self, fail_gateway=False, survivor={'ok': True}):
         import types
         temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup)
         root=pathlib.Path(temp.name);observer=root/'observer';observer.mkdir()
         config=dict(bastion='unused',apiServer='https://unused',name='worker',probeNamespace='ns',
                     observerDirectory=str(observer),survivorTargets=['a=a','b=b'],sourcePod='source',windowsVersion='2025',
                     workDirectory='private',gateway='gateway',gatewayUID='gateway-uid',gatewayTemplate='existing',
-                    awsnode='awsnode',awsremove='awsremove',siteDirectory='site')
+                    awsnode='awsnode',awsremove='awsremove',siteDirectory='site',
+                    observerExecutors='unused-executors')
         calls=[]
         class Fake(Trial):
             created=False
@@ -95,15 +70,13 @@ class SequenceTest(unittest.TestCase):
                 return None
             def snapshot(self):return {}
         trial=Fake(config,root/'result')
-        if survivor is not None:
-            config['observerMode']='native-oob';config['observerExecutors']='unused-executors'
-            from unittest.mock import Mock
-            native=Mock();native.live_ready.return_value=True;native.finish.return_value=survivor
-            trial.native_observer=lambda:native
+        from unittest.mock import Mock
+        native=Mock();native.live_ready.return_value=True;native.finish.return_value=survivor
+        trial.native_observer=lambda:native
         def submit(args,**kwargs):
             calls.append(('probe-create',args));return types.SimpleNamespace(returncode=0)
-        with patch('windows_lifecycle.observer_ready',return_value=True),patch('windows_lifecycle.preflight',return_value={'passed':True}),patch('windows_lifecycle.evaluate',return_value={'passed':True}),patch('windows_lifecycle.time.sleep'),patch('windows_lifecycle.subprocess.run',side_effect=submit):
-            if fail_gateway or (survivor is not None and not survivor['ok']):
+        with patch('windows_lifecycle.preflight',return_value={'passed':True}),patch('windows_lifecycle.evaluate',return_value={'passed':True}),patch('windows_lifecycle.time.sleep'),patch('windows_lifecycle.subprocess.run',side_effect=submit):
+            if fail_gateway or not survivor['ok']:
                 with self.assertRaises(RuntimeError):trial.execute()
             else:trial.execute()
         return calls,root
@@ -112,11 +85,10 @@ class SequenceTest(unittest.TestCase):
         calls,root=self.exercise();labels=[c[0] for c in calls]
         self.assertEqual(labels,['create','gateway','join','probe-create','probe-create','probe-ready','matrix','removal'])
         self.assertIn('--require-gateway',next(args for label,args in calls if label=='join'))
-        self.assertTrue((root/'observer/STOP').exists())
         operation=json.loads((root/'result/operation.json').read_text())
-        self.assertFalse(operation['passed'])
+        self.assertTrue(operation['passed'])
         self.assertTrue(operation['lifecyclePassed'])
-        self.assertEqual(operation['survivorStatus'],'pending')
+        self.assertEqual(operation['survivorStatus'],'complete')
 
     def test_native_failure_cannot_leave_successful_operation_report(self):
         fixture=json.loads((pathlib.Path(__file__).parent/'testdata/failed-survivor.json').read_text())
@@ -144,16 +116,15 @@ class SequenceTest(unittest.TestCase):
 if __name__ == '__main__':unittest.main()
 
 class NativeObserverIntegrationTest(unittest.TestCase):
-    def test_native_dispatch_does_not_use_legacy_log_reader(self):
-        trial=Trial(dict(bastion='test',apiServer='https://test',observerMode='native-oob',survivorTargets=['a=x','b=y']),pathlib.Path('/unused'))
-        with patch.object(trial,'native_observer') as observer,patch('windows_lifecycle.observer_ready') as legacy:
+    def test_readiness_uses_native_session(self):
+        trial=Trial(dict(bastion='test',apiServer='https://test',survivorTargets=['a=x','b=y']),pathlib.Path('/unused'))
+        with patch.object(trial,'native_observer') as observer:
             observer.return_value.live_ready.return_value=True
             self.assertTrue(trial.survivor_ready('before-addition'))
             observer.return_value.live_ready.assert_called_once_with(['a=x','b=y'],'before-addition')
-            legacy.assert_not_called()
 
     def test_native_failed_terminal_report_fails_trial(self):
-        trial=Trial(dict(bastion='test',apiServer='https://test',observerMode='native-oob'),pathlib.Path('/unused'))
+        trial=Trial(dict(bastion='test',apiServer='https://test'),pathlib.Path('/unused'))
         with patch.object(trial,'native_observer') as observer,patch.object(trial,'save') as save:
             observer.return_value.finish.return_value=dict(ok=False)
             with self.assertRaises(RuntimeError):trial.finish_survivors(dict(startedAt='start',finishedAt='end'))

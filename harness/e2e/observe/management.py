@@ -20,7 +20,19 @@ import threading
 import time
 
 from pod_matrix import Kubectl, snapshot
-from survivor import summarize, utc
+
+
+def utc():
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+def summarize(rows, max_gap):
+    gaps = [b['startMonotonic'] - a['finishMonotonic'] for a, b in zip(rows, rows[1:])]
+    starts = [b['startMonotonic'] - a['startMonotonic'] for a, b in zip(rows, rows[1:])]
+    return dict(maxStartIntervalSeconds=max(starts, default=0), attempts=len(rows), passed=sum(r['ok'] for r in rows),
+                maxGapSeconds=max(gaps, default=0),
+                maxAttemptSeconds=max((r['finishMonotonic'] - r['startMonotonic'] for r in rows), default=0),
+                ok=bool(rows) and all(r['ok'] for r in rows) and max(starts, default=0) <= max_gap)
 
 
 def command(server, namespace, pod, operation):

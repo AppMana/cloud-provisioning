@@ -6,8 +6,7 @@ import unittest
 import subprocess
 from types import SimpleNamespace
 from unittest.mock import patch
-from management import command, successful, complete, assess_window, observe
-from survivor import summarize
+from management import command, successful, complete, assess_window, observe, summarize
 
 
 class ManagementTests(unittest.TestCase):

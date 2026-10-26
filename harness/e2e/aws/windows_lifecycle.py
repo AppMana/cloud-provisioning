@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run a Windows CAPA add/gateway/traffic/remove trial against an existing VM site.
 
-Requires an independently running survivor observer. Failed stages retain the
+Requires a native out-of-band survivor Session started before the trial. Failed stages retain the
 original resources and evidence for diagnosis; rerunning never resumes a claim.
 """
 import argparse
@@ -30,46 +30,13 @@ def validate_config(config):
         raise ValueError('Complete nonempty lifecycle configuration required before provisioning')
     if config['windowsVersion'] not in ['2022', '2025']:
         raise ValueError('Windows version must be 2022 or 2025')
-    if config.get('observerMode', 'legacy') not in ('legacy', 'native-oob'):
-        raise ValueError('Unknown observer mode')
-    if config.get('observerMode') == 'native-oob' and not config.get('observerExecutors'):
+    if not config.get('observerExecutors'):
         raise ValueError('Native observer requires trusted OOB executor mapping path')
     targets = config.get('survivorTargets')
     if (not isinstance(targets, list) or len(targets) < 2 or
             any(not isinstance(t, str) or t.count('=') != 1 or not all(t.split('=')) for t in targets) or
             len({t.split('=')[0] for t in targets}) != len(targets)):
         raise ValueError('Distinct survivor Pod=NodeUID targets required')
-
-
-def observer_ready(directory, targets):
-    """Require live successful samples, not just a retained READY marker."""
-    directory = pathlib.Path(directory)
-    if not (directory / 'READY.json').exists() or (directory / 'result.json').exists() or (directory / 'STOP').exists():
-        return False
-    lanes = list(directory.glob('lane-*.jsonl'))
-    initial = json.loads((directory / 'initial.json').read_text())
-    expected = {item['pod'] + '=' + item['nodeUID'] for item in initial}
-    count = len(initial) * (len(initial) - 1)
-    if (len(initial) < 2 or len(expected) != len(initial) or expected != set(targets) or
-            len(lanes) != count or json.loads((directory / 'READY.json').read_text())['lanes'] != count):
-        return False
-    pairs = set()
-    names = {item['pod'] for item in initial}
-    for lane in lanes:
-        # A concurrent append can leave an incomplete final line. Completed
-        # rows remain authoritative; never interpret partial JSON as success.
-        raw = lane.read_bytes()
-        rows = [json.loads(line) for line in raw.split(b'\n')[:-1] if line]
-        if not rows or not all(row['ok'] for row in rows) or time.time() - lane.stat().st_mtime > 30:
-            return False
-        pair = (rows[0]['source'], rows[0]['target'])
-        if pair in pairs or pair[0] == pair[1] or not set(pair) <= names or any((row['source'], row['target']) != pair for row in rows):
-            return False
-        age = (datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(rows[-1]['finishedAt'])).total_seconds()
-        if not 0 <= age <= 30:
-            return False
-        pairs.add(pair)
-    return len(pairs) == count
 
 
 def probe_objects(source, service, node, name, namespace, version):
@@ -134,15 +101,9 @@ class Trial:
         return Session(kube,c['observerDirectory'])
 
     def survivor_ready(self, label):
-        if self.c.get('observerMode','legacy') == 'legacy':
-            return observer_ready(self.c['observerDirectory'],self.c['survivorTargets'])
         return self.native_observer().live_ready(self.c['survivorTargets'],label)
 
     def finish_survivors(self, operation):
-        if self.c.get('observerMode','legacy') == 'legacy':
-            time.sleep(15)
-            (pathlib.Path(self.c['observerDirectory'])/'STOP').touch(exist_ok=False)
-            return
         session=self.native_observer()
         def dump(source,args):
             return subprocess.run(session.kube.command+['exec','-i',source['pod'],
@@ -251,10 +212,8 @@ class Trial:
         self.save('operation-window.json', operation)
         try:
             survivor = self.finish_survivors(operation)
-            # The legacy observer completes externally after receiving STOP.
-            # A successful stop request is not a successful traffic result.
-            operation['survivorStatus'] = 'complete' if survivor is not None else 'pending'
-            operation['survivorPassed'] = bool(survivor and survivor['ok'])
+            operation['survivorStatus'] = 'complete'
+            operation['survivorPassed'] = bool(survivor['ok'])
             operation['passed'] = operation['lifecyclePassed'] and operation['survivorPassed']
         except Exception:
             operation['survivorStatus'] = 'failed-or-incomplete'

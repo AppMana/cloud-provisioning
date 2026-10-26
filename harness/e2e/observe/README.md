@@ -209,10 +209,9 @@ establish progress within that interval, not at the instant of fault injection.
 `assess_window` checks that host-side readiness preceded an operation and every
 stop request followed it. It is only an ordering check: independently validate
 terminal logs with `survivor_stream.evaluate` and recheck the complete Pod/Node/
-container identity snapshot before accepting a lifecycle result. The legacy
-`survivor.py` log format is not interchangeable with native Session evidence.
-For `aws/windows_lifecycle.py`, set `observerMode` to `native-oob` and
-`observerExecutors` to the trusted executor-mapping JSON path; keep the existing
+container identity snapshot before accepting a lifecycle result.
+For `aws/windows_lifecycle.py`, set `observerExecutors` to the trusted
+executor-mapping JSON path; keep the existing
 `observerDirectory` and `survivorTargets` configuration. Start the native Session
 with pre-staged probe executables before running the trial. Native mode verifies
 the complete directed lane matrix, reads two advancing OOB progress rounds, and
@@ -223,8 +222,7 @@ the trial even after successful machine removal. Retain and inspect guest files
 if stop or collection fails; remove only owned probe files after collection.
 `operation-window.json` records the completed lifecycle timestamps before
 collection. `operation.json` is finalized afterward and cannot report combined
-success when native traffic failed or when the legacy external observer is still
-pending. `lifecyclePassed` records successful resource convergence independently.
+success when native traffic failed. `lifecyclePassed` records successful resource convergence independently.
 
 ## Packet Monitor correlation
 
@@ -703,48 +701,19 @@ separate integration gates.
 
 ## Survivor traffic during lifecycle operations
 
-`survivor.py` runs a concurrent 64-byte UDP echo lane for each directed pair of
-existing ordinary pods. Targets are bound to explicit Node UIDs and the initial
-Pod, container and Service identities. Every attempt is retained in a separate
-lane JSONL file with timestamps, executor status and diagnostics. A failed
-attempt stays failed even if later probes recover. `maxStartIntervalSeconds`
-measures the sampling interval including executor time; `maxGapSeconds` measures
-the idle interval between commands. Neither proves delivery between probes.
-
-```sh
-python3 observe/survivor.py \
-  --api-server https://10.10.0.10:6443 --bastion clab-cldt-bastion \
-  --namespace TEST_NAMESPACE \
-  --target LINUX_POD=LINUX_NODE_UID --target WINDOWS_POD=WINDOWS_NODE_UID \
-  --duration 1800 --max-gap 5 --output .state/survivors-NEW
-```
-
-Use a new evidence directory. Wait for `READY.json`, confirm the observer is
-still running and its lane files are advancing successfully, then start the
-CAPI operation. Record timezone-aware `startedAt` and `finishedAt` timestamps in
-an operation JSON file. Allow probes to run after completion, create the owned
-output directory's `STOP` file, and wait for the original observer to finish.
-The duration is a maximum observation window; its expiration does not mean the
-CAPI operation completed and is not a reason to recreate a VM.
-
-```sh
-python3 observe/survivor.py --output .state/survivors-NEW \
-  --assess-window operation.json --window-output operation-traffic.json
-```
-
-The assessment requires successful samples before and after the operation in
-every lane, stable identities, and the configured maximum sampling interval.
-Keep lifecycle completion/cleanup evidence alongside it: successful traffic does
-not establish that deletion or replacement finished. This observer uses the
-Kubernetes exec path; a transport failure is a failed observation, not an exact
-packet-loss count. Use VM out-of-band observation to distinguish that failure
-from workload networking. Larger fragmented packets require their own matrix.
+Lifecycle survivor traffic uses the native out-of-band Session
+(`survivor_native.py` with `survivor_oob.py`). Targets are bound to explicit
+Node UIDs and the initial Pod, container and Service identities; probes run
+inside the existing containers through each VM's CRI endpoint, so a fault in
+Kubernetes exec cannot be mistaken for lost workload traffic. A failed sample
+stays failed even if later probes recover, and sampling gaps never prove
+delivery between probes. Larger fragmented packets require their own matrix.
 
 ### Out-of-band pod execution
 
-Use `--oob-executors executors.json` when Kubernetes exec would share the fault
-being tested. API reads still bind initial/final pod identities, but every traffic
-command enters the existing container through the VM's native CRI endpoint.
+The Session reads `executors.json`. API reads still bind initial/final pod
+identities, but every traffic command enters the existing container through the
+VM's native CRI endpoint.
 The mapping keys are exact Node UIDs, not hostnames. Example entry for a QEMU VM:
 
 ```json

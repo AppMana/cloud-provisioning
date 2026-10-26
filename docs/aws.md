@@ -1158,6 +1158,7 @@ Create a private JSON configuration with these fields, replacing the placeholder
   "probeNamespace": "EXISTING_PROBE_NAMESPACE",
   "sourcePod": "EXISTING_PROBE_FOR_THIS_WINDOWS_VERSION",
   "observerDirectory": "/absolute/private/running-survivor-observer",
+  "observerExecutors": "/absolute/private/executors.json",
   "survivorTargets": ["LINUX_POD=NODE_UID", "WINDOWS_POD=NODE_UID"]
 }
 ```
@@ -1180,10 +1181,7 @@ runs the matrix, then removes the claim through CAPI. It verifies survivor and
 gateway-lease convergence and records `operation-window.json` before stopping
 the observer. The final `operation.json` separates `lifecyclePassed` from
 `survivorPassed`; combined `passed` requires both. Native collection failures
-leave a failed final report. With the legacy external observer, the survivor
-status remains `pending` and combined `passed` remains false; the runner does not
-rewrite that report when an external assessment finishes. Assess the completed
-observer against that operation window, then
+leave a failed final report. After the report,
 remove the owned probe Service, machine template and temporary observer tools.
 Preserve the attachment retirement records.
 

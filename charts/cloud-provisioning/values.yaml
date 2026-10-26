@@ -118,6 +118,18 @@ tunnel:
   # IPv4-only even on a dual-stack cluster.
   ipv6Prefix: "fd00:10:100::/96"
 
+# Present this cluster's own control plane to Cluster API, so CAPI can
+# manage cloud workers joining a cluster it did not create. Each
+# ImportedControlPlane in the release namespace gets a <name>-kubeconfig
+# Secret holding a bound, rotated token for serviceAccount.
+importedControlPlane:
+  enabled: true
+  serviceAccount: capi-workload
+  # Infrastructure provider managers that read the control-plane contract
+  # while reconciling workers, e.g. [{name: capa-controller-manager,
+  # namespace: capa-system}]. CAPI core reads it through aggregation.
+  providerServiceAccounts: []
+
 # The namespace an infrastructure provider's controller runs in, when
 # this controller needs to read a credentials Secret there to check a
 # cluster identity before provisioning. Empty grants no such access.

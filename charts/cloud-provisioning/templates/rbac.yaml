@@ -96,6 +96,14 @@ rules:
   - apiGroups: ["infrastructure.labcontainers.appmana.com"]
     resources: ["*"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  {{- if .Values.importedControlPlane.enabled }}
+  - apiGroups: ["cloud-provisioning.appmana.com"]
+    resources: ["importedcontrolplanes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["cloud-provisioning.appmana.com"]
+    resources: ["importedcontrolplanes/status"]
+    verbs: ["update"]
+  {{- end }}
   # The claim CRD itself.
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodeclaims"]
@@ -200,6 +208,13 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "create", "update", "patch", "delete"]
+  {{- if .Values.importedControlPlane.enabled }}
+  # Bound tokens for Cluster API's identity on this cluster, and nothing else.
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    resourceNames: [{{ .Values.importedControlPlane.serviceAccount | quote }}]
+    verbs: ["create"]
+  {{- end }}
   # CAPI lifetime guards delete their UID-bound attachment request to start
   # withdrawal. This permission remains confined to the release namespace.
   - apiGroups: [""]

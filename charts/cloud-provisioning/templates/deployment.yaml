@@ -159,6 +159,9 @@ spec:
             - "--dialer-image={{ include "cloud-provisioning.dialerImage" . }}"
             - "--dialer-image-pull-policy={{ .Values.dialerImage.pullPolicy }}"
             - "--join-provider={{ .Values.joinProvider }}"
+            {{- if .Values.importedControlPlane.enabled }}
+            - "--capi-workload-service-account={{ .Values.importedControlPlane.serviceAccount }}"
+            {{- end }}
             {{- with .Values.siteDialer.nodeSelector }}
             {{- $selectors := list }}
             {{- range $key, $value := . }}

@@ -53,7 +53,7 @@ type Claimer struct {
 func Objects(name, node string, imported ...bool) string {
 	controlPlane := ""
 	if len(imported) > 0 && imported[0] {
-		controlPlane = "  controlPlaneRef:\n    apiGroup: infrastructure.labcontainers.appmana.com\n    kind: LabImportedControlPlane\n    name: " + ClusterName + "\n"
+		controlPlane = "  controlPlaneRef:\n    apiGroup: cloud-provisioning.appmana.com\n    kind: ImportedControlPlane\n    name: " + ClusterName + "\n"
 	}
 	objects := fmt.Sprintf(`apiVersion: infrastructure.labcontainers.appmana.com/v1alpha1
 kind: LabCluster
@@ -96,7 +96,7 @@ spec:
   clusterName: %[3]s
 `, name, node, ClusterName, Namespace, controlPlane)
 	if controlPlane != "" {
-		objects += fmt.Sprintf("---\napiVersion: infrastructure.labcontainers.appmana.com/v1alpha1\nkind: LabImportedControlPlane\nmetadata:\n  name: %s\n  namespace: %s\nspec: {}\n", ClusterName, Namespace)
+		objects += fmt.Sprintf("---\napiVersion: cloud-provisioning.appmana.com/v1alpha1\nkind: ImportedControlPlane\nmetadata:\n  name: %s\n  namespace: %s\nspec: {}\n", ClusterName, Namespace)
 	}
 	return objects
 }
@@ -114,11 +114,6 @@ func (c *Claimer) Claim(ctx context.Context, name, node string) error {
 	apiServer := c.Topology.NodesInRole(lab.ControlPlane)[0].ClusterAddress()
 	if err := c.Provider.ReconcileCluster(ctx, Namespace, ClusterName, apiServer, c.Kube.ServingPort()); err != nil {
 		return err
-	}
-	if c.ImportedControlPlane {
-		if err := c.Provider.ImportControlPlane(ctx, Namespace, ClusterName); err != nil {
-			return err
-		}
 	}
 
 	// The unconnected compatibility mode omits <cluster>-kubeconfig deliberately.

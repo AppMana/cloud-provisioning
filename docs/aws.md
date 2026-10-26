@@ -68,12 +68,15 @@ Before applying worker claims, configure:
   SHA-256, and a remotely pullable dialer image or configured host-binary
   adoption image. These chart settings are separate from the machine template.
 
-The [validated VM/AWS setup](#running-the-aws-worker-matrix) supplies the import
-contract through `cmd/importsite` and the harness's `ImportedControlPlane` CRD.
-That import mechanism is currently harness tooling, not an import controller
-installed by the product chart. The [cluster-level example](../examples/aws.yaml)
-shows the alternative externally managed Cluster shape; it does not create a
-connection Secret or reproduce the validated import contract by itself.
+The chart presents the cluster's own control plane to Cluster API: a
+`Cluster` whose `controlPlaneRef` names an `ImportedControlPlane`
+(`cloud-provisioning.appmana.com/v1alpha1`) in the release namespace gets the
+v1beta2 control-plane contract status and a `<name>-kubeconfig` Secret holding a
+bound token for the `importedControlPlane.serviceAccount` ServiceAccount,
+rotated at half its lifetime. Grant the infrastructure provider's manager read
+access with `importedControlPlane.providerServiceAccounts` (for CAPA,
+`capa-controller-manager` in `capa-system`). An `AWSCluster` annotated
+`cluster.x-k8s.io/managed-by: external` is reported ready by the controller.
 A ready-looking Cluster or an EC2 launch alone is not proof of Node association.
 
 ### Create the first worker
@@ -739,7 +742,7 @@ during cleanup.
 
 ## Preparing a Linux campaign on a VM site
 
-After `native_access.py`, `importsite`, `session.py` and `identity.py` have bound
+After `native_access.py`, `session.py` and `identity.py` have bound
 a run inventory to the site, `harness/e2e/aws/prepare_campaign.py` installs the
 committed candidate for that run. It cross-compiles both architectures, builds
 multi-platform OCI layouts by layer copy, publishes them with `publisher.py`,
@@ -796,8 +799,7 @@ remains available as a fallback, sharing the interface with the adopting dialer;
 do not disable it to qualify adoption.
 
 For a MicroK8s site created with `cmd/lab -rig vm -distro microk8s -cni calico
--product`, keep the setup helpers' API URL on port 16443 and import the site
-with `cmd/importsite -api-port 16443`. Use the prepared Linux AMI with snapd
+-product`, keep the setup helpers' API URL on port 16443. Use the prepared Linux AMI with snapd
 and Python 3 and the site's native MicroK8s join configuration. After CAPA
 claims have been applied, select the matching observer:
 
@@ -892,7 +894,6 @@ renewing CAPA's session:
 ```sh
 python3 aws/install.py --work-dir .state/aws/example --api-server https://10.10.0.10:6443
 python3 aws/identity.py --work-dir .state/aws/example --api-server https://10.10.0.10:6443
-go run ./cmd/importsite -name cldt-example -work-dir .state/site
 python3 aws/claim.py --work-dir .state/aws/example --name aws-k0s-1 --api-server https://10.10.0.10:6443
 python3 aws/claim.py --work-dir .state/aws/example --name aws-k0s-2 --api-server https://10.10.0.10:6443
 go run ./cmd/awsrow -cni calico -work-dir .state/aws/example -site-work-dir .state/site \

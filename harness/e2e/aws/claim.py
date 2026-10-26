@@ -91,13 +91,9 @@ if ipv6:
     infra['spec']['network']['vpc']['ipv6'] = {'cidrBlock': str(vpc6)}
     infra['spec']['network']['subnets'][0].update(ipv6CidrBlock=str(subnet6), isIpv6=True)
 apply(infra)
-# cmd/importsite observes the live site and creates this target's connection.
-observed = json.loads(kube('-n', ns, 'get', 'labimportedcontrolplane', cluster, '-o', 'json'))
-if not observed.get('status', {}).get('initialization', {}).get('controlPlaneInitialized'):
-    raise RuntimeError('run cmd/importsite for this cluster before creating claims')
-kube('-n', ns, 'get', 'secret', cluster+'-kubeconfig', '-o', 'name')
+apply(obj('cloud-provisioning.appmana.com/v1alpha1', 'ImportedControlPlane', cluster, {}))
 apply(obj('cluster.x-k8s.io/v1beta2', 'Cluster', cluster, {
-    'controlPlaneRef': {'apiGroup': 'infrastructure.labcontainers.appmana.com', 'kind': 'LabImportedControlPlane', 'name': cluster},
+    'controlPlaneRef': {'apiGroup': 'cloud-provisioning.appmana.com', 'kind': 'ImportedControlPlane', 'name': cluster},
     'infrastructureRef': {'apiGroup': 'infrastructure.cluster.x-k8s.io', 'kind': 'AWSCluster', 'name': cluster},
 }))
 apply(obj('infrastructure.cluster.x-k8s.io/v1beta2', 'AWSMachineTemplate', template_name, {'template': {'metadata': {'labels': {'kubernetes.io/os': machine_os, **({'cloud-provisioning.appmana.com/cni': a.cni} if a.cni else {})}}, 'spec': {

@@ -1,0 +1,55 @@
+# ImportedControlPlane: the existing cluster's own control plane, presented to
+# Cluster API so it can manage cloud workers joining a cluster it did not
+# create. Source of truth for the schema:
+# ../../controller/api/v1alpha1/importedcontrolplane.go. The label declares
+# the CAPI v1beta2 control-plane contract version this kind implements.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: importedcontrolplanes.cloud-provisioning.appmana.com
+  labels:
+    cluster.x-k8s.io/v1beta2: v1alpha1
+spec:
+  group: cloud-provisioning.appmana.com
+  scope: Namespaced
+  names:
+    kind: ImportedControlPlane
+    listKind: ImportedControlPlaneList
+    plural: importedcontrolplanes
+    singular: importedcontrolplane
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - {name: Available, type: string, jsonPath: '.status.conditions[?(@.type=="Available")].status'}
+        - {name: Version, type: string, jsonPath: .status.version}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+            status:
+              type: object
+              properties:
+                externalManagedControlPlane: {type: boolean}
+                initialization:
+                  type: object
+                  properties:
+                    controlPlaneInitialized: {type: boolean}
+                version: {type: string}
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required: [type, status, lastTransitionTime, reason, message]
+                    properties:
+                      type: {type: string}
+                      status: {type: string}
+                      observedGeneration: {type: integer, format: int64}
+                      lastTransitionTime: {type: string, format: date-time}
+                      reason: {type: string}
+                      message: {type: string}

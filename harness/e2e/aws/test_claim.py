@@ -34,8 +34,6 @@ import json, os, pathlib, sys
 root = pathlib.Path(os.environ['CLAIM_TEST_ROOT'])
 if 'apply' in sys.argv:
  with (root/'objects.jsonl').open('a') as f: f.write(sys.stdin.read()+'\\n')
-elif 'labimportedcontrolplane' in sys.argv:
- print(json.dumps({'status': {'initialization': {'controlPlaneInitialized': True}}}))
 ''')
         docker.chmod(0o700)
         args = ['python3', str(SCRIPT), '--work-dir', str(root), '--api-server', 'https://10.10.0.10:6443']
@@ -59,6 +57,15 @@ elif 'labimportedcontrolplane' in sys.argv:
         machine = next(o for o in objects if o['kind'] == 'AWSMachineTemplate')['spec']['template']['spec']
         self.assertEqual(machine['assignPrimaryIPv6'], 'enabled')
         self.assertEqual(machine['additionalSecurityGroups'], [{'id': 'sg-owned'}])
+
+    def test_cluster_references_the_products_imported_control_plane(self):
+        result, objects = self.run_claim()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        imported = next(o for o in objects if o['kind'] == 'ImportedControlPlane')
+        self.assertEqual(imported['apiVersion'], 'cloud-provisioning.appmana.com/v1alpha1')
+        cluster = next(o for o in objects if o['kind'] == 'Cluster')
+        self.assertEqual(cluster['spec']['controlPlaneRef'],
+                         {'apiGroup': 'cloud-provisioning.appmana.com', 'kind': 'ImportedControlPlane', 'name': imported['metadata']['name']})
 
     def test_partial_or_mismatched_ipv6_inventory_has_no_writes(self):
         for inventory in [dict(vpcIPv6CIDR='2001:db8:1::/56'),

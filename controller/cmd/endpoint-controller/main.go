@@ -39,6 +39,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	claimpkg "github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
+	"github.com/appmana/cloud-provisioning/controller/pkg/controlplane"
 	"github.com/appmana/cloud-provisioning/controller/pkg/discover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
@@ -2377,6 +2378,7 @@ func main() {
 	flag.StringVar(&machineSelector, "machine-selector", fmt.Sprintf("%s=%s", cloudWorkerRoleLabel, cloudWorkerRoleValue),
 		"label selector identifying the Machine(s) whose external address drives the dialer's endpoint")
 	flag.StringVar(&secretNamespace, "secret-namespace", "cloud-provisioning", "namespace of the dialer peer Secret")
+	capiWorkloadServiceAccount := flag.String("capi-workload-service-account", "", "ServiceAccount, in the release namespace, whose bound token Cluster API uses on this cluster; enables ImportedControlPlane")
 	flag.StringVar(&secretName, "secret-name", "tunnel-peers", "name of the dialer peer Secret")
 	flag.StringVar(&secretKey, "secret-key-prefix", tunnel.PeerEndpointPrefix, "prefix (Machine name is appended) for the Secret key this Machine's endpoint is written into: per-Machine, not a flat singleton")
 	flag.StringVar(&port, "port", "51820", "WireGuard listen port on the joining node")
@@ -2852,6 +2854,12 @@ func main() {
 		}
 	}
 
+	if *capiWorkloadServiceAccount != "" {
+		if err := controlplane.Register(mgr, secretNamespace, *capiWorkloadServiceAccount); err != nil {
+			fmt.Fprintf(os.Stderr, "unable to register the imported control plane: %v\n", err)
+			os.Exit(1)
+		}
+	}
 	if *nodeGroups {
 		if !joinEnabled {
 			fmt.Fprintln(os.Stderr, "experimental node groups require --join-enabled")

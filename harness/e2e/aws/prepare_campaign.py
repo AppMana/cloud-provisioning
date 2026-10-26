@@ -80,6 +80,7 @@ def render_values(state, urls, binaries, native_cidrs):
         'dialerBinary': binary,
         'awsPodObserver': {'configMap': 'native-pod-scope', 'credentialsFileSecret': 'native-pod-observer-file'},
         'providerManagerNamespace': 'capa-system',
+        'importedControlPlane': {'providerServiceAccounts': [{'name': 'capa-controller-manager', 'namespace': 'capa-system'}]},
         'tunnel': {
             'receiptTLSSecret': RECEIPT_SECRET,
             'receivePreparation': {

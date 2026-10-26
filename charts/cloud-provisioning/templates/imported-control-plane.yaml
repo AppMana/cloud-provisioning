@@ -1,0 +1,90 @@
+{{- if .Values.importedControlPlane.enabled }}
+{{- /*
+The identity Cluster API acts as on this cluster when it manages cloud
+workers joining it. The controller issues a bound token for it into each
+ImportedControlPlane's <name>-kubeconfig Secret and rotates it.
+
+Grants are what CAPI's Machine, MachineSet and MachineHealthCheck
+controllers do on a workload cluster: watch and label Nodes, delete a
+Machine's Node, drain it (Pods, evictions, the DaemonSets and namespaces
+drain rules match), wait for volumes to detach, and probe the API root.
+*/}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.importedControlPlane.serviceAccount }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cloud-provisioning.name" . }}-capi-workload
+rules:
+  - nonResourceURLs: ["/"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch", "patch", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/eviction"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["namespaces", "persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cloud-provisioning.name" . }}-capi-workload
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "cloud-provisioning.name" . }}-capi-workload
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.importedControlPlane.serviceAccount }}
+    namespace: {{ .Release.Namespace }}
+---
+{{- /*
+Cluster API's core manager reads control-plane kinds through its
+aggregated ClusterRole; infrastructure providers (CAPA) read the
+control-plane contract while reconciling workers and are bound
+explicitly. Neither may change the resource.
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cloud-provisioning.name" . }}-imported-control-plane-reader
+  labels:
+    cluster.x-k8s.io/aggregate-to-manager: "true"
+rules:
+  - apiGroups: ["cloud-provisioning.appmana.com"]
+    resources: ["importedcontrolplanes"]
+    verbs: ["get", "list", "watch"]
+{{- with .Values.importedControlPlane.providerServiceAccounts }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cloud-provisioning.name" $ }}-imported-control-plane-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "cloud-provisioning.name" $ }}-imported-control-plane-reader
+subjects:
+  {{- range . }}
+  - kind: ServiceAccount
+    name: {{ .name }}
+    namespace: {{ .namespace }}
+  {{- end }}
+{{- end }}
+{{- end }}

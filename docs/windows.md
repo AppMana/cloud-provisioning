@@ -282,8 +282,7 @@ bootstrap completion alone does not establish CNI availability.
 After `windows_image.py --phase status` reports both images available, run
 `windows_image.py --phase authorize` with the same run directory and awsnode
 arguments. This checks live image and CAPA role ownership and adds the two exact
-AMI ARNs to the run policy, retaining its existing Linux AMI permission. Then import the observed site with `cmd/importsite` and publish the derived CAPA
-identity with `aws/identity.py`. Create each worker through the claim helper:
+AMI ARNs to the run policy, retaining its existing Linux AMI permission. Then publish the derived CAPA identity with `aws/identity.py`. Create each worker through the claim helper:
 
 ```sh
 python3 aws/claim.py --work-dir <private-run-directory> \

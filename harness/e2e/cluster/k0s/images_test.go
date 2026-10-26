@@ -57,18 +57,15 @@ func TestNativeImageSettingsSurviveConfigWithoutMutation(t *testing.T) {
 			images.DefaultPullPolicy = policy
 			images.CoreDNS = &native.ImageSpec{Image: "example.invalid/dns", Version: "explicit"}
 			before := images.DeepCopy()
-			node := &configNode{}
-			d := cluster.Deps{Topology: lab.Default(), Rig: configRig{node: node}, Network: "calico", K0sImages: images}
-			if err := (Builder{}).config(context.Background(), d, d.Topology.MustNode("cp")); err != nil {
-				t.Fatal(err)
-			}
+			d := cluster.Deps{Topology: lab.Default(), Network: "calico", K0sImages: images}
+			rendered := renderedConfig(t, d)
 			if !reflect.DeepEqual(images, before) {
 				t.Fatal("mutated native caller settings")
 			}
 			var decoded struct {
 				Spec struct{ Images *native.ClusterImages }
 			}
-			if err := yaml.Unmarshal(node.config, &decoded); err != nil {
+			if err := yaml.Unmarshal(rendered, &decoded); err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(decoded.Spec.Images, images) {

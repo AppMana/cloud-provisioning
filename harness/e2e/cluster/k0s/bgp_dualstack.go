@@ -104,16 +104,18 @@ func bgpDualStackConfig(d cluster.Deps, n lab.Node) (*native.ClusterConfig, erro
 	return config, nil
 }
 
-// bgpDualStackControllerArgs are the controller's install arguments.
+// bgpDualStackControllerArgs are the controller's install arguments beyond
+// its role, join token and configuration.
 func bgpDualStackControllerArgs(n lab.Node, siteOnly ...bool) []string {
-	return []string{"controller", "--enable-worker", "--no-taints",
+	return []string{"--enable-worker", "--no-taints",
 		"--disable-components=" + strings.Join(bgpDualStackDisabled, ","),
-		"-c", "/etc/k0s/k0s.yaml", kubeletNodeIPs(n, siteOnly...)}
+		kubeletNodeIPs(n, siteOnly...)}
 }
 
-// bgpDualStackWorkerArgs are a worker's install arguments.
+// bgpDualStackWorkerArgs are a worker's install arguments beyond its role
+// and join token.
 func bgpDualStackWorkerArgs(n lab.Node, siteOnly ...bool) []string {
-	return []string{"worker", "--token-file", "/etc/k0s/token", kubeletNodeIPs(n, siteOnly...)}
+	return []string{kubeletNodeIPs(n, siteOnly...)}
 }
 
 func kubeletNodeIPs(n lab.Node, siteOnly ...bool) string {

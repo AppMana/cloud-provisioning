@@ -8,7 +8,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 )
 
 // Replumb gives a machine back exactly what a platform would: its

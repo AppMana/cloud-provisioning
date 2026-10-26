@@ -13,7 +13,6 @@
 package k0s
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -21,9 +20,10 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 	"github.com/appmana/labcontainers/pkg/artifact"
 	shared "github.com/appmana/labcontainers/pkg/kubernetes/k0s"
+	"github.com/appmana/labcontainers/pkg/rig"
+	"github.com/appmana/labcontainers/pkg/wait"
 	native "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -42,14 +42,7 @@ func expectedVersion(d cluster.Deps) string {
 }
 
 func verifyVersion(ctx context.Context, d cluster.Deps, name string) error {
-	version, err := d.Rig.Node(name).Exec(ctx, "k0s", "version")
-	if err != nil {
-		return fmt.Errorf("reading %s k0s version: %w", name, err)
-	}
-	if strings.TrimSpace(string(version)) != expectedVersion(d) {
-		return fmt.Errorf("%s k0s version %q does not match %s", name, strings.TrimSpace(string(version)), expectedVersion(d))
-	}
-	return nil
+	return shared.VerifyVersion(ctx, d.Rig.Node(name), expectedVersion(d))
 }
 
 // Builder builds a k0s site.
@@ -74,8 +67,8 @@ func (Builder) ImportArgs() []string {
 	return []string{"k0s", "ctr", "images", "import", "-"}
 }
 
-// Build carries the binary in, writes each node's config, and starts
-// the controllers and then the workers.
+// Build writes each node's configuration and lets k0s.Site carry the binary,
+// start the first controller and join the rest.
 func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 	if err := ValidateImages(d.Network, d.K0sImages); err != nil {
 		return err
@@ -87,79 +80,40 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 	if err := validateSiteConfig(d); err != nil {
 		return err
 	}
-	if d.Network == BGPDualStack {
-		if _, err := bgpDualStackConfig(d, cps[0]); err != nil {
-			return err
-		}
-	}
 	binary, err := b.binary(ctx, d)
 	if err != nil {
 		return err
 	}
-	for _, n := range cluster.SiteNodes(d.Topology) {
-		if err := d.Rig.Node(n.Name).Put(ctx, bytes.NewReader(binary),
-			"/usr/local/bin/k0s", 0o755); err != nil {
-			return fmt.Errorf("carrying k0s onto %s: %w", n.Name, err)
-		}
-	}
-
-	for _, n := range cluster.SiteNodes(d.Topology) {
-		if err := verifyVersion(ctx, d, n.Name); err != nil {
+	site := shared.Site{Binary: binary, Version: expectedVersion(d), ReadyWithin: 5 * time.Minute}
+	// Every controller is also a worker: a row that places tunnels on a
+	// control plane needs a kubelet there.
+	for _, n := range cps {
+		config, err := b.config(d, n)
+		if err != nil {
 			return err
 		}
+		args := []string{"--enable-worker", siteKubeletArgs(d.Network, n.ClusterAddress())}
+		if d.Network == BGPDualStack {
+			args = bgpDualStackControllerArgs(n, d.K0sCalicoSiteOnly)
+		}
+		site.Members = append(site.Members, shared.Member{Node: d.Rig.Node(n.Name), Role: shared.Controller, Config: config, Args: args})
 	}
-
-	// The first controller, which is also a worker: a row that places
-	// tunnels on a control plane needs a kubelet there.
-	first := cps[0]
-	if err := b.config(ctx, d, first); err != nil {
+	for _, n := range d.Topology.NodesInRole(lab.Worker) {
+		args := []string{siteKubeletArgs(d.Network, n.ClusterAddress())}
+		if d.Network == BGPDualStack {
+			args = bgpDualStackWorkerArgs(n, d.K0sCalicoSiteOnly)
+		}
+		site.Members = append(site.Members, shared.Member{Node: d.Rig.Node(n.Name), Role: shared.Worker, Args: args})
+	}
+	if err := site.Build(ctx); err != nil {
 		return err
 	}
-	firstArgs := []string{"controller", "--enable-worker", "-c", "/etc/k0s/k0s.yaml",
-		siteKubeletArgs(d.Network, first.ClusterAddress())}
-	if d.Network == BGPDualStack {
-		firstArgs = bgpDualStackControllerArgs(first, d.K0sCalicoSiteOnly)
-	}
-	if err := b.start(ctx, d, first, firstArgs...); err != nil {
-		return err
-	}
-	if err := b.waitForAPI(ctx, d, first, 5*time.Minute); err != nil {
-		return err
-	}
-
-	kubeconfig, err := d.Rig.Node(first.Name).Exec(ctx, "k0s", "kubeconfig", "admin")
+	kubeconfig, err := d.Rig.Node(cps[0].Name).Exec(ctx, "k0s", "kubeconfig", "admin")
 	if err != nil {
 		return fmt.Errorf("reading the kubeconfig: %w", err)
 	}
 	if err := d.Kube.Install(ctx, kubeconfig); err != nil {
 		return err
-	}
-
-	for _, n := range cps[1:] {
-		if err := b.config(ctx, d, n); err != nil {
-			return err
-		}
-		if err := b.join(ctx, d, first, n, "controller",
-			"controller", "--enable-worker", "--token-file", "/etc/k0s/token", "-c", "/etc/k0s/k0s.yaml",
-			siteKubeletArgs(d.Network, n.ClusterAddress())); err != nil {
-			return err
-		}
-		// Adding an etcd member changes quorum. Starting the next join before
-		// this member serves its API raced token creation against that change
-		// on the real VM rig (etcdserver: request timed out).
-		if err := b.waitForAPI(ctx, d, n, 5*time.Minute); err != nil {
-			return err
-		}
-	}
-	for _, n := range d.Topology.NodesInRole(lab.Worker) {
-		args := []string{"worker", "--token-file", "/etc/k0s/token",
-			siteKubeletArgs(d.Network, n.ClusterAddress())}
-		if d.Network == BGPDualStack {
-			args = bgpDualStackWorkerArgs(n, d.K0sCalicoSiteOnly)
-		}
-		if err := b.join(ctx, d, first, n, "worker", args...); err != nil {
-			return err
-		}
 	}
 	return labelControlPlanes(ctx, d)
 }
@@ -178,21 +132,14 @@ func validateSiteConfig(d cluster.Deps) error {
 	return err
 }
 
-// config writes one node's k0s.yaml.
-func (b Builder) config(ctx context.Context, d cluster.Deps, n lab.Node) error {
-	if err := ValidateImages(d.Network, d.K0sImages); err != nil {
-		return err
-	}
+// config is one controller's native k0s configuration.
+func (b Builder) config(d cluster.Deps, n lab.Node) (*native.ClusterConfig, error) {
 	if d.Network == BGPDualStack {
-		config, err := bgpDualStackConfig(d, n)
-		if err != nil {
-			return err
-		}
-		return shared.WriteConfig(ctx, d.Rig.Node(n.Name), "/etc/k0s/k0s.yaml", config)
+		return bgpDualStackConfig(d, n)
 	}
 	calicoSettings, err := calicoConfig(d.Network, d.K0sCalicoMTU, d.K0sCalicoManagedAddresses)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	addr := n.ClusterAddress()
 	sans := []string{"127.0.0.1"}
@@ -223,80 +170,7 @@ func (b Builder) config(ctx context.Context, d cluster.Deps, n lab.Node) error {
 			},
 		},
 	}
-	return shared.WriteConfig(ctx, d.Rig.Node(n.Name), "/etc/k0s/k0s.yaml", config)
-}
-
-// join mints a token on the first controller and starts the node with
-// it.
-func (b Builder) join(ctx context.Context, d cluster.Deps, first, n lab.Node, role string, args ...string) error {
-	node := d.Rig.Node(n.Name)
-	if _, err := node.Exec(ctx, "test", "-f", "/etc/systemd/system/k0sworker.service"); err == nil {
-		return nil
-	}
-	if _, err := node.Exec(ctx, "test", "-f", "/etc/systemd/system/k0scontroller.service"); err == nil {
-		return nil
-	}
-
-	// The token is minted through the first controller's status
-	// socket, so it has to still be serving: a controller that has
-	// just been joined can restart the one that admitted it.
-	if err := b.waitForAPI(ctx, d, first, 3*time.Minute); err != nil {
-		return err
-	}
-	token, err := d.Rig.Node(first.Name).Exec(ctx, "k0s", "token", "create", "--role", role)
-	if err != nil {
-		return fmt.Errorf("minting a %s token: %w", role, err)
-	}
-	clean := strings.TrimSpace(strings.ReplaceAll(string(token), "\r", ""))
-	if clean == "" {
-		return fmt.Errorf("k0s printed no %s token", role)
-	}
-	if _, err := node.Exec(ctx, "mkdir", "-p", "/etc/k0s"); err != nil {
-		return err
-	}
-	if err := node.Put(ctx, strings.NewReader(clean), "/etc/k0s/token", 0o600); err != nil {
-		return err
-	}
-	return b.start(ctx, d, n, args...)
-}
-
-// start installs k0s as a unit and starts it.
-//
-// As a unit, because a reboot row brings the node back through the
-// distribution's own supervision, and a node started any other way
-// would prove this harness can restart it.
-func (b Builder) start(ctx context.Context, d cluster.Deps, n lab.Node, args ...string) error {
-	node := d.Rig.Node(n.Name)
-	installed := false
-	for _, unit := range []string{"k0scontroller", "k0sworker"} {
-		if _, err := node.Exec(ctx, "test", "-f", "/etc/systemd/system/"+unit+".service"); err == nil {
-			installed = true
-		}
-	}
-	if !installed {
-		if err := shared.Install(ctx, node, args...); err != nil {
-			return err
-		}
-	}
-	out, err := node.Exec(ctx, "k0s", "start")
-	if err != nil {
-		return fmt.Errorf("%s: k0s start: %w: %s", n.Name, err, out)
-	}
-	return nil
-}
-
-// waitForAPI blocks until the first controller is actually serving.
-//
-// Asks k0s itself, and then for the kubeconfig. "k0s kubeconfig
-// admin" alone is not a readiness probe: it can answer from what is
-// on disk before the controller is up, and then the next thing that
-// needs a running k0s — minting a join token, which goes through
-// /run/k0s/status.sock — fails with a connection reset that reads as
-// the distribution being broken rather than as not started yet.
-func (b Builder) waitForAPI(ctx context.Context, d cluster.Deps, n lab.Node, within time.Duration) error {
-	return wait.Until(ctx, within, n.Name+"'s k0s never served a ready API", func(ctx context.Context) error {
-		return shared.Ready(ctx, d.Rig.Node(n.Name))
-	})
+	return config, nil
 }
 
 // KubeletInvariant checks that no kubelet depends on another node's
@@ -412,22 +286,13 @@ func (Builder) Reuse(ctx context.Context, d cluster.Deps) error {
 // A command reusing a site is not given the binary the site was built from,
 // so the installed one is the pin; a given pin must equal it.
 func installedBinary(ctx context.Context, d cluster.Deps) (string, error) {
-	var pin, first string
+	var nodes []rig.Commands
 	for _, node := range cluster.SiteNodes(d.Topology) {
-		out, err := d.Rig.Node(node.Name).Exec(ctx, "sha256sum", "/usr/local/bin/k0s")
-		if err != nil {
-			return "", fmt.Errorf("hashing %s's k0s binary: %w", node.Name, err)
-		}
-		fields := strings.Fields(string(out))
-		if len(fields) == 0 {
-			return "", fmt.Errorf("%s reported no k0s binary digest", node.Name)
-		}
-		switch {
-		case pin == "":
-			pin, first = fields[0], node.Name
-		case fields[0] != pin:
-			return "", fmt.Errorf("%s carries k0s %s, %s carries %s", node.Name, fields[0], first, pin)
-		}
+		nodes = append(nodes, d.Rig.Node(node.Name))
+	}
+	pin, err := shared.InstalledDigest(ctx, nodes...)
+	if err != nil {
+		return "", err
 	}
 	if d.K0sBinarySHA256 != "" && !strings.EqualFold(d.K0sBinarySHA256, pin) {
 		return "", fmt.Errorf("site k0s binary %s differs from the given %s", pin, d.K0sBinarySHA256)

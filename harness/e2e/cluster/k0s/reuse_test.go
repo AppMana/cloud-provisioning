@@ -14,10 +14,13 @@ import (
 // the digest of its installed binary and its stored configuration.
 type installedNode struct {
 	rig.Node
+	name    string
 	digest  string
 	version string
 	config  []byte
 }
+
+func (n installedNode) Name() string { return n.name }
 
 func (n installedNode) Exec(_ context.Context, args ...string) ([]byte, error) {
 	switch strings.Join(args, " ") {
@@ -39,7 +42,11 @@ type installedRig struct {
 	nodes map[string]installedNode
 }
 
-func (r installedRig) Node(name string) rig.Node { return r.nodes[name] }
+func (r installedRig) Node(name string) rig.Node {
+	n := r.nodes[name]
+	n.name = name
+	return n
+}
 
 // A command that reuses a site, such as an AWS row, is not given the
 // binary the site was built from; the digest installed on the site's nodes

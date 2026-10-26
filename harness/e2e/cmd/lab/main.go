@@ -38,7 +38,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/provider"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 	nativek0s "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )

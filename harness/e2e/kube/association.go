@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 	"time"
 )
 

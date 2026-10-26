@@ -82,6 +82,7 @@ type stagedVersionNode struct {
 	staged int
 }
 
+func (n *stagedVersionNode) Name() string { return "cp" }
 func (n *stagedVersionNode) Put(_ context.Context, _ io.Reader, path string, _ fs.FileMode) error {
 	if path != "/usr/local/bin/k0s" {
 		n.t.Fatalf("configured runtime before version admission: %s", path)

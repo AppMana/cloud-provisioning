@@ -15,7 +15,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"

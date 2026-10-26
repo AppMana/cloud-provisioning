@@ -9,7 +9,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 )
 
 // Delete asks the product to remove a claim, while the infrastructure provider

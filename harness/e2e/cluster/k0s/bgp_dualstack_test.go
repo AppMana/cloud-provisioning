@@ -76,12 +76,12 @@ func TestBGPDualStackReproducesTheDeployedNetwork(t *testing.T) {
 func TestBGPDualStackInstallsLikeTheDeployment(t *testing.T) {
 	d := identityDeps(t)
 	cp, w1 := d.Topology.MustNode("cp"), d.Topology.MustNode("w1")
-	if got, want := bgpDualStackControllerArgs(cp), []string{"controller", "--enable-worker", "--no-taints",
-		"--disable-components=konnectivity-server,metrics-server", "-c", "/etc/k0s/k0s.yaml",
+	if got, want := bgpDualStackControllerArgs(cp), []string{"--enable-worker", "--no-taints",
+		"--disable-components=konnectivity-server,metrics-server",
 		"--kubelet-extra-args=--node-ip=10.101.0.1,fd8f:cf26:522a::1"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("controller args %q", got)
 	}
-	if got, want := bgpDualStackWorkerArgs(w1), []string{"worker", "--token-file", "/etc/k0s/token",
+	if got, want := bgpDualStackWorkerArgs(w1), []string{
 		"--kubelet-extra-args=--node-ip=10.101.0.2,fd8f:cf26:522a::2"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("worker args %q", got)
 	}

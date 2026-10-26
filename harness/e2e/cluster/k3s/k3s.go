@@ -22,8 +22,8 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 	"github.com/appmana/labcontainers/pkg/artifact"
+	"github.com/appmana/labcontainers/pkg/wait"
 	systemdunit "github.com/coreos/go-systemd/v22/unit"
 )
 

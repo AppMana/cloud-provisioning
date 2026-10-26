@@ -31,7 +31,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster/kubeadm"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 )
 
 // LabName and NodeName are what the builder's wrapper is called, and

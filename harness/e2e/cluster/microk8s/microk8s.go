@@ -16,7 +16,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 )
 
 const Revision = "9063"

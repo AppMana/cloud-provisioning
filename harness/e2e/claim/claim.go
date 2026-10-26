@@ -26,7 +26,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/provider"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 )
 
 // Namespace is where claims and the mesh's own Secrets live.

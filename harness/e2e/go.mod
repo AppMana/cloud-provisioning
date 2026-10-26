@@ -6,10 +6,10 @@ replace github.com/appmana/cloud-provisioning/controller => ../../controller
 
 require (
 	github.com/appmana/cloud-provisioning/controller v0.0.0-00010101000000-000000000000
+	github.com/distribution/reference v0.6.0
 	github.com/k0sproject/k0s v1.36.5-0.20260918181138-c37fe960bdee
 	golang.org/x/crypto v0.54.0
 	google.golang.org/grpc v1.82.1
-	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.36.4
 	k8s.io/apimachinery v0.36.4
 	k8s.io/client-go v0.36.4
@@ -72,7 +72,6 @@ require (
 	github.com/cyphar/filepath-securejoin v0.7.0 // indirect
 	github.com/digitalocean/go-openvswitch v0.0.0-20250625173537-a00eb8d2cfce // indirect
 	github.com/disiqueira/gotree/v3 v3.0.2 // indirect
-	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.8 // indirect
@@ -254,6 +253,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	helm.sh/helm/v3 v3.21.4 // indirect
 	k8s.io/apiextensions-apiserver v0.36.4 // indirect
 	k8s.io/apiserver v0.36.4 // indirect
@@ -274,7 +274,7 @@ require (
 )
 
 require (
-	github.com/appmana/labcontainers v0.2.0-alpha.2.0.20261005235206-208b63a3311d
+	github.com/appmana/labcontainers v0.2.0-alpha.2.0.20261026200937-2c9fb9ef82fe
 	github.com/aws/aws-sdk-go-v2 v1.46.0 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.2 // indirect

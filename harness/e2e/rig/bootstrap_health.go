@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 )
 
 // BootstrapHealth is optional: machine adapters provide it only when they can

@@ -10,7 +10,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 )
 
 // Placement is which site nodes terminate tunnels.

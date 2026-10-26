@@ -14,7 +14,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
 	"github.com/appmana/cloud-provisioning/harness/e2e/network"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 )
 
 func init() { network.Register(Installer{}) }

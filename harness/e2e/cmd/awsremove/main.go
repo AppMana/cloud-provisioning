@@ -17,7 +17,7 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/network"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/aws"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 )
 
 func main() {

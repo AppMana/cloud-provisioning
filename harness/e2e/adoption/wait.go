@@ -6,7 +6,7 @@ import (
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
-	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
+	"github.com/appmana/labcontainers/pkg/wait"
 )
 
 // Wait requires a current running adopter and an acknowledgment of the current

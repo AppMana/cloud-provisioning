@@ -15,7 +15,8 @@ import (
 // provider-native pod network unless their template chooses the site CNI.
 type nativeNetworkStub struct{ *stubInfraProvider }
 
-func (nativeNetworkStub) DefaultCNI(os string) string { return "aws-vpc" }
+func (nativeNetworkStub) DefaultCNI(os string) string        { return "aws-vpc" }
+func (nativeNetworkStub) NativeNetworks() []platform.Network { return nil }
 
 func renderedKubeletArgs(t *testing.T, templateLabels map[string]string) string {
 	t.Helper()

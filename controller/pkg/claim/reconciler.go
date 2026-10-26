@@ -21,6 +21,7 @@ import (
 
 	v1alpha1 "github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
+	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -143,6 +144,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err != nil {
 			return r.fail(ctx, claim, err)
 		}
+		// Admit the node class before any machine exists, so a class the
+		// platform cannot run never reaches the infrastructure provider.
+		if err := classOf(provisioner, infraMachine).Check(nativeNetworks(provisioner)); err != nil {
+			return r.fail(ctx, claim, err)
+		}
 		infraMachine.SetName(claim.Name)
 		infraMachine.SetNamespace(claim.Namespace)
 		labels := infraMachine.GetLabels()
@@ -235,6 +241,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		ExternalIP:       externalIP,
 		WireGuardAddress: machine.GetAnnotations()["cloud-provisioning.appmana.com/wireguard-addr4"],
 		TunnelInterface:  r.TunnelInterface,
+		NodeClass:        nodeClassStatus(classOf(provisioner, infraMachine)),
 	}
 	if updated.Status != claim.Status {
 		if err := r.Status().Update(ctx, updated); err != nil {
@@ -583,6 +590,27 @@ func machineFromTemplate(ctx context.Context, reader client.Reader, mapper apime
 	machine.SetAnnotations(annotations)
 	machine.SetGroupVersionKind(machineGVK)
 	return machine, nil
+}
+
+// classOf is the node class of a provider machine, from its template labels
+// and its provider's default network.
+func classOf(provisioner join.MachineProvisioner, infraMachine *unstructured.Unstructured) platform.Class {
+	var defaultCNI func(string) string
+	if n, ok := provisioner.(join.NetworkProvider); ok {
+		defaultCNI = n.DefaultCNI
+	}
+	return platform.ClassOf(infraMachine, defaultCNI)
+}
+
+func nativeNetworks(provisioner join.MachineProvisioner) []platform.Network {
+	if n, ok := provisioner.(join.NetworkProvider); ok {
+		return n.NativeNetworks()
+	}
+	return nil
+}
+
+func nodeClassStatus(c platform.Class) v1alpha1.NodeClass {
+	return v1alpha1.NodeClass{OS: c.OS, Arch: c.Arch, CNI: c.CNI}
 }
 
 func externalIPOf(machine *unstructured.Unstructured) string {

@@ -108,3 +108,30 @@ func ValidateExtraFlags(flags string) error {
 	}
 	return nil
 }
+
+// Network is a provider-native pod network a platform runs on its nodes.
+type Network interface {
+	// Name is the CNILabel value that selects it.
+	Name() string
+	// Supports reports whether it runs on this guest OS and architecture.
+	// An empty arch means the template does not pin one.
+	Supports(os, arch string) error
+}
+
+// Check admits the class only when its platform provides the chosen
+// network and runs it on this guest. The site CNI needs nothing from the
+// platform.
+func (c Class) Check(networks []Network) error {
+	if !c.Native() {
+		return nil
+	}
+	for _, n := range networks {
+		if n.Name() == c.CNI {
+			if err := n.Supports(c.OS, c.Arch); err != nil {
+				return fmt.Errorf("pod network %q on %s/%s: %w", c.CNI, c.OS, c.Arch, err)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("this platform provides no pod network %q", c.CNI)
+}

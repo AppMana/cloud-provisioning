@@ -71,3 +71,37 @@ func TestExtraFlagsMayNotSetLabelsOrTaints(t *testing.T) {
 		t.Errorf("ValidateExtraFlags rejected an ordinary flag: %v", err)
 	}
 }
+
+type linuxOnly struct{}
+
+func (linuxOnly) Name() string { return "linux-net" }
+func (linuxOnly) Supports(os, arch string) error {
+	if os != "linux" {
+		return errUnsupported
+	}
+	return nil
+}
+
+var errUnsupported = errorString("unsupported")
+
+type errorString string
+
+func (e errorString) Error() string { return string(e) }
+
+// A class is admitted only when its platform runs the chosen network for
+// that guest; the site CNI needs nothing from the platform.
+func TestCheckAdmitsOnlyClassesThePlatformRuns(t *testing.T) {
+	networks := []Network{linuxOnly{}}
+	if err := (Class{OS: "linux", CNI: "linux-net"}).Check(networks); err != nil {
+		t.Errorf("supported class rejected: %v", err)
+	}
+	if err := (Class{OS: "windows", CNI: "linux-net"}).Check(networks); err == nil {
+		t.Error("a guest the network does not support was admitted")
+	}
+	if err := (Class{OS: "linux", CNI: "unknown"}).Check(networks); err == nil {
+		t.Error("a network the platform does not provide was admitted")
+	}
+	if err := (Class{OS: "windows", CNI: SiteCNI}).Check(nil); err != nil {
+		t.Errorf("the site CNI was rejected: %v", err)
+	}
+}

@@ -96,3 +96,9 @@ spec:
                 wireGuardAddress: {type: string}
                 tunnelInterface: {type: string}
                 message: {type: string}
+                nodeClass:
+                  type: object
+                  properties:
+                    os: {type: string}
+                    arch: {type: string}
+                    cni: {type: string}

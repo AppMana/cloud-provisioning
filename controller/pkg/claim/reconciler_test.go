@@ -628,3 +628,39 @@ func TestReconcileDelete_RemovesTheNodeItProduced(t *testing.T) {
 		t.Errorf("an unrelated node was removed: %v", err)
 	}
 }
+
+// A claim whose node class the platform cannot run fails before any
+// machine exists; an admitted class is recorded for operators.
+func TestReconcile_NodeClassIsCheckedBeforeTheMachineExists(t *testing.T) {
+	unsupported := fakeClaim("windows-arm")
+	template := fakeTemplate("windows-arm")
+	_ = unstructured.SetNestedStringMap(template.Object, map[string]string{"kubernetes.io/os": "windows", "kubernetes.io/arch": "arm64"}, "spec", "template", "metadata", "labels")
+	r := newClaimReconciler(t, unsupported, template, fakeCluster("appmana"), fakeNode())
+	if err := reconcileClaim(t, r, unsupported); err == nil {
+		t.Fatal("Windows on arm64 with the VPC CNI was admitted")
+	}
+	machine := &unstructured.Unstructured{}
+	machine.SetGroupVersionKind(joinaws.Provider{}.GVK())
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "windows-arm"}, machine); !apierrors.IsNotFound(err) {
+		t.Fatalf("an AWSMachine exists for a rejected class: %v", err)
+	}
+	got := &v1alpha1.ProvisionedNodeClaim{}
+	if err := r.Get(context.Background(), client.ObjectKeyFromObject(unsupported), got); err != nil || got.Status.Phase != "Failed" {
+		t.Fatalf("claim status = %+v, %v; want Failed", got.Status, err)
+	}
+
+	admitted := fakeClaim("linux-arm")
+	template = fakeTemplate("linux-arm")
+	_ = unstructured.SetNestedStringMap(template.Object, map[string]string{"kubernetes.io/arch": "arm64"}, "spec", "template", "metadata", "labels")
+	r = newClaimReconciler(t, admitted, template, fakeCluster("appmana"), fakeNode())
+	if err := reconcileClaim(t, r, admitted); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if err := r.Get(context.Background(), client.ObjectKeyFromObject(admitted), got); err != nil {
+		t.Fatal(err)
+	}
+	want := v1alpha1.NodeClass{OS: "linux", Arch: "arm64", CNI: "aws-vpc"}
+	if got.Status.NodeClass != want {
+		t.Fatalf("status.nodeClass = %+v, want %+v", got.Status.NodeClass, want)
+	}
+}

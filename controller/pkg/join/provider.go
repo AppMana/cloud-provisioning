@@ -9,6 +9,8 @@ package join
 import (
 	"context"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -111,6 +113,7 @@ type NodeLocalBalancer interface {
 // the tunnel.
 type NetworkProvider interface {
 	DefaultCNI(os string) string
+	NativeNetworks() []platform.Network
 }
 
 // AddressObserver is an optional capability an InfraProvider

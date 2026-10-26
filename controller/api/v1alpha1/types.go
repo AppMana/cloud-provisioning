@@ -89,6 +89,17 @@ type ProvisionedNodeClaimStatus struct {
 	// Message carries the latest human-readable fulfillment error.
 	// +optional
 	Message string `json:"message,omitempty"`
+	// NodeClass is the platform tuple the node was admitted with.
+	// +optional
+	NodeClass NodeClass `json:"nodeClass,omitempty"`
+}
+
+// NodeClass is a cloud node's guest OS, architecture and pod network: a
+// provider-native network name, or "site" for the site CNI over the tunnel.
+type NodeClass struct {
+	OS   string `json:"os,omitempty"`
+	Arch string `json:"arch,omitempty"`
+	CNI  string `json:"cni,omitempty"`
 }
 
 // ProvisionedNodeClaim is the single user-facing resource.

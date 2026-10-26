@@ -422,40 +422,14 @@ func (c *Controller) nodeAt(ctx context.Context, address string) (string, error)
 	return "", nil
 }
 
-// ReconcileCluster reports the infrastructure cluster.
-//
-// Cluster API's Cluster controller will not move a Cluster out of
-// Provisioning until its infrastructure reports ready, and until the
-// Cluster is provisioned every Machine in it stays Pending — so
-// nothing is ever linked to a node and the mesh is never told a peer
-// exists. That is a real provider responsibility, not a lab detail:
-// CAPA reports an AWSCluster the same way, once the load balancer and
-// the network exist.
-//
-// The endpoint is stated because Cluster API requires one before it
-// considers a cluster usable. It names a real control plane: the site
-// has no address that moves between nodes, so any member is as good
-// as any other and the first is chosen for being deterministic.
+// ReconcileCluster states the site's API endpoint on its LabCluster, which an
+// operator does for an existing cluster. The LabCluster is annotated
+// managed-by external, so reporting it ready is the product's job.
 func (c *Controller) ReconcileCluster(ctx context.Context, namespace, name, host string, port int) error {
-	ready, err := c.Kube.Get(ctx, namespace, "labcluster", name, "{.status.ready}")
-	if err != nil {
-		return fmt.Errorf("reading the infrastructure cluster: %w", err)
-	}
-	// Spec before status, as everywhere else: an endpoint has to be
-	// readable before anything is told the cluster is usable.
 	endpoint := fmt.Sprintf(`{"spec":{"controlPlaneEndpoint":{"host":%q,"port":%d}}}`, host, port)
 	if _, err := c.Kube.Run(ctx, "-n", namespace, "patch", "labcluster", name,
 		"--type", "merge", "-p", endpoint); err != nil {
 		return fmt.Errorf("stating the cluster's endpoint: %w", err)
-	}
-	// A retained cluster can be Ready while advertising an obsolete endpoint.
-	if ready == "true" {
-		return nil
-	}
-	if _, err := c.Kube.Run(ctx, "-n", namespace, "patch", "labcluster", name,
-		"--subresource=status", "--type", "merge",
-		"-p", `{"status":{"ready":true,"initialization":{"provisioned":true}}}`); err != nil {
-		return fmt.Errorf("reporting the cluster ready: %w", err)
 	}
 	return nil
 }

@@ -60,6 +60,8 @@ kind: LabCluster
 metadata:
   name: %[3]s
   namespace: %[4]s
+  annotations:
+    cluster.x-k8s.io/managed-by: external
 spec: {}
 ---
 apiVersion: cluster.x-k8s.io/v1beta2

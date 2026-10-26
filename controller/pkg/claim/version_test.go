@@ -139,4 +139,9 @@ func TestInfrastructureAnnotatedAsExternallyManagedIsMarkedReady(t *testing.T) {
 	if ready, _, _ := unstructured.NestedBool(got.Object, "status", "ready"); !ready {
 		t.Error("an AWSCluster annotated as externally managed was not marked ready")
 	}
+	// The v1beta2 contract reads initialization.provisioned instead; a
+	// provider's schema prunes whichever field it does not declare.
+	if provisioned, _, _ := unstructured.NestedBool(got.Object, "status", "initialization", "provisioned"); !provisioned {
+		t.Error("the v1beta2 contract's provisioned field was not set")
+	}
 }

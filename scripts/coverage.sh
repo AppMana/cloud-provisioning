@@ -26,7 +26,7 @@ failed=()
 if [[ "${1:-}" != report ]]; then
   for module in controller harness/e2e; do
     (cd "$root/$module" && GOWORK=off GOMAXPROCS=${GOMAXPROCS:-4} \
-      go test -p 2 -cover -coverpkg=./... ./... -args -test.gocoverdir="$go_raw") || failed+=("$module")
+      go test -count=1 -p 2 -cover -coverpkg=./... ./... -args -test.gocoverdir="$go_raw") || failed+=("$module")
   done
   for suite in harness/e2e/aws harness/e2e/observe harness/e2e/runner images providers/k0s .github; do
     (cd "$root/$suite" && COVERAGE_FILE="$py_data/.coverage.${suite//\//_}" \

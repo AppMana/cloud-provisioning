@@ -508,9 +508,17 @@ func (r *Reconciler) ensureClusterProvisioned(ctx context.Context, cluster *unst
 		// The contract puts the annotation on the infrastructure cluster: its
 		// provider then stands down, and this controller reports readiness.
 		external := clusterExternal || infra.GetAnnotations()[managedByAnnotation] == "external"
-		if ready, _, _ := unstructured.NestedBool(infra.Object, "status", "ready"); external && !ready {
+		ready, _, _ := unstructured.NestedBool(infra.Object, "status", "ready")
+		provisioned, _, _ := unstructured.NestedBool(infra.Object, "status", "initialization", "provisioned")
+		if external && (!ready || !provisioned) {
+			// Both contracts: v1beta1 reads status.ready, v1beta2 reads
+			// status.initialization.provisioned, and a provider's schema
+			// prunes whichever it does not declare.
 			patched := infra.DeepCopy()
 			if err := unstructured.SetNestedField(patched.Object, true, "status", "ready"); err != nil {
+				return err
+			}
+			if err := unstructured.SetNestedField(patched.Object, true, "status", "initialization", "provisioned"); err != nil {
 				return err
 			}
 			if err := r.Status().Patch(ctx, patched, client.MergeFrom(infra)); err != nil {

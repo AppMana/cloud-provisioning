@@ -183,10 +183,9 @@ func TestAReportedMachineIsNotRewritten(t *testing.T) {
 
 // fakeKube answers kubectl through a bastion that is not there.
 type fakeKube struct {
-	clusterReady string
-	objects      map[string]string
-	nodes        string
-	calls        [][]string
+	objects map[string]string
+	nodes   string
+	calls   [][]string
 }
 
 func (f *fakeKube) client() *kube.Client {
@@ -214,8 +213,6 @@ func (n *fakeNode) Exec(ctx context.Context, argv ...string) ([]byte, error) {
 	n.k.calls = append(n.k.calls, call)
 
 	switch {
-	case containsPrefix(argv, "jsonpath={.status.ready}"):
-		return []byte(n.k.clusterReady), nil
 	case contains(argv, "-o") && contains(argv, "json") && !contains(argv, "jsonpath"):
 		for name, body := range n.k.objects {
 			if contains(argv, name) {

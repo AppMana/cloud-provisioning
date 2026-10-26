@@ -445,6 +445,8 @@ func (r *Reconciler) resolveCluster(ctx context.Context, claim *v1alpha1.Provisi
 	}
 }
 
+const managedByAnnotation = "cluster.x-k8s.io/managed-by"
+
 // ensureClusterProvisioned reports readiness for a Cluster annotated
 // cluster.x-k8s.io/managed-by: external. That annotation tells Cluster
 // API's own controllers to stand down, so nothing upstream sets the
@@ -453,9 +455,7 @@ func (r *Reconciler) resolveCluster(ctx context.Context, claim *v1alpha1.Provisi
 // reporting it is this controller's job rather than a `kubectl patch`
 // an operator has to know to run after every install.
 func (r *Reconciler) ensureClusterProvisioned(ctx context.Context, cluster *unstructured.Unstructured) error {
-	if cluster.GetAnnotations()["cluster.x-k8s.io/managed-by"] != "external" {
-		return nil
-	}
+	clusterExternal := cluster.GetAnnotations()[managedByAnnotation] == "external"
 	infraKind, _, _ := unstructured.NestedString(cluster.Object, "spec", "infrastructureRef", "kind")
 	infraGroup, _, _ := unstructured.NestedString(cluster.Object, "spec", "infrastructureRef", "apiGroup")
 	infraName, _, _ := unstructured.NestedString(cluster.Object, "spec", "infrastructureRef", "name")
@@ -467,9 +467,18 @@ func (r *Reconciler) ensureClusterProvisioned(ctx context.Context, cluster *unst
 		infra := &unstructured.Unstructured{}
 		infra.SetGroupVersionKind(mapping.GroupVersionKind)
 		if err := r.Get(ctx, types.NamespacedName{Namespace: cluster.GetNamespace(), Name: infraName}, infra); err != nil {
+			// An infrastructure object its own provider has yet to create is
+			// that provider's business, unless the Cluster says this
+			// controller manages it.
+			if apierrors.IsNotFound(err) && !clusterExternal {
+				return nil
+			}
 			return fmt.Errorf("getting %s %q: %w", infraKind, infraName, err)
 		}
-		if ready, _, _ := unstructured.NestedBool(infra.Object, "status", "ready"); !ready {
+		// The contract puts the annotation on the infrastructure cluster: its
+		// provider then stands down, and this controller reports readiness.
+		external := clusterExternal || infra.GetAnnotations()[managedByAnnotation] == "external"
+		if ready, _, _ := unstructured.NestedBool(infra.Object, "status", "ready"); external && !ready {
 			patched := infra.DeepCopy()
 			if err := unstructured.SetNestedField(patched.Object, true, "status", "ready"); err != nil {
 				return err
@@ -478,6 +487,9 @@ func (r *Reconciler) ensureClusterProvisioned(ctx context.Context, cluster *unst
 				return fmt.Errorf("marking %s %q ready: %w", infraKind, infraName, err)
 			}
 		}
+	}
+	if !clusterExternal {
+		return nil
 	}
 	cpInit, _, _ := unstructured.NestedBool(cluster.Object, "status", "initialization", "controlPlaneInitialized")
 	infraProv, _, _ := unstructured.NestedBool(cluster.Object, "status", "initialization", "infrastructureProvisioned")

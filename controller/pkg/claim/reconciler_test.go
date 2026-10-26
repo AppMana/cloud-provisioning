@@ -42,7 +42,7 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	scheme.AddKnownTypeWithName(clusterGVK, &unstructured.Unstructured{})
 	scheme.AddKnownTypeWithName(clusterListGVK, &unstructured.UnstructuredList{})
 	awsMachineGVK := joinaws.Provider{}.GVK()
-	for _, kind := range []string{"AWSMachine", "AWSMachineTemplate", "DockerMachine", "DockerMachineTemplate"} {
+	for _, kind := range []string{"AWSMachine", "AWSMachineTemplate", "AWSCluster", "DockerMachine", "DockerMachineTemplate"} {
 		scheme.AddKnownTypeWithName(awsMachineGVK.GroupVersion().WithKind(kind), &unstructured.Unstructured{})
 		scheme.AddKnownTypeWithName(awsMachineGVK.GroupVersion().WithKind(kind+"List"), &unstructured.UnstructuredList{})
 	}
@@ -69,6 +69,7 @@ func fakeCluster(name string) *unstructured.Unstructured {
 	cluster.SetName(name)
 	cluster.SetNamespace("default")
 	_ = unstructured.SetNestedField(cluster.Object, "AWSCluster", "spec", "infrastructureRef", "kind")
+	_ = unstructured.SetNestedField(cluster.Object, infraGroup, "spec", "infrastructureRef", "apiGroup")
 	_ = unstructured.SetNestedField(cluster.Object, name, "spec", "infrastructureRef", "name")
 	return cluster
 }

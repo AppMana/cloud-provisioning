@@ -6,6 +6,7 @@ import (
 
 	v1alpha1 "github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
+	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	joinlabcontainers "github.com/appmana/cloud-provisioning/controller/pkg/join/labcontainers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -38,6 +39,7 @@ func TestReconcile_TemplateVersionIsTheOneTheAPIServes(t *testing.T) {
 	_ = unstructured.SetNestedMap(template.Object, map[string]any{"slot": "remote1"}, "spec", "template", "spec")
 	cluster := fakeCluster("lab")
 	_ = unstructured.SetNestedField(cluster.Object, clusterGVK.Kind, "spec", "infrastructureRef", "kind")
+	_ = unstructured.SetNestedField(cluster.Object, clusterGVK.Group, "spec", "infrastructureRef", "apiGroup")
 	labCluster := &unstructured.Unstructured{}
 	labCluster.SetGroupVersionKind(clusterGVK)
 	labCluster.SetName("lab")
@@ -105,5 +107,36 @@ func TestExternallyManagedInfrastructureIsReadAtItsServedVersion(t *testing.T) {
 	}
 	if ready, _, _ := unstructured.NestedBool(got.Object, "status", "ready"); !ready {
 		t.Error("the infrastructure cluster was not marked ready")
+	}
+}
+
+// The CAPI contract puts managed-by: external on the infrastructure cluster
+// (CAPA then stands down), so that annotation alone must be enough for this
+// controller to report the infrastructure ready.
+func TestInfrastructureAnnotatedAsExternallyManagedIsMarkedReady(t *testing.T) {
+	scheme := testScheme(t)
+	awsClusterGVK := joinaws.Provider{}.ClusterGVK()
+	scheme.AddKnownTypeWithName(awsClusterGVK, &unstructured.Unstructured{})
+	scheme.AddKnownTypeWithName(awsClusterGVK.GroupVersion().WithKind(awsClusterGVK.Kind+"List"), &unstructured.UnstructuredList{})
+	cluster := fakeCluster("site")
+	_ = unstructured.SetNestedField(cluster.Object, awsClusterGVK.Group, "spec", "infrastructureRef", "apiGroup")
+	awsCluster := &unstructured.Unstructured{}
+	awsCluster.SetGroupVersionKind(awsClusterGVK)
+	awsCluster.SetName("site")
+	awsCluster.SetNamespace("default")
+	awsCluster.SetAnnotations(map[string]string{"cluster.x-k8s.io/managed-by": "external"})
+	c := fake.NewClientBuilder().WithScheme(scheme).WithRESTMapper(servedBy(scheme)).
+		WithStatusSubresource(cluster, awsCluster).WithObjects(cluster, awsCluster).Build()
+	r := &Reconciler{Client: c, Reader: c}
+	if err := r.ensureClusterProvisioned(context.Background(), cluster); err != nil {
+		t.Fatalf("ensureClusterProvisioned: %v", err)
+	}
+	got := &unstructured.Unstructured{}
+	got.SetGroupVersionKind(awsClusterGVK)
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "site"}, got); err != nil {
+		t.Fatal(err)
+	}
+	if ready, _, _ := unstructured.NestedBool(got.Object, "status", "ready"); !ready {
+		t.Error("an AWSCluster annotated as externally managed was not marked ready")
 	}
 }

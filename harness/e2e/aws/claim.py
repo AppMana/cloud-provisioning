@@ -91,7 +91,6 @@ if ipv6:
     infra['spec']['network']['vpc']['ipv6'] = {'cidrBlock': str(vpc6)}
     infra['spec']['network']['subnets'][0].update(ipv6CidrBlock=str(subnet6), isIpv6=True)
 apply(infra)
-kube('-n', ns, 'patch', 'awscluster', cluster, '--subresource=status', '--type=merge', '-p', json.dumps({'status': {'ready': True}}))
 # cmd/importsite observes the live site and creates this target's connection.
 observed = json.loads(kube('-n', ns, 'get', 'labimportedcontrolplane', cluster, '-o', 'json'))
 if not observed.get('status', {}).get('initialization', {}).get('controlPlaneInitialized'):

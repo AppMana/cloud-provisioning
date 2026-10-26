@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
+	"github.com/appmana/labcontainers/pkg/containerd"
 )
 
-func TestImageImportBoundsConcurrencyAndReportsGuestFailure(t *testing.T) {
+// One export on the host reaches every guest through labcontainers.
+func TestAnImageIsExportedOnceForEveryGuest(t *testing.T) {
 	var mu sync.Mutex
 	exports := 0
 	active, peak := 0, 0
@@ -72,12 +74,12 @@ func TestImageImportBoundsConcurrencyAndReportsGuestFailure(t *testing.T) {
 	carried, importedFromFile := 0, 0
 	for command, body := range imported {
 		switch {
-		case strings.Contains(command, "cat > '"+GuestImageArchive+"'"):
+		case strings.Contains(command, "cat > '"+containerd.CarriedArchive+"'"):
 			carried++
 			if body != "image archive" {
 				t.Fatalf("carried %q", body)
 			}
-		case strings.Contains(command, "k0s ctr images import "+GuestImageArchive):
+		case strings.Contains(command, "k0s ctr images import "+containerd.CarriedArchive):
 			importedFromFile++
 			if body != "" {
 				t.Fatalf("the import was piped stdin: %q", command)

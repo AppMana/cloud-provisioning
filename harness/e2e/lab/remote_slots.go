@@ -15,7 +15,7 @@ func WithRemoteSlots(count int) (Topology, error) {
 			prefix, segment = CloudBPrefix, CloudBSegment
 		}
 		name := fmt.Sprintf("remote%d", n)
-		topo.Nodes = append(topo.Nodes, Node{Name: name, Role: Remote, Interfaces: []Interface{{Name: "eth1", Segment: segment, Address: fmt.Sprintf("%s.%d/24", prefix, 10+(n-1)/2)}}, Binds: clusterBinds(name)})
+		topo.Nodes = append(topo.Nodes, Node{Name: name, Role: Remote, Interfaces: []Interface{{Name: "eth1", Segment: segment, Address: fmt.Sprintf("%s.%d/24", prefix, 10+(n-1)/2)}}})
 	}
 	return topo, nil
 }

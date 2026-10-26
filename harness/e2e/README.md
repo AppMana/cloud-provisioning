@@ -13,14 +13,12 @@ cloud-connected scenario still supplies its existing site gateway and resolver
 explicitly in that object. Those settings are not generic SDK defaults, and
 the product's single-link constraint does not restrict general SDK VM topologies.
 
-SDK-backed VM/container rigs never interpret a missing saved session as
-permission to destroy a same-named Containerlab lab. `Down` is a no-op when no
-owned session exists; `Up` lets the SDK reject runtime name collisions. For
-container rigs, nonempty bind directories without an owned session also stop
-deployment rather than being erased. Recover or relocate legacy lab state
-explicitly; normal SDK operation does not adopt or remove it automatically.
-The explicit nil-runtime compatibility path remains for legacy callers/tests
-and does not provide these ownership guarantees.
+The VM rig never interprets a missing saved session as permission to destroy a
+same-named Containerlab lab. `Down` is a no-op when no owned session exists;
+`Up` lets the SDK reject runtime name collisions. Recover or relocate older lab
+state explicitly; normal SDK operation does not adopt or remove it
+automatically. Cluster nodes are always VMs. Routers, cloud edges and the
+bastion stay containers and are reached only through the lab's own session.
 
 This module pins its published Labcontainers dependency in [go.mod](go.mod);
 no local SDK workspace or SDK replace directive is needed. Build the SDK daemon
@@ -55,8 +53,8 @@ the normal product tag. Missing or unloaded base images fail before the build;
 there is no default base or automatic pull in the Make target. The SDK launcher
 owns declared-NIC handling, loopback-only QEMU control listeners, QGA, and the
 `/labcontainers-reset-instance` marker. Existing old product wrappers must be
-rebuilt before using these paths. Image-builder SSH, CoreOS's policy wrapper, and nil-runtime legacy
-tests remain separate paths; their migration is not claimed complete here.
+rebuilt before using these paths. Image-builder SSH remains a separate path; its
+migration is not claimed complete here.
 
 The Ubuntu SDK command adapter has an opt-in real-VM regression:
 

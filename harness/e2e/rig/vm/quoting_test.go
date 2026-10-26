@@ -4,8 +4,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-
-	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 )
 
 // SSH joins command arguments into a remote shell command. Quote each argument
@@ -43,19 +41,5 @@ func TestAQuoteInAValueDoesNotSplitIt(t *testing.T) {
 	remote := rec.calls[0][len(rec.calls[0])-1]
 	if !strings.Contains(remote, `'it'\''s one'`) {
 		t.Errorf("a quoted value was not escaped: %q", remote)
-	}
-}
-
-// And an appliance is unaffected, because docker exec does take an
-// argv.
-func TestAnApplianceStillGetsItsWordsDirectly(t *testing.T) {
-	rec := &recorder{}
-	r := &Rig{Topology: lab.Default(), WorkDir: t.TempDir(), Run: rec.run}
-	if _, err := r.Node("router").Exec(context.Background(), "sh", "-c", "cat > /tmp/x"); err != nil {
-		t.Fatal(err)
-	}
-	last := rec.calls[0][len(rec.calls[0])-1]
-	if last != "cat > /tmp/x" {
-		t.Errorf("an appliance's words were altered: %q", last)
 	}
 }

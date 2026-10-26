@@ -37,7 +37,6 @@ import (
 	"github.com/appmana/cloud-provisioning/harness/e2e/outage"
 	"github.com/appmana/cloud-provisioning/harness/e2e/provider"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
-	"github.com/appmana/cloud-provisioning/harness/e2e/rig/container"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig/vm"
 	"github.com/appmana/cloud-provisioning/harness/e2e/wait"
 	nativek0s "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
@@ -98,7 +97,7 @@ func runLab() {
 		outages                = flag.String("outage", "", "outages under each placement: all or comma-separated victim:cut/victim:reboot")
 		places                 = flag.String("placements", "", "also walk these placements, comma separated (e.g. control-plane,two-workers,all-nodes)")
 		repoDir                = flag.String("repo-dir", "../..", "the repository root")
-		rigKind                = flag.String("rig", "vm", "cluster node platform: vm (single-NIC KVM guest) or legacy container")
+		rigKind                = flag.String("rig", "vm", "cluster node platform: vm (single-NIC KVM guest)")
 		workDir                = flag.String("work-dir", "_work", "where the generated topology is written")
 		reuseSite              = flag.Bool("reuse-site", false, "resume tests on a verified existing VM site; does not establish a fresh bringup")
 		recoverHost            = flag.Bool("recover-host", false, "with -reuse-site after a host reboot: rebuild this host's segments and every wrapper's links, booting each machine from its existing disk")
@@ -262,14 +261,11 @@ func runLab() {
 	var images cluster.Images
 	var prober bringup.Prober
 	switch *rigKind {
-	case "container":
-		cr := container.New(topo, *workDir)
-		r, images, prober = cr, cr, bringup.HostProber{Host: host}
 	case "vm":
 		vr := vm.New(topo, *workDir)
 		r, images, prober = vr, vr, bringup.MixedProber{Topology: topo, Rig: vr, Host: host}
 	default:
-		fail("no rig called %q: container or vm", *rigKind)
+		fail("no rig called %q: vm", *rigKind)
 	}
 
 	if *down {
@@ -537,11 +533,6 @@ func runLab() {
 					}
 				}
 				awaitAdoption([]string{name})
-				if cn, ok := r.Node(name).(*container.Node); ok {
-					for _, why := range cn.Accommodations() {
-						fmt.Printf("  NOTE this rig %s\n", why)
-					}
-				}
 			}
 
 			for _, name := range strings.Split(*remotes, ",") {

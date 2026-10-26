@@ -1,14 +1,7 @@
-// Package container runs cluster nodes as containers.
-//
-// The fast rig. Its kernel is real — WireGuard, netfilter, ip rules
-// and routing tables are exercised per network namespace against the
-// host's own kernel, and every defect the matrix has found was a
-// genuine kernel-datapath bug rather than an artifact of this. What
-// it cannot reach is a boot: no bootloader, no initramfs, no
-// first-boot userdata, and one kernel shared by every node.
-//
-// Normal command/file operations use the owned Labcontainers session. The
-// explicit nil-runtime compatibility path still drives the Docker CLI.
+// Package container reaches a VM lab's network appliances: the routers,
+// cloud edges and bastion that run as containers beside the machines.
+// Commands and files go through the lab's own Labcontainers session;
+// stopping and starting an appliance uses the Docker CLI.
 package container
 
 import (
@@ -19,10 +12,8 @@ import (
 	"io"
 	"io/fs"
 	"os/exec"
-	"strconv"
 	"strings"
 
-	"github.com/appmana/cloud-provisioning/harness/e2e/cloudinit"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 	labclient "github.com/appmana/labcontainers/pkg/client"
@@ -47,16 +38,12 @@ func Exec(ctx context.Context, stdin io.Reader, argv ...string) ([]byte, []byte,
 	return out.Bytes(), errb.Bytes(), 0, err
 }
 
-// Node is one containerised node.
+// Node is one appliance.
 type Node struct {
 	node    lab.Node
 	labName string
 	run     Runner
 	rig     *Rig
-
-	// accommodations records what this rig had to change about the
-	// last document it applied. See Accommodations.
-	accommodations []string
 }
 
 // Container is the name docker knows this node by. The topology calls
@@ -80,31 +67,12 @@ func (n *Node) Exec(ctx context.Context, argv ...string) ([]byte, error) {
 }
 
 func (n *Node) Pipe(ctx context.Context, stdin io.Reader, argv ...string) (out []byte, runErr error) {
-	if n.rig != nil && n.rig.Runtime != nil {
-		c, session, err := n.openSDK(ctx)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { runErr = errors.Join(runErr, c.Close()) }()
-		return session.Node(n.Name()).Commands().Pipe(ctx, stdin, argv...)
-	}
-	full := []string{"docker", "exec"}
-	if stdin != nil {
-		// -i, the flag whose absence is silent: a manifest read from
-		// an unattached stdin applies nothing and reports success.
-		full = append(full, "-i")
-	}
-	full = append(full, n.Container())
-	full = append(full, argv...)
-
-	out, errb, code, err := n.run(ctx, stdin, full...)
+	c, session, err := n.openSDK(ctx)
 	if err != nil {
-		return out, fmt.Errorf("%s: running %v: %w", n.Name(), argv, err)
+		return nil, err
 	}
-	if code != 0 {
-		return out, &rig.ExitError{Node: n.Name(), Argv: argv, Code: code, Stderr: errb}
-	}
-	return out, nil
+	defer func() { runErr = errors.Join(runErr, c.Close()) }()
+	return session.Node(n.Name()).Commands().Pipe(ctx, stdin, argv...)
 }
 
 // Put writes a file onto the node.
@@ -118,32 +86,19 @@ func (n *Node) Put(ctx context.Context, src io.Reader, dst string, mode fs.FileM
 			return fmt.Errorf("creating %s: %w", dst[:i], err)
 		}
 	}
-	if n.rig != nil && n.rig.Runtime != nil {
-		c, session, err := n.openSDK(ctx)
-		if err != nil {
-			return err
-		}
-		defer func() { runErr = errors.Join(runErr, c.Close()) }()
-		return session.Node(n.Name()).Commands().Put(ctx, src, dst, mode)
+	c, session, err := n.openSDK(ctx)
+	if err != nil {
+		return err
 	}
-	// Written through a shell redirect held open by this process
-	// rather than by docker cp, so that a file whose content is
-	// generated does not have to exist on this host first.
-	if _, err := n.Pipe(ctx, src, "sh", "-c", "cat > "+shellQuote(dst)); err != nil {
-		return fmt.Errorf("writing %s: %w", dst, err)
-	}
-	if _, err := n.Exec(ctx, "chmod", strconv.FormatUint(uint64(mode.Perm()), 8), dst); err != nil {
-		return fmt.Errorf("setting mode on %s: %w", dst, err)
-	}
-	return nil
+	defer func() { runErr = errors.Join(runErr, c.Close()) }()
+	return session.Node(n.Name()).Commands().Put(ctx, src, dst, mode)
 }
 
 func (n *Node) openSDK(ctx context.Context) (*labclient.Client, *labclient.Session, error) {
-	kind := n.rig.RuntimeKind
-	if kind == "" {
-		kind = n.rig.Kind()
+	if n.rig == nil || n.rig.Runtime == nil || n.rig.RuntimeKind == "" {
+		return nil, nil, fmt.Errorf("%s: appliances are reached only through their lab's session", n.Name())
 	}
-	return rig.OpenRuntime(ctx, n.rig.Runtime, n.rig.WorkDir, kind)
+	return rig.OpenRuntime(ctx, n.rig.Runtime, n.rig.WorkDir, n.rig.RuntimeKind)
 }
 
 // Cut takes every data interface down, leaving the machine running.
@@ -205,90 +160,8 @@ func (n *Node) Boot(ctx context.Context) error {
 	return nil
 }
 
-// Userdata applies the rendered cloud-config by hand, because this
-// rig has no cloud-init to apply it.
-//
-// This is the container rig's largest fidelity gap and it is narrowed
-// rather than hidden: the document is parsed by the same package that
-// refuses what it cannot do, and anything skipped is returned so a
-// caller can say so out loud.
-func (n *Node) Userdata(ctx context.Context, cloudConfig []byte) error {
-	doc, err := cloudinit.Parse(cloudConfig)
-	if err != nil {
-		return fmt.Errorf("%s: %w", n.Name(), err)
-	}
-	n.accommodations = nil
-	for _, f := range doc.WriteFiles {
-		if err := n.Put(ctx, strings.NewReader(f.Content), f.Path, fs.FileMode(f.Mode)); err != nil {
-			return err
-		}
-	}
-	for _, c := range doc.RunCmd {
-		c, why := accommodate(c)
-		if why != "" {
-			n.accommodations = append(n.accommodations, why)
-		}
-		argv := c.Argv
-		if c.Shell {
-			argv = []string{"sh", "-c", c.Argv[0]}
-		}
-		if _, err := n.Exec(ctx, argv...); err != nil {
-			return fmt.Errorf("%s: runcmd %q: %w", n.Name(), c, err)
-		}
-	}
-	return nil
-}
-
-// Accommodations are the changes this rig made to the last document
-// it applied, because a container cannot satisfy what the document
-// asked for.
-//
-// Reported rather than silent. The shell harness rewrote the rendered
-// kubeadm join with a string substitution and said nothing, so every
-// kubeadm row ran a command the product had not rendered and no
-// reader could tell.
-func (n *Node) Accommodations() []string { return n.accommodations }
-
-// accommodate adjusts one command for what a container cannot do, and
-// says why.
-//
-// Only the container rig does this, and that is the point: a virtual
-// machine has a kernel of its own, so it runs the rendered command
-// unchanged and preflight means something there. Anything this
-// function has to touch is a fidelity gap the VM tier closes.
-func accommodate(c cloudinit.Cmd) (cloudinit.Cmd, string) {
-	const join = "kubeadm join"
-	const relax = " --ignore-preflight-errors=all"
-
-	for i, word := range c.Argv {
-		if !strings.Contains(word, join) || strings.Contains(word, "--ignore-preflight-errors") {
-			continue
-		}
-		// kubeadm's preflight inspects the kernel it runs on, which
-		// in a container is this host's: it cannot load the "configs"
-		// module, cannot read what it needs from /proc/sys, and
-		// objects to things the node neither owns nor can change.
-		out := c
-		out.Argv = append([]string(nil), c.Argv...)
-		out.Argv[i] = strings.Replace(word, join, join+relax, 1)
-		return out, "relaxed kubeadm's preflight: a container shares this host's kernel and cannot satisfy it"
-	}
-	return c, ""
-}
-
-// Skipped reports the cloud-config keys this rig would not apply for
-// the given document, so a caller can record the difference between
-// what the pattern says and what the row proves.
-func Skipped(cloudConfig []byte) ([]string, error) {
-	doc, err := cloudinit.Parse(cloudConfig)
-	if err != nil {
-		return nil, err
-	}
-	return doc.Skipped, nil
-}
-
-// shellQuote wraps a word for the one place this package uses a
-// shell: a redirect, which has no argv form.
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+// Userdata is refused: appliances are not machines a product provisions,
+// so no rendered cloud-config is ever meant for one.
+func (n *Node) Userdata(context.Context, []byte) error {
+	return fmt.Errorf("%s: appliances take no userdata", n.Name())
 }

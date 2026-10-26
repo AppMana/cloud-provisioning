@@ -45,24 +45,13 @@ import (
 type Rig int
 
 const (
-	// Container runs cluster nodes as kindest/node containers. Fast
-	// enough to iterate on, and the kernel is real, but it shares this
-	// host's kernel, has no bootloader, and never runs first-boot
-	// userdata.
-	Container Rig = iota
-	// VM runs cluster nodes as virtual machines under QEMU/KVM. Slower
-	// per row, and the only way to reach a real init path: per-node
+	// VM runs cluster nodes as virtual machines under QEMU/KVM: per-node
 	// kernels, a bootloader, and userdata a platform processes rather
 	// than the harness interpreting it.
-	VM
+	VM Rig = iota
 )
 
-func (r Rig) String() string {
-	if r == VM {
-		return "vm"
-	}
-	return "container"
-}
+func (r Rig) String() string { return "vm" }
 
 // Role is what a node is for. It decides which nodes become virtual
 // machines under the VM rig (the cluster) and which stay containers
@@ -105,11 +94,6 @@ type Node struct {
 	Name       string
 	Role       Role
 	Interfaces []Interface
-	// Binds are host paths a container node needs so that a container
-	// runtime's state does not land on an overlay filesystem, which
-	// fails in ways that look like the product misbehaving. A VM has a
-	// disk and needs none of it.
-	Binds []string
 	// Identity holds the node's cluster addresses (CIDRs, IPv4 first) on
 	// its identity device, for sites that do not identify nodes by their
 	// LAN address. See identity.go.
@@ -173,7 +157,6 @@ func Default() Topology {
 			Name: name, Role: role,
 			Interfaces: []Interface{{Name: "eth1", Segment: LANSegment,
 				Address: fmt.Sprintf("%s.%d/24", SitePrefix, host)}},
-			Binds: clusterBinds(name),
 		}
 	}
 	remote := func(name, prefix, segment string) Node {
@@ -181,7 +164,6 @@ func Default() Topology {
 			Name: name, Role: Remote,
 			Interfaces: []Interface{{Name: "eth1", Segment: segment,
 				Address: fmt.Sprintf("%s.10/24", prefix)}},
-			Binds: clusterBinds(name),
 		}
 	}
 
@@ -219,19 +201,6 @@ func Default() Topology {
 			remote("remote1", CloudAPrefix, CloudASegment),
 			remote("remote2", CloudBPrefix, CloudBSegment),
 		},
-	}
-}
-
-// clusterBinds keeps each runtime's state off an overlay filesystem.
-// A container runtime unpacking images onto the upper layer of the
-// overlay it is itself running on fails in ways that read as the
-// product misbehaving, so every distribution's data root is a real
-// directory on the host.
-func clusterBinds(name string) []string {
-	return []string{
-		"var/" + name + ":/var/lib/containerd",
-		"var-k0s/" + name + ":/var/lib/k0s",
-		"var-rancher/" + name + ":/var/lib/rancher",
 	}
 }
 
@@ -315,7 +284,7 @@ func (t Topology) ContainerlabYAML(rig Rig) (string, error) {
 // generic topology schema. This package's product-specific site/cloud model
 // stays in cloud-provisioning; Labcontainers owns serialization and deployment.
 func (t Topology) ContainerlabConfig(rig Rig) (*core.Config, error) {
-	if rig != VM && rig != Container {
+	if rig != VM {
 		return nil, fmt.Errorf("unknown rig %d", rig)
 	}
 	config := &core.Config{Name: t.Name, Topology: &types.Topology{
@@ -329,7 +298,7 @@ func (t Topology) ContainerlabConfig(rig Rig) (*core.Config, error) {
 	}
 	for _, node := range t.Nodes {
 		definition := &types.NodeDefinition{Kind: "linux"}
-		if rig == VM && node.IsClusterNode() {
+		if node.IsClusterNode() {
 			// The SDK commands a generic_vm through its guest agent; a
 			// linux node's commands would run in the wrapper container.
 			definition.Kind = "generic_vm"
@@ -351,9 +320,6 @@ func (t Topology) ContainerlabConfig(rig Rig) (*core.Config, error) {
 				"QEMU_MEMORY": strconv.Itoa(t.vmMemoryMB()), "QEMU_SMP": strconv.Itoa(VMCPUs),
 				"CLAB_MGMT_INTF": "eth1", "VR_MGMT_IS_A_LINK": "1",
 			}
-		}
-		if rig == Container {
-			definition.Binds = append([]string(nil), node.Binds...)
 		}
 		if !node.IsClusterNode() {
 			// Reuse the node image's network tools and systemd, but do not run

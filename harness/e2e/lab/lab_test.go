@@ -1,7 +1,6 @@
 package lab
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 
@@ -78,24 +77,14 @@ func TestQuorumSurvivesOneDeath(t *testing.T) {
 	}
 }
 
-// The generated topology has to be something containerlab accepts,
-// and the node kind is the one thing that differs between the two
-// rigs. Everything else — segments, links, addresses — is shared, so
-// that a VM row and a container row differ in what a node *is* and
-// nothing else.
-func TestTheRigDecidesOnlyWhatANodeIsMadeOf(t *testing.T) {
-	asContainers, err := Default().ContainerlabConfig(Container)
-	if err != nil {
-		t.Fatal(err)
-	}
+// Cluster nodes run the VM wrapper image; routers, edges and the bastion
+// run the appliance image.
+func TestEachNodeRunsItsRolesImage(t *testing.T) {
 	asVMs, err := Default().ContainerlabConfig(VM)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, node := range Default().Nodes {
-		if got := asContainers.Topology.GetNodeImage(node.Name); got != NodeImage {
-			t.Errorf("%s container image = %q", node.Name, got)
-		}
 		want := ApplianceImage
 		if node.IsClusterNode() {
 			want = VMImage
@@ -103,9 +92,6 @@ func TestTheRigDecidesOnlyWhatANodeIsMadeOf(t *testing.T) {
 		if got := asVMs.Topology.GetNodeImage(node.Name); got != want {
 			t.Errorf("%s VM rig image = %q, want %q", node.Name, got, want)
 		}
-	}
-	if !reflect.DeepEqual(asContainers.Topology.Links, asVMs.Topology.Links) {
-		t.Fatal("the two rigs wire the lab differently")
 	}
 }
 
@@ -200,15 +186,6 @@ func TestEveryMachineIsAGuestAgentControlledVM(t *testing.T) {
 				t.Errorf("%s is declared as %q, want %q", n.Name, got, want)
 			}
 		}
-		containers, err := topo.ContainerlabConfig(Container)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, n := range topo.Nodes {
-			if got := containers.Topology.Nodes[n.Name].Kind; got != "linux" {
-				t.Errorf("container rig %s is %q", n.Name, got)
-			}
-		}
 	}
 }
 
@@ -245,7 +222,7 @@ func TestGuestMemoryIsChosenPerTopology(t *testing.T) {
 }
 
 func TestAppliancesDoNotStartKubernetesDaemons(t *testing.T) {
-	for _, rig := range []Rig{VM, Container} {
+	for _, rig := range []Rig{VM} {
 		topo := Default()
 		config, err := topo.ContainerlabConfig(rig)
 		if err != nil {

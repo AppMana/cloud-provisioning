@@ -78,8 +78,7 @@ def render_values(state, urls, binaries, native_cidrs):
         'dialerImage': split_image(dialer),
         'imagePullSecrets': [{'name': state['linuxControllerPullSecret']}, {'name': state['linuxDialerPullSecret']}],
         'dialerBinary': binary,
-        'awsPodObserver': {'configMap': 'native-pod-scope', 'credentialsSecret': '',
-                           'credentialsFileSecret': 'native-pod-observer-file'},
+        'awsPodObserver': {'configMap': 'native-pod-scope', 'credentialsFileSecret': 'native-pod-observer-file'},
         'providerManagerNamespace': 'capa-system',
         'tunnel': {
             'receiptTLSSecret': RECEIPT_SECRET,

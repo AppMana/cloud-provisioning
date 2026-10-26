@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Configure scoped IPAM and observer access for an isolated native CNI campaign."""
 import argparse
-import base64
 import json
 import ipaddress
 import os
@@ -103,23 +102,14 @@ def main():
     if not any(rule['IpProtocol'] == '-1' and any(pair.get('GroupId') == state['securityGroupID'] for pair in rule.get('UserIdGroupPairs', [])) for rule in group['IpPermissions']):
         aws('ec2', 'authorize-security-group-ingress', GroupId=state['securityGroupID'],
             IpPermissions=[{'IpProtocol': '-1', 'UserIdGroupPairs': [{'GroupId': state['securityGroupID']}]}])
-    observer_policy = {'Version': '2012-10-17', 'Statement': [{'Effect': 'Allow',
-        'Action': 'ec2:DescribeNetworkInterfaces', 'Resource': '*',
-        'Condition': {'StringEquals': {'aws:RequestedRegion': state['region']}}}]}
-    credentials = aws('sts', 'get-federation-token', Name='cldt-pod-observer', DurationSeconds=3600,
-                      Policy=json.dumps(observer_policy))['Credentials']
-    (args.work_dir / 'observer-session.json').write_text(json.dumps(credentials))
-    scope = {'account': state['account'], 'region': state['region'], 'vpc': state['vpcID'],
+    # Observer credentials rotate separately through observer_credentials.py.
+    scope ={'account': state['account'], 'region': state['region'], 'vpc': state['vpcID'],
              'subnets': [state['subnetID']], 'namespace': 'cloud-provisioning', 'cluster': state['runID'],
              'ownerTag': 'cloud-provisioning-test', 'ownerValue': state['runID'], 'family': args.family,
              'podRanges': [pod_range]}
     objects = [
         {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'native-pod-scope', 'namespace': 'cloud-provisioning'},
          'data': {'scope.json': json.dumps(scope)}},
-        {'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {'name': 'native-pod-observer', 'namespace': 'cloud-provisioning'},
-         'type': 'Opaque', 'data': {name: base64.b64encode(credentials[key].encode()).decode()
-          for name, key in {'AWS_ACCESS_KEY_ID': 'AccessKeyId', 'AWS_SECRET_ACCESS_KEY': 'SecretAccessKey',
-                            'AWS_SESSION_TOKEN': 'SessionToken'}.items()}},
     ]
     if args.calico_site:
         exclusion = calico_exclusion(state, pod_range)

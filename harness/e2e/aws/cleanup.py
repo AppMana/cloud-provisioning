@@ -120,7 +120,6 @@ if s.get('capaRoleName'):
 session = path.parent / 'capa-session.json'
 session.unlink(missing_ok=True)
 (path.parent / 'harness-session.json').unlink(missing_ok=True)
-(path.parent / 'observer-session.json').unlink(missing_ok=True)
 (path.parent / 'asset-urls.json').unlink(missing_ok=True)
 s['cleanedUp'] = True
 path.write_text(json.dumps(s, indent=2) + '\n')

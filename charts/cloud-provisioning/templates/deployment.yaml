@@ -1,8 +1,8 @@
 {{- if and .Values.windowsBootstrap.nativePodRouting (not .Values.windowsBootstrap.tunnelSHA256) }}
 {{- fail "Windows native pod routing requires a pinned tunnel executable" }}
 {{- end }}
-{{- if and .Values.awsPodObserver.credentialsSecret .Values.awsPodObserver.credentialsFileSecret }}
-{{- fail "Choose either AWS observer environment credentials or rotating file credentials" }}
+{{- if .Values.awsPodObserver.credentialsSecret }}
+{{- fail "awsPodObserver.credentialsSecret was removed: static environment keys never refresh. Use workload identity or awsPodObserver.credentialsFileSecret" }}
 {{- end }}
 {{- if and .Values.awsPodObserver.credentialsFileSecret (not .Values.awsPodObserver.configMap) }}
 {{- fail "Rotating AWS observer credentials require awsPodObserver.configMap" }}
@@ -123,13 +123,6 @@ spec:
           {{- end }}
           {{- if .Values.awsGateway.configMap }}
           {{- with .Values.awsGateway.credentialsSecret }}
-          envFrom:
-            - secretRef:
-                name: {{ . | quote }}
-          {{- end }}
-          {{- end }}
-          {{- if .Values.awsPodObserver.configMap }}
-          {{- with .Values.awsPodObserver.credentialsSecret }}
           envFrom:
             - secretRef:
                 name: {{ . | quote }}

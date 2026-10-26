@@ -75,14 +75,14 @@ configuration ownership and management-availability evidence.
 
 ## AWS observer configuration
 
-Use `awsPodObserver.configMap` containing `scope.json`; optionally supply
-`awsPodObserver.credentialsSecret` with SDK credential environment variables.
-Prefer refreshable role credentials. The observer needs only
+Use `awsPodObserver.configMap` containing `scope.json`. Prefer refreshable role
+credentials through workload identity. The observer needs only
 `ec2:DescribeNetworkInterfaces`; it does not allocate ENIs or change AWS routes.
 CAPA provisioning credentials and AWS-node IPAM credentials remain separate.
+Static keys in environment variables are not supported: they never refresh.
 
 For installations without workload identity, set
-`awsPodObserver.credentialsFileSecret` instead of `credentialsSecret`. The
+`awsPodObserver.credentialsFileSecret`. The
 Secret must contain `credentials.json` with the STS response's `Credentials`
 object: `AccessKeyId`, `SecretAccessKey`, `SessionToken` and RFC3339
 `Expiration`. The chart mounts the entire directory read-only and grants the

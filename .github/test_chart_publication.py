@@ -120,13 +120,15 @@ class ObserverCredentialMount(unittest.TestCase):
         self.assertNotIn("subPath:", result.stdout)
         self.assertNotIn("envFrom:", result.stdout)
 
-    def test_rejects_ambiguous_or_unused_credential_source(self):
-        for values in [
-            ["awsPodObserver.credentialsFileSecret=rotating"],
-            ["awsPodObserver.configMap=scope", "awsPodObserver.credentialsFileSecret=rotating", "awsPodObserver.credentialsSecret=environment"],
-        ]:
-            with self.subTest(values=values):
-                self.assertNotEqual(self.render(*values).returncode, 0)
+    def test_rejects_unused_credential_source(self):
+        self.assertNotEqual(self.render("awsPodObserver.credentialsFileSecret=rotating").returncode, 0)
+
+    def test_rejects_static_environment_credentials(self):
+        # Static keys in the environment never refresh; a values file that still
+        # names them must fail rather than leave the observer without credentials.
+        result = self.render("awsPodObserver.configMap=scope", "awsPodObserver.credentialsSecret=environment")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("credentialsFileSecret", result.stderr)
 
 
 if __name__ == "__main__":

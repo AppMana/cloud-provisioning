@@ -237,6 +237,6 @@ experimentalNodeGroups: false
 # this enables ownership publication, not deployment qualification.
 awsPodObserver:
   configMap: ""
-  credentialsSecret: ""
-  # Alternative to environment credentials; mount credentials.json for SDK refresh.
+  # Without workload identity, a Secret holding a rotating credentials.json,
+  # mounted as a directory so the SDK sees each refresh.
   credentialsFileSecret: ""

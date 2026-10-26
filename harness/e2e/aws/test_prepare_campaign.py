@@ -35,7 +35,6 @@ class RenderValuesTest(unittest.TestCase):
         self.assertEqual(values['tunnel']['receiptTLSSecret'], subject.RECEIPT_SECRET)
         self.assertEqual(values['tunnel']['receivePreparation']['nativeCIDRs'], ['203.0.113.0/24', '172.29.0.0/25'])
         self.assertEqual(values['awsPodObserver']['credentialsFileSecret'], 'native-pod-observer-file')
-        self.assertEqual(values['awsPodObserver']['credentialsSecret'], '')
 
     def test_unpublished_component_is_rejected(self):
         with self.assertRaisesRegex(ValueError, 'linuxDialer has not been published'):

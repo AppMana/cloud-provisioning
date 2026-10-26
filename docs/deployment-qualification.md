@@ -32,11 +32,12 @@ results do not qualify changed binaries or a different cloud CNI.
   not receive Calico address annotations. Masquerade conflicts block publication.
 - BGP transit distinguishes failed reads from authoritative empty state and
   withdraws the last deleted worker's routes.
-- The dual-stack VM site supports `-k0s-calico-site-only`, bounding Calico
-  installation and both IPAM families to pre-labelled site nodes.
-- `awsrow -pod-family IPv4|IPv6 -k0s-calico-site-only` measures separate
-  single-family campaigns. IPv6-only probes include TCP, Service, DNS, large
-  transfers and UDP; missing requested families fail instead of being skipped.
+- The product keeps every site network DaemonSet off AWS VPC CNI nodes
+  (`siteCNI.exclusion`); the site is built without any placement patch.
+- `awsrow -pod-family IPv4|IPv6` measures separate single-family campaigns
+  for nodes the product registered on a native network. IPv6-only probes
+  include TCP, Service, DNS, large transfers and UDP; missing requested
+  families fail instead of being skipped.
   Every AWS matrix also compares the source IP reported by the destination
   pod with the sending pod IP for each directed pod path. Sender-local socket
   addresses alone cannot establish source preservation.

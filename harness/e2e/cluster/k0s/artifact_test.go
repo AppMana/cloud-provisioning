@@ -49,14 +49,6 @@ func TestBinaryRequiresPreparedContentPin(t *testing.T) {
 	}
 }
 
-func TestKubeletArgumentsAreOneNativeArgument(t *testing.T) {
-	got := siteKubeletArgs("calico-site-bgp", "192.0.2.1")
-	want := "--kubelet-extra-args=--node-ip=192.0.2.1 --node-labels=" + siteCalicoLabel + "=" + siteCalicoValue
-	if got != want {
-		t.Fatalf("native argument = %q, want %q", got, want)
-	}
-}
-
 // A content pin alone does not prove that bytes identify the selected release.
 // Simulated staging proves pre-start rejection, not guest execution or health.
 func TestBuildRejectsWrongStagedVersionBeforeStartingRuntime(t *testing.T) {

@@ -15,11 +15,13 @@ package claim
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	v1alpha1 "github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	"github.com/appmana/cloud-provisioning/controller/pkg/cni/site"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	corev1 "k8s.io/api/core/v1"
@@ -47,6 +49,9 @@ const clusterNameLabel = "cluster.x-k8s.io/cluster-name"
 
 // Reconciler expands claims.
 type Reconciler struct {
+	// SiteNetwork reports whether the site pod network excludes
+	// native-network nodes; nil skips the check.
+	SiteNetwork func(context.Context) error
 	// Lifecycle reads must bypass caches. Production registration supplies direct
 	// Client, Reader and Workload APIs for drain and retirement admission.
 	client.Client
@@ -146,8 +151,20 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 		// Admit the node class before any machine exists, so a class the
 		// platform cannot run never reaches the infrastructure provider.
-		if err := classOf(provisioner, infraMachine).Check(nativeNetworks(provisioner)); err != nil {
+		class := classOf(provisioner, infraMachine)
+		if err := class.Check(nativeNetworks(provisioner)); err != nil {
 			return r.fail(ctx, claim, err)
+		}
+		// A native-network node must never run the site's pod network, so
+		// its machine waits until every site network agent excludes it.
+		if class.Native() && r.SiteNetwork != nil {
+			if err := r.SiteNetwork(ctx); err != nil {
+				var pending *site.PendingError
+				if !errors.As(err, &pending) {
+					return r.fail(ctx, claim, err)
+				}
+				return r.hold(ctx, claim, err)
+			}
 		}
 		infraMachine.SetName(claim.Name)
 		infraMachine.SetNamespace(claim.Namespace)
@@ -404,6 +421,19 @@ func (r *Reconciler) deleteClaimedNodes(ctx context.Context, claim *v1alpha1.Pro
 		ctrl.LoggerFrom(ctx).Info("removed node for claim teardown", "node", node.Name)
 	}
 	return nil
+}
+
+// hold records what a claim waits for and looks again shortly.
+func (r *Reconciler) hold(ctx context.Context, claim *v1alpha1.ProvisionedNodeClaim, cause error) (ctrl.Result, error) {
+	updated := claim.DeepCopy()
+	updated.Status.Phase = "Pending"
+	updated.Status.Message = cause.Error()
+	if updated.Status != claim.Status {
+		if err := r.Status().Update(ctx, updated); err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("recording %q: %w", cause, err)
+		}
+	}
+	return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 }
 
 func (r *Reconciler) fail(ctx context.Context, claim *v1alpha1.ProvisionedNodeClaim, cause error) (ctrl.Result, error) {

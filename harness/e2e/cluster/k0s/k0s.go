@@ -92,16 +92,16 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 		if err != nil {
 			return err
 		}
-		args := []string{"--enable-worker", siteKubeletArgs(d.Network, n.ClusterAddress())}
+		args := []string{"--enable-worker", siteKubeletArgs(n.ClusterAddress())}
 		if d.Network == BGPDualStack {
-			args = bgpDualStackControllerArgs(n, d.K0sCalicoSiteOnly)
+			args = bgpDualStackControllerArgs(n)
 		}
 		site.Members = append(site.Members, shared.Member{Node: d.Rig.Node(n.Name), Role: shared.Controller, Config: config, Args: args})
 	}
 	for _, n := range d.Topology.NodesInRole(lab.Worker) {
-		args := []string{siteKubeletArgs(d.Network, n.ClusterAddress())}
+		args := []string{siteKubeletArgs(n.ClusterAddress())}
 		if d.Network == BGPDualStack {
-			args = bgpDualStackWorkerArgs(n, d.K0sCalicoSiteOnly)
+			args = bgpDualStackWorkerArgs(n)
 		}
 		site.Members = append(site.Members, shared.Member{Node: d.Rig.Node(n.Name), Role: shared.Worker, Args: args})
 	}

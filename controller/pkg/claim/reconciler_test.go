@@ -7,6 +7,7 @@ import (
 	"time"
 
 	v1alpha1 "github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	"github.com/appmana/cloud-provisioning/controller/pkg/cni/site"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	corev1 "k8s.io/api/core/v1"
@@ -663,5 +664,46 @@ func TestReconcile_NodeClassIsCheckedBeforeTheMachineExists(t *testing.T) {
 	want := v1alpha1.NodeClass{OS: "linux", Arch: "arm64", CNI: "aws-vpc"}
 	if got.Status.NodeClass != want {
 		t.Fatalf("status.nodeClass = %+v, want %+v", got.Status.NodeClass, want)
+	}
+}
+
+// A native-network machine is not created while the site pod network could
+// still run on it; the claim says what it waits for, then proceeds.
+func TestReconcile_NativeNetworkMachinesWaitForTheSiteNetworkExclusion(t *testing.T) {
+	claim := fakeClaim("native")
+	r := newClaimReconciler(t, claim, fakeTemplate("native"), fakeCluster("appmana"), fakeNode())
+	waiting := &site.PendingError{DaemonSets: []string{"kube-system/calico-node"}}
+	r.SiteNetwork = func(context.Context) error { return waiting }
+	result, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(claim)})
+	if err != nil || result.RequeueAfter <= 0 {
+		t.Fatalf("Reconcile = %+v, %v; want a timed requeue", result, err)
+	}
+	machine := &unstructured.Unstructured{}
+	machine.SetGroupVersionKind(joinaws.Provider{}.GVK())
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "native"}, machine); !apierrors.IsNotFound(err) {
+		t.Fatalf("an AWSMachine exists before the site network excludes it: %v", err)
+	}
+	got := &v1alpha1.ProvisionedNodeClaim{}
+	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Status.Phase != "Pending" || !strings.Contains(got.Status.Message, "kube-system/calico-node") {
+		t.Fatalf("status = %+v", got.Status)
+	}
+
+	r.SiteNetwork = func(context.Context) error { return &site.UnsupportedError{Reason: "embedded flannel"} }
+	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(claim)}); err == nil {
+		t.Fatal("an unsupported site network was not reported")
+	}
+	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), got); err != nil || got.Status.Phase != "Failed" {
+		t.Fatalf("status = %+v, %v; want Failed", got.Status, err)
+	}
+
+	r.SiteNetwork = func(context.Context) error { return nil }
+	if err := reconcileClaim(t, r, claim); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "native"}, machine); err != nil {
+		t.Fatalf("no AWSMachine once the site network excludes it: %v", err)
 	}
 }

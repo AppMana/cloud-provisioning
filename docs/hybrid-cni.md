@@ -11,9 +11,22 @@ complete mixed-CNI path before deployment; Calico-only evidence does not apply.
 | AWS Linux nodes | AWS VPC CNI | EC2 ENI secondary addresses or delegated prefixes |
 | AWS Windows Server 2022/2025 nodes | AWS VPC CNI Windows plugins | AWS Windows IPAM allocations on the primary ENI |
 
-Calico node agents and CNI installers must select only on-premises nodes.
-Calico IP pools must also select only those nodes. Installing Calico on AWS,
-even as a fallback for an incomplete VPC CNI integration, violates this target.
+Calico node agents and CNI installers must not run on AWS nodes. Installing
+Calico on AWS, even as a fallback for an incomplete VPC CNI integration,
+violates this target. The product enforces this (`siteCNI.exclusion`, on by
+default): every site network DaemonSet (those mounting `/etc/cni/net.d` or
+`/opt/cni/bin`, `calico-node-windows`, and any named in `siteCNI.daemonSets`)
+gets the required node-affinity requirement
+`cloud-provisioning.appmana.com/cni NotIn [aws-vpc]` in every required term.
+CNI DaemonSets tolerate every taint, so the cloud worker taint does not keep
+them off. A Tigera operator install is changed through its `Installation`
+override. Site nodes carry no such label and still match. If another writer
+removes the requirement more than three times in ten minutes the controller
+stops restoring it and reports the conflict on new claims. A claim for an AWS
+VPC CNI node creates no machine until every site network DaemonSet excludes
+it; OVN-Kubernetes and networks with no DaemonSet (k3s embedded flannel) are
+refused. Without a Calico agent on AWS nodes, Calico IPAM never allocates
+there, so the site's pools need no node selector.
 The AWS Linux `aws-node` DaemonSet must select only AWS Linux nodes. Windows
 requires its native VPC CNI binaries/configuration and Windows IPAM controller;
 the Linux DaemonSet is not evidence that Windows networking is configured.
@@ -46,19 +59,17 @@ explicit; a passing NATed probe is not proof that original pod addresses work.
 
 `lab -rig vm -distro k0s -cni calico-site-bgp` builds the on-premises
 component with k0s's bundled Calico. It uses `mode: bird`, `overlay: Never`,
-and each node's Kubernetes InternalIP. The site kubelets register with
-`cloud-provisioning.appmana.com/cni=calico-site` before networking starts.
-The Calico DaemonSet, including its installer, requires that label and retains
-k0s's Linux selector. The initial IPv4 pool uses the same site selector.
+and each node's Kubernetes InternalIP. Calico placement is left as k0s ships
+it: keeping it off AWS nodes is the product's job, and the site stays the
+deployment an operator has.
 
 This profile permits verified site reuse and product installation for AWS
-qualification. Reuse checks require native BGP and the positive site selector.
+qualification. Reuse checks require native BGP.
 Generic remote VM claims remain disabled because they need their own remote
 CNI configuration. AWS VPC CNI qualification is still in progress. Use an
 [isolated VM runner](../harness/e2e/runner/README.md) alongside a retained lab.
 Changing an existing overlay cluster to this profile is not a supported
-migration procedure. Configuration tests apply the strategic patch to an
-observed k0s DaemonSet and verify the placement and pool boundaries.
+migration procedure.
 
 ## Control-plane dependency
 
@@ -146,7 +157,8 @@ The chart archive is published in [the AWS Helm repository](https://aws.github.i
 The family and prefix-delegation contract is documented in the
 [pinned VPC CNI release](https://github.com/aws/amazon-vpc-cni-k8s/blob/v1.23.2/README.md).
 
-The IPv4/IPv6 `awsrow` campaigns with `-k0s-calico-site-only` also require
+IPv4/IPv6 `awsrow` campaigns with nodes registered on the AWS VPC CNI class
+(the `cloud-provisioning.appmana.com/cni` node label) also require
 `native-vpc-routes.json` to pass. This checks host-originated and forwarded pod
 routes between at least two workers against each worker's physical ENI. Every
 measured worker must belong to the campaign VPC. Connectivity through WireGuard

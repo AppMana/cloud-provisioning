@@ -80,7 +80,6 @@ func runLab() {
 		rke2ArchiveSHA256      = flag.String("rke2-archive-sha256", "", "required SHA256 of rke2.linux-amd64.tar.gz")
 		rke2ChecksumsSHA256    = flag.String("rke2-checksums-sha256", "", "required SHA256 of sha256sum-amd64.txt")
 		cni                    = flag.String("cni", "", "distribution-supported network profile (default: bundled default)")
-		calicoSiteOnly         = flag.Bool("k0s-calico-site-only", false, "exclude AWS nodes from the dual-stack site Calico installer and IPAM")
 		calicoMTU              = flag.Int("k0s-calico-mtu", 0, "bundled Calico MTU for a fresh k0s site; zero preserves the distro default")
 		calicoObjectsPath      = flag.String("calico-objects", "", "prepared native Kubernetes List JSON from the aligned Calico fork (standalone installer)")
 		calicoObjectsSHA256    = flag.String("calico-objects-sha256", "", "required SHA256 of --calico-objects")
@@ -162,9 +161,6 @@ func runLab() {
 		if err := k0s.ValidateImages(selected.BuilderNetwork, k0sImages); err != nil {
 			fail("%v", err)
 		}
-	}
-	if *calicoSiteOnly && (*distro != "k0s" || selected.Network != k0s.BGPDualStack || *remotes != "") {
-		fail("--k0s-calico-site-only requires the dual-stack k0s site and separately configured AWS workers, not remote VM claims")
 	}
 	if *siteMesh && (*distro != "k0s" || (selected.Network != k0s.BGPDualStack && selected.Network != "calico-site-bgp")) {
 		fail("-calico-site-mesh applies to the k0s Calico BGP profiles")
@@ -336,7 +332,6 @@ func runLab() {
 			RKE2ArtifactsDirectory: *rke2Artifacts, RKE2InstallerSHA256: *rke2InstallerSHA256,
 			RKE2ArchiveSHA256: *rke2ArchiveSHA256, RKE2ChecksumsSHA256: *rke2ChecksumsSHA256,
 			K0sCalicoMTU:              *calicoMTU,
-			K0sCalicoSiteOnly:         *calicoSiteOnly,
 			K0sCalicoManagedAddresses: *calicoManagedAddresses,
 			Images:                    cluster.Importer{Images: images, Args: b.ImportArgs()},
 			PodCIDR:                   podCIDR(selected), SvcCIDR: serviceCIDR(selected),

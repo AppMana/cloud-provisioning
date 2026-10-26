@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	native "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
@@ -93,62 +94,40 @@ func TestCalicoMTUOverridePreservesProfileBoundaries(t *testing.T) {
 	}
 }
 
-// Apply the real strategic patch before checking scheduling: replacing the
-// selector would discard k0s's Linux constraint and expose Windows hosts.
-func TestSiteBGPPatchRestrictsInstallerAndPool(t *testing.T) {
-	original, err := os.ReadFile("testdata/calico-node-environment.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var base appsv1.DaemonSet
-	if err := json.Unmarshal(original, &base); err != nil {
-		t.Fatal(err)
-	}
-	base.Spec.Template.Spec.NodeSelector = map[string]string{"kubernetes.io/os": "linux"}
-	original, _ = json.Marshal(base)
+// The site BGP profile configures BGP routing only. Which nodes run calico-node
+// and allocate from its pools is left to the product's site CNI exclusion, so
+// the site stays the unmodified deployment an operator has.
+func TestSiteBGPLeavesCalicoPlacementToTheProduct(t *testing.T) {
 	for _, managed := range []bool{false, true} {
 		config, err := calicoConfig("calico-site-bgp", 1370, managed)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if config.Mode != native.CalicoModeBIRD || config.Overlay != "Never" || len(config.Patches) != 1 {
+		if config.Mode != native.CalicoModeBIRD || config.Overlay != "Never" {
 			t.Fatalf("invalid native BGP configuration: %+v", config)
 		}
-		raw, err := strategicpatch.StrategicMergePatch(original, []byte(config.Patches[0].Patch.Content), appsv1.DaemonSet{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		var after appsv1.DaemonSet
-		if err := json.Unmarshal(raw, &after); err != nil {
-			t.Fatal(err)
-		}
-		want := map[string]string{"kubernetes.io/os": "linux", siteCalicoLabel: siteCalicoValue}
-		if !reflect.DeepEqual(after.Spec.Template.Spec.NodeSelector, want) {
-			t.Fatalf("installer can escape site Linux nodes: %+v", after.Spec.Template.Spec.NodeSelector)
-		}
-		found := false
-		for _, e := range after.Spec.Template.Spec.Containers[0].Env {
-			if managed && e.Name == "IP" {
-				t.Fatal("lost stored-address override")
-			}
-			if e.Name == "CALICO_IPV4POOL_NODE_SELECTOR" {
-				found = e.Value == siteCalicoLabel+` == "calico-site"`
+		for _, p := range config.Patches {
+			if strings.Contains(p.Patch.Content, "nodeSelector") || strings.Contains(p.Patch.Content, "NODE_SELECTOR") || strings.Contains(p.Patch.Content, "affinity") {
+				t.Fatalf("the site restricts Calico placement itself: %s", p.Patch.Content)
 			}
 		}
-		if !found {
-			t.Fatal("pool can allocate addresses outside the site")
+		if (len(config.Patches) == 1) != managed {
+			t.Fatalf("patches = %+v", config.Patches)
 		}
-		if !reflect.DeepEqual(base.Spec.Template.Spec.InitContainers, after.Spec.Template.Spec.InitContainers) {
-			t.Fatal("changed the distro CNI installer")
-		}
+	}
+	if args := siteKubeletArgs("192.0.2.1"); args != "--kubelet-extra-args=--node-ip=192.0.2.1" {
+		t.Fatalf("site kubelet arguments = %q", args)
 	}
 }
 
-func TestSiteBGPReuseRejectsOverlayAndUnscopedCalico(t *testing.T) {
+func TestSiteBGPReuseRejectsOverlay(t *testing.T) {
 	for _, network := range []string{"calico", "calico-site-bgp"} {
 		cfg, err := calicoConfig(network, 0, false)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if cfg == nil {
+			cfg = &native.Calico{Mode: native.CalicoModeVXLAN}
 		}
 		raw, err := yaml.Marshal(&native.ClusterConfig{Spec: &native.ClusterSpec{Network: &native.Network{Provider: "calico", Calico: cfg}}})
 		if err != nil {
@@ -158,14 +137,5 @@ func TestSiteBGPReuseRejectsOverlayAndUnscopedCalico(t *testing.T) {
 		if (err == nil) != (network == "calico-site-bgp") {
 			t.Fatalf("%s reuse: %v", network, err)
 		}
-	}
-	raw, err := yaml.Marshal(&native.ClusterConfig{Spec: &native.ClusterSpec{Network: &native.Network{
-		Provider: "calico", Calico: &native.Calico{Mode: native.CalicoModeBIRD, Overlay: "Never"},
-	}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if verifySiteBGPConfig(raw) == nil {
-		t.Fatal("accepted unscoped Calico")
 	}
 }

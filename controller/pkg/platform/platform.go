@@ -28,6 +28,9 @@ const (
 	// SiteCNI chooses the site's own pod network over the tunnel. Nodes of
 	// this class carry no CNILabel.
 	SiteCNI = "site"
+	// ComponentLabel marks a workload this product runs for a platform; the
+	// site CNI exclusion never applies to one.
+	ComponentLabel = "cloud-provisioning.appmana.com/component"
 )
 
 // Class is the platform tuple of one cloud node.

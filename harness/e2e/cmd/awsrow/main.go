@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -46,7 +48,6 @@ func run() error {
 	report := flag.String("report-dir", "", "evidence directory (must not exist)")
 	timeout := flag.Duration("timeout", 45*time.Minute, "row deadline")
 	moduleDir := flag.String("module-dir", ".", "harness module directory the UDP prober is built from")
-	calicoSiteOnly := flag.Bool("k0s-calico-site-only", false, "verify site-only Calico ownership; require an explicit AWS pod family")
 	podFamily := flag.String("pod-family", "", "explicit AWS pod campaign: IPv4 or IPv6")
 	calicoMTU := flag.Int("k0s-calico-mtu", 0, "the Calico MTU the site was built with (calico-bird-dualstack required settings); zero is the profile's own")
 	k0sVersion := flag.String("k0s-version", k0s.Version, "expected k0s version on the existing site")
@@ -55,14 +56,6 @@ func run() error {
 	flag.Parse()
 	if *podFamily != "" && *podFamily != "IPv4" && *podFamily != "IPv6" {
 		return fmt.Errorf("pod-family must be IPv4 or IPv6")
-	}
-	if *calicoSiteOnly && *podFamily == "" {
-		return fmt.Errorf("site-only Calico requires an explicit AWS pod-family campaign")
-	}
-	if *calicoSiteOnly {
-		if err := validateNativeClaims(*claims); err != nil {
-			return err
-		}
 	}
 	if *work == "" || *site == "" {
 		return fmt.Errorf("-work-dir and -site-work-dir are required")
@@ -98,7 +91,7 @@ func run() error {
 	}
 	siteRig := vm.New(topo, *site)
 	k := &kube.Client{Bastion: siteRig.Node("bastion"), ControlPlanes: cluster.ControlPlaneAddresses(topo)}
-	if err := builder.Reuse(ctx, cluster.Deps{Rig: siteRig, Kube: k, Topology: topo, Network: profile.BuilderNetwork, WorkDir: *site, K0sCalicoMTU: *calicoMTU, K0sCalicoSiteOnly: *calicoSiteOnly, K0sVersion: *k0sVersion, K0sBinarySHA256: *k0sBinarySHA256, K0sSourceRevision: *k0sSourceRevision}); err != nil {
+	if err := builder.Reuse(ctx, cluster.Deps{Rig: siteRig, Kube: k, Topology: topo, Network: profile.BuilderNetwork, WorkDir: *site, K0sCalicoMTU: *calicoMTU, K0sVersion: *k0sVersion, K0sBinarySHA256: *k0sBinarySHA256, K0sSourceRevision: *k0sSourceRevision}); err != nil {
 		return err
 	}
 	cli := &aws.CLI{Region: state.Region, SessionPath: filepath.Join(*work, "harness-session.json")}
@@ -366,18 +359,25 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	// The network's agent ready on every measured node, workers included:
+	// Which network each node runs is the class the product registered it
+	// with, read from the node rather than from how it was launched.
+	native, siteNetwork, err := observedNodeNetworks(ctx, k, nodes)
+	if err != nil {
+		return err
+	}
+	if len(native) > 0 {
+		if *podFamily == "" {
+			return fmt.Errorf("native-network nodes %v require an explicit AWS pod-family campaign", slices.Sorted(maps.Keys(native)))
+		}
+		if err := validateNativeClaims(*claims); err != nil {
+			return err
+		}
+	}
+	// The network's agent ready on every site-network node, workers included:
 	// one that is never ready stalls every rolling update of it.
 	if strings.HasPrefix(profile.Network, "calico") {
 		readyErr := wait.Until(ctx, 10*time.Minute, "calico-node is not ready everywhere", func(ctx context.Context) error {
-			calicoNodes := nodes
-			if *calicoSiteOnly {
-				calicoNodes = nil
-				for _, n := range cluster.SiteNodes(topo) {
-					calicoNodes = append(calicoNodes, n.Name)
-				}
-			}
-			return k0s.CalicoNodesReady(ctx, k, calicoNodes)
+			return k0s.CalicoNodesReady(ctx, k, slices.Sorted(maps.Keys(siteNetwork)))
 		})
 		raw, _ := json.Marshal(map[string]any{"nodes": nodes, "ok": readyErr == nil, "error": fmt.Sprint(readyErr)})
 		if err = os.WriteFile(filepath.Join(reportDir, "calico-node-ready.json"), raw, 0600); err != nil {
@@ -390,8 +390,8 @@ func run() error {
 	if err = observe.Capture(ctx, reportDir, "ready", k, fleet, nodes); err != nil {
 		return err
 	}
-	if *calicoSiteOnly {
-		if err := verifyNativeCNI(ctx, k, fleet, nodes, bindings, reportDir); err != nil {
+	if len(native) > 0 {
+		if err := verifyNativeCNI(ctx, k, fleet, native, siteNetwork, reportDir); err != nil {
 			return fmt.Errorf("native CNI ownership failed: %w", err)
 		}
 		if err := verifyNativePaths(ctx, fleet, targets, bindings, *podFamily, reportDir); err != nil {

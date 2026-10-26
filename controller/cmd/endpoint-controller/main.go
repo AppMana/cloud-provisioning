@@ -39,6 +39,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	claimpkg "github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
+	"github.com/appmana/cloud-provisioning/controller/pkg/cni/site"
 	"github.com/appmana/cloud-provisioning/controller/pkg/controlplane"
 	"github.com/appmana/cloud-provisioning/controller/pkg/discover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
@@ -1344,6 +1345,26 @@ func (r *meshReconciler) ensureCNINodeAddressForMachine(ctx context.Context, mac
 	return r.ensureCNINodeAddress(ctx, nodeName, tunnelAddrs, claimRef)
 }
 
+// siteExcluder keeps the site pod network off nodes of every native network
+// the infrastructure providers run.
+func siteExcluder(c client.Client, reader client.Reader, providers []join.InfraProvider, extra string) (*site.Excluder, error) {
+	e := &site.Excluder{Client: c, Reader: reader, Now: time.Now}
+	for name := range nativeNetworksOf(providers) {
+		e.Native = append(e.Native, name)
+	}
+	for _, ref := range strings.Split(extra, ",") {
+		if ref = strings.TrimSpace(ref); ref == "" {
+			continue
+		}
+		namespace, name, ok := strings.Cut(ref, "/")
+		if !ok || namespace == "" || name == "" {
+			return nil, fmt.Errorf("%q is not namespace/name", ref)
+		}
+		e.Extra = append(e.Extra, client.ObjectKey{Namespace: namespace, Name: name})
+	}
+	return e, nil
+}
+
 // nativeNetworksOf indexes the pod networks the infrastructure providers run
 // natively.
 func nativeNetworksOf(providers []join.InfraProvider) map[string]platform.Network {
@@ -2378,6 +2399,8 @@ func main() {
 	flag.StringVar(&machineSelector, "machine-selector", fmt.Sprintf("%s=%s", cloudWorkerRoleLabel, cloudWorkerRoleValue),
 		"label selector identifying the Machine(s) whose external address drives the dialer's endpoint")
 	flag.StringVar(&secretNamespace, "secret-namespace", "cloud-provisioning", "namespace of the dialer peer Secret")
+	siteCNIExclusion := flag.Bool("site-cni-exclusion", true, "keep the site pod network's DaemonSets off provider-native-network nodes by adding a required node-affinity term; when false, only verify it before creating such a node's machine")
+	siteCNIDaemonSets := flag.String("site-cni-daemonsets", "", "comma-separated namespace/name of site pod network DaemonSets that mount no host CNI directory, in addition to those recognised")
 	capiWorkloadServiceAccount := flag.String("capi-workload-service-account", "", "ServiceAccount, in the release namespace, whose bound token Cluster API uses on this cluster; enables ImportedControlPlane")
 	flag.StringVar(&secretName, "secret-name", "tunnel-peers", "name of the dialer peer Secret")
 	flag.StringVar(&secretKey, "secret-key-prefix", tunnel.PeerEndpointPrefix, "prefix (Machine name is appended) for the Secret key this Machine's endpoint is written into: per-Machine, not a flat singleton")
@@ -2615,6 +2638,18 @@ func main() {
 	labcontainersProvider := joinlabcontainers.Provider{}
 	infraProviders := []join.InfraProvider{awsProvider, dockerProvider, labcontainersProvider}
 
+	excluder, err := siteExcluder(mgr.GetClient(), mgr.GetAPIReader(), infraProviders, *siteCNIDaemonSets)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid --site-cni-daemonsets: %v\n", err)
+		os.Exit(1)
+	}
+	if *siteCNIExclusion && len(excluder.Native) > 0 {
+		if err := site.Register(mgr, excluder); err != nil {
+			fmt.Fprintf(os.Stderr, "unable to register the site CNI exclusion: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	mesh := &meshReconciler{
 		nativeNetworks:         nativeNetworksOf(infraProviders),
 		Client:                 mgr.GetClient(),
@@ -2836,6 +2871,13 @@ func main() {
 			Named("claim").
 			For(&v1alpha1.ProvisionedNodeClaim{}).
 			Complete(&claim.Reconciler{
+				SiteNetwork: func(ctx context.Context) error {
+					network, err := cni.Detect(ctx, mgr.GetAPIReader())
+					if err != nil {
+						return err
+					}
+					return excluder.Verify(ctx, network)
+				},
 				Client:                    claimAPI,
 				Workload:                  claimAPI,
 				RetirementAPI:             clientset,

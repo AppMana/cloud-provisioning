@@ -8,6 +8,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni/awspod"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
+	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	platformaws "github.com/appmana/cloud-provisioning/controller/pkg/platform/aws"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
@@ -48,5 +49,20 @@ func TestAnEC2NodeOnTheSiteCNIIsNotAnError(t *testing.T) {
 	}
 	if err := r.ensureCNINodeAddress(context.Background(), "worker", []string{"10.100.0.128"}, ""); err != nil {
 		t.Fatalf("site-CNI EC2 node rejected for its CNI address: %v", err)
+	}
+}
+
+// The exclusion covers every native network the providers run, plus the
+// DaemonSets the operator names.
+func TestSiteExcluderCoversEveryNativeNetwork(t *testing.T) {
+	e, err := siteExcluder(nil, nil, []join.InfraProvider{joinaws.Provider{}}, " kube-system/vendor-agent ,")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(e.Native, ",") != awspod.NodeValue || len(e.Extra) != 1 || e.Extra[0].Name != "vendor-agent" {
+		t.Fatalf("excluder = %+v", e)
+	}
+	if _, err := siteExcluder(nil, nil, nil, "vendor-agent"); err == nil {
+		t.Fatal("a DaemonSet without a namespace was accepted")
 	}
 }

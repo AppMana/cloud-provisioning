@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
@@ -92,16 +93,41 @@ func cniPodOwnership(pods corev1.PodList, cloud map[string]bool, site map[string
 
 // A working workload is insufficient: reject competing CNI agents or runtime
 // configurations even if the currently allocated pod still has connectivity.
-func verifyNativeCNI(ctx context.Context, k *kube.Client, fleet *rig.Fleet, nodes []string, bindings []map[string]any, reportDir string) error {
-	cloud, site := map[string]bool{}, map[string]bool{}
-	for _, binding := range bindings {
-		cloud[binding["node"].(string)] = true
-	}
-	for _, node := range nodes {
-		if !cloud[node] {
-			site[node] = true
+// cniLabel is the class label the product registers a native-network node with.
+const cniLabel = "cloud-provisioning.appmana.com/cni"
+
+// nodeNetworks splits the measured nodes by the class the product registered
+// them with: a provider-native network, or the site's.
+func nodeNetworks(list corev1.NodeList, measured []string) (native, site map[string]bool) {
+	native, site = map[string]bool{}, map[string]bool{}
+	for _, node := range list.Items {
+		if !slices.Contains(measured, node.Name) {
+			continue
+		}
+		if node.Labels[cniLabel] != "" {
+			native[node.Name] = true
+		} else {
+			site[node.Name] = true
 		}
 	}
+	return native, site
+}
+
+// observedNodeNetworks reads nodeNetworks from the cluster.
+func observedNodeNetworks(ctx context.Context, k *kube.Client, measured []string) (native, site map[string]bool, err error) {
+	raw, err := k.Run(ctx, "get", "nodes", "-o", "json")
+	if err != nil {
+		return nil, nil, err
+	}
+	var list corev1.NodeList
+	if err := json.Unmarshal(raw, &list); err != nil {
+		return nil, nil, err
+	}
+	native, site = nodeNetworks(list, measured)
+	return native, site, nil
+}
+
+func verifyNativeCNI(ctx context.Context, k *kube.Client, fleet *rig.Fleet, cloud, site map[string]bool, reportDir string) error {
 	raw, failure := k.Run(ctx, "get", "pods", "-A", "-o", "json")
 	var pods corev1.PodList
 	if failure == nil {

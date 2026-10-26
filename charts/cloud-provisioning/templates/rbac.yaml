@@ -104,6 +104,18 @@ rules:
     resources: ["importedcontrolplanes/status"]
     verbs: ["update"]
   {{- end }}
+  # The site CNI exclusion: every DaemonSet is read to find the site's
+  # network agents, and only those are patched (a required node-affinity
+  # term). The gate before a native-network machine reads them too.
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "list", "watch"{{ if .Values.siteCNI.exclusion }}, "patch"{{ end }}]
+  {{- if .Values.siteCNI.exclusion }}
+  # A Tigera operator renders calico-node from its Installation.
+  - apiGroups: ["operator.tigera.io"]
+    resources: ["installations"]
+    verbs: ["get", "patch"]
+  {{- end }}
   # The claim CRD itself.
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodeclaims"]

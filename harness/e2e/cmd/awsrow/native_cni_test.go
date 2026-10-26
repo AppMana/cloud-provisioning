@@ -62,3 +62,18 @@ func TestNativeAgentOwnership(t *testing.T) {
 		})
 	}
 }
+
+// A node's network comes from the class label the product registered it
+// with, never from how the harness launched it.
+func TestNodeNetworksAreReadFromTheRegisteredClass(t *testing.T) {
+	list := corev1.NodeList{Items: []corev1.Node{
+		{ObjectMeta: metav1.ObjectMeta{Name: "site-1"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "aws-1", Labels: map[string]string{"cloud-provisioning.appmana.com/cni": "aws-vpc"}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "tunnel-1", Labels: map[string]string{"cloud-provisioning.appmana.com/role": "cloud-worker"}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "unmeasured", Labels: map[string]string{"cloud-provisioning.appmana.com/cni": "aws-vpc"}}},
+	}}
+	native, site := nodeNetworks(list, []string{"site-1", "aws-1", "tunnel-1"})
+	if len(native) != 1 || !native["aws-1"] || len(site) != 2 || !site["site-1"] || !site["tunnel-1"] {
+		t.Fatalf("native=%v site=%v", native, site)
+	}
+}

@@ -118,6 +118,21 @@ tunnel:
   # IPv4-only even on a dual-stack cluster.
   ipv6Prefix: "fd00:10:100::/96"
 
+# Keep the site's pod network off cloud nodes whose pods a provider-native
+# network (the AWS VPC CNI) owns. Site CNI DaemonSets tolerate every taint,
+# so each one gets a required node-affinity term excluding those nodes'
+# cloud-provisioning.appmana.com/cni values; site nodes, which carry no such
+# label, still match. Recognised: DaemonSets mounting /etc/cni/net.d or
+# /opt/cni/bin (Calico, Canal, Flannel, Cilium, kube-router, Multus) and
+# calico-node-windows; a Tigera operator install is changed through its
+# Installation. Adding the term rolls the DaemonSet once. With exclusion
+# false nothing is written, and a native-network machine is created only
+# once the site's own configuration already excludes it.
+siteCNI:
+  exclusion: true
+  # namespace/name of further site network DaemonSets.
+  daemonSets: []
+
 # Present this cluster's own control plane to Cluster API, so CAPI can
 # manage cloud workers joining a cluster it did not create. Each
 # ImportedControlPlane in the release namespace gets a <name>-kubeconfig

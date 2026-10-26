@@ -7,9 +7,6 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-const siteCalicoLabel = "cloud-provisioning.appmana.com/cni"
-const siteCalicoValue = "calico-site"
-
 // calicoConfig constructs native k0s overrides for this product's profile.
 func calicoConfig(network string, mtu int, managedAddresses bool) (*native.Calico, error) {
 	siteBGP := network == "calico-site-bgp"
@@ -28,18 +25,9 @@ func calicoConfig(network string, mtu int, managedAddresses bool) (*native.Calic
 		config.Overlay = "Never"
 		config.IPAutodetectionMethod = "kubernetes-internal-ip"
 	}
-	if managedAddresses || siteBGP {
-		env := []map[string]string{}
-		if managedAddresses {
-			env = append(env, map[string]string{"name": "IP", "$patch": "delete"})
-		}
-		if siteBGP {
-			env = append(env, map[string]string{"name": "CALICO_IPV4POOL_NODE_SELECTOR", "value": siteCalicoLabel + " == " + `"` + siteCalicoValue + `"`})
-		}
+	if managedAddresses {
+		env := []map[string]string{{"name": "IP", "$patch": "delete"}}
 		spec := map[string]any{"containers": []any{map[string]any{"name": "calico-node", "env": env}}}
-		if siteBGP {
-			spec["nodeSelector"] = map[string]string{siteCalicoLabel: siteCalicoValue}
-		}
 		patch, err := json.Marshal(map[string]any{"spec": map[string]any{"template": map[string]any{"spec": spec}}})
 		if err != nil {
 			return nil, err
@@ -64,13 +52,10 @@ func networkProvider(name string) string {
 	}
 }
 
-// Label before the first registration so CNI placement never races an API patch.
-func siteKubeletArgs(network, address string) string {
-	args := "--node-ip=" + address
-	if network == "calico-site-bgp" {
-		args += " --node-labels=" + siteCalicoLabel + "=" + siteCalicoValue
-	}
-	return "--kubelet-extra-args=" + args
+// siteKubeletArgs pins a site node's address. Which nodes run the site CNI is
+// the product's business (its site CNI exclusion), not the site's.
+func siteKubeletArgs(address string) string {
+	return "--kubelet-extra-args=--node-ip=" + address
 }
 
 // Reuse must not accept a VXLAN site just because both profiles use Calico.
@@ -79,13 +64,7 @@ func verifySiteBGPConfig(raw []byte) error {
 		Spec struct {
 			Network struct {
 				Provider string
-				Calico   struct {
-					Mode, Overlay string
-					Patches       []struct {
-						Target struct{ Kind, Name, Namespace string }
-						Patch  struct{ Type, Content string }
-					}
-				}
+				Calico   struct{ Mode, Overlay string }
 			}
 		}
 	}
@@ -96,22 +75,5 @@ func verifySiteBGPConfig(raw []byte) error {
 	if n.Provider != "calico" || n.Calico.Mode != "bird" || n.Calico.Overlay != "Never" {
 		return fmt.Errorf("site requires native Calico BGP")
 	}
-	for _, p := range n.Calico.Patches {
-		if p.Target.Kind != "DaemonSet" || p.Target.Name != "calico-node" || p.Target.Namespace != "kube-system" || p.Patch.Type != "StrategicMergePatch" {
-			continue
-		}
-		var patch struct {
-			Spec struct {
-				Template struct {
-					Spec struct {
-						NodeSelector map[string]string `json:"nodeSelector"`
-					}
-				}
-			}
-		}
-		if json.Unmarshal([]byte(p.Patch.Content), &patch) == nil && patch.Spec.Template.Spec.NodeSelector[siteCalicoLabel] == siteCalicoValue {
-			return nil
-		}
-	}
-	return fmt.Errorf("site requires a positive on-premises Calico installer selector")
+	return nil
 }

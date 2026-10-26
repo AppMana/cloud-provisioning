@@ -89,41 +89,25 @@ func bgpDualStackConfig(d cluster.Deps, n lab.Node) (*native.ClusterConfig, erro
 	if err := shared.ConfigureNetwork(config, selection); err != nil {
 		return nil, err
 	}
-	if d.K0sCalicoSiteOnly {
-		site, err := calicoConfig("calico-site-bgp", d.K0sCalicoMTU, false)
-		if err != nil {
-			return nil, err
-		}
-		config.Spec.Network.Calico.Patches = site.Patches
-		// k0s interpolates EnvVars into double-quoted YAML scalars. Calico
-		// accepts single quotes, which avoid invalid generated manifests.
-		selector := siteCalicoLabel + " == '" + siteCalicoValue + "'"
-		config.Spec.Network.Calico.EnvVars["CALICO_IPV4POOL_NODE_SELECTOR"] = selector
-		config.Spec.Network.Calico.EnvVars["CALICO_IPV6POOL_NODE_SELECTOR"] = selector
-	}
 	return config, nil
 }
 
 // bgpDualStackControllerArgs are the controller's install arguments beyond
 // its role, join token and configuration.
-func bgpDualStackControllerArgs(n lab.Node, siteOnly ...bool) []string {
+func bgpDualStackControllerArgs(n lab.Node) []string {
 	return []string{"--enable-worker", "--no-taints",
 		"--disable-components=" + strings.Join(bgpDualStackDisabled, ","),
-		kubeletNodeIPs(n, siteOnly...)}
+		kubeletNodeIPs(n)}
 }
 
 // bgpDualStackWorkerArgs are a worker's install arguments beyond its role
 // and join token.
-func bgpDualStackWorkerArgs(n lab.Node, siteOnly ...bool) []string {
-	return []string{kubeletNodeIPs(n, siteOnly...)}
+func bgpDualStackWorkerArgs(n lab.Node) []string {
+	return []string{kubeletNodeIPs(n)}
 }
 
-func kubeletNodeIPs(n lab.Node, siteOnly ...bool) string {
-	args := "--kubelet-extra-args=--node-ip=" + strings.Join(n.ClusterAddresses(), ",")
-	if len(siteOnly) > 0 && siteOnly[0] {
-		args += " --node-labels=" + siteCalicoLabel + "=" + siteCalicoValue
-	}
-	return args
+func kubeletNodeIPs(n lab.Node) string {
+	return "--kubelet-extra-args=--node-ip=" + strings.Join(n.ClusterAddresses(), ",")
 }
 
 // kubernetesVersion is the Kubernetes release the pinned k0s release carries.

@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -74,7 +76,8 @@ func TestExtraFlagsMayNotSetLabelsOrTaints(t *testing.T) {
 
 type linuxOnly struct{}
 
-func (linuxOnly) Name() string { return "linux-net" }
+func (linuxOnly) Name() string                  { return "linux-net" }
+func (linuxOnly) VerifyNode(*corev1.Node) error { return nil }
 func (linuxOnly) Supports(os, arch string) error {
 	if os != "linux" {
 		return errUnsupported

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
+	platformaws "github.com/appmana/cloud-provisioning/controller/pkg/platform/aws"
 	"testing"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
@@ -63,6 +65,7 @@ func dualStackReconciler(t *testing.T, prefix6 string, objects ...client.Object)
 		tunnelIPv6Prefix:       prefix6,
 		endpointRetention:      testRetention,
 		network:                cni.Network{Name: cni.Calico, Encapsulation: cni.Encapsulated},
+		nativeNetworks:         platform.Index(platformaws.VPCCNI{}),
 	}, c
 }
 

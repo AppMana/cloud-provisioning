@@ -39,7 +39,6 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	claimpkg "github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
-	"github.com/appmana/cloud-provisioning/controller/pkg/cni/awspod"
 	"github.com/appmana/cloud-provisioning/controller/pkg/discover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
@@ -53,6 +52,7 @@ import (
 	joinrke2 "github.com/appmana/cloud-provisioning/controller/pkg/join/rke2"
 	"github.com/appmana/cloud-provisioning/controller/pkg/nodegroup"
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
+	platformaws "github.com/appmana/cloud-provisioning/controller/pkg/platform/aws"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -144,12 +144,16 @@ type meshReconciler struct {
 	tunnelEndpointSelector labels.Selector
 	tunnelEndpointsRaw     string
 	siteDialerSelector     labels.Selector
-	awsPodObserver         *awspod.Observer
-	receivePreparation     *receivePreparationPolicy
-	receiveJournal         handover.Store
-	receiveAPI             kubernetes.Interface
-	tunnelSubnet           string
-	localAddressBase       string
+	// nativeNetworks are the provider-native pod networks the registered
+	// providers can run; nativeObservers report the configured ones'
+	// allocations. Both are keyed by the name a node's class registers.
+	nativeNetworks     map[string]platform.Network
+	nativeObservers    map[string]platform.Observer
+	receivePreparation *receivePreparationPolicy
+	receiveJournal     handover.Store
+	receiveAPI         kubernetes.Interface
+	tunnelSubnet       string
+	localAddressBase   string
 	// tunnelIPv6Prefix is the prefix IPv6 tunnel addresses are paired
 	// into (tunnel.TunnelAddress6), set only when the cluster's pod
 	// network is dual-stack. Empty means a single-stack mesh.
@@ -435,7 +439,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 			log.Info("updated Gateway external-dns target", "ip", externalIP, "gateway", gwKey)
 		}
 	}
-	if remoteBlocksPending || r.awsPodObserver != nil || r.receivePreparation != nil {
+	if remoteBlocksPending || len(r.nativeObservers) > 0 || r.receivePreparation != nil {
 		// Come back for the blocks this node has not been given yet.
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
@@ -1339,6 +1343,29 @@ func (r *meshReconciler) ensureCNINodeAddressForMachine(ctx context.Context, mac
 	return r.ensureCNINodeAddress(ctx, nodeName, tunnelAddrs, claimRef)
 }
 
+// nativeNetworksOf indexes the pod networks the infrastructure providers run
+// natively.
+func nativeNetworksOf(providers []join.InfraProvider) map[string]platform.Network {
+	var networks []platform.Network
+	for _, p := range providers {
+		if n, ok := p.(join.NetworkProvider); ok {
+			networks = append(networks, n.NativeNetworks()...)
+		}
+	}
+	return platform.Index(networks...)
+}
+
+// nativeObserver is the allocation observer for a provider-native network.
+// A node registered on a network nobody observes cannot be routed: its pod
+// addresses are unknown.
+func (r *meshReconciler) nativeObserver(network string) (platform.Observer, error) {
+	observer := r.nativeObservers[network]
+	if observer == nil {
+		return nil, fmt.Errorf("pod network %q has no allocation observer configured", network)
+	}
+	return observer, nil
+}
+
 // ensureCNINodeAddress states the address the CNI peers on for each
 // family named in addrs. A family with no address here is left to the
 // CNI.
@@ -1359,12 +1386,14 @@ func (r *meshReconciler) ensureCNINodeAddress(ctx context.Context, nodeName stri
 		}
 		return fmt.Errorf("getting node %s: %w", nodeName, err)
 	}
-	if r.awsPodObserver != nil && strings.HasPrefix(node.Spec.ProviderID, "aws:///") && node.Labels[awspod.NodeLabel] != awspod.NodeValue {
-		return fmt.Errorf("AWS node %s lacks its required VPC CNI ownership label", node.Name)
-	}
-	// AWS VPC CNI owns this node; never pin a Calico BGP address on it.
-	if node.Labels[awspod.NodeLabel] == awspod.NodeValue {
-		return awspod.ValidateNodeCNI(node)
+	// A provider-native network owns this node; never pin a site CNI
+	// address on it.
+	if name := node.Labels[platform.CNILabel]; name != "" {
+		network := r.nativeNetworks[name]
+		if network == nil {
+			return fmt.Errorf("node %s registered on pod network %q, which no provider runs", node.Name, name)
+		}
+		return network.VerifyNode(node)
 	}
 	owned, err := attachment.NativeTransportOwned(node)
 	if err != nil {
@@ -1521,33 +1550,28 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 	if err := r.reader.Get(ctx, types.NamespacedName{Name: nodeName}, node); err != nil {
 		return false, err
 	}
-	if r.awsPodObserver != nil && strings.HasPrefix(node.Spec.ProviderID, "aws:///") && node.Labels[awspod.NodeLabel] != awspod.NodeValue {
-		return false, fmt.Errorf("AWS node %s lacks its required VPC CNI ownership label", node.Name)
-	}
-	awsNode := node.Labels[awspod.NodeLabel] == awspod.NodeValue
+	nativeName := node.Labels[platform.CNILabel]
+	nativeNode := nativeName != ""
 	var prefixes []netip.Prefix
 	var nativeNetwork []byte
 	var nativeScope *tunnel.NativeNetwork
 	var err error
-	if awsNode {
-		if r.awsPodObserver == nil {
-			return false, fmt.Errorf("AWS VPC CNI node requires a scoped allocation observer")
+	if nativeNode {
+		observer, observerErr := r.nativeObserver(nativeName)
+		if observerErr != nil {
+			return false, observerErr
 		}
-		allocation, observeErr := r.awsPodObserver.AllocationsFor(ctx, machine, nodeName)
-		err = observeErr
-		if err == nil {
-			prefixes = allocation.PodPrefixes
-			scope := r.awsPodObserver.Config
-			network := tunnel.NativeNetwork{ID: fmt.Sprintf("aws:%s:%s:%s", scope.Account, scope.Region, scope.VPC)}
-			for _, prefix := range allocation.NativePrefixes {
-				network.Prefixes = append(network.Prefixes, prefix.String())
-			}
-			sort.Strings(network.Prefixes)
-			nativeScope = &network
+		allocation, observeErr := observer.Allocations(ctx, machine, nodeName)
+		if observeErr != nil {
+			return false, fmt.Errorf("observing %s pod allocation: %w", nativeName, observeErr)
 		}
-		if err != nil {
-			return false, fmt.Errorf("observing AWS pod allocation: %w", err)
+		prefixes = allocation.PodPrefixes
+		network := tunnel.NativeNetwork{ID: allocation.NetworkID}
+		for _, prefix := range allocation.NativePrefixes {
+			network.Prefixes = append(network.Prefixes, prefix.String())
 		}
+		sort.Strings(network.Prefixes)
+		nativeScope = &network
 	} else {
 		prefixes, err = r.network.PrefixesFor(ctx, r.reader, nodeName)
 	}
@@ -1555,7 +1579,7 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 		// No block yet, which is not a failure: the caller comes back.
 		return false, nil
 	}
-	if len(prefixes) == 0 && !awsNode {
+	if len(prefixes) == 0 && !nativeNode {
 		// An encapsulated network needs none, so there is nothing
 		// pending and nothing to publish.
 		return r.network.Encapsulation == cni.Encapsulated, nil
@@ -1565,7 +1589,7 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 	// the node with no reachability at all rather than reachability
 	// that fails in one direction. Saying so is what was missing.
 	if err := r.network.CheckMasquerade(ctx, r.reader, prefixes); err != nil {
-		if awsNode {
+		if nativeNode {
 			return false, err
 		}
 		ctrl.LoggerFrom(ctx).Error(err, "the remote's pod block will not survive the network's outgoing NAT", "node", nodeName)
@@ -1596,8 +1620,8 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 		hosts = append(hosts, prefix.String())
 	}
 	want := strings.Join(hosts, ",")
-	if awsNode {
-		want, err = awsAllowedIPs(machine, secret, prefixes)
+	if nativeNode {
+		want, err = nativeAllowedIPs(machine, secret, prefixes)
 		if err != nil {
 			return false, err
 		}
@@ -1614,7 +1638,7 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 		secret.Data = map[string][]byte{}
 	}
 	secret.Data[key] = []byte(want)
-	if awsNode {
+	if nativeNode {
 		secret.Data[nativeKey] = nativeNetwork
 	} else {
 		delete(secret.Data, nativeKey)
@@ -2580,7 +2604,17 @@ func main() {
 	machine := &unstructured.Unstructured{}
 	machine.SetGroupVersionKind(machineGVK)
 
+	awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName}
+	dockerProvider := joindocker.Provider{}
+	// Adopts a container someone else owns, which is how a lab topology
+	// presents a machine. Shipped like the docker provider rather than
+	// hidden behind a build tag, so a harness exercises the same binary
+	// that is released.
+	labcontainersProvider := joinlabcontainers.Provider{}
+	infraProviders := []join.InfraProvider{awsProvider, dockerProvider, labcontainersProvider}
+
 	mesh := &meshReconciler{
+		nativeNetworks:         nativeNetworksOf(infraProviders),
 		Client:                 mgr.GetClient(),
 		reader:                 mgr.GetAPIReader(),
 		machineSelector:        selector,
@@ -2624,11 +2658,12 @@ func main() {
 		os.Exit(1)
 	}
 	if *awsPodConfig != "" {
-		mesh.awsPodObserver, err = newAWSPodObserver(*awsPodConfig, *awsPodCredentialsFile, mgr.GetAPIReader())
+		observer, err := newAWSPodObserver(*awsPodConfig, *awsPodCredentialsFile, mgr.GetAPIReader())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "AWS pod observer configuration: %v\n", err)
 			os.Exit(1)
 		}
+		mesh.nativeObservers = map[string]platform.Observer{platformaws.VPCCNI{}.Name(): platformaws.Observer{Observer: observer}}
 	}
 	if receivePolicy != nil && receivePolicy.Journal != nil {
 		api, err := kubernetes.NewForConfig(mgr.GetConfig())
@@ -2699,13 +2734,6 @@ func main() {
 				sshKeys = append(sshKeys, k)
 			}
 		}
-		awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName}
-		dockerProvider := joindocker.Provider{}
-		// Adopts a container someone else owns, which is how a lab
-		// topology presents a machine. Shipped like the docker provider
-		// rather than hidden behind a build tag, so a harness exercises
-		// the same binary that is released.
-		labcontainersProvider := joinlabcontainers.Provider{}
 
 		// Each cluster technology is one implementation of
 		// join.ClusterJoinProvider behind the same seam. Selection is by
@@ -2749,7 +2777,7 @@ func main() {
 			Client:         mgr.GetClient(),
 			Reader:         mgr.GetAPIReader(),
 			Join:           joinProvider,
-			InfraProviders: []join.InfraProvider{awsProvider, dockerProvider, labcontainersProvider},
+			InfraProviders: infraProviders,
 
 			BootstrapRenderers: bootstrapRenderers,
 			APIVIP:             joinAPIVIP,

@@ -6,7 +6,9 @@
 package platform
 
 import (
+	"context"
 	"fmt"
+	"net/netip"
 	"sort"
 	"strings"
 
@@ -116,6 +118,18 @@ type Network interface {
 	// Supports reports whether it runs on this guest OS and architecture.
 	// An empty arch means the template does not pin one.
 	Supports(os, arch string) error
+	// VerifyNode rejects a node whose state contradicts this network owning
+	// its pods (for example a site CNI address pinned on it).
+	VerifyNode(node *corev1.Node) error
+}
+
+// Index keys networks by name.
+func Index(networks ...Network) map[string]Network {
+	index := map[string]Network{}
+	for _, n := range networks {
+		index[n.Name()] = n
+	}
+	return index
 }
 
 // Check admits the class only when its platform provides the chosen
@@ -134,4 +148,19 @@ func (c Class) Check(networks []Network) error {
 		}
 	}
 	return fmt.Errorf("this platform provides no pod network %q", c.CNI)
+}
+
+// Allocation is what a provider-native network assigned one node.
+type Allocation struct {
+	// PodPrefixes are the node's own pod addresses.
+	PodPrefixes []netip.Prefix
+	// NetworkID names the native network the node belongs to; peers in the
+	// same network reach NativePrefixes without the tunnel.
+	NetworkID      string
+	NativePrefixes []netip.Prefix
+}
+
+// Observer reports a provider-native network's per-node allocations.
+type Observer interface {
+	Allocations(ctx context.Context, machine *unstructured.Unstructured, nodeName string) (Allocation, error)
 }

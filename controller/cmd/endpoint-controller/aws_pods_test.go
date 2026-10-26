@@ -12,6 +12,8 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni/awspod"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
+	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
+	platformaws "github.com/appmana/cloud-provisioning/controller/pkg/platform/aws"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,18 +27,18 @@ func TestAWSReleasedHostAllocationIsWithdrawn(t *testing.T) {
 	m.SetAnnotations(map[string]string{join.WireGuardAddrAnnotation: "10.100.0.128/24"})
 	s := &corev1.Secret{Data: map[string][]byte{tunnel.PeerAllowedIPsPrefix + "worker": []byte("10.100.0.128/32,172.29.0.11/32")}}
 	for _, prefixes := range [][]netip.Prefix{nil, {netip.MustParsePrefix("172.29.0.12/32")}} {
-		got, err := awsAllowedIPs(m, s, prefixes)
+		got, err := nativeAllowedIPs(m, s, prefixes)
 		if err != nil || strings.Contains(got, "172.29.0.11") || !strings.Contains(got, "10.100.0.128/32") {
 			t.Fatalf("%q %v", got, err)
 		}
 	}
 	s.Data[tunnel.SitePodCIDRsPrefix+"site"] = []byte("172.29.0.0/24")
-	if _, err := awsAllowedIPs(m, s, []netip.Prefix{netip.MustParsePrefix("172.29.0.12/32")}); err == nil {
+	if _, err := nativeAllowedIPs(m, s, []netip.Prefix{netip.MustParsePrefix("172.29.0.12/32")}); err == nil {
 		t.Fatal("AWS stole site pod allocation")
 	}
 	delete(s.Data, tunnel.SitePodCIDRsPrefix+"site")
 	s.Data[tunnel.PeerAllowedIPsPrefix+"other"] = []byte("172.29.0.12/32")
-	if _, err := awsAllowedIPs(m, s, []netip.Prefix{netip.MustParsePrefix("172.29.0.12/32")}); err == nil {
+	if _, err := nativeAllowedIPs(m, s, []netip.Prefix{netip.MustParsePrefix("172.29.0.12/32")}); err == nil {
 		t.Fatal("duplicate ownership accepted")
 	}
 }
@@ -111,7 +113,7 @@ func TestAWSObservationPublishesAndWithdrawsWithoutCalicoFallback(t *testing.T) 
 	// checked by the CNI package and must be qualified by the native campaign.
 	r.network = cni.Network{Name: cni.KubeRouter, Encapsulation: cni.Native}
 	api := &allocationAPI{address: "172.29.0.11"}
-	r.awsPodObserver = &awspod.Observer{Reader: c, API: api, Config: awspod.Config{Account: "123", Region: "us-west-2", VPC: "vpc-1", Subnets: []string{"subnet-1"}, Namespace: "cloud-provisioning", Cluster: "cluster", OwnerTag: "run", OwnerValue: "test", Family: "ipv4", PodRanges: []string{"172.29.0.0/24"}}}
+	r.nativeObservers = map[string]platform.Observer{awspod.NodeValue: platformaws.Observer{Observer: &awspod.Observer{Reader: c, API: api, Config: awspod.Config{Account: "123", Region: "us-west-2", VPC: "vpc-1", Subnets: []string{"subnet-1"}, Namespace: "cloud-provisioning", Cluster: "cluster", OwnerTag: "run", OwnerValue: "test", Family: "ipv4", PodRanges: []string{"172.29.0.0/24"}}}}}
 	read := func() string {
 		t.Helper()
 		if err := c.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {

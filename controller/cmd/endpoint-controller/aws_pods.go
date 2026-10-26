@@ -58,7 +58,7 @@ func newAWSPodObserver(path, credentialsPath string, reader client.Reader) (*aws
 
 // Rebuild from authoritative hosts and this observation, never from the previous
 // AllowedIPs: secondary pod IPs are /32s too and must disappear when released.
-func awsAllowedIPs(machine *unstructured.Unstructured, secret *corev1.Secret, prefixes []netip.Prefix) (string, error) {
+func nativeAllowedIPs(machine *unstructured.Unstructured, secret *corev1.Secret, prefixes []netip.Prefix) (string, error) {
 	var hosts []string
 	for _, key := range []string{join.WireGuardAddrAnnotation, join.WireGuardAddr6Annotation} {
 		if raw := machine.GetAnnotations()[key]; raw != "" {
@@ -96,13 +96,13 @@ func awsAllowedIPs(machine *unstructured.Unstructured, secret *corev1.Secret, pr
 			for _, raw := range hosts {
 				next, _ := netip.ParsePrefix(raw)
 				if next.Overlaps(existing) {
-					return "", fmt.Errorf("AWS allocation overlaps another mesh peer")
+					return "", fmt.Errorf("native allocation overlaps another mesh peer")
 				}
 			}
 		}
 	}
 	// Site pod space is also an ownership boundary; it must never migrate to
-	// an AWS peer because a provider range or allocation was misconfigured.
+	// a native peer because a provider range or allocation was misconfigured.
 	for key, value := range secret.Data {
 		if !strings.HasPrefix(key, tunnel.SitePodCIDRsPrefix) {
 			continue
@@ -114,7 +114,7 @@ func awsAllowedIPs(machine *unstructured.Unstructured, secret *corev1.Secret, pr
 			}
 			for _, p := range prefixes {
 				if p.Overlaps(site) {
-					return "", fmt.Errorf("AWS allocation overlaps site pod space")
+					return "", fmt.Errorf("native allocation overlaps site pod space")
 				}
 			}
 		}

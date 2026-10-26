@@ -12,3 +12,6 @@ charts/*/charts/*.tgz
 
 # Local Python coverage database.
 .coverage
+
+# Cumulative coverage data from scripts/coverage.sh.
+.coverage-data/

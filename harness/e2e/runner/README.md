@@ -203,7 +203,7 @@ destroy the previous inner lab first.
 
 ## Match the wrapper to the pinned SDK
 
-The SDK currently pins upstream commit `2c9fb9ef82fe3e72ba70307c9c9043ac5003f27f`
+The SDK currently pins upstream commit `c1fef84d9ffd8087f4b8bcbd7574ba9654a38a89`
 in both Go modules. Build the guest helper and
 launcher from that same clean checkout:
 

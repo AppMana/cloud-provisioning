@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const LabcontainersRevision = "2c9fb9ef82fe3e72ba70307c9c9043ac5003f27f"
+const LabcontainersRevision = "c1fef84d9ffd8087f4b8bcbd7574ba9654a38a89"
 
 func matchesLabcontainers(info *debug.BuildInfo) bool {
 	const module = "github.com/appmana/labcontainers"

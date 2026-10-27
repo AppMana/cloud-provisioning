@@ -106,10 +106,17 @@ rules:
   {{- end }}
   # The site CNI exclusion: every DaemonSet is read to find the site's
   # network agents, and only those are patched (a required node-affinity
-  # term). The gate before a native-network machine reads them too.
+  # term). On a Calico site the product creates and updates its own Calico
+  # agent for tunnel-class nodes beside calico-node. The gate before a
+  # cloud machine reads them too.
   - apiGroups: ["apps"]
     resources: ["daemonsets"]
-    verbs: ["get", "list", "watch"{{ if .Values.siteCNI.exclusion }}, "patch"{{ end }}]
+    verbs: ["get", "list", "watch"{{ if .Values.siteCNI.exclusion }}, "patch", "create", "update"{{ end }}]
+  # Calico BGP peering is limited to site nodes, since the tunnel carries
+  # no BGP: the full mesh is replaced by a peer selecting site nodes.
+  - apiGroups: ["crd.projectcalico.org"]
+    resources: ["bgpconfigurations", "bgppeers"]
+    verbs: ["get", "list"{{ if .Values.siteCNI.exclusion }}, "create", "patch"{{ end }}]
   {{- if .Values.siteCNI.exclusion }}
   # A Tigera operator renders calico-node from its Installation.
   - apiGroups: ["operator.tigera.io"]

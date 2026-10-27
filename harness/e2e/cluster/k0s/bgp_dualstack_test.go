@@ -155,8 +155,4 @@ func TestTheBuilderAcceptsTheDualStackProfilesRequiredMTU(t *testing.T) {
 	if err := validateSiteConfig(d); err != nil {
 		t.Fatalf("validateSiteConfig: %v", err)
 	}
-	d.K0sCalicoManagedAddresses = true
-	if err := validateSiteConfig(d); err == nil {
-		t.Fatal("managed addresses would change the deployment's own autodetection, and were accepted")
-	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni/site"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	joinaws "github.com/appmana/cloud-provisioning/controller/pkg/join/aws"
+	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -667,13 +668,39 @@ func TestReconcile_NodeClassIsCheckedBeforeTheMachineExists(t *testing.T) {
 	}
 }
 
+// A tunnel-class machine waits for the site network too: on a Calico site
+// the product's Calico agent and site-only BGP peering come first.
+func TestReconcile_TunnelMachinesWaitForTheSiteNetwork(t *testing.T) {
+	claim := fakeClaim("tunnel")
+	template := fakeTemplate("tunnel")
+	_ = unstructured.SetNestedStringMap(template.Object, map[string]string{platform.CNILabel: platform.SiteCNI}, "spec", "template", "metadata", "labels")
+	r := newClaimReconciler(t, claim, template, fakeCluster("appmana"), fakeNode())
+	var asked platform.Class
+	r.SiteNetwork = func(_ context.Context, class platform.Class) error {
+		asked = class
+		return &site.PendingError{DaemonSets: []string{"kube-system/calico-node-tunnel (not yet created)"}}
+	}
+	result, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(claim)})
+	if err != nil || result.RequeueAfter <= 0 {
+		t.Fatalf("Reconcile = %+v, %v; want a timed requeue", result, err)
+	}
+	if asked.Native() {
+		t.Fatalf("the gate was asked about class %+v", asked)
+	}
+	machine := &unstructured.Unstructured{}
+	machine.SetGroupVersionKind(joinaws.Provider{}.GVK())
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "tunnel"}, machine); !apierrors.IsNotFound(err) {
+		t.Fatalf("an AWSMachine exists before the site network admits it: %v", err)
+	}
+}
+
 // A native-network machine is not created while the site pod network could
 // still run on it; the claim says what it waits for, then proceeds.
 func TestReconcile_NativeNetworkMachinesWaitForTheSiteNetworkExclusion(t *testing.T) {
 	claim := fakeClaim("native")
 	r := newClaimReconciler(t, claim, fakeTemplate("native"), fakeCluster("appmana"), fakeNode())
 	waiting := &site.PendingError{DaemonSets: []string{"kube-system/calico-node"}}
-	r.SiteNetwork = func(context.Context) error { return waiting }
+	r.SiteNetwork = func(context.Context, platform.Class) error { return waiting }
 	result, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(claim)})
 	if err != nil || result.RequeueAfter <= 0 {
 		t.Fatalf("Reconcile = %+v, %v; want a timed requeue", result, err)
@@ -691,7 +718,7 @@ func TestReconcile_NativeNetworkMachinesWaitForTheSiteNetworkExclusion(t *testin
 		t.Fatalf("status = %+v", got.Status)
 	}
 
-	r.SiteNetwork = func(context.Context) error { return &site.UnsupportedError{Reason: "embedded flannel"} }
+	r.SiteNetwork = func(context.Context, platform.Class) error { return &site.UnsupportedError{Reason: "embedded flannel"} }
 	if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(claim)}); err == nil {
 		t.Fatal("an unsupported site network was not reported")
 	}
@@ -699,7 +726,7 @@ func TestReconcile_NativeNetworkMachinesWaitForTheSiteNetworkExclusion(t *testin
 		t.Fatalf("status = %+v, %v; want Failed", got.Status, err)
 	}
 
-	r.SiteNetwork = func(context.Context) error { return nil }
+	r.SiteNetwork = func(context.Context, platform.Class) error { return nil }
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatal(err)
 	}

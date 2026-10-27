@@ -128,9 +128,24 @@ tunnel:
 # label, still match. Recognised: DaemonSets mounting /etc/cni/net.d or
 # /opt/cni/bin (Calico, Canal, Flannel, Cilium, kube-router, Multus) and
 # calico-node-windows; a Tigera operator install is changed through its
-# Installation. Adding the term rolls the DaemonSet once. With exclusion
-# false nothing is written, and a native-network machine is created only
-# once the site's own configuration already excludes it.
+# Installation. Adding the term rolls the DaemonSet once.
+#
+# On a Calico site, tunnel-class cloud nodes (those on the site network over
+# their tunnel) do not run the site's calico-node either: it detects each
+# node's address, and on a cloud node finds one the site cannot reach. The
+# product runs a copy, calico-node-tunnel beside calico-node and kept in step
+# with it, on those nodes only, with address detection off (IP=none, and
+# IP6=none where the site sets IP6), so Calico keeps the tunnel address the
+# product stores. The tunnel carries no BGP, so the full BGP mesh is
+# replaced by BGPPeer cloud-provisioning-site-mesh selecting only site nodes
+# (nodeToNodeMeshEnabled: false). Peering the site already configured is not
+# changed: each BGPPeer must leave cloud nodes out, with
+# "!has(cloud-provisioning.appmana.com/role)" as a conjunct of its
+# nodeSelector and peerSelector, or name a site node; otherwise tunnel-class
+# claims fail naming the peer.
+#
+# With exclusion false nothing is written, and a cloud machine is created
+# only once the site's own configuration already provides all of this.
 siteCNI:
   exclusion: true
   # namespace/name of further site network DaemonSets.

@@ -2401,7 +2401,7 @@ func main() {
 	flag.StringVar(&machineSelector, "machine-selector", fmt.Sprintf("%s=%s", cloudWorkerRoleLabel, cloudWorkerRoleValue),
 		"label selector identifying the Machine(s) whose external address drives the dialer's endpoint")
 	flag.StringVar(&secretNamespace, "secret-namespace", "cloud-provisioning", "namespace of the dialer peer Secret")
-	siteCNIExclusion := flag.Bool("site-cni-exclusion", true, "keep the site pod network's DaemonSets off provider-native-network nodes by adding a required node-affinity term; when false, only verify it before creating such a node's machine")
+	siteCNIExclusion := flag.Bool("site-cni-exclusion", true, "keep the site pod network's DaemonSets off provider-native-network nodes by adding a required node-affinity term, and on a Calico site run Calico on tunnel-class cloud nodes with stated addresses and limit BGP peering to site nodes; when false, only verify these before creating a cloud node's machine")
 	siteCNIDaemonSets := flag.String("site-cni-daemonsets", "", "comma-separated namespace/name of site pod network DaemonSets that mount no host CNI directory, in addition to those recognised")
 	capiWorkloadServiceAccount := flag.String("capi-workload-service-account", "", "ServiceAccount, in the release namespace, whose bound token Cluster API uses on this cluster; enables ImportedControlPlane")
 	flag.StringVar(&secretName, "secret-name", "tunnel-peers", "name of the dialer peer Secret")
@@ -2645,7 +2645,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "invalid --site-cni-daemonsets: %v\n", err)
 		os.Exit(1)
 	}
-	if *siteCNIExclusion && len(excluder.Native) > 0 {
+	if *siteCNIExclusion {
 		if err := site.Register(mgr, excluder); err != nil {
 			fmt.Fprintf(os.Stderr, "unable to register the site CNI exclusion: %v\n", err)
 			os.Exit(1)
@@ -2873,12 +2873,12 @@ func main() {
 			Named("claim").
 			For(&v1alpha1.ProvisionedNodeClaim{}).
 			Complete(&claim.Reconciler{
-				SiteNetwork: func(ctx context.Context) error {
+				SiteNetwork: func(ctx context.Context, class platform.Class) error {
 					network, err := cni.Detect(ctx, mgr.GetAPIReader())
 					if err != nil {
 						return err
 					}
-					return excluder.Verify(ctx, network)
+					return excluder.Verify(ctx, network, class)
 				},
 				Client:                    claimAPI,
 				Workload:                  claimAPI,

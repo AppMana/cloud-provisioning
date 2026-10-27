@@ -49,9 +49,9 @@ const clusterNameLabel = "cluster.x-k8s.io/cluster-name"
 
 // Reconciler expands claims.
 type Reconciler struct {
-	// SiteNetwork reports whether the site pod network excludes
-	// native-network nodes; nil skips the check.
-	SiteNetwork func(context.Context) error
+	// SiteNetwork reports whether a node of the class can join the site pod
+	// network as it now stands; nil skips the check.
+	SiteNetwork func(context.Context, platform.Class) error
 	// Lifecycle reads must bypass caches. Production registration supplies direct
 	// Client, Reader and Workload APIs for drain and retirement admission.
 	client.Client
@@ -155,10 +155,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err := class.Check(nativeNetworks(provisioner)); err != nil {
 			return r.fail(ctx, claim, err)
 		}
-		// A native-network node must never run the site's pod network, so
-		// its machine waits until every site network agent excludes it.
-		if class.Native() && r.SiteNetwork != nil {
-			if err := r.SiteNetwork(ctx); err != nil {
+		// A native-network node must never run the site's pod network, and a
+		// tunnel-class node must run it the way a tunnel node needs, so the
+		// machine waits until the site network is ready for its class.
+		if r.SiteNetwork != nil {
+			if err := r.SiteNetwork(ctx, class); err != nil {
 				var pending *site.PendingError
 				if !errors.As(err, &pending) {
 					return r.fail(ctx, claim, err)

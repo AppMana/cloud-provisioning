@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,6 +48,10 @@ func excluder(t *testing.T, objs ...client.Object) (*Excluder, client.Client) {
 	}
 	scheme.AddKnownTypeWithName(installationGVK, &unstructured.Unstructured{})
 	scheme.AddKnownTypeWithName(installationGVK.GroupVersion().WithKind("InstallationList"), &unstructured.UnstructuredList{})
+	for _, gvk := range []schema.GroupVersionKind{bgpConfigurationGVK, bgpPeerGVK} {
+		scheme.AddKnownTypeWithName(gvk, &unstructured.Unstructured{})
+		scheme.AddKnownTypeWithName(gvk.GroupVersion().WithKind(gvk.Kind+"List"), &unstructured.UnstructuredList{})
+	}
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 	return &Excluder{Client: c, Reader: c, Native: []string{"aws-vpc"}, Now: time.Now}, c
 }
@@ -59,6 +64,8 @@ func get(t *testing.T, c client.Client, namespace, name string) *appsv1.DaemonSe
 	}
 	return ds
 }
+
+var nativeClass = platform.Class{OS: "linux", Arch: "amd64", CNI: "aws-vpc"}
 
 var want = corev1.NodeSelectorRequirement{Key: platform.CNILabel, Operator: corev1.NodeSelectorOpNotIn, Values: []string{"aws-vpc"}}
 
@@ -73,7 +80,7 @@ func TestASiteCNIIsKeptOffNativeNetworkNodes(t *testing.T) {
 	if len(terms) != 1 || !reflect.DeepEqual(terms[0].MatchExpressions, []corev1.NodeSelectorRequirement{want}) {
 		t.Fatalf("terms = %+v", terms)
 	}
-	if err := e.Verify(context.Background(), cni.Network{Name: cni.Calico}); err != nil {
+	if err := e.Verify(context.Background(), cni.Network{Name: cni.Calico}, nativeClass); err != nil {
 		t.Fatalf("verify after exclusion: %v", err)
 	}
 }
@@ -133,7 +140,7 @@ func TestTargetsAreTheDaemonSetsThatInstallAPodNetwork(t *testing.T) {
 // Verification fails while any target can still schedule onto a native node.
 func TestVerifyNamesEveryTargetNotYetExcluded(t *testing.T) {
 	e, _ := excluder(t, calicoNode())
-	err := e.Verify(context.Background(), cni.Network{Name: cni.Calico})
+	err := e.Verify(context.Background(), cni.Network{Name: cni.Calico}, nativeClass)
 	var pending *PendingError
 	if !errors.As(err, &pending) || !reflect.DeepEqual(pending.DaemonSets, []string{"kube-system/calico-node"}) {
 		t.Fatalf("verify = %v", err)
@@ -146,7 +153,7 @@ func TestNetworksWithoutAnExcludableAgentAreUnsupported(t *testing.T) {
 	for _, network := range []cni.Network{{Name: cni.OVNKubernetes}, {Name: cni.Flannel, Detail: "node annotation backend-type=vxlan"}, {Name: cni.Unrecognised}} {
 		e, _ := excluder(t)
 		var unsupported *UnsupportedError
-		if err := e.Verify(context.Background(), network); !errors.As(err, &unsupported) {
+		if err := e.Verify(context.Background(), network, nativeClass); !errors.As(err, &unsupported) {
 			t.Fatalf("%s: verify = %v", network.Name, err)
 		}
 	}
@@ -216,7 +223,7 @@ func TestAWriterThatKeepsRemovingTheExclusionTripsTheBreaker(t *testing.T) {
 		t.Fatal("re-applied after the breaker tripped")
 	}
 	var conflict *WriterConflictError
-	if err := e.Verify(context.Background(), cni.Network{Name: cni.Calico}); !errors.As(err, &conflict) {
+	if err := e.Verify(context.Background(), cni.Network{Name: cni.Calico}, nativeClass); !errors.As(err, &conflict) {
 		t.Fatalf("verify = %v", err)
 	}
 	// The window passes: the breaker closes and the exclusion is restored.
@@ -254,7 +261,7 @@ func TestCapturedK0sNetworkAgentsAreExcluded(t *testing.T) {
 		if err := e.Ensure(context.Background(), get(t, c, ds.Namespace, ds.Name)); err != nil {
 			t.Fatal(err)
 		}
-		if err := e.Verify(context.Background(), cni.Network{Name: cni.Calico}); err != nil {
+		if err := e.Verify(context.Background(), cni.Network{Name: cni.Calico}, nativeClass); err != nil {
 			t.Fatalf("%s: %v", capture, err)
 		}
 	}

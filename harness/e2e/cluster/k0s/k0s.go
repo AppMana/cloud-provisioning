@@ -120,12 +120,9 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 // required MTU; the other Calico profiles go through calicoConfig.
 func validateSiteConfig(d cluster.Deps) error {
 	if d.Network == BGPDualStack {
-		if d.K0sCalicoManagedAddresses {
-			return fmt.Errorf("%s keeps the deployment's own address autodetection", BGPDualStack)
-		}
 		return nil
 	}
-	_, err := calicoConfig(d.Network, d.K0sCalicoMTU, d.K0sCalicoManagedAddresses)
+	_, err := calicoConfig(d.Network, d.K0sCalicoMTU)
 	return err
 }
 
@@ -134,7 +131,7 @@ func (b Builder) config(d cluster.Deps, n lab.Node) (*native.ClusterConfig, erro
 	if d.Network == BGPDualStack {
 		return bgpDualStackConfig(d, n)
 	}
-	calicoSettings, err := calicoConfig(d.Network, d.K0sCalicoMTU, d.K0sCalicoManagedAddresses)
+	calicoSettings, err := calicoConfig(d.Network, d.K0sCalicoMTU)
 	if err != nil {
 		return nil, err
 	}
@@ -296,4 +293,3 @@ func installedBinary(ctx context.Context, d cluster.Deps) (string, error) {
 	}
 	return pin, nil
 }
-

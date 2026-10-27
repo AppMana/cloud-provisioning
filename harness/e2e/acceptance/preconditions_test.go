@@ -88,18 +88,18 @@ func byName(results []Check) map[string]Check {
 }
 
 // The deployed cluster as captured: a native dual-stack Calico network
-// the product recognises, whose blocks keep their pod sources, whose
-// address autodetection cannot select a remote's addresses, and whose
-// ranges stay clear of the tunnel's. Its pods' 1450-byte MTU is larger
-// than the 1420 bytes the tunnel carries over a 1500-byte underlay, and
-// that is the one required change.
-func TestTheObservedDeploymentNeedsItsPodMTULoweredAndASiteMesh(t *testing.T) {
+// the product recognises, whose blocks keep their pod sources and whose
+// ranges stay clear of the tunnel's. Its pods' 1450-byte MTU is larger than
+// the 1420 bytes the tunnel carries over a 1500-byte underlay, and that is
+// the one required change: Calico's addresses on cloud nodes and its BGP
+// mesh are the product's, not settings the operator makes.
+func TestTheObservedDeploymentNeedsOnlyItsPodMTULowered(t *testing.T) {
 	results, err := Preconditions(context.Background(), observedCluster(t, nil), Options{TunnelMTU: 1420})
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := byName(results)
-	for _, name := range []string{"network", "dual-stack", "masquerade", "ipv4-autodetection", "ipv6-autodetection", "tunnel-ranges"} {
+	for _, name := range []string{"network", "dual-stack", "masquerade", "tunnel-ranges", "bgp-peers"} {
 		if c, ok := got[name]; !ok || !c.OK {
 			t.Errorf("%s: %+v", name, c)
 		}
@@ -111,17 +111,9 @@ func TestTheObservedDeploymentNeedsItsPodMTULoweredAndASiteMesh(t *testing.T) {
 	if Passed(results) {
 		t.Error("the precondition set passed with a pod MTU larger than the tunnel's")
 	}
-	// Calico peers every node with every other unless told otherwise, and
-	// the deployment has no BGP configuration of its own.
-	mesh := got["bgp-mesh"]
-	if mesh.OK || !mesh.Required {
-		t.Errorf("bgp-mesh = %+v, want a required failure", mesh)
-	}
-	// Lowered to the tunnel's MTU and peering site nodes only, nothing
-	// required remains.
 	results, err = Preconditions(context.Background(), observedCluster(t, func(ds *appsv1.DaemonSet) {
 		setCNIMTU(ds, 1420)
-	}, siteMesh()...), Options{TunnelMTU: 1420})
+	}), Options{TunnelMTU: 1420})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,54 +122,32 @@ func TestTheObservedDeploymentNeedsItsPodMTULoweredAndASiteMesh(t *testing.T) {
 	}
 }
 
-// siteMesh is the BGP setting the lab applies with -calico-site-mesh.
-func siteMesh() []client.Object {
-	return []client.Object{
-		&unstructured.Unstructured{Object: map[string]any{
-			"apiVersion": "crd.projectcalico.org/v1", "kind": "BGPConfiguration",
-			"metadata": map[string]any{"name": "default"}, "spec": map[string]any{"nodeToNodeMeshEnabled": false}}},
-		&unstructured.Unstructured{Object: map[string]any{
-			"apiVersion": "crd.projectcalico.org/v1", "kind": "BGPPeer",
-			"metadata": map[string]any{"name": "site-mesh"},
-			"spec":     map[string]any{"nodeSelector": "!has(cloud-provisioning.appmana.com/role)", "peerSelector": "!has(cloud-provisioning.appmana.com/role)"}}},
+func bgpPeer(name, nodeSelector string) *unstructured.Unstructured {
+	spec := map[string]any{"peerIP": "10.2.0.1"}
+	if nodeSelector != "" {
+		spec["nodeSelector"] = nodeSelector
 	}
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "crd.projectcalico.org/v1", "kind": "BGPPeer",
+		"metadata": map[string]any{"name": name}, "spec": spec}}
 }
 
-// Autodetection that can find an address on a remote fights the address
-// the product publishes for it: a remote's calico-node keeps a stored
-// address only when its own detection finds nothing.
-func TestAutodetectionThatCanSelectARemoteAddressIsRefused(t *testing.T) {
-	for method, ok := range map[string]bool{
-		"first-found":                false,
-		"kubernetes-internal-ip":     false,
-		"can-reach=10.101.0.1":       false,
-		"cidr=10.0.0.0/8":            false, // covers the IPv4 tunnel range
-		"cidr=10.101.0.0/24":         true,
-		"interface=eno1":             false,
-		"skip-interface=cldt.*,eth9": false,
+// A peer the operator configured, such as a site router, must leave cloud
+// nodes out, since the product does not change it.
+func TestARouterPeerMustLeaveCloudNodesOut(t *testing.T) {
+	for selector, ok := range map[string]bool{
+		"":      false,
+		"all()": false,
+		"!has(cloud-provisioning.appmana.com/role)":                                true,
+		"!has(cloud-provisioning.appmana.com/role) && kubernetes.io/os == 'linux'": true,
+		"!has(cloud-provisioning.appmana.com/role) || rack == 'a'":                 false,
 	} {
-		results, err := Preconditions(context.Background(), observedCluster(t, func(ds *appsv1.DaemonSet) {
-			setEnv(ds, "IP_AUTODETECTION_METHOD", method)
-		}), Options{TunnelMTU: 1420})
+		results, err := Preconditions(context.Background(), observedCluster(t, nil, bgpPeer("router", selector)), Options{TunnelMTU: 1420})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if c := byName(results)["ipv4-autodetection"]; c.OK != ok {
-			t.Errorf("method %q: %+v, want ok=%v", method, c, ok)
-		}
-	}
-}
-
-func setEnv(ds *appsv1.DaemonSet, name, value string) {
-	for i := range ds.Spec.Template.Spec.Containers {
-		c := &ds.Spec.Template.Spec.Containers[i]
-		if c.Name != "calico-node" {
-			continue
-		}
-		for j := range c.Env {
-			if c.Env[j].Name == name {
-				c.Env[j].Value = value
-			}
+		if c := byName(results)["bgp-peers"]; c.OK != ok || !c.Required {
+			t.Errorf("nodeSelector %q: %+v, want ok=%v", selector, c, ok)
 		}
 	}
 }
@@ -233,54 +203,6 @@ func TestPodMTURejectsInvalidTunnelBudget(t *testing.T) {
 func itoa(n int) string {
 	raw, _ := json.Marshal(n)
 	return string(raw)
-}
-
-func TestUnrelatedOrCloudInclusiveBGPSelectorsDoNotQualifySiteMesh(t *testing.T) {
-	for _, selectors := range [][2]string{
-		{"all()", "all()"},
-		{"rack == 'absent'", "rack == 'absent'"},
-		{"!has(cloud-provisioning.appmana.com/role)", "all()"},
-		{"all()", "!has(cloud-provisioning.appmana.com/role)"},
-		{"", "!has(cloud-provisioning.appmana.com/role)"},
-	} {
-		objects := siteMesh()
-		peer := objects[1].(*unstructured.Unstructured)
-		_ = unstructured.SetNestedField(peer.Object, selectors[0], "spec", "nodeSelector")
-		_ = unstructured.SetNestedField(peer.Object, selectors[1], "spec", "peerSelector")
-		got := bgpMesh(context.Background(), observedCluster(t, nil, objects...))
-		if got.OK || !got.Required {
-			t.Fatalf("unsafe selectors %v accepted: %+v", selectors, got)
-		}
-	}
-}
-
-func TestSiteMeshRequiresActualSiteNodeCoverage(t *testing.T) {
-	objects := append(siteMesh(), &corev1.Node{ObjectMeta: metav1.ObjectMeta{
-		Name: "excluded-site", Labels: map[string]string{"cloud-provisioning.appmana.com/role": "site"},
-	}})
-	got := bgpMesh(context.Background(), observedCluster(t, nil, objects...))
-	if got.OK || !strings.Contains(got.Detail, "excluded-site") {
-		t.Fatalf("excluded site node accepted: %+v", got)
-	}
-}
-
-func TestGlobalRouterPeerCannotHideBehindSafeSiteMesh(t *testing.T) {
-	objects := siteMesh()
-	router := objects[1].(*unstructured.Unstructured).DeepCopy()
-	router.SetName("external-router")
-	unstructured.RemoveNestedField(router.Object, "spec", "nodeSelector")
-	unstructured.RemoveNestedField(router.Object, "spec", "peerSelector")
-	_ = unstructured.SetNestedField(router.Object, "10.2.0.1", "spec", "peerIP")
-	objects = append(objects, router)
-	got := bgpMesh(context.Background(), observedCluster(t, nil, objects...))
-	if got.OK {
-		t.Fatal("global router peer passed cloud exclusion")
-	}
-	_ = unstructured.SetNestedField(router.Object, "!has(cloud-provisioning.appmana.com/role)", "spec", "nodeSelector")
-	got = bgpMesh(context.Background(), observedCluster(t, nil, objects...))
-	if !got.OK {
-		t.Fatalf("site-scoped router peer rejected: %+v", got)
-	}
 }
 
 func TestCalicoPreflightCannotQualifyAWSAllocations(t *testing.T) {

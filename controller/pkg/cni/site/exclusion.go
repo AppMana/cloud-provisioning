@@ -1,5 +1,6 @@
 // Package site keeps the site's own pod network off nodes whose pods a
-// provider-native network owns.
+// provider-native network owns, and runs the site's Calico on tunnel-class
+// cloud nodes in the form those nodes need (see calico_tunnel.go).
 //
 // Taints do not do this: a CNI DaemonSet tolerates every taint so that it
 // reaches every node. Each one is given a required node-affinity term that
@@ -101,6 +102,20 @@ func Requirement(native []string) corev1.NodeSelectorRequirement {
 	return corev1.NodeSelectorRequirement{Key: platform.CNILabel, Operator: corev1.NodeSelectorOpNotIn, Values: values}
 }
 
+// requirements are the node requirements one site network DaemonSet
+// carries: off native-network nodes, and for the site's Calico, off every
+// cloud worker, where the tunnel agent runs instead.
+func (e *Excluder) requirements(ds *appsv1.DaemonSet) []corev1.NodeSelectorRequirement {
+	var reqs []corev1.NodeSelectorRequirement
+	if len(e.Native) > 0 {
+		reqs = append(reqs, Requirement(e.Native))
+	}
+	if isCalicoAgent(ds) {
+		reqs = append(reqs, cloudWorkers)
+	}
+	return reqs
+}
+
 // IsTarget reports whether a DaemonSet runs the site's pod network.
 func (e *Excluder) IsTarget(ds *appsv1.DaemonSet) bool {
 	if _, ok := ds.Labels[platform.ComponentLabel]; ok {
@@ -138,9 +153,14 @@ func (e *Excluder) Targets(ctx context.Context) ([]appsv1.DaemonSet, error) {
 	return targets, nil
 }
 
-// Verify reports whether a native-network node can join: every site network
-// DaemonSet excludes it, and the site network is one that can be excluded.
-func (e *Excluder) Verify(ctx context.Context, network cni.Network) error {
+// Verify reports whether a node of this class can join. A native-network
+// node needs every site network DaemonSet to exclude it, on a site network
+// that can be excluded. A tunnel-class node on a Calico site needs the
+// product's Calico agent and BGP peering limited to site nodes.
+func (e *Excluder) Verify(ctx context.Context, network cni.Network, class platform.Class) error {
+	if !class.Native() {
+		return e.verifyTunnel(ctx, network)
+	}
 	if network.Name == cni.OVNKubernetes {
 		return &UnsupportedError{Reason: "OVN-Kubernetes is managed by the distribution's network operator, which places its node agent on every node"}
 	}
@@ -151,14 +171,13 @@ func (e *Excluder) Verify(ctx context.Context, network cni.Network) error {
 	if len(targets) == 0 {
 		return &UnsupportedError{Reason: fmt.Sprintf("no DaemonSet runs the %s pod network (%s), so it runs inside the node agent and cannot be kept off a node", network.Name, network.Detail)}
 	}
-	req := Requirement(e.Native)
 	var pending []string
 	for _, ds := range targets {
 		key := client.ObjectKeyFromObject(&ds)
 		if e.tripped(key) {
 			return &WriterConflictError{DaemonSet: key.String()}
 		}
-		if !excludes(&ds.Spec.Template.Spec, req) {
+		if !excludes(&ds.Spec.Template.Spec, e.requirements(&ds)) {
 			pending = append(pending, key.String())
 		}
 	}
@@ -168,26 +187,78 @@ func (e *Excluder) Verify(ctx context.Context, network cni.Network) error {
 	return nil
 }
 
-// Ensure excludes native-network nodes from one site network DaemonSet.
-func (e *Excluder) Ensure(ctx context.Context, ds *appsv1.DaemonSet) error {
-	req := Requirement(e.Native)
-	if len(req.Values) == 0 || excludes(&ds.Spec.Template.Spec, req) {
+// verifyTunnel reports whether a tunnel-class node can join the site network.
+func (e *Excluder) verifyTunnel(ctx context.Context, network cni.Network) error {
+	if network.Name != cni.Calico {
 		return nil
+	}
+	targets, err := e.Targets(ctx)
+	if err != nil {
+		return err
+	}
+	var agents []appsv1.DaemonSet
+	for _, ds := range targets {
+		if isCalicoAgent(&ds) {
+			agents = append(agents, ds)
+		}
+	}
+	if len(agents) == 0 {
+		return &UnsupportedError{Reason: "the site runs Calico but no calico-node DaemonSet, so there is no agent to run on tunnel nodes with their stated addresses"}
+	}
+	for _, ds := range agents {
+		key := client.ObjectKeyFromObject(&ds)
+		if e.tripped(key) {
+			return &WriterConflictError{DaemonSet: key.String()}
+		}
+		if !excludes(&ds.Spec.Template.Spec, e.requirements(&ds)) {
+			return &PendingError{DaemonSets: []string{key.String()}}
+		}
+		if err := e.verifyTunnelAgent(ctx, &ds); err != nil {
+			return err
+		}
+	}
+	return e.verifyBGPScope(ctx)
+}
+
+// Ensure excludes native-network nodes from one site network DaemonSet and,
+// for the site's Calico, cloud workers too, after which it brings up the
+// tunnel agent and limits the BGP mesh to site nodes. The exclusion comes
+// first so the two agents never run on one node.
+func (e *Excluder) Ensure(ctx context.Context, ds *appsv1.DaemonSet) error {
+	excluded, err := e.ensureExcluded(ctx, ds)
+	if err != nil || !excluded || !isCalicoAgent(ds) {
+		return err
+	}
+	if err := e.ensureTunnelAgent(ctx, ds); err != nil {
+		return err
+	}
+	return e.ensureBGPScope(ctx)
+}
+
+// ensureExcluded reports whether the DaemonSet as it now runs carries the
+// exclusion. Through an Installation that is only once the operator has
+// rendered it, which brings this DaemonSet back to the reconciler.
+func (e *Excluder) ensureExcluded(ctx context.Context, ds *appsv1.DaemonSet) (bool, error) {
+	reqs := e.requirements(ds)
+	if len(reqs) == 0 || excludes(&ds.Spec.Template.Spec, reqs) {
+		return true, nil
 	}
 	key := client.ObjectKeyFromObject(ds)
 	if !e.admit(key) {
-		logf.FromContext(ctx).Info("not restoring the native-network exclusion: another writer keeps removing it", "daemonSet", key)
-		return nil
+		logf.FromContext(ctx).Info("not restoring the cloud-node exclusion: another writer keeps removing it", "daemonSet", key)
+		return false, nil
 	}
+	rendered := true
 	if owner := installationOwner(ds); owner != "" {
-		if err := e.ensureInstallation(ctx, owner, ds, req); err != nil {
-			return err
+		if err := e.ensureInstallation(ctx, owner, ds, reqs); err != nil {
+			return false, err
 		}
+		rendered = false
 	} else {
 		patched := ds.DeepCopy()
-		exclude(&patched.Spec.Template.Spec, req)
+		exclude(&patched.Spec.Template.Spec, reqs)
 		if err := e.Client.Patch(ctx, patched, client.MergeFromWithOptions(ds, client.MergeFromWithOptimisticLock{})); err != nil {
-			return fmt.Errorf("excluding native-network nodes from %s: %w", key, err)
+			return false, fmt.Errorf("excluding cloud nodes from %s: %w", key, err)
 		}
 	}
 	e.mu.Lock()
@@ -196,8 +267,8 @@ func (e *Excluder) Ensure(ctx context.Context, ds *appsv1.DaemonSet) error {
 	}
 	e.applied[key] = true
 	e.mu.Unlock()
-	logf.FromContext(ctx).Info("excluded native-network nodes from the site pod network", "daemonSet", key, "requirement", req)
-	return nil
+	logf.FromContext(ctx).Info("excluded cloud nodes from the site pod network", "daemonSet", key, "requirements", reqs)
+	return rendered, nil
 }
 
 // admit records a restore of an exclusion this process applied before, and
@@ -250,7 +321,7 @@ func installationOwner(ds *appsv1.DaemonSet) string {
 // ensureInstallation writes the exclusion into the Installation override the
 // operator renders this DaemonSet from. The override's affinity replaces the
 // operator's default, so it starts from what the operator rendered.
-func (e *Excluder) ensureInstallation(ctx context.Context, name string, ds *appsv1.DaemonSet, req corev1.NodeSelectorRequirement) error {
+func (e *Excluder) ensureInstallation(ctx context.Context, name string, ds *appsv1.DaemonSet, reqs []corev1.NodeSelectorRequirement) error {
 	field, ok := installationFields[ds.Name]
 	if !ok {
 		return fmt.Errorf("the Tigera operator renders %s from no Installation override this controller knows", client.ObjectKeyFromObject(ds))
@@ -261,7 +332,7 @@ func (e *Excluder) ensureInstallation(ctx context.Context, name string, ds *apps
 		return fmt.Errorf("reading Installation %s: %w", name, err)
 	}
 	spec := ds.Spec.Template.Spec.DeepCopy()
-	exclude(spec, req)
+	exclude(spec, reqs)
 	affinity, err := runtime.DefaultUnstructuredConverter.ToUnstructured(spec.Affinity)
 	if err != nil {
 		return err
@@ -276,8 +347,8 @@ func (e *Excluder) ensureInstallation(ctx context.Context, name string, ds *apps
 	return nil
 }
 
-// excludes reports whether every required term carries req.
-func excludes(spec *corev1.PodSpec, req corev1.NodeSelectorRequirement) bool {
+// excludes reports whether every required term carries every requirement.
+func excludes(spec *corev1.PodSpec, reqs []corev1.NodeSelectorRequirement) bool {
 	if spec.Affinity == nil || spec.Affinity.NodeAffinity == nil || spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
 		return false
 	}
@@ -286,10 +357,12 @@ func excludes(spec *corev1.PodSpec, req corev1.NodeSelectorRequirement) bool {
 		return false
 	}
 	for _, term := range terms {
-		if !slices.ContainsFunc(term.MatchExpressions, func(r corev1.NodeSelectorRequirement) bool {
-			return r.Key == req.Key && r.Operator == req.Operator && covers(r.Values, req.Values)
-		}) {
-			return false
+		for _, req := range reqs {
+			if !slices.ContainsFunc(term.MatchExpressions, func(r corev1.NodeSelectorRequirement) bool {
+				return r.Key == req.Key && r.Operator == req.Operator && covers(r.Values, req.Values)
+			}) {
+				return false
+			}
 		}
 	}
 	return true
@@ -304,9 +377,9 @@ func covers(have, need []string) bool {
 	return true
 }
 
-// exclude ANDs req into every required term, replacing any earlier
-// exclusion on the same key; with no required terms it adds one.
-func exclude(spec *corev1.PodSpec, req corev1.NodeSelectorRequirement) {
+// exclude ANDs each requirement into every required term, replacing any
+// earlier exclusion on the same key; with no required terms it adds one.
+func exclude(spec *corev1.PodSpec, reqs []corev1.NodeSelectorRequirement) {
 	if spec.Affinity == nil {
 		spec.Affinity = &corev1.Affinity{}
 	}
@@ -316,15 +389,17 @@ func exclude(spec *corev1.PodSpec, req corev1.NodeSelectorRequirement) {
 	required := spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 	if required == nil || len(required.NodeSelectorTerms) == 0 {
 		spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{
-			NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: []corev1.NodeSelectorRequirement{req}}},
+			NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: slices.Clone(reqs)}},
 		}
 		return
 	}
 	for i := range required.NodeSelectorTerms {
 		term := &required.NodeSelectorTerms[i]
-		term.MatchExpressions = slices.DeleteFunc(term.MatchExpressions, func(r corev1.NodeSelectorRequirement) bool {
-			return r.Key == req.Key && r.Operator == corev1.NodeSelectorOpNotIn
-		})
-		term.MatchExpressions = append(term.MatchExpressions, req)
+		for _, req := range reqs {
+			term.MatchExpressions = slices.DeleteFunc(term.MatchExpressions, func(r corev1.NodeSelectorRequirement) bool {
+				return r.Key == req.Key && r.Operator == corev1.NodeSelectorOpNotIn
+			})
+			term.MatchExpressions = append(term.MatchExpressions, req)
+		}
 	}
 }

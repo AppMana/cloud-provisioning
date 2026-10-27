@@ -1,16 +1,17 @@
 package k0s
 
 import (
-	"encoding/json"
 	"fmt"
 	native "github.com/k0sproject/k0s/pkg/apis/k0s/v1beta1"
 	"sigs.k8s.io/yaml"
 )
 
-// calicoConfig constructs native k0s overrides for this product's profile.
-func calicoConfig(network string, mtu int, managedAddresses bool) (*native.Calico, error) {
+// calicoConfig constructs native k0s overrides for the lab's site profile.
+// Which address Calico keeps on a cloud node is the product's business (its
+// tunnel-node Calico agent), not the site's.
+func calicoConfig(network string, mtu int) (*native.Calico, error) {
 	siteBGP := network == "calico-site-bgp"
-	if mtu == 0 && !managedAddresses && !siteBGP {
+	if mtu == 0 && !siteBGP {
 		return nil, nil
 	}
 	if network != "calico" && !siteBGP {
@@ -24,19 +25,6 @@ func calicoConfig(network string, mtu int, managedAddresses bool) (*native.Calic
 		config.Mode = native.CalicoModeBIRD
 		config.Overlay = "Never"
 		config.IPAutodetectionMethod = "kubernetes-internal-ip"
-	}
-	if managedAddresses {
-		env := []map[string]string{{"name": "IP", "$patch": "delete"}}
-		spec := map[string]any{"containers": []any{map[string]any{"name": "calico-node", "env": env}}}
-		patch, err := json.Marshal(map[string]any{"spec": map[string]any{"template": map[string]any{"spec": spec}}})
-		if err != nil {
-			return nil, err
-		}
-		// The patch covers the entire pod, including the host CNI installer.
-		config.Patches = native.Patches{{
-			Target: native.PatchTarget{Kind: "DaemonSet", Name: "calico-node", Namespace: "kube-system"},
-			Patch:  native.PatchSpec{Type: native.StrategicMergePatchType, Content: string(patch)},
-		}}
 	}
 	return config, nil
 }

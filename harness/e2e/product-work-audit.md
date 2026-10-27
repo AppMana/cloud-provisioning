@@ -10,11 +10,11 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 
 | Item | Status |
 |---|---|
-| C1 Calico placement | DaemonSet exclusion in product (95021de). OPEN: IPPool node selectors (`cni not in` on site pools) not done in product; harness pool selectors were dropped |
-| C2 Calico IP env delete | open |
-| C3 kubeadm IP_AUTODETECTION can-reach | open |
-| C4 dual-stack cidr autodetect | open |
-| C5 BGP mesh scoping (site_mesh.go) | open |
+| C1 Calico placement | done: DaemonSet exclusion in product (95021de). IPPool node selectors are not needed: no Calico agent or CNI runs on a native node, so nothing allocates from site pools there |
+| C2 Calico IP env delete | done: product runs `calico-node-tunnel` (IP=none, IP6=none) on tunnel-class Linux nodes and keeps the site calico-node off cloud workers; harness patch and flag deleted. OPEN part: Windows `calico-node-windows` still autodetects on Windows cloud workers (tracked with C17) |
+| C3 kubeadm IP_AUTODETECTION can-reach | done: now governs site nodes only (remotes run the product agent with IP=none), so it is site configuration, not cover |
+| C4 dual-stack cidr autodetect | done: same as C3; acceptance no longer requires an operator autodetection setting |
+| C5 BGP mesh scoping (site_mesh.go) | done: product replaces the full mesh with BGPPeer cloud-provisioning-site-mesh, refuses tunnel claims while an operator peer reaches cloud nodes; site_mesh.go and -calico-site-mesh deleted; acceptance uses the product check |
 | C6 control-plane recognition | done: product recognises k0s, MicroK8s and taint marks (`platform.IsControlPlane`); harness labelling deleted; placement rows and windows_join.py no longer read a harness label |
 | C7 harness providerID patch | done: harness deleted the Node patch; `WaitRegistration` fails when the node did not register under the product's `--provider-id` |
 | C8 microk8s join token renewal | open |
@@ -34,9 +34,14 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | D5 windows-publisher image release | open |
 | D6 nodegroup CRD | open |
 | D7 forks | open |
-| Assertions list | CAPI association (C7) and control-plane placement (C6) closed; rest open |
+| Assertions list | CAPI association (C7), control-plane placement (C6), kubeadm Calico (C3) and CalicoNodesReady (C5, now measures the product agent on remotes) closed; rest open |
 | /tmp writes | open |
 | Mechanical write guard (harness kube/AWS writes refused outside an allowlist) | open |
+
+## Found while closing items
+
+- `scripts/coverage.sh` never set `KUBEBUILDER_ASSETS`, so every envtest skipped; once enabled, an RBAC envtest and an observer race surfaced. Fixed: the script uses the newest installed envtest binaries and starts Go data afresh per run.
+- `observe/survivor_native.py` lost other hosts' evidence when one host failed first (`Executor.map` cancels pending work). Fixed with `each_host` and a regression test.
 
 ## Report (verbatim)
 

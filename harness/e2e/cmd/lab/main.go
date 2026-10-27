@@ -66,42 +66,40 @@ func exitCode(run func()) (code int) {
 
 func runLab() {
 	var (
-		distro                 = flag.String("distro", "", "also build the site cluster with this distribution")
-		k0sBinary              = flag.String("k0s-binary", "", "prepared host k0s binary for a fresh k0s site; no automatic download")
-		k0sVersion             = flag.String("k0s-version", k0s.Version, "expected version of the prepared or installed k0s binary")
-		k0sSourceRevision      = flag.String("k0s-source-revision", "", "full source commit for a prepared k0s fork build")
-		k0sBinarySHA256        = flag.String("k0s-binary-sha256", "", "required SHA256 of --k0s-binary")
-		k0sImagesPath          = flag.String("k0s-images", "", "prepared native k0s ClusterImages JSON; required for fresh Calico profiles")
-		k0sImagesSHA256        = flag.String("k0s-images-sha256", "", "required SHA256 of --k0s-images")
-		k3sBinary              = flag.String("k3s-binary", "", "prepared host k3s binary; no automatic download")
-		k3sBinarySHA256        = flag.String("k3s-binary-sha256", "", "required SHA256 of --k3s-binary")
-		rke2Artifacts          = flag.String("rke2-artifacts-dir", "", "prepared RKE2 installer, archive and checksum directory")
-		rke2InstallerSHA256    = flag.String("rke2-installer-sha256", "", "required SHA256 of RKE2 install.sh")
-		rke2ArchiveSHA256      = flag.String("rke2-archive-sha256", "", "required SHA256 of rke2.linux-amd64.tar.gz")
-		rke2ChecksumsSHA256    = flag.String("rke2-checksums-sha256", "", "required SHA256 of sha256sum-amd64.txt")
-		cni                    = flag.String("cni", "", "distribution-supported network profile (default: bundled default)")
-		calicoMTU              = flag.Int("k0s-calico-mtu", 0, "bundled Calico MTU for a fresh k0s site; zero preserves the distro default")
-		calicoObjectsPath      = flag.String("calico-objects", "", "prepared native Kubernetes List JSON from the aligned Calico fork (standalone installer)")
-		calicoObjectsSHA256    = flag.String("calico-objects-sha256", "", "required SHA256 of --calico-objects")
-		calicoManagedAddresses = flag.Bool("k0s-calico-managed-addresses", false, "use stored per-node Calico addresses on a fresh k0s site instead of repeated IP autodetection")
-		linuxEgress            = flag.Bool("k0s-linux-egress", false, "add Linux default-route Konnectivity agents on a fresh k0s VM site for mixed-OS API egress")
-		siteMesh               = flag.Bool("calico-site-mesh", false, "replace Calico's full node mesh with BGP peering among site nodes only, the setting remote calico-node readiness requires")
-		product                = flag.Bool("product", false, "also install the product's chart")
-		remoteSlots            = flag.Int("remote-slots", 2, "fixed single-NIC remote VM capacity (2..32), including spare group slots")
-		vmMemory               = flag.Int("vm-memory-mib", lab.VMMemoryMB, "memory of each cluster VM; budget it against the host's available memory")
-		remotes                = flag.String("remotes", "", "comma-separated remotes to claim and bootstrap (e.g. remote1)")
-		lifecycle              = flag.Bool("lifecycle", true, "remove and re-add each claimed remote under every requested placement (initial two-workers if none)")
-		capiMode               = flag.String("capi-mode", "imported", "imported (CAPI associates Nodes) or unconnected (product providerID fallback)")
-		checks                 = flag.Bool("check", false, "also run the reachability matrix")
-		outages                = flag.String("outage", "", "outages under each placement: all or comma-separated victim:cut/victim:reboot")
-		places                 = flag.String("placements", "", "also walk these placements, comma separated (e.g. control-plane,two-workers,all-nodes)")
-		repoDir                = flag.String("repo-dir", "../..", "the repository root")
-		rigKind                = flag.String("rig", "vm", "cluster node platform: vm (single-NIC KVM guest)")
-		workDir                = flag.String("work-dir", "_work", "where the generated topology is written")
-		reuseSite              = flag.Bool("reuse-site", false, "resume tests on a verified existing VM site; does not establish a fresh bringup")
-		recoverHost            = flag.Bool("recover-host", false, "with -reuse-site after a host reboot: rebuild this host's segments and every wrapper's links, booting each machine from its existing disk")
-		down                   = flag.Bool("down", false, "destroy the lab instead of building it")
-		timeout                = flag.Duration("timeout", 2*time.Hour, "deadline for the whole run")
+		distro              = flag.String("distro", "", "also build the site cluster with this distribution")
+		k0sBinary           = flag.String("k0s-binary", "", "prepared host k0s binary for a fresh k0s site; no automatic download")
+		k0sVersion          = flag.String("k0s-version", k0s.Version, "expected version of the prepared or installed k0s binary")
+		k0sSourceRevision   = flag.String("k0s-source-revision", "", "full source commit for a prepared k0s fork build")
+		k0sBinarySHA256     = flag.String("k0s-binary-sha256", "", "required SHA256 of --k0s-binary")
+		k0sImagesPath       = flag.String("k0s-images", "", "prepared native k0s ClusterImages JSON; required for fresh Calico profiles")
+		k0sImagesSHA256     = flag.String("k0s-images-sha256", "", "required SHA256 of --k0s-images")
+		k3sBinary           = flag.String("k3s-binary", "", "prepared host k3s binary; no automatic download")
+		k3sBinarySHA256     = flag.String("k3s-binary-sha256", "", "required SHA256 of --k3s-binary")
+		rke2Artifacts       = flag.String("rke2-artifacts-dir", "", "prepared RKE2 installer, archive and checksum directory")
+		rke2InstallerSHA256 = flag.String("rke2-installer-sha256", "", "required SHA256 of RKE2 install.sh")
+		rke2ArchiveSHA256   = flag.String("rke2-archive-sha256", "", "required SHA256 of rke2.linux-amd64.tar.gz")
+		rke2ChecksumsSHA256 = flag.String("rke2-checksums-sha256", "", "required SHA256 of sha256sum-amd64.txt")
+		cni                 = flag.String("cni", "", "distribution-supported network profile (default: bundled default)")
+		calicoMTU           = flag.Int("k0s-calico-mtu", 0, "bundled Calico MTU for a fresh k0s site; zero preserves the distro default")
+		calicoObjectsPath   = flag.String("calico-objects", "", "prepared native Kubernetes List JSON from the aligned Calico fork (standalone installer)")
+		calicoObjectsSHA256 = flag.String("calico-objects-sha256", "", "required SHA256 of --calico-objects")
+		linuxEgress         = flag.Bool("k0s-linux-egress", false, "add Linux default-route Konnectivity agents on a fresh k0s VM site for mixed-OS API egress")
+		product             = flag.Bool("product", false, "also install the product's chart")
+		remoteSlots         = flag.Int("remote-slots", 2, "fixed single-NIC remote VM capacity (2..32), including spare group slots")
+		vmMemory            = flag.Int("vm-memory-mib", lab.VMMemoryMB, "memory of each cluster VM; budget it against the host's available memory")
+		remotes             = flag.String("remotes", "", "comma-separated remotes to claim and bootstrap (e.g. remote1)")
+		lifecycle           = flag.Bool("lifecycle", true, "remove and re-add each claimed remote under every requested placement (initial two-workers if none)")
+		capiMode            = flag.String("capi-mode", "imported", "imported (CAPI associates Nodes) or unconnected (product providerID fallback)")
+		checks              = flag.Bool("check", false, "also run the reachability matrix")
+		outages             = flag.String("outage", "", "outages under each placement: all or comma-separated victim:cut/victim:reboot")
+		places              = flag.String("placements", "", "also walk these placements, comma separated (e.g. control-plane,two-workers,all-nodes)")
+		repoDir             = flag.String("repo-dir", "../..", "the repository root")
+		rigKind             = flag.String("rig", "vm", "cluster node platform: vm (single-NIC KVM guest)")
+		workDir             = flag.String("work-dir", "_work", "where the generated topology is written")
+		reuseSite           = flag.Bool("reuse-site", false, "resume tests on a verified existing VM site; does not establish a fresh bringup")
+		recoverHost         = flag.Bool("recover-host", false, "with -reuse-site after a host reboot: rebuild this host's segments and every wrapper's links, booting each machine from its existing disk")
+		down                = flag.Bool("down", false, "destroy the lab instead of building it")
+		timeout             = flag.Duration("timeout", 2*time.Hour, "deadline for the whole run")
 	)
 	flag.Parse()
 	if *distro == "rke2" && !*reuseSite && !*down && (*rke2Artifacts == "" || *rke2InstallerSHA256 == "" || *rke2ArchiveSHA256 == "" || *rke2ChecksumsSHA256 == "") {
@@ -141,9 +139,6 @@ func runLab() {
 		// The dual-stack profile verifies a reused site's stored MTU against it.
 		fail("--k0s-calico-mtu requires a fresh k0s Calico site (or a reused calico-bird-dualstack site built with it) and an MTU between 1280 and 65535")
 	}
-	if *calicoManagedAddresses && (*distro != "k0s" || (selected.Network != "calico" && selected.Network != "calico-site-bgp") || *reuseSite) {
-		fail("--k0s-calico-managed-addresses requires a fresh k0s Calico site")
-	}
 	if selected.Network == "calico-site-bgp" && *remotes != "" {
 		fail("calico-site-bgp remote VM claims need a separately configured remote CNI; use the AWS VPC CNI workflow for AWS workers")
 	}
@@ -161,9 +156,6 @@ func runLab() {
 		if err := k0s.ValidateImages(selected.BuilderNetwork, k0sImages); err != nil {
 			fail("%v", err)
 		}
-	}
-	if *siteMesh && (*distro != "k0s" || (selected.Network != k0s.BGPDualStack && selected.Network != "calico-site-bgp")) {
-		fail("-calico-site-mesh applies to the k0s Calico BGP profiles")
 	}
 	if *linuxEgress && (*distro != "k0s" || *rigKind != "vm" || *reuseSite) {
 		fail("--k0s-linux-egress requires a fresh k0s VM site")
@@ -331,10 +323,9 @@ func runLab() {
 			K3sBinary: *k3sBinary, K3sBinarySHA256: *k3sBinarySHA256,
 			RKE2ArtifactsDirectory: *rke2Artifacts, RKE2InstallerSHA256: *rke2InstallerSHA256,
 			RKE2ArchiveSHA256: *rke2ArchiveSHA256, RKE2ChecksumsSHA256: *rke2ChecksumsSHA256,
-			K0sCalicoMTU:              *calicoMTU,
-			K0sCalicoManagedAddresses: *calicoManagedAddresses,
-			Images:                    cluster.Importer{Images: images, Args: b.ImportArgs()},
-			PodCIDR:                   podCIDR(selected), SvcCIDR: serviceCIDR(selected),
+			K0sCalicoMTU: *calicoMTU,
+			Images:       cluster.Importer{Images: images, Args: b.ImportArgs()},
+			PodCIDR:      podCIDR(selected), SvcCIDR: serviceCIDR(selected),
 			Kube: &kube.Client{Bastion: r.Node("bastion"), ControlPlanes: cluster.ControlPlaneAddresses(topo)},
 		}
 		if *reuseSite {
@@ -381,13 +372,6 @@ func runLab() {
 				fail("%v", err)
 			}
 			fmt.Println("  every node Ready")
-			if *siteMesh {
-				step("peering Calico among site nodes only")
-				if err := d.Kube.ApplyObjects(ctx, k0s.SiteMeshObjects()...); err != nil {
-					fail("applying the site BGP mesh: %v", err)
-				}
-				recordEvent("calico-site-mesh-applied", k0s.SiteMeshObjects())
-			}
 			if err := observe.Capture(ctx, *workDir, "site-ready", d.Kube, r, rigNodes(topo, nodes)); err != nil {
 				fail("%v", err)
 			}

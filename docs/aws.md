@@ -949,11 +949,12 @@ unchanged survivor identities, matrix counts and placement records; it exports
 only selected metadata and matrix hashes, never raw observation snapshots.
 
 For the dual-stack Calico BGP site (`cmd/lab -cni calico-bird-dualstack
--k0s-calico-mtu 1420 -calico-site-mesh`), pass `-cni calico-bird-dualstack
+-k0s-calico-mtu 1420`), pass `-cni calico-bird-dualstack
 -k0s-calico-mtu 1420` to `cmd/awsrow` and `-cni calico-bird-dualstack` to
 `cmd/awsremove`, and export with `--site-nodes cp,w1,w2 --dual-stack --udp`
 plus the expected k0s release and digest-pinned `calico-node` image. Each row
-then also requires a Ready `calico-node` on every measured node and kubelet
+then also requires a Ready Calico agent on every measured node (the site's
+`calico-node` on site nodes, the product's `calico-node-tunnel` on remotes) and kubelet
 logs and exec through the API server, which on this profile has no
 konnectivity agent. Renew the sessions before each row. The harness retries
 throttled AWS calls until the check's deadline; SSM throttles `SendCommand`

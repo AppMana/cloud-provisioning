@@ -82,9 +82,6 @@ type Deps struct {
 	// K0sCalicoMTU overrides the bundled Calico overlay MTU for a fresh k0s
 	// site. Zero preserves the distribution default.
 	K0sCalicoMTU int
-	// K0sCalicoManagedAddresses keeps Calico's per-node stored addresses
-	// authoritative when the product selects native or WireGuard transport.
-	K0sCalicoManagedAddresses bool
 }
 
 // Builder builds one distribution's site cluster.

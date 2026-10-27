@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
+	"github.com/appmana/cloud-provisioning/controller/pkg/cni/site"
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -68,8 +69,6 @@ func Passed(checks []Check) bool {
 var (
 	calicoPools      = schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: "IPPoolList"}
 	calicoIPAMBlocks = schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: "IPAMBlockList"}
-	calicoBGPPeers   = schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: "BGPPeerList"}
-	calicoBGPConfig  = schema.GroupVersionKind{Group: "crd.projectcalico.org", Version: "v1", Kind: "BGPConfiguration"}
 )
 
 // Preconditions reads the cluster and reports what the product needs of
@@ -114,15 +113,7 @@ func Preconditions(ctx context.Context, c client.Reader, o Options) ([]Check, er
 		if err := c.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: "calico-node"}, ds); err != nil {
 			return nil, fmt.Errorf("reading kube-system/calico-node: %w", err)
 		}
-		env := containerEnv(ds, "calico-node")
-		out = append(out, autodetection("ipv4-autodetection", env["IP"], env["IP_AUTODETECTION_METHOD"], tunnel4))
-		if dualStack {
-			out = append(out, autodetection("ipv6-autodetection", env["IP6"], env["IP6_AUTODETECTION_METHOD"], tunnel6))
-		}
 		out = append(out, podMTU(ctx, c, ds, o.TunnelMTU))
-		if env["CALICO_NETWORKING_BACKEND"] == "bird" {
-			out = append(out, bgpMesh(ctx, c))
-		}
 	}
 
 	ranges := []netip.Prefix{tunnel4}
@@ -169,65 +160,6 @@ func masquerade(ctx context.Context, c client.Reader, network cni.Network, nodes
 		}
 	}
 	check.Detail = "pod sources preserved for " + strings.Join(blocks, ", ")
-	return check
-}
-
-func containerEnv(ds *appsv1.DaemonSet, name string) map[string]string {
-	env := map[string]string{}
-	for _, c := range ds.Spec.Template.Spec.Containers {
-		if c.Name != name {
-			continue
-		}
-		// Later entries win, as they do for the container.
-		for _, e := range c.Env {
-			env[e.Name] = e.Value
-		}
-	}
-	return env
-}
-
-// autodetection decides whether Calico's address detection, run on a
-// remote, finds nothing and so keeps the address the product stores for
-// it. Calico keeps a stored address only when detection fails; any
-// method that finds an address on a remote replaces the tunnel address
-// with one the site cannot reach, on every restart of calico-node.
-func autodetection(name, mode, method string, tunnel netip.Prefix) Check {
-	check := Check{Name: name, Required: true}
-	switch strings.TrimSpace(mode) {
-	case "none":
-		check.OK = true
-		check.Detail = "address detection is disabled for this family"
-		return check
-	case "":
-		check.OK = true
-		check.Detail = "no detection while a stored address exists, so the product's address stands"
-		return check
-	case "autodetect":
-	default:
-		check.Detail = fmt.Sprintf("a fixed address %q would be every node's, a remote's included", mode)
-		return check
-	}
-	if method == "" {
-		method = "first-found"
-	}
-	cidrs, ok := strings.CutPrefix(method, "cidr=")
-	if !ok {
-		check.Detail = fmt.Sprintf("method %q finds an address on a remote and replaces the tunnel address the product stores; use cidr= with the site's own ranges", method)
-		return check
-	}
-	for _, raw := range strings.Split(cidrs, ",") {
-		prefix, err := netip.ParsePrefix(strings.TrimSpace(raw))
-		if err != nil {
-			check.Detail = fmt.Sprintf("method %q: %v", method, err)
-			return check
-		}
-		if prefix.Overlaps(tunnel) {
-			check.Detail = fmt.Sprintf("method %q covers the tunnel range %s, so a remote detects its tunnel address itself and the site's own nodes can pick theirs", method, tunnel)
-			return check
-		}
-	}
-	check.OK = true
-	check.Detail = fmt.Sprintf("method %q finds nothing on a remote outside %s (its cloud addresses must stay outside it too), so the stored tunnel address stands", method, cidrs)
 	return check
 }
 
@@ -432,116 +364,23 @@ func borrowedAddresses(ctx context.Context, c client.Reader) Check {
 	return check
 }
 
-// bgpMesh: with Calico's full node mesh every node peers with every
-// remote, the tunnel refuses those sessions, and Calico reports a node
-// whose configured peers never establish as unready forever, so a remote's
-// calico-node never becomes Ready and every rolling update of the
-// DaemonSet stalls. Peering the site's nodes with each other only leaves a
-// remote with no peers, which Calico reports ready.
-func bgpMesh(ctx context.Context, c client.Reader) Check {
-	check := Check{Name: "bgp-mesh", Required: true}
-	config := &unstructured.Unstructured{}
-	config.SetGroupVersionKind(calicoBGPConfig)
-	err := c.Get(ctx, types.NamespacedName{Name: "default"}, config)
-	mesh := true
-	switch {
-	case err == nil:
-		enabled, found, err := unstructured.NestedBool(config.Object, "spec", "nodeToNodeMeshEnabled")
-		if err != nil {
-			check.Detail = "invalid BGP mesh setting: " + err.Error()
-			return check
-		}
-		if found {
-			mesh = enabled
-		}
-	case absent(err):
-	default:
-		check.Detail = "BGP configuration not readable: " + err.Error()
-		return check
-	}
-	if mesh {
-		check.Detail = "Calico's full node-to-node mesh is enabled, so every node peers with every remote across a tunnel that refuses BGP and remote calico-node pods are never Ready; disable it (BGPConfiguration default nodeToNodeMeshEnabled: false) and peer site nodes with each other (BGPPeer nodeSelector/peerSelector " + `"!has(cloud-provisioning.appmana.com/role)"` + ")"
-		return check
-	}
-	peers := &unstructured.UnstructuredList{}
-	peers.SetGroupVersionKind(calicoBGPPeers)
-	if err := c.List(ctx, peers); err != nil && !absent(err) {
-		check.Detail = "BGP peers not readable: " + err.Error()
-		return check
-	}
-	const siteSelector = "!has(cloud-provisioning.appmana.com/role)"
-	// A safe site mesh does not make an additional global/router peer safe.
-	// Require every peer to exclude future cloud nodes on its local side.
-	for _, p := range peers.Items {
-		node, _, _ := unstructured.NestedString(p.Object, "spec", "nodeSelector")
-		peer, _, _ := unstructured.NestedString(p.Object, "spec", "peerSelector")
-		external, _, _ := unstructured.NestedString(p.Object, "spec", "peerIP")
-		localSafe := strings.TrimSpace(node) == siteSelector
-		if external != "" && peer == "" {
-			// Preserve Linux-only IPv6 router scope while excluding cloud workers.
-			for _, osSelector := range []string{`kubernetes.io/os == 'linux'`, `kubernetes.io/os == "linux"`} {
-				localSafe = localSafe || strings.TrimSpace(node) == siteSelector+" && "+osSelector || strings.TrimSpace(node) == osSelector+" && "+siteSelector
-			}
-		}
-		if !localSafe || (peer != "" && strings.TrimSpace(peer) != siteSelector) {
-			check.Detail = fmt.Sprintf("BGP peer %s does not prove cloud exclusion; scope all peers (including external routers) to the qualified site selector", p.GetName())
-			return check
-		}
-	}
-	for _, p := range peers.Items {
-		node, _, _ := unstructured.NestedString(p.Object, "spec", "nodeSelector")
-		peer, _, _ := unstructured.NestedString(p.Object, "spec", "peerSelector")
-		// Only the documented site mesh proves both complete site coverage
-		// and exclusion of future cloud workers. Nonempty selectors alone
-		// can select no nodes, or select every cloud worker as well.
-		if strings.TrimSpace(node) == siteSelector && strings.TrimSpace(peer) == siteSelector {
-			nodes := &corev1.NodeList{}
-			if err := c.List(ctx, nodes); err != nil {
-				check.Detail = "site node coverage not readable: " + err.Error()
-				return check
-			}
-			sites := 0
-			for _, n := range nodes.Items {
-				role, labelled := n.Labels["cloud-provisioning.appmana.com/role"]
-				if labelled && role != "cloud-worker" {
-					check.Detail = fmt.Sprintf("site mesh excludes node %s with unrecognised role %q", n.Name, role)
-					return check
-				}
-				if !labelled {
-					sites++
-				}
-			}
-			if sites < 2 {
-				check.Detail = "site mesh must cover at least two site nodes"
-				return check
-			}
-			check.OK = true
-			check.Detail = fmt.Sprintf("node mesh disabled; %s covers %d site nodes and excludes cloud workers", p.GetName(), sites)
-			return check
-		}
-	}
-	check.Detail = "node mesh disabled but no verified site mesh; require nodeSelector and peerSelector !has(cloud-provisioning.appmana.com/role); other selector expressions are not qualified"
-	return check
-}
-
+// bgpPeers: the tunnel carries no BGP, and Calico reports a node whose
+// configured peers never establish as unready. The product replaces the
+// full mesh with one of site nodes; peering the operator configured is
+// theirs to scope, and the product refuses tunnel nodes until it does.
 func bgpPeers(ctx context.Context, c client.Reader) Check {
-	check := Check{Name: "bgp-peers", OK: true}
-	peers := &unstructured.UnstructuredList{}
-	peers.SetGroupVersionKind(calicoBGPPeers)
-	if err := c.List(ctx, peers); err != nil {
-		if absent(err) {
-			check.Detail = "no BGPPeer resources: the full node mesh only"
-			return check
-		}
+	check := Check{Name: "bgp-peers", Required: true}
+	reaching, err := site.PeersReachingCloudNodes(ctx, c)
+	if err != nil {
 		check.Detail = "BGP peers not readable: " + err.Error()
 		return check
 	}
-	var names []string
-	for _, p := range peers.Items {
-		ip, _, _ := unstructured.NestedString(p.Object, "spec", "peerIP")
-		names = append(names, p.GetName()+"="+ip)
+	if len(reaching) > 0 {
+		check.Detail = fmt.Sprintf("BGPPeer %s can peer with cloud nodes; scope its nodeSelector and peerSelector with %q", strings.Join(reaching, ", "), "!has(cloud-provisioning.appmana.com/role)")
+		return check
 	}
-	check.Detail = fmt.Sprintf("%d explicit BGP peers %v; the tunnel refuses BGP, so none of them learns a remote's routes over it", len(names), names)
+	check.OK = true
+	check.Detail = "no BGP peer reaches a cloud node; the product limits the node mesh to site nodes"
 	return check
 }
 

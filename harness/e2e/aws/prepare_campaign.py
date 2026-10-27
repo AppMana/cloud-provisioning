@@ -58,12 +58,15 @@ def render_values(state, urls, binaries, native_cidrs):
         name = 'wg-dialer-linux-' + arch
         if name not in urls or arch not in binaries:
             raise ValueError('missing first-boot dialer for ' + arch)
+        if not urls[name].startswith('s3://'):
+            raise ValueError('first-boot dialers are s3:// sources the controller signs')
         binary[arch] = {'url': urls[name], 'sha256': binaries[arch]}
     return {
         'image': split_image(state['linuxControllerImage']),
         'dialerImage': split_image(dialer),
         'imagePullSecrets': [{'name': state['linuxControllerPullSecret']}, {'name': state['linuxDialerPullSecret']}],
         'dialerBinary': binary,
+        'artifactRegion': state['region'],
         'aws': {'credentials': {'secretName': AWS_SECRET, 'mount': 'env'}},
         'providerManagerNamespace': 'capa-system',
         'importedControlPlane': {'providerServiceAccounts': [{'name': 'capa-controller-manager', 'namespace': 'capa-system'}]},

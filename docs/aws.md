@@ -234,6 +234,7 @@ configuration. Every AWSMachine must carry the selected tag value.
 | Gateway source/destination-check adapter (experimental) | [gateway-source-check.json](iam/gateway-source-check.json) | Observe interfaces and change only SourceDestCheck on one explicitly named, run-tagged gateway ENI |
 | Gateway UDP ingress adapter (experimental) | [gateway-ingress.json](iam/gateway-ingress.json) | Observe groups/rules, add tagged rules and revoke ingress in one named, run-tagged security group |
 | Controller (`aws.credentials`) | [controller.json](iam/controller.json) | Observe VPC CNI allocations (interfaces and subnets) and check that VPC CNI nodes' security groups admit each other |
+| Controller, with `s3://` artifact sources | [controller-artifacts.json](iam/controller-artifacts.json) | Read the artifact objects whose download URLs the controller signs when it renders a bootstrap |
 | EC2 worker running the AWS VPC CNI | [vpc-cni-node-ipv4.json](iam/vpc-cni-node-ipv4.json) or [vpc-cni-node-ipv6.json](iam/vpc-cni-node-ipv6.json) | aws-node's IPAM: assign and release pod addresses, and record the instance, only on interfaces CAPA tagged `sigs.k8s.io/cluster-api-provider-aws/cluster/${CLUSTER_NAME}: owned` |
 
 VPC CNI nodes' security groups must admit each other: pods on different nodes
@@ -989,51 +990,21 @@ Treat an empty coverage directory as unavailable evidence, not zero failures.
 
 ## Private bootstrap binaries
 
+A first-boot artifact (`dialerBinary.<architecture>.url`, `cniPlugins`) may be
+an `s3://bucket/key` source in `artifactRegion`. The controller signs it with
+`aws.credentials` each time it renders a bootstrap document, for as long as the
+join token beside it ([controller-artifacts.json](iam/controller-artifacts.json)
+grants the read). Nothing renews these URLs, and a Helm upgrade cannot revert
+one. A signed URL stops working when its signing credentials expire, so sign
+with credentials that outlive it. An `https://` URL is used as given; for a
+SigV4 URL the controller withholds a bootstrap whose URL has already expired.
+Existing bootstrap Secrets are not rewritten: a failed first boot needs a new
+Machine after the artifact configuration is corrected.
+
 EC2 cannot reach the VM lab's local download server. `harness/e2e/aws/assets.py`
 creates a private, public-access-blocked S3 bucket, uploads test binaries with
-server-side encryption, and saves four-hour presigned URLs in `asset-urls.json`.
-It signs with an STS federation session restricted to `GetObject` on the bucket's
-`downloads/` prefix. Pass a URL and the binary's SHA-256 to the chart's
-`dialerBinary` values. URLs are bearer credentials; keep them out of logs.
-
-Renew these URLs separately from CAPA and SSM sessions. Before a later claim or
-replacement, rerun `assets.py` with the intended binaries and update the chart's
-`dialerBinary.<architecture>.url` together with the matching digest. Writing a
-new `asset-urls.json` does not update the running controller. Temporary signing
-credentials can expire before the URL's advertised deadline; see
-[S3 presigned URL expiration](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html#PresignedUrl-Expiration).
-
-For a bounded integration run that needs the **same existing Linux binary**,
-`harness/e2e/aws/renew_artifact.py` downloads the currently configured S3 object,
-verifies its configured SHA-256, signs it with a new exact-object session, and
-conditionally updates only that URL argument on the running controller. Run it
-with setup credentials loaded through `source-me.sh` and a new evidence directory:
-
-```sh
-python3 harness/e2e/aws/renew_artifact.py \
-  --work-dir harness/e2e/.state/aws/windows-v2 \
-  --api-server https://10.10.0.10:6443 \
-  --evidence-dir harness/e2e/.state/artifact-renewal-NEW
-```
-
-The conditional update rejects a concurrent Deployment change. It starts a
-controller rollout and retains a private patch containing the new URL; do not
-publish that file. The helper does not upload a replacement binary or recreate
-a claim. Keep Helm's configured URL synchronized before a later upgrade, since
-this integration helper updates the live Deployment directly. It requires the
-setup identity's existing-object `s3:GetObject` and `sts:GetFederationToken`
-permissions, not additional worker permissions. A claim still waiting for its
-first bootstrap Secret can resume after renewal without being recreated.
-
-For new cloud-config bootstrap documents, the controller rejects a dialer URL
-whose SigV4 timestamp and lifetime already indicate expiration. It withholds
-the bootstrap Secret and reports an error without logging the credential-bearing
-URL. This does not validate S3 permissions, revocation, or a signing session's
-earlier expiry, nor guarantee that a URL survives a delayed instance launch.
-Existing bootstrap Secrets are not rewritten: a failed first boot needs a new
-Machine after the artifact configuration is corrected. The test helper's
-four-hour URLs are intended for bounded runs, not unattended long-term
-provisioning.
+server-side encryption under `downloads/`, grants the run's controller identity
+`s3:GetObject` there, and records the `s3://` sources in `asset-urls.json`.
 
 Qualify bootstrap publication, dialer adoption, network reachability and survivor
 traffic separately. A same-name claim recreation does not establish automatic

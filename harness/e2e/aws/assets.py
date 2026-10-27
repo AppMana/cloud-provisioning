@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Publish test binaries to private S3 objects and return expiring download URLs.
+"""Publish test binaries to private S3 objects as s3:// artifact sources.
 
-Run with setup credentials. URLs are written privately, never printed. The
+Run with setup credentials. The controller signs the sources when it renders a
+bootstrap; this grants the run's controller identity read access to them. The
 bucket is recorded before uploads so cleanup can handle interrupted setup.
 """
 import argparse
@@ -36,16 +37,16 @@ if not bucket:
     path.write_text(json.dumps(s, indent=2) + '\n')
     aws('s3api', 'put-public-access-block', '--bucket', bucket, '--public-access-block-configuration', 'BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true')
     aws('s3api', 'put-bucket-tagging', '--bucket', bucket, '--tagging', json.dumps({'TagSet': [{'Key': 'cloud-provisioning-test', 'Value': s['runID']}]}))
-policy = {'Version': '2012-10-17', 'Statement': [{'Effect': 'Allow', 'Action': ['s3:GetObject'], 'Resource': f'arn:aws:s3:::{bucket}/downloads/*'}]}
-# A restricted session signs the URLs; the source identity itself never reaches
-# a VM or a Kubernetes Secret. URLs remain bearer credentials for these objects.
-session = json.loads(aws('sts', 'get-federation-token', '--name', 'cldt-assets', '--duration-seconds', '14400', '--policy', json.dumps(policy)))['Credentials']
-env = dict(os.environ, AWS_ACCESS_KEY_ID=session['AccessKeyId'], AWS_SECRET_ACCESS_KEY=session['SecretAccessKey'], AWS_SESSION_TOKEN=session['SessionToken'])
-urls = {}
+# The controller signs these sources itself when it renders a bootstrap, with
+# the run's controller identity, which reads only the downloads/ prefix.
+iam = pathlib.Path(__file__).resolve().parents[3] / 'docs' / 'iam'
+policy = (iam / 'controller-artifacts.json').read_text().replace('${ASSET_BUCKET}', bucket).replace('${ASSET_PREFIX}', 'downloads/')
+aws('iam', 'put-user-policy', '--user-name', s['controllerUserName'], '--policy-name', 'cldt-artifacts', '--policy-document', json.dumps(json.loads(policy)))
+sources = {}
 for value in a.file:
     source = pathlib.Path(value)
     key = 'downloads/' + source.name
     aws('s3api', 'put-object', '--bucket', bucket, '--key', key, '--body', str(source), '--server-side-encryption', 'AES256')
-    urls[source.name] = aws('s3', 'presign', f's3://{bucket}/{key}', '--expires-in', '14400', env=env).strip()
-(work / 'asset-urls.json').write_text(json.dumps(urls, indent=2) + '\n')
-print('Published', len(urls), 'private objects; download URLs saved in asset-urls.json')
+    sources[source.name] = f's3://{bucket}/{key}'
+(work / 'asset-urls.json').write_text(json.dumps(sources, indent=2) + '\n')
+print('Published', len(sources), 'private objects; their s3:// sources are in asset-urls.json')

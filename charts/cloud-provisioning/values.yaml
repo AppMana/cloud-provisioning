@@ -216,7 +216,12 @@ joinKubeletExtraFlags: ""
 
 # First-boot binary delivery. A remote node has no image puller before
 # it joins, so cloud-init fetches this sha-pinned binary; afterwards
-# the DaemonSet image is the upgrade channel.
+# the DaemonSet image is the upgrade channel. A url is an https:// URL used
+# as given, or s3://bucket/key in artifactRegion, which the controller signs
+# with aws.credentials each time it renders a bootstrap, valid as long as the
+# join token beside it; the credentials need s3:GetObject on the key and
+# must outlive the URL. The same applies to cniPlugins.
+artifactRegion: ""
 dialerBinary:
   arm64:
     url: ""

@@ -2474,6 +2474,7 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	nodeGroups := flag.Bool("experimental-node-groups", false, "enable experimental node groups in the mesh namespace; requires the group CRD and drain RBAC")
 	vpcCNIFamily := flag.String("aws-vpc-cni-family", "ipv4", "the AWS VPC CNI's pod address family, ipv4 or ipv6")
+	artifactRegion := flag.String("artifact-region", "", "region of the S3 bucket s3:// artifact sources name; the controller signs them when it renders a bootstrap")
 	vpcCNI := flag.Bool("aws-vpc-cni", true, "apply the AWS VPC CNI (aws-node) for AWS VPC CNI nodes, configured from the site's ranges")
 	vpcCNIImage := flag.String("aws-vpc-cni-image", "", "digest-pinned aws-node image; empty uses the pinned upstream image")
 	vpcCNIInitImage := flag.String("aws-vpc-cni-init-image", "", "digest-pinned aws-node init image; empty uses the pinned upstream image")
@@ -2862,6 +2863,7 @@ func main() {
 
 			InterfaceName: ifaceName,
 
+			SignArtifact:            awsSDK.SignS3(*artifactRegion),
 			DialerBinaryURLARM64:    dialerBinaryURLARM64,
 			DialerBinarySHA256ARM64: dialerBinarySHA256ARM64,
 			DialerBinaryURLAMD64:    dialerBinaryURLAMD64,

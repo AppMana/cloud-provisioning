@@ -121,7 +121,8 @@ if s.get('controllerUserName'):
             raise RuntimeError('controller user ownership mismatch')
         for key in aws('iam', 'list-access-keys', '--user-name', s['controllerUserName']).get('AccessKeyMetadata', []):
             aws('iam', 'delete-access-key', '--user-name', s['controllerUserName'], '--access-key-id', key['AccessKeyId'], absent_ok=True)
-        aws('iam', 'delete-user-policy', '--user-name', s['controllerUserName'], '--policy-name', 'cldt-test', absent_ok=True)
+        for policy in ('cldt-test', 'cldt-artifacts'):
+            aws('iam', 'delete-user-policy', '--user-name', s['controllerUserName'], '--policy-name', policy, absent_ok=True)
         aws('iam', 'delete-user', '--user-name', s['controllerUserName'], absent_ok=True)
 (path.parent / 'controller-credentials.json').unlink(missing_ok=True)
 if s.get('capaRoleName'):

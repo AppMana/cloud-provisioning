@@ -126,3 +126,26 @@ func TestTheSDKAssumesTheProfilesRole(t *testing.T) {
 		t.Fatalf("signed by %v, want the assumed role", signer.Load())
 	}
 }
+
+// An s3:// source becomes a URL signed with the controller's credentials,
+// valid for the join token's lifetime.
+func TestS3SourcesAreSignedForTheJoinTokensLifetime(t *testing.T) {
+	isolateAWSEnvironment(t)
+	t.Setenv("AWS_ACCESS_KEY_ID", "AKIASIGNER")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "secret")
+	sign := (&SDK{}).SignS3("us-west-2")
+	signed, err := sign(context.Background(), "s3://assets/downloads/wg-dialer-linux-amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"assets", "downloads/wg-dialer-linux-amd64", "X-Amz-Expires=7200", "AKIASIGNER", "X-Amz-Signature="} {
+		if !strings.Contains(signed, want) {
+			t.Errorf("signed URL %q lacks %q", signed, want)
+		}
+	}
+	for _, bad := range []string{"https://assets/x", "s3://assets", "s3://assets/key?versionId=1"} {
+		if _, err := sign(context.Background(), bad); err == nil {
+			t.Errorf("%q was signed", bad)
+		}
+	}
+}

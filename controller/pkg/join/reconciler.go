@@ -155,6 +155,11 @@ type Reconciler struct {
 	DialerBinaryURLAMD64    string
 	DialerBinarySHA256AMD64 string
 
+	// SignArtifact turns an s3://bucket/key artifact source into a URL a
+	// machine can fetch, signed when the bootstrap is rendered, so the
+	// URL is fresh for every machine and nothing renews it.
+	SignArtifact func(ctx context.Context, source string) (string, error)
+
 	// Standard containernetworking plugins. A cluster's CNI config may
 	// chain bandwidth/portmap/tuning; calico-node installs only its
 	// own, and a stock cloud image has none, so without these every
@@ -378,6 +383,18 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		apiProxyPort = r.APIProxyPort
 	}
 
+	artifacts := map[string]string{}
+	for key, source := range map[string]string{
+		"dialerBinaryURLArm64": r.DialerBinaryURLARM64, "dialerBinaryURLAmd64": r.DialerBinaryURLAMD64,
+		"cniPluginsURLArm64": r.CNIPluginsURLARM64, "cniPluginsURLAmd64": r.CNIPluginsURLAMD64,
+	} {
+		url, err := r.artifactURL(ctx, source)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("%s: %w", key, err)
+		}
+		artifacts[key] = url
+	}
+
 	values := map[string]any{
 		"sshAuthorizedKeys":       r.SSHAuthorizedKeys,
 		"apiVIP":                  r.APIVIP,
@@ -388,13 +405,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		"wireguardListenPort":     r.WireGuardListenPort,
 		"peersFileJSON":           string(peersFileJSON),
 		"interfaceName":           r.InterfaceName,
-		"dialerBinaryURLArm64":    r.DialerBinaryURLARM64,
+		"dialerBinaryURLArm64":    artifacts["dialerBinaryURLArm64"],
 		"dialerBinarySHA256Arm64": r.DialerBinarySHA256ARM64,
-		"dialerBinaryURLAmd64":    r.DialerBinaryURLAMD64,
+		"dialerBinaryURLAmd64":    artifacts["dialerBinaryURLAmd64"],
 		"dialerBinarySHA256Amd64": r.DialerBinarySHA256AMD64,
-		"cniPluginsURLArm64":      r.CNIPluginsURLARM64,
+		"cniPluginsURLArm64":      artifacts["cniPluginsURLArm64"],
 		"cniPluginsSHA256Arm64":   r.CNIPluginsSHA256ARM64,
-		"cniPluginsURLAmd64":      r.CNIPluginsURLAMD64,
+		"cniPluginsURLAmd64":      artifacts["cniPluginsURLAmd64"],
 		"cniPluginsSHA256Amd64":   r.CNIPluginsSHA256AMD64,
 		"machineName":             machine.GetName(),
 		// Where the machine is, when the infrastructure provider knows.
@@ -584,6 +601,18 @@ func (r *Reconciler) validateDialerBinaries() error {
 		return fmt.Errorf("no dialer binary configured for any architecture")
 	}
 	return nil
+}
+
+// artifactURL is the URL a machine fetches an artifact source from: an
+// s3:// source signed now, anything else as configured.
+func (r *Reconciler) artifactURL(ctx context.Context, source string) (string, error) {
+	if !strings.HasPrefix(source, "s3://") {
+		return source, nil
+	}
+	if r.SignArtifact == nil {
+		return "", fmt.Errorf("an s3:// artifact source needs AWS credentials to sign it")
+	}
+	return r.SignArtifact(ctx, source)
 }
 
 // allocateWireGuardAddress finds the next free cloud tunnel address by

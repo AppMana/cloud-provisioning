@@ -118,6 +118,9 @@ spec:
           {{- end }}
           args:
             - "--aws-vpc-cni-family={{ .Values.platforms.aws.vpcCNI.family }}"
+            {{- with .Values.artifactRegion }}
+            - "--artifact-region={{ . }}"
+            {{- end }}
             - "--aws-vpc-cni={{ .Values.platforms.aws.vpcCNI.enabled }}"
             {{- with .Values.platforms.aws.vpcCNI.image }}
             - "--aws-vpc-cni-image={{ . }}"

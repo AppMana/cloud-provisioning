@@ -8,13 +8,13 @@ DIALER = '123.dkr.ecr.us-west-2.amazonaws.com/cldt-test/linux-dialer@sha256:' + 
 
 
 def state(**overrides):
-    value = {'runID': 'cldt-test', 'linuxControllerImage': CONTROLLER, 'linuxControllerPullSecret': 'cldt-test-controller-pull',
+    value = {'runID': 'cldt-test', 'region': 'us-west-2', 'linuxControllerImage': CONTROLLER, 'linuxControllerPullSecret': 'cldt-test-controller-pull',
              'linuxDialerImage': DIALER, 'linuxDialerPullSecret': 'cldt-test-dialer-pull'}
     value.update(overrides)
     return value
 
 
-URLS = {'wg-dialer-linux-amd64': 'https://signed/amd64', 'wg-dialer-linux-arm64': 'https://signed/arm64'}
+URLS = {'wg-dialer-linux-amd64': 's3://assets/downloads/wg-dialer-linux-amd64', 'wg-dialer-linux-arm64': 's3://assets/downloads/wg-dialer-linux-arm64'}
 BINARIES = {'amd64': '1' * 64, 'arm64': '2' * 64}
 
 
@@ -26,7 +26,9 @@ class RenderValuesTest(unittest.TestCase):
         self.assertEqual(values['dialerImage']['digest'], DIALER.split('@')[1])
         self.assertEqual([s['name'] for s in values['imagePullSecrets']],
                          ['cldt-test-controller-pull', 'cldt-test-dialer-pull'])
-        self.assertEqual(values['dialerBinary']['arm64'], {'url': 'https://signed/arm64', 'sha256': '2' * 64})
+        # The controller signs the sources; the harness renews nothing.
+        self.assertEqual(values['dialerBinary']['arm64'], {'url': 's3://assets/downloads/wg-dialer-linux-arm64', 'sha256': '2' * 64})
+        self.assertEqual(values['artifactRegion'], 'us-west-2')
         receipts = values['tunnel']['receivePreparation']['journal']['receipts']
         # Every architecture admits exactly the deployed dialer reference.
         self.assertEqual(receipts['imageIDs'], {'amd64': DIALER, 'arm64': DIALER})
@@ -48,7 +50,11 @@ class RenderValuesTest(unittest.TestCase):
 
     def test_missing_architecture_binary_is_rejected(self):
         with self.assertRaisesRegex(ValueError, 'arm64'):
-            subject.render_values(state(), {'wg-dialer-linux-amd64': 'u'}, BINARIES, ['203.0.113.0/24'])
+            subject.render_values(state(), {'wg-dialer-linux-amd64': 's3://assets/downloads/wg-dialer-linux-amd64'}, BINARIES, ['203.0.113.0/24'])
+
+    def test_presigned_urls_are_refused(self):
+        with self.assertRaisesRegex(ValueError, 's3://'):
+            subject.render_values(state(), dict(URLS, **{'wg-dialer-linux-amd64': 'https://signed/amd64'}), BINARIES, ['203.0.113.0/24'])
 
     def test_receiver_preparation_requires_cloud_ranges(self):
         with self.assertRaisesRegex(ValueError, 'protected cloud range'):

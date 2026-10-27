@@ -37,7 +37,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | Assertions list | CAPI association (C7), control-plane placement (C6), kubeadm Calico (C3) and CalicoNodesReady (C5, now measures the product agent on remotes) closed; rest open |
 | /tmp writes | open |
 | IAM docs key ownership on the harness's `cloud-provisioning-test` tag and `RUN_ID` (found while closing C13) | open: product policies should key on CAPA's cluster tag and named resources |
-| `discover.PodCIDRs` widens node pod CIDRs to a guessed /16 (found while closing C9; the VPC CNI reads exact ranges instead) | open: used for join values |
+| `discover.PodCIDRs` widens node pod CIDRs to a guessed /16 (found while closing C9) | done: it and `NodeAddressRanges` (a guessed /24) had no callers and were deleted; the VPC CNI reads exact ranges |
 | Mechanical write guard (harness kube/AWS writes refused outside an allowlist) | open |
 
 ## Found while closing items

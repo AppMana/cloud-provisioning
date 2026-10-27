@@ -2,8 +2,7 @@
 // needs, from the cluster itself.
 //
 // These are all properties the cluster already knows: where its API
-// server is, which ranges it allocates pods and services from, and what
-// its nodes' addresses look like. Asking an operator to restate them in
+// server is and which ranges it allocates services from. Asking an operator to restate them in
 // values is asking them to keep a second copy in sync with the first,
 // and every one of them is fatal to get wrong: a wrong service CIDR
 // silently drops all service traffic from the joined node rather than
@@ -18,7 +17,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/netip"
 	"net/url"
 	"sort"
 	"strings"
@@ -31,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -193,231 +190,4 @@ func parseServiceRange(msg string) (string, error) {
 		return "", fmt.Errorf("%q is not a CIDR", cidr)
 	}
 	return cidr, nil
-}
-
-// PodCIDRs returns the ranges the cluster allocates pod addresses from,
-// asking whichever CNI is installed.
-//
-// There is no single source: a cluster whose controller manager does
-// the allocating records it on each Node, while a CNI with its own IPAM
-// keeps it in that CNI's own configuration and leaves Node.spec.podCIDRs
-// empty. Both are checked, and the CNIs are asked in turn.
-func PodCIDRs(ctx context.Context, c client.Client) ([]string, error) {
-	if cidrs, err := podCIDRsFromNodes(ctx, c); err == nil && len(cidrs) > 0 {
-		return cidrs, nil
-	}
-	for _, source := range []func(context.Context, client.Client) ([]string, error){
-		podCIDRsFromCalico,
-		podCIDRsFromCilium,
-		podCIDRsFromFlannel,
-	} {
-		if cidrs, err := source(ctx, c); err == nil && len(cidrs) > 0 {
-			return cidrs, nil
-		}
-	}
-	return nil, fmt.Errorf("no pod CIDR found on any Node, or in Calico, Cilium or Flannel configuration")
-}
-
-// podCIDRsFromNodes covers every CNI that lets the controller manager
-// allocate per-node blocks: kubeadm defaults, Flannel, kube-router, and
-// Calico configured with host-local IPAM.
-func podCIDRsFromNodes(ctx context.Context, c client.Client) ([]string, error) {
-	nodes := &corev1.NodeList{}
-	if err := c.List(ctx, nodes); err != nil {
-		return nil, err
-	}
-	seen := map[string]bool{}
-	var out []string
-	for _, node := range nodes.Items {
-		cidrs := node.Spec.PodCIDRs
-		if len(cidrs) == 0 && node.Spec.PodCIDR != "" {
-			cidrs = []string{node.Spec.PodCIDR}
-		}
-		for _, cidr := range cidrs {
-			// Per-node blocks are carved out of one cluster range, and
-			// the joining node needs the whole range, not the blocks.
-			super, err := supernet(cidr)
-			if err != nil || seen[super] {
-				continue
-			}
-			seen[super] = true
-			out = append(out, super)
-		}
-	}
-	sort.Strings(out)
-	return out, nil
-}
-
-// podCIDRsFromCalico reads Calico's own IPAM configuration. Pools with
-// no allocation disabled are the ones pods actually come from.
-func podCIDRsFromCalico(ctx context.Context, c client.Client) ([]string, error) {
-	list := &unstructured.UnstructuredList{}
-	list.SetGroupVersionKind(schema.GroupVersionKind{
-		Group: "crd.projectcalico.org", Version: "v1", Kind: "IPPoolList",
-	})
-	if err := c.List(ctx, list); err != nil {
-		return nil, err
-	}
-	var out []string
-	for _, pool := range list.Items {
-		if disabled, _, _ := unstructured.NestedBool(pool.Object, "spec", "disabled"); disabled {
-			continue
-		}
-		if cidr, ok, _ := unstructured.NestedString(pool.Object, "spec", "cidr"); ok && cidr != "" {
-			out = append(out, cidr)
-		}
-	}
-	sort.Strings(out)
-	return out, nil
-}
-
-// podCIDRsFromCilium reads the cluster-pool ranges out of Cilium's
-// ConfigMap, which is where its IPAM keeps them.
-func podCIDRsFromCilium(ctx context.Context, c client.Client) ([]string, error) {
-	cm := &corev1.ConfigMap{}
-	if err := c.Get(ctx, types.NamespacedName{Namespace: "kube-system", Name: "cilium-config"}, cm); err != nil {
-		return nil, err
-	}
-	var out []string
-	for _, key := range []string{"cluster-pool-ipv4-cidr", "cluster-pool-ipv6-cidr"} {
-		for _, cidr := range strings.Fields(strings.ReplaceAll(cm.Data[key], ",", " ")) {
-			if _, _, err := net.ParseCIDR(cidr); err == nil {
-				out = append(out, cidr)
-			}
-		}
-	}
-	sort.Strings(out)
-	return out, nil
-}
-
-// podCIDRsFromFlannel reads the network out of Flannel's ConfigMap,
-// for the case where the controller manager is not the allocator.
-func podCIDRsFromFlannel(ctx context.Context, c client.Client) ([]string, error) {
-	for _, ns := range []string{"kube-flannel", "kube-system"} {
-		cm := &corev1.ConfigMap{}
-		if err := c.Get(ctx, types.NamespacedName{Namespace: ns, Name: "kube-flannel-cfg"}, cm); err != nil {
-			if apierrors.IsNotFound(err) {
-				continue
-			}
-			return nil, err
-		}
-		var out []string
-		for _, key := range []string{"Network", "IPv6Network"} {
-			// net-conf.json is small and its shape is stable; the
-			// values wanted are quoted CIDRs against these two keys.
-			for _, cidr := range jsonStringValues(cm.Data["net-conf.json"], key) {
-				if _, _, err := net.ParseCIDR(cidr); err == nil {
-					out = append(out, cidr)
-				}
-			}
-		}
-		sort.Strings(out)
-		if len(out) > 0 {
-			return out, nil
-		}
-	}
-	return nil, fmt.Errorf("no Flannel configuration found")
-}
-
-func jsonStringValues(doc, key string) []string {
-	var out []string
-	needle := `"` + key + `"`
-	for rest := doc; ; {
-		i := strings.Index(rest, needle)
-		if i < 0 {
-			return out
-		}
-		rest = rest[i+len(needle):]
-		colon := strings.Index(rest, ":")
-		if colon < 0 {
-			return out
-		}
-		rest = rest[colon+1:]
-		open := strings.Index(rest, `"`)
-		if open < 0 {
-			return out
-		}
-		rest = rest[open+1:]
-		close := strings.Index(rest, `"`)
-		if close < 0 {
-			return out
-		}
-		out = append(out, rest[:close])
-		rest = rest[close+1:]
-	}
-}
-
-// NodeAddressRanges returns the ranges the cluster's own nodes carry
-// addresses in, one per family.
-//
-// A remote node's real address belongs to its cloud provider, not to
-// this cluster, so it is given a second address inside these ranges for
-// the CNI to peer and autodetect on. Reading the ranges off the
-// existing nodes keeps that allocation in the cluster's own address
-// space without anyone having to name it.
-func NodeAddressRanges(ctx context.Context, c client.Client) ([]netip.Prefix, error) {
-	nodes := &corev1.NodeList{}
-	if err := c.List(ctx, nodes); err != nil {
-		return nil, err
-	}
-	var v4, v6 *netip.Prefix
-	for _, node := range nodes.Items {
-		for _, addr := range node.Status.Addresses {
-			if addr.Type != corev1.NodeInternalIP {
-				continue
-			}
-			ip, err := netip.ParseAddr(addr.Address)
-			if err != nil {
-				continue
-			}
-			// A /24 and a /64 are the smallest ranges that reliably
-			// contain a site's nodes without reaching past them.
-			bits, target := 24, &v4
-			if ip.Is6() {
-				bits, target = 64, &v6
-			}
-			prefix, err := ip.Prefix(bits)
-			if err != nil {
-				continue
-			}
-			if *target == nil {
-				p := prefix.Masked()
-				*target = &p
-			}
-		}
-	}
-	var out []netip.Prefix
-	for _, p := range []*netip.Prefix{v4, v6} {
-		if p != nil {
-			out = append(out, *p)
-		}
-	}
-	if len(out) == 0 {
-		return nil, fmt.Errorf("no node carries an InternalIP")
-	}
-	return out, nil
-}
-
-// supernet widens a per-node block to the range it was carved from.
-// Controller-manager allocation hands out /24s from a /16 by default,
-// and /64s from a /48; a joining node needs the whole range in its
-// accept list, since it will talk to every node's pods, not just its
-// own.
-func supernet(cidr string) (string, error) {
-	prefix, err := netip.ParsePrefix(cidr)
-	if err != nil {
-		return "", err
-	}
-	bits := 16
-	if prefix.Addr().Is6() {
-		bits = 48
-	}
-	if prefix.Bits() <= bits {
-		return prefix.Masked().String(), nil
-	}
-	wider, err := prefix.Addr().Prefix(bits)
-	if err != nil {
-		return "", err
-	}
-	return wider.Masked().String(), nil
 }

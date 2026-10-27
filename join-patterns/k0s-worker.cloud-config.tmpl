@@ -63,22 +63,24 @@ runcmd:
       *) url=''; sha='' ;;
     esac
     [ -n "$url" ] || exit 0
-    mkdir -p /opt/cni/bin /tmp/cni-plugins
-    curl -fsSL -o /tmp/cni-plugins.tgz "$url"
-    echo "$sha  /tmp/cni-plugins.tgz" | sha256sum -c -
-    tar -C /tmp/cni-plugins -xzf /tmp/cni-plugins.tgz
-    for f in /tmp/cni-plugins/*; do
+    work=/var/lib/cloud-provisioning/bootstrap
+    mkdir -p /opt/cni/bin "$work/cni-plugins"
+    curl -fsSL -o "$work/cni-plugins.tgz" "$url"
+    echo "$sha  $work/cni-plugins.tgz" | sha256sum -c -
+    tar -C "$work/cni-plugins" -xzf "$work/cni-plugins.tgz"
+    for f in "$work"/cni-plugins/*; do
       [ -e "/opt/cni/bin/$(basename "$f")" ] || cp -a "$f" /opt/cni/bin/
     done
-    rm -rf /tmp/cni-plugins /tmp/cni-plugins.tgz
+    rm -rf "$work/cni-plugins" "$work/cni-plugins.tgz"
   {{- end }}
   {{- if not (index . "k0sWorkerVersion") }}
   - |
     set -e
     if [ "$(k0s version 2>/dev/null || true)" != '{{ .k0sVersion }}' ]; then
-      curl -sSLf https://get.k0s.sh -o /tmp/install-k0s.sh
-      K0S_VERSION='{{ .k0sVersion }}' sh /tmp/install-k0s.sh
-      rm -f /tmp/install-k0s.sh
+      mkdir -p /var/lib/cloud-provisioning/bootstrap
+      curl -sSLf https://get.k0s.sh -o /var/lib/cloud-provisioning/bootstrap/install-k0s.sh
+      K0S_VERSION='{{ .k0sVersion }}' sh /var/lib/cloud-provisioning/bootstrap/install-k0s.sh
+      rm -f /var/lib/cloud-provisioning/bootstrap/install-k0s.sh
     fi
   {{- end }}
   # k0s resolves node IPs by looking up the instance's own hostname

@@ -15,6 +15,8 @@ import (
 type S3Input struct {
 	CLI    *CLI
 	Bucket string
+	// WorkDir is the private run directory staged input passes through.
+	WorkDir string
 }
 
 func (s *S3Input) Stage(ctx context.Context, src io.Reader) (string, func(context.Context) error, error) {
@@ -26,7 +28,10 @@ func (s *S3Input) Stage(ctx context.Context, src io.Reader) (string, func(contex
 		return "", nil, err
 	}
 	key := "transfers/" + hex.EncodeToString(nonce[:])
-	f, err := os.CreateTemp("", "cldt-aws-input-*")
+	if s.WorkDir == "" {
+		return "", nil, fmt.Errorf("a private run directory is required to stage input")
+	}
+	f, err := os.CreateTemp(s.WorkDir, ".aws-input-*")
 	if err != nil {
 		return "", nil, err
 	}

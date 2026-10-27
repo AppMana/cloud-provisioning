@@ -9,12 +9,12 @@ VM unless sysfs identifies exactly one physical NIC.
 From the controller module:
 
 ```sh
-CGO_ENABLED=0 go build -o /tmp/handover-vm ./pkg/tunneldevice/testdata/handover-vm
+CGO_ENABLED=0 go build -o _work/handover-vm ./pkg/tunneldevice/testdata/handover-vm
 python3 pkg/tunneldevice/testdata/handover-vm/run.py \
-  --binary /tmp/handover-vm \
+  --binary _work/handover-vm \
   --outer cldt-kuberouter-runner-v1 \
-  --work-dir /tmp/handover-vm-evidence
-python3 pkg/tunneldevice/testdata/handover-vm/validate.py /tmp/handover-vm-evidence
+  --work-dir _work/handover-vm-evidence
+python3 pkg/tunneldevice/testdata/handover-vm/validate.py _work/handover-vm-evidence
 ```
 
 The work directory must not exist. Each invocation assigns a fresh namespace,
@@ -28,8 +28,8 @@ namespace and moves them into a separate namespace. The encrypted UDP sockets
 remain in their birthplace namespace, using the existing physical NIC. It does
 not change the VM's physical addresses, product devices, CNI, or host routing.
 UDP ports 54871 and 54872 must be available. New device creation fails on a name
-collision. Readiness and stop files, plus the executable, remain in `/tmp` for
-inspection; `run.json` identifies them. Remove only those run-owned files after
+collision. Readiness and stop files, plus the executable, remain in `/var/lib/cldt` on
+the VM for inspection; `run.json` identifies them. Remove only those run-owned files after
 all native processes have terminated.
 
 Each sender uses the same test source addresses (`10.254.99.11` and

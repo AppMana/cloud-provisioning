@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 	"path/filepath"
 	"strings"
 	"time"
@@ -157,10 +158,14 @@ func (b Builder) install(ctx context.Context, d cluster.Deps, n lab.Node, files 
 			return fmt.Errorf("carrying %s onto %s: %w", name, n.Name, err)
 		}
 	}
-	if err := node.Put(ctx, bytes.NewReader(files["install.sh"]), "/tmp/rke2-install.sh", 0o755); err != nil {
+	installer := rig.LabDir + "/rke2-install.sh"
+	if _, err := node.Exec(ctx, "mkdir", "-p", rig.LabDir); err != nil {
 		return err
 	}
-	return shared.Install(ctx, node, "/tmp/rke2-install.sh",
+	if err := node.Put(ctx, bytes.NewReader(files["install.sh"]), installer, 0o755); err != nil {
+		return err
+	}
+	return shared.Install(ctx, node, installer,
 		"INSTALL_RKE2_ARTIFACT_PATH="+ArtifactDir,
 		"INSTALL_RKE2_VERSION="+Version,
 		"INSTALL_RKE2_METHOD=tar",

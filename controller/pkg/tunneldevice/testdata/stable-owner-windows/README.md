@@ -80,7 +80,7 @@ UDP 54871 and B at UDP 54872. The Windows nodes retain their own keys and decryp
 each other's packets; the relay has no WireGuard keys.
 
 ```sh
-python3 relay.py --work-dir /var/tmp/cldt-relay-unique \
+python3 relay.py --work-dir /var/lib/cldt/relay-unique \
   --peer WINDOWS_2022_PUBLIC_IP --peer WINDOWS_2025_PUBLIC_IP --seconds 300
 ```
 

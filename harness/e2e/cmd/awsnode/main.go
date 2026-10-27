@@ -43,7 +43,7 @@ func main() {
 		fatal(fmt.Errorf("test run has been cleaned up"))
 	}
 	cli := &aws.CLI{Region: state.Region, SessionPath: filepath.Join(*work, "harness-session.json")}
-	node := &aws.Node{API: cli, Input: &aws.S3Input{CLI: cli, Bucket: state.AssetBucket}, NodeName: *instance, InstanceID: *instance}
+	node := &aws.Node{API: cli, Input: &aws.S3Input{CLI: cli, Bucket: state.AssetBucket, WorkDir: *work}, NodeName: *instance, InstanceID: *instance}
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
 	node.Commands, err = aws.DiscoverGuestCommands(ctx, cli, *instance)

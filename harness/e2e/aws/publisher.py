@@ -91,7 +91,8 @@ if a.renew_pull_only:
 else:
     auth = aws('ecr', 'get-authorization-token', {})['authorizationData'][0]
     config = {'auths': {registry: {'auth': auth['authorizationToken']}}}
-    with tempfile.TemporaryDirectory(prefix='cldt-ecr-') as directory:
+    # The registry token stays in the private run directory, never in /tmp.
+    with tempfile.TemporaryDirectory(prefix='.ecr-', dir=a.work_dir) as directory:
         cfg = pathlib.Path(directory)/'config.json'
         cfg.write_text(json.dumps(config)); cfg.chmod(0o600)
         env = dict(os.environ, DOCKER_CONFIG=directory)
@@ -112,7 +113,7 @@ pull_env = dict(os.environ, AWS_ACCESS_KEY_ID=pull_session['AccessKeyId'],
 pull_env.pop('AWS_SECURITY_TOKEN', None)
 pull_auth = aws('ecr', 'get-authorization-token', {}, env=pull_env)['authorizationData'][0]
 config = {'auths': {registry: {'auth': pull_auth['authorizationToken']}}}
-with tempfile.TemporaryDirectory(prefix='cldt-ecr-pull-') as directory:
+with tempfile.TemporaryDirectory(prefix='.ecr-pull-', dir=a.work_dir) as directory:
     cfg = pathlib.Path(directory)/'config.json'
     cfg.write_text(json.dumps(config)); cfg.chmod(0o600)
     probe = subprocess.run(['crane', 'digest', ref], capture_output=True, text=True,

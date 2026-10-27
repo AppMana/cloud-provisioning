@@ -15,3 +15,4 @@ charts/*/charts/*.tgz
 
 # Cumulative coverage data from scripts/coverage.sh.
 .coverage-data/
+dist/

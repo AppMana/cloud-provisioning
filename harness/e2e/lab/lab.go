@@ -31,6 +31,8 @@ package lab
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -436,4 +438,15 @@ func endpointName(segment string, n Node) string {
 		name = "edge"
 	}
 	return short + "-" + name
+}
+
+// LockPath is the lock every command that builds or drives the lab holds,
+// so two never act on it at once. It lives in the user's runtime
+// directory, which the session creates and removes.
+func LockPath() (string, error) {
+	dir := os.Getenv("XDG_RUNTIME_DIR")
+	if dir == "" {
+		return "", fmt.Errorf("XDG_RUNTIME_DIR is not set; the lab lock lives there")
+	}
+	return filepath.Join(dir, "cloud-provisioning-cldt.lock"), nil
 }

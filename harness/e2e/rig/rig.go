@@ -34,3 +34,8 @@ type Fleet = labrig.Fleet
 // because a harness that reports only an exit status makes every
 // failure a second investigation.
 type ExitError = labrig.ExitError
+
+// LabDir is where the lab keeps what it carries onto a machine it builds:
+// installers, configuration and archives. Not /tmp, which a reboot clears
+// and which may be mounted noexec.
+const LabDir = "/var/lib/cldt"

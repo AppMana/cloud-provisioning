@@ -81,7 +81,7 @@ Build the Linux cache on the unjoined VM after staging its runtime binaries:
 
 ```sh
 python3 prepare_cache.py --recipe cache-recipe.json \
-  --operation /var/tmp/cache-build-unique-id
+  --operation harness/e2e/.state/images/cache-build-unique-id
 ```
 
 Stage [prepare_cache.py](linux/prepare_cache.py), the recipe and any referenced
@@ -114,7 +114,7 @@ recipe on the unjoined builder, then run:
 
 ```sh
 python3 linux_cache_native.py --recipe cache-recipe.json \
-  --operation /var/tmp/cache-acceptance-unique-build-id
+  --operation harness/e2e/.state/images/cache-acceptance-unique-build-id
 ```
 
 The recipe requires `schemaVersion: 1`, `machineOS: linux`, `architecture: amd64`

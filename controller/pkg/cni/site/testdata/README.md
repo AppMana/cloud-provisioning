@@ -8,3 +8,4 @@ v1.36.5-0.20260918181138-c37fe960bdee (Calico v3.32.1), rendered with
 `ipAutodetectionMethod: cidr=10.10.0.0/24`,
 `ipV6AutodetectionMethod: cidr=fd00:10::/64`, pod CIDRs 10.244.0.0/16 and
 fd00:244::/56, and no extra `envVars`. Blank lines were removed.
+`render-k0s-calico-node.go` regenerates it (command in its header).

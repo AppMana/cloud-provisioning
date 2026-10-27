@@ -7,12 +7,15 @@ $packages=@{
  'AWS.Tools.SecretsManager'='b4312531b98a3b4007a7b4ddaeda5d1b823c0880702d26f327f3a19516c50cef'
 }
 $ProgressPreference='SilentlyContinue'
+# Downloads are staged in the image's own directory, not the user temp directory.
+$staging=Join-Path $env:ProgramData 'CloudProvisioning\ImageStaging'
+New-Item -ItemType Directory -Force -Path $staging | Out-Null
 foreach ($name in @('AWS.Tools.Common','AWS.Tools.SecretsManager')) {
- $package=Join-Path $env:TEMP ($name+'.zip')
+ $package=Join-Path $staging ($name+'.zip')
  Invoke-WebRequest -UseBasicParsing -Uri "https://www.powershellgallery.com/api/v2/package/$name/$version" -OutFile $package
  if ((Get-FileHash $package -Algorithm SHA256).Hash.ToLowerInvariant() -ne $packages[$name]) { throw "Package checksum mismatch: $name" }
  $destination=Join-Path "$env:ProgramFiles\WindowsPowerShell\Modules" "$name\$version"
- $stage=Join-Path $env:TEMP ([Guid]::NewGuid().ToString())
+ $stage=Join-Path $staging ([Guid]::NewGuid().ToString())
  try {
   Expand-Archive -Path $package -DestinationPath $stage
   if (Test-Path $destination) {
@@ -32,5 +35,6 @@ foreach ($name in @('AWS.Tools.Common','AWS.Tools.SecretsManager')) {
   Remove-Item -Force -ErrorAction SilentlyContinue $package
  }
 }
+Remove-Item -Force -ErrorAction SilentlyContinue $staging
 Import-Module AWS.Tools.SecretsManager -RequiredVersion $version -ErrorAction Stop
 if (!(Get-Command Get-SECSecretValue) -or !(Get-Command Remove-SECSecret)) { throw 'Secrets Manager cmdlets unavailable' }

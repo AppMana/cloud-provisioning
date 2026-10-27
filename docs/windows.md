@@ -366,7 +366,7 @@ Build the instrumented probe from `controller`:
 ```sh
 GOOS=windows GOARCH=amd64 go build -cover \
   -coverpkg=github.com/appmana/cloud-provisioning/controller/pkg/tunneldevice,github.com/appmana/cloud-provisioning/controller/cmd/tunnelprobe \
-  -o /tmp/tunnelprobe.exe ./cmd/tunnelprobe
+  -o _work/tunnelprobe.exe ./cmd/tunnelprobe
 ```
 
 Include the command package in instrumentation so the executable emits runtime
@@ -374,9 +374,9 @@ coverage files. With the two prepared Windows VMs and the signed WireGuardNT
 1.1 DLL and its license extracted from the official SDK, run from `harness/e2e`:
 
 ```sh
-go build -o /tmp/awsnode ./cmd/awsnode
+go build -o _workvm/awsnode ./cmd/awsnode
 python3 aws/windows_tunnel.py --work-dir <private-run-directory> \
-  --awsnode /tmp/awsnode --probe /tmp/tunnelprobe.exe \
+  --awsnode _workvm/awsnode --probe ../../controller/_work/tunnelprobe.exe \
   --driver <path-to-amd64-wireguard.dll> --driver-license <path-to-LICENSE.txt> \
   --family ipv6 --output <new-private-evidence-directory>
 ```
@@ -427,14 +427,14 @@ Build the instrumented service from `controller`:
 ```sh
 GOOS=windows GOARCH=amd64 go build -cover \
   -coverpkg=github.com/appmana/cloud-provisioning/controller/cmd/windows-tunnel,github.com/appmana/cloud-provisioning/controller/pkg/tunnelhost,github.com/appmana/cloud-provisioning/controller/pkg/tunneldevice,github.com/appmana/cloud-provisioning/controller/pkg/apiproxy \
-  -o /tmp/windows-tunnel.exe ./cmd/windows-tunnel
+  -o _work/windows-tunnel.exe ./cmd/windows-tunnel
 ```
 
 With the prepared single-NIC Windows VMs running, execute from `harness/e2e`:
 
 ```sh
 python3 aws/windows_service.py --work-dir <private-run-directory> \
-  --awsnode /tmp/awsnode --service /tmp/windows-tunnel.exe \
+  --awsnode _workvm/awsnode --service ../../controller/_work/windows-tunnel.exe \
   --driver <path-to-amd64-wireguard.dll> --driver-license <path-to-LICENSE.txt> \
   --coverage --output <new-private-evidence-directory>
 ```
@@ -548,13 +548,13 @@ command documents, with the same run-tag restriction on instances.
 From `harness/e2e`:
 
 ```sh
-go run ./cmd/windowsprobe -render-userdata -output /tmp/cldt-windows-userdata.xml
+go run ./cmd/windowsprobe -render-userdata -output <private-run-directory>/windows-userdata.xml
 # With the authorized AWS setup identity:
 python3 aws/windows_probe.py --work-dir <private-run-directory> \
-  --userdata /tmp/cldt-windows-userdata.xml
+  --userdata <private-run-directory>/windows-userdata.xml
 # After EC2Launch finishes and SSM becomes available:
 go run ./cmd/windowsprobe -work-dir <private-run-directory> \
-  -output /tmp/cldt-windows-results.json
+  -output <private-run-directory>/windows-results.json
 ```
 
 Use new output paths. The launcher resolves Amazon's available, licensed Windows

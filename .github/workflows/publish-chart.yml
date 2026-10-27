@@ -33,5 +33,5 @@ jobs:
           base_version="$(helm show chart charts/cloud-provisioning | awk '/^version:/ {print $2}')"
           test -n "$base_version"
           chart_version="${base_version}-sha.${{ github.event.workflow_run.head_sha }}"
-          helm package charts/cloud-provisioning --version "$chart_version" --app-version "$sha" --destination /tmp/chart
-          helm push /tmp/chart/cloud-provisioning-*.tgz oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts
+          helm package charts/cloud-provisioning --version "$chart_version" --app-version "$sha" --destination dist/chart
+          helm push dist/chart/cloud-provisioning-*.tgz oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts

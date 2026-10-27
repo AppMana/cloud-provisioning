@@ -3,9 +3,9 @@
 Apply to a clean checkout, then build/test in that checkout:
 
 ```sh
-git clone --branch v2.12.1 --depth 1 https://github.com/kubernetes-sigs/cluster-api-provider-aws.git /tmp/capa-windows
-./providers/capa/apply.sh /tmp/capa-windows
-cd /tmp/capa-windows
+git clone --branch v2.12.1 --depth 1 https://github.com/kubernetes-sigs/cluster-api-provider-aws.git ~/Documents/forks-capa-windows
+./providers/capa/apply.sh ~/Documents/forks-capa-windows
+cd ~/Documents/forks-capa-windows
 go test ./pkg/cloud/services/userdata
 go test ./pkg/cloud/scope -run 'TestPowerShellUsesSecrets|TestUseSecretsManager|TestCompressUserData'
 ```

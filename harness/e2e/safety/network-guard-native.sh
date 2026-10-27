@@ -9,7 +9,8 @@ if ip link show ng-guard-test >/dev/null 2>&1; then
   echo 'Refusing to reuse an existing test interface' >&2
   exit 1
 fi
-root=$(mktemp -d /var/tmp/network-guard-native.XXXXXXXX)
+mkdir -p /var/lib/cldt
+root=$(mktemp -d /var/lib/cldt/network-guard-native.XXXXXXXX)
 chmod 700 "$root"
 units=()
 sampler=

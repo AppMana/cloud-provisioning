@@ -187,7 +187,12 @@ func runMatrix(ctx context.Context, config *rest.Config, nodeList string, tries 
 	if len(nodes) < 2 {
 		return nil, fmt.Errorf("a matrix needs at least two nodes, have %v", nodes)
 	}
-	work, err := os.MkdirTemp("", "cloud-provisioning-acceptance-")
+	// The prober is built in the module's private state directory.
+	state := filepath.Join(moduleDir, ".state")
+	if err := os.MkdirAll(state, 0o700); err != nil {
+		return nil, err
+	}
+	work, err := os.MkdirTemp(state, "acceptance-")
 	if err != nil {
 		return nil, err
 	}

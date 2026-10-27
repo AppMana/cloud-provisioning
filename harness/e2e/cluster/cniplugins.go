@@ -47,12 +47,16 @@ func EnsureCNIPlugins(ctx context.Context, r rig.Rig, workDir string, nodes []st
 	}
 	for _, name := range missing {
 		node := r.Node(name)
-		if err := node.Put(ctx, bytes.NewReader(archive), "/tmp/cni-plugins.tgz", 0o644); err != nil {
+		archivePath := rig.LabDir + "/cni-plugins.tgz"
+		if _, err := node.Exec(ctx, "mkdir", "-p", rig.LabDir); err != nil {
+			return err
+		}
+		if err := node.Put(ctx, bytes.NewReader(archive), archivePath, 0o644); err != nil {
 			return fmt.Errorf("carrying the CNI plugins onto %s: %w", name, err)
 		}
 		if _, err := node.Exec(ctx, "sh", "-c",
 			"mkdir -p "+CNIPluginsDir+" && tar -C "+CNIPluginsDir+
-				" -xzf /tmp/cni-plugins.tgz && rm -f /tmp/cni-plugins.tgz"); err != nil {
+				" -xzf "+archivePath+" && rm -f "+archivePath); err != nil {
 			return fmt.Errorf("unpacking the CNI plugins on %s: %w", name, err)
 		}
 	}

@@ -69,8 +69,8 @@ def main():
         raise RuntimeError('candidate must differ from the current MTU')
     transaction = 'mtu-' + uuid.uuid4().hex[:12]
     namespace = 'guard-' + transaction
-    root = '/var/tmp/' + transaction
-    guest('cp', f'mkdir -m 700 {root}')
+    root = '/var/lib/cldt/' + transaction
+    guest('cp', f'mkdir -p /var/lib/cldt && mkdir -m 700 {root}')
     put('cp', root + '/network-guard', args.guard.read_bytes(), '0700')
     kube('create', 'namespace', namespace)
     completed = False
@@ -98,12 +98,12 @@ def main():
         # Independent host processes survive control-plane/API and CNI pod restarts.
         for number, address in enumerate(['10.101.0.1', 'fd8f:cf26:522a::1'] + [p['ip'] for p in remote['status']['podIPs']]):
             unit = transaction + '-probe-' + str(number)
-            logfile = '/var/tmp/' + unit + '.log'
+            logfile = '/var/lib/cldt/' + unit + '.log'
             guest('w1', f"systemd-run --quiet --unit {unit} /bin/sh -c 'exec ping -n -i 0.2 -w 1200 {address} > {logfile} 2>&1'")
             samplers.append((unit, logfile, address))
         for number, endpoint in enumerate(remote['status']['podIPs']):
             address = endpoint['ip']
-            logfile = '/tmp/guard-ping-' + str(number) + '.log'
+            logfile = '/var/lib/cldt/guard-ping-' + str(number) + '.log'
             pid = int(kube('-n', namespace, 'exec', 'stable-w1', '--', 'sh', '-c',
                            f'nohup ping -n -i 0.2 -w 1200 {address} > {logfile} 2>&1 < /dev/null & echo $!'))
             pod_samplers.append((pid, logfile, address))

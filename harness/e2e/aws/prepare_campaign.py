@@ -112,7 +112,7 @@ def main():
     p.add_argument('--cluster-uid', required=True, help='observed kube-system namespace UID')
     p.add_argument('--native-cidr', action='append', required=True, help='protected cloud range; repeat')
     p.add_argument('--builder', required=True, help='docker-container buildx builder for multi-platform OCI output')
-    p.add_argument('--chart', default='/tmp/chart', help='chart directory on the bastion')
+    p.add_argument('--chart', default='/var/lib/cldt/chart', help='chart directory on the bastion (install.ChartPath)')
     p.add_argument('--apply', action='store_true', help='upgrade the release after the server dry run')
     a = p.parse_args()
     os.umask(0o077)

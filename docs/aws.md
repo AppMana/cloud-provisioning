@@ -493,7 +493,7 @@ For this workspace, run from `~/Documents/appmana/appmana-cluster/src` in Bash:
 
 ```sh
 umask 077
-source ./source-me.sh > /tmp/cldt-aws-source.log 2>&1
+source ./source-me.sh > ~/Documents/cloud-provisioning/harness/e2e/.state/aws/source.log 2>&1
 python3 ~/Documents/cloud-provisioning/harness/e2e/aws/bootstrap.py \
   --work-dir ~/Documents/cloud-provisioning/harness/e2e/.state/aws/example \
   --run-id cldt-example

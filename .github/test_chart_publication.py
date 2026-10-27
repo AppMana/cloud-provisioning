@@ -29,7 +29,7 @@ class ChartPublication(unittest.TestCase):
             with tempfile.TemporaryDirectory() as directory:
                 script = textwrap.dedent(commands).replace(
                     "${{ github.event.workflow_run.head_sha }}", commit
-                ).replace("/tmp/chart", directory)
+                ).replace("dist/chart", directory)
                 subprocess.run(["bash", "-euo", "pipefail", "-c", script],
                                cwd=ROOT, env={**os.environ, "sha": commit[:7]}, check=True)
                 packages = list(Path(directory).glob("*.tgz"))

@@ -84,7 +84,7 @@ func TestTheClusterEndpointIsTheNodesOwnLoopback(t *testing.T) {
 	_ = (Builder{}).init(context.Background(), d,
 		lab.Default().MustNode("cp"), cluster.ControlPlaneAddresses(lab.Default()))
 
-	config := r.fileOn("cp", "/tmp/init.yaml")
+	config := r.fileOn("cp", rig.LabDir+"/kubeadm-init.yaml")
 	decoder := yamlutil.NewYAMLOrJSONDecoder(strings.NewReader(config), 4096)
 	var initConfig native.InitConfiguration
 	var clusterConfig native.ClusterConfiguration
@@ -208,7 +208,8 @@ func (n *fakeNode) Exec(ctx context.Context, argv ...string) ([]byte, error) {
 	if out, ok := n.rig.execOut[""]; ok {
 		return []byte(out), nil
 	}
-	if n.rig.failExec {
+	// Making the lab directory is not a command under test.
+	if n.rig.failExec && argv[0] != "mkdir" {
 		return nil, errFake
 	}
 	return nil, nil

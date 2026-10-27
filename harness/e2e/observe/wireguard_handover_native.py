@@ -46,7 +46,7 @@ def outcomes_expected(phases, mode):
     return True
 
 
-def experiment(mode, planner=None, runtime=None):
+def experiment(mode, planner=None, runtime=None, work_dir=None):
     if runtime and (mode != 'dual' or planner):
         raise ValueError('runtime requires dual mode without a separate planner')
     if planner and mode != 'dual':
@@ -54,6 +54,8 @@ def experiment(mode, planner=None, runtime=None):
     if mode not in ('single', 'dual'):
         raise ValueError('unsupported receiver mode')
     require_isolation()
+    if not work_dir:
+        raise ValueError('a private work directory is required for the receivers\' keys')
 
     def run(*args, input=None):
         return subprocess.check_output(args, input=input, stderr=subprocess.PIPE)
@@ -78,7 +80,7 @@ def experiment(mode, planner=None, runtime=None):
         ns(name, 'ip', 'address', 'add', address, 'dev', iface)
         ns(name, 'ip', 'link', 'set', iface, 'up')
     try:
-        with tempfile.TemporaryDirectory(prefix='cldt-dual-receiver-') as directory:
+        with tempfile.TemporaryDirectory(prefix='dual-receiver-', dir=work_dir) as directory:
             os.chmod(directory, 448)
             paths = {}
             pubs = {}
@@ -184,5 +186,6 @@ if __name__ == '__main__':
     parser.add_argument('--mode', choices=['single', 'dual'], required=True)
     parser.add_argument('--planner', help='staged receiveplan executable; consumes the public request on stdin')
     parser.add_argument('--runtime', help='staged dialer test binary; prepares real receivers in the cloud namespace')
+    parser.add_argument('--work-dir', required=True, help='private directory for the receivers\' keys')
     args = parser.parse_args()
-    experiment(args.mode, args.planner, args.runtime)
+    experiment(args.mode, args.planner, args.runtime, args.work_dir)

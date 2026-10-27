@@ -297,14 +297,18 @@ func (b Builder) init(ctx context.Context, d cluster.Deps, first lab.Node, addrs
 	if _, err := node.Exec(ctx, "test", "-f", "/etc/kubernetes/admin.conf"); err == nil {
 		return nil // already initialised
 	}
-	if err := shared.WriteObjects(ctx, node, "/tmp/init.yaml", 0o600, initConfig, clusterConfig, proxyConfig); err != nil {
+	initPath := rig.LabDir + "/kubeadm-init.yaml"
+	if _, err := node.Exec(ctx, "mkdir", "-p", rig.LabDir); err != nil {
+		return err
+	}
+	if err := shared.WriteObjects(ctx, node, initPath, 0o600, initConfig, clusterConfig, proxyConfig); err != nil {
 		return err
 	}
 	// Preflight inspects the kernel it runs on, which in a container
 	// is this host's, so it checks things the node neither owns nor
 	// can change. It also objects to a manifests directory that
 	// already holds the forwarder, which is there on purpose.
-	out, err := node.Exec(ctx, "kubeadm", "init", "--config", "/tmp/init.yaml",
+	out, err := node.Exec(ctx, "kubeadm", "init", "--config", initPath,
 		"--skip-token-print", "--upload-certs", "--ignore-preflight-errors=all")
 	if err != nil {
 		return fmt.Errorf("%w\n%s", err, tail(out, 30))

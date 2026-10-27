@@ -61,6 +61,10 @@ type Product struct {
 
 // binaryPath is where the first-boot binary is, whether or not Build
 // ran in this process.
+
+// ChartPath is where the chart is carried onto the bastion.
+const ChartPath = rig.LabDir + "/chart"
+
 func (p *Product) BinaryPath() string {
 	if p.binary != "" {
 		return p.binary
@@ -197,7 +201,7 @@ func (p *Product) Install(ctx context.Context, opts Options, dialerSHA string) e
 	// is Never because the site has no registry; the rest is what the
 	// row varies.
 	args := []string{
-		"upgrade", "--install", "cloud-provisioning", "/tmp/chart",
+		"upgrade", "--install", "cloud-provisioning", ChartPath,
 		"--namespace", Namespace, "--create-namespace", "--wait", "--timeout", "6m",
 		"--set", "image.repository=" + strings.Split(p.controllerRef(), ":")[0],
 		"--set", "image.tag=" + strings.Split(p.controllerRef(), ":")[1],
@@ -255,14 +259,15 @@ func (p *Product) carryChart(ctx context.Context) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("packing the chart: %w", err)
 	}
-	if _, err := p.Kube.Bastion.Exec(ctx, "mkdir", "-p", "/tmp/chartsrc"); err != nil {
+	staging := rig.LabDir + "/chartsrc"
+	if _, err := p.Kube.Bastion.Exec(ctx, "sh", "-c", "rm -rf "+staging+" && mkdir -p "+staging); err != nil {
 		return err
 	}
-	if _, err := p.Kube.Bastion.Pipe(ctx, &buf, "tar", "-C", "/tmp/chartsrc", "-xf", "-"); err != nil {
+	if _, err := p.Kube.Bastion.Pipe(ctx, &buf, "tar", "-C", staging, "-xf", "-"); err != nil {
 		return fmt.Errorf("unpacking the chart: %w", err)
 	}
 	if _, err := p.Kube.Bastion.Exec(ctx, "sh", "-c",
-		"rm -rf /tmp/chart && mv /tmp/chartsrc/cloud-provisioning /tmp/chart"); err != nil {
+		"rm -rf "+ChartPath+" && mv "+staging+"/cloud-provisioning "+ChartPath); err != nil {
 		return err
 	}
 	return nil

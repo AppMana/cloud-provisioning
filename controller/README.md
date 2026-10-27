@@ -3,14 +3,14 @@
 From the repository root, compile the static payloads with the host Go toolchain:
 
 ```sh
-bash controller/build-binaries.sh /tmp/controller-binaries all amd64 arm64
+bash controller/build-binaries.sh controller/_work/binaries all amd64 arm64
 ```
 
 Assemble either `endpoint-controller` or `dialer` for the required platforms:
 
 ```sh
 docker buildx build --platform linux/amd64,linux/arm64 \
-  --build-context binaries=/tmp/controller-binaries \
+  --build-context binaries=controller/_work/binaries \
   --target endpoint-controller -f controller/Dockerfile \
   -t registry.example/controller:VERSION --push .
 ```

@@ -100,7 +100,7 @@ $null = New-Item -ItemType Directory -Force -Path 'C:\ProgramData\CloudProvision
 		if err != nil {
 			return err
 		}
-		node := &aws.Node{API: cli, Input: &aws.S3Input{CLI: cli, Bucket: state.AssetBucket}, NodeName: year, InstanceID: item.InstanceID, Commands: commands}
+		node := &aws.Node{API: cli, Input: &aws.S3Input{CLI: cli, Bucket: state.AssetBucket, WorkDir: *workArg}, NodeName: year, InstanceID: item.InstanceID, Commands: commands}
 		ps := func(script string) ([]byte, error) {
 			return node.Exec(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
 		}

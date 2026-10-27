@@ -12,15 +12,15 @@ case "$(uname -m)" in
 esac
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y unzip
-mkdir -p /tmp/cldt-awscli
-cd /tmp/cldt-awscli
+mkdir -p /var/lib/cldt/awscli
+cd /var/lib/cldt/awscli
 curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${awscli_arch}-2.36.33.zip" -o awscli.zip
 printf '%s  %s\n' "$awscli_sha256" awscli.zip | sha256sum -c -
 unzip -q awscli.zip
 ./aws/install --update
 /usr/local/bin/aws --version
 cd /
-rm -rf /tmp/cldt-awscli
+rm -rf /var/lib/cldt/awscli
 # Match kubernetes-sigs/image-builder 96bd49f71859ff7863f08ba4dc3321c560f8802b,
 # images/capi/ansible/roles/providers/tasks/main.yml. CAPA's boothook creates
 # the include file after initial parsing; strict include failure prevents it.

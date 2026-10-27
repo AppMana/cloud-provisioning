@@ -44,7 +44,11 @@ func run(work, namespace string, count, port int, once bool) error {
 	if err != nil {
 		return err
 	}
-	lock, err := os.OpenFile(filepath.Join(os.TempDir(), "cloud-provisioning-cldt.lock"), os.O_CREATE|os.O_RDWR, 0600)
+	lockPath, err := lab.LockPath()
+	if err != nil {
+		return err
+	}
+	lock, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return err
 	}

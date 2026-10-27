@@ -43,7 +43,7 @@ func run() error {
 	distro := flag.String("distro", "k0s", "site distribution: k0s or microk8s")
 	cni := flag.String("cni", "default", "distribution-supported site network")
 	claims := flag.String("claims", "aws-k0s-1", "existing CAPA claim/Machine names, comma separated")
-	chartPath := flag.String("chart-path", "/tmp/chart", "chart directory or archive on the bastion used for placement upgrades")
+	chartPath := flag.String("chart-path", install.ChartPath, "chart directory or archive on the bastion used for placement upgrades")
 	placementName := flag.String("placement", "", "change tunnel endpoints: control-plane, one-worker, two-workers, all-nodes")
 	report := flag.String("report-dir", "", "evidence directory (must not exist)")
 	timeout := flag.Duration("timeout", 45*time.Minute, "row deadline")
@@ -164,7 +164,7 @@ func run() error {
 		if !strings.HasPrefix(id, "i-") {
 			return fmt.Errorf("invalid EC2 providerID")
 		}
-		remote := &aws.Node{API: cli, Input: &aws.S3Input{CLI: cli, Bucket: state.AssetBucket}, NodeName: name, InstanceID: id, Commands: aws.CAPALinuxCommands{}}
+		remote := &aws.Node{API: cli, Input: &aws.S3Input{CLI: cli, Bucket: state.AssetBucket, WorkDir: *work}, NodeName: name, InstanceID: id, Commands: aws.CAPALinuxCommands{}}
 		fmt.Println("Waiting for native", builder.Name(), "runtime on", id)
 		err = wait.Until(ctx, 15*time.Minute, builder.Name()+" did not bootstrap on "+name, func(ctx context.Context) error {
 			if err := builder.VerifyWorker(ctx, remote); err != nil {

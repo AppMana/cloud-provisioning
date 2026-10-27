@@ -8,7 +8,7 @@ parser.add_argument('--binary',required=True,type=pathlib.Path,help='Statically 
 parser.add_argument('--egress',action='store_true',help='Also exercise unbound sockets across route switches and rollback')
 args=parser.parse_args()
 work=args.work_dir;work.mkdir(mode=0o700)
-binary=args.binary.resolve();runid=uuid.uuid4().hex[:8];exe='/tmp/cldt-hov-'+runid;ns='cldt-hov-'+runid
+binary=args.binary.resolve();runid=uuid.uuid4().hex[:8];exe='/var/lib/cldt/cldt-hov-'+runid;ns='cldt-hov-'+runid
 (work/'run.json').write_text(json.dumps(dict(namespace=ns,executable=exe,outer=args.outer,lab=args.lab,egress=args.egress,startedAt=datetime.datetime.now(datetime.timezone.utc).isoformat()),indent=2))
 keys=json.loads(subprocess.check_output([str(binary),'-mode','keys']));(work/'keys.private.json').write_text(json.dumps(keys))
 now=lambda:datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -67,7 +67,7 @@ try:
  for node in ['cp2','w1','w2']:
   info=call(node,['python3','-c','import pathlib,json,platform; print(json.dumps(dict(kernel=platform.release(),physicalNICs=[p.name for p in pathlib.Path("/sys/class/net").iterdir() if (p/"device").exists()])))']).stdout
   v=json.loads(info);assert len(v['physicalNICs'])==1;(work/(node+'-hardware.json')).write_bytes(info)
-  call(node,['sh','-ec','umask 077; test ! -e '+exe+'; cat > '+exe+'; chmod 700 '+exe],binary.read_bytes())
+  call(node,['sh','-ec','umask 077; mkdir -p /var/lib/cldt; test ! -e '+exe+'; cat > '+exe+'; chmod 700 '+exe],binary.read_bytes())
  setup('cp2','cldt-hov-a','rxA','old','10.10.0.11:54871',True)
  setup('w1','cldt-hov-a','old','rxA','10.10.0.13:54871',True)
  receipts += [server('a',4),server('a',6)]

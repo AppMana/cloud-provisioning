@@ -329,46 +329,25 @@ func (c *Controller) setReady(ctx context.Context, namespace, name string) error
 	return err
 }
 
-// SetNodeProviderID tells Kubernetes which machine a node is.
+// WaitRegistration waits for every reported machine's node to register,
+// and checks that it registered under the machine's provider identity.
 //
-// In a cloud this is the cloud controller manager's job, or kubelet's
-// when it is started with a provider. Here the lab is the cloud, so
-// the lab does it — and this is the line worth keeping straight: it
-// is the CLOUD's job, not Cluster API's. Cluster API's Machine
-// controller then links the Machine to the Node by matching this
-// against the Machine's own providerID, and this harness does not
-// write nodeRef at all.
-//
-// A node whose providerID is already set is left alone: the field is
-// immutable once written.
-func (c *Controller) SetNodeProviderID(ctx context.Context, node, providerID string) error {
-	existing, err := c.Kube.Get(ctx, "", "node", node, "{.spec.providerID}")
-	if err != nil {
-		return err
-	}
-	if existing != "" {
-		return nil
-	}
-	patch := fmt.Sprintf(`{"spec":{"providerID":%q}}`, providerID)
-	if _, err := c.Kube.Run(ctx, "patch", "node", node, "--type", "merge", "-p", patch); err != nil {
-		return fmt.Errorf("giving node %s its provider identity: %w", node, err)
-	}
-	return nil
-}
-
-// AdoptNodes gives every node that a machine reported an address for
-// the provider identity Cluster API matches on.
+// The identity is the product's to set: its join pattern starts the
+// kubelet with --provider-id, and Cluster API links the Machine to the
+// Node by matching it. The harness never writes a Node, so a node that
+// registered without it, or under another machine's, is the product's
+// failure. The field is immutable, so that failure is final.
 //
 // Found by address rather than by name, because the address is the
 // fact the provider already reported: a machine bound to the wrong
-// node then adopts nothing instead of adopting the wrong node.
-func (c *Controller) AdoptNodes(ctx context.Context, namespace string, every time.Duration) error {
+// node then matches nothing instead of the wrong node.
+func (c *Controller) WaitRegistration(ctx context.Context, namespace string, every time.Duration) error {
 	for {
 		pass, cancel := context.WithTimeout(ctx, ReconcileTimeout)
 		machines, err := c.Reconcile(pass, namespace)
 		cancel()
 		if err == nil {
-			adopted := len(machines) > 0
+			registered := len(machines) > 0
 			for _, m := range machines {
 				node, err := c.nodeAt(ctx, m.Address)
 				if err != nil {
@@ -382,20 +361,24 @@ func (c *Controller) AdoptNodes(ctx context.Context, namespace string, every tim
 							}
 						}
 					}
-					adopted = false
+					registered = false
 					continue
 				}
-				if err := c.SetNodeProviderID(ctx, node, m.ProviderID); err != nil {
+				got, err := c.Kube.Get(ctx, "", "node", node, "{.spec.providerID}")
+				if err != nil {
 					return err
 				}
+				if got != m.ProviderID {
+					return fmt.Errorf("node %s registered with providerID %q, want %q from the product's join", node, got, m.ProviderID)
+				}
 			}
-			if adopted {
+			if registered {
 				return nil
 			}
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("no node took the provider's identity: %w", ctx.Err())
+			return fmt.Errorf("no node registered for the reported machines: %w", ctx.Err())
 		case <-time.After(every):
 		}
 	}

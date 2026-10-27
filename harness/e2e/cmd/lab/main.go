@@ -472,14 +472,11 @@ func runLab() {
 					fail("%v", err)
 				}
 
-				// The node joins after the machine is reported, and
-				// then the cloud tells Kubernetes which machine it is.
-				// That is the cloud's job — a cloud controller manager
-				// does it, or kubelet started with a provider — and
-				// here the lab is the cloud.
-				adoptCtx, cancelAdopt := context.WithTimeout(ctx, 10*time.Minute)
-				err := c.Provider.AdoptNodes(adoptCtx, claim.Namespace, 5*time.Second)
-				cancelAdopt()
+				// The node joins after the machine is reported, under the
+				// provider identity the product's join gave its kubelet.
+				regCtx, cancelReg := context.WithTimeout(ctx, 10*time.Minute)
+				err := c.Provider.WaitRegistration(regCtx, claim.Namespace, 5*time.Second)
+				cancelReg()
 				if err != nil {
 					fail("%v", err)
 				}

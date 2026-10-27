@@ -32,7 +32,7 @@ func TestRegistrationStopsOnObservedTerminalBootstrapFailure(t *testing.T) {
 	c := &Controller{Kube: k.client(), Rig: bootstrapHealthRig{node: node}, Topology: lab.Default(), LabName: "cldt"}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := c.AdoptNodes(ctx, "cloud-provisioning", time.Millisecond); !errors.Is(err, failure) {
+	if err := c.WaitRegistration(ctx, "cloud-provisioning", time.Millisecond); !errors.Is(err, failure) {
 		t.Fatalf("terminal failure hidden behind registration wait: %v", err)
 	}
 	if node.probes != 1 {

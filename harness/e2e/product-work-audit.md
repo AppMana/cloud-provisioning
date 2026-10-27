@@ -16,7 +16,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | C4 dual-stack cidr autodetect | open |
 | C5 BGP mesh scoping (site_mesh.go) | open |
 | C6 control-plane recognition | done: product recognises k0s, MicroK8s and taint marks (`platform.IsControlPlane`); harness labelling deleted; placement rows and windows_join.py no longer read a harness label |
-| C7 harness providerID patch | open |
+| C7 harness providerID patch | done: harness deleted the Node patch; `WaitRegistration` fails when the node did not register under the product's `--provider-id` |
 | C8 microk8s join token renewal | open |
 | C9 Linux VPC CNI install | open (Phase 4) |
 | C10 VPC CNI IAM | open |
@@ -34,7 +34,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | D5 windows-publisher image release | open |
 | D6 nodegroup CRD | open |
 | D7 forks | open |
-| Assertions list | open |
+| Assertions list | CAPI association (C7) and control-plane placement (C6) closed; rest open |
 | /tmp writes | open |
 | Mechanical write guard (harness kube/AWS writes refused outside an allowlist) | open |
 

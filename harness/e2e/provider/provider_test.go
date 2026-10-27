@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
@@ -185,7 +184,9 @@ func TestAReportedMachineIsNotRewritten(t *testing.T) {
 type fakeKube struct {
 	objects map[string]string
 	nodes   string
-	calls   [][]string
+	// nodeProviderID is what a registered node's kubelet reported.
+	nodeProviderID string
+	calls          [][]string
 }
 
 func (f *fakeKube) client() *kube.Client {
@@ -223,7 +224,7 @@ func (n *fakeNode) Exec(ctx context.Context, argv ...string) ([]byte, error) {
 	case containsPrefix(argv, "jsonpath=") && contains(argv, "nodes"):
 		return []byte(n.k.nodes), nil
 	case containsPrefix(argv, "jsonpath={.spec.providerID}"):
-		return nil, nil
+		return []byte(n.k.nodeProviderID), nil
 	case containsPrefix(argv, "jsonpath={.status.nodeRef.name}"):
 		// Unlinked until something links it, which is the state every
 		// machine starts in.
@@ -274,45 +275,6 @@ var errNotFound = &notFound{}
 type notFound struct{}
 
 func (*notFound) Error() string { return "not found" }
-
-// The cloud tells Kubernetes which machine a node is, and Cluster
-// API links the Machine to it from there.
-//
-// That split is the point. Setting spec.providerID on the Node is the
-// cloud's job — a cloud controller manager does it, or kubelet with a
-// provider — and here the lab is the cloud. Writing nodeRef is
-// Cluster API's job, and this harness does not do it at all: if it
-// did, no row would notice a dependency the product declares being
-// absent.
-func TestTheCloudGivesANodeItsIdentityAndNothingMore(t *testing.T) {
-	k := &fakeKube{
-		objects: map[string]string{
-			"remote1": `{"metadata":{"name":"remote1"},"spec":{"nodeName":"remote1"}}`,
-		},
-		nodes: "cp 10.10.0.10,\nremote1 203.0.113.10,\n",
-	}
-	c := &Controller{Kube: k.client(), Topology: lab.Default(), LabName: "cldt"}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	if err := c.AdoptNodes(ctx, "cloud-provisioning", 10*time.Millisecond); err != nil {
-		t.Fatal(err)
-	}
-
-	var gaveIdentity bool
-	for _, call := range k.calls {
-		joined := strings.Join(call, " ")
-		if strings.Contains(joined, "patch node") && strings.Contains(joined, ProviderID("cldt", "remote1")) {
-			gaveIdentity = true
-		}
-		if strings.Contains(joined, "nodeRef") {
-			t.Errorf("the harness wrote nodeRef, which is Cluster API's job: %v", call)
-		}
-	}
-	if !gaveIdentity {
-		t.Errorf("the node was never given the provider's identity: %v", k.calls)
-	}
-}
 
 // The node is found by the address the provider reported, not by
 // name. A machine bound to the wrong node would otherwise adopt that

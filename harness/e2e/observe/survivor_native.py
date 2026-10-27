@@ -38,6 +38,21 @@ def exclusive(path, value):
         stream.write('\n')
 
 
+
+def each_host(groups, work, workers=8):
+    """Runs work on every host's group in parallel and returns the results in
+    order. Every host finishes before any failure is raised: Executor.map
+    cancels hosts not yet started once one result raises, which loses their
+    evidence whenever a failure comes back first."""
+    groups = list(groups)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(workers, max(1, len(groups)))) as pool:
+        futures = [pool.submit(work, g) for g in groups]
+        concurrent.futures.wait(futures)
+    for future in futures:
+        if future.exception() is not None:
+            raise future.exception()
+    return [future.result() for future in futures]
+
 class Session:
     def __init__(self, kube, output):
         self.kube = kube
@@ -308,8 +323,7 @@ class Session:
         def collect_host(lanes):
             return [collect_lane(i, lane) for i, lane in lanes]
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, max(1, len(groups)))) as pool:
-            collected = list(pool.map(collect_host, groups.values()))
+        collected = each_host(groups.values(), collect_host)
         reports = [report for _, report in sorted(item for group in collected for item in group)]
         stable=snapshot(self.kube,[(s['pod'],s['nodeUID']) for s in initial],
                         family=session.get('addressFamily')) == initial

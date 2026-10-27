@@ -275,6 +275,20 @@ class NativeControlTest(unittest.TestCase):
             self.assertEqual(sum(r['attempts']-r['passed'] for r in reports),1)
             self.assertEqual(len(list(p.glob('lane-*.jsonl.gz'))),len(f['lanes']))
 
+    def test_every_host_collects_even_when_one_fails_before_the_others_start(self):
+        import threading, time
+        from survivor_native import each_host
+        done=set(); lock=threading.Lock()
+        def work(host):
+            if host==0: raise RuntimeError('collection unavailable')
+            time.sleep(0.05)
+            with lock: done.add(host)
+        # More hosts than workers: the last ones wait for a free worker
+        # while host 0 has already failed.
+        with self.assertRaisesRegex(RuntimeError,'collection unavailable'):
+            each_host(range(6),work,workers=2)
+        self.assertEqual(done,{1,2,3,4,5})
+
     def test_collection_failure_keeps_other_hosts_evidence_without_retry(self):
         import gzip
         from unittest.mock import patch

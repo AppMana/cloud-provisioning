@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # Cumulative coverage across both Go modules and every Python suite.
 #
-# Each run adds raw Go coverage to one directory, so unit tests, envtests and
+# Raw Go coverage goes to one directory, so unit tests, envtests and
 # instrumented harness binaries (GOCOVERDIR, see harness/e2e/runner/README.md)
 # merge into one profile. Functions that stay at 0% across all of them are
-# candidates for dead code.
+# candidates for dead code. A full run starts that directory afresh: data
+# from an earlier build of a changed package carries the old line numbers
+# and would report functions that no longer exist. Add instrumented-binary
+# data from the same build afterwards, then run `report`.
+#
+# Envtests run against the newest API binaries setup-envtest installed,
+# unless KUBEBUILDER_ASSETS names others.
 #
 #   scripts/coverage.sh            run every suite, then report
 #   scripts/coverage.sh report     report only (after adding GOCOVERDIR data)
@@ -24,6 +30,12 @@ mkdir -p "$go_raw" "$py_data"
 # silently shrink the profile; the exit status still reports it.
 failed=()
 if [[ "${1:-}" != report ]]; then
+  rm -rf "${go_raw:?}"
+  mkdir -p "$go_raw"
+  if [[ -z "${KUBEBUILDER_ASSETS:-}" ]]; then
+    assets=$(ls -d "$HOME"/.local/share/kubebuilder-envtest/k8s/*-linux-amd64 2>/dev/null | sort -V | tail -n 1 || true)
+    [[ -n "$assets" ]] && export KUBEBUILDER_ASSETS=$assets
+  fi
   for module in controller harness/e2e; do
     (cd "$root/$module" && GOWORK=off GOMAXPROCS=${GOMAXPROCS:-4} \
       go test -count=1 -p 2 -cover -coverpkg=./... ./... -args -test.gocoverdir="$go_raw") || failed+=("$module")

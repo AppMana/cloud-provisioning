@@ -219,8 +219,13 @@ path is not yet validated. See [join patterns](../join-patterns/README.md).
 
 Use separate identities for provisioning and guest execution. The JSON files
 below are parameterized templates; render them before attaching them to a role.
-The `cloud-provisioning-test` ownership tag scopes this isolated integration
-configuration. Every AWSMachine must carry the selected tag value.
+The CAPA, worker and VPC CNI policies scope what they change to resources CAPA
+tagged `sigs.k8s.io/cluster-api-provider-aws/cluster/${CLUSTER_NAME}: owned`,
+which CAPA puts on every instance, volume, network interface and bootstrap
+secret it creates for that Cluster. The gateway policies scope theirs to the
+ownership tag (`${OWNER_TAG}: ${OWNER_VALUE}`) the gateway adapter's scope
+names. Harness-only policies (harness, runner, publisher) use the run's
+`cloud-provisioning-test` tag.
 
 | Role | Policies | Purpose |
 | --- | --- | --- |
@@ -243,8 +248,8 @@ ingress rule allowing all protocols from one of them (for example from itself);
 the controller refuses a VPC CNI claim whose groups do not, before any machine
 exists. Name the groups by ID in the template's `additionalSecurityGroups`.
 
-The gateway route policy uses `AWS_REGION`, `AWS_ACCOUNT_ID`, `ROUTE_TABLE_ID`
-and `RUN_ID` when rendered with `docs/iam/render.py`. Attach the rendered policy
+The gateway route policy uses `AWS_REGION`, `AWS_ACCOUNT_ID`, `ROUTE_TABLE_ID`,
+`OWNER_TAG` and `OWNER_VALUE` when rendered with `docs/iam/render.py`. Attach the rendered policy
 to the identity running the route adapter, separately from worker bootstrap.
 EC2 scopes CreateRoute/DeleteRoute authorization to the route table; individual
 route ownership is therefore maintained in the adapter's lease journal. See the
@@ -288,7 +293,7 @@ need the worker Node or gateway instance to survive. An ENI reassigned to a
 different instance, a changed route target or lost ownership prevents deletion.
 
 The gateway source/destination-check policy uses `AWS_REGION`, `AWS_ACCOUNT_ID`,
-`GATEWAY_ENI_ID` and `RUN_ID`. Render it with `docs/iam/render.py` and attach it to
+`GATEWAY_ENI_ID`, `OWNER_TAG` and `OWNER_VALUE`. Render it with `docs/iam/render.py` and attach it to
 the gateway reconciliation identity, separately from the worker role:
 
 ```sh
@@ -297,8 +302,8 @@ aws iam put-role-policy --role-name <gateway-controller-role> \
   --policy-name gateway-source-check --policy-document file://gateway-source-check.json
 ```
 
-The mutation permission names the exact ENI ARN and requires its
-`cloud-provisioning-test` ownership tag. The
+The mutation permission names the exact ENI ARN and requires its ownership
+tag. The
 `ec2:Attribute/SourceDestCheck` condition allows the Boolean setting to be
 disabled and restored; it does not grant changes to other interface attributes.
 This uses AWS's [attribute-specific IAM conditions](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-policies-for-amazon-ec2.html).
@@ -313,7 +318,7 @@ refuses an ENI reassigned to another instance. Run one elected writer per
 provider scope and retain the journal through worker deletion.
 
 The gateway ingress policy uses `AWS_REGION`, `AWS_ACCOUNT_ID`,
-`SECURITY_GROUP_ID` and `RUN_ID`. Render `docs/iam/gateway-ingress.json` with
+`SECURITY_GROUP_ID`, `OWNER_TAG` and `OWNER_VALUE`. Render `docs/iam/gateway-ingress.json` with
 `docs/iam/render.py` and attach it to the gateway reconciliation role. It grants
 rule creation and ingress revocation in the named, tagged security group;
 `CreateTags` is limited to rule creation and the two ownership tag keys.
@@ -376,6 +381,9 @@ configuration, not access keys:
   "AWS_ACCOUNT_ID": "123456789012",
   "AWS_REGION": "us-west-2",
   "RUN_ID": "cldt-example",
+  "CLUSTER_NAME": "cldt-example",
+  "OWNER_TAG": "cloud-provisioning-test",
+  "OWNER_VALUE": "cldt-example",
   "AMI_ID": "ami-0123456789abcdef0",
   "SUBNET_ID": "subnet-0123456789abcdef0",
   "SECURITY_GROUP_ID": "sg-0123456789abcdef0",

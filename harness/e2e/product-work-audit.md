@@ -36,7 +36,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | D7 forks | open |
 | Assertions list | CAPI association (C7), control-plane placement (C6), kubeadm Calico (C3) and CalicoNodesReady (C5, now measures the product agent on remotes) closed; rest open |
 | /tmp writes | done: this host uses the run work dir, the module `.state` dir or `$XDG_RUNTIME_DIR` (lock); site guests, bastion and image builders use `/var/lib/cldt` (`rig.LabDir`); the product's k0s bootstrap uses `/var/lib/cloud-provisioning/bootstrap`; Windows image staging uses ProgramData; docs, READMEs and CI use `_work`, `.state` or `dist`. Kept by decision: probe pods' `/tmp/transfer` and `/tmp/udpprobe` and the VM wrapper's `/tmp/cldt-guest-key`/`cldt-ssh-%C`, which are private to an ephemeral container and go with it |
-| IAM docs key ownership on the harness's `cloud-provisioning-test` tag and `RUN_ID` (found while closing C13) | open: product policies should key on CAPA's cluster tag and named resources |
+| IAM docs key ownership on the harness's `cloud-provisioning-test` tag and `RUN_ID` (found while closing C13) | done: CAPA, worker and VPC CNI policies key on CAPA's `sigs.k8s.io/cluster-api-provider-aws/cluster/${CLUSTER_NAME}: owned` (confirmed on instances, volumes, ENIs and bootstrap secrets in CAPA v2.13 source); gateway policies on the adapter's configured `${OWNER_TAG}: ${OWNER_VALUE}`; only harness-only policies keep the run tag |
 | `discover.PodCIDRs` widens node pod CIDRs to a guessed /16 (found while closing C9) | done: it and `NodeAddressRanges` (a guessed /24) had no callers and were deleted; the VPC CNI reads exact ranges |
 | Mechanical write guard (harness kube/AWS writes refused outside an allowlist) | open |
 

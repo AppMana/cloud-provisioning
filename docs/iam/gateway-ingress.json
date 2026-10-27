@@ -24,7 +24,7 @@
       "Condition": {
         "StringEquals": {
           "aws:RequestedRegion": "${AWS_REGION}",
-          "ec2:ResourceTag/cloud-provisioning-test": "${RUN_ID}"
+          "ec2:ResourceTag/${OWNER_TAG}": "${OWNER_VALUE}"
         }
       }
     },
@@ -35,7 +35,7 @@
       "Condition": {
         "StringEquals": {
           "aws:RequestedRegion": "${AWS_REGION}",
-          "aws:RequestTag/cloud-provisioning-test": "${RUN_ID}"
+          "aws:RequestTag/${OWNER_TAG}": "${OWNER_VALUE}"
         },
         "Null": {
           "aws:RequestTag/cloud-provisioning.appmana.com/ingress-owner": "false"
@@ -50,11 +50,11 @@
         "StringEquals": {
           "aws:RequestedRegion": "${AWS_REGION}",
           "ec2:CreateAction": "AuthorizeSecurityGroupIngress",
-          "aws:RequestTag/cloud-provisioning-test": "${RUN_ID}"
+          "aws:RequestTag/${OWNER_TAG}": "${OWNER_VALUE}"
         },
         "ForAllValues:StringEquals": {
           "aws:TagKeys": [
-            "cloud-provisioning-test",
+            "${OWNER_TAG}",
             "cloud-provisioning.appmana.com/ingress-owner"
           ]
         }

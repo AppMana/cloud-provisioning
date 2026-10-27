@@ -12,7 +12,7 @@
       "Condition": {
         "StringEquals": {
           "aws:RequestedRegion": "${AWS_REGION}",
-          "aws:ResourceTag/cloud-provisioning-test": "${RUN_ID}"
+          "aws:ResourceTag/sigs.k8s.io/cluster-api-provider-aws/cluster/${CLUSTER_NAME}": "owned"
         }
       }
     }

@@ -82,7 +82,10 @@ profile=remember('instanceProfileName',a.run_id+'-node')
 aws('iam','create-instance-profile','--instance-profile-name',profile,'--tags',json.dumps(tags))
 aws('iam','add-role-to-instance-profile','--instance-profile-name',profile,'--role-name',node_role)
 capa_arn=remember('capaRoleARN',role(capa_role,{'AWS':identity['Arn']}));remember('capaRoleName',capa_role)
-values={'AWS_ACCOUNT_ID':account,'AWS_REGION':a.region,'RUN_ID':a.run_id,
+# The harness names its CAPI Cluster after the run and tags what it owns with
+# the run; the gateway adapter's scope uses that tag.
+values={'AWS_ACCOUNT_ID':account,'AWS_REGION':a.region,'RUN_ID':a.run_id,'CLUSTER_NAME':a.run_id,
+    'OWNER_TAG':'cloud-provisioning-test','OWNER_VALUE':a.run_id,
     'AMI_ID':ami,'SUBNET_ID':subnet,'SECURITY_GROUP_ID':sg,
     'NODE_ROLE_NAME':node_role,'INSTANCE_PROFILE_NAME':profile,
     'SOURCE_PRINCIPAL_ARN':identity['Arn']}

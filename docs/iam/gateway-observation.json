@@ -41,7 +41,7 @@
       "Condition": {
         "StringEquals": {
           "aws:RequestedRegion": "${AWS_REGION}",
-          "ssm:resourceTag/cloud-provisioning-test": "${RUN_ID}"
+          "ssm:resourceTag/${OWNER_TAG}": "${OWNER_VALUE}"
         }
       }
     }

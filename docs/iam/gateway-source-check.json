@@ -16,7 +16,7 @@
       "Condition": {
         "StringEquals": {
           "aws:RequestedRegion": "${AWS_REGION}",
-          "ec2:ResourceTag/cloud-provisioning-test": "${RUN_ID}",
+          "ec2:ResourceTag/${OWNER_TAG}": "${OWNER_VALUE}",
           "ec2:Attribute/SourceDestCheck": ["true", "false"]
         }
       }

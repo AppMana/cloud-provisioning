@@ -8,6 +8,9 @@ import argparse
 import json
 import pathlib
 import subprocess
+import time
+
+from leaks import product_leaks
 
 p = argparse.ArgumentParser()
 p.add_argument('--work-dir', required=True)
@@ -47,6 +50,16 @@ if vpc:
         if ids:
             aws('ec2', 'terminate-instances', '--instance-ids', *ids)
             aws('ec2', 'wait', 'instance-terminated', '--instance-ids', *ids)
+        # Before the network goes, record what the product should have removed
+        # itself. A terminated instance's interfaces take a while to disappear.
+        deadline = time.monotonic() + 180
+        while True:
+            leaks = product_leaks(aws, s)
+            if not any(leak['kind'] == 'network-interface' for leak in leaks) or time.monotonic() > deadline:
+                break
+            time.sleep(10)
+        s['productLeaks'] = leaks
+        path.write_text(json.dumps(s, indent=2) + '\n')
         for key, command, flag in [('securityGroupID', 'delete-security-group', '--group-id'), ('routeAssociationID', 'disassociate-route-table', '--association-id'), ('routeTableID', 'delete-route-table', '--route-table-id'), ('subnetID', 'delete-subnet', '--subnet-id')]:
             if s.get(key):
                 aws('ec2', command, flag, s[key], absent_ok=True)
@@ -142,4 +155,6 @@ if s.get('capaRoleName'):
 (path.parent / 'asset-urls.json').unlink(missing_ok=True)
 s['cleanedUp'] = True
 path.write_text(json.dumps(s, indent=2) + '\n')
+if s.get('productLeaks'):
+    raise SystemExit('cleanup finished, but the product left AWS state behind: ' + json.dumps(s['productLeaks']))
 print('Cleaned up ' + s['runID'])

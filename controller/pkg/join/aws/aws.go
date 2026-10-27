@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	attachmentaws "github.com/appmana/cloud-provisioning/controller/pkg/attachment/aws"
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	platformaws "github.com/appmana/cloud-provisioning/controller/pkg/platform/aws"
 
@@ -41,6 +42,8 @@ import (
 type Provider struct {
 	ConfigNamespace string
 	ConfigName      string
+	// EC2 is an EC2 API in a region, for checks before a machine exists.
+	EC2 func(ctx context.Context, region string) (attachmentaws.API, error)
 }
 
 var (

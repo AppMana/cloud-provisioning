@@ -108,3 +108,15 @@ func TestAnIncompleteAWSClusterHasNoScope(t *testing.T) {
 		t.Fatal("a subnet outside the AWSCluster's VPC was accepted")
 	}
 }
+
+// Provider ranges are every AWSCluster's subnet ranges.
+func TestProviderRangesAreEveryAWSClustersSubnets(t *testing.T) {
+	scopes, _, api := scopeFixture(t, "ipv4", externalNetwork())
+	ranges, err := ProviderRanges{Reader: scopes.Reader, Family: "ipv4", API: scopes.API}.Ranges(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ranges) != 1 || ranges[0].String() != "172.29.0.0/24" || api.region != "us-west-2" {
+		t.Fatalf("ranges %v from %q", ranges, api.region)
+	}
+}

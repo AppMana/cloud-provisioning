@@ -2,11 +2,12 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "ObserveVPCCNIAllocations",
+      "Sid": "ObserveVPCCNIAllocationsAndCheckSecurityGroups",
       "Effect": "Allow",
       "Action": [
         "ec2:DescribeNetworkInterfaces",
-        "ec2:DescribeSubnets"
+        "ec2:DescribeSubnets",
+        "ec2:DescribeSecurityGroups"
       ],
       "Resource": "*",
       "Condition": {

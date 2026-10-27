@@ -9,9 +9,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// bgpRecheck is how often the site's BGP peering is checked again. Its
-// resources exist only on Calico sites, so they are not watched.
-const bgpRecheck = 5 * time.Minute
+// calicoRecheck is how often a Calico site's BGP peering and provider-range
+// pools are checked again. Calico's resources and the AWSClusters the
+// ranges come from exist only on some sites, so they are not watched.
+const calicoRecheck = time.Minute
 
 // Reconciler restores the exclusion on any site network DaemonSet that lacks
 // it, including one created or rewritten by its installer after startup,
@@ -30,7 +31,7 @@ func (r Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resul
 		return ctrl.Result{}, err
 	}
 	if isCalicoAgent(ds) {
-		return ctrl.Result{RequeueAfter: bgpRecheck}, nil
+		return ctrl.Result{RequeueAfter: calicoRecheck}, nil
 	}
 	return ctrl.Result{}, nil
 }

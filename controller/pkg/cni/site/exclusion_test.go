@@ -48,7 +48,7 @@ func excluder(t *testing.T, objs ...client.Object) (*Excluder, client.Client) {
 	}
 	scheme.AddKnownTypeWithName(installationGVK, &unstructured.Unstructured{})
 	scheme.AddKnownTypeWithName(installationGVK.GroupVersion().WithKind("InstallationList"), &unstructured.UnstructuredList{})
-	for _, gvk := range []schema.GroupVersionKind{bgpConfigurationGVK, bgpPeerGVK} {
+	for _, gvk := range []schema.GroupVersionKind{bgpConfigurationGVK, bgpPeerGVK, ipPoolGVK} {
 		scheme.AddKnownTypeWithName(gvk, &unstructured.Unstructured{})
 		scheme.AddKnownTypeWithName(gvk.GroupVersion().WithKind(gvk.Kind+"List"), &unstructured.UnstructuredList{})
 	}

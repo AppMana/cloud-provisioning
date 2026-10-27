@@ -89,6 +89,14 @@ type Validator interface {
 	Validate(ctx context.Context, c client.Reader, infraMachine *unstructured.Unstructured) error
 }
 
+// ClassValidator is an optional MachineProvisioner capability: it checks,
+// before a machine exists, what a node of this class needs from its
+// platform, so a claim that cannot work fails with the reason rather than
+// launching a machine that never networks.
+type ClassValidator interface {
+	ValidateClass(ctx context.Context, c client.Reader, infraMachine *unstructured.Unstructured, class platform.Class) error
+}
+
 // NodeLocalBalancer is an optional capability a ClusterJoinProvider
 // implements when its distribution ships no node-local balancing of
 // its own, so a joining worker needs the operator's loopback balancer

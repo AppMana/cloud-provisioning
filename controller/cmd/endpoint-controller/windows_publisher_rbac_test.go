@@ -139,11 +139,12 @@ func TestWindowsPublisherReconcilesWithChartServiceAccount(t *testing.T) {
 		}
 	})
 
-	// Calico's pools and blocks are only read. Its BGP resources are read,
-	// and written only to limit the node mesh to site nodes: a new peer and
-	// a patch of the mesh setting, never an update or deletion of the
-	// site's own peering.
-	t.Run("Calico routing is changed only to limit the BGP mesh", func(t *testing.T) {
+	// Calico's blocks are only read. Its pools are read, and created or
+	// deleted only as the disabled pools of provider ranges. Its BGP
+	// resources are read, and written only to limit the node mesh to site
+	// nodes: a new peer and a patch of the mesh setting, never an update or
+	// deletion of the site's own peering.
+	t.Run("Calico routing is changed only for provider ranges and the BGP mesh", func(t *testing.T) {
 		for _, resource := range []string{"ippools", "blockaffinities", "bgppeers", "bgpconfigurations"} {
 			for _, verb := range []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"} {
 				review := &authorizationv1.SelfSubjectAccessReview{Spec: authorizationv1.SelfSubjectAccessReviewSpec{
@@ -153,6 +154,7 @@ func TestWindowsPublisherReconcilesWithChartServiceAccount(t *testing.T) {
 					t.Fatal("review controller authorization:", err)
 				}
 				want := (resource == "ippools" || resource == "blockaffinities") && (verb == "get" || verb == "list" || verb == "watch") ||
+					resource == "ippools" && (verb == "create" || verb == "delete") ||
 					(resource == "bgppeers" || resource == "bgpconfigurations") && (verb == "get" || verb == "list" || verb == "create" || verb == "patch")
 				if review.Status.Allowed != want {
 					t.Errorf("controller %s %s allowed=%v, want %v", verb, resource, review.Status.Allowed, want)

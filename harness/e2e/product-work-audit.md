@@ -19,9 +19,9 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | C7 harness providerID patch | done: harness deleted the Node patch; `WaitRegistration` fails when the node did not register under the product's `--provider-id` |
 | C8 microk8s join token renewal | done: chart runs `microk8s-token-agent` on a MicroK8s control plane; it mints `token|expiry` lines, renews at half life, prunes its own expired tokens, follows snap refreshes and keeps microk8s-provider-config current; harness minting deleted |
 | C9 Linux VPC CNI install | done: controller applies aws-node (pinned chart 1.23.2 render, server-side, field manager cloud-provisioning, adopts a hand install) with SNAT exclusions from the site's exact pod, Service and node ranges, pod MTU min(tunnel, site Calico), one ENI; static RBAC in chart; vpc_cni.py deleted; awsrow requires the product to own aws-node |
-| C10 VPC CNI IAM | open |
-| C11 SG self ingress | open |
-| C12 disabled IPPool for provider ranges | open |
+| C10 VPC CNI IAM | done: published `docs/iam/vpc-cni-node-ipv4.json`/`-ipv6.json` keyed on CAPA's cluster tag, plus `controller.json`; harness attaches the published policy (no harness-built policy) |
+| C11 SG self ingress | done: documented requirement; the product refuses a VPC CNI claim whose security groups do not admit each other (`join.ClassValidator`, DescribeSecurityGroups) before any machine exists; harness adds the rule as an operator |
+| C12 disabled IPPool for provider ranges | done: on Calico sites the product creates a disabled `!all()` no-NAT no-export pool per AWSCluster subnet range, prunes unused ones, refuses ranges inside site pools and holds native claims until the pools exist; harness `calico_exclusion` deleted |
 | C13 observer STS renewal | done: controller uses the SDK standard chain via generic `aws.credentials` (env keys or config/credentials files; role_arn+source_profile refreshes itself); the observer configures itself per Machine from its AWSCluster, EC2 subnets, STS and CAPA's ownership tag; `observer_credentials.py`, `native-pod-scope`, `--aws-pod-config` and `pkg/awscredentials` deleted; harness gives a run-scoped IAM user's keys as an operator would |
 | C14 receipt TLS + reload | open |
 | C15 dialer URL renewal, --reuse-values undo | open |

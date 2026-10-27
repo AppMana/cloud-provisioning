@@ -140,14 +140,15 @@ the upstream images. Observe actual ENI allocations and packet sources after
 installation; an applied DaemonSet alone is insufficient evidence for a
 mixed-CNI campaign.
 
-For an isolated IPv4 run, `harness/e2e/aws/native_access.py --work-dir
-"$PRIVATE_AWS_RUN" --runner "$ISOLATED_LAB_RUNNER" --calico-site` configures
-single-ENI IPAM permissions, the read-only allocation observer and a site SNAT
-exclusion for the verified AWS subnet. Run it on the setup host; only derived
-observer credentials enter the lab. The exclusion is a disabled Calico pool
-with allocation and BGP export disabled. Existing pool overlap or foreign
-ownership is rejected. Remove this run-owned pool after its workers and routes
-are removed if retaining the lab for a different campaign.
+On a Calico site the controller makes each AWS subnet range cluster-internal
+to Calico with a disabled pool (no allocation, no BGP export, no NAT), so site
+pods reaching AWS pods keep their source. It refuses a range inside a pool the
+site allocates from, and holds VPC CNI claims until the pools exist.
+
+The operator gives the worker role the published
+[VPC CNI node policy](aws.md) and the workers' security groups a rule
+admitting each other; for an isolated run,
+`harness/e2e/aws/native_access.py --work-dir "$PRIVATE_AWS_RUN"` does both.
 
 The chart archive is published in [the AWS Helm repository](https://aws.github.io/eks-charts/).
 The family and prefix-delegation contract is documented in the

@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"slices"
 
 	attachmentaws "github.com/appmana/cloud-provisioning/controller/pkg/attachment/aws"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni/awspod"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,22 +64,9 @@ func (s ClusterScopes) Scope(ctx context.Context, machine *unstructured.Unstruct
 	if err := s.Reader.Get(ctx, client.ObjectKey{Namespace: machine.GetNamespace(), Name: name}, infra); err != nil {
 		return awspod.Config{}, nil, fmt.Errorf("reading AWSCluster %s: %w", name, err)
 	}
-	region, _, _ := unstructured.NestedString(infra.Object, "spec", "region")
-	vpc, _, _ := unstructured.NestedString(infra.Object, "spec", "network", "vpc", "id")
-	subnetSpecs, _, _ := unstructured.NestedSlice(infra.Object, "spec", "network", "subnets")
-	var subnets []string
-	for _, raw := range subnetSpecs {
-		spec, _ := raw.(map[string]any)
-		id, _ := spec["resourceID"].(string)
-		if id == "" {
-			id, _ = spec["id"].(string)
-		}
-		if id != "" {
-			subnets = append(subnets, id)
-		}
-	}
-	if region == "" || vpc == "" || len(subnets) == 0 {
-		return awspod.Config{}, nil, fmt.Errorf("AWSCluster %s names no region, VPC or subnets", name)
+	region, vpc, subnets, err := awsClusterNetwork(infra)
+	if err != nil {
+		return awspod.Config{}, nil, err
 	}
 	api, err := s.API(ctx, region)
 	if err != nil {
@@ -97,6 +86,68 @@ func (s ClusterScopes) Scope(ctx context.Context, machine *unstructured.Unstruct
 		OwnerTag: OwnerTag(clusterName), OwnerValue: "owned",
 		Family: s.Family, PodRanges: ranges,
 	}, api, nil
+}
+
+// awsClusterNetwork is the region, VPC and subnets an AWSCluster names.
+func awsClusterNetwork(infra *unstructured.Unstructured) (region, vpc string, subnets []string, err error) {
+	region, _, _ = unstructured.NestedString(infra.Object, "spec", "region")
+	vpc, _, _ = unstructured.NestedString(infra.Object, "spec", "network", "vpc", "id")
+	specs, _, _ := unstructured.NestedSlice(infra.Object, "spec", "network", "subnets")
+	for _, raw := range specs {
+		spec, _ := raw.(map[string]any)
+		id, _ := spec["resourceID"].(string)
+		if id == "" {
+			id, _ = spec["id"].(string)
+		}
+		if id != "" {
+			subnets = append(subnets, id)
+		}
+	}
+	if region == "" || vpc == "" || len(subnets) == 0 {
+		return "", "", nil, fmt.Errorf("AWSCluster %s names no region, VPC or subnets", infra.GetName())
+	}
+	return region, vpc, subnets, nil
+}
+
+// ProviderRanges are the pod ranges of every AWSCluster's subnets: what the
+// VPC CNI can give pods anywhere in this cluster.
+type ProviderRanges struct {
+	Reader client.Reader
+	Family string
+	API    func(ctx context.Context, region string) (attachmentaws.API, error)
+}
+
+func (r ProviderRanges) Ranges(ctx context.Context) ([]netip.Prefix, error) {
+	list := &unstructured.UnstructuredList{}
+	list.SetGroupVersionKind(awsClusterGVK.GroupVersion().WithKind(awsClusterGVK.Kind + "List"))
+	if err := r.Reader.List(ctx, list); err != nil {
+		if meta.IsNoMatchError(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("listing AWSClusters: %w", err)
+	}
+	var out []netip.Prefix
+	for i := range list.Items {
+		region, vpc, subnets, err := awsClusterNetwork(&list.Items[i])
+		if err != nil {
+			return nil, err
+		}
+		api, err := r.API(ctx, region)
+		if err != nil {
+			return nil, err
+		}
+		ranges, err := subnetRanges(ctx, api, vpc, subnets, r.Family)
+		if err != nil {
+			return nil, err
+		}
+		for _, raw := range ranges {
+			p := netip.MustParsePrefix(raw)
+			if !slices.Contains(out, p) {
+				out = append(out, p)
+			}
+		}
+	}
+	return out, nil
 }
 
 // subnetRanges are the ranges the VPC CNI allocates pod addresses from in

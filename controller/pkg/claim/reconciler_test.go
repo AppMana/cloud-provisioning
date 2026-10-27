@@ -1,7 +1,10 @@
 package claim
 
 import (
+	"encoding/json"
+
 	"context"
+	attachmentaws "github.com/appmana/cloud-provisioning/controller/pkg/attachment/aws"
 	"strings"
 	"testing"
 	"time"
@@ -129,6 +132,24 @@ func fakeClaim(name string) *v1alpha1.ProvisionedNodeClaim {
 func newClaimReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 	t.Helper()
 	scheme := testScheme(t)
+	// Every Cluster's AWSCluster, in a region, unless the test gives one.
+	for _, obj := range objs {
+		if u, ok := obj.(*unstructured.Unstructured); ok && u.GetKind() == "Cluster" {
+			name, _, _ := unstructured.NestedString(u.Object, "spec", "infrastructureRef", "name")
+			infra := &unstructured.Unstructured{}
+			infra.SetGroupVersionKind(schema.GroupVersionKind{Group: infraGroup, Version: "v1beta2", Kind: "AWSCluster"})
+			infra.SetNamespace(u.GetNamespace())
+			infra.SetName(name)
+			_ = unstructured.SetNestedField(infra.Object, "us-west-2", "spec", "region")
+			present := false
+			for _, other := range objs {
+				present = present || other.GetObjectKind().GroupVersionKind().Kind == "AWSCluster" && other.GetName() == name
+			}
+			if !present {
+				objs = append(objs, infra)
+			}
+		}
+	}
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithRESTMapper(servedBy(scheme)).
@@ -138,7 +159,7 @@ func newClaimReconciler(t *testing.T, objs ...client.Object) *Reconciler {
 	return &Reconciler{
 		Client:                    c,
 		Reader:                    c,
-		Provisioners:              []join.MachineProvisioner{joinaws.Provider{ConfigNamespace: "wg-dialer", ConfigName: "aws-provider-config"}},
+		Provisioners:              []join.MachineProvisioner{joinaws.Provider{ConfigNamespace: "wg-dialer", ConfigName: "aws-provider-config", EC2: admittingGroups}},
 		RoleLabel:                 "cloud-provisioning.appmana.com/role",
 		RoleValue:                 "cloud-worker",
 		BootstrapSecretNameFormat: "%s-bootstrap",
@@ -732,5 +753,53 @@ func TestReconcile_NativeNetworkMachinesWaitForTheSiteNetworkExclusion(t *testin
 	}
 	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "native"}, machine); err != nil {
 		t.Fatalf("no AWSMachine once the site network excludes it: %v", err)
+	}
+}
+
+// selfAdmitting answers every security group as allowing all traffic from
+// itself, as a VPC CNI node's groups must.
+type selfAdmitting struct{}
+
+func (selfAdmitting) Call(_ context.Context, _, _ string, input map[string]any) (json.RawMessage, error) {
+	var groups []map[string]any
+	for _, id := range input["GroupIds"].([]string) {
+		groups = append(groups, map[string]any{"GroupId": id, "IpPermissions": []any{
+			map[string]any{"IpProtocol": "-1", "UserIdGroupPairs": []any{map[string]any{"GroupId": id}}}}})
+	}
+	return json.Marshal(map[string]any{"SecurityGroups": groups})
+}
+
+func admittingGroups(context.Context, string) (attachmentaws.API, error) { return selfAdmitting{}, nil }
+
+// separateGroups answers every security group as admitting nothing from
+// the others.
+type separateGroups struct{}
+
+func (separateGroups) Call(_ context.Context, _, _ string, input map[string]any) (json.RawMessage, error) {
+	var groups []map[string]any
+	for _, id := range input["GroupIds"].([]string) {
+		groups = append(groups, map[string]any{"GroupId": id})
+	}
+	return json.Marshal(map[string]any{"SecurityGroups": groups})
+}
+
+// A VPC CNI claim whose security groups do not admit each other fails with
+// the reason, and no AWSMachine is created.
+func TestReconcile_VPCCNIMachinesNeedGroupsThatAdmitEachOther(t *testing.T) {
+	claim := fakeClaim("isolated")
+	r := newClaimReconciler(t, claim, fakeTemplate("isolated"), fakeCluster("appmana"), fakeNode())
+	r.Provisioners = []join.MachineProvisioner{joinaws.Provider{ConfigNamespace: "wg-dialer", ConfigName: "aws-provider-config",
+		EC2: func(context.Context, string) (attachmentaws.API, error) { return separateGroups{}, nil }}}
+	if err := reconcileClaim(t, r, claim); err == nil {
+		t.Fatal("a VPC CNI claim with separate security groups was admitted")
+	}
+	machine := &unstructured.Unstructured{}
+	machine.SetGroupVersionKind(joinaws.Provider{}.GVK())
+	if err := r.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "isolated"}, machine); !apierrors.IsNotFound(err) {
+		t.Fatalf("an AWSMachine exists: %v", err)
+	}
+	got := &v1alpha1.ProvisionedNodeClaim{}
+	if err := r.Get(context.Background(), client.ObjectKeyFromObject(claim), got); err != nil || got.Status.Phase != "Failed" || !strings.Contains(got.Status.Message, "sg-000000000000000cd") {
+		t.Fatalf("status = %+v, %v", got.Status, err)
 	}
 }

@@ -233,6 +233,14 @@ configuration. Every AWSMachine must carry the selected tag value.
 | Gateway route adapter (experimental) | [gateway-routes.json](iam/gateway-routes.json) | Observe route tables/interfaces and create/delete return routes in one explicitly named, run-tagged route table |
 | Gateway source/destination-check adapter (experimental) | [gateway-source-check.json](iam/gateway-source-check.json) | Observe interfaces and change only SourceDestCheck on one explicitly named, run-tagged gateway ENI |
 | Gateway UDP ingress adapter (experimental) | [gateway-ingress.json](iam/gateway-ingress.json) | Observe groups/rules, add tagged rules and revoke ingress in one named, run-tagged security group |
+| Controller (`aws.credentials`) | [controller.json](iam/controller.json) | Observe VPC CNI allocations (interfaces and subnets) and check that VPC CNI nodes' security groups admit each other |
+| EC2 worker running the AWS VPC CNI | [vpc-cni-node-ipv4.json](iam/vpc-cni-node-ipv4.json) or [vpc-cni-node-ipv6.json](iam/vpc-cni-node-ipv6.json) | aws-node's IPAM: assign and release pod addresses, and record the instance, only on interfaces CAPA tagged `sigs.k8s.io/cluster-api-provider-aws/cluster/${CLUSTER_NAME}: owned` |
+
+VPC CNI nodes' security groups must admit each other: pods on different nodes
+talk directly from addresses on each node's interface. Give one of the groups an
+ingress rule allowing all protocols from one of them (for example from itself);
+the controller refuses a VPC CNI claim whose groups do not, before any machine
+exists. Name the groups by ID in the template's `additionalSecurityGroups`.
 
 The gateway route policy uses `AWS_REGION`, `AWS_ACCOUNT_ID`, `ROUTE_TABLE_ID`
 and `RUN_ID` when rendered with `docs/iam/render.py`. Attach the rendered policy
@@ -746,8 +754,8 @@ After `native_access.py`, `session.py` and `identity.py` have bound
 a run inventory to the site, `harness/e2e/aws/prepare_campaign.py` installs the
 committed candidate for that run. It cross-compiles both architectures, builds
 multi-platform OCI layouts by layer copy, publishes them with `publisher.py`,
-uploads the first-boot dialers with `assets.py` and renews the observer file
-credentials. It issues the receipt serving certificate from a run-scoped
+uploads the first-boot dialers with `assets.py` and gives the controller the
+run's controller-user keys as the Secret `aws.credentials` names. It issues the receipt serving certificate from a run-scoped
 cert-manager CA, so the certificate renews without manual rotation, and renders
 the chart values only from recorded digests and URLs. Run it with setup
 credentials; without `--apply` it stops after a Helm server dry run:

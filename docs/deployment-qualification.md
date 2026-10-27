@@ -139,8 +139,8 @@ not convert the failed campaign into a pass. This matrix checks convergence;
 separate continuous observers establish existing-site availability.
 
 For a separate native IPv6 campaign, use `aws/bootstrap.py --ipv6` when
-creating its infrastructure and `aws/native_access.py --family ipv6` when
-configuring IPAM and observation. The recorded VPC and subnet IPv6 ranges feed
+creating its infrastructure and `aws/native_access.py --family ipv6` to attach
+the IPv6 VPC CNI node policy. The recorded VPC and subnet IPv6 ranges feed
 the existing CAPA claim's IPv6 configuration and primary-address assignment.
 Set `platforms.aws.vpcCNI.family=ipv6` and use `awsrow -pod-family IPv6` for
 that campaign. Changing the family of an existing native CNI campaign is rejected.

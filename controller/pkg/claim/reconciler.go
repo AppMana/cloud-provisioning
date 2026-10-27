@@ -176,6 +176,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		labels[clusterNameLabel] = cluster.GetName()
 		infraMachine.SetLabels(labels)
 		infraMachine.SetOwnerReferences([]metav1.OwnerReference{ownerRef})
+		if v, ok := provisioner.(join.ClassValidator); ok {
+			if err := v.ValidateClass(ctx, r.Reader, infraMachine, class); err != nil {
+				return r.fail(ctx, claim, err)
+			}
+		}
 		if err := r.Create(ctx, infraMachine); err != nil {
 			return r.fail(ctx, claim, fmt.Errorf("creating %s: %w", provisioner.GVK().Kind, err))
 		}

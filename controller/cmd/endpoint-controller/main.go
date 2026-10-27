@@ -2644,7 +2644,9 @@ func main() {
 	machine := &unstructured.Unstructured{}
 	machine.SetGroupVersionKind(machineGVK)
 
-	awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName}
+	// AWS calls use the SDK's standard credentials.
+	awsSDK := &platformaws.SDK{}
+	awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName, EC2: awsSDK.API}
 	dockerProvider := joindocker.Provider{}
 	// Adopts a container someone else owns, which is how a lab topology
 	// presents a machine. Shipped like the docker provider rather than
@@ -2658,6 +2660,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "invalid --site-cni-daemonsets: %v\n", err)
 		os.Exit(1)
 	}
+	if *vpcCNIFamily != "ipv4" && *vpcCNIFamily != "ipv6" {
+		fmt.Fprintln(os.Stderr, "--aws-vpc-cni-family must be ipv4 or ipv6")
+		os.Exit(1)
+	}
+	// The VPC CNI's ranges are cluster-internal to a Calico site.
+	excluder.ProviderRanges = platformaws.ProviderRanges{Reader: mgr.GetAPIReader(), Family: *vpcCNIFamily, API: awsSDK.API}.Ranges
 	if *siteCNIExclusion {
 		if err := site.Register(mgr, excluder); err != nil {
 			fmt.Fprintf(os.Stderr, "unable to register the site CNI exclusion: %v\n", err)
@@ -2705,10 +2713,6 @@ func main() {
 		windowsPublisherAPIServer: windowsPublisherAPIServer,
 		dialerCloudHostBinary:     dialerCloudHostBinary,
 	}
-	if *vpcCNIFamily != "ipv4" && *vpcCNIFamily != "ipv6" {
-		fmt.Fprintln(os.Stderr, "--aws-vpc-cni-family must be ipv4 or ipv6")
-		os.Exit(1)
-	}
 	if *vpcCNI {
 		// Uncached: the facts include the Service range, read from a dry run.
 		direct, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme(), Mapper: mgr.GetRESTMapper()})
@@ -2723,8 +2727,7 @@ func main() {
 		}
 	}
 	// The VPC CNI's allocations are observed in the scope of each Machine's
-	// AWSCluster, with the AWS SDK's standard credentials.
-	awsSDK := &platformaws.SDK{}
+	// AWSCluster.
 	mesh.nativeObservers = map[string]platform.Observer{platformaws.VPCCNI{}.Name(): platformaws.Observer{Observer: &awspod.Observer{
 		Reader: mgr.GetAPIReader(),
 		Scopes: platformaws.ClusterScopes{Reader: mgr.GetAPIReader(), Family: *vpcCNIFamily, API: awsSDK.API, Account: awsSDK.Account},

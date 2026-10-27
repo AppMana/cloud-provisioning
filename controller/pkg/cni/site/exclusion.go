@@ -12,6 +12,7 @@ package site
 import (
 	"context"
 	"fmt"
+	"net/netip"
 	"path"
 	"slices"
 	"sort"
@@ -86,6 +87,9 @@ type Excluder struct {
 	Native []string
 	// Extra names site network DaemonSets the rules above do not recognise.
 	Extra []client.ObjectKey
+	// ProviderRanges are the ranges provider-native networks give pods; nil
+	// means none.
+	ProviderRanges func(context.Context) ([]netip.Prefix, error)
 	Now   func() time.Time
 
 	mu sync.Mutex
@@ -184,6 +188,9 @@ func (e *Excluder) Verify(ctx context.Context, network cni.Network, class platfo
 	if len(pending) > 0 {
 		return &PendingError{DaemonSets: pending}
 	}
+	if network.Name == cni.Calico {
+		return e.verifyProviderPools(ctx)
+	}
 	return nil
 }
 
@@ -222,7 +229,8 @@ func (e *Excluder) verifyTunnel(ctx context.Context, network cni.Network) error 
 
 // Ensure excludes native-network nodes from one site network DaemonSet and,
 // for the site's Calico, cloud workers too, after which it brings up the
-// tunnel agent and limits the BGP mesh to site nodes. The exclusion comes
+// tunnel agent, makes provider ranges cluster-internal to Calico and limits
+// the BGP mesh to site nodes. The exclusion comes
 // first so the two agents never run on one node.
 func (e *Excluder) Ensure(ctx context.Context, ds *appsv1.DaemonSet) error {
 	excluded, err := e.ensureExcluded(ctx, ds)
@@ -230,6 +238,9 @@ func (e *Excluder) Ensure(ctx context.Context, ds *appsv1.DaemonSet) error {
 		return err
 	}
 	if err := e.ensureTunnelAgent(ctx, ds); err != nil {
+		return err
+	}
+	if err := e.ensureProviderPools(ctx); err != nil {
 		return err
 	}
 	return e.ensureBGPScope(ctx)

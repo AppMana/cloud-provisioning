@@ -55,7 +55,7 @@ needed. Cloud transport must still match the cluster's CNI, routing and MTU.
 
 [GPU workers](docs/gpu-workers.md) · [Node groups](docs/node-groups.md) ·
 [Windows constraints](docs/windows.md) · [Tunnel scenarios](docs/tunneling-scenarios.md) ·
-[Dual-stack Calico BGP](docs/dual-stack.md)
+[Dual-stack Calico BGP](docs/dual-stack.md) · [Forked components](docs/forks.md)
 
 Before changing an existing cluster, complete the
 [deployment qualification](docs/deployment-qualification.md) for its exact CNI,

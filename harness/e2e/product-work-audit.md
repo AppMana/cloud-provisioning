@@ -17,7 +17,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | C5 BGP mesh scoping (site_mesh.go) | done: product replaces the full mesh with BGPPeer cloud-provisioning-site-mesh, refuses tunnel claims while an operator peer reaches cloud nodes; site_mesh.go and -calico-site-mesh deleted; acceptance uses the product check |
 | C6 control-plane recognition | done: product recognises k0s, MicroK8s and taint marks (`platform.IsControlPlane`); harness labelling deleted; placement rows and windows_join.py no longer read a harness label |
 | C7 harness providerID patch | done: harness deleted the Node patch; `WaitRegistration` fails when the node did not register under the product's `--provider-id` |
-| C8 microk8s join token renewal | open |
+| C8 microk8s join token renewal | done: chart runs `microk8s-token-agent` on a MicroK8s control plane; it mints `token|expiry` lines, renews at half life, prunes its own expired tokens, follows snap refreshes and keeps microk8s-provider-config current; harness minting deleted |
 | C9 Linux VPC CNI install | open (Phase 4) |
 | C10 VPC CNI IAM | open |
 | C11 SG self ingress | open |

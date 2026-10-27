@@ -18,7 +18,7 @@ one rather than stacking two balancers or leaving none:
 | k0s | `nodeLocalLoadBalancing` (opt-in in the k0s spec; this operator's target sites enable it) | off: k0s workers balance for themselves once nllb is enabled. A k0s site without nllb has the kubeadm problem and should enable it there, not here |
 | k3s | built into the agent: a client-side load balancer across all servers, maintained automatically after registration (state in `<data-dir>/agent/etc/k3s-agent-load-balancer.json`) | off: the pattern never references the balancer port, and a render test pins that |
 | RKE2 | agent balancer, registering through supervisor port 9345 | off |
-| MicroK8s | native worker API proxy on 16443 | off; join credentials come from native `microk8s add-node` |
+| MicroK8s | native worker API proxy on 16443 | off; the chart's token agent mints native cluster-agent join tokens |
 | Talos | KubePrism, `127.0.0.1:7445`, enabled by default on current releases | excluded from the pattern matrix, by decision: the tunnel is host-configured *because* a worker's tunnels must not rely on the Kubernetes they carry, and Talos runs no foreign binaries and has no systemd to host that floor. Supporting Talos is a different product surface (WireGuard in the machine config, or a system extension), not a join pattern; this row is the tracking record for that open design question |
 
 `--join-api-proxy-port=0` turns the operator's balancer off for a
@@ -90,8 +90,14 @@ selected:
 
 ## MicroK8s configuration
 
-Select `joinProvider: microk8s` and supply Secret
-`cloud-provisioning/microk8s-provider-config`, key `config.json`:
+Select `joinProvider: microk8s`. The chart then runs a token agent on one
+MicroK8s control plane (`microk8s.tokenAgent`). MicroK8s join tokens are lines
+in the cluster agent's token file on the control plane a join URL names, not
+Kubernetes objects, so the agent writes them there as
+`microk8s add-node --token-ttl` does, with a 24-hour lifetime by default. It
+replaces the token at half its lifetime, removes the tokens it minted once
+they expire, follows snap refreshes, and keeps Secret
+`cloud-provisioning/microk8s-provider-config` (key `config.json`) current:
 
 ```json
 {
@@ -102,12 +108,10 @@ Select `joinProvider: microk8s` and supply Secret
 }
 ```
 
-Obtain the native URL with `microk8s add-node --token-ttl 14400 --format json`
-on a control-plane host. Set expiration from the issuance time and actual TTL;
-renew the Secret before expiration. The provider refuses credentials with less
-than five minutes remaining and requires the configured version to match the
-registered nodes. This credential is managed by MicroK8s's cluster agent, not a
-Kubernetes bootstrap-token Secret.
+The URL names the agent's node by its InternalIP and the cluster agent's port.
+The provider refuses credentials with less than five minutes remaining and
+requires the configured version to match the registered nodes. With
+`microk8s.tokenAgent.enabled: false` you supply this Secret yourself.
 
 The pattern writes a native launch configuration before installing the pinned
 snap revision, requests a worker join, and lets MicroK8s install bundled Calico.

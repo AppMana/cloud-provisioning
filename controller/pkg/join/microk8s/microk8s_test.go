@@ -28,7 +28,7 @@ func TestNativeCredentialValidation(t *testing.T) {
 		{"expired token", func(c *Config) { c.ExpiresAt = now }, "v1.34.9", true},
 		{"insufficient bootstrap window", func(c *Config) { c.ExpiresAt = now.Add(5 * time.Minute) }, "v1.34.9", true},
 		{"API token is not cluster agent token", func(c *Config) { c.JoinURL = "10.10.0.10:25000/abcdef.0123456789abcdef" }, "v1.34.9", true},
-		{"wrong API port", func(c *Config) { c.JoinURL = strings.Replace(c.JoinURL, ":25000/", ":16443/", 1) }, "v1.34.9", true},
+		{"not a port", func(c *Config) { c.JoinURL = strings.Replace(c.JoinURL, ":25000/", ":99999/", 1) }, "v1.34.9", true},
 		{"unpinned revision", func(c *Config) { c.Revision = "latest" }, "v1.34.9", true},
 		{"version mismatch", func(*Config) {}, "v1.34.8", true},
 	} {

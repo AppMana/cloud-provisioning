@@ -8,11 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 
-	joinmicrok8s "github.com/appmana/cloud-provisioning/controller/pkg/join/microk8s"
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/cluster"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
@@ -106,43 +103,9 @@ func configureAccess(ctx context.Context, d cluster.Deps) error {
 	if err != nil {
 		return err
 	}
-	if err := d.Kube.Install(ctx, config); err != nil {
-		return err
-	}
-	started := time.Now().UTC()
-	raw, err := d.Rig.Node(nodes[0].Name).Exec(ctx, "/snap/bin/microk8s", "add-node", "--token-ttl", "14400", "--format", "json")
-	if err != nil {
-		return fmt.Errorf("mint native remote join credential: %w", err)
-	}
-	var token struct {
-		Token string `json:"token"`
-	}
-	if err := json.Unmarshal(raw, &token); err != nil || token.Token == "" {
-		return fmt.Errorf("invalid MicroK8s add-node output")
-	}
-	cfg, err := json.Marshal(joinmicrok8s.Config{JoinURL: nodes[0].Address(lab.LANSegment) + ":25000/" + token.Token, Revision: Revision, Version: Version, ExpiresAt: started.Add(4 * time.Hour)})
-	if err != nil {
-		return err
-	}
-	if err := d.Kube.ApplyObjects(ctx, &corev1.Namespace{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"},
-		ObjectMeta: metav1.ObjectMeta{Name: "cloud-provisioning"},
-	}); err != nil {
-		return err
-	}
-	if err := d.Kube.ApplyObjects(ctx, providerSecret(cfg)); err != nil {
-		return fmt.Errorf("publishing native MicroK8s join credential failed")
-	}
-	return nil
-}
-
-func providerSecret(config []byte) *corev1.Secret {
-	return &corev1.Secret{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
-		ObjectMeta: metav1.ObjectMeta{Name: "microk8s-provider-config", Namespace: "cloud-provisioning"},
-		Type:       corev1.SecretTypeOpaque,
-		StringData: map[string]string{"config.json": string(config)},
-	}
+	// The join credential is the product's: its token agent mints it on a
+	// control plane once the chart is installed with joinProvider microk8s.
+	return d.Kube.Install(ctx, config)
 }
 
 func (Builder) KubeletInvariant(ctx context.Context, d cluster.Deps) error {

@@ -2340,6 +2340,9 @@ func (r *meshReconciler) ensureCloudDialerDaemonSet(ctx context.Context) error {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == microk8sTokenAgentCommand {
+		os.Exit(runMicrok8sTokenAgent(os.Args[2:]))
+	}
 	var (
 		machineSelector  string
 		secretNamespace  string

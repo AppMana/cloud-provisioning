@@ -196,6 +196,16 @@ transit:
 # Which cluster technology mints join credentials
 # (k0s | kubeadm | k3s | rke2 | microk8s).
 joinProvider: k0s
+
+# With joinProvider microk8s, the chart runs a token agent on one MicroK8s
+# control plane that mints the cluster agent's join tokens and keeps Secret
+# microk8s-provider-config current; each token is replaced at half its
+# lifetime and removed once expired. Disable it only to supply that Secret
+# yourself (config.json: joinURL, revision, version, expiresAt).
+microk8s:
+  tokenAgent:
+    enabled: true
+    tokenTTL: 24h
 # Extra kubelet flags for every cloud worker. Its labels and taint come
 # from its node class (the machine template's cloud-provisioning.appmana.com/cni
 # label, or the platform default) and may not be set here.

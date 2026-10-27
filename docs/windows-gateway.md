@@ -429,8 +429,11 @@ detection off Calico keeps the stored address
 See `siteCNI` in the chart's values. The site's own nodes keep the site's
 autodetection.
 
-Windows Calico (`calico-node-windows`) still detects its address on Windows
-cloud workers; the product does not yet own it there.
+Windows tunnel-class workers are handled the same way: the site's
+`calico-node-windows` stays off cloud workers and the product runs
+`calico-node-windows-tunnel`, a copy with `IP=none` in both its `felix` and
+`node` containers. k0s sets that agent's `IP` to its autodetection method, which
+would otherwise detect the address at every check.
 
 Require stable stored addresses and running Calico pod identities across at
 least one periodic address-check interval after rollout. Readiness alone does

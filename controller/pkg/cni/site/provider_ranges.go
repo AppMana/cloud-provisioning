@@ -146,4 +146,3 @@ func (e *Excluder) verifyProviderPools(ctx context.Context) error {
 	}
 	return nil
 }
-

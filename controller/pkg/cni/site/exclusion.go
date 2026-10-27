@@ -90,7 +90,7 @@ type Excluder struct {
 	// ProviderRanges are the ranges provider-native networks give pods; nil
 	// means none.
 	ProviderRanges func(context.Context) ([]netip.Prefix, error)
-	Now   func() time.Time
+	Now            func() time.Time
 
 	mu sync.Mutex
 	// applied are DaemonSets this process has excluded; a later absence of

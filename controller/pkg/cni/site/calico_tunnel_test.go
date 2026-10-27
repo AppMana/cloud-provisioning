@@ -277,3 +277,62 @@ func TestTheTunnelAgentWaitsForTheOperatorToExcludeCloudWorkers(t *testing.T) {
 	}
 	get(t, c, "calico-system", "calico-node-tunnel")
 }
+
+// k0s's own calico-node-windows, rendered from its bundled manifest (testdata/README.md).
+func k0sCalicoNodeWindows(t *testing.T) *appsv1.DaemonSet {
+	t.Helper()
+	raw, err := os.ReadFile("testdata/k0s-v1.36.5-calico-node-windows.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ds := &appsv1.DaemonSet{}
+	if err := yaml.Unmarshal(raw, ds); err != nil {
+		t.Fatal(err)
+	}
+	return ds
+}
+
+// Windows tunnel-class workers get the same treatment from the site's
+// calico-node-windows: k0s sets its IP to the autodetection method, which
+// detects the address on every check, so the site's agent stays off cloud
+// workers and the product's copy runs on Windows tunnel-class ones with
+// detection off in both of its Calico containers.
+func TestWindowsTunnelNodesRunTheSiteWindowsCalicoAsTheProductsAgent(t *testing.T) {
+	ctx := context.Background()
+	e, c := excluder(t, k0sCalicoNode(t), k0sCalicoNodeWindows(t))
+	for _, name := range []string{"calico-node", "calico-node-windows"} {
+		if err := e.Ensure(ctx, get(t, c, "kube-system", name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	siteDS := get(t, c, "kube-system", "calico-node-windows")
+	role := corev1.NodeSelectorRequirement{Key: platform.RoleLabel, Operator: corev1.NodeSelectorOpNotIn, Values: []string{platform.RoleValue}}
+	for _, term := range siteDS.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+		if !slices.ContainsFunc(term.MatchExpressions, func(r corev1.NodeSelectorRequirement) bool { return reflect.DeepEqual(r, role) }) {
+			t.Fatalf("the site's calico-node-windows can still run on cloud workers: %+v", term)
+		}
+	}
+	agent := get(t, c, "kube-system", "calico-node-windows-tunnel")
+	linux := get(t, c, "kube-system", "calico-node-tunnel")
+	if reflect.DeepEqual(agent.Spec.Selector, linux.Spec.Selector) {
+		t.Fatalf("the Windows and Linux agents share a selector: %+v", agent.Spec.Selector)
+	}
+	for _, name := range []string{"felix", "node"} {
+		vars := env(container(agent.Spec.Template.Spec, name))
+		if vars["IP"] != "none" || vars["IP6"] != "none" {
+			t.Fatalf("%s still detects its address: %v", name, vars)
+		}
+		if _, ok := vars["IP_AUTODETECTION_METHOD"]; ok {
+			t.Fatalf("%s keeps an autodetection method", name)
+		}
+	}
+	if agent.Spec.Template.Spec.NodeSelector[corev1.LabelOSStable] != "windows" {
+		t.Fatalf("node selector %v", agent.Spec.Template.Spec.NodeSelector)
+	}
+	if err := e.Verify(ctx, cni.Network{Name: cni.Calico}, platform.Class{OS: "windows", Arch: "amd64", CNI: platform.SiteCNI}); err != nil && !errors.As(err, new(*PendingError)) {
+		t.Fatal(err)
+	}
+	if err := e.verifyTunnelAgent(ctx, siteDS); err != nil {
+		t.Fatalf("the Windows agent is not current: %v", err)
+	}
+}

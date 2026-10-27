@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
@@ -38,10 +39,14 @@ import (
 const (
 	// calicoAgent is the site's Linux Calico DaemonSet and its container.
 	calicoAgent = "calico-node"
+	// windowsCalicoAgent is the site's Windows Calico DaemonSet.
+	windowsCalicoAgent = "calico-node-windows"
 	// tunnelAgentSuffix names the product's copy beside the site's.
 	tunnelAgentSuffix = "-tunnel"
-	// tunnelComponent is the agent's ComponentLabel value and pod selector.
+	// tunnelComponent is the Linux agent's ComponentLabel value and pod
+	// selector; the Windows agent's adds windowsSuffix.
 	tunnelComponent = "calico-tunnel"
+	windowsSuffix   = "-windows"
 	// tunnelHashAnnotation records the site template the agent was made from.
 	tunnelHashAnnotation = "cloud-provisioning.appmana.com/site-template"
 	// siteMeshPeer replaces the full mesh with one limited to site nodes.
@@ -55,17 +60,36 @@ var (
 	siteOnly = "!has(" + platform.RoleLabel + ")"
 )
 
-// isCalicoAgent reports whether a DaemonSet is the site's Linux Calico.
+// calicoContainers are, per site Calico DaemonSet, the containers that
+// state a node's address: Windows Calico runs its startup and Felix
+// separately, and each reads IP.
+var calicoContainers = map[string][]string{
+	calicoAgent:        {calicoAgent},
+	windowsCalicoAgent: {"felix", "node"},
+}
+
+// isCalicoAgent reports whether a DaemonSet is the site's Linux or Windows
+// Calico.
 func isCalicoAgent(ds *appsv1.DaemonSet) bool {
-	if ds.Name != calicoAgent {
+	names, ok := calicoContainers[ds.Name]
+	if !ok {
 		return false
 	}
 	for _, c := range ds.Spec.Template.Spec.Containers {
-		if c.Name == calicoAgent {
+		if slices.Contains(names, c.Name) {
 			return true
 		}
 	}
 	return false
+}
+
+// agentComponent is the ComponentLabel value of the agent made from a site
+// Calico DaemonSet.
+func agentComponent(site string) string {
+	if site == windowsCalicoAgent {
+		return tunnelComponent + windowsSuffix
+	}
+	return tunnelComponent
 }
 
 // cloudWorkers keeps the site's Calico off every node this product
@@ -73,7 +97,7 @@ func isCalicoAgent(ds *appsv1.DaemonSet) bool {
 var cloudWorkers = corev1.NodeSelectorRequirement{Key: platform.RoleLabel, Operator: corev1.NodeSelectorOpNotIn, Values: []string{platform.RoleValue}}
 
 // TunnelAgent is the product's Calico agent for tunnel-class cloud nodes,
-// made from the site's calico-node.
+// made from the site's calico-node or calico-node-windows.
 func TunnelAgent(site *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
 	spec := site.Spec.Template.Spec.DeepCopy()
 	spec.Affinity = &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{
@@ -85,10 +109,11 @@ func TunnelAgent(site *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
 		}}},
 	}}
 	for i := range spec.Containers {
-		if spec.Containers[i].Name == calicoAgent {
+		if slices.Contains(calicoContainers[site.Name], spec.Containers[i].Name) {
 			spec.Containers[i].Env = statedAddresses(spec.Containers[i].Env)
 		}
 	}
+	component := agentComponent(site.Name)
 	// The site's selector keys come off the agent's pods, so neither
 	// DaemonSet selects the other's.
 	labels := map[string]string{}
@@ -103,7 +128,7 @@ func TunnelAgent(site *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
 			delete(labels, r.Key)
 		}
 	}
-	labels[platform.ComponentLabel] = tunnelComponent
+	labels[platform.ComponentLabel] = component
 	annotations := map[string]string{}
 	for k, v := range site.Spec.Template.Annotations {
 		annotations[k] = v
@@ -112,13 +137,13 @@ func TunnelAgent(site *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      site.Name + tunnelAgentSuffix,
 			Namespace: site.Namespace,
-			Labels:    map[string]string{platform.ComponentLabel: tunnelComponent},
+			Labels:    map[string]string{platform.ComponentLabel: component},
 			OwnerReferences: []metav1.OwnerReference{{
 				APIVersion: "apps/v1", Kind: "DaemonSet", Name: site.Name, UID: site.UID, Controller: ptrTo(true),
 			}},
 		},
 		Spec: appsv1.DaemonSetSpec{
-			Selector:             &metav1.LabelSelector{MatchLabels: map[string]string{platform.ComponentLabel: tunnelComponent}},
+			Selector:             &metav1.LabelSelector{MatchLabels: map[string]string{platform.ComponentLabel: component}},
 			UpdateStrategy:       site.Spec.UpdateStrategy,
 			MinReadySeconds:      site.Spec.MinReadySeconds,
 			RevisionHistoryLimit: site.Spec.RevisionHistoryLimit,
@@ -186,20 +211,22 @@ func (e *Excluder) ensureTunnelAgent(ctx context.Context, site *appsv1.DaemonSet
 	return nil
 }
 
-// tunnelAgentIntact reports whether the agent still has detection off; an
-// edit that left the recorded hash would otherwise hide it.
+// tunnelAgentIntact reports whether every Calico container of the agent
+// still has detection off; an edit that left the recorded hash would
+// otherwise hide it.
 func tunnelAgentIntact(ds *appsv1.DaemonSet) bool {
+	names := calicoContainers[strings.TrimSuffix(ds.Name, tunnelAgentSuffix)]
+	found := false
 	for _, c := range ds.Spec.Template.Spec.Containers {
-		if c.Name != calicoAgent {
+		if !slices.Contains(names, c.Name) {
 			continue
 		}
-		for _, v := range c.Env {
-			if v.Name == "IP" {
-				return v.Value == "none"
-			}
+		found = true
+		if !slices.Contains(c.Env, corev1.EnvVar{Name: "IP", Value: "none"}) {
+			return false
 		}
 	}
-	return false
+	return found
 }
 
 // verifyTunnelAgent reports whether the agent exists and is current.

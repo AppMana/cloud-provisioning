@@ -139,7 +139,8 @@ tunnel:
 # product runs a copy, calico-node-tunnel beside calico-node and kept in step
 # with it, on those nodes only, with address detection off (IP=none, and
 # IP6=none where the site sets IP6), so Calico keeps the tunnel address the
-# product stores. The tunnel carries no BGP, so the full BGP mesh is
+# product stores. calico-node-windows gets the same copy,
+# calico-node-windows-tunnel, for Windows tunnel-class nodes. The tunnel carries no BGP, so the full BGP mesh is
 # replaced by BGPPeer cloud-provisioning-site-mesh selecting only site nodes
 # (nodeToNodeMeshEnabled: false). Peering the site already configured is not
 # changed: each BGPPeer must leave cloud nodes out, with

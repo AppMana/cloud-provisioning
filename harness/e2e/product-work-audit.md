@@ -11,7 +11,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | Item | Status |
 |---|---|
 | C1 Calico placement | done: DaemonSet exclusion in product (95021de). IPPool node selectors are not needed: no Calico agent or CNI runs on a native node, so nothing allocates from site pools there |
-| C2 Calico IP env delete | done: product runs `calico-node-tunnel` (IP=none, IP6=none) on tunnel-class Linux nodes and keeps the site calico-node off cloud workers; harness patch and flag deleted. OPEN part: Windows `calico-node-windows` still autodetects on Windows cloud workers (tracked with C17) |
+| C2 Calico IP env delete | done: product runs `calico-node-tunnel` (IP=none, IP6=none) on tunnel-class Linux nodes and keeps the site calico-node off cloud workers; harness patch and flag deleted. Windows: the product runs `calico-node-windows-tunnel` (IP=none in `felix` and `node`) on Windows tunnel-class workers and keeps the site's `calico-node-windows` off cloud workers; red test against k0s's rendered Windows manifest |
 | C3 kubeadm IP_AUTODETECTION can-reach | done: now governs site nodes only (remotes run the product agent with IP=none), so it is site configuration, not cover |
 | C4 dual-stack cidr autodetect | done: same as C3; acceptance no longer requires an operator autodetection setting |
 | C5 BGP mesh scoping (site_mesh.go) | done: product replaces the full mesh with BGPPeer cloud-provisioning-site-mesh, refuses tunnel claims while an operator peer reaches cloud nodes; site_mesh.go and -calico-site-mesh deleted; acceptance uses the product check |

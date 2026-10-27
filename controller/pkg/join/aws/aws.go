@@ -44,6 +44,9 @@ type Provider struct {
 	ConfigName      string
 	// EC2 is an EC2 API in a region, for checks before a machine exists.
 	EC2 func(ctx context.Context, region string) (attachmentaws.API, error)
+	// WindowsIPAM is whether the cluster runs Windows IPAM, which Windows
+	// VPC CNI machines need.
+	WindowsIPAM bool
 }
 
 var (
@@ -64,8 +67,8 @@ var VPCCNI = platformaws.VPCCNI{}.Name()
 func (Provider) DefaultCNI(string) string { return VPCCNI }
 
 // NativeNetworks is the pod network EC2 machines can run natively.
-func (Provider) NativeNetworks() []platform.Network {
-	return []platform.Network{platformaws.VPCCNI{}}
+func (p Provider) NativeNetworks() []platform.Network {
+	return []platform.Network{platformaws.VPCCNI{Windows: p.WindowsIPAM}}
 }
 
 func (Provider) GVK() schema.GroupVersionKind { return gvk }

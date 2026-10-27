@@ -10,6 +10,7 @@ import (
 )
 
 const NativeTransportOwner = "cloud-provisioning.appmana.com/native-transport"
+
 // CalicoIPv4Address is the Node annotation holding the address Calico
 // reaches the node by, and so the destination of its VXLAN packets.
 const CalicoIPv4Address = "projectcalico.org/IPv4Address"

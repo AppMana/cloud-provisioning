@@ -35,6 +35,9 @@ class Cluster:
         url = urllib.parse.urlparse(arguments[-1])
         if url.path == "/echo":
             return body, 28 if self.failure == "exit" else 0
+        if url.path == "/clientip":
+            seen = "172.29.0.5" if self.failure == "masquerade" else source["podIP"]
+            return (seen + ":40000").encode(), 0
         if url.path == "/hostname":
             address = url.hostname
             if address.startswith("10."):
@@ -141,7 +144,8 @@ class MatrixTest(unittest.TestCase):
         cluster = Cluster()
         report = run(cluster, cluster.targets, "test")
         self.assertTrue(report["ok"])
-        self.assertEqual(len(report["checks"]), 60)
+        self.assertEqual(len(report["checks"]), 66)
+        self.assertEqual(sum(c["kind"] == "source" for c in report["checks"]), 6)
         self.assertEqual(sum(c["kind"] == "tcp" for c in report["checks"]), 18)
         self.assertEqual(sum(c["kind"] == "udp" for c in report["checks"]), 30)
         self.assertEqual({t["os"] for t in report["targets"]}, {"windows", "linux"})
@@ -150,6 +154,14 @@ class MatrixTest(unittest.TestCase):
         report = run(Cluster("exit"), Cluster.targets, "test")
         self.assertFalse(report["ok"])
         self.assertTrue(all(not c["ok"] for c in report["checks"] if c["kind"] == "tcp"))
+
+    def test_a_masqueraded_source_fails(self):
+        # A pod reached from another node's pod must see that pod's own
+        # address: a reply routed to a masquerading node proves nothing.
+        report = run(Cluster("masquerade"), Cluster.targets, "test")
+        self.assertFalse(report["ok"])
+        source = [c for c in report["checks"] if c["kind"] == "source"]
+        self.assertTrue(source and all(not c["ok"] and c["observedSource"] == "172.29.0.5" for c in source))
 
     def test_null_udp_does_not_pass(self):
         report = run(Cluster("null"), Cluster.targets, "test")

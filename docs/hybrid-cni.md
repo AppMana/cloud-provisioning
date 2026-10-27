@@ -186,3 +186,13 @@ The plugin keeps the configuration a node was given: the initializer refuses
 to replace a live one, so a site change reaches Windows nodes that join after
 it, and an existing node's initializer reports the difference when it next
 restarts. Replace the node to take the change.
+
+Windows IPAM is AWS's VPC resource controller with the
+[node-selector patch](../providers/aws-vpc-resource-controller/README.md): set
+`platforms.aws.vpcCNI.windows.ipamImage` to the built image's digest (and
+`pullSecrets` to kube-system Secrets if the registry needs them). The chart
+installs its RBAC, CRDs, cert-manager certificate and webhooks; the controller
+runs it on Linux VPC CNI workers for the one AWS cluster's VPC and enables
+`enable-windows-ipam` once it is available. Without the image, Windows VPC CNI
+claims are refused.
+

@@ -89,8 +89,19 @@ rules:
     verbs: ["create"]
   - apiGroups: [""]
     resources: ["configmaps"]
-    resourceNames: ["amazon-vpc-cni"]
+    resourceNames: ["amazon-vpc-cni"{{ if .Values.platforms.aws.vpcCNI.windows.ipamImage }}, "aws-vpc-cni-windows-scripts", "aws-vpc-cni-windows-settings"{{ end }}]
     verbs: ["get", "patch"]
+  {{- if .Values.platforms.aws.vpcCNI.windows.ipamImage }}
+  # Windows IPAM's Deployment, which the controller applies with the AWS
+  # cluster's facts.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["create"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["vpc-resource-local-controller"]
+    verbs: ["get", "patch"]
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

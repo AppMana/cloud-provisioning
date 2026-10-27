@@ -2476,6 +2476,8 @@ func main() {
 	vpcCNI := flag.Bool("aws-vpc-cni", true, "apply the AWS VPC CNI (aws-node) for AWS VPC CNI nodes, configured from the site's ranges")
 	vpcCNIImage := flag.String("aws-vpc-cni-image", "", "digest-pinned aws-node image; empty uses the pinned upstream image")
 	vpcCNIInitImage := flag.String("aws-vpc-cni-init-image", "", "digest-pinned aws-node init image; empty uses the pinned upstream image")
+	windowsIPAMImage := flag.String("aws-windows-ipam-image", "", "digest-pinned patched VPC resource controller; runs Windows IPAM and admits Windows VPC CNI nodes")
+	windowsIPAMPullSecrets := flag.String("aws-windows-ipam-pull-secrets", "", "comma-separated kube-system Secrets for pulling the Windows IPAM image")
 	receivePolicyJSON := flag.String("receive-preparation-policy", "", "experimental receiver policy JSON with nativeCIDRs and permitted ports; optional journal enables fenced handover and explicit expiry recovery")
 	gatewayConfig := flag.String("aws-gateway-config", "", "optional path to AWS Windows Calico gateway scope JSON")
 	flag.Parse()
@@ -2645,7 +2647,7 @@ func main() {
 
 	// AWS calls use the SDK's standard credentials.
 	awsSDK := &platformaws.SDK{}
-	awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName, EC2: awsSDK.API}
+	awsProvider := joinaws.Provider{ConfigNamespace: awsConfigNamespace, ConfigName: awsConfigName, EC2: awsSDK.API, WindowsIPAM: *vpcCNI && *windowsIPAMImage != ""}
 	dockerProvider := joindocker.Provider{}
 	// Adopts a container someone else owns, which is how a lab topology
 	// presents a machine. Shipped like the docker provider rather than
@@ -2719,7 +2721,12 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		component := &platformaws.VPCCNIComponent{Client: direct, Family: *vpcCNIFamily, Image: *vpcCNIImage, InitImage: *vpcCNIInitImage}
+		var ipamPullSecrets []string
+		for _, ref := range imagePullSecrets(*windowsIPAMPullSecrets) {
+			ipamPullSecrets = append(ipamPullSecrets, ref.Name)
+		}
+		component := &platformaws.VPCCNIComponent{Client: direct, Family: *vpcCNIFamily, Image: *vpcCNIImage, InitImage: *vpcCNIInitImage,
+			WindowsIPAMImage: *windowsIPAMImage, WindowsIPAMPullSecrets: ipamPullSecrets}
 		if err := component.Register(mgr); err != nil {
 			fmt.Fprintf(os.Stderr, "unable to register the AWS VPC CNI: %v\n", err)
 			os.Exit(1)

@@ -58,7 +58,7 @@ func requestSourceFixture(t *testing.T, extra ...client.Object) (RequestSource, 
 	objects = append(objects, extra...)
 	api := &resolverEC2{}
 	r := Resolver{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build(), API: api,
-		Scope: Scope{Account: "account", Region: "us-west-2", VPCID: "vpc", SubnetID: "subnet", OwnerTag: "run", OwnerValue: "test"},
+		Scope:     Scope{Account: "account", Region: "us-west-2", VPCID: "vpc", SubnetID: "subnet", OwnerTag: "run", OwnerValue: "test"},
 		Namespace: "test", ClusterName: "cluster", GroupID: "sg"}
 	return RequestSource{Resolver: r, MeshName: "mesh"}, api
 }

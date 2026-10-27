@@ -135,6 +135,13 @@ def run(kube, targets, namespace, tries=10, udp_sizes=DEFAULT_UDP_SIZES, udp_onl
                     expectedSHA256=hashlib.sha256(payload).hexdigest(),
                     receivedSHA256=hashlib.sha256(body).hexdigest(),
                     ok=code == 0 and body == payload))
+            if not udp_only:
+                # The destination must see the source pod's own address: a
+                # masqueraded source means replies go to a node, not the pod.
+                body, code = kube.curl(source, ["http://" + host(target["podIP"]) + ":8080/clientip"])
+                seen = body.decode(errors="replace").strip().rsplit(":", 1)[0].strip("[]")
+                rows.append(dict(identity, kind="source", exitCode=code, observedSource=seen,
+                                 ok=code == 0 and seen == source["podIP"]))
             for kind, address in (() if udp_only else (("service", host(target["serviceIP"])),
                     ("dns", target.get("service", target["pod"]) + "." + namespace + ".svc.cluster.local"))):
                 body, code = kube.curl(source, ["http://" + address + ":8080/hostname"])

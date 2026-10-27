@@ -32,6 +32,9 @@ type VPCCNIFacts struct {
 	PodMTU int
 	// Image and InitImage override the pinned upstream images.
 	Image, InitImage string
+	// WindowsIPAM turns on Windows address management, whose controller is
+	// available.
+	WindowsIPAM bool
 }
 
 var digestRE = regexp.MustCompile(`^[^\s@]+@sha256:[0-9a-f]{64}$`)
@@ -69,6 +72,7 @@ func VPCCNIObjects(f VPCCNIFacts) (*corev1.ConfigMap, *appsv1.DaemonSet, error) 
 		return l
 	}
 	configMap.Labels = labels(configMap.Labels)
+	configMap.Data["enable-windows-ipam"] = strconv.FormatBool(f.WindowsIPAM)
 	ds.Labels = labels(ds.Labels)
 
 	spec := &ds.Spec.Template.Spec

@@ -31,10 +31,12 @@ import (
 const FieldOwner = "cloud-provisioning"
 
 // awsNode is the VPC CNI DaemonSet; amazon-vpc-cni its ConfigMap.
-// windowsCNI is the Windows nodes' plugin initializer.
+// windowsCNI is the Windows nodes' plugin initializer; windowsIPAM the
+// VPC resource controller.
 var (
-	awsNode    = types.NamespacedName{Namespace: "kube-system", Name: "aws-node"}
-	windowsCNI = types.NamespacedName{Namespace: "kube-system", Name: windowsCNIName}
+	awsNode     = types.NamespacedName{Namespace: "kube-system", Name: "aws-node"}
+	windowsCNI  = types.NamespacedName{Namespace: "kube-system", Name: windowsCNIName}
+	windowsIPAM = types.NamespacedName{Namespace: "kube-system", Name: "vpc-resource-local-controller"}
 )
 
 // factsRecheck is how often the site's ranges are read again: a Service or
@@ -48,9 +50,14 @@ type VPCCNIComponent struct {
 	Client           client.Client
 	Family           string
 	Image, InitImage string
-	// Windows also configures Windows VPC CNI nodes' native plugin.
-	Windows bool
+	// WindowsIPAMImage, the patched VPC resource controller, turns on
+	// Windows VPC CNI nodes: their plugin's configuration and Windows IPAM.
+	WindowsIPAMImage       string
+	WindowsIPAMPullSecrets []string
 }
+
+// windows reports whether Windows VPC CNI nodes are configured.
+func (c *VPCCNIComponent) windows() bool { return c.WindowsIPAMImage != "" }
 
 // Facts reads what aws-node depends on from the cluster.
 func (c *VPCCNIComponent) Facts(ctx context.Context) (VPCCNIFacts, error) {
@@ -241,35 +248,88 @@ func (c *VPCCNIComponent) WindowsFacts(ctx context.Context, linux VPCCNIFacts) (
 	return f, nil
 }
 
-// Ensure applies aws-node and its ConfigMap for the current facts, and with
-// Windows, the Windows nodes' plugin initializer.
+// WindowsIPAMFacts reads the AWS cluster Windows IPAM manages: the one CAPI
+// Cluster on an AWSCluster, and that AWSCluster's VPC.
+func (c *VPCCNIComponent) WindowsIPAMFacts(ctx context.Context) (WindowsIPAMFacts, error) {
+	f := WindowsIPAMFacts{Image: c.WindowsIPAMImage, PullSecrets: c.WindowsIPAMPullSecrets}
+	clusters := &unstructured.UnstructuredList{}
+	clusters.SetGroupVersionKind(clusterGVK.GroupVersion().WithKind(clusterGVK.Kind + "List"))
+	if err := c.Client.List(ctx, clusters); err != nil {
+		return f, fmt.Errorf("listing Clusters: %w", err)
+	}
+	var aws []unstructured.Unstructured
+	for _, cluster := range clusters.Items {
+		if kind, _, _ := unstructured.NestedString(cluster.Object, "spec", "infrastructureRef", "kind"); kind == awsClusterGVK.Kind {
+			aws = append(aws, cluster)
+		}
+	}
+	if len(aws) != 1 {
+		return f, fmt.Errorf("Windows IPAM manages one AWS cluster's VPC; there are %d Clusters on AWSClusters", len(aws))
+	}
+	name, _, _ := unstructured.NestedString(aws[0].Object, "spec", "infrastructureRef", "name")
+	infra := &unstructured.Unstructured{}
+	infra.SetGroupVersionKind(awsClusterGVK)
+	if err := c.Client.Get(ctx, client.ObjectKey{Namespace: aws[0].GetNamespace(), Name: name}, infra); err != nil {
+		return f, fmt.Errorf("reading AWSCluster %s: %w", name, err)
+	}
+	_, vpc, _, err := awsClusterNetwork(infra)
+	if err != nil {
+		return f, err
+	}
+	f.ClusterName, f.VPCID = aws[0].GetName(), vpc
+	return f, nil
+}
+
+// Ensure applies aws-node and its ConfigMap for the current facts and, for
+// Windows VPC CNI nodes, their plugin's initializer and Windows IPAM. Windows
+// facts that cannot be read leave Linux nodes' network applied.
 func (c *VPCCNIComponent) Ensure(ctx context.Context) error {
 	facts, err := c.Facts(ctx)
 	if err != nil {
 		return err
 	}
+	var windows []client.Object
+	var windowsErr error
+	if c.windows() {
+		windows, facts.WindowsIPAM, windowsErr = c.windowsObjects(ctx, facts)
+	}
 	configMap, ds, err := VPCCNIObjects(facts)
 	if err != nil {
 		return err
 	}
-	objects := []client.Object{configMap, ds}
-	if c.Windows {
-		windowsFacts, err := c.WindowsFacts(ctx, facts)
-		if err != nil {
-			return fmt.Errorf("Windows VPC CNI: %w", err)
-		}
-		scripts, settings, windowsDS, err := WindowsCNIObjects(windowsFacts)
-		if err != nil {
-			return fmt.Errorf("Windows VPC CNI: %w", err)
-		}
-		objects = append(objects, scripts, settings, windowsDS)
-	}
-	for _, obj := range objects {
+	for _, obj := range append([]client.Object{configMap, ds}, windows...) {
 		if err := apply(ctx, c.Client, obj); err != nil {
 			return fmt.Errorf("applying %s %s: %w", obj.GetObjectKind().GroupVersionKind().Kind, client.ObjectKeyFromObject(obj), err)
 		}
 	}
-	return nil
+	return windowsErr
+}
+
+// windowsObjects are the Windows nodes' initializer and Windows IPAM, and
+// whether IPAM's controller is available to enable.
+func (c *VPCCNIComponent) windowsObjects(ctx context.Context, linux VPCCNIFacts) ([]client.Object, bool, error) {
+	cniFacts, err := c.WindowsFacts(ctx, linux)
+	if err != nil {
+		return nil, false, fmt.Errorf("Windows VPC CNI: %w", err)
+	}
+	scripts, settings, ds, err := WindowsCNIObjects(cniFacts)
+	if err != nil {
+		return nil, false, fmt.Errorf("Windows VPC CNI: %w", err)
+	}
+	objects := []client.Object{scripts, settings, ds}
+	ipamFacts, err := c.WindowsIPAMFacts(ctx)
+	if err != nil {
+		return objects, false, fmt.Errorf("Windows IPAM: %w", err)
+	}
+	deployment, err := WindowsIPAMDeployment(ipamFacts)
+	if err != nil {
+		return objects, false, fmt.Errorf("Windows IPAM: %w", err)
+	}
+	current := &appsv1.Deployment{}
+	if err := c.Client.Get(ctx, windowsIPAM, current); client.IgnoreNotFound(err) != nil {
+		return objects, false, err
+	}
+	return append(objects, deployment), current.Status.AvailableReplicas > 0, nil
 }
 
 // apply server-side applies a typed object as the product's field manager,
@@ -296,6 +356,14 @@ func (c *VPCCNIComponent) Reconcile(ctx context.Context, _ ctrl.Request) (ctrl.R
 	if err := c.Ensure(ctx); err != nil {
 		return ctrl.Result{}, err
 	}
+	// Windows IPAM is enabled once its controller is available, which
+	// raises no event this controller watches.
+	if c.windows() {
+		current := &appsv1.Deployment{}
+		if err := c.Client.Get(ctx, windowsIPAM, current); err == nil && current.Status.AvailableReplicas == 0 {
+			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+		}
+	}
 	logf.FromContext(ctx).V(1).Info("applied the AWS VPC CNI", "daemonSet", awsNode)
 	return ctrl.Result{RequeueAfter: factsRecheck}, nil
 }
@@ -318,7 +386,7 @@ func (c *VPCCNIComponent) Register(mgr ctrl.Manager) error {
 		Named("aws-vpc-cni").
 		For(&appsv1.DaemonSet{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(o client.Object) bool {
 			key := client.ObjectKeyFromObject(o)
-			return key == awsNode || (c.Windows && key == windowsCNI)
+			return key == awsNode || (c.windows() && key == windowsCNI)
 		}))).
 		Watches(&corev1.Node{}, toAWSNode, builder.WithPredicates(addresses)).
 		Complete(c)

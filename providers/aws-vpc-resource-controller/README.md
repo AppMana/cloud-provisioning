@@ -24,46 +24,27 @@ docker build -f /path/to/providers/aws-vpc-resource-controller/Dockerfile \
   -t your-registry/aws-windows-ipam:build .
 ```
 
-The node selector does not scope admission webhooks. Deployment must also limit
-the Windows IPAM webhook to workloads explicitly selecting AWS Windows nodes;
-site Windows workloads must retain their existing resource requests. Reuse the
-upstream RBAC, certificate and webhook manifests with that restriction.
-
-This source extension alone does not install Windows networking. Deployment
-also requires AWS-side controller placement for upstream IMDS discovery,
-scoped EC2 permissions, Windows IPAM enablement, and the native Windows CNI
-plugin and Kubernetes connector. Preserve k0s's runtime and kubelet ownership.
-Qualify fresh Windows 2022 and 2025 workers, native pod allocation and release,
-and site connectivity according to [the hybrid CNI contract](../../docs/hybrid-cni.md).
-
-## Deployment overlay
-
-[deploy](deploy/kustomization.yaml) composes the pinned upstream manifests. It
-places the controller on AWS Linux cloud workers with host networking for native
-IMDS access and uses the instance profile instead of an EKS-specific projected
-identity token. Two replicas require separate workers to avoid host-port
-collisions. Grant their instance profile the scoped Windows IPAM permissions
-before installation; do not grant site nodes those permissions.
-
-Create an environment-specific Kustomization that references this overlay,
-replaces the upstream `controller` image with the immutable digest built from
-the patched source, and generates `aws-windows-ipam-settings` in `kube-system`
-with `clusterName` and `vpcID`. Do not apply the base directly: it intentionally
-has no environment settings or release image selection. The controller's AWS
-account and region are discovered through IMDS on its EC2 host.
-
-The overlay preserves upstream RBAC and cert-manager certificate wiring. It
-scopes admission to Windows pods explicitly selecting both the `aws-vpc` CNI
-and `cloud-worker` role. All three node selectors must be present in workload
-pod templates, alongside any architecture/build selectors. Host-network pods
+The product runs the built image as Windows IPAM: set
+`platforms.aws.vpcCNI.windows.ipamImage` to its digest. The chart ships the
+upstream RBAC, CRDs, cert-manager certificate and webhooks, rendered from the
+vendored upstream `config/` at this revision
+([controller/pkg/platform/aws/upstream/vpc-resource-controller](../../controller/pkg/platform/aws/upstream/vpc-resource-controller)),
+with admission scoped to Windows pods that select both the `aws-vpc` CNI and the
+`cloud-worker` role: all three node selectors must be present in workload pod
+templates, alongside any architecture or build selectors. Host-network pods
 bypass IPAM admission. Matching workload admission fails closed if the webhook
 is unavailable; site workloads bypass it. Node validation checks both old and
-new labels so removing the selection labels does not bypass validation.
+new labels, so removing the selection labels does not bypass validation.
 
-After controller readiness and webhook certificate verification, enable Windows
-IPAM through the existing `kube-system/amazon-vpc-cni` ConfigMap's
-`enable-windows-ipam: "true"` setting. Preserve other keys and its existing owner;
-do not replace a shared CNI ConfigMap. Keep prefix delegation disabled for the
+The controller applies the Deployment with the cluster's facts: on AWS Linux
+VPC CNI workers with host networking, where IMDS gives the controller its
+region, instance identity and the worker role (the VPC CNI node policy already
+covers assigning pod addresses on CAPA-owned interfaces), with
+`--cluster-name` and `--vpc-id` from the one CAPI Cluster on an AWSCluster, and
+this patch's `--node-selector` limited to Windows VPC CNI nodes. Two replicas
+need separate workers to avoid host-port collisions. Once the Deployment is
+available it sets `enable-windows-ipam: "true"` in `kube-system/amazon-vpc-cni`,
+which it owns along with aws-node. Keep prefix delegation disabled for the
 secondary-address profile. Verify resource capacity, pod annotation assignment,
 CNI execution, cooldown and release on both Windows versions before qualifying
-traffic. Manifest acceptance and admission selection do not prove allocation.
+traffic; manifest acceptance and admission selection do not prove allocation.

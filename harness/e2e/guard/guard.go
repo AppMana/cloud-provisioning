@@ -83,13 +83,13 @@ var Policy = []Allowed{
 	{Resource: "configmaps", Namespaces: []string{"cloud-provisioning"}, Verbs: []string{"create", "patch"}, Names: []string{"cldt-vm-slots"}, Why: "lab: the VM provider's slot pool"},
 	{Resource: "awsclusterstaticidentities", Verbs: []string{"apply", "create"}, Why: "operator: CAPA's source credentials"},
 	{Resource: "awsclusterroleidentities", Verbs: []string{"apply", "create"}, Why: "operator: CAPA's role"},
+	{Resource: "secrets", Namespaces: []string{"kube-system"}, Verbs: []string{"apply"}, Names: []string{"*-ipam-pull", "*-calico-pull"}, Why: "operator: registry credentials for kube-system images (platforms.aws.vpcCNI.windows.pullSecrets, the site's Windows Calico)"},
 	{Resource: "customresourcedefinitions", Verbs: []string{"apply", "create"}, Why: "lab: the lab infrastructure provider's own kinds"},
 }
 
 // StandIns are writes the harness still makes for the product, each with
 // the open tracker item that removes it. The list only shrinks.
 var StandIns = []Allowed{
-	{Resource: "secrets", Namespaces: []string{"kube-system"}, Verbs: []string{"apply"}, Names: []string{"*-ipam-pull", "*-calico-pull"}, Why: "C17: pull credentials for the Windows IPAM and Calico images the harness deploys for the product"},
 }
 
 // Prerequisites are operator prerequisites the harness installs as pinned,

@@ -322,6 +322,15 @@ platforms:
       # mirror's; empty uses public.ecr.aws/eks/amazon-k8s-cni(-init) v1.23.2.
       image: ""
       initImage: ""
+      # Windows VPC CNI nodes. ipamImage is the patched VPC resource
+      # controller (providers/aws-vpc-resource-controller), pinned by digest;
+      # setting it runs Windows IPAM on Linux VPC CNI workers, configures
+      # Windows nodes' native plugin from the cluster, and admits Windows
+      # VPC CNI claims, which are refused without it. It needs cert-manager
+      # for its webhooks. pullSecrets name Secrets in kube-system.
+      windows:
+        ipamImage: ""
+        pullSecrets: []
 
 # Reconcile the experimental ProvisionedNodeGroupClaim API, whose CRD the
 # chart installs.

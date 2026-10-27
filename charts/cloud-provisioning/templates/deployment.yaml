@@ -1,3 +1,6 @@
+{{- if and .Values.platforms.aws.vpcCNI.windows.ipamImage (not .Values.platforms.aws.vpcCNI.enabled) }}
+{{- fail "platforms.aws.vpcCNI.windows.ipamImage needs platforms.aws.vpcCNI.enabled" }}
+{{- end }}
 {{- if not (has .Values.aws.credentials.mount (list "env" "files")) }}
 {{- fail "aws.credentials.mount must be env or files" }}
 {{- end }}
@@ -124,6 +127,12 @@ spec:
             {{- end }}
             {{- with .Values.platforms.aws.vpcCNI.initImage }}
             - "--aws-vpc-cni-init-image={{ . }}"
+            {{- end }}
+            {{- with .Values.platforms.aws.vpcCNI.windows.ipamImage }}
+            - "--aws-windows-ipam-image={{ . }}"
+            {{- end }}
+            {{- with .Values.platforms.aws.vpcCNI.windows.pullSecrets }}
+            - "--aws-windows-ipam-pull-secrets={{ join "," . }}"
             {{- end }}
             {{- if .Values.experimentalNodeGroups }}
             - "--experimental-node-groups=true"

@@ -15,7 +15,11 @@ import (
 // VPCCNI is the AWS VPC CNI. Linux nodes run aws-node; Windows nodes run
 // the Windows VPC CNI plugins with the VPC resource controller's IPAM,
 // which AWS provides only for amd64.
-type VPCCNI struct{}
+type VPCCNI struct {
+	// Windows is whether this cluster runs Windows IPAM, without which
+	// Windows nodes' pods get no addresses.
+	Windows bool
+}
 
 // Name is the node class network name and node label value.
 func (VPCCNI) Name() string { return awspod.NodeValue }
@@ -23,11 +27,14 @@ func (VPCCNI) Name() string { return awspod.NodeValue }
 // VerifyNode rejects a VPC CNI node that retains site Calico BGP addresses.
 func (VPCCNI) VerifyNode(node *corev1.Node) error { return awspod.ValidateNodeCNI(node) }
 
-func (VPCCNI) Supports(os, arch string) error {
+func (v VPCCNI) Supports(os, arch string) error {
 	switch {
 	case os == "linux" && (arch == "" || arch == "amd64" || arch == "arm64"):
 		return nil
 	case os == "windows" && (arch == "" || arch == "amd64"):
+		if !v.Windows {
+			return fmt.Errorf("Windows nodes need Windows IPAM, which runs when platforms.aws.vpcCNI.windows.ipamImage names the patched VPC resource controller")
+		}
 		return nil
 	}
 	return fmt.Errorf("the AWS VPC CNI does not run %s/%s nodes", os, arch)

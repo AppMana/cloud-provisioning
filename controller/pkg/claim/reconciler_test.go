@@ -567,6 +567,7 @@ func TestReconcile_TemplateDrivesTheMachine(t *testing.T) {
 	_ = unstructured.SetNestedStringMap(template.Object, map[string]string{"kubernetes.io/os": "windows", clusterNameLabel: "must-not-override-cluster"}, "spec", "template", "metadata", "labels")
 	_ = unstructured.SetNestedStringMap(template.Object, map[string]string{"image.example/recipe": "windows-2025"}, "spec", "template", "metadata", "annotations")
 	r := newClaimReconciler(t, claim, template, fakeCluster("appmana"), fakeNode())
+	r.Provisioners = []join.MachineProvisioner{joinaws.Provider{ConfigNamespace: "wg-dialer", ConfigName: "aws-provider-config", EC2: admittingGroups, WindowsIPAM: true}}
 	if err := reconcileClaim(t, r, claim); err != nil {
 		t.Fatalf("Reconcile: %v", err)
 	}
@@ -671,6 +672,16 @@ func TestReconcile_NodeClassIsCheckedBeforeTheMachineExists(t *testing.T) {
 	got := &v1alpha1.ProvisionedNodeClaim{}
 	if err := r.Get(context.Background(), client.ObjectKeyFromObject(unsupported), got); err != nil || got.Status.Phase != "Failed" {
 		t.Fatalf("claim status = %+v, %v; want Failed", got.Status, err)
+	}
+
+	// Windows on the VPC CNI needs Windows IPAM, without which its pods
+	// would get no addresses.
+	noIPAM := fakeClaim("windows-no-ipam")
+	template = fakeTemplate("windows-no-ipam")
+	_ = unstructured.SetNestedStringMap(template.Object, map[string]string{"kubernetes.io/os": "windows", "kubernetes.io/arch": "amd64"}, "spec", "template", "metadata", "labels")
+	r = newClaimReconciler(t, noIPAM, template, fakeCluster("appmana"), fakeNode())
+	if err := reconcileClaim(t, r, noIPAM); err == nil || !strings.Contains(err.Error(), "Windows IPAM") {
+		t.Fatalf("a Windows VPC CNI claim without Windows IPAM: %v", err)
 	}
 
 	admitted := fakeClaim("linux-arm")

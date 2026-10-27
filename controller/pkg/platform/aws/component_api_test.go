@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -10,7 +11,9 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -43,7 +46,16 @@ func TestTheVPCCNIIsAppliedFromTheSitesFacts(t *testing.T) {
 	if os.Getenv("KUBEBUILDER_ASSETS") == "" {
 		t.Skip("requires isolated Kubernetes API binaries")
 	}
-	env := &envtest.Environment{}
+	preserve := true
+	crd := func(group, kind, plural string) *apiextv1.CustomResourceDefinition {
+		return &apiextv1.CustomResourceDefinition{ObjectMeta: metav1.ObjectMeta{Name: plural + "." + group},
+			Spec: apiextv1.CustomResourceDefinitionSpec{Group: group, Scope: apiextv1.NamespaceScoped,
+				Names: apiextv1.CustomResourceDefinitionNames{Plural: plural, Kind: kind, ListKind: kind + "List"},
+				Versions: []apiextv1.CustomResourceDefinitionVersion{{Name: "v1beta2", Served: true, Storage: true,
+					Schema: &apiextv1.CustomResourceValidation{OpenAPIV3Schema: &apiextv1.JSONSchemaProps{Type: "object", XPreserveUnknownFields: &preserve}}}}}}
+	}
+	env := &envtest.Environment{CRDInstallOptions: envtest.CRDInstallOptions{CRDs: []*apiextv1.CustomResourceDefinition{
+		crd("cluster.x-k8s.io", "Cluster", "clusters"), crd("infrastructure.cluster.x-k8s.io", "AWSCluster", "awsclusters")}}}
 	cfg, err := env.Start()
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +106,19 @@ func TestTheVPCCNIIsAppliedFromTheSitesFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	component := &VPCCNIComponent{Client: c, Family: "ipv4", Windows: true}
+	// The one AWS cluster Windows IPAM manages.
+	for _, obj := range []*unstructured.Unstructured{
+		{Object: map[string]any{"apiVersion": "cluster.x-k8s.io/v1beta2", "kind": "Cluster", "metadata": map[string]any{"name": "cldt-site", "namespace": "default"},
+			"spec": map[string]any{"infrastructureRef": map[string]any{"kind": "AWSCluster", "name": "cldt-site"}}}},
+		{Object: map[string]any{"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2", "kind": "AWSCluster", "metadata": map[string]any{"name": "cldt-site", "namespace": "default"},
+			"spec": map[string]any{"region": "us-west-2", "network": map[string]any{"vpc": map[string]any{"id": "vpc-0123"}, "subnets": []any{map[string]any{"id": "subnet-1"}}}}}},
+	} {
+		if err := c.Create(ctx, obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	component := &VPCCNIComponent{Client: c, Family: "ipv4", WindowsIPAMImage: ipamImage}
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{Scheme: scheme, Metrics: metricsserver.Options{BindAddress: "0"}})
 	if err != nil {
 		t.Fatal(err)
@@ -167,5 +191,35 @@ func TestTheVPCCNIIsAppliedFromTheSitesFacts(t *testing.T) {
 		`"hostRouteCIDRs":["10.101.0.10/32","10.101.0.11/32","10.101.128.0/24","10.101.129.0/24"],"podMTU":1420}`
 	if got := settings.Data["settings.json"]; got != want {
 		t.Fatalf("Windows settings:\n got %s\nwant %s", got, want)
+	}
+
+	// Windows IPAM, for the AWS cluster's VPC, enabled once available.
+	ipam := &appsv1.Deployment{}
+	if err := c.Get(ctx, windowsIPAM, ipam); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(ipam.Spec.Template.Spec.Containers[0].Args, "--vpc-id=vpc-0123") {
+		t.Fatalf("IPAM args %v", ipam.Spec.Template.Spec.Containers[0].Args)
+	}
+	enabled := func() string {
+		cm := &corev1.ConfigMap{}
+		if err := c.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "amazon-vpc-cni"}, cm); err != nil {
+			return ""
+		}
+		return cm.Data["enable-windows-ipam"]
+	}
+	if got := enabled(); got != "false" {
+		t.Fatalf("enabled before its controller was available: %q", got)
+	}
+	ipam.Status.Replicas, ipam.Status.ReadyReplicas, ipam.Status.AvailableReplicas = 1, 1, 1
+	if err := c.Status().Update(ctx, ipam); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(40 * time.Second)
+	for enabled() != "true" {
+		if time.Now().After(deadline) {
+			t.Fatal("Windows IPAM never enabled once its controller was available")
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 }

@@ -111,15 +111,12 @@ const (
 	cloudWorkerRoleValue = platform.RoleValue
 )
 
-// controlPlaneLabel marks control-plane nodes. The on-prem dialer
-// DaemonSet excludes them by nodeAffinity, not merely by lacking a
-// toleration, so the other side of a cloud tunnel does not land on a
-// controller. Control planes therefore carry no WireGuard interface
-// and no tunnel routes, so a tunnel cannot cost a control plane its
-// default route; the exclusion is enforced by scheduling, not only by
-// code. Remotes reach the API through a designated worker that
-// masquerades tunnel-sourced traffic.
-const controlPlaneLabel = "node-role.kubernetes.io/control-plane"
+// controlPlaneLabel is the conventional control-plane role label and
+// taint. Control planes are recognised by platform.IsControlPlane, which
+// also knows the labels k0s and MicroK8s use instead, and terminate
+// tunnels only when tunnel.endpoints names them. Remotes reach the API
+// through a designated worker that masquerades tunnel-sourced traffic.
+const controlPlaneLabel = platform.ControlPlaneLabel
 
 // meshReconciler owns the tunnel mesh.
 type meshReconciler struct {
@@ -716,7 +713,7 @@ func (r *meshReconciler) reconcileTunnelEndpoints(ctx context.Context) (time.Dur
 	var apiServers []string
 	for i := range nodes.Items {
 		node := &nodes.Items[i]
-		if _, isCP := node.Labels[controlPlaneLabel]; !isCP {
+		if !platform.IsControlPlane(node) {
 			continue
 		}
 		for _, a := range node.Status.Addresses {
@@ -788,7 +785,7 @@ func (r *meshReconciler) isTunnelEndpoint(node *corev1.Node) bool {
 	if node.Labels[cloudWorkerRoleLabel] == cloudWorkerRoleValue {
 		return false
 	}
-	if _, isCP := node.Labels[controlPlaneLabel]; isCP && !selectorNamesControlPlane(r.tunnelEndpointsRaw) {
+	if platform.IsControlPlane(node) && !selectorNamesControlPlane(r.tunnelEndpointsRaw) {
 		return false
 	}
 	if isAllNodes(r.tunnelEndpointsRaw) {
@@ -1137,7 +1134,12 @@ func retireTunnelAddress(data map[string][]byte, addr string) bool {
 // selectorNamesControlPlane reports whether the operator was asked,
 // explicitly, to place tunnels on control-plane nodes.
 func selectorNamesControlPlane(raw string) bool {
-	return strings.Contains(raw, controlPlaneLabel) || isAllNodes(raw)
+	for key := range platform.ControlPlaneMarks {
+		if strings.Contains(raw, key) {
+			return true
+		}
+	}
+	return isAllNodes(raw)
 }
 
 // isAllNodes is the one selector a label selector cannot express: every
@@ -2178,17 +2180,6 @@ func stopOwningAsEndpoint(data map[string][]byte, name string) bool {
 	return changed
 }
 
-// imagePullSecrets is the pull secret list for a dialer pod, which is
-// empty when no secret is configured rather than holding a reference to
-// nothing.
-//
-// A LocalObjectReference with an empty name is accepted by the API and
-// then breaks every strategic merge patch against the object, because
-// name is the merge key for this list and the element has none:
-// "does not contain declared merge key: name". kubectl rollout restart,
-// kubectl set image and kubectl apply all fail against a DaemonSet
-// carrying one, so an operator cannot restart their own dialers, on a
-// cluster where nothing is visibly wrong.
 // dialerTolerations lets a dialer run on a control plane. See the
 // caller for why this is unconditional.
 func dialerTolerations() []corev1.Toleration {
@@ -2201,6 +2192,17 @@ func dialerTolerations() []corev1.Toleration {
 	return tolerations
 }
 
+// imagePullSecrets is the pull secret list for a dialer pod, which is
+// empty when no secret is configured rather than holding a reference to
+// nothing.
+//
+// A LocalObjectReference with an empty name is accepted by the API and
+// then breaks every strategic merge patch against the object, because
+// name is the merge key for this list and the element has none:
+// "does not contain declared merge key: name". kubectl rollout restart,
+// kubectl set image and kubectl apply all fail against a DaemonSet
+// carrying one, so an operator cannot restart their own dialers, on a
+// cluster where nothing is visibly wrong.
 func imagePullSecrets(names string) []corev1.LocalObjectReference {
 	var refs []corev1.LocalObjectReference
 	seen := make(map[string]bool)
@@ -2408,7 +2410,7 @@ func main() {
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "metrics endpoint address (0 disables it)")
 	flag.StringVar(&gatewayNamespace, "gateway-namespace", "", "optional: namespace of a Gateway to annotate with the node's external IP for external-dns (blank disables this)")
 	flag.StringVar(&gatewayName, "gateway-name", "", "optional: name of a Gateway to annotate with the node's external IP for external-dns")
-	flag.StringVar(&tunnelEndpoints, "tunnel-endpoints", "", "node selector (k=v,k2=v2) choosing which local nodes terminate tunnels; empty = every Linux worker. Control-plane nodes are excluded unless this selector names node-role.kubernetes.io/control-plane explicitly")
+	flag.StringVar(&tunnelEndpoints, "tunnel-endpoints", "", "node selector (k=v,k2=v2) choosing which local nodes terminate tunnels; empty = every Linux worker. Control-plane nodes are excluded unless this selector names their distribution's role label (node-role.kubernetes.io/control-plane, node.k0sproject.io/role or node.kubernetes.io/microk8s-controlplane) or is \"all\"")
 	flag.StringVar(&siteDialerSelectorRaw, "site-dialer-node-selector", "", "additional label selector admitting site dialers; empty preserves all Linux site nodes; selected tunnel endpoints must be admitted")
 	flag.DurationVar(&endpointRetention, "tunnel-endpoint-retention", 3*time.Minute, "how long a node that has left --tunnel-endpoints goes on being one: dialer still scheduled, entries still published, tunnel still carrying traffic. A remote reads its peer list over the tunnel it is about to lose, so this is the time it is given to read the one naming the replacement, and it is measured in the dialer's 30s poll interval rather than in anything about the departing node's health")
 	flag.StringVar(&dialerPrivateKeyDir, "dialer-private-key-dir", "/var/lib/cloud-provisioning", "host directory where each node's dialer keeps its own WireGuard private key (generated on first start; never leaves the node)")

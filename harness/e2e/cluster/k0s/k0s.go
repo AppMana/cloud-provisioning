@@ -112,10 +112,7 @@ func (b Builder) Build(ctx context.Context, d cluster.Deps) error {
 	if err != nil {
 		return fmt.Errorf("reading the kubeconfig: %w", err)
 	}
-	if err := d.Kube.Install(ctx, kubeconfig); err != nil {
-		return err
-	}
-	return labelControlPlanes(ctx, d)
+	return d.Kube.Install(ctx, kubeconfig)
 }
 
 // validateSiteConfig rejects a configuration before any node is touched.
@@ -279,7 +276,7 @@ func (Builder) Reuse(ctx context.Context, d cluster.Deps) error {
 
 		}
 	}
-	return labelControlPlanes(ctx, d)
+	return nil
 }
 
 // installedBinary is the digest of the k0s binary every site node carries.
@@ -300,16 +297,3 @@ func installedBinary(ctx context.Context, d cluster.Deps) (string, error) {
 	return pin, nil
 }
 
-// k0s does not publish the conventional role label. Label only the topology's
-// controller members so endpoint selectors reflect the roles actually built.
-func labelControlPlanes(ctx context.Context, d cluster.Deps) error {
-	for _, node := range d.Topology.NodesInRole(lab.ControlPlane) {
-		if err := wait.Until(ctx, 5*time.Minute, "control-plane node is not registered", func(ctx context.Context) error {
-			_, err := d.Kube.Run(ctx, "label", "node", node.Name, "node-role.kubernetes.io/control-plane=", "--overwrite")
-			return err
-		}); err != nil {
-			return fmt.Errorf("label control-plane %s: %w", node.Name, err)
-		}
-	}
-	return nil
-}

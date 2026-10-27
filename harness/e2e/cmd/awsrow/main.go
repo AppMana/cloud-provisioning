@@ -317,7 +317,7 @@ func run() error {
 		return err
 	}
 	if *placementName != "" {
-		placement, err := install.PlacementNamed(*placementName)
+		placement, err := install.PlacementNamed(*placementName, *distro)
 		if err != nil {
 			return err
 		}

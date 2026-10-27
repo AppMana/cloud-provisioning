@@ -47,12 +47,33 @@ var (
 // Placements is the walk a campaign takes.
 var Placements = []Placement{OnControlPlane, OnOneWorker, OnTwoWorkers, OnAllNodes}
 
-// PlacementNamed returns one by name.
-func PlacementNamed(name string) (Placement, error) {
+// controlPlaneRoles is the label each distribution itself puts on a
+// control plane, which is what an operator names one by. Nothing in the
+// lab adds a role label, so the conventional one names nothing on k0s or
+// MicroK8s.
+var controlPlaneRoles = map[string]string{
+	"k0s":      "node.k0sproject.io/role=control-plane",
+	"microk8s": "node.kubernetes.io/microk8s-controlplane",
+	"kubeadm":  "node-role.kubernetes.io/control-plane",
+	"k3s":      "node-role.kubernetes.io/control-plane",
+	"rke2":     "node-role.kubernetes.io/control-plane",
+}
+
+// PlacementNamed returns one by name, with any role it names spelled the
+// way the distribution spells it.
+func PlacementNamed(name, distro string) (Placement, error) {
 	for _, p := range Placements {
-		if p.Name == name {
-			return p, nil
+		if p.Name != name {
+			continue
 		}
+		if p == OnControlPlane {
+			role, ok := controlPlaneRoles[distro]
+			if !ok {
+				return Placement{}, fmt.Errorf("no control-plane role label known for distribution %q", distro)
+			}
+			p.Endpoints = role + ",kubernetes.io/hostname=cp"
+		}
+		return p, nil
 	}
 	var have []string
 	for _, p := range Placements {

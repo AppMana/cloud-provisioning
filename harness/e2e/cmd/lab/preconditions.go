@@ -27,7 +27,7 @@ func preconditions(distro, cni string, product bool, remotes, outages string, ch
 
 // Validate every requested placement before provisioning. A nonempty flag that
 // parses to no placements must not silently skip lifecycle and outage checks.
-func validatePlacements(raw string, checks bool) error {
+func validatePlacements(raw, distro string, checks bool) error {
 	if strings.TrimSpace(raw) == "" {
 		return nil
 	}
@@ -40,7 +40,7 @@ func validatePlacements(raw string, checks bool) error {
 		if name == "" {
 			continue
 		}
-		if _, err := install.PlacementNamed(name); err != nil {
+		if _, err := install.PlacementNamed(name, distro); err != nil {
 			return fmt.Errorf("-placements: %w", err)
 		}
 		count++

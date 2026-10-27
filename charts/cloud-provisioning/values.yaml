@@ -95,8 +95,11 @@ tunnel:
   receiptTLSSecret: ""
   # Node selector (k=v,k2=v2) choosing which local nodes terminate
   # tunnels. Empty selects every Linux worker; control planes are
-  # excluded unless named explicitly. Only the selected nodes get a
-  # cldt* interface.
+  # excluded unless the selector names the role label the distribution
+  # puts on them (node-role.kubernetes.io/control-plane, or
+  # node.k0sproject.io/role=control-plane on k0s, or
+  # node.kubernetes.io/microk8s-controlplane on MicroK8s), or is "all".
+  # Only the selected nodes get a cldt* interface.
   endpoints: ""
 
   # How long a node that has left the selector goes on being an

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
+	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -551,7 +552,7 @@ func endpointCandidates(nodes []corev1.Node) Check {
 		if n.Labels["kubernetes.io/os"] == "windows" {
 			continue
 		}
-		if _, cp := n.Labels["node-role.kubernetes.io/control-plane"]; cp {
+		if platform.IsControlPlane(&n) {
 			planes = append(planes, n.Name)
 			continue
 		}

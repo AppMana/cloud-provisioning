@@ -176,7 +176,7 @@ func runLab() {
 		fail("%v", err)
 	}
 
-	if err := validatePlacements(*places, *checks); err != nil {
+	if err := validatePlacements(*places, *distro, *checks); err != nil {
 		fail("%v", err)
 	}
 
@@ -772,7 +772,7 @@ func runLab() {
 					if name = strings.TrimSpace(name); name == "" {
 						continue
 					}
-					placement, err := install.PlacementNamed(name)
+					placement, err := install.PlacementNamed(name, *distro)
 					if err != nil {
 						fail("%v", err)
 					}

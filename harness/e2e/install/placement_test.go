@@ -50,10 +50,10 @@ func TestASetSelectorSurvivesHelm(t *testing.T) {
 // unknown one is an error naming what exists rather than a silent
 // default that would run the wrong row.
 func TestAnUnknownPlacementIsAnError(t *testing.T) {
-	if _, err := PlacementNamed("two-workers"); err != nil {
+	if _, err := PlacementNamed("two-workers", "k0s"); err != nil {
 		t.Errorf("a known placement was not found: %v", err)
 	}
-	_, err := PlacementNamed("nowhere")
+	_, err := PlacementNamed("nowhere", "k0s")
 	if err == nil {
 		t.Fatal("an unknown placement was accepted")
 	}
@@ -80,10 +80,25 @@ func TestActiveEndpointsAfterRetirement(t *testing.T) {
 	}
 }
 
-// The real k0s cp carries the control-plane role label. A hostname selector
-// alone does not opt in under the product's control-plane placement policy.
-func TestControlPlanePlacementExplicitlyOptsIn(t *testing.T) {
-	if !strings.Contains(OnControlPlane.Endpoints, "node-role.kubernetes.io/control-plane") {
-		t.Fatal("control-plane row would retain workers without selecting cp")
+// A stock control plane carries only its distribution's own role label.
+// A hostname selector alone does not opt in under the product's
+// control-plane placement policy, so the row names the role the way the
+// distribution publishes it.
+func TestControlPlanePlacementNamesTheDistributionsRole(t *testing.T) {
+	for distro, role := range map[string]string{
+		"k0s":      "node.k0sproject.io/role=control-plane",
+		"microk8s": "node.kubernetes.io/microk8s-controlplane",
+		"kubeadm":  "node-role.kubernetes.io/control-plane",
+	} {
+		p, err := PlacementNamed("control-plane", distro)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(p.Endpoints, role+",") {
+			t.Errorf("%s: control-plane row selects %q", distro, p.Endpoints)
+		}
+	}
+	if _, err := PlacementNamed("control-plane", "unknown"); err == nil {
+		t.Error("a distribution with no known role label was accepted")
 	}
 }

@@ -57,7 +57,7 @@ func TestPlacementRequestsCannotSilentlySkipChecks(t *testing.T) {
 		{" control-plane,one-worker,two-workers,all-nodes ", true, true},
 		{",two-workers,", true, true},
 	} {
-		if err := validatePlacements(c.raw, c.checks); (err == nil) != c.valid {
+		if err := validatePlacements(c.raw, "k0s", c.checks); (err == nil) != c.valid {
 			t.Errorf("placements=%q check=%t: %v", c.raw, c.checks, err)
 		}
 	}

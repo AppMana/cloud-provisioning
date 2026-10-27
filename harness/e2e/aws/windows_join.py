@@ -132,7 +132,8 @@ def main():
         result=subprocess.run(['docker','exec',a.bastion,'kubectl','--server='+a.api_server,*args,'-o','json'],capture_output=True,text=True)
         if result.returncode:raise RuntimeError('Kubernetes observation failed')
         return json.loads(result.stdout)
-    site=kube('get','nodes','-l','node-role.kubernetes.io/control-plane')
+    # Site nodes are those the product did not provision; no role label is assumed.
+    site=kube('get','nodes','-l','!cloud-provisioning.appmana.com/role')
     site_versions=sorted({n['status']['nodeInfo']['kubeletVersion'] for n in site['items']})
     machine=kube('-n','cloud-provisioning','get','machine',a.name)
     if machine['spec']['clusterName']!=s['runID']:raise RuntimeError('Machine belongs to another cluster')

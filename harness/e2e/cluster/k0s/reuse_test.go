@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
 	"sigs.k8s.io/yaml"
 )
@@ -68,7 +67,6 @@ func TestReuseTakesTheBinaryPinFromTheSiteNodes(t *testing.T) {
 		nodes[n.Name] = installedNode{digest: installed, config: raw}
 	}
 	d.Rig = installedRig{nodes: nodes}
-	d.Kube = &kube.Client{Bastion: &roleBastion{}, ControlPlanes: []string{"10.101.0.1"}}
 	d.K0sBinarySHA256 = ""
 	if err := (Builder{}).Reuse(context.Background(), d); err != nil {
 		t.Fatalf("reuse without a given pin: %v", err)
@@ -109,7 +107,6 @@ func TestReuseForkRequiresMatchingArtifactIdentity(t *testing.T) {
 		nodes[n.Name] = installedNode{digest: d.K0sBinarySHA256, version: d.K0sVersion, config: raw}
 	}
 	d.Rig = installedRig{nodes: nodes}
-	d.Kube = &kube.Client{Bastion: &roleBastion{}, ControlPlanes: []string{"10.101.0.1"}}
 	if err := (Builder{}).Reuse(context.Background(), d); err != nil {
 		t.Fatal(err)
 	}

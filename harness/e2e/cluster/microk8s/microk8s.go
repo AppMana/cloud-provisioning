@@ -109,13 +109,6 @@ func configureAccess(ctx context.Context, d cluster.Deps) error {
 	if err := d.Kube.Install(ctx, config); err != nil {
 		return err
 	}
-	// MicroK8s does not necessarily publish Kubernetes role labels. These
-	// names were actually started as dqlite/control-plane members above.
-	for _, n := range d.Topology.NodesInRole(lab.ControlPlane) {
-		if _, err := d.Kube.Run(ctx, "label", "node", n.Name, "node-role.kubernetes.io/control-plane=", "--overwrite"); err != nil {
-			return err
-		}
-	}
 	started := time.Now().UTC()
 	raw, err := d.Rig.Node(nodes[0].Name).Exec(ctx, "/snap/bin/microk8s", "add-node", "--token-ttl", "14400", "--format", "json")
 	if err != nil {

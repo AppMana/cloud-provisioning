@@ -32,7 +32,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | D3 LabCluster status | done (54ef1cd) |
 | D4 static identity renewal | done: docs recommend an `AWSClusterRoleIdentity` CAPA assumes and refreshes from a long-lived source key (`capa-source.json`); the product refuses a static identity holding an STS session token and follows the role chain; the harness publishes that chain once and no longer renews a CAPA session |
 | D5 windows-publisher image release | done: the release workflow builds and publishes `cloud-provisioning-windows-publisher` (windows/amd64, cross-built on Linux; verified locally); the harness publisher stays only for unreleased candidates |
-| D6 nodegroup CRD | open |
+| D6 nodegroup CRD | done: the CRD ships in the chart's `crds/` (inert unless `experimentalNodeGroups`); no manual apply from testdata |
 | D7 forks | open |
 | Assertions list | CAPI association (C7), control-plane placement (C6), kubeadm Calico (C3) and CalicoNodesReady (C5, now measures the product agent on remotes) closed; rest open |
 | /tmp writes | done: this host uses the run work dir, the module `.state` dir or `$XDG_RUNTIME_DIR` (lock); site guests, bastion and image builders use `/var/lib/cldt` (`rig.LabDir`); the product's k0s bootstrap uses `/var/lib/cloud-provisioning/bootstrap`; Windows image staging uses ProgramData; docs, READMEs and CI use `_work`, `.state` or `dist`. Kept by decision: probe pods' `/tmp/transfer` and `/tmp/udpprobe` and the VM wrapper's `/tmp/cldt-guest-key`/`cldt-ssh-%C`, which are private to an ephemeral container and go with it |

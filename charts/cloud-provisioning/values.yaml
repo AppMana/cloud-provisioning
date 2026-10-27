@@ -321,6 +321,7 @@ platforms:
       image: ""
       initImage: ""
 
-# Requires manual installation of the experimental group CRD.
+# Reconcile the experimental ProvisionedNodeGroupClaim API, whose CRD the
+# chart installs.
 experimentalNodeGroups: false
 

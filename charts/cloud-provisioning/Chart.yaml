@@ -7,7 +7,7 @@ description: |
   whole stack from a single release instead of an imperative
   `clusterctl init` that gitops cannot reproduce.
 type: application
-version: 0.1.12
+version: 0.1.13
 appVersion: "d46770f"
 dependencies:
   # Cluster API's own operator is the supported declarative install

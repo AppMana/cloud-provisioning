@@ -6,11 +6,10 @@ remains under development.
 
 ## Enable in an isolated harness
 
-Install the experimental API contract, then enable the controller on the harness
-release using its existing values and a newly built controller image:
+The chart installs the experimental API contract. Enable the controller on the
+harness release using its existing values and a newly built controller image:
 
 ```sh
-kubectl apply -f controller/pkg/nodegroup/testdata/provisionednodegroupclaims.yaml
 helm upgrade cloud-provisioning charts/cloud-provisioning \
   --namespace cloud-provisioning --reuse-values \
   --set experimentalNodeGroups=true \
@@ -23,7 +22,7 @@ its release namespace. CAPI and workload Nodes must be in this cluster API;
 separate management/workload cluster registration remains to be implemented.
 The value adds group status and child creation/deletion permissions in the
 release namespace, plus pod listing and eviction permissions for workload drain.
-It defaults to `false`; the group CRD is installed separately for this experiment.
+It defaults to `false`; the group CRD is installed with the chart either way.
 KEDA-driven scaling has native Linux k0s/Calico VM coverage. Broader distribution,
 Windows, and real-cloud group qualification remain pending.
 
@@ -270,7 +269,7 @@ its own eviction and withdrawal gates before triggering that teardown.
 - [x] Inspect the single-claim lifecycle and define a separate group API.
 - [x] Add a deterministic replica planner with ownership and terminating-slot tests. See `controller/pkg/nodegroup`; it proposes one create or drain at a time.
 - [x] Add API types and an experimental CRD with scale and status subresources. An isolated API test verifies defaulting, scale-to-zero, status preservation,
-      and resource-version conflicts. The CRD is in `controller/pkg/nodegroup/testdata`.
+      and resource-version conflicts. The CRD is in the chart's `crds/`.
 - [x] Register the experimental controller behind an explicit flag, with namespace
       filtering, child ownership watches and opt-in Helm RBAC. The real-manager
       API test observes group creation and creates the owned child through its

@@ -31,8 +31,9 @@ dialerCloud:
   image: ""             # e.g. busybox:1.37
   hostBinary: /host-bin/wg-dialer
 
+# A Windows worker's tunnel routes native pod prefixes when its node class
+# runs a provider-native pod network; the class decides, not a value.
 windowsBootstrap:
-  nativePodRouting: false # requires matching native CNI gateway configuration and qualification
   tunnelSHA256: ""  # enables the k0s prepared-image Windows bootstrap renderer
   workerVersion: "" # optional patched build of the same base k0s release
   workerSHA256: ""  # required with workerVersion; exact baked executable hash

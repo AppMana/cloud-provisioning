@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/appmana/cloud-provisioning/controller/pkg/bootstrap"
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -60,5 +61,36 @@ func TestBootstrapRegistersTheNodeClass(t *testing.T) {
 	site := renderedKubeletArgs(t, map[string]string{platform.CNILabel: platform.SiteCNI})
 	if strings.Contains(site, platform.CNILabel) {
 		t.Errorf("a template choosing the site CNI still registered a native CNI label: %q", site)
+	}
+}
+
+type capturingRenderer struct{ values map[string]any }
+
+func (c *capturingRenderer) Render(values map[string]any) (bootstrap.Data, error) {
+	c.values = values
+	return bootstrap.Data{Format: bootstrap.CloudConfig, Value: []byte("#cloud-config\n")}, nil
+}
+
+// Whether a node's pods are a provider-native network's is the class's to
+// say, so a bootstrap that routes native pod prefixes through its tunnel
+// (the Windows tunnel service) takes it from the class, not from a flag.
+func TestBootstrapValuesCarryWhetherTheClassIsNative(t *testing.T) {
+	for _, c := range []struct {
+		labels map[string]string
+		native bool
+	}{{nil, true}, {map[string]string{platform.CNILabel: platform.SiteCNI}, false}} {
+		machine := machineWithInfraRef("cloud-worker-0", "default", "cloud-worker-0")
+		awsMachine := fakeAWSMachine("cloud-worker-0", "default", true)
+		awsMachine.SetLabels(c.labels)
+		r := newFakeJoinReconciler(t, &stubJoinProvider{values: map[string]any{"joinToken": "t", "k0sVersion": "v"}}, machine, awsMachine, dialerPeerSecretFixture())
+		r.InfraProviders = []InfraProvider{nativeNetworkStub{awsShapedStub()}}
+		renderer := &capturingRenderer{}
+		r.BootstrapRenderers = map[string]BootstrapRenderer{"linux": renderer}
+		if _, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(machine)}); err != nil {
+			t.Fatalf("Reconcile: %v", err)
+		}
+		if got, ok := renderer.values["nativePodNetwork"].(bool); !ok || got != c.native {
+			t.Errorf("labels %v: nativePodNetwork = %v, want %v", c.labels, renderer.values["nativePodNetwork"], c.native)
+		}
 	}
 }

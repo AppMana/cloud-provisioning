@@ -84,7 +84,17 @@ func TestTheVPCCNIIsAppliedFromTheSitesFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	component := &VPCCNIComponent{Client: c, Family: "ipv4"}
+	// The cluster DNS a Windows node's plugin configuration names.
+	if err := c.Create(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "kube-dns", Namespace: "kube-system"},
+		Spec: corev1.ServiceSpec{ClusterIP: "10.0.0.10", Ports: []corev1.ServicePort{{Name: "dns", Port: 53, Protocol: corev1.ProtocolUDP}}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "coredns", Namespace: "kube-system"},
+		Data: map[string]string{"Corefile": ".:53 {\n    kubernetes cluster.local in-addr.arpa ip6.arpa {\n    }\n}\n"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	component := &VPCCNIComponent{Client: c, Family: "ipv4", Windows: true}
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{Scheme: scheme, Metrics: metricsserver.Options{BindAddress: "0"}})
 	if err != nil {
 		t.Fatal(err)
@@ -142,5 +152,20 @@ func TestTheVPCCNIIsAppliedFromTheSitesFacts(t *testing.T) {
 	configMap := &corev1.ConfigMap{}
 	if err := c.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "amazon-vpc-cni"}, configMap); err != nil {
 		t.Fatal(err)
+	}
+
+	// Windows nodes' plugin configuration, from the same facts.
+	if err := c.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "aws-vpc-cni-windows"}, &appsv1.DaemonSet{}); err != nil {
+		t.Fatal(err)
+	}
+	settings := &corev1.ConfigMap{}
+	if err := c.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "aws-vpc-cni-windows-settings"}, settings); err != nil {
+		t.Fatal(err)
+	}
+	want := `{"serviceCIDR":"10.0.0.0/24","clusterDNS":"10.0.0.10","clusterDomain":"cluster.local",` +
+		`"snatExcludedCIDRs":["10.0.0.0/24","10.101.0.10/32","10.101.0.11/32","10.101.128.0/24","10.101.129.0/24"],` +
+		`"hostRouteCIDRs":["10.101.0.10/32","10.101.0.11/32","10.101.128.0/24","10.101.129.0/24"],"podMTU":1420}`
+	if got := settings.Data["settings.json"]; got != want {
+		t.Fatalf("Windows settings:\n got %s\nwant %s", got, want)
 	}
 }

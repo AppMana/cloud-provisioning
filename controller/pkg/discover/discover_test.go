@@ -135,3 +135,55 @@ func TestAPIEndpointAbsentIsEmptyNotError(t *testing.T) {
 		t.Fatalf("got %q, want empty", got)
 	}
 }
+
+// k0s's CoreDNS configuration, as k0s renders it for cluster.example.
+const k0sCorefile = `.:53 {
+    errors
+    health
+    ready
+    kubernetes cluster.example in-addr.arpa ip6.arpa {
+      pods insecure
+      ttl 30
+      fallthrough in-addr.arpa ip6.arpa
+    }
+    prometheus :9153
+    forward . /etc/resolv.conf
+    cache 30
+    loop
+    reload
+    loadbalance
+}
+`
+
+// The cluster's DNS is the kube-dns Service kubelets point pods at, and its
+// domain the zone CoreDNS serves the cluster's records under.
+func TestClusterDNSIsTheKubeDNSServiceAndCoreDNSZone(t *testing.T) {
+	ctx := context.Background()
+	c := newClient(
+		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "kube-dns", Namespace: "kube-system"}, Spec: corev1.ServiceSpec{ClusterIP: "10.96.0.10", ClusterIPs: []string{"10.96.0.10", "fd00:96::a"}}},
+		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "coredns", Namespace: "kube-system"}, Data: map[string]string{"Corefile": k0sCorefile}},
+	)
+	addresses, err := ClusterDNS(ctx, c)
+	if err != nil || len(addresses) != 2 || addresses[0] != "10.96.0.10" || addresses[1] != "fd00:96::a" {
+		t.Fatalf("ClusterDNS = %v, %v", addresses, err)
+	}
+	domain, err := ClusterDomain(ctx, c)
+	if err != nil || domain != "cluster.example" {
+		t.Fatalf("ClusterDomain = %q, %v", domain, err)
+	}
+}
+
+// Without the Service or CoreDNS's kubernetes zone, nothing is assumed.
+func TestClusterDNSIsNotGuessed(t *testing.T) {
+	ctx := context.Background()
+	if _, err := ClusterDNS(ctx, newClient()); err == nil {
+		t.Fatal("a DNS address without a kube-dns Service")
+	}
+	if _, err := ClusterDomain(ctx, newClient()); err == nil {
+		t.Fatal("a domain without CoreDNS's configuration")
+	}
+	c := newClient(&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "coredns", Namespace: "kube-system"}, Data: map[string]string{"Corefile": ".:53 {\n    forward . /etc/resolv.conf\n}\n"}})
+	if _, err := ClusterDomain(ctx, c); err == nil {
+		t.Fatal("a domain from a Corefile that serves no cluster zone")
+	}
+}

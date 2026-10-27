@@ -21,10 +21,9 @@ var windowsScript string
 // WindowsBootstrap consumes prepared image assets. Platform identity comes
 // from infrastructure values; this distribution renderer has no cloud API code.
 type WindowsBootstrap struct {
-	NativePodRouting bool
-	ServiceSHA256    string
-	WorkerVersion    string
-	WorkerSHA256     string
+	ServiceSHA256 string
+	WorkerVersion string
+	WorkerSHA256  string
 }
 
 type windowsPlan struct {
@@ -46,7 +45,10 @@ type windowsPlan struct {
 
 func (w WindowsBootstrap) Render(values map[string]any) (bootstrap.Data, error) {
 	str := func(key string) string { v, _ := values[key].(string); return v }
-	p := windowsPlan{NativePodRouting: w.NativePodRouting, MachineName: str("machineName"), Interface: str("interfaceName"), K0sVersion: str("k0sVersion"), JoinToken: str("joinToken"), KubeletExtraArgs: str("kubeletExtraArgs"), APIEndpoint: str("apiEndpoint"), NodeAddress: str("nodeAddress"), ProviderID: str("providerID"), IdentityPowerShell: str("providerIdentityPowerShell"), ServiceSHA256: w.ServiceSHA256}
+	// A node whose pods a provider-native network owns routes the native
+	// pod prefixes peers publish through its tunnel; the class decides.
+	native, _ := values["nativePodNetwork"].(bool)
+	p := windowsPlan{NativePodRouting: native, MachineName: str("machineName"), Interface: str("interfaceName"), K0sVersion: str("k0sVersion"), JoinToken: str("joinToken"), KubeletExtraArgs: str("kubeletExtraArgs"), APIEndpoint: str("apiEndpoint"), NodeAddress: str("nodeAddress"), ProviderID: str("providerID"), IdentityPowerShell: str("providerIdentityPowerShell"), ServiceSHA256: w.ServiceSHA256}
 	if !regexp.MustCompile(`^[a-fA-F0-9]{64}$`).MatchString(w.ServiceSHA256) {
 		return bootstrap.Data{}, fmt.Errorf("Windows image requires a pinned tunnel service SHA256")
 	}
@@ -94,7 +96,7 @@ func (w WindowsBootstrap) Render(values map[string]any) (bootstrap.Data, error) 
 	// install a connected subnet route on every remote.
 	p.Peers.LocalAddress = netip.PrefixFrom(address.Addr(), address.Addr().BitLen()).String()
 	compile := tunneldevice.Compile
-	if w.NativePodRouting {
+	if native {
 		compile = tunneldevice.CompileNativePodRouting
 	}
 	if _, err = compile(p.Peers); err != nil {

@@ -392,66 +392,34 @@ For AWS, compose these shared layers with
 `aws/windows/prepare-bootstrap.ps1`, which bakes the pinned AWS PowerShell
 modules used by CAPA’s secure Windows consumer.
 
-For AWS VPC CNI Windows workers, `aws/windows/cni-artifacts.json` pins AWS's
-published Image Builder artifact archive and its native `vpc-bridge` plugin
-and Kubernetes connector. Fetch that archive during image construction and run
+For AWS VPC CNI Windows workers, the image carries the patched `vpc-bridge`
+plugin and AWS's Kubernetes connector that
+[`cni-artifacts.json`](../controller/pkg/platform/aws/windowscni/cni-artifacts.json)
+pins: the build of [providers/aws-vpc-cni-plugins](../providers/aws-vpc-cni-plugins/README.md)
+that the product's host routes and pod MTU need, with its source and AWS's base
+archive recorded in the recipe. Run
 `aws/windows/prepare-cni.ps1 -Archive <archive> -Recipe <recipe>` on an unjoined
-image. It extracts only those two binaries, verifies their hashes, and sets the
+image, with the controller package's `verify-cni.ps1` staged beside it. It
+extracts only those two binaries, verifies their hashes, and sets the
 connector's machine `KUBECONFIG` to k0s's future kubelet credential path. No
 credentials are baked. It refuses a different pre-existing binary or CNI
 configuration; it does not invoke the EKS bootstrap that installs its own
 runtime and kubelet services.
 
-Run `aws/windows/verify-cni.ps1 -Recipe <recipe>` before capture and preserve
+Run `verify-cni.ps1 -Recipe <recipe>` before capture and preserve
 `C:\ProgramData\CloudProvisioning\aws-vpc-cni-image.json` in the image. The
 native `aws/windows/test-cni.ps1 -Archive <archive>` regression test requires
-an unjoined builder without this layer and leaves the verified layer installed.
+an unjoined builder without this layer, `verify-cni.ps1` and the recipe staged
+beside it, and leaves the verified layer installed.
 Pass `--cni-archive <archive>` to the existing Windows capture helper's `revise`
 and `prepare` phases to compose this layer. Preparation runs the product scripts
 and preserves the receipt; capture checks the native OS and artifact identities
 and includes the CNI archive hash in the AMI name. Subsequent revisions must
 explicitly retain the CNI archive.
-Image-layer verification does not prove networking: fresh workers still need
-node-specific CNI configuration, the scoped AWS Windows IPAM controller, and
-the [mixed-CNI lifecycle and traffic checks](../docs/hybrid-cni.md).
 
-`aws/windows/kustomization.yaml` deploys the AWS Windows CNI initializer as a
-HostProcess DaemonSet. It selects only Windows AMD64 nodes with both the
-`cloud-provisioning.appmana.com/role=cloud-worker` and
-`cloud-provisioning.appmana.com/cni=aws-vpc` labels. Its init container verifies
-the prepared image, discovers the primary ENI through IMDSv2, and writes the
-native plugin's configuration before its regular container starts. It does
-not allocate addresses, create HNS networks, install services, or replace an
-existing differing CNI configuration. AWS IPAM and the native plugin retain
-those responsibilities.
-
-In an environment overlay, replace the generated
-`aws-vpc-cni-windows-settings` ConfigMap's `settings.json` entry with an object
-containing `serviceCIDR`, `clusterDNS`, `clusterDomain`, and
-`snatExcludedCIDRs` (an array). Read the Service CIDR from the cluster's
-ServiceCIDR objects, DNS settings from the selected k0s worker configuration,
-and site exclusions from the existing native AWS CNI configuration. This
-initializer supports IPv4 Windows networking; it rejects default-route
-exclusions and ambiguous primary-interface gateways. Its empty base settings
-must be replaced before use. Cluster credentials are not mounted into the
-initializer; the native connector uses the worker's kubelet credentials.
-
-The optional `podGateway` setting defaults to `vpc`. The experimental `host`
-mode selects the primary ENI address as the pod gateway and requires exactly
-one running tunnel service configured with `--native-pod-routing`. Enable
-that service mode for new workers with `windowsBootstrap.nativePodRouting`
-and a matching pinned tunnel executable. It installs the controller's verified
-remote prefixes on the owned tunnel adapter, while the controller excludes
-same-VPC destinations from tunnel projection. The CNI plugin still creates
-and owns its HNS network. Qualify host-gateway pod traffic on fresh workers;
-this option is not a live-network migration mechanism.
-
-The installed configuration is retained when the DaemonSet is removed.
-Changing a live network configuration requires a separate migration; an
-initializer restart accepts only the same configuration. Run
-`aws/windows/test-configure-cni.ps1` for input-boundary checks, then qualify
-fresh claims and ordinary pod traffic on each Windows version. A Ready
-initializer alone does not prove IP allocation or application connectivity.
+The controller configures the plugin on each Windows VPC CNI node (see
+[hybrid-cni.md](../docs/hybrid-cni.md#windows-aws-vpc-cni)). Its initializer
+verifies this layer before writing anything.
 
 The [Windows capture helper](../docs/windows.md#private-aws-image-capture) cleans
 run-owned diagnostic state, dispatches EC2Launch Sysprep, captures private AMIs

@@ -1,7 +1,0 @@
-{
-  "componentARN": "arn:aws:imagebuilder:us-west-2:aws:component/eks-optimized-ami-windows/1.36.0/1",
-  "archiveURI": "s3://ec2imagebuilder-managed-resources-us-west-2-prod/components/eks-optimized-ami-windows/1.36.0/EKS-Artifacts.zip",
-  "archiveSHA256": "d5ffe41505f13a6dbea753c89852558be64e07d0c51f8905f2918af60ed7008a",
-  "pluginSHA256": "13922daaf10aac37434e9715c6c0fcfdb17fdfcb7e24a4804f598e181d20eb97",
-  "connectorSHA256": "2497e64b0c4b8315c15e71dd393cf950fe1094f6d33c32c48fd1c08b2e484804"
-}

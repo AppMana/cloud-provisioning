@@ -396,10 +396,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	values := map[string]any{
-		"sshAuthorizedKeys":       r.SSHAuthorizedKeys,
-		"apiVIP":                  r.APIVIP,
-		"apiProxyPort":            apiProxyPort,
-		"kubeletExtraArgs":        class.KubeletArgs(r.KubeletExtraFlags),
+		"sshAuthorizedKeys": r.SSHAuthorizedKeys,
+		"apiVIP":            r.APIVIP,
+		"apiProxyPort":      apiProxyPort,
+		"kubeletExtraArgs":  class.KubeletArgs(r.KubeletExtraFlags),
+		// A provider-native network owns this node's pods, so its tunnel
+		// routes the native pod prefixes peers publish.
+		"nativePodNetwork":        class.Native(),
 		"wireguardAddress":        cloudWGAddress,
 		"wireguardAddress6":       cloudWGAddress6,
 		"wireguardListenPort":     r.WireGuardListenPort,

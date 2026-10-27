@@ -1,6 +1,3 @@
-{{- if and .Values.windowsBootstrap.nativePodRouting (not .Values.windowsBootstrap.tunnelSHA256) }}
-{{- fail "Windows native pod routing requires a pinned tunnel executable" }}
-{{- end }}
 {{- if not (has .Values.aws.credentials.mount (list "env" "files")) }}
 {{- fail "aws.credentials.mount must be env or files" }}
 {{- end }}
@@ -193,9 +190,6 @@ spec:
             {{- $names = append $names .name }}
             {{- end }}
             - {{ printf "--dialer-image-pull-secret=%s" (join "," $names) | quote }}
-            {{- end }}
-            {{- if .Values.windowsBootstrap.nativePodRouting }}
-            - "--windows-native-pod-routing=true"
             {{- end }}
             {{- with .Values.windowsBootstrap.tunnelSHA256 }}
             - {{ printf "--windows-tunnel-sha256=%s" . | quote }}

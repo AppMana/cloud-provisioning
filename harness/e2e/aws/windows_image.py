@@ -42,7 +42,7 @@ cni={}
 if a.cni_recipe and not a.cni_archive:raise RuntimeError('--cni-recipe requires --cni-archive')
 if a.cni_archive:
  if a.phase not in ['revise','prepare']:raise RuntimeError('CNI archive applies only to revise/prepare')
- cni=json.loads((a.cni_recipe or repo/'images/aws/windows/cni-artifacts.json').read_text())
+ cni=json.loads((a.cni_recipe or repo/'controller/pkg/platform/aws/windowscni/cni-artifacts.json').read_text())
  if hashlib.sha256(a.cni_archive.read_bytes()).hexdigest()!=cni['archiveSHA256']:raise RuntimeError('AWS CNI archive checksum mismatch')
 if s.get('cleanedUp'):raise RuntimeError('run is cleaned up')
 def save():state_path.write_text(json.dumps(s,indent=2)+'\n')
@@ -215,7 +215,7 @@ $cni=& "$r\image-stage\verify-cni.ps1" -Recipe "$r\image-stage\cni-artifacts.jso
     z.write(a.cni_archive,'EKS-Artifacts.zip')
     z.writestr('cni-artifacts.json',json.dumps(cni))
     if record.get('previousCNIRecipe') and record['previousCNIRecipe']!=cni:z.writestr('previous-cni-artifacts.json',json.dumps(record['previousCNIRecipe']))
-    for name in ['prepare-cni.ps1','verify-cni.ps1']:z.write(repo/'images/aws/windows'/name,name)
+    z.write(repo/'images/aws/windows/prepare-cni.ps1','prepare-cni.ps1');z.write(repo/'controller/pkg/platform/aws/windowscni/verify-cni.ps1','verify-cni.ps1')
    if cache:
     z.writestr('cache-recipe.json',json.dumps(cache));z.write(repo/'images/windows/verify-cache.ps1','verify-cache.ps1');z.write(repo/'images/windows/inspect-cache.ps1','inspect-cache.ps1');z.write(repo/'images/windows/cache-runtime.ps1','cache-runtime.ps1')
    if worker:

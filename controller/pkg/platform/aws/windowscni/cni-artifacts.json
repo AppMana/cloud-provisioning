@@ -1,0 +1,38 @@
+{
+  "archiveSHA256": "342ac875222b3f7c2cce3008ac112a4f135b8b22feaee20e939649c8c889e78e",
+  "pluginSHA256": "d0c1667892814d72127e4a8e2366a258f9b298d65ed0db1f37d07ee75d8c6489",
+  "connectorSHA256": "2497e64b0c4b8315c15e71dd393cf950fe1094f6d33c32c48fd1c08b2e484804",
+  "features": [
+    "hostRouteCIDRs",
+    "podMTU"
+  ],
+  "source": {
+    "baseRecipe": {
+      "componentARN": "arn:aws:imagebuilder:us-west-2:aws:component/eks-optimized-ami-windows/1.36.0/1",
+      "archiveURI": "s3://ec2imagebuilder-managed-resources-us-west-2-prod/components/eks-optimized-ami-windows/1.36.0/EKS-Artifacts.zip",
+      "archiveSHA256": "d5ffe41505f13a6dbea753c89852558be64e07d0c51f8905f2918af60ed7008a",
+      "pluginSHA256": "13922daaf10aac37434e9715c6c0fcfdb17fdfcb7e24a4804f598e181d20eb97",
+      "connectorSHA256": "2497e64b0c4b8315c15e71dd393cf950fe1094f6d33c32c48fd1c08b2e484804"
+    },
+    "upstreamRevision": "8c8909eabf08b598af67afb9e540fab67a1f4ff3",
+    "integrationRevision": "34e9a0e18da72bf42e0ff02bea48af750f645f07",
+    "toolchain": "go1.26.3",
+    "tags": [
+      "enablek8sconnector"
+    ],
+    "buildFlags": [
+      "-trimpath",
+      "-tags=enablek8sconnector"
+    ],
+    "patches": [
+      {
+        "file": "host-routes.patch",
+        "sha256": "a08c167c4510ebf9c37bd49da1c1a8c08f8f69fbb86beed62c7db39350f88062"
+      },
+      {
+        "file": "endpoint-mtu.patch",
+        "sha256": "37c5b5ab2495a456502420e40be1dc7d84669e2098846ad2fd92e70322204c46"
+      }
+    ]
+  }
+}

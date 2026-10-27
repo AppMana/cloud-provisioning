@@ -140,7 +140,9 @@ func TestWindowsBootstrapConsumesPublishedRemotePeers(t *testing.T) {
 
 func TestWindowsNativePodRoutingReachesServicePlan(t *testing.T) {
 	for _, enabled := range []bool{false, true} {
-		result, err := (WindowsBootstrap{ServiceSHA256: strings.Repeat("a", 64), NativePodRouting: enabled}).Render(windowsValues(t))
+		values := windowsValues(t)
+		values["nativePodNetwork"] = enabled
+		result, err := (WindowsBootstrap{ServiceSHA256: strings.Repeat("a", 64)}).Render(values)
 		if err != nil {
 			t.Fatal(err)
 		}

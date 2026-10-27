@@ -31,7 +31,11 @@ import (
 const FieldOwner = "cloud-provisioning"
 
 // awsNode is the VPC CNI DaemonSet; amazon-vpc-cni its ConfigMap.
-var awsNode = types.NamespacedName{Namespace: "kube-system", Name: "aws-node"}
+// windowsCNI is the Windows nodes' plugin initializer.
+var (
+	awsNode    = types.NamespacedName{Namespace: "kube-system", Name: "aws-node"}
+	windowsCNI = types.NamespacedName{Namespace: "kube-system", Name: windowsCNIName}
+)
 
 // factsRecheck is how often the site's ranges are read again: a Service or
 // pod range change raises no event this controller watches.
@@ -44,6 +48,8 @@ type VPCCNIComponent struct {
 	Client           client.Client
 	Family           string
 	Image, InitImage string
+	// Windows also configures Windows VPC CNI nodes' native plugin.
+	Windows bool
 }
 
 // Facts reads what aws-node depends on from the cluster.
@@ -203,7 +209,40 @@ func covered(ranges []netip.Prefix, addr netip.Addr) bool {
 	return false
 }
 
-// Ensure applies aws-node and its ConfigMap for the current facts.
+// WindowsFacts reads what Windows nodes' plugin configuration depends on,
+// beyond the facts aws-node shares.
+func (c *VPCCNIComponent) WindowsFacts(ctx context.Context, linux VPCCNIFacts) (WindowsCNIFacts, error) {
+	f := WindowsCNIFacts{SiteRanges: linux.SiteRanges, PodMTU: linux.PodMTU}
+	services, err := discover.ServiceCIDRs(ctx, c.Client)
+	if err != nil {
+		return f, fmt.Errorf("reading the Service ranges: %w", err)
+	}
+	for _, raw := range services {
+		p, err := netip.ParsePrefix(raw)
+		if err != nil {
+			return f, err
+		}
+		f.ServiceRanges = append(f.ServiceRanges, p.Masked())
+	}
+	dns, err := discover.ClusterDNS(ctx, c.Client)
+	if err != nil {
+		return f, err
+	}
+	for _, raw := range dns {
+		a, err := netip.ParseAddr(raw)
+		if err != nil {
+			return f, err
+		}
+		f.ClusterDNS = append(f.ClusterDNS, a)
+	}
+	if f.ClusterDomain, err = discover.ClusterDomain(ctx, c.Client); err != nil {
+		return f, err
+	}
+	return f, nil
+}
+
+// Ensure applies aws-node and its ConfigMap for the current facts, and with
+// Windows, the Windows nodes' plugin initializer.
 func (c *VPCCNIComponent) Ensure(ctx context.Context) error {
 	facts, err := c.Facts(ctx)
 	if err != nil {
@@ -213,7 +252,19 @@ func (c *VPCCNIComponent) Ensure(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for _, obj := range []client.Object{configMap, ds} {
+	objects := []client.Object{configMap, ds}
+	if c.Windows {
+		windowsFacts, err := c.WindowsFacts(ctx, facts)
+		if err != nil {
+			return fmt.Errorf("Windows VPC CNI: %w", err)
+		}
+		scripts, settings, windowsDS, err := WindowsCNIObjects(windowsFacts)
+		if err != nil {
+			return fmt.Errorf("Windows VPC CNI: %w", err)
+		}
+		objects = append(objects, scripts, settings, windowsDS)
+	}
+	for _, obj := range objects {
 		if err := apply(ctx, c.Client, obj); err != nil {
 			return fmt.Errorf("applying %s %s: %w", obj.GetObjectKind().GroupVersionKind().Kind, client.ObjectKeyFromObject(obj), err)
 		}
@@ -266,7 +317,8 @@ func (c *VPCCNIComponent) Register(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("aws-vpc-cni").
 		For(&appsv1.DaemonSet{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(o client.Object) bool {
-			return client.ObjectKeyFromObject(o) == awsNode
+			key := client.ObjectKeyFromObject(o)
+			return key == awsNode || (c.Windows && key == windowsCNI)
 		}))).
 		Watches(&corev1.Node{}, toAWSNode, builder.WithPredicates(addresses)).
 		Complete(c)

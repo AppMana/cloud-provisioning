@@ -160,3 +160,29 @@ IPv4/IPv6 `awsrow` campaigns with nodes registered on the AWS VPC CNI class
 routes between at least two workers against each worker's physical ENI. Every
 measured worker must belong to the campaign VPC. Connectivity through WireGuard
 does not satisfy this check, even when the workload matrix passes.
+
+## Windows AWS VPC CNI
+
+Windows VPC CNI nodes run AWS's native `vpc-bridge` plugin, baked into the
+image, and AWS's Windows IPAM. The controller configures the plugin on each
+node through the `aws-vpc-cni-windows` HostProcess DaemonSet in `kube-system`
+(scheduled only on Windows AMD64 nodes registered with the AWS VPC CNI class).
+Its initializer verifies the baked plugin against the pinned
+[recipe](../controller/pkg/platform/aws/windowscni/cni-artifacts.json), the
+patched build of [providers/aws-vpc-cni-plugins](../providers/aws-vpc-cni-plugins/README.md),
+then writes `vpc-bridge.conf` once. Its settings come from the cluster:
+
+- Service range: the cluster's IPv4 Service range.
+- DNS: the `kube-system/kube-dns` Service address and the zone CoreDNS serves
+  (`kube-system/coredns`, its `kubernetes` plugin).
+- SNAT: kept off the same site ranges as Linux.
+- Host routes: every site range but the Service range. The VPC's router has
+  no route to the site, so site-bound pod traffic goes to the host, whose
+  tunnel routes the site's pod prefixes (a native class's Windows tunnel
+  service always routes native pod prefixes).
+- Pod MTU: as Linux.
+
+The plugin keeps the configuration a node was given: the initializer refuses
+to replace a live one, so a site change reaches Windows nodes that join after
+it, and an existing node's initializer reports the difference when it next
+restarts. Replace the node to take the change.

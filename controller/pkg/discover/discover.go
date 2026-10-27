@@ -191,3 +191,52 @@ func parseServiceRange(msg string) (string, error) {
 	}
 	return cidr, nil
 }
+
+// ClusterDNS returns the cluster DNS Service's addresses, which kubelets
+// give pods as their nameserver: the kube-dns Service in kube-system, the
+// name kubeadm, k0s, k3s and RKE2 all give it.
+func ClusterDNS(ctx context.Context, c client.Client) ([]string, error) {
+	svc := &corev1.Service{}
+	if err := c.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "kube-dns"}, svc); err != nil {
+		return nil, fmt.Errorf("reading kube-system/kube-dns: %w", err)
+	}
+	addresses := svc.Spec.ClusterIPs
+	if len(addresses) == 0 && svc.Spec.ClusterIP != "" {
+		addresses = []string{svc.Spec.ClusterIP}
+	}
+	for _, a := range addresses {
+		if net.ParseIP(a) == nil {
+			return nil, fmt.Errorf("kube-system/kube-dns has no cluster address (%q)", a)
+		}
+	}
+	if len(addresses) == 0 {
+		return nil, fmt.Errorf("kube-system/kube-dns has no cluster address")
+	}
+	return addresses, nil
+}
+
+// ClusterDomain returns the zone CoreDNS serves the cluster's records under:
+// the first zone of the kubernetes plugin in kube-system/coredns's
+// Corefile, which kubelets' clusterDomain names too.
+func ClusterDomain(ctx context.Context, c client.Client) (string, error) {
+	cm := &corev1.ConfigMap{}
+	if err := c.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "coredns"}, cm); err != nil {
+		return "", fmt.Errorf("reading kube-system/coredns: %w", err)
+	}
+	for _, line := range strings.Split(cm.Data["Corefile"], "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 || fields[0] != "kubernetes" {
+			continue
+		}
+		for _, zone := range fields[1:] {
+			if zone == "{" {
+				break
+			}
+			zone = strings.TrimSuffix(zone, ".")
+			if !strings.HasSuffix(zone, "in-addr.arpa") && !strings.HasSuffix(zone, "ip6.arpa") {
+				return zone, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("kube-system/coredns serves no cluster zone through its kubernetes plugin")
+}

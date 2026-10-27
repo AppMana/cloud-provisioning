@@ -31,7 +31,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | D2 kubeadm image prerequisites | done: a kubeadm worker image (runtime, kubeadm/kubelet, modules, sysctls, no swap) is documented as an operator input, as image-builder produces; the kubeadm pattern now installs the configured `cniPlugins` like k0s (shared `cni-plugins` block). The harness builds that image as an operator would |
 | D3 LabCluster status | done (54ef1cd) |
 | D4 static identity renewal | done: docs recommend an `AWSClusterRoleIdentity` CAPA assumes and refreshes from a long-lived source key (`capa-source.json`); the product refuses a static identity holding an STS session token and follows the role chain; the harness publishes that chain once and no longer renews a CAPA session |
-| D5 windows-publisher image release | open |
+| D5 windows-publisher image release | done: the release workflow builds and publishes `cloud-provisioning-windows-publisher` (windows/amd64, cross-built on Linux; verified locally); the harness publisher stays only for unreleased candidates |
 | D6 nodegroup CRD | open |
 | D7 forks | open |
 | Assertions list | CAPI association (C7), control-plane placement (C6), kubeadm Calico (C3) and CalicoNodesReady (C5, now measures the product agent on remotes) closed; rest open |

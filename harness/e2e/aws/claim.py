@@ -21,6 +21,7 @@ p.add_argument('--instance-type')
 p.add_argument('--linux-image-id', help='explicit authorized Linux image; leaves the run default unchanged')
 p.add_argument('--variant', choices=['cpu','gpu'], default='cpu', help='Windows image variant; GPU requires an explicit instance type')
 p.add_argument('--root-volume-gib', type=int)
+p.add_argument('--gateway', help='claim of the Linux node that forwards this worker\'s native CNI traffic')
 p.add_argument('--cni', help='node class network: site, or a provider-native network; defaults to the platform default')
 p.add_argument('--windows-version', choices=['2022', '2025'], help='Use this run’s captured, available Windows image')
 a = p.parse_args()
@@ -107,5 +108,6 @@ apply(obj('infrastructure.cluster.x-k8s.io/v1beta2', 'AWSMachineTemplate', templ
 }}}))
 apply(obj('cloud-provisioning.appmana.com/v1alpha1', 'ProvisionedNodeClaim', a.name, {
     'infrastructureRef': {'apiGroup': 'infrastructure.cluster.x-k8s.io', 'kind': 'AWSMachineTemplate', 'name': template_name}, 'clusterName': cluster,
+    **({'gateway': a.gateway} if a.gateway else {}),
 }))
 print('Applied CAPA claim', a.name)

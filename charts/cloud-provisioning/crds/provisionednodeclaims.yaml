@@ -85,6 +85,14 @@ spec:
                     exactly one Cluster exists in the claim's
                     namespace.
                   type: string
+                gateway:
+                  description: >-
+                    The ProvisionedNodeClaim, in this namespace, of the Linux
+                    node that forwards this node's native CNI traffic (a
+                    Windows worker on a Calico VXLAN site). The controller
+                    derives the attachment and withdraws it when this is
+                    cleared. Requires the AWS attachment controller.
+                  type: string
             status:
               type: object
               properties:

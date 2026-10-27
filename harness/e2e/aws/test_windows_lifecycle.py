@@ -11,8 +11,8 @@ from windows_lifecycle import probe_objects, Trial, validate_config
 class ConfigTest(unittest.TestCase):
     def test_native_executors_are_required_before_provisioning(self):
         config=dict(bastion='b',apiServer='https://a',name='n',probeNamespace='ns',sourcePod='s',windowsVersion='2025',
-                    workDirectory='w',siteDirectory='site',awsnode='an',awsremove='ar',gateway='g',gatewayUID='u',
-                    gatewayTemplate='t',observerDirectory='o',survivorTargets=['a=x','b=y'])
+                    workDirectory='w',siteDirectory='site',awsnode='an',awsremove='ar',gateway='g',
+                    observerDirectory='o',survivorTargets=['a=x','b=y'])
         with self.assertRaisesRegex(ValueError,'executor'):validate_config(config)
         validate_config(dict(config,observerExecutors='executors.json'))
 
@@ -51,7 +51,7 @@ class SequenceTest(unittest.TestCase):
         root=pathlib.Path(temp.name);observer=root/'observer';observer.mkdir()
         config=dict(bastion='unused',apiServer='https://unused',name='worker',probeNamespace='ns',
                     observerDirectory=str(observer),survivorTargets=['a=a','b=b'],sourcePod='source',windowsVersion='2025',
-                    workDirectory='private',gateway='gateway',gatewayUID='gateway-uid',gatewayTemplate='existing',
+                    workDirectory='private',gateway='gateway',
                     awsnode='awsnode',awsremove='awsremove',siteDirectory='site',
                     observerExecutors='unused-executors')
         calls=[]
@@ -60,7 +60,6 @@ class SequenceTest(unittest.TestCase):
             def run(self,args,label):
                 calls.append((label,args))
                 if label=='create':self.created=True
-                if label=='gateway' and fail_gateway:raise RuntimeError('native gateway failure')
                 if label=='removal':self.save('removal.json',{'terminated':True})
             def get(self,kind,name=None,namespace='cloud-provisioning'):
                 if kind=='pod' and name=='source':return {'spec':{'nodeName':'source-node','containers':[{'image':'example@sha256:'+'a'*64}]}}
@@ -75,7 +74,7 @@ class SequenceTest(unittest.TestCase):
         trial.native_observer=lambda:native
         def submit(args,**kwargs):
             calls.append(('probe-create',args));return types.SimpleNamespace(returncode=0)
-        with patch('windows_lifecycle.preflight',return_value={'passed':True}),patch('windows_lifecycle.evaluate',return_value={'passed':True}),patch('windows_lifecycle.time.sleep'),patch('windows_lifecycle.subprocess.run',side_effect=submit):
+        with patch('windows_lifecycle.preflight',return_value={'passed':not fail_gateway}),patch('windows_lifecycle.evaluate',return_value={'passed':True}),patch('windows_lifecycle.time.sleep'),patch('windows_lifecycle.subprocess.run',side_effect=submit):
             if fail_gateway or not survivor['ok']:
                 with self.assertRaises(RuntimeError):trial.execute()
             else:trial.execute()
@@ -83,7 +82,9 @@ class SequenceTest(unittest.TestCase):
 
     def test_gateway_and_join_gate_precede_single_probe_creation_and_delete(self):
         calls,root=self.exercise();labels=[c[0] for c in calls]
-        self.assertEqual(labels,['create','gateway','join','probe-create','probe-create','probe-ready','matrix','removal'])
+        self.assertEqual(labels,['create','join','probe-create','probe-create','probe-ready','matrix','removal'])
+        create=next(args for label,args in calls if label=='create')
+        self.assertEqual(create[create.index('--gateway')+1],'gateway')
         self.assertIn('--require-gateway',next(args for label,args in calls if label=='join'))
         operation=json.loads((root/'result/operation.json').read_text())
         self.assertTrue(operation['passed'])
@@ -108,7 +109,7 @@ class SequenceTest(unittest.TestCase):
 
     def test_failed_gateway_preserves_original_binding_without_workload_or_deletion(self):
         calls,root=self.exercise(True)
-        self.assertEqual([c[0] for c in calls],['create','gateway'])
+        self.assertEqual([c[0] for c in calls],['create'])
         self.assertTrue((root/'result/binding.json').exists())
         self.assertFalse((root/'observer/STOP').exists())
 

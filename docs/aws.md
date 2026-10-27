@@ -262,35 +262,12 @@ security-group changes use the separate policies below. Enable the
 [attachment controller](windows-gateway.md#enable-the-aws-attachment-controller)
 to reconcile the components together.
 
-The reusable route check creates one return route for two CAPI worker leases,
-verifies that the first release preserves it, then verifies that the last
-release restores the original route table:
-
-```sh
-cd harness/e2e
-go run ./cmd/awsroutecheck --work-dir .state/aws/<run> \
-  --plans <observed-gateway-plan-results.json> \
-  --api-server https://<isolated-site-api>:6443 \
-  --destination <observed-site-host>/32 \
-  --output-dir .state/aws/<run>/route-check
-```
-
-Store the short-lived, route-policy-scoped STS response in the run's private
-`gateway-session.json`. The check reloads those credentials for each AWS call.
-It resolves the observed Machine and Node UIDs through the bastion and checks
-that both plans name the same gateway and include the requested return host.
-It locks the run against another simultaneous route check. Use a new output
-directory for each check; its intent journal and lease inputs support recovery:
-
-```sh
-go run ./cmd/awsroutecheck --recover --work-dir .state/aws/<run> \
-  --output-dir .state/aws/<run>/route-check
-```
-
-Recovery releases only the saved leases, checks the current run scope and
-requires the target route to be absent before reporting success. It does not
-need the worker Node or gateway instance to survive. An ENI reassigned to a
-different instance, a changed route target or lost ownership prevents deletion.
+Two worker claims naming the same gateway share its return routes. The
+adapter's journal (a ConfigMap per route in the release namespace) keeps a
+shared route until the last lease using it is released, then restores the
+table ([journal test](../controller/pkg/attachment/aws/journal_envtest_test.go)).
+An ENI reassigned to a different instance, a changed route target or lost
+ownership prevents deletion.
 
 The gateway source/destination-check policy uses `AWS_REGION`, `AWS_ACCOUNT_ID`,
 `GATEWAY_ENI_ID`, `OWNER_TAG` and `OWNER_VALUE`. Render it with `docs/iam/render.py` and attach it to
@@ -1066,29 +1043,12 @@ References: [CAPA existing infrastructure](https://cluster-api-aws.sigs.k8s.io/t
 
 ## Recreating a gateway attachment
 
-For an isolated harness replacement that needs the same gateway topology as an
-existing worker, use `harness/e2e/aws/gateway_request.py`. It reads an existing
-gateway request as the topology template, observes both live Machine/Node/EC2
-bindings, checks run ownership and one primary NIC, and creates a new request
-with the replacement's identities. Linux and Windows use the same AWS binding
-model; the template supplies the distribution's existing transport settings.
-
-```sh
-python3 harness/e2e/aws/gateway_request.py \
-  --work-dir PRIVATE_RUN_DIRECTORY --api-server https://ISOLATED_API:6443 \
-  --worker WORKER_MACHINE --worker-uid CURRENT_MACHINE_UID \
-  --gateway GATEWAY_MACHINE --gateway-uid CURRENT_GATEWAY_MACHINE_UID \
-  --template-configmap EXISTING_GATEWAY_REQUEST \
-  --intent NEW_PRIVATE_INTENT.json
-```
-
-The helper requires an observed Node association and a matching live gateway;
-it does not provision a gateway or invent a topology. It preserves the template's
-CNI and TCP-port settings. The intent file is created exclusively before the
-ConfigMap submission. If submission fails, inspect the saved intent and cluster
-state before retrying. Wait for the attachment to become Ready; request creation
-alone does not prove forwarding. Preserve each completed or failed operation's
-intent file and use a new path for each replacement.
+A replacement worker gets its gateway attachment the way the original did: its
+claim names the gateway (`spec.gateway`) and the controller derives the request
+from the live Machines, the mesh and EC2
+([windows-gateway.md](windows-gateway.md#enable-the-aws-attachment-controller)).
+Wait for the attachment to become Ready; the request alone does not prove
+forwarding.
 
 For Windows gateway-mode trials, qualify the attachment before creating workload
 probes. Node readiness and a delivered host WireGuard peer document alone do not

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	provider "github.com/appmana/cloud-provisioning/controller/pkg/attachment/aws"
 	sdk "github.com/aws/aws-sdk-go-v2/aws"
@@ -77,6 +78,10 @@ func RegisterAWS(mgr ctrl.Manager, cfg AWSConfig, credentials sdk.Config, namesp
 			Verifier:    attachment.ConsumerVerifier{Reader: c},
 			Transport:   attachment.CalicoTransport{Client: c, Observer: attachment.WindowsCalicoObserver{Guest: guest}}, APIVIP: apiVIP, APIPort: apiPort,
 		},
+	}
+	if err := ctrl.NewControllerManagedBy(mgr).Named("aws-gateway-requests").For(&v1alpha1.ProvisionedNodeClaim{}).Owns(&corev1.ConfigMap{}).
+		Complete(&GatewayClaims{Client: c, Namespace: namespace, MeshName: meshName, Source: provider.RequestSource{Resolver: resolver, MeshName: meshName}}); err != nil {
+		return err
 	}
 	return ctrl.NewControllerManagedBy(mgr).Named("aws-gateway-attachments").For(&corev1.ConfigMap{}).Complete(&RequestController{Client: c, Namespace: namespace, MeshName: meshName, Lifecycle: lifecycle})
 }

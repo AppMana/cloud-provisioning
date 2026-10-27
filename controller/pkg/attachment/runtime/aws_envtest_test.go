@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/appmana/cloud-provisioning/controller/api/v1alpha1"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"net/http"
 	"os"
 	"strings"
@@ -41,7 +44,7 @@ func TestAPIRegisteredAWSRequestRetirementAndNameReuse(t *testing.T) {
 		t.Skip("set KUBEBUILDER_ASSETS")
 	}
 	preserve := true
-	env := &envtest.Environment{CRDInstallOptions: envtest.CRDInstallOptions{CRDs: []*apiextv1.CustomResourceDefinition{{
+	env := &envtest.Environment{ErrorIfCRDPathMissing: true, CRDInstallOptions: envtest.CRDInstallOptions{Paths: []string{"../../../../charts/cloud-provisioning/crds"}, CRDs: []*apiextv1.CustomResourceDefinition{{
 		ObjectMeta: metav1.ObjectMeta{Name: "machines.cluster.x-k8s.io"},
 		Spec: apiextv1.CustomResourceDefinitionSpec{Group: "cluster.x-k8s.io", Scope: apiextv1.NamespaceScoped,
 			Names:    apiextv1.CustomResourceDefinitionNames{Plural: "machines", Singular: "machine", Kind: "Machine", ListKind: "MachineList"},
@@ -66,7 +69,14 @@ func TestAPIRegisteredAWSRequestRetirementAndNameReuse(t *testing.T) {
 	if err = c.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}}); err != nil {
 		t.Fatal(err)
 	}
-	mgr, err := ctrl.NewManager(config, ctrl.Options{Metrics: metricsserver.Options{BindAddress: "0"}, HealthProbeBindAddress: "0", LeaderElection: true, LeaderElectionNamespace: "test", LeaderElectionID: "gateway-runtime-test"})
+	scheme := k8sruntime.NewScheme()
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := v1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	mgr, err := ctrl.NewManager(config, ctrl.Options{Scheme: scheme, Metrics: metricsserver.Options{BindAddress: "0"}, HealthProbeBindAddress: "0", LeaderElection: true, LeaderElectionNamespace: "test", LeaderElectionID: "gateway-runtime-test"})
 	if err != nil {
 		t.Fatal(err)
 	}

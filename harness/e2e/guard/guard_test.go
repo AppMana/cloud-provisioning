@@ -39,7 +39,7 @@ func TestTheAuditedStandInsAreRefused(t *testing.T) {
 	refused(t, "-n cloud-provisioning create configmap native-pod-scope --from-literal=scope.json={}", "")
 	refused(t, "apply -f -", `{"apiVersion":"v1","kind":"List","items":[{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"x"}},{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"native-pod-scope","namespace":"cloud-provisioning"}}]}`)
 	refused(t, "delete namespace kube-system", "")
-	allowed(t, "-n cloud-provisioning create -f -", `{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"gateway-aws-win2022","namespace":"cloud-provisioning"}}`)
+	refused(t, "-n cloud-provisioning create -f -", `{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"gateway-aws-win2022","namespace":"cloud-provisioning"}}`)
 	refused(t, "apply -f /tmp/manifest.yaml", "")
 }
 

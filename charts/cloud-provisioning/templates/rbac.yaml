@@ -139,6 +139,13 @@ rules:
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodeclaims/status"]
     verbs: ["update"]
+  {{- if .Values.awsGateway.configMap }}
+  # A claim's gateway request is owned by the claim, blocking its deletion
+  # until the request is gone.
+  - apiGroups: ["cloud-provisioning.appmana.com"]
+    resources: ["provisionednodeclaims/finalizers"]
+    verbs: ["update"]
+  {{- end }}
   # Tunnel-endpoint allocation watches Nodes (a new/relabeled node
   # changes the mesh membership).
   # Reading the cluster's own addresses and ranges, so none of them

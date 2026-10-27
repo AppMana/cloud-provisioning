@@ -25,7 +25,7 @@ def now():
 def validate_config(config):
     required = ['bastion', 'apiServer', 'name', 'probeNamespace', 'sourcePod',
                 'windowsVersion', 'workDirectory', 'siteDirectory', 'awsnode',
-                'awsremove', 'gateway', 'gatewayUID', 'gatewayTemplate', 'observerDirectory']
+                'awsremove', 'gateway', 'observerDirectory']
     if any(not isinstance(config.get(key), str) or not config[key].strip() for key in required):
         raise ValueError('Complete nonempty lifecycle configuration required before provisioning')
     if config['windowsVersion'] not in ['2022', '2025']:
@@ -142,7 +142,9 @@ class Trial:
         operation = dict(claim=name, startedAt=now())
         self.save('operation-start.json', operation)
         common = ['--work-dir', c['workDirectory'], '--api-server', c['apiServer'], '--bastion', c['bastion']]
-        self.run(self.helper('aws/claim.py', *common, '--name', name, '--windows-version', c['windowsVersion'], '--cni', 'site'), 'create')
+        # The claim names its gateway; the product derives the attachment.
+        self.run(self.helper('aws/claim.py', *common, '--name', name, '--windows-version', c['windowsVersion'], '--cni', 'site',
+                             '--gateway', c['gateway']), 'create')
         for _ in range(120):
             machine = self.get('machine', name)
             node_name = (machine or {}).get('status', {}).get('nodeRef', {}).get('name')
@@ -155,9 +157,6 @@ class Trial:
         binding = dict(claim=name, machineUID=machine['metadata']['uid'], node=node_name,
                        nodeUID=node['metadata']['uid'], providerID=machine['spec']['providerID'])
         self.save('binding.json', binding)
-        self.run(self.helper('aws/gateway_request.py', *common, '--worker', name, '--worker-uid', binding['machineUID'],
-                             '--gateway', c['gateway'], '--gateway-uid', c['gatewayUID'],
-                             '--template-configmap', c['gatewayTemplate'], '--intent', str(self.output / 'gateway-intent.json')), 'gateway')
         for attempt in range(60):
             snapshot = self.snapshot()
             guard = preflight(snapshot, name, binding['machineUID'])

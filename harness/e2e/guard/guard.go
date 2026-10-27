@@ -89,7 +89,6 @@ var Policy = []Allowed{
 // StandIns are writes the harness still makes for the product, each with
 // the open tracker item that removes it. The list only shrinks.
 var StandIns = []Allowed{
-	{Resource: "configmaps", Namespaces: []string{"cloud-provisioning"}, Verbs: []string{"create"}, Names: []string{"gateway-*"}, Why: "C16: the harness builds Windows gateway requests the product should derive"},
 	{Resource: "secrets", Namespaces: []string{"kube-system"}, Verbs: []string{"apply"}, Names: []string{"*-ipam-pull", "*-calico-pull"}, Why: "C17: pull credentials for the Windows IPAM and Calico images the harness deploys for the product"},
 }
 

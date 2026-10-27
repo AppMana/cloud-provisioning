@@ -23,6 +23,9 @@ type resolverEC2 struct {
 }
 
 func (e *resolverEC2) Call(_ context.Context, _, op string, in map[string]any) (json.RawMessage, error) {
+	if op == "describe-subnets" {
+		return json.Marshal(map[string]any{"Subnets": []any{map[string]any{"SubnetId": "subnet", "VpcId": "vpc", "OwnerId": "account", "CidrBlock": "172.29.0.0/25"}}})
+	}
 	if op != "describe-network-interfaces" {
 		return nil, fmt.Errorf("unexpected mutation %s", op)
 	}

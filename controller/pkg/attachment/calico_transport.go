@@ -10,7 +10,9 @@ import (
 )
 
 const NativeTransportOwner = "cloud-provisioning.appmana.com/native-transport"
-const calicoAddress = "projectcalico.org/IPv4Address"
+// CalicoIPv4Address is the Node annotation holding the address Calico
+// reaches the node by, and so the destination of its VXLAN packets.
+const CalicoIPv4Address = "projectcalico.org/IPv4Address"
 
 type NativeTransportRecord struct {
 	Lease, NodeUID, ProviderID, Original, Native string
@@ -90,7 +92,7 @@ func (c CalicoTransport) Ensure(ctx context.Context, r Record) (bool, error) {
 		}
 	} else {
 		owner = NativeTransportRecord{Lease: r.LeaseID(), NodeUID: string(node.UID), ProviderID: node.Spec.ProviderID, Native: r.Plan.Worker.Address.String()}
-		owner.Original, owner.HadOriginal = node.Annotations[calicoAddress]
+		owner.Original, owner.HadOriginal = node.Annotations[CalicoIPv4Address]
 		raw, err := json.Marshal(owner)
 		if err != nil {
 			return false, err
@@ -99,12 +101,12 @@ func (c CalicoTransport) Ensure(ctx context.Context, r Record) (bool, error) {
 			node.Annotations = map[string]string{}
 		}
 		node.Annotations[NativeTransportOwner] = string(raw)
-		node.Annotations[calicoAddress] = owner.Native + fmt.Sprintf("/%d", r.Plan.Worker.Subnet.Bits())
+		node.Annotations[CalicoIPv4Address] = owner.Native + fmt.Sprintf("/%d", r.Plan.Worker.Subnet.Bits())
 		if err = c.Client.Update(ctx, node); err != nil {
 			return false, err
 		}
 	}
-	if strings.SplitN(node.Annotations[calicoAddress], "/", 2)[0] != owner.Native {
+	if strings.SplitN(node.Annotations[CalicoIPv4Address], "/", 2)[0] != owner.Native {
 		return false, fmt.Errorf("native CNI address changed outside its owner")
 	}
 	return c.Observer.Ready(ctx, r.Plan.Worker, owner.Native)
@@ -131,13 +133,13 @@ func (c CalicoTransport) Restore(ctx context.Context, r Record) (bool, error) {
 	if owner.Lease != r.LeaseID() {
 		return false, fmt.Errorf("cannot restore another lease's CNI address")
 	}
-	if strings.SplitN(node.Annotations[calicoAddress], "/", 2)[0] != owner.Native {
+	if strings.SplitN(node.Annotations[CalicoIPv4Address], "/", 2)[0] != owner.Native {
 		return false, fmt.Errorf("refusing to overwrite externally changed CNI address")
 	}
 	if owner.HadOriginal {
-		node.Annotations[calicoAddress] = owner.Original
+		node.Annotations[CalicoIPv4Address] = owner.Original
 	} else {
-		delete(node.Annotations, calicoAddress)
+		delete(node.Annotations, CalicoIPv4Address)
 	}
 	delete(node.Annotations, NativeTransportOwner)
 	if err = c.Client.Update(ctx, node); err != nil {

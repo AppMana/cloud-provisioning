@@ -21,14 +21,13 @@ var productEC2 = []string{
 // changes a deployment's documentation asks for.
 var operatorEC2 = map[string][]string{
 	"authorize-security-group-ingress": {"aws/bootstrap.py", "aws/native_access.py"},
+	// The new VPC's default route to its internet gateway.
+	"create-route": {"aws/bootstrap.py"},
 }
 
 // AWSStandIns are product EC2 operations the harness still performs, each
 // with the open tracker item that removes it.
-var AWSStandIns = map[string]string{
-	"create-route": "C16: awsroutecheck drives the product's route adapter outside the gateway controller",
-	"delete-route": "C16: awsroutecheck drives the product's route adapter outside the gateway controller",
-}
+var AWSStandIns = map[string]string{}
 
 // AWS allows or refuses an AWS operation the harness makes at run time.
 func AWS(service, operation string) error {

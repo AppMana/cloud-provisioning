@@ -325,27 +325,43 @@ Never put credentials in `scope.json`, requests or resource journals. Attach the
 route, source-check, ingress and observation policies documented in [AWS](aws.md).
 The worker and gateway require a working SSM agent and instance role.
 
-Submit a ConfigMap in the release namespace labeled
-`cloud-provisioning.appmana.com/gateway-request: <peer-secret-name>`. Its
-`data.request.json` is a JSON [GatewayRequest](../controller/pkg/attachment/plan.go):
-`worker` and `gateway` each contain the observed CAPI `uid`, `nodeUID`,
-`providerID`, `interfaceID`, provider-qualified `networkID`, native `subnet` and
-`address`; `siteTransport` lists native CNI transport IPv4 destinations.
-`siteReturnSources` adds observed mesh source addresses that need AWS return
-routes while retaining their worker tunnel routes (including API balancer
-addresses). Do not mix those source-only addresses into `siteTransport`. `underlay`
-lists outer tunnel endpoint addresses, and `udpPort` is Calico's configured VXLAN
-port. Resolve these identities from the running cluster and provider rather than
-copying an old validation artifact. The AWS resolver rechecks them before use.
+Name the gateway on the worker's claim. `spec.gateway` is the
+ProvisionedNodeClaim, in the release namespace, of the Linux node that forwards
+for it:
 
-Set `tcpPorts` to additional control-plane listeners that the distribution uses
-through the native gateway. For k0s's default Konnectivity agent listener, include
-`"tcpPorts": [8132]`; the configured Kubernetes API port is already included by
-the runtime. Use the actual configured listener if it differs. Do not add k0s's
-port to distributions that do not use it. Rules remain scoped to the worker's
-native `/32` in the owned security group. Port order and duplicates do not affect
-identity, but changing the port set retires the previous attachment and prepares
-a new immutable binding. An empty list retains API-only TCP ingress.
+```yaml
+apiVersion: cloud-provisioning.appmana.com/v1alpha1
+kind: ProvisionedNodeClaim
+metadata:
+  name: windows-worker
+  namespace: cloud-provisioning
+spec:
+  infrastructureRef: {apiGroup: infrastructure.cluster.x-k8s.io, kind: AWSMachineTemplate, name: windows-2025}
+  gateway: linux-gateway
+```
+
+Once both claims have Machines, the controller derives the
+[GatewayRequest](../controller/pkg/attachment/plan.go)
+([source](../controller/pkg/attachment/aws/request_source.go)) and keeps it in
+the `gateway-<claim>` ConfigMap, owned by the claim and labelled
+`cloud-provisioning.appmana.com/gateway-request: <peer-secret-name>`:
+
+| Field | Derived from |
+| --- | --- |
+| `worker`, `gateway` | each Machine, its Node, and its instance's single network interface and subnet in EC2 |
+| `siteTransport` | the Calico address (`projectcalico.org/IPv4Address`) of every site node; Calico sends VXLAN there |
+| `siteReturnSources` | the site tunnel endpoints' mesh addresses (`node-tunnel-address-*` in the peer Secret), which source the site's mesh traffic |
+| `underlay` | every published peer endpoint and every Machine's external IPv4 address |
+| `udpPort` | Calico's `default` FelixConfiguration `vxlanPort`, or Calico's default 4789 |
+| `tcpPorts` | the `--proxy-server-port` of `kube-system/konnectivity-agent` when the site runs Konnectivity (k0s); the API port is always included |
+
+It derives the request again every 30 seconds, so a change in the site becomes a
+new plan. A pass that cannot derive (a Machine being replaced, a site without a
+Calico FelixConfiguration, a Konnectivity agent naming no port) leaves the
+standing request alone and reports the reason in the controller log. Rules stay
+scoped to the worker's native `/32` in the owned security group; changing the
+port set retires the previous attachment and prepares a new immutable binding.
+Clearing `spec.gateway` or deleting the claim withdraws the attachment.
 
 A request's UID forms its durable attachment identity. The controller adds its
 finalizer before infrastructure preparation, periodically checks readiness and

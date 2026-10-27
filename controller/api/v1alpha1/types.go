@@ -58,6 +58,16 @@ type ProvisionedNodeClaimSpec struct {
 	// when exactly one Cluster exists in the claim's namespace.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty"`
+
+	// Gateway names the ProvisionedNodeClaim, in this namespace, of the
+	// Linux node that forwards this node's native CNI traffic: a Windows
+	// worker on a Calico VXLAN site, whose HNS network cannot be hosted on
+	// the tunnel adapter. The controller derives the attachment from the
+	// two Machines, the mesh and the provider, and withdraws it when this
+	// is cleared or the claim is deleted. Requires the AWS attachment
+	// controller (awsGateway in the chart).
+	// +optional
+	Gateway string `json:"gateway,omitempty"`
 }
 
 // ProvisionedNodeClaimStatus reports fulfillment progress.

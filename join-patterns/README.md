@@ -43,10 +43,15 @@ that joins and is quietly wrong:
   the Azure/GCP default images; absent on RHEL 8's 4.18 without
   elrepo). The dialer needs no package beyond the binary the pattern
   verifies and installs.
-- kubeadm: kubeadm, kubelet, and a container runtime must already be
-  on the image; the pattern deliberately installs no packages, because
-  package-manager syntax is the least portable thing a cloud-config
-  can contain and the machine template already chooses the image.
+- kubeadm: the image is a kubeadm worker image, as kubernetes-sigs/
+  image-builder produces: kubeadm and kubelet, a container runtime with
+  the systemd cgroup driver, the overlay and br_netfilter modules loaded
+  at boot, net.ipv4.ip_forward and the bridge-nf-call sysctls set, and
+  swap off. kubeadm's preflight refuses a node without them. The pattern
+  installs no packages, because package-manager syntax is the least
+  portable thing a cloud-config can contain and the machine template
+  already chooses the image; it installs the configured `cniPlugins`, as
+  every pattern does.
   Kubelet extra args are written to both families' environment files
   (/etc/default/kubelet and /etc/sysconfig/kubelet), because each
   family's kubelet drop-in reads only its own.

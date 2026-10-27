@@ -44,6 +44,7 @@ write_files:
       KUBELET_EXTRA_ARGS={{ .kubeletExtraArgs }}{{ if .providerID }} --provider-id={{ .providerID }}{{ end }}
 runcmd:
 {{- template "dialer-install" . }}
+{{- template "cni-plugins" . }}
   # Which of its own addresses this node registers with.
   #
   # Appended to the same environment files, and before the join,

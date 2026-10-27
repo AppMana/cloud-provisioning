@@ -385,6 +385,10 @@ func renderKubeadmPattern(t *testing.T, proxyPort int) string {
 		"dialerBinarySHA256Arm64": "a",
 		"dialerBinaryURLAmd64":    "https://example.com/b",
 		"dialerBinarySHA256Amd64": "b",
+		"cniPluginsURLArm64":      "",
+		"cniPluginsSHA256Arm64":   "",
+		"cniPluginsURLAmd64":      "",
+		"cniPluginsSHA256Amd64":   "",
 	})
 }
 
@@ -548,5 +552,24 @@ func TestNoPatternWritesAConfigKeyTwice(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Every pattern installs the configured CNI plugins before its node joins,
+// verified by digest, so a stock image has what the site's CNI chains.
+func TestKubeadmWorkersGetTheConfiguredCNIPlugins(t *testing.T) {
+	rendered := renderPattern(t, "kubeadm-worker.cloud-config.tmpl", map[string]any{
+		"peersFileJSON": "{}", "sshAuthorizedKeys": []string{}, "nodeAddress": "", "providerID": "",
+		"machineName": "remote1", "interfaceName": "cldt0", "wireguardListenPort": "51820", "apiProxyPort": 0,
+		"apiEndpoint": "10.101.0.1:6443", "joinEndpoint": "10.101.0.1:6443", "joinToken": "t.t", "caCertHash": "sha256:x",
+		"kubeletExtraArgs": "", "dialerBinaryURLArm64": "https://example.com/a", "dialerBinarySHA256Arm64": "a",
+		"dialerBinaryURLAmd64": "https://example.com/b", "dialerBinarySHA256Amd64": "b",
+		"cniPluginsURLArm64": "", "cniPluginsSHA256Arm64": "",
+		"cniPluginsURLAmd64": "https://example.invalid/cni-amd64.tgz", "cniPluginsSHA256Amd64": "d",
+	})
+	install := strings.Index(rendered, "https://example.invalid/cni-amd64.tgz")
+	join := strings.Index(rendered, "kubeadm join")
+	if install < 0 || !strings.Contains(rendered, `sha256sum -c -`) || join < 0 || install > join {
+		t.Fatal("the kubeadm pattern does not install the CNI plugins, verified, before joining")
 	}
 }

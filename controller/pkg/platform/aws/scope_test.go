@@ -108,4 +108,3 @@ func TestAnIncompleteAWSClusterHasNoScope(t *testing.T) {
 		t.Fatal("a subnet outside the AWSCluster's VPC was accepted")
 	}
 }
-

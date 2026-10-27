@@ -300,9 +300,18 @@ aws:
 
 platforms:
   aws:
+    # The AWS VPC CNI (aws-node) on AWS nodes whose class runs it. The
+    # controller applies it from the pinned upstream chart with the site's
+    # facts: it keeps SNAT off traffic to the site's pod, Service and node
+    # addresses, gives pods the tunnel's MTU, and uses one ENI per node.
     vpcCNI:
+      enabled: true
       # The pod address family the AWS VPC CNI gives pods on AWS nodes.
       family: ipv4
+      # Digest-pinned overrides of the pinned upstream images, such as a
+      # mirror's; empty uses public.ecr.aws/eks/amazon-k8s-cni(-init) v1.23.2.
+      image: ""
+      initImage: ""
 
 # Requires manual installation of the experimental group CRD.
 experimentalNodeGroups: false

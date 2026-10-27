@@ -1,6 +1,7 @@
 package main
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
@@ -33,10 +34,14 @@ func TestNativeAgentOwnership(t *testing.T) {
 			Status:     corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}},
 		}
 	}
-	for _, name := range []string{"healthy", "missing", "calico-on-aws", "aws-on-site", "duplicate", "unready", "terminating", "unlabelled-installer"} {
+	for _, name := range []string{"healthy", "tunnel-agent", "missing", "calico-on-aws", "aws-on-site", "duplicate", "unready", "terminating", "unlabelled-installer"} {
 		t.Run(name, func(t *testing.T) {
 			pods := corev1.PodList{Items: []corev1.Pod{pod("site", "calico-node"), pod("cloud", "aws-node")}}
 			switch name {
+			case "tunnel-agent":
+				// A tunnel-class node on the site network runs the product's
+				// Calico agent instead of the site's.
+				pods.Items[0].Labels["k8s-app"] = "calico-node-tunnel"
 			case "missing":
 				pods.Items = pods.Items[:1]
 			case "calico-on-aws":
@@ -56,7 +61,7 @@ func TestNativeAgentOwnership(t *testing.T) {
 				pods.Items = append(pods.Items, p)
 			}
 			err := cniPodOwnership(pods, map[string]bool{"cloud": true}, map[string]bool{"site": true})
-			if (err == nil) != (name == "healthy") {
+			if (err == nil) != (name == "healthy" || name == "tunnel-agent") {
 				t.Fatalf("unexpected ownership verdict: %v", err)
 			}
 		})
@@ -75,5 +80,24 @@ func TestNodeNetworksAreReadFromTheRegisteredClass(t *testing.T) {
 	native, site := nodeNetworks(list, []string{"site-1", "aws-1", "tunnel-1"})
 	if len(native) != 1 || !native["aws-1"] || len(site) != 2 || !site["site-1"] || !site["tunnel-1"] {
 		t.Fatalf("native=%v site=%v", native, site)
+	}
+}
+
+// aws-node must be the product's: applied by its field manager, not by an
+// operator or the harness.
+func TestAWSNodeMustBeTheProducts(t *testing.T) {
+	for _, tc := range []struct {
+		managers []metav1.ManagedFieldsEntry
+		labels   map[string]string
+		ok       bool
+	}{
+		{[]metav1.ManagedFieldsEntry{{Manager: "cloud-provisioning", Operation: metav1.ManagedFieldsOperationApply}}, map[string]string{"app.kubernetes.io/managed-by": "cloud-provisioning"}, true},
+		{[]metav1.ManagedFieldsEntry{{Manager: "helm", Operation: metav1.ManagedFieldsOperationUpdate}}, map[string]string{"app.kubernetes.io/managed-by": "Helm"}, false},
+		{[]metav1.ManagedFieldsEntry{{Manager: "kubectl-client-side-apply", Operation: metav1.ManagedFieldsOperationUpdate}}, map[string]string{"app.kubernetes.io/managed-by": "cloud-provisioning"}, false},
+	} {
+		ds := appsv1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "aws-node", Namespace: "kube-system", ManagedFields: tc.managers, Labels: tc.labels}}
+		if err := awsNodeOwnedByProduct(ds); (err == nil) != tc.ok {
+			t.Errorf("%+v: %v", tc.managers, err)
+		}
 	}
 }

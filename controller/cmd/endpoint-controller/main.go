@@ -2474,6 +2474,9 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	nodeGroups := flag.Bool("experimental-node-groups", false, "enable experimental node groups in the mesh namespace; requires the group CRD and drain RBAC")
 	vpcCNIFamily := flag.String("aws-vpc-cni-family", "ipv4", "the AWS VPC CNI's pod address family, ipv4 or ipv6")
+	vpcCNI := flag.Bool("aws-vpc-cni", true, "apply the AWS VPC CNI (aws-node) for AWS VPC CNI nodes, configured from the site's ranges")
+	vpcCNIImage := flag.String("aws-vpc-cni-image", "", "digest-pinned aws-node image; empty uses the pinned upstream image")
+	vpcCNIInitImage := flag.String("aws-vpc-cni-init-image", "", "digest-pinned aws-node init image; empty uses the pinned upstream image")
 	receivePolicyJSON := flag.String("receive-preparation-policy", "", "experimental receiver policy JSON with nativeCIDRs and permitted ports; optional journal enables fenced handover and explicit expiry recovery")
 	gatewayConfig := flag.String("aws-gateway-config", "", "optional path to AWS Windows Calico gateway scope JSON")
 	flag.Parse()
@@ -2705,6 +2708,19 @@ func main() {
 	if *vpcCNIFamily != "ipv4" && *vpcCNIFamily != "ipv6" {
 		fmt.Fprintln(os.Stderr, "--aws-vpc-cni-family must be ipv4 or ipv6")
 		os.Exit(1)
+	}
+	if *vpcCNI {
+		// Uncached: the facts include the Service range, read from a dry run.
+		direct, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme(), Mapper: mgr.GetRESTMapper()})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		component := &platformaws.VPCCNIComponent{Client: direct, Family: *vpcCNIFamily, Image: *vpcCNIImage, InitImage: *vpcCNIInitImage}
+		if err := component.Register(mgr); err != nil {
+			fmt.Fprintf(os.Stderr, "unable to register the AWS VPC CNI: %v\n", err)
+			os.Exit(1)
+		}
 	}
 	// The VPC CNI's allocations are observed in the scope of each Machine's
 	// AWSCluster, with the AWS SDK's standard credentials.

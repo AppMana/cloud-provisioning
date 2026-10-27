@@ -18,7 +18,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | C6 control-plane recognition | done: product recognises k0s, MicroK8s and taint marks (`platform.IsControlPlane`); harness labelling deleted; placement rows and windows_join.py no longer read a harness label |
 | C7 harness providerID patch | done: harness deleted the Node patch; `WaitRegistration` fails when the node did not register under the product's `--provider-id` |
 | C8 microk8s join token renewal | done: chart runs `microk8s-token-agent` on a MicroK8s control plane; it mints `token|expiry` lines, renews at half life, prunes its own expired tokens, follows snap refreshes and keeps microk8s-provider-config current; harness minting deleted |
-| C9 Linux VPC CNI install | open (Phase 4) |
+| C9 Linux VPC CNI install | done: controller applies aws-node (pinned chart 1.23.2 render, server-side, field manager cloud-provisioning, adopts a hand install) with SNAT exclusions from the site's exact pod, Service and node ranges, pod MTU min(tunnel, site Calico), one ENI; static RBAC in chart; vpc_cni.py deleted; awsrow requires the product to own aws-node |
 | C10 VPC CNI IAM | open |
 | C11 SG self ingress | open |
 | C12 disabled IPPool for provider ranges | open |
@@ -37,6 +37,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | Assertions list | CAPI association (C7), control-plane placement (C6), kubeadm Calico (C3) and CalicoNodesReady (C5, now measures the product agent on remotes) closed; rest open |
 | /tmp writes | open |
 | IAM docs key ownership on the harness's `cloud-provisioning-test` tag and `RUN_ID` (found while closing C13) | open: product policies should key on CAPA's cluster tag and named resources |
+| `discover.PodCIDRs` widens node pod CIDRs to a guessed /16 (found while closing C9; the VPC CNI reads exact ranges instead) | open: used for join values |
 | Mechanical write guard (harness kube/AWS writes refused outside an allowlist) | open |
 
 ## Found while closing items

@@ -1,0 +1,12 @@
+# Baseline values for the pinned aws-vpc-cni chart. Everything that depends
+# on the cluster (address family, SNAT exclusions, MTU, ENI limits, node
+# placement) is set by the controller when it applies the DaemonSet; these
+# only pin the images and turn off the parts this product does not run.
+image:
+  override: public.ecr.aws/eks/amazon-k8s-cni@sha256:a00bbd204067ca2e99117acb8328f5882f9ddf548693e53ece66bb0f3f1797f1
+init:
+  image:
+    override: public.ecr.aws/eks/amazon-k8s-cni-init@sha256:bd9af5d0770e5e076beac13c8515f7dd1bf68eb1cfa41d45ee7821650a363ef5
+nodeAgent:
+  enabled: false
+enableNetworkPolicy: "false"

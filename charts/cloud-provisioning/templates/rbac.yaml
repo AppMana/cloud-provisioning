@@ -107,11 +107,11 @@ rules:
   # The site CNI exclusion: every DaemonSet is read to find the site's
   # network agents, and only those are patched (a required node-affinity
   # term). On a Calico site the product creates and updates its own Calico
-  # agent for tunnel-class nodes beside calico-node. The gate before a
-  # cloud machine reads them too.
+  # agent for tunnel-class nodes beside calico-node, and it applies aws-node
+  # for AWS VPC CNI nodes. The gate before a cloud machine reads them too.
   - apiGroups: ["apps"]
     resources: ["daemonsets"]
-    verbs: ["get", "list", "watch"{{ if .Values.siteCNI.exclusion }}, "patch", "create", "update"{{ end }}]
+    verbs: ["get", "list", "watch"{{ if or .Values.siteCNI.exclusion .Values.platforms.aws.vpcCNI.enabled }}, "patch", "create", "update"{{ end }}]
   # Calico BGP peering is limited to site nodes, since the tunnel carries
   # no BGP: the full mesh is replaced by a peer selecting site nodes.
   - apiGroups: ["crd.projectcalico.org"]

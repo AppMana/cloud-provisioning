@@ -11,7 +11,9 @@ import (
 
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/rig"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func nativePlugins(raw []byte) ([]string, error) {
@@ -54,14 +56,16 @@ func cniPodOwnership(pods corev1.PodList, cloud map[string]bool, site map[string
 				return fmt.Errorf("Calico container scheduled on AWS node %s", pod.Spec.NodeName)
 			}
 		}
-		if agent != "aws-node" && agent != "calico-node" {
+		// The site network's agent is the site's calico-node, or on a
+		// tunnel-class cloud node the product's calico-node-tunnel.
+		if agent != "aws-node" && agent != "calico-node" && agent != "calico-node-tunnel" {
 			continue
 		}
 		node := pod.Spec.NodeName
 		if node == "" {
 			return fmt.Errorf("unassigned %s pod", agent)
 		}
-		if (agent == "aws-node" && !cloud[node]) || (agent == "calico-node" && !site[node]) {
+		if (agent == "aws-node" && !cloud[node]) || (agent != "aws-node" && !site[node]) {
 			return fmt.Errorf("%s scheduled outside its owned nodes: %s", agent, node)
 		}
 		if pod.DeletionTimestamp != nil || pod.Status.Phase != corev1.PodRunning {
@@ -127,9 +131,34 @@ func observedNodeNetworks(ctx context.Context, k *kube.Client, measured []string
 	return native, site, nil
 }
 
+// awsNodeOwnedByProduct requires aws-node to be applied by the product's
+// field manager and labelled as its own, so a hand-installed aws-node cannot
+// stand in for the product's.
+func awsNodeOwnedByProduct(ds appsv1.DaemonSet) error {
+	if ds.Labels["app.kubernetes.io/managed-by"] != "cloud-provisioning" {
+		return fmt.Errorf("aws-node is managed by %q, not cloud-provisioning", ds.Labels["app.kubernetes.io/managed-by"])
+	}
+	for _, m := range ds.ManagedFields {
+		if m.Manager == "cloud-provisioning" && m.Operation == metav1.ManagedFieldsOperationApply {
+			return nil
+		}
+	}
+	return fmt.Errorf("aws-node has no fields applied by cloud-provisioning")
+}
+
 func verifyNativeCNI(ctx context.Context, k *kube.Client, fleet *rig.Fleet, cloud, site map[string]bool, reportDir string) error {
-	raw, failure := k.Run(ctx, "get", "pods", "-A", "-o", "json")
+	raw, failure := k.Run(ctx, "-n", "kube-system", "get", "daemonset", "aws-node", "-o", "json", "--show-managed-fields")
+	var awsNode appsv1.DaemonSet
+	if failure == nil {
+		failure = json.Unmarshal(raw, &awsNode)
+	}
+	if failure == nil {
+		failure = awsNodeOwnedByProduct(awsNode)
+	}
 	var pods corev1.PodList
+	if failure == nil {
+		raw, failure = k.Run(ctx, "get", "pods", "-A", "-o", "json")
+	}
 	if failure == nil {
 		failure = json.Unmarshal(raw, &pods)
 	}

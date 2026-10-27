@@ -88,8 +88,8 @@ the site's MTU can move a cold-path UDP failure to the cloud-to-site direction.
 TCP success and a warmed path-MTU cache do not qualify the UDP path.
 
 Configure each CNI through its existing owner: k0s Calico uses
-`spec.network.calico.mtu`, Linux AWS VPC CNI uses `POD_MTU` (rendered by
-`aws/vpc_cni.py --pod-mtu`), and the patched Windows VPC CNI uses the optional
+`spec.network.calico.mtu`, Linux AWS VPC CNI uses `POD_MTU` (the product
+sets it to the smaller of the tunnel's MTU and the site's Calico pod MTU), and the patched Windows VPC CNI uses the optional
 `podMTU` setting described in the [plugin documentation](../providers/aws-vpc-cni-plugins/README.md).
 Do not lower the physical management interface MTU to configure workloads.
 Changing a template does not update existing pod interfaces. Verify fresh pods'

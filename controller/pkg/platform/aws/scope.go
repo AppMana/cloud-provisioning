@@ -22,7 +22,9 @@ var (
 // OwnerTag is the tag CAPA puts, with value "owned", on every instance it
 // creates and that instance's primary network interface
 // (cluster-api-provider-aws v2 infrav1.ClusterTagKey).
-func OwnerTag(cluster string) string { return "sigs.k8s.io/cluster-api-provider-aws/cluster/" + cluster }
+func OwnerTag(cluster string) string {
+	return "sigs.k8s.io/cluster-api-provider-aws/cluster/" + cluster
+}
 
 // ClusterScopes resolves the EC2 scope of a Machine's pod allocations from
 // its Cluster's AWSCluster, so nothing about the VPC is restated as

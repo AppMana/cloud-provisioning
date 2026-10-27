@@ -119,6 +119,13 @@ spec:
           {{- end }}
           args:
             - "--aws-vpc-cni-family={{ .Values.platforms.aws.vpcCNI.family }}"
+            - "--aws-vpc-cni={{ .Values.platforms.aws.vpcCNI.enabled }}"
+            {{- with .Values.platforms.aws.vpcCNI.image }}
+            - "--aws-vpc-cni-image={{ . }}"
+            {{- end }}
+            {{- with .Values.platforms.aws.vpcCNI.initImage }}
+            - "--aws-vpc-cni-init-image={{ . }}"
+            {{- end }}
             {{- if .Values.experimentalNodeGroups }}
             - "--experimental-node-groups=true"
             {{- end }}

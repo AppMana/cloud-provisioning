@@ -27,7 +27,8 @@ VPC CNI node creates no machine until every site network DaemonSet excludes
 it; OVN-Kubernetes and networks with no DaemonSet (k3s embedded flannel) are
 refused. Without a Calico agent on AWS nodes, Calico IPAM never allocates
 there, so the site's pools need no node selector.
-The AWS Linux `aws-node` DaemonSet must select only AWS Linux nodes. Windows
+The product applies the AWS Linux `aws-node` DaemonSet itself, scheduled only
+on AWS VPC CNI Linux nodes (see [Linux AWS VPC CNI](#linux-aws-vpc-cni)). Windows
 requires its native VPC CNI binaries/configuration and Windows IPAM controller;
 the Linux DaemonSet is not evidence that Windows networking is configured.
 
@@ -114,35 +115,30 @@ on the on-premises control plane alone does not satisfy this dependency.
 - [Calico BGP peering](https://docs.tigera.io/calico/latest/networking/configuring/bgp)
 - [AWS hybrid network routing requirements](https://docs.aws.amazon.com/eks/latest/userguide/hybrid-nodes-networking.html)
 
-## Linux campaign manifests
+## Linux AWS VPC CNI
 
-Use `harness/e2e/aws/vpc_cni.py` to render the pinned AWS VPC CNI 1.23.2 Helm
-chart for separate IPv4 and IPv6 campaigns. The renderer verifies the chart
-archive digest, requires immutable CNI/init image references, validates site,
-Service and VPC ranges, and restricts the installer to labelled Linux cloud
-workers. It sets IPv6 consistently in the initializer and IPAM containers;
-IPv6 uses prefix delegation and requires Nitro instances. IPv4 uses secondary
-addresses. Site-bound IPv4 traffic is excluded from SNAT, while normal VPC
-egress retains its upstream behavior.
+The controller applies `aws-node` (DaemonSet and `amazon-vpc-cni` ConfigMap in
+`kube-system`) from the pinned AWS VPC CNI 1.23.2 chart, with the server-side
+field manager `cloud-provisioning`, and keeps it current. An `aws-node` already
+installed by hand is adopted. Its configuration comes from the cluster, not
+values:
 
-```sh
-python3 harness/e2e/aws/vpc_cni.py \
-  --chart "$PINNED_CNI_CHART_ARCHIVE" --family ipv6 \
-  --site-cidr "$SITE_NODE_CIDR4" --site-cidr "$SITE_POD_CIDR4" \
-  --site-cidr "$SITE_NODE_CIDR6" --site-cidr "$SITE_POD_CIDR6" \
-  --service-cidr "$SERVICE_CIDR4" --service-cidr "$SERVICE_CIDR6" \
-  --vpc-cidr "$VPC_CIDR4" --vpc-cidr "$VPC_CIDR6" \
-  --run-id "$ISOLATED_RUN_ID" \
-  --image "$CNI_IMAGE_DIGEST" --init-image "$CNI_INIT_IMAGE_DIGEST" \
-  > "$PRIVATE_MANIFEST_PATH"
-```
+- Placement: Linux nodes registered with `cloud-provisioning.appmana.com/cni:
+  aws-vpc` and the cloud worker role.
+- SNAT: kept off traffic to the site's pod ranges (Calico's enabled pools,
+  Cilium's node ranges, or the site nodes' pod CIDRs), the Service ranges and
+  each site node's address, which the site routes back to pods. Normal VPC
+  egress keeps its upstream behaviour.
+- Pod MTU: the tunnel's 1420 bytes, or the site's Calico pod MTU where the
+  site has set a smaller budget for its paths.
+- One ENI per node (`MAX_ENI=1`): pods share the interface the tunnel uses.
+- Family: `platforms.aws.vpcCNI.family`; IPv6 uses prefix delegation and needs
+  Nitro instances, IPv4 uses secondary addresses.
 
-Installation requires the matching VPC/subnet family, native IPAM IAM policy,
-positive Calico exclusion, and pre-registration cloud labels. The renderer tags
-IPAM-created ENIs with the test run ID; the primary ENI also needs verified
-ownership tags before the allocation observer can accept it. Observe actual
-ENI allocations and packet sources after installation. Rendered manifests alone
-are insufficient evidence for a mixed-CNI campaign.
+`platforms.aws.vpcCNI.image` and `initImage` take digest-pinned mirrors of
+the upstream images. Observe actual ENI allocations and packet sources after
+installation; an applied DaemonSet alone is insufficient evidence for a
+mixed-CNI campaign.
 
 For an isolated IPv4 run, `harness/e2e/aws/native_access.py --work-dir
 "$PRIVATE_AWS_RUN" --runner "$ISOLATED_LAB_RUNNER" --calico-site` configures

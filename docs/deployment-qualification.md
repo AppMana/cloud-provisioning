@@ -142,8 +142,8 @@ For a separate native IPv6 campaign, use `aws/bootstrap.py --ipv6` when
 creating its infrastructure and `aws/native_access.py --family ipv6` when
 configuring IPAM and observation. The recorded VPC and subnet IPv6 ranges feed
 the existing CAPA claim's IPv6 configuration and primary-address assignment.
-Use `aws/vpc_cni.py --family ipv6` and `awsrow -pod-family IPv6` for that
-campaign. Changing the family of an existing native CNI campaign is rejected.
+Set `platforms.aws.vpcCNI.family=ipv6` and use `awsrow -pod-family IPv6` for
+that campaign. Changing the family of an existing native CNI campaign is rejected.
 
 ## Qualification order
 
@@ -1454,8 +1454,9 @@ configuration update alone does not establish workload convergence.
 
 Apply the same path budget to AWS VPC CNI pods. Its `POD_MTU` is independent of
 Calico's setting and of `AWS_VPC_ENI_MTU`; changing the site CNI does not change
-AWS pod interfaces. For a verified 1370-byte pod budget, render the AWS CNI with
-`aws/vpc_cni.py --pod-mtu 1370` and recreate measured AWS pods before testing.
+AWS pod interfaces. The product sets it to the site's Calico pod MTU when that is below the
+tunnel's 1420 bytes, so a verified 1370-byte site budget reaches AWS pods too;
+recreate measured AWS pods before testing.
 Leave the physical ENI MTU unchanged and retain the original failed sweep.
 
 Ordinary-neighbor reconciliation must preserve a recently authenticated

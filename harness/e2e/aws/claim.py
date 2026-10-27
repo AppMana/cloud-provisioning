@@ -82,7 +82,7 @@ def apply(obj, private=False):
 def obj(api, kind, name, spec):
     return {'apiVersion': api, 'kind': kind, 'metadata': {'name': name, 'namespace': ns}, 'spec': spec}
 infra = obj('infrastructure.cluster.x-k8s.io/v1beta2', 'AWSCluster', cluster, {
-    'region': s['region'], 'identityRef': {'kind': 'AWSClusterStaticIdentity', 'name': cluster},
+    'region': s['region'], 'identityRef': {'kind': 'AWSClusterRoleIdentity', 'name': cluster},
     'controlPlaneEndpoint': {'host': a.api_server.removeprefix('https://').rsplit(':', 1)[0], 'port': int(a.api_server.rsplit(':', 1)[1])},
     'network': {'vpc': {'id': s['vpcID']}, 'subnets': [{'id': s['subnetID'], 'isPublic': True}]},
 })

@@ -446,11 +446,17 @@ does not prove that CAPA can provision and delete a joined worker.
 
 ## Supplying CAPA credentials
 
-Prefer short-lived role sessions to new long-lived access keys. An
-`AWSClusterStaticIdentity` resolves its credential Secret in **`capa-system`**,
-the CAPA controller's namespace. The Secret keys are `AccessKeyID`,
-`SecretAccessKey`, and, for STS credentials, `SessionToken`. Restrict
-`allowedNamespaces` to the namespace containing the intended AWSCluster.
+Give CAPA an `AWSClusterRoleIdentity` naming its role
+([capa.json](iam/capa.json), trusted per [capa-trust.json](iam/capa-trust.json)),
+whose `sourceIdentityRef` is an `AWSClusterStaticIdentity` holding long-lived
+keys of a principal that may only assume that role
+([capa-source.json](iam/capa-source.json)). CAPA assumes the role and refreshes
+the session itself, so nothing renews credentials. Point the AWSCluster's
+`identityRef` at the role identity. The static identity resolves its Secret
+(`AccessKeyID`, `SecretAccessKey`) in **`capa-system`**, the CAPA controller's
+namespace. Restrict `allowedNamespaces` to the namespace containing the
+intended AWSCluster. The controller refuses a static identity whose Secret holds
+an STS `SessionToken`: that session expires and nothing renews it.
 
 Set the product chart's `providerManagerNamespace=capa-system` as well. Its
 infrastructure validator checks that the referenced credential Secret exists;
@@ -906,8 +912,8 @@ Use an existing k0s/Calico VM site prepared with `cmd/lab -rig vm -distro k0s
 `providerManagerNamespace=capa-system` and the private binary URL and SHA-256
 from the asset helper. Run the following from `harness/e2e` after preparing and
 promoting the AMI. First run `aws/session.py --work-dir <absolute-run-directory>`
-from the sourced setup shell to create the derived harness session as well as
-renewing CAPA's session:
+from the sourced setup shell to create the harness session; `identity.py`
+publishes CAPA's role identity once:
 
 ```sh
 python3 aws/install.py --work-dir .state/aws/example --api-server https://10.10.0.10:6443
@@ -978,10 +984,10 @@ konnectivity agent. Renew the sessions before each row. The harness retries
 throttled AWS calls until the check's deadline; SSM throttles `SendCommand`
 per account during UDP-heavy rows.
 
-`aws/session.py` renews one-hour derived CAPA and harness sessions using the setup
-identity. Run it from the sourced setup shell, then rerun `aws/identity.py` to
-publish the renewed CAPA session. Session files are replaced atomically so active
-SSM checks can reload them. Keep all run evidence private: observation snapshots
+`aws/session.py` renews the harness operator's own one-hour session using the
+setup identity; CAPA refreshes its role session itself. Run it from the sourced
+setup shell. Session files are replaced atomically so active SSM checks can
+reload them. Keep all run evidence private: observation snapshots
 can include expiring download URLs in workload arguments.
 
 For runtime coverage, build commands with `go build -cover`, run them with

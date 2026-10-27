@@ -81,14 +81,26 @@ aws('iam','attach-role-policy','--role-name',node_role,'--policy-arn','arn:aws:i
 profile=remember('instanceProfileName',a.run_id+'-node')
 aws('iam','create-instance-profile','--instance-profile-name',profile,'--tags',json.dumps(tags))
 aws('iam','add-role-to-instance-profile','--instance-profile-name',profile,'--role-name',node_role)
-capa_arn=remember('capaRoleARN',role(capa_role,{'AWS':identity['Arn']}));remember('capaRoleName',capa_role)
+# CAPA's identity, as an operator gives it: an AWSClusterRoleIdentity that CAPA
+# assumes and refreshes itself, from a source user whose long-lived key may only
+# assume that role. Nothing renews a session.
+capa_source=remember('capaSourceUserName',a.run_id+'-capa-source')
+capa_source_arn=aws('iam','create-user','--user-name',capa_source,'--tags',json.dumps(tags))['User']['Arn']
+for attempt in range(12):
+    try:
+        capa_arn=role(capa_role,{'AWS':capa_source_arn})
+        break
+    except RuntimeError:
+        if attempt==11:raise
+        time.sleep(5)
+remember('capaRoleARN',capa_arn);remember('capaRoleName',capa_role)
 # The harness names its CAPI Cluster after the run and tags what it owns with
 # the run; the gateway adapter's scope uses that tag.
 values={'AWS_ACCOUNT_ID':account,'AWS_REGION':a.region,'RUN_ID':a.run_id,'CLUSTER_NAME':a.run_id,
     'OWNER_TAG':'cloud-provisioning-test','OWNER_VALUE':a.run_id,
     'AMI_ID':ami,'SUBNET_ID':subnet,'SECURITY_GROUP_ID':sg,
     'NODE_ROLE_NAME':node_role,'INSTANCE_PROFILE_NAME':profile,
-    'SOURCE_PRINCIPAL_ARN':identity['Arn']}
+    'SOURCE_PRINCIPAL_ARN':capa_source_arn,'CAPA_ROLE_NAME':capa_role}
 values_path=work/'iam-values.json';values_path.write_text(json.dumps(values,indent=2)+'\n')
 iam_dir=pathlib.Path(__file__).resolve().parents[3]/'docs'/'iam'
 for template,role_name in [('capa',capa_role),('worker-bootstrap',node_role)]:
@@ -106,14 +118,9 @@ aws('iam','put-user-policy','--user-name',controller_user,'--policy-name','cldt-
 key=aws('iam','create-access-key','--user-name',controller_user)['AccessKey']
 remember('controllerAccessKeyID',key['AccessKeyId'])
 (work/'controller-credentials.json').write_text(json.dumps({'AWS_ACCESS_KEY_ID':key['AccessKeyId'],'AWS_SECRET_ACCESS_KEY':key['SecretAccessKey'],'AWS_REGION':a.region}))
-# Allow IAM trust and instance profile propagation before obtaining the session.
-for attempt in range(12):
-    try:
-        session=aws('sts','assume-role','--role-arn',capa_arn,'--role-session-name',a.run_id,'--duration-seconds','3600')
-        break
-    except RuntimeError:
-        if attempt==11:raise
-        time.sleep(5)
-(work/'capa-session.json').write_text(json.dumps(session))
-remember('sessionExpiresAt',session['Credentials']['Expiration'])
-print(json.dumps({k:state[k] for k in ['runID','region','vpcID','subnetID','securityGroupID','capaRoleARN','sessionExpiresAt']},indent=2))
+rendered=subprocess.run(['python3',str(iam_dir/'render.py'),str(iam_dir/'capa-source.json'),str(values_path)],capture_output=True,text=True,check=True).stdout
+aws('iam','put-user-policy','--user-name',capa_source,'--policy-name','cldt-test','--policy-document',rendered)
+key=aws('iam','create-access-key','--user-name',capa_source)['AccessKey']
+remember('capaSourceAccessKeyID',key['AccessKeyId'])
+(work/'capa-source-credentials.json').write_text(json.dumps({'AccessKeyID':key['AccessKeyId'],'SecretAccessKey':key['SecretAccessKey']}))
+print(json.dumps({k:state[k] for k in ['runID','region','vpcID','subnetID','securityGroupID','capaRoleARN']},indent=2))

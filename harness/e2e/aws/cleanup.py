@@ -125,11 +125,19 @@ if s.get('controllerUserName'):
             aws('iam', 'delete-user-policy', '--user-name', s['controllerUserName'], '--policy-name', policy, absent_ok=True)
         aws('iam', 'delete-user', '--user-name', s['controllerUserName'], absent_ok=True)
 (path.parent / 'controller-credentials.json').unlink(missing_ok=True)
+if s.get('capaSourceUserName'):
+    user = aws('iam', 'get-user', '--user-name', s['capaSourceUserName'], absent_ok=True).get('User')
+    if user:
+        if {t['Key']: t['Value'] for t in user.get('Tags', [])}.get('cloud-provisioning-test') != s['runID']:
+            raise RuntimeError('CAPA source user ownership mismatch')
+        for key in aws('iam', 'list-access-keys', '--user-name', s['capaSourceUserName']).get('AccessKeyMetadata', []):
+            aws('iam', 'delete-access-key', '--user-name', s['capaSourceUserName'], '--access-key-id', key['AccessKeyId'], absent_ok=True)
+        aws('iam', 'delete-user-policy', '--user-name', s['capaSourceUserName'], '--policy-name', 'cldt-test', absent_ok=True)
+        aws('iam', 'delete-user', '--user-name', s['capaSourceUserName'], absent_ok=True)
+(path.parent / 'capa-source-credentials.json').unlink(missing_ok=True)
 if s.get('capaRoleName'):
     aws('iam', 'delete-role-policy', '--role-name', s['capaRoleName'], '--policy-name', 'cldt-test', absent_ok=True)
     aws('iam', 'delete-role', '--role-name', s['capaRoleName'], absent_ok=True)
-session = path.parent / 'capa-session.json'
-session.unlink(missing_ok=True)
 (path.parent / 'harness-session.json').unlink(missing_ok=True)
 (path.parent / 'asset-urls.json').unlink(missing_ok=True)
 s['cleanedUp'] = True

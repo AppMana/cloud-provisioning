@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Renew private, short-lived CAPA and harness sessions using setup credentials."""
+"""Renew the harness operator's own private, short-lived session using setup credentials.
+
+CAPA's identity is a role CAPA assumes and refreshes itself (identity.py).
+"""
 import argparse,json,os,pathlib,subprocess,tempfile
 p=argparse.ArgumentParser()
 p.add_argument('--work-dir',required=True)
@@ -20,8 +23,6 @@ def aws(service,operation,**inputs):
  if r.returncode:raise RuntimeError(service+'/'+operation+' failed')
  return json.loads(r.stdout)
 if s.get('cleanedUp') or aws('sts','get-caller-identity')['Account']!=s['account']:raise RuntimeError('inactive run or AWS account mismatch')
-capa=aws('sts','assume-role',RoleArn=s['capaRoleARN'],RoleSessionName=s['runID'],DurationSeconds=3600)
-private_write(work/'capa-session.json',json.dumps(capa))
 values_path=work/'iam-values.json'
 values=json.loads(values_path.read_text());values['ASSET_BUCKET']=s['assetBucket']
 values_path.write_text(json.dumps(values,indent=2)+'\n')
@@ -38,6 +39,6 @@ wire_policy=json.dumps(session_policy,separators=(',',':'))
 if len(wire_policy)>2048:raise RuntimeError('harness session policy exceeds STS 2048-character limit')
 harness=aws('sts','get-federation-token',Name='cldt-harness',DurationSeconds=3600,Policy=wire_policy)
 private_write(work/'harness-session.json',json.dumps(harness))
-s['sessionExpiresAt']=capa['Credentials']['Expiration'];s['harnessSessionExpiresAt']=harness['Credentials']['Expiration']
+s['harnessSessionExpiresAt']=harness['Credentials']['Expiration']
 path.write_text(json.dumps(s,indent=2)+'\n')
-print('Renewed derived sessions; CAPA expires',s['sessionExpiresAt'])
+print('Renewed the harness session; it expires',s['harnessSessionExpiresAt'])

@@ -30,7 +30,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | D1 k0s mixed-OS egress workaround | done: the fix is the pinned k0s fork (native-linux-egress patch); the product refuses Windows claims on a Konnectivity k0s site without its `konnectivity-agent-default-route-linux` agents; the harness addon, `cmd/k0segress` and `-k0s-linux-egress` are deleted |
 | D2 kubeadm image prerequisites | done: a kubeadm worker image (runtime, kubeadm/kubelet, modules, sysctls, no swap) is documented as an operator input, as image-builder produces; the kubeadm pattern now installs the configured `cniPlugins` like k0s (shared `cni-plugins` block). The harness builds that image as an operator would |
 | D3 LabCluster status | done (54ef1cd) |
-| D4 static identity renewal | open |
+| D4 static identity renewal | done: docs recommend an `AWSClusterRoleIdentity` CAPA assumes and refreshes from a long-lived source key (`capa-source.json`); the product refuses a static identity holding an STS session token and follows the role chain; the harness publishes that chain once and no longer renews a CAPA session |
 | D5 windows-publisher image release | open |
 | D6 nodegroup CRD | open |
 | D7 forks | open |

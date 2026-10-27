@@ -52,6 +52,7 @@ var (
 
 	awsClusterGVK               = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSCluster"}
 	awsClusterStaticIdentityGVK = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSClusterStaticIdentity"}
+	awsClusterRoleIdentityGVK   = schema.GroupVersionKind{Group: "infrastructure.cluster.x-k8s.io", Version: "v1beta2", Kind: "AWSClusterRoleIdentity"}
 )
 
 // GVK implements join.InfraProvider.
@@ -130,6 +131,24 @@ func (Provider) Validate(ctx context.Context, c client.Reader, awsMachine *unstr
 	}
 	identityRefKind, _, _ := unstructured.NestedString(awsCluster.Object, "spec", "identityRef", "kind")
 	identityRefName, _, _ := unstructured.NestedString(awsCluster.Object, "spec", "identityRef", "name")
+	// A role identity is assumed by CAPA from its source identity, and that
+	// source holds the credentials checked below.
+	if identityRefKind == "AWSClusterRoleIdentity" && identityRefName != "" {
+		role := &unstructured.Unstructured{}
+		role.SetGroupVersionKind(awsClusterRoleIdentityGVK)
+		if err := c.Get(ctx, client.ObjectKey{Name: identityRefName}, role); err != nil {
+			return nil
+		}
+		identityRefKind, _, _ = unstructured.NestedString(role.Object, "spec", "sourceIdentityRef", "kind")
+		identityRefName, _, _ = unstructured.NestedString(role.Object, "spec", "sourceIdentityRef", "name")
+		if identityRefKind == "AWSClusterStaticIdentity" && identityRefName != "" {
+			source := &unstructured.Unstructured{}
+			source.SetGroupVersionKind(awsClusterStaticIdentityGVK)
+			if err := c.Get(ctx, client.ObjectKey{Name: identityRefName}, source); err != nil {
+				return fmt.Errorf("AWSClusterRoleIdentity %q assumes its role from AWSClusterStaticIdentity %q, which does not exist: %w", role.GetName(), identityRefName, err)
+			}
+		}
+	}
 	if identityRefKind != "AWSClusterStaticIdentity" || identityRefName == "" {
 		return nil
 	}
@@ -150,6 +169,12 @@ func (Provider) Validate(ctx context.Context, c client.Reader, awsMachine *unstr
 			"AWSClusterStaticIdentity %q references secretRef %q, but CAPA always resolves it against its own manager namespace %q, not %q (where the AWSCluster lives): create/move the Secret to namespace %q: %w",
 			identityRefName, secretRefName, managerNamespace, awsCluster.GetNamespace(), managerNamespace, err,
 		)
+	}
+	// An STS session stops working when it expires, and nothing renews a
+	// Secret: CAPA would fail every call from then on. CAPA renews a role
+	// itself when an AWSClusterRoleIdentity assumes it.
+	if len(secret.Data["SessionToken"]) > 0 {
+		return fmt.Errorf("AWSClusterStaticIdentity %q holds an expiring STS session (SessionToken), which nothing renews; give it long-lived keys that may only assume CAPA's role, and point the AWSCluster at an AWSClusterRoleIdentity with that role and this identity as its sourceIdentityRef", identityRefName)
 	}
 	return nil
 }

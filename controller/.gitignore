@@ -1,1 +1,9 @@
+# Binaries `go build ./cmd/<name>` leaves in this directory.
 /dialer
+/endpoint-controller
+/network-guard
+/peer-publisher
+/transit-guard
+/tunnelobserve
+/tunnelprobe
+/windows-tunnel

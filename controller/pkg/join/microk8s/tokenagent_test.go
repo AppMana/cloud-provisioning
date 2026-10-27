@@ -220,3 +220,29 @@ func TestTheClusterAgentPortFollowsMicroK8s(t *testing.T) {
 		}
 	}
 }
+
+// Run passes until its context ends and keeps going after a failed pass.
+func TestTheTokenAgentRunsUntilStopped(t *testing.T) {
+	agent, c, root := agentFixture(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error)
+	go func() { done <- agent.Run(ctx, 10*time.Millisecond) }()
+	// The first passes fail: there is no snap data yet.
+	time.Sleep(30 * time.Millisecond)
+	snapData(t, root, "9063", "")
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		secret := &corev1.Secret{}
+		if c.Get(context.Background(), client.ObjectKey{Namespace: "cloud-provisioning", Name: "microk8s-provider-config"}, secret) == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("no credential after the snap data appeared")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}

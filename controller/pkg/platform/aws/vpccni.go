@@ -41,7 +41,7 @@ func (o Observer) Allocations(ctx context.Context, machine *unstructured.Unstruc
 	if err != nil {
 		return platform.Allocation{}, err
 	}
-	scope := o.Config
+	scope := a.Scope
 	return platform.Allocation{
 		PodPrefixes:    a.PodPrefixes,
 		NetworkID:      fmt.Sprintf("aws:%s:%s:%s", scope.Account, scope.Region, scope.VPC),

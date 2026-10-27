@@ -54,10 +54,25 @@ func (c Config) Validate() error {
 	return nil
 }
 
-type Observer struct {
+// ScopeSource resolves the EC2 scope a Machine's allocations are observed in,
+// and the API to observe them with.
+type ScopeSource interface {
+	Scope(ctx context.Context, machine *unstructured.Unstructured) (Config, attachmentaws.API, error)
+}
+
+// StaticScope is one fixed scope.
+type StaticScope struct {
 	Config Config
-	Reader client.Reader
 	API    attachmentaws.API
+}
+
+func (s StaticScope) Scope(context.Context, *unstructured.Unstructured) (Config, attachmentaws.API, error) {
+	return s.Config, s.API, nil
+}
+
+type Observer struct {
+	Reader client.Reader
+	Scopes ScopeSource
 }
 
 // Allocation keeps native VPC destinations separate from pod ownership.
@@ -65,6 +80,8 @@ type Observer struct {
 type Allocation struct {
 	PodPrefixes    []netip.Prefix
 	NativePrefixes []netip.Prefix
+	// Scope is the EC2 scope the allocation was observed in.
+	Scope Config
 }
 
 func (o *Observer) PrefixesFor(ctx context.Context, expected *unstructured.Unstructured, nodeName string) ([]netip.Prefix, error) {
@@ -76,19 +93,26 @@ func (o *Observer) PrefixesFor(ctx context.Context, expected *unstructured.Unstr
 }
 
 func (o *Observer) AllocationsFor(ctx context.Context, expected *unstructured.Unstructured, nodeName string) (*Allocation, error) {
-	if err := o.Config.Validate(); err != nil {
-		return nil, err
-	}
-	if o.Reader == nil || o.API == nil || expected == nil || expected.GetUID() == "" {
+	if o.Reader == nil || o.Scopes == nil || expected == nil || expected.GetUID() == "" {
 		return nil, fmt.Errorf("allocation observer requires clients and immutable Machine identity")
 	}
-	m, node, err := o.binding(ctx, expected, nodeName)
+	cfg, api, err := o.Scopes.Scope(ctx, expected)
+	if err != nil {
+		return nil, fmt.Errorf("resolving the EC2 scope of Machine %s: %w", expected.GetName(), err)
+	}
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	if api == nil {
+		return nil, fmt.Errorf("allocation observer requires an EC2 API")
+	}
+	m, node, err := o.binding(ctx, cfg, expected, nodeName)
 	if err != nil {
 		return nil, err
 	}
 	provider, _, _ := unstructured.NestedString(m.Object, "spec", "providerID")
 	parts := strings.Split(provider, "/")
-	if len(parts) != 5 || parts[0] != "aws:" || parts[1] != "" || parts[2] != "" || len(parts[3]) != len(o.Config.Region)+1 || !strings.HasPrefix(parts[3], o.Config.Region) || !strings.HasPrefix(parts[4], "i-") || len(parts[4]) <= 2 {
+	if len(parts) != 5 || parts[0] != "aws:" || parts[1] != "" || parts[2] != "" || len(parts[3]) != len(cfg.Region)+1 || !strings.HasPrefix(parts[3], cfg.Region) || !strings.HasPrefix(parts[4], "i-") || len(parts[4]) <= 2 {
 		return nil, fmt.Errorf("invalid EC2 provider identity")
 	}
 	instance := parts[4]
@@ -101,7 +125,7 @@ func (o *Observer) AllocationsFor(ctx context.Context, expected *unstructured.Un
 		if token != "" {
 			input["NextToken"] = token
 		}
-		raw, err := o.API.Call(ctx, "ec2", "describe-network-interfaces", input)
+		raw, err := api.Call(ctx, "ec2", "describe-network-interfaces", input)
 		if err != nil {
 			return nil, err
 		}
@@ -129,16 +153,16 @@ func (o *Observer) AllocationsFor(ctx context.Context, expected *unstructured.Un
 		for _, eni := range response.NetworkInterfaces {
 			owned, subnet := false, false
 			for _, tag := range eni.TagSet {
-				if tag.Key == o.Config.OwnerTag && tag.Value == o.Config.OwnerValue {
+				if tag.Key == cfg.OwnerTag && tag.Value == cfg.OwnerValue {
 					owned = true
 				}
 			}
-			for _, id := range o.Config.Subnets {
+			for _, id := range cfg.Subnets {
 				if id == eni.SubnetId {
 					subnet = true
 				}
 			}
-			if eni.NetworkInterfaceId == "" || seenENI[eni.NetworkInterfaceId] || !owned || !subnet || eni.OwnerId != o.Config.Account || eni.VpcId != o.Config.VPC || eni.Status != "in-use" || eni.Attachment.InstanceId != instance || eni.Attachment.Status != "attached" {
+			if eni.NetworkInterfaceId == "" || seenENI[eni.NetworkInterfaceId] || !owned || !subnet || eni.OwnerId != cfg.Account || eni.VpcId != cfg.VPC || eni.Status != "in-use" || eni.Attachment.InstanceId != instance || eni.Attachment.Status != "attached" {
 				return nil, fmt.Errorf("foreign, duplicate or detached EC2 interface")
 			}
 			if node.Labels[corev1.LabelOSStable] == "windows" && (eni.Attachment.DeviceIndex == nil || *eni.Attachment.DeviceIndex != 0 || len(seenENI) != 0) {
@@ -166,7 +190,7 @@ func (o *Observer) AllocationsFor(ctx context.Context, expected *unstructured.Un
 				nativeHosts = append(nativeHosts, netip.PrefixFrom(address, 128))
 			}
 
-			if o.Config.Family == "ipv4" {
+			if cfg.Family == "ipv4" {
 				if len(eni.Ipv4Prefixes) > 0 {
 					return nil, fmt.Errorf("IPv4 qualification requires secondary IP mode, not prefix delegation")
 				}
@@ -204,7 +228,7 @@ func (o *Observer) AllocationsFor(ctx context.Context, expected *unstructured.Un
 	}
 	for i, p := range prefixes {
 		scoped := false
-		for _, raw := range o.Config.PodRanges {
+		for _, raw := range cfg.PodRanges {
 			allowed, _ := netip.ParsePrefix(raw)
 			if allowed.Bits() <= p.Bits() && allowed.Contains(p.Addr()) {
 				scoped = true
@@ -221,7 +245,7 @@ func (o *Observer) AllocationsFor(ctx context.Context, expected *unstructured.Un
 	}
 	// The EC2 read can span multiple requests. Never publish allocations for
 	// a Node or Machine replaced while those requests were in flight.
-	latestMachine, latestNode, err := o.binding(ctx, expected, nodeName)
+	latestMachine, latestNode, err := o.binding(ctx, cfg, expected, nodeName)
 	if err != nil {
 		return nil, err
 	}
@@ -231,10 +255,10 @@ func (o *Observer) AllocationsFor(ctx context.Context, expected *unstructured.Un
 	}
 	sort.Slice(prefixes, func(i, j int) bool { return prefixes[i].String() < prefixes[j].String() })
 	// A complete, successful empty observation is authoritative withdrawal.
-	return &Allocation{PodPrefixes: prefixes, NativePrefixes: append(nativeHosts, prefixes...)}, nil
+	return &Allocation{PodPrefixes: prefixes, NativePrefixes: append(nativeHosts, prefixes...), Scope: cfg}, nil
 }
 
-func (o *Observer) binding(ctx context.Context, expected *unstructured.Unstructured, nodeName string) (*unstructured.Unstructured, *corev1.Node, error) {
+func (o *Observer) binding(ctx context.Context, cfg Config, expected *unstructured.Unstructured, nodeName string) (*unstructured.Unstructured, *corev1.Node, error) {
 	m := &unstructured.Unstructured{}
 	m.SetGroupVersionKind(expected.GroupVersionKind())
 	if err := o.Reader.Get(ctx, client.ObjectKeyFromObject(expected), m); err != nil {
@@ -244,7 +268,7 @@ func (o *Observer) binding(ctx context.Context, expected *unstructured.Unstructu
 	provider, _, _ := unstructured.NestedString(m.Object, "spec", "providerID")
 	boundName, _, _ := unstructured.NestedString(m.Object, "status", "nodeRef", "name")
 	boundUID, _, _ := unstructured.NestedString(m.Object, "status", "nodeRef", "uid")
-	if m.GetUID() != expected.GetUID() || m.GetDeletionTimestamp() != nil || m.GetNamespace() != o.Config.Namespace || cluster != o.Config.Cluster || boundName != nodeName {
+	if m.GetUID() != expected.GetUID() || m.GetDeletionTimestamp() != nil || m.GetNamespace() != cfg.Namespace || cluster != cfg.Cluster || boundName != nodeName {
 		return nil, nil, fmt.Errorf("Machine allocation binding absent or changed")
 	}
 	node := &corev1.Node{}
@@ -260,7 +284,7 @@ func (o *Observer) binding(ctx context.Context, expected *unstructured.Unstructu
 	switch node.Labels[corev1.LabelOSStable] {
 	case "linux":
 	case "windows":
-		if o.Config.Family != "ipv4" {
+		if cfg.Family != "ipv4" {
 			return nil, nil, fmt.Errorf("Windows allocation observation requires IPv4 secondary IP mode")
 		}
 	default:

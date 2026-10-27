@@ -102,15 +102,7 @@ def main():
     if not any(rule['IpProtocol'] == '-1' and any(pair.get('GroupId') == state['securityGroupID'] for pair in rule.get('UserIdGroupPairs', [])) for rule in group['IpPermissions']):
         aws('ec2', 'authorize-security-group-ingress', GroupId=state['securityGroupID'],
             IpPermissions=[{'IpProtocol': '-1', 'UserIdGroupPairs': [{'GroupId': state['securityGroupID']}]}])
-    # Observer credentials rotate separately through observer_credentials.py.
-    scope ={'account': state['account'], 'region': state['region'], 'vpc': state['vpcID'],
-             'subnets': [state['subnetID']], 'namespace': 'cloud-provisioning', 'cluster': state['runID'],
-             'ownerTag': 'cloud-provisioning-test', 'ownerValue': state['runID'], 'family': args.family,
-             'podRanges': [pod_range]}
-    objects = [
-        {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'native-pod-scope', 'namespace': 'cloud-provisioning'},
-         'data': {'scope.json': json.dumps(scope)}},
-    ]
+    objects = []
     if args.calico_site:
         exclusion = calico_exclusion(state, pod_range)
         existing = subprocess.run(['docker', 'exec', args.runner, 'docker', 'exec', 'clab-cldt-bastion',

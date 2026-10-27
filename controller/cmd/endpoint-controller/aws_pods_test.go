@@ -113,7 +113,7 @@ func TestAWSObservationPublishesAndWithdrawsWithoutCalicoFallback(t *testing.T) 
 	// checked by the CNI package and must be qualified by the native campaign.
 	r.network = cni.Network{Name: cni.KubeRouter, Encapsulation: cni.Native}
 	api := &allocationAPI{address: "172.29.0.11"}
-	r.nativeObservers = map[string]platform.Observer{awspod.NodeValue: platformaws.Observer{Observer: &awspod.Observer{Reader: c, API: api, Config: awspod.Config{Account: "123", Region: "us-west-2", VPC: "vpc-1", Subnets: []string{"subnet-1"}, Namespace: "cloud-provisioning", Cluster: "cluster", OwnerTag: "run", OwnerValue: "test", Family: "ipv4", PodRanges: []string{"172.29.0.0/24"}}}}}
+	r.nativeObservers = map[string]platform.Observer{awspod.NodeValue: platformaws.Observer{Observer: &awspod.Observer{Reader: c, Scopes: awspod.StaticScope{API: api, Config: awspod.Config{Account: "123", Region: "us-west-2", VPC: "vpc-1", Subnets: []string{"subnet-1"}, Namespace: "cloud-provisioning", Cluster: "cluster", OwnerTag: "run", OwnerValue: "test", Family: "ipv4", PodRanges: []string{"172.29.0.0/24"}}}}}}
 	read := func() string {
 		t.Helper()
 		if err := c.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {

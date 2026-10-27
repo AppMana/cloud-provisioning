@@ -88,11 +88,11 @@ func TestReceiptChartServingConfiguration(t *testing.T) {
 	}
 	policy := map[string]any{"nativeCIDRs": []string{"192.0.2.0/24"}, "ports": []int{51821}, "journal": map[string]any{"roundLifetime": "5m", "maxReceiptAge": "1m", "drainInterval": "1m", "receipts": receiveReceiptPolicy{BindAddress: ":9444", CertFile: "/etc/cloud-provisioning/receipts/tls.crt", KeyFile: "/etc/cloud-provisioning/receipts/tls.key", ImageIDs: map[string]string{"amd64": "sha256:" + strings.Repeat("a", 64)}}}}
 	raw, _ := json.Marshal(policy)
-	for _, scenario := range []string{"receipts", "observer", "gateway"} {
+	for _, scenario := range []string{"receipts", "aws-credential-files", "gateway"} {
 		t.Run(scenario, func(t *testing.T) {
 			args := []string{"template", "receipt-test", "../../../charts/cloud-provisioning", "--namespace", "receipt-test", "--set-json", "tunnel.receivePreparation=" + string(raw), "--set", "tunnel.receiptTLSSecret=serving-identity"}
-			if scenario == "observer" {
-				args = append(args, "--set", "awsPodObserver.configMap=scope", "--set", "awsPodObserver.credentialsFileSecret=credentials")
+			if scenario == "aws-credential-files" {
+				args = append(args, "--set", "aws.credentials.secretName=credentials", "--set", "aws.credentials.mount=files")
 			}
 			if scenario == "gateway" {
 				args = append(args, "--set", "awsGateway.configMap=scope")
@@ -129,7 +129,7 @@ func TestReceiptChartServingConfiguration(t *testing.T) {
 					for _, m := range d.Spec.Template.Spec.Containers[0].VolumeMounts {
 						mounts[m.Name] = true
 					}
-					if !mounts["receipt-tls"] || scenario == "observer" && (!mounts["aws-pod-scope"] || !mounts["aws-pod-credentials"]) || scenario == "gateway" && !mounts["aws-gateway-scope"] {
+					if !mounts["receipt-tls"] || scenario == "aws-credential-files" && !mounts["aws-credentials"] || scenario == "gateway" && !mounts["aws-gateway-scope"] {
 						t.Fatalf("missing combined volume mounts: %v", mounts)
 					}
 					deployment = true

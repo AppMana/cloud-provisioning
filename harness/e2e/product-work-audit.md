@@ -22,7 +22,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | C10 VPC CNI IAM | open |
 | C11 SG self ingress | open |
 | C12 disabled IPPool for provider ranges | open |
-| C13 observer STS renewal | open |
+| C13 observer STS renewal | done: controller uses the SDK standard chain via generic `aws.credentials` (env keys or config/credentials files; role_arn+source_profile refreshes itself); the observer configures itself per Machine from its AWSCluster, EC2 subnets, STS and CAPA's ownership tag; `observer_credentials.py`, `native-pod-scope`, `--aws-pod-config` and `pkg/awscredentials` deleted; harness gives a run-scoped IAM user's keys as an operator would |
 | C14 receipt TLS + reload | open |
 | C15 dialer URL renewal, --reuse-values undo | open |
 | C16 GatewayRequest built by harness | open |
@@ -36,6 +36,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | D7 forks | open |
 | Assertions list | CAPI association (C7), control-plane placement (C6), kubeadm Calico (C3) and CalicoNodesReady (C5, now measures the product agent on remotes) closed; rest open |
 | /tmp writes | open |
+| IAM docs key ownership on the harness's `cloud-provisioning-test` tag and `RUN_ID` (found while closing C13) | open: product policies should key on CAPA's cluster tag and named resources |
 | Mechanical write guard (harness kube/AWS writes refused outside an allowlist) | open |
 
 ## Found while closing items

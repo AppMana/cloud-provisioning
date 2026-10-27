@@ -40,8 +40,6 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/Masterminds/semver/v3 v3.5.0 h1:kQceYJfbupGfZOKZQg0kou0DgAKhzDg2NZPAwZ/2OOE=
 github.com/Masterminds/semver/v3 v3.5.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
-github.com/appmana/labcontainers v0.2.0-alpha.2.0.20261026201736-c1fef84d9ffd h1:7iCNC3eD+jSh6JyIw74LU0Pfd2WJLGwc0gqcOhaeo7Y=
-github.com/appmana/labcontainers v0.2.0-alpha.2.0.20261026201736-c1fef84d9ffd/go.mod h1:t8wYsITQR0SWsj4m8Lj6GZqnu3Ph0K+ihHWPZAhZhNo=
 github.com/appmana/labcontainers v0.2.0-alpha.2.0.20261026204009-f112934f2498 h1:Wrey6E8X3L4ozWp1vb/O+2WrZOwU8o0qK+LwaaXzImY=
 github.com/appmana/labcontainers v0.2.0-alpha.2.0.20261026204009-f112934f2498/go.mod h1:t8wYsITQR0SWsj4m8Lj6GZqnu3Ph0K+ihHWPZAhZhNo=
 github.com/aws/aws-sdk-go-v2 v1.46.0 h1:1kt7m/EKcEHt5mlyyxx9cSlMddRPIKbjb6DIQsu4HPk=

@@ -45,6 +45,8 @@ func (t *EC2Transport) Call(ctx context.Context, service, operation string, inpu
 		return sdkCall(ctx, input, t.client.DeleteRoute)
 	case "modify-network-interface-attribute":
 		return sdkCall(ctx, input, t.client.ModifyNetworkInterfaceAttribute)
+	case "describe-subnets":
+		return sdkCall(ctx, input, t.client.DescribeSubnets)
 	case "describe-security-groups":
 		return sdkCall(ctx, input, t.client.DescribeSecurityGroups)
 	case "describe-security-group-rules":

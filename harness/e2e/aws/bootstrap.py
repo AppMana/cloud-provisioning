@@ -92,6 +92,17 @@ for template,role_name in [('capa',capa_role),('worker-bootstrap',node_role)]:
     rendered=subprocess.run(['python3',str(iam_dir/'render.py'),str(iam_dir/(template+'.json')),str(values_path)],capture_output=True,text=True,check=True).stdout
     (work/(template+'-policy.json')).write_text(rendered)
     aws('iam','put-role-policy','--role-name',role_name,'--policy-name','cldt-test','--policy-document',rendered)
+# The controller's own AWS identity, as an operator gives it: a user with the
+# documented controller policy whose keys the chart reads through the SDK's
+# standard chain (aws.credentials). Long-lived keys, deleted by cleanup.
+controller_user=remember('controllerUserName',a.run_id+'-controller')
+aws('iam','create-user','--user-name',controller_user,'--tags',json.dumps(tags))
+rendered=subprocess.run(['python3',str(iam_dir/'render.py'),str(iam_dir/'controller.json'),str(values_path)],capture_output=True,text=True,check=True).stdout
+(work/'controller-policy.json').write_text(rendered)
+aws('iam','put-user-policy','--user-name',controller_user,'--policy-name','cldt-test','--policy-document',rendered)
+key=aws('iam','create-access-key','--user-name',controller_user)['AccessKey']
+remember('controllerAccessKeyID',key['AccessKeyId'])
+(work/'controller-credentials.json').write_text(json.dumps({'AWS_ACCESS_KEY_ID':key['AccessKeyId'],'AWS_SECRET_ACCESS_KEY':key['SecretAccessKey'],'AWS_REGION':a.region}))
 # Allow IAM trust and instance profile propagation before obtaining the session.
 for attempt in range(12):
     try:

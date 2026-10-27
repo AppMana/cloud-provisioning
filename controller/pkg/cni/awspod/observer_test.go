@@ -48,16 +48,16 @@ func fixture(t *testing.T) (*Observer, *unstructured.Unstructured, *ec2) {
 	}
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(m, n).Build()
 	api := &ec2{eni: map[string]any{"NetworkInterfaceId": "eni-1", "OwnerId": "123", "VpcId": "vpc-1", "SubnetId": "subnet-1", "Status": "in-use", "Attachment": map[string]any{"InstanceId": "i-123", "Status": "attached"}, "TagSet": []any{map[string]any{"Key": "cluster", "Value": "test"}}, "PrivateIpAddresses": []any{map[string]any{"PrivateIpAddress": "172.29.0.10", "Primary": true}, map[string]any{"PrivateIpAddress": "172.29.0.11", "Primary": false}}, "Ipv6Prefixes": []any{map[string]any{"Ipv6Prefix": "2001:db8:1::/80"}}}}
-	return &Observer{Reader: c, API: api, Config: Config{Account: "123", Region: "us-west-2", VPC: "vpc-1", Subnets: []string{"subnet-1"}, Namespace: "test", Cluster: "cluster", OwnerTag: "cluster", OwnerValue: "test", Family: "ipv4", PodRanges: []string{"172.29.0.0/24"}}}, m, api
+	return &Observer{Reader: c, Scopes: &StaticScope{API: api, Config: Config{Account: "123", Region: "us-west-2", VPC: "vpc-1", Subnets: []string{"subnet-1"}, Namespace: "test", Cluster: "cluster", OwnerTag: "cluster", OwnerValue: "test", Family: "ipv4", PodRanges: []string{"172.29.0.0/24"}}}}, m, api
 }
 func TestObservedAllocationFamiliesAndRelease(t *testing.T) {
 	for _, family := range []string{"ipv4", "ipv6"} {
 		t.Run(family, func(t *testing.T) {
 			o, m, api := fixture(t)
-			o.Config.Family = family
+			scopeOf(o).Config.Family = family
 			want := "172.29.0.11/32"
 			if family == "ipv6" {
-				o.Config.PodRanges = []string{"2001:db8:1::/64"}
+				scopeOf(o).Config.PodRanges = []string{"2001:db8:1::/64"}
 				want = "2001:db8:1::/80"
 			}
 			got, err := o.PrefixesFor(context.Background(), m, "worker")
@@ -106,12 +106,12 @@ func TestRejectUnverifiedAllocations(t *testing.T) {
 			case "detached":
 				api.eni["Status"] = "available"
 			case "range":
-				o.Config.PodRanges = []string{"10.0.0.0/24"}
+				scopeOf(o).Config.PodRanges = []string{"10.0.0.0/24"}
 			case "dual-stack":
-				o.Config.Family = "dual"
+				scopeOf(o).Config.Family = "dual"
 			case "broad-v6":
-				o.Config.Family = "ipv6"
-				o.Config.PodRanges = []string{"2001:db8:1::/64"}
+				scopeOf(o).Config.Family = "ipv6"
+				scopeOf(o).Config.PodRanges = []string{"2001:db8:1::/64"}
 				api.eni["Ipv6Prefixes"] = []any{map[string]any{"Ipv6Prefix": "2001:db8:1::/64"}}
 			case "v4-prefix":
 				api.eni["Ipv4Prefixes"] = []any{map[string]any{"Ipv4Prefix": "172.29.0.16/28"}}
@@ -204,9 +204,9 @@ func TestIPv6ENIAddressesAreNativeButNeverPodOwned(t *testing.T) {
 	for _, family := range []string{"ipv4", "ipv6"} {
 		t.Run(family, func(t *testing.T) {
 			o, machine, api := fixture(t)
-			o.Config.Family = family
+			scopeOf(o).Config.Family = family
 			if family == "ipv6" {
-				o.Config.PodRanges = []string{"2001:db8:1::/64"}
+				scopeOf(o).Config.PodRanges = []string{"2001:db8:1::/64"}
 			}
 			api.eni["Ipv6Addresses"] = []any{
 				map[string]any{"Ipv6Address": "2001:db8:1:0:1234::1", "IsPrimaryIpv6": true},
@@ -270,8 +270,8 @@ func TestWindowsSecondaryIPAllocationAndWithdrawal(t *testing.T) {
 			case "missing-index":
 				delete(attachment, "DeviceIndex")
 			case "ipv6":
-				o.Config.Family = "ipv6"
-				o.Config.PodRanges = []string{"2001:db8:1::/64"}
+				scopeOf(o).Config.Family = "ipv6"
+				scopeOf(o).Config.PodRanges = []string{"2001:db8:1::/64"}
 			case "unknown-os":
 				node.Labels[corev1.LabelOSStable] = "other"
 			case "foreign-owner":
@@ -298,3 +298,5 @@ func TestWindowsSecondaryIPAllocationAndWithdrawal(t *testing.T) {
 		})
 	}
 }
+
+func scopeOf(o *Observer) *StaticScope { return o.Scopes.(*StaticScope) }

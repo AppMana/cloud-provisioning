@@ -39,6 +39,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	claimpkg "github.com/appmana/cloud-provisioning/controller/pkg/claim"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
+	"github.com/appmana/cloud-provisioning/controller/pkg/cni/awspod"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni/site"
 	"github.com/appmana/cloud-provisioning/controller/pkg/controlplane"
 	"github.com/appmana/cloud-provisioning/controller/pkg/discover"
@@ -334,12 +335,19 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	// are observed and published. Either can appear after Machine events stop;
 	// absence of a Node must not disable the periodic retry.
 	remoteBlocksPending := true
+	// A native network's allocations change without any Kubernetes event,
+	// so a node on one is observed again periodically.
+	observedNative := false
 	if nodeName := r.nodeNameForMachine(ctx, machine); nodeName != "" {
 		published, err := r.publishRemotePodCIDRs(ctx, machine, nodeName)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		remoteBlocksPending = !published
+		node := &corev1.Node{}
+		if err := r.reader.Get(ctx, types.NamespacedName{Name: nodeName}, node); err == nil {
+			_, observedNative = r.nativeObservers[node.Labels[platform.CNILabel]]
+		}
 	}
 
 	// Tell the CNI which address to peer on, once the node exists.
@@ -438,7 +446,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 			log.Info("updated Gateway external-dns target", "ip", externalIP, "gateway", gwKey)
 		}
 	}
-	if remoteBlocksPending || len(r.nativeObservers) > 0 || r.receivePreparation != nil {
+	if remoteBlocksPending || observedNative || r.receivePreparation != nil {
 		// Come back for the blocks this node has not been given yet.
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
@@ -2465,8 +2473,7 @@ func main() {
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
 	nodeGroups := flag.Bool("experimental-node-groups", false, "enable experimental node groups in the mesh namespace; requires the group CRD and drain RBAC")
-	awsPodConfig := flag.String("aws-pod-config", "", "optional scoped AWS VPC CNI allocation observer JSON file")
-	awsPodCredentialsFile := flag.String("aws-pod-credentials-file", "", "optional rotating STS credential JSON file; overrides ambient credentials for the AWS pod observer")
+	vpcCNIFamily := flag.String("aws-vpc-cni-family", "ipv4", "the AWS VPC CNI's pod address family, ipv4 or ipv6")
 	receivePolicyJSON := flag.String("receive-preparation-policy", "", "experimental receiver policy JSON with nativeCIDRs and permitted ports; optional journal enables fenced handover and explicit expiry recovery")
 	gatewayConfig := flag.String("aws-gateway-config", "", "optional path to AWS Windows Calico gateway scope JSON")
 	flag.Parse()
@@ -2695,18 +2702,17 @@ func main() {
 		windowsPublisherAPIServer: windowsPublisherAPIServer,
 		dialerCloudHostBinary:     dialerCloudHostBinary,
 	}
-	if *awsPodCredentialsFile != "" && *awsPodConfig == "" {
-		fmt.Fprintln(os.Stderr, "AWS pod credential file requires --aws-pod-config")
+	if *vpcCNIFamily != "ipv4" && *vpcCNIFamily != "ipv6" {
+		fmt.Fprintln(os.Stderr, "--aws-vpc-cni-family must be ipv4 or ipv6")
 		os.Exit(1)
 	}
-	if *awsPodConfig != "" {
-		observer, err := newAWSPodObserver(*awsPodConfig, *awsPodCredentialsFile, mgr.GetAPIReader())
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "AWS pod observer configuration: %v\n", err)
-			os.Exit(1)
-		}
-		mesh.nativeObservers = map[string]platform.Observer{platformaws.VPCCNI{}.Name(): platformaws.Observer{Observer: observer}}
-	}
+	// The VPC CNI's allocations are observed in the scope of each Machine's
+	// AWSCluster, with the AWS SDK's standard credentials.
+	awsSDK := &platformaws.SDK{}
+	mesh.nativeObservers = map[string]platform.Observer{platformaws.VPCCNI{}.Name(): platformaws.Observer{Observer: &awspod.Observer{
+		Reader: mgr.GetAPIReader(),
+		Scopes: platformaws.ClusterScopes{Reader: mgr.GetAPIReader(), Family: *vpcCNIFamily, API: awsSDK.API, Account: awsSDK.Account},
+	}}}
 	if receivePolicy != nil && receivePolicy.Journal != nil {
 		api, err := kubernetes.NewForConfig(mgr.GetConfig())
 		if err != nil {

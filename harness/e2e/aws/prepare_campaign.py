@@ -2,13 +2,14 @@
 """Prepare an isolated Linux AWS worker campaign on an existing VM site.
 
 Run on the setup host with setup credentials loaded through source-me.sh. Each
-step calls the helper that owns it (build-binaries.sh, publisher.py, assets.py,
-observer_credentials.py); this command orders them, issues the receipt serving
-certificate through the site's cert-manager and renders the chart values from
-what those helpers recorded. Without --apply it stops after a server dry run.
+step calls the helper that owns it (build-binaries.sh, publisher.py, assets.py);
+this command orders them, gives the controller its AWS credentials as an
+operator does (a Secret the chart's aws.credentials names), issues the receipt
+serving certificate through the site's cert-manager and renders the chart
+values from what those helpers recorded. Without --apply it stops after a
+server dry run.
 """
 import argparse
-import datetime
 import hashlib
 import json
 import os
@@ -19,6 +20,7 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 NAMESPACE = 'cloud-provisioning'
+AWS_SECRET = 'cloud-provisioning-aws'
 CONTROLLER = 'cloud-provisioning-endpoint-controller'
 RECEIPT_SECRET = 'cldt-receipt-serving'
 RECEIPT_PORT = 9444
@@ -52,6 +54,15 @@ def receipt_tls_objects(run_id):
     ]
 
 
+def aws_secret(keys):
+    """The controller's AWS identity as the chart reads it: AWS_* keys for the
+    SDK's standard chain."""
+    if sorted(keys) != ['AWS_ACCESS_KEY_ID', 'AWS_REGION', 'AWS_SECRET_ACCESS_KEY']:
+        raise ValueError('controller credentials need exactly an access key, its secret and a region')
+    return {'apiVersion': 'v1', 'kind': 'Secret', 'type': 'Opaque',
+            'metadata': {'name': AWS_SECRET, 'namespace': NAMESPACE}, 'stringData': keys}
+
+
 def split_image(reference):
     repository, digest = reference.split('@', 1)
     if not digest.startswith('sha256:') or len(digest) != 71:
@@ -78,7 +89,7 @@ def render_values(state, urls, binaries, native_cidrs):
         'dialerImage': split_image(dialer),
         'imagePullSecrets': [{'name': state['linuxControllerPullSecret']}, {'name': state['linuxDialerPullSecret']}],
         'dialerBinary': binary,
-        'awsPodObserver': {'configMap': 'native-pod-scope', 'credentialsFileSecret': 'native-pod-observer-file'},
+        'aws': {'credentials': {'secretName': AWS_SECRET, 'mount': 'env'}},
         'providerManagerNamespace': 'capa-system',
         'importedControlPlane': {'providerServiceAccounts': [{'name': 'capa-controller-manager', 'namespace': 'capa-system'}]},
         'tunnel': {
@@ -153,10 +164,9 @@ def main():
              '--component', component, '--api-server', a.api_server, '--runner', a.runner])
     run([sys.executable, str(HERE / 'assets.py'), '--work-dir', str(a.work_dir),
          *[arg for arch in ARCHITECTURES for arg in ('--file', str(binaries_dir / ('wg-dialer-linux-' + arch)))]])
-    # The observer helper requires a new receipt directory for every renewal.
-    renewal = 'observer-renewal-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-    run([sys.executable, str(HERE / 'observer_credentials.py'), '--work-dir', str(a.work_dir), '--runner', a.runner,
-         '--cluster-uid', a.cluster_uid, '--receipts', str(out / renewal)])
+    # Server-side, so the keys are not copied into a last-applied annotation.
+    bastion(a.runner, a.api_server, 'kubectl', '--server=' + a.api_server, 'apply', '--server-side',
+            '--field-manager=cldt-operator', '-f', '-', stdin=json.dumps(aws_secret(json.loads((a.work_dir / 'controller-credentials.json').read_text()))))
     tls = {'apiVersion': 'v1', 'kind': 'List', 'items': receipt_tls_objects(state['runID'])}
     bastion(a.runner, a.api_server, 'kubectl', '--server=' + a.api_server, 'apply', '-f', '-', stdin=json.dumps(tls))
     bastion(a.runner, a.api_server, 'kubectl', '--server=' + a.api_server, '-n', NAMESPACE, 'wait',

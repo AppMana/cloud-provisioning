@@ -1,60 +1,15 @@
 package main
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
 	"fmt"
-	"github.com/appmana/cloud-provisioning/controller/pkg/awscredentials"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"io"
 	"net/netip"
-	"os"
 	"strings"
-	"time"
 
-	attachmentaws "github.com/appmana/cloud-provisioning/controller/pkg/attachment/aws"
-	"github.com/appmana/cloud-provisioning/controller/pkg/cni/awspod"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
-	"github.com/aws/aws-sdk-go-v2/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-func newAWSPodObserver(path, credentialsPath string, reader client.Reader) (*awspod.Observer, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var scope awspod.Config
-	d := json.NewDecoder(bytes.NewReader(raw))
-	d.DisallowUnknownFields()
-	if err := d.Decode(&scope); err != nil {
-		return nil, err
-	}
-	if err := d.Decode(new(any)); err != io.EOF {
-		return nil, fmt.Errorf("unexpected trailing AWS pod configuration")
-	}
-	if err := scope.Validate(); err != nil {
-		return nil, err
-	}
-	options := []func(*config.LoadOptions) error{config.WithRegion(scope.Region), config.WithRetryMaxAttempts(3)}
-	if credentialsPath != "" {
-		provider := aws.NewCredentialsCache(awscredentials.FileProvider{Path: credentialsPath}, func(o *aws.CredentialsCacheOptions) { o.ExpiryWindow = time.Minute })
-		options = append(options, config.WithCredentialsProvider(provider))
-	}
-	cfg, err := config.LoadDefaultConfig(context.Background(), options...)
-	if err != nil {
-		return nil, err
-	}
-	api, err := attachmentaws.NewEC2Transport(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &awspod.Observer{Config: scope, Reader: reader, API: api}, nil
-}
 
 // Rebuild from authoritative hosts and this observation, never from the previous
 // AllowedIPs: secondary pod IPs are /32s too and must disappear when released.

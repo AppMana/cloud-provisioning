@@ -34,7 +34,8 @@ class RenderValuesTest(unittest.TestCase):
         self.assertNotIn('endpoint', receipts)
         self.assertEqual(values['tunnel']['receiptTLSSecret'], subject.RECEIPT_SECRET)
         self.assertEqual(values['tunnel']['receivePreparation']['nativeCIDRs'], ['203.0.113.0/24', '172.29.0.0/25'])
-        self.assertEqual(values['awsPodObserver']['credentialsFileSecret'], 'native-pod-observer-file')
+        self.assertEqual(values['aws'], {'credentials': {'secretName': 'cloud-provisioning-aws', 'mount': 'env'}})
+        self.assertNotIn('awsPodObserver', values)
 
     def test_unpublished_component_is_rejected(self):
         with self.assertRaisesRegex(ValueError, 'linuxDialer has not been published'):
@@ -65,6 +66,19 @@ class ReceiptTLSTest(unittest.TestCase):
                          ['cloud-provisioning-endpoint-controller-receipts.cloud-provisioning.svc'])
         self.assertEqual(serving['spec']['issuerRef']['name'], objects[2]['metadata']['name'])
         self.assertTrue(all(o['metadata']['labels'] == {'cloud-provisioning-test': 'cldt-test'} for o in objects))
+
+
+
+
+class ControllerCredentials(unittest.TestCase):
+    def test_the_secret_holds_exactly_the_sdk_keys(self):
+        from prepare_campaign import aws_secret
+        keys = {'AWS_ACCESS_KEY_ID': 'AKIA', 'AWS_SECRET_ACCESS_KEY': 'secret', 'AWS_REGION': 'us-west-2'}
+        secret = aws_secret(keys)
+        self.assertEqual(secret['metadata'], {'name': 'cloud-provisioning-aws', 'namespace': 'cloud-provisioning'})
+        self.assertEqual(secret['stringData'], keys)
+        with self.assertRaises(ValueError):
+            aws_secret(dict(keys, AWS_SESSION_TOKEN='expiring'))
 
 
 if __name__ == '__main__':

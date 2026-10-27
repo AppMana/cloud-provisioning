@@ -1,19 +1,14 @@
 {{- if and .Values.windowsBootstrap.nativePodRouting (not .Values.windowsBootstrap.tunnelSHA256) }}
 {{- fail "Windows native pod routing requires a pinned tunnel executable" }}
 {{- end }}
-{{- if .Values.awsPodObserver.credentialsSecret }}
-{{- fail "awsPodObserver.credentialsSecret was removed: static environment keys never refresh. Use workload identity or awsPodObserver.credentialsFileSecret" }}
+{{- if not (has .Values.aws.credentials.mount (list "env" "files")) }}
+{{- fail "aws.credentials.mount must be env or files" }}
 {{- end }}
-{{- if and .Values.awsPodObserver.credentialsFileSecret (not .Values.awsPodObserver.configMap) }}
-{{- fail "Rotating AWS observer credentials require awsPodObserver.configMap" }}
-{{- end }}
+{{- $awsFiles := and .Values.aws.credentials.secretName (eq .Values.aws.credentials.mount "files") }}
 {{- /* Every arg is quoted: an IPv6 prefix value ends in ":", and an
 unquoted YAML list item ending in a colon parses as a mapping key with
 a null value, which injects a {} into the container args and makes the
 Deployment patch invalid. */ -}}
-{{- if and .Values.awsGateway.configMap .Values.awsPodObserver.configMap }}
-{{- fail "AWS pod observer and Windows gateway require separate qualified deployments" }}
-{{- end }}
 {{- $receivePolicy := deepCopy .Values.tunnel.receivePreparation }}
 {{- $receipts := dig "journal" "receipts" (dict) $receivePolicy }}
 {{- if $receipts }}
@@ -63,30 +58,23 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.awsPodObserver.credentialsFileSecret }}
+      {{- if $awsFiles }}
       securityContext:
         fsGroup: 65532
       {{- end }}
-      {{- if or .Values.awsGateway.configMap .Values.awsPodObserver.configMap $receipts }}
+      {{- if or .Values.awsGateway.configMap $awsFiles $receipts }}
       volumes:
         {{- if $receipts }}
         - name: receipt-tls
           secret:
             secretName: {{ .Values.tunnel.receiptTLSSecret | quote }}
         {{- end }}
-        {{- with .Values.awsPodObserver.configMap }}
-        - name: aws-pod-scope
-          configMap:
-            name: {{ . | quote }}
-        {{- end }}
-        {{- with .Values.awsPodObserver.credentialsFileSecret }}
-        - name: aws-pod-credentials
+        {{- if $awsFiles }}
+        # The directory, not subPaths, so a rotated Secret reaches the SDK.
+        - name: aws-credentials
           secret:
-            secretName: {{ . | quote }}
+            secretName: {{ .Values.aws.credentials.secretName | quote }}
             defaultMode: 0440
-            items:
-              - key: credentials.json
-                path: credentials.json
         {{- end }}
         {{- with .Values.awsGateway.configMap }}
         - name: aws-gateway-scope
@@ -98,7 +86,7 @@ spec:
         - name: controller
           image: {{ include "cloud-provisioning.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if or .Values.awsGateway.configMap .Values.awsPodObserver.configMap $receipts }}
+          {{- if or .Values.awsGateway.configMap $awsFiles $receipts }}
           volumeMounts:
             {{- if $receipts }}
             - name: receipt-tls
@@ -110,31 +98,27 @@ spec:
               mountPath: /etc/cloud-provisioning/gateway
               readOnly: true
             {{- end }}
-            {{- if .Values.awsPodObserver.configMap }}
-            - name: aws-pod-scope
-              mountPath: /etc/cloud-provisioning/aws-pods
+            {{- if $awsFiles }}
+            - name: aws-credentials
+              mountPath: /etc/cloud-provisioning/aws
               readOnly: true
-            {{- with .Values.awsPodObserver.credentialsFileSecret }}
-            - name: aws-pod-credentials
-              mountPath: /etc/cloud-provisioning/aws-credentials
-              readOnly: true
-            {{- end }}
             {{- end }}
           {{- end }}
-          {{- if .Values.awsGateway.configMap }}
-          {{- with .Values.awsGateway.credentialsSecret }}
+          {{- with .Values.aws.credentials.secretName }}
+          {{- if eq $.Values.aws.credentials.mount "env" }}
           envFrom:
             - secretRef:
                 name: {{ . | quote }}
+          {{- else }}
+          env:
+            - name: AWS_CONFIG_FILE
+              value: /etc/cloud-provisioning/aws/config
+            - name: AWS_SHARED_CREDENTIALS_FILE
+              value: /etc/cloud-provisioning/aws/credentials
           {{- end }}
           {{- end }}
           args:
-            {{- if .Values.awsPodObserver.configMap }}
-            - "--aws-pod-config=/etc/cloud-provisioning/aws-pods/scope.json"
-            {{- if .Values.awsPodObserver.credentialsFileSecret }}
-            - "--aws-pod-credentials-file=/etc/cloud-provisioning/aws-credentials/credentials.json"
-            {{- end }}
-            {{- end }}
+            - "--aws-vpc-cni-family={{ .Values.platforms.aws.vpcCNI.family }}"
             {{- if .Values.experimentalNodeGroups }}
             - "--experimental-node-groups=true"
             {{- end }}

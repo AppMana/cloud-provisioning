@@ -101,34 +101,38 @@ class ImageReferences(unittest.TestCase):
                     self.assertIn("image digest must be a string", result.stderr)
 
 
-class ObserverCredentialMount(unittest.TestCase):
+class AWSCredentials(unittest.TestCase):
+    """The controller's AWS calls use the SDK's standard chain, fed by a
+    Secret the operator names, either as environment keys or as files."""
+
     def render(self, *values):
         args = ["helm", "template", "credential-test", "charts/cloud-provisioning"]
         for value in values:
             args += ["--set-string", value]
         return subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
 
-    def test_rotating_secret_directory_and_nonroot_access(self):
-        result = self.render("awsPodObserver.configMap=scope", "awsPodObserver.credentialsFileSecret=rotating")
+    def test_environment_keys(self):
+        result = self.render("aws.credentials.secretName=keys")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("envFrom:", result.stdout)
+        self.assertIn('name: "keys"', result.stdout)
+        self.assertNotIn("AWS_CONFIG_FILE", result.stdout)
+
+    def test_files_mount_the_directory_for_the_sdk(self):
+        result = self.render("aws.credentials.secretName=profiles", "aws.credentials.mount=files")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("fsGroup: 65532", result.stdout)
-        self.assertIn("defaultMode: 0440", result.stdout)
-        self.assertIn('secretName: "rotating"', result.stdout)
-        self.assertIn("key: credentials.json", result.stdout)
-        self.assertIn("mountPath: /etc/cloud-provisioning/aws-credentials", result.stdout)
-        self.assertIn("--aws-pod-credentials-file=/etc/cloud-provisioning/aws-credentials/credentials.json", result.stdout)
+        self.assertIn('secretName: "profiles"', result.stdout)
+        self.assertIn("mountPath: /etc/cloud-provisioning/aws", result.stdout)
+        self.assertIn("value: /etc/cloud-provisioning/aws/config", result.stdout)
+        self.assertIn("value: /etc/cloud-provisioning/aws/credentials", result.stdout)
         self.assertNotIn("subPath:", result.stdout)
         self.assertNotIn("envFrom:", result.stdout)
 
-    def test_rejects_unused_credential_source(self):
-        self.assertNotEqual(self.render("awsPodObserver.credentialsFileSecret=rotating").returncode, 0)
-
-    def test_rejects_static_environment_credentials(self):
-        # Static keys in the environment never refresh; a values file that still
-        # names them must fail rather than leave the observer without credentials.
-        result = self.render("awsPodObserver.configMap=scope", "awsPodObserver.credentialsSecret=environment")
+    def test_rejects_an_unknown_mount(self):
+        result = self.render("aws.credentials.secretName=profiles", "aws.credentials.mount=volume")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("credentialsFileSecret", result.stderr)
+        self.assertIn("aws.credentials.mount", result.stderr)
 
 
 if __name__ == "__main__":

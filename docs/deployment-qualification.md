@@ -76,52 +76,21 @@ configuration ownership and management-availability evidence.
 
 ## AWS observer configuration
 
-Use `awsPodObserver.configMap` containing `scope.json`. Prefer refreshable role
-credentials through workload identity. The observer needs only
-`ec2:DescribeNetworkInterfaces`; it does not allocate ENIs or change AWS routes.
-CAPA provisioning credentials and AWS-node IPAM credentials remain separate.
-Static keys in environment variables are not supported: they never refresh.
+The controller observes the AWS VPC CNI's allocations in the scope of each
+Machine's AWSCluster: its region, VPC and subnets, the subnets' ranges from
+EC2, the account from STS, and CAPA's ownership tag on the instance's primary
+interface. There is no scope to configure; `platforms.aws.vpcCNI.family`
+chooses IPv4 or IPv6 pods.
 
-For installations without workload identity, set
-`awsPodObserver.credentialsFileSecret`. The
-Secret must contain `credentials.json` with the STS response's `Credentials`
-object: `AccessKeyId`, `SecretAccessKey`, `SessionToken` and RFC3339
-`Expiration`. The chart mounts the entire directory read-only and grants the
-nonroot controller group read access. Do not use a `subPath` mount: it would
-prevent projected Secret rotation from reaching the process.
-
-A separate trusted credential producer must update the Secret well before
-expiration, allowing for Kubernetes projection delay. The observer's SDK cache
-refreshes one minute before expiry and rereads the file without restarting the
-controller. Missing, malformed or expired replacements fail observation rather
-than falling back to other credentials. Existing observed allocations retain
-the observer's existing API-failure behavior. This option does not renew CAPA,
-harness or registry credentials, and it does not itself issue credentials.
-Qualify rotation across an actual expiry boundary, including producer outage,
-before relying on this mechanism for unattended operation.
-
-The isolated AWS harness provides `aws/observer_credentials.py` as a separate
-producer. Run it with setup credentials that remain refreshable for the entire
-campaign; the one-hour harness federation session cannot issue these sessions.
-From `harness/e2e`:
-
-```sh
-python3 aws/observer_credentials.py --work-dir "$CAMPAIGN_DIRECTORY" \
-  --runner "$ISOLATED_RUNNER" --cluster-uid "$KUBE_SYSTEM_UID" \
-  --receipts "$FRESH_PRIVATE_RECEIPTS_DIRECTORY" --duration 86400
-```
-
-Set `awsPodObserver.credentialsFileSecret=native-pod-observer-file` in the
-candidate deployment. The producer verifies the distinct Docker daemon,
-explicit cluster UID, AWS account and Secret ownership before each renewal.
-It issues region-limited `ec2:DescribeNetworkInterfaces` credentials and renews
-ten minutes before expiry. Secret replacement uses its existing resource
-version. It does not change IAM policies, networking or controller workloads.
-A failed or ambiguous write stops the process without automatic retry; inspect
-the actual Secret before restarting. Retain all receipts and require terminal
-completion; a missing terminal receipt is incomplete, including process death.
-Successful Secret publication alone does not establish projection to the Pod
-or successful observer API calls across expiry.
+Its AWS calls use the SDK's standard credential chain. Name a Secret in
+`aws.credentials.secretName` holding either `AWS_*` environment keys
+(`mount: env`) or the files `config` and `credentials` (`mount: files`). A
+profile with `role_arn` and `source_profile` has the SDK assume that role and
+refresh it before expiry, so nothing outside the controller renews credentials.
+Grant the identity [controller.json](iam/controller.json):
+`ec2:DescribeNetworkInterfaces` and `ec2:DescribeSubnets` in the region. The
+observer does not allocate addresses or change AWS routes. CAPA provisioning
+credentials and AWS-node IPAM credentials remain separate.
 
 Do not enable the Windows gateway adapter in the same deployment.
 

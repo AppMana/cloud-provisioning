@@ -281,18 +281,29 @@ cluster-api-operator:
   controlPlane: {}
 
 # Opt-in Windows Calico subnet gateway reconciliation. The ConfigMap contains
-# scope.json; credentials are separate. Empty configMap disables registration.
+# scope.json. Empty configMap disables registration.
 awsGateway:
   configMap: ""
-  credentialsSecret: "" # optional AWS_* env keys; restart after credential rotation
+
+# Credentials for the controller's own AWS calls (observing the VPC CNI's
+# allocations, Windows gateway routes), read through the AWS SDK's standard
+# chain. secretName is a Secret in the release namespace holding either AWS_*
+# environment keys (mount: env), or the files `config` and `credentials`
+# (mount: files), which the SDK reads as AWS_CONFIG_FILE and
+# AWS_SHARED_CREDENTIALS_FILE. A profile with role_arn and source_profile has
+# the SDK assume that role and refresh it itself. Empty uses whatever the
+# pod's environment provides (for example workload identity).
+aws:
+  credentials:
+    secretName: ""
+    mount: env
+
+platforms:
+  aws:
+    vpcCNI:
+      # The pod address family the AWS VPC CNI gives pods on AWS nodes.
+      family: ipv4
 
 # Requires manual installation of the experimental group CRD.
 experimentalNodeGroups: false
 
-# Read-only EC2 allocation observation for AWS VPC CNI cloud nodes. Experimental:
-# this enables ownership publication, not deployment qualification.
-awsPodObserver:
-  configMap: ""
-  # Without workload identity, a Secret holding a rotating credentials.json,
-  # mounted as a directory so the SDK sees each refresh.
-  credentialsFileSecret: ""

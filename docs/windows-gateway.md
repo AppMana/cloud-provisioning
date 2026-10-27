@@ -319,11 +319,9 @@ with a `scope.json` key:
 
 The peer Secret UID pins the mesh across restarts; replacing that Secret requires
 explicit scope reconfiguration. Restart the controller after changing this startup
-configuration. Configure an AWS SDK credential provider for the controller role.
-For temporary test credentials, `awsGateway.credentialsSecret` names an existing
-Secret containing `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and
-`AWS_SESSION_TOKEN`; restart after rotating these environment credentials. Never
-put credentials in `scope.json`, requests or resource journals. Attach the gateway
+configuration. The controller's AWS credentials come from `aws.credentials` (the SDK's
+standard chain; see [AWS observer configuration](deployment-qualification.md#aws-observer-configuration)).
+Never put credentials in `scope.json`, requests or resource journals. Attach the gateway
 route, source-check, ingress and observation policies documented in [AWS](aws.md).
 The worker and gateway require a working SSM agent and instance role.
 

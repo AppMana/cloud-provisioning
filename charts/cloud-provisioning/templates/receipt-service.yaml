@@ -17,4 +17,64 @@ spec:
       port: {{ $port }}
       targetPort: {{ $port }}
       protocol: TCP
+{{- if not .Values.tunnel.receiptTLSSecret }}
+{{- if not (.Capabilities.APIVersions.Has "cert-manager.io/v1") }}
+{{- fail "Receipt serving needs tunnel.receiptTLSSecret, or cert-manager to issue one" }}
+{{- end }}
+{{- $name := include "cloud-provisioning.controllerName" . }}
+{{- /* A self-signed root signs a long-lived CA; the CA issues the serving
+certificate, which cert-manager renews well inside the CA's lifetime, so the
+CA agents trust does not change when the serving certificate does. */}}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ $name }}-receipts-root
+  namespace: {{ .Release.Namespace }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $name }}-receipts-ca
+  namespace: {{ .Release.Namespace }}
+spec:
+  isCA: true
+  commonName: {{ $name }} receipt CA
+  secretName: {{ $name }}-receipts-ca
+  duration: 87600h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: {{ $name }}-receipts-root
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ $name }}-receipts-ca
+  namespace: {{ .Release.Namespace }}
+spec:
+  ca:
+    secretName: {{ $name }}-receipts-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $name }}-receipts-tls
+  namespace: {{ .Release.Namespace }}
+spec:
+  secretName: {{ $name }}-receipts-tls
+  dnsNames:
+    - {{ $name }}-receipts.{{ .Release.Namespace }}.svc
+  usages: ["server auth", "digital signature", "key encipherment"]
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: {{ $name }}-receipts-ca
+    kind: Issuer
+{{- end }}
 {{- end }}

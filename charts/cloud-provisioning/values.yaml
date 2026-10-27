@@ -89,9 +89,12 @@ tunnel:
   # (architecture -> pinned runtime image ID). TLS files must be tls.crt/tls.key
   # under /etc/cloud-provisioning/receipts. Agents require matching CA trust.
   receivePreparation: {}
-  # Existing TLS Secret containing tls.crt, tls.key and ca.crt. Agents project
-  # only ca.crt alongside a separate audience-bound token. The certificate must
-  # cover <controller-name>-receipts.<namespace>.svc. Restart on certificate rotation.
+  # TLS Secret (tls.crt, tls.key, ca.crt) the receipt server presents; it must
+  # cover <controller-name>-receipts.<namespace>.svc. Agents project only
+  # ca.crt alongside a separate audience-bound token. Empty has the chart issue
+  # one through cert-manager from a CA of its own (cert-manager must be
+  # installed); cert-manager renews it, and the controller serves a renewed
+  # certificate without restarting.
   receiptTLSSecret: ""
   # Node selector (k=v,k2=v2) choosing which local nodes terminate
   # tunnels. Empty selects every Linux worker; control planes are

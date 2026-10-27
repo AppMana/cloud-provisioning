@@ -16,6 +16,12 @@ label value. */}}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end -}}
 
+{{- /* The receipt serving Secret: the operator's, or the one the chart
+issues through cert-manager. */ -}}
+{{- define "cloud-provisioning.receiptTLSSecret" -}}
+{{- default (printf "%s-receipts-tls" (include "cloud-provisioning.controllerName" .)) .Values.tunnel.receiptTLSSecret -}}
+{{- end -}}
+
 {{- define "cloud-provisioning.image" -}}
 {{ include "cloud-provisioning.imageReference" (dict "image" .Values.image "defaultTag" .Chart.AppVersion) }}
 {{- end -}}

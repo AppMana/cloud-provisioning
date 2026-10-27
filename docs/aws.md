@@ -755,9 +755,10 @@ a run inventory to the site, `harness/e2e/aws/prepare_campaign.py` installs the
 committed candidate for that run. It cross-compiles both architectures, builds
 multi-platform OCI layouts by layer copy, publishes them with `publisher.py`,
 uploads the first-boot dialers with `assets.py` and gives the controller the
-run's controller-user keys as the Secret `aws.credentials` names. It issues the receipt serving certificate from a run-scoped
-cert-manager CA, so the certificate renews without manual rotation, and renders
-the chart values only from recorded digests and URLs. Run it with setup
+run's controller-user keys as the Secret `aws.credentials` names. It renders
+the chart values only from recorded digests and URLs. The chart issues the
+receipt serving certificate through the site's cert-manager, which renews it;
+the controller serves the renewed certificate without restarting. Run it with setup
 credentials; without `--apply` it stops after a Helm server dry run:
 
 ```sh

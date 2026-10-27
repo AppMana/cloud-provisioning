@@ -23,7 +23,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | C11 SG self ingress | done: documented requirement; the product refuses a VPC CNI claim whose security groups do not admit each other (`join.ClassValidator`, DescribeSecurityGroups) before any machine exists; harness adds the rule as an operator |
 | C12 disabled IPPool for provider ranges | done: on Calico sites the product creates a disabled `!all()` no-NAT no-export pool per AWSCluster subnet range, prunes unused ones, refuses ranges inside site pools and holds native claims until the pools exist; harness `calico_exclusion` deleted |
 | C13 observer STS renewal | done: controller uses the SDK standard chain via generic `aws.credentials` (env keys or config/credentials files; role_arn+source_profile refreshes itself); the observer configures itself per Machine from its AWSCluster, EC2 subnets, STS and CAPA's ownership tag; `observer_credentials.py`, `native-pod-scope`, `--aws-pod-config` and `pkg/awscredentials` deleted; harness gives a run-scoped IAM user's keys as an operator would |
-| C14 receipt TLS + reload | open |
+| C14 receipt TLS + reload | done: the chart issues the receipt certificate through cert-manager (self-signed root, 10-year CA, renewed serving certificate) unless a Secret is named; the controller reloads a renewed certificate without restarting and keeps the last good one; harness cert-manager objects deleted; aws.md claim corrected |
 | C15 dialer URL renewal, --reuse-values undo | open |
 | C16 GatewayRequest built by harness | open |
 | C17 Windows VPC CNI + IPAM | open |

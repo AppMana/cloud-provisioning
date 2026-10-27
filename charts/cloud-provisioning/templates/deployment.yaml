@@ -12,8 +12,7 @@ Deployment patch invalid. */ -}}
 {{- $receivePolicy := deepCopy .Values.tunnel.receivePreparation }}
 {{- $receipts := dig "journal" "receipts" (dict) $receivePolicy }}
 {{- if $receipts }}
-{{- $_ := required "Receipt serving requires tunnel.receiptTLSSecret" .Values.tunnel.receiptTLSSecret }}
-{{- $_ := set $receipts "trustSecret" .Values.tunnel.receiptTLSSecret }}
+{{- $_ := set $receipts "trustSecret" (include "cloud-provisioning.receiptTLSSecret" .) }}
 {{- $_ := set $receipts "endpoint" (printf "https://%s-receipts.%s.svc:%s/v1/receipts" (include "cloud-provisioning.controllerName" .) .Release.Namespace (last (splitList ":" $receipts.bindAddress))) }}
 {{- if or (ne $receipts.certFile "/etc/cloud-provisioning/receipts/tls.crt") (ne $receipts.keyFile "/etc/cloud-provisioning/receipts/tls.key") }}
 {{- fail "Receipt TLS files must use the mounted /etc/cloud-provisioning/receipts directory" }}
@@ -67,7 +66,7 @@ spec:
         {{- if $receipts }}
         - name: receipt-tls
           secret:
-            secretName: {{ .Values.tunnel.receiptTLSSecret | quote }}
+            secretName: {{ include "cloud-provisioning.receiptTLSSecret" . | quote }}
         {{- end }}
         {{- if $awsFiles }}
         # The directory, not subPaths, so a rotated Secret reaches the SDK.

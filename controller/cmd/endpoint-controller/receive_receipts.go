@@ -283,7 +283,7 @@ type receiveReceiptServer struct {
 func (*receiveReceiptServer) NeedLeaderElection() bool { return true }
 
 func (s *receiveReceiptServer) Start(ctx context.Context) error {
-	certificate, err := tls.LoadX509KeyPair(s.policy.CertFile, s.policy.KeyFile)
+	files, err := loadCertificateFiles(s.policy.CertFile, s.policy.KeyFile)
 	if err != nil {
 		return fmt.Errorf("load receipt serving identity: %w", err)
 	}
@@ -291,16 +291,16 @@ func (s *receiveReceiptServer) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return s.serve(ctx, listener, certificate)
+	return s.serve(ctx, listener, files.get)
 }
 
-func (s *receiveReceiptServer) serve(ctx context.Context, listener net.Listener, certificate tls.Certificate) error {
+func (s *receiveReceiptServer) serve(ctx context.Context, listener net.Listener, certificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)) error {
 	defer listener.Close()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	mux := http.NewServeMux()
 	mux.Handle("/v1/receipts", s.handler)
-	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: handover.ReceiptWriteTimeout, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 32768, TLSConfig: &tls.Config{Certificates: []tls.Certificate{certificate}, MinVersion: tls.VersionTLS12}, BaseContext: func(net.Listener) context.Context { return ctx }}
+	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: handover.ReceiptWriteTimeout, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 32768, TLSConfig: &tls.Config{GetCertificate: certificate, MinVersion: tls.VersionTLS12}, BaseContext: func(net.Listener) context.Context { return ctx }}
 	collectorDone := make(chan struct{})
 	go func() { s.handler.Run(ctx); close(collectorDone) }()
 	result := make(chan error, 1)

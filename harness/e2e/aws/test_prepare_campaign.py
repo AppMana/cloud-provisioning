@@ -32,7 +32,8 @@ class RenderValuesTest(unittest.TestCase):
         self.assertEqual(receipts['imageIDs'], {'amd64': DIALER, 'arm64': DIALER})
         self.assertEqual(receipts['certFile'], '/etc/cloud-provisioning/receipts/tls.crt')
         self.assertNotIn('endpoint', receipts)
-        self.assertEqual(values['tunnel']['receiptTLSSecret'], subject.RECEIPT_SECRET)
+        # The chart issues the receipt certificate; the harness names none.
+        self.assertNotIn('receiptTLSSecret', values['tunnel'])
         self.assertEqual(values['tunnel']['receivePreparation']['nativeCIDRs'], ['203.0.113.0/24', '172.29.0.0/25'])
         self.assertEqual(values['aws'], {'credentials': {'secretName': 'cloud-provisioning-aws', 'mount': 'env'}})
         self.assertNotIn('awsPodObserver', values)
@@ -52,22 +53,6 @@ class RenderValuesTest(unittest.TestCase):
     def test_receiver_preparation_requires_cloud_ranges(self):
         with self.assertRaisesRegex(ValueError, 'protected cloud range'):
             subject.render_values(state(), URLS, BINARIES, [])
-
-
-class ReceiptTLSTest(unittest.TestCase):
-    def test_serving_certificate_covers_receipt_service_through_run_ca(self):
-        objects = subject.receipt_tls_objects('cldt-test')
-        self.assertEqual([o['kind'] for o in objects], ['Issuer', 'Certificate', 'Issuer', 'Certificate'])
-        ca, serving = objects[1], objects[3]
-        self.assertTrue(ca['spec']['isCA'])
-        self.assertEqual(objects[2]['spec']['ca']['secretName'], ca['spec']['secretName'])
-        self.assertEqual(serving['spec']['secretName'], subject.RECEIPT_SECRET)
-        self.assertEqual(serving['spec']['dnsNames'],
-                         ['cloud-provisioning-endpoint-controller-receipts.cloud-provisioning.svc'])
-        self.assertEqual(serving['spec']['issuerRef']['name'], objects[2]['metadata']['name'])
-        self.assertTrue(all(o['metadata']['labels'] == {'cloud-provisioning-test': 'cldt-test'} for o in objects))
-
-
 
 
 class ControllerCredentials(unittest.TestCase):

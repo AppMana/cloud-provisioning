@@ -4,9 +4,9 @@
 Run on the setup host with setup credentials loaded through source-me.sh. Each
 step calls the helper that owns it (build-binaries.sh, publisher.py, assets.py);
 this command orders them, gives the controller its AWS credentials as an
-operator does (a Secret the chart's aws.credentials names), issues the receipt
-serving certificate through the site's cert-manager and renders the chart
-values from what those helpers recorded. Without --apply it stops after a
+operator does (a Secret the chart's aws.credentials names) and renders the
+chart values from what those helpers recorded; the chart issues the receipt
+serving certificate through the site's cert-manager. Without --apply it stops after a
 server dry run.
 """
 import argparse
@@ -21,37 +21,12 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 NAMESPACE = 'cloud-provisioning'
 AWS_SECRET = 'cloud-provisioning-aws'
-CONTROLLER = 'cloud-provisioning-endpoint-controller'
-RECEIPT_SECRET = 'cldt-receipt-serving'
 RECEIPT_PORT = 9444
 # UDP ports already permitted by the run-owned security group's self rule.
 RECEIVE_PORTS = list(range(51821, 51841))
 ARCHITECTURES = ('amd64', 'arm64')
 COMPONENTS = {'endpoint-controller': 'linuxController', 'dialer': 'linuxDialer'}
 PUBLISHED = {'endpoint-controller': 'endpoint-controller', 'dialer': 'linux-dialer'}
-
-
-def receipt_tls_objects(run_id):
-    """A run-scoped CA and serving certificate; cert-manager renews both."""
-    labels = {'cloud-provisioning-test': run_id}
-    ca, issuer = run_id + '-receipt-ca', run_id + '-receipt-issuer'
-    def meta(name):
-        return {'name': name, 'namespace': NAMESPACE, 'labels': labels}
-    return [
-        {'apiVersion': 'cert-manager.io/v1', 'kind': 'Issuer', 'metadata': meta(run_id + '-receipt-root'),
-         'spec': {'selfSigned': {}}},
-        {'apiVersion': 'cert-manager.io/v1', 'kind': 'Certificate', 'metadata': meta(ca),
-         'spec': {'isCA': True, 'commonName': 'receipt CA ' + run_id, 'secretName': ca,
-                  'privateKey': {'algorithm': 'ECDSA', 'size': 256},
-                  'issuerRef': {'name': run_id + '-receipt-root', 'kind': 'Issuer'}}},
-        {'apiVersion': 'cert-manager.io/v1', 'kind': 'Issuer', 'metadata': meta(issuer),
-         'spec': {'ca': {'secretName': ca}}},
-        {'apiVersion': 'cert-manager.io/v1', 'kind': 'Certificate', 'metadata': meta(RECEIPT_SECRET),
-         'spec': {'secretName': RECEIPT_SECRET, 'dnsNames': [f'{CONTROLLER}-receipts.{NAMESPACE}.svc'],
-                  'usages': ['server auth', 'digital signature', 'key encipherment'],
-                  'privateKey': {'algorithm': 'ECDSA', 'size': 256},
-                  'issuerRef': {'name': issuer, 'kind': 'Issuer'}}},
-    ]
 
 
 def aws_secret(keys):
@@ -93,7 +68,6 @@ def render_values(state, urls, binaries, native_cidrs):
         'providerManagerNamespace': 'capa-system',
         'importedControlPlane': {'providerServiceAccounts': [{'name': 'capa-controller-manager', 'namespace': 'capa-system'}]},
         'tunnel': {
-            'receiptTLSSecret': RECEIPT_SECRET,
             'receivePreparation': {
                 'nativeCIDRs': list(native_cidrs),
                 'ports': RECEIVE_PORTS,
@@ -167,10 +141,6 @@ def main():
     # Server-side, so the keys are not copied into a last-applied annotation.
     bastion(a.runner, a.api_server, 'kubectl', '--server=' + a.api_server, 'apply', '--server-side',
             '--field-manager=cldt-operator', '-f', '-', stdin=json.dumps(aws_secret(json.loads((a.work_dir / 'controller-credentials.json').read_text()))))
-    tls = {'apiVersion': 'v1', 'kind': 'List', 'items': receipt_tls_objects(state['runID'])}
-    bastion(a.runner, a.api_server, 'kubectl', '--server=' + a.api_server, 'apply', '-f', '-', stdin=json.dumps(tls))
-    bastion(a.runner, a.api_server, 'kubectl', '--server=' + a.api_server, '-n', NAMESPACE, 'wait',
-            '--for=condition=Ready', '--timeout=2m', 'certificate/' + RECEIPT_SECRET)
     state = json.loads(state_path.read_text())
     urls = json.loads((a.work_dir / 'asset-urls.json').read_text())
     values = render_values(state, urls, binaries, a.native_cidr)

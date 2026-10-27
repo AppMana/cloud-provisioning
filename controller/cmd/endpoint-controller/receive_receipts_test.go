@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -52,7 +53,9 @@ func TestReceiptServerStopsWithLeadership(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { done <- server.serve(ctx, listener, certificate) }()
+	go func() {
+		done <- server.serve(ctx, listener, func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return &certificate, nil })
+	}()
 	client, err := handover.NewReceiptClient("https://"+listener.Addr().String()+"/v1/receipts", ca)
 	if err != nil {
 		t.Fatal(err)

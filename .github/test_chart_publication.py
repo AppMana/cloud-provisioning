@@ -1,4 +1,5 @@
 """Package the chart using the workflow's actual version arguments; never push."""
+import json
 import os
 from pathlib import Path
 import re
@@ -6,6 +7,8 @@ import subprocess
 import tempfile
 import textwrap
 import unittest
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ".github/workflows/publish-chart.yml"
@@ -133,6 +136,42 @@ class AWSCredentials(unittest.TestCase):
         result = self.render("aws.credentials.secretName=profiles", "aws.credentials.mount=volume")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("aws.credentials.mount", result.stderr)
+
+
+class ReceiptTLS(unittest.TestCase):
+    """Receipt serving gets its certificate from cert-manager unless the
+    operator names a Secret; the CA agents trust outlives serving renewals."""
+    POLICY = json.dumps({"nativeCIDRs": ["192.0.2.0/24"], "ports": [51821], "journal": {
+        "roundLifetime": "5m", "maxReceiptAge": "1m", "drainInterval": "1m", "receipts": {
+            "bindAddress": ":9444", "certFile": "/etc/cloud-provisioning/receipts/tls.crt",
+            "keyFile": "/etc/cloud-provisioning/receipts/tls.key", "imageIDs": {"amd64": "sha256:" + "a" * 64}}}})
+
+    def render(self, *args):
+        return subprocess.run(["helm", "template", "receipt-test", "charts/cloud-provisioning",
+                               "--set-json", "tunnel.receivePreparation=" + self.POLICY, *args],
+                              cwd=ROOT, capture_output=True, text=True)
+
+    def test_cert_manager_issues_and_renews_the_serving_certificate(self):
+        result = self.render("--api-versions", "cert-manager.io/v1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        docs = [d for d in yaml.safe_load_all(result.stdout) if d]
+        certificates = {d["metadata"]["name"]: d for d in docs if d["kind"] == "Certificate"}
+        serving = certificates["cloud-provisioning-endpoint-controller-receipts-tls"]
+        self.assertEqual(serving["spec"]["dnsNames"], ["cloud-provisioning-endpoint-controller-receipts.appmana.svc"])
+        self.assertEqual(serving["spec"]["issuerRef"]["name"], "cloud-provisioning-endpoint-controller-receipts-ca")
+        self.assertTrue(certificates["cloud-provisioning-endpoint-controller-receipts-ca"]["spec"]["isCA"])
+        self.assertIn('\\"trustSecret\\":\\"cloud-provisioning-endpoint-controller-receipts-tls\\"', result.stdout)
+
+    def test_an_operator_secret_is_used_as_given(self):
+        result = self.render("--set", "tunnel.receiptTLSSecret=operator-tls")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("kind: Certificate", result.stdout)
+        self.assertIn('\\"trustSecret\\":\\"operator-tls\\"', result.stdout)
+
+    def test_without_either_rendering_fails(self):
+        result = self.render()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("cert-manager", result.stderr)
 
 
 if __name__ == "__main__":

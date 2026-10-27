@@ -83,7 +83,6 @@ func runLab() {
 		calicoMTU           = flag.Int("k0s-calico-mtu", 0, "bundled Calico MTU for a fresh k0s site; zero preserves the distro default")
 		calicoObjectsPath   = flag.String("calico-objects", "", "prepared native Kubernetes List JSON from the aligned Calico fork (standalone installer)")
 		calicoObjectsSHA256 = flag.String("calico-objects-sha256", "", "required SHA256 of --calico-objects")
-		linuxEgress         = flag.Bool("k0s-linux-egress", false, "add Linux default-route Konnectivity agents on a fresh k0s VM site for mixed-OS API egress")
 		product             = flag.Bool("product", false, "also install the product's chart")
 		remoteSlots         = flag.Int("remote-slots", 2, "fixed single-NIC remote VM capacity (2..32), including spare group slots")
 		vmMemory            = flag.Int("vm-memory-mib", lab.VMMemoryMB, "memory of each cluster VM; budget it against the host's available memory")
@@ -156,9 +155,6 @@ func runLab() {
 		if err := k0s.ValidateImages(selected.BuilderNetwork, k0sImages); err != nil {
 			fail("%v", err)
 		}
-	}
-	if *linuxEgress && (*distro != "k0s" || *rigKind != "vm" || *reuseSite) {
-		fail("--k0s-linux-egress requires a fresh k0s VM site")
 	}
 	if *recoverHost && (!*reuseSite || *rigKind != "vm") {
 		fail("--recover-host rebuilds the host side of an existing VM site and requires -reuse-site")
@@ -379,14 +375,6 @@ func runLab() {
 			if err := observe.Capture(ctx, *workDir, "site-ready", d.Kube, r, rigNodes(topo, nodes)); err != nil {
 				fail("%v", err)
 			}
-		}
-
-		if *linuxEgress {
-			step("installing Linux default-route Konnectivity agents")
-			if err := k0s.InstallDefaultRouteAgents(ctx, d); err != nil {
-				fail("%v", err)
-			}
-			recordEvent("k0s-linux-egress-installed", selected)
 		}
 
 		var claimed []string

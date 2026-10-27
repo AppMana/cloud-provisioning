@@ -2908,7 +2908,15 @@ func main() {
 					if err != nil {
 						return err
 					}
-					return excluder.Verify(ctx, network, class)
+					if err := excluder.Verify(ctx, network, class); err != nil {
+						return err
+					}
+					// A Windows worker on k0s must not take the API
+					// server's Service egress.
+					if class.OS == "windows" && joinProviderName == "k0s" {
+						return joink0s.WindowsEgressReady(ctx, mgr.GetAPIReader())
+					}
+					return nil
 				},
 				Client:                    claimAPI,
 				Workload:                  claimAPI,

@@ -33,7 +33,7 @@ remain unqualified. The Linux cloud-init observer does not apply to Windows. See
 ## Validation boundaries
 
 For CAPI webhook timeouts on mixed-OS k0s sites, see
-[API egress diagnosis and the Linux routing canary](k0s-windows-egress.md).
+[k0s API egress with Windows workers](k0s-windows-egress.md).
 Node readiness and successful Windows exec do not establish webhook reachability.
 
 Use the [ordinary-pod matrix observer](../harness/e2e/observe/README.md) with

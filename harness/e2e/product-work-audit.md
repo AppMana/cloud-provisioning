@@ -27,7 +27,7 @@ documents a genuine operator prerequisite) and deletes the harness stand-in.
 | C15 dialer URL renewal, --reuse-values undo | done: artifact sources may be s3://bucket/key, which the controller signs with aws.credentials at each bootstrap render for the join token's lifetime; nothing renews URLs, so a Helm upgrade cannot revert one; `controller-artifacts.json` published; renew_artifact.py deleted |
 | C16 GatewayRequest built by harness | open |
 | C17 Windows VPC CNI + IPAM | open |
-| D1 k0s mixed-OS egress workaround | open |
+| D1 k0s mixed-OS egress workaround | done: the fix is the pinned k0s fork (native-linux-egress patch); the product refuses Windows claims on a Konnectivity k0s site without its `konnectivity-agent-default-route-linux` agents; the harness addon, `cmd/k0segress` and `-k0s-linux-egress` are deleted |
 | D2 kubeadm image prerequisites | open |
 | D3 LabCluster status | done (54ef1cd) |
 | D4 static identity renewal | open |

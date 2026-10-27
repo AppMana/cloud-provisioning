@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/appmana/cloud-provisioning/harness/e2e/guard"
 	"os"
 	"os/exec"
 	"regexp"
@@ -52,6 +53,9 @@ func (c *CLI) environment() ([]string, error) {
 }
 
 func (c *CLI) Call(ctx context.Context, service, operation string, input map[string]any) (json.RawMessage, error) {
+	if err := guard.AWS(service, operation); err != nil {
+		return nil, err
+	}
 	data, err := json.Marshal(input)
 	if err != nil {
 		return nil, err

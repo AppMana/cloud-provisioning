@@ -185,6 +185,29 @@ step; this check does not prove that all offline runtime images are present.
 The native refresh hold requires snapd 2.58 or newer, as documented in
 [Snap's update controls](https://snapcraft.io/docs/how-to-guides/manage-snaps/manage-updates/).
 
+## The write guard
+
+The harness builds the lab, gives the product what an operator gives it,
+injects faults and observes. Everything else a real cluster needs is the
+product's, and a harness that writes it makes a test pass on the harness
+([product-work-audit.md](product-work-audit.md)). Package `guard` enforces
+that mechanically:
+
+- Once the site and its prerequisites are installed, `cmd/lab` installs
+  `cmd/kubeguard` on the bastion in front of `/usr/bin/kubectl`. Every later
+  kubectl, from Go or Python, is checked against `guard.Policy`: writes in the
+  harness's own namespaces are free; in protected namespaces and at cluster
+  scope only the listed operator inputs and lab objects are allowed. A pinned
+  prerequisite manifest (CAPA's) is admitted whole by digest.
+- `rig/aws.CLI` refuses EC2 operations on what the product owns.
+- Tests scan the harness source and fail on a literal kubectl write to a node,
+  DaemonSet, CNI object or CAPI machine, and on Python EC2 changes the product
+  owns.
+
+`guard.StandIns` and `guard.AWSStandIns` name the writes the harness still
+makes for the product, each with the tracker item that removes it. They only
+shrink.
+
 ## VM nodes through the SDK
 
 Cluster VMs are declared as containerlab `generic_vm` nodes, which is what the

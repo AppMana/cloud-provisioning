@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/netip"
 	"regexp"
+	"slices"
 	"sort"
 
 	"github.com/appmana/labcontainers/pkg/artifact"
@@ -39,7 +40,7 @@ func ReadObjects(ctx context.Context, path, sha256 string) ([]runtime.Object, er
 
 var digestImage = regexp.MustCompile(`^.+@sha256:[0-9a-fA-F]{64}$`)
 
-func prepareObjects(input []runtime.Object, podCIDR string) ([]runtime.Object, []string, error) {
+func prepareObjects(input []runtime.Object, podCIDR, apiServer string) ([]runtime.Object, []string, error) {
 	if len(input) == 0 {
 		return nil, nil, fmt.Errorf("explicit Calico objects from the aligned fork are required; no upstream release is downloaded")
 	}
@@ -85,14 +86,23 @@ func prepareObjects(input []runtime.Object, podCIDR string) ([]runtime.Object, [
 						continue
 					}
 					found++
-					env := corev1.EnvVar{Name: "CALICO_IPV4POOL_CIDR", Value: podCIDR}
+					// The site's pool, unencapsulated so the tunnel sees
+					// packets addressed to pods; Calico creates its default
+					// pool from these. Site nodes have several interfaces, so
+					// each finds its address by the route to the API server.
+					settings := []corev1.EnvVar{
+						{Name: "CALICO_IPV4POOL_CIDR", Value: podCIDR},
+						{Name: "CALICO_IPV4POOL_IPIP", Value: "Never"},
+						{Name: "CALICO_IPV4POOL_VXLAN", Value: "Never"},
+						{Name: "IP_AUTODETECTION_METHOD", Value: "can-reach=" + apiServer},
+					}
 					var updated []corev1.EnvVar
 					for _, current := range container.Env {
-						if current.Name != env.Name {
+						if !slices.ContainsFunc(settings, func(e corev1.EnvVar) bool { return e.Name == current.Name }) {
 							updated = append(updated, current)
 						}
 					}
-					container.Env = append(updated, env)
+					container.Env = append(updated, settings...)
 				}
 			}
 		case "apps/v1, Kind=Deployment":

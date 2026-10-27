@@ -51,7 +51,7 @@ func TestPreparedListUsesNativeObjectsAndPreservesCustomResources(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, _, err := prepareObjects(objects, "10.244.0.0/16")
+	prepared, _, err := prepareObjects(objects, "10.244.0.0/16", "10.10.0.10")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestPreparedListUsesNativeObjectsAndPreservesCustomResources(t *testing.T) 
 func TestNativePoolPinPreservesCallerAndImageIdentity(t *testing.T) {
 	ds := preparedDaemonSet()
 	before := ds.DeepCopy()
-	objects, images, err := prepareObjects([]runtime.Object{ds}, "10.244.0.0/16")
+	objects, images, err := prepareObjects([]runtime.Object{ds}, "10.244.0.0/16", "10.10.0.10")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,9 +80,17 @@ func TestNativePoolPinPreservesCallerAndImageIdentity(t *testing.T) {
 	if !reflect.DeepEqual(images, []string{ds.Spec.Template.Spec.Containers[0].Image}) {
 		t.Fatal("digest identity lost", images)
 	}
-	env := pod.Containers[0].Env
-	if len(env) != 2 || env[0].Name != "PRESERVE" || env[1].Name != "CALICO_IPV4POOL_CIDR" || env[1].Value != "10.244.0.0/16" {
-		t.Fatalf("pool pin failed: %+v", env)
+	// The site's own choices are in the manifest it applies, not patched in
+	// afterwards: its pool, unencapsulated, and how its nodes find their
+	// address.
+	env := map[string]string{}
+	for _, e := range pod.Containers[0].Env {
+		env[e.Name] = e.Value
+	}
+	want := map[string]string{"PRESERVE": env["PRESERVE"], "CALICO_IPV4POOL_CIDR": "10.244.0.0/16", "CALICO_IPV4POOL_IPIP": "Never",
+		"CALICO_IPV4POOL_VXLAN": "Never", "IP_AUTODETECTION_METHOD": "can-reach=10.10.0.10"}
+	if !reflect.DeepEqual(env, want) || pod.Containers[0].Env[0].Name != "PRESERVE" {
+		t.Fatalf("site settings: %+v", pod.Containers[0].Env)
 	}
 }
 
@@ -106,7 +114,7 @@ func TestInvalidObjectsFailClosed(t *testing.T) {
 			case "missing kind":
 				ds.Kind = ""
 			}
-			if _, _, err := prepareObjects([]runtime.Object{ds}, "10.244.0.0/16"); err == nil {
+			if _, _, err := prepareObjects([]runtime.Object{ds}, "10.244.0.0/16", "10.10.0.10"); err == nil {
 				t.Fatal("accepted invalid input")
 			}
 		})

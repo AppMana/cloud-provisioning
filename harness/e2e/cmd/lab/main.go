@@ -28,6 +28,7 @@ import (
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/kubeadm"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/microk8s"
 	_ "github.com/appmana/cloud-provisioning/harness/e2e/cluster/rke2"
+	"github.com/appmana/cloud-provisioning/harness/e2e/guard"
 	"github.com/appmana/cloud-provisioning/harness/e2e/install"
 	"github.com/appmana/cloud-provisioning/harness/e2e/kube"
 	"github.com/appmana/cloud-provisioning/harness/e2e/lab"
@@ -377,6 +378,23 @@ func runLab() {
 			}
 		}
 
+		// From here on the harness writes only what an operator would
+		// give the product, the lab's own objects and its probes: every
+		// kubectl on the bastion goes through the write guard.
+		installGuard := func() {
+			step("the harness write guard")
+			binary, err := guard.Build(ctx, filepath.Join(*repoDir, "harness", "e2e"), *workDir)
+			if err != nil {
+				fail("%v", err)
+			}
+			if err := guard.Install(ctx, r.Node("bastion"), binary); err != nil {
+				fail("%v", err)
+			}
+		}
+		if !*product {
+			installGuard()
+		}
+
 		var claimed []string
 		if *product {
 			step("installing the product")
@@ -412,6 +430,7 @@ func runLab() {
 			}
 			defer func() { _ = origin.Stop(context.Background()) }()
 
+			installGuard()
 			if err := prod.Install(ctx, install.Options{
 				TunnelEndpoints: "kubernetes.io/hostname in (w1,w2)",
 				JoinProvider:    *distro,

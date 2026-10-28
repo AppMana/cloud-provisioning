@@ -55,17 +55,26 @@ subjects:
     namespace: {{ .Release.Namespace }}
 ---
 {{- /*
-Cluster API's core manager reads control-plane kinds through its
-aggregated ClusterRole; infrastructure providers (CAPA) read the
-control-plane contract while reconciling workers and are bound
-explicitly. Neither may change the resource.
+Cluster API's core manager reconciles control-plane kinds through its
+aggregated ClusterRole (stamping the Cluster ownerReference and cluster-name
+label); infrastructure providers (CAPA) read the control-plane contract while
+reconciling workers and are bound explicitly.
 */}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "cloud-provisioning.name" . }}-imported-control-plane-reader
+  name: {{ include "cloud-provisioning.name" . }}-imported-control-plane-manager
   labels:
     cluster.x-k8s.io/aggregate-to-manager: "true"
+rules:
+  - apiGroups: ["cloud-provisioning.appmana.com"]
+    resources: ["importedcontrolplanes"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cloud-provisioning.name" . }}-imported-control-plane-reader
 rules:
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["importedcontrolplanes"]

@@ -203,11 +203,6 @@ and waits for the builder to stop before snapshotting. Require a fresh CAPA
 instance to join and pass pod networking checks before accepting an image;
 successful SSM access or bootstrap-secret retrieval alone is insufficient.
 
-The AWS integration uses **k0s v1.34.1+k0s.0** and its bundled
-**Calico v3.29.6-0**, with the distribution's default VXLAN configuration. Five single-NIC site VMs and two single-ENI EC2 workers pass all **140** checks
-for pod traffic, Services, 1 MiB transfers, DNS and external access. The full AWS validation passes **1,184 checks across nine gates**: two independent
-delete-and-readd cycles, survivor connectivity, and all four endpoint placements. Both replacements require new EC2 instance IDs and Kubernetes Node UIDs.
-
 For k0s, k3s and RKE2, use a compatible cloud-init image with systemd and
 WireGuard support. MicroK8s additionally needs snapd and Python 3; its current
 pattern installs snapd using apt when absent. kubeadm requires an image containing
@@ -284,8 +279,6 @@ tag. The
 `ec2:Attribute/SourceDestCheck` condition allows the Boolean setting to be
 disabled and restored; it does not grant changes to other interface attributes.
 This uses AWS's [attribute-specific IAM conditions](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-policies-for-amazon-ec2.html).
-Real EC2 DryRun calls allowed both setting values and denied a description
-change with the same temporary session.
 
 The adapter records the original setting before modifying EC2. Worker leases
 share the disabled setting; the final release restores it only if it was
@@ -307,7 +300,7 @@ checks the observed permission and recorded rule ID, and revokes only that ID
 after the final lease release. It rejects an existing matching permission
 without ownership. See the [EC2 authorization reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ec2.html). Do not grant this role to worker pods. The adapter validates an explicit IPv4
 host source and UDP port; these packet fields are application constraints,
-not restrictions enforced by this IAM policy. All original rules were restored.
+not restrictions enforced by this IAM policy.
 
 For the gateway controller's guest observations, attach
 [gateway-observation.json](iam/gateway-observation.json) to its AWS role after
@@ -1082,9 +1075,7 @@ it acknowledges direct tunnel routes. The controller stages this change with
 routes. Only the exact worker's acknowledgement permits global withdrawal;
 all recipients must then acknowledge before forwarding resources and CAPI hooks
 are released. Controllers that ignore `retiringWorker` cannot perform this
-staged transition. Both retain UDP failures and therefore do not
-qualify uninterrupted lifecycle traffic. CPU results do not qualify GPU caching,
-fragmented UDP or repeated reliability. Use the
+staged transition. Use the
 [withdrawal recorder](../harness/e2e/observe/README.md#verifying-staged-gateway-withdrawal)
 with original object UIDs and preserve incomplete observations.
 

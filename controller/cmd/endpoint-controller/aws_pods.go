@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/netip"
 	"strings"
@@ -75,4 +76,44 @@ func nativeAllowedIPs(machine *unstructured.Unstructured, secret *corev1.Secret,
 		}
 	}
 	return strings.Join(hosts, ","), nil
+}
+
+// remoteNeighborSourcesWithdrawn reports whether desiredRaw narrows any remote
+// neighbor's WGAllowedIPs compared to currentRaw (for example when verified
+// same-VPC native network membership removes underlay destinations from a
+// bootstrap peer list before receiver preparation begins).
+func remoteNeighborSourcesWithdrawn(currentRaw, desiredRaw []byte) bool {
+	var current, desired tunnel.PeerListDoc
+	if err := json.Unmarshal(currentRaw, &current); err != nil {
+		return false
+	}
+	if err := json.Unmarshal(desiredRaw, &desired); err != nil {
+		return false
+	}
+	desiredPeers := make(map[string]map[string]bool, len(desired.Peers))
+	for _, peer := range desired.Peers {
+		if !peer.Remote {
+			continue
+		}
+		allowed := make(map[string]bool, len(peer.WGAllowedIPs))
+		for _, prefix := range peer.WGAllowedIPs {
+			allowed[prefix] = true
+		}
+		desiredPeers[peer.PublicKey] = allowed
+	}
+	for _, peer := range current.Peers {
+		if !peer.Remote {
+			continue
+		}
+		allowed, ok := desiredPeers[peer.PublicKey]
+		if !ok {
+			continue
+		}
+		for _, prefix := range peer.WGAllowedIPs {
+			if !allowed[prefix] {
+				return true
+			}
+		}
+	}
+	return false
 }

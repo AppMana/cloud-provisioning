@@ -149,6 +149,13 @@ def main():
     values = render_values(state, urls, binaries, a.native_cidr)
     values_path = out / 'campaign-values.json'
     values_path.write_text(json.dumps(values, indent=2) + '\n')
+    chart_src = REPO / 'charts' / 'cloud-provisioning'
+    chart_tar = run(['tar', '-C', str(chart_src), '-cf', '-', 'Chart.yaml', 'values.yaml', 'templates', 'crds'],
+                    capture_output=True).stdout
+    run(['docker', 'exec', '-i', a.runner, 'docker', 'exec', '-i', 'clab-cldt-bastion', 'tar', '-C', a.chart, '-xf', '-'],
+        input=chart_tar)
+    for crd in sorted((chart_src / 'crds').glob('*.yaml')):
+        bastion(a.runner, a.api_server, 'kubectl', '--server=' + a.api_server, 'apply', '-f', '-', stdin=crd.read_text())
     helm = ['helm', 'upgrade', 'cloud-provisioning', a.chart, '-n', NAMESPACE, '--kube-apiserver=' + a.api_server, '--reuse-values', '-f', '-']
     bastion(a.runner, a.api_server, *helm, '--dry-run=server', stdin=json.dumps(values))
     if a.apply:

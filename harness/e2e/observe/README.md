@@ -576,10 +576,7 @@ on Windows. A snapshot cannot establish that a deleted Pod or an out-of-band
 container never ran, so retain the earlier observations and native startup
 records as well. Build-selected plugin readiness and GPU execution remain
 separate checks. The GPU gate also requires positive, consistent WDDM capacity
-and allocatable resources on the Node. In the refreshed Windows 2025 trial, the
-plugin Pod became Ready before kubelet reported that resource; submitting then
-produced an `Insufficient directx.microsoft.com/display` scheduling warning.
-Wait for this gate before submitting the first GPU Job.
+and allocatable resources on the Node. Wait for this gate before submitting the first GPU Job.
 
 ## Analyze Windows peer membership captures
 

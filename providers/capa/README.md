@@ -49,8 +49,7 @@ receipt as evidence for a new VM.
 `cmd/awsnode -bootstrap-status` observes this contract through the selected
 machine adapter. Add `-bootstrap-wait 15m -timeout 16m` to wait for completion. New Windows lifecycle rows require this receipt through
 `aws/windows_join.py --require-bootstrap-completion`. They need a CAPA controller
-built from the updated consumer; older controllers do not write the receipt. The existing Windows image prerequisites remain unchanged. Those joins required renewal of
-expired private image pull credentials. Workload traffic, continuous survivor
+built from the updated consumer; older controllers do not write the receipt. The existing Windows image prerequisites remain unchanged. Workload traffic, continuous survivor
 availability and Windows replacement remain separate qualification gates.
 
 The extension requires the Secrets Manager backend and refuses the insecure

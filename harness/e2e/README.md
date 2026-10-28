@@ -190,7 +190,7 @@ The native refresh hold requires snapd 2.58 or newer, as documented in
 The harness builds the lab, gives the product what an operator gives it,
 injects faults and observes. Everything else a real cluster needs is the
 product's, and a harness that writes it makes a test pass on the harness
-([product-work-audit.md](product-work-audit.md)). Package `guard` enforces
+rather than the product. Package `guard` enforces
 that mechanically:
 
 - Once the site and its prerequisites are installed, `cmd/lab` installs

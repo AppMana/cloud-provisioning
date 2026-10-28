@@ -14,6 +14,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/attachment"
 	"github.com/appmana/cloud-provisioning/controller/pkg/handover"
 	"github.com/appmana/cloud-provisioning/controller/pkg/join"
+	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	corev1 "k8s.io/api/core/v1"
@@ -90,6 +91,9 @@ func (r *meshReconciler) prepareRemoteReceiveGeneration(ctx context.Context, exp
 	if !ready || node.UID == "" || node.Status.NodeInfo.BootID == "" || node.DeletionTimestamp != nil {
 		return nil, nil
 	}
+	if node.Labels[platform.CNILabel] != "" && len(mesh.Data[tunnel.PeerNativeNetworkPrefix+machine.GetName()]) == 0 {
+		return nil, nil
+	}
 	root := string(mesh.Data[tunnel.PeerPublicKeyPrefix+machine.GetName()])
 	key, err := wgtypes.ParseKey(root)
 	if err != nil || key == (wgtypes.Key{}) || key.String() != root {
@@ -127,6 +131,9 @@ func (r *meshReconciler) prepareRemoteReceiveGeneration(ctx context.Context, exp
 	}
 	if err := json.Unmarshal(futureRaw, &future); err != nil {
 		return nil, err
+	}
+	if predecessor == nil && remoteNeighborSourcesWithdrawn(baseRaw, futureRaw) {
+		return nil, nil
 	}
 	request := tunnel.ReceivePrepare{Version: 1, MeshUID: string(mesh.UID), NodeName: node.Name, NodeUID: string(node.UID), BootID: node.Status.NodeInfo.BootID, RootPublicKey: root, BaseHash: tunnel.HashPeerList(baseRaw), Desired: future, Native: native}
 	if predecessor != nil {

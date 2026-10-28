@@ -196,6 +196,9 @@ func (p *Product) Install(ctx context.Context, opts Options, dialerSHA string) e
 	if err := p.carryChart(ctx); err != nil {
 		return err
 	}
+	if err := p.applyCRDs(ctx); err != nil {
+		return err
+	}
 
 	// The real values an operator sets, and nothing else. imagePullPolicy
 	// is Never because the site has no registry; the rest is what the
@@ -269,6 +272,30 @@ func (p *Product) carryChart(ctx context.Context) error {
 	if _, err := p.Kube.Bastion.Exec(ctx, "sh", "-c",
 		"rm -rf "+ChartPath+" && mv "+staging+"/cloud-provisioning "+ChartPath); err != nil {
 		return err
+	}
+	return nil
+}
+
+// applyCRDs applies the chart's CRDs before helm upgrade so new or updated
+// CRDs are present when reusing an existing release (Helm skips crds/ on
+// upgrade).
+func (p *Product) applyCRDs(ctx context.Context) error {
+	crdsDir := filepath.Join(p.RepoDir, "charts", "cloud-provisioning", "crds")
+	entries, err := os.ReadDir(crdsDir)
+	if err != nil {
+		return fmt.Errorf("reading chart crds: %w", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || (!strings.HasSuffix(entry.Name(), ".yaml") && !strings.HasSuffix(entry.Name(), ".yml")) {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Join(crdsDir, entry.Name()))
+		if err != nil {
+			return err
+		}
+		if err := p.Kube.Apply(ctx, body); err != nil {
+			return fmt.Errorf("applying CRD %s: %w", entry.Name(), err)
+		}
 	}
 	return nil
 }

@@ -338,7 +338,9 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	// A native network's allocations change without any Kubernetes event,
 	// so a node on one is observed again periodically.
 	observedNative := false
-	if nodeName := r.nodeNameForMachine(ctx, machine); nodeName != "" {
+	nativeNode := false
+	nodeName := r.nodeNameForMachine(ctx, machine)
+	if nodeName != "" {
 		published, err := r.publishRemotePodCIDRs(ctx, machine, nodeName)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -346,6 +348,7 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 		remoteBlocksPending = !published
 		node := &corev1.Node{}
 		if err := r.reader.Get(ctx, types.NamespacedName{Name: nodeName}, node); err == nil {
+			nativeNode = node.Labels[platform.CNILabel] != ""
 			_, observedNative = r.nativeObservers[node.Labels[platform.CNILabel]]
 		}
 	}
@@ -397,13 +400,23 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	// safe for the address the tunnel also dials. The join reconciler
 	// cannot write these at render time because the address does not
 	// exist yet; this mirror is where it first becomes known.
+	//
+	// Before the Node exists or on a provider-native network, only the
+	// dialled endpoint address is published here; InternalIP addresses on a
+	// native network are published atomically with peer-native-network-<machine>
+	// in publishRemotePodCIDRs so same-VPC neighbors never observe an unverified
+	// underlay address that would later have to be withdrawn.
+	endpointAddrs := machineAddrs
+	if nodeName == "" || nativeNode {
+		endpointAddrs = []string{externalIP}
+	}
 	machineKey := r.secretKey + machine.GetName()
 	allowedKey := tunnel.PeerAllowedIPsPrefix + machine.GetName()
 	routeHostsKey := tunnel.PeerRouteHostsPrefix + machine.GetName()
 	allowed := tunnel.SplitList(string(secret.Data[allowedKey]))
 	routeHosts := tunnel.SplitList(string(secret.Data[routeHostsKey]))
 	wantAllowed, wantRouteHosts := allowed, routeHosts
-	for _, addr := range machineAddrs {
+	for _, addr := range endpointAddrs {
 		wantAllowed = appendMissing(wantAllowed, tunnel.HostCIDR(addr))
 		wantRouteHosts = appendMissing(wantRouteHosts, addr)
 	}
@@ -423,6 +436,13 @@ func (r *meshReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 			return ctrl.Result{}, fmt.Errorf("patching secret %s: %w", secretKey, err)
 		}
 		log.Info("updated dialer peer endpoint", "endpoint", endpoint, "machine", req.NamespacedName)
+	}
+
+	if err := r.ensureAdoptionConfig(ctx, machine); err != nil {
+		return ctrl.Result{}, fmt.Errorf("ensuring adoption config: %w", err)
+	}
+	if err := r.ensureDialerRole(ctx); err != nil {
+		return ctrl.Result{}, fmt.Errorf("scoping the dialer Role: %w", err)
 	}
 
 	if r.gatewayName != "" {
@@ -1652,14 +1672,28 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 		hosts = append(hosts, prefix.String())
 	}
 	want := strings.Join(hosts, ",")
+	routeHostsKey := tunnel.PeerRouteHostsPrefix + machine.GetName()
+	wantRouteHosts := string(secret.Data[routeHostsKey])
 	if nativeNode {
 		want, err = nativeAllowedIPs(machine, secret, prefixes)
 		if err != nil {
 			return false, err
 		}
+		addresses, _, err := unstructured.NestedSlice(machine.Object, "status", "addresses")
+		if err != nil {
+			return false, err
+		}
+		_, machineAddresses := machineHosts(addresses)
+		routeHosts := tunnel.SplitList(wantRouteHosts)
+		for _, addr := range machineAddresses {
+			routeHosts = appendMissing(routeHosts, addr)
+		}
+		wantRouteHosts = strings.Join(routeHosts, ",")
 	}
 	nativeKey := tunnel.PeerNativeNetworkPrefix + machine.GetName()
-	if want == string(secret.Data[key]) && string(nativeNetwork) == string(secret.Data[nativeKey]) {
+	if want == string(secret.Data[key]) &&
+		string(nativeNetwork) == string(secret.Data[nativeKey]) &&
+		(!nativeNode || wantRouteHosts == string(secret.Data[routeHostsKey])) {
 		return true, nil
 	}
 	if err := attachment.CheckPeerPublication(ctx, r.reader, machine); err != nil {
@@ -1672,6 +1706,9 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 	secret.Data[key] = []byte(want)
 	if nativeNode {
 		secret.Data[nativeKey] = nativeNetwork
+		if wantRouteHosts != "" {
+			secret.Data[routeHostsKey] = []byte(wantRouteHosts)
+		}
 	} else {
 		delete(secret.Data, nativeKey)
 	}
@@ -1679,6 +1716,24 @@ func (r *meshReconciler) publishRemotePodCIDRs(ctx context.Context, machine *uns
 		return false, fmt.Errorf("publishing the remote node's pod blocks: %w", err)
 	}
 	return true, nil
+}
+
+func (r *meshReconciler) hasReceiveJournal(ctx context.Context, machine *unstructured.Unstructured) (bool, error) {
+	if r.receivePreparation == nil || r.receivePreparation.Journal == nil || r.receiveJournal.ConfigMaps == nil {
+		return false, nil
+	}
+	uid := string(machine.GetUID())
+	if uid == "" {
+		return false, nil
+	}
+	_, err := r.receiveJournal.ConfigMaps.Get(ctx, tunnel.ReceiveTransitionName(uid), metav1.GetOptions{})
+	if err == nil {
+		return true, nil
+	}
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unstructured.Unstructured) error {
@@ -1711,6 +1766,21 @@ func (r *meshReconciler) ensureAdoptionConfig(ctx context.Context, machine *unst
 	if r.receivePreparation != nil {
 		if !machine.GetDeletionTimestamp().IsZero() || machine.GetAnnotations()[attachment.DrainIntentAnnotation] != "" {
 			return nil
+		}
+		_, preparing := existing.Data[tunnel.ReceivePrepareKey]
+		if !preparing && remoteNeighborSourcesWithdrawn(existing.Data[tunnel.CloudPeersKey], doc) {
+			hasJournal, err := r.hasReceiveJournal(ctx, machine)
+			if err != nil {
+				return err
+			}
+			if !hasJournal {
+				patch := client.MergeFromWithOptions(existing.DeepCopy(), client.MergeFromWithOptimisticLock{})
+				if existing.Data == nil {
+					existing.Data = map[string][]byte{}
+				}
+				existing.Data[tunnel.CloudPeersKey] = doc
+				return r.Patch(ctx, existing, patch)
+			}
 		}
 		return r.reconcileReceivePreparation(ctx, machine)
 	}

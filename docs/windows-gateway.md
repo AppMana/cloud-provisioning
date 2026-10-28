@@ -84,10 +84,9 @@ Use refreshable role credentials when wiring the runtime, following the
 The transport preserves the harness JSON observation contract, including ENI
 `TagSet`, source/destination check booleans, ownership tags and pagination tokens.
 SDK protocol tests cover signed requests and service errors. This transport is
-available through opt-in runtime registration. The managed two-worker validation below exercises the registered worker with
-real AWS attachment requests.
+available through opt-in runtime registration.
 
-The [EC2 route adapter](../controller/pkg/attachment/aws/routes.go) now provides
+The [EC2 route adapter](../controller/pkg/attachment/aws/routes.go) provides
 shared return-route leases with a separate per-route journal. It persists create
 and delete intent, resolves uncertain API responses by reading the exact target,
 preserves a route until its final lease is released, and refuses pre-existing
@@ -98,8 +97,7 @@ provider scope; its shared adapter serializes resource operations across workers
 in the mesh Secret's namespace, named from a hash of the Secret name. Controllers
 pointing at the same mesh contend for that lock even if their Deployment names
 differ. Lease release on cancellation is disabled so takeover waits for expiry. The chart's controller Role grants Lease get/list/watch/create/update/patch;
-manual RBAC installations must provide these before upgrading the binary. All ten Nodes
-remain Ready. No gateway requests were submitted. Different meshes sharing AWS
+manual RBAC installations must provide these before upgrading the binary. Different meshes sharing AWS
 resources still require an explicit common ownership scope.
 
 The [UDP ingress adapter](../controller/pkg/attachment/aws/ingress.go) shares
@@ -189,8 +187,7 @@ hash; it does not require a WireGuard key for an interface that no longer exists
 A retained-endpoint receipt cannot acknowledge the subsequent non-endpoint role.
 
 The controller configuration
-pins the site image; direct DaemonSet image edits are overwritten by that owner. No gateway projection was active during this validation. Retained-endpoint
-receipts have unit coverage but still need a live placement-transition test. The [projection store](../controller/pkg/attachment/projection_store.go) persists
+pins the site image; direct DaemonSet image edits are overwritten by that owner. The [projection store](../controller/pkg/attachment/projection_store.go) persists
 desired entries in the original mesh Secret using resourceVersion concurrency
 checks. It preserves unrelated leases and fields, refuses active binding changes,
 and validates the complete site render before updating it. Tests cover shared
@@ -385,8 +382,7 @@ Automatic gateway deletion and the remaining provider/distro paths still need
 native tests. Deployments without the paired hooks must withdraw the attachment
 and wait for its request finalizer before deleting participants. Missing consumers
 block acknowledgement until retirement is proved against Node, adoption Secret
-and mesh identities. One UDP case failed in the post-removal matrix, so this
-resource-lifecycle result does not qualify sustained workload connectivity.
+and mesh identities.
 
 The native Windows tunnel service verifies desired kernel routes before renewing
 an unchanged delivery receipt. Missing routes trigger repair from the current OS

@@ -83,3 +83,59 @@ func TestControllerDrainPermissions(t *testing.T) {
 		})
 	}
 }
+
+func TestImportedControlPlaneClusterAPIRBAC(t *testing.T) {
+	if _, err := exec.LookPath("helm"); err != nil {
+		t.Skip("native Helm required")
+	}
+	chart := t.TempDir()
+	if err := os.Mkdir(filepath.Join(chart, "templates"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(chart, "Chart.yaml"), []byte("apiVersion: v2\nname: icp-rbac\nversion: 0.1.0\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"values.yaml", "templates/_helpers.tpl", "templates/imported-control-plane.yaml"} {
+		body, err := os.ReadFile(filepath.Join("../../../charts/cloud-provisioning", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(chart, name), body, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	body, err := exec.Command("helm", "template", "test", chart,
+		"--set", "importedControlPlane.providerServiceAccounts[0].name=capa-controller-manager",
+		"--set", "importedControlPlane.providerServiceAccounts[0].namespace=capa-system",
+	).CombinedOutput()
+	if err != nil {
+		t.Fatalf("render: %v: %s", err, body)
+	}
+	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(body), 4096)
+	roles := map[string]rbacv1.ClusterRole{}
+	for {
+		var role rbacv1.ClusterRole
+		if err := decoder.Decode(&role); err == io.EOF {
+			break
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		if role.Kind == "ClusterRole" {
+			roles[role.Name] = role
+		}
+	}
+	mgr, ok := roles["cloud-provisioning-imported-control-plane-manager"]
+	if !ok || mgr.Labels["cluster.x-k8s.io/aggregate-to-manager"] != "true" {
+		t.Fatalf("missing CAPI manager aggregated ClusterRole: %+v", mgr)
+	}
+	if len(mgr.Rules) != 1 || !slices.Equal(mgr.Rules[0].Verbs, []string{"get", "list", "watch", "patch", "update"}) {
+		t.Fatalf("unexpected CAPI manager verbs: %+v", mgr.Rules)
+	}
+	reader, ok := roles["cloud-provisioning-imported-control-plane-reader"]
+	if !ok || reader.Labels["cluster.x-k8s.io/aggregate-to-manager"] != "" {
+		t.Fatalf("provider reader ClusterRole missing or unexpectedly aggregated: %+v", reader)
+	}
+	if len(reader.Rules) != 1 || !slices.Equal(reader.Rules[0].Verbs, []string{"get", "list", "watch"}) {
+		t.Fatalf("unexpected provider reader verbs: %+v", reader.Rules)
+	}
+}

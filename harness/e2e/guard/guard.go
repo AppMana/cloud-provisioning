@@ -157,7 +157,7 @@ func Check(w Write) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("%w: %s is the product's or the site's to write; if a real cluster needs it, the product must do it (see harness/e2e/product-work-audit.md)", ErrRefused, w)
+	return fmt.Errorf("%w: %s is the product's or the site's to write; if a real cluster needs it, the product must do it", ErrRefused, w)
 }
 
 // Writes lists what a kubectl invocation would change. A read changes

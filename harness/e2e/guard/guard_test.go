@@ -57,6 +57,8 @@ func TestOperatorInputsLabObjectsAndProbesAreAllowed(t *testing.T) {
 	allowed(t, "-n cloud-provisioning patch secret remote1-tunnel-peers --type=json -p []", "")
 	allowed(t, "-n cloud-provisioning create configmap cldt-vm-slots --from-literal=pool.json={} -o json", "")
 	allowed(t, "apply -f -", `{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"cldt-probe"}}`)
+	allowed(t, "apply -f -", `{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"ClusterRole","metadata":{"name":"capi-aggregate-labcontainers"}}`)
+	refused(t, "apply -f -", `{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"ClusterRole","metadata":{"name":"other"}}`)
 	allowed(t, "apply -f -", `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"hc-w1","namespace":"cldt-probe"}}`)
 	allowed(t, "delete namespace cldt-probe --wait=false", "")
 	allowed(t, "-n kube-system get daemonset calico-node -o json", "")

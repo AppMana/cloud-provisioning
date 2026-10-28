@@ -85,6 +85,7 @@ var Policy = []Allowed{
 	{Resource: "awsclusterroleidentities", Verbs: []string{"apply", "create"}, Why: "operator: CAPA's role"},
 	{Resource: "secrets", Namespaces: []string{"kube-system"}, Verbs: []string{"apply"}, Names: []string{"*-ipam-pull", "*-calico-pull"}, Why: "operator: registry credentials for kube-system images (platforms.aws.vpcCNI.windows.pullSecrets, the site's Windows Calico)"},
 	{Resource: "customresourcedefinitions", Verbs: []string{"apply", "create"}, Why: "lab: the lab infrastructure provider's own kinds"},
+	{Resource: "clusterroles", Verbs: []string{"apply", "create"}, Names: []string{"capi-aggregate-labcontainers"}, Why: "lab: the lab infrastructure provider's CAPI aggregation role"},
 }
 
 // StandIns are writes the harness still makes for the product, each with

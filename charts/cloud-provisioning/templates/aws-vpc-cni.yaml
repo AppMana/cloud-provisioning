@@ -94,6 +94,10 @@ rules:
   {{- if .Values.platforms.aws.vpcCNI.windows.ipamImage }}
   # Windows IPAM's Deployment, which the controller applies with the AWS
   # cluster's facts.
+  - apiGroups: [""]
+    resources: ["services"]
+    resourceNames: ["kube-dns"]
+    verbs: ["get"]
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["create"]

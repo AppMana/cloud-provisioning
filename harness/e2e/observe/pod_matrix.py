@@ -41,7 +41,7 @@ class Kubectl:
         try:
             result = subprocess.run(self.command + ["exec", "-i", source["pod"],
                 "-c", source["container"], "--", CURL[source["os"]],
-                "--silent", "--show-error", "--fail", "--max-time", str(timeout),
+                "--globoff", "--silent", "--show-error", "--fail", "--max-time", str(timeout),
                 "--noproxy", "*"] + arguments, input=body,
                 capture_output=True, timeout=timeout + 15)
             return result.stdout, result.returncode, result.stderr.decode("utf-8", errors="replace")
@@ -112,14 +112,14 @@ def host(address):
     return "[" + address + "]" if ":" in address else address
 
 
-def run(kube, targets, namespace, tries=10, udp_sizes=DEFAULT_UDP_SIZES, udp_only=False):
+def run(kube, targets, namespace, tries=10, udp_sizes=DEFAULT_UDP_SIZES, udp_only=False, family=None):
     if not 1 <= tries <= 100:
         raise ValueError("UDP tries must be between 1 and 100")
     udp_sizes = tuple(udp_sizes)
     if (not udp_sizes or len(set(udp_sizes)) != len(udp_sizes) or
             any(type(size) is not int or not 1 <= size <= 2043 for size in udp_sizes)):
         raise ValueError("UDP sizes must be distinct integers from 1 to 2043 (agnhost buffer minus echo prefix)")
-    before = snapshot(kube, targets)
+    before = snapshot(kube, targets, family=family)
     rows = []
     for source in before:
         for target in before:
@@ -160,14 +160,15 @@ def run(kube, targets, namespace, tries=10, udp_sizes=DEFAULT_UDP_SIZES, udp_onl
                                  finishedAt=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                                  rawBody=body.decode("utf-8-sig", errors="replace")))
     try:
-        stable = snapshot(kube, targets) == before
+        stable = snapshot(kube, targets, family=family) == before
         identity_error = None
     except (ValueError, KeyError, subprocess.SubprocessError) as error:
         stable, identity_error = False, type(error).__name__
     return dict(observedAt=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         scope=("Distinct-node ordinary-pod " + ("UDP sweep" if udp_only else "matrix") +
                " through Kubernetes exec; excludes policy and failover"),
-        parameters=dict(udpTries=tries, udpPayloadBytes=list(udp_sizes), udpOnly=udp_only),
+        parameters=dict(udpTries=tries, udpPayloadBytes=list(udp_sizes), udpOnly=udp_only,
+                        **({"addressFamily": family} if family is not None else {})),
         targets=before, checks=rows, identitiesStable=stable, identityError=identity_error,
         ok=stable and bool(rows) and all(row["ok"] for row in rows))
 
@@ -182,6 +183,7 @@ def main():
     parser.add_argument("--udp-payload-bytes", action="append", type=int,
                         help="repeat for each UDP payload size; 1..2043, excluding the echo prefix")
     parser.add_argument("--udp-only", action="store_true", help="run only the directed UDP sweep")
+    parser.add_argument("--family", type=int, choices=[4, 6], default=None)
     parser.add_argument("--output", type=pathlib.Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
@@ -192,7 +194,7 @@ def main():
     report = run(Kubectl(args.api_server, args.bastion, args.namespace),
                  targets, args.namespace, args.tries,
                  args.udp_payload_bytes if args.udp_payload_bytes is not None else DEFAULT_UDP_SIZES,
-                 args.udp_only)
+                 args.udp_only, family=args.family)
     with args.output.open("x") as output:
         json.dump(report, output, indent=2)
         output.write("\n")

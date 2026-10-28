@@ -1,10 +1,11 @@
 # Native image-layer regression test. Requires a fresh, unjoined image builder.
 param(
     [Parameter(Mandatory=$true)][string]$Archive,
-    [string]$Recipe=(Join-Path $PSScriptRoot 'cni-artifacts.json')
+    [string]$Recipe=$(if (Test-Path (Join-Path $PSScriptRoot 'cni-artifacts.json')) { Join-Path $PSScriptRoot 'cni-artifacts.json' } else { Join-Path $PSScriptRoot '..\..\..\controller\pkg\platform\aws\windowscni\cni-artifacts.json' })
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
+$verifyScript=if (Test-Path (Join-Path $PSScriptRoot 'verify-cni.ps1')) { Join-Path $PSScriptRoot 'verify-cni.ps1' } else { Join-Path $PSScriptRoot '..\..\..\controller\pkg\platform\aws\windowscni\verify-cni.ps1' }
 $root='C:\ProgramData\CloudProvisioning'
 $plugin='C:\opt\cni\bin\vpc-bridge.exe'
 $connector='C:\Program Files\Amazon\EKS\bin\aws-vpc-cni-k8s-connector.exe'
@@ -40,7 +41,7 @@ try {
         $tests.Add($field+' rejected without installation')
     }
     $first=& "$PSScriptRoot\prepare-cni.ps1" -Archive $Archive -Recipe $Recipe | ConvertFrom-Json
-    $verified=& "$PSScriptRoot\verify-cni.ps1" -Recipe $Recipe | ConvertFrom-Json
+    $verified=& $verifyScript -Recipe $Recipe | ConvertFrom-Json
     if ($first.pluginSHA256 -ne $verified.pluginSHA256 -or $first.connectorSHA256 -ne $verified.connectorSHA256) { throw 'Installed verification differs from preparation' }
     $tests.Add('native installation and readback')
     $repeat=& "$PSScriptRoot\prepare-cni.ps1" -Archive $Archive -Recipe $Recipe | ConvertFrom-Json
@@ -50,12 +51,12 @@ try {
     Copy-Item -LiteralPath $plugin -Destination $backup
     try {
         [IO.File]::WriteAllText($plugin,'invalid executable')
-        Expect-Failure { & "$PSScriptRoot\verify-cni.ps1" -Recipe $Recipe } 'Installed AWS CNI checksum mismatch'
+        Expect-Failure { & $verifyScript -Recipe $Recipe } 'Installed AWS CNI checksum mismatch'
         Expect-Failure { & "$PSScriptRoot\prepare-cni.ps1" -Archive $Archive -Recipe $Recipe } 'AWS CNI destination already contains a different artifact'
         if ([IO.File]::ReadAllText($plugin) -ne 'invalid executable') { throw 'Preparation overwrote an unexpected binary' }
     } finally { Copy-Item -LiteralPath $backup -Destination $plugin -Force }
     $tests.Add('tamper detected and unexpected artifact preserved')
-    $null=& "$PSScriptRoot\verify-cni.ps1" -Recipe $Recipe
+    $null=& $verifyScript -Recipe $Recipe
     if (@(Get-ChildItem 'C:\etc\cni\net.d' -File -ErrorAction SilentlyContinue).Count) { throw 'Image preparation created node-specific CNI configuration' }
     if (Test-Path 'C:\var\lib\k0s\kubelet.conf') { throw 'Image preparation created cluster credentials' }
     if (Get-Service k0sworker -ErrorAction SilentlyContinue) { throw 'Image preparation installed a worker service' }

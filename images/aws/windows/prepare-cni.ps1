@@ -26,11 +26,12 @@ if ($previous -and $previous -ne $kubeconfig) { throw 'Existing machine kubeconf
 # A revision may replace only a complete installation matching an explicitly
 # supplied previous recipe. Verification runs before any destination changes.
 $previousVerified=$false
+$verifyScript=if (Test-Path (Join-Path $PSScriptRoot 'verify-cni.ps1')) { Join-Path $PSScriptRoot 'verify-cni.ps1' } else { Join-Path $PSScriptRoot '..\..\..\controller\pkg\platform\aws\windowscni\verify-cni.ps1' }
 if ($PreviousRecipe) {
     $currentVerified=$false
-    try { $null=& "$PSScriptRoot\verify-cni.ps1" -Recipe $Recipe; $currentVerified=$true } catch { }
+    try { $null=& $verifyScript -Recipe $Recipe; $currentVerified=$true } catch { }
     if (!$currentVerified) {
-        $null=& "$PSScriptRoot\verify-cni.ps1" -Recipe $PreviousRecipe
+        $null=& $verifyScript -Recipe $PreviousRecipe
         $previousVerified=$true
     }
 }

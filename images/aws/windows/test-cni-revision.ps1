@@ -10,7 +10,8 @@ if (Get-Service k0sworker -ErrorAction SilentlyContinue) { throw 'Test requires 
 $root='C:\ProgramData\CloudProvisioning'
 $plugin='C:\opt\cni\bin\vpc-bridge.exe'
 $receipt=Join-Path $root 'aws-vpc-cni-image.json'
-$initial=& "$PSScriptRoot\verify-cni.ps1" -Recipe $Recipe | ConvertFrom-Json
+$verifyScript=if (Test-Path (Join-Path $PSScriptRoot 'verify-cni.ps1')) { Join-Path $PSScriptRoot 'verify-cni.ps1' } else { Join-Path $PSScriptRoot '..\..\..\controller\pkg\platform\aws\windowscni\verify-cni.ps1' }
+$initial=& $verifyScript -Recipe $Recipe | ConvertFrom-Json
 $beforeRoutes=Get-NetRoute -AddressFamily IPv4 | Select-Object InterfaceIndex,DestinationPrefix,NextHop,RouteMetric | Sort-Object InterfaceIndex,DestinationPrefix,NextHop | ConvertTo-Json -Compress
 $tests=[Collections.Generic.List[string]]::new()
 $temp=Join-Path $root ('cni-revision-test-'+[Guid]::NewGuid().ToString('N'))
@@ -32,7 +33,7 @@ try {
         if ([IO.File]::ReadAllText($plugin) -cne 'unexpected artifact' -or [IO.File]::ReadAllText($receipt) -cne $recordBefore) { throw 'Rejected revision changed existing artifacts or receipt' }
     } finally { Copy-Item -LiteralPath $backup -Destination $plugin -Force }
     $tests.Add('tampered installation rejected without replacement')
-    $verified=& "$PSScriptRoot\verify-cni.ps1" -Recipe $Recipe | ConvertFrom-Json
+    $verified=& $verifyScript -Recipe $Recipe | ConvertFrom-Json
     $afterRoutes=Get-NetRoute -AddressFamily IPv4 | Select-Object InterfaceIndex,DestinationPrefix,NextHop,RouteMetric | Sort-Object InterfaceIndex,DestinationPrefix,NextHop | ConvertTo-Json -Compress
     if ($beforeRoutes -cne $afterRoutes) { throw 'Image revision changed routing' }
     if (Get-Service k0sworker -ErrorAction SilentlyContinue) { throw 'Image revision installed a worker' }

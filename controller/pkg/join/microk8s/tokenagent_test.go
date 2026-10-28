@@ -209,6 +209,7 @@ func TestTheClusterAgentPortFollowsMicroK8s(t *testing.T) {
 	for args, want := range map[string]string{
 		"--bind=0.0.0.0:25000\n--timeout=240\n": "25000",
 		"--port 25001\n":                        "25001",
+		"--port 25001\n--timeout 240\n":         "25001",
 	} {
 		dir := t.TempDir()
 		if err := os.WriteFile(filepath.Join(dir, "cluster-agent"), []byte(args), 0o600); err != nil {

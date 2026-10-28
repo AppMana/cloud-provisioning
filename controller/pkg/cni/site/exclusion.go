@@ -240,10 +240,10 @@ func (e *Excluder) Ensure(ctx context.Context, ds *appsv1.DaemonSet) error {
 	if err := e.ensureTunnelAgent(ctx, ds); err != nil {
 		return err
 	}
-	if err := e.ensureProviderPools(ctx); err != nil {
+	if err := e.ensureBGPScope(ctx); err != nil {
 		return err
 	}
-	return e.ensureBGPScope(ctx)
+	return e.ensureProviderPools(ctx)
 }
 
 // ensureExcluded reports whether the DaemonSet as it now runs carries the

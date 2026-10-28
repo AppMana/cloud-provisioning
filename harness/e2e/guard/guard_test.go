@@ -41,6 +41,8 @@ func TestTheAuditedStandInsAreRefused(t *testing.T) {
 	refused(t, "delete namespace kube-system", "")
 	refused(t, "-n cloud-provisioning create -f -", `{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"gateway-aws-win2022","namespace":"cloud-provisioning"}}`)
 	refused(t, "apply -f /tmp/manifest.yaml", "")
+	refused(t, "apply -f=/tmp/manifest.yaml", "")
+	refused(t, "-n=cloud-provisioning create -f=-", `{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"gateway-aws-win2022"}}`)
 }
 
 // What an operator gives the product, the lab's own provider, fault

@@ -16,7 +16,9 @@
       "Condition": {
         "StringEquals": {
           "aws:RequestedRegion": "${AWS_REGION}",
-          "ec2:ResourceTag/${OWNER_TAG}": "${OWNER_VALUE}",
+          "ec2:ResourceTag/${OWNER_TAG}": "${OWNER_VALUE}"
+        },
+        "StringEqualsIfExists": {
           "ec2:Attribute/SourceDestCheck": ["true", "false"]
         }
       }

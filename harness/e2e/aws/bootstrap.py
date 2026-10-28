@@ -13,20 +13,72 @@ p.add_argument('--region',default='us-west-2')
 p.add_argument('--base-ami-id',help='explicit Canonical base image matching the selected architecture')
 p.add_argument('--architecture',choices=['x86_64','arm64'],default='x86_64')
 p.add_argument('--ipv6', action='store_true', help='create dual-stack infrastructure for a native IPv6 pod campaign')
+p.add_argument('--backfill-iam', action='store_true', help='idempotently backfill or refresh IAM users, role trust, and policies on an existing run directory')
 a=p.parse_args()
 if not a.run_id.startswith('cldt-') or not all(c.isalnum() or c=='-' for c in a.run_id):
     p.error('run-id must start cldt- and contain only alphanumeric characters or hyphens')
 os.umask(0o077)
 work=pathlib.Path(a.work_dir).resolve();work.mkdir(parents=True,exist_ok=True)
 state_path=work/'resources.json'
-if state_path.exists():p.error('resources.json already exists; use its recorded resources or clean them up first')
-state={'runID':a.run_id,'region':a.region,'architecture':a.architecture,'createdAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}
+if state_path.exists() and not a.backfill_iam:
+    p.error('resources.json already exists; use its recorded resources or clean them up first')
+state=json.loads(state_path.read_text()) if state_path.exists() else {'runID':a.run_id,'region':a.region,'architecture':a.architecture,'createdAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}
+if state.get('runID')!=a.run_id:
+    p.error('run-id does not match existing resources.json')
 def save():state_path.write_text(json.dumps(state,indent=2)+'\n')
 def aws(*args):
-    r=subprocess.run(['aws','--region',a.region,*args,'--output','json'],capture_output=True,text=True)
+    r=subprocess.run(['aws','--region',state.get('region',a.region),*args,'--output','json'],capture_output=True,text=True)
     if r.returncode:raise RuntimeError(r.stderr.strip())
     return json.loads(r.stdout) if r.stdout.strip() else {}
 def remember(key,value):state[key]=value;save();return value
+tags=[{'Key':'cloud-provisioning-test','Value':a.run_id},{'Key':'Name','Value':a.run_id}]
+if a.backfill_iam and state_path.exists():
+    account=state['account'];ami=state['amiID'];subnet=state['subnetID'];sg=state['securityGroupID']
+    node_role=state['nodeRoleName'];profile=state['instanceProfileName'];capa_role=state['capaRoleName']
+    capa_source=remember('capaSourceUserName',state.get('capaSourceUserName') or (a.run_id+'-capa-source'))
+    try:
+        capa_source_arn=aws('iam','get-user','--user-name',capa_source)['User']['Arn']
+    except RuntimeError:
+        capa_source_arn=aws('iam','create-user','--user-name',capa_source,'--tags',json.dumps(tags))['User']['Arn']
+    trust={'Version':'2012-10-17','Statement':[{'Effect':'Allow','Principal':{'AWS':capa_source_arn},'Action':'sts:AssumeRole'}]}
+    for attempt in range(12):
+        try:
+            aws('iam','update-assume-role-policy','--role-name',capa_role,'--policy-document',json.dumps(trust))
+            break
+        except RuntimeError:
+            if attempt==11:raise
+            time.sleep(5)
+    values={'AWS_ACCOUNT_ID':account,'AWS_REGION':state['region'],'RUN_ID':a.run_id,'CLUSTER_NAME':a.run_id,
+        'OWNER_TAG':'cloud-provisioning-test','OWNER_VALUE':a.run_id,
+        'AMI_ID':ami,'SUBNET_ID':subnet,'SECURITY_GROUP_ID':sg,
+        'NODE_ROLE_NAME':node_role,'INSTANCE_PROFILE_NAME':profile,
+        'SOURCE_PRINCIPAL_ARN':capa_source_arn,'CAPA_ROLE_NAME':capa_role}
+    values_path=work/'iam-values.json';values_path.write_text(json.dumps(values,indent=2)+'\n')
+    iam_dir=pathlib.Path(__file__).resolve().parents[3]/'docs'/'iam'
+    for template,role_name in [('capa',capa_role),('worker-bootstrap',node_role)]:
+        rendered=subprocess.run(['python3',str(iam_dir/'render.py'),str(iam_dir/(template+'.json')),str(values_path)],capture_output=True,text=True,check=True).stdout
+        (work/(template+'-policy.json')).write_text(rendered)
+        aws('iam','put-role-policy','--role-name',role_name,'--policy-name','cldt-test','--policy-document',rendered)
+    controller_user=remember('controllerUserName',state.get('controllerUserName') or (a.run_id+'-controller'))
+    try:
+        aws('iam','get-user','--user-name',controller_user)
+    except RuntimeError:
+        aws('iam','create-user','--user-name',controller_user,'--tags',json.dumps(tags))
+    rendered=subprocess.run(['python3',str(iam_dir/'render.py'),str(iam_dir/'controller.json'),str(values_path)],capture_output=True,text=True,check=True).stdout
+    (work/'controller-policy.json').write_text(rendered)
+    aws('iam','put-user-policy','--user-name',controller_user,'--policy-name','cldt-test','--policy-document',rendered)
+    if not (work/'controller-credentials.json').exists():
+        key=aws('iam','create-access-key','--user-name',controller_user)['AccessKey']
+        remember('controllerAccessKeyID',key['AccessKeyId'])
+        (work/'controller-credentials.json').write_text(json.dumps({'AWS_ACCESS_KEY_ID':key['AccessKeyId'],'AWS_SECRET_ACCESS_KEY':key['SecretAccessKey'],'AWS_REGION':state['region']}))
+    rendered=subprocess.run(['python3',str(iam_dir/'render.py'),str(iam_dir/'capa-source.json'),str(values_path)],capture_output=True,text=True,check=True).stdout
+    aws('iam','put-user-policy','--user-name',capa_source,'--policy-name','cldt-test','--policy-document',rendered)
+    if not (work/'capa-source-credentials.json').exists():
+        key=aws('iam','create-access-key','--user-name',capa_source)['AccessKey']
+        remember('capaSourceAccessKeyID',key['AccessKeyId'])
+        (work/'capa-source-credentials.json').write_text(json.dumps({'AccessKeyID':key['AccessKeyId'],'SecretAccessKey':key['SecretAccessKey']}))
+    print(json.dumps({k:state[k] for k in ['runID','region','vpcID','subnetID','securityGroupID','capaRoleARN','controllerUserName','capaSourceUserName']},indent=2))
+    raise SystemExit(0)
 identity=aws('sts','get-caller-identity');account=identity['Account'];state['account']=account;save()
 # Resolve the exact AMI once; both the template and IAM policy use this ID.
 if a.base_ami_id:

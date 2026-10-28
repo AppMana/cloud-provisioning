@@ -101,6 +101,9 @@ class MatrixTest(unittest.TestCase):
                 self.assertEqual(source['addressFamily'], family)
                 self.assertEqual(ipaddress.ip_address(source['podIP']).version, family)
                 self.assertEqual(ipaddress.ip_address(source['serviceIP']).version, family)
+            report = run(cluster, cluster.targets[:2], 'test', tries=1, udp_sizes=(64,), family=family)
+            self.assertEqual(report['parameters']['addressFamily'], family)
+            self.assertEqual(ipaddress.ip_address(report['targets'][0]['podIP']).version, family)
         self.assertNotIn('addressFamily', snapshot(cluster, cluster.targets)[0])
 
     def test_missing_or_ambiguous_family_never_falls_back_to_primary(self):

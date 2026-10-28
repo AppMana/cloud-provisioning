@@ -231,7 +231,7 @@ func clusterAgentPort(path string) (string, error) {
 	}
 	var ports []string
 	for _, line := range strings.Split(strings.TrimRight(string(raw), "\n"), "\n") {
-		if fields := strings.Fields(line); len(fields) >= 2 {
+		if fields := strings.Fields(line); len(fields) >= 2 && strings.Contains(fields[0], "port") {
 			ports = append(ports, fields[1])
 		}
 	}

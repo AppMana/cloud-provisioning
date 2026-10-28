@@ -3,6 +3,7 @@ package site
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"os"
 	"reflect"
 	"slices"
@@ -334,5 +335,20 @@ func TestWindowsTunnelNodesRunTheSiteWindowsCalicoAsTheProductsAgent(t *testing.
 	}
 	if err := e.verifyTunnelAgent(ctx, siteDS); err != nil {
 		t.Fatalf("the Windows agent is not current: %v", err)
+	}
+}
+
+func TestBGPScopeCompletesBeforeProviderPools(t *testing.T) {
+	ctx := context.Background()
+	e, c := excluder(t, k0sCalicoNode(t))
+	e.ProviderRanges = func(context.Context) ([]netip.Prefix, error) {
+		return nil, errors.New("provider pool discovery pending")
+	}
+	err := e.Ensure(ctx, get(t, c, "kube-system", "calico-node"))
+	if err == nil {
+		t.Fatal("expected provider pool error")
+	}
+	if err := e.verifyBGPScope(ctx); err != nil {
+		t.Fatalf("BGP mesh scope was blocked by provider pool discovery: %v", err)
 	}
 }

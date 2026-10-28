@@ -30,6 +30,9 @@ class NativeAccessTest(unittest.TestCase):
         for family, actions in (('ipv4', ['ec2:AssignPrivateIpAddresses', 'ec2:UnassignPrivateIpAddresses']),
                                 ('ipv6', ['ec2:AssignIpv6Addresses', 'ec2:UnassignIpv6Addresses'])):
             policy = module.node_policy(STATE, family)
+            describe = next(s for s in policy['Statement'] if s.get('Sid') == 'DescribeForIPAM')
+            self.assertIn('ec2:DescribeVpcs', describe['Action'])
+            self.assertIn('ec2:DescribeSecurityGroups', describe['Action'])
             mutations = [s for s in policy['Statement'] if any(not a.startswith('ec2:Describe') for a in s['Action'])]
             self.assertEqual(mutations[0]['Action'], actions)
             for statement in mutations:

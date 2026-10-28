@@ -149,7 +149,7 @@ def main():
     values = render_values(state, urls, binaries, a.native_cidr)
     values_path = out / 'campaign-values.json'
     values_path.write_text(json.dumps(values, indent=2) + '\n')
-    helm = ['helm', 'upgrade', 'cloud-provisioning', a.chart, '-n', NAMESPACE, '--reuse-values', '-f', '-']
+    helm = ['helm', 'upgrade', 'cloud-provisioning', a.chart, '-n', NAMESPACE, '--kube-apiserver=' + a.api_server, '--reuse-values', '-f', '-']
     bastion(a.runner, a.api_server, *helm, '--dry-run=server', stdin=json.dumps(values))
     if a.apply:
         bastion(a.runner, a.api_server, *helm, '--wait', '--timeout', '10m', stdin=json.dumps(values))

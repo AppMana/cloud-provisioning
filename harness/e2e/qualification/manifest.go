@@ -111,7 +111,10 @@ func walkContainers(value any) error {
 }
 
 func checkArtifactFlags(argv []string) error {
-	images := map[string]bool{"dialer-image": true, "dialer-cloud-image": true, "windows-publisher-image": true}
+	images := map[string]bool{
+		"dialer-image": true, "dialer-cloud-image": true, "windows-publisher-image": true,
+		"aws-vpc-cni-image": true, "aws-vpc-cni-init-image": true, "aws-windows-ipam-image": true,
+	}
 	urls := map[string]string{}
 	for _, family := range []string{"arm64", "amd64"} {
 		for _, component := range []string{"join-dialer-binary", "join-cni-plugins"} {

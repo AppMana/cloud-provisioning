@@ -41,6 +41,9 @@ for image in state.get('retiredImages', []):
                        ('InvalidSnapshot.NotFound',), 'Snapshots'))
 for name in [state['nodeRoleName'], state['capaRoleName']] + ([state['gatewayRuntimeRoleName']] if state.get('gatewayRuntimeRoleName') else []):
     checks.append(('iam', 'get-role', {'RoleName': name}, ('NoSuchEntity',), 'Role'))
+for key in ('controllerUserName', 'capaSourceUserName'):
+    if state.get(key):
+        checks.append(('iam', 'get-user', {'UserName': state[key]}, ('NoSuchEntity',), 'User'))
 checks.append(('iam', 'get-instance-profile', {'InstanceProfileName': state['instanceProfileName']},
                ('NoSuchEntity',), 'InstanceProfile'))
 for key in ('windowsIPAMRepository', 'linuxControllerRepository', 'linuxDialerRepository', 'publisherRepository', 'calicoWindowsRepository', 'windowsGPUPluginRepository', 'windowsGPUProbeRepository'):

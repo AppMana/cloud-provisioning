@@ -161,7 +161,10 @@ rules:
   # request is a dry run, so nothing is created.
   - apiGroups: [""]
     resources: ["services"]
-    verbs: ["create"]
+    verbs: ["get", "create"]
+  - apiGroups: ["crd.projectcalico.org"]
+    resources: ["felixconfigurations"]
+    verbs: ["get"]
   # Which network is installed, how it carries pod traffic, and which
   # blocks it gave each node. All of it read from the network's own
   # records, because they are what it routes by.
@@ -215,7 +218,7 @@ metadata:
 rules:
   {{- if .Values.experimentalNodeGroups }}
   - apiGroups: ["cloud-provisioning.appmana.com"]
-    resources: ["provisionednodegroupclaims", "provisionednodegroupclaims/status"]
+    resources: ["provisionednodegroupclaims", "provisionednodegroupclaims/status", "provisionednodegroupclaims/finalizers"]
     verbs: ["update", "patch"]
   - apiGroups: ["cloud-provisioning.appmana.com"]
     resources: ["provisionednodeclaims"]

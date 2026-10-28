@@ -97,6 +97,8 @@ var StandIns = []Allowed{
 // applied: a manifest that differs in a byte is checked like any other.
 var Prerequisites = map[string]string{
 	"976a937f7348e6d360dc419995af68c1230a383e409bf9a40fdcada0886633a3": "CAPA v2.12.1 infrastructure-components.yaml as aws/install.py renders it",
+	"1d51cdecd442f1f5f89783e9e0169b95d372724da203cc75dd7a5c4e50a10ce6": "cert-manager v1.16.2 cert-manager.yaml as install/capi.go applies it",
+	"763a468d38bacd892e595ee9be96aeb8678910efc28d815e681efc75fdde71c6": "Cluster API v1.12.5 cluster-api-components.yaml as install/capi.go renders it",
 }
 
 // ErrRefused marks a write the policy does not allow.
@@ -179,9 +181,9 @@ func Writes(args []string, stdin []byte) ([]Write, error) {
 		switch {
 		case a == "--":
 			i = len(args)
-		case a == "-n" || a == "--namespace" || strings.HasPrefix(a, "--namespace="):
+		case a == "-n" || a == "--namespace" || strings.HasPrefix(a, "-n=") || strings.HasPrefix(a, "--namespace="):
 			namespace = value()
-		case a == "-f" || a == "--filename" || strings.HasPrefix(a, "--filename="):
+		case a == "-f" || a == "--filename" || strings.HasPrefix(a, "-f=") || strings.HasPrefix(a, "--filename="):
 			files = append(files, value())
 		case strings.HasPrefix(a, "--subresource"):
 			subresource = value()
@@ -193,8 +195,9 @@ func Writes(args []string, stdin []byte) ([]Write, error) {
 			}
 			dryRun = mode != "none"
 		case a == "-p" || a == "--patch" || a == "-o" || a == "--output" || a == "--type" || a == "-l" || a == "--selector" ||
-			a == "--field-manager" || a == "--timeout" || a == "--server" || a == "--context" || a == "--kubeconfig" ||
-			a == "-c" || a == "--container" || a == "--from-literal" || a == "--from-file" || a == "--image":
+			a == "--field-manager" || a == "--timeout" || a == "-s" || a == "--server" || a == "--context" || a == "--kubeconfig" ||
+			a == "-c" || a == "--container" || a == "--from-literal" || a == "--from-file" || a == "--image" ||
+			a == "--request-timeout" || a == "--grace-period" || a == "--cascade" || a == "--patch-file" || a == "--for":
 			value()
 		case strings.HasPrefix(a, "-"):
 		default:

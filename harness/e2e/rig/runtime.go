@@ -116,7 +116,9 @@ func ensureLabd(ctx context.Context, workDir string) (string, error) {
 		return verifiedLabd(configured)
 	}
 	if installed, err := exec.LookPath("labd"); err == nil {
-		return verifiedLabd(installed)
+		if path, err := verifiedLabd(installed); err == nil {
+			return path, nil
+		}
 	}
 	target := filepath.Join(workDir, ".labcontainers", "bin", LabcontainersRevision, "labd")
 	if info, err := os.Stat(target); err == nil && info.Mode().IsRegular() {

@@ -38,6 +38,9 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Chart version
+        id: chart
+        run: echo "version=$(awk '/^version:/ {print $2}' charts/cloud-provisioning/Chart.yaml)" >> "$GITHUB_OUTPUT"
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -45,7 +48,10 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.target }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix=
+            type=raw,value=${{ steps.chart.outputs.version }},enable={{is_default_branch}}
+            type=raw,value=v${{ steps.chart.outputs.version }},enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern=v{{version}}
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -75,6 +81,9 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Chart version
+        id: chart
+        run: echo "version=$(awk '/^version:/ {print $2}' charts/cloud-provisioning/Chart.yaml)" >> "$GITHUB_OUTPUT"
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -82,7 +91,10 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ github.repository }}-windows-publisher
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix=
+            type=raw,value=${{ steps.chart.outputs.version }},enable={{is_default_branch}}
+            type=raw,value=v${{ steps.chart.outputs.version }},enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern=v{{version}}
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -116,27 +128,44 @@ jobs:
         run: |
           set -euo pipefail
           bash build-binaries.sh "$DIALER_DIST" dialer arm64 amd64
-          for arch in arm64 amd64; do
-            go version -m "$DIALER_DIST/wg-dialer-linux-$arch" | grep -F 'vcs.modified=false'
+          bash build-binaries.sh "$DIALER_DIST" windows-tunnel amd64
+          for bin in wg-dialer-linux-arm64 wg-dialer-linux-amd64 wg-dialer-windows-amd64.exe windows-tunnel.exe; do
+            go version -m "$DIALER_DIST/$bin" | grep -F 'vcs.modified=false'
           done
-          (cd "$DIALER_DIST" && sha256sum wg-dialer-linux-arm64 wg-dialer-linux-amd64 | tee SHA256SUMS)
+          (cd "$DIALER_DIST" && sha256sum wg-dialer-linux-arm64 wg-dialer-linux-amd64 wg-dialer-windows-amd64.exe windows-tunnel.exe | tee SHA256SUMS)
       - name: Retain raw binaries and checksums
         uses: actions/upload-artifact@v4
         with:
-          name: dialer-${{ github.sha }}
+          name: dialer-binaries
           path: |
             ${{ runner.temp }}/dialer-dist/wg-dialer-linux-*
+            ${{ runner.temp }}/dialer-dist/wg-dialer-windows-*
+            ${{ runner.temp }}/dialer-dist/windows-tunnel.exe
             ${{ runner.temp }}/dialer-dist/SHA256SUMS
-      - name: Publish release dialer-${{ github.sha }}
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_dialer_release && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      - name: Publish release
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DIALER_DIST: ${{ runner.temp }}/dialer-dist
         run: |
           set -euo pipefail
-          tag="dialer-${GITHUB_SHA::7}"
-          gh release create "$tag" \
-            --target "$GITHUB_SHA" \
-            --title "$tag" \
-            --notes "wg-dialer static binaries for $GITHUB_SHA. Pin the matching SHA256SUMS entries into --join-dialer-binary-sha256-*." \
-            "$DIALER_DIST/wg-dialer-linux-arm64" "$DIALER_DIST/wg-dialer-linux-amd64" "$DIALER_DIST/SHA256SUMS"
+          chart_version="$(awk '/^version:/ {print $2}' charts/cloud-provisioning/Chart.yaml)"
+          version_tag="v${chart_version}"
+          if gh release view "$version_tag" >/dev/null 2>&1; then
+            gh release upload "$version_tag" --clobber \
+              "$DIALER_DIST/wg-dialer-linux-arm64" \
+              "$DIALER_DIST/wg-dialer-linux-amd64" \
+              "$DIALER_DIST/wg-dialer-windows-amd64.exe" \
+              "$DIALER_DIST/windows-tunnel.exe" \
+              "$DIALER_DIST/SHA256SUMS"
+          else
+            gh release create "$version_tag" \
+              --target "$GITHUB_SHA" \
+              --title "$version_tag" \
+              --notes "Release $version_tag." \
+              "$DIALER_DIST/wg-dialer-linux-arm64" \
+              "$DIALER_DIST/wg-dialer-linux-amd64" \
+              "$DIALER_DIST/wg-dialer-windows-amd64.exe" \
+              "$DIALER_DIST/windows-tunnel.exe" \
+              "$DIALER_DIST/SHA256SUMS"
+          fi

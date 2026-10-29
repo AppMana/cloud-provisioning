@@ -23,15 +23,11 @@ jobs:
       - name: Package and push
         run: |
           set -euo pipefail
-          sha=$(git rev-parse --short=7 HEAD)
-          # The images are tagged with the commit SHA, and the chart's
-          # templates default every image tag to .Chart.AppVersion.
           helm repo add cluster-api-operator https://kubernetes-sigs.github.io/cluster-api-operator
           helm dependency build charts/cloud-provisioning
           helm lint charts/cloud-provisioning
           python3 .github/test_chart_publication.py
           base_version="$(helm show chart charts/cloud-provisioning | awk '/^version:/ {print $2}')"
           test -n "$base_version"
-          chart_version="${base_version}-sha.${{ github.event.workflow_run.head_sha }}"
-          helm package charts/cloud-provisioning --version "$chart_version" --app-version "$sha" --destination dist/chart
+          helm package charts/cloud-provisioning --version "$base_version" --app-version "$base_version" --destination dist/chart
           helm push dist/chart/cloud-provisioning-*.tgz oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts

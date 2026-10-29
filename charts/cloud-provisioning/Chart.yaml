@@ -7,8 +7,8 @@ description: |
   whole stack from a single release instead of an imperative
   `clusterctl init` that gitops cannot reproduce.
 type: application
-version: 0.1.17
-appVersion: "d46770f"
+version: 0.1.18
+appVersion: "0.1.18"
 dependencies:
   # Cluster API's own operator is the supported declarative install
   # path (clusterctl is imperative by design and cannot be reconciled).

@@ -91,15 +91,39 @@ type Interface struct {
 	Address6 string
 }
 
+// RoCELink is a point-to-point RDMA/RoCE interface on a site worker (for
+// example, DGX Spark GB10 ConnectX-7 /30 links at MTU 9978 with strict ARP).
+type RoCELink struct {
+	Name    string
+	Address string
+	MTU     int
+}
+
 // Node is one machine in the topology.
 type Node struct {
 	Name       string
 	Role       Role
+	Arch       string
 	Interfaces []Interface
 	// Identity holds the node's cluster addresses (CIDRs, IPv4 first) on
 	// its identity device, for sites that do not identify nodes by their
 	// LAN address. See identity.go.
 	Identity []string
+	// ServiceVIPs holds secondary non-cluster service VIPs (such as LAN BGP
+	// or Gateway VIPs) carried on the same dummy identity device (vip0) that
+	// must never be selected as the node's cluster or CNI address.
+	ServiceVIPs []string
+	// RoCELinks holds point-to-point jumbo RDMA interfaces that must not
+	// expand the tunnel MTU ceiling or collide with cluster/tunnel routing.
+	RoCELinks []RoCELink
+}
+
+// NodeArch returns the node's CPU architecture, defaulting to amd64.
+func (n Node) NodeArch() string {
+	if n.Arch != "" {
+		return n.Arch
+	}
+	return "amd64"
 }
 
 // Segments lists the segments this node has an interface on.

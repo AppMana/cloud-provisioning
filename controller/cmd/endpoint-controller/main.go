@@ -57,6 +57,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
 	platformaws "github.com/appmana/cloud-provisioning/controller/pkg/platform/aws"
 	"github.com/appmana/cloud-provisioning/controller/pkg/tunnel"
+	"github.com/appmana/cloud-provisioning/controller/pkg/tuple"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -2983,15 +2984,7 @@ func main() {
 					if err != nil {
 						return err
 					}
-					if err := excluder.Verify(ctx, network, class); err != nil {
-						return err
-					}
-					// A Windows worker on k0s must not take the API
-					// server's Service egress.
-					if class.OS == "windows" && joinProviderName == "k0s" {
-						return joink0s.WindowsEgressReady(ctx, mgr.GetAPIReader())
-					}
-					return nil
+					return tuple.VerifyClaimEnvironment(ctx, mgr.GetAPIReader(), joinProviderName, network, class, excluder)
 				},
 				Client:                    claimAPI,
 				Workload:                  claimAPI,

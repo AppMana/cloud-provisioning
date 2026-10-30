@@ -50,6 +50,9 @@ if vpc:
         if ids:
             aws('ec2', 'terminate-instances', '--instance-ids', *ids)
             aws('ec2', 'wait', 'instance-terminated', '--instance-ids', *ids)
+        if s.get('publicHTTPIngressRuleIDs') and s.get('securityGroupID'):
+            aws('ec2', 'revoke-security-group-ingress', '--group-id', s['securityGroupID'],
+                '--security-group-rule-ids', *s['publicHTTPIngressRuleIDs'], absent_ok=True)
         # Before the network goes, record what the product should have removed
         # itself. A terminated instance's interfaces take a while to disappear.
         deadline = time.monotonic() + 180

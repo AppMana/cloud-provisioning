@@ -33,7 +33,13 @@ func (e *ingressAPI) Call(ctx context.Context, _, op string, in map[string]any) 
 			return nil, fmt.Errorf("no create intent")
 		}
 		e.creates++
-		rule := ingressRule{SecurityGroupRuleId: fmt.Sprintf("sgr-%d", e.creates), GroupId: "sg-test", GroupOwnerId: "account", IpProtocol: in["IpPermissions"].([]map[string]any)[0]["IpProtocol"].(string), CidrIpv4: r.Target.Source.String(), FromPort: int(r.Target.Port), ToPort: int(r.Target.Port)}
+		perm := in["IpPermissions"].([]map[string]any)[0]
+		rule := ingressRule{SecurityGroupRuleId: fmt.Sprintf("sgr-%d", e.creates), GroupId: "sg-test", GroupOwnerId: "account", IpProtocol: perm["IpProtocol"].(string), FromPort: int(r.Target.Port), ToPort: int(r.Target.Port)}
+		if r.Target.Source.Addr().Is6() {
+			rule.CidrIpv6 = r.Target.Source.String()
+		} else {
+			rule.CidrIpv4 = r.Target.Source.String()
+		}
 		for _, tag := range in["TagSpecifications"].([]map[string]any)[0]["Tags"].([]map[string]any) {
 			rule.Tags = append(rule.Tags, struct{ Key, Value string }{tag["Key"].(string), tag["Value"].(string)})
 		}
@@ -215,5 +221,34 @@ func TestTCPAPIPermissionHasSeparateLeaseAndExactRemoval(t *testing.T) {
 	target.Protocol = "-1"
 	if _, err := r.Acquire(context.Background(), "all", target); err == nil {
 		t.Fatal("unrestricted protocol accepted")
+	}
+}
+
+func TestPublicHTTPIngressLifecycleAndPortRestriction(t *testing.T) {
+	ctx := context.Background()
+	for _, cidr := range []string{"0.0.0.0/0", "::/0"} {
+		for _, port := range []uint16{80, 443} {
+			r, e, _, _ := ingressFixture(t)
+			target := IngressTarget{GroupID: "sg-test", Source: netip.MustParsePrefix(cidr), Port: port, Protocol: "tcp"}
+			e.key = r.key(target)
+			if ok, err := r.Acquire(ctx, "public-http", target); err != nil || !ok || len(e.rules) != 1 {
+				t.Fatalf("acquire %s:%d: ok=%v err=%v rules=%+v", cidr, port, ok, err, e.rules)
+			}
+			if ok, err := r.Release(ctx, "public-http", target); err != nil || !ok || len(e.rules) != 0 {
+				t.Fatalf("release %s:%d: ok=%v err=%v rules=%+v", cidr, port, ok, err, e.rules)
+			}
+		}
+		// Public 0.0.0.0/0 or ::/0 ingress must be rejected for UDP or non-HTTP/HTTPS ports.
+		for _, bad := range []IngressTarget{
+			{GroupID: "sg-test", Source: netip.MustParsePrefix(cidr), Port: 80, Protocol: "udp"},
+			{GroupID: "sg-test", Source: netip.MustParsePrefix(cidr), Port: 6443, Protocol: "tcp"},
+			{GroupID: "sg-test", Source: netip.MustParsePrefix(cidr), Port: 51820, Protocol: "udp"},
+		} {
+			r, e, _, _ := ingressFixture(t)
+			e.key = r.key(bad)
+			if _, err := r.Acquire(ctx, "public-http", bad); err == nil || e.creates != 0 {
+				t.Fatalf("accepted non-HTTP/HTTPS public ingress %+v", bad)
+			}
+		}
 	}
 }

@@ -435,6 +435,34 @@ func ensureForwardingPath(iface string, mtu int) error {
 		Hooknum:  nftables.ChainHookForward,
 		Priority: &prio,
 	})
+	// Site pods with a larger LAN CNI MTU (such as k0s's default 1450 or a
+	// 1500-byte BGP LAN) emit IPv4 UDP datagrams in (mtu, podMTU] unfragmented
+	// with DF=1 (IP_PMTUDISC_WANT). Because ip_forward() checks ip_exceeds_mtu()
+	// before NF_INET_FORWARD, clearing DF in prerouting on IPv4 UDP packets
+	// larger than the tunnel MTU lets ip_finish_output2 fragment them cleanly
+	// at the tunnel interface instead of dropping the first datagram.
+	prerouting := c.AddChain(&nftables.Chain{
+		Name:     "prerouting",
+		Table:    table,
+		Type:     nftables.ChainTypeFilter,
+		Hooknum:  nftables.ChainHookPrerouting,
+		Priority: &prio,
+	})
+	c.AddRule(&nftables.Rule{
+		Table: table,
+		Chain: prerouting,
+		Exprs: []expr.Any{
+			&expr.Meta{Key: expr.MetaKeyNFPROTO, Register: 1},
+			&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte{unix.NFPROTO_IPV4}},
+			&expr.Meta{Key: expr.MetaKeyL4PROTO, Register: 1},
+			&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte{unix.IPPROTO_UDP}},
+			&expr.Payload{DestRegister: 1, Base: expr.PayloadBaseNetworkHeader, Offset: 2, Len: 2},
+			&expr.Cmp{Op: expr.CmpOpGt, Register: 1, Data: []byte{byte(mtu >> 8), byte(mtu)}},
+			&expr.Payload{DestRegister: 1, Base: expr.PayloadBaseNetworkHeader, Offset: 6, Len: 2},
+			&expr.Bitwise{SourceRegister: 1, DestRegister: 1, Len: 2, Mask: []byte{0xbf, 0xff}, Xor: []byte{0x00, 0x00}},
+			&expr.Payload{OperationType: expr.PayloadWrite, SourceRegister: 1, Base: expr.PayloadBaseNetworkHeader, Offset: 6, Len: 2, CsumType: expr.CsumTypeInet, CsumOffset: 10},
+		},
+	})
 
 	// Both directions: a session crossing the tunnel has one endpoint
 	// on either side, and each has to be told. Each family separately,

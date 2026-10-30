@@ -149,7 +149,11 @@ func Check(e Evidence) []string {
 			if r.CloudCNI != "aws-vpc" {
 				problem = "AWS VPC CNI evidence required"
 			}
-			if r.Workers < 2 {
+			minWorkers := 2
+			if strings.HasSuffix(id, "/ingress") {
+				minWorkers = 1
+			}
+			if r.Workers < minWorkers {
 				problem = "two-worker campaign evidence required"
 			}
 		}

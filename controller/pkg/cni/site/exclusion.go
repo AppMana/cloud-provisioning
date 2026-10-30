@@ -237,6 +237,9 @@ func (e *Excluder) Ensure(ctx context.Context, ds *appsv1.DaemonSet) error {
 	if err != nil || !excluded || !isCalicoAgent(ds) {
 		return err
 	}
+	if err := e.ensureCalicoAlignment(ctx, ds); err != nil {
+		return err
+	}
 	if err := e.ensureTunnelAgent(ctx, ds); err != nil {
 		return err
 	}
@@ -271,6 +274,7 @@ func (e *Excluder) ensureExcluded(ctx context.Context, ds *appsv1.DaemonSet) (bo
 		if err := e.Client.Patch(ctx, patched, client.MergeFromWithOptions(ds, client.MergeFromWithOptimisticLock{})); err != nil {
 			return false, fmt.Errorf("excluding cloud nodes from %s: %w", key, err)
 		}
+		*ds = *patched
 	}
 	e.mu.Lock()
 	if e.applied == nil {

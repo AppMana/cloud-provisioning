@@ -10,6 +10,7 @@ import (
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni"
 	"github.com/appmana/cloud-provisioning/controller/pkg/cni/site"
 	"github.com/appmana/cloud-provisioning/controller/pkg/platform"
+	"github.com/appmana/cloud-provisioning/controller/pkg/tuple"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,6 +30,11 @@ type Options struct {
 	// tunnel subnet and tunnel.ipv6Prefix.
 	TunnelIPv4 string
 	TunnelIPv6 string
+	// Tuple is an optional platform tuple (e.g. "k0s + calico,bgp + aws") to
+	// evaluate alongside cluster preconditions.
+	Tuple string
+	// K0sConfig is optional raw k0s.yaml or k0sctl.yaml bytes to validate.
+	K0sConfig []byte `json:"-"`
 }
 
 func (o Options) withDefaults() Options {
@@ -127,6 +133,29 @@ func Preconditions(ctx context.Context, c client.Reader, o Options) ([]Check, er
 		out = append(out, borrowedAddresses(ctx, c), bgpPeers(ctx, c))
 	}
 	out = append(out, endpointCandidates(nodes.Items))
+	if strings.TrimSpace(o.Tuple) != "" || len(o.K0sConfig) > 0 {
+		tupleChecks, err := tuple.Evaluate(ctx, c, tuple.CheckOptions{
+			Tuple:      o.Tuple,
+			K0sConfig:  o.K0sConfig,
+			TunnelMTU:  o.TunnelMTU,
+			TunnelIPv4: o.TunnelIPv4,
+			TunnelIPv6: o.TunnelIPv6,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, tc := range tupleChecks {
+			switch tc.Name {
+			case "tuple", "k0s-config", "calico-mtu", "calico-autodetection", "windows-bgp", "k0s-windows-egress", "site-cni-exclusion":
+				out = append(out, Check{
+					Name:     tc.Name,
+					Required: true,
+					OK:       tc.Pass,
+					Detail:   tc.Detail,
+				})
+			}
+		}
+	}
 	return out, nil
 }
 

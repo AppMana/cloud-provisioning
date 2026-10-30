@@ -26,6 +26,12 @@ const (
 	SiteCIDR6       = SitePrefix6 + "::/64"
 	// IdentityDevice is the dummy interface identities live on.
 	IdentityDevice = "vip0"
+	// LANServiceVIP4 and LANServiceVIP6 are secondary service VIPs carried on
+	// the controller's vip0 alongside its cluster identities.
+	LANServiceVIP4 = "10.19.3.240/32"
+	LANServiceVIP6 = SitePrefix6 + "::240/128"
+	// RoCEMTU is the jumbo MTU on worker point-to-point RoCE links.
+	RoCEMTU = 9978
 )
 
 // WithIdentities is one control plane that is also a worker, two workers and
@@ -36,6 +42,7 @@ func WithIdentities(remoteSlots int) (Topology, error) {
 		return Topology{}, err
 	}
 	identities := map[string]int{"cp": 1, "w1": 2, "w2": 3}
+	roceHost := map[string]int{"w1": 1, "w2": 2}
 	nodes := topo.Nodes[:0]
 	for _, n := range topo.Nodes {
 		switch {
@@ -50,12 +57,35 @@ func WithIdentities(remoteSlots int) (Topology, error) {
 				fmt.Sprintf("%s.%d/32", IdentityPrefix4, host),
 				fmt.Sprintf("%s::%d/128", SitePrefix6, host),
 			}
+			if n.Name == "cp" {
+				n.Arch = "amd64"
+				n.ServiceVIPs = []string{LANServiceVIP4, LANServiceVIP6}
+			} else if rHost := roceHost[n.Name]; rHost != 0 {
+				n.Arch = "arm64"
+				n.RoCELinks = []RoCELink{
+					{Name: "enp1s0f1np1", Address: fmt.Sprintf("10.255.0.%d/30", rHost), MTU: RoCEMTU},
+					{Name: "enP2p1s0f1np1", Address: fmt.Sprintf("10.255.1.%d/30", rHost), MTU: RoCEMTU},
+				}
+			}
 		}
 		nodes = append(nodes, n)
 	}
 	topo.Nodes = nodes
 	topo.IdentityRoutes = []string{IdentityCIDR4}
 	return topo, nil
+}
+
+// IdentityDeviceAddresses returns all addresses configured on the node's dummy
+// vip0 interface: its primary cluster identities followed by any secondary
+// service VIPs.
+func (n Node) IdentityDeviceAddresses() []string {
+	if len(n.Identity) == 0 && len(n.ServiceVIPs) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(n.Identity)+len(n.ServiceVIPs))
+	out = append(out, n.Identity...)
+	out = append(out, n.ServiceVIPs...)
+	return out
 }
 
 // siteAddress6 numbers a LAN IPv6 address after the node's LAN IPv4 host

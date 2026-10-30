@@ -71,3 +71,72 @@ func TestIPv6IdentitiesAnswerNeighbourDiscoveryOnTheLAN(t *testing.T) {
 		t.Errorf("a node without identities got %s", path)
 	}
 }
+
+func TestControllerIdentityNetplanAndNDPIncludeSecondaryLANVIPs(t *testing.T) {
+	topo, err := lab.WithIdentities(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cp := topo.MustNode("cp")
+	doc, err := identityNetplan(cp, "ens2", topo.IdentityRoutes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got, want map[string]any
+	if err := yaml.Unmarshal(doc, &got); err != nil {
+		t.Fatal(err)
+	}
+	if err := yaml.Unmarshal([]byte(`
+network:
+  version: 2
+  renderer: networkd
+  dummy-devices:
+    vip0:
+      addresses:
+        - "10.101.0.1/32"
+        - "fd8f:cf26:522a::1/128"
+        - "10.19.3.240/32"
+        - "fd8f:cf26:522a::240/128"
+  ethernets:
+    ens2:
+      routes:
+        - to: 10.101.0.0/24
+          scope: link
+`), &want); err != nil {
+		t.Fatal(err)
+	}
+	if !equalJSON(got, want) {
+		t.Fatalf("cp netplan got\n%s", doc)
+	}
+	_, ndp := identityProxyNDP(cp, "ens2")
+	wantNDP := "[Network]\nIPv6ProxyNDP=yes\nIPv6ProxyNDPAddress=fd8f:cf26:522a::1\nIPv6ProxyNDPAddress=fd8f:cf26:522a::240\n"
+	if string(ndp) != wantNDP {
+		t.Fatalf("cp NDP drop-in =\n%s\nwant\n%s", ndp, wantNDP)
+	}
+}
+
+func TestIdentityNodeNetworkConfiguresRoCEMetricsAndTailscaleRules(t *testing.T) {
+	topo, err := lab.WithIdentities(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &fakeRig{}
+	if err := identities(t.Context(), topo, r); err != nil {
+		t.Fatal(err)
+	}
+	w1Cmds := r.commandsFor("w1")
+	for _, want := range [][]string{
+		{"ip link set dev enp1s0f1np1 mtu 9978 up; ip addr replace 10.255.0.1/30 dev enp1s0f1np1; sysctl -qw net.ipv4.conf.enp1s0f1np1.arp_ignore=1 net.ipv4.conf.enp1s0f1np1.arp_announce=2"},
+		{"ip link set dev enP2p1s0f1np1 mtu 9978 up; ip addr replace 10.255.1.1/30 dev enP2p1s0f1np1; sysctl -qw net.ipv4.conf.enP2p1s0f1np1.arp_ignore=1 net.ipv4.conf.enP2p1s0f1np1.arp_announce=2"},
+		{"10.101.0.0/24", "dev", "eth1", "proto", "static", "scope", "link", "src", "10.101.0.2", "metric", "100"},
+		{"10.101.0.0/24", "dev", "eth1", "proto", "static", "scope", "link", "src", "10.101.0.2", "metric", "300"},
+		{"10.101.0.0/24", "dev", "eth1", "proto", "static", "scope", "link", "src", "10.101.0.2", "metric", "640"},
+		{"pref 5200 to 100.64.0.0/10 lookup 52"},
+		{"pref 5200 to fd7a:115c:a1e0::/48 lookup 52"},
+		{"pref 5210 fwmark 0x80000/0xff0000 lookup main"},
+	} {
+		if !containsCommand(w1Cmds, want...) {
+			t.Errorf("w1 commands missing %v in %v", want, w1Cmds)
+		}
+	}
+}

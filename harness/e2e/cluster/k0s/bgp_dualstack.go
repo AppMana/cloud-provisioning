@@ -64,6 +64,13 @@ func bgpDualStackConfig(d cluster.Deps, n lab.Node) (*native.ClusterConfig, erro
 			Images:  bgpDualStackImages(),
 			API:     &native.APISpec{Address: addrs[0], SANs: sans},
 			Storage: &native.StorageSpec{Type: native.EtcdStorageType, Etcd: &native.EtcdConfig{PeerAddress: addrs[0]}},
+			ControllerManager: &native.ControllerManagerSpec{
+				ExtraArgs: map[string]string{
+					// Calico IPAM allocates pod addresses; the controller-manager
+					// must not hand out node CIDRs in parallel.
+					"allocate-node-cidrs": "false",
+				},
+			},
 			Network: &native.Network{
 				PodCIDR: BGPDualStackPodCIDR4, ServiceCIDR: BGPDualStackServiceCIDR4,
 				PrimaryAddressFamily: native.PrimaryFamilyIPv4,
@@ -139,8 +146,10 @@ func verifyBGPDualStackConfig(raw []byte, d cluster.Deps, n lab.Node) error {
 	if want, err = asStored(want); err != nil {
 		return err
 	}
-	if !equality.Semantic.DeepEqual(got.Spec.Network, want.Spec.Network) || !equality.Semantic.DeepEqual(got.Spec.API, want.Spec.API) {
-		return fmt.Errorf("stored k0s network or API configuration differs from %s", BGPDualStack)
+	if !equality.Semantic.DeepEqual(got.Spec.Network, want.Spec.Network) ||
+		!equality.Semantic.DeepEqual(got.Spec.API, want.Spec.API) ||
+		!equality.Semantic.DeepEqual(got.Spec.ControllerManager, want.Spec.ControllerManager) {
+		return fmt.Errorf("stored k0s network, API, or controllerManager configuration differs from %s", BGPDualStack)
 	}
 	return nil
 }

@@ -55,6 +55,8 @@ func runWith(args []string,
 	tunnelMTU := flags.Int("tunnel-mtu", 1420, "tunnel device MTU: the endpoints' underlay MTU less 80")
 	tunnel4 := flags.String("tunnel-ipv4", "10.100.0.0/24", "tunnel IPv4 range (chart tunnel subnet)")
 	tunnel6 := flags.String("tunnel-ipv6", "fd00:10:100::/96", "tunnel IPv6 prefix (chart tunnel.ipv6Prefix)")
+	tupleExpr := flags.String("tuple", "", "optional platform tuple to qualify (e.g. \"k0s + calico,bgp + aws\")")
+	k0sConfigPath := flags.String("k0s-config", "", "optional k0s.yaml or k0sctl.yaml path to validate")
 	out := flags.String("out", "", "write the JSON result here (must not exist)")
 	nodes := flags.String("nodes", "", "matrix: comma-separated nodes (default: every Ready Linux node)")
 	tries := flags.Int("udp-tries", 10, "matrix: datagrams per UDP size")
@@ -74,6 +76,14 @@ func runWith(args []string,
 			return fmt.Errorf("%s exists; use a new evidence path", *out)
 		}
 	}
+	var k0sBytes []byte
+	if *k0sConfigPath != "" {
+		raw, err := os.ReadFile(*k0sConfigPath)
+		if err != nil {
+			return err
+		}
+		k0sBytes = raw
+	}
 	config, err := acceptance.Config(*kubeconfig, *kubeContext)
 	if err != nil {
 		return err
@@ -83,7 +93,7 @@ func runWith(args []string,
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
 
-	opts := acceptance.Options{TunnelMTU: *tunnelMTU, TunnelIPv4: *tunnel4, TunnelIPv6: *tunnel6}
+	opts := acceptance.Options{TunnelMTU: *tunnelMTU, TunnelIPv4: *tunnel4, TunnelIPv6: *tunnel6, Tuple: *tupleExpr, K0sConfig: k0sBytes}
 	result := map[string]any{
 		"observedAt": time.Now().UTC(),
 		"server":     config.Host,

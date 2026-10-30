@@ -352,3 +352,58 @@ func TestBGPScopeCompletesBeforeProviderPools(t *testing.T) {
 		t.Fatalf("BGP mesh scope was blocked by provider pool discovery: %v", err)
 	}
 }
+
+// When k0s leaves install-cni's CNI_NETWORK_CONFIG at "mtu": 1450 while
+// FELIX_*MTU is 1500 (or calico-windows-config-actual drifts on CNI_MTU / IP),
+// Excluder.Ensure reconciles both the site Calico and the Windows BGP ConfigMap
+// before copying the pod template into calico-node-tunnel.
+func TestEnsureAutomaticallyAlignsCalicoMTUAndWindowsBGPConfigMap(t *testing.T) {
+	ctx := context.Background()
+	ds := k0sCalicoNode(t)
+	for i := range ds.Spec.Template.Spec.Containers {
+		if ds.Spec.Template.Spec.Containers[i].Name != "calico-node" {
+			continue
+		}
+		for j := range ds.Spec.Template.Spec.Containers[i].Env {
+			switch ds.Spec.Template.Spec.Containers[i].Env[j].Name {
+			case "FELIX_IPINIPMTU", "FELIX_VXLANMTU", "FELIX_WIREGUARDMTU":
+				ds.Spec.Template.Spec.Containers[i].Env[j].Value = "1500"
+			}
+		}
+	}
+	winCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "kube-system", Name: "calico-windows-config-actual"},
+		Data: map[string]string{
+			"CALICO_NETWORKING_BACKEND": "windows-bgp",
+			"IP_AUTODETECTION_METHOD":   "cidr=192.168.10.0/24",
+			"CNI_MTU":                   "1450",
+			"FELIX_MTU":                 "1450",
+		},
+	}
+	winDS := k0sCalicoNodeWindows(t)
+	e, c := excluder(t, ds, winCM, winDS)
+	for _, name := range []string{"calico-node", "calico-node-windows"} {
+		if err := e.Ensure(ctx, get(t, c, "kube-system", name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, dsName := range []string{"calico-node", "calico-node-tunnel"} {
+		gotDS := get(t, c, "kube-system", dsName)
+		changed, effMTU, _, err := AlignLinuxCalicoMTU(gotDS.DeepCopy(), 0)
+		if err != nil {
+			t.Fatalf("%s: AlignLinuxCalicoMTU: %v", dsName, err)
+		}
+		if changed || effMTU != 1500 {
+			t.Fatalf("%s: expected already-aligned effectiveMTU=1500, got changed=%v effectiveMTU=%d", dsName, changed, effMTU)
+		}
+	}
+
+	var gotCM corev1.ConfigMap
+	if err := c.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "calico-windows-config-actual"}, &gotCM); err != nil {
+		t.Fatal(err)
+	}
+	if gotCM.Data["CNI_MTU"] != "1500" || gotCM.Data["FELIX_MTU"] != "1500" || gotCM.Data["IP"] != "autodetect" || gotCM.Data["CALICO_DSR_DISABLE"] != "true" {
+		t.Fatalf("unexpected calico-windows-config-actual data: %+v", gotCM.Data)
+	}
+}

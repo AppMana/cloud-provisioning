@@ -66,6 +66,12 @@ func TestBGPDualStackReproducesTheDeployedNetwork(t *testing.T) {
 	if verifyBGPDualStackConfig(changed, d, d.Topology.MustNode("cp")) == nil {
 		t.Fatal("reuse accepted a different Calico overlay")
 	}
+	written.Spec.Network.Calico.Overlay = "Never"
+	written.Spec.ControllerManager = nil
+	missingCM, _ := yaml.Marshal(written)
+	if verifyBGPDualStackConfig(missingCM, d, d.Topology.MustNode("cp")) == nil {
+		t.Fatal("reuse accepted a site without allocate-node-cidrs=false")
+	}
 }
 
 func TestBGPDualStackInstallsLikeTheDeployment(t *testing.T) {

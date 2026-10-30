@@ -42,10 +42,10 @@ type Ingress struct {
 	Scope   Scope
 }
 type ingressRule struct {
-	SecurityGroupRuleId, GroupId, GroupOwnerId, IpProtocol, CidrIpv4 string
-	IsEgress                                                         bool
-	FromPort, ToPort                                                 int
-	Tags                                                             []struct{ Key, Value string }
+	SecurityGroupRuleId, GroupId, GroupOwnerId, IpProtocol, CidrIpv4, CidrIpv6 string
+	IsEgress                                                                   bool
+	FromPort, ToPort                                                           int
+	Tags                                                                       []struct{ Key, Value string }
 }
 
 func (t IngressTarget) protocol() string {
@@ -55,13 +55,25 @@ func (t IngressTarget) protocol() string {
 	return t.Protocol
 }
 
+func isValidIngressSource(t IngressTarget) bool {
+	if !t.Source.IsValid() || t.Source.Addr().Is4In6() || t.Source.Addr().IsLoopback() {
+		return false
+	}
+	if t.Source.Addr().Is4() && t.Source.Bits() == 32 && t.Source.Addr().IsGlobalUnicast() {
+		return true
+	}
+	// Public HTTP/HTTPS ingress (0.0.0.0/0 or ::/0) is permitted only for
+	// explicit TCP ports 80 and 443 on internet-facing ingress worker groups.
+	return t.protocol() == "tcp" && (t.Port == 80 || t.Port == 443) && t.Source.Bits() == 0 && t.Source.Addr().IsUnspecified()
+}
+
 func (r *Ingress) key(t IngressTarget) string {
 	return fmt.Sprintf("%s/%s/%s/%s/%d/%s", r.Scope.Account, r.Scope.Region, t.GroupID, t.protocol(), t.Port, t.Source)
 }
 func (r *Ingress) observe(ctx context.Context, t IngressTarget, acquire bool) ([]ingressRule, error) {
 	s := r.Scope
-	if r.API == nil || r.Journal == nil || s.Account == "" || s.Region == "" || s.VPCID == "" || s.OwnerTag == "" || s.OwnerValue == "" || s.OwnerTag == ingressOwnerTag || t.GroupID == "" || !t.Source.IsValid() || !t.Source.Addr().Is4() || t.Source.Bits() != 32 || !t.Source.Addr().IsGlobalUnicast() || t.Source.Addr().IsLoopback() || t.Port == 0 || (t.protocol() != "udp" && t.protocol() != "tcp") {
-		return nil, fmt.Errorf("ingress requires owned scope and an explicit IPv4 TCP/UDP host permission")
+	if r.API == nil || r.Journal == nil || s.Account == "" || s.Region == "" || s.VPCID == "" || s.OwnerTag == "" || s.OwnerValue == "" || s.OwnerTag == ingressOwnerTag || t.GroupID == "" || !isValidIngressSource(t) || t.Port == 0 || (t.protocol() != "udp" && t.protocol() != "tcp") {
+		return nil, fmt.Errorf("ingress requires owned scope and an explicit TCP/UDP permission")
 	}
 	raw, err := r.API.Call(ctx, "ec2", "describe-security-groups", map[string]any{"Filters": []map[string]any{{"Name": "group-id", "Values": []string{t.GroupID}}}})
 	if err != nil {
@@ -134,7 +146,11 @@ func matchesIngress(rule ingressRule, t IngressTarget) bool {
 	if protocol == "tcp" {
 		number = "6"
 	}
-	return !rule.IsEgress && (rule.IpProtocol == protocol || rule.IpProtocol == number) && rule.FromPort == int(t.Port) && rule.ToPort == int(t.Port) && rule.CidrIpv4 == t.Source.String()
+	cidrMatch := rule.CidrIpv4 == t.Source.String() && rule.CidrIpv6 == ""
+	if t.Source.Addr().Is6() {
+		cidrMatch = rule.CidrIpv6 == t.Source.String() && rule.CidrIpv4 == ""
+	}
+	return !rule.IsEgress && (rule.IpProtocol == protocol || rule.IpProtocol == number) && rule.FromPort == int(t.Port) && rule.ToPort == int(t.Port) && cidrMatch
 }
 func (r *Ingress) ownedRule(rules []ingressRule, record *IngressRecord) (*ingressRule, error) {
 	if record.Token == "" {
@@ -253,7 +269,13 @@ func (r *Ingress) Acquire(ctx context.Context, lease string, t IngressTarget) (b
 				return false, fmt.Errorf("ingress repair intent missing")
 			}
 		}
-		_, createErr := r.API.Call(ctx, "ec2", "authorize-security-group-ingress", map[string]any{"GroupId": t.GroupID, "IpPermissions": []map[string]any{{"IpProtocol": t.protocol(), "FromPort": int(t.Port), "ToPort": int(t.Port), "IpRanges": []map[string]any{{"CidrIp": t.Source.String()}}}}, "TagSpecifications": []map[string]any{{"ResourceType": "security-group-rule", "Tags": []map[string]any{{"Key": ingressOwnerTag, "Value": old.Token}, {"Key": r.Scope.OwnerTag, "Value": r.Scope.OwnerValue}}}}})
+		perm := map[string]any{"IpProtocol": t.protocol(), "FromPort": int(t.Port), "ToPort": int(t.Port)}
+		if t.Source.Addr().Is6() {
+			perm["Ipv6Ranges"] = []map[string]any{{"CidrIpv6": t.Source.String()}}
+		} else {
+			perm["IpRanges"] = []map[string]any{{"CidrIp": t.Source.String()}}
+		}
+		_, createErr := r.API.Call(ctx, "ec2", "authorize-security-group-ingress", map[string]any{"GroupId": t.GroupID, "IpPermissions": []map[string]any{perm}, "TagSpecifications": []map[string]any{{"ResourceType": "security-group-rule", "Tags": []map[string]any{{"Key": ingressOwnerTag, "Value": old.Token}, {"Key": r.Scope.OwnerTag, "Value": r.Scope.OwnerValue}}}}})
 		rules, err = r.observe(ctx, t, true)
 		if err != nil {
 			return false, err

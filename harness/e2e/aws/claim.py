@@ -18,6 +18,7 @@ p.add_argument('--machine-template', help='new immutable template name; defaults
 p.add_argument('--api-server', required=True)
 p.add_argument('--bastion', default='clab-cldt-bastion')
 p.add_argument('--instance-type')
+p.add_argument('--profile', choices=['worker', 'ingress'], default='worker', help='worker sizing profile; ingress selects low-cost t4g.small (arm64) / t3.small (x86_64) with 20 GiB gp3 root volume')
 p.add_argument('--linux-image-id', help='explicit authorized Linux image; leaves the run default unchanged')
 p.add_argument('--variant', choices=['cpu','gpu'], default='cpu', help='Windows image variant; GPU requires an explicit instance type')
 p.add_argument('--root-volume-gib', type=int)
@@ -41,7 +42,11 @@ if ipv6:
             raise ValueError('subnet must be a /64 inside the recorded VPC range')
     except (KeyError, ValueError) as error:
         p.error('incomplete or invalid dual-stack infrastructure: ' + str(error))
-a.instance_type = a.instance_type or ('m6g.large' if not a.windows_version and s.get('architecture') == 'arm64' else 't3.large')
+if a.profile == 'ingress' and not a.windows_version:
+    default_instance = 't4g.small' if s.get('architecture') == 'arm64' else 't3.small'
+else:
+    default_instance = 'm6g.large' if not a.windows_version and s.get('architecture') == 'arm64' else 't3.large'
+a.instance_type = a.instance_type or default_instance
 if a.windows_version:
     image = s.get('windowsGpuImageBuilds' if a.variant == 'gpu' else 'windowsImageBuilds', {}).get(a.windows_version, {})
     if image.get('imageState') != 'available' or not image.get('imageID'):
@@ -68,7 +73,12 @@ else:
         p.error('This run still selects its unprepared Ubuntu base AMI; run bake.py start, capture and promote before a Linux CAPA claim')
     machine_os = 'linux'
 if a.root_volume_gib is None:
-    a.root_volume_gib = minimum_volume if a.windows_version else 40
+    if a.windows_version:
+        a.root_volume_gib = minimum_volume
+    elif a.profile == 'ingress' or a.instance_type in ('t4g.small', 't3.small'):
+        a.root_volume_gib = 20
+    else:
+        a.root_volume_gib = 40
 if a.root_volume_gib < minimum_volume:
     p.error(f'root-volume-gib must be at least {minimum_volume}')
 ns = 'cloud-provisioning'

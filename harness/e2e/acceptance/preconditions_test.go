@@ -213,3 +213,46 @@ func TestCalicoPreflightCannotQualifyAWSAllocations(t *testing.T) {
 		t.Fatal("Calico preflight claimed AWS source preservation")
 	}
 }
+
+func TestPlatformTupleChecksCatchCalicoFelixMTUDrift(t *testing.T) {
+	// With only CNI_NETWORK_CONFIG lowered to 1420 while FELIX_IPINIPMTU remains 1500,
+	// tuple-aware Preconditions catches the CNI vs Felix MTU drift.
+	c := observedCluster(t, func(ds *appsv1.DaemonSet) { setCNIMTU(ds, 1420) })
+	results, err := Preconditions(context.Background(), c, Options{
+		TunnelMTU: 1420,
+		Tuple:     "k0s + calico,bgp + aws",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := byName(results)
+	if !got["tuple"].OK || !got["calico-autodetection"].OK || !got["k0s-windows-egress"].OK {
+		t.Fatalf("expected tuple/autodetection/egress to pass: %+v", got)
+	}
+	if got["calico-mtu"].OK || !strings.Contains(got["calico-mtu"].Detail, "disagrees with FELIX_IPINIPMTU=1500") {
+		t.Fatalf("expected calico-mtu to fail on 1420 vs 1500 drift, got: %+v", got["calico-mtu"])
+	}
+
+	// Aligning FELIX_*MTU with CNI_NETWORK_CONFIG (1420) passes all checks.
+	aligned := observedCluster(t, func(ds *appsv1.DaemonSet) {
+		setCNIMTU(ds, 1420)
+		for i := range ds.Spec.Template.Spec.Containers {
+			for j := range ds.Spec.Template.Spec.Containers[i].Env {
+				switch ds.Spec.Template.Spec.Containers[i].Env[j].Name {
+				case "FELIX_IPINIPMTU", "FELIX_VXLANMTU", "FELIX_WIREGUARDMTU":
+					ds.Spec.Template.Spec.Containers[i].Env[j].Value = "1420"
+				}
+			}
+		}
+	})
+	results, err = Preconditions(context.Background(), aligned, Options{
+		TunnelMTU: 1420,
+		Tuple:     "k0s + calico,bgp + aws",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !Passed(results) {
+		t.Fatalf("expected aligned tuple preconditions to pass: %+v", results)
+	}
+}

@@ -344,7 +344,7 @@ func TestRetirementReleasePolicyAndAgentOptIn(t *testing.T) {
 func verifyReceiveReceiptAdmission(t *testing.T, original *meshReconciler, snapshot handover.Snapshot, plan tunnel.ReceiveTransitionPlan) {
 	t.Helper()
 	ctx := context.Background()
-	for _, fault := range []string{"valid", "unreserved", "cloud-command", "node-uid", "provider", "platform", "architecture", "missing-account", "missing-daemon"} {
+	for _, fault := range []string{"valid", "mixed-arch", "unreserved", "cloud-command", "node-uid", "provider", "platform", "architecture", "missing-account", "missing-daemon"} {
 		t.Run("receipt-admission-"+fault, func(t *testing.T) {
 			r := *original
 			r.dialerServiceAccount = "receipt-agent"
@@ -352,6 +352,9 @@ func verifyReceiveReceiptAdmission(t *testing.T, original *meshReconciler, snaps
 			r.dialerCloudDaemonSetName = "receipt-cloud"
 			r.dialerImage = "example.invalid/agent@sha256:" + strings.Repeat("a", 64)
 			policy := receiveReceiptPolicy{ImageIDs: map[string]string{"amd64": "sha256:" + strings.Repeat("b", 64)}}
+			if fault == "mixed-arch" {
+				policy.ImageIDs["arm64"] = "sha256:" + strings.Repeat("c", 64)
+			}
 			objects := []runtime.Object{}
 			if fault != "missing-account" {
 				objects = append(objects, &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: r.secretNamespace, Name: r.dialerServiceAccount, UID: "account"}})
@@ -366,13 +369,17 @@ func verifyReceiveReceiptAdmission(t *testing.T, original *meshReconciler, snaps
 			for _, site := range plan.Sites {
 				names = append(names, site.NodeName)
 			}
-			for _, name := range names {
+			archByUID := map[string]string{}
+			for idx, name := range names {
 				node := &corev1.Node{}
 				if err := r.reader.Get(ctx, client.ObjectKey{Name: name}, node); err != nil {
 					t.Fatal(err)
 				}
 				node.Status.NodeInfo.OperatingSystem = "linux"
 				node.Status.NodeInfo.Architecture = "amd64"
+				if fault == "mixed-arch" && (name == plan.CloudNodeName || idx > 1) {
+					node.Status.NodeInfo.Architecture = "arm64"
+				}
 				if name == plan.CloudNodeName {
 					switch fault {
 					case "node-uid":
@@ -385,6 +392,7 @@ func verifyReceiveReceiptAdmission(t *testing.T, original *meshReconciler, snaps
 						node.Status.NodeInfo.Architecture = "arm64"
 					}
 				}
+				archByUID[string(node.UID)] = node.Status.NodeInfo.Architecture
 				objects = append(objects, node)
 			}
 			uid := plan.MachineUID
@@ -397,14 +405,15 @@ func verifyReceiveReceiptAdmission(t *testing.T, original *meshReconciler, snaps
 			api := fake.NewClientset(objects...)
 			store, policies, err := r.resolveReceiveReceipts(ctx, api, policy, uid)
 			collection, collectionErr := r.resolveReceiveReceiptCollection(ctx, api, policy, uid)
-			if fault != "valid" && collectionErr == nil {
+			validFault := fault == "valid" || fault == "mixed-arch"
+			if !validFault && collectionErr == nil {
 				t.Fatal("shared endpoint bypassed source admission")
 			}
-			if fault == "valid" && (collectionErr != nil || collection.UID != string(snapshot.Metadata().UID) || len(collection.Members) == 0) {
+			if validFault && (collectionErr != nil || collection.UID != string(snapshot.Metadata().UID) || len(collection.Members) == 0) {
 				t.Fatal("shared endpoint lost handover scope", collectionErr)
 			}
 
-			if fault != "valid" {
+			if !validFault {
 				if err == nil {
 					t.Fatal("unsafe admission accepted")
 				}
@@ -421,7 +430,8 @@ func verifyReceiveReceiptAdmission(t *testing.T, original *meshReconciler, snaps
 				if uid == plan.CloudNodeUID {
 					expected = r.dialerCloudDaemonSetName
 				}
-				if p.DaemonSetName != expected || p.ServiceAccountUID != "account" || p.Image != r.dialerImage || p.ImageID != policy.ImageIDs["amd64"] || p.Audience != receiveReceiptAudience {
+				wantImageID := policy.ImageIDs[archByUID[uid]]
+				if p.DaemonSetName != expected || p.ServiceAccountUID != "account" || p.Image != r.dialerImage || p.ImageID != wantImageID || p.Audience != receiveReceiptAudience {
 					t.Fatal("policy did not use controller-owned release identity")
 				}
 			}

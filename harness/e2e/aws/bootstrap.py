@@ -13,6 +13,7 @@ p.add_argument('--region',default='us-west-2')
 p.add_argument('--base-ami-id',help='explicit Canonical base image matching the selected architecture')
 p.add_argument('--architecture',choices=['x86_64','arm64'],default='x86_64')
 p.add_argument('--ipv6', action='store_true', help='create dual-stack infrastructure for a native IPv6 pod campaign')
+p.add_argument('--public-http-ingress', action='store_true', help='authorize inbound TCP 80 and 443 for internet-facing ingress worker campaigns')
 p.add_argument('--backfill-iam', action='store_true', help='idempotently backfill or refresh IAM users, role trust, and policies on an existing run directory')
 a=p.parse_args()
 if not a.run_id.startswith('cldt-') or not all(c.isalnum() or c=='-' for c in a.run_id):
@@ -27,7 +28,8 @@ if state.get('runID')!=a.run_id:
     p.error('run-id does not match existing resources.json')
 def save():state_path.write_text(json.dumps(state,indent=2)+'\n')
 def aws(*args):
-    r=subprocess.run(['aws','--region',state.get('region',a.region),*args,'--output','json'],capture_output=True,text=True)
+    env=dict(os.environ,AWS_STS_REGIONAL_ENDPOINTS='regional')
+    r=subprocess.run(['aws','--region',state.get('region',a.region),*args,'--output','json'],capture_output=True,text=True,env=env)
     if r.returncode:raise RuntimeError(r.stderr.strip())
     return json.loads(r.stdout) if r.stdout.strip() else {}
 def remember(key,value):state[key]=value;save();return value
@@ -112,7 +114,11 @@ if a.ipv6:
         time.sleep(2)
     else:raise RuntimeError('original VPC IPv6 association is still pending; inspect recorded resources')
 aws('ec2','modify-vpc-attribute','--vpc-id',vpc,'--enable-dns-hostnames','{"Value":true}')
-az=aws('ec2','describe-availability-zones','--filters','Name=state,Values=available')['AvailabilityZones'][0]['ZoneName']
+zones=[z for z in aws('ec2','describe-availability-zones','--filters','Name=state,Values=available','Name=zone-type,Values=availability-zone')['AvailabilityZones']
+       if z.get('OptInStatus') in (None,'opt-in-not-required','opted-in')]
+if not zones:raise RuntimeError(f'no available opted-in availability zones in {a.region}')
+az=sorted(zones,key=lambda z:z['ZoneName'])[0]['ZoneName']
+remember('availabilityZone',az)
 subnet=remember('subnetID',aws('ec2','create-subnet','--vpc-id',vpc,'--cidr-block','172.29.0.0/25','--availability-zone',az,'--tag-specifications',tag_spec('subnet'),*subnet_ipv6_args)['Subnet']['SubnetId'])
 aws('ec2','modify-subnet-attribute','--subnet-id',subnet,'--map-public-ip-on-launch')
 if a.ipv6:aws('ec2','modify-subnet-attribute','--subnet-id',subnet,'--assign-ipv6-address-on-creation')
@@ -124,6 +130,17 @@ aws('ec2','create-route','--route-table-id',rt,'--destination-cidr-block','0.0.0
 if a.ipv6:aws('ec2','create-route','--route-table-id',rt,'--destination-ipv6-cidr-block','::/0','--gateway-id',igw)
 sg=remember('securityGroupID',aws('ec2','create-security-group','--vpc-id',vpc,'--group-name',a.run_id,'--description','Single-NIC cloud-provisioning WireGuard test workers','--tag-specifications',tag_spec('security-group'))['GroupId'])
 aws('ec2','authorize-security-group-ingress','--group-id',sg,'--ip-permissions',json.dumps([{'IpProtocol':'udp','FromPort':51820,'ToPort':51820,'IpRanges':[{'CidrIp':'0.0.0.0/0','Description':'Authenticated WireGuard transport'}]}]))
+if a.public_http_ingress:
+    ingress_tags=tags+[{'Key':'cloud-provisioning.appmana.com/ingress-owner','Value':a.run_id+'-public-http'}]
+    http_perms=[]
+    for port in (80,443):
+        perm={'IpProtocol':'tcp','FromPort':port,'ToPort':port,'IpRanges':[{'CidrIp':'0.0.0.0/0','Description':f'Public HTTP/HTTPS ingress {port}'}]}
+        if a.ipv6:
+            perm['Ipv6Ranges']=[{'CidrIpv6':'::/0','Description':f'Public IPv6 HTTP/HTTPS ingress {port}'}]
+        http_perms.append(perm)
+    resp=aws('ec2','authorize-security-group-ingress','--group-id',sg,'--ip-permissions',json.dumps(http_perms),
+             '--tag-specifications',json.dumps([{'ResourceType':'security-group-rule','Tags':ingress_tags}]))
+    remember('publicHTTPIngressRuleIDs',[r['SecurityGroupRuleId'] for r in resp.get('SecurityGroupRules',[])])
 node_role=a.run_id+'-node';capa_role=a.run_id+'-capa'
 def role(name,principal):
     trust={'Version':'2012-10-17','Statement':[{'Effect':'Allow','Principal':principal,'Action':'sts:AssumeRole'}]}

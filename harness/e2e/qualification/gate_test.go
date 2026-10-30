@@ -203,3 +203,29 @@ func TestRecoveryScope(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestIngressQualificationRowSupportsSingleWorkerProfile(t *testing.T) {
+	e := complete()
+	ingressRows := 0
+	for i := range e.Rows {
+		if strings.HasSuffix(e.Rows[i].ID, "/ingress") {
+			ingressRows++
+			e.Rows[i].Workers = 1
+		}
+	}
+	if ingressRows != 4 {
+		t.Fatalf("expected 4 ingress rows across both sites and families, got %d", ingressRows)
+	}
+	if got := Check(e); len(got) != 0 {
+		t.Fatalf("expected single-worker ingress campaign to pass qualification gate, got %v", got)
+	}
+	for i := range e.Rows {
+		if strings.HasSuffix(e.Rows[i].ID, "/ingress") {
+			e.Rows[i].Workers = 0
+			break
+		}
+	}
+	if got := Check(e); len(got) == 0 {
+		t.Fatal("expected zero-worker ingress row to fail qualification gate")
+	}
+}

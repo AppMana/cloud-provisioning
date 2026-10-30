@@ -240,6 +240,65 @@ func TestTheTunnelClampsEachFamilysSegmentSizeAgainstTheKernel(t *testing.T) {
 			t.Errorf("family %d: a 1300-byte sender settled on segment size %d, want its own %d", family, got, want)
 		}
 	}
+
+	// Restore near leaf MTU to 1450 (k0s default Calico CNI MTU) and set the
+	// router's tunnel-facing interface to 1420. A 1405-byte UDP payload
+	// (1433-byte IPv4 packet, inside (1420, 1450]) leaves the near leaf with
+	// DF=1 and must still cross the 1420-byte tunnel on the first datagram
+	// without being dropped by ip_exceeds_mtu.
+	inNamespace(t, rig.near, router, func() {
+		leaf, err := netlink.LinkByName("leaf0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := netlink.LinkSetMTU(leaf, 1450); err != nil {
+			t.Fatal(err)
+		}
+	})
+	tunLink, err := netlink.LinkByName("cldttest1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := netlink.LinkSetMTU(tunLink, mtu); err != nil {
+		t.Fatal(err)
+	}
+	udpAddr := net.JoinHostPort(rig.farAddr[netlink.FAMILY_V4].String(), "8082")
+	var udpServer net.PacketConn
+	inNamespace(t, rig.far, router, func() {
+		udpServer, err = net.ListenPacket("udp4", udpAddr)
+	})
+	if err != nil {
+		t.Fatalf("listening UDP on %s: %v", udpAddr, err)
+	}
+	defer udpServer.Close()
+	payload := make([]byte, 1405)
+	for i := range payload {
+		payload[i] = 'x'
+	}
+	received := make(chan int, 1)
+	go func() {
+		buf := make([]byte, 2048)
+		_ = udpServer.SetReadDeadline(time.Now().Add(3 * time.Second))
+		n, _, readErr := udpServer.ReadFrom(buf)
+		if readErr != nil {
+			received <- -1
+			return
+		}
+		received <- n
+	}()
+	inNamespace(t, rig.near, router, func() {
+		conn, dialErr := net.Dial("udp4", udpAddr)
+		if dialErr != nil {
+			t.Fatalf("dial UDP: %v", dialErr)
+		}
+		defer conn.Close()
+		if _, writeErr := conn.Write(payload); writeErr != nil {
+			t.Fatalf("write 1405B UDP from 1450-MTU leaf: %v", writeErr)
+		}
+	})
+	if got := <-received; got != len(payload) {
+		t.Fatalf("1405B UDP across 1420-MTU tunnel from 1450-MTU sender received %d bytes, want %d", got, len(payload))
+	}
 }
 
 // BGP is refused at the tunnel in both families. Calico peers every

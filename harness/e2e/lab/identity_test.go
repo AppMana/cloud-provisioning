@@ -91,3 +91,48 @@ func TestDefaultSiteNodesAreKnownByTheirLANAddress(t *testing.T) {
 		}
 	}
 }
+
+func TestIdentitySiteModelsMixedArchServiceVIPsAndRoCELinks(t *testing.T) {
+	topo, err := WithIdentities(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cp := topo.MustNode("cp")
+	if cp.NodeArch() != "amd64" {
+		t.Fatalf("cp arch = %q, want amd64", cp.NodeArch())
+	}
+	if !reflect.DeepEqual(cp.ServiceVIPs, []string{"10.19.3.240/32", "fd8f:cf26:522a::240/128"}) {
+		t.Fatalf("cp ServiceVIPs = %v", cp.ServiceVIPs)
+	}
+	if !reflect.DeepEqual(cp.IdentityDeviceAddresses(), []string{
+		"10.101.0.1/32", "fd8f:cf26:522a::1/128",
+		"10.19.3.240/32", "fd8f:cf26:522a::240/128",
+	}) {
+		t.Fatalf("cp vip0 addresses = %v", cp.IdentityDeviceAddresses())
+	}
+	// ClusterAddresses must return only the primary cluster identities, never lan_vip.
+	if !reflect.DeepEqual(cp.ClusterAddresses(), []string{"10.101.0.1", "fd8f:cf26:522a::1"}) {
+		t.Fatalf("cp ClusterAddresses = %v", cp.ClusterAddresses())
+	}
+
+	for i, name := range []string{"w1", "w2"} {
+		w := topo.MustNode(name)
+		if w.NodeArch() != "arm64" {
+			t.Fatalf("%s arch = %q, want arm64", name, w.NodeArch())
+		}
+		if len(w.ServiceVIPs) != 0 {
+			t.Fatalf("%s has unexpected ServiceVIPs %v", name, w.ServiceVIPs)
+		}
+		wantRoCE := []RoCELink{
+			{Name: "enp1s0f1np1", Address: netip.MustParsePrefix("10.255.0.0/30").Addr().Next().String() + "/30", MTU: 9978},
+			{Name: "enP2p1s0f1np1", Address: netip.MustParsePrefix("10.255.1.0/30").Addr().Next().String() + "/30", MTU: 9978},
+		}
+		if i == 1 {
+			wantRoCE[0].Address = "10.255.0.2/30"
+			wantRoCE[1].Address = "10.255.1.2/30"
+		}
+		if !reflect.DeepEqual(w.RoCELinks, wantRoCE) {
+			t.Fatalf("%s RoCELinks = %+v, want %+v", name, w.RoCELinks, wantRoCE)
+		}
+	}
+}

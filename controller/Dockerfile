@@ -4,6 +4,7 @@
 FROM gcr.io/distroless/static-debian12:nonroot AS endpoint-controller
 ARG TARGETARCH
 COPY --from=binaries /linux/${TARGETARCH}/endpoint-controller /endpoint-controller
+COPY --from=binaries /linux/${TARGETARCH}/platform-tuple /platform-tuple
 # join.Reconciler's default --join-template-path; the join-pattern
 # templates are versioned alongside this Dockerfile's own repo, not a
 # separate distribution mechanism.

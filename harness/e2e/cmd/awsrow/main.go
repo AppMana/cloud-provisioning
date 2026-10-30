@@ -53,6 +53,7 @@ func run() error {
 	k0sVersion := flag.String("k0s-version", k0s.Version, "expected k0s version on the existing site")
 	k0sBinarySHA256 := flag.String("k0s-binary-sha256", "", "expected k0s binary SHA256 on every site node; required for a fork")
 	k0sSourceRevision := flag.String("k0s-source-revision", "", "full source commit for the existing site's k0s fork build")
+	verifyIngress := flag.Bool("verify-ingress", false, "verify public HTTP/HTTPS ingress on the cloud worker across the WireGuard tunnel to a site backend pod")
 	flag.Parse()
 	if *podFamily != "" && *podFamily != "IPv4" && *podFamily != "IPv6" {
 		return fmt.Errorf("pod-family must be IPv4 or IPv6")
@@ -441,6 +442,23 @@ func run() error {
 	}
 	if !matrix.OK() {
 		return fmt.Errorf("AWS matrix failed; evidence in %s", reportDir)
+	}
+	if *verifyIngress {
+		var siteNodeNames []string
+		for _, n := range cluster.SiteNodes(topo) {
+			siteNodeNames = append(siteNodeNames, n.Name)
+		}
+		cloudNode := bindings[0]["node"].(string)
+		ingressReport, err := check.VerifyLiveClusterIngress(ctx, k, pods.Namespace, cloudNode, siteNodeNames)
+		if ingressReport != nil {
+			rawIngress, _ := json.MarshalIndent(ingressReport, "", "  ")
+			if writeErr := os.WriteFile(filepath.Join(reportDir, "ingress.json"), rawIngress, 0600); writeErr != nil {
+				return writeErr
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("AWS ingress check failed: %w", err)
+		}
 	}
 	fmt.Println("AWS matrix passed; evidence in", reportDir)
 	return nil

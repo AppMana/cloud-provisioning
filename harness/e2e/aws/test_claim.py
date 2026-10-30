@@ -9,11 +9,11 @@ import unittest
 SCRIPT = pathlib.Path(__file__).with_name('claim.py')
 
 class ClaimTest(unittest.TestCase):
-    def run_claim(self, version=None, image_state='available', volume=None, unprepared=False, gpu=False, instance_type=None, machine_template=None, cache=None, linux_image=None, authorized=True, architecture='x86_64', ipv6=None):
+    def run_claim(self, version=None, image_state='available', volume=None, unprepared=False, gpu=False, instance_type=None, machine_template=None, cache=None, linux_image=None, authorized=True, architecture='x86_64', ipv6=None, region='us-west-2', profile=None):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         root = pathlib.Path(temp.name)
-        state = dict(architecture=architecture, runID='test-run', region='us-west-2', vpcID='vpc-owned',
+        state = dict(architecture=architecture, runID='test-run', region=region, vpcID='vpc-owned',
                      subnetID='subnet-owned', securityGroupID='sg-owned',
                      instanceProfileName='profile', amiID='ami-linux',
                      windowsImageBuilds={year: dict(imageID='ami-'+year, imageState=image_state)
@@ -41,6 +41,7 @@ if 'apply' in sys.argv:
         if version: args += ['--windows-version', version]
         if gpu: args += ['--variant','gpu']
         if instance_type: args += ['--instance-type',instance_type]
+        if profile: args += ['--profile', profile]
         if machine_template: args += ['--machine-template',machine_template]
         if volume is not None: args += ['--root-volume-gib', str(volume)]
         result = subprocess.run(args, capture_output=True, text=True,
@@ -219,5 +220,20 @@ if 'apply' in sys.argv:
                 result,objects=self.run_claim(gpu=True,**kw)
                 self.assertNotEqual(result.returncode,0)
                 self.assertEqual(objects,[])
+
+    def test_hong_kong_ap_east_1_t4g_small_ingress_profile(self):
+        for kw, want_type, want_vol in [
+            (dict(region='ap-east-1', architecture='arm64', profile='ingress'), 't4g.small', 20),
+            (dict(region='ap-east-1', architecture='arm64', instance_type='t4g.small'), 't4g.small', 20),
+            (dict(region='ap-east-1', architecture='x86_64', profile='ingress'), 't3.small', 20),
+        ]:
+            with self.subTest(kw=kw):
+                result, objects = self.run_claim(**kw)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                aws_cluster = next(o for o in objects if o['kind'] == 'AWSCluster')
+                self.assertEqual(aws_cluster['spec']['region'], 'ap-east-1')
+                template = next(o for o in objects if o['kind'] == 'AWSMachineTemplate')['spec']['template']['spec']
+                self.assertEqual(template['instanceType'], want_type)
+                self.assertEqual(template['rootVolume'], {'size': want_vol, 'type': 'gp3', 'encrypted': True})
 
 if __name__ == '__main__': unittest.main()

@@ -60,6 +60,17 @@ class RenderValuesTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'protected cloud range'):
             subject.render_values(state(), URLS, BINARIES, [])
 
+    def test_hong_kong_ap_east_1_region_renders_without_us_west_2_assumptions(self):
+        hk_ctrl = '123.dkr.ecr.ap-east-1.amazonaws.com/cldt-hk/endpoint-controller@' + DIGEST
+        hk_dialer = '123.dkr.ecr.ap-east-1.amazonaws.com/cldt-hk/linux-dialer@sha256:' + 'b' * 64
+        values = subject.render_values(
+            state(region='ap-east-1', linuxControllerImage=hk_ctrl, linuxDialerImage=hk_dialer),
+            URLS, BINARIES, ['172.29.0.0/25'])
+        self.assertEqual(values['artifactRegion'], 'ap-east-1')
+        self.assertEqual(values['image']['repository'], '123.dkr.ecr.ap-east-1.amazonaws.com/cldt-hk/endpoint-controller')
+        self.assertEqual(values['tunnel']['receivePreparation']['journal']['receipts']['imageIDs'],
+                         {'amd64': hk_dialer, 'arm64': hk_dialer})
+
 
 class ControllerCredentials(unittest.TestCase):
     def test_the_secret_holds_exactly_the_sdk_keys(self):

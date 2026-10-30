@@ -182,7 +182,7 @@ def main():
         'bootstrapInstalled':any(v['installed'] for v in g.get('meshes',[])),
         'capiAssociation':n.get('associationMatches',False),
         'windowsNode':n.get('labels',{}).get('kubernetes.io/os')=='windows',
-        'matchesSiteKubelet':len(site_versions)==1 and n.get('nodeInfo',{}).get('kubeletVersion')==site_versions[0],
+        'matchesSiteKubelet':len(site_versions)==1 and n.get('nodeInfo',{}).get('kubeletVersion','').split('+',1)[0]==site_versions[0].split('+',1)[0],
         'containerd2':n.get('nodeInfo',{}).get('containerRuntimeVersion','').startswith('containerd://2.'),
         'cloudWorkerLabel':n.get('labels',{}).get('cloud-provisioning.appmana.com/role')=='cloud-worker',
         'internetFacingTaint':any(v.get('key')=='cloud-provisioning.appmana.com/internet-facing' and v.get('effect')=='NoSchedule' for v in n.get('taints',[])),

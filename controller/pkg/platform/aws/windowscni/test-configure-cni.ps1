@@ -4,7 +4,7 @@ Set-StrictMode -Version Latest
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'configure-cni.ps1'),[ref]$tokens,[ref]$errors)
 if ($errors.Count) { throw 'CNI initializer has parse errors' }
-foreach ($name in @('IPv4','Prefix','Contains','HostRoutes','PodMTU')) {
+foreach ($name in @('IPv4','Prefix','Contains','PrefixRange','MatchesAnyPrefix','HostRoutes','PodMTU')) {
     $definition=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$false)
     if (!$definition) { throw 'Input guard missing' }
     . ([ScriptBlock]::Create($definition.Extent.Text))
@@ -56,3 +56,12 @@ foreach ($case in @(@(1420,1370),@(1279,1370),@(-1,1370),@(65536,65536),@('1370'
     if (!$rejected) { throw 'Unsafe pod MTU accepted' }
 }
 Write-Output 'Pod MTU bounds and tunnel budget checks passed'
+$r16=PrefixRange (Prefix '10.244.0.0/16')
+if ($r16.start -cne '10.244.0.0' -or $r16.end -cne '10.244.255.255') { throw 'Incorrect /16 prefix range' }
+$r32=PrefixRange (Prefix '10.10.0.10/32')
+if ($r32.start -cne '10.10.0.10' -or $r32.end -cne '10.10.0.10') { throw 'Incorrect /32 prefix range' }
+$prefixes=@((Prefix '10.244.0.0/16'),(Prefix '10.10.0.0/24'))
+if (!(MatchesAnyPrefix $prefixes '10.244.190.93') -or !(MatchesAnyPrefix $prefixes '10.10.0.10') -or (MatchesAnyPrefix $prefixes '172.29.0.122')) {
+    throw 'Incorrect site prefix matching'
+}
+Write-Output 'Site prefix range and VFP mapping match checks passed'

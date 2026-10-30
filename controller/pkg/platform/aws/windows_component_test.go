@@ -85,6 +85,9 @@ func TestWindowsCNISettingsComeFromTheSite(t *testing.T) {
 	if volumes["scripts"] != scripts.Name || volumes["settings"] != settings.Name {
 		t.Fatalf("volumes %v", volumes)
 	}
+	if len(ds.Spec.Template.Spec.Containers) != 1 || !slices.Contains(ds.Spec.Template.Spec.Containers[0].Args, "-Reconcile") {
+		t.Fatalf("installed container args: %v", ds.Spec.Template.Spec.Containers)
+	}
 }
 
 // What the plugin cannot be configured from is refused.

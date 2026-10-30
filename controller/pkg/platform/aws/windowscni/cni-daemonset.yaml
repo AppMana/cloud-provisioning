@@ -47,7 +47,15 @@ spec:
       containers:
         - name: installed
           image: mcr.microsoft.com/oss/kubernetes/windows-host-process-containers-base-image:v1.0.0@sha256:b4c9637e032f667c52d1eccfa31ad8c63f1b035e8639f3f48a510536bf34032b
-          command: ['C:\Windows\System32\ping.exe', '-t', '127.0.0.1']
+          command: ['C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe']
+          args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', 'C:\aws-cni\configure-cni.ps1', '-Settings', 'C:\aws-cni-settings\settings.json', '-Reconcile']
+          volumeMounts:
+            - name: scripts
+              mountPath: 'C:\aws-cni'
+              readOnly: true
+            - name: settings
+              mountPath: 'C:\aws-cni-settings'
+              readOnly: true
       volumes:
         - name: scripts
           configMap:
